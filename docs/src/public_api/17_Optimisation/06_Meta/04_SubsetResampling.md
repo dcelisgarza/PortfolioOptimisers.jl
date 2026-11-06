@@ -1,11 +1,12 @@
 ```@meta
-Description = "Subset resampling, public API of PortfolioOptimisers.jl: SubsetResamplingResult, SubsetResampling, factory, port_opt_view, optimise, needs_previous_weights."
+Description = "Subset resampling, public API of PortfolioOptimisers.jl: SubsetResamplingResult, PowerSubsetSize, SubsetResampling, factory, port_opt_view, optimise, …"
 ```
 
 # Subset resampling
 
 ```@docs
 SubsetResamplingResult
+PowerSubsetSize
 SubsetResampling
 factory(sr::SubsetResamplingResult, fb::Option{<:OptE_Opt_FbChain})
 factory(sr::SubsetResampling, w::AbstractVector)

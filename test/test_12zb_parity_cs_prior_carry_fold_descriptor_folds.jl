@@ -78,7 +78,7 @@ end
 # A test-local target that fits as a `LinearModel` and keeps the default answer of
 # `is_basis_invariant`, so a move of the dropped member under it fits every observation again
 # (#1614).
-struct BasisBoundTarget <: PortfolioOptimisers.AbstractRegressionTarget end
+struct BasisBoundTarget <: PortfolioOptimisers.AbstractUnpenalisedRegressionTarget end
 function PortfolioOptimisers.factory(::BasisBoundTarget, w::PortfolioOptimisers.ObsWeights)
     return factory(LinearModel(), w)
 end
@@ -630,6 +630,18 @@ end
                        message(() -> po.EWDownsideBetaState(; cd = [0.0, 0.0], n = [0],
                                                             vd = 0.0, t = 0)))
         @test po.show_fields(EWDownsideBeta()) == (:mcap, :decay, :min_obs, :mar, :min_val)
+        # Two states of the macro sensitivity do not merge: the second block starts from the first.
+        @test isa(m.st, po.EWMacroSensitivityState)
+        @test occursin("an EWMacroSensitivityState cannot merge",
+                       message(() -> po.merge_states(m.st, copy(m.st))))
+        # A carried Descriptor pads the rows before its own with `NaN`, keeps them when they fill the returns.
+        Nd = length(rd.nx)
+        carried = po.CarriedDescriptor(ones(2, Nd))
+        padded = descriptor(carried, rows(rd, 1:5))
+        @test size(padded) == (5, Nd)
+        @test all(isnan, padded[1:3, :]) && padded[4:5, :] == ones(2, Nd)
+        @test descriptor(carried, rows(rd, 1:2)) == ones(2, Nd)
+        @test_throws DimensionMismatch descriptor(carried, rows(rd, 1:1))
         # On the carry fold each Descriptor counts as one row, so the carry keeps the rows of
         # the lag alone, and the exposures of every step equal those of the batch fit.
         ewb = ["market" => ConstantExposure(),

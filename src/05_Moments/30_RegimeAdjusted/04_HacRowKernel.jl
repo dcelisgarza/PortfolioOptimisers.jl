@@ -9,7 +9,7 @@ Without a HAC adjustment there is no lag.
 
 # Arguments
 
-  - `hac_lags::Option{<:Union{<:Integer, <:VecNum}}`: Count of HAC lags, the weight of each lag, or
+  - `hac_lags::Option{<:Union{Integer, VecNum}}`: Count of HAC lags, the weight of each lag, or
     `nothing`.
   - `o::Number`: A number whose type the Bartlett weights take.
 
@@ -194,7 +194,7 @@ and then rises, and the integral stops at the minimum with half weight, as
 
 # Returns
 
-  - `(m, e)::Tuple{<:VecNum, <:Number}`: ``\\mathbb{E}[x_{a} x_{c} / Q]`` for each ``a`` on the
+  - `(m, e)::Tuple{VecNum, Number}`: ``\\mathbb{E}[x_{a} x_{c} / Q]`` for each ``a`` on the
     first rows, and ``\\mathbb{E}[1 / Q]``.
 
 # Related
@@ -344,7 +344,7 @@ before its update, else `ce.hac_lags`. The kernel is made the first time the sta
 
 # Returns
 
-  - `hac::Option{<:Union{<:Integer, <:VecNum}}`: The kernel, or `ce.hac_lags`.
+  - `hac::Option{<:Union{Integer, VecNum}}`: The kernel, or `ce.hac_lags`.
 
 # Related
 
@@ -365,4 +365,38 @@ function correlation_hac_lags!(store::NamedTuple, ce::RegimeAdjustedExpWeightedC
     end
 
     return store.kernel
+end
+"""
+$(DocStringExtensions.TYPEDSIGNATURES)
+
+Forms the Laplace transform of a HAC estimate on the grid, cut at its minimum.
+
+Where the weight matrix is positive definite, ``G`` falls on the whole grid and nothing is cut.
+Where it is not, ``G`` falls to a minimum and then rises to the first zero of the determinant,
+where the negative part of the estimate rules the transform. The transform is cut at the minimum,
+and the last point takes the weight one half of a closed trapezoid, so the error of the cut is of
+the second order in the step.
+
+# Arguments
+
+  - `G::VecNum`: Transform on the grid (mutated).
+  - `lG::VecNum`: ``\\ln G`` on the grid, ``-\\infty`` past the first zero of the determinant.
+
+# Returns
+
+  - `G::VecNum`: The cut transform.
+
+# Related
+
+  - [`regime_bias_table`](@ref)
+"""
+function hac_laplace!(G::VecNum, lG::VecNum)
+    i = argmin(j -> isinf(lG[j]) ? typemax(eltype(lG)) : lG[j], eachindex(lG))
+    G .= exp.(lG)
+    if i < lastindex(G)
+        G[i] /= 2
+        G[(i + 1):end] .= zero(eltype(G))
+    end
+
+    return G
 end

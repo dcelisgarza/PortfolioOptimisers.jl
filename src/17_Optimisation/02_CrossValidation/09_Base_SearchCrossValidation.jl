@@ -19,30 +19,21 @@ Abstract result type for search-based cross-validation routines. Serves as the p
 
 # Interfaces
 
-  - Subtypes must store the optimal estimator, test and train scores, parameter grid, and selected index.
+  - Subtypes must store the optimal estimator `opt`, the score matrices `test_scores` and `train_scores`, the parameter grid `lens_grid` and `val_grid`, and the selected index `idx`.
+  - Subtypes must store the kept candidates in rank order, `ranked`, with their columns `rank_idx` and their scorer values `rank_scores`, and the path of each row of the score matrix, `path_ids`. `opt` is `ranked[1]`, and `idx` is `rank_idx[1]`.
 """
 abstract type AbstractSearchCrossValidationResult <: AbstractResult end
 """
 $(DocStringExtensions.TYPEDEF)
 
-Abstract supertype for all search-based cross-validation algorithm types.
-
-Subtypes define the strategy used to select the best hyperparameter combination from the search results (e.g. selecting by highest mean score).
-
-# Related
-
-  - [`AbstractSearchCrossValidationEstimator`](@ref)
-  - [`SearchCrossValidationResult`](@ref)
-"""
-abstract type AbstractSearchCrossValidationAlgorithm <: AbstractAlgorithm end
-"""
-$(DocStringExtensions.TYPEDEF)
-
 Defines the interface for scoring strategies used in search cross-validation. Implementations select the optimal parameter set based on cross-validation scores.
+
+It is the branch of [`AbstractCrossValidationScorer`](@ref) that selects a candidate of a search. Its sibling [`PredictionScorer`](@ref) selects a path of a cross-validation.
 
 # Interfaces
 
-  - `(::CrossValidationSearchScorer)(scores::AbstractMatrix)`: Returns the index of the optimal parameter set — the column with the best (highest) aggregate score.
+  - [`candidate_scores`](@ref)`(::CrossValidationSearchScorer, scores::AbstractMatrix)`: Returns one value per column of `scores`, bigger is better. The search orders the candidates by this value, so it can keep the `n_best` best ones. A subtype that defines no method gives `nothing`, and the search then calls the index form below and keeps one candidate.
+  - `(::CrossValidationSearchScorer)(scores::AbstractMatrix)`: Returns the index of the optimal parameter set, the column with the best (highest) aggregate score. It must equal `argmax` of `candidate_scores` when the subtype defines both.
 
 ## Arguments
 
@@ -50,23 +41,33 @@ Defines the interface for scoring strategies used in search cross-validation. Im
 
 ## Returns
 
-  - `Int`: Index of the optimal parameter set, **as a position in the matrix the scorer received**.
+  - `candidate_scores`: `VecNum`, one value per column of the matrix the scorer received, in the order of the columns.
+  - The index form: `Int`, the index of the optimal parameter set, **as a position in the matrix the scorer received**.
 
 ## A scorer never sees a failed candidate
 
-`finite_candidate_index` hands the scorer the columns whose every entry is finite, and maps the index back to the parameter grid itself. A scorer therefore reads a matrix of finite numbers alone, and it may compute anything on it — a mean, a spread, a rank — without a candidate that failed a fold winning. The matrix a scorer receives is a *view* of the score matrix, and its column count can be smaller than the grid, so a scorer must return a position in that view and must not index the grid itself.
+The search, through `finite_candidate_order`, hands the scorer the columns whose every entry is finite, and maps the order back to the parameter grid itself. A scorer therefore reads a matrix of finite numbers alone, and it may compute anything on it, such as a mean, a spread or a rank, and a candidate that failed a fold cannot win. The matrix a scorer receives is a *view* of the score matrix, and its column count can be smaller than the grid. So a scorer must return values or a position in that view, and must not index the grid itself.
 
 # Examples
 
 ```jldoctest
 julia> struct MyScore <: PortfolioOptimisers.CrossValidationSearchScorer end
 
-julia> (s::MyScore)(X::Matrix{Float64}) = argmax(dropdims(mean(X; dims = 1); dims = 1))
+julia> function PortfolioOptimisers.candidate_scores(::MyScore, X::AbstractMatrix)
+           return vec(minimum(X; dims = 1))
+       end
+
+julia> (s::MyScore)(X::AbstractMatrix) = argmax(PortfolioOptimisers.candidate_scores(s, X))
 
 julia> scores = [0.5 0.6; 0.7 0.8];
 
 julia> scorer = MyScore()
 MyScore()
+
+julia> PortfolioOptimisers.candidate_scores(scorer, scores)
+2-element Vector{Float64}:
+ 0.5
+ 0.6
 
 julia> scorer(scores)
 2
@@ -74,17 +75,95 @@ julia> scorer(scores)
 
 # Related
 
+  - [`AbstractCrossValidationScorer`](@ref)
   - [`CrossValSearchScorer`](@ref)
   - [`HighestMeanScore`](@ref)
+  - [`candidate_scores`](@ref)
   - [`AbstractSearchCrossValidationEstimator`](@ref)
 """
-abstract type CrossValidationSearchScorer <: AbstractEstimator end
+abstract type CrossValidationSearchScorer <: AbstractCrossValidationScorer end
 """
-    const CrossValSearchScorer = Union{<:CrossValidationSearchScorer, <:Function}
+    const CrossValSearchScorer = Union{CrossValidationSearchScorer, Function}
 
 Union type for search cross-validation scoring strategies. Accepts either a subtype of `CrossValidationSearchScorer` or a plain function that accepts a matrix and returns an integer.
+
+A function returns one index, and one index cannot order more than one candidate. So a search with a function scorer keeps one candidate, and the search estimators refuse a function scorer with `n_best > 1`.
 """
-const CrossValSearchScorer = Union{<:CrossValidationSearchScorer, <:Function}
+const CrossValSearchScorer = Union{CrossValidationSearchScorer, Function}
+"""
+    candidate_scores(scorer::CrossValSearchScorer, X)
+    candidate_scores(scorer::HighestMeanScore, X::MatNum)
+
+Give one value per candidate of a search, bigger is better, so that the search can order the candidates.
+
+The column `j` of `X` holds the scores of candidate `j` over the rows of the scheme, signed so that a bigger score is better. The search sorts the candidates by these values, in descending order, and keeps the first `n_best`. The sort is stable, so a tie keeps the order of the grid.
+
+The method on [`CrossValSearchScorer`](@ref) is the fallback. It gives `nothing`, which states that the scorer gives no value per candidate. A function scorer, and a subtype of [`CrossValidationSearchScorer`](@ref) that defines no method, give `nothing`. The search then calls the index form of the scorer and keeps one candidate, and it refuses `n_best > 1` with an `ArgumentError`.
+
+# Arguments
+
+  - `scorer`: The search scorer.
+  - `X`: The `rows × candidates` score matrix that the scorer receives. Every entry is finite.
+
+# Returns
+
+  - `vals::Option{<:VecNum}`: One value per column of `X`, or `nothing` when the scorer gives no value per candidate.
+
+# Examples
+
+```jldoctest
+julia> PortfolioOptimisers.candidate_scores(HighestMeanScore(), [0.5 0.75 0.25; 1.0 0.5 0.25])
+3-element Vector{Float64}:
+ 0.75
+ 0.625
+ 0.25
+```
+
+# Related
+
+  - [`CrossValidationSearchScorer`](@ref)
+  - [`HighestMeanScore`](@ref)
+  - [`finite_candidate_order`](@ref)
+  - [`SearchCrossValidationResult`](@ref)
+"""
+function candidate_scores(::CrossValSearchScorer, ::Any)
+    # The second argument is untyped, so a subtype's own method on any matrix type is more
+    # specific in both arguments and never ambiguous with this fallback.
+    return nothing
+end
+"""
+    assert_search_n_best(scorer::CrossValSearchScorer, n_best::Integer)
+
+Refuse a count of kept candidates that a search estimator cannot keep, when the estimator is built.
+
+The configuration alone decides both rules, so the constructors of [`GridSearchCrossValidation`](@ref) and [`RandomisedSearchCrossValidation`](@ref) call this check. A subtype of [`CrossValidationSearchScorer`](@ref) that gives no [`candidate_scores`](@ref) is known only when the search runs, so [`finite_candidate_order`](@ref) refuses it.
+
+# Arguments
+
+  - `scorer`: The search scorer.
+  - `n_best`: The count of the candidates that the search keeps.
+
+# Validation
+
+  - `n_best > 0` and finite.
+  - If `scorer` is a function: `n_best == 1`. An `ArgumentError` says to subtype [`CrossValidationSearchScorer`](@ref) and to define [`candidate_scores`](@ref).
+
+# Returns
+
+  - `nothing`.
+
+# Related
+
+  - [`candidate_scores`](@ref)
+  - [`finite_candidate_order`](@ref)
+  - [`CrossValSearchScorer`](@ref)
+"""
+function assert_search_n_best(scorer::CrossValSearchScorer, n_best::Integer)::Nothing
+    assert_nonempty_gt0_finite_val(n_best, :n_best)
+    @argcheck(isone(n_best) || !isa(scorer, Function),
+              ArgumentError("a function scorer returns one index, and one index cannot order the n_best = $n_best best candidates of a search. Subtype `CrossValidationSearchScorer` and define `PortfolioOptimisers.candidate_scores(scorer, X)`, which returns one value per column of the score matrix, bigger is better, or set `n_best = 1`."))
+    return nothing
+end
 """
 $(DocStringExtensions.TYPEDEF)
 
@@ -101,18 +180,23 @@ $(DocStringExtensions.FIELDS)
         cv::CVE_Onl = KFold(),
         r::AbstractBaseRiskMeasure = ConditionalValueatRisk(),
         scorer::CrossValSearchScorer = HighestMeanScore(),
+        n_best::Integer = 1,
         ex::FLoops.Transducers.Executor = FLoops.ThreadedEx(),
         train_score::Bool = false,
         kwargs::NamedTuple = (;),
     ) -> GridSearchCrossValidation
 
-Positional and keyword arguments correspond to fields above.
+Positional and keyword arguments correspond to fields above. The outer constructor takes a vector of parameter sets whose types differ. Such a literal infers the element type `Vector`, so the constructor narrows it through [`narrow_mixed_vector`](@ref).
 
 ## Validation
 
   - `!isempty(p)`.
   - If `p` is a vector of parameter sets: each element must not be empty.
   - All keys in `p` must be of type `GSCVKey` (i.e. `String`, `Symbol`, or `Integer`).
+  - `n_best > 0` and finite.
+  - If `scorer` is a function: `n_best == 1`, because a function returns one index and cannot order more candidates.
+
+$(val_dict[:count_fraction_grid])
 
 # Examples
 
@@ -136,6 +220,7 @@ GridSearchCrossValidation
               │      alpha ┼ Float64: 0.05
               │          w ┴ nothing
        scorer ┼ HighestMeanScore()
+       n_best ┼ Int64: 1
            ex ┼ Transducers.ThreadedEx{@NamedTuple{}}: Transducers.ThreadedEx()
   train_score ┼ Bool: false
        kwargs ┴ @NamedTuple{}: NamedTuple()
@@ -170,6 +255,10 @@ GridSearchCrossValidation
     """
     scorer
     """
+    $(field_dict[:n_best])
+    """
+    n_best
+    """
     $(field_dict[:ex])
     """
     ex
@@ -181,15 +270,15 @@ GridSearchCrossValidation
     $(field_dict[:kwargs])
     """
     kwargs
-    function GridSearchCrossValidation(p::Union{<:AbstractVector{<:Pair{<:Any,
-                                                                        <:AbstractVector}},
-                                                <:AbstractVector{<:AbstractVector{<:Pair{<:Any,
-                                                                                         <:AbstractVector}}},
-                                                <:AbstractDict{<:Any, <:AbstractVector},
-                                                <:AbstractVector{<:AbstractDict{<:Any,
-                                                                                <:AbstractVector}}},
+    function GridSearchCrossValidation(p::Union{AbstractVector{<:Pair{<:Any,
+                                                                      <:AbstractVector}},
+                                                AbstractVector{<:AbstractVector{<:Pair{<:Any,
+                                                                                       <:AbstractVector}}},
+                                                AbstractDict{<:Any, <:AbstractVector},
+                                                AbstractVector{<:AbstractDict{<:Any,
+                                                                              <:AbstractVector}}},
                                        cv::CVE_Onl, r::AbstractBaseRiskMeasure,
-                                       scorer::CrossValSearchScorer,
+                                       scorer::CrossValSearchScorer, n_best::Integer,
                                        ex::FLoops.Transducers.Executor, train_score::Bool,
                                        kwargs::NamedTuple)
         @argcheck(!isempty(p), IsEmptyError)
@@ -219,29 +308,31 @@ GridSearchCrossValidation
                 end
             end
         end
-        return new{typeof(p), typeof(cv), typeof(r), typeof(scorer), typeof(ex),
-                   typeof(train_score), typeof(kwargs)}(p, cv, r, scorer, ex, train_score,
-                                                        kwargs)
+        assert_search_n_best(scorer, n_best)
+        return new{typeof(p), typeof(cv), typeof(r), typeof(scorer), typeof(n_best),
+                   typeof(ex), typeof(train_score), typeof(kwargs)}(p, cv, r, scorer,
+                                                                    n_best, ex, train_score,
+                                                                    kwargs)
     end
 end
-function GridSearchCrossValidation(p::Union{<:AbstractVector{<:Pair{<:Any,
-                                                                    <:AbstractVector}},
-                                            <:AbstractVector{<:AbstractVector{<:Pair{<:Any,
-                                                                                     <:AbstractVector}}},
-                                            <:AbstractDict{<:Any, <:AbstractVector},
-                                            <:AbstractVector{<:AbstractDict{<:Any,
-                                                                            <:AbstractVector}}};
+function GridSearchCrossValidation(p::Union{AbstractVector,
+                                            AbstractDict{<:Any, <:AbstractVector}};
                                    cv::CVE_Onl = KFold(),
                                    r::AbstractBaseRiskMeasure = ConditionalValueatRisk(),
                                    scorer::CrossValSearchScorer = HighestMeanScore(),
+                                   n_best::Integer = 1,
                                    ex::FLoops.Transducers.Executor = FLoops.ThreadedEx(),
                                    train_score::Bool = false, kwargs::NamedTuple = (;))
-    return GridSearchCrossValidation(p, cv, r, scorer, ex, train_score, kwargs)
+    p = narrow_mixed_vector(p,
+                            Union{Pair{<:Any, <:AbstractVector},
+                                  AbstractVector{<:Pair{<:Any, <:AbstractVector}},
+                                  AbstractDict{<:Any, <:AbstractVector}}, :p)
+    return GridSearchCrossValidation(p, cv, r, scorer, n_best, ex, train_score, kwargs)
 end
 """
 $(DocStringExtensions.TYPEDEF)
 
-Randomised search cross-validation estimator for portfolio optimisation. Samples parameter sets from distributions or vectors, applies cross-validation splits, fits and scores each configuration, and selects the optimal parameters using the provided scoring strategy.
+Randomised search cross-validation estimator for portfolio optimisation. It draws `n_iter` trials from the search space, each a joint value of every key of one parameter set, through [`make_p_grid`](@ref). Then it scores the trials with the search of [`GridSearchCrossValidation`](@ref), and selects one with the scorer. The count of fits grows with `n_iter`, not with the count of keys.
 
 # Fields
 
@@ -259,6 +350,7 @@ $(DocStringExtensions.FIELDS)
         cv::CVE_Onl = KFold(),
         r::AbstractBaseRiskMeasure = ConditionalValueatRisk(),
         scorer::CrossValSearchScorer = HighestMeanScore(),
+        n_best::Integer = 1,
         ex::FLoops.Transducers.Executor = FLoops.ThreadedEx(),
         n_iter::Integer = 10,
         rng::Random.AbstractRNG = Random.default_rng(),
@@ -267,7 +359,9 @@ $(DocStringExtensions.FIELDS)
         kwargs::NamedTuple = (;),
     ) -> RandomisedSearchCrossValidation
 
-Positional and keyword arguments correspond to the struct's fields.
+Positional and keyword arguments correspond to the struct's fields. The outer constructor takes a vector of parameter sets whose types differ, such as a vector of pairs and a vector of pairs with other value types. Such a literal infers the element type `Vector`, so the constructor narrows it through [`narrow_mixed_vector`](@ref).
+
+The search draws its trials from `rng`, so the trials, and the order of the `n_best` kept candidates, are the same in two runs only when `seed` is set.
 
 ## Validation
 
@@ -276,6 +370,10 @@ Positional and keyword arguments correspond to the struct's fields.
   - All keys in `p` must be of type `GSCVKey` (i.e. `String`, `Symbol`, or `Integer`).
   - All values in `p` must be of type `RSCVVal` (i.e. an `AbstractVector` or `Distributions.Distribution`).
   - `n_iter > 0` and finite.
+  - `n_best > 0` and finite.
+  - If `scorer` is a function: `n_best == 1`, because a function returns one index and cannot order more candidates.
+
+$(val_dict[:count_fraction_grid])
 
 # Examples
 
@@ -283,7 +381,7 @@ Positional and keyword arguments correspond to the struct's fields.
 julia> RandomisedSearchCrossValidation(Dict(\"alpha\" => [0.1, 0.2, 0.3],
                                             \"beta\" => Normal(1.0, 0.5)))
 RandomisedSearchCrossValidation
-            p ┼ Dict{String, Any}: Dict{String, Any}("alpha" => [0.1, 0.2, 0.3], "beta" => Distributions.Normal{Float64}(μ=1.0, σ=0.5))
+            p ┼ Dict{String, Any}: Dict{String, Any}("alpha" => [0.1, 0.2, 0.3], "beta" => Normal(1.0, 0.5))
            cv ┼ KFold
               │                   n ┼ Int64: 5
               │         purged_size ┼ Int64: 0
@@ -300,6 +398,7 @@ RandomisedSearchCrossValidation
               │      alpha ┼ Float64: 0.05
               │          w ┴ nothing
        scorer ┼ HighestMeanScore()
+       n_best ┼ Int64: 1
            ex ┼ Transducers.ThreadedEx{@NamedTuple{}}: Transducers.ThreadedEx()
        n_iter ┼ Int64: 10
           rng ┼ Random.TaskLocalRNG: Random.TaskLocalRNG()
@@ -337,6 +436,10 @@ RandomisedSearchCrossValidation
     """
     scorer
     """
+    $(field_dict[:n_best])
+    """
+    n_best
+    """
     $(field_dict[:ex])
     """
     ex
@@ -360,12 +463,12 @@ RandomisedSearchCrossValidation
     $(field_dict[:kwargs])
     """
     kwargs
-    function RandomisedSearchCrossValidation(p::Union{<:AbstractVector{<:Pair},
-                                                      <:AbstractVector{<:AbstractVector{<:Pair}},
-                                                      <:AbstractDict,
-                                                      <:AbstractVector{<:AbstractDict}},
+    function RandomisedSearchCrossValidation(p::Union{AbstractVector{<:Pair},
+                                                      AbstractVector{<:AbstractVector{<:Pair}},
+                                                      AbstractDict,
+                                                      AbstractVector{<:AbstractDict}},
                                              cv::CVE_Onl, r::AbstractBaseRiskMeasure,
-                                             scorer::CrossValSearchScorer,
+                                             scorer::CrossValSearchScorer, n_best::Integer,
                                              ex::FLoops.Transducers.Executor,
                                              n_iter::Integer, rng::Random.AbstractRNG,
                                              seed::Option{<:Integer}, train_score::Bool,
@@ -406,26 +509,27 @@ RandomisedSearchCrossValidation
             end
         end
         assert_nonempty_gt0_finite_val(n_iter, :n_iter)
-        return new{typeof(p), typeof(cv), typeof(r), typeof(scorer), typeof(ex),
-                   typeof(n_iter), typeof(rng), typeof(seed), typeof(train_score),
-                   typeof(kwargs)}(p, cv, r, scorer, ex, n_iter, rng, seed, train_score,
-                                   kwargs)
+        assert_search_n_best(scorer, n_best)
+        return new{typeof(p), typeof(cv), typeof(r), typeof(scorer), typeof(n_best),
+                   typeof(ex), typeof(n_iter), typeof(rng), typeof(seed),
+                   typeof(train_score), typeof(kwargs)}(p, cv, r, scorer, n_best, ex,
+                                                        n_iter, rng, seed, train_score,
+                                                        kwargs)
     end
 end
-function RandomisedSearchCrossValidation(p::Union{<:AbstractVector{<:Pair},
-                                                  <:AbstractVector{<:AbstractVector{<:Pair}},
-                                                  <:AbstractDict,
-                                                  <:AbstractVector{<:AbstractDict}};
+function RandomisedSearchCrossValidation(p::Union{AbstractVector, AbstractDict};
                                          cv::CVE_Onl = KFold(),
                                          r::AbstractBaseRiskMeasure = ConditionalValueatRisk(),
                                          scorer::CrossValSearchScorer = HighestMeanScore(),
+                                         n_best::Integer = 1,
                                          ex::FLoops.Transducers.Executor = FLoops.ThreadedEx(),
                                          n_iter::Integer = 10,
                                          rng::Random.AbstractRNG = Random.default_rng(),
                                          seed::Option{<:Integer} = nothing,
                                          train_score::Bool = false,
                                          kwargs::NamedTuple = (;))
-    return RandomisedSearchCrossValidation(p, cv, r, scorer, ex, n_iter, rng, seed,
+    p = narrow_mixed_vector(p, Union{Pair, AbstractVector{<:Pair}, AbstractDict}, :p)
+    return RandomisedSearchCrossValidation(p, cv, r, scorer, n_best, ex, n_iter, rng, seed,
                                            train_score, kwargs)
 end
 """
@@ -433,7 +537,7 @@ $(DocStringExtensions.TYPEDEF)
 
 A [`CrossValidationSearchScorer`](@ref) that selects the parameter set with the highest mean score across cross-validation splits.
 
-When called with a score matrix (rows = CV splits, columns = parameter sets), it returns the column index with the largest mean score.
+When called with a score matrix (rows = CV splits, columns = parameter sets), it returns the column index with the largest mean score. Its [`candidate_scores`](@ref) are the column means, so a search orders its candidates by the mean score. A tie goes to the first column, in the index form and in the order.
 
 # Examples
 
@@ -444,67 +548,124 @@ julia> scores = [0.5 0.8; 0.6 0.7];
 
 julia> scorer(scores)
 2
+
+julia> PortfolioOptimisers.candidate_scores(scorer, scores)
+2-element Vector{Float64}:
+ 0.55
+ 0.75
 ```
 
 # Related
 
   - [`CrossValidationSearchScorer`](@ref)
   - [`CrossValSearchScorer`](@ref)
+  - [`candidate_scores`](@ref)
   - [`SearchCrossValidationResult`](@ref)
 """
 struct HighestMeanScore <: CrossValidationSearchScorer end
 function (s::HighestMeanScore)(X::MatNum; dims::Integer = 1)
     return argmax(dropdims(mean(X; dims = dims); dims = dims))
 end
+function candidate_scores(::HighestMeanScore, X::MatNum)
+    return vec(mean(X; dims = 1))
+end
 """
-$(DocStringExtensions.TYPEDSIGNATURES)
+    finite_candidate_order(scorer::CrossValSearchScorer, test_scores::MatNum, n_best::Integer)
 
-Choose the winning candidate of a search, and never let a failed one win.
+Order the candidates of a search, best first, keep the first `n_best`, and never let a failed candidate in.
 
-A candidate that did not finish every fold carries a non-finite entry in its column of the score matrix, and `argmax` over `[0.80, NaN, 0.50]` returns the position of the `NaN`. So the scorer is handed the columns whose **every** entry is finite, and the index it returns — a position in the matrix it received — is mapped back to the grid through the list of those columns.
+A candidate that did not finish every fold carries a non-finite entry in its column of the score matrix, and `argmax` over `[0.80, NaN, 0.50]` returns the position of the `NaN`. So the scorer receives the columns whose **every** entry is finite, and the order that it gives, in positions of the matrix that it received, maps back to the grid through the list of those columns.
 
-The scorer therefore never sees a failed candidate, and it may compute anything on the matrix it receives: a mean, a spread, a rank. A `-Inf` substitution would be safe only for a scorer that reads order alone, because a column holding `-Inf` gives `NaN` for a spread and the `NaN` wins again.
+The scorer therefore never sees a failed candidate, and it can compute anything on the matrix that it receives: a mean, a spread, a rank. A `-Inf` substitution would be safe only for a scorer that reads order alone, because a column that holds `-Inf` gives `NaN` for a spread and the `NaN` wins again.
 
-The **raw** matrix stays on the result, so its columns line up with the grid and a reader sees which fold failed.
+The **raw** matrix stays on the result, so its columns agree with the grid and a reader sees which fold failed.
+
+# Mathematical definition
+
+```math
+\\begin{align}
+\\mathcal{C} &= \\left\\{ i : S_{fi} \\text{ is finite for every } f \\right\\}\\,, \\\\
+\\pi &= \\operatorname{sortperm}_{\\downarrow}\\, v\\left(\\mathbf{S}_{:,\\,\\mathcal{C}}\\right)\\,, \\\\
+r_k &= c_{\\pi_k}\\,, \\quad k = 1, \\ldots, \\min\\left(n_{b}, |\\mathcal{C}|\\right)\\,.
+\\end{align}
+```
+
+Where:
+
+  - $(math_dict[:C_finite_cand])
+  - $(math_dict[:S_C_search])
+  - $(math_dict[:v_cand_scores])
+  - $(math_dict[:pi_cand_order])
+  - $(math_dict[:c_j_search])
+  - $(math_dict[:r_k_rank])
+  - $(math_dict[:n_b_best])
+
+The sort is stable, so a tie keeps the order of the grid, as `argmax` does.
 
 # Algorithm
 
- 1. Mark the columns of `test_scores` whose every entry is finite.
+ 1. Mark the columns of `test_scores` whose every entry is finite, giving `cols`.
  2. Throw an `IsNonFiniteError` when no column is finite.
- 3. Call `scorer` on the view of `test_scores` at the finite columns.
- 4. Return the finite column the index the scorer gave names.
+ 3. Take the view `X` of `test_scores` at `cols`, and call [`candidate_scores`](@ref) of `scorer` on it, giving `vals`.
+ 4. If `vals` is a vector: take the first `min(n_best, length(cols))` positions of the descending order of `vals` through a partial sort, which breaks a tie by the position, and so gives the order of a stable sort. Return the columns of `cols` at those positions and their values.
+ 5. If `vals` is `nothing`: refuse `n_best > 1`, call the index form `scorer(X)`, and return its column of `cols` and `nothing`.
 
 # Arguments
 
   - `scorer`: The search scorer ([`CrossValSearchScorer`](@ref)).
   - `test_scores`: The `folds × candidates`, or `paths × candidates`, score matrix.
+  - `n_best`: The count of the candidates to keep.
 
 # Validation
 
-  - At least one candidate must have finished every fold.
+  - At least one candidate must have finished every fold. Otherwise an `IsNonFiniteError`.
+  - A scorer that gives no [`candidate_scores`](@ref) keeps one candidate. Otherwise an `ArgumentError` names the type of the scorer and the method to add.
 
 # Returns
 
-  - `opt_idx::Integer`: The position of the winning candidate in the parameter grid.
+  - `rank_idx::AbstractVector{<:Integer}`: The positions in the parameter grid of the kept candidates, best first.
+  - `rank_scores::Option{<:VecNum}`: The value of [`candidate_scores`](@ref) of each kept candidate, in the order of `rank_idx`, or `nothing` when the scorer gives no value per candidate.
 
 # Related
 
+  - [`candidate_scores`](@ref)
   - [`CrossValidationSearchScorer`](@ref)
   - [`CrossValSearchScorer`](@ref)
   - [`search_cross_validation`](@ref)
   - [`IsNonFiniteError`](@ref)
 """
-function finite_candidate_index(scorer::CrossValSearchScorer, test_scores::MatNum)
+function finite_candidate_order(scorer::CrossValSearchScorer, test_scores::MatNum,
+                                n_best::Integer)
     finite = vec(all(isfinite, test_scores; dims = 1))
     @argcheck(any(finite),
               IsNonFiniteError("no parameter set finished every fold: every one of the $(size(test_scores, 2)) columns of the score matrix holds a non-finite entry over its $(size(test_scores, 1)) rows. Every candidate failed a fold, so none can be compared; widen the grid, or find why the folds failed."))
     cols = findall(finite)
-    return cols[scorer(view(test_scores, :, cols))]
+    X = view(test_scores, :, cols)
+    return finite_candidate_order(scorer, X, cols, n_best, candidate_scores(scorer, X))
+end
+function finite_candidate_order(scorer::CrossValSearchScorer, X::MatNum,
+                                cols::AbstractVector{<:Integer}, n_best::Integer,
+                                vals::VecNum)
+    # A partial sort is not stable, so the order breaks a tie by the position in the grid,
+    # which gives the order of a stable descending sort.
+    keep = partialsort!(collect(eachindex(vals)), 1:min(n_best, length(cols));
+                        lt = (i, j) -> vals[i] > vals[j] || (vals[i] == vals[j] && i < j))
+    return cols[keep], vals[keep]
+end
+function finite_candidate_order(scorer::CrossValSearchScorer, X::MatNum,
+                                cols::AbstractVector{<:Integer}, n_best::Integer, ::Nothing)
+    @argcheck(isone(n_best),
+              ArgumentError("`$(typeof(scorer))` gives no value for each candidate, so a search can pick one candidate with it but cannot order the n_best = $n_best best ones. Add a method `PortfolioOptimisers.candidate_scores(::$(typeof(scorer)), X::AbstractMatrix)` that returns one value per column of `X`, bigger is better, or set `n_best = 1`."))
+    return [cols[scorer(X)]], nothing
 end
 """
 $(DocStringExtensions.TYPEDEF)
 
 Result type for search-based cross-validation routines. Stores the optimal estimator, score matrices, parameter grid, and selected index for hyperparameter search.
+
+The search keeps the `n_best` best candidates in rank order, as configurations, in `ranked`. It keeps no fitted result. Fit a kept candidate outside the search, as you fit `opt`. A candidate that failed a fold never enters `ranked`, so `ranked` holds fewer than `n_best` candidates when fewer finished every fold.
+
+The scores of the kept candidate `j` over the rows of the scheme are `test_scores[:, rank_idx[j]]`. The Result keeps no summary of their spread. Compute it from the matrix, for example `std(res.test_scores[:, res.rank_idx]; dims = 1)`. Under a [`MultipleRandomised`](@ref) scheme, `path_ids` gives the path of each row, so `test_scores[path_ids .== k, rank_idx[j]]` are the scores of candidate `j` over path `k`.
 
 # Fields
 
@@ -542,25 +703,111 @@ $(DocStringExtensions.FIELDS)
     $(field_dict[:idx_cv])
     """
     idx
+    """
+    $(field_dict[:ranked_cv])
+    """
+    ranked
+    """
+    $(field_dict[:rank_idx_cv])
+    """
+    rank_idx
+    """
+    $(field_dict[:rank_scores_cv])
+    """
+    rank_scores
+    """
+    $(field_dict[:path_ids_search])
+    """
+    path_ids
     function SearchCrossValidationResult(opt::AbstractEstimator, test_scores::MatNum,
-                                         train_scores::Option{<:Union{<:MatNum,
-                                                                      <:AbstractVector{<:MatNum}}},
+                                         train_scores::Option{<:Union{MatNum,
+                                                                      AbstractVector{<:MatNum}}},
                                          lens_grid::AbstractVector,
-                                         val_grid::AbstractVector, idx::Integer)
+                                         val_grid::AbstractVector, idx::Integer,
+                                         ranked::AbstractVector{<:AbstractEstimator},
+                                         rank_idx::AbstractVector{<:Integer},
+                                         rank_scores::Option{<:VecNum},
+                                         path_ids::Option{<:AbstractVector{<:Integer}})
+        @argcheck(!isempty(rank_idx) &&
+                  length(ranked) == length(rank_idx) &&
+                  first(rank_idx) == idx &&
+                  (isnothing(rank_scores) || length(rank_scores) == length(rank_idx)),
+                  DimensionMismatch("`ranked`, `rank_idx` and `rank_scores` must hold one entry per kept candidate, at least one, and `rank_idx[1]` must equal `idx`: got $(length(ranked)) candidates, the columns $(rank_idx), $(isnothing(rank_scores) ? "no values" : "$(length(rank_scores)) values") and `idx = $idx`."))
         return new{typeof(opt), typeof(test_scores), typeof(train_scores),
-                   typeof(lens_grid), typeof(val_grid), typeof(idx)}(opt, test_scores,
-                                                                     train_scores,
-                                                                     lens_grid, val_grid,
-                                                                     idx)
+                   typeof(lens_grid), typeof(val_grid), typeof(idx), typeof(ranked),
+                   typeof(rank_idx), typeof(rank_scores), typeof(path_ids)}(opt,
+                                                                            test_scores,
+                                                                            train_scores,
+                                                                            lens_grid,
+                                                                            val_grid, idx,
+                                                                            ranked,
+                                                                            rank_idx,
+                                                                            rank_scores,
+                                                                            path_ids)
     end
 end
 function SearchCrossValidationResult(; opt::AbstractEstimator, test_scores::MatNum,
-                                     train_scores::Option{<:Union{<:MatNum,
-                                                                  <:AbstractVector{<:MatNum}}},
+                                     train_scores::Option{<:Union{MatNum,
+                                                                  AbstractVector{<:MatNum}}},
                                      lens_grid::AbstractVector, val_grid::AbstractVector,
-                                     idx::Integer)::SearchCrossValidationResult
+                                     idx::Integer,
+                                     ranked::AbstractVector{<:AbstractEstimator} = [opt],
+                                     rank_idx::AbstractVector{<:Integer} = [idx],
+                                     rank_scores::Option{<:VecNum} = nothing,
+                                     path_ids::Option{<:AbstractVector{<:Integer}} = nothing)::SearchCrossValidationResult
     return SearchCrossValidationResult(opt, test_scores, train_scores, lens_grid, val_grid,
-                                       idx)
+                                       idx, ranked, rank_idx, rank_scores, path_ids)
+end
+"""
+    search_result(base, gscv::GridSearchCrossValidation, test_scores::MatNum,
+                  train_scores, lens_grid::AbstractVector, val_grid::AbstractVector,
+                  path_ids::Option{<:AbstractVector{<:Integer}})
+
+Build the Result of a search from its score matrices: order the candidates, keep the best `gscv.n_best`, and build each kept candidate from the estimator that the search was given.
+
+The four methods of [`search_cross_validation`](@ref) on an optimiser and on a [`Pipeline`](@ref), batch and combinatorial, call it after their score loop. Each kept candidate is built from `base` through the lenses of its own grid point. A grid that joins parameter sets with different keys therefore gives each kept candidate the values of its own set alone, and none of the values of `opt`.
+
+# Algorithm
+
+ 1. Order the finite candidates and keep the first `gscv.n_best` through [`finite_candidate_order`](@ref), giving `rank_idx` and `rank_scores`.
+ 2. Build each kept candidate `k` of `rank_idx` from `base` through [`search_candidate`](@ref), giving `ranked`.
+ 3. Return a [`SearchCrossValidationResult`](@ref) with `opt = ranked[1]` and `idx = rank_idx[1]`.
+
+# Arguments
+
+  - `base`: The estimator, or the [`Pipeline`](@ref), that the search tunes.
+  - `gscv`: The grid search. It gives `scorer` and `n_best`.
+  - `test_scores`: The raw test score matrix.
+  - `train_scores`: The train scores, or `nothing`.
+  - `lens_grid`: The lenses of each grid point.
+  - `val_grid`: The values of each grid point.
+  - `path_ids`: The path of each row of `test_scores`, or `nothing` for a scheme with one path.
+
+# Validation
+
+  - The checks of [`finite_candidate_order`](@ref).
+
+# Returns
+
+  - `res::SearchCrossValidationResult`.
+
+# Related
+
+  - [`finite_candidate_order`](@ref)
+  - [`search_candidate`](@ref)
+  - [`score_path_ids`](@ref)
+  - [`search_cross_validation`](@ref)
+"""
+function search_result(base, gscv::GridSearchCrossValidation, test_scores::MatNum,
+                       train_scores, lens_grid::AbstractVector, val_grid::AbstractVector,
+                       path_ids::Option{<:AbstractVector{<:Integer}})
+    rank_idx, rank_scores = finite_candidate_order(gscv.scorer, test_scores, gscv.n_best)
+    ranked = [search_candidate(base, lens_grid[k], val_grid[k]) for k in rank_idx]
+    return SearchCrossValidationResult(; opt = first(ranked), test_scores = test_scores,
+                                       train_scores = train_scores, lens_grid = lens_grid,
+                                       val_grid = val_grid, idx = first(rank_idx),
+                                       ranked = ranked, rank_idx = rank_idx,
+                                       rank_scores = rank_scores, path_ids = path_ids)
 end
 """
     assert_search_entry(est, cv)
@@ -659,6 +906,8 @@ function assert_search_candidates(opt, lens_grid, val_grid)::Nothing
 end
 """
     pin_draw(cv::MultipleRandomised)
+    pin_draw(cv::MultipleRandomised, seed::Nothing)
+    pin_draw(cv::MultipleRandomised, seed::Integer)
     pin_draw(cv)
 
 Fix the folds a search scores every candidate over.
@@ -668,6 +917,7 @@ A search splits its data once and scores every candidate against the same folds,
 # Arguments
 
   - `cv`: The search's scheme.
+  - `seed`: The `seed` field of `cv`. Its type selects the method.
 
 # Returns
 
@@ -680,7 +930,15 @@ A search splits its data once and scores every candidate against the same folds,
   - [`resolve_rng`](@ref)
 """
 function pin_draw(cv::MultipleRandomised)
-    return isnothing(cv.seed) ? Accessors.@set(cv.seed = rand(cv.rng, UInt32)) : cv
+    return pin_draw(cv, cv.seed)
+end
+function pin_draw(cv::MultipleRandomised, ::Nothing)
+    return MultipleRandomised(cv.cv; subset_size = cv.subset_size, n_subsets = cv.n_subsets,
+                              max_comb = cv.max_comb, window_size = cv.window_size,
+                              rng = cv.rng, seed = rand(cv.rng, UInt32))
+end
+function pin_draw(cv::MultipleRandomised, ::Integer)
+    return cv
 end
 function pin_draw(cv)
     return cv
@@ -716,6 +974,34 @@ function score_rows(cvr::MultipleRandomisedResult)
         rows = findall(==(k), cvr.path_ids)
         return rows[sortperm(cvr.test_idx[rows]; by = first)]
     end
+end
+"""
+    score_path_ids(cvr::CrossValidationResult)
+    score_path_ids(cvr::MultipleRandomisedResult)
+
+The path of each row of a search's score matrix, for the `path_ids` field of [`SearchCrossValidationResult`](@ref).
+
+Row `j` of the score matrix is fold `j` of `split`, see [`score_rows`](@ref). A [`MultipleRandomised`](@ref) scheme runs one walk-forward per asset subset, and `cvr.path_ids[j]` is the path of fold `j`, so the method returns `cvr.path_ids`. Every other scheme of this method has one path, so the method returns `nothing`. The combinatorial methods of [`search_cross_validation`](@ref) score one row per path, and they give `1:M` themselves.
+
+# Arguments
+
+  - `cvr`: The split the search scores over.
+
+# Returns
+
+  - `path_ids::Option{<:AbstractVector{<:Integer}}`: The path of each row, or `nothing` for a scheme with one path.
+
+# Related
+
+  - [`score_rows`](@ref)
+  - [`SearchCrossValidationResult`](@ref)
+  - [`MultipleRandomisedResult`](@ref)
+"""
+function score_path_ids(::CrossValidationResult)
+    return nothing
+end
+function score_path_ids(cvr::MultipleRandomisedResult)
+    return cvr.path_ids
 end
 """
     fold_train_returns(cv::CrossValidationResult, rd::ReturnsResult, k::Integer)
@@ -802,7 +1088,7 @@ end
 
 Write the per-fold scores of candidate `i` into column `i` of a search's score matrices.
 
-The candidate's predictions are what [`fit_and_predict`](@ref) returned over the search's scheme, one per fold, and `rows` is [`score_rows`](@ref) of that scheme's split, so prediction and row are zipped and the column reads in `split`'s order. A population is one series per path, and each path is written against its own rows. Each fold's test score is [`expected_risk`](@ref) of the fold's prediction, and its train score, written only when `train_scores` is a matrix, is the risk of the fold's fitted result over its own sample. Both are multiplied by `sgn`, `1` when [`bigger_is_better`](@ref) holds for `r` and `-1` otherwise, so a higher score is always better whatever measure `r` is, which is the orientation a [`CrossValidationSearchScorer`](@ref) relies on. A fold that failed scores `NaN`, and [`finite_candidate_index`](@ref) keeps that column from the scorer.
+The candidate's predictions are what [`fit_and_predict`](@ref) returned over the search's scheme, one per fold, and `rows` is [`score_rows`](@ref) of that scheme's split, so prediction and row are zipped and the column reads in `split`'s order. A population is one series per path, and each path is written against its own rows. Each fold's test score is [`expected_risk`](@ref) of the fold's prediction, and its train score, written only when `train_scores` is a matrix, is the risk of the fold's fitted result over its own sample. Both are multiplied by `sgn`, `1` when [`bigger_is_better`](@ref) holds for `r` and `-1` otherwise, so a higher score is always better whatever measure `r` is, which is the orientation a [`CrossValidationSearchScorer`](@ref) relies on. A fold that failed scores `NaN`, and [`finite_candidate_order`](@ref) keeps that column from the scorer.
 
 # Arguments
 
@@ -824,7 +1110,7 @@ The candidate's predictions are what [`fit_and_predict`](@ref) returned over the
   - [`search_cross_validation`](@ref)
   - [`expected_risk`](@ref)
   - [`bigger_is_better`](@ref)
-  - [`finite_candidate_index`](@ref)
+  - [`finite_candidate_order`](@ref)
 """
 function write_candidate_scores!(test_scores::MatNum, train_scores::Option{<:MatNum},
                                  i::Integer, predictions::MultiPeriodPredictionResult, rows,
@@ -932,7 +1218,7 @@ function expr_to_lens_chain(ex)
     if !(ex isa Symbol)
         throw(Meta.ParseError("Unsupported expression: $ex"))
     end
-    push!(optics, Accessors.PropertyLens(ex))  # base case: Symbol
+    push!(optics, _expr_to_lens(ex))  # base case: Symbol
     return foldl(∘, optics)
 end
 """
@@ -983,8 +1269,8 @@ function parse_lens(key::Union{Expr, Symbol})
               Meta.ParseError("Lens key expression is too deeply nested (exceeds depth $(lim.max_depth))."))
     return expr_to_lens_chain(key)
 end
-function parse_lens(key::Union{<:ComposedFunction, <:Accessors.PropertyLens,
-                               <:Accessors.IndexLens})
+function parse_lens(key::Union{ComposedFunction, Accessors.PropertyLens,
+                               Accessors.IndexLens})
     return key
 end
 """
@@ -1030,9 +1316,6 @@ function assert_search_grid_cap(total::Integer, detail::AbstractString)::Nothing
     return nothing
 end
 function assert_search_grid_cap(factors::AbstractVector{<:Pair})::Nothing
-    if isempty(factors)
-        return nothing
-    end
     for (key, n) in factors
         @argcheck(!iszero(n),
                   IsEmptyError("the search grid parameter `$key` holds no candidate value, so the grid is the product of an empty set and holds no candidate for the search to score. Give every tuned parameter at least one value."))
@@ -1051,6 +1334,6 @@ end
 
 export SearchCrossValidationResult, HighestMeanScore
 # The `# Interfaces`-marked types of #1138 (ADR 0154). `AbstractSearchCrossValidationResult`
-# names required fields only, and `CrossValidationSearchScorer` names only its callable
-# shape, so neither names a separate verb.
-public AbstractSearchCrossValidationResult, CrossValidationSearchScorer
+# names required fields only. `CrossValidationSearchScorer` names its callable shape and
+# the verb `candidate_scores` (#1937), which a subtype implements.
+public AbstractSearchCrossValidationResult, CrossValidationSearchScorer, candidate_scores

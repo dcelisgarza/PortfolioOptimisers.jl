@@ -287,7 +287,7 @@ end
     forecast_calibration(fe::ForecastEvaluationResult, w::Option{<:MatNum} = nothing;
                          bins::Integer = 10) -> NamedTuple
     forecast_calibration(fe::ForecastEvaluationResult, csfm::CrossSectionalFactorModel;
-                         weighting::AbstractOrthogonalityMetric = IdentityMetric(),
+                         weighting::Option{<:AbstractOrthogonalityMetric} = nothing,
                          bins::Integer = 10) -> NamedTuple
 
 Score whether the magnitude of a Return Forecast is right, and not only its order.
@@ -318,7 +318,7 @@ Every other statistic of an evaluation is a statistic of a cross-section. Each o
   - `fe`: The [`ForecastEvaluationResult`](@ref) to score.
   - `w`: Cross-sectional weight history `observations × assets`, on the axis of `fe.alpha`, or `nothing` for equal weights. The curve and the moments read no weights.
   - `csfm`: The fitted factor-model block of the evaluation. It supplies the weight history that the metric names.
-  - `weighting`: A member of [`AbstractOrthogonalityMetric`](@ref). It names the weight history of the slope, and [`cs_diagnostic_weights`](@ref) resolves it over the whole observation axis. The default reads equal weights.
+  - `weighting`: A member of [`AbstractOrthogonalityMetric`](@ref), or `nothing` for equal weights. It names the weight history of the slope, and [`cs_diagnostic_weights`](@ref) resolves it over the whole observation axis. The default reads equal weights.
   - `bins`: Number of quantile bins at which the curve cuts the forecast.
 
 # Validation
@@ -377,7 +377,7 @@ function forecast_calibration(fe::ForecastEvaluationResult, w::Option{<:MatNum} 
             n_bins = length(curve.bin))
 end
 function forecast_calibration(fe::ForecastEvaluationResult, csfm::CrossSectionalFactorModel;
-                              weighting::AbstractOrthogonalityMetric = IdentityMetric(),
+                              weighting::Option{<:AbstractOrthogonalityMetric} = nothing,
                               bins::Integer = 10)
     return forecast_calibration(fe, cs_diagnostic_weights(weighting, csfm); bins = bins)
 end

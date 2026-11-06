@@ -5,7 +5,9 @@ Add maximum drawdown risk constraints to `model`.
 
 Introduces a scalar variable `mdd_risk` and the constraint
 `sc * (mdd_risk .- dd[2:T+1]) >= 0` so that `mdd_risk` upper-bounds every drawdown
-observation. Returns the existing expression if already present.
+observation. A second call with the same `prefix` uses the registered variable and builds no
+rows. The settings of the first [`MaximumDrawdown`](@ref) take effect, and a second measure
+logs a warning, because its bound and its scale have no effect.
 
 # Mathematical definition
 
@@ -32,25 +34,26 @@ where ``dd_t`` is the portfolio drawdown at time ``t``.
 
 # Returns
 
-  - `nothing`.
+  - `mdd_risk`: The risk variable.
 
 # Related
 
   - [`set_drawdown_constraints!`](@ref)
-  - [`set_risk_bounds_and_expression!`](@ref)
+  - [`set_unindexed_risk_bounds_and_expression!`](@ref)
 """
 function set_risk_constraints!(model::JuMP.Model, ::Any, r::MaximumDrawdown,
                                opt::RiskConstraintOwner, pr::AbstractPriorResult, args...;
                                prefix::Symbol = Symbol(""), kwargs...)
-    return state_build!(model, prefix, :mdd_risk) do
+    mdd_risk = state_build!(model, prefix, :mdd_risk) do
         sc = get_constraint_scale(model)
         dd = set_drawdown_constraints!(model, pr.X; prefix = prefix)
         T = length(dd) - 1
         mdd_risk = JuMP.@variable(model)
         state_set!(model, prefix, :cmdd_risk,
                    JuMP.@constraint(model, sc * (mdd_risk .- view(dd, 2:(T + 1))) >= 0))
-        set_risk_bounds_and_expression!(model, opt, mdd_risk, r.settings, :mdd_risk;
-                                        prefix = prefix)
         return mdd_risk
     end
+    set_unindexed_risk_bounds_and_expression!(model, opt, mdd_risk, r, :mdd_risk;
+                                              prefix = prefix)
+    return mdd_risk
 end

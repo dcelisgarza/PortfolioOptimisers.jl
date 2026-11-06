@@ -276,7 +276,7 @@ function assert_partial_fittable(me::AbstractExpectedReturnsEstimator,
     @argcheck(isnothing(w),
               ArgumentError("$name cannot be fitted incrementally while `w` is set, because observation weights reweight every past observation when a new one arrives. Set `w = nothing`, or run the batch verb."))
     @argcheck(isa(me, SimpleExpectedReturns) && isnothing(me.w),
-              ArgumentError("$name cannot be fitted incrementally with `me = $(typeof(me))`, because a partial-fit state carries the running sample mean and no other centre. Set `me = SimpleExpectedReturns()`, or run the batch verb."))
+              ArgumentError("$name cannot be fitted incrementally with `me = $(typeof(me))`, because a partial-fit state carries the running sample mean and no other centre. The available-case fit of a `CoveragePolicy` centres each asset on that mean too. Set `me = SimpleExpectedReturns()`, or clear `cvg` and run the batch verb."))
     return nothing
 end
 """
@@ -494,7 +494,7 @@ The method builds a new state rather than writing into the arrays of the old one
  2. Orient `X` to observations × assets with [`dims_oriented`](@ref), which validates `dims`, and write `NaN` in each cell that `active_mask` turns off with [`inactive_as_nonfinite`](@ref). Return the estimator unchanged when the block holds no observation, because the fold of an empty sample is the identity, and the mean of an empty block is `NaN`, which the merge would carry into every accumulator.
  3. Build the state of the block alone, with [`comoment_block`](@ref).
  4. Merge it into the state the estimator carries, unless the estimator carries none.
- 5. Rebind `cache` with `Accessors.@reset`, and return the estimator.
+ 5. Rebuild the estimator with the merged state in `cache` through [`rebuild_estimator`](@ref), and return it.
 
 # Arguments
 
@@ -555,8 +555,7 @@ function partial_fit!(ske::Coskewness{<:Any, <:Any, <:FullMoment, <:Any, Nothing
     if !isnothing(ske.cache)
         state = merge_states(ske.cache, state)
     end
-    Accessors.@reset ske.cache = state
-    return ske
+    return rebuild_estimator(ske, (; cache = state))
 end
 """
 $(DocStringExtensions.TYPEDSIGNATURES)
@@ -661,7 +660,7 @@ The companion of the [`Coskewness`](@ref) method, carried one order further. The
  2. Orient `X` to observations × assets with [`dims_oriented`](@ref), which validates `dims`, and write `NaN` in each cell that `active_mask` turns off with [`inactive_as_nonfinite`](@ref). Return the estimator unchanged when the block holds no observation, for the reason that the [`Coskewness`](@ref) method states.
  3. Build the state of the block alone, with [`comoment_block`](@ref), and square its pairwise deviation product for the fourth accumulator.
  4. Merge it into the state the estimator carries, unless the estimator carries none.
- 5. Rebind `cache` with `Accessors.@reset`, and return the estimator.
+ 5. Rebuild the estimator with the merged state in `cache` through [`rebuild_estimator`](@ref), and return it.
 
 # Arguments
 
@@ -720,8 +719,7 @@ function partial_fit!(kte::Cokurtosis{<:Any, <:Any, <:FullMoment, <:Any, Nothing
     if !isnothing(kte.cache)
         state = merge_states(kte.cache, state)
     end
-    Accessors.@reset kte.cache = state
-    return kte
+    return rebuild_estimator(kte, (; cache = state))
 end
 """
 $(DocStringExtensions.TYPEDSIGNATURES)

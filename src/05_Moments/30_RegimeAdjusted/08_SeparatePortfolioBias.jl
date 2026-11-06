@@ -36,7 +36,7 @@ separate path is within 0.07 % of the multiplier of one decay on the same data o
 the factor holds no second order of the estimated correlation. Under the default
 `cor_vol = BiasCorrectedVolatility()`, at 12 assets, an equicorrelation of 0.5, half-lives of 10
 and 20 and 20 observations, the ratio is 1.0172, and 1.0095 at 40. At ``R = I`` it is within
-0.05 % at 20 observations. Under `RawVolatility()` the correlation state weights its first
+0.05 % at 20 observations. Under `cor_vol = nothing` the correlation state weights its first
 products by ``1 / (1 - \\lambda^{t})``, which the factor does not hold, and the same ratios read
 1.0802 and 1.0448. Under HAC the three tables and the weight sums read the Bartlett weights of
 `hac_lags`. At two lags and equal weights, on the same data, the separate path reads 0.06 % to
@@ -56,7 +56,7 @@ measure left out the first scored row of a zero block, which the statistic now s
 
 # Returns
 
-  - `f::Union{<:Number, <:VecNum}`: One where `bias` is `nothing`, the factor of every direction
+  - `f::Union{Number, VecNum}`: One where `bias` is `nothing`, the factor of every direction
     on one decay, and the factor of each direction on the separate path.
 
 # Related
@@ -125,7 +125,7 @@ Where:
 
 # Returns
 
-  - `(theta, mu)::Tuple{<:Number, <:Number}`: The weight ``\\theta`` and the shift ``\\mu``, both
+  - `(theta, mu)::Tuple{Number, Number}`: The weight ``\\theta`` and the shift ``\\mu``, both
     zero where the variance of the direction is not positive.
 
 # Related
@@ -327,10 +327,11 @@ $(DocStringExtensions.TYPEDSIGNATURES)
 Mask of the assets whose row of the covariance state the regime statistic can read.
 
 Where `cor_decay` is `nothing`, the state steps at every observation, so every asset is built.
-On the separate path, [`update_var_cor!`](@ref) writes the block only when the diagonal of the
-correlation state is above `min_val`. Under HAC an asset contributes nothing on its first row,
-so the block can stay at its zero seed for the first rows. A written asset has a diagonal equal
-to its variance state, so an asset with a positive variance and a zero diagonal is not built.
+On the separate path, [`update_var_cor!`](@ref) writes the row of an asset only when its
+diagonal of the correlation state is above `min_val`, and it sets the row of every other asset
+with a positive variance to zero. Under HAC an asset contributes nothing on its first row, so its
+row can stay at zero for the first rows. A written asset has a diagonal equal to its variance
+state, so an asset with a positive variance and a zero diagonal is not built.
 A constant asset has a variance of zero, and it stays built: its row is zero by design.
 
 # Arguments

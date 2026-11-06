@@ -756,6 +756,48 @@ function mr_block6()
     return nothing
 end
 
+function mr_block6_distribution_tails()
+    # #1821. A `DistributionValueatRisk` tail reads the weights, so `expected_risk` evaluates
+    # it on `w` for the loss and on `-w` for the gain. The value must equal what the model
+    # optimises, for the symmetric range, for a mixed range, and on either side.
+    vdist = ValueatRisk(; alg = DistributionValueatRisk())
+    opt = JuMPOptimiser(; pe = pr2, slv = slv)
+    rs = [GenericValueatRiskRange(; loss = vdist, gain = vdist),
+          GenericValueatRiskRange(; loss = vdist, gain = ConditionalValueatRisk()),
+          GenericValueatRiskRange(; loss = ConditionalValueatRisk(), gain = vdist)]
+    for (i, r) in enumerate(rs)
+        res = optimise(MeanRisk(; r = r, opt = opt), rd2)
+        @test isa(res.retcode, OptimisationSuccess)
+        rk = expected_risk(r, res.w, pr2)
+        success = isapprox(JuMP.objective_value(res.model), rk; rtol = 1e-6)
+        if !success
+            println("Counter: $i")
+            find_tol(JuMP.objective_value(res.model), rk)
+        end
+        @test success
+    end
+    @test isapprox(expected_risk(rs[1], w0, pr2),
+                   expected_risk(ValueatRiskRange(; alg = DistributionValueatRisk()), w0,
+                                 pr2))
+    # The bound of a `DistributionValueatRisk` gain tail bounds the value of that tail. It
+    # used to bound the negated value, so it never bound the portfolio.
+    r0 = GenericValueatRiskRange(; loss = ConditionalValueatRisk(), gain = vdist)
+    res0 = optimise(MeanRisk(; r = r0, obj = MaximumReturn(), opt = opt), rd2)
+    g0 = expected_risk(vdist, -res0.w, pr2)
+    ub = 0.8 * g0
+    r1 = GenericValueatRiskRange(; loss = ConditionalValueatRisk(),
+                                 gain = ValueatRisk(;
+                                                    settings = RiskMeasureSettings(;
+                                                                                   ub = ub),
+                                                    alg = DistributionValueatRisk()))
+    res1 = optimise(MeanRisk(; r = r1, obj = MaximumReturn(), opt = opt), rd2)
+    @test isa(res1.retcode, OptimisationSuccess)
+    g1 = expected_risk(vdist, -res1.w, pr2)
+    @test g1 <= ub * (1 + 1e-6)
+    @test isapprox(g1, ub; rtol = 1e-4)
+    return nothing
+end
+
 function mr_block6_asymmetric()
     # ADR 0057. The pairs above are symmetric — both tails share every parameter — so they
     # pass even when a range builder shapes its gain tail with the *loss* tail's parameter.

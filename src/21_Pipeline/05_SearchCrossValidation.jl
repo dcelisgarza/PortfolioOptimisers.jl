@@ -57,7 +57,7 @@ pipeline_asset_view(data::AbstractPricesResult, cols) = port_opt_view(data, :, c
 
 Return the element type of the score matrices of a Pipeline search over the data `rd` or `pr`.
 
-The type comes from the data. A score is a fraction, and a failed fold scores `NaN`, so [`float_if_integer`](@ref) changes an integer type to a floating point type. Every other type stays as it is.
+The type comes from the data. A [`ReturnsResult`](@ref) and a [`PricesResult`](@ref) hold floating-point values, so the type holds the `NaN` of a failed fold.
 
 # Arguments
 
@@ -66,15 +66,14 @@ The type comes from the data. A score is a fraction, and a failed fold scores `N
 
 # Returns
 
-  - `T::Type`: The element type of `rd.X`, or of the values of the time array `pr.X`, through [`float_if_integer`](@ref).
+  - `T::Type`: The element type of `rd.X`, or of the values of the time array `pr.X`.
 
 # Related
 
-  - [`float_if_integer`](@ref)
   - [`search_cross_validation`](@ref)
 """
-cv_data_eltype(rd::AbstractReturnsResult) = float_if_integer(eltype(rd.X))
-cv_data_eltype(pr::AbstractPricesResult) = float_if_integer(eltype(TimeSeries.values(pr.X)))
+cv_data_eltype(rd::AbstractReturnsResult) = eltype(rd.X)
+cv_data_eltype(pr::AbstractPricesResult) = eltype(TimeSeries.values(pr.X))
 """
     is_pipeline_raw_path(key::AbstractString) -> Bool
 
@@ -221,8 +220,8 @@ end
                            estval::AbstractVector{<:Pair{<:Any, <:AbstractVector}})
     pipeline_lens_val_grid(pipe::Pipeline, estval::AbstractDict{<:Any, <:AbstractVector})
     pipeline_lens_val_grid(pipe::Pipeline,
-                           estvals::AbstractVector{<:Union{<:AbstractVector{<:Pair{<:Any, <:AbstractVector}},
-                                                           <:AbstractDict{<:Any, <:AbstractVector}}})
+                           estvals::AbstractVector{<:Union{AbstractVector{<:Pair{<:Any, <:AbstractVector}},
+                                                           AbstractDict{<:Any, <:AbstractVector}}})
 
 Build the grid of a Pipeline search, the lenses and the values of every candidate.
 
@@ -304,10 +303,10 @@ function pipeline_lens_val_grid(pipe::Pipeline,
     return lenses, vals
 end
 function pipeline_lens_val_grid(pipe::Pipeline,
-                                estvals::AbstractVector{<:Union{<:AbstractVector{<:Pair{<:Any,
-                                                                                        <:AbstractVector}},
-                                                                <:AbstractDict{<:Any,
-                                                                               <:AbstractVector}}})
+                                estvals::AbstractVector{<:Union{AbstractVector{<:Pair{<:Any,
+                                                                                      <:AbstractVector}},
+                                                                AbstractDict{<:Any,
+                                                                             <:AbstractVector}}})
     lenses_vals = [pipeline_lens_val_grid(pipe, estval) for estval in estvals]
     lenses = mapreduce(x -> x[1], vcat, lenses_vals)
     vals = mapreduce(x -> x[2], vcat, lenses_vals)
@@ -406,14 +405,12 @@ For `gscv`:
 10. Build `pipei` through [`search_candidate`](@ref).
 11. Run `pipei` over `scheme` through [`cross_val_predict`](@ref), with the folds in sequence, giving `predictions`.
 12. Write column `i` of `test_scores` and `train_scores` through [`write_candidate_scores!`](@ref), with no view of the training returns.
-13. Select `opt_idx`, the position ``i^{\\star}``, through [`finite_candidate_index`](@ref).
-14. Build the selected candidate `pipe` through [`search_candidate`](@ref).
-15. Return a [`SearchCrossValidationResult`](@ref).
+13. Order the finite candidates, keep the best `gscv.n_best`, build each from `pipe`, and return the [`SearchCrossValidationResult`](@ref) through [`search_result`](@ref). The path of each row is [`score_path_ids`](@ref) of `cv`.
 
 For `rscv`:
 
  1. Resolve the random number generator from `rscv.rng` and `rscv.seed` through [`resolve_rng`](@ref).
- 2. Sample the grid through [`make_p_grid`](@ref), with at most `rscv.n_iter` values per key.
+ 2. Draw at most `rscv.n_iter` trials through [`make_p_grid`](@ref), each a joint value of every key of one parameter set.
  3. Build a [`GridSearchCrossValidation`](@ref) with that grid and the other fields of `rscv`, and run the search of that grid. Under a [`CombinatorialCrossValidation`](@ref) this is the combinatorial method.
 
 # Arguments
@@ -429,7 +426,7 @@ For `rscv`:
   - No candidate holds a [`TrainTestSplit`](@ref), through [`assert_search_candidates`](@ref).
   - The grid is not empty, it holds at most `RESOURCE_LIMITS[].max_search_grid` candidates, and every key names a step or a path rooted at `steps`, through [`pipeline_lens_val_grid`](@ref).
   - A [`TimeDependent`](@ref) schedule of a candidate holds one entry per fold. The fold loop checks each candidate as it runs it.
-  - At least one candidate finishes every fold. Otherwise [`finite_candidate_index`](@ref) throws an `IsNonFiniteError`.
+  - At least one candidate finishes every fold. Otherwise [`finite_candidate_order`](@ref) throws an `IsNonFiniteError`.
 
 # Returns
 
@@ -445,7 +442,7 @@ For `rscv`:
   - [`candidate_train_score`](@ref): the train score reads the prior result, because the steps of a Pipeline change the data of each fold.
   - [`score_rows`](@ref)
   - [`pin_draw`](@ref)
-  - [`finite_candidate_index`](@ref)
+  - [`finite_candidate_order`](@ref)
   - [`assert_search_entry`](@ref)
   - [`Prices_RR`](@ref)
 """
@@ -483,11 +480,8 @@ function search_cross_validation(pipe::Pipeline, gscv::GridSearchCrossValidation
                                     nothing, r, sgn, gscv.kwargs)
         end
     end
-    opt_idx = finite_candidate_index(gscv.scorer, test_scores)
-    pipe = search_candidate(pipe, lens_grid[opt_idx], val_grid[opt_idx])
-    return SearchCrossValidationResult(; opt = pipe, test_scores = test_scores,
-                                       train_scores = train_scores, lens_grid = lens_grid,
-                                       val_grid = val_grid, idx = opt_idx)
+    return search_result(pipe, gscv, test_scores, train_scores, lens_grid, val_grid,
+                         score_path_ids(cv))
 end
 """
     search_cross_validation(pipe::Pipeline,
@@ -541,9 +535,7 @@ The scorer never reads the column of a candidate that failed a path, so the sear
 10. Run `pipei` over `gscv.cv` through [`cross_val_predict`](@ref), with the executor `gscv.ex`, giving `predictions`, one path per member.
 11. Write ``s \\, \\mathcal{R}`` of each path of `predictions` into column `i` of `test_scores`.
 12. When `gscv.train_score` is `true`, write the train score of each fold of each path into column `i` of the matrix of that path, through [`candidate_train_score`](@ref) with no view of the training returns.
-13. Select `opt_idx`, the position ``i^{\\star}``, through [`finite_candidate_index`](@ref).
-14. Build the selected candidate `pipe` through [`search_candidate`](@ref).
-15. Return a [`SearchCrossValidationResult`](@ref).
+13. Order the finite candidates, keep the best `gscv.n_best`, build each from `pipe`, and return the [`SearchCrossValidationResult`](@ref) through [`search_result`](@ref). Row `p` is path `p`, so the path of each row is `1:M`.
 
 # Arguments
 
@@ -556,7 +548,7 @@ The scorer never reads the column of a candidate that failed a path, so the sear
   - `pipe` carries no partial-fit state, through [`assert_search_entry`](@ref).
   - No candidate holds a [`TrainTestSplit`](@ref), through [`assert_search_candidates`](@ref).
   - The grid is not empty, it holds at most `RESOURCE_LIMITS[].max_search_grid` candidates, and every key names a step or a path rooted at `steps`, through [`pipeline_lens_val_grid`](@ref).
-  - At least one candidate finishes every path. Otherwise [`finite_candidate_index`](@ref) throws an `IsNonFiniteError`.
+  - At least one candidate finishes every path. Otherwise [`finite_candidate_order`](@ref) throws an `IsNonFiniteError`.
 
 # Returns
 
@@ -570,7 +562,7 @@ The scorer never reads the column of a candidate that failed a path, so the sear
   - [`cross_val_predict`](@ref)
   - [`sort_predictions`](@ref)
   - [`expected_risk`](@ref)
-  - [`finite_candidate_index`](@ref)
+  - [`finite_candidate_order`](@ref)
   - [`candidate_train_score`](@ref)
 """
 function search_cross_validation(pipe::Pipeline,
@@ -609,11 +601,7 @@ function search_cross_validation(pipe::Pipeline,
             end
         end
     end
-    opt_idx = finite_candidate_index(gscv.scorer, test_scores)
-    pipe = search_candidate(pipe, lens_grid[opt_idx], val_grid[opt_idx])
-    return SearchCrossValidationResult(; opt = pipe, test_scores = test_scores,
-                                       train_scores = train_scores, lens_grid = lens_grid,
-                                       val_grid = val_grid, idx = opt_idx)
+    return search_result(pipe, gscv, test_scores, train_scores, lens_grid, val_grid, 1:M)
 end
 function search_cross_validation(pipe::Pipeline, rscv::RandomisedSearchCrossValidation,
                                  data::Prices_RR)
@@ -623,6 +611,7 @@ function search_cross_validation(pipe::Pipeline, rscv::RandomisedSearchCrossVali
                                                                          rscv.n_iter, rng);
                                                              cv = rscv.cv, r = rscv.r,
                                                              scorer = rscv.scorer,
+                                                             n_best = rscv.n_best,
                                                              ex = rscv.ex,
                                                              train_score = rscv.train_score,
                                                              kwargs = rscv.kwargs), data)

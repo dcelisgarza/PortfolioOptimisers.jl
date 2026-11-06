@@ -152,7 +152,7 @@ A field `r` that holds no such measure is an error. Else the computed uncertaint
 function route_sigma_ucs(x, sig::AbstractUncertaintySetResult)
     replace_usv(y) =
         if isa(y, UncertaintySetVariance)
-            Accessors.set(y, Accessors.PropertyLens{:ucs}(), sig)
+            rebuild_estimator(y, (; ucs = sig))
         else
             y
         end
@@ -165,7 +165,7 @@ function route_sigma_ucs(x, sig::AbstractUncertaintySetResult)
     end
     @argcheck(found,
               ArgumentError("cannot route a covariance uncertainty set into a $(Base.typename(typeof(x)).wrapper): no UncertaintySetVariance risk measure in its r field"))
-    return Accessors.set(x, Accessors.PropertyLens{:r}(), newr)
+    return rebuild_estimator(x, (; r = newr))
 end
 """
     @pipe_route_sigma_ucs T
@@ -214,8 +214,8 @@ macro pipe_route_rkb(T)
                    function pipe_route(x::$T, ::Val{:rkb}, v)
                        @argcheck(hasfield(typeof(x.rba), :rkb),
                                  ArgumentError("cannot route a risk budget into a $(Base.typename(typeof(x)).wrapper): its rba field holds a $(Base.typename(typeof(x.rba)).wrapper), which has no rkb field to receive it"))
-                       rba = Accessors.set(x.rba, Accessors.PropertyLens{:rkb}(), v)
-                       return Accessors.set(x, Accessors.PropertyLens{:rba}(), rba)
+                       rba = rebuild_estimator(x.rba, (; rkb = v))
+                       return rebuild_estimator(x, (; rba = rba))
                    end
                    function pipe_accepts(x::$T, ::Val{:rkb})::Bool
                        return hasfield(typeof(x.rba), :rkb)

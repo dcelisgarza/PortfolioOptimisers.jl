@@ -143,89 +143,38 @@ function one_hot_exposure_names(xe::OneHotExposure, rd::ReturnsResult)::Vector{S
     return panel_field_labels(f)
 end
 """
-    one_hot_level_fill!(B::AbstractArray{<:Real, 3}) -> nothing
+$(DocStringExtensions.TYPEDSIGNATURES)
 
-Write `NaN` across every level of a one-hot Factor Exposure where the asset sets no level, in place.
+Write a one-hot Factor Exposure into `B` in one pass, in place.
 
-An asset that belongs to no level of the classification has no exposure to any of its factors, and a row of zeros would say that it belongs to none of them with certainty. A level counts as set when its entry is finite and not zero.
+A live cell takes one at the level of its code and zero at every other level. A cell that is not live takes `NaN` across every level. The codes of a categorical Panel Field lie in its levels, so every live cell sets exactly one level. A blank never reaches a `ReturnsResult`: the builder resolves it to a fill value and records the resolution in an observed mask. So the caller marks a cell that the Panel Field does not observe as not live, and a level that a fill wrote does not become a classification the asset never carried. The observation axis is the slowest axis of `B`, so it is the outer loop, and the pass writes `B` in its memory order.
 
 # Arguments
 
-  - `B`: The one-hot block, `observations × assets × levels`, changed in place. Its element type must hold `NaN`.
+  - `B`: The one-hot block, `assets × levels × observations`, written in place. Its element type must hold `NaN`.
+  - `codes`: The codes of the Panel Field, `observations × assets`, each in `1:size(B, 2)`.
+  - `live`: Mask `observations × assets`, `true` where the Panel Field observes the cell and the Asset Panel activates it.
 
 # Validation
 
-  - `eltype(B)` holds `NaN`, through [`nan_fill_value`](@ref). Raises an `ArgumentError`.
+  - `eltype(B)` holds `NaN`, through [`nan_fill_value`](@ref), whether or not a cell needs it. Raises an `ArgumentError`.
 
 # Returns
 
-  - `nothing`. `B` carries the filled block.
+  - `nothing`. `B` carries the block.
 
 # Related
 
   - [`OneHotExposure`](@ref)
-  - [`one_hot_observed_fill!`](@ref)
   - [`factor_exposure`](@ref)
+  - [`exposure_active_fill!`](@ref)
 """
-function one_hot_level_fill!(B::AbstractArray{<:Real, 3})::Nothing
+function one_hot_fill!(B::AbstractArray{<:Number, 3}, codes::AbstractMatrix{<:Integer},
+                       live::AbstractMatrix{Bool})::Nothing
     nan = nan_fill_value(B)
-    for t in axes(B, 1), i in axes(B, 2)
-        set = false
-        for l in axes(B, 3)
-            v = B[t, i, l]
-            if isfinite(v) && !iszero(v)
-                set = true
-                break
-            end
-        end
-        if !set
-            for l in axes(B, 3)
-                B[t, i, l] = nan
-            end
-        end
-    end
-    return nothing
-end
-"""
-    one_hot_observed_fill!(B::AbstractArray{<:Number, 3}, omsk::Nothing) -> nothing
-    one_hot_observed_fill!(B::AbstractArray{<:Number, 3},
-                           omsk::AbstractMatrix{Bool}) -> nothing
-
-Write `NaN` across every level of a one-hot Factor Exposure where the Panel Field was not observed, in place.
-
-A blank never reaches a `ReturnsResult`: the builder resolves it to a fill value and records the resolution in an observed-mask column. The read undoes that resolution, so a level the fill wrote does not become a classification the asset never carried.
-
-# Arguments
-
-  - `B`: The one-hot block, `observations × assets × levels`, changed in place. Its element type must hold `NaN`.
-  - `omsk`: The Panel Field's observed mask, `observations × assets`, or `nothing` when the Panel Field cannot blank.
-
-# Validation
-
-  - `eltype(B)` holds `NaN` when `omsk` is a mask, through [`nan_fill_value`](@ref). Raises an `ArgumentError`.
-
-# Returns
-
-  - `nothing`. `B` carries the filled block.
-
-# Related
-
-  - [`OneHotExposure`](@ref)
-  - [`one_hot_level_fill!`](@ref)
-  - [`factor_exposure`](@ref)
-"""
-function one_hot_observed_fill!(::AbstractArray{<:Number, 3}, ::Nothing)::Nothing
-    return nothing
-end
-function one_hot_observed_fill!(B::AbstractArray{<:Number, 3},
-                                omsk::AbstractMatrix{Bool})::Nothing
-    nan = nan_fill_value(B)
-    for t in axes(B, 1), i in axes(B, 2)
-        if !omsk[t, i]
-            for l in axes(B, 3)
-                B[t, i, l] = nan
-            end
-        end
+    on, off = one(eltype(B)), zero(eltype(B))
+    for t in axes(B, 3), l in axes(B, 2), i in axes(B, 1)
+        B[i, l, t] = live[t, i] ? (codes[t, i] == l ? on : off) : nan
     end
     return nothing
 end
@@ -236,10 +185,9 @@ Compute the Factor Exposure of a categorical Panel Field, one factor per level.
 
 # Algorithm
 
- 1. Look the Panel Field up, and expand its codes into a one-hot block.
- 2. Write `NaN` across the levels of every cell the Panel Field does not observe.
- 3. Write `NaN` across the levels of every cell that sets no level.
- 4. Write `NaN` across the levels of every cell the active mask does not activate.
+ 1. Look the Panel Field up.
+ 2. Mark a cell live when the Panel Field observes it and the active mask of the Asset Panel activates it.
+ 3. Expand the codes into a one-hot block through [`one_hot_fill!`](@ref), with `NaN` across the levels of every cell that is not live.
 
 # Arguments
 
@@ -249,10 +197,12 @@ Compute the Factor Exposure of a categorical Panel Field, one factor per level.
 # Validation
 
   - The rules of [`one_hot_field`](@ref).
+  - The active mask of the Asset Panel has the size of the codes. Raises a `DimensionMismatch`.
+  - The element type of the returns holds `NaN`, through [`nan_fill_value`](@ref). Raises an `ArgumentError`.
 
 # Returns
 
-  - `L::Array{<:Real, 3}`: The Factor Exposure, `observations × assets × levels`, in the level order the Panel Field declares.
+  - `L::Array{<:Real, 3}`: The Factor Exposure, `assets × levels × observations`, in the level order the Panel Field declares.
 
 # Examples
 
@@ -266,12 +216,12 @@ julia> rd = ReturnsResult(; nx = [\"A\", \"B\"], X = zeros(2, 2), pnl = pnl);
 julia> factor_exposure(OneHotExposure(; field = \"sector\", family = \"sector\"), rd)
 2×2×2 Array{Float64, 3}:
 [:, :, 1] =
- 0.0    1.0
- 0.0  NaN
+ 0.0  1.0
+ 1.0  0.0
 
 [:, :, 2] =
- 1.0    0.0
- 1.0  NaN
+   0.0    1.0
+ NaN    NaN
 ```
 
 # Related
@@ -279,21 +229,53 @@ julia> factor_exposure(OneHotExposure(; field = \"sector\", family = \"sector\")
   - [`OneHotExposure`](@ref)
   - [`AbstractExposureEstimator`](@ref)
   - [`one_hot_exposure_names`](@ref)
-  - [`one_hot_level_fill!`](@ref)
+  - [`one_hot_fill!`](@ref)
   - [`exposure_active_fill!`](@ref)
 """
 function factor_exposure(xe::OneHotExposure, rd::ReturnsResult)::Array{<:Real, 3}
+    (; codes, live, nl) = one_hot_inputs(xe, rd)
+    Tf = real(eltype(rd.X))
+    B = Array{Tf}(undef, size(codes, 2), nl, size(codes, 1))
+    one_hot_fill!(B, codes, live)
+    return B
+end
+"""
+$(DocStringExtensions.TYPEDSIGNATURES)
+
+Return what [`one_hot_fill!`](@ref) reads to expand a [`OneHotExposure`](@ref): the codes of its Panel Field, the cells that are live, and the number of levels.
+
+[`factor_exposure`](@ref) fills a block of its own from them, and the exposure history of a [`CrossSectionalFactorPrior`](@ref) fills the columns of the member in the history, with no block between. Both read the same checks.
+
+# Arguments
+
+  - `xe`: One-hot Exposure Estimator.
+  - $(arg_dict[:rd]) It must carry an Asset Panel in `rd.pnl`.
+
+# Validation
+
+  - The rules of [`one_hot_field`](@ref).
+  - The codes match the active mask of the Asset Panel. Raises a `DimensionMismatch`.
+
+# Returns
+
+  - `codes::AbstractMatrix{<:Integer}`: The codes of the Panel Field, `observations × assets`.
+  - `live::AbstractMatrix{Bool}`: `true` where the Panel Field observes the cell and the active mask activates it.
+  - `nl::Int`: The number of levels, one factor each.
+
+# Related
+
+  - [`factor_exposure`](@ref)
+  - [`one_hot_fill!`](@ref)
+  - [`one_hot_field`](@ref)
+"""
+function one_hot_inputs(xe::OneHotExposure, rd::ReturnsResult)
     f = one_hot_field(rd, xe.field)
     codes = f.codes
-    Tf = float_if_integer(real(eltype(rd.X)))
-    B = zeros(Tf, size(codes, 1), size(codes, 2), length(f.levels))
-    for i in CartesianIndices(codes)
-        B[i, codes[i]] = one(Tf)
-    end
-    one_hot_observed_fill!(B, f.omsk)
-    one_hot_level_fill!(B)
-    exposure_active_fill!(B, rd.pnl)
-    return B
+    amsk = rd.pnl.amsk
+    @argcheck(size(amsk) == size(codes),
+              DimensionMismatch("the codes of a one-hot Factor Exposure must match the active mask of the Asset Panel, got size(codes) = $(size(codes)) and size(pnl.amsk) = $(size(amsk))"))
+    live = isnothing(f.omsk) ? amsk : f.omsk .& amsk
+    return (; codes = codes, live = live, nl = length(f.levels))
 end
 function lookback(::OneHotExposure)::Integer
     return 1

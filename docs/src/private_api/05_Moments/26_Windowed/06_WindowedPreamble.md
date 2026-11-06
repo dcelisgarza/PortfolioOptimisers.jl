@@ -1,5 +1,5 @@
 ```@meta
-Description = "Windowed preamble, private API of PortfolioOptimisers.jl: windowed_preamble, windowed_rows, windowed_keywords, windowed_panel, windowed_series_rows, …"
+Description = "Windowed preamble, private API of PortfolioOptimisers.jl: windowed_preamble, windowed_inner, windowed_rows, windowed_keywords, windowed_panel, …"
 ```
 
 # [Windowed preamble: private API](@id private-api-windowed-preamble)
@@ -8,6 +8,7 @@ Description = "Windowed preamble, private API of PortfolioOptimisers.jl: windowe
 
 ```@docs
 windowed_preamble
+windowed_inner
 windowed_rows
 windowed_keywords
 windowed_panel
@@ -16,5 +17,6 @@ windowed_series_row
 windowed_variance_series
 SeedWindowed
 seed_window_path(::SeedWindowed)
-PortfolioOptimisers.show_fields(est::Union{<:WindowedExpectedReturns, <:WindowedCovariance, <:WindowedVariance, <:WindowedCoskewness, <:WindowedCokurtosis})
+PortfolioOptimisers.observation_count(est::SeedWindowed)
+PortfolioOptimisers.show_fields(est::Union{WindowedExpectedReturns, WindowedCovariance, WindowedVariance, WindowedCoskewness, WindowedCokurtosis})
 ```

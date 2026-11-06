@@ -3,7 +3,9 @@
 
 Evaluate the Kaniadakis logarithm of [kaniadakis2001](@cite), the inverse of the κ-deformed exponential.
 
-[rlvar](@cite) builds the relativistic value at risk on this logarithm. So the relativistic risk measures, their JuMP constraint layer and the entropy pooling views of the relativistic value at risk all scale a dual variable by this quantity, and the library states it once here. The function checks neither argument, because every caller holds `kappa` in a field that its constructor has already passed to [`assert_unit_interval`](@ref), and every caller passes the reciprocal of a tail mass, which is positive.
+[rlvar](@cite) defines the relativistic value at risk with this logarithm. [`RRM`](@ref), [`set_relativistic_risk_constraints!`](@ref) and the relativistic value at risk views of entropy pooling multiply a dual variable by `kappa_log(inv(alpha * T), kappa)`, where `alpha` is the significance level and `T` is the sample size. [`EntropyBudget`](@ref) finds the `kappa` that gives a target value of this coefficient.
+
+The function checks neither argument. Each relativistic risk measure and each relativistic value at risk view runs [`assert_unit_interval`](@ref) on `kappa` in its constructor. When a calibration rule gives `kappa`, `rebuild_with_slots` runs the same constructor on the new value. [`EntropyBudget`](@ref) passes the midpoints of a bracket inside ``(0, 1)``. Every caller passes ``u = 1 / (\\alpha T)``, which is positive.
 
 # Mathematical definition
 
@@ -17,14 +19,14 @@ Where:
 
   - $(math_dict[:ln_kappa])
   - ``u > 0``: Argument of the logarithm.
-  - ``\\kappa \\in (0, 1)``: Deformation parameter.
+  - $(math_dict[:kappa_rm])
 
 The value is negative for every ``u < 1``, and ``\\ln_{\\kappa}(u) \\to \\ln(u)`` as ``\\kappa \\to 0``.
 
 # Arguments
 
-  - `u`: Argument of the logarithm. Must be positive.
-  - $(arg_dict[:kappa]) Must lie in ``(0, 1)``.
+  - `u`: Argument of the logarithm. It must be positive.
+  - `kappa`: Kaniadakis deformation parameter. It must lie in ``(0, 1)``.
 
 # Returns
 
@@ -42,11 +44,13 @@ julia> PortfolioOptimisers.kappa_log(0.5, 0.3)
 
 # Related
 
-  - [`RRM`](@ref): every relativistic risk measure reaches the logarithm through it.
+  - [`RRM`](@ref)
+  - [`set_relativistic_risk_constraints!`](@ref)
   - [`RelativisticValueatRisk`](@ref)
   - [`ConicRelativisticValueatRiskView`](@ref)
-  - [`GridRelativisticValueatRiskView`](@ref)
-  - [`assert_unit_interval`](@ref): the check that every caller's constructor runs on `kappa`.
+  - [`GridTailView`](@ref)
+  - [`EntropyBudget`](@ref)
+  - [`assert_unit_interval`](@ref): the check that the constructors run on `kappa`.
 
 # References
 

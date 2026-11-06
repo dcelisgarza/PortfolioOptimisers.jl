@@ -12,7 +12,6 @@ AbstractPanelFillAlgorithm
 NumericPanelInput
 CategoricalPanelInput
 TensorPanelInput
-NoPanelFill
 ConstantPanelFill
 ForwardPanelFill
 BackwardPanelFill

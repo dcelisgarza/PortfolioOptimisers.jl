@@ -63,6 +63,10 @@ the gap of the root mean square and the log under HAC, but the first moment, whi
 0.2 % high under HAC at 8 and 12 assets, then reads 0.26 % to 0.40 % high. The two rules are under comparison on the forecasts of the
 estimator, and the closure may be removed if it does not pay its cost.
 
+!!! warning
+
+    The closure runs in `Float64` at least, whatever the type of the decay. Its kernel, [`level_closure_kernel`](@ref), is a covariance that it reads as the difference of two terms of almost equal size, and each term reads differences of log-determinants of up to several hundred. On `Float32` the round-off of those differences is larger than the covariance, so the closure gave a covariance of `NaN`. A narrower decay, such as `0.9f0`, runs the closure in `Float64`, and [`mahalanobis_recursion_ratio`](@ref) converts the ratio back to the type of the decay. The ratio is near one, so it keeps the precision of that type. A wider type, such as `BigFloat`, runs in its own type. The closure therefore costs on `Float32` what it costs on `Float64`.
+
 # Constructors
 
     GaussianLevelRecursion() -> GaussianLevelRecursion
@@ -101,7 +105,7 @@ it, and a barycentric interpolant reads it at each count.
   - `decay::Number`: Decay of the weights.
   - `Ks::AbstractVector{<:Integer}`: Counts of observations.
   - `n::Integer`: Count of assets that contribute to the statistic, at least two.
-  - `hac_lags::Option{<:Union{<:Integer, <:VecNum}}`: Count of HAC lags, the weight of each lag, or
+  - `hac_lags::Option{<:Union{Integer, VecNum}}`: Count of HAC lags, the weight of each lag, or
     `nothing`.
   - `start::Integer`: The first count, [`mahalanobis_bias_start`](@ref).
   - `Ksat::Integer`: The count of saturation, [`mahalanobis_bias_saturation`](@ref).
@@ -124,30 +128,34 @@ function mahalanobis_recursion_ratio(::MeanLevelRecursion, ::RegimeAdjustedMetho
 end
 function mahalanobis_recursion_ratio(::GaussianLevelRecursion, method::RegimeAdjustedMethod,
                                      decay::Number, Ks::AbstractVector{<:Integer},
-                                     n::Integer,
-                                     hac_lags::Option{<:Union{<:Integer, <:VecNum}},
+                                     n::Integer, hac_lags::Option{<:Union{Integer, VecNum}},
                                      start::Integer, Ksat::Integer)
-    o = one(decay)
+    # The kernel of the closure is a difference of two near-equal terms, which a type narrower
+    # than Float64 loses to round-off (#1827). The maintainer ruled that the closure runs in
+    # Float64 at least, and the docstring of `GaussianLevelRecursion` states it.
+    lam = convert(promote_type(typeof(decay), Float64), decay)
+    o = one(lam)
     t = (o .- cos.(pi .* (0:7) ./ 7 .* o)) ./ 2
-    Kr = unique([if t[i] <= decay^(Ksat - start)
+    Kr = unique([if t[i] <= lam^(Ksat - start)
                      Ksat
                  else
-                     clamp(round(Int, start + log(t[i]) / log(decay)), start, Ksat)
+                     clamp(round(Int, start + log(t[i]) / log(lam)), start, Ksat)
                  end
                  for i in eachindex(t)])
-    closure = [level_closure_factors((method,), decay, K, n, hac_lags)[1] for K in Kr]
-    lr = log.(closure ./ mahalanobis_level_bias(method, decay, Kr, n, hac_lags))
-    sigma = decay .^ (Kr .- start)
+    closure = [level_closure_factors((method,), lam, K, n, hac_lags)[1] for K in Kr]
+    lr = log.(closure ./ mahalanobis_level_bias(method, lam, Kr, n, hac_lags))
+    sigma = lam .^ (Kr .- start)
     bw = [inv(prod(sigma[a] - sigma[b] for b in eachindex(sigma) if b != a; init = o))
           for a in eachindex(sigma)]
     return map(Ks) do K
-        x = decay^(min(K, Ksat) - start)
+        x = lam^(min(K, Ksat) - start)
         a = findfirst(==(x), sigma)
         if !(isnothing(a))
-            return exp(lr[a])
+            return oftype(decay, exp(lr[a]))
         end
-        return exp(sum(bw[k] * lr[k] / (x - sigma[k]) for k in eachindex(bw)) /
-                   sum(bw[k] / (x - sigma[k]) for k in eachindex(bw)))
+        return oftype(decay,
+                      exp(sum(bw[k] * lr[k] / (x - sigma[k]) for k in eachindex(bw)) /
+                          sum(bw[k] / (x - sigma[k]) for k in eachindex(bw))))
     end
 end
 """
@@ -212,7 +220,7 @@ derivative ``\\rho = \\rho_{0} - q``.
 
 # Returns
 
-  - `(D, rho)::Tuple{<:Number, <:Number}`: The two values.
+  - `(D, rho)::Tuple{Number, Number}`: The two values.
 
 # Related
 
@@ -692,7 +700,7 @@ grid, with the cut of [`mahalanobis_transform`](@ref) where the count has one.
 
 # Returns
 
-  - `(so, L)::Tuple{<:VecNum, <:VecNum}`: The grid and the transform on it.
+  - `(so, L)::Tuple{VecNum, VecNum}`: The grid and the transform on it.
 
 # Related
 
@@ -743,7 +751,7 @@ of [`GaussianLevelRecursion`](@ref).
   - `decay::Number`: Decay of the weights.
   - `K::Integer`: Count of observations.
   - `n::Integer`: Count of assets that contribute to the statistic, at least two.
-  - `hac_lags::Option{<:Union{<:Integer, <:VecNum}}`: Count of HAC lags, the weight of each lag, or
+  - `hac_lags::Option{<:Union{Integer, VecNum}}`: Count of HAC lags, the weight of each lag, or
     `nothing`.
 
 # Returns
@@ -756,7 +764,7 @@ of [`GaussianLevelRecursion`](@ref).
   - [`mahalanobis_recursion_ratio`](@ref)
 """
 function level_closure_factors(methods::Tuple, decay::Number, K::Integer, n::Integer,
-                               hac_lags::Option{<:Union{<:Integer, <:VecNum}})
+                               hac_lags::Option{<:Union{Integer, VecNum}})
     grid = mahalanobis_bias_grid(decay)
     G, Rh, peaks = mahalanobis_lattice(decay, [K], grid.xf, hac_lags)
     c = (one(decay) - decay) / (one(decay) - decay^K)

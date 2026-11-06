@@ -564,3 +564,12 @@ pseudo-inverse, and counts its rank as the dimension `K`. A market factor beside
 industry block makes that covariance singular, because the market exposure is the sum of the
 industry exposures, and the fitted factor returns and `g` both lie in the range of the covariance.
 An inverse there gives a meaningless weight.
+
+## Amendment (2026-10-28)
+
+`IdentityMetric` is removed
+([#1867](https://github.com/dcelisgarza/PortfolioOptimisers.jl/issues/1867), ADR 0222). It named
+no weight source, so `metric = nothing` now spells the equal-weight metric of
+`OrthogonalUncertaintySet`. Read "under `IdentityMetric`" in the amendment of 2026-09-08 as "under
+`metric = nothing`". The units of the compact radius do not change: under `metric = nothing` it
+still carries the units of a variance.

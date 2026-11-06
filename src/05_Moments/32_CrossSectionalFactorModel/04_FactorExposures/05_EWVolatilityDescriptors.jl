@@ -486,7 +486,7 @@ julia> PortfolioOptimisers.ew_residual_returns([0.1 0.2; NaN 0.0], [0.1, -0.05],
 function ew_residual_returns(X::AbstractMatrix{<:Real}, rm::AbstractVector{<:Real},
                              B::AbstractMatrix{<:Real},
                              amsk::AbstractMatrix{Bool})::Matrix{<:Real}
-    Tf = float_if_integer(promote_type(eltype(X), eltype(rm), eltype(B)))
+    Tf = promote_type(eltype(X), eltype(rm), eltype(B))
     E = fill(Tf(NaN), size(X))
     for t in axes(X, 1), i in axes(X, 2)
         x = X[t, i]
@@ -783,7 +783,7 @@ function ew_volatility_variance(ce::RegimeAdjustedExpWeightedVariance,
                                 Y::AbstractMatrix{<:Real}, pnl::AssetPanel,
                                 st::Option{<:RegimeAdjustedVarianceState})
     amsk, emsk = panel_moment_masks(pnl)
-    V = Matrix{float_if_integer(eltype(Y))}(undef, size(Y))
+    V = Matrix{eltype(Y)}(undef, size(Y))
     vs = regime_adjusted_variance_pass!(ce, Y, 1, emsk, amsk,
                                         isnothing(st) ? nothing : copy(st)) do i, cache
         V[i, :] = regime_adjusted_variance(cache, ce)
@@ -898,7 +898,7 @@ function descriptor_step(de::Union{EWVolatility{<:RegimeAdjustedExpWeightedVaria
                                                         <:RegimeAdjustedExpWeightedVariance}},
                          rd::ReturnsResult)
     (; st, D) = ew_volatility_fold(de, rd, de.cache)
-    return (; de = Accessors.@set(de.cache = st), D = D)
+    return (; de = rebuild_estimator(de, (; cache = st)), D = D)
 end
 """
     partial_fit!(de::Union{EWVolatility{<:RegimeAdjustedExpWeightedVariance},

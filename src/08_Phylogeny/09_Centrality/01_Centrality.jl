@@ -5,38 +5,40 @@ Abstract supertype for the algorithms that score how central each asset is in a 
 
 Every member wraps one routine of [`Graphs.jl`](https://juliagraphs.org/Graphs.jl/stable/algorithms/centrality/).
 
-All concrete and/or abstract types implementing specific centrality algorithms (e.g., betweenness, closeness, degree, eigenvector, Katz, pagerank, radiality, stress) should be subtypes of `AbstractCentralityAlgorithm`.
+Every concrete or abstract type that selects a centrality algorithm must subtype `AbstractCentralityAlgorithm`.
 
 # Each member declares the weights it needs
 
-A member says which quantity its edge weights must be, through [`centrality_polarity`](@ref), and [`centrality_graph`](@ref) supplies it. The declaration is about **correctness** — a shortest path over similarities is backwards — and never about capability: a member that declares nothing, and a source that carries no weights, both run on the plain graph rather than raising. The fallback declares `nothing`, so a new member is unweighted until it opts in.
+A member states through [`centrality_polarity`](@ref) which quantity its edge weights must be, and [`centrality_graph`](@ref) gives it that quantity. The declaration is about correctness, because a shortest path over similarities gives the reverse order. It is not about capability. A member that declares nothing, and a source that carries no weights, both run on the plain graph with no error. The method on the abstract type declares `nothing`, so a new member is unweighted until it declares a polarity.
 
-The five members that do declare one carry an `ov` field, and [`TopologyOnly`](@ref) in it withdraws the declaration for that instance. [`centrality_polarity`](@ref) therefore answers the **effective** polarity, not the declared one.
+The five members that declare a polarity have an `ov` field. [`TopologyOnly`](@ref) in that field withdraws the declaration for that instance. [`centrality_polarity`](@ref) returns the effective polarity, and not the declared one.
+
+The rule is the one of [pozzi2013](@cite). It weights the degree and the eigenvector centrality by a similarity, ``1 + \\rho_{i,\\,j}``, and the betweenness, the eccentricity and the closeness by the distance ``\\sqrt{2(1 - \\rho_{i,\\,j})}``.
 
 # Interfaces
 
-In order to implement a new centrality algorithm that works seamlessly with the library, subtype `AbstractCentralityAlgorithm` with the routine's configuration as fields, and implement the following method:
+To add a centrality algorithm, subtype `AbstractCentralityAlgorithm` with the configuration of its routine as fields. Then implement `calc_centrality`. Implement `centrality_polarity` too if the algorithm reads edge weights.
 
 ## `calc_centrality`
 
-  - `calc_centrality(ct::MyCentrality, g::Graphs.AbstractGraph) -> VecNum`: Score every vertex of `g`. `centrality_graph` has already weighted `g` in the polarity the algorithm declares, so the method forwards to the routine and inspects nothing.
+  - `calc_centrality(ct::MyCentrality, g::Graphs.AbstractGraph) -> VecNum`: Score every vertex of `g`. `centrality_graph` builds `g` with the weights of the polarity that the algorithm declares. The method only calls the routine, and checks nothing.
 
 ### Arguments
 
-  - `ct`: The concrete subtype instance.
-  - `g`: The graph to score, weighted or plain as the declared polarity decides.
+  - `ct`: The instance of the subtype.
+  - `g`: The graph to score. The declared polarity decides whether it is weighted or plain.
 
 ### Returns
 
-  - `scores::VecNum`: One score per vertex of `g`, in vertex order.
+  - `scores::VecNum`: One score for each vertex of `g`, in the order of the vertices.
 
 ## `centrality_polarity`
 
-  - `centrality_polarity(ct::MyCentrality) -> Option{<:AbstractCentralityPolarity}`: Declare which quantity the edge weights must be. The fallback answers `nothing`, so a new algorithm runs on the plain graph until it opts in. Declare [`DistancePolarity`](@ref) for a routine defined over shortest paths, and [`SimilarityPolarity`](@ref) for one that reads the adjacency matrix itself.
+  - `centrality_polarity(ct::MyCentrality) -> Option{<:AbstractCentralityPolarity}`: Declare which quantity the edge weights must be. The method on the abstract type returns `nothing`, so a new algorithm runs on the plain graph until it declares a polarity. Declare [`DistancePolarity`](@ref) for a routine over shortest paths, and [`SimilarityPolarity`](@ref) for a routine that reads the adjacency matrix.
 
 ### Arguments
 
-  - `ct`: The concrete subtype instance.
+  - `ct`: The instance of the subtype.
 
 ### Returns
 
@@ -58,8 +60,7 @@ In order to implement a new centrality algorithm that works seamlessly with the 
 
 # References
 
-  - $(ref_dict[:cajas2025]) Section 13.1.3.
-  - $(ref_dict[:estrada2011]) Chapter 7.
+  - $(ref_dict[:pozzi2013]) Section "Methods", "Centrality and Peripherality measures".
 """
 abstract type AbstractCentralityAlgorithm <: AbstractPhylogenyAlgorithm end
 """
@@ -67,25 +68,25 @@ $(DocStringExtensions.TYPEDEF)
 
 Withdraws an algorithm's polarity declaration, so it reads the network's topology alone.
 
-An algorithm that declares a polarity is handed weights wherever the source carries them. `TopologyOnly` in its `ov` field withdraws that request: [`centrality_polarity`](@ref) then answers `nothing`, and [`centrality_graph`](@ref) routes to the plain `Graphs.SimpleGraph` of [`phylogeny_matrix`](@ref). The computation is the one that already runs for [`DegreeCentrality`](@ref), [`Pagerank`](@ref) and [`KatzCentrality`](@ref), so this is a redirect and never a new estimator.
+An algorithm that declares a polarity receives weights wherever the source carries them. `TopologyOnly` in its `ov` field withdraws that request. [`centrality_polarity`](@ref) then returns `nothing`, and [`centrality_graph`](@ref) builds the plain `Graphs.SimpleGraph` of [`phylogeny_matrix`](@ref). [`DegreeCentrality`](@ref), [`Pagerank`](@ref) and [`KatzCentrality`](@ref) already run on that graph. `TopologyOnly` selects a route that exists, and it adds no estimator.
 
 # The override runs one way only
 
-It removes weights and never supplies them. There is no value that forces a polarity onto an algorithm, and the field is deliberately **not** typed over [`AbstractCentralityPolarity`](@ref). A forced polarity would succeed rather than raise — [`calc_distance_weighted_graph`](@ref) carries distances on both branches — and the algorithm would read a distance where it needs a similarity, reversing its own ordering in silence. Polarity correctness is not a runtime property, so nothing could catch it.
+It removes weights and never adds them. No value forces a polarity on an algorithm, and the type of the field is not [`AbstractCentralityPolarity`](@ref) on purpose. A forced polarity runs with no error, because [`calc_distance_weighted_graph`](@ref) carries distances on both branches. The algorithm then reads a distance where it needs a similarity, and reverses its order with no error. No check at run time can find a wrong polarity.
 
-# Every request is honoured, on every source
+# Every source honours the request
 
-The answer over the topology alone is available from every source, so the override never warns and never goes inert. On a partition source, on a precomputed [`PhylogenyResult`](@ref), and on the tree branch under [`SimilarityPolarity`](@ref), the plain graph is what those routes already build, so the request is satisfied before it is made.
+Every source can give the answer over the topology alone. The override never warns, and no source ignores it. A partition source, a precomputed [`PhylogenyResult`](@ref), and the tree branch under [`SimilarityPolarity`](@ref) already build the plain graph. On these sources, the answer is already the answer that the override asks for.
 
-Only the five algorithms that declare a polarity carry an `ov` field. [`DegreeCentrality`](@ref), [`Pagerank`](@ref) and [`KatzCentrality`](@ref) already return the topology-only answer, so there is nothing for them to override and `DegreeCentrality(; ov = TopologyOnly())` is a `MethodError`.
+Only the five algorithms that declare a polarity have an `ov` field. [`DegreeCentrality`](@ref), [`Pagerank`](@ref) and [`KatzCentrality`](@ref) already return the answer over the topology alone. They have nothing to override, so `DegreeCentrality(; ov = TopologyOnly())` raises a `MethodError`.
 
 # It is a choice, not a simplification, and it moves no default
 
-A topology-only centrality is often argued to be the more **fold-stable** of the two, by the same reasoning that makes a fixed `dmax` fold-stable under [`PathLength`](@ref). That is not a reason to default to it.
+A centrality over the topology alone can be more stable across folds, for the same reason that a fixed `dmax` is stable across folds under [`PathLength`](@ref). That is not a reason to make it the default.
 
-**The shipped default is already unweighted.** [`CentralityEstimator`](@ref)'s `ct` defaults to [`DegreeCentrality`](@ref), which declares no polarity, so a caller who names no algorithm gets this answer already. Defaulting `ov` to `TopologyOnly` would change the answer only for a caller who named one of the five deliberately — and for those five, reading the weights the source carries is the correct answer, which is what [`AbstractCentralityPolarity`](@ref) exists to say.
+**The shipped default is already unweighted.** The default `ct` of [`CentralityEstimator`](@ref) is [`DegreeCentrality`](@ref), which declares no polarity. A caller who names no algorithm already gets this answer. A default of `ov = TopologyOnly()` changes the answer only for a caller who selected one of the five. For those five, the weights of the source give the correct answer, and [`AbstractCentralityPolarity`](@ref) states why.
 
-**The override re-arms `sep`.** The plain-graph route reads the separation closure [`phylogeny_matrix`](@ref) builds, and the weighted routes bypass it. So the override trades the edge weights for a second knob rather than removing one: measured over twenty assets, all five algorithms answer differently at `HopCount(; n = 1)` and at `n = 3` once they carry it, including the four that are inert to `sep` without it. Under a bare [`PathLength`](@ref) that knob is the **observed diameter**, which is the data-dependent quantity the fold-stability argument set out to avoid.
+**The override makes `sep` active again.** The route of the plain graph reads the separation closure that [`phylogeny_matrix`](@ref) builds, and the weighted routes do not read it. The override replaces the edge weights by a second parameter, and does not remove a parameter. Over twenty assets, all five algorithms with the override give different answers at `HopCount(; n = 1)` and at `n = 3`. Four of them do not read `sep` without the override. Under a default [`PathLength`](@ref), that parameter is the observed diameter. The diameter depends on the data, and the argument for stability across folds tries to avoid such a quantity.
 
 # Examples
 
@@ -119,24 +120,24 @@ struct TopologyOnly <: AbstractAlgorithm end
     assert_no_weight_channel_args(::Type{T}, args::Tuple, S::Type, shape::AbstractString,
                                   channel::AbstractString) where {T}
 
-Refuse an entry of `args` that would reach a second weighting channel.
+Refuse an entry of `args` that reaches a second weight channel.
 
-The one refusal both splat guards make. A `Graphs.jl` entry point takes its weights in a positional slot, so an entry of `args` with that shape is a second channel answering a question the declared one already answered. [`assert_centrality_args`](@ref) and [`assert_tree_args`](@ref) differ only in which shape reaches a channel and in which declared channel they name, so both call this with their own `S`, `shape` and `channel`.
+Both guards of a splatted `args` make this refusal. An entry point of `Graphs.jl` takes its weights in a positional slot. An entry of `args` with that type is then a second weight channel, and the declared channel already gives the weights. [`assert_centrality_args`](@ref) and [`assert_tree_args`](@ref) differ only in the type that reaches a channel, and in the declared channel that they name. Both call this function with their own `S`, `shape` and `channel`.
 
-The index of the offending entry is reported with its type, because `args` is splatted and the caller sees no argument names.
+The message gives the index and the type of the entry. The library splats `args`, so the caller sees no argument names.
 
 # Algorithm
 
- 1. Find the index of the first entry of `args` that is an `S`, giving `idx`.
- 2. Throw a [`ConflictingArgumentError`](@ref) when `idx` is an index rather than `nothing`. The message carries `T`, `shape`, `channel`, `idx` and the type of the offending entry.
+ 1. Find `idx`, the index of the first entry of `args` that is an `S`.
+ 2. Throw a [`ConflictingArgumentError`](@ref) when `idx` is not `nothing`. The message holds `T`, `shape`, `channel`, `idx` and the type of the entry.
 
 # Arguments
 
-  - `T`: Algorithm type, named in the error message.
-  - `args`: Positional arguments destined for the `Graphs.jl` function.
-  - `S`: The shape that reaches a weight slot, e.g. `AbstractMatrix`.
-  - `shape`: Name of that shape, used in the error message.
-  - `channel`: Sentence naming the declared channel the caller must use instead.
+  - `T`: Algorithm type, which the error message names.
+  - `args`: Positional arguments for the function of `Graphs.jl`.
+  - `S`: The type of an entry that reaches a weight slot, such as `AbstractMatrix`.
+  - `shape`: Name of that type, for the error message.
+  - `channel`: Sentence that names the declared channel that the caller must use.
 
 # Validation
 
@@ -164,24 +165,24 @@ end
 
 Refuse a matrix inside a centrality algorithm's `args`.
 
-`args` is splatted straight into the `Graphs.jl` centrality function, so a matrix in it is a `distmx` — a second, undeclared way to weight the graph. [`centrality_polarity`](@ref) is the declared one, and it picks the weights the algorithm's own mathematics needs, from the structure that was actually built. Two channels answering the same question is one too many, and this one was never safe:
+[`calc_centrality`](@ref) splats `args` into the centrality function of `Graphs.jl`. A matrix in `args` is then a `distmx`, a second way to weight the graph that no polarity declares. [`centrality_polarity`](@ref) is the declared way. It selects the weights that the mathematics of the algorithm needs, from the structure that the estimator built. The second channel is not safe:
 
-  - `Graphs.betweenness_centrality`'s `distmx` is its **third** positional argument, so a matrix in `args` binds to `vs` instead and the call **overflows the stack** inside `Graphs.degree`. The `StackOverflowError` is catchable and the process survives it, so what is lost is the call and not the session.
-  - `Graphs.closeness_centrality`'s is its second, so that one worked — silently overriding the polarity, and reporting a wrong-sized matrix as a `BoundsError` rather than a `DimensionMismatch`.
-  - `Graphs.stress_centrality` has no `distmx` at all.
+  - `distmx` is the third positional argument of `Graphs.betweenness_centrality`. A matrix in `args` binds to `vs`, and the call overflows the stack inside `Graphs.degree`. A caller can catch the `StackOverflowError`, and the process continues. Only the call fails.
+  - `distmx` is the second positional argument of `Graphs.closeness_centrality`. A matrix in `args` ran, and replaced the polarity with no error. A matrix of the wrong size raised a `BoundsError`, and not a `DimensionMismatch`.
+  - `Graphs.stress_centrality` has no `distmx`.
 
-Non-matrix entries are untouched: a vertex list or a sample count is a genuine positional argument of those functions and says nothing about weights.
+The guard accepts every other entry. A list of vertices or a sample count is a real positional argument of those functions, and it does not set weights.
 
-`kwargs` needs no companion guard. A keyword binds **by name**, so a matrix there cannot reach a positional slot: none of the four functions declares a matrix-valued keyword, and every one of `normalize`, `endpoints`, `rng` and `seed` refuses a matrix on its own. The whole family fails closed with a `MethodError` or a `TypeError`.
+`kwargs` needs no second guard. A keyword binds by name, so a matrix in `kwargs` cannot reach a positional slot. None of the four functions declares a keyword whose value is a matrix. Each of `normalize`, `endpoints`, `rng` and `seed` refuses a matrix. A matrix in `kwargs` always raises a `MethodError` or a `TypeError`.
 
 # Algorithm
 
- 1. Refuse an `AbstractMatrix` in `args` with [`assert_no_weight_channel_args`](@ref), naming [`centrality_polarity`](@ref) as the declared weight channel.
+ 1. Refuse an `AbstractMatrix` in `args` with [`assert_no_weight_channel_args`](@ref), which names [`centrality_polarity`](@ref) as the declared weight channel.
 
 # Arguments
 
-  - `T`: Centrality algorithm type, named in the error message.
-  - `args`: Positional arguments destined for the `Graphs.jl` centrality function.
+  - `T`: Centrality algorithm type, which the error message names.
+  - `args`: Positional arguments for the centrality function of `Graphs.jl`.
 
 # Validation
 
@@ -207,26 +208,26 @@ end
 """
     assert_tree_args(::Type{T}, args::Tuple, kwargs::NamedTuple) where {T}
 
-Refuse a second weighting channel inside a spanning-tree algorithm's `args` and `kwargs`.
+Refuse a second weight channel in the `args` and the `kwargs` of a spanning tree algorithm.
 
-Both fields are splatted straight into the `Graphs.jl` spanning-tree function, and **every** channel they can reach re-weights or re-orients a tree that [`calc_weighted_adjacency_graph`](@ref) has already weighted. The graph it hands to [`calc_mst`](@ref) carries the distances the estimator's `de` and `ce` produced, and `Graphs.jl` defaults `distmx` to exactly those weights. A caller who fills these fields therefore answers a question that was already answered, and the wrong answer is **silent**:
+[`calc_mst`](@ref) splats both fields into the spanning tree function of `Graphs.jl`. Every weight channel that they can reach re-weights or re-orients the tree that [`calc_weighted_adjacency_graph`](@ref) builds. The graph that it gives to [`calc_mst`](@ref) carries the distances from the `de` and the `ce` of the estimator, and the default `distmx` of `Graphs.jl` is those weights. A caller who fills these fields replaces weights that are already correct, and no error shows it:
 
-  - `kruskal_mst`, `boruvka_mst` and `prim_mst` all take `distmx` as their second positional argument, so a matrix in `args` replaces the estimator's distances outright. It is correctly sized often enough to succeed, and the tree it builds is a legitimate-looking tree of the wrong graph.
-  - `kruskal_mst` also takes a `weight_vector` there, which is the same override in the other shape.
-  - `minimize` in `kwargs` inverts the sense of the search. The tree branch is *defined* by minimising a distance — [`calc_weighted_adjacency_graph`](@ref) and [`SimilarityPolarity`](@ref) both say so — and `minimize = false` yields a **maximum** spanning tree while everything downstream still reads it as a minimum one.
+  - `kruskal_mst`, `boruvka_mst` and `prim_mst` all take `distmx` as their second positional argument. A matrix in `args` replaces the distances of the estimator. Such a matrix often has the correct size, and the call then returns a valid tree of the wrong graph.
+  - `kruskal_mst` also takes a `weight_vector` in that slot, which replaces the weights in the same way.
+  - `minimize` in `kwargs` inverts the direction of the search. A minimised distance defines the tree branch, as [`calc_weighted_adjacency_graph`](@ref) and [`SimilarityPolarity`](@ref) state. `minimize = false` gives a maximum spanning tree, and every consumer reads it as a minimum spanning tree.
 
-Non-matrix, non-vector entries are untouched, and so is every other keyword. Those reach no weighting channel, and the three functions declare none, so they fail closed at the call.
+The guard accepts every entry that is not a matrix or a vector, and every other keyword. Those reach no weight channel. The three functions declare no other weight channel, so a wrong entry raises an error at the call.
 
 # Algorithm
 
- 1. Refuse an `AbstractMatrix` or an `AbstractVector` in `args` with [`assert_no_weight_channel_args`](@ref), naming the graph [`calc_weighted_adjacency_graph`](@ref) built as the declared weight channel.
- 2. Throw a [`ConflictingArgumentError`](@ref) when `kwargs` carries the key `minimize`. The message carries `T` and the value of that key.
+ 1. Refuse an `AbstractMatrix` or an `AbstractVector` in `args` with [`assert_no_weight_channel_args`](@ref). The message names the graph that [`calc_weighted_adjacency_graph`](@ref) built as the declared weight channel.
+ 2. Throw a [`ConflictingArgumentError`](@ref) when `kwargs` holds the key `minimize`. The message holds `T` and the value of that key.
 
 # Arguments
 
-  - `T`: Spanning-tree algorithm type, named in the error message.
-  - `args`: Positional arguments destined for the `Graphs.jl` spanning-tree function.
-  - `kwargs`: Keyword arguments destined for the same function.
+  - `T`: Spanning tree algorithm type, which the error message names.
+  - `args`: Positional arguments for the spanning tree function of `Graphs.jl`.
+  - `kwargs`: Keyword arguments for the same function.
 
 # Validation
 
@@ -257,28 +258,26 @@ end
 """
 $(DocStringExtensions.TYPEDSIGNATURES)
 
-Compute the centrality vector from a matrix [`PhylogenyResult`](@ref) using the specified centrality algorithm.
+Compute the centrality vector of a precomputed phylogeny matrix with the algorithm `ct`.
 
-Builds a graph from the phylogeny matrix and applies `ct` to compute node centrality scores.
-
-The graph is **always unweighted**, whatever polarity `ct` declares. A precomputed [`PhylogenyResult`](@ref) is a matrix of `0`s and `1`s, so it is one of the weightless sources listed on [`centrality_vector`](@ref)'s warning, and the weights it does not carry cannot be recovered from it. Pass the estimator instead of its result to get the weighted answer.
+The graph is always unweighted, whatever polarity `ct` declares. `Graphs.SimpleGraph` reads every nonzero entry of `plr.X` as an edge, and removes its value. A precomputed [`PhylogenyResult`](@ref) is one of the sources with no weights that the warning of [`centrality_vector`](@ref) lists. To get the weighted answer, pass the estimator and not its result.
 
 # Algorithm
 
- 1. Read `plr.X`, the precomputed phylogeny matrix, into a plain `Graphs.SimpleGraph`, giving the structure `G`.
- 2. Score the vertices of `G` with [`calc_centrality`](@ref), giving the centrality vector.
- 3. Wrap that vector in a [`PhylogenyResult`](@ref).
+ 1. Convert `plr.X`, the precomputed phylogeny matrix, to a plain `Graphs.SimpleGraph` `G`.
+ 2. Score the vertices of `G` with [`calc_centrality`](@ref).
+ 3. Return the scores in a [`PhylogenyResult`](@ref).
 
 # Arguments
 
-  - `plr`: Phylogeny matrix result object.
+  - `plr`: Precomputed phylogeny matrix.
   - $(arg_dict[:cta])
-  - `args...`: Additional positional arguments (ignored).
-  - `kwargs...`: Additional keyword arguments (ignored).
+  - `args...`: Positional arguments. The method does not read them.
+  - `kwargs...`: Keyword arguments. The method does not read them.
 
 # Returns
 
-  - `plr::PhylogenyResult{<:VecNum}`: Centrality scores for each asset.
+  - `plr::PhylogenyResult{<:VecNum}`: One centrality score for each asset.
 
 # Related
 
@@ -297,9 +296,9 @@ $(DocStringExtensions.TYPEDEF)
 
 Scores each asset by the share of the network's shortest paths that run through it.
 
-`BetweennessCentrality` computes the [betweenness centrality](https://juliagraphs.org/Graphs.jl/stable/algorithms/centrality/#Graphs.betweenness_centrality) of nodes in a graph, measuring the extent to which a node lies on shortest paths between other nodes.
+`BetweennessCentrality` selects the [betweenness centrality](https://juliagraphs.org/Graphs.jl/stable/algorithms/centrality/#Graphs.betweenness_centrality) of `Graphs.jl`. It measures how much an asset lies on the shortest paths between other assets.
 
-Declares [`DistancePolarity`](@ref), unless `ov` overrides it: it is defined over shortest paths, so its weights must be distances. On a tree the weighted answer equals the unweighted one — a tree has exactly one path between any two vertices, so no weighting can change the shortest-path set — which is a theorem about the graph rather than a limitation, and it does not hold on the similarity branch. Set `ov` to [`TopologyOnly`](@ref) to withdraw the declaration and read the topology alone.
+It declares [`DistancePolarity`](@ref), unless `ov` overrides it. It is defined over shortest paths, so its weights must be distances. On a tree, the weighted answer is equal to the unweighted one. A tree has exactly one path between two vertices, so no weights can change the set of shortest paths. This is a property of the tree, and it does not hold on the similarity branch. Set `ov` to [`TopologyOnly`](@ref) to withdraw the declaration and read the topology alone.
 
 # Mathematical definition
 
@@ -316,9 +315,11 @@ Where:
   - $(math_dict[:sigma_st_i_paths])
   - $(math_dict[:n_network])
 
-The sum runs over the ordered pairs of distinct assets, so an undirected network counts each pair twice and the leading factor is the reciprocal of ``(n - 1)(n - 2)`` rather than of half of it. `Graphs.jl` applies that factor by default, and `kwargs = (; normalize = false)` replaces it by ``1/2``, which is the count over the unordered pairs. `kwargs = (; endpoints = true)` counts the two ends of every path as well, which raises every score.
+The sum runs over the ordered pairs of distinct assets, so an undirected network counts each pair two times. The leading factor is therefore the reciprocal of ``(n - 1)(n - 2)``, and not of half of it. `Graphs.jl` applies that factor by default. `kwargs = (; normalize = false)` replaces it by ``1/2``, which gives the count over the unordered pairs. `kwargs = (; endpoints = true)` also counts the two ends of every path, which raises every score.
 
-A pair joined by several shortest paths shares one unit of score between them, because the summand is a fraction of ``\\sigma_{s,\\,t}``. [`StressCentrality`](@ref) omits that division and counts the paths themselves.
+A pair that several shortest paths join gives one unit of score, divided among those paths, because the summand is a fraction of ``\\sigma_{s,\\,t}``. [`StressCentrality`](@ref) does not divide, and counts the paths.
+
+[freeman1979](@cite) states the measure of [freeman1977](@cite) again over the unordered pairs. It divides the measure by its largest value, ``(n^2 - 3n + 2) / 2``, which the centre of a star reaches. That is the factor above, over the ordered pairs. No copy of the work of 1977 is available.
 
 # Fields
 
@@ -359,7 +360,8 @@ BetweennessCentrality
 # References
 
   - $(ref_dict[:freeman1977])
-  - $(ref_dict[:brandes2001])
+  - $(ref_dict[:freeman1979]) Pages 223-224. $(ref_dict[:no_original_source])
+  - $(ref_dict[:brandes2001]) Sections 2 and 4, for the sum over the ordered pairs and the algorithm that `Graphs.jl` runs.
 """
 @concrete struct BetweennessCentrality <: AbstractCentralityAlgorithm
     """
@@ -389,9 +391,9 @@ $(DocStringExtensions.TYPEDEF)
 
 Scores each asset by the reciprocal of its mean shortest-path distance to the others.
 
-`ClosenessCentrality` computes the [closeness centrality](https://juliagraphs.org/Graphs.jl/stable/algorithms/centrality/#Graphs.closeness_centrality) of nodes in a graph, measuring how close a node is to all other nodes.
+`ClosenessCentrality` selects the [closeness centrality](https://juliagraphs.org/Graphs.jl/stable/algorithms/centrality/#Graphs.closeness_centrality) of `Graphs.jl`. It measures how near an asset is to all other assets.
 
-Declares [`DistancePolarity`](@ref), unless `ov` overrides it: it sums shortest-path lengths, so its weights must be distances. It reads them on **both** branches, so its answer on a [`NetworkEstimator`](@ref) source differs from the unweighted one — measured over twenty assets, a maximum absolute change of `0.713` on a triangulated maximally filtered graph and `0.538` on a tree. Set `ov` to [`TopologyOnly`](@ref) to withdraw the declaration and read the topology alone.
+It declares [`DistancePolarity`](@ref), unless `ov` overrides it. It sums the lengths of shortest paths, so its weights must be distances. It reads them on both branches, so its answer on a [`NetworkEstimator`](@ref) source is different from the unweighted one. Over twenty assets, the measured largest absolute change is `0.713` on a triangulated maximally filtered graph and `0.538` on a tree. Set `ov` to [`TopologyOnly`](@ref) to withdraw the declaration and read the topology alone.
 
 # Mathematical definition
 
@@ -404,14 +406,16 @@ Declares [`DistancePolarity`](@ref), unless `ov` overrides it: it sums shortest-
 Where:
 
   - ``\\mathrm{CC}_i``: Closeness centrality of asset ``i``.
-  - ``\\mathcal{R}_i``: Set of assets that asset ``i`` reaches, excluding itself.
+  - ``\\mathcal{R}_i``: Set of assets other than asset ``i`` that asset ``i`` reaches.
   - ``r_i``: Cardinality of ``\\mathcal{R}_i``.
   - $(math_dict[:ell_ij_path])
   - $(math_dict[:n_network])
 
-The first factor is the reciprocal of the mean length from asset ``i`` to the assets it reaches. The second is the share of the universe it reaches, which `Graphs.jl` applies by default and `kwargs = (; normalize = false)` drops. On a connected network ``r_i = n - 1`` and the second factor is one, so the two settings agree there and part only where the network falls into components.
+The first factor is the reciprocal of the mean length from asset ``i`` to the assets that it reaches. The second factor is the share of the assets that it reaches. `Graphs.jl` applies the second factor by default, and `kwargs = (; normalize = false)` removes it. On a connected network, ``r_i = n - 1`` and the second factor is one. The two settings agree there, and are different only on a network with more than one component.
 
-An asset that reaches nothing scores zero rather than an infinity, because the sum in the denominator is over ``\\mathcal{R}_i`` alone and an unreachable asset never enters it.
+An asset that reaches no asset scores zero, and not an infinity. The sum in the denominator is over ``\\mathcal{R}_i`` alone, so an unreachable asset never enters it.
+
+[freeman1979](@cite) states the first factor for a connected network, as the reciprocal of the mean distance. It gives the factor to two earlier works, and no copy of those works is available. The second factor extends the measure to a network with more than one component. It is the rule of `Graphs.jl`, and no available work states it first.
 
 # Fields
 
@@ -451,7 +455,7 @@ ClosenessCentrality
 
 # References
 
-  - $(ref_dict[:freeman1979])
+  - $(ref_dict[:freeman1979]) Pages 225-226. $(ref_dict[:no_original_source])
 """
 @concrete struct ClosenessCentrality <: AbstractCentralityAlgorithm
     """
@@ -480,7 +484,11 @@ $(DocStringExtensions.TYPEDEF)
 
 Counts the network edges that touch each asset, divided by the number of other assets.
 
-`DegreeCentrality` computes the [degree centrality](https://juliagraphs.org/Graphs.jl/stable/algorithms/centrality/#Graphs.degree_centrality-Tuple%7BAbstractGraph%7D) of nodes in a graph. It is the simplest score of the family, and the shipped default of [`CentralityEstimator`](@ref)'s `ct`.
+`DegreeCentrality` selects the [degree centrality](https://juliagraphs.org/Graphs.jl/stable/algorithms/centrality/#Graphs.degree_centrality-Tuple%7BAbstractGraph%7D) of `Graphs.jl`. It is the simplest score of the family, and the default `ct` of [`CentralityEstimator`](@ref).
+
+It declares no polarity, and runs on the plain graph. `Graphs._degree_centrality` counts edges and does not read their weights. The `sep` of the estimator has an effect on it. The unweighted route reads the separation closure that [`phylogeny_matrix`](@ref) builds, so `HopCount(; n = 2)` changes this answer.
+
+It has no `ov` field, and [`TopologyOnly`](@ref) does not apply to it. It already reads the topology alone, so it has no declaration to withdraw. `DegreeCentrality(; ov = TopologyOnly())` raises a `MethodError`.
 
 # Mathematical definition
 
@@ -499,17 +507,13 @@ Where:
   - ``\\mathbf{1}_n``: Column vector of ones of length ``n``.
   - $(math_dict[:n_network])
 
-`Graphs.jl` **normalises** that vector by default, so what this type returns is ``\\mathbf{D}_n / (n - 1)`` and not ``\\mathbf{D}_n``. `kwargs = (; normalize = false)` recovers ``\\mathbf{D}_n`` exactly.
+`Graphs._degree_centrality` normalises that vector by default, and this type returns ``\\mathbf{D}_n / (n - 1)``, and not ``\\mathbf{D}_n``. `kwargs = (; normalize = false)` gives ``\\mathbf{D}_n``.
 
-The factor is the whole difference, and it re-ranks nothing. [`average_centrality`](@ref) is linear in the score vector, so a constant scale moves the average by that same constant.
+The factor is the only difference, and it does not change the ranking. [`average_centrality`](@ref) is linear in the score vector, so the average changes by the same factor.
 
-# The three `kind` values coincide on these structures
+# The three `kind` values agree on these structures
 
-`kind` selects the total, the in- or the out-degree. Every graph this library builds is **undirected**, where the three are one number: measured over the same tree, `kind = 0`, `1` and `2` agree exactly. The field is kept because `Graphs.jl` takes it, not because it selects anything here.
-
-Declares no polarity and runs on the plain graph: `Graphs.degree_centrality` counts edges and ignores what they weigh. It is therefore one of the algorithms for which the estimator's `sep` stays **live** — the unweighted route reads the separation closure [`phylogeny_matrix`](@ref) builds, so `HopCount(; n = 2)` does change this answer.
-
-It carries no `ov` field, and [`TopologyOnly`](@ref) is not applicable to it: the topology alone is what it already reads, so there is no declaration to withdraw. `DegreeCentrality(; ov = TopologyOnly())` is a `MethodError`.
+`kind = 0` counts the total degree, `kind = 1` the in-degree, and `kind = 2` the out-degree. Every graph that this library builds is undirected, and on an undirected graph the three are one number. On the same tree, `kind = 0`, `1` and `2` give the same vector. The field exists because `Graphs.jl` takes it, and it selects nothing here.
 
 # Fields
 
@@ -546,12 +550,12 @@ DegreeCentrality
 
 # References
 
-  - $(ref_dict[:cajas2025]) Section 13.1.3.1, Equation 13.3.
-  - $(ref_dict[:freeman1979])
+  - $(ref_dict[:graphpo1]) Section 2.3.1, Equation 3.
+  - $(ref_dict[:freeman1979]) Page 221, for the division by ``n - 1``.
 """
 @concrete struct DegreeCentrality <: AbstractCentralityAlgorithm
     """
-    Degree type (0: total, 1: in-degree, 2: out-degree).
+    Degree to count. `0` counts the total degree, `1` the in-degree, and `2` the out-degree.
     """
     kind
     """
@@ -571,7 +575,7 @@ $(DocStringExtensions.TYPEDEF)
 
 Scores each asset by the leading eigenvector of the network's adjacency matrix.
 
-`EigenvectorCentrality` computes the eigenvector centrality of nodes in a graph, measuring the influence of a node based on the centrality of its neighbours.
+`EigenvectorCentrality` selects the eigenvector centrality of `Graphs.jl`. The score of an asset grows with the scores of its neighbours.
 
 # Mathematical definition
 
@@ -588,11 +592,13 @@ Where:
   - $(math_dict[:lambda_max_network])
   - ``\\mathbf{q}_{\\mathrm{max}}``: Eigenvector of ``\\lambda_{\\mathrm{max}}``.
 
-The right-hand side is ``\\mathbf{q}_{\\mathrm{max}}`` itself, so the score is the leading eigenvector under whatever normalisation the eigensolver applies. `Graphs.jl` returns it with unit 2-norm, and takes the absolute value of every entry — the leading eigenvector of a non-negative matrix shares one sign, by the Perron-Frobenius theorem, so that changes no ordering. The returned vector matches the formula above to eigensolver precision, which moves by a few ulps between calls on one graph.
+The right-hand side is ``\\mathbf{q}_{\\mathrm{max}}``, so the score is the leading eigenvector, with the normalisation of the eigensolver. `Graphs.jl` returns it with unit 2-norm, and takes the absolute value of every entry. By the Perron-Frobenius theorem, the entries of the leading eigenvector of a non-negative matrix have one sign, so the absolute value changes no order. The returned vector agrees with the formula above to the precision of the eigensolver, which changes by a few ulps between calls on one graph.
 
-Declares [`SimilarityPolarity`](@ref) — the only member that declares it — unless `ov` overrides it: it is the leading eigenvector of the adjacency matrix itself, so a stronger link must contribute a larger entry. It therefore reads weights on the similarity branch alone. A tree is selected by minimising a distance and carries no similarity, so this algorithm runs unweighted there rather than being handed the wrong quantity. Set `ov` to [`TopologyOnly`](@ref) to withdraw the declaration and read the topology alone.
+The formula above is Equation 4 of [graphpo1](@cite). [bonacich1987](@cite) states the measure as ``\\lambda \\mathbf{e} = \\mathbf{R}\\,\\mathbf{e}``, and prefers the largest eigenvalue. It gives the measure to a work of 1972 by the same author, and no copy of that work is available.
 
-The weights change the answer by less than the shortest-path algorithms do, and they do change it: the weighted and unweighted vectors differ while still correlating closely, and withdrawing the weights also moves the structure's ``\\lambda_{\\mathrm{max}}``.
+It declares [`SimilarityPolarity`](@ref), unless `ov` overrides it, and it is the only member that declares it. It is the leading eigenvector of the adjacency matrix, so a stronger link must give a larger entry. It reads weights on the similarity branch alone. A minimised distance selects a tree, and a tree carries no similarity. This algorithm runs unweighted on a tree, and does not receive the wrong quantity. Set `ov` to [`TopologyOnly`](@ref) to withdraw the declaration and read the topology alone.
+
+The weights change this answer less than they change the answers of the shortest path algorithms, but they change it. The weighted and the unweighted vectors are different, and their correlation is high. A withdrawal of the weights also changes the ``\\lambda_{\\mathrm{max}}`` of the structure.
 
 # Fields
 
@@ -624,8 +630,8 @@ EigenvectorCentrality
 
 # References
 
-  - $(ref_dict[:cajas2025]) Section 13.1.3.2, Equation 13.4.
-  - $(ref_dict[:bonacich1987])
+  - $(ref_dict[:graphpo1]) Section 2.3.2, Equation 4.
+  - $(ref_dict[:bonacich1987]) Page 1172, Equations 1-2. $(ref_dict[:no_original_source])
 """
 @concrete struct EigenvectorCentrality <: AbstractCentralityAlgorithm
     """
@@ -644,11 +650,11 @@ $(DocStringExtensions.TYPEDEF)
 
 Scores each asset by every walk that reaches it, discounted geometrically by the walk's length.
 
-`KatzCentrality` computes the [Katz centrality](https://juliagraphs.org/Graphs.jl/stable/algorithms/centrality/#Graphs.katz_centrality) of nodes in a graph, measuring the influence of a node based on the number and length of walks between nodes, controlled by the attenuation factor `alpha`.
+`KatzCentrality` selects the [Katz centrality](https://juliagraphs.org/Graphs.jl/stable/algorithms/centrality/#Graphs.katz_centrality) of `Graphs.jl`. It counts the walks that reach an asset, and the attenuation factor `alpha` discounts each walk by its length.
 
-Declares no polarity and runs on the plain graph: `Graphs.katz_centrality` binarises its input through `adjacency_matrix(g, Bool)`, and throws an `InexactError` when the graph is weighted. The unweighted route is real code here rather than an absent check.
+It declares no polarity, and runs on the plain graph. `Graphs.katz_centrality` reads the adjacency matrix with the element type `Bool`, through `adjacency_matrix(g, Bool)`. A weight other than `0` or `1` cannot become a `Bool`, so on a weighted graph the call throws an `InexactError`. The unweighted route is therefore necessary for this algorithm.
 
-It carries no `ov` field, and [`TopologyOnly`](@ref) is not applicable to it: the topology alone is what it already reads, so there is no declaration to withdraw. `KatzCentrality(; ov = TopologyOnly())` is a `MethodError`.
+It has no `ov` field, and [`TopologyOnly`](@ref) does not apply to it. It already reads the topology alone, so it has no declaration to withdraw. `KatzCentrality(; ov = TopologyOnly())` raises a `MethodError`.
 
 # Mathematical definition
 
@@ -670,13 +676,15 @@ Where:
   - ``\\mathbf{1}_n``: Column vector of ones of length ``n``.
   - $(math_dict[:n_network])
 
-The series converges to the resolvent only for ``\\alpha < 1 / \\lambda_{\\mathrm{max}}``, and the two right-hand sides are equal only there. Outside that range the resolvent is still defined at almost every ``\\alpha``, and the vector it gives is the walk sum of nothing.
+The series converges to the resolvent only for ``\\alpha < 1 / \\lambda_{\\mathrm{max}}``, and the two right-hand sides are equal only there. Outside that range, the resolvent is defined at almost every ``\\alpha``, but its vector is not a sum of walks.
+
+[katz1953](@cite) sums the walks of length one and more, ``\\left(\\mathbf{I}_n - \\alpha\\,\\mathbf{A}\\right)^{-1} - \\mathbf{I}_n``. On ``\\mathbf{1}_n``, that sum gives ``\\boldsymbol{v} - \\mathbf{1}_n``. [katz1953](@cite) then divides by a constant that depends on ``n`` and ``\\alpha``. `Graphs.jl` keeps the walk of length zero, and scales to unit 2-norm. The ranking is the same, and the scores are not proportional. [katz1953](@cite) states the same bound on ``\\alpha``.
 
 # `alpha` must be below the reciprocal of the largest eigenvalue
 
-Above the bound the linear solve still returns a vector, and the vector is not a centrality: some of its scores turn negative, and a negative centrality has no reading.
+Above the bound, the linear solve still returns a vector, but the vector is not a centrality. Some of its scores become negative, and a negative centrality has no meaning.
 
-**The constructor cannot check this.** ``\\lambda_{\\mathrm{max}}`` is a property of the graph, and the graph is built later by [`centrality_graph`](@ref), so the validation is `alpha > 0` and the bound is the caller's to respect. A dense network raises ``\\lambda_{\\mathrm{max}}`` and lowers the bound, so a value that held on a tree can fail on a triangulated maximally filtered graph over the same assets — the default `alpha = 0.3` is not safe against every graph shape.
+**The constructor cannot check this.** ``\\lambda_{\\mathrm{max}}`` is a property of the graph, and [`centrality_graph`](@ref) builds the graph later. The constructor checks only `alpha > 0`, and the caller must obey the bound. A dense network has a larger ``\\lambda_{\\mathrm{max}}``, and so a smaller bound. A value that holds on a tree can fail on a triangulated maximally filtered graph over the same assets. The default `alpha = 0.3` is not safe for every shape of graph.
 
 # Fields
 
@@ -711,11 +719,11 @@ KatzCentrality
 
 # References
 
-  - $(ref_dict[:katz1953])
+  - $(ref_dict[:katz1953]) Pages 41-42.
 """
 @concrete struct KatzCentrality <: AbstractCentralityAlgorithm
     """
-    Attenuation factor for Katz centrality.
+    Attenuation factor. The series of walks converges only when `alpha` is below the reciprocal of the largest eigenvalue of the adjacency matrix, and the constructor does not check it.
     """
     alpha
     function KatzCentrality(alpha::Number)
@@ -731,11 +739,11 @@ $(DocStringExtensions.TYPEDEF)
 
 Scores each asset by the stationary distribution of a damped random walk over the network.
 
-`Pagerank` computes the [PageRank](https://juliagraphs.org/Graphs.jl/stable/algorithms/centrality/#Graphs.pagerank-Union%7BTuple%7BAbstractGraph%7BU%7D%7D,%20Tuple%7BU%7D,%20Tuple%7BAbstractGraph%7BU%7D,%20Any%7D,%20Tuple%7BAbstractGraph%7BU%7D,%20Any,%20Integer%7D,%20Tuple%7BAbstractGraph%7BU%7D,%20Any,%20Integer,%20Any%7D%7D%20where%20U%3C:Integer) of nodes in a graph, measuring the importance of nodes based on the structure of incoming links. The algorithm is controlled by the damping factor `alpha`, number of iterations `n`, and convergence tolerance `epsilon`.
+`Pagerank` selects the [PageRank](https://juliagraphs.org/Graphs.jl/stable/algorithms/centrality/#Graphs.pagerank-Union%7BTuple%7BAbstractGraph%7BU%7D%7D,%20Tuple%7BU%7D,%20Tuple%7BAbstractGraph%7BU%7D,%20Any%7D,%20Tuple%7BAbstractGraph%7BU%7D,%20Any,%20Integer%7D,%20Tuple%7BAbstractGraph%7BU%7D,%20Any,%20Integer,%20Any%7D%7D%20where%20U%3C:Integer) of `Graphs.jl`. The score of an asset grows with the scores of the assets that link to it. The damping factor `alpha`, the number of iterations `n` and the convergence tolerance `epsilon` control the iteration.
 
-Declares no polarity and runs on the plain graph: `Graphs.pagerank` walks `outdegree` and `inneighbors` alone and never reads an edge weight, so the weighted and the plain graph give the identical vector. Like [`DegreeCentrality`](@ref) it therefore keeps the estimator's `sep` live, reading the separation closure rather than the structure.
+It declares no polarity, and runs on the plain graph. `Graphs.pagerank` reads only `outdegree` and `inneighbors`, and never reads an edge weight. The weighted graph and the plain graph give the same vector. As for [`DegreeCentrality`](@ref), the `sep` of the estimator has an effect on it, because it reads the separation closure and not the structure.
 
-It carries no `ov` field, and [`TopologyOnly`](@ref) is not applicable to it: the topology alone is what it already reads, so there is no declaration to withdraw. `Pagerank(; ov = TopologyOnly())` is a `MethodError`.
+It has no `ov` field, and [`TopologyOnly`](@ref) does not apply to it. It already reads the topology alone, so it has no declaration to withdraw. `Pagerank(; ov = TopologyOnly())` raises a `MethodError`.
 
 # Mathematical definition
 
@@ -747,16 +755,18 @@ It carries no `ov` field, and [`TopologyOnly`](@ref) is not applicable to it: th
 
 Where:
 
-  - ``\\mathrm{PR}_i``: PageRank of asset ``i``, the share of its time the damped walk spends there.
-  - ``\\alpha``: Damping factor, `alpha`. It is the probability that the walk follows an edge rather than teleporting.
-  - ``\\mathcal{I}_i``: Set of assets carrying an edge into asset ``i``.
-  - ``k_j``: Number of edges leaving asset ``j``.
-  - ``\\mathcal{D}``: Set of dangling assets, those that no edge leaves.
+  - ``\\mathrm{PR}_i``: PageRank of asset ``i``, the share of time that the damped walk is at asset ``i``.
+  - ``\\alpha``: Damping factor, `alpha`. It is the probability that the walk follows an edge, and does not teleport.
+  - ``\\mathcal{I}_i``: Set of assets with an edge into asset ``i``.
+  - ``k_j``: Number of edges that leave asset ``j``.
+  - ``\\mathcal{D}``: Set of dangling assets, which no edge leaves.
   - $(math_dict[:n_network])
 
-The three terms are the walk's three moves: it teleports to a uniformly drawn asset, it teleports out of a dangling asset it cannot leave, or it follows one of the edges into asset ``i``. Every score is therefore non-negative and the vector sums to one, which is what separates this member from the counting scores of the family.
+The three terms are the three moves of the walk. It teleports to an asset drawn uniformly, it teleports out of a dangling asset that it cannot leave, or it follows one of the edges into asset ``i``. Every score is non-negative, and the vector sums to one. The members of the family that count edges or paths do not have this property.
 
-Every network this library builds is **undirected**, where ``\\mathcal{I}_i`` is the neighbourhood of asset ``i`` and ``k_j`` is its degree. On a connected undirected network the solution approaches the degree vector [`DegreeCentrality`](@ref) counts, up to a scale, as ``\\alpha`` approaches one, and a smaller ``\\alpha`` blends that limit with the uniform distribution.
+[brin1998](@cite) writes ``\\mathrm{PR}_i = (1 - \\alpha) + \\alpha \\sum_{j \\in \\mathcal{I}_i} \\mathrm{PR}_j / k_j``, with no division by ``n`` and no term for the dangling assets. The division by ``n`` makes the vector sum to one, as [brin1998](@cite) states. The uniform spread of the mass of the dangling assets is the rule of `Graphs.jl`, and no available work states it first.
+
+Every network that this library builds is undirected. On it, ``\\mathcal{I}_i`` is the neighbourhood of asset ``i``, and ``k_j`` is the degree of asset ``j``. On a connected undirected network, the solution goes to a scaled copy of the degree vector of [`DegreeCentrality`](@ref) as ``\\alpha`` goes to one. A smaller ``\\alpha`` mixes that limit with the uniform distribution.
 
 # Fields
 
@@ -797,15 +807,15 @@ Pagerank
 
 # References
 
-  - $(ref_dict[:brin1998])
+  - $(ref_dict[:brin1998]) Section 2.1.1. $(ref_dict[:no_original_source])
 """
 @concrete struct Pagerank <: AbstractCentralityAlgorithm
     """
-    Number of iterations. `Graphs.pagerank` raises when the scores have not converged after this many sweeps.
+    Largest number of iterations. `Graphs.pagerank` raises an error if the scores do not converge in this number of sweeps.
     """
     n
     """
-    Damping factor. It is the probability that the walk follows an edge rather than teleporting.
+    Damping factor. It is the probability that the walk follows an edge, and does not teleport.
     """
     alpha
     """
@@ -828,9 +838,9 @@ $(DocStringExtensions.TYPEDEF)
 
 Scores each asset by its mean shortest-path distance, measured against the network's diameter.
 
-`RadialityCentrality` computes the radiality centrality of nodes in a graph, measuring how close a node is to all other nodes, adjusted for the maximum possible distance.
+`RadialityCentrality` selects the radiality centrality of `Graphs.jl`. It measures how near an asset is to all other assets, relative to the diameter of the network.
 
-Declares [`DistancePolarity`](@ref), unless `ov` overrides it: it reads shortest-path lengths against the graph's diameter, so its weights must be distances. It reads them on both branches, and its answer moves when they arrive — measured over twenty assets, a maximum absolute change of `0.248` on a triangulated maximally filtered graph and `0.234` on a tree. Set `ov` to [`TopologyOnly`](@ref) to withdraw the declaration and read the topology alone.
+It declares [`DistancePolarity`](@ref), unless `ov` overrides it. It reads the lengths of shortest paths against the diameter of the graph, so its weights must be distances. It reads them on both branches, and the weights change its answer. Over twenty assets, the measured largest absolute change is `0.248` on a triangulated maximally filtered graph and `0.234` on a tree. Set `ov` to [`TopologyOnly`](@ref) to withdraw the declaration and read the topology alone.
 
 # Mathematical definition
 
@@ -849,9 +859,11 @@ Where:
   - $(math_dict[:ell_ij_path])
   - $(math_dict[:n_network])
 
-The diameter is what separates this score from [`ClosenessCentrality`](@ref). Closeness reciprocates the mean length and reads a scale of its own; radiality subtracts it from the longest length the network holds, so the score says how far inside the network's own reach an asset sits.
+The diameter makes this score different from [`ClosenessCentrality`](@ref). Closeness takes the reciprocal of the mean length. Radiality subtracts the mean length from the diameter plus one, so the score states how far inside the reach of the network an asset is.
 
-The score is at most ``1``, which an asset one edge away from every other reaches, and at least ``1/D``, which an asset whose mean length equals the diameter reaches. Both bounds move with ``D``, so two networks give comparable scores only when the two have the same diameter.
+The smallest score is ``1/D``, for an asset whose mean length is equal to the diameter. On an unweighted network every length is at least ``1``, so the largest score is ``1``, for an asset one edge away from every other asset. On a weighted network a length can be less than ``1``, and a score can be larger than ``1``. The bounds change with ``D``, so the scores of two networks are comparable only when the two have the same diameter.
+
+[brandes2001](@cite) states the formula, and gives it to [valente1998](@cite). No copy of that work is available. [brandes2001](@cite) sums ``D + 1 - \\ell_{i,\\,j}`` over every asset ``j``, with the asset ``i``, and divides by ``(n - 1) D``. In that form every score is larger by ``(D + 1) / ((n - 1) D)``, so the ranking is the same. The form above, which `Graphs.jl` computes, does not include ``j = i``.
 
 # Fields
 
@@ -884,6 +896,7 @@ RadialityCentrality
 # References
 
   - $(ref_dict[:valente1998])
+  - $(ref_dict[:brandes2001]) Section 4. $(ref_dict[:no_original_source])
 """
 @concrete struct RadialityCentrality <: AbstractCentralityAlgorithm
     """
@@ -902,9 +915,9 @@ $(DocStringExtensions.TYPEDEF)
 
 Counts the shortest paths of the network that pass through each asset.
 
-`StressCentrality` computes the stress centrality of nodes in a graph, measuring the number of shortest paths passing through each node.
+`StressCentrality` selects the stress centrality of `Graphs.jl`. It counts the shortest paths that go through each asset.
 
-Declares [`DistancePolarity`](@ref), unless `ov` overrides it: it counts shortest paths, so its weights must be distances. Like [`BetweennessCentrality`](@ref) it is unchanged by them on a tree, where the shortest-path set is fixed by the structure alone, and does move on the similarity branch. Set `ov` to [`TopologyOnly`](@ref) to withdraw the declaration and read the topology alone.
+It declares [`DistancePolarity`](@ref), unless `ov` overrides it. It counts shortest paths, so its weights must be distances. As for [`BetweennessCentrality`](@ref), the weights do not change it on a tree, where the structure alone sets the shortest paths. They change it on the similarity branch. Set `ov` to [`TopologyOnly`](@ref) to withdraw the declaration and read the topology alone.
 
 # Mathematical definition
 
@@ -919,9 +932,11 @@ Where:
   - ``\\mathrm{SC}_i``: Stress centrality of asset ``i``.
   - $(math_dict[:sigma_st_i_paths])
 
-The sum runs over the ordered pairs of distinct assets, so an undirected network counts each pair twice. There is no normalisation, so the score is a count rather than a rate: it grows with the size of the network, and two networks give comparable scores only when the two hold the same number of assets.
+The sum runs over the ordered pairs of distinct assets, so an undirected network counts each pair two times. The score has no normalisation, so it is a count and not a rate. It grows with the size of the network. The scores of two networks are comparable only when the two have the same number of assets.
 
-It is [`BetweennessCentrality`](@ref)'s sum without the division by ``\\sigma_{s,\\,t}``. A pair joined by many shortest paths therefore contributes many units here and one unit there, so this score reads how much traffic an asset carries and betweenness reads how much of it the asset alone can carry.
+[brandes2001](@cite) states this sum, and gives it to [shimbel1953](@cite). No copy of that work is available.
+
+It is the sum of [`BetweennessCentrality`](@ref) without the division by ``\\sigma_{s,\\,t}``. A pair that many shortest paths join adds many units here, and one unit to the betweenness. This score measures how many shortest paths go through an asset. The betweenness measures the share of the shortest paths of each pair that go through it.
 
 # Fields
 
@@ -962,6 +977,7 @@ StressCentrality
 # References
 
   - $(ref_dict[:shimbel1953])
+  - $(ref_dict[:brandes2001]) Section 2. $(ref_dict[:no_original_source])
 """
 @concrete struct StressCentrality <: AbstractCentralityAlgorithm
     """
@@ -988,36 +1004,44 @@ end
 """
     calc_centrality(ct::AbstractCentralityAlgorithm, g::Graphs.AbstractGraph)
 
-Compute node centrality scores for a graph using the specified centrality algorithm.
+Compute the centrality score of every vertex of a graph with the algorithm `ct`.
 
-This function dispatches to the appropriate centrality computation from [`Graphs.jl`](https://juliagraphs.org/Graphs.jl/stable/algorithms/centrality/) based on the type of `ct`. Supported algorithms include betweenness, closeness, degree, eigenvector, Katz, pagerank, radiality, and stress centrality.
+The type of `ct` selects one routine of [`Graphs.jl`](https://juliagraphs.org/Graphs.jl/stable/algorithms/centrality/).
 
-`g` may be weighted or unweighted, and nothing here inspects which. `Graphs.jl` weights implicitly — the `distmx` of every routine that takes one defaults to `weights(g)` — so the choice is made once, by [`centrality_graph`](@ref), and this function only forwards. Handing a weighted graph to an algorithm that declares no polarity is what [`centrality_graph`](@ref) exists to prevent: `Graphs.katz_centrality` throws an `InexactError` on one.
+`g` can be weighted or unweighted, and this function does not check which. The default `distmx` of every routine of `Graphs.jl` that takes one is `weights(g)`. [`centrality_graph`](@ref) makes the choice one time, and this function only calls the routine. [`centrality_graph`](@ref) does not give a weighted graph to an algorithm that declares no polarity, because `Graphs.katz_centrality` throws an `InexactError` on a weighted graph.
 
 # Algorithm
 
- 1. Select the `Graphs.jl` routine that the type of `ct` names, from the list under `# Arguments`.
- 2. Splat the configuration `ct` carries into that call. [`BetweennessCentrality`](@ref), [`ClosenessCentrality`](@ref) and [`StressCentrality`](@ref) pass `args` and `kwargs`; [`DegreeCentrality`](@ref) passes `kind` and `kwargs`; [`KatzCentrality`](@ref) passes `alpha`; [`Pagerank`](@ref) passes `alpha`, `n` and `epsilon`; [`EigenvectorCentrality`](@ref) and [`RadialityCentrality`](@ref) pass nothing.
- 3. Return the scores that routine produced, one entry per vertex of `g`.
+ 1. Select the routine of `Graphs.jl` that the type of `ct` names, from the list under `# Arguments`.
+
+ 2. Splat the configuration of `ct` into that call.
+
+      + [`BetweennessCentrality`](@ref), [`ClosenessCentrality`](@ref) and [`StressCentrality`](@ref): `args` and `kwargs`.
+      + [`DegreeCentrality`](@ref): `kind` and `kwargs`.
+      + [`KatzCentrality`](@ref): `alpha`.
+      + [`Pagerank`](@ref): `alpha`, `n` and `epsilon`.
+      + [`EigenvectorCentrality`](@ref) and [`RadialityCentrality`](@ref): nothing.
+
+ 3. Return the scores of that routine, one for each vertex of `g`.
 
 # Arguments
 
-  - `ct`: Centrality algorithm to use.
+  - `ct`: Centrality algorithm.
 
-      + `ct::BetweennessCentrality`: Computes betweenness centrality.
-      + `ct::ClosenessCentrality`: Computes closeness centrality.
-      + `ct::DegreeCentrality`: Computes degree centrality.
-      + `ct::EigenvectorCentrality`: Computes eigenvector centrality.
-      + `ct::KatzCentrality`: Computes Katz centrality.
-      + `ct::Pagerank`: Computes PageRank.
-      + `ct::RadialityCentrality`: Computes radiality centrality.
-      + `ct::StressCentrality`: Computes stress centrality.
+      + `ct::BetweennessCentrality`: `Graphs.betweenness_centrality`.
+      + `ct::ClosenessCentrality`: `Graphs.closeness_centrality`.
+      + `ct::DegreeCentrality`: `Graphs._degree_centrality`.
+      + `ct::EigenvectorCentrality`: `Graphs.eigenvector_centrality`.
+      + `ct::KatzCentrality`: `Graphs.katz_centrality`.
+      + `ct::Pagerank`: `Graphs.pagerank`.
+      + `ct::RadialityCentrality`: `Graphs.radiality_centrality`.
+      + `ct::StressCentrality`: `Graphs.stress_centrality`.
 
-  - `g`: Graph to compute centrality on.
+  - `g`: Graph to score.
 
 # Returns
 
-  - `ct::VecNum`: Centrality scores for each node in the graph.
+  - `scores::VecNum`: One centrality score for each vertex of the graph.
 
 # Related
 

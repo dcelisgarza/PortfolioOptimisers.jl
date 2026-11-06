@@ -23,13 +23,14 @@ term can constrain the portfolio and stay out of the objective.
 
 ## Constraints
 
-  - `ret_lb_i`: ``s_c \\left(\\mathrm{ret}_i - \\mathrm{lb}_i\\, k\\right) \\geq 0``, for a number bound.
+  - `ret_lb_i`: ``s_c \\left(\\mathrm{ret}_i - \\mathrm{lb}_i\\, k\\right) / m_i \\geq 0``, for a number bound.
 
 Where:
 
   - $(math_dict[:k_budget])
   - $(math_dict[:ret_i_term])
   - ``\\mathrm{lb}_i``: The number bound of term ``i``.
+  - ``m_i``: The [`bound_scale`](@ref) of ``\\mathrm{lb}_i``, which keeps the coefficients of the row of order one.
   - $(math_dict[:sc_scale])
 
 # Arguments
@@ -55,8 +56,9 @@ end
 function set_return_bounds!(model::JuMP.Model, i, ret_expr, lb::Number)
     sc = get_constraint_scale(model)
     k = get_k(model)
+    m = bound_scale(lb)
     state_set!(model, Symbol(""), :ret_lb_, i,
-               JuMP.@constraint(model, sc * (ret_expr - lb * k) >= 0))
+               JuMP.@constraint(model, sc * (ret_expr - lb * k) / m >= 0))
     return nothing
 end
 function set_return_bounds!(model::JuMP.Model, i, ret_expr, lb::Front_NumVec)
@@ -65,9 +67,9 @@ function set_return_bounds!(model::JuMP.Model, i, ret_expr, lb::Front_NumVec)
     if !shared_has(model, :ret_frontier)
         JuMP.@expression(model, ret_frontier,
                          Pair{Tuple{Symbol, Symbol},
-                              Tuple{<:JuMP.AbstractJuMPScalar, <:Front_NumVec, <:Integer}}[(bound_var_key, bound_key) => (ret_expr,
-                                                                                                                          lb,
-                                                                                                                          i)])
+                              Tuple{JuMP.AbstractJuMPScalar, Front_NumVec, Integer}}[(bound_var_key, bound_key) => (ret_expr,
+                                                                                                                    lb,
+                                                                                                                    i)])
     else
         push!(shared_get(model, :ret_frontier),
               (bound_var_key, bound_key) => (ret_expr, lb, i))
@@ -504,7 +506,7 @@ Where:
   - $(math_dict[:w_t_obs]) Every ``w_{t}`` is ``1`` when the term and the prior carry no weights.
   - $(math_dict[:x_t_obs])
   - $(math_dict[:sc_scale])
-  - ``\\mathcal{K}_{\\exp} = \\{(x, y, z) : y e^{x / y} \\leq z,\\ y > 0\\}``: Exponential cone, with its closure.
+  - ``\\mathcal{K}_{\\exp} = \\{(x, y, z) : y e^{x / y} \\leq z,\\ y > 0\\}``: Exponential cone, with its closure. Section 4.2 of [chares2009](@cite) defines it with the last two entries in the other order.
 
 ## Relaxation
 
@@ -537,6 +539,11 @@ $(val_dict[:relax])
   - [`scalarise_return_expression!`](@ref)
   - [`set_return_bounds!`](@ref)
   - [`add_fees_to_ret!`](@ref)
+
+# References
+
+  - $(ref_dict[:chares2009]) Section 4.2.
+  - $(ref_dict[:cajas2025]) Section 8.1.2, Equations 8.5 and 8.6. $(ref_dict[:no_original_source])
 """
 function set_return_constraints!(model::JuMP.Model, pret::JuMPReturnsEstimator,
                                  obj::ObjectiveFunction, pr::AbstractPriorResult; kwargs...)
@@ -852,7 +859,9 @@ Build one term's signed-``\\ell_1``-robust return expression.
 The rows are linear, and the term forces the risk form of [`MaximumRatio`](@ref), as the
 ``\\ell_1`` set does. The worst case keeps the long-short problem as one problem. Thus it does not need the two
 separate problems of equations (27) and (28) of [quintile](@cite). It also does not need the
-condition on complementary supports that Remark 12 of that source sets to join the two parts.
+condition on disjoint supports that Remark 12 of [quintile](@cite) sets to join the two parts.
+The closed form below is this library's own. It applies the argument of Lemma 8 of
+[quintile](@cite), which states the worst case over the joint ``\\ell_1`` set, to each sign.
 
 # Mathematical definition
 
@@ -1029,8 +1038,9 @@ function set_return_constraints!(model::JuMP.Model, i,
     fb = ifelse(isnothing(pret.mu), pr.mu, pret.mu)
     # The prior travels beside the returns, because an `AbstractPriorUncertaintySetEstimator`
     # is fitted from the optimisation's own prior result rather than from returns data. An
-    # estimator that carries its own `pe` drops it (see [`mu_ucs`](@ref)).
-    uc = mu_ucs(pret.ucs, rd, pr; kwargs...)
+    # estimator that carries its own `pe` drops it (see [`mu_ucs`](@ref)). The form of three
+    # arguments takes no keyword.
+    uc = mu_ucs(pret.ucs, rd, pr)
     ret, mu, forces_risk = set_ucs_return_constraints!(model, i, uc, fb, settings,
                                                        pret.mtx_sqrt)
     set_return_bounds!(model, i, ret, settings.lb)
@@ -1046,8 +1056,9 @@ function set_return_constraints!(model::JuMP.Model, i, pret::LogarithmicReturn,
     T = length(X)
     t_elog_ret = state_set!(model, Symbol(""), :t_elog_ret_, i,
                             JuMP.@variable(model, [1:T]))
-    wi = nothing_scalar_array_selector(pret.w, pr.w)
-    wi = get_observation_weights(wi, X)
+    # Both fields hold an `Option{<:ObsWeights}`, so the term's own weights and then the
+    # prior's are the choice, as `fb` is in the arithmetic term.
+    wi = get_observation_weights(ifelse(isnothing(pret.w), pr.w, pret.w), X)
     ret = if isnothing(wi)
         JuMP.@expression(model, Statistics.mean(t_elog_ret))
     else

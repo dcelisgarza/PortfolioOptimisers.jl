@@ -153,7 +153,7 @@ $(DocStringExtensions.TYPEDSIGNATURES)
 
 Read the slot an uncertainty-set step fits from, as the arguments its verb takes.
 
-An estimator that reads a prior result — [`reads_prior_result`](@ref) answers `true` — is fitted from the `prior` slot, and never touches the returns; every other estimator is fitted from the `returns` slot, whose `X` and `F` its verb takes. The estimator reads the source that its own prior states, [`returns_source`](@ref) of `ue.pe`, as the verb over a [`ReturnsResult`](@ref) reads it. The observations of a Shared Series gap that the fit reads are dropped first with [`shared_series_view`](@ref): a gap of a vector benchmark under `ExcessSource()`, and a gap of the factor returns when the prior of the estimator reads them. When the optimiser receives the set, the `returns` slot already has the gaps of its group dropped, see [`run_group_step`](@ref), so a raw prior in an excess group reads the same observations as the other readers of the group. The asset returns are then read with [`benchmark_relative_returns`](@ref) under the same source. The required slot is checked here, so a missing one is refused with an error that names it before any fit. The predicate reads the type, so the branch folds.
+An estimator that reads a prior result — [`reads_prior_result`](@ref) answers `true` — is fitted from the `prior` slot, and never touches the returns; every other estimator is fitted from the `returns` slot, whose `X` and `F` its verb takes. The estimator reads the source that its own prior states, [`returns_source`](@ref) of `ue.pe`, as the verb over a [`ReturnsResult`](@ref) reads it. The observations of a Shared Series gap that the fit reads are dropped first with [`shared_series_fit`](@ref): a gap of a vector benchmark under `ExcessSource()`, and a gap of the factor returns when the prior of the estimator reads them. Each fixed observation weight in the tree of the estimator loses the same observations, so the function returns the cut estimator too. When the optimiser receives the set, the `returns` slot already has the gaps of its group dropped, see [`run_group_step`](@ref), so a raw prior in an excess group reads the same observations as the other readers of the group. The asset returns are then read with [`benchmark_relative_returns`](@ref) under the same source. The required slot is checked here, so a missing one is refused with an error that names it before any fit. The predicate reads the type, so the branch folds.
 
 # Arguments
 
@@ -163,10 +163,11 @@ An estimator that reads a prior result — [`reads_prior_result`](@ref) answers 
 # Validation
 
   - The slot the estimator reads is filled, through [`require_slot`](@ref).
-  - The rules of [`benchmark_relative_returns`](@ref) and [`shared_series_view`](@ref).
+  - The rules of [`benchmark_relative_returns`](@ref) and [`shared_series_fit`](@ref).
 
 # Returns
 
+  - `ue::AbstractUncertaintySetEstimator`: The estimator that the fit reads, cut to the observations that the fit keeps. A prior-reading estimator comes back with no change.
   - `src::Tuple`: `(ctx.prior,)` for a prior-reading estimator, `(X, F)` otherwise, where `X` is the asset returns from the source of `ue.pe` and both hold the observations that the fit keeps.
 
 # Related
@@ -178,12 +179,12 @@ An estimator that reads a prior result — [`reads_prior_result`](@ref) answers 
 function uncertainty_step_source(ue::AbstractUncertaintySetEstimator, ctx::PipelineContext)
     if reads_prior_result(ue)
         require_slot(ctx, :prior, ue)
-        return (ctx.prior,)
+        return ue, (ctx.prior,)
     end
     require_slot(ctx, :returns, ue)
     x_src = returns_source(ue.pe)
-    rd = shared_series_view(ctx.returns, x_src, reads_factor_returns(ue.pe))
-    return (benchmark_relative_returns(rd, x_src), rd.F)
+    ue, rd = shared_series_fit(ue, ctx.returns, x_src, reads_factor_returns(ue.pe))
+    return ue, (benchmark_relative_returns(rd, x_src), rd.F)
 end
 """
 $(DocStringExtensions.TYPEDSIGNATURES)
@@ -224,7 +225,7 @@ function run_uncertainty_step(ue::AbstractUncertaintySetEstimator, target::Optio
                               ctx::PipelineContext)
     @argcheck(target in (:mu, :sigma, :both),
               ArgumentError("the PipelineStep target of a $(typeof(ue)) step must be :mu, :sigma, or :both, got $(repr(target))"))
-    src = uncertainty_step_source(ue, ctx)
+    ue, src = uncertainty_step_source(ue, ctx)
     cur = ctx.uncertainty
     res, pair = if target == :mu
         r = mu_ucs(ue, src...)
@@ -483,7 +484,7 @@ function run_step(ce::AbstractConstraintEstimator, ctx::PipelineContext)
     return run_constraint_step(ce, nothing, ctx)
 end
 pipe_reads(::PricesToReturns) = (:prices,)
-pipe_writes(::PricesToReturns) = :returns
+pipe_writes(::PricesToReturns)::Symbol = :returns
 function run_step(ptr::PricesToReturns, ctx::PipelineContext)
     require_slot(ctx, :prices, ptr)
     return ptr, set_slot(ctx, :returns, apply_preprocessing(ptr, ctx.prices))
@@ -502,7 +503,7 @@ A [`TrainTestSplit`](@ref) narrows whichever data slot the pipeline input filled
   - [`assert_split_position`](@ref)
   - [`PIPELINE_SLOTS`](@ref)
 """
-pipe_writes(::TrainTestSplit) = :split
+pipe_writes(::TrainTestSplit)::Symbol = :split
 pipe_reads(::TrainTestSplit) = ()
 """
 $(DocStringExtensions.TYPEDSIGNATURES)
@@ -608,7 +609,7 @@ function pipe_step_targets(step)
         (:pe,)
     elseif slot === :phylogeny
         est = isa(step, PipelineStep) ? step.est : step
-        if isa(est, Union{<:AbstractClustersEstimator, <:AbstractClusteringResult})
+        if isa(est, Union{AbstractClustersEstimator, AbstractClusteringResult})
             (:cle,)
         else
             ()
@@ -628,7 +629,7 @@ Internal machinery — not part of the user-facing API.
 
 # Algorithm
 
- 1. `:sigma_ucs` on a value with a field `r`: the path `"r.ucs"`, or `"r[i].ucs"` for each element `i` of a vector that is an `UncertaintySetVariance`.
+ 1. `:sigma_ucs`: the path `"r.ucs"`, or `"r[i].ucs"` for each element `i` of a vector that is an `UncertaintySetVariance`. Only an optimiser that [`@pipe_route_sigma_ucs`](@ref) declares accepts this target, and each one has a field `r`.
  2. A target with a field of the same name in `x`: the name of the field.
  3. Otherwise the paths in the configuration of `x`, after its field name, see [`pipe_config_paths`](@ref).
 
@@ -654,9 +655,8 @@ function pipe_target_paths(::JuMPOptimiser, ::Val{:mu_ucs})::Vector{String}
     return ["ret.ucs"]
 end
 function pipe_target_paths(x, t::Val{:sigma_ucs})::Vector{String}
-    if !hasfield(typeof(x), :r)
-        return pipe_config_paths(x, t)
-    end
+    # Only an optimiser that `@pipe_route_sigma_ucs` declares accepts the target, and each
+    # one holds the measures in its own field `r`.
     r = getfield(x, :r)
     return if isa(r, UncertaintySetVariance)
         ["r.ucs"]
@@ -1006,29 +1006,30 @@ function run_group_step(step, ctx::PipelineContext, ::Nothing)
 end
 function run_group_step(step, ctx::PipelineContext, gsrc::ExcessSource)
     rd = ctx.returns
-    fitted, ctx = run_step(step, set_slot(ctx, :returns, group_returns_view(rd, gsrc)))
+    step, rdv = group_returns_view(step, rd, gsrc)
+    fitted, ctx = run_step(step, set_slot(ctx, :returns, rdv))
     return fitted, set_slot(ctx, :returns, rd)
 end
 """
-    group_returns_view(rd::ReturnsResult, gsrc::ExcessSource) -> ReturnsResult
-    group_returns_view(rd, gsrc::ExcessSource)
+    group_returns_view(step, rd::ReturnsResult, gsrc::ExcessSource) -> Tuple{Any, ReturnsResult}
+    group_returns_view(step, rd, gsrc::ExcessSource)
 
-Return the returns data that a step of the group of a [`Pipeline`](@ref) reads: `rd` with each gap of a vector benchmark dropped, see [`shared_series_view`](@ref).
+Return the step and the returns data that a step of the group of a [`Pipeline`](@ref) reads: `rd` with each gap of a vector benchmark dropped, and `step` with each fixed observation weight of the same observations dropped, see [`shared_series_fit`](@ref).
 
-A slot that holds no [`ReturnsResult`](@ref), such as an empty slot before a step that reads prices, is returned unchanged.
+A slot that holds no [`ReturnsResult`](@ref), such as an empty slot before a step that reads prices, is returned unchanged with the step.
 
 Internal machinery — not part of the user-facing API.
 
 # Related
 
   - [`run_group_step`](@ref)
-  - [`shared_series_view`](@ref)
+  - [`shared_series_fit`](@ref)
 """
-function group_returns_view(rd::ReturnsResult, gsrc::ExcessSource)
-    return shared_series_view(rd, gsrc, false)
+function group_returns_view(step, rd::ReturnsResult, gsrc::ExcessSource)
+    return shared_series_fit(step, rd, gsrc, false)
 end
-function group_returns_view(rd, ::ExcessSource)
-    return rd
+function group_returns_view(step, rd, ::ExcessSource)
+    return step, rd
 end
 """
     pipeline_refits(ests, received, opt) -> Tuple{Bool, Bool}

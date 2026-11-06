@@ -104,13 +104,14 @@
     # ------------------------------------------------------------------------ the scope
 
     #=
-    The four fixed files, plus every markdown file in the two instruction directories, so
+    The six fixed files, plus every markdown file in the two instruction directories, so
     that a new instructions file or a new prompt joins the census on the day it lands.
     `docs/src/contribute/` is the sixth tier of the Precedence list and is NOT in scope: it
     is a rendered documentation page, and `.github/workflows/LinkChecker.yml` already walks
     the links of the built documentation.
     =#
     standards_files = let fs = String["CODING_STANDARDS.md", "GLOSSARY.md", "CLAUDE.md",
+                                      "src/CLAUDE.md", "docs/paper/CLAUDE.md",
                                       ".github/copilot-instructions.md"]
         for d in (".github/instructions", ".github/prompts")
             for f in sort(readdir(joinpath(root, d)))

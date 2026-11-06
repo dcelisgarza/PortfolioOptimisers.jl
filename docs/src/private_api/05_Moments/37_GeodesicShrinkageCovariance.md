@@ -15,4 +15,5 @@ PortfolioOptimisers.geodesic_shrinkage!
 PortfolioOptimisers.frame_cov2cor!
 gap_fill_value(::GeodesicShrinkageCovariance)
 PortfolioOptimisers.show_fields(::GeodesicShrinkageCovariance)
+PortfolioOptimisers.observation_count(ce::GeodesicShrinkageCovariance{<:Any, <:Any, <:Any, <:Any, Nothing})
 ```

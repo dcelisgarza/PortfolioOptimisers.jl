@@ -58,7 +58,7 @@
     end
 
     @testset "the weight acts, and acts identically under cv" begin
-        for cv in (nothing, OptimisationCrossValidation(; cv = KFold(; n = 4)))
+        for cv in (nothing, KFold(; n = 4))
             r0 = optimise(stack(nothing, cv), rd)
             rs = optimise(stack(scale, cv), rd)
             # It is no longer inert. This is the whole defect under `cv`, where the two

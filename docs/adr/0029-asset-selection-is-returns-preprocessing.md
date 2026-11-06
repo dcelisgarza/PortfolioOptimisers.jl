@@ -167,3 +167,40 @@ because observation filtering is a price-level policy, which `MissingDataFilter`
 
 `find_uncorrelated_indices` is unchanged. `RedundancySelector` still calls it, through its
 `PairwiseCorrelation` algorithm.
+
+## Amendment (2026-11-02)
+
+Decision 4 is amended by [ADR 0225](0225-an-asset-scorer-scores-the-assets-from-the-whole-returns-data-and-each-fold-scores-its-own-coverage-universe.md).
+A risk measure stays a valid `score` with no wrapper, and it is the in-sample case. Both selectors
+also take an `AbstractAssetScorer`, a new family for the scores that a risk measure on one column
+cannot state: a risk measure aggregated over the test windows of a scheme, and the weight that an
+optimiser gives each asset over the splits of a scheme. The second score reads the whole
+cross-section of each fold, so it cannot be a risk measure.
+
+## Amendment (2026-11-02): a non-finite score is outside every rule (#1933)
+
+Decision 6 is amended for a non-finite score that reaches a rule. A non-finite score is outside
+both tails and outside every band, under each `action`. A selection rule returns `false` at it,
+and so does each redundancy algorithm. An asset with no score then leaves the selection, and the
+run does not stop. This also fails closed: an unscored asset never survives. A selector with no
+finite score keeps no asset, and `fit_preprocessing` throws `IsEmptyError` as before.
+
+Before this amendment the rules read a `NaN` through `isless` and `>`. `tail_mask` put the `NaN`
+at the cut end, and the mask came back empty. `tail_action_mask` with `action = :drop` kept a
+`NaN` that was in neither tail. `QuantileRule` counted a `NaN` in the size of the universe.
+`groups_argbest` kept no asset of a group whose first member had a `NaN`. `find_uncorrelated_indices`
+removed both assets of a pair with one `NaN`. Each of these now ranks, counts and compares only
+the finite scores. `find_uncorrelated_indices` removes an asset with a non-finite score in
+`scores` before its greedy pass, so the partner of that asset survives their pair. The default
+drop score, the summary of a column of the correlation matrix, does not take this step. A `ce`
+that returns the correlation with a constant column as `NaN` makes every summary `NaN`, and that
+`NaN` does not mark an asset with no score. Before R30 of #1817 the step read the summary too,
+so one constant column removed every asset.
+
+`asset_scores` on a risk measure keeps its `DomainError` on a non-finite score. A non-finite value
+from a live column is a defect of the measure, for example `ThirdCentralMoment(; ve =
+SimpleVariance())` on a constant series, and an exception names it. A `NaN` that reaches a rule
+comes from a scorer that cannot score an asset, for example a fold scheme that never offered it.
+The two routes disagree on purpose. The interfaces of `AbstractSelectionRule` and
+`AbstractRedundancyAlgorithm` state the rule for a rule or an algorithm that a user adds: its
+keep-mask is `false` at every non-finite score.

@@ -1,11 +1,10 @@
 ```@meta
-Description = "Smyth-Broby Covariance, private API of PortfolioOptimisers.jl: BaseSmythBrobyCovariance, SmythBrobyCovarianceAlgorithm, GerberComovementZero, …"
+Description = "Smyth-Broby Covariance, private API of PortfolioOptimisers.jl: SmythBrobyCovarianceAlgorithm, GerberComovementZero, GerberComovementOne, …"
 ```
 
 # Smyth-Broby Covariance: private API
 
 ```@docs
-BaseSmythBrobyCovariance
 SmythBrobyCovarianceAlgorithm
 GerberComovementZero
 GerberComovementOne

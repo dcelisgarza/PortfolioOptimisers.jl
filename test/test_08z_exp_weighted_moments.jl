@@ -317,6 +317,13 @@ end
     @test isequal(cov(fitted), cov(cc, Xg; active_mask = amsk))
     @test isequal(cor(fitted), cor(cc, Xg; active_mask = amsk))
     @test isequal(cov(cc, fitted.cache), cov(fitted))
+    @test isequal(cor(cc, fitted.cache), cor(fitted))
+    # One observation at a time, with and without the active mask, is the block fit.
+    by_row = foldl((c, i) -> partial_fit!(c, Xg[i, :]; active_mask = amsk[i, :]),
+                   axes(Xg, 1); init = cc)
+    @test isequal(cov(by_row), cov(fitted))
+    no_mask = foldl((c, i) -> partial_fit!(c, Xg[i, :]), axes(Xg, 1); init = cc)
+    @test size(cov(no_mask)) == size(cov(fitted))
 
     # A copy shares no array, so a fold on one leaves the other alone.
     original = fitted.cache
@@ -630,13 +637,11 @@ end
 end
 
 @testset "Exponentially weighted expected returns: the number type and the correction" begin
-    # Issue #889. The state was seeded with `eltype(X)`, so an integer sample threw
-    # `InexactError` at the first step. A mean divides, so the state now holds the type of a
-    # division: an integer sample lands in a float, and a `Float32` sample stays `Float32`.
+    # Issue #889. A mean divides, so a `Float32` sample stays `Float32`. Issue #1972 removed
+    # the integer case: integer data convert at the carrier.
     me = ExpWeightedExpectedReturns(; decay = 0.9, min_obs = 1)
-    Xi = [1 -2; -1 3; 2 -1; 0 1]
-    @test isequal(mean(me, Xi), mean(me, float.(Xi)))
-    @test eltype(mean(me, Float32.(Xi ./ 100))) === Float32
+    Xf = [1.0 -2.0; -1.0 3.0; 2.0 -1.0; 0.0 1.0]
+    @test eltype(mean(me, Float32.(Xf ./ 100))) === Float32
 
     # With one observation the mean is that observation. The correction divided by
     # `max(1 - decay^n, eps(T))`, which cut the answer when `1 - decay` fell below `eps(T)`:
@@ -826,12 +831,10 @@ end
     c2 = partial_fit!(c1, view(Xc, 21:EW_T, :))
     @test c1.cache === c2.cache
 
-    # The state takes the type of a quotient of two returns: an integer sample gives a
-    # floating-point estimate, and a `Float32` sample keeps `Float32`.
-    Xi = [1 2 3; 4 -1 2; 0 3 -2; 5 1 1; -3 2 4]
-    ci = ExpWeightedCovariance(; decay = 0.8, min_obs = 1)
-    @test isequal(cov(ci, Xi), cov(ci, float.(Xi)))
-    @test eltype(cov(ExpWeightedCovariance(; decay = 0.8f0, min_obs = 1), Float32.(Xi))) ===
+    # A `Float32` sample keeps `Float32`. Issue #1972 removed the integer case: integer
+    # data convert at the carrier.
+    Xf = [1.0 2.0 3.0; 4.0 -1.0 2.0; 0.0 3.0 -2.0; 5.0 1.0 1.0; -3.0 2.0 4.0]
+    @test eltype(cov(ExpWeightedCovariance(; decay = 0.8f0, min_obs = 1), Float32.(Xf))) ===
           Float32
 
     # A panel whose mask does not have the size of the sample is refused.
@@ -967,14 +970,12 @@ end
               var([0.01, -0.02])
     end
 
-    # An integer panel gets a floating-point state, and a `Float32` panel keeps `Float32`.
-    Xi = [1 2; 3 -1; 0 2; 2 1; -1 0]
+    # A `Float32` panel keeps `Float32`. Issue #1972 removed the integer case: integer data
+    # convert at the carrier.
+    X32 = Float32[1 2; 3 -1; 0 2; 2 1; -1 0]
     ce = ExpWeightedVariance(; decay = 0.9, min_obs = 2)
-    @test var(ce, Xi) == var(ce, float.(Xi))
-    @test isequal(PortfolioOptimisers.variance_series(ce, Xi),
-                  PortfolioOptimisers.variance_series(ce, float.(Xi)))
-    @test eltype(var(ce, Float32.(Xi))) === Float32
-    @test eltype(PortfolioOptimisers.variance_series(ce, Float32.(Xi))) === Float32
+    @test eltype(var(ce, X32)) === Float32
+    @test eltype(PortfolioOptimisers.variance_series(ce, X32)) === Float32
 
     # Under `PreCentred` the effective count is Kish's count of the weights `decay^k` over the
     # finite rows, and it is also the divisor, because the weights sum to one. Under the
@@ -1089,7 +1090,7 @@ end
     # two estimated deviations has a non-zero mean. The factor reads it, so the recursion is
     # unbiased for returns independent in time, at one, two and five lags, with holidays. The
     # test reads the raw state: the report floors a negative HAC variance at zero, which is the
-    # floor of `NoHacFloor` and adds a positive bias to a young estimate.
+    # floor of `hac_floor = nothing` and adds a positive bias to a young estimate.
     rng = StableRNG(1509)
     μ, M, T = 0.3, 20_000, 30
     λ = 2.0^(-1 / 10)

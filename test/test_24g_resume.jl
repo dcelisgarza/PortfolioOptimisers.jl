@@ -79,6 +79,16 @@ assets is what keeps the JuMP families cheap.
         cvr = split(online_cv, rd_T)
         @test po.returns_result(o.opt).X == rows(rd_T, 1:last(cvr.train_idx[end])).X
         @test po.held_timestamps(o.opt) == ts[1:last(cvr.train_idx[end])]
+        # #1939: the Result does not carry the type of its estimator, so the Results of
+        # online runs over different optimisers, and of a batch run, have one type, and
+        # every verb on them compiles one time. `Resume` carries the type instead.
+        oh = cross_val_predict(hrp, rd_T, online_cv)
+        @test typeof(oh) === typeof(o) === typeof(b)
+        @test fieldtype(typeof(o), :opt) === Union{Nothing, po.AbstractEstimator}
+        @test Resume(o).opt === o.opt
+        @test isa(Resume(o), po.OptimiserResume)
+        @test isa(Resume(oh), po.OptimiserResume)
+        @test !isa(Resume(o), po.PipelineResume)
         # The loop returns the estimator beside the predictions, and `nothing` from the
         # batch arms.
         preds, est = po.fold_loop(mr, length(cvr.train_idx), FLoops.SequentialEx();

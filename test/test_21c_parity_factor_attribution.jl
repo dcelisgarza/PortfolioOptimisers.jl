@@ -184,8 +184,7 @@ end
     ind = ["market" => ConstantExposure(),
            "industry" => OneHotExposure(; field = "industry", family = "industry"),
            "style1" => grid_pass("style1"), "style2" => grid_pass("style2")]
-    ve1 = RegimeAdjustedExpWeightedVariance(; centring = PreCentred(),
-                                            debias = RawStatistic(),
+    ve1 = RegimeAdjustedExpWeightedVariance(; centring = PreCentred(), debias = nothing,
                                             regime_lohi_mult = (0.7, 1.6), min_val = 1e-12,
                                             min_obs = 1)
     lz = KindwiseUnknown(; leverage = ZeroUnknown())
@@ -682,7 +681,7 @@ end
         @test_throws DomainError factor_attribution(wt, Br, f, eps, ret; lag = -1,
                                                     trim = true)
         T = size(f, 1)
-        Bh = stack(fill(Br, T); dims = 1)
+        Bh = stack(fill(Br, T); dims = 3)
         @test isequal(fa_pack(factor_attribution(wt, Bh, f, eps, ret)),
                       fa_pack(factor_attribution(wt, Bh, f, eps, ret; lag = 1)))
         @test !isequal(fa_pack(factor_attribution(wt, Bh, f, eps, ret)), fa_pack(r0))
@@ -693,7 +692,7 @@ end
               length(30:10:T)
         @test_throws DomainError factor_attribution(wt, Br, f, eps, ret; lag = -1)
         @test_throws DimensionMismatch factor_attribution(wt, Br, f, eps[2:end, :], ret)
-        @test_throws DimensionMismatch factor_attribution(wt, Bh[2:end, :, :], f, eps, ret)
+        @test_throws DimensionMismatch factor_attribution(wt, Bh[:, :, 2:end], f, eps, ret)
     end
 
     @testset "A Scenario Cap leaves the realised attribution of a re-based fit (#1422)" begin
@@ -771,7 +770,7 @@ end
     # The realised method reads the mask row by row: a weight of zero at the marked row is no
     # holding.
     h1 = BitMatrix([0 0 0; 0 1 0])
-    Bh = permutedims(cat(B, B; dims = 3), (3, 1, 2))
+    Bh = cat(B, B; dims = 3)
     @test isnothing(PO.attribution_leverage_split(EntrywiseUnknown(), h1,
                                                   [0.5 0.5 0.0; 0.5 0.0 0.5], Bh))
     lv = PO.attribution_leverage_split(EntrywiseUnknown(), h1, [0.5 0.0 0.5; 0.5 0.5 0.0],

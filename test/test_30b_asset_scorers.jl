@@ -1,0 +1,450 @@
+# An Asset Scorer that declares no orientation. The library gives the family no default, so
+# `bigger_is_better` on it is a `MethodError`. A struct must be defined at top level.
+struct NoOrientationScorer <: PortfolioOptimisers.AbstractAssetScorer end
+
+@testset "Asset scorers" begin
+    using Test, PortfolioOptimisers, StableRNGs, Statistics, Clarabel, InteractiveUtils
+    PO = PortfolioOptimisers
+
+    rng = StableRNG(19310)
+    X = 0.01 .* randn(rng, 120, 6)
+    nx = string.('A':'F')
+    rd = ReturnsResult(; nx = nx, X = X)
+    slv = Solver(; name = :clarabel, solver = Clarabel.Optimizer,
+                 settings = Dict("verbose" => false),
+                 check_sol = (; allow_local = true, allow_almost = true))
+
+    # The value of `r` on each test window of `cv`, one column for each window.
+    function window_values(r, cv, rd)
+        wins = PO.distinct_test_windows(split(cv, rd).test_idx)
+        return reduce(hcat, [PO.asset_scores(r, rd.X[T, :]) for T in wins])
+    end
+    # The midrank percentile of each entry of `v`, by hand, with the best entry first.
+    function hand_rank(v, bib)
+        u = bib ? -v : v
+        n = length(u)
+        return [(count(<(x), u) + count(<=(x), u)) / (2n) for x in u]
+    end
+
+    @testset "the seam: a risk measure is the in-sample score" begin
+        @test PO.asset_scores(SCM(), rd) == PO.asset_scores(SCM(), rd.X)
+        s = FoldRiskScorer(; r = SCM())
+        @test isnothing(PO.assert_scoreable(s))
+        @test ScoreSelector(; score = s, rule = RankRule(; best = 2)).score === s
+        @test RedundancySelector(; score = s).score === s
+        @test_throws MethodError PO.bigger_is_better(NoOrientationScorer())
+        for T in subtypes(PO.AbstractAssetScorer)
+            T === NoOrientationScorer && continue
+            m = which(PO.bigger_is_better, (T,))
+            @test m.sig.parameters[2] <: T
+        end
+    end
+
+    @testset "fold statistics" begin
+        v = [0.3, 0.1, 0.1, 0.2]
+        @test PO.fold_statistic(Value(), v, false) === v
+        @test PO.fold_statistic(Rank(), v, false) == [0.875, 0.25, 0.25, 0.625]
+        @test PO.fold_statistic(Rank(), v, false) == hand_rank(v, false)
+        @test PO.fold_statistic(Rank(), v, true) == hand_rank(v, true)
+        @test PO.fold_statistic(Rank(), v, true) == [0.125, 0.75, 0.75, 0.375]
+        @test PO.statistic_bigger_is_better(Value(), true)
+        @test !PO.statistic_bigger_is_better(Value(), false)
+        @test !PO.statistic_bigger_is_better(Rank(), true)
+        @test !PO.statistic_bigger_is_better(Rank(), false)
+        @test MeanFoldScore().alg === Value()
+        @test MedianFoldScore(; alg = Rank()).alg === Rank()
+        @test PO.fold_aggregate(MeanFoldScore(), [1.0, 2.0, 6.0], false) == 3.0
+        @test PO.fold_aggregate(MedianFoldScore(), [1.0, 2.0, 6.0], false) == 2.0
+        @test PO.fold_aggregate(WorstFoldScore(), [1.0, 2.0, 6.0], false) == 6.0
+        @test PO.fold_aggregate(WorstFoldScore(), [1.0, 2.0, 6.0], true) == 1.0
+    end
+
+    @testset "FoldRiskScorer equals a hand loop over the test windows" begin
+        cv = KFold(; n = 3)
+        for r in (SCM(), MeanReturn(), ConditionalValueatRisk())
+            bib = PO.bigger_is_better(r)
+            V = window_values(r, cv, rd)
+            R = reduce(hcat, [hand_rank(c, bib) for c in eachcol(V)])
+            worst(M, b) = b ? vec(minimum(M; dims = 2)) : vec(maximum(M; dims = 2))
+            cases = ((MeanFoldScore(), vec(mean(V; dims = 2)), bib),
+                     (MedianFoldScore(), vec(median(V; dims = 2)), bib),
+                     (WorstFoldScore(), worst(V, bib), bib),
+                     (MeanFoldScore(; alg = Rank()), vec(mean(R; dims = 2)), false),
+                     (MedianFoldScore(; alg = Rank()), vec(median(R; dims = 2)), false),
+                     (WorstFoldScore(; alg = Rank()), vec(maximum(R; dims = 2)), false))
+            for (agg, expected, ebib) in cases
+                s = FoldRiskScorer(; r = r, cv = cv, agg = agg)
+                @test PO.asset_scores(s, rd) ≈ expected
+                @test PO.bigger_is_better(s) == ebib
+            end
+        end
+        # A risk takes the maximum of its windows, and a reward the minimum.
+        V = window_values(MeanReturn(), cv, rd)
+        s = FoldRiskScorer(; r = MeanReturn(), cv = cv, agg = WorstFoldScore())
+        @test PO.asset_scores(s, rd) == vec(minimum(V; dims = 2))
+    end
+
+    @testset "CombinatorialCrossValidation counts each test block once" begin
+        ccv = CombinatorialCrossValidation(; n_folds = 4, n_test_folds = 2)
+        test_idx = split(ccv, rd).test_idx
+        # Six splits of two blocks each hold twelve blocks, and four of them are distinct.
+        @test sum(length, test_idx) == 12
+        wins = PO.distinct_test_windows(test_idx)
+        @test length(wins) == 4
+        @test sort(first.(wins)) == [1, 31, 61, 91]
+        V = reduce(hcat, [PO.asset_scores(SCM(), rd.X[T, :]) for T in wins])
+        s = FoldRiskScorer(; r = SCM(), cv = ccv)
+        @test PO.asset_scores(s, rd) ≈ vec(mean(V; dims = 2))
+    end
+
+    @testset "FoldRiskScorer scores each window on its Coverage Universe" begin
+        X2 = copy(X)
+        X2[1:5, 2] .= NaN
+        rd2 = ReturnsResult(; nx = nx, X = X2)
+        cv = KFold(; n = 3)
+        wins = PO.distinct_test_windows(split(cv, rd2).test_idx)
+        # Asset B has a gap in the first window alone, so it keeps the other two.
+        V = [PO.asset_scores(SCM(), rd2.X[T, setdiff(1:6, k == 1 ? [2] : Int[])])
+             for (k, T) in enumerate(wins)]
+        s = FoldRiskScorer(; r = SCM(), cv = cv)
+        sc = PO.asset_scores(s, rd2)
+        @test sc[2] ≈ mean([V[2][2], V[3][2]])
+        @test sc[1] ≈ mean([V[1][1], V[2][1], V[3][1]])
+        # Under Rank, the first window ranks only the five assets that it covers.
+        sr = FoldRiskScorer(; r = SCM(), cv = cv, agg = MeanFoldScore(; alg = Rank()))
+        R1 = hand_rank(V[1], false)
+        R2 = hand_rank(V[2], false)
+        R3 = hand_rank(V[3], false)
+        @test PO.asset_scores(sr, rd2)[1] ≈ mean([R1[1], R2[1], R3[1]])
+        @test PO.asset_scores(sr, rd2)[2] ≈ mean([R2[2], R3[2]])
+        # Two covered windows are fewer than three, so asset B has no score (#1933). The
+        # other assets keep the scores of `min_folds = 1`.
+        s3 = FoldRiskScorer(; r = SCM(), cv = cv, min_folds = 3)
+        sc3 = PO.asset_scores(s3, rd2)
+        @test isnan(sc3[2])
+        @test sc3[[1, 3, 4, 5, 6]] ≈ sc[[1, 3, 4, 5, 6]]
+        # An asset that no window covers has no score at the default `min_folds = 1`.
+        X3 = copy(X)
+        X3[1:5, 4] .= NaN
+        X3[41:45, 4] .= NaN
+        X3[81:85, 4] .= NaN
+        rd3 = ReturnsResult(; nx = nx, X = X3)
+        @test findall(isnan, PO.asset_scores(s, rd3)) == [4]
+        # A reward puts the NaN at the best end. Before #1933 the tail took it, and the
+        # selector kept no asset. Now it keeps the best of the five finite scores.
+        f = FoldRiskScorer(; r = MeanReturn(), cv = cv)
+        fs = PO.asset_scores(f, rd3)
+        @test findall(isnan, fs) == [4]
+        @test findall(PO.select_assets(ScoreSelector(; score = f,
+                                                     rule = QuantileRule(; best = 0.2)),
+                                       rd3)) == [argmax(replace(fs, NaN => -Inf))]
+        # With no scored asset, the scores take the number type of the returns.
+        none = PO.asset_scores(FoldRiskScorer(; r = SCM(), cv = cv, min_folds = 99), rd3)
+        @test all(isnan, none)
+        @test eltype(none) == eltype(rd3.X)
+        # A selector with no finite score keeps no asset, so fit_preprocessing throws.
+        sel = ScoreSelector(; score = FoldRiskScorer(; r = SCM(), cv = cv, min_folds = 99),
+                            rule = RankRule(; best = 2))
+        @test_throws PO.IsEmptyError fit_preprocessing(sel, rd)
+    end
+
+    @testset "FoldRiskScorer validation" begin
+        @test_throws ArgumentError FoldRiskScorer(; r = Variance())
+        @test_throws DomainError FoldRiskScorer(; r = SCM(), min_folds = 0)
+    end
+
+    @testset "WeightMassScorer equals the mean weight over the folds" begin
+        iv = InverseVolatility()
+        cv = KFold(; n = 3)
+        pred = cross_val_predict(iv, rd, cv)
+        W = reduce(hcat, [p.res.w for p in pred.pred])
+        s = WeightMassScorer(; opt = iv, cv = cv)
+        @test PO.asset_scores(s, rd) ≈ vec(mean(W; dims = 2))
+        @test PO.bigger_is_better(s)
+        # With `tol`, the score is the share of the folds with an absolute weight above it.
+        t = median(W)
+        st = WeightMassScorer(; opt = iv, cv = cv, tol = t)
+        @test PO.asset_scores(st, rd) ≈ vec(mean(abs.(W) .> t; dims = 2))
+        @test_throws DomainError WeightMassScorer(; opt = iv, tol = -1.0)
+        @test_throws DomainError WeightMassScorer(; opt = iv, min_folds = 0)
+    end
+
+    @testset "WeightMassScorer reads each combinatorial split once" begin
+        iv = InverseVolatility()
+        ccv = CombinatorialCrossValidation(; n_folds = 4, n_test_folds = 2)
+        cvr = split(ccv, rd)
+        # The weights of each split, fitted once on its training window.
+        W = reduce(hcat,
+                   [optimise(iv, ReturnsResult(; nx = nx, X = X[tr, :])).w
+                    for tr in cvr.train_idx])
+        s = WeightMassScorer(; opt = iv, cv = ccv)
+        @test PO.asset_scores(s, rd) ≈ vec(mean(W; dims = 2))
+    end
+
+    @testset "a grid of two configurations pools both" begin
+        sel(k) = ScoreSelector(; score = SCM(), rule = RankRule(; best = k))
+        pipe = Pipeline(; steps = ("select" => sel(3), "opt" => InverseVolatility()))
+        cv = KFold(; n = 3)
+        p = ["select.rule" => [RankRule(; best = 3), RankRule(; best = 5)]]
+        s = WeightMassScorer(; opt = pipe, p = p, cv = cv)
+        @test length(PO.weight_mass_candidates(s.opt, s.p)) == 2
+        # A selector drops assets, and a dropped asset counts with weight zero.
+        function full_weights(k)
+            pk = Pipeline(; steps = ("select" => sel(k), "opt" => InverseVolatility()))
+            pr = cross_val_predict(pk, rd, cv)
+            return reduce(hcat,
+                          [[get(Dict(zip(q.rd.nx, q.res.w)), n, 0.0) for n in nx]
+                           for q in pr.pred])
+        end
+        W = hcat(full_weights(3), full_weights(5))
+        @test PO.asset_scores(s, rd) ≈ vec(mean(W; dims = 2))
+        @test any(iszero, full_weights(3))
+        @test PO.asset_scores(WeightMassScorer(; opt = pipe, cv = cv), rd) ≈
+              vec(mean(full_weights(3); dims = 2))
+        # The same grid syntax on an estimator, with its field paths.
+        mr(r) = MeanRisk(; r = r, opt = JuMPOptimiser(; slv = slv))
+        se = WeightMassScorer(; opt = mr(Variance()), cv = cv,
+                              p = ["r" => [Variance(), ConditionalValueatRisk()]])
+        We = reduce(hcat,
+                    [p.res.w for r in (Variance(), ConditionalValueatRisk())
+                     for p in cross_val_predict(mr(r), rd, cv).pred])
+        @test PO.asset_scores(se, rd) ≈ vec(mean(We; dims = 2))
+    end
+
+    @testset "MultipleRandomised counts only the draws that hold an asset" begin
+        iv = InverseVolatility()
+        mr = MultipleRandomised(IndexWalkForward(40, 20); subset_size = 3, n_subsets = 3,
+                                seed = 7)
+        cvr = split(mr, rd)
+        held = [count(a -> i in a, cvr.asset_idx) for i in 1:6]
+        sums = zeros(6)
+        for (tr, a) in zip(cvr.train_idx, cvr.asset_idx)
+            w = optimise(iv, ReturnsResult(; nx = nx[a], X = X[tr, a])).w
+            sums[a] .+= w
+        end
+        s = WeightMassScorer(; opt = iv, cv = mr)
+        # The seed draws three subsets, and each asset is in at least one of them.
+        @test held == [4, 4, 8, 12, 4, 4]
+        @test PO.asset_scores(s, rd) ≈ sums ./ held
+        # An asset with fewer than `min_folds` draws has no score (#1933), and the other
+        # assets keep their mean weight.
+        k = minimum(held) + 1
+        sk = PO.asset_scores(WeightMassScorer(; opt = iv, cv = mr, min_folds = k), rd)
+        @test isnan.(sk) == (held .< k)
+        @test sk[held .>= k] ≈ (sums ./ held)[held .>= k]
+    end
+
+    @testset "a draw that misses an asset leaves it with no score (#1933)" begin
+        iv = InverseVolatility()
+        # The seed draws two subsets of five, and neither holds asset C.
+        mr = MultipleRandomised(IndexWalkForward(40, 20); subset_size = 5, n_subsets = 2,
+                                seed = 16)
+        @test [count(a -> i in a, split(mr, rd).asset_idx) for i in 1:6] ==
+              [8, 8, 0, 8, 8, 8]
+        s = WeightMassScorer(; opt = iv, cv = mr)
+        sc = PO.asset_scores(s, rd)
+        @test findall(isnan, sc) == [3]
+        # The score is a reward, so the NaN is at the best end. Before #1933 the tail took
+        # it and kept no asset. Now the rule ranks the five finite scores alone.
+        @test findall(PO.select_assets(ScoreSelector(; score = s,
+                                                     rule = QuantileRule(; best = 0.2)),
+                                       rd)) == [argmax(replace(sc, NaN => -Inf))]
+        # `:drop` drops the worst finite asset, and does not keep the unscored one.
+        keep = PO.select_assets(ScoreSelector(; score = s,
+                                              rule = RankRule(; worst = 1, action = :drop)),
+                                rd)
+        @test findall(keep) == setdiff(1:6, [3, argmin(replace(sc, NaN => Inf))])
+    end
+
+    @testset "WeightMassScorer offers each split its Coverage Universe" begin
+        X2 = copy(X)
+        X2[1:5, 2] .= NaN
+        rd2 = ReturnsResult(; nx = nx, X = X2)
+        iv = InverseVolatility()
+        cv = KFold(; n = 3)
+        cvr = split(cv, rd2)
+        # Asset B is in the training window of the first split alone.
+        w1 = optimise(iv, ReturnsResult(; nx = nx, X = X2[cvr.train_idx[1], :])).w
+        sc = PO.asset_scores(WeightMassScorer(; opt = iv, cv = cv), rd2)
+        @test sc[2] ≈ w1[2]
+        # One split offered asset B, fewer than two, so B has no score (#1933).
+        sc2 = PO.asset_scores(WeightMassScorer(; opt = iv, cv = cv, min_folds = 2), rd2)
+        @test findall(isnan, sc2) == [2]
+        @test sc2[[1, 3, 4, 5, 6]] ≈ sc[[1, 3, 4, 5, 6]]
+    end
+
+    @testset "a failed fold leaves the sum and the count" begin
+        N = size(X, 2)
+        ok = WeightBounds(; lb = zeros(N), ub = ones(N))
+        # `N` assets at a floor of one half cannot sum to one: the fold is infeasible.
+        bad = WeightBounds(; lb = fill(0.5, N), ub = ones(N))
+        sets = UniverseSets(; dict = Dict("nx" => nx))
+        cv = KFold(; n = 3)
+        opt = MeanRisk(;
+                       opt = JuMPOptimiser(; slv = slv, wb = TimeDependent([ok, bad, ok]),
+                                           sets = sets))
+        pred = cross_val_predict(opt, rd, cv)
+        @test isa(pred.pred[2].res.retcode, OptimisationFailure)
+        W = reduce(hcat, [pred.pred[k].res.w for k in (1, 3)])
+        s = WeightMassScorer(; opt = opt, cv = cv)
+        @test PO.asset_scores(s, rd) ≈ vec(mean(W; dims = 2))
+        # Two successful splits are fewer than three, so no asset has a score (#1933).
+        @test all(isnan,
+                  PO.asset_scores(WeightMassScorer(; opt = opt, cv = cv, min_folds = 3),
+                                  rd))
+    end
+
+    @testset "a prediction that the split does not hold is refused" begin
+        pred = cross_val_predict(InverseVolatility(), rd, KFold(; n = 3))
+        @test_throws ArgumentError PO.prediction_at(pred, 9999)
+    end
+
+    @testset "the selectors take a scorer in a Pipeline" begin
+        wm = WeightMassScorer(; opt = InverseVolatility(), cv = KFold(; n = 2))
+        rule = QuantileRule(; best = 0.5)
+        sel = ScoreSelector(; score = wm, rule = rule)
+        # The acceptance identity: the public verbs give the score and its orientation.
+        @test PO.select_assets(sel, rd) ==
+              PO.rule_keep(rule, PO.asset_scores(wm, rd), PO.bigger_is_better(wm))
+        fr = FoldRiskScorer(; r = SCM(), cv = KFold(; n = 2))
+        red = RedundancySelector(; alg = PairwiseCorrelation(; t = 0.0), score = fr)
+        @test count(PO.select_assets(red, rd)) >= 1
+        pipe = Pipeline(;
+                        steps = ("select" => ScoreSelector(; score = fr,
+                                                           rule = RankRule(; best = 3)),
+                                 "opt" => InverseVolatility()))
+        pr = cross_val_predict(pipe, rd, KFold(; n = 3))
+        @test all(p -> length(p.rd.nx) == 3, pr.pred)
+        pipe_w = Pipeline(; steps = ("select" => sel, "opt" => EqualWeighted()))
+        pw = cross_val_predict(pipe_w, rd, KFold(; n = 3))
+        @test all(p -> length(p.rd.nx) == 3, pw.pred)
+        pipe_r = Pipeline(; steps = ("select" => red, "opt" => EqualWeighted()))
+        @test cross_val_predict(pipe_r, rd, KFold(; n = 3)) isa MultiPeriodPredictionResult
+        gscv = GridSearchCrossValidation(["select.score.agg" => [MeanFoldScore(),
+                                                                 WorstFoldScore(; alg = Rank())]];
+                                         cv = KFold(; n = 3), r = SCM())
+        tuned = search_cross_validation(pipe, gscv, rd)
+        @test tuned.opt.steps[1].score.agg in
+              (MeanFoldScore(), WorstFoldScore(; alg = Rank()))
+    end
+
+    @testset "PanelFieldScorer is a statistic of a Panel Field term or a Descriptor" begin
+        T, N = 40, 5
+        prng = StableRNG(6301)
+        P = 10 .+ rand(prng, T, N)
+        Q = 100 .* rand(prng, T, N)
+        P[5, 2] = NaN          # a blank close, filled forward, so not a trade
+        Q[7:9, 3] .= NaN       # three blank volumes
+        Q[:, 5] .= NaN         # an asset with no observed volume
+        amsk = trues(T, N)
+        amsk[1:10, 4] .= false # a late listing
+        pnl = asset_panel([NumericPanelInput(; name = "close", vals = P,
+                                             alg = ForwardPanelFill()),
+                           NumericPanelInput(; name = "volume", vals = Q,
+                                             alg = ForwardPanelFill())]; amsk = amsk,
+                          emsk = amsk)
+        Xp = 0.01 .* randn(prng, T, N)
+        Xp[.!amsk] .= NaN
+        rdp = ReturnsResult(; nx = string.('A':'E'), X = Xp, pnl = pnl)
+        # The traded amount by hand: NaN outside the universe and at every blank of a field.
+        V = P .* Q
+        V[.!amsk] .= NaN
+        hand(f, rows) = [(v = filter(isfinite, V[rows, i]); isempty(v) ? NaN : f(v))
+                         for i in 1:N]
+        same(a, b) = all(isapprox.(a, b; nans = true))
+
+        s = PanelFieldScorer(; fields = ["close", "volume"])
+        sc = PO.asset_scores(s, rdp)
+        @test same(sc, hand(median, 1:T))
+        @test isnan(sc[5])
+        @test same(PO.asset_scores(PanelFieldScorer(; fields = ["close", "volume"],
+                                                    stat = maximum), rdp),
+                   hand(maximum, 1:T))
+        # Asset D holds 30 traded amounts and asset C holds 37.
+        sc35 = PO.asset_scores(PanelFieldScorer(; fields = ["close", "volume"],
+                                                min_obs = 35), rdp)
+        @test isnan(sc35[4]) && isfinite(sc35[3])
+        Qh = copy(Q)
+        Qh[.!amsk] .= NaN
+        @test same(PO.asset_scores(PanelFieldScorer(; fields = ["volume"],
+                                                    stat = MeanValue()), rdp),
+                   [(v = filter(isfinite, Qh[:, i]); isempty(v) ? NaN : mean(v))
+                    for i in 1:N])
+        # One name with no vector, and a sum of Panel Fields.
+        hand_of(W, f) = [(v = filter(isfinite, W[:, i]); isempty(v) ? NaN : f(v))
+                         for i in 1:N]
+        @test same(PO.asset_scores(PanelFieldScorer(; fields = "volume"), rdp),
+                   hand_of(Qh, median))
+        Sh = P .+ 2 .* Q
+        Sh[.!amsk] .= NaN
+        @test same(PO.asset_scores(PanelFieldScorer(;
+                                                    fields = ["close" => 1, "volume" => 2]),
+                                   rdp), hand_of(Sh, median))
+        # A Descriptor Estimator gives its Descriptor, and over a window it reads that window
+        # alone.
+        de = EWVolumeRatio(; num = "volume", den = "close", decay = 0.8, min_obs = 3)
+        sde = PanelFieldScorer(; fields = de, bib = false)
+        @test same(PO.asset_scores(sde, rdp), hand_of(descriptor(de, rdp), median))
+        rdk = PO.port_opt_view(rdp, 1:20, :)
+        @test same(PO.asset_scores(sde, rdk), hand_of(descriptor(de, rdk), median))
+        @test !PO.bigger_is_better(sde)
+        @test PO.bigger_is_better(PanelFieldScorer(; fields = de))
+        # A weighted statistic keeps the weight of each finite value, and loses the weight of
+        # each gap.
+        wv = collect(1.0:T)
+        wsc = PO.asset_scores(PanelFieldScorer(; fields = ["close", "volume"],
+                                               stat = MeanValue(; w = aweights(wv))), rdp)
+        whand = [(f = isfinite.(V[:, i]);
+                  any(f) ? sum(wv[f] .* V[f, i]) / sum(wv[f]) : NaN) for i in 1:N]
+        @test same(wsc, whand)
+
+        # A floor reads the training window alone, and drops the asset with no score.
+        lo = median(filter(isfinite, sc))
+        sel = ScoreSelector(; score = s, rule = ThresholdRule(; lo = lo))
+        @test PO.select_assets(sel, rdp) == (isfinite.(sc) .& (sc .>= lo))
+        k = 20
+        @test same(PO.asset_scores(s, PO.port_opt_view(rdp, 1:k, :)), hand(median, 1:k))
+        pipe = Pipeline(; steps = ("select" => sel, "opt" => EqualWeighted()))
+        cv = KFold(; n = 2)
+        pr = cross_val_predict(pipe, rdp, cv)
+        cvr = split(cv, rdp)
+        for (j, p) in enumerate(pr.pred)
+            sc_j = hand(median, cvr.train_idx[j])
+            @test issubset(p.rd.nx, rdp.nx[isfinite.(sc_j) .& (sc_j .>= lo)])
+        end
+
+        # The orientation is a trait of the statistic, and `bib` overrides it.
+        for m in
+            (MinValue(), MeanValue(), MedianValue(), MaxValue(), SumValue(), ProdValue(),
+             ModeValue(), StandardisedValue())
+            @test PO.bigger_is_better(m)
+            @test PO.bigger_is_better(PanelFieldScorer(; fields = ["close"], stat = m))
+        end
+        for m in (StdValue(), VarValue())
+            @test !PO.bigger_is_better(m)
+            @test !PO.bigger_is_better(PanelFieldScorer(; fields = ["close"], stat = m))
+        end
+        @test PO.bigger_is_better(maximum)
+        @test !PO.bigger_is_better(PanelFieldScorer(; fields = ["close"], bib = false))
+        @test PO.bigger_is_better(PanelFieldScorer(; fields = ["close"], stat = StdValue(),
+                                                   bib = true))
+        # An ordinal rule takes the best end that the trait states.
+        best = PO.rule_keep(RankRule(; best = 1), sc, PO.bigger_is_better(s))
+        @test findall(best) == [argmax(replace(sc, NaN => -Inf))]
+        sd = PanelFieldScorer(; fields = ["close"], stat = StdValue())
+        sd_sc = PO.asset_scores(sd, rdp)
+        @test findall(PO.rule_keep(RankRule(; best = 1), sd_sc, PO.bigger_is_better(sd))) ==
+              [argmin(replace(sd_sc, NaN => Inf))]
+
+        # Validation, at construction and at the read of the panel.
+        @test_throws PO.IsEmptyError PanelFieldScorer(; fields = String[])
+        @test_throws PO.IsEmptyError PanelFieldScorer(; fields = ["close", ""])
+        @test_throws PO.IsEmptyError PanelFieldScorer(; fields = "")
+        @test_throws PO.IsEmptyError PanelFieldScorer(; fields = Pair{String, Float64}[])
+        @test_throws DomainError PanelFieldScorer(; fields = ["close" => NaN])
+        @test_throws TypeError PanelFieldScorer(; fields = nothing)
+        @test_throws DomainError PanelFieldScorer(; fields = ["close"], min_obs = 0)
+        @test_throws PO.IsNothingError PO.asset_scores(s, rd)
+        @test_throws KeyError PO.asset_scores(PanelFieldScorer(; fields = ["nope"]), rdp)
+    end
+end

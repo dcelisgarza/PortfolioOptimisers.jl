@@ -3,26 +3,26 @@
                     LabelVec2::VecNum,
                     LinkageDist::Num_VecNum)
 
-Construct the linkage matrix by continually adding rows to the matrix.
+Append one merge to a linkage matrix.
 
-This function appends a new row to the linkage matrix at each iteration, recording the merge of clusters as indicated by changes in the label vectors. It is used internally for building dendrograms in DBHT and related hierarchical clustering routines.
+The function finds the merge from the change between two label vectors, and it appends one row for it to the linkage matrix. [`build_link_and_dendro`](@ref) and [`HierarchyConstruct4s`](@ref) call it once for each merge of the dendrogram.
 
 # Algorithm
 
- 1. Take `indx`, the vertices whose label differs between `LabelVec1` and `LabelVec2`. Those are the vertices the merge moved.
- 2. Read the labels `LabelVec1` gave them, drop the repeats and sort them. A merge joins two labels, so exactly two survive.
- 3. Append one row to `Zi`: those two labels, followed by `LinkageDist`.
+ 1. Take `indx`, the vertices whose label is different in `LabelVec1` and `LabelVec2`. The merge moved those vertices.
+ 2. Read the labels that `LabelVec1` gave them, drop the repeats and sort them. A merge joins two labels, so exactly two labels remain.
+ 3. Append one row to `Zi`, which holds those two labels and then `LinkageDist`.
 
 # Arguments
 
-  - `Zi`: `i × 3` linkage matrix at iteration `i` in the same format as the output from Matlab. Each row holds the two merged labels and the height of the merge.
-  - `LabelVec1`: `N × 1` label vector for the vertices in the bubble for the previous valid iteration.
-  - `LabelVec2`: `N × 1` label vector for the vertices in the bubble for the trial iteration.
-  - `LinkageDist`: Height of the current merge, written into the third column.
+  - `Zi`: `i × 3` linkage matrix at iteration `i`, in the format of the Matlab output. Each row holds the two merged labels and the height of the merge.
+  - `LabelVec1`: `N × 1` label vector of the vertices, for the last valid iteration.
+  - `LabelVec2`: `N × 1` label vector of the vertices, for the trial iteration.
+  - `LinkageDist`: Height of the current merge, which the function writes into the third column.
 
 # Returns
 
-  - `Z::MatNum`: `(i + 1)×3` linkage matrix at iteration `i + 1` in the same format as the output from Matlab. [`turn_into_Hclust_merges`](@ref) converts it to the [`Clustering.Hclust`](https://juliastats.org/Clustering.jl/stable/hclust.html#Clustering.Hclust) convention.
+  - `Z::MatNum`: `(i + 1)×3` linkage matrix at iteration `i + 1`, in the format of the Matlab output. [`turn_into_Hclust_merges`](@ref) converts it to the [`Clustering.Hclust`](https://juliastats.org/Clustering.jl/stable/hclust.html#Clustering.Hclust) convention.
 
 # Related
 
@@ -40,7 +40,7 @@ end
 
 Find the pair of clusters of smallest union diameter in a bubble.
 
-This function scores every pair of clusters that `labelvec` names by the diameter of their union under the distance matrix `d`, and returns the pair of smallest score. The diameter is the largest non-zero distance inside the union, so the score is a complete linkage. Used internally for hierarchical linkage construction in DBHT dendrogram routines.
+The function scores every pair of clusters that `labelvec` names by the diameter of their union under the distance matrix `d`, and it returns the pair of smallest score. The diameter is the largest non-zero distance inside the union, so the score is a complete linkage. [`build_link_and_dendro`](@ref) and [`HierarchyConstruct4s`](@ref) call it to select each merge.
 
 # Mathematical definition
 
@@ -57,19 +57,19 @@ Where:
   - ``\\mathcal{C}_{I}``: Vertices that carry label ``I``.
   - ``\\delta(I,\\, J)``: Diameter of the union of the two clusters.
 
-The union is scored, not the cut between the two clusters, so a distance between two members of the **same** cluster can set ``\\delta``. A pair whose union carries no non-zero distance scores ``0``, which is the smallest score there is.
+The function scores the union, not the cut between the two clusters, so a distance between two members of one cluster can set ``\\delta``. A pair whose union has no non-zero distance scores ``0``, the smallest possible score.
 
 # Algorithm
 
  1. Take `lvec`, the sorted distinct labels of `labelvec`.
- 2. For each pair `(r, c)` of labels with `r < c`, select the vertices that carry either label.
- 3. Take the largest non-zero entry of the distance submatrix on those vertices, and record `(lvec[r], lvec[c], value)` as a row of `Links`. Record `0` as the value when the submatrix carries no non-zero entry.
- 4. Take the row of smallest value, giving the pair `PairLink` and the score `dvu`.
+ 2. For each pair `(r, c)` of labels with `r < c`, select the vertices that have either label.
+ 3. Take the largest non-zero entry of the distance submatrix on those vertices, and record `(lvec[r], lvec[c], value)` as a row of `Links`. Record `0` as the value when the submatrix has no non-zero entry.
+ 4. Take the row of smallest value, which gives the pair `PairLink` and the score `dvu`.
 
 # Arguments
 
-  - `d`: `Nv×Nv` distance matrix for the vertices assigned to a bubble. Row and column `i` are the same vertex, and entry `i` of `labelvec` names its cluster.
-  - `labelvec`: `Nv×1` label vector for the vertices in the bubble.
+  - `d`: `Nv×Nv` distance matrix of the vertices of a bubble, a cluster or the graph. Row and column `i` are the same vertex, and entry `i` of `labelvec` names its cluster.
+  - `labelvec`: `Nv×1` label vector of the same vertices.
 
 # Returns
 
@@ -119,9 +119,9 @@ end
         Z::MatNum
     )
 
-Iteratively construct the linkage matrix for a bubble or cluster.
+Merge the clusters of a bubble or a cluster one pair at a time, and append each merge to the linkage matrix.
 
-This function iterates over the vertices in a bubble or cluster, merging the pair of clusters with the best linkage at each step (as determined by [`LinkageFunction`](@ref)), and appending the corresponding row to the linkage matrix using [`DendroConstruct`](@ref). Used internally for building dendrograms in DBHT and related hierarchical clustering routines.
+At each step the function merges the pair of clusters that [`LinkageFunction`](@ref) selects, and it appends the row of the merge to the linkage matrix with [`DendroConstruct`](@ref). [`HierarchyConstruct4s`](@ref) calls it for each bubble and for each cluster.
 
 # Algorithm
 
@@ -134,12 +134,12 @@ This function iterates over the vertices in a bubble or cluster, merging the pai
 
 # Arguments
 
-  - `rg`: Range whose **length** sets the number of merges. Its values are not read.
-  - `dpm`: `Nv×Nv` distance matrix for the vertices assigned to the bubble or cluster, in the order of `V`.
-  - `LabelVec`: `Nv×1` label vector of those vertices. It is mutated by step 2.
-  - `LabelVec1`: `N × 1` label vector over every vertex, for the previous valid iteration.
-  - `LabelVec2`: `N × 1` label vector over every vertex, for the trial iteration. It is mutated by step 3.
-  - `V`: `Nv×1` vector of the indices of the vertices in the bubble or cluster, indexing the rows of `LabelVec1`.
+  - `rg`: Range whose length sets the number of merges. The function does not read its values.
+  - `dpm`: `Nv×Nv` distance matrix of the vertices of the bubble or cluster, in the order of `V`.
+  - `LabelVec`: `Nv×1` label vector of those vertices. Step 2 changes it in place.
+  - `LabelVec1`: `N × 1` label vector of every vertex, for the last valid iteration.
+  - `LabelVec2`: `N × 1` label vector of every vertex, for the trial iteration. Step 3 changes it in place.
+  - `V`: `Nv×1` vector of the vertices of the bubble or cluster, which index the rows of `LabelVec1`.
   - `nc::Number`: Merge counter. Step 4 writes the height `1 / nc` and step 5 lowers it by one, so the heights of a run rise towards `1`.
   - `Z`: Current linkage matrix, with three columns.
 
@@ -147,7 +147,7 @@ This function iterates over the vertices in a bubble or cluster, merging the pai
 
   - `Z::MatNum`: Linkage matrix after every merge of the range, one row longer per merge.
   - `nc::Number`: Merge counter, lowered by the number of merges.
-  - `LabelVec1::VecNum`: `N × 1` label vector for the next iteration, carrying the merged labels.
+  - `LabelVec1::VecNum`: `N × 1` label vector for the next iteration, with the merged labels.
 
 # Related
 
@@ -178,30 +178,30 @@ end
         Mv::MatNum
     )
 
-Constructs the intra- and inter-cluster hierarchy by utilizing the Bubble Hierarchy structure of a Maximal Planar Graph, specifically a Planar Maximally Filtered Graph (PMFG).
+Build the dendrogram of the Direct Bubble Hierarchical Tree (DBHT), first inside each cluster and then across the clusters.
 
-This function builds a hierarchical clustering (dendrogram) by first constructing intra-cluster linkages within each cluster (using the bubble structure), and then merging clusters to form the global hierarchy. It is a core step in the DBHT (Direct Bubble Hierarchical Tree) clustering pipeline.
+The function first merges the vertices inside each discrete cluster, bubble by bubble, on the bubble tree of the Planar Maximally Filtered Graph (PMFG). It then merges the clusters into one hierarchy.
 
 # Algorithm
 
  1. Give every vertex its own label in `LabelVec1`, and build `E`, the `N × maximum(Tc)` indicator of the discrete clustering `Tc`.
- 2. For each cluster `k`, restrict `Mv` to the vertices of that cluster, giving `Mc`, and assign each of them to exactly one bubble with [`BubbleMember`](@ref), giving `Mvv`. Set the merge counter `nc` to the vertex count of the cluster less one.
+ 2. For each cluster `k`, restrict `Mv` to the vertices of that cluster, which gives `Mc`. Assign each of them to exactly one bubble with [`BubbleMember`](@ref), which gives `Mvv`. Set the merge counter `nc` to the vertex count of the cluster minus one.
  3. For each bubble of the cluster that holds more than one vertex, merge its vertices with [`build_link_and_dendro`](@ref) over `length(V) - 1` steps, on the distance submatrix of that bubble.
- 4. Merge the bubbles of the cluster with [`build_link_and_dendro`](@ref) over `length(Bub) - 1` steps, on the distance submatrix of the whole cluster. Steps 3 and 4 share one `nc`, so the heights of a cluster rise across both.
- 5. Repeat steps 2 to 4 for each cluster, which leaves one label per cluster.
- 6. Merge the clusters over `length(kvec) - 1` steps: take the pair of smallest union diameter with [`LinkageFunction`](@ref) over the whole of `Dpm`, and give both sides a fresh label.
- 7. Write the height of that merge from `dcl` and not from the score of step 6. `dcl` starts at `1` for every vertex and each merge sets both sides to the sum of the two, so the height counts the clusters the merge joins. This is what puts every inter-cluster merge above every intra-cluster one, whose heights never exceed `1`.
+ 4. Merge the bubbles of the cluster with [`build_link_and_dendro`](@ref) over `length(Bub) - 1` steps, on the distance submatrix of the whole cluster. Steps 3 and 4 share one `nc`, so the heights of a cluster rise across both steps.
+ 5. Repeat steps 2 to 4 for each cluster, which leaves one label for each cluster.
+ 6. Merge the clusters over `length(kvec) - 1` steps. At each step, take the pair of smallest union diameter with [`LinkageFunction`](@ref) over all of `Dpm`, and give both sides a new label.
+ 7. Write the height of that merge from `dcl`, not from the score of step 6. `dcl` starts at `1` for every vertex, and each merge sets both sides to the sum of the two, so the height counts the clusters that the merge joins. Thus every merge across clusters is above every merge inside a cluster, whose height is never more than `1`.
 
 # Arguments
 
-  - `Rpm`: `N × N` sparse weighted adjacency matrix of the PMFG. It is read by [`BubbleMember`](@ref) alone.
-  - `Dpm`: `N × N` shortest path lengths matrix of the PMFG. Every linkage score is read from it.
-  - `Tc`: `N × 1` cluster membership vector. `Tc[n] = k` indicates cluster membership of vertex `n` to the `k`-th discrete cluster.
-  - `Mv`: `N × Nb` bubble membership matrix. `Mv[n, bi] = 1` means vertex `n` is a vertex of bubble `bi`.
+  - `Rpm`: `N × N` sparse weighted adjacency matrix of the PMFG. Only [`BubbleMember`](@ref) reads it.
+  - `Dpm`: `N × N` matrix of the shortest path lengths of the PMFG. Each linkage score comes from it.
+  - `Tc`: `N × 1` cluster membership vector. `Tc[n] = k` means that vertex `n` belongs to the `k`-th discrete cluster.
+  - `Mv`: `N × Nb` bubble membership matrix. `Mv[n, bi] = 1` means that vertex `n` is a vertex of bubble `bi`.
 
 # Returns
 
-  - `Z::MatNum`: `(N-1)×3` linkage matrix in the same format as the output from Matlab. Each row holds the two merged labels and the height of the merge. [`turn_into_Hclust_merges`](@ref) converts it to the [`Clustering.Hclust`](https://juliastats.org/Clustering.jl/stable/hclust.html#Clustering.Hclust) convention.
+  - `Z::MatNum`: `(N-1)×3` linkage matrix in the format of the Matlab output. Each row holds the two merged labels and the height of the merge. [`turn_into_Hclust_merges`](@ref) converts it to the [`Clustering.Hclust`](https://juliastats.org/Clustering.jl/stable/hclust.html#Clustering.Hclust) convention.
 
 # Related
 
@@ -266,34 +266,34 @@ end
 """
     turn_into_Hclust_merges(Z::MatNum)
 
-Convert a Matlab-style linkage matrix to a format compatible with [`Clustering.Hclust`](https://juliastats.org/Clustering.jl/stable/hclust.html#Clustering.Hclust).
+Convert a linkage matrix in the Matlab convention to the convention of [`Clustering.Hclust`](https://juliastats.org/Clustering.jl/stable/hclust.html#Clustering.Hclust).
 
-This function transforms a linkage matrix produced by DBHT or similar hierarchical clustering routines into the format required by [`Clustering.Hclust`](https://juliastats.org/Clustering.jl/stable/hclust.html#Clustering.Hclust), including proper indexing and cluster size tracking.
+The function writes the linkage matrix of [`HierarchyConstruct4s`](@ref) in the index convention of [`Clustering.Hclust`](https://juliastats.org/Clustering.jl/stable/hclust.html#Clustering.Hclust), and it adds the size of the cluster of each merge.
 
-**This is the point where the result passes to [`Clustering.Hclust`](https://juliastats.org/Clustering.jl/stable/hclust.html#Clustering.Hclust), so the convention below is the one every consumer downstream reads.** [`DBHTs`](@ref) loads the first two columns into `mleft` and `mright` and the third into `heights`, and [`Clusters`](@ref) and everything that cuts a dendrogram reads them back on that convention.
+At this function the result passes to [`Clustering.Hclust`](https://juliastats.org/Clustering.jl/stable/hclust.html#Clustering.Hclust), so every consumer downstream reads the convention below. [`DBHTs`](@ref) loads the first two columns into `mleft` and `mright` and the third into `heights`. [`Clusters`](@ref) and each function that cuts a dendrogram read them on that convention.
 
-Both conventions number one merge per row, and they differ in how a row names its two sides.
+Both conventions give one merge to each row, and they name the two sides of a row in different ways.
 
 | The side is                  | Matlab writes             | `Clustering.Hclust` writes |
 |:---------------------------- |:------------------------- |:-------------------------- |
 | a leaf, vertex `a`           | `a`, which is at most `N` | `-a`                       |
 | the cluster built by row `j` | `j + N`                   | `j`                        |
 
-A row therefore names only rows above it, and the size of the cluster it builds is the sum of the sizes of its two sides.
+Thus a row names only rows above it, and the size of the cluster that it builds is the sum of the sizes of its two sides.
 
 # Algorithm
 
- 1. Set `N` to `size(Z, 1) + 1`, which is the leaf count, and append a fourth column of zeros to hold the cluster sizes.
- 2. For each row `i` and for each of its first two entries `a`: when `a` is at most `N` it names a leaf, so write `-a` in its place and add `1` to the size of row `i`.
- 3. Otherwise `a` names the cluster that row `j = a - N` built, so write `j` in its place and add the size of row `j` to the size of row `i`. Row `j` is above row `i`, so its size is already final.
+ 1. Set `N` to `size(Z, 1) + 1`, the leaf count, and append a fourth column of zeros to hold the cluster sizes.
+ 2. For each row `i`, read each of its first two entries `a`. When `a` is at most `N`, it names a leaf. Write `-a` in its place and add `1` to the size of row `i`.
+ 3. Otherwise `a` names the cluster that row `j = a - N` built. Write `j` in its place and add the size of row `j` to the size of row `i`. Row `j` is above row `i`, so its size is already final.
 
 # Arguments
 
-  - `Z`: `(N-1)×3` Matlab-style linkage matrix, where each row represents a merge step with cluster indices and linkage heights.
+  - `Z`: `(N-1)×3` linkage matrix in the Matlab convention. Each row is one merge, with the two merged labels and the height of the merge.
 
 # Returns
 
-  - `Z::MatNum`: `(N-1)×4` linkage matrix in [`Clustering.Hclust`](https://juliastats.org/Clustering.jl/stable/hclust.html#Clustering.Hclust) format. Columns one and two hold the two sides on the convention of the table above, column three keeps the heights unchanged, and column four holds the leaf count of the cluster each row builds.
+  - `Z::MatNum`: `(N-1)×4` linkage matrix in the format of [`Clustering.Hclust`](https://juliastats.org/Clustering.jl/stable/hclust.html#Clustering.Hclust). Columns one and two hold the two sides in the convention of the table above. Column three holds the heights with no change, and column four holds the leaf count of the cluster that each row builds.
 
 # Related
 

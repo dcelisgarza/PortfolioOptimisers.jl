@@ -86,7 +86,7 @@ pretty_table(DataFrame("Asset" => rd.nx, "Target" => res.w,
 
 [`DiscreteAllocation`](@ref) optimises all the share counts together, where the greedy method
 takes one asset at a time. It needs a mixed-integer solver, and we use
-[HiGHS](https://github.com/jump-dev/HiGHS.jl). The table compares the cash left over and the
+[HiGHS](https://jump.dev/JuMP.jl/stable/packages/HiGHS/). The table compares the cash left over and the
 rounding error of the two methods.
 =#
 
@@ -105,12 +105,17 @@ pretty_table(DataFrame("Method" => ["Greedy", "Discrete (MIP)"],
 #=
 ## 4. Lot sizes
 
-Many instruments trade in lots, not single shares. `GreedyAllocation(; unit = u)` rounds to
-multiples of `u` shares. A larger lot gives a larger rounding error and can leave
+Many instruments trade in lots, not single shares. `GreedyAllocation(; unit = LotUnit(u))`
+buys whole lots of `u` shares. A larger lot gives a larger rounding error and can leave
 more cash unspent. The table compares single shares with lots of ten.
+
+A lot unit can differ between assets. A vector `LotUnit` gives one lot unit to each asset, and
+a `LotUnitEstimator` names them by asset or group, and resolves against the `sets` of the
+allocator. A lot unit below one buys fractional shares. `DiscreteAllocation` takes the same
+`unit`.
 =#
 
-greedy_lots = optimise(GreedyAllocation(; unit = 10),
+greedy_lots = optimise(GreedyAllocation(; unit = LotUnit(10)),
                        FiniteAllocationInput(; w = res.w, prices = prices, cash = cash))
 
 pretty_table(DataFrame("Allocation" => ["Single shares", "Lots of 10"],

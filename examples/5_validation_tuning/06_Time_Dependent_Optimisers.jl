@@ -309,7 +309,7 @@ has no cap. The schedule runs it on inner folds 1 and 3 and in the `default`. It
 optimiser, which combines the clusters.
 =#
 minvar = MeanRisk(; obj = MinimumRisk(), opt = JuMPOptimiser(; slv = slv))
-inner_cv = OptimisationCrossValidation(; cv = KFold(; n = 3))
+inner_cv = KFold(; n = 3)
 nco = NestedClustered(;
                       opti = TimeDependent([minvar, aggressive, minvar], :nearest;
                                            default = minvar), opto = minvar, cv = inner_cv)

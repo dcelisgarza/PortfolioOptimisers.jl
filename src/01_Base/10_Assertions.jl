@@ -3,16 +3,16 @@ $(DocStringExtensions.TYPEDSIGNATURES)
 
 Assert that `val` is non-empty.
 
-No-op for `Pair` and `Number` inputs; emptiness does not apply to scalars.
+A `Pair` or a `Number` input does nothing, because a scalar cannot be empty.
 
 # Arguments
 
-  - `val`: Container to check; one of `AbstractDict`, `VecPair`, or `ArrNum`.
+  - `val`: The container to check. It is an `AbstractDict`, a `VecPair` or an `ArrNum`.
   - $(arg_dict[:sym_msg])
 
 # Validation
 
-  - `!isempty(val)`, which raises an [`IsEmptyError`](@ref) naming `sym`.
+  - `!isempty(val)`, which raises an [`IsEmptyError`](@ref) that names `sym`.
 
 # Returns
 
@@ -27,7 +27,7 @@ No-op for `Pair` and `Number` inputs; emptiness does not apply to scalars.
   - [`assert_nonempty_gt0_finite_val`](@ref)
   - [`assert_nonempty_finite_val`](@ref)
 """
-function assert_nonempty(val::Union{<:AbstractDict, <:VecPair, <:ArrNum},
+function assert_nonempty(val::Union{AbstractDict, VecPair, ArrNum},
                          sym::Sym_Str = :val)::Nothing
     @argcheck(!isempty(val),
               IsEmptyError("!isempty($sym) must hold. Got\n!isempty($sym) => $(!isempty(val))"))
@@ -36,14 +36,14 @@ end
 """
 $(DocStringExtensions.TYPEDSIGNATURES)
 
-No-op overload of [`assert_nonempty`](@ref) for scalar inputs.
+Method of [`assert_nonempty`](@ref) for scalar inputs, which does nothing.
 
-Emptiness does not apply to `Pair` or `Number` values.
+A `Pair` or a `Number` value cannot be empty.
 
 # Arguments
 
-  - `::Union{<:Pair, <:Number}`: Scalar value, not read.
-  - `::Sym_Str = :val`: Symbolic name, not read.
+  - `::Union{Pair, Number}`: The scalar value. The method does not read it.
+  - `::Sym_Str = :val`: The symbolic name. The method does not read it.
 
 # Returns
 
@@ -53,7 +53,7 @@ Emptiness does not apply to `Pair` or `Number` values.
 
   - [`assert_nonempty`](@ref)
 """
-function assert_nonempty(::Union{<:Pair, <:Number}, ::Sym_Str = :val)::Nothing
+function assert_nonempty(::Union{Pair, Number}, ::Sym_Str = :val)::Nothing
     return nothing
 end
 """
@@ -63,9 +63,9 @@ Assert that every element of `val` is finite.
 
 # Algorithm
 
-The method Julia selects on the type of `val` is the algorithm. Each method checks one predicate and raises a `DomainError` that names `sym` and the predicate it failed.
+The method that Julia selects on the type of `val` is the algorithm. Each method checks one predicate, and raises a `DomainError` that names `sym` and the predicate that failed.
 
- 1. An `AbstractDict` checks `all(isfinite, values(val))`, so the keys are not read.
+ 1. An `AbstractDict` checks `all(isfinite, values(val))`, so the method does not read the keys.
  2. A `VecPair` checks `all(isfinite, getindex.(val, 2))`, so the second element of each pair is the value.
  3. An `ArrNum` checks `all(isfinite, val)`.
  4. A `Pair` checks `isfinite(val[2])`.
@@ -73,7 +73,7 @@ The method Julia selects on the type of `val` is the algorithm. Each method chec
 
 # Arguments
 
-  - `val`: Value to check.
+  - `val`: The value to check.
   - $(arg_dict[:sym_msg])
 
 # Validation
@@ -124,18 +124,20 @@ end
 """
     assert_all_finite(val::ArrNum, sym::Sym_Str = :val)
 
-Assert that *every* element of `val` is finite, failing closed with an [`IsNonFiniteError`](@ref) otherwise.
+Assert that every element of `val` is finite, and raise an [`IsNonFiniteError`](@ref) when one is not.
 
-[`assert_finite`](@ref) checks the same predicate and raises a `DomainError` alongside its [`assert_nonneg`](@ref) and [`assert_gt0`](@ref) siblings; this one raises an [`IsNonFiniteError`](@ref) and reports where the breach is, so a caller can find the offending entry without the message quoting the data. It guards the comparison-based covariance estimators ([`GerberCovariance`](@ref), [`SmythBrobyCovariance`](@ref)): their `X .>= sd` / `X .<= -sd` comparisons silently evaluate a `NaN` entry as `false`, masking it as "no co-movement" and yielding a finite, plausible, *wrong* covariance rather than an error. Clean returns first with an asset selector (e.g. [`CompleteAssetSelector`](@ref)) or [`MissingDataFilter`](@ref) — non-finite entries in a returns matrix are a supported input to *those*, but not to a comparison-based estimator. The message reports the count of offending entries and the first offending index only — never the data values.
+[`assert_finite`](@ref) checks the same predicate and raises a `DomainError`, as [`assert_nonneg`](@ref) and [`assert_gt0`](@ref) do. This function raises an [`IsNonFiniteError`](@ref), and it reports the position of the breach. With the position, a caller can find the bad entry, and the message does not quote the data.
+
+This function guards the covariance estimators that compare returns with a threshold, [`GerberCovariance`](@ref) and [`SmythBrobyCovariance`](@ref). Their comparisons `X .>= sd` and `X .<= -sd` give `false` for a `NaN` entry, with no message. The estimator then reads the `NaN` as "no co-movement", and gives a finite covariance that looks correct and is wrong. Clean the returns first with an asset selector, such as [`CompleteAssetSelector`](@ref), or with [`MissingDataFilter`](@ref). Those accept non-finite entries in a returns matrix, and an estimator that compares returns does not. The message reports the count of bad entries and the first bad index, and never a data value.
 
 # Arguments
 
-  - `val`: Array to check.
+  - `val`: The array to check.
   - $(arg_dict[:sym_msg])
 
 # Validation
 
-  - `all(isfinite, val)`, which raises an [`IsNonFiniteError`](@ref). The message carries the count of offending entries and the first offending index, and never a data value.
+  - `all(isfinite, val)`, which raises an [`IsNonFiniteError`](@ref). The message gives the count of bad entries and the first bad index, and never a data value.
 
 # Returns
 
@@ -154,20 +156,20 @@ end
 """
     assert_resource_cap(val::Integer, cap::Integer, sym::Sym_Str, knob::Sym_Str)
 
-Assert that an untrusted sizing integer `val` does not exceed the active [`RESOURCE_LIMITS`](@ref) ceiling `cap`, failing closed with a `DomainError` otherwise.
+Assert that an untrusted size `val` is not above the active cap `cap` of [`RESOURCE_LIMITS`](@ref), and raise a `DomainError` when it is.
 
-`sym` names the offending field in the message (e.g. `:n_sim`) and `knob` names the [`ResourceLimits`](@ref) field to raise (e.g. `:max_n_sim`), so the error tells the caller both what was rejected and how to allow it deliberately.
+`sym` is the name of the field that the message reports, for example `:n_sim`. `knob` is the field of [`ResourceLimits`](@ref) to raise, for example `:max_n_sim`. The error tells the caller what the function refused, and how to allow it.
 
 # Arguments
 
   - `val`: The requested size.
-  - `cap`: The active ceiling.
-  - `sym`: Symbolic name of the offending field.
-  - `knob`: Symbolic name of the [`ResourceLimits`](@ref) field that raises the ceiling.
+  - `cap`: The active cap.
+  - `sym`: The symbolic name of the field that holds `val`.
+  - `knob`: The symbolic name of the [`ResourceLimits`](@ref) field that raises the cap.
 
 # Validation
 
-  - `val <= cap`, which raises a `DomainError` naming `val`, `sym`, `cap` and `knob`.
+  - `val <= cap`, which raises a `DomainError` that names `val`, `sym`, `cap` and `knob`.
 
 # Returns
 
@@ -190,9 +192,9 @@ end
 """
     assert_ep_grid_size(K::Integer)
 
-Assert that `K`, the number of grid points of a grid tail view formulation, is odd, positive and within the active [`RESOURCE_LIMITS`](@ref) ceiling `max_ep_grid`.
+Assert that `K`, the number of grid points of a grid formulation of a tail view, is odd, positive and not above the active cap `max_ep_grid` of [`RESOURCE_LIMITS`](@ref).
 
-Every grid point is one binary variable of the mixed-integer program an upper-bound or equality view builds, and one dense row over the posterior probabilities, so `K` is an untrusted sizing integer of the class [`assert_resource_cap`](@ref) guards. The parity rule keeps the centre of the grid a point of the grid. Both grid formulations state one rule, so both call this one assertion.
+Each grid point is one binary variable of the mixed-integer program that an upper-bound or equality view builds, and one dense row over the posterior probabilities. `K` is an untrusted size of the kind that [`assert_resource_cap`](@ref) checks. An odd `K` makes the centre of the grid a point of the grid. The two grid formulations state one rule, so both call this function.
 
 # Arguments
 
@@ -210,8 +212,7 @@ Every grid point is one binary variable of the mixed-integer program an upper-bo
 
   - [`assert_resource_cap`](@ref)
   - [`RESOURCE_LIMITS`](@ref)
-  - [`GridEntropicValueatRiskView`](@ref)
-  - [`GridRelativisticValueatRiskView`](@ref)
+  - [`GridTailView`](@ref)
 """
 function assert_ep_grid_size(K::Integer)::Nothing
     @argcheck(K >= one(K) && isodd(K), DomainError(K, "K must be odd and >= 1"))
@@ -221,33 +222,34 @@ end
 """
     resolve_rng(rng::Random.AbstractRNG, seed::Option{<:Integer})
 
-Resolve which random number generator to draw from given an optional `seed`.
+Resolve the random number generator to draw from, for an optional `seed`.
 
-A supplied `seed` yields a fresh, private generator — a `copy` of `rng` reseeded with `seed`
-via `Random.seed!` — so a seeded estimator is reproducible **without** reseeding, and thereby
-silently derandomising, the task-global RNG the caller may also own (the default `rng` is
-`Random.default_rng()`, a shared object). When `seed` is `nothing`, `rng` is returned unchanged
-and used as-is.
+A `seed` gives a fresh, private generator. It is a `copy` of `rng` that `Random.seed!` reseeds
+with `seed`. A seeded estimator is thus reproducible, and it does not reseed the task-global
+generator that the caller can also use. The default `rng` is `Random.default_rng()`, which is a
+shared object, and a reseed of it removes the randomness from the other draws of the caller with
+no message. When `seed` is `nothing`, the function returns `rng` unchanged.
 
-Copying `rng` before seeding (rather than constructing a fixed generator type such as
-`Random.Xoshiro(seed)`) preserves both the caller's generator *object* — it is never mutated —
-and its *type*, so a caller-supplied portable generator (e.g. `StableRNGs.StableRNG`) keeps
-producing the same stream `Random.seed!(rng, seed)` did in place. The observable draws are thus
-identical to the old in-place seeding; only the side effect on the caller's stream disappears.
+The function copies `rng` before it seeds it, and does not construct a fixed generator type such
+as `Random.Xoshiro(seed)`. The copy keeps the generator object of the caller unchanged, and it
+keeps the type of that generator. A portable generator from the caller, such as
+`StableRNGs.StableRNG`, thus gives the same stream as `Random.seed!(rng, seed)` gave in place. The
+draws are the same as the draws of the old in-place seed. The only difference is that the stream
+of the caller does not change.
 
 # Arguments
 
-  - `rng`: Fallback random number generator, used verbatim when `seed` is `nothing`.
-  - `seed`: Optional seed. If set, a private `Random.seed!(copy(rng), seed)` is returned instead of touching `rng`.
+  - `rng`: The fallback random number generator. The function returns it unchanged when `seed` is `nothing`.
+  - `seed`: The optional seed. When it is set, the function returns a private `Random.seed!(copy(rng), seed)`, and does not change `rng`.
 
 # Algorithm
 
- 1. Return `rng` unchanged when `seed` is `nothing`, so the caller's generator is used as it stands.
- 2. Otherwise copy `rng`, reseed the copy with `seed`, and return the copy. The caller's own generator is never mutated.
+ 1. Return `rng` unchanged when `seed` is `nothing`, so that the caller's generator is the generator to draw from.
+ 2. Otherwise copy `rng`, reseed the copy with `seed`, and return the copy. The function never mutates the caller's own generator.
 
 # Returns
 
-  - `Random.AbstractRNG`: the generator to draw from.
+  - `Random.AbstractRNG`: The generator to draw from.
 
 # Related
 
@@ -263,9 +265,9 @@ Assert that all elements of `val` are non-negative (`>= 0`).
 
 # Algorithm
 
-The method Julia selects on the type of `val` is the algorithm. Each method checks one predicate and raises a `DomainError` that names `sym` and the predicate it failed.
+The method that Julia selects on the type of `val` is the algorithm. Each method checks one predicate, and raises a `DomainError` that names `sym` and the predicate that failed.
 
- 1. An `AbstractDict` checks `all(x -> 0 <= x, values(val))`, so the keys are not read.
+ 1. An `AbstractDict` checks `all(x -> 0 <= x, values(val))`, so the method does not read the keys.
  2. A `VecPair` checks `all(x -> 0 <= x[2], val)`, so the second element of each pair is the value.
  3. An `ArrNum` checks `all(x -> 0 <= x, val)`.
  4. A `Pair` checks `0 <= val[2]`.
@@ -273,7 +275,7 @@ The method Julia selects on the type of `val` is the algorithm. Each method chec
 
 # Arguments
 
-  - `val`: Value to check.
+  - `val`: The value to check.
   - $(arg_dict[:sym_msg])
 
 # Validation
@@ -325,9 +327,9 @@ Assert that all elements of `val` are strictly positive (`> 0`).
 
 # Algorithm
 
-The method Julia selects on the type of `val` is the algorithm. Each method checks one predicate and raises a `DomainError` that names `sym` and the predicate it failed.
+The method that Julia selects on the type of `val` is the algorithm. Each method checks one predicate, and raises a `DomainError` that names `sym` and the predicate that failed.
 
- 1. An `AbstractDict` checks `all(x -> 0 < x, values(val))`, so the keys are not read.
+ 1. An `AbstractDict` checks `all(x -> 0 < x, values(val))`, so the method does not read the keys.
  2. A `VecPair` checks `all(x -> 0 < x[2], val)`, so the second element of each pair is the value.
  3. An `ArrNum` checks `all(x -> 0 < x, val)`.
  4. A `Pair` checks `0 < val[2]`.
@@ -335,7 +337,7 @@ The method Julia selects on the type of `val` is the algorithm. Each method chec
 
 # Arguments
 
-  - `val`: Value to check.
+  - `val`: The value to check.
   - $(arg_dict[:sym_msg])
 
 # Validation
@@ -381,22 +383,22 @@ function assert_gt0(val::Number, sym::Sym_Str = :val)::Nothing
     return nothing
 end
 """
-    assert_unit_interval(val::Number, sym::Union{Symbol,<:AbstractString} = :val)
+    assert_unit_interval(val::Number, sym::Union{Symbol,AbstractString} = :val)
     assert_unit_interval(args...)
 
 Assert that `val` lies strictly inside the open unit interval (`0 < val < 1`).
 
-A value of any other type selects the `args...` method, which checks nothing. That is what lets a caller validate a slot whose bound admits more than a number without a branch of its own, on the terms [`assert_nonempty_gt0_finite_val`](@ref) already sets. A **Calibration Rule** ([`AbstractCalibrationAlgorithm`](@ref)) states no number at construction, so the range is checked when the rebuild runs, against the number the rule returned.
+A value of a different type selects the `args...` method, which checks nothing. With that method, a caller can check a slot whose bound accepts more than a number and write no branch, as with [`assert_nonempty_gt0_finite_val`](@ref). A Calibration Rule, an [`AbstractCalibrationAlgorithm`](@ref), states no number at construction. The library checks the range later, when the rebuild runs, on the number that the rule returns.
 
 # Arguments
 
-  - `val`: Value to check.
+  - `val`: The value to check.
   - $(arg_dict[:sym_msg])
 
 # Validation
 
-  - `::Number`: `0 < val < 1`, which raises a `DomainError` naming `sym` and `val`.
-  - Any other type: no rule, so the call always passes.
+  - `::Number`: `0 < val < 1`, which raises a `DomainError` that names `sym` and `val`.
+  - Each other type: No rule, so the call always passes.
 
 # Returns
 
@@ -418,24 +420,24 @@ function assert_unit_interval(args...)::Nothing
     return nothing
 end
 """
-    assert_closed_unit_interval(val::Number, sym::Union{Symbol,<:AbstractString} = :val)
+    assert_closed_unit_interval(val::Number, sym::Union{Symbol,AbstractString} = :val)
     assert_closed_unit_interval(args...)
 
 Assert that `val` lies inside the closed unit interval (`0 <= val <= 1`).
 
-This is the closed sibling of [`assert_unit_interval`](@ref), and the two differ only in whether the ends belong to the interval. A weight that a template may switch off entirely, or hand its full value to, reaches both ends, so it needs this rule and not the open one.
+It is the closed form of [`assert_unit_interval`](@ref). The two functions differ only in whether the ends belong to the interval. A template can turn a weight fully off, or give it its full value, so the weight reaches both ends and needs this rule and not the open one.
 
-A value of any other type selects the `args...` method, which checks nothing, on the terms [`assert_unit_interval`](@ref) already sets.
+A value of a different type selects the `args...` method, which checks nothing, as in [`assert_unit_interval`](@ref).
 
 # Arguments
 
-  - `val`: Value to check.
+  - `val`: The value to check.
   - $(arg_dict[:sym_msg])
 
 # Validation
 
-  - `::Number`: `0 <= val <= 1`, which raises a `DomainError` naming `sym` and `val`.
-  - Any other type: no rule, so the call always passes.
+  - `::Number`: `0 <= val <= 1`, which raises a `DomainError` that names `sym` and `val`.
+  - Each other type: No rule, so the call always passes.
 
 # Returns
 
@@ -457,33 +459,33 @@ function assert_closed_unit_interval(args...)::Nothing
 end
 """
     assert_nonempty_nonneg_finite_val(
-        val::Union{<:AbstractDict, <:VecPair, <:ArrNum, Pair, Number},
-        val_sym::Union{Symbol,<:AbstractString} = :val
+        val::Union{AbstractDict, VecPair, ArrNum, Pair, Number},
+        val_sym::Union{Symbol,AbstractString} = :val
     )
     assert_nonempty_nonneg_finite_val(args...)
 
-Validate that the input value is non-empty, non-negative and finite.
+Check that the input value is non-empty, non-negative and finite.
 
 # Algorithm
 
- 1. Call [`assert_nonempty`](@ref), then [`assert_finite`](@ref), then [`assert_nonneg`](@ref), each on `val` and `val_sym`. The order is the order of the raises, so the first rule a value breaks is the one it is told about.
- 2. A value of any other type selects the `args...` method, which checks nothing. That is what lets a caller validate an optional field without a branch of its own.
+ 1. Call [`assert_nonempty`](@ref), then [`assert_finite`](@ref), then [`assert_nonneg`](@ref), each on `val` and `val_sym`. The calls run in this order, so the error names the first rule that the value breaks.
+ 2. A value of any other type selects the `args...` method, which checks nothing. With that method, a caller can check an optional field and write no branch.
 
 # Arguments
 
-  - `val`: Input value to validate.
-  - `val_sym`: Symbolic name used in the error messages.
+  - `val`: The input value to check.
+  - `val_sym`: The symbolic name that the error messages show.
 
 # Validation
 
-Each rule is the one that `val`'s own type selects in the three functions of step 1.
+Each rule is the rule that the type of `val` selects in the three functions of step 1.
 
   - `::AbstractDict`: `!isempty(val)`, `all(isfinite, values(val))`, `all(x -> x >= 0, values(val))`.
   - `::VecPair`: `!isempty(val)`, `all(isfinite, getindex.(val, 2))`, `all(x -> x[2] >= 0, val)`.
   - `::ArrNum`: `!isempty(val)`, `all(isfinite, val)`, `all(x -> x >= 0, val)`.
   - `::Pair`: `isfinite(val[2])` and `val[2] >= 0`.
   - `::Number`: `isfinite(val)` and `val >= 0`.
-  - Any other type: no rule, so the call always passes.
+  - Each other type: No rule, so the call always passes.
 
 # Returns
 
@@ -497,8 +499,8 @@ Each rule is the one that `val`'s own type selects in the three functions of ste
   - [`assert_finite`](@ref)
   - [`assert_nonneg`](@ref)
 """
-function assert_nonempty_nonneg_finite_val(val::Union{<:AbstractDict, <:VecPair, <:ArrNum,
-                                                      <:Pair, <:Number},
+function assert_nonempty_nonneg_finite_val(val::Union{AbstractDict, VecPair, ArrNum, Pair,
+                                                      Number},
                                            val_sym::Sym_Str = :val)::Nothing
     assert_nonempty(val, val_sym)
     assert_finite(val, val_sym)
@@ -510,33 +512,33 @@ function assert_nonempty_nonneg_finite_val(args...)::Nothing
 end
 """
     assert_nonempty_gt0_finite_val(
-        val::Union{<:AbstractDict, <:VecPair, <:ArrNum, Pair, Number},
-        val_sym::Union{Symbol,<:AbstractString} = :val
+        val::Union{AbstractDict, VecPair, ArrNum, Pair, Number},
+        val_sym::Union{Symbol,AbstractString} = :val
     )
     assert_nonempty_gt0_finite_val(args...)
 
-Validate that the input value is non-empty, greater than zero, and finite.
+Check that the input value is non-empty, greater than zero, and finite.
 
 # Algorithm
 
- 1. Call [`assert_nonempty`](@ref), then [`assert_finite`](@ref), then [`assert_gt0`](@ref), each on `val` and `val_sym`. The order is the order of the raises, so the first rule a value breaks is the one it is told about.
- 2. A value of any other type selects the `args...` method, which checks nothing. That is what lets a caller validate an optional field without a branch of its own.
+ 1. Call [`assert_nonempty`](@ref), then [`assert_finite`](@ref), then [`assert_gt0`](@ref), each on `val` and `val_sym`. The calls run in this order, so the error names the first rule that the value breaks.
+ 2. A value of any other type selects the `args...` method, which checks nothing. With that method, a caller can check an optional field and write no branch.
 
 # Arguments
 
-  - `val`: Input value to validate.
-  - `val_sym`: Symbolic name used in the error messages.
+  - `val`: The input value to check.
+  - `val_sym`: The symbolic name that the error messages show.
 
 # Validation
 
-Each rule is the one that `val`'s own type selects in the three functions of step 1.
+Each rule is the rule that the type of `val` selects in the three functions of step 1.
 
   - `::AbstractDict`: `!isempty(val)`, `all(isfinite, values(val))`, `all(x -> x > 0, values(val))`.
   - `::VecPair`: `!isempty(val)`, `all(isfinite, getindex.(val, 2))`, `all(x -> x[2] > 0, val)`.
   - `::ArrNum`: `!isempty(val)`, `all(isfinite, val)`, `all(x -> x > 0, val)`.
   - `::Pair`: `isfinite(val[2])` and `val[2] > 0`.
   - `::Number`: `isfinite(val)` and `val > 0`.
-  - Any other type: no rule, so the call always passes.
+  - Each other type: No rule, so the call always passes.
 
 # Returns
 
@@ -550,8 +552,8 @@ Each rule is the one that `val`'s own type selects in the three functions of ste
   - [`assert_finite`](@ref)
   - [`assert_gt0`](@ref)
 """
-function assert_nonempty_gt0_finite_val(val::Union{<:AbstractDict, <:VecPair, <:ArrNum,
-                                                   <:Pair, <:Number},
+function assert_nonempty_gt0_finite_val(val::Union{AbstractDict, VecPair, ArrNum, Pair,
+                                                   Number},
                                         val_sym::Sym_Str = :val)::Nothing
     assert_nonempty(val, val_sym)
     assert_finite(val, val_sym)
@@ -563,33 +565,33 @@ function assert_nonempty_gt0_finite_val(args...)::Nothing
 end
 """
     assert_nonempty_finite_val(
-        val::Union{<:AbstractDict, <:VecPair, <:ArrNum, Pair, Number},
-        val_sym::Union{Symbol,<:AbstractString} = :val
+        val::Union{AbstractDict, VecPair, ArrNum, Pair, Number},
+        val_sym::Union{Symbol,AbstractString} = :val
     )
     assert_nonempty_finite_val(args...)
 
-Validate that the input value is non-empty and finite.
+Check that the input value is non-empty and finite.
 
 # Algorithm
 
- 1. Call [`assert_nonempty`](@ref), then [`assert_finite`](@ref), each on `val` and `val_sym`. The order is the order of the raises, so the first rule a value breaks is the one it is told about.
- 2. A value of any other type selects the `args...` method, which checks nothing. That is what lets a caller validate an optional field without a branch of its own.
+ 1. Call [`assert_nonempty`](@ref), then [`assert_finite`](@ref), each on `val` and `val_sym`. The calls run in this order, so the error names the first rule that the value breaks.
+ 2. A value of any other type selects the `args...` method, which checks nothing. With that method, a caller can check an optional field and write no branch.
 
 # Arguments
 
-  - `val`: Input value to validate.
-  - `val_sym`: Symbolic name used in the error messages.
+  - `val`: The input value to check.
+  - `val_sym`: The symbolic name that the error messages show.
 
 # Validation
 
-Each rule is the one that `val`'s own type selects in the two functions of step 1.
+Each rule is the rule that the type of `val` selects in the two functions of step 1.
 
   - `::AbstractDict`: `!isempty(val)`, `all(isfinite, values(val))`.
   - `::VecPair`: `!isempty(val)`, `all(isfinite, getindex.(val, 2))`.
   - `::ArrNum`: `!isempty(val)`, `all(isfinite, val)`.
   - `::Pair`: `isfinite(val[2])`.
   - `::Number`: `isfinite(val)`.
-  - Any other type: no rule, so the call always passes.
+  - Each other type: No rule, so the call always passes.
 
 # Returns
 
@@ -602,8 +604,8 @@ Each rule is the one that `val`'s own type selects in the two functions of step 
   - [`assert_nonempty`](@ref)
   - [`assert_finite`](@ref)
 """
-function assert_nonempty_finite_val(val::Union{<:AbstractDict, <:VecPair, <:ArrNum, <:Pair,
-                                               <:Number}, val_sym::Sym_Str = :val)::Nothing
+function assert_nonempty_finite_val(val::Union{AbstractDict, VecPair, ArrNum, Pair, Number},
+                                    val_sym::Sym_Str = :val)::Nothing
     assert_nonempty(val, val_sym)
     assert_finite(val, val_sym)
     return nothing
@@ -618,12 +620,12 @@ Assert that the input matrix is square.
 
 # Arguments
 
-  - `X`: Input matrix to validate.
-  - `X_sym`: Symbolic name used in error messages.
+  - `X`: The input matrix to check.
+  - `X_sym`: The symbolic name that the error messages show.
 
 # Validation
 
-  - `size(X, 1) == size(X, 2)`, which raises a `DimensionMismatch` naming `X_sym` and both sizes.
+  - `size(X, 1) == size(X, 2)`, which raises a `DimensionMismatch` that names `X_sym` and both sizes.
 
 # Returns
 
@@ -651,7 +653,7 @@ Assert that `dims` selects a valid matrix dimension (`dims in (1, 2)`).
 
 # Validation
 
-  - `dims in (1, 2)`, which raises a `DomainError` naming `sym` and `dims`.
+  - `dims in (1, 2)`, which raises a `DomainError` that names `sym` and `dims`.
 
 # Returns
 
@@ -670,24 +672,24 @@ end
 """
 $(DocStringExtensions.TYPEDSIGNATURES)
 
-Validate `dims` and return the matrices with the observations along the rows.
+Check `dims`, and return the matrices with the observations along the rows.
 
-The guard and the orientation are one call, so a caller cannot orient a matrix without validating `dims`. This is the single decision point: a leaf that spelled the guard and the `transpose` by hand could omit the guard and answer a `dims` of `3` with the raw input.
+The check and the orientation are one call, so a caller cannot orient a matrix and skip the check of `dims`. All callers use this one function. A caller that writes the check and the `transpose` itself can omit the check, and then return the raw input for a `dims` of `3`.
 
 # Algorithm
 
- 1. Validate `dims` with [`assert_dims`](@ref).
- 2. Return each matrix untouched when `dims` is `1`, because the observations already lie along the rows.
+ 1. Check `dims` with [`assert_dims`](@ref).
+ 2. Return each matrix unchanged when `dims` is `1`, because the observations are already along the rows.
  3. Return the `transpose` of each matrix when `dims` is `2`. A `nothing` passes through unchanged.
 
 # Arguments
 
-  - `dims`: Dimension along which the observations lie.
-  - `A`, `B`, `Cs...`: Matrices to orient. A `nothing` passes through unchanged, so an optional matrix needs no branch of its own.
+  - `dims`: The dimension that holds the observations.
+  - `A`, `B`, `Cs...`: The matrices to orient. A `nothing` passes through unchanged, so an optional matrix needs no branch of its own.
 
 # Validation
 
-  - `dims in (1, 2)`, by [`assert_dims`](@ref).
+  - `dims in (1, 2)`. [`assert_dims`](@ref) checks it.
 
 # Returns
 

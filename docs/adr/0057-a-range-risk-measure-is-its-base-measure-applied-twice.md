@@ -109,3 +109,26 @@ on #1212). The DR-CVaR gain tail still reaches `1 - X` through `set_asset_return
 `-X` under its `gain_` prefix, so no result changes. The key `:nXap1` has no builder now.
 ADR [0037](0037-model-state-accessor-interface.md) records the same deletion for four accessor
 pairs.
+
+## Amendment (2026-10-29) — an OWA range is spelled only as `OrderedWeightsArrayRange`
+
+The verdict of #1894 removes the two fused range builders,
+`OrderedWeightsArrayConditionalValueatRiskRange` and `OrderedWeightsArrayTailGiniRange` (#1896).
+An OWA range is now spelled only as `OrderedWeightsArrayRange`, and the aliases `OWA_RG`,
+`OWA_CVaR_RG` and `OWA_TG_RG` build it with one builder or function per tail.
+
+The reason is the approximate formulation. Under `ApproxOrderedWeightsArray`, this ADR builds
+each tail through the single-tail seam, and the two tails are a tighter relaxation than one
+`OrderedWeightsArray` over the fused vector. In a minimum-risk `MeanRisk` on seeded returns
+with `T = 100` and `N = 8`, the fused optimum had an exact risk 4.6 % (CVaR range), 2.1 % (tail
+Gini range) and 9.6 % (`owa_rg`) above the exact optimum. The two tails reached the exact
+optimum for the CVaR range and for the range, and came to 0.2 % above it for the tail Gini
+range. Under `ExactOrderedWeightsArray` and `SortingNetworkOrderedWeightsArray`, the two
+spellings give the same model. The fused functions `owa_rg`, `owa_cvarrg`, `owa_wcvarrg` and
+`owa_tgrg` stay, and their docstrings state the gap.
+
+`OrderedWeightsArrayRange` loses its `rev` field and keyword. `w2` defaults to `nothing`, and
+only then does the constructor store the reversal of `w1`: `reverse(w1)` for a vector and
+`reverse ∘ w1` for a callable. A `w2` that the caller gives is stored as given, so the caller
+gives it reversed. The stored `w2` is never `nothing`, so a positional rebuild reverses nothing
+a second time.

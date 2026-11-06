@@ -1,8 +1,8 @@
 """
     lens_val_grid(estval::AbstractVector{<:Pair{<:Any, <:AbstractVector}})
     lens_val_grid(estval::AbstractDict{<:Any, <:AbstractVector})
-    lens_val_grid(estvals::AbstractVector{<:Union{<:AbstractVector{<:Pair{<:Any, <:AbstractVector}},
-                                                  <:AbstractDict{<:Any, <:AbstractVector}}})
+    lens_val_grid(estvals::AbstractVector{<:Union{AbstractVector{<:Pair{<:Any, <:AbstractVector}},
+                                                  AbstractDict{<:Any, <:AbstractVector}}})
 
 Build the grid of a search, the lenses and the values of every candidate.
 
@@ -81,10 +81,10 @@ function lens_val_grid(estval::AbstractDict{<:Any, <:AbstractVector})
     lenses = fill(map(x -> parse_lens(x), collect(keys(estval))), length(vals))
     return lenses, vals
 end
-function lens_val_grid(estvals::AbstractVector{<:Union{<:AbstractVector{<:Pair{<:Any,
-                                                                               <:AbstractVector}},
-                                                       <:AbstractDict{<:Any,
-                                                                      <:AbstractVector}}})
+function lens_val_grid(estvals::AbstractVector{<:Union{AbstractVector{<:Pair{<:Any,
+                                                                             <:AbstractVector}},
+                                                       AbstractDict{<:Any,
+                                                                    <:AbstractVector}}})
     lenses_vals = [lens_val_grid(estval) for estval in estvals]
     lenses = mapreduce(x -> x[1], vcat, lenses_vals)
     vals = mapreduce(x -> x[2], vcat, lenses_vals)
@@ -138,15 +138,13 @@ A candidate that failed one fold is never selected, whatever the scorer computes
  5. Split `rd` by `scheme`, giving `cv`.
  6. Read the rows of the folds through [`score_rows`](@ref), giving `rows`.
  7. Set `sgn` to ``s``.
- 8. Allocate `test_scores`, of size `M × N` for `M` folds and `N` candidates, with the element type of `rd.X` through [`float_if_integer`](@ref), because a score is a fraction. When `gscv.train_score` is `true`, allocate `train_scores` of the same size.
+ 8. Allocate `test_scores`, of size `M × N` for `M` folds and `N` candidates, with the element type of `rd.X`. When `gscv.train_score` is `true`, allocate `train_scores` of the same size.
  9. When `gscv.train_score` is `true`, view the training returns of each fold through [`fold_train_returns`](@ref), giving `train_X`.
 10. For each candidate `i`, in parallel over `gscv.ex`, do steps 11 to 13.
 11. Build `opti` through [`search_candidate`](@ref).
 12. Fit and predict `opti` over `scheme` through [`fit_and_predict`](@ref), with the folds in sequence, giving `predictions`.
 13. Write column `i` of `test_scores` and `train_scores` through [`write_candidate_scores!`](@ref).
-14. Select `opt_idx`, the position ``i^{\\star}``, through [`finite_candidate_index`](@ref).
-15. Build the selected candidate `opt` through [`search_candidate`](@ref).
-16. Return a [`SearchCrossValidationResult`](@ref).
+14. Order the finite candidates, keep the best `gscv.n_best`, build each from `opt`, and return the [`SearchCrossValidationResult`](@ref) through [`search_result`](@ref). The path of each row is [`score_path_ids`](@ref) of `cv`.
 
 # Arguments
 
@@ -159,7 +157,7 @@ A candidate that failed one fold is never selected, whatever the scorer computes
   - `opt` carries no partial-fit state, through [`assert_search_entry`](@ref). Under an Online Scheme, `opt` also passes every check of [`assert_online_entry`](@ref).
   - Every candidate passes the entry checks of [`cross_val_predict`](@ref), through [`assert_search_candidates`](@ref).
   - The grid is not empty, and it holds at most `RESOURCE_LIMITS[].max_search_grid` candidates, through [`lens_val_grid`](@ref).
-  - At least one candidate finishes every fold. Otherwise [`finite_candidate_index`](@ref) throws an `IsNonFiniteError`.
+  - At least one candidate finishes every fold. Otherwise [`finite_candidate_order`](@ref) throws an `IsNonFiniteError`.
 
 # Returns
 
@@ -170,7 +168,7 @@ A candidate that failed one fold is never selected, whatever the scorer computes
   - [`GridSearchCrossValidation`](@ref)
   - [`RandomisedSearchCrossValidation`](@ref): its search samples a grid and runs this method on it.
   - [`fit_and_predict`](@ref)
-  - [`finite_candidate_index`](@ref)
+  - [`finite_candidate_order`](@ref)
   - [`write_candidate_scores!`](@ref)
   - [`score_rows`](@ref)
   - [`pin_draw`](@ref)
@@ -191,9 +189,9 @@ function search_cross_validation(opt::NonFiniteAllocationOptimisationEstimator,
     M = length(cv.train_idx)
     r = gscv.r
     sgn = ifelse(bigger_is_better(r), 1, -1)
-    test_scores = Matrix{float_if_integer(eltype(rd.X))}(undef, M, N)
+    test_scores = Matrix{eltype(rd.X)}(undef, M, N)
     train_scores = if gscv.train_score
-        Matrix{float_if_integer(eltype(rd.X))}(undef, M, N)
+        Matrix{eltype(rd.X)}(undef, M, N)
     else
         nothing
     end
@@ -217,11 +215,8 @@ function search_cross_validation(opt::NonFiniteAllocationOptimisationEstimator,
                                     train_X, r, sgn, gscv.kwargs)
         end
     end
-    opt_idx = finite_candidate_index(gscv.scorer, test_scores)
-    opt = search_candidate(opt, lens_grid[opt_idx], val_grid[opt_idx])
-    return SearchCrossValidationResult(; opt = opt, test_scores = test_scores,
-                                       train_scores = train_scores, lens_grid = lens_grid,
-                                       val_grid = val_grid, idx = opt_idx)
+    return search_result(opt, gscv, test_scores, train_scores, lens_grid, val_grid,
+                         score_path_ids(cv))
 end
 """
     search_cross_validation(opt::NonFiniteAllocationOptimisationEstimator,
@@ -267,16 +262,14 @@ A candidate that failed one path is never selected, whatever the scorer computes
  4. Split `rd` by `gscv.cv`, giving `cv`.
  5. Set `M`, the count of the paths, to the greatest entry of `cv.path_ids`.
  6. Set `sgn` to ``s``.
- 7. Allocate `test_scores`, of size `M × N` for `N` candidates, with the element type of `rd.X` through [`float_if_integer`](@ref), because a score is a fraction. When `gscv.train_score` is `true`, allocate `train_scores`, one matrix per path, with one row per fold of the path and one column per candidate.
+ 7. Allocate `test_scores`, of size `M × N` for `N` candidates, with the element type of `rd.X`. When `gscv.train_score` is `true`, allocate `train_scores`, one matrix per path, with one row per fold of the path and one column per candidate.
  8. View the training returns of each fold of each path through [`fold_train_returns`](@ref), giving `path_X`. The entries of a path in `cv.path_ids` are read in column order, and the column is the fold, which is the order of the folds in the path that [`sort_predictions`](@ref) gives.
  9. For each candidate `i`, in sequence, do steps 10 to 13.
 10. Build `opti` through [`search_candidate`](@ref).
 11. Fit and predict `opti` over `gscv.cv` through [`fit_and_predict`](@ref), with the executor `gscv.ex`, giving `predictions`, one path per member.
 12. Write ``s \\, \\mathcal{R}`` of each path of `predictions` into column `i` of `test_scores`.
 13. When `gscv.train_score` is `true`, write the train score of each fold of each path into column `i` of the matrix of that path, through [`candidate_train_score`](@ref) with the view of `path_X`.
-14. Select `opt_idx`, the position ``i^{\\star}``, through [`finite_candidate_index`](@ref).
-15. Build the selected candidate `opt` through [`search_candidate`](@ref).
-16. Return a [`SearchCrossValidationResult`](@ref).
+14. Order the finite candidates, keep the best `gscv.n_best`, build each from `opt`, and return the [`SearchCrossValidationResult`](@ref) through [`search_result`](@ref). Row `p` is path `p`, so the path of each row is `1:M`.
 
 # Arguments
 
@@ -289,7 +282,7 @@ A candidate that failed one path is never selected, whatever the scorer computes
   - `opt` carries no partial-fit state, through [`assert_search_entry`](@ref).
   - Every candidate passes the entry checks of [`cross_val_predict`](@ref), through [`assert_search_candidates`](@ref).
   - The grid is not empty, and it holds at most `RESOURCE_LIMITS[].max_search_grid` candidates, through [`lens_val_grid`](@ref).
-  - At least one candidate finishes every path. Otherwise [`finite_candidate_index`](@ref) throws an `IsNonFiniteError`.
+  - At least one candidate finishes every path. Otherwise [`finite_candidate_order`](@ref) throws an `IsNonFiniteError`.
 
 # Returns
 
@@ -303,7 +296,7 @@ A candidate that failed one path is never selected, whatever the scorer computes
   - [`fit_and_predict`](@ref)
   - [`sort_predictions`](@ref)
   - [`expected_risk`](@ref)
-  - [`finite_candidate_index`](@ref)
+  - [`finite_candidate_order`](@ref)
   - [`candidate_train_score`](@ref)
   - [`fold_train_returns`](@ref)
 """
@@ -319,13 +312,12 @@ function search_cross_validation(opt::NonFiniteAllocationOptimisationEstimator,
     M = maximum(cv.path_ids)          # one score per recombined backtest path
     r = gscv.r
     sgn = ifelse(bigger_is_better(r), 1, -1)
-    test_scores = Matrix{float_if_integer(eltype(rd.X))}(undef, M, N)
+    test_scores = Matrix{eltype(rd.X)}(undef, M, N)
     # Train scores are per fold, and each path holds a different number of folds, so they
     # are kept as one `folds × candidates` matrix per path (a Vector of matrices) rather
     # than collapsed. Test scores stay one per path.
     train_scores = if gscv.train_score
-        [Matrix{float_if_integer(eltype(rd.X))}(undef, count(==(p), cv.path_ids), N)
-         for p in 1:M]
+        [Matrix{eltype(rd.X)}(undef, count(==(p), cv.path_ids), N) for p in 1:M]
     else
         nothing
     end
@@ -353,10 +345,6 @@ function search_cross_validation(opt::NonFiniteAllocationOptimisationEstimator,
             end
         end
     end
-    opt_idx = finite_candidate_index(gscv.scorer, test_scores)
-    opt = search_candidate(opt, lens_grid[opt_idx], val_grid[opt_idx])
-    return SearchCrossValidationResult(; opt = opt, test_scores = test_scores,
-                                       train_scores = train_scores, lens_grid = lens_grid,
-                                       val_grid = val_grid, idx = opt_idx)
+    return search_result(opt, gscv, test_scores, train_scores, lens_grid, val_grid, 1:M)
 end
 export search_cross_validation, GridSearchCrossValidation

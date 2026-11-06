@@ -80,7 +80,7 @@ function oracle_estimator(; kwargs...)
                                                regime_min_obs = 2,
                                                regime_lohi_mult = (0.7, 1.6),
                                                centring = PreCentred(), min_val = 1e-12,
-                                               debias = RawStatistic(), kwargs...)
+                                               debias = nothing, kwargs...)
 end
 
 #=
@@ -145,8 +145,7 @@ correlation of the block (ADR 0190).
     end
     @test 0.99 < covariance_multiplier(PO.RootMeanSquaredAdjusted()) < 1.01
     @test 0.97 < covariance_multiplier(PO.FirstMomentRegimeAdjusted()) < 1.03
-    @test covariance_multiplier(PO.RootMeanSquaredAdjusted(); debias = RawStatistic()) >
-          1.08
+    @test covariance_multiplier(PO.RootMeanSquaredAdjusted(); debias = nothing) > 1.08
     @test 0.98 <
           covariance_multiplier(PO.RootMeanSquaredAdjusted(); cor_decay = 2.0^(-1 / 20)) <
           1.02
@@ -155,7 +154,7 @@ end
 #=
 Issue #1432. The diagonal sum `S = Σ_i z_i²` of returns with the correlation `R` has the law
 `Σ_k μ_k χ²_k(1)` on the eigenvalues of `R`, so its root and its log read the correlation. The
-constants `√n` and `ψ(x n) + ln y` do not, so `DiagonalTarget` divides the sum by the factor of its
+constants `E[χ(n)]` and `ψ(x n) + ln y` do not, so `DiagonalTarget` divides the sum by the factor of its
 law, on the estimated spectrum shrunk until its dispersion is unbiased (ADR 0190).
 =#
 @testset "the diagonal statistic divides by the factor of its law" begin
@@ -163,12 +162,17 @@ law, on the estimated spectrum shrunk until its dispersion is unbiased (ADR 0190
     FM, LG = PO.FirstMomentRegimeAdjusted(), PO.LogRegimeAdjusted()
     chi_root(n) = sqrt(2) * exp(SF.loggamma((n + 1) / 2) - SF.loggamma(n / 2))
     # The law is known at independent squares, a χ²(n) variate, and at one eigenvalue n, n times
-    # a χ²(1) variate. The Log factor is one at μ = 1 whatever its parameters, because it takes each
-    # square as the Gamma(x, y) variate that its constant assumes. Measured: 1e-13 or less.
+    # a χ²(1) variate. Both factors are one at μ = 1, because each constant is the expectation at
+    # independent squares: the root of a χ²(n) variate for the first moment, and the Log's
+    # whatever its parameters, because it takes each square as the Gamma(x, y) variate that its
+    # constant assumes. Measured: 1e-13 or less.
     for n in (1, 2, 12, 200)
         spike = [n; zeros(n - 1)]
-        @test isapprox(PO.regime_law_factor(FM, ones(n)), chi_root(n)^2 / n; rtol = 1e-12)
-        @test isapprox(PO.regime_law_factor(FM, spike), 2 / pi; rtol = 1e-12)
+        @test isapprox(PO.regime_denom(FM, PO.DiagonalTarget(), n), chi_root(n);
+                       rtol = 1e-14)
+        @test isapprox(PO.regime_law_factor(FM, ones(n)), 1; rtol = 1e-12)
+        @test isapprox(PO.regime_law_factor(FM, spike), 2n / (pi * chi_root(n)^2);
+                       rtol = 1e-12)
         @test isapprox(PO.regime_law_factor(LG, ones(n)), 1; rtol = 1e-12)
         @test isapprox(PO.regime_law_factor(PO.LogRegimeAdjusted(; x = 1.3, y = 0.7),
                                             ones(n)), 1; rtol = 1e-12)
@@ -216,8 +220,7 @@ law, on the estimated spectrum shrunk until its dispersion is unbiased (ADR 0190
         # factor reads the moments of each term at the count of its asset (#1434).
         raw = RegimeAdjustedExpWeightedCovariance(; decay = lambda, min_obs = 5, extra...,
                                                   regime_target = PO.DiagonalTarget(),
-                                                  regime_method = FM,
-                                                  debias = RawStatistic())
+                                                  regime_method = FM, debias = nothing)
         m = [PO.regime_bias!(cache.bias.moments, PO.RegimeTermMoments(FM), lambda, k)
              for k in cache.obs_count[idx]]
         @test PO.diagonal_law_factor(PO.RootMeanSquaredAdjusted(), cache, ce, C, idx, m) ===
@@ -264,7 +267,7 @@ every term carries the same noise (ADR 0190).
     # the scalar method's, and at a correlation of one it is the law of one eigenvalue at the scale
     # b. Measured: 2e-15 or less.
     b, v = 0.93, 0.07
-    @test isapprox(PO.regime_law_factor(FM, [b], ones(1, 1), fill(v, 1, 1)), 2b / pi;
+    @test isapprox(PO.regime_law_factor(FM, [b], ones(1, 1), fill(v, 1, 1)), b;
                    rtol = 1e-12)
     @test isapprox(PO.regime_law_factor(LG, [b], ones(1, 1), fill(v, 1, 1)), b;
                    rtol = 1e-12)
@@ -293,7 +296,12 @@ every term carries the same noise (ADR 0190).
             tau = exp(xi) / n
             M = Rb / (I + 2tau * Rb)
             L = det(I + 2tau * Rb)^(-a)
-            wl, wq = PO.regime_law_weights(method, tau)
+            # The weights of the integrands, without the factors that the library folds in.
+            wl, wq = if method isa PO.FirstMomentRegimeAdjusted
+                (sqrt(tau / pi), 2tau * sqrt(tau / pi))
+            else
+                (2method.x * tau, tau^2)
+            end
             lin += wl * L * dot(diag(Cm), diag(M))
             quad += wq *
                     L *
@@ -392,20 +400,12 @@ and `hac_floor = PerTermHacFloor()` keeps it (ADR 0190).
     @test PO.exp_weight_cross_sum(0.9, 0.95, 17, nothing) ==
           PO.exp_weight_cross_sum(0.9, 0.95, 17)
 
-    # The two sums of the Mahalanobis fixed point, against the eigenvalues, and the fixed point.
+    # The slope of `ln det(I + t A)`, against the eigenvalues.
     for K in (20, 600), L in (1, 5), t in (1.0, 30.0)
         mu = eigvals(Symmetric(hac_A(lam, L, K)))
-        slopes = PO.hac_log_det_slopes(lam, K, t, L)
-        @test isapprox(slopes[1], sum(mu ./ (1 .+ t .* mu)); rtol = 1e-12)
-        @test isapprox(slopes[2], sum(mu ./ (1 .+ t .* mu) .^ 2); rtol = 1e-12)
+        @test isapprox(PO.hac_log_det_slope(lam, K, t, L), sum(mu ./ (1 .+ t .* mu));
+                       rtol = 1e-12)
     end
-    mu = eigvals(Symmetric(hac_A(lam, 2, 200)))
-    b = PO.mahalanobis_bias(lam, 200, 12, 2)
-    @test isapprox(inv(b), sum(mu ./ (1 .+ 13 .* mu .* b)); rtol = 1e-12)
-    # A Monte Carlo reads 2.479 there, and the plain fixed point 1.623. At 17 observations the
-    # estimate is not positive definite in 11 % of draws, and no root exists.
-    @test isapprox(b, 2.523; atol = 1e-3)
-    @test isnothing(PO.mahalanobis_bias(lam, 17, 12, 2))
 
     # The gate: 12 assets at a half-life of 10 and two lags first score at 54 observations;
     # at a half-life of 5 the steady state has 6.8 effective observations, and never scores.
@@ -415,6 +415,13 @@ and `hac_floor = PerTermHacFloor()` keeps it (ADR 0190).
     @test first_open(1, lam, 2) == 5
     @test isnothing(first_open(12, 2.0^(-1 / 5), 2))
     @test first_open(12, lam, nothing) == 16
+
+    # `nothing` turns the floor off, as it turns `regime_method` off, and it is the default (#1867).
+    @test isnothing(RegimeAdjustedExpWeightedVariance().hac_floor)
+    @test isnothing(RegimeAdjustedExpWeightedCovariance().hac_floor)
+    @test PO.hac_floor!(nothing, [-1.0, 2.0], [true, true]) == [-1.0, 2.0]
+    @test PO.hac_floor!(PerTermHacFloor(), [-1.0, 2.0, -3.0], [true, true, false]) ==
+          [0.0, 2.0, -3.0]
 
     # Without the floor the scalar HAC variance is the diagonal of the HAC covariance of one
     # decay, as the plain variance is. The floor breaks that identity.
@@ -465,11 +472,149 @@ and `hac_floor = PerTermHacFloor()` keeps it (ADR 0190).
     for method in (RMS, FM)
         @test 0.97 < variance_multiplier(method) < 1.03
     end
-    @test variance_multiplier(RMS; debias = RawStatistic()) > 1.1
+    @test variance_multiplier(RMS; debias = nothing) > 1.1
     @test variance_multiplier(RMS; hac_floor = PerTermHacFloor()) < 0.9
     @test 0.97 < covariance_multiplier(fixed, RMS) < 1.03
-    @test covariance_multiplier(fixed, RMS; debias = RawStatistic()) > 1.1
+    @test covariance_multiplier(fixed, RMS; debias = nothing) > 1.1
     @test 0.97 < covariance_multiplier(PO.MahalanobisTarget(), RMS; min_obs = 17) < 1.03
     @test covariance_multiplier(PO.MahalanobisTarget(), RMS; min_obs = 17,
-                                debias = RawStatistic()) > 2
+                                debias = nothing) > 2
+end
+
+#=
+A row with no valid asset is one lag of the HAC products. The variance estimator returned before
+it pushed the row into its buffer, so the returns on the two sides of a holiday read as one lag
+apart, and its variance left the diagonal of the covariance, which kept the row.
+=#
+@testset "a row with no valid asset is one lag of the HAC products" begin
+    # Two finite returns two observations apart give no product at one lag, so the variance is
+    # (λ r₁² + r₃²) / (1 + λ). The defect read 2 ω₁ r₁ r₃ more, 4.33e-4 for 3e-4.
+    lam = 0.5
+    kw = (; decay = lam, min_obs = 1, regime_method = nothing, centring = PreCentred(),
+          hac_lags = 1)
+    X = reshape([0.01, NaN, 0.02], :, 1)
+    expected = (lam * 0.01^2 + 0.02^2) / (1 + lam)
+    @test isapprox(var(RegimeAdjustedExpWeightedVariance(; kw...), X)[1], expected;
+                   rtol = 1e-14)
+    online = partial_fit!(RegimeAdjustedExpWeightedVariance(; kw...), X[1:1, :])
+    v1 = copy(online.cache.variance)
+    online = partial_fit!(online, X[2:2, :])
+    # The holiday holds every estimate and every count, and enters the buffer as one lag.
+    @test online.cache.variance == v1 && online.cache.obs_count == [1]
+    @test all(isnan, only(online.cache.ret_buffer))
+    online = partial_fit!(online, X[3:3, :])
+    @test isapprox(var(online)[1], expected; rtol = 1e-14)
+
+    # An asset reads the same lags whether a neighbour is valid on its holidays or not, under
+    # both centrings, at one and three lags, and across one and three holidays.
+    for centring in (PreCentred(), EstimatedCentring()), L in (1, 3), gap in (1, 3)
+        x = [0.01; fill(NaN, gap); -0.02; 0.015; fill(NaN, gap); 0.03; 0.005; -0.01]
+        kw = (; decay = 2.0^(-1 / 5), min_obs = 1, regime_method = nothing, centring,
+              hac_lags = L)
+        alone = var(RegimeAdjustedExpWeightedVariance(; kw...), reshape(x, :, 1))[1]
+        mixed = var(RegimeAdjustedExpWeightedVariance(; kw...),
+                    hcat(x, 0.01 .* sin.(axes(x, 1))))[1]
+        @test isapprox(alone, mixed; rtol = 1e-13)
+    end
+
+    # On a panel with holidays the scalar HAC variance is still the diagonal of the HAC
+    # covariance of one decay.
+    R = randn(StableRNG(1795), 400, 4) .* 0.01
+    R[[30, 31, 120, 250, 251, 252], :] .= NaN
+    R[[60, 61], 2] .= NaN
+    plain = (; decay = 2.0^(-1 / 20), min_obs = 5, regime_method = nothing,
+             centring = PreCentred(), hac_lags = 2)
+    @test isapprox(var(RegimeAdjustedExpWeightedVariance(; plain...), R),
+                   diag(cov(RegimeAdjustedExpWeightedCovariance(; plain...), R));
+                   rtol = 1e-12)
+end
+@testset "the bias corrections answer on Float32 data (#1823)" begin
+    # On Float32 the weights of the law correction overflowed at the top of its grid, so the
+    # diagonal fit refused its matrix, and the output grid of the Mahalanobis factor read a
+    # stencil far past its lattice, so the Mahalanobis fit was all NaN.
+    # The parameters of each method are Float32 too, so every operation runs in Float32.
+    FM = PO.FirstMomentRegimeAdjusted(; x = sqrt(2 / Float32(pi)))
+    LG = PO.LogRegimeAdjusted(; x = 0.5f0, y = 2.0f0)
+
+    # Two assets and a small shape: the quadratic weight of the log method times L grows as
+    # τ^{2 - x n}, past floatmax(Float32) at the top of the grid, and d d' underflows there.
+    # Measured: the three corrections are within 3e-6 of Float64.
+    for (method, mu, V, Cm) in ((PO.LogRegimeAdjusted(; x = 0.25f0, y = 2.0f0), [0.6, 1.4],
+                                 Matrix(qr(randn(StableRNG(1823), 2, 2)).Q), [0.07 0.01; 0.01 0.03]),
+                                (FM, [0.2, 0.9, 2.9], Matrix(qr(randn(StableRNG(1823), 3, 3)).Q),
+                                 fill(0.05, 3, 3) + 0.02I),
+                                (LG, [0.2, 0.9, 2.9], Matrix(qr(randn(StableRNG(1823), 3, 3)).Q),
+                                 fill(0.05, 3, 3) + 0.02I))
+        r32 = PO.regime_law_correction(method, Float32.(mu), Float32.(V), Float32.(Cm))
+        @test isfinite(r32) &&
+              isapprox(r32, PO.regime_law_correction(method, mu, V, Cm); rtol = 1e-4)
+    end
+
+    # The lattice reaches one stencil past the output grid, so no stencil extrapolates.
+    grid = PO.mahalanobis_bias_grid(0.9f0)
+    @test last(grid.xf) >= log(last(grid.so)) + 4 * step(grid.xf)
+
+    X = Float32.(randn(StableRNG(1823), 60, 4) ./ 100)
+    function fit(F, target, method, debias)
+        ce = RegimeAdjustedExpWeightedCovariance(; regime_target = target,
+                                                 regime_method = method, debias = debias,
+                                                 decay = F(0.9), min_val = F(1e-12),
+                                                 regime_lohi_mult = (F(0.7), F(1.6)),
+                                                 min_obs = 6)
+        return cov(ce, F.(X))
+    end
+    for target in (DiagonalTarget(), MahalanobisTarget()), method in (FM, LG),
+        debias in (ExactDebias(), LawDebias())
+
+        S32 = fit(Float32, target, method, debias)
+        # The first-moment constant of the two whole-block targets was a Float64 literal, so
+        # the first-moment fit gave a Float64 matrix on Float32 data (#1827).
+        @test eltype(S32) == Float32
+        @test all(isapprox.(S32, fit(Float64, target, method, debias); rtol = 1e-4))
+    end
+end
+
+@testset "the Gaussian level closure answers on Float32 data (#1827)" begin
+    # The kernel of the closure is a difference of two near-equal terms, which Float32 loses
+    # to round-off, so the fit was all NaN. The closure now runs in Float64 at least, and its
+    # ratio returns to the type of the decay. The ratio does not read the debias rule.
+    X = Float32.(randn(StableRNG(1827), 80, 4) ./ 100)
+    function fit(F, method)
+        ce = RegimeAdjustedExpWeightedCovariance(;
+                                                 regime_target = MahalanobisTarget(;
+                                                                                   recursion = GaussianLevelRecursion()),
+                                                 regime_method = method, decay = F(0.9),
+                                                 min_val = F(1e-12),
+                                                 regime_lohi_mult = (F(0.7), F(1.6)),
+                                                 min_obs = 6)
+        return cov(ce, F.(X))
+    end
+    for method in (PO.FirstMomentRegimeAdjusted(; x = sqrt(2 / Float32(pi))),
+                   PO.LogRegimeAdjusted(; x = 0.5f0, y = 2.0f0))
+        S32 = fit(Float32, method)
+        @test eltype(S32) == Float32
+        @test all(isapprox.(S32, fit(Float64, method); rtol = 1e-4))
+    end
+end
+
+@testset "the estimated Mahalanobis lattice starts at its seed on a BigFloat" begin
+    # The lattice seeds at ln(eps) + ln(1 - decay), and the grid that shares its points began at
+    # -61 + ln(1 - decay). An epsilon below e^-61 put the seed below the grid, so the offset of
+    # the seed was negative and the fit raised a BoundsError (R11 of #1817). A precision of 96
+    # bits has an epsilon of 2.5e-29, below e^-61 = 3.2e-27. Measured: each factor is within
+    # 1.6e-14 of the Float64 factor.
+    setprecision(BigFloat, 96) do
+        for (mb, m64) in ((PO.FirstMomentRegimeAdjusted(; x = sqrt(2 / big(pi))),
+                           PO.FirstMomentRegimeAdjusted(; x = sqrt(2 / pi))),
+                          (PO.LogRegimeAdjusted(; x = big(0.5), y = big(2.0)),
+                           PO.LogRegimeAdjusted(; x = 0.5, y = 2.0)))
+            fb = PO.mahalanobis_level_bias(mb, big(0.9), [20], 4, nothing,
+                                           EstimatedCentring())
+            @test eltype(fb) == BigFloat
+            @test all(isfinite, fb)
+            @test isapprox(Float64.(fb),
+                           PO.mahalanobis_level_bias(m64, 0.9, [20], 4, nothing,
+                                                     EstimatedCentring()); rtol = 1e-12)
+        end
+    end
 end

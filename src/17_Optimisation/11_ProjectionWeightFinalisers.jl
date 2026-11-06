@@ -3,7 +3,7 @@ $(DocStringExtensions.TYPEDEF)
 
 Moves weights into their bounds by the exact Euclidean projection, which needs no solver.
 
-It solves the programme of a [`JuMPWeightFinaliser`](@ref) with a [`SquaredAbsoluteErrorWeightFinaliser`](@ref) in closed form. It keeps any budget that the input weights carry, a zero or a negative budget too, and it accepts long-short bounds. When the budget lies outside the sums of the bounds, no projection exists, and [`finalise_weight_bounds`](@ref) then reports an [`OptimisationFailure`](@ref).
+It solves the programme of a [`JuMPWeightFinaliser`](@ref) with `ErrorWeightFinaliser(; alg = L2Norm(), dev = AbsoluteWeightDeviation())` in closed form. It keeps any budget that the input weights carry, a zero or a negative budget too, and it accepts long-short bounds. When the budget lies outside the sums of the bounds, no projection exists, and [`finalise_weight_bounds`](@ref) then reports an [`OptimisationFailure`](@ref).
 
 The projection moves every free weight by the same amount, so it does not keep the ratios of the free weights. [`EntropicWeightFinaliser`](@ref) and [`IterativeWeightFinaliser`](@ref) scale them instead. Under `ub = 0.5`, the weights `[0.9, 0.09, 0.01]` become `[0.5, 0.29, 0.21]` here and `[0.5, 0.45, 0.05]` there.
 
@@ -136,9 +136,8 @@ Projects `w` in the Euclidean norm onto the weights that lie in the bounds `wb` 
 """
 function euclidean_weight_projection(w::VecNum, wb::WeightBounds)
     s = sum(w)
-    # An absent bound is an infinity of the type the root lands in, so it adds no kink. An
-    # integer's own `typemin` is finite, and `w .- typemin` overflows.
-    T = float_if_integer(eltype(w))
+    # An absent bound is an infinity of the type the root lands in, so it adds no kink.
+    T = eltype(w)
     lb = isnothing(wb.lb) ? typemin(T) : wb.lb
     ub = isnothing(wb.ub) ? typemax(T) : wb.ub
     # `Σ clip(w − θ, lb, ub)` is piecewise linear and non-increasing in `θ`, with its kinks
@@ -251,7 +250,7 @@ Projects `w` in relative entropy onto the weights that lie in the bounds `wb` an
 function entropic_weight_projection(w::VecNum, wb::WeightBounds)
     s = sum(w)
     # `zero(w) .+ b` spreads a scalar bound over the assets.
-    T = float_if_integer(eltype(w))
+    T = eltype(w)
     lb = isnothing(wb.lb) ? zero(w) : zero(w) .+ wb.lb
     ub = isnothing(wb.ub) ? zero(w) .+ typemax(T) : zero(w) .+ wb.ub
     if !(s > zero(s) &&
@@ -282,7 +281,7 @@ The choice is made by dispatch on `Type{T}`. A package that defines another exac
 
 # Arguments
 
-  - `T`: The element type of the weights. An `Integer` type has no fractional weight to compare, so the caller repairs it with [`float_if_integer`](@ref) first.
+  - `T`: The element type of the weights.
 
 # Returns
 
@@ -301,7 +300,6 @@ julia> PortfolioOptimisers.weights_bound_tolerance(Rational{Int})
 # Related
 
   - [`weights_meet_bounds`](@ref)
-  - [`float_if_integer`](@ref)
 """
 weights_bound_tolerance(::Type{T}) where {T} = sqrt(eps(T))
 weights_bound_tolerance(::Type{T}) where {T <: Rational} = zero(T)
@@ -352,8 +350,7 @@ function weights_meet_bounds(wb::WeightBounds, w::VecNum, s::Number)::Bool
     if !all(isfinite, w)
         return false
     end
-    # An integer vector that no finaliser moved takes its float type, which has an `eps`.
-    tol = weights_bound_tolerance(float_if_integer(eltype(w)))
+    tol = weights_bound_tolerance(eltype(w))
     lb_ok = isnothing(wb.lb) ||
             all(Broadcast.instantiate(Broadcast.broadcasted((x, l) -> x >= l - tol, w,
                                                             wb.lb)))
@@ -372,7 +369,7 @@ function opt_weight_bounds(wf::IterativeWeightFinaliser, wb::WeightBounds, w::Ve
     if !weights_break_bounds(wb, w)
         return w
     end
-    T = float_if_integer(eltype(w))
+    T = eltype(w)
     lb = isnothing(wb.lb) ? typemin(T) : wb.lb
     ub = isnothing(wb.ub) ? typemax(T) : wb.ub
     w0 = w
@@ -385,7 +382,7 @@ function opt_weight_bounds(wf::IterativeWeightFinaliser, wb::WeightBounds, w::Ve
         w_sub = sum(x -> min(x, zero(eltype(w))), old_w ⊖ lb)
         delta = w_add + w_sub
         if !iszero(delta)
-            # A new vector, which the division widens when the clip kept integers.
+            # A new vector.
             w = ifelse.(idx, w .+ delta .* w ./ sum(w[idx]), w)
         end
         w *= s1 / sum(w)

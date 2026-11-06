@@ -4,11 +4,13 @@ Description = "Log-wealth regret, public API of PortfolioOptimisers.jl: LogWealt
 
 # Log-wealth regret
 
-[`log_wealth_regret`](@ref) compares two prediction results scored over the same timestamps, a strategy and a comparator. It returns the difference in log final wealth between the comparator and the strategy, which is positive when the comparator ends with more. It also returns the difference at each row, and a Diebold-Mariano-West test, with a Newey-West variance, that the two have the same expected log growth, in the same form as [`covariance_forecast_compare`](@ref). It was written for the online selection rules, and it accepts any two prediction results over one sequence of rows. Called with the strategy alone, it compares the strategy against the benchmark of its own rows, the `B` of the returns data, in batch and online alike.
+[`log_wealth_regret`](@ref) compares two prediction results scored over the same timestamps, a strategy and a comparator. It returns the difference in log final wealth between the comparator and the strategy, which is positive when the comparator ends with more. It also returns the difference at each row, and a Diebold-Mariano-West test that the two have the same expected log growth, [`WildBootstrapMeanTest`](@ref) by default, in the same form as [`covariance_forecast_compare`](@ref). It was written for the online selection rules, and it accepts any two prediction results over one sequence of rows. Called with the strategy alone, it compares the strategy against the benchmark of its own rows, the `B` of the returns data, in batch and online alike.
 
 The comparator can be the same estimator run causally. It can also be a hindsight comparator, an estimator fitted on the rows it is scored on and predicted on those same rows. [`BestConstantRebalancedPortfolio`](@ref) gives the best constant rebalanced portfolio. A [`ScoreSelector`](@ref) that keeps the top asset, composed with [`EqualWeighted`](@ref), gives the best single asset.
 
 Run through a [`HindsightSplit`](@ref), the same estimators give the comparators of dynamic regret, which can change at each row. These are be-the-leader, the best constant rebalanced portfolio over the rows up to and including each row, and the best portfolio of each period. The result reports the path length of these comparators next to the regret. [`BudgetedHindsightPath`](@ref) is the third comparator of dynamic regret, the best sequence of weights whose path length stays within a budget. Like the others, it is an estimator. Its fit is one optimisation over the whole panel, and its prediction result has one fold per row.
+
+[`fold_target`](@ref) and [`fold_held`](@ref) read one fold of a prediction result. They give the weights that the fold started from and the weights that it held after its last observation, on the names `rd.nx` of the fold. When the fit drops an asset that it cannot hold, `res.w` has fewer entries than `rd.nx`. These two readers give one entry for each name of `rd.nx`.
 
 ```@docs
 LogWealthRegretResult
@@ -18,6 +20,8 @@ BudgetedHindsightPathResult
 factory(res::BudgetedHindsightPathResult, fb::Option{<:FbChain})
 _optimise(est::BudgetedHindsightPath, rd::ReturnsResult; dims::Int = 1, kwargs...)
 predict(res::BudgetedHindsightPathResult, rd::ReturnsResult)
+fold_target
+fold_held
 ```
 
 ## References

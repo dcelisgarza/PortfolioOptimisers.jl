@@ -84,7 +84,7 @@ end
 
 Accumulate the signed weighted Descriptor scores and the surviving absolute weight of a composite, in place.
 
-It is [`composite_accumulate!`](@ref) with two changes. The weights are signed, so the numerator takes the signed product and the denominator takes the absolute weight. It also reads the Descriptors as the third axis of one score array, so it forms no slice of that array.
+It is [`composite_accumulate!`](@ref) with two changes. The weights are signed, so the numerator takes the signed product and the denominator takes the absolute weight. It also reads the Descriptors as the second axis of one score array, so it forms no slice of that array.
 
 A Descriptor whose score is not finite on a cell adds to neither sum there. The composite of that cell thus renormalises over the Descriptors that remain.
 
@@ -92,7 +92,7 @@ A Descriptor whose score is not finite on a cell adds to neither sum there. The 
 
   - `num`: Weighted score sum, `observations × assets`, changed in place.
   - `den`: Surviving absolute weight sum, `observations × assets`, changed in place.
-  - `S`: The Descriptor scores, `observations × assets × descriptors`.
+  - `S`: The Descriptor scores, `assets × descriptors × observations`.
   - `wv`: The signed Descriptor weights, one per Descriptor.
 
 # Returns
@@ -109,11 +109,11 @@ A Descriptor whose score is not finite on a cell adds to neither sum there. The 
 function signed_composite_accumulate!(num::AbstractMatrix{<:Real},
                                       den::AbstractMatrix{<:Real}, S::Arr3Num,
                                       wv::VecNum)::Nothing
-    for k in axes(S, 3)
+    for k in axes(S, 2)
         w = wv[k]
         a = abs(w)
         for idx in CartesianIndices(num)
-            s = S[idx, k]
+            s = S[idx[2], k, idx[1]]
             if isfinite(s)
                 num[idx] += w * s
                 den[idx] += a
@@ -195,6 +195,7 @@ FixedWeightedReturnForecast
                │           cre ┼ CrossSectionalLinearRegression
                │               │         alg ┼ PseudoInverseFallback()
                │               │   intercept ┼ Bool: true
+               │               │    leverage ┼ Bool: true
                │               │          ex ┴ Transducers.ThreadedEx{@NamedTuple{}}: Transducers.ThreadedEx()
                │       outlier ┼ CrossSectionalWinsoriser
                │               │    low ┼ Float64: 0.01
@@ -413,12 +414,12 @@ A row of the history reads the scores, the exposures, the regression weights and
 function return_forecast_step(rfe::FixedWeightedReturnForecast, P::NamedTuple,
                               csfm::CrossSectionalFactorModel, ::Nothing)::NamedTuple
     ds = rfe.scores
-    Sb = descriptor_neutralised_scores(ds, P, csfm, axes(P.S, 1))
-    K = size(Sb, 3)
+    Sb = descriptor_neutralised_scores(ds, P, csfm, axes(P.S, 3))
+    K = size(Sb, 2)
     wv = signed_composite_weights(rfe.weights, K)
     Tf = promote_type(eltype(Sb), eltype(wv))
-    num = zeros(Tf, size(Sb, 1), size(Sb, 2))
-    den = zeros(Tf, size(Sb, 1), size(Sb, 2))
+    num = zeros(Tf, size(Sb, 3), size(Sb, 1))
+    den = zeros(Tf, size(Sb, 3), size(Sb, 1))
     signed_composite_accumulate!(num, den, Sb, wv)
     composite_finalise!(num, den, rfe.min_coverage)
     Z = K > 1 ? exposure_transform(ds.scoring, num, P.w, P.g) : num

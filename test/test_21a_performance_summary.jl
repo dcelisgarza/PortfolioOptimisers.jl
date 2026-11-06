@@ -175,7 +175,7 @@ misses, and `brinson_attribution` had no test in the whole suite. Every check be
 with real numbers in the REPL first, and each quoted number is the one the REPL returned.
 =#
 
-using Dates
+using Dates, Clarabel
 
 const PO = PortfolioOptimisers
 
@@ -542,8 +542,11 @@ end
         mpred = MultiPeriodPredictionResult(; pred = [predv])
         # 0.025 = mean([0.01, -0.02, 0.03, 0.005]) * 4.
         @test isapprox(performance_summary(predv; ppy = 4).ann_return, 0.025)
-        # A vector of vectors takes the first one: mean([0.01, -0.02]) * 4 = -0.02.
-        @test isapprox(performance_summary(predvv; ppy = 4).ann_return, -0.02)
+        # A vector of vectors gives one entry for each member (#1934):
+        # mean([0.01, -0.02]) * 4 = -0.02 and mean([0.03, 0.005]) * 4 = 0.07.
+        psvv = performance_summary(predvv; ppy = 4)
+        @test isapprox(psvv.ann_return, [-0.02, 0.07])
+        @test psvv.members == [1, 2]
         @test isapprox(performance_summary(mpred; ppy = 4).ann_return, 0.025)
     end
 end
@@ -561,12 +564,19 @@ end
     Uc = PO.weight_path(nothing, w, X)
 
     # A path is scored as the series that path produces, on the method that already takes a
-    # series. Every statistic agrees, not only the first.
+    # series. Every statistic agrees, not only the first. The path holds weights and the
+    # series does not, so only the weight statistics differ: the mean over the rows of the
+    # path of `n_eff` (#1934) and of each exposure (#1962).
     ps_path = performance_summary(U, X, fees; ppy = 4)
     ps_ret = performance_summary(calc_net_returns(U, X, fees); ppy = 4)
+    wfs = (:n_eff, :long_exposure, :short_exposure, :gross_exposure, :net_exposure)
     for f in fieldnames(typeof(ps_path))
+        f in wfs && continue
         @test isequal(getfield(ps_path, f), getfield(ps_ret, f))
     end
+    @test all(f -> isnan(getfield(ps_ret, f)), wfs)
+    @test ps_path.n_eff ≈ mean(number_effective_assets(U[i, :]) for i in axes(U, 1))
+    @test ps_path.gross_exposure ≈ mean(sum(abs, U[i, :]) for i in axes(U, 1))
 
     # It is the series the drift route forms from the same window under the same drift.
     @test isapprox(ps_path.ann_return,
@@ -591,4 +601,385 @@ end
     @test occursin("serial dependence", doc)
     @test occursin("Weight Drift", doc)
     @test occursin("long-run variance estimator", doc)
+end
+
+@testset "#1938: the folds of a prediction Result stay a `Vector{PredictionResult}`" begin
+    # ADR 0067, amendment of 2026-11-02. A narrow element type puts the type of the
+    # optimiser into the type of the prediction Result, so every verb that reads the Result
+    # compiles again for each optimiser. The loop keeps the folds type-erased by decision.
+    # This testset pins that decision, and that the verbs read a narrowed copy alike.
+    rd = ReturnsResult(; nx = ["A", "B", "C", "D"], X = ER_X)
+    p = cross_val_predict(InverseVolatility(), rd, IndexWalkForward(20, 10))
+    @test length(p.pred) == 4
+    @test eltype(p.pred) === PredictionResult
+    # The fold reader infers its result abstractly, but the value is concrete at run time.
+    ps = performance_summary(p; ppy = 12)
+    @test ps.turnover isa Float64
+    @test ps.turnover > 0
+    # A user can narrow the folds. The narrowed copy infers, and gives the same figures.
+    n = MultiPeriodPredictionResult(; pred = concrete_typed_array(p.pred), id = p.id,
+                                    opt = p.opt)
+    @test isconcretetype(eltype(n.pred))
+    psn = @inferred performance_summary(n; ppy = 12)
+    for f in fieldnames(typeof(ps))
+        @test isequal(getfield(psn, f), getfield(ps, f))
+    end
+end
+
+@testset "#1939: a Result does not carry the type of its risk measure" begin
+    # ADR 0067, amendment of 2026-11-02. An optimisation Result held the type of its
+    # resolved risk measure in a type parameter, so each new risk measure gave a new
+    # Result type, a new fold type, and a new compilation of every verb on them. The field
+    # `r` keeps its bound and leaves the type parameters.
+    rd = ReturnsResult(; nx = ["A", "B", "C", "D"], X = ER_X)
+    slv = Solver(; solver = Clarabel.Optimizer, settings = ["verbose" => false])
+    opt = JuMPOptimiser(; slv = slv)
+    rv = optimise(MeanRisk(; r = Variance(), opt = opt), rd)
+    rc = optimise(MeanRisk(; r = ConditionalValueatRisk(), opt = opt), rd)
+    @test typeof(rv) === typeof(rc)
+    @test rc.r isa ConditionalValueatRisk
+    hv = optimise(HierarchicalRiskParity(; r = Variance()), rd)
+    hc = optimise(HierarchicalRiskParity(; r = ConditionalValueatRisk()), rd)
+    @test typeof(hv) === typeof(hc)
+    @test hc.r isa ConditionalValueatRisk
+    # The folds of two risk measures have one type, so a fold reader compiles one time.
+    cv = IndexWalkForward(20, 10)
+    pv = cross_val_predict(MeanRisk(; r = Variance(), opt = opt), rd, cv)
+    pc = cross_val_predict(MeanRisk(; r = ConditionalValueatRisk(), opt = opt), rd, cv)
+    @test typeof(pv.pred[1]) === typeof(pc.pred[1])
+    @test typeof(pv) === typeof(pc)
+end
+
+@testset "#1941: a Result does not carry the type of its scalariser or returns estimator" begin
+    # ADR 0067, amendment of 2026-11-02. Every JuMP optimisation Result held the types of
+    # `sca` and `ret` in the type parameters of `pa`, and the hierarchical Results held the
+    # types of their scalarisers and of the HERC measures. Each new part gave a new Result type
+    # and a new compilation of every verb on it. The fields keep their bounds and leave the
+    # type parameters.
+    rd = ReturnsResult(; nx = ["A", "B", "C", "D"], X = ER_X)
+    slv = Solver(; solver = Clarabel.Optimizer, settings = ["verbose" => false])
+    r0 = optimise(MeanRisk(; opt = JuMPOptimiser(; slv = slv)), rd)
+    rs = optimise(MeanRisk(; opt = JuMPOptimiser(; slv = slv, sca = MaxScalariser())), rd)
+    rr = optimise(MeanRisk(; opt = JuMPOptimiser(; slv = slv, ret = NoReturn())), rd)
+    @test typeof(r0) === typeof(rs) === typeof(rr)
+    @test rs.sca isa MaxScalariser
+    @test rr.ret isa NoReturn
+    h0 = optimise(HierarchicalRiskParity(), rd)
+    hs = optimise(HierarchicalRiskParity(; sca = MaxScalariser()), rd)
+    @test typeof(h0) === typeof(hs)
+    @test hs.sca isa MaxScalariser
+    e0 = optimise(HierarchicalEqualRiskContribution(), rd)
+    e1 = optimise(HierarchicalEqualRiskContribution(; ri = ConditionalValueatRisk(),
+                                                    ro = StandardDeviation(),
+                                                    scai = MaxScalariser(),
+                                                    scao = MaxScalariser()), rd)
+    @test typeof(e0) === typeof(e1)
+    @test e1.ri isa ConditionalValueatRisk
+    @test e1.ro isa StandardDeviation
+    @test e1.scai isa MaxScalariser
+    @test e1.scao isa MaxScalariser
+end
+
+#=
+Issue #1934 (ADR 0227): one summary of one series, a population of paths, the members of a
+prediction and a set of candidates, with extra risk measures, a risk-free rate, the effective
+number of assets, and a table. The shape follows the type of the input.
+=#
+
+# A one-fold prediction over a series, on the timestamps and the weights handed in.
+function ps_prediction(r, ts; w = [1.0], nx = ["P"], B = nothing)
+    res = PO.NaiveOptimisationResult(; pr = nothing, wb = nothing,
+                                     retcode = OptimisationSuccess(), w = w, fb = nothing)
+    rd = PO.PredictionReturnsResult(; nx = nx, X = r, ts = ts,
+                                    nb = isnothing(B) ? nothing : ["b"], B = B)
+    return PredictionResult(; res = res, rd = rd)
+end
+const PS_FIGS = (:n_periods, :ann_return, :ann_volatility, :sharpe, :sharpe_stderr,
+                 :sortino, :calmar, :max_drawdown, :cvar, :excess_ret, :tracking_error,
+                 :information_ratio, :turnover, :n_eff, :long_exposure, :short_exposure,
+                 :gross_exposure, :net_exposure, :date0, :date1)
+const PS_TS = Date(2024, 1, 1) .+ Day.(0:59)
+const PS_RD = ReturnsResult(; nx = ["A", "B", "C", "D"], X = ER_X, ts = PS_TS)
+
+@testset "#1934: the shape follows the type of the input" begin
+    ret = vec(ER_X * ER_W)
+    ps = performance_summary(ret; ppy = 12)
+    @testset "one series gives scalar fields, and the keys are `nothing`" begin
+        @test ps.sharpe isa Number && ps.n_periods isa Integer
+        @test isnothing(ps.names) && isnothing(ps.paths) && isnothing(ps.members)
+        @test isnothing(ps.date0) && isnothing(ps.date1)
+        @test ps.rf == 0 && isnan(ps.n_eff) && isempty(ps.measures) && isempty(ps.risk)
+        @test @inferred(performance_summary(ret)) isa PerformanceSummaryResult
+        @test @inferred(performance_summary(ER_W, ER_X)) isa PerformanceSummaryResult
+        @test @inferred(performance_summary(ER_W, PS_RD)) isa PerformanceSummaryResult
+    end
+    @testset "a vector of one input gives vectors of length one" begin
+        v1 = @inferred performance_summary([ret]; ppy = 12)
+        @test v1.names == ["Portfolio 1"]
+        for f in PS_FIGS
+            @test isequal(getfield(v1, f), [getfield(ps, f)])
+        end
+        @test v1.ppy == 12 && v1.rf == 0
+    end
+    @testset "a returns result gives the dates of its rows" begin
+        pr = performance_summary(ER_W, PS_RD)
+        @test pr.date0 == PS_TS[1] && pr.date1 == PS_TS[end]
+        @test pr.n_eff ≈ number_effective_assets(ER_W)
+    end
+end
+
+@testset "#1934: the extra risk measures" begin
+    ret = vec(ER_X * ER_W)
+    ms = [:cvar_99 => ConditionalValueatRisk(; alpha = 0.01), :mdd => MaximumDrawdown(),
+          :ulcer => UlcerIndex()]
+    ps = performance_summary(ret; measures = ms)
+    @test keys(ps.measures) == (:cvar_99, :mdd, :ulcer)
+    for (k, r) in ms
+        @test ps.risk[k] == PO.expected_risk_from_returns(r, ret)
+    end
+    # A tuple of pairs is the same call, and the released figures do not move.
+    pt = performance_summary(ret; measures = Tuple(ms))
+    @test pt.risk == ps.risk
+    base = performance_summary(ret)
+    for f in PS_FIGS
+        @test isequal(getfield(ps, f), getfield(base, f))
+    end
+    # A measure that cannot read a series is refused at entry, by its key and its type:
+    # the wrong benchmark would raise a `DimensionMismatch` at the first figure.
+    err = try
+        performance_summary(ret; benchmark = ret[1:2],
+                            measures = [:ok => MaximumDrawdown(), :v => Variance(),
+                                        :sd => StandardDeviation()])
+    catch e
+        e
+    end
+    @test err isa ArgumentError
+    # The type prints with its module prefix outside `Main`, so the check reads the name.
+    @test occursin("`v` (`", err.msg) && occursin("Variance{", err.msg)
+    @test occursin("`sd` (`", err.msg) && occursin("StandardDeviation{", err.msg)
+    @test occursin("expected_risk", err.msg) && !occursin("`ok`", err.msg)
+    # A repeated name, a name of a released column and a bad entry are refused.
+    @test_throws ArgumentError performance_summary(ret;
+                                                   measures = [:a => MaximumDrawdown(),
+                                                               :a => UlcerIndex()])
+    @test_throws ArgumentError performance_summary(ret;
+                                                   measures = [:sharpe => UlcerIndex()])
+    @test_throws ArgumentError performance_summary(ret; measures = [:n_eff => UlcerIndex()])
+    @test_throws ArgumentError performance_summary(ret; measures = ["a" => UlcerIndex()])
+    @test_throws ArgumentError performance_summary(ret; measures = [:a => 1.0])
+    # An empty vector of measures is no measure.
+    @test isempty(performance_summary(ret; measures = Pair{Symbol, UlcerIndex}[]).risk)
+    # Every shape reads the same series: an optimisation result and its prediction agree.
+    res = optimise(EqualWeighted(), PS_RD)
+    a = performance_summary(res, PS_RD; measures = ms)
+    b = performance_summary(predict(res, PS_RD); measures = ms)
+    @test a.risk.mdd ≈ b.risk.mdd
+    @test PO.bigger_is_better(last(ms[1])) == false
+end
+
+@testset "#1934: the risk-free rate" begin
+    ret = vec(ER_X * ER_W)
+    rf = 0.0005
+    ps = performance_summary(ret; ppy = 12, rf = rf)
+    ps0 = performance_summary(ret; ppy = 12)
+    m = mean(ret)
+    s = std(ret)
+    @test ps.rf == rf
+    @test ps.sharpe ≈ (m - rf) * 12 / (s * sqrt(12))
+    @test ps.sortino ≈ (m - rf) * 12 / sqrt(mean(min.(ret, 0) .^ 2) * 12)
+    sr = (m - rf) / s
+    v = PO.sharpe_ratio_variance_factor(sr, skewness(ret), kurtosis(ret)) /
+        (length(ret) - 1)
+    @test ps.sharpe_stderr ≈ sqrt(v * 12)
+    for f in (:ann_return, :ann_volatility, :calmar, :max_drawdown, :cvar, :excess_ret)
+        @test isequal(getfield(ps, f), getfield(ps0, f))
+    end
+    @test ps.sharpe < ps0.sharpe
+    @test_throws DomainError performance_summary(ret; rf = Inf)
+    @test_throws DomainError performance_summary(ret; rf = NaN)
+end
+
+@testset "#1934: a population gives one entry for each path" begin
+    for cv in (CombinatorialCrossValidation(; n_folds = 5, n_test_folds = 2),
+               MultipleRandomised(IndexWalkForward(30, 10); subset_size = 3, n_subsets = 3,
+                                  rng = StableRNG(11), seed = 7))
+        ppred = cross_val_predict(InverseVolatility(), PS_RD, cv)
+        pps = performance_summary(ppred; ppy = 12)
+        @test length(pps.sharpe) == length(ppred.pred)
+        @test pps.paths == [p.id for p in ppred.pred]
+        @test all(isnothing, pps.names) && all(isnothing, pps.members)
+        for k in eachindex(ppred.pred)
+            one = performance_summary(ppred.pred[k]; ppy = 12)
+            for f in PS_FIGS
+                @test isequal(getfield(pps, f)[k], getfield(one, f))
+            end
+        end
+    end
+    # A single-fold prediction in a population has no `id`, so its position keys it.
+    a = ps_prediction([0.01, -0.02, 0.03], PS_TS[1:3])
+    b = ps_prediction([0.02, 0.01], PS_TS[4:5])
+    pp = performance_summary(PopulationPredictionResult(; pred = [a, b]))
+    @test pp.paths == [1, 2]
+    @test_throws PO.IsEmptyError performance_summary(PopulationPredictionResult())
+end
+
+@testset "#1934: a prediction with many members gives one entry for each member" begin
+    X = [[0.01, -0.02, 0.03, 0.005], [0.02, 0.01, -0.01, 0.0]]
+    B = [[0.0, 0.01, 0.0, 0.01], [0.01, 0.0, 0.0, -0.01]]
+    pred = ps_prediction(X, PS_TS[1:4]; w = [0.5, 0.5], nx = ["A", "B"], B = B)
+    ps = performance_summary(pred; ppy = 4)
+    @test ps.members == [1, 2] && all(isnothing, ps.paths)
+    for j in 1:2
+        one = performance_summary(X[j]; ppy = 4, benchmark = B[j])
+        for f in (:ann_return, :sharpe, :sortino, :excess_ret, :tracking_error)
+            @test getfield(ps, f)[j] == getfield(one, f)
+        end
+    end
+    # `benchmark = nothing` turns the excess statistics off for every member.
+    @test all(isnan, performance_summary(pred; benchmark = nothing).excess_ret)
+    # A weight set with many members gives one entry for each member.
+    W = [[0.4, 0.3, 0.2, 0.1], [0.25, 0.25, 0.25, 0.25]]
+    pw = performance_summary(W, PS_RD; ppy = 12)
+    @test pw.members == [1, 2]
+    @test pw.sharpe[2] == performance_summary(W[2], PS_RD; ppy = 12).sharpe
+    @test pw.n_eff ≈ [number_effective_assets(W[1]), 4.0]
+    # A frontier gives one portfolio for each member: its optimisation result reads the
+    # weights of each member, and its prediction the targets of each member's folds.
+    slv = Solver(; name = :clarabel, solver = Clarabel.Optimizer,
+                 check_sol = (; allow_local = true, allow_almost = true),
+                 settings = Dict("verbose" => false))
+    mr = MeanRisk(;
+                  opt = JuMPOptimiser(; slv = slv,
+                                      ret = ArithmeticReturn(;
+                                                             settings = JuMPReturnsSettings(;
+                                                                                            lb = Frontier(;
+                                                                                                          N = 3)))))
+    fres = optimise(mr, PS_RD)
+    pr = performance_summary(fres, PS_RD; ppy = 12)
+    @test pr.members == [1, 2, 3]
+    @test pr.sharpe == performance_summary(fres.w, PS_RD; ppy = 12).sharpe
+    @test pr.n_eff ≈ number_effective_assets.(fres.w)
+    fpred = cross_val_predict(mr, PS_RD, IndexWalkForward(30, 10))
+    pf = performance_summary(fpred; ppy = 12)
+    for j in 1:3
+        @test pf.n_eff[j] ≈
+              mean(f -> number_effective_assets(PO.fold_target(f, j)), fpred.pred)
+        @test isequal(pf.turnover[j], PO.held_path_turnover(fpred, j))
+    end
+    @test !allequal(pf.n_eff)
+end
+
+@testset "#1934: a vector of candidates gives the long form" begin
+    ppred = cross_val_predict(InverseVolatility(), PS_RD,
+                              CombinatorialCrossValidation(; n_folds = 5, n_test_folds = 2))
+    single = cross_val_predict(EqualWeighted(), PS_RD, IndexWalkForward(30, 10))
+    X = [[0.01, -0.02, 0.03], [0.02, 0.01, -0.01]]
+    many = ps_prediction(X, PS_TS[1:3]; w = [0.5, 0.5], nx = ["A", "B"])
+    ps = performance_summary([ppred, single, many]; names = ["pop", "ew", "two"])
+    P = length(ppred.pred)
+    @test ps.names == vcat(fill("pop", P), "ew", "two", "two")
+    @test isequal(ps.paths, vcat([p.id for p in ppred.pred], nothing, nothing, nothing))
+    @test isequal(ps.members, vcat(fill(nothing, P), nothing, 1, 2))
+    @test ps.sharpe[P + 1] == performance_summary(single).sharpe
+    # Entries on different rows are permitted, and each carries its own rows.
+    @test ps.n_periods[P + 1] == 30 && ps.n_periods[P + 2] == 3
+    @test ps.date0[P + 2] == PS_TS[1] && ps.date1[P + 2] == PS_TS[3]
+    @test ps.date1[P + 1] == PS_TS[end]
+    # The default names, a wrong length and an empty vector.
+    @test performance_summary([single, many]).names ==
+          ["Portfolio 1", "Portfolio 2", "Portfolio 2"]
+    @test_throws DimensionMismatch performance_summary([single, many]; names = ["a"])
+    @test_throws PO.IsEmptyError performance_summary(Vector{Float64}[])
+    @test_throws PO.IsEmptyError performance_summary(PO.AbstractPredictionResult[])
+    # A benchmark that a caller gives is checked against each entry.
+    @test_throws DimensionMismatch performance_summary([single, many]; benchmark = zeros(3))
+    # A vector of optimisation results reads the returns result of the call.
+    r1 = optimise(EqualWeighted(), PS_RD)
+    r2 = optimise(InverseVolatility(), PS_RD)
+    pr = performance_summary([r1, r2], PS_RD; names = ["ew", "iv"])
+    @test pr.names == ["ew", "iv"]
+    @test pr.sharpe ==
+          [performance_summary(r1, PS_RD).sharpe, performance_summary(r2, PS_RD).sharpe]
+    @test pr.n_eff ≈ [4.0, number_effective_assets(r2.w)]
+    # The folds of a prediction stay a `Vector{PredictionResult}` (ADR 0067, amendment of
+    # 2026-11-02), so a summary of predictions is not checked with `@inferred`. A vector of
+    # optimisation results holds concrete weights, and it infers.
+    @test @inferred(performance_summary([r1, r1], PS_RD)) isa PerformanceSummaryResult
+end
+
+@testset "#1934: the effective number of assets" begin
+    single = cross_val_predict(InverseVolatility(), PS_RD, IndexWalkForward(30, 10))
+    ps = performance_summary(single)
+    @test ps.n_eff ≈ mean(f -> number_effective_assets(PO.fold_target(f)), single.pred)
+    @test performance_summary(single.pred[1]).n_eff ≈
+          number_effective_assets(PO.fold_target(single.pred[1]))
+    @test isnan(performance_summary(vec(ER_X * ER_W)).n_eff)
+end
+
+@testset "#1934: the table" begin
+    ret = vec(ER_X * ER_W)
+    ps = performance_summary([ret, ret[1:30]]; names = ["a", "b"], ppy = 12, rf = 0.001,
+                             measures = [:mdd => MaximumDrawdown()])
+    df = DataFrame(ps)
+    cols = ["name", "path", "member", "date0", "date1", "n_periods", "ann_return",
+            "ann_volatility", "sharpe", "sharpe_stderr", "sortino", "calmar",
+            "max_drawdown", "cvar", "excess_ret", "tracking_error", "information_ratio",
+            "turnover", "n_eff", "long_exposure", "short_exposure", "gross_exposure",
+            "net_exposure", "mdd"]
+    @test names(df) == cols
+    @test size(df, 1) == 2
+    @test df.name == ["a", "b"] && df.n_periods == [60, 30] && df.mdd == ps.risk.mdd
+    @test metadata(df, "ppy") == 12 && metadata(df, "rf") == 0.001
+    @test metadata(df, "alpha") == 0.05 && metadata(df, "compound") == false
+    one = DataFrame(performance_summary(ret))
+    @test size(one) == (1, 23)
+    @test one.sharpe == [performance_summary(ret).sharpe]
+    @test collect(keys(PO.performance_summary_columns())) == Symbol.(cols[1:23])
+end
+
+@testset "#1962: the exposures of a book, and an effective number free of its scale" begin
+    # The count reads the concentration of the book and not its leverage.
+    @test number_effective_assets([1.0, -1.0]) == 2
+    @test number_effective_assets([0.5, -0.5]) == 2
+    @test number_effective_assets([0.65, 0.65, -0.3]) ≈ 1.6^2 / (2 * 0.65^2 + 0.3^2)
+    @test number_effective_assets(3 .* ER_W) ≈ number_effective_assets(ER_W)
+    # On weights whose absolute values sum to one, it is the inverse of the HHI.
+    @test number_effective_assets(ER_W) ≈ inv(sum(abs2, ER_W))
+    # A book with no position holds no asset.
+    @test isnan(number_effective_assets(zeros(3)))
+
+    X = ER_X[:, 1:3]
+    ls = [0.65, 0.65, -0.3]
+    ps = performance_summary(ls, X)
+    @test ps.long_exposure ≈ 1.3 && ps.short_exposure ≈ 0.3
+    @test ps.gross_exposure ≈ 1.6 && ps.net_exposure ≈ 1.0
+    @test ps.n_eff ≈ number_effective_assets(ls)
+    # A dollar-neutral book has a net exposure of zero. Issue #1972 removed the integer
+    # case: integer weights are outside the domain.
+    dn = performance_summary([1.0, -1.0, 0.0], X)
+    @test dn.net_exposure == 0 && dn.gross_exposure == 2 && dn.n_eff == 2
+    # A long-only book with a budget of one.
+    lo = performance_summary(ER_W, ER_X)
+    @test lo.long_exposure ≈ 1 && lo.short_exposure == 0
+    @test lo.gross_exposure ≈ 1 && lo.net_exposure ≈ 1
+    # A weight path takes the mean of each figure over its rows.
+    U = [0.6 0.4 0.0; 0.7 0.5 -0.2; 0.5 0.5 0.0; 0.6 0.6 -0.2]
+    pu = performance_summary(U, X[1:4, :])
+    @test pu.gross_exposure ≈ 1.2 && pu.short_exposure ≈ 0.1 && pu.net_exposure ≈ 1.0
+    @test pu.n_eff ≈ mean(number_effective_assets, eachrow(U))
+    # Many members give one entry for each member.
+    pv = performance_summary([ls, [0.5, -0.5, 0.0]], X)
+    @test pv.net_exposure ≈ [1.0, 0.0] && pv.gross_exposure ≈ [1.6, 1.0]
+    @test pv.n_eff ≈ [number_effective_assets(ls), 2.0]
+    # A multi-period prediction takes the mean over its folds of each figure of the target.
+    pred = cross_val_predict(InverseVolatility(), PS_RD, IndexWalkForward(30, 10))
+    pp = performance_summary(pred)
+    @test pp.gross_exposure ≈ mean(f -> sum(abs, PO.fold_target(f)), pred.pred)
+    @test pp.long_exposure ≈ pp.gross_exposure && pp.short_exposure == 0
+    one = performance_summary(pred.pred[1])
+    @test one.net_exposure ≈ sum(PO.fold_target(pred.pred[1]))
+    # A bare series holds no weights.
+    pr = performance_summary(vec(X * ls))
+    @test all(isnan,
+              (pr.long_exposure, pr.short_exposure, pr.gross_exposure, pr.net_exposure))
 end

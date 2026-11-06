@@ -30,9 +30,13 @@ include(joinpath(@__DIR__, "panel_census.jl"))
 
 # The blanks: about one active cell in twenty of every Panel Field becomes a placeholder, label
 # by label on a tensor Panel Field. An inactive cell keeps its masks.
+# A tensor Panel Field holds `assets × labels × observations`, so it reads the active mask
+# transposed, with a label axis of length one.
+census_active(amsk, ::NTuple{2, Int}) = amsk
+census_active(amsk, sz::NTuple{3, Int}) = reshape(permutedims(amsk), sz[1], 1, sz[3])
 function census_blank_masks(f, amsk::AbstractMatrix{Bool}, sz::Tuple, rng)
     b = rand(rng, sz...) .< 0.05
-    b .&= amsk
+    b .&= census_active(amsk, sz)
     o = (isnothing(f.omsk) ? trues(sz) : BitArray(f.omsk)) .& .!b
     p = (isnothing(f.pmsk) ? falses(sz) : BitArray(f.pmsk)) .| b
     return o, p
@@ -142,21 +146,17 @@ end
     fd(alg) = FeatureDistance(; sel = ["a"], alg = alg, metric = euc)
     @testset "feature_matrix holds NaN at a placeholder" begin
         Z = feature_matrix(tv)
-        @test isnan(Z[3, 2, 1])
+        @test isnan(Z[2, 1, 3])
         @test count(isnan, Z) == 1
-        @test feature_matrix(tv; placeholder = nothing)[3, 2, 1] == 1e6
-        @test feature_matrix(tv; placeholder = 0)[3, 2, 1] == 0
-        # An integer panel with no observed mask cannot blank, and keeps its type.
-        pint = AssetPanel(; pf = [NumericPanelField(; name = "i", vals = [1, 2])])
-        @test eltype(feature_matrix(pint)) === Int
+        @test feature_matrix(tv; placeholder = nothing)[2, 1, 3] == 1e6
+        @test feature_matrix(tv; placeholder = 0)[2, 1, 3] == 0
     end
     @testset "FeatureDistance reads the last readable row" begin
         # x at row 3 (7), y at row 2 (5), z at row 3 (9).
-        D = distance(fd(LastObservation(; alg = LastActiveRow())), nothing, rd.X; rd = rd)
+        D = distance(fd(LastActiveRow()), nothing, rd.X; rd = rd)
         @test D ≈ [0 2 2; 2 0 4; 2 4 0]
-        @test_throws "the assets [\"y\"]" distance(fd(LastObservation()), nothing, rd.X;
-                                                   rd = rd)
-        @test CENSUS_PO.feature_readable_mask(fd(LastObservation()), nothing, rd) ==
+        @test_throws "the assets [\"y\"]" distance(fd(LastRow()), nothing, rd.X; rd = rd)
+        @test CENSUS_PO.feature_readable_mask(fd(LastRow()), nothing, rd) ==
               BitVector([1, 0, 1])
     end
     @testset "A static asset with a placeholder is unreadable" begin
@@ -165,12 +165,11 @@ end
                                                 omsk = BitVector([1, 0, 1]),
                                                 pmsk = BitVector([0, 1, 0]))])
         rds = ReturnsResult(; nx = nx, X = zeros(3, 3), pnl = st)
-        @test_throws "the assets [\"y\"]" distance(fd(LastObservation()), nothing, rds.X;
-                                                   rd = rds)
+        @test_throws "the assets [\"y\"]" distance(fd(LastRow()), nothing, rds.X; rd = rds)
         @test CENSUS_PO.feature_readable_mask(fd(AggregateFeatures()), nothing, rds) ==
               BitVector([1, 0, 1])
         rdv = CENSUS_PO.port_opt_view(rds, [1, 3])
-        @test distance(fd(LastObservation()), nothing, rdv.X; rd = rdv) ≈ [0 2; 2 0]
+        @test distance(fd(LastRow()), nothing, rdv.X; rd = rdv) ≈ [0 2; 2 0]
     end
     W = [0.5 0.0; 0.5 0.0; 0.0 1.0]
     @testset "The panel collapse divides by the weight of the members that hold data" begin

@@ -1,21 +1,15 @@
 ```@meta
-Description = "Covariance forecast summary, private API of PortfolioOptimisers.jl: covariance_ratio_band, summary_quantile, covariance_forecast_names, …"
+Description = "Covariance forecast summary, private API of PortfolioOptimisers.jl: covariance_ratio_band, covariance_summary_entry, summary_quantile, …"
 ```
 
 # Covariance forecast summary: private API
 
 ```@docs
 PortfolioOptimisers.covariance_ratio_band
+PortfolioOptimisers.covariance_summary_entry
 PortfolioOptimisers.summary_quantile
 PortfolioOptimisers.covariance_forecast_names
 PortfolioOptimisers.covariance_diagonal_mean
 PortfolioOptimisers.covariance_exceedance
-PortfolioOptimisers.newey_west_variance
-```
-
-## References
-
-```@bibliography
-Pages = [@__FILE__]
-Canonical = false
+PortfolioOptimisers.loss_difference_test
 ```

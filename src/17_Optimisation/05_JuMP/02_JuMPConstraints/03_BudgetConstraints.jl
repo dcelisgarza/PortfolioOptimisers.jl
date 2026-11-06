@@ -11,11 +11,11 @@ Abstract supertype for all budget constraint estimators.
 """
 abstract type BudgetConstraintEstimator <: JuMPConstraintEstimator end
 """
-    const Num_BgtCE = Union{<:Number, <:BudgetConstraintEstimator}
+    const Num_BgtCE = Union{Number, BudgetConstraintEstimator}
 
 Union of scalar budget values and [`BudgetConstraintEstimator`](@ref) instances.
 """
-const Num_BgtCE = Union{<:Number, <:BudgetConstraintEstimator}
+const Num_BgtCE = Union{Number, BudgetConstraintEstimator}
 """
 $(DocStringExtensions.TYPEDEF)
 
@@ -100,18 +100,19 @@ function BudgetRange(; lb::Option{<:Number} = 1.0, ub::Option{<:Number} = 1.0)
     return BudgetRange(lb, ub)
 end
 """
-    const Num_BgtRg = Union{<:Number, <:BudgetRange}
+    const Num_BgtRg = Union{Number, BudgetEstimator}
 
 Alias for a scalar budget value or budget range.
 
-Matches either a plain number (fixed budget, e.g. `1.0`) or a [`BudgetRange`](@ref) (interval budget constraint). Used for dispatch in budget constraint generation.
+Matches either a plain number (fixed budget, e.g. `1.0`) or a [`BudgetEstimator`](@ref), such as a [`BudgetRange`](@ref) (interval budget constraint). Used for dispatch in budget constraint generation.
 
 # Related
 
+  - [`BudgetEstimator`](@ref)
   - [`BudgetRange`](@ref)
   - [`set_long_short_budget_constraints!`](@ref)
 """
-const Num_BgtRg = Union{<:Number, <:BudgetRange}
+const Num_BgtRg = Union{Number, BudgetEstimator}
 """
     set_budget_constraints!(args...)
     set_budget_constraints!(model::JuMP.Model, val::Number, w::VecNum)
@@ -205,6 +206,8 @@ Models the cost of the bid-ask spread, of slippage, of a borrowing charge, or of
 fee. The cost is charged **against the budget**: the weights and their costs must together
 meet `bgt`, so a portfolio that trades more may hold less.
 
+The rows are Equations 1 to 3 of [pogue1969](@cite) with one linear segment on each side of the trade. Exhibit 3 of that work charges the cost against the cash of the revised portfolio, as the first row charges it against the budget.
+
 # Mathematical definition
 
 ```math
@@ -241,8 +244,8 @@ A pinned `bgt = 1.0` and a [`MaximumReturn`](@ref) objective reproduce the ident
     ``\\boldsymbol{1}^\\intercal \\boldsymbol{w}`` and so shrinks the risk, and the solver inflates
     both increments to their `up` and `un` caps. On the sample above, minimising the variance
     gives `sum(w) = 0.9514` with a charged cost of **0.0486** against a traded cost of
-    **0.0014**. Give the return term a lower bound through `settings.lb`, exactly as the source
-    formulation does, whenever the objective minimises a risk measure.
+    **0.0014**. Give the return term a lower bound through `settings.lb`, as Listing 9.8 of
+    [cajas2025](@cite) does, whenever the objective minimises a risk measure.
 
 # Fields
 
@@ -271,13 +274,13 @@ Keywords correspond to the struct's fields.
 
 ## View parameters
 
-When [`port_opt_view`](@ref) is called on this type, the following `@vprop`-tagged fields are automatically subset to the selected indices:
+[`port_opt_view`](@ref) takes the view of these `@vprop` fields at the selected indices:
 
-  - `w`: Sliced to the selected indices via [`port_opt_view`](@ref).
-  - `vp`: Sliced to the selected indices via [`port_opt_view`](@ref).
-  - `vn`: Sliced to the selected indices via [`port_opt_view`](@ref).
-  - `up`: Sliced to the selected indices via [`port_opt_view`](@ref).
-  - `un`: Sliced to the selected indices via [`port_opt_view`](@ref).
+  - `w`: Sliced to the selected indices through [`port_opt_view`](@ref).
+  - `vp`: Sliced to the selected indices through [`port_opt_view`](@ref).
+  - `vn`: Sliced to the selected indices through [`port_opt_view`](@ref).
+  - `up`: Sliced to the selected indices through [`port_opt_view`](@ref).
+  - `un`: Sliced to the selected indices through [`port_opt_view`](@ref).
 
 # Related
 
@@ -289,7 +292,8 @@ When [`port_opt_view`](@ref) is called on this type, the following `@vprop`-tagg
 
 # References
 
-  - $(ref_dict[:cajas2025]) Section 9.1, equations 9.14 and 9.15.
+  - $(ref_dict[:pogue1969]) Pages 11 and 12, Equations 1 to 3, and page 29, Exhibit 3.
+  - $(ref_dict[:cajas2025]) Section 9.1, Equations 9.14 and 9.15, and Listing 9.8.
 """
 @propagatable @concrete struct BudgetCosts <: BudgetCostEstimator
     """
@@ -368,6 +372,8 @@ Extends [`BudgetCosts`](@ref) with a power cone, so the charge grows as the trad
 raised to ``1/\\mathrm{beta}``. Unlike a linear cost, the charge is **also subtracted from the
 return expression** of every term whose `settings.mic` is `true`.
 
+Section 6.3 of [mosek2023c](@cite) states this cost, charges it against the budget, and writes it as a power cone. That work names page 452 of [grinoldkahn1999](@cite) as the source of the power law. No copy of that work was found. [cajas2025](@cite) splits the trade into its two signs, as the rows below do.
+
 # Mathematical definition
 
 ```math
@@ -401,7 +407,9 @@ Every row is homogeneous in ``(\\boldsymbol{w}, k)``. Under [`MaximumRatio`](@re
 
     **`beta` is the reciprocal of the power law's exponent.** The cone gives
     ``\\iota_i \\geq w_i^{1/\\beta}``, so the default `beta = 2/3` charges the volume raised to
-    **3/2**, the value the empirical literature reports. The cone needs `0 < beta < 1`; the
+    **3/2**. Equation 1 of [toth2011](@cite) is the square-root law of the price impact, and
+    the cost is the impact times the traded volume, so it grows as the volume raised to 3/2.
+    The cone needs `0 < beta < 1`; the
     constructor refuses both endpoints, because a solver reports `SLOW_PROGRESS` on either.
 
 A pinned `bgt = 1.0` and a [`MaximumReturn`](@ref) objective reproduce the identity to
@@ -414,8 +422,8 @@ A pinned `bgt = 1.0` and a [`MaximumReturn`](@ref) objective reproduce the ident
     objective prefers a **larger** invested budget. Under [`MinimumRisk`](@ref) the solver
     treats them as riskless assets and concentrates the whole budget in them: on the sample
     above, minimising the variance gives `sum(w) = 0.0051`. Give the return term a lower bound
-    through `settings.lb`, exactly as the source formulation instructs, whenever the objective
-    minimises a risk measure.
+    through `settings.lb`, as Section 9.3 of [cajas2025](@cite) instructs, whenever the
+    objective minimises a risk measure.
 
 # Fields
 
@@ -446,13 +454,13 @@ Keywords correspond to the struct's fields.
 
 ## View parameters
 
-When [`port_opt_view`](@ref) is called on this type, the following `@vprop`-tagged fields are automatically subset to the selected indices:
+[`port_opt_view`](@ref) takes the view of these `@vprop` fields at the selected indices:
 
-  - `w`: Sliced to the selected indices via [`port_opt_view`](@ref).
-  - `vp`: Sliced to the selected indices via [`port_opt_view`](@ref).
-  - `vn`: Sliced to the selected indices via [`port_opt_view`](@ref).
-  - `up`: Sliced to the selected indices via [`port_opt_view`](@ref).
-  - `un`: Sliced to the selected indices via [`port_opt_view`](@ref).
+  - `w`: Sliced to the selected indices through [`port_opt_view`](@ref).
+  - `vp`: Sliced to the selected indices through [`port_opt_view`](@ref).
+  - `vn`: Sliced to the selected indices through [`port_opt_view`](@ref).
+  - `up`: Sliced to the selected indices through [`port_opt_view`](@ref).
+  - `un`: Sliced to the selected indices through [`port_opt_view`](@ref).
 
 # Related
 
@@ -464,9 +472,10 @@ When [`port_opt_view`](@ref) is called on this type, the following `@vprop`-tagg
 
 # References
 
-  - $(ref_dict[:cajas2025]) Section 9.3, equations 9.22 and 9.23.
+  - $(ref_dict[:mosek2023c]) Section 6.3, Equations 6.4 to 6.6. $(ref_dict[:no_original_source])
   - $(ref_dict[:grinoldkahn1999])
-  - $(ref_dict[:toth2011])
+  - $(ref_dict[:toth2011]) Section 1, Equation 1.
+  - $(ref_dict[:cajas2025]) Section 9.3, Equations 9.22 and 9.23.
 """
 @propagatable @concrete struct BudgetMarketImpact <: BudgetCostEstimator
     """
@@ -587,7 +596,7 @@ $(DocStringExtensions.TYPEDSIGNATURES)
 
 Assert that a gross budget is admissible alongside the net and short budgets.
 
-`bgt` and `sbgt` constrain the net and gross exposures only *together*: pinning both gives `1'w == bgt` and `norm(w, 1) == bgt + 2 * sbgt`. `gbgt` exists for the combination they cannot reach — gross pinned with net free — so it is rejected when they already determine the gross exposure, and when the weight bounds forbid short positions (whereupon gross and net coincide and `bgt` already owns the constraint).
+`bgt` and `sbgt` constrain the net and gross exposures only *together*. When both are numbers, the long budget is `sum(lw) == bgt + sbgt` and the short budget is `sum(sw) == sbgt`, so the gross budget `sum(lw) + sum(sw)` is `bgt + 2 * sbgt`, the row that `gbgt` writes. The realised gross exposure `norm(w, 1)` equals it when `xbgt` is `true`, and it can be smaller when `xbgt` is `false`. `gbgt` exists for the combination they cannot reach — gross pinned with net free — so it is rejected when they already determine the gross exposure, and when the weight bounds forbid short positions (whereupon gross and net coincide and `bgt` already owns the constraint).
 
 Only the statically-decidable contradictions are caught. Ranges may still conflict at solve time, surfacing as infeasibility, and a [`WeightBoundsEstimator`](@ref) is not resolved until then. [`TimeDependent`](@ref) schedules are reached through [`assert_time_dependent_substitution`](@ref).
 
@@ -600,7 +609,7 @@ Only the statically-decidable contradictions are caught. Ranges may still confli
 """
 function assert_gross_budget_admissible(bgt, sbgt, gbgt, wb)::Nothing
     @argcheck(!(isa(bgt, Number) && isa(sbgt, Number)),
-              ArgumentError("gross budget (gbgt) is over-determined: net budget (bgt = $bgt) and short budget (sbgt = $sbgt) already pin the gross exposure at bgt + 2 * sbgt = $(bgt + 2 * sbgt). Give at most two of bgt, sbgt and gbgt — gbgt exists for the case bgt and sbgt cannot express, a pinned gross exposure with a free net exposure (bgt = nothing)."))
+              ArgumentError("gross budget (gbgt) is over-determined: net budget (bgt = $bgt) and short budget (sbgt = $sbgt) already pin the gross budget at bgt + 2 * sbgt = $(bgt + 2 * sbgt). Give at most two of bgt, sbgt and gbgt. gbgt exists for the case that bgt and sbgt cannot express, a pinned gross budget with a free net exposure (bgt = nothing)."))
     if isa(wb, WeightBounds)
         @argcheck(w_neg_flag(wb.lb) || w_neg_flag(wb.ub),
                   ArgumentError(gross_budget_bounds_msg(wb.lb, wb.ub)))
@@ -609,7 +618,7 @@ function assert_gross_budget_admissible(bgt, sbgt, gbgt, wb)::Nothing
 end
 # No gross budget, or a schedule that `assert_time_dependent_substitution` reaches, has
 # nothing to assert here.
-function assert_gross_budget_admissible(::Any, ::Any, ::Union{Nothing, <:TimeDependent},
+function assert_gross_budget_admissible(::Any, ::Any, ::Union{Nothing, TimeDependent},
                                         ::Any)::Nothing
     return nothing
 end
@@ -941,6 +950,13 @@ gives `lw_i == sw_i == 0`, hence `w_i == 0`.
 Under [`WeightsFromParts`](@ref) the pair alone is enough and the slack-closing constraints are
 not emitted: `w = lw - sw` is an identity, so `sw_i = 0` already leaves `lw_i == w_i`.
 
+A [`HeldIndicators`](@ref) bundle takes the [`WeightsFromParts`](@ref) method alone. The held
+builder pins the decomposition only for that head, because [`run_mip_builder!`](@ref) gives an
+explicit `xbgt` on a model with a short side to the sign or the long-short builder. A held bundle
+under any other contract is a `TypeError`. So the [`PartsBoundWeights`](@ref) method, and the
+method that reads the contract off the model, take the two bundles that carry binaries:
+[`LongShortIndicators`](@ref) and [`SignIndicators`](@ref).
+
 # Arguments
 
   - $(arg_dict[:model])
@@ -975,8 +991,8 @@ function set_exact_budget_constraints!(model::JuMP.Model, sp::AbstractMIPSpace,
     return nothing
 end
 function set_exact_budget_constraints!(model::JuMP.Model, sp::AbstractMIPSpace,
-                                       ind::AbstractMIPIndicators, wx::VecNum, ss,
-                                       ::PartsBoundWeights)
+                                       ind::Union{LongShortIndicators, SignIndicators},
+                                       wx::VecNum, ss, ::PartsBoundWeights)
     lw = shared_get(model, :lw)
     sw = shared_get(model, :sw)
     sc = get_constraint_scale(model)
@@ -996,9 +1012,18 @@ function set_exact_budget_constraints!(model::JuMP.Model, sp::AbstractMIPSpace,
     return nothing
 end
 function set_exact_budget_constraints!(model::JuMP.Model, sp::AbstractMIPSpace,
-                                       ind::AbstractMIPIndicators, wx::VecNum, ss)
+                                       ind::Union{LongShortIndicators, SignIndicators},
+                                       wx::VecNum, ss)
     return set_exact_budget_constraints!(model, sp, ind, wx, ss,
                                          decomposition_contract(model))
+end
+function set_exact_budget_constraints!(model::JuMP.Model, sp::AbstractMIPSpace,
+                                       ind::HeldIndicators, wx::VecNum, ss)
+    # The held builder pins the decomposition only for a `WeightsFromParts` head: an
+    # explicit `xbgt` on a model with a short side runs the sign or the long-short builder
+    # (`run_mip_builder!`). So the held bundle never meets the slack-closing rows.
+    return set_exact_budget_constraints!(model, sp, ind, wx, ss,
+                                         decomposition_contract(model)::WeightsFromParts)
 end
 
 export BudgetRange, BudgetCosts, BudgetMarketImpact

@@ -6,5 +6,5 @@ Description = "Rank covariance, private API of PortfolioOptimisers.jl: RankCovar
 
 ```@docs
 RankCovarianceEstimator
-PortfolioOptimisers.show_fields(::Union{<:KendallCovariance, <:SpearmanCovariance})
+PortfolioOptimisers.show_fields(::Union{KendallCovariance, SpearmanCovariance})
 ```

@@ -18,6 +18,8 @@ include(joinpath(@__DIR__, "test18_setup.jl"))
     @test NoReturn(; settings = s).settings === s
     # The bounds helpers treat it like any other term.
     @test bounds_returns_estimator(r, 0.02).settings.lb == 0.02
+    # A bound that is already the bound returns the term itself.
+    @test bounds_returns_estimator(r, r.settings.lb) === r
     @test isnothing(PortfolioOptimisers.no_bounds_returns_estimator(NoReturn(;
                                                                              settings = s)).settings.lb)
     @test isa(PortfolioOptimisers.no_bounds_returns_estimator(NoReturn(; settings = s)),
@@ -619,7 +621,8 @@ end
     @testset "`kmin` is validated where `ohf` is" begin
         @test isnothing(MaximumRatio().kmin)
         @test MaximumRatio(; kmin = 0.5).kmin == 0.5
-        @test_throws DomainError MaximumRatio(; kmin = 0.0)
+        # A stated zero turns the floor off and keeps only `k >= 0`.
+        @test MaximumRatio(; kmin = 0.0).kmin == 0.0
         @test_throws DomainError MaximumRatio(; kmin = -1e-8)
     end
 end
@@ -1126,10 +1129,17 @@ end
     @testset "every declared slot refuses, and none that has a sample reading" begin
         # `mu` at `nothing` means the sample mean on a value-level route, so the moment
         # measures pass and evaluate.
-        for r in (LowOrderMoment(), HighOrderMoment(), Kurtosis(), Skewness(),
-                  MedianAbsoluteDeviation(), ThirdCentralMoment())
+        for r in (LowOrderMoment(), HighOrderMoment(), MedianAbsoluteDeviation(),
+                  ThirdCentralMoment(), ThirdCentralMoment(; ve = SimpleVariance()))
             @test isnothing(PO.assert_resolved_slots(r))
             @test isa(expected_risk(r, w, X), Number)
+        end
+        # `Kurtosis` and `Skewness` read their comoment matrix as it stands, so a bare
+        # returns matrix cannot fill it (#1846).
+        for (r, name) in ((Kurtosis(), "`Kurtosis.kt`"), (Skewness(), "`Skewness.sk`"))
+            @test_throws IsNothingError expected_risk(r, w, X)
+            @test occursin(name, message(() -> expected_risk(r, w, X)))
+            @test isa(expected_risk(r, w, hpr), Number)
         end
         @test_throws IsNothingError expected_risk(UncertaintySetVariance(), w, X)
         @test_throws IsNothingError expected_risk(NegativeSkewness(), w, X)
@@ -1142,27 +1152,26 @@ end
         @test occursin("`DistributionValueatRisk.mu`",
                        message(() -> expected_risk(rv, w, X)))
         @test isa(expected_risk(rv, w, pr), Number)
-        # A container that reads a grandchild names it by the path the caller wrote. `vr`
-        # is reached through the child, so the child's own name is what the refusal reads,
-        # and it is refused first. With `vr` stated the grandchildren are the ones named.
+        # A container reaches each child through its slot, so the child's own name is what
+        # the refusal reads. `vr` is refused first, and with `vr` stated the refusal names
+        # `sk`, which the child `Skewness` reads.
         vsk = VarianceSkewKurtosis()
         @test_throws IsNothingError expected_risk(vsk, w, X)
         @test occursin("`Variance.sigma`", message(() -> expected_risk(vsk, w, X)))
         vsk2 = VarianceSkewKurtosis(; vr = Variance(; sigma = sigma))
         @test_throws IsNothingError expected_risk(vsk2, w, X)
-        @test occursin("`VarianceSkewKurtosis.sk.sk`",
-                       message(() -> expected_risk(vsk2, w, X)))
-        # A Deferred Quantity below the container is named before the slot the container
-        # reads off that child: the deferred `pe` is what would fill `sk`.
+        @test occursin("`Skewness.sk`", message(() -> expected_risk(vsk2, w, X)))
+        # A Deferred Quantity in a child is named as a Deferred Quantity, not as an empty
+        # slot.
         vsk3 = VarianceSkewKurtosis(; vr = Variance(; sigma = sigma),
-                                    sk = Skewness(; pe = HighOrderPriorEstimator()))
+                                    sk = Skewness(; sk = HighOrderPriorEstimator()))
         @test_throws ArgumentError expected_risk(vsk3, w, X)
-        @test occursin("`Skewness.pe`", message(() -> expected_risk(vsk3, w, X)))
+        @test occursin("holds a Deferred Quantity",
+                       message(() -> expected_risk(vsk3, w, X)))
         # A low-order prior carries no co-moment tensor, so the prior route leaves the
-        # grandchild empty and the same refusal names it; the high-order prior fills it.
+        # child empty and the same refusal names it; the high-order prior fills it.
         @test_throws IsNothingError expected_risk(vsk, w, pr)
-        @test occursin("`VarianceSkewKurtosis.sk.sk`",
-                       message(() -> expected_risk(vsk, w, pr)))
+        @test occursin("`Skewness.sk`", message(() -> expected_risk(vsk, w, pr)))
         @test isa(expected_risk(vsk, w, hpr), Number)
         @test isa(expected_risk(NegativeSkewness(), w, hpr), Number)
         # A child measure held by a tracking measure is reached through its slot.
@@ -1283,6 +1292,175 @@ end
         @test isapprox(g[[1, 2, 4, 5]],
                        2 .* (prg.sigma[[1, 2, 4, 5], [1, 2, 4, 5]] * wg[[1, 2, 4, 5]]);
                        atol = 1e-15)
+    end
+end
+
+@testset "A measure whose value is a solve differentiates its Worst-Case Distribution (#1835)" begin
+    using PortfolioOptimisers, Test, StableRNGs, LinearAlgebra, StatsBase, Clarabel
+
+    #=
+    The finite difference of a measure whose value is a solve differenced two solves. The
+    change that the step `1e-6` makes is about `1e-8`, and the solver stops at a gap of about
+    `1e-8`, so the contributions missed the risk: by 0.005 % on the EVaR, 5.4 % on the RLVaR
+    and 2.2 % on the EDaR, on the data below. Each measure is the largest expected loss over a
+    set of distributions, so its gradient is the gradient of the expected loss under the
+    Worst-Case Distribution of one solve, which has no solver noise.
+    =#
+
+    po = PortfolioOptimisers
+    X = randn(StableRNG(987456), 200, 5) * 0.01 .+ 0.0005
+    pr = prior(EmpiricalPrior(), X)
+    w = [0.3, 0.25, 0.2, 0.15, 0.1]
+    x = X * w
+    slv = Solver(; solver = Clarabel.Optimizer, settings = Dict("verbose" => false))
+    # Even observations have weight zero, so their rows leave every programme.
+    ow = StatsBase.Weights([iseven(t) ? 0.0 : 1.0 + t / 200 for t in 1:200])
+    ratio(r; kw...) = sum(risk_contribution(r, w, pr; kw...)) /
+                      expected_risk(r, w, pr; kw...)
+
+    @testset "every homogeneous measure of the three families sums to its risk" begin
+        # `alpha = 0.2` and `p = 1.5` put the power norm measures on their programme. At the
+        # defaults they are the largest loss on 200 observations.
+        pn = (; alpha = 0.2, p = 1.5)
+        rs = [EntropicValueatRisk(), EntropicValueatRiskRange(), EntropicDrawdownatRisk(),
+              RelativisticValueatRisk(), RelativisticValueatRiskRange(),
+              RelativisticDrawdownatRisk(), PowerNormValueatRisk(; pn...),
+              PowerNormValueatRiskRange(; alpha = 0.2, beta = 0.2, pa = 1.5, pb = 1.5),
+              PowerNormDrawdownatRisk(; pn...), EntropicValueatRisk(; w = ow),
+              RelativisticValueatRisk(; w = ow), PowerNormValueatRisk(; w = ow, pn...),
+              EntropicValueatRisk(; alpha = 0), PowerNormValueatRisk()]
+        for r in rs
+            @test isapprox(ratio(factory(r, pr, slv)), 1; rtol = 1e-6)
+        end
+        # A vector of them decomposes its aggregate, and a measure with no solve sits beside
+        # them.
+        mixed = [factory(EntropicValueatRisk(), pr, slv), Variance(),
+                 factory(RelativisticValueatRisk(), pr, slv)]
+        @test isapprox(ratio(mixed), 1; rtol = 1e-6)
+        @test isapprox(ratio(mixed; sca = MaxScalariser()), 1; rtol = 1e-6)
+        # A proportional fee keeps the measure homogeneous.
+        fees = Fees(; l = fill(0.0004, 5))
+        r = factory(EntropicValueatRisk(), pr, slv)
+        @test isapprox(sum(risk_contribution(r, w, pr, fees)) /
+                       expected_risk(r, w, pr, fees), 1; rtol = 1e-6)
+    end
+
+    @testset "the gradient is that of the measure" begin
+        r = factory(EntropicValueatRisk(), pr, slv)
+        q = po.ERM_worst_case(x, slv, 0.05)
+        @test isapprox(risk_gradient(r, w, pr), -transpose(X) * q; rtol = 1e-8)
+        # A compounded drawdown is not homogeneous, so its contributions do not sum to its
+        # risk. Its gradient is the expected loss under the Worst-Case Distribution of one
+        # solve, through the Jacobian `J` of the drawdown series. `J` is in closed form, so
+        # the check solves at `w` alone. A finite difference of the measure solved at shifted
+        # weights, and a solve that fails returns `NaN` on some hosts (#1916).
+        J = similar(X)
+        cp = peak = one(eltype(x))
+        dcp = zeros(size(X, 2))
+        dpeak = zeros(size(X, 2))
+        for t in axes(X, 1)
+            cp *= 1 + x[t]
+            dcp .= dcp .* (1 + x[t]) .+ (cp / (1 + x[t])) .* view(X, t, :)
+            if cp > peak
+                peak = cp
+                dpeak .= dcp
+            end
+            J[t, :] .= dcp ./ peak .- (cp / peak^2) .* dpeak
+        end
+        dd = po.relative_drawdown_vec(x)
+        for (r, q) in
+            ((RelativeEntropicDrawdownatRisk(), po.ERM_worst_case(dd, slv, 0.05)),
+             (RelativeRelativisticDrawdownatRisk(), po.RRM_worst_case(dd, slv, 0.05, 0.3)),
+             (RelativePowerNormDrawdownatRisk(; alpha = 0.2, p = 1.5),
+              po.PRM_worst_case(dd, slv, 0.2, 1.5)))
+            @test isapprox(risk_gradient(factory(r, pr, slv), w, pr), -transpose(J) * q;
+                           rtol = 1e-6)
+        end
+    end
+
+    @testset "a composite carries the distributions of the measures it wraps" begin
+        rl = factory(RelativisticValueatRisk(), pr, slv)
+        ev = factory(EntropicValueatRisk(), pr, slv)
+        sd = factory(StandardDeviation(), pr, slv)
+        quot(a, b) = (risk_gradient(a, w, pr) .* expected_risk(b, w, pr) .-
+                      expected_risk(a, w, pr) .* risk_gradient(b, w, pr)) ./
+                     expected_risk(b, w, pr)^2
+        @test isapprox(risk_gradient(RiskRatio(; r1 = rl, r2 = StandardDeviation()), w, pr),
+                       quot(rl, sd); rtol = 1e-6)
+        @test isapprox(risk_gradient(MeanReturnRiskRatio(; rk = rl), w, pr),
+                       quot(MeanReturn(), rl); rtol = 1e-6)
+        top = expected_risk(rl, w, pr) >= expected_risk(ev, w, pr) ? rl : ev
+        nr = NonOptimisationRiskRatio(; r1 = [rl, ev], sca1 = MaxScalariser(),
+                                      r2 = StandardDeviation())
+        @test isapprox(risk_gradient(nr, w, pr), quot(top, sd); rtol = 1e-6)
+        # A ratio of measures with no solve keeps the finite difference of its own figure.
+        r = RiskRatio(; r1 = Variance(), r2 = ConditionalValueatRisk())
+        @test risk_gradient(r, w, pr) ==
+              po.finite_difference_gradient(v -> expected_risk(r, v, pr), w, 1e-6)
+        # The independent tracking measure is the risk of the active weights, so Euler's
+        # theorem holds on them. The finite difference of the measure itself meets failed
+        # solves here, and returns `NaN`.
+        wb = fill(0.2, 5)
+        fees = Fees(; l = fill(0.0004, 5))
+        t = RiskTrackingRiskMeasure(; tr = WeightsTracking(; w = wb), r = rl)
+        @test isapprox(dot(w - wb, risk_gradient(t, w, pr)), expected_risk(t, w, pr);
+                       rtol = 1e-6)
+        @test all(isfinite, risk_gradient(t, w, pr, fees))
+        # An inner measure with no solve keeps the finite difference of the tracking measure.
+        t = RiskTrackingRiskMeasure(; tr = WeightsTracking(; w = wb),
+                                    r = factory(ConditionalValueatRisk(), pr))
+        @test risk_gradient(t, w, pr, fees) ==
+              po.finite_difference_gradient(v -> expected_risk(t, v, pr, fees), w, 1e-6)
+        t = RiskTrackingRiskMeasure(; tr = WeightsTracking(; w = wb), r = sd)
+        @test risk_gradient(t, w, pr, fees) ==
+              po.finite_difference_gradient(v -> expected_risk(t, v, pr, fees), w, 1e-6)
+        t = RiskTrackingRiskMeasure(; tr = WeightsTracking(; w = wb), r = rl,
+                                    alg = DependentVariableTracking())
+        for f in (nothing, fees)
+            gfd = po.finite_difference_gradient(v -> expected_risk(t, v, pr, f), w, 1e-3)
+            @test isapprox(risk_gradient(t, w, pr, f), gfd; rtol = 1e-3)
+        end
+    end
+
+    @testset "the distribution of each programme" begin
+        for (q, v) in ((po.ERM_worst_case(x, slv, 0.05), po.ERM(x, slv, 0.05)),
+                       (po.RRM_worst_case(x, slv, 0.05, 0.3), po.RRM(x, slv, 0.05, 0.3)),
+                       (po.PRM_worst_case(x, slv, 0.2, 1.5), po.PRM(x, slv, 0.2, 1.5)))
+            @test isapprox(sum(q), 1; rtol = 1e-6)
+            @test isapprox(-dot(q, x), v; rtol = 1e-6)
+        end
+        # An observation of weight zero has no probability.
+        for (q, v) in ((po.ERM_worst_case(x, slv, 0.05, ow), po.ERM(x, slv, 0.05, ow)),
+                       (po.RRM_worst_case(x, slv, 0.05, 0.3, ow), po.RRM(x, slv, 0.05, 0.3, ow)),
+                       (po.PRM_worst_case(x, slv, 0.2, 1.5, ow), po.PRM(x, slv, 0.2, 1.5, ow)))
+            @test length(q) == 200 && all(iszero, q[2:2:end])
+            @test isapprox(-dot(q, x), v; rtol = 1e-6)
+        end
+        # Without a programme, the mass sits on the largest loss of positive weight, and a
+        # tie shares it by weight.
+        @test po.ERM_worst_case(x, slv, 0, ow) == po.worst_loss_distribution(x, ow)
+        @test po.PRM_worst_case(x, slv) == po.worst_loss_distribution(x, nothing)
+        @test po.worst_loss_distribution([-0.1, 0.2, -0.1, 0.0], nothing) ==
+              [0.5, 0, 0.5, 0]
+        @test po.worst_loss_distribution([-0.1, 0.2, -0.1, -0.1], [1, 1, 3, 0]) ==
+              [0.25, 0, 0.75, 0]
+        # A failed solve gives no distribution, so the contribution falls back to the
+        # finite difference of the measure itself.
+        bad = Solver(; solver = Clarabel.Optimizer,
+                     settings = Dict("verbose" => false, "max_iter" => 1))
+        @test isnothing(po.ERM_worst_case(x, bad, 0.05))
+        @test isnothing(po.RRM_worst_case(x, bad, 0.05, 0.3))
+        @test isnothing(po.PRM_worst_case(x, bad, 0.2, 1.5))
+        @test isnothing(po.worst_case_distribution(EntropicValueatRiskRange(; slv = bad),
+                                                   x))
+        @test isnothing(po.worst_case_distribution(Variance(), x))
+        @test isnothing(po.worst_case_distribution(Variance(; sigma = cov(X)), w, X,
+                                                   nothing))
+        # The route on the weights checks the slots as `expected_risk` does.
+        @test_throws IsNothingError po.worst_case_distribution(Variance(), w, X, nothing)
+        @test_throws IsEmptyError po.ERM_worst_case(x, Solver[])
+        @test_throws IsEmptyError po.RRM_worst_case(x, Solver[])
+        @test_throws IsEmptyError po.PRM_worst_case(x, Solver[])
     end
 end
 
@@ -1440,4 +1618,65 @@ end
     @test all(r -> isapprox((dot(pr.mu, r.w) - mic(r.w)) / sqrt(dot(r.w, pr.sigma, r.w)),
                             (dot(pr.mu, rmi[1].w) - mic(rmi[1].w)) /
                             sqrt(dot(rmi[1].w, pr.sigma, rmi[1].w)); rtol = 1e-5), rmi)
+end
+
+@testset "NoReturn: the contributions of an expected return beside any fee (#1912)" begin
+    # `risk_contribution` divides a contribution by the degree of homogeneity of the measure.
+    # A `NoReturn` term has degree one beside any fee, a `LogarithmicReturn` has none, and a
+    # vector of terms has none when one of its terms that enters the ratio has none.
+    Xc = 0.01 .* randn(StableRNG(1919), 60, 4) .+ 0.002
+    prc = prior(EmpiricalPrior(), ReturnsResult(; nx = string.('A':'D'), X = Xc))
+    wc = [0.1, 0.2, 0.3, 0.4]
+    fc = Fees(; fl = 0.0001)
+    mu_rc = prc.mu .* wc
+    # The log return has the contribution w_i mean(x_i / (1 + x w)) of its gradient.
+    log_rc = wc .* (Xc' * (1 ./ (1 .+ Xc * wc)) ./ 60)
+    # The arithmetic return has degree one, so its contributions sum to the return.
+    @test isapprox(risk_contribution(ExpectedReturn(), wc, prc), mu_rc)
+    @test isapprox(sum(risk_contribution(ExpectedReturn(), wc, prc)), dot(wc, prc.mu))
+    # `NoReturn` contributes nothing, with and without a fee.
+    nr = ExpectedReturn(; rt = NoReturn())
+    @test risk_contribution(nr, wc, prc) == zeros(4)
+    @test risk_contribution(nr, wc, prc, fc) == zeros(4)
+    # The log return has no degree, so its contribution is left as the gradient gives it.
+    lr = ExpectedReturn(; rt = LogarithmicReturn())
+    @test isapprox(risk_contribution(lr, wc, prc), log_rc; rtol = 1e-6)
+    # A vector adds the contributions of its terms. `NoReturn` adds none, and the log term
+    # leaves the sum unadjusted.
+    @test isapprox(risk_contribution(ExpectedReturn(;
+                                                    rt = [ArithmeticReturn(), NoReturn()]),
+                                     wc, prc), mu_rc)
+    @test isapprox(risk_contribution(ExpectedReturn(;
+                                                    rt = [ArithmeticReturn(),
+                                                          LogarithmicReturn()]), wc, prc),
+                   mu_rc + log_rc; rtol = 1e-6)
+    # A return of degree one and a return of no degree give the same contributions above,
+    # because a division by one changes nothing. Over a variance the ratio has degree
+    # 1 - 2 = -1, or none, so the degree of the return decides the sign of each
+    # contribution (R25 of #1817). The reference is the analytic gradient of the ratio.
+    V = dot(wc, prc.sigma, wc)
+    gV = 2 .* (prc.sigma * wc)
+    ratio_g(f, gf) = gf ./ V .- f .* gV ./ V^2
+    A = dot(prc.mu, wc)
+    L = sum(log1p.(Xc * wc)) / 60
+    gL = Xc' * (1 ./ (1 .+ Xc * wc)) ./ 60
+    rr(rt) = ExpectedReturnRiskRatio(; rt = rt, rk = Variance())
+    nofee = ArithmeticReturn(; settings = JuMPReturnsSettings(; fee = false))
+    # Degree -1: the contributions are the gradient divided by -1, and they sum to the
+    # ratio by Euler's theorem.
+    for (rt, f) in ((ArithmeticReturn(), nothing), (nofee, fc),
+                    ([ArithmeticReturn(), NoReturn()], nothing), ([nofee, NoReturn()], fc))
+        rc = risk_contribution(rr(rt), wc, prc, f)
+        @test isapprox(rc, -wc .* ratio_g(A, prc.mu); rtol = 1e-6)
+        @test isapprox(sum(rc), A / V; rtol = 1e-6)
+    end
+    # No degree: a fixed fee on a term that pays it, or a log return. The contributions are
+    # the gradient unadjusted. The fixed fee of four held assets over 60 observations moves
+    # the value, not the gradient.
+    @test isapprox(risk_contribution(rr(ArithmeticReturn()), wc, prc, fc),
+                   wc .* ratio_g(A - 4 * 0.0001 / 60, prc.mu); rtol = 1e-6)
+    @test isapprox(risk_contribution(rr(LogarithmicReturn()), wc, prc),
+                   wc .* ratio_g(L, gL); rtol = 1e-6)
+    @test isapprox(risk_contribution(rr([ArithmeticReturn(), LogarithmicReturn()]), wc,
+                                     prc), wc .* ratio_g(A + L, prc.mu .+ gL); rtol = 1e-6)
 end

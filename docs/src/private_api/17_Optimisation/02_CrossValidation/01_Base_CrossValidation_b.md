@@ -12,7 +12,6 @@ cv_sequential_info
 parallel_folds
 run_folds
 advance_previous_fold
-folds_are_time_ordered
 fold_evaluation
 folds_are_stepped
 fold_loop

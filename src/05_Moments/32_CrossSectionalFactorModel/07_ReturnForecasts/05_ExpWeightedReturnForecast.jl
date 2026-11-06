@@ -43,7 +43,7 @@ A pair enters the fit when it carries a positive cross-sectional weight, a finit
 
 # Arguments
 
-  - `S`: The Descriptor scores, `observations × assets × descriptors`.
+  - `S`: The Descriptor scores, `assets × descriptors × observations`.
   - `y`: Forward mean idiosyncratic returns, `observations × assets`.
   - `vs`: Idiosyncratic variance history, `observations × assets`.
   - `w`: Cross-sectional weights, `observations × assets`.
@@ -62,8 +62,8 @@ function ew_forecast_valid(S::Arr3Num, y::MatNum, vs::MatNum, w::MatNum)::BitMat
     valid = falses(size(w))
     for idx in CartesianIndices(valid)
         ok = w[idx] > zero(w[idx]) && isfinite(y[idx]) && zero(vs[idx]) < vs[idx] < Inf
-        for k in axes(S, 3)
-            ok &= isfinite(S[idx, k])
+        for k in axes(S, 2)
+            ok &= isfinite(S[idx[2], k, idx[1]])
         end
         valid[idx] = ok
     end
@@ -75,11 +75,11 @@ end
 
 Gather the design, the target and the weights of one observation of an [`ExpWeightedReturnForecast`](@ref).
 
-The function copies the three arrays into their promoted element type, so the accumulation reads one number type.
+The function copies the rows of the valid assets. Each array keeps its own element type.
 
 # Arguments
 
-  - `S`: The Descriptor scores, `observations × assets × descriptors`.
+  - `S`: The Descriptor scores, `assets × descriptors × observations`.
   - `y`: The target in the Forecast Unit, `observations × assets`.
   - `W`: Regression weights, `observations × assets`.
   - `t`: Index of the observation.
@@ -97,9 +97,8 @@ The function copies the three arrays into their promoted element type, so the ac
 """
 function ew_forecast_design(S::Arr3Num, y::MatNum, W::MatNum, t::Integer,
                             valid::AbstractMatrix{Bool})
-    Tf = promote_type(real(eltype(S)), real(eltype(y)), real(eltype(W)))
     idx = findall(view(valid, t, :))
-    return Tf.(view(S, t, idx, :)), Tf.(view(y, t, idx)), Tf.(view(W, t, idx))
+    return S[idx, :, t], y[t, idx], W[t, idx]
 end
 """
     ew_forecast_accumulate!(A::AbstractMatrix{<:Real}, c::AbstractVector{<:Real},
@@ -154,7 +153,7 @@ Solve the ridge stabilised normal equations of an [`ExpWeightedReturnForecast`](
 # Algorithm
 
  1. When `ridge` is positive, add `ridge` times the mean absolute diagonal entry of `A` to that diagonal, with the floor `eps` on the mean, so an empty normal matrix still gets a positive penalty.
- 2. Solve through [`cross_sectional_solve`](@ref) under [`PseudoInverseFallback`](@ref), which takes the plain solve on a full rank matrix and the minimum-norm solution on a rank deficient one.
+ 2. Solve through [`cross_sectional_solve`](@ref) under [`PseudoInverseFallback`](@ref), which takes the plain solve on a full rank matrix and the minimum-norm solution on a rank deficient one, and keep its factor returns. The normal matrix is square, so the residual count of the solve has no meaning here.
 
 # Arguments
 
@@ -188,7 +187,7 @@ function ew_forecast_solve(A::MatNum, c::VecNum, ridge::Real, t::Integer)::VecNu
             Ar[k, k] += r
         end
     end
-    return cross_sectional_solve(PseudoInverseFallback(), Ar, c, t)
+    return cross_sectional_solve(PseudoInverseFallback(), Ar, c, t).f
 end
 """
     ew_forecast_state(fs::Nothing, Td::Type, K::Integer) -> NamedTuple
@@ -236,7 +235,7 @@ The forecast at observation `t` uses the coefficients estimated from the targets
 
 # Arguments
 
-  - `S`: The Descriptor scores, `observations × assets × descriptors`.
+  - `S`: The Descriptor scores, `assets × descriptors × observations`.
   - `coefs`: The coefficient history, `trainable observations × descriptors`.
   - `gap`: `lag + horizon - 1`, the number of observations a target takes to mature.
 
@@ -252,12 +251,12 @@ The forecast at observation `t` uses the coefficients estimated from the targets
 """
 function ew_forecast_history(S::Arr3Num, coefs::MatNum, gap::Integer)::Matrix{<:Real}
     Tf = promote_type(real(eltype(S)), real(eltype(coefs)))
-    T = size(S, 1)
-    H = fill(Tf(NaN), T, size(S, 2))
-    for t in (gap + 1):T, i in axes(S, 2)
+    T = size(S, 3)
+    H = fill(Tf(NaN), T, size(S, 1))
+    for t in (gap + 1):T, i in axes(S, 1)
         h = zero(Tf)
-        for k in axes(S, 3)
-            h += S[t, i, k] * coefs[t - gap, k]
+        for k in axes(S, 2)
+            h += S[i, k, t] * coefs[t - gap, k]
         end
         H[t, i] = h
     end
@@ -271,6 +270,8 @@ A Return Forecast that fits its Descriptor weights by exponentially weighted lea
 The member turns its Descriptors into scores with the recipe in `scores`. It regresses the forward mean idiosyncratic return of every observation on those scores across the assets. It combines the normal equations of the observations under an exponential decay and does not solve them one at a time, so the coefficients carry the whole history and move slowly. The fit has no intercept, so the forecast absorbs no cross-sectional mean and suits a long-short caller.
 
 The Forecast Unit chooses the pair of target and weights. In the return unit the target is the forward return and the weights are the inverse idiosyncratic variance, which is a generalised least squares. In the Sharpe unit the target is the forward return divided by the idiosyncratic volatility and the weights are the estimation mask. That is the same estimator written as an ordinary least squares, and the member multiplies the forecast by the idiosyncratic volatility at the end.
+
+[grinoldkahn1999](@citet) states the forecast as the volatility of the asset times a coefficient times its score, and Chapter 10 of that work refines a raw score into a forecast of the return by regression. The exponential accumulation of the normal equations, the ridge and the two Forecast Units are this library's own, and no earlier source for them was found.
 
 # Mathematical definition
 
@@ -349,6 +350,7 @@ ExpWeightedReturnForecast
             │           cre ┼ CrossSectionalLinearRegression
             │               │         alg ┼ PseudoInverseFallback()
             │               │   intercept ┼ Bool: true
+            │               │    leverage ┼ Bool: true
             │               │          ex ┴ Transducers.ThreadedEx{@NamedTuple{}}: Transducers.ThreadedEx()
             │       outlier ┼ CrossSectionalWinsoriser
             │               │    low ┼ Float64: 0.01
@@ -379,7 +381,7 @@ ExpWeightedReturnForecast
 
 # References
 
-  - $(ref_dict[:grinoldkahn1999])
+  - $(ref_dict[:grinoldkahn1999]) Chapter 10. $(ref_dict[:no_original_source])
 """
 @concrete struct ExpWeightedReturnForecast <: AbstractReturnForecastEstimator
     """
@@ -603,7 +605,7 @@ The fold state `fs` holds the normal equations `A` and `c`, the count `n` of the
 function return_forecast_step(rfe::ExpWeightedReturnForecast, P::NamedTuple,
                               csfm::CrossSectionalFactorModel,
                               fs::Option{<:NamedTuple})::NamedTuple
-    Sb = descriptor_neutralised_scores(rfe.scores, P, csfm, axes(P.S, 1))
+    Sb = descriptor_neutralised_scores(rfe.scores, P, csfm, axes(P.S, 3))
     emsk::MatNum = P.w
     vs = forecast_idiosyncratic_variances(csfm)
     fwd = forward_mean_returns(forecast_idiosyncratic_returns(csfm), rfe.horizon, rfe.lag)
@@ -611,7 +613,7 @@ function return_forecast_step(rfe::ExpWeightedReturnForecast, P::NamedTuple,
     W = ew_forecast_weights(rfe.unit, emsk, vs)
     valid = ew_forecast_valid(Sb, fwd, vs, emsk)
     T = size(emsk, 1)
-    K = size(Sb, 3)
+    K = size(Sb, 2)
     gap = forecast_target_gap(rfe)
     # The state holds the decay and the ridge as well as the data, so a hyperparameter of a
     # wider type widens the state and is not truncated into the type of the data.

@@ -359,7 +359,7 @@ separate. The cell below crosses four decays against two separations.
 separations = ["HopCount(; n = 2)" => HopCount(; n = 2),
                "PathLength(; dmax = 1.0)" => PathLength(; dmax = 1.0)]
 decays = ["LinearDecay()" => LinearDecay(), "ExponentialDecay()" => ExponentialDecay(),
-          "ReciprocalDecay()" => ReciprocalDecay(), "NoDecay()" => NoDecay()]
+          "ReciprocalDecay()" => ReciprocalDecay(), "nothing" => nothing]
 
 function graph_panel(sep, decay)
     ape = PhylogenyPanel(; pl = NetworkEstimator(; sep = sep),
@@ -397,7 +397,7 @@ Compare the table column by column rather than row by row.
     pairing it does not.
   - **`ARI vs correlation` moves with both settings.** The decay changes the distance, and it
     changes the clusters that come out of it.
-  - **[`NoDecay`](@ref) does not mean no truncation.** The budget still cuts, so the field is `1`
+  - **`decay = nothing` does not mean no truncation.** The budget still cuts, so the field is `1`
     inside the budget and `0` outside it, which is an indicator of the neighbourhood rather than a
     matrix of ones. It is also the only decay under which the two separations score the same
     against the correlation cut. An indicator keeps only the support, and the `Related pairs`
@@ -489,12 +489,13 @@ println("S is cos(πD): ", S_fea ≈ cos.(π .* D_fea))
 ## 6. Both shapes: static and time-varying
 
 A panel is static or time-varying, and the whole panel is one shape. A static panel carries no
-mask, and every field is `assets` or `assets × labels`. A time-varying panel leads every field
-with an observation axis, and carries two `observations × assets` masks of `true` and `false`
-beside the fields. The active mask marks when each asset was in the universe, and the
+mask, and every field is `assets` or `assets × labels`. A time-varying panel adds an
+observation axis to every field, and carries two `observations × assets` masks of `true` and
+`false` beside the fields. The active mask marks when each asset was in the universe, and the
 estimation mask marks the active cells a fit may use.
 [`feature_matrix`](@ref) follows the shape. A static panel stacks to `assets × features`, and a
-time-varying one to `observations × assets × features`.
+time-varying one to `assets × features × observations`. The observations are the last axis, so
+the matrix of one observation, `Ztv[:, :, t]`, is one contiguous block.
 
 A time-varying matrix must give one distance matrix, and the `alg` field says how. The library
 ships four collapse rules, and you can write your own.
@@ -517,15 +518,14 @@ pnl_tv = asset_panel([NumericPanelInput(; name = "volatility", vals = Zvol),
                       NumericPanelInput(; name = "momentum", vals = Zmom)])
 Ztv = feature_matrix(pnl_tv)
 
-collapses = ["LastObservation()" => LastObservation(),
-             "AggregateFeatures()" => AggregateFeatures(),
+collapses = ["LastRow()" => LastRow(), "AggregateFeatures()" => AggregateFeatures(),
              "AggregateDistances()" => AggregateDistances(),
              "StackObservations()" => StackObservations()]
 
 collapse_rows = DataFrame()
 for (cname, alg) in collapses
     Dc = distance(FeatureDistance(; alg = alg), Ztv; dims = 1)
-    D1 = distance(FeatureDistance(; alg = alg), reshape(Ztv[end, :, :], 1, N, 2); dims = 1)
+    D1 = distance(FeatureDistance(; alg = alg), reshape(Ztv[:, :, end], N, 2, 1); dims = 1)
     append!(collapse_rows,
             DataFrame("Collapse" => cname, "Mean distance" => round(mean(Dc); digits = 4),
                       "Maximum distance" => round(maximum(Dc); digits = 4),
@@ -537,7 +537,7 @@ pretty_table(collapse_rows;
 #=
 The four rules give four different answers.
 
-  - [`LastObservation`](@ref), the default, uses the most recent slice and ignores the rest.
+  - [`LastRow`](@ref), the default, uses the most recent slice and ignores the rest.
   - [`AggregateFeatures`](@ref) averages the features first, then measures the distance once.
   - [`AggregateDistances`](@ref) measures each period, then averages the distance matrices. Its
     constructor refuses [`MedianCollapse`](@ref), because a convex combination of metrics is a
@@ -563,8 +563,9 @@ plot([distance(FeatureDistance(; alg = alg), Ztv; dims = 1)[1, :] for (_, alg) i
 
 A panel is one shape throughout, so a static input that joins a time-varying one gains an
 observation axis.
-[`asset_panel`](@ref) wraps its values in a [`RepeatedLeading`](@ref), which stores them once and
-indexes a leading observation axis. A classification that never moves therefore costs its own
+[`asset_panel`](@ref) wraps its values in a [`RepeatedObservations`](@ref), which stores them once
+and adds the observation axis where [`observation_axis`](@ref) puts it: first for a lifted vector,
+last for a lifted matrix. A classification that never moves therefore costs its own
 memory beside characteristics that move every day, rather than its own memory times the
 observation count.
 =#
@@ -574,7 +575,7 @@ pnl_mixed = asset_panel([panel_input(sets, taxonomy);
                          NumericPanelInput(; name = "momentum", vals = Zmom)])
 
 held(f) = isa(f, CategoricalPanelField) ? f.codes : f.vals
-stored(v) = isa(v, PortfolioOptimisers.RepeatedLeading) ? length(v.parent) : length(v)
+stored(v) = isa(v, PortfolioOptimisers.RepeatedObservations) ? length(v.parent) : length(v)
 
 pretty_table(DataFrame("Field" => [f.name for f in pnl_mixed.pf],
                        "Values type" =>
@@ -839,7 +840,7 @@ Two settings close the gap, and each is one keyword.
 
   - State a numeric `dmax`, which fixes the budget and the scale across every fold.
   - Use a decay that pins `f(0) = 1`, which is [`ExponentialDecay`](@ref),
-    [`ReciprocalDecay`](@ref) or [`NoDecay`](@ref). None of the three reads the budget as a scale.
+    [`ReciprocalDecay`](@ref) or `nothing`. None of the three reads the budget as a scale.
 
 ## 9. A walk-forward backtest
 

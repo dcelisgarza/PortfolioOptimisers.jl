@@ -329,7 +329,7 @@ The two lines are different operations. The first repeats the coefficient on eve
   - `bl_flag`: Selects which of the two expansions above runs. `false` takes the first, which constrains the sum over the group. `true` takes the second, the Black-Litterman-style expansion, which constrains the mean.
   - `ep_flag`: If `true`, the function expands `prior(...)` expressions, for entropy pooling.
   - `rho_flag`: If `true`, the function expands correlation views `(A, B)`, for entropy pooling.
-  - `ledger`: The Departure Ledger of the entry of the fit, or `nothing` when nobody is collecting. A shed group is recorded into it through [`record_group_shed!`](@ref).
+  - $(arg_dict[:ledger]) A shed group is recorded into it through [`record_group_shed!`](@ref).
 
 # Validation
 
@@ -662,14 +662,14 @@ The function drops whole rows and never single terms. A row is one statement ove
   - `datatype`: Numeric type for coefficients and right-hand side.
   - `strict`: If `true`, a variable name that the universe does not hold throws. If `false`, it warns.
   - `rr`: Loadings to re-base through, or `nothing` for an ordinary asset-space constraint. Callers do not pass it directly, and [`ExposureConstraintEstimator`](@ref) passes it.
-  - `ledger`: The Departure Ledger of the entry of the fit, or `nothing` when nobody is collecting. A row dropped for a name on the counterpart axis is recorded into it through [`record_non_investable_drop!`](@ref).
+  - $(arg_dict[:ledger]) A row dropped for a name on the counterpart axis is recorded into it through [`record_non_investable_drop!`](@ref).
 
 # Validation
 
   - `lcs` is non-empty, when it is a vector.
   - A variable name that matches no entry of the universe and none of the counterpart axis raises when `strict` is `true`, and issues a warning otherwise. The row is dropped either way.
   - A variable name on the counterpart axis drops its row in silence, under both settings of `strict`.
-  - A row whose terms all fall away raises when `strict` is `true`, and issues a warning otherwise. The row is dropped either way.
+  - A row whose terms all fall away raises an [`IsZeroError`](@ref) when `strict` is `true`, and issues a warning otherwise. The row is dropped either way.
   - Each `op` is one of `"=="`, `"<="` or `">="`, which [`comparison_sign_ineq_flag`](@ref) enforces.
 
 # Returns
@@ -722,7 +722,7 @@ function get_linear_constraints(lcs::PR_VecPR, sets::UniverseSets,
                 if v ∉ other
                     msg = unknown_variable_msg(v, nx, k; axis = axis,
                                                consequence = "row dropped")
-                    strict_diagnostic(msg, strict)
+                    strict_diagnostic(msg, strict; id = @log_id(v, k))
                 elseif !dropped
                     # Once per row, not once per departed name in it: the row is the unit
                     # that went, and `ni` already names every asset that left.
@@ -746,7 +746,7 @@ function get_linear_constraints(lcs::PR_VecPR, sets::UniverseSets,
             else
                 empty_row_msg(lc.eqn, nx, k; axis = axis)
             end
-            strict_diagnostic(msg, strict)
+            strict_diagnostic(msg, strict; id = @log_id(lc.eqn, k), exception = IsZeroError)
             continue
         end
         d, flag = comparison_sign_ineq_flag(lc.op)
@@ -829,7 +829,8 @@ LinearConstraint
 
 # References
 
-  - $(ref_dict[:cajas2025]) Section 9.1.
+  - $(ref_dict[:markowitz1955]) Section 0.1, Equations 1 and 2.
+  - $(ref_dict[:cajas2025]) Section 9.1, Equations 9.2 to 9.5. It adds the rows written over groups of assets and the relative rows between two assets or groups.
 """
 @concrete struct LinearConstraintEstimator <: AbstractConstraintEstimator
     """
@@ -856,7 +857,7 @@ function LinearConstraintEstimator(; val::EqnType,
     return LinearConstraintEstimator(val, key)
 end
 """
-    const LcE_Lc = Union{<:LinearConstraintEstimator, <:LinearConstraint}
+    const LcE_Lc = Union{LinearConstraintEstimator, LinearConstraint}
 
 An unparsed [`LinearConstraintEstimator`](@ref), or an assembled [`LinearConstraint`](@ref). The group exists because a constraint slot accepts both. [`linear_constraints`](@ref) parses the first and returns the second unchanged, so a caller can give equations or a block that it built earlier.
 
@@ -866,7 +867,7 @@ An unparsed [`LinearConstraintEstimator`](@ref), or an assembled [`LinearConstra
   - [`LinearConstraint`](@ref)
   - [`linear_constraints`](@ref)
 """
-const LcE_Lc = Union{<:LinearConstraintEstimator, <:LinearConstraint}
+const LcE_Lc = Union{LinearConstraintEstimator, LinearConstraint}
 """
     const VecLcE_Lc = AbstractVector{<:LcE_Lc}
 
@@ -893,7 +894,7 @@ Every abstract vector whose elements are [`LinearConstraintEstimator`](@ref)s. T
 """
 const VecLcE = AbstractVector{<:LinearConstraintEstimator}
 """
-    const LcE_Lc_VecLcE_Lc = Union{<:LcE_Lc, <:VecLcE_Lc}
+    const LcE_Lc_VecLcE_Lc = Union{LcE_Lc, VecLcE_Lc}
 
 One [`LcE_Lc`](@ref), or a vector of them. It is the widest linear-constraint group that the library declares. It names every shape that a user can write into a linear-constraint field, so the type bound of that field uses it.
 
@@ -903,9 +904,9 @@ One [`LcE_Lc`](@ref), or a vector of them. It is the widest linear-constraint gr
   - [`VecLcE_Lc`](@ref)
   - [`linear_constraints`](@ref)
 """
-const LcE_Lc_VecLcE_Lc = Union{<:LcE_Lc, <:VecLcE_Lc}
+const LcE_Lc_VecLcE_Lc = Union{LcE_Lc, VecLcE_Lc}
 """
-    const LcE_VecLcE = Union{<:LinearConstraintEstimator, <:VecLcE}
+    const LcE_VecLcE = Union{LinearConstraintEstimator, VecLcE}
 
 One [`LinearConstraintEstimator`](@ref), or a vector of them. The group excludes an assembled [`LinearConstraint`](@ref), so a method that dispatches on it knows that every element still carries equations to parse.
 
@@ -916,7 +917,7 @@ One [`LinearConstraintEstimator`](@ref), or a vector of them. The group excludes
   - [`LcE_Lc`](@ref)
   - [`linear_constraints`](@ref)
 """
-const LcE_VecLcE = Union{<:LinearConstraintEstimator, <:VecLcE}
+const LcE_VecLcE = Union{LinearConstraintEstimator, VecLcE}
 """
     linear_constraints(lcs::Option{<:LinearConstraint}, args...; kwargs...)
     linear_constraints(lcs::AbstractVector{<:LinearConstraint}, ::Nothing, args...; kwargs...)

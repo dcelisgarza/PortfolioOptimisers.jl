@@ -489,7 +489,7 @@ A [`Regression`](@ref) fits one loadings matrix over the whole sample, so it alw
 
 # Returns
 
-  - `Ms::Union{<:MatNum, <:Arr3Num}`: The exposure history `observations × assets × factors`, or the static loadings `assets × factors`.
+  - `Ms::Union{MatNum, Arr3Num}`: The exposure history `assets × factors × observations`, or the static loadings `assets × factors`.
 
 # Related
 
@@ -580,7 +580,7 @@ A realised [`factor_attribution`](@ref) of a cross-validation reads it to find t
 function attribution_row_key(::AbstractLoadingsRegressionResult)
     return (; idx = nothing, ts = nothing)
 end
-function attribution_row_key(rr::Union{<:CrossSectionalFactorModel, <:Regression})
+function attribution_row_key(rr::Union{CrossSectionalFactorModel, Regression})
     return (; idx = rr.idx, ts = rr.ts)
 end
 """
@@ -871,7 +871,7 @@ In order to implement a new rule for an unknown entry which will work seamlessly
   - `w`: Portfolio weights.
   - `W`: Portfolio weights, or the weight history, `observations × assets`.
   - `M`: Loadings, `assets × factors`.
-  - `B`: Loadings, or the exposure history, `observations × assets × factors`.
+  - `B`: Loadings, or the exposure history, `assets × factors × observations`. Earlier releases held the observations of the history on its first axis. A method written for them reads `B[t, :, :]`, and it must now read `B[:, :, t]`, or the slice that `attribution_slice(B, t)` gives.
 
 ### Returns
 
@@ -1103,7 +1103,7 @@ function attribution_investable_diagnostic(held::AbstractVector{<:Integer},
         return nothing
     end
     strict_diagnostic("a factor attribution cannot decompose a holding in an asset the prior could not estimate. Assets $(held) are not investable, and $(holder). $(note). Pass `strict = true` to refuse instead, reduce the weights to the investable universe, or refit the prior over a history that covers these assets.",
-                      strict)
+                      strict; id = @log_id(holder, note))
     return nothing
 end
 """
@@ -1536,7 +1536,7 @@ The three components sum to the total: ``\\sum_{C} \\mathrm{VC}_{C} = \\sqrt{p}\
   - `pred`: Multi-period prediction result whose folds give the weight history, the return series and the row key of each observation.
   - `ppred`: Population prediction result, whose paths are each attributed as a `pred`.
   - `args`: The positional `window` of a rolling attribution, or nothing.
-  - `B`: Loadings, `assets × factors`, or on the realised side the exposure history, `observations × assets × factors`. A `NaN` row marks an asset the model does not state.
+  - `B`: Loadings, `assets × factors`, or on the realised side the exposure history, `assets × factors × observations`. A `NaN` row marks an asset the model does not state.
   - `F`: Factor covariance, `factors × factors`.
   - `d`: Idiosyncratic variances, `assets`, or the idiosyncratic covariance, `assets × assets`.
   - `mu_f`: Expected factor returns, or `nothing` for zeros.
@@ -1640,7 +1640,7 @@ The exposures, the factor returns and the idiosyncratic returns are the model, s
 
 # Arguments
 
-  - `B`: Loadings, `assets × factors`, or the exposure history, `observations × assets × factors`.
+  - `B`: Loadings, `assets × factors`, or the exposure history, `assets × factors × observations`.
   - `f`: Factor returns, `observations × factors`.
   - `eps`: Idiosyncratic returns, `observations × assets`.
   - `lag`: Number of observations by which the exposures lag the returns.

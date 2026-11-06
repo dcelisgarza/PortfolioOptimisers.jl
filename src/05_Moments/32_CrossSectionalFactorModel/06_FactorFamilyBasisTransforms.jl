@@ -69,15 +69,15 @@ Where:
 # Arguments
 
   - `fcb`: A Factor Family Basis.
-  - `Ms::Arr3Num`: Exposure history on the raw axis, `observations × assets × factors`.
+  - `Ms::Arr3Num`: Exposure history on the raw axis, `assets × factors × observations`.
 
 # Validation
 
-  - `size(Ms, 3) == fcb.K`, and `size(Ms, 1)` matches the observation axis of the basis.
+  - `size(Ms, 2) == fcb.K`, and `size(Ms, 3)` matches the observation axis of the basis.
 
 # Returns
 
-  - `Ms::Array{<:Real, 3}`: The exposure history on the reduced axis, `observations × assets × reduced factors`.
+  - `Ms::Array{<:Real, 3}`: The exposure history on the reduced axis, `assets × reduced factors × observations`.
 
 # Related
 
@@ -85,21 +85,21 @@ Where:
   - [`reduce_loadings`](@ref)
 """
 function reduce_exposures(fcb::FactorFamilyBasis, Ms::Arr3Num)
-    assert_factor_axis_length(size(Ms, 3), fcb.K, :Ms)
-    assert_factor_basis_obs(size(Ms, 1), fcb, :Ms)
+    assert_factor_axis_length(size(Ms, 2), fcb.K, :Ms)
+    assert_factor_basis_obs(size(Ms, 3), fcb, :Ms)
     Tf = promote_type(real(eltype(Ms)), real(eltype(fcb.ratios)))
-    T, N, _ = size(Ms)
+    N, _, T = size(Ms)
     ret = retained_factor_indices(fcb)
-    Y = Array{Tf, 3}(undef, T, N, length(ret))
-    for k in eachindex(ret), i in 1:N, t in 1:T
-        Y[t, i, k] = Tf(Ms[t, i, ret[k]])
+    Y = Array{Tf, 3}(undef, N, length(ret), T)
+    for t in 1:T, k in eachindex(ret), i in 1:N
+        Y[i, k, t] = Tf(Ms[i, ret[k], t])
     end
     for j in eachindex(fcb.fnm)
         raw, red, col = family_retained_indices(fcb, j)
         d = fcb.fi[j][fcb.di[j]]
-        for p in eachindex(raw), i in 1:N, t in 1:T
-            Y[t, i, red[p]] = Tf(Ms[t, i, raw[p]]) -
-                              Tf(fcb.ratios[t, col[p]]) * Tf(Ms[t, i, d])
+        for t in 1:T, p in eachindex(raw), i in 1:N
+            Y[i, red[p], t] = Tf(Ms[i, raw[p], t]) -
+                              Tf(fcb.ratios[t, col[p]]) * Tf(Ms[i, d, t])
         end
     end
     return Y
@@ -131,7 +131,7 @@ Where:
 # Arguments
 
   - `fcb`: A Factor Family Basis.
-  - `M::MatNum_Arr3Num`: Loading matrix on the raw axis, `assets × factors`, or a stack of them, `observations × assets × factors`.
+  - `M::MatNum_Arr3Num`: Loading matrix on the raw axis, `assets × factors`, or a stack of them, `assets × factors × observations`.
   - `t::Integer`: Observation whose ratios the function applies to a matrix. It defaults to the last observation of the basis.
 
 # Validation
@@ -333,7 +333,7 @@ Where:
 # Arguments
 
   - `fcb`: A Factor Family Basis.
-  - `sigma::MatNum_Arr3Num`: Factor covariance on the raw axis, `factors × factors`, or a stack of them, `observations × factors × factors`.
+  - `sigma::MatNum_Arr3Num`: Factor covariance on the raw axis, `factors × factors`, or a stack of them, `factors × factors × observations`.
 
 # Validation
 
@@ -355,10 +355,10 @@ function reduce_factor_covariance(fcb::FactorFamilyBasis, sigma::MatNum)
     return sigma[ret, ret]
 end
 function reduce_factor_covariance(fcb::FactorFamilyBasis, sigma::Arr3Num)
+    assert_factor_axis_length(size(sigma, 1), fcb.K, :sigma)
     assert_factor_axis_length(size(sigma, 2), fcb.K, :sigma)
-    assert_factor_axis_length(size(sigma, 3), fcb.K, :sigma)
     ret = retained_factor_indices(fcb)
-    return sigma[:, ret, ret]
+    return sigma[ret, ret, :]
 end
 """
     dropped_factor_weights(fcb::FactorFamilyBasis, t::Integer)
@@ -397,7 +397,7 @@ Where:
 
 # Returns
 
-  - `W::Array{<:Real}`: The reconstruction weights, `constrained families × reduced factors`, or without `t` the stack of them, `observations × constrained families × reduced factors`.
+  - `W::Array{<:Real}`: The reconstruction weights, `constrained families × reduced factors`, or without `t` the stack of them, `constrained families × reduced factors × observations`.
 
 # Related
 
@@ -418,9 +418,9 @@ function dropped_factor_weights(fcb::FactorFamilyBasis, t::Integer)
 end
 function dropped_factor_weights(fcb::FactorFamilyBasis)
     T = size(fcb.ratios, 1)
-    W = zeros(real(eltype(fcb.ratios)), T, length(fcb.fnm), reduced_factor_count(fcb))
+    W = zeros(real(eltype(fcb.ratios)), length(fcb.fnm), reduced_factor_count(fcb), T)
     for t in 1:T
-        W[t, :, :] = dropped_factor_weights(fcb, t)
+        W[:, :, t] = dropped_factor_weights(fcb, t)
     end
     return W
 end
@@ -609,7 +609,7 @@ Where:
 # Arguments
 
   - `fcb`: A Factor Family Basis.
-  - `sigma::MatNum_Arr3Num`: Factor covariance on the reduced axis, `reduced factors × reduced factors`, or a stack of them, `observations × reduced factors × reduced factors`.
+  - `sigma::MatNum_Arr3Num`: Factor covariance on the reduced axis, `reduced factors × reduced factors`, or a stack of them, `reduced factors × reduced factors × observations`.
   - `t::Integer`: Observation whose ratios the function applies to a matrix. It defaults to the last observation of the basis.
 
 # Validation
@@ -628,17 +628,15 @@ julia> fcb = FactorFamilyBasis(; fnm = [\"ind\"], fi = [[2, 3]], di = [2],
 
 julia> V = cat([1.0 0.0; 0.0 1.0], [1.0 0.0; 0.0 4.0]; dims = 3);
 
-julia> V = permutedims(V, (3, 1, 2));
-
 julia> S = PortfolioOptimisers.expand_factor_covariance(fcb, V);
 
-julia> S[1, :, :]
+julia> S[:, :, 1]
 3×3 Matrix{Float64}:
  1.0   0.0   0.0
  0.0   1.0  -0.5
  0.0  -0.5   0.25
 
-julia> S[2, :, :] == PortfolioOptimisers.expand_factor_covariance(fcb, V[2, :, :], 2)
+julia> S[:, :, 2] == PortfolioOptimisers.expand_factor_covariance(fcb, V[:, :, 2], 2)
 true
 ```
 
@@ -676,12 +674,12 @@ function expand_factor_covariance(fcb::FactorFamilyBasis, sigma::MatNum,
     return raw
 end
 function expand_factor_covariance(fcb::FactorFamilyBasis, sigma::Arr3Num)
-    assert_factor_basis_obs(size(sigma, 1), fcb, :sigma)
+    assert_factor_basis_obs(size(sigma, 3), fcb, :sigma)
     Tf = promote_type(real(eltype(sigma)), real(eltype(fcb.ratios)))
-    T = size(sigma, 1)
-    raw = Array{Tf, 3}(undef, T, fcb.K, fcb.K)
+    T = size(sigma, 3)
+    raw = Array{Tf, 3}(undef, fcb.K, fcb.K, T)
     for t in 1:T
-        raw[t, :, :] = expand_factor_covariance(fcb, view(sigma, t, :, :), t)
+        raw[:, :, t] = expand_factor_covariance(fcb, view(sigma, :, :, t), t)
     end
     return raw
 end
@@ -817,7 +815,7 @@ Where:
 
   - `rule`: The Unseen Member rule.
   - `fcb`: The Factor Family Basis of the lagged exposures, one row per observation of `Zl`, or `nothing` without a constrained Factor Family.
-  - `B`: Lagged exposures on the raw axis, `observations × assets × factors`.
+  - `B`: Lagged exposures on the raw axis, `assets × factors × observations`.
   - `Zl`: Lagged exposures on the reduced axis, which `fcb` gives from `B`.
   - `W`: Cross-sectional weights matrix `observations × assets`. The pairs of positive weight are the sample of each observation, as [`cross_sectional_design_mask`](@ref) states it. The fit passes the weights it regresses with, and a consumer of a [`CrossSectionalFactorModel`](@ref) passes the stored weights `rw`.
 
@@ -828,7 +826,7 @@ Where:
 
 # Returns
 
-  - `Z::Arr3Num`: The design to regress on: `Zl`, with `Zl[t, :, :] * P` at each observation in `P`.
+  - `Z::Arr3Num`: The design to regress on: `Zl`, with `Zl[:, :, t] * P` at each observation in `P`.
   - `P`: One `t => P_t` pair per observation that the function changes. It is empty when the function changes none, and `()` without a basis or under [`SolvedUnseenMember`](@ref).
 
 # Related
@@ -850,15 +848,15 @@ function unseen_member_design(::SolvedUnseenMember, ::FactorFamilyBasis, ::Arr3N
 end
 function unseen_member_design(::ZeroUnseenMember, fcb::FactorFamilyBasis, B::Arr3Num,
                               Zl::Arr3Num, W::MatNum)
-    assert_factor_axis_length(size(B, 3), fcb.K, :B)
-    assert_factor_basis_obs(size(B, 1), fcb, :B)
-    @argcheck(size(W) == (size(B, 1), size(B, 2)),
-              DimensionMismatch("W ($(size(W, 1))×$(size(W, 2))) must match B ($(size(B, 1))×$(size(B, 2))) on the observation and asset axes"))
+    assert_factor_axis_length(size(B, 2), fcb.K, :B)
+    assert_factor_basis_obs(size(B, 3), fcb, :B)
+    @argcheck(size(W) == (size(B, 3), size(B, 1)),
+              DimensionMismatch("W ($(size(W, 1))×$(size(W, 2))) must match B ($(size(B, 1))×$(size(B, 2))×$(size(B, 3))) on the observation and asset axes"))
     act = W .> zero(eltype(W))
-    Tp = float_if_integer(real(eltype(fcb.ratios)))
+    Tp = real(eltype(fcb.ratios))
     P = Pair{Int, Matrix{Tp}}[]
-    for t in axes(B, 1)
-        Pt = unseen_member_change(fcb, view(B, t, :, :), view(act, t, :), t)
+    for t in axes(B, 3)
+        Pt = unseen_member_change(fcb, view(B, :, :, t), view(act, t, :), t)
         if !isnothing(Pt)
             push!(P, t => Pt)
         end
@@ -870,8 +868,8 @@ function unseen_member_design(::ZeroUnseenMember, fcb::FactorFamilyBasis, B::Arr
     copyto!(Z, Zl)
     # A product over views of an open element type is opaque to the analysis, so the rows that
     # change take a loop of scalar products.
-    for (t, Pt) in P, k in axes(Pt, 2), i in axes(Z, 2)
-        Z[t, i, k] = sum(j -> Zl[t, i, j] * Pt[j, k], axes(Pt, 1))
+    for (t, Pt) in P, k in axes(Pt, 2), i in axes(Z, 1)
+        Z[i, k, t] = sum(j -> Zl[i, j, t] * Pt[j, k], axes(Pt, 1))
     end
     return (; Z = Z, P = P)
 end
@@ -900,7 +898,7 @@ A family needs a change when the sample does not see its dropped member, or when
 """
 function unseen_member_change(fcb::FactorFamilyBasis, Bt::MatNum, at::AbstractVector{Bool},
                               t::Integer)
-    Tp = float_if_integer(real(eltype(fcb.ratios)))
+    Tp = real(eltype(fcb.ratios))
     seen(i) = any(n -> at[n] && !iszero(Bt[n, i]), eachindex(at))
     Pt = nothing
     for j in eachindex(fcb.fnm)
@@ -987,8 +985,8 @@ function unseen_member_returns(csr::CrossSectionalRegression, P)
     for (t, Pt) in P
         LinearAlgebra.mul!(view(f, t, :), Pt, view(csr.f, t, :))
     end
-    return CrossSectionalRegression(; f = f, eps = csr.eps, n = csr.n, b = csr.b,
-                                    h1 = csr.h1, dc = csr.dc, lv = csr.lv)
+    return CrossSectionalRegression(; f = f, eps = csr.eps, n = csr.n, edof = csr.edof,
+                                    b = csr.b, h1 = csr.h1, dc = csr.dc, lv = csr.lv)
 end
 """
 $(DocStringExtensions.TYPEDSIGNATURES)
@@ -1030,7 +1028,7 @@ Under [`DependentColumnDrop`](@ref) the fit of an observation solves the columns
 
 # Arguments
 
-  - `B`: The design of the regression, `observations × assets × factors`, from [`cs_regression_data`](@ref).
+  - `B`: The design of the regression, `assets × factors × observations`, from [`cs_regression_data`](@ref).
   - `P`: The `t => P_t` pairs on the rows of `B`.
   - `dc`: The dropped-column mask `observations × factors` on the rows of `B`, or `nothing`.
 
@@ -1052,16 +1050,16 @@ function cs_dropped_design(B::Arr3Num, P, dc::AbstractMatrix{Bool})
     if !any(dc)
         return (; B = B, P = P)
     end
-    K = size(B, 3)
-    # A decomposition leaves an integer or a `Rational` type, as a square root does.
-    Tp = typeof(sqrt(one(float_if_integer(real(eltype(B))))))
+    K = size(B, 2)
+    # A decomposition leaves a `Rational` type, as a square root does.
+    Tp = typeof(sqrt(one(real(eltype(B)))))
     Bd = copy(B)
     Pd = Pair{Int, Matrix{Tp}}[]
-    for t in axes(B, 1)
+    for t in axes(B, 3)
         Pt = unseen_member_change_at(P, t)
         d = view(dc, t, :)
         if any(d)
-            Bd[t, :, d] .= zero(eltype(Bd))
+            Bd[:, d, t] .= zero(eltype(Bd))
             push!(Pd, t => cs_dropped_change(Pt, d, 1:K, K, Tp))
         elseif !isnothing(Pt)
             push!(Pd, t => Pt)

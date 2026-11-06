@@ -13,6 +13,9 @@ add_best_factor_after_pval_failure!
 get_forward_reg_incl_excl!
 get_backward_reg_incl!
 assert_stepwise_included
+assert_stepwise_regression
+assert_stepwise_regression_fields
 stepwise_factor_set
+stepwise_asset_fit!
 pin_regression_choice(re::StepwiseRegression{<:Any, <:Any, <:Any, <:PinnedChoice}, X::MatNum, F::MatNum, w::Option{<:ObsWeights} = nothing)
 ```

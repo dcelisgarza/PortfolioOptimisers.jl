@@ -16,7 +16,7 @@ The file also holds this estimator's first tests. Two defects it found are fixed
 change, and the last two testsets are their regressions. The final testset is issue #743's
 regression: `regime_lohi_mult` clamps the multiplier now, so this file also covers that field.
 =#
-using Test, PortfolioOptimisers, Statistics, StableRNGs, LinearAlgebra
+using Test, PortfolioOptimisers, Statistics, StatsBase, StableRNGs, LinearAlgebra
 
 const PO = PortfolioOptimisers
 
@@ -27,7 +27,8 @@ function slow_series(ce, X; dims::Int = 1, kwargs...)
 end
 
 # The expanding window written out by hand, slicing every per-observation keyword with the data.
-# This is what the fallback cannot do, because it cannot know which keyword carries observations.
+# The fallback slices the two masks, `iv` and the observation weights of the estimator (#1928), and
+# this reference states that slice independently of it.
 function masked_slow_series(ce, X; estimation_mask = nothing, active_mask = nothing)
     return permutedims(reduce(hcat,
                               [var(ce, view(X, 1:t, :);
@@ -42,6 +43,14 @@ function masked_slow_series(ce, X; estimation_mask = nothing, active_mask = noth
                                    end) for t in axes(X, 1)]))
 end
 
+# A variance estimator that reads `iv` and answers the sum of each of its columns, so a test can
+# see which rows of `iv` each fit of a series reads.
+struct IvEcho <: PO.AbstractVarianceEstimator end
+function Statistics.var(::IvEcho, X::PO.MatNum; dims::Int = 1, iv = nothing, kwargs...)
+    @assert size(iv) == size(X)
+    return sum(iv; dims = 1)
+end
+
 @testset "the fallback refits on an expanding window" begin
     rng = StableRNG(4321)
     X = randn(rng, 12, 3) .* 0.03
@@ -52,8 +61,10 @@ end
         for t in axes(X, 1)
             @test isequal(val[t, :], vec(var(ce, view(X, 1:t, :))))
         end
-        # `dims = 2` names the same series with the observations on the columns.
-        @test isequal(PO.variance_series(ce, permutedims(X); dims = 2), permutedims(val))
+        # `dims = 2` names the same series with the observations on the columns. Each fit runs
+        # along `dims`, as the whole-sample `var` does, so the two agree to rounding (#1928).
+        @test isapprox(PO.variance_series(ce, permutedims(X); dims = 2), permutedims(val);
+                       rtol = 1e-12, nans = true)
     end
 
     # Row 1 is a fit on one observation, so a corrected estimator has nothing to divide by.
@@ -144,6 +155,167 @@ end
                                      active_mask = permutedims(amsk)),
                   permutedims(PO.variance_series(ce, X; estimation_mask = emsk,
                                                  active_mask = amsk)))
+    # The fallback slices the masks with the data, so the refit reaches the recursion bit for bit.
+    @test isequal(slow_series(ce, X; estimation_mask = emsk, active_mask = amsk),
+                  PO.variance_series(ce, X; estimation_mask = emsk, active_mask = amsk))
+end
+
+@testset "the fallback slices every per-observation input with the data (#1928)" begin
+    rng = StableRNG(1928)
+    X = randn(rng, 10, 3) .* 0.03
+    msk = trues(size(X))
+    wv = StatsBase.aweights(collect(range(1.0, 4.0; length = size(X, 1))))
+    # Row t under observation weights is the weighted fit on the first t observations, with the
+    # weights those observations carry in the full sample.
+    function weighted_reference(ce, X, w; rows = t -> 1:t)
+        return permutedims(reduce(hcat,
+                                  [vec(var(PO.factory(ce, StatsBase.aweights(w[rows(t)])),
+                                           X[rows(t), :])) for t in axes(X, 1)]))
+    end
+    for ce in (SimpleVariance(), Covariance())
+        # Two plain estimators that read both masks: the fallback slices them with the data.
+        @test isequal(PO.variance_series(ce, X; estimation_mask = msk, active_mask = msk),
+                      PO.variance_series(ce, X))
+        # With the observations on the columns, each fit runs along `dims = 2`, as the
+        # whole-sample `var` does, so the two orientations agree to rounding.
+        @test isapprox(PO.variance_series(ce, permutedims(X); dims = 2,
+                                          estimation_mask = permutedims(msk),
+                                          active_mask = permutedims(msk)),
+                       permutedims(PO.variance_series(ce, X)); rtol = 1e-12, nans = true)
+        cw = PO.factory(ce, wv)
+        ref = weighted_reference(ce, X, wv)
+        @test isequal(PO.variance_series(cw, X), ref)
+        @test isapprox(PO.variance_series(cw, permutedims(X); dims = 2), permutedims(ref);
+                       rtol = 1e-12, nans = true)
+        # The panel route refits on the same rows, so it cuts the weights the same way.
+        @test isequal(PO.variance_series(cw, X, nothing), ref)
+    end
+    # The weights of the series are relative: a rescaled vector states the same series.
+    sw = PO.factory(SimpleVariance(), wv)
+    @test isapprox(PO.variance_series(PO.factory(SimpleVariance(),
+                                                 StatsBase.aweights(3 .* wv.values)), X)[2:end,
+                                                                                         :],
+                   PO.variance_series(sw, X)[2:end, :]; rtol = 1e-12)
+    # A windowed wrapper with no weights of its own cuts the weights of its inner estimator to
+    # each window, and the weights of the wrapper replace them when it holds some.
+    @test isequal(PO.variance_series(WindowedVariance(; ve = sw), X),
+                  weighted_reference(SimpleVariance(), X, wv))
+    @test isequal(PO.variance_series(WindowedVariance(; ve = sw, window = 3), X),
+                  weighted_reference(SimpleVariance(), X, wv; rows = t -> max(1, t - 2):t))
+    @test isequal(var(WindowedVariance(; ve = sw, window = 4), X),
+                  var(PO.factory(SimpleVariance(), StatsBase.aweights(wv[7:10])),
+                      X[7:10, :]))
+    @test isequal(var(WindowedVariance(; ve = sw, window = 4,
+                                       w = StatsBase.aweights(ones(10))), X),
+                  var(PO.factory(SimpleVariance(), StatsBase.aweights(ones(4))),
+                      X[7:10, :]))
+    # The vector method cuts the weights of the inner estimator to its window too, and a window
+    # that keeps every observation leaves the inner estimator as it is.
+    @test isequal(var(WindowedVariance(; ve = sw, window = 4), X[:, 1]),
+                  var(PO.factory(SimpleVariance(), StatsBase.aweights(wv[7:10])),
+                      X[7:10, 1]))
+    @test isequal(var(WindowedVariance(; ve = sw), X), var(sw, X))
+    # On an Asset Panel, each row of the windowed series fits the inner estimator on the panel
+    # of its own rows, with its weights cut to the same rows.
+    pnl = PO.AssetPanel(;
+                        pf = [PO.NumericPanelField(; name = "mcap", vals = ones(size(X)...),
+                                                   omsk = trues(size(X)...))],
+                        amsk = trues(size(X)), emsk = trues(size(X)))
+    @test isequal(PO.variance_series(WindowedVariance(; ve = sw, window = 3), X, pnl),
+                  weighted_reference(SimpleVariance(), X, wv; rows = t -> max(1, t - 2):t))
+    # The available-case route refits on the same expanding window as the plain route.
+    cp = SimpleVariance(; cvg = CoveragePolicy())
+    @test isapprox(PO.variance_series(cp, X, pnl), PO.variance_series(SimpleVariance(), X);
+                   rtol = 1e-12, nans = true)
+    # An estimator that reads `iv` gets the implied volatility of its own rows. `IvEcho` answers
+    # the sum of each column of the `iv` that its fit reads, so row t is the sum of rows 1 to t.
+    ivm = reshape(collect(1.0:30.0), 10, 3)
+    @test isequal(PO.variance_series(IvEcho(), X; iv = ivm), cumsum(ivm; dims = 1))
+    @test isequal(PO.variance_series(WindowedVariance(; ve = IvEcho(), window = 2), X;
+                                     iv = ivm),
+                  vcat(ivm[1:1, :], ivm[1:(end - 1), :] .+ ivm[2:end, :]))
+end
+
+#=
+Issue 1954. The weighted mean of one observation can differ from it by one unit in the last
+place, so a corrected weighted fit on one observation divided a sum of squares of about `1e-36`
+by zero, and gave `Inf` for about one asset in four. The unweighted fit gives `NaN`. Row 1 of a
+weighted series is a fit on one observation, so the cross-sectional inverse variance of row 2 gave
+such an asset a weight of `0`, where the unweighted fit drops it as `NaN`.
+=#
+@testset "a corrected fit on one weighted observation is NaN, as the unweighted fit is (#1954)" begin
+    eps = randn(StableRNG(11), 8, 6) .* 0.02
+    wv = StatsBase.aweights(rand(StableRNG(12), 8) .+ 0.1)
+    m = trues(size(eps))
+    @test all(isnan, PO.variance_series(SimpleVariance(; w = wv), eps)[1, :])
+    @test all(isnan, PO.variance_series(Covariance(; w = wv), eps)[1, :])
+    @test all(isnan,
+              PO.cross_sectional_lagged_inverse_variance(SimpleVariance(; w = wv), eps, m)[2,
+                                                                                           :])
+    @test isequal(PO.cross_sectional_lagged_inverse_variance(SimpleVariance(; w = wv), eps,
+                                                             m)[2, :],
+                  PO.cross_sectional_lagged_inverse_variance(SimpleVariance(), eps, m)[2,
+                                                                                       :])
+    # Over many draws of one observation, every weight type and every verb is `NaN` under the
+    # correction, with no `Inf` among them. The unweighted fit is `NaN` too. A frequency weight
+    # counts copies, so the weight is at most one: more than one copy has a variance.
+    rng = StableRNG(1954)
+    for W in (StatsBase.aweights, StatsBase.pweights, StatsBase.fweights), _ in 1:200
+        x = randn(rng, 1, 3) .* 0.02
+        w1 = W([0.1 + 0.9 * rand(rng)])
+        ce = Covariance(; w = w1)
+        @test all(isnan, var(SimpleVariance(; w = w1), x))
+        @test all(isnan, std(SimpleVariance(; w = w1), x))
+        @test isnan(var(SimpleVariance(; w = w1), x[:, 1]))
+        @test isnan(std(SimpleVariance(; w = w1), x[:, 1]))
+        @test all(isnan, cov(ce, x))
+        @test all(isnan, cov(Covariance(; w = w1, alg = SemiMoment()), x))
+        @test all(isnan, var(ce, x))
+        # A correlation needs two observations, under either correction. The diagonal stays
+        # one, as the unweighted fit keeps it.
+        for c in (true, false)
+            rho = cor(Covariance(; w = w1,
+                                 ce = GeneralCovariance(;
+                                                        ce = StatsBase.SimpleCovariance(;
+                                                                                        corrected = c))),
+                      x)
+            @test isequal(rho, cor(Covariance(), x))
+        end
+    end
+    @test all(isnan, var(SimpleVariance(), randn(StableRNG(1), 1, 3)))
+    # Frequency weights that sum to less than one have a negative divisor, which gave a negative
+    # variance.
+    @test all(isnan, var(SimpleVariance(; w = StatsBase.fweights([0.4])), [0.01 0.02]))
+    # A correlation does not read the divisor, so two observations under such weights have a
+    # correlation. The square root of the negative diagonal threw before.
+    Xf = [0.01 0.03; -0.02 0.01; 0.02 -0.01]
+    wf = StatsBase.fweights([0.2, 0.3, 0.1])
+    @test all(isnan, cov(GeneralCovariance(; w = wf), Xf))
+    @test cor(GeneralCovariance(; w = wf), Xf) ≈ cor(GeneralCovariance(; w = wf,
+                                                                       ce = StatsBase.SimpleCovariance(; corrected = false)), Xf)
+    @test PO.weighted_correlation_estimator(StatsBase.SimpleCovariance(), wf) ==
+          StatsBase.SimpleCovariance(; corrected = false)
+    gce = PO.GerberCovariance()
+    @test PO.weighted_correlation_estimator(gce, wf) === gce
+    # A fit with a positive divisor does not change: an uncorrected fit, and a corrected fit on
+    # one observation that a frequency weight counts twice.
+    x1 = [0.01 -0.02 0.03]
+    @test all(isfinite,
+              var(SimpleVariance(; w = StatsBase.aweights([0.4]), corrected = false), x1))
+    @test all(isfinite, var(SimpleVariance(; w = StatsBase.fweights([2.0])), x1))
+    X2 = randn(StableRNG(2), 2, 3)
+    w2 = StatsBase.aweights([0.3, 0.7])
+    @test var(SimpleVariance(; w = w2), X2) == var(X2, w2, 1; corrected = true)
+    @test cor(GeneralCovariance(; w = w2), X2) == cor(X2, w2, 1)
+    # The guard reads the divisor of `StatsBase` and does not change a valid estimate. A
+    # covariance estimator other than `StatsBase.SimpleCovariance` has a divisor that the
+    # library does not know, so it keeps its value.
+    @test PO.weighted_moment_guard(2.0, StatsBase.aweights([0.3, 0.7]), true) == 2.0
+    @test isnan(PO.weighted_moment_guard(2.0f0, StatsBase.pweights([0.0, 0.7]), true))
+    @test PO.weighted_moment_guard(2.0f0, StatsBase.pweights([0.0, 0.7]), true) isa Float32
+    @test PO.weighted_comoment_guard(Statistics.cov, PO.GerberCovariance(),
+                                     [1.0 2.0; 2.0 1.0], StatsBase.aweights([1.0])) ==
+          [1.0 2.0; 2.0 1.0]
 end
 
 @testset "an observation the pass cannot use leaves the cache where it was" begin
@@ -327,6 +499,50 @@ always gave.
                                                                regime_lohi_mult = (0.0,
                                                                                    1.6))
 end
+#=
+Issue #397, the docstring sweep of the family, checked each formula with numbers and found four
+defects in the code: a `regime_decay` that no constructor checked, a zero parameter of a regime
+method that made the multiplier `NaN` or `Inf`, a log multiplier that read the shape of its law as
+its exponent, and a method of the caller's own that failed with a `MethodError` from the fit.
+=#
+struct MyRegimeMethod397 <: PO.RegimeAdjustedMethod end
+PO.regime_multiplier(::MyRegimeMethod397, s::Number) = sqrt(max(s, 0))
+function PO.get_regime_state(::MyRegimeMethod397, z2::AbstractVector, ::Number)
+    return sum(z2) / length(z2)
+end
+@testset "The regime methods refuse what they cannot compute (#397)" begin
+    # `regime_decay` weighs an exponentially weighted recursion. At one the regime state never
+    # leaves its first statistic, and at 1.5 or -0.5 the variance came out as zero (#397).
+    @test_throws DomainError RegimeAdjustedExpWeightedVariance(; regime_decay = 1.0)
+    @test_throws DomainError RegimeAdjustedExpWeightedVariance(; regime_decay = 1.5)
+    @test_throws DomainError RegimeAdjustedExpWeightedVariance(; regime_decay = -0.5)
+    # A zero parameter made the multiplier `NaN` or `Inf`: `x = 0` gives the digamma pole in the
+    # constant of the log method and a division by zero in the first-moment method, and `y = 0`
+    # gives `log(0)` (#397).
+    @test_throws DomainError LogRegimeAdjusted(; x = 0.0)
+    @test_throws DomainError LogRegimeAdjusted(; y = 0.0)
+    @test_throws DomainError FirstMomentRegimeAdjusted(; x = 0.0)
+
+    # The log method's state is a log variance ratio whatever the law of the squares, so a ratio
+    # of four is a volatility multiplier of two. The multiplier read `exp(x * s)`, so a law with
+    # `x = 2` scaled the variance by the ratio to the fourth power (#397).
+    for method in (LogRegimeAdjusted(), LogRegimeAdjusted(; x = 2.0, y = 0.5))
+        @test PO.regime_multiplier(method, log(4.0)) ≈ 2.0
+    end
+
+    # A method the caller defines runs under the raw statistic, and the two bias corrections,
+    # which read the moments of the library methods alone, refuse it at construction rather
+    # than with a `MethodError` from the fit (#397).
+    rm = MyRegimeMethod397()
+    @test_throws ArgumentError RegimeAdjustedExpWeightedVariance(; regime_method = rm)
+    @test_throws ArgumentError RegimeAdjustedExpWeightedVariance(; regime_method = rm,
+                                                                 debias = LawDebias())
+    X = [0.01 -0.02; -0.015 0.03; 0.02 -0.01; -0.005 0.012; 0.008 -0.02; -0.02 0.03]
+    kw = (; decay = 0.9, min_obs = 2, regime_min_obs = 1, debias = nothing)
+    @test var(RegimeAdjustedExpWeightedVariance(; regime_method = rm, kw...), X) ≈
+          var(RegimeAdjustedExpWeightedVariance(; regime_method = RootMeanSquaredAdjusted(),
+                                                kw...), X)
+end
 
 #=
 `std` is the root of `var`, and issue #637 names its absence.
@@ -387,16 +603,11 @@ carries that half, and `VERB_EXEMPT` in `test/moment_family_setup.jl` still name
     @test_throws ArgumentError std(RegimeAdjustedExpWeightedVariance())
 end
 #=
-Integer returns. Both regime-adjusted passes built their state in the element type of `X`, so an
-integer panel raised an `InexactError` at the first `NaN` the state holds, in every verb of both
-estimators. The state now takes `float_if_integer(eltype(X))`: an integer panel computes in
-`Float64` and gives the answer of the same panel in `Float64` bit for bit, and a `Float32` panel
-keeps a `Float32` variance.
+A `Float32` panel keeps a `Float32` variance in both regime-adjusted passes. Issue #1972
+removed the integer case: integer data convert at the carrier.
 =#
-@testset "an integer panel is the same panel in floating point" begin
-    Xi = [1 2 0; -1 0 1; 1 1 -2; 0 -1 1; 2 1 0; -1 2 1]
-    Xf = Float64.(Xi)
-    X32 = Float32.(Xi) ./ 100
+@testset "a Float32 panel keeps a Float32 variance" begin
+    X32 = Float32[1 2 0; -1 0 1; 1 1 -2; 0 -1 1; 2 1 0; -1 2 1] ./ 100
     ves = (RegimeAdjustedExpWeightedVariance(; decay = 0.5, min_obs = 1,
                                              regime_min_obs = 1),
            RegimeAdjustedExpWeightedVariance(; decay = 0.5, min_obs = 1, regime_min_obs = 1,
@@ -405,18 +616,6 @@ keeps a `Float32` variance.
                                              centring = PreCentred(), hac_lags = 2,
                                              regime_method = nothing))
     for ce in ves
-        @test isequal(var(ce, Xi), var(ce, Xf))
-        @test isequal(std(ce, Xi), std(ce, Xf))
-        @test isequal(PO.variance_series(ce, Xi), PO.variance_series(ce, Xf))
-        @test isequal(var(partial_fit!(ce, Xi)), var(partial_fit!(ce, Xf)))
         @test eltype(PO.variance_series(ce, X32)) == Float32
-    end
-    ces = (RegimeAdjustedExpWeightedCovariance(; decay = 0.5, min_obs = 1,
-                                               regime_min_obs = 1),
-           RegimeAdjustedExpWeightedCovariance(; decay = 0.5, min_obs = 1,
-                                               regime_min_obs = 1, hac_lags = 2))
-    for ce in ces
-        @test isequal(cov(ce, Xi), cov(ce, Xf))
-        @test isequal(PO.variance_series(ce, Xi), PO.variance_series(ce, Xf))
     end
 end

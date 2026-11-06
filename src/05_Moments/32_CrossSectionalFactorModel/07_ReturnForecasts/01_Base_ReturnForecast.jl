@@ -156,7 +156,7 @@ The weights are the estimation mask of the Asset Panel read as numbers, so an as
 
 # Arguments
 
-  - $(arg_dict[:rd]) It must carry an Asset Panel in `rd.pnl`.
+  - $(arg_dict[:rd]) It must carry an Asset Panel in `rd.pnl`, or returns in `rd.X`, which give the mask-only panel of [`returns_with_universe`](@ref).
 
 # Validation
 
@@ -186,11 +186,12 @@ function return_forecast_weights(rd::ReturnsResult)::MatNum
 end
 """
     return_forecast_history_rows(A::Nothing) -> Nothing
-    return_forecast_history_rows(A::MatNum_Arr3Num) -> Integer
+    return_forecast_history_rows(A::MatNum) -> Integer
+    return_forecast_history_rows(A::Arr3Num) -> Integer
 
 Return the observation count of one history of a factor-model block, or `nothing`.
 
-Every history of a block lays its observations on the first axis, whatever its rank, so one method reads a per-asset history and an exposure history. An absent history gives `nothing`. So [`return_forecast_block_observations`](@ref) reads the first history that the block carries with no `isnothing` test of its own.
+A per-asset history lays its observations on its first axis, as the returns do, and an exposure history lays them on its last axis. The method that Julia selects reads the axis of the rank. An absent history gives `nothing`. So [`return_forecast_block_observations`](@ref) reads the first history that the block carries with no `isnothing` test of its own.
 
 # Arguments
 
@@ -209,8 +210,11 @@ Every history of a block lays its observations on the first axis, whatever its r
 function return_forecast_history_rows(::Nothing)::Nothing
     return nothing
 end
-function return_forecast_history_rows(A::MatNum_Arr3Num)::Integer
+function return_forecast_history_rows(A::MatNum)::Integer
     return size(A, 1)
+end
+function return_forecast_history_rows(A::Arr3Num)::Integer
+    return size(A, 3)
 end
 """
     return_forecast_block_observations(csfm::CrossSectionalFactorModel) -> Option{<:Integer}
@@ -265,7 +269,7 @@ Where:
 
 # Arguments
 
-  - $(arg_dict[:rd]) It must carry an Asset Panel in `rd.pnl`.
+  - $(arg_dict[:rd]) It must carry an Asset Panel in `rd.pnl`, or returns in `rd.X`, which give the mask-only panel of [`returns_with_universe`](@ref).
   - `Tc`: Number of observations of the returns data, in place of `rd`. [`return_forecast_step`](@ref) reads it off the scores it gets.
   - `csfm`: The fitted factor-model block.
 
@@ -330,7 +334,7 @@ function return_forecast_cut(A::MatNum, rows::AbstractUnitRange)::MatNum
     return A[rows, :]
 end
 function return_forecast_cut(A::Arr3Num, rows::AbstractUnitRange)::Arr3Num
-    return A[rows, :, :]
+    return A[:, :, rows]
 end
 """
     return_forecast_pad(A::Nothing, rows::AbstractUnitRange, T::Integer) -> Nothing
@@ -348,11 +352,11 @@ The rows before the block carry no information of the factor model, so they are 
 
 # Validation
 
-  - The element type of `A` holds `NaN` after [`float_if_integer`](@ref). A `Rational` element type raises an `ArgumentError`.
+  - The element type of `A` holds `NaN`. A `Rational` element type raises an `ArgumentError`.
 
 # Returns
 
-  - `A`: The same history on the axis of the returns data, `NaN` before the block, or `nothing`. Its element type is [`float_if_integer`](@ref) of the element type of `A`, so an integer history becomes a floating-point history.
+  - `A`: The same history on the axis of the returns data, `NaN` before the block, or `nothing`. Its element type is the element type of `A`.
 
 # Related
 
@@ -364,7 +368,7 @@ function return_forecast_pad(::Nothing, ::AbstractUnitRange, ::Integer)::Nothing
     return nothing
 end
 function return_forecast_pad(A::MatNum, rows::AbstractUnitRange, T::Integer)::MatNum
-    Tf = float_if_integer(real(eltype(A)))
+    Tf = real(eltype(A))
     @argcheck(!(Tf <: Rational),
               ArgumentError("a factor model history is NaN on the observations before the block, and its element type $Tf cannot hold NaN. Convert the history to a floating-point type."))
     B = fill(Tf(NaN), T, size(A, 2))
@@ -559,11 +563,11 @@ So the last ``\\ell + h - 1`` observations are `NaN`.
 
 # Validation
 
-  - The element type of `X` holds `NaN` after [`float_if_integer`](@ref). A `Rational` element type raises an `ArgumentError`.
+  - The element type of `X` holds `NaN`. A `Rational` element type raises an `ArgumentError`.
 
 # Returns
 
-  - `Y::Matrix{<:Real}`: Forward mean returns, `observations × assets`. Its element type is [`float_if_integer`](@ref) of the element type of `X`, so integer returns give a floating-point mean.
+  - `Y::Matrix{<:Real}`: Forward mean returns, `observations × assets`. Its element type is the element type of `X`.
 
 # Examples
 
@@ -584,7 +588,7 @@ julia> PortfolioOptimisers.forward_mean_returns([1.0; 2.0; NaN; 4.0; 5.0;;], 2, 
   - [`return_forecast`](@ref)
 """
 function forward_mean_returns(X::MatNum, horizon::Integer, lag::Integer)::Matrix{<:Real}
-    Tf = float_if_integer(real(eltype(X)))
+    Tf = real(eltype(X))
     @argcheck(!(Tf <: Rational),
               ArgumentError("a forward mean is NaN where its window holds no finite return and on the last lag + horizon - 1 observations, and the element type $Tf cannot hold NaN. Convert the returns to a floating-point type."))
     T = size(X, 1)

@@ -4,7 +4,7 @@ Description = "Base cross-sectional factor Prior, public API of PortfolioOptimis
 
 # Base cross-sectional factor Prior
 
-The systematic repair rule of a [`CrossSectionalFactorPrior`](@ref) says which steps of its matrix processing run on the systematic block of the asset covariance before the prior adds the idiosyncratic block. [`NoSystematicRepair`](@ref), the default, and [`SystematicRepair`](@ref) are its two members.
+The systematic repair rule of a [`CrossSectionalFactorPrior`](@ref) says which steps of its matrix processing run on the systematic block of the asset covariance before the prior adds the idiosyncratic block. The default `nothing` runs every step except the `:pdm` step, and [`SystematicRepair`](@ref) runs every step.
 
 ```@docs
 AbstractSystematicRepair

@@ -50,11 +50,10 @@ include(joinpath(@__DIR__, "parity_harness.jl"))
                "style2" => mpass("style2")]
     pe = EmpiricalPrior(; me = ExpWeightedExpectedReturns(),
                         ce = RegimeAdjustedExpWeightedCovariance(; centring = PreCentred(),
-                                                                 debias = RawStatistic(),
+                                                                 debias = nothing,
                                                                  regime_lohi_mult = (0.7,
                                                                                      1.6)))
-    ve = RegimeAdjustedExpWeightedVariance(; centring = PreCentred(),
-                                           debias = RawStatistic(),
+    ve = RegimeAdjustedExpWeightedVariance(; centring = PreCentred(), debias = nothing,
                                            regime_lohi_mult = (0.7, 1.6), min_val = 0.0)
     fit(rd; kw...) = prior(CrossSectionalFactorPrior(; lambda = 1, factors = factors,
                                                      pe = pe, ve = ve, kw...), rd)
@@ -132,9 +131,9 @@ include(joinpath(@__DIR__, "parity_harness.jl"))
     @testset "The Descriptor Scores, $(c)" for (c, d) in scores
         (_, rd, pr) = panels[1]
         S = descriptor_scores(d, rd, pr.rr).S
-        for k in axes(S, 3)
-            @test same(S[:, :, k], load("DescriptorScores", "Small$(c)", "Scores$(k)"),
-                       "$(c) $(k)")
+        for k in axes(S, 2)
+            @test same(permutedims(S[:, k, :]),
+                       load("DescriptorScores", "Small$(c)", "Scores$(k)"), "$(c) $(k)")
         end
     end
 
@@ -142,7 +141,8 @@ include(joinpath(@__DIR__, "parity_harness.jl"))
         (_, rd, pr) = panels[1]
         S = descriptor_scores(scores[4][2], rd, pr.rr).S
         for k in 1:2
-            @test isequal(S[:, :, k], load("DescriptorScores", "SmallRaw", "Scores$(k)"))
+            @test isequal(permutedims(S[:, k, :]),
+                          load("DescriptorScores", "SmallRaw", "Scores$(k)"))
         end
     end
 

@@ -1,5 +1,5 @@
 ```@meta
-Description = "Regime adjusted exp weighted covariance (a), private API of PortfolioOptimisers.jl: RegimeAdjustedCovarianceState, has_separate_cor_decay, regime_kappa, …"
+Description = "Regime adjusted exp weighted covariance (a), private API of PortfolioOptimisers.jl: RegimeAdjustedCovarianceState, pair_weighted_correlation, …"
 ```
 
 # Regime adjusted exp weighted covariance (a): private API
@@ -13,13 +13,6 @@ RegimeAdjustedCovarianceState
 ## Functions
 
 ```@docs
-has_separate_cor_decay
-regime_kappa
-regime_denom
-get_regime_state(::RootMeanSquaredAdjusted, ::RegimeAdjustedTarget, stats::VecNum, n::Integer, ::Any)
-get_regime_state(method::FirstMomentRegimeAdjusted, target::RegimeAdjustedTarget, stats::VecNum, n::Integer, ::Any)
-get_regime_state(method::LogRegimeAdjusted, target::RegimeAdjustedTarget, stats::VecNum, n::Integer, min_val::Number)
-regime_statistic
 pair_weighted_correlation
 update_var_cor!
 bias_corrected_covariance

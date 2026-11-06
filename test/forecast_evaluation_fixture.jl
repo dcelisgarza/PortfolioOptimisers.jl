@@ -27,15 +27,15 @@ function evaluation_fixture(; n_observations::Integer = 60, drop::Integer = 8,
                            weights = [0.4, 0.6], min_coverage = 0.5, outlier = ct_out,
                            scoring = ct_sco, group = "industry", bw = "market_cap")
     Lo = factor_exposure(OneHotExposure(; field = "industry", family = "industry"), rd)
-    K = 1 + size(Lo, 3)
-    Ms = Array{Float64, 3}(undef, T, N, K)
+    K = 1 + size(Lo, 2)
+    Ms = Array{Float64, 3}(undef, N, K, T)
     Z = factor_exposure(xc, rd)
-    Ms[:, :, 1] = Z
-    for k in 1:size(Lo, 3)
-        Ms[:, :, k + 1] = Lo[:, :, k]
+    Ms[:, 1, :] = transpose(Z)
+    for k in 1:size(Lo, 2)
+        Ms[:, k + 1, :] = Lo[:, k, :]
     end
-    nf = ["style"; ["ind$k" for k in 1:size(Lo, 3)]]
-    fam = ["style"; fill("industry", size(Lo, 3))]
+    nf = ["style"; ["ind$k" for k in 1:size(Lo, 2)]]
+    fam = ["style"; fill("industry", size(Lo, 2))]
     vs = [pnl.amsk[t, i] ? 0.0004 * (1.5 + sin(0.3 * t + 0.7 * i)) : NaN
           for t in rows, i in 1:N]
     rng = StableRNG(24680)
@@ -55,8 +55,8 @@ function evaluation_fixture(; n_observations::Integer = 60, drop::Integer = 8,
          for t in rows, i in 1:N]
     end
     csr = CrossSectionalRegression(; f = zeros(Tb, K), eps = eps, n = fill(N, Tb))
-    csfm = CrossSectionalFactorModel(; M = Ms[end, :, :], b = zeros(N), csr = csr,
-                                     Ms = Ms[rows, :, :], vs = vs, nf = nf, fam = fam)
+    csfm = CrossSectionalFactorModel(; M = Ms[:, :, end], b = zeros(N), csr = csr,
+                                     Ms = Ms[:, :, rows], vs = vs, nf = nf, fam = fam)
     scores = DescriptorScores(;
                               descriptors = [Passthrough(; field = "book_equity"),
                                              Passthrough(; field = "market_cap")],

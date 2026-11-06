@@ -14,7 +14,7 @@ include(joinpath(@__DIR__, "parity_harness.jl"))
     # change to any of them invalidates the literals of `the stored oracle`.
     rng = StableRNG(987654321)
     T, N, K = 8, 6, 3
-    Ms = randn(rng, T, N, K)
+    Ms = permutedims(randn(rng, T, N, K), (2, 3, 1))
     f = 0.02 * randn(rng, T, K)
     eps = 0.01 * randn(rng, T, N)
     rw = abs.(randn(rng, T, N)) .+ 0.1
@@ -30,14 +30,14 @@ include(joinpath(@__DIR__, "parity_harness.jl"))
     # A pair whose residual is not finite leaves the mask.
     eps[4, 3] = NaN
     # A pair whose exposure is not finite leaves the mask.
-    Ms[2, 4, 1] = NaN
+    Ms[4, 1, 2] = NaN
     # An observation whose factor return is not finite has no t-statistic.
     f[5, 2] = NaN
     # An observation whose design is collinear identifies one coefficient of three.
-    Ms[6, :, 3] = Ms[6, :, 1]
+    Ms[:, 3, 6] = Ms[:, 1, 6]
 
     csr = CrossSectionalRegression(; f = f, eps = eps, n = fill(N, T))
-    csfm = CrossSectionalFactorModel(; M = Ms[T, :, :], b = zeros(N), csr = csr, Ms = Ms,
+    csfm = CrossSectionalFactorModel(; M = Ms[:, :, T], b = zeros(N), csr = csr, Ms = Ms,
                                      rw = rw, bw = bw, lag = 1)
 
     @testset "the stored oracle" begin
@@ -138,12 +138,12 @@ include(joinpath(@__DIR__, "parity_harness.jl"))
     @testset "the standard error comes from a direct solve" begin
         rng2 = StableRNG(11223344)
         Tl, Nl, Kl = 2, 7, 3
-        B = randn(rng2, Tl, Nl, Kl)
+        B = permutedims(randn(rng2, Tl, Nl, Kl), (2, 3, 1))
         fl = 0.05 * randn(rng2, Tl, Kl)
         epsl = 0.02 * randn(rng2, Tl, Nl)
         t = cs_regression_t_stats(B, fl, epsl)
         for tt in 1:Tl
-            A = B[tt, :, :]
+            A = B[:, :, tt]
             G = transpose(A) * A
             rss = sum(abs2, epsl[tt, :])
             s2 = rss / (Nl - Kl)
@@ -153,27 +153,27 @@ include(joinpath(@__DIR__, "parity_harness.jl"))
         # The Gram history a caller already holds is the same answer.
         @test isapprox(cs_regression_t_stats(B, fl, epsl; G = cs_gram(B)), t; rtol = 1e-12)
         @test_throws DimensionMismatch cs_regression_t_stats(B, fl, epsl;
-                                                             G = cs_gram(B[:, :, 1:2]))
+                                                             G = cs_gram(B[:, 1:2, :]))
         @test_throws DimensionMismatch cs_regression_t_stats(B, fl[:, 1:2], epsl)
     end
 
     @testset "the Gram kernel and the weights" begin
-        B = reshape([1.0, 1.0, 0.0, 1.0], 1, 2, 2)
-        @test cs_gram(B)[1, :, :] == [2.0 1.0; 1.0 1.0]
+        B = reshape([1.0, 1.0, 0.0, 1.0], 2, 2, 1)
+        @test cs_gram(B)[:, :, 1] == [2.0 1.0; 1.0 1.0]
         # A zero weight excludes the pair, so the second asset leaves the design.
-        @test cs_gram(B, [1.0 0.0])[1, :, :] == [1.0 0.0; 0.0 0.0]
+        @test cs_gram(B, [1.0 0.0])[:, :, 1] == [1.0 0.0; 0.0 0.0]
         # A weight scales the pair.
-        @test cs_gram(B, [1.0 4.0])[1, :, :] == [5.0 4.0; 4.0 4.0]
+        @test cs_gram(B, [1.0 4.0])[:, :, 1] == [5.0 4.0; 4.0 4.0]
         # An exposure that is not finite excludes the pair.
-        Bn = reshape([1.0, NaN, 0.0, 1.0], 1, 2, 2)
-        @test cs_gram(Bn)[1, :, :] == [1.0 0.0; 0.0 0.0]
+        Bn = reshape([1.0, NaN, 0.0, 1.0], 2, 2, 1)
+        @test cs_gram(Bn)[:, :, 1] == [1.0 0.0; 0.0 0.0]
         @test_throws PortfolioOptimisers.IsEmptyError cs_gram(zeros(0, 0, 0))
         @test_throws DimensionMismatch cs_gram(B, [1.0 1.0 1.0])
     end
 
     @testset "the variance inflation factor and the condition number" begin
         # An orthonormal design inflates nothing and is perfectly conditioned.
-        Bo = reshape([1.0, 0.0, 0.0, 0.0, 1.0, 0.0], 1, 3, 2)
+        Bo = reshape([1.0, 0.0, 0.0, 0.0, 1.0, 0.0], 3, 2, 1)
         @test exposure_vif(cs_gram(Bo)) == [1.0 1.0]
         @test exposure_condition_number(cs_gram(Bo)) == [1.0]
         # The methods that read a design also gate on the degrees of freedom, which a
@@ -181,14 +181,14 @@ include(joinpath(@__DIR__, "parity_harness.jl"))
         @test exposure_vif(Bo, nothing) == [1.0 1.0]
         @test exposure_condition_number(Bo, nothing) == [1.0]
         # Two assets and two factors leave no degrees of freedom, so there is no answer.
-        Bt = reshape([1.0, 0.0, 0.0, 1.0], 1, 2, 2)
+        Bt = reshape([1.0, 0.0, 0.0, 1.0], 2, 2, 1)
         @test all(isnan, exposure_vif(Bt, nothing))
         @test all(isnan, exposure_condition_number(Bt, nothing))
 
         # A nearly duplicated column inflates the variance of both members of the pair.
         rng3 = StableRNG(55667788)
-        Bd = randn(rng3, 4, 30, 3)
-        Bd[:, :, 3] = Bd[:, :, 1] + 0.01 * randn(rng3, 4, 30)
+        Bd = permutedims(randn(rng3, 4, 30, 3), (2, 3, 1))
+        Bd[:, 3, :] = Bd[:, 1, :] + 0.01 * permutedims(randn(rng3, 4, 30))
         vif = exposure_vif(Bd, nothing)
         @test all(vif[:, 1] .> 100)
         @test all(vif[:, 3] .> 100)
@@ -199,7 +199,7 @@ include(joinpath(@__DIR__, "parity_harness.jl"))
         # so `R_k^2 = 1` and its factor is `Inf` (#1421). The third column is identified,
         # and its factor is finite and at least one.
         Bs = copy(Bd)
-        Bs[:, :, 3] = Bs[:, :, 1]
+        Bs[:, 3, :] = Bs[:, 1, :]
         vs = exposure_vif(Bs, nothing)
         @test all(==(Inf), vs[:, [1, 3]])
         @test all(v -> isfinite(v) && v >= 1, vs[:, 2])
@@ -225,24 +225,24 @@ include(joinpath(@__DIR__, "parity_harness.jl"))
     @testset "a signal factor and a noise factor" begin
         rng4 = StableRNG(31415926)
         Ts, Ns = 300, 40
-        B = randn(rng4, Ts, Ns, 2)
+        B = permutedims(randn(rng4, Ts, Ns, 2), (2, 3, 1))
         noise = 0.01 * randn(rng4, Ts, Ns)
         Rt = Matrix{Float64}(undef, Ts, Ns)
         for i in 1:Ns, t in 1:Ts
-            Rt[t, i] = 0.03 * B[t, i, 1] + noise[t, i]
+            Rt[t, i] = 0.03 * B[i, 1, t] + noise[t, i]
         end
         f2 = Matrix{Float64}(undef, Ts, 2)
         eps2 = Matrix{Float64}(undef, Ts, Ns)
-        B1 = B[:, :, 1:1]
+        B1 = B[:, 1:1, :]
         f1 = Matrix{Float64}(undef, Ts, 1)
         eps1 = Matrix{Float64}(undef, Ts, Ns)
         for t in 1:Ts
-            A = B[t, :, :]
+            A = B[:, :, t]
             y = Rt[t, :]
             b2 = A \ y
             f2[t, :] = b2
             eps2[t, :] = y - A * b2
-            A1 = B1[t, :, :]
+            A1 = B1[:, :, t]
             b1 = A1 \ y
             f1[t, :] = b1
             eps1[t, :] = y - A1 * b1
@@ -272,7 +272,7 @@ include(joinpath(@__DIR__, "parity_harness.jl"))
     @testset "a re-based block answers on the reduced axis" begin
         rng5 = StableRNG(19283746)
         Tr, Nr, Kr = 6, 5, 3
-        Msr = randn(rng5, Tr, Nr, Kr)
+        Msr = permutedims(randn(rng5, Tr, Nr, Kr), (2, 3, 1))
         # A fit under a re-basis estimates its factor returns on the reduced axis, so the
         # block states them there.
         fr = 0.02 * randn(rng5, Tr, Kr - 1)
@@ -283,8 +283,8 @@ include(joinpath(@__DIR__, "parity_harness.jl"))
                                 ratios = reshape(collect(range(0.4, 0.9; length = Tr)), Tr,
                                                  1), K = Kr)
         csr_r = CrossSectionalRegression(; f = fr, eps = epsr, n = fill(Nr, Tr))
-        L = PortfolioOptimisers.reduce_loadings(fcb, Msr[Tr, :, :])
-        blk = CrossSectionalFactorModel(; M = Msr[Tr, :, :], L = L, b = zeros(Nr),
+        L = PortfolioOptimisers.reduce_loadings(fcb, Msr[:, :, Tr])
+        blk = CrossSectionalFactorModel(; M = Msr[:, :, Tr], L = L, b = zeros(Nr),
                                         csr = csr_r, Ms = Msr, rw = rwr, fcb = fcb, lag = 1,
                                         nf = ["value", "size", "momentum"],
                                         fam = ["industry", "industry", "style"])
@@ -325,9 +325,9 @@ include(joinpath(@__DIR__, "parity_harness.jl"))
                                                                      LabelGroup("sector"))
         @test isnothing(PortfolioOptimisers.cs_diagnostic_factor_names(csfm))
         @test PortfolioOptimisers.cs_diagnostic_factor_names(CrossSectionalFactorModel(;
-                                                                                       M = Msr[Tr,
+                                                                                       M = Msr[:,
                                                                                                :,
-                                                                                               :],
+                                                                                               Tr],
                                                                                        b = zeros(Nr),
                                                                                        nf = ["a",
                                                                                              "b",
@@ -336,8 +336,8 @@ include(joinpath(@__DIR__, "parity_harness.jl"))
     end
 
     @testset "a block that carries no history is refused" begin
-        no_ms = CrossSectionalFactorModel(; M = Ms[T, :, :], b = zeros(N), csr = csr)
-        no_csr = CrossSectionalFactorModel(; M = Ms[T, :, :], b = zeros(N), Ms = Ms)
+        no_ms = CrossSectionalFactorModel(; M = Ms[:, :, T], b = zeros(N), csr = csr)
+        no_csr = CrossSectionalFactorModel(; M = Ms[:, :, T], b = zeros(N), Ms = Ms)
         for verb in (cs_regression_t_stats, exposure_vif, exposure_condition_number,
                      cs_regression_r2, cs_regression_adjusted_r2, cs_regression_aic,
                      cs_regression_bic, cs_regression_t_stat_exceedance_rate)
@@ -357,7 +357,7 @@ include(joinpath(@__DIR__, "parity_harness.jl"))
         end
         @test occursin("csr", err2.msg)
         # A lag that consumes the whole history leaves nothing to answer on.
-        short = CrossSectionalFactorModel(; M = Ms[T, :, :], b = zeros(N), csr = csr,
+        short = CrossSectionalFactorModel(; M = Ms[:, :, T], b = zeros(N), csr = csr,
                                           Ms = Ms, lag = T)
         @test_throws DimensionMismatch cs_regression_t_stats(short)
     end
@@ -365,10 +365,10 @@ include(joinpath(@__DIR__, "parity_harness.jl"))
     @testset "the lag defaults to zero" begin
         rng6 = StableRNG(65432109)
         Tn, Nn, Kn = 5, 4, 2
-        Msn = randn(rng6, Tn, Nn, Kn)
+        Msn = permutedims(randn(rng6, Tn, Nn, Kn), (2, 3, 1))
         csrn = CrossSectionalRegression(; f = 0.02 * randn(rng6, Tn, Kn),
                                         eps = 0.01 * randn(rng6, Tn, Nn), n = fill(Nn, Tn))
-        blk = CrossSectionalFactorModel(; M = Msn[Tn, :, :], b = zeros(Nn), csr = csrn,
+        blk = CrossSectionalFactorModel(; M = Msn[:, :, Tn], b = zeros(Nn), csr = csrn,
                                         Ms = Msn)
         @test size(cs_regression_t_stats(blk).X) == (Tn, Kn)
         @test isapprox(cs_regression_t_stats(blk).X,
@@ -378,13 +378,13 @@ include(joinpath(@__DIR__, "parity_harness.jl"))
     @testset "the verbs agree with a weighted least-squares fit written out" begin
         rng7 = StableRNG(24681357)
         Tw, Nw, Kw = 4, 12, 3
-        B = randn(rng7, Tw, Nw, Kw)
-        B[:, :, 1] .= 1.0
+        B = permutedims(randn(rng7, Tw, Nw, Kw), (2, 3, 1))
+        B[:, 1, :] .= 1.0
         W = rand(rng7, Tw, Nw)
         # Each mask branch: a zero weight, a NaN weight, a NaN exposure, a NaN residual.
         W[1, 3] = 0.0
         W[2, 5] = NaN
-        B[3, 4, 2] = NaN
+        B[4, 2, 3] = NaN
         fw = randn(rng7, Tw, Kw)
         ew = 0.2 * randn(rng7, Tw, Nw)
         ew[4, 6] = NaN
@@ -397,22 +397,22 @@ include(joinpath(@__DIR__, "parity_harness.jl"))
         bic = cs_regression_bic(B, fw, ew, W)
         for t in 1:Tw
             # The Gram diagnostics mask on the weight and the exposures.
-            ok = [W[t, i] > 0 && all(isfinite, B[t, i, :]) for i in 1:Nw]
-            X = B[t, ok, :]
+            ok = [W[t, i] > 0 && all(isfinite, B[i, :, t]) for i in 1:Nw]
+            X = B[ok, :, t]
             G = transpose(X) * LinearAlgebra.Diagonal(W[t, ok]) * X
             @test isapprox(vif[t, :], LinearAlgebra.diag(G) .* LinearAlgebra.diag(inv(G));
                            rtol = 1e-12)
             @test isapprox(kappa[t], LinearAlgebra.cond(G); rtol = 1e-12)
             # The t-statistic also masks on the residual.
             ok2 = ok .& isfinite.(ew[t, :])
-            X2 = B[t, ok2, :]
+            X2 = B[ok2, :, t]
             u2 = W[t, ok2]
             G2 = transpose(X2) * LinearAlgebra.Diagonal(u2) * X2
             s2 = sum(u2 .* ew[t, ok2] .^ 2) / (count(ok2) - Kw)
             se = sqrt.(s2 .* LinearAlgebra.diag(inv(G2)))
             @test isapprox(ts[t, :], fw[t, :] ./ se; rtol = 1e-12)
             # The scores mask on the reconstructed return and normalise the weights.
-            r = [sum(B[t, i, :] .* fw[t, :]) + ew[t, i] for i in 1:Nw]
+            r = [sum(B[i, :, t] .* fw[t, :]) + ew[t, i] for i in 1:Nw]
             ok3 = (W[t, :] .> 0) .& isfinite.(r)
             q = W[t, ok3] ./ sum(W[t, ok3])
             n = count(ok3)
@@ -425,7 +425,7 @@ include(joinpath(@__DIR__, "parity_harness.jl"))
             @test isapprox(bic[t], n * log(rss) + Kw * log(n); rtol = 1e-12)
         end
         # A perfect fit has a residual sum of squares of zero.
-        Bp = reshape([1.0, 1.0, 1.0, -1.0, 1.0, 0.0], 1, 3, 2)
+        Bp = reshape([1.0, 1.0, 1.0, -1.0, 1.0, 0.0], 3, 2, 1)
         @test cs_regression_aic(Bp, [1.0 0.0], zeros(1, 3); k = 1) == [-Inf]
         @test cs_regression_bic(Bp, [1.0 0.0], zeros(1, 3); k = 1) == [-Inf]
     end
@@ -436,7 +436,7 @@ include(joinpath(@__DIR__, "parity_harness.jl"))
         # of three to seven assets reach the rounding that four assets can miss.
         rng8 = StableRNG(97531864)
         for n in 3:7, _ in 1:200
-            B = randn(rng8, 1, n, 1)
+            B = permutedims(randn(rng8, 1, n, 1), (2, 3, 1))
             e = fill(randn(rng8), 1, n)
             @test isnan(cs_regression_r2(B, zeros(1, 1), e, rand(rng8, 1, n))[1])
         end
@@ -448,10 +448,10 @@ include(joinpath(@__DIR__, "parity_harness.jl"))
         # factor is `Inf`: the diagonal of the pseudo-inverse gave values below one, which
         # no `1 / (1 - R_k^2)` reaches.
         Nc = 9
-        Bc = zeros(1, Nc, 4)
-        Bc[1, :, 1] .= 1.0
+        Bc = zeros(Nc, 4, 1)
+        Bc[:, 1, 1] .= 1.0
         for i in 1:Nc
-            Bc[1, i, 2 + mod(i, 3)] = 1.0
+            Bc[i, 2 + mod(i, 3), 1] = 1.0
         end
         @test all(==(Inf), exposure_vif(Bc, nothing))
         @test all(==(Inf), PortfolioOptimisers.cs_gram_inverse_diagonal(cs_gram(Bc)))
@@ -465,18 +465,18 @@ include(joinpath(@__DIR__, "parity_harness.jl"))
         # an infinite factor, and the zero column has no factor.
         rngc = StableRNG(24681357)
         Tc, Nd = 5, 12
-        Br = randn(rngc, Tc, Nd, 2)
-        Bx = cat(Br, Br[:, :, 1:1], zeros(Tc, Nd, 1); dims = 3)
+        Br = permutedims(randn(rngc, Tc, Nd, 2), (2, 3, 1))
+        Bx = cat(Br, Br[:, 1:1, :], zeros(Nd, 1, Tc); dims = 2)
         wc = rand(rngc, Tc, Nd) .+ 0.5
         fx = zeros(Tc, 4)
         ex = zeros(Tc, Nd)
         fr = zeros(Tc, 2)
         for t in 1:Tc
-            y = Br[t, :, :] * [0.3, -0.2] + 0.1 * randn(rngc, Nd)
+            y = Br[:, :, t] * [0.3, -0.2] + 0.1 * randn(rngc, Nd)
             sw = sqrt.(wc[t, :])
-            fx[t, :] = pinv(sw .* Bx[t, :, :]) * (sw .* y)
-            ex[t, :] = y - Bx[t, :, :] * fx[t, :]
-            fr[t, :] = (sw .* Br[t, :, :]) \ (sw .* y)
+            fx[t, :] = pinv(sw .* Bx[:, :, t]) * (sw .* y)
+            ex[t, :] = y - Bx[:, :, t] * fx[t, :]
+            fr[t, :] = (sw .* Br[:, :, t]) \ (sw .* y)
         end
         @test fr ≈ fx[:, 1:2] .* [2 1] rtol = 1e-12
         tx = cs_regression_t_stats(Bx, fx, ex, wc)
@@ -504,33 +504,20 @@ include(joinpath(@__DIR__, "parity_harness.jl"))
     @testset "the numeric types" begin
         rng9 = StableRNG(13572468)
         Tn, Nn, Kn = 3, 7, 2
-        Bi = rand(rng9, -3:3, Tn, Nn, Kn)
-        Bi[:, :, 1] .= 1
-        fi = rand(rng9, -3:3, Tn, Kn)
-        ei = rand(rng9, -3:3, Tn, Nn)
-        wi = rand(rng9, 1:3, Tn, Nn)
-        Bf, ff, ef, wf = float.(Bi), float.(fi), float.(ei), float.(wi)
-        # An integer history keeps an exact Gram history, and an integer weight scales it.
-        @test cs_gram(Bi, wi) isa Array{Int, 3}
-        @test cs_gram(Bi, wi) == cs_gram(Bf, wf)
-        # Every other verb answers in `Float64`, and agrees with the float history.
-        @test exposure_vif(Bi, wi) ≈ exposure_vif(Bf, wf)
-        @test exposure_condition_number(Bi, wi) ≈ exposure_condition_number(Bf, wf)
-        @test cs_regression_t_stats(Bi, fi, ei, wi) ≈ cs_regression_t_stats(Bf, ff, ef, wf)
-        for verb in (cs_regression_r2, cs_regression_adjusted_r2, cs_regression_aic,
-                     cs_regression_bic)
-            @test verb(Bi, fi, ei, wi) isa Vector{Float64}
-            @test verb(Bi, fi, ei, wi) ≈ verb(Bf, ff, ef, wf)
-        end
-        @test cs_regression_t_stat_exceedance_rate([3 1; 1 1]) == [0.5, 0.0]
+        # Issue #1972 removed the integer history: integer data convert at the carrier.
+        Bf = float.(permutedims(rand(rng9, -3:3, Tn, Nn, Kn), (2, 3, 1)))
+        Bf[:, 1, :] .= 1
+        ff = float.(rand(rng9, -3:3, Tn, Kn))
+        ef = float.(rand(rng9, -3:3, Tn, Nn))
+        wf = float.(rand(rng9, 1:3, Tn, Nn))
         # A `Rational` history keeps its Gram history and its scores exact. The
         # decomposition and the logarithm answer in `Float64`.
-        Br, fr, er = Rational{Int}.(Bi), Rational{Int}.(fi), ei .// 7
+        Br, fr, er = Rational{Int}.(Bf), Rational{Int}.(ff), Rational{Int}.(ef) .// 7
         @test cs_gram(Br) isa Array{Rational{Int}, 3}
         @test cs_regression_r2(Br, fr, er) isa Vector{Rational{Int}}
-        @test cs_regression_r2(Br, fr, er) ≈ cs_regression_r2(Bf, ff, ei ./ 7)
+        @test cs_regression_r2(Br, fr, er) ≈ cs_regression_r2(Bf, ff, ef ./ 7)
         @test exposure_vif(Br, nothing) ≈ exposure_vif(Bf, nothing)
-        @test cs_regression_aic(Br, fr, er) ≈ cs_regression_aic(Bf, ff, ei ./ 7)
+        @test cs_regression_aic(Br, fr, er) ≈ cs_regression_aic(Bf, ff, ef ./ 7)
         @test cs_regression_t_stat_exceedance_rate([3//1 1; 1 1]) == [1//2, 0]
         # A `Float32` history stays `Float32`.
         B32, f32, e32, w32 = Float32.(Bf), Float32.(ff), Float32.(ef), Float32.(wf)
@@ -546,19 +533,19 @@ end
     PO = PortfolioOptimisers
     rng = StableRNG(1_367_08)
     T, N = 8, 6
-    Ms = randn(rng, T, N, 3)
-    Ms[:, :, 3] .= 1.0
+    Ms = permutedims(randn(rng, T, N, 3), (2, 3, 1))
+    Ms[:, 3, :] .= 1.0
     f = 0.02 * randn(rng, T, 2)
     fx = 0.01 * randn(rng, T, 1)
     eps = 0.01 * randn(rng, T, N)
     rw = abs.(randn(rng, T, N)) .+ 0.1
     csr = CrossSectionalRegression(; f = f, eps = eps, n = fill(N, T))
-    blk = CrossSectionalFactorModel(; M = Ms[T, :, :], b = zeros(N), csr = csr, Ms = Ms,
+    blk = CrossSectionalFactorModel(; M = Ms[:, :, T], b = zeros(N), csr = csr, Ms = Ms,
                                     rw = rw, lag = 1, nf = ["value", "size", "usd"],
                                     fam = ["style", "style", "currency"], fx = fx)
     # The same block without the observed factor is the design the regression ran on.
-    est = CrossSectionalFactorModel(; M = Ms[T, :, 1:2], b = zeros(N), csr = csr,
-                                    Ms = Ms[:, :, 1:2], rw = rw, lag = 1,
+    est = CrossSectionalFactorModel(; M = Ms[:, 1:2, T], b = zeros(N), csr = csr,
+                                    Ms = Ms[:, 1:2, :], rw = rw, lag = 1,
                                     nf = ["value", "size"])
     @test cs_regression_t_stats(blk).X == cs_regression_t_stats(est).X
     @test isequal(exposure_vif(blk).X, exposure_vif(est).X)
@@ -587,7 +574,7 @@ using Statistics
     # change to any of them invalidates the literals of `the stored oracle`.
     rng = StableRNG(24680)
     T, N, K = 10, 6, 4
-    Ms = randn(rng, T, N, K)
+    Ms = permutedims(randn(rng, T, N, K), (2, 3, 1))
     f = 0.02 * randn(rng, T, K)
     eps = 0.01 * randn(rng, T, N)
     rw = abs.(randn(rng, T, N)) .+ 0.1
@@ -595,30 +582,30 @@ using Statistics
     vs = abs.(randn(rng, T, N)) .+ 0.5
     # The third factor is the global intercept. Its cross-section is constant, so every
     # pair that holds it is degenerate and reads `0` by convention.
-    Ms[:, :, 3] .= 1.0
+    Ms[:, 3, :] .= 1.0
     # The fourth factor is finite on two assets alone, so no pair that holds it ever
     # reaches the three common assets an estimate needs, and every such pair reads `NaN`.
-    Ms[:, 3:6, 4] .= NaN
+    Ms[3:6, 4, :] .= NaN
     # An asset that carries no weight leaves the universe of that observation.
     rw[3, 2] = 0.0
     bw[7, 4] = 0.0
     # A missing exposure costs its own pair and not the observation.
-    Ms[2, 4, 1] = NaN
+    Ms[4, 1, 2] = NaN
     # An observation at which a factor keeps two finite assets is insufficient there alone.
-    Ms[5, 1, 2] = NaN
-    Ms[5, 2, 2] = NaN
-    Ms[5, 3, 2] = NaN
-    Ms[5, 4, 2] = NaN
+    Ms[1, 2, 5] = NaN
+    Ms[2, 2, 5] = NaN
+    Ms[3, 2, 5] = NaN
+    Ms[4, 2, 5] = NaN
 
     csr = CrossSectionalRegression(; f = f, eps = eps, n = fill(N, T))
-    csfm = CrossSectionalFactorModel(; M = Ms[T, :, :], b = zeros(N), csr = csr, Ms = Ms,
+    csfm = CrossSectionalFactorModel(; M = Ms[:, :, T], b = zeros(N), csr = csr, Ms = Ms,
                                      vs = vs, rw = rw, bw = bw, lag = 1)
     # The fourth factor is not finite on four of the six assets, so the reconstructed asset
     # return of those assets is not finite either, and the information coefficient of every
     # factor would be `NaN`. It is read on the three dense factors of the same fixture.
     csr3 = CrossSectionalRegression(; f = f[:, 1:3], eps = eps, n = fill(N, T))
-    csfm3 = CrossSectionalFactorModel(; M = Ms[T, :, 1:3], b = zeros(N), csr = csr3,
-                                      Ms = Ms[:, :, 1:3], vs = vs, rw = rw, bw = bw,
+    csfm3 = CrossSectionalFactorModel(; M = Ms[:, 1:3, T], b = zeros(N), csr = csr3,
+                                      Ms = Ms[:, 1:3, :], vs = vs, rw = rw, bw = bw,
                                       lag = 1)
 
     # Cell by cell: the pattern of the absent answers agrees exactly, and each finite cell
@@ -700,7 +687,7 @@ using Statistics
 
         # Measured maxrel 3.5e-16, 6.6e-16 and 3.4e-16.
         @test exposure_agrees(exposure_correlation(csfm).X, ref_corr_bw)
-        @test exposure_agrees(exposure_correlation(csfm; weighting = IdentityMetric()).X,
+        @test exposure_agrees(exposure_correlation(csfm; weighting = nothing).X,
                               ref_corr_id)
         @test exposure_agrees(exposure_correlation(csfm;
                                                    weighting = RegressionWeightMetric()).X,
@@ -804,13 +791,13 @@ using Statistics
         rng2 = StableRNG(13571113)
         Ti, Ni = 5, 6
         R = randn(rng2, Ti, Ni)
-        B = Array{Float64, 3}(undef, Ti, Ni, 1)
+        B = Array{Float64, 3}(undef, Ni, 1, Ti)
         # The exposure of an observation is the return of the observation that follows it,
         # so the exposure forecasts the return without error.
         for t in 1:(Ti - 1)
-            B[t, :, 1] = R[t + 1, :]
+            B[:, 1, t] = R[t + 1, :]
         end
-        B[Ti, :, 1] = R[1, :]
+        B[:, 1, Ti] = R[1, :]
         @test isapprox(exposure_ic(B, R)[:, 1], ones(Ti - 1); rtol = 1e-12)
         @test isapprox(exposure_ic(B, R; rank = false)[:, 1], ones(Ti - 1); rtol = 1e-12)
         # The forward mean return of a horizon of one observation is the next return.
@@ -826,18 +813,18 @@ using Statistics
     @testset "the stability of a constant exposure and of a reshuffled one" begin
         rng3 = StableRNG(97531)
         Ts, Ns = 4, 8
-        B = Array{Float64, 3}(undef, Ts, Ns, 3)
+        B = Array{Float64, 3}(undef, Ns, 3, Ts)
         col = randn(rng3, Ns)
         for t in 1:Ts
             # The first factor keeps its ordering, so its stability is `1`.
-            B[t, :, 1] = col
+            B[:, 1, t] = col
             # The second factor is constant across the assets, so it has no correlation and
             # its stability is `NaN`. The summary of #709 is what reads such a factor as
             # `1`.
-            B[t, :, 2] .= 2.0
+            B[:, 2, t] .= 2.0
             # The third factor is drawn afresh at each observation, so its stability is the
             # correlation of two independent cross-sections.
-            B[t, :, 3] = randn(rng3, Ns)
+            B[:, 3, t] = randn(rng3, Ns)
         end
         S = exposure_stability(B; step = 1)
         @test size(S) == (Ts - 1, 3)
@@ -851,30 +838,30 @@ using Statistics
     @testset "the dispersion of a standardised exposure is one" begin
         rng4 = StableRNG(2468013)
         Td, Nd = 3, 7
-        B = Array{Float64, 3}(undef, Td, Nd, 2)
+        B = Array{Float64, 3}(undef, Nd, 2, Td)
         for t in 1:Td
             x = randn(rng4, Nd)
             # A cross-section of zero mean and unit population standard deviation has a
             # dispersion of exactly one under equal weights.
-            B[t, :, 1] = (x .- Statistics.mean(x)) ./ Statistics.std(x; corrected = false)
-            B[t, :, 2] = 3.0 * B[t, :, 1]
+            B[:, 1, t] = (x .- Statistics.mean(x)) ./ Statistics.std(x; corrected = false)
+            B[:, 2, t] = 3.0 * B[:, 1, t]
         end
         D = exposure_dispersion(B)
         @test isapprox(D[:, 1], ones(Td); rtol = 1e-12)
         @test isapprox(D[:, 2], fill(3.0, Td); rtol = 1e-12)
         # A factor whose whole cross-section is absent has no dispersion.
         Bn = copy(B)
-        Bn[1, :, 1] .= NaN
+        Bn[:, 1, 1] .= NaN
         @test isnan(exposure_dispersion(Bn)[1, 1])
         @test !isnan(exposure_dispersion(Bn)[1, 2])
     end
 
     @testset "the coverage counts the universe of each observation" begin
-        B = Array{Float64, 3}(undef, 2, 4, 2)
-        B[:, :, 1] .= 1.0
-        B[:, :, 2] .= 1.0
+        B = Array{Float64, 3}(undef, 4, 2, 2)
+        B[:, 1, :] .= 1.0
+        B[:, 2, :] .= 1.0
         # One asset of the universe carries no exposure, so the coverage is `1 - 1/n`.
-        B[1, 2, 2] = NaN
+        B[2, 2, 1] = NaN
         @test exposure_coverage(B) == [1.0, 1 - 1 / 8]
         # An asset outside the universe counts in neither the numerator nor the
         # denominator, so a missing exposure there costs no coverage.
@@ -895,16 +882,15 @@ using Statistics
               rw
         @test PortfolioOptimisers.cs_diagnostic_weights(InverseIdiosyncraticVarianceMetric(),
                                                         csfm) == 1 ./ vs
-        @test isnothing(PortfolioOptimisers.cs_diagnostic_weights(IdentityMetric(), csfm))
+        @test isnothing(PortfolioOptimisers.cs_diagnostic_weights(nothing, csfm))
         # The answer under a member is the answer under the history it names.
         @test exposure_agrees(exposure_dispersion(csfm;
                                                   weighting = RegressionWeightMetric()).X,
                               exposure_dispersion(Ms, rw))
-        @test exposure_agrees(exposure_stability(csfm; step = 2,
-                                                 weighting = IdentityMetric()).X,
+        @test exposure_agrees(exposure_stability(csfm; step = 2, weighting = nothing).X,
                               exposure_stability(Ms; step = 2))
         # A block that carries no such field refuses, and the refusal names the field.
-        bare = CrossSectionalFactorModel(; M = Ms[T, :, :], b = zeros(N), csr = csr,
+        bare = CrossSectionalFactorModel(; M = Ms[:, :, T], b = zeros(N), csr = csr,
                                          Ms = Ms, lag = 1)
         for metric in (BenchmarkWeightMetric(), RegressionWeightMetric(),
                        InverseIdiosyncraticVarianceMetric())
@@ -922,16 +908,16 @@ using Statistics
         @test isnothing(PortfolioOptimisers.exposure_coverage_weights(RegressionWeightMetric(),
                                                                       bare))
         @test exposure_coverage(bare).X ==
-              exposure_coverage(bare; weighting = IdentityMetric()).X ==
+              exposure_coverage(bare; weighting = nothing).X ==
               exposure_coverage(Ms)
     end
 
     @testset "a block that carries no history refuses by name" begin
-        empty_block = CrossSectionalFactorModel(; M = Ms[T, :, :], b = zeros(N))
+        empty_block = CrossSectionalFactorModel(; M = Ms[:, :, T], b = zeros(N))
         @test_throws PortfolioOptimisers.IsNothingError exposure_correlation(empty_block;
-                                                                             weighting = IdentityMetric())
+                                                                             weighting = nothing)
         @test_throws PortfolioOptimisers.IsNothingError exposure_ic(empty_block)
-        no_fit = CrossSectionalFactorModel(; M = Ms[T, :, :], b = zeros(N), Ms = Ms,
+        no_fit = CrossSectionalFactorModel(; M = Ms[:, :, T], b = zeros(N), Ms = Ms,
                                            lag = 1)
         @test_throws PortfolioOptimisers.IsNothingError exposure_ic(no_fit)
         @test_throws PortfolioOptimisers.IsNothingError exposure_ic_summary(no_fit;
@@ -939,16 +925,16 @@ using Statistics
         # The exposure history and the fit must carry the same axes.
         short = CrossSectionalRegression(; f = f[1:(T - 1), :], eps = eps[1:(T - 1), :],
                                          n = fill(N, T - 1))
-        mismatched = CrossSectionalFactorModel(; M = Ms[T, :, :], b = zeros(N), csr = short,
+        mismatched = CrossSectionalFactorModel(; M = Ms[:, :, T], b = zeros(N), csr = short,
                                                Ms = Ms, lag = 1)
         @test_throws DimensionMismatch exposure_ic(mismatched)
-        long_lag = CrossSectionalFactorModel(; M = Ms[T, :, :], b = zeros(N), csr = csr,
+        long_lag = CrossSectionalFactorModel(; M = Ms[:, :, T], b = zeros(N), csr = csr,
                                              Ms = Ms, lag = T)
         @test_throws DimensionMismatch exposure_ic(long_lag)
     end
 
     @testset "the level-1 verbs check their arguments" begin
-        B = randn(StableRNG(5), 3, 4, 2)
+        B = permutedims(randn(StableRNG(5), 3, 4, 2), (2, 3, 1))
         @test_throws DimensionMismatch exposure_dispersion(B, ones(2, 4))
         @test_throws DomainError exposure_dispersion(B, fill(-1.0, 3, 4))
         @test_throws PortfolioOptimisers.IsEmptyError exposure_dispersion(zeros(0, 0, 0))
@@ -1028,7 +1014,7 @@ using Statistics
     @testset "a re-based block answers on the reduced axis when it is asked to" begin
         rng6 = StableRNG(864213579)
         Tr, Nr, Kr = 6, 5, 3
-        Msr = randn(rng6, Tr, Nr, Kr)
+        Msr = permutedims(randn(rng6, Tr, Nr, Kr), (2, 3, 1))
         # A fit under a re-basis estimates its factor returns on the reduced axis.
         fr = 0.02 * randn(rng6, Tr, Kr - 1)
         epsr = 0.01 * randn(rng6, Tr, Nr)
@@ -1037,8 +1023,8 @@ using Statistics
                                 ratios = reshape(collect(range(0.4, 0.9; length = Tr)), Tr,
                                                  1), K = Kr)
         csr_r = CrossSectionalRegression(; f = fr, eps = epsr, n = fill(Nr, Tr))
-        L = PortfolioOptimisers.reduce_loadings(fcb, Msr[Tr, :, :])
-        blk = CrossSectionalFactorModel(; M = Msr[Tr, :, :], L = L, b = zeros(Nr),
+        L = PortfolioOptimisers.reduce_loadings(fcb, Msr[:, :, Tr])
+        blk = CrossSectionalFactorModel(; M = Msr[:, :, Tr], L = L, b = zeros(Nr),
                                         csr = csr_r, Ms = Msr, rw = rwr, fcb = fcb, lag = 1,
                                         nf = ["tech", "bank", "value"],
                                         fam = ["industry", "industry", "style"])
@@ -1046,8 +1032,8 @@ using Statistics
         @test Kred == 2
         # The exposure group answers on the raw axis, because it reads the exposure history
         # and never the design of the fit.
-        @test size(exposure_correlation(blk; weighting = IdentityMetric()).X) == (Kr, Kr)
-        @test size(exposure_dispersion(blk; weighting = IdentityMetric()).X) == (Tr, Kr)
+        @test size(exposure_correlation(blk; weighting = nothing).X) == (Kr, Kr)
+        @test size(exposure_dispersion(blk; weighting = nothing).X) == (Tr, Kr)
         @test size(exposure_ic(blk).X) == (Tr - 1, Kr)
         # `reduced` is the one mode that maps the exposures through the re-basis first.
         @test size(exposure_ic(blk; reduced = true).X) == (Tr - 1, Kred)
@@ -1059,10 +1045,10 @@ using Statistics
         # Each answer carries the names and the families of its own axis: the raw axis, or
         # the reduced axis, which drops the second industry.
         PO = PortfolioOptimisers
-        raw = (exposure_correlation(blk; weighting = IdentityMetric()),
-               exposure_dispersion(blk; weighting = IdentityMetric()), exposure_ic(blk),
-               exposure_stability(blk; step = 2, weighting = IdentityMetric()),
-               exposure_coverage(blk; weighting = IdentityMetric()))
+        raw = (exposure_correlation(blk; weighting = nothing),
+               exposure_dispersion(blk; weighting = nothing), exposure_ic(blk),
+               exposure_stability(blk; step = 2, weighting = nothing),
+               exposure_coverage(blk; weighting = nothing))
         for r in raw
             @test r.nf == ["tech", "bank", "value"]
             @test r.fam == ["industry", "industry", "style"]
@@ -1131,20 +1117,20 @@ using Statistics
 
     @testset "an asset enters only on a finite positive weight" begin
         rng7 = StableRNG(842)
-        Bw = randn(rng7, 1, 4, 2)
+        Bw = permutedims(randn(rng7, 1, 4, 2), (2, 3, 1))
         # Two assets of positive weight are fewer than the three a correlation needs, and a
         # zero weight does not make up the count.
         @test isnan(exposure_correlation(Bw, [1.0 1.0 0.0 0.0])[1, 2])
         # A `NaN` or an infinite weight excludes its own asset and not the observation.
         for bad in (NaN, Inf)
             wb = [1.0 1.0 1.0 bad]
-            @test exposure_correlation(Bw, wb) ≈ exposure_correlation(Bw[:, 1:3, :])
-            @test exposure_dispersion(Bw, wb) ≈ exposure_dispersion(Bw[:, 1:3, :])
+            @test exposure_correlation(Bw, wb) ≈ exposure_correlation(Bw[1:3, :, :])
+            @test exposure_dispersion(Bw, wb) ≈ exposure_dispersion(Bw[1:3, :, :])
         end
         # The universe of the coverage reads the same rule: the asset of infinite weight
         # leaves the universe, so the three finite exposures cover all of it.
         Bc = copy(Bw)
-        Bc[1, 4, :] .= NaN
+        Bc[4, :, 1] .= NaN
         @test exposure_coverage(Bc, [1.0 1.0 1.0 Inf]) == [1.0, 1.0]
         @test exposure_coverage(Bc) == [0.75, 0.75]
     end
@@ -1157,7 +1143,7 @@ using Statistics
                                                                 [1e6, 3e6, 2e6], ones(3)))
         rng8 = StableRNG(2842)
         for x in (0.1, 0.3, 0.7), n in (3, 5, 7)
-            @test iszero(exposure_dispersion(fill(x, 1, n, 1), rand(rng8, 1, n))[1, 1])
+            @test iszero(exposure_dispersion(fill(x, n, 1, 1), rand(rng8, 1, n))[1, 1])
         end
         # The intercept of the fixture is constant, so its dispersion is exactly zero, where
         # the oracle reads the round-off `2.2e-16`.
@@ -1167,8 +1153,8 @@ using Statistics
     @testset "the verbs agree with the textbook estimators" begin
         rng9 = StableRNG(1842)
         Tn, Nn, Kn, H = 30, 12, 3, 3
-        Bn = randn(rng9, Tn, Nn, Kn)
-        Bn[rand(rng9, Tn, Nn, Kn) .< 0.1] .= NaN
+        Bn = permutedims(randn(rng9, Tn, Nn, Kn), (2, 3, 1))
+        Bn[permutedims(rand(rng9, Tn, Nn, Kn) .< 0.1, (2, 3, 1))] .= NaN
         Rn = 0.02 * randn(rng9, Tn, Nn)
         Rn[rand(rng9, Tn, Nn) .< 0.05] .= NaN
         wn = rand(rng9, Tn, Nn)
@@ -1189,22 +1175,22 @@ using Statistics
                     1.0
                 else
                     mean(filter(isfinite,
-                                [wcor(Bn[t, :, k], Bn[t, :, l], wn[t, :]) for t in 1:Tn]))
+                                [wcor(Bn[:, k, t], Bn[:, l, t], wn[t, :]) for t in 1:Tn]))
                 end
                 for k in 1:Kn, l in 1:Kn]
         @test exposure_correlation(Bn, wn) ≈ Cref
         @test exposure_ic(Bn, Rn, wn; horizon = H, rank = false) ≈
-              [wcor(Bn[t, :, k], y[t, :], wn[t, :]) for t in 1:(Tn - H), k in 1:Kn]
+              [wcor(Bn[:, k, t], y[t, :], wn[t, :]) for t in 1:(Tn - H), k in 1:Kn]
         @test exposure_ic(Bn, Rn, wn; horizon = H) ≈
-              [srank(Bn[t, :, k], y[t, :]) for t in 1:(Tn - H), k in 1:Kn]
+              [srank(Bn[:, k, t], y[t, :]) for t in 1:(Tn - H), k in 1:Kn]
         @test exposure_stability(Bn, wn; step = 4) ≈
-              [wcor(Bn[t, :, k], Bn[t + 4, :, k], wn[t, :]) for t in 1:(Tn - 4), k in 1:Kn]
-        Dref = [(m = isfinite.(Bn[t, :, k]) .& (wn[t, :] .> 0);
-                 std(Bn[t, m, k], Weights(wn[t, m]); corrected = false))
+              [wcor(Bn[:, k, t], Bn[:, k, t + 4], wn[t, :]) for t in 1:(Tn - 4), k in 1:Kn]
+        Dref = [(m = isfinite.(Bn[:, k, t]) .& (wn[t, :] .> 0);
+                 std(Bn[m, k, t], Weights(wn[t, m]); corrected = false))
                 for t in 1:Tn, k in 1:Kn]
         @test exposure_dispersion(Bn, wn) ≈ Dref
         @test exposure_coverage(Bn, wn) ≈
-              [mean(count(isfinite.(Bn[t, :, k]) .& (wn[t, :] .> 0)) / count(wn[t, :] .> 0)
+              [mean(count(isfinite.(Bn[:, k, t]) .& (wn[t, :] .> 0)) / count(wn[t, :] .> 0)
                     for t in 1:Tn) for k in 1:Kn]
         # The t-statistic over two lags, written out from its definition.
         ic = exposure_ic(Bn, Rn, wn; horizon = H)
@@ -1225,33 +1211,20 @@ using Statistics
 
     @testset "the verbs derive their types from the data" begin
         rng10 = StableRNG(3842)
-        Bi = rand(rng10, -3:3, 8, 5, 2)
-        Ri = rand(rng10, -3:3, 8, 5)
-        Bf = float.(Bi)
-        Rf = float.(Ri)
-        # An integer panel answers in `Float64`, with the numbers of the same panel in floats.
-        @test exposure_correlation(Bi) ≈ exposure_correlation(Bf)
-        @test isequal(exposure_ic(Bi, Ri), exposure_ic(Bf, Rf))
-        @test isequal(exposure_ic(Bi, Ri; rank = false), exposure_ic(Bf, Rf; rank = false))
-        @test isequal(exposure_stability(Bi; step = 2), exposure_stability(Bf; step = 2))
-        @test exposure_dispersion(Bi) ≈ exposure_dispersion(Bf)
-        @test exposure_coverage(Bi) == exposure_coverage(Bf)
-        @test PortfolioOptimisers.cs_ranks([3, 1, 1, 2], trues(4), :average) ==
-              [4.0, 1.5, 1.5, 3.0]
-        ici = rand(rng10, -1:1, 6, 2)
-        @test isequal(exposure_ic_summary(ici; lags = 1, mt = OverlapMeanTest()),
-                      exposure_ic_summary(float.(ici); lags = 1, mt = OverlapMeanTest()))
+        # Issue #1972 removed the integer panel: integer data convert at the carrier.
+        Bf = float.(permutedims(rand(rng10, -3:3, 8, 5, 2), (2, 3, 1)))
+        Rf = float.(rand(rng10, -3:3, 8, 5))
+        icf = float.(rand(rng10, -1:1, 6, 2))
         # A `Rational` panel keeps its means exact, and a square root answers in `Float64`.
-        Rr = Rational{Int}.(Ri)
+        Rr = Rational{Int}.(Rf)
         @test PortfolioOptimisers.exposure_forward_mean_return(Rr, 2) isa
               Matrix{Rational{Int}}
-        @test exposure_coverage(Rational{Int}.(Bi)) isa Vector{Rational{Int}}
-        sr = exposure_ic_summary(Rational{Int}.(ici); lags = 1, mt = OverlapMeanTest())
+        @test exposure_coverage(Rational{Int}.(Bf)) isa Vector{Rational{Int}}
+        sr = exposure_ic_summary(Rational{Int}.(icf); lags = 1, mt = OverlapMeanTest())
         @test sr.mean_ic isa Vector{Rational{Int}}
         @test sr.hit_rate isa Vector{Rational{Int}}
-        @test sr.std_ic ≈
-              exposure_ic_summary(float.(ici); lags = 1, mt = OverlapMeanTest()).std_ic
-        @test exposure_correlation(Rational{Int}.(Bi)) ≈ exposure_correlation(Bf)
+        @test sr.std_ic ≈ exposure_ic_summary(icf; lags = 1, mt = OverlapMeanTest()).std_ic
+        @test exposure_correlation(Rational{Int}.(Bf)) ≈ exposure_correlation(Bf)
         # A `Float32` panel stays in `Float32`.
         B32 = Float32.(Bf)
         R32 = Float32.(Rf)
@@ -1267,17 +1240,17 @@ end
     PO = PortfolioOptimisers
     rng = StableRNG(1_367_09)
     T, N = 8, 6
-    Ms = randn(rng, T, N, 3)
+    Ms = permutedims(randn(rng, T, N, 3), (2, 3, 1))
     f = 0.02 * randn(rng, T, 2)
     fx = 0.01 * randn(rng, T, 1)
     eps = 0.01 * randn(rng, T, N)
     csr = CrossSectionalRegression(; f = f, eps = eps, n = fill(N, T))
-    blk = CrossSectionalFactorModel(; M = Ms[T, :, :], b = zeros(N), csr = csr, Ms = Ms,
+    blk = CrossSectionalFactorModel(; M = Ms[:, :, T], b = zeros(N), csr = csr, Ms = Ms,
                                     lag = 1, fx = fx)
     B, R, _ = PO.exposure_ic_data(blk, nothing, false)
     F = hcat(f, fx)
     for t in 2:T
-        @test R[t, :] ≈ Ms[t - 1, :, :] * F[t, :] + eps[t, :]
+        @test R[t, :] ≈ Ms[:, :, t - 1] * F[t, :] + eps[t, :]
     end
     @test size(exposure_ic(blk).X) == (T - 1, 3)
     # The returns the reconstruction gives back, observed part included, score every factor
@@ -1290,18 +1263,18 @@ end
     PO = PortfolioOptimisers
     rng = StableRNG(1_524)
     T, N, K = 10, 6, 4
-    Ms = randn(rng, T, N, K)
+    Ms = permutedims(randn(rng, T, N, K), (2, 3, 1))
     f = 0.02 * randn(rng, T, K)
     eps = 0.01 * randn(rng, T, N)
     rw = abs.(randn(rng, T, N)) .+ 0.1
     # The fourth factor is finite on two assets alone.
-    Ms[:, 3:6, 4] .= NaN
+    Ms[3:6, 4, :] .= NaN
     csr = CrossSectionalRegression(; f = f, eps = eps, n = fill(N, T))
-    csfm = CrossSectionalFactorModel(; M = Ms[T, :, :], b = zeros(N), csr = csr, Ms = Ms,
+    csfm = CrossSectionalFactorModel(; M = Ms[:, :, T], b = zeros(N), csr = csr, Ms = Ms,
                                      rw = rw, lag = 1)
     csr3 = CrossSectionalRegression(; f = f[:, 1:3], eps = eps, n = fill(N, T))
-    csfm3 = CrossSectionalFactorModel(; M = Ms[T, :, 1:3], b = zeros(N), csr = csr3,
-                                      Ms = Ms[:, :, 1:3], rw = rw, lag = 1)
+    csfm3 = CrossSectionalFactorModel(; M = Ms[:, 1:3, T], b = zeros(N), csr = csr3,
+                                      Ms = Ms[:, 1:3, :], rw = rw, lag = 1)
     # The reconstruction reads the sparse factor, so four assets of six lose their return,
     # and no factor keeps the three assets a coefficient needs.
     @test all(isnan, exposure_ic(csfm).X)
@@ -1325,33 +1298,33 @@ end
                   exposure_ic_summary(csfm3; horizon = 2, mt = OverlapMeanTest()).t_stat)
 
     # A block that records the position of each row reads those rows of the returns data.
-    pos = CrossSectionalFactorModel(; M = Ms[T, :, 1:3], b = zeros(N), csr = csr3,
-                                    Ms = Ms[:, :, 1:3], rw = rw, lag = 1,
+    pos = CrossSectionalFactorModel(; M = Ms[:, 1:3, T], b = zeros(N), csr = csr3,
+                                    Ms = Ms[:, 1:3, :], rw = rw, lag = 1,
                                     idx = collect(3:(T + 2)))
     rdp = ReturnsResult(; nx = string.(1:N), X = vcat(randn(rng, 2, N), R3))
     @test isequal(exposure_ic(pos, rdp).X, exposure_ic(csfm3).X)
     # The returns data form reads no fit.
-    no_fit = CrossSectionalFactorModel(; M = Ms[T, :, 1:3], b = zeros(N),
-                                       Ms = Ms[:, :, 1:3], rw = rw, lag = 1)
+    no_fit = CrossSectionalFactorModel(; M = Ms[:, 1:3, T], b = zeros(N),
+                                       Ms = Ms[:, 1:3, :], rw = rw, lag = 1)
     @test_throws PO.IsNothingError exposure_ic(no_fit)
     @test isequal(exposure_ic(no_fit, rd3).X, exposure_ic(csfm3).X)
 
     # The reconstruction starts at row `lag` of the block. The returns data has every row,
     # so it scores the rows before that too.
-    lag2 = CrossSectionalFactorModel(; M = Ms[T, :, 1:3], b = zeros(N), csr = csr3,
-                                     Ms = Ms[:, :, 1:3], rw = rw, lag = 2)
+    lag2 = CrossSectionalFactorModel(; M = Ms[:, 1:3, T], b = zeros(N), csr = csr3,
+                                     Ms = Ms[:, 1:3, :], rw = rw, lag = 2)
     R = 0.01 * randn(rng, T, N)
     rdr = ReturnsResult(; nx = string.(1:N), X = R)
     @test size(exposure_ic(lag2).X) == (T - 2, 3)
-    @test isequal(exposure_ic(lag2, rdr).X, exposure_ic(Ms[:, :, 1:3], R))
+    @test isequal(exposure_ic(lag2, rdr).X, exposure_ic(Ms[:, 1:3, :], R))
     @test isequal(exposure_ic(lag2, rdr; rank = false, horizon = 2).X,
-                  exposure_ic(Ms[:, :, 1:3], R, rw; rank = false, horizon = 2))
+                  exposure_ic(Ms[:, 1:3, :], R, rw; rank = false, horizon = 2))
 
     # The refusals name what is missing.
     @test_throws PO.IsNothingError exposure_ic(csfm,
                                                ReturnsResult(; nf = ["a"],
                                                              F = randn(rng, T, 1)))
-    @test_throws PO.IsNothingError exposure_ic(CrossSectionalFactorModel(; M = Ms[T, :, :],
+    @test_throws PO.IsNothingError exposure_ic(CrossSectionalFactorModel(; M = Ms[:, :, T],
                                                                          b = zeros(N)), rdr)
     @test_throws DimensionMismatch exposure_ic(csfm,
                                                ReturnsResult(; nx = string.(1:N),
@@ -1402,7 +1375,8 @@ function exposure_hand_panel(fields::AbstractVector{<:Pair{String, <:AbstractMat
                              emsk::AbstractMatrix{Bool} = amsk,
                              bw::Union{Nothing, <:AbstractMatrix} = nothing,
                              sectors::Union{Nothing, <:AbstractMatrix} = nothing,
-                             sector_alg::PortfolioOptimisers.AbstractPanelFillAlgorithm = NoPanelFill())
+                             sector_alg::Union{Nothing,
+                                               <:PortfolioOptimisers.AbstractPanelFillAlgorithm} = nothing)
     inputs = Any[NumericPanelInput(; name = n, vals = v,
                                    alg = ForwardPanelFill(; val = 0.0))
                  for (n, v) in fields]
@@ -1537,14 +1511,14 @@ end
         L2 = [1.0 2.0; 3.0 4.0]
         PortfolioOptimisers.exposure_active_fill!(L2, rd.pnl)
         @test isequal(L2, [1.0 2.0; 3.0 NaN])
-        L3 = ones(2, 2, 3)
+        L3 = ones(2, 3, 2)
         PortfolioOptimisers.exposure_active_fill!(L3, rd.pnl)
-        @test all(isnan, L3[2, 2, :])
-        @test all(isone, L3[1, :, :])
+        @test all(isnan, L3[2, :, 2])
+        @test all(isone, L3[:, :, 1])
         @test_throws DimensionMismatch PortfolioOptimisers.exposure_active_fill!(ones(3, 3),
                                                                                  rd.pnl)
-        @test_throws DimensionMismatch PortfolioOptimisers.exposure_active_fill!(ones(3, 3,
-                                                                                      2),
+        @test_throws DimensionMismatch PortfolioOptimisers.exposure_active_fill!(ones(3, 2,
+                                                                                      3),
                                                                                  rd.pnl)
     end
 end
@@ -1675,18 +1649,14 @@ end
               ["sector=banks", "sector=tech"]
         L = factor_exposure(xe, rd)
         @test size(L) == (2, 2, 2)
-        @test L[1, 1, :] == [0.0, 1.0]
-        @test L[1, 2, :] == [1.0, 0.0]
-        @test L[2, 1, :] == [0.0, 1.0]
+        @test L[1, :, 1] == [0.0, 1.0]
+        @test L[2, :, 1] == [1.0, 0.0]
+        @test L[1, :, 2] == [0.0, 1.0]
     end
     @testset "An inactive cell is NaN across every level" begin
-        @test all(isnan, factor_exposure(xe, rd)[2, 2, :])
+        @test all(isnan, factor_exposure(xe, rd)[2, :, 2])
     end
-    @testset "Integer returns take a float exposure, which holds the inactive NaN" begin
-        # The levels used to take the element type of the returns, so integer returns threw
-        # `InexactError: Int64(NaN)` at the first inactive cell.
-        rdi = ReturnsResult(; nx = rd.nx, X = zeros(Int, 2, 2), pnl = rd.pnl)
-        @test isequal(factor_exposure(xe, rdi), factor_exposure(xe, rd))
+    @testset "Float32 returns take a Float32 exposure" begin
         rdf = ReturnsResult(; nx = rd.nx, X = zeros(Float32, 2, 2), pnl = rd.pnl)
         @test eltype(factor_exposure(xe, rdf)) == Float32
     end
@@ -1708,9 +1678,9 @@ end
                                   sectors = ["tech" missing; "tech" "banks"],
                                   sector_alg = ForwardPanelFill(; val = "tech"))
         L = factor_exposure(xe, rdf)
-        @test all(isnan, L[1, 2, :])
-        @test L[1, 1, :] == [0.0, 1.0]
-        @test L[2, 2, :] == [1.0, 0.0]
+        @test all(isnan, L[2, :, 1])
+        @test L[1, :, 1] == [0.0, 1.0]
+        @test L[2, :, 2] == [1.0, 0.0]
     end
     @testset "A numeric Panel Field, and a carrier with no Asset Panel, are refused" begin
         @test_throws ArgumentError factor_exposure(OneHotExposure(; field = "a",
@@ -1726,18 +1696,13 @@ end
         L = factor_exposure(ConstantExposure(), rd)
         @test isequal(L, [1.0 1.0; 1.0 NaN])
     end
-    @testset "Integer returns take a float exposure, which holds the inactive NaN" begin
-        # The ones used to take the element type of the returns, so integer returns threw
-        # `InexactError: Int64(NaN)` at the first inactive cell.
-        rdi = ReturnsResult(; nx = rd.nx, X = zeros(Int, 2, 2), pnl = rd.pnl)
-        @test isequal(factor_exposure(ConstantExposure(), rdi), [1.0 1.0; 1.0 NaN])
+    @testset "Float32 returns take a Float32 exposure" begin
         rdf = ReturnsResult(; nx = rd.nx, X = zeros(Float32, 2, 2), pnl = rd.pnl)
         @test eltype(factor_exposure(ConstantExposure(), rdf)) == Float32
     end
-    @testset "A carrier with no Asset Panel is refused" begin
+    @testset "A carrier with no Asset Panel reads the mask of its returns" begin
         rdn = ReturnsResult(; nx = ["A1", "A2"], X = zeros(2, 2))
-        @test_throws PortfolioOptimisers.IsNothingError factor_exposure(ConstantExposure(),
-                                                                        rdn)
+        @test factor_exposure(ConstantExposure(), rdn) == ones(2, 2)
     end
 end
 
@@ -1774,12 +1739,12 @@ end
         Lo = factor_exposure(OneHotExposure(; field = "industry", family = "industry"), rd)
         G = cross_sectional_groups(rd.pnl, "industry")
         amsk = rd.pnl.amsk
-        @test size(Lo) == (size(amsk)..., 4)
+        @test size(Lo) == (size(amsk, 2), 4, size(amsk, 1))
         for k in CartesianIndices(amsk)
             if amsk[k]
-                @test Lo[k, :] == [l == G[k] ? 1.0 : 0.0 for l in 1:4]
+                @test Lo[k[2], :, k[1]] == [l == G[k] ? 1.0 : 0.0 for l in 1:4]
             else
-                @test all(isnan, Lo[k, :])
+                @test all(isnan, Lo[k[2], :, k[1]])
             end
         end
         Lk = factor_exposure(ConstantExposure(), rd)
@@ -2052,7 +2017,7 @@ using Statistics
         @test all(isnan, (m.m2, m.m3, m.m4))
     end
 
-    @testset "a constant cross-section, an infinite entry and an integer input" begin
+    @testset "a constant cross-section and an infinite entry" begin
         # A cross-section of equal non-zero values has no skewness and no kurtosis. Its mean
         # carries round-off, so a centred moment computed from it is often a tiny positive
         # number and not zero: before the exact test, 4195 of 20000 such rows of 3 to 7
@@ -2068,13 +2033,6 @@ using Statistics
         # An infinite entry enters neither the count nor the sum of the tail rate, so the
         # rate over the finite entries 0.5, 4 and -5 is two in three, never one.
         @test idio_tail_rate([Inf 0.5 4.0 NaN -5.0]) == [2 / 3]
-        # An integer history answers in floating point rather than raising `InexactError`.
-        e_int = [1 -2 3 0; 3 4 -1 2; 0 1 2 -3]
-        v_int = [1 4 1 0; 1 0 4 1; 1 1 1 1]
-        z_int = standardised_idio_returns(e_int, v_int; ahead = false)
-        @test eltype(z_int) == Float64
-        @test isequal(z_int, [1.0 -1.0 3.0 NaN; 3.0 NaN -0.5 2.0; 0.0 1.0 2.0 -3.0])
-        @test idio_calibration([1 2 3; 4 5 7]) ≈ [1.0, std([4, 5, 7])]
         # A Float32 history keeps its element type through every series.
         rng32 = StableRNG(7)
         e32 = randn(rng32, Float32, 6, 9)
@@ -2153,7 +2111,7 @@ using Statistics
     # change to any of them invalidates the literals of `the stored oracle`.
     rngA = StableRNG(987654321)
     TA, NA, KA = 8, 6, 3
-    MsA = randn(rngA, TA, NA, KA)
+    MsA = permutedims(randn(rngA, TA, NA, KA), (2, 3, 1))
     fA = 0.02 * randn(rngA, TA, KA)
     epsA = 0.01 * randn(rngA, TA, NA)
     rwA = abs.(randn(rngA, TA, NA)) .+ 0.1
@@ -2165,14 +2123,14 @@ using Statistics
     rwA[8, 5] = 0.0
     rwA[8, 6] = 0.0
     epsA[4, 3] = NaN
-    MsA[2, 4, 1] = NaN
+    MsA[4, 1, 2] = NaN
     # The factor return of one observation is absent, which costs that observation its
     # t-statistic and costs the whole series its autocorrelation.
     fA[5, 2] = NaN
-    MsA[6, :, 3] = MsA[6, :, 1]
+    MsA[:, 3, 6] = MsA[:, 1, 6]
 
     csrA = CrossSectionalRegression(; f = fA, eps = epsA, n = fill(NA, TA))
-    csfmA = CrossSectionalFactorModel(; M = MsA[TA, :, :], b = zeros(NA), csr = csrA,
+    csfmA = CrossSectionalFactorModel(; M = MsA[:, :, TA], b = zeros(NA), csr = csrA,
                                       Ms = MsA, rw = rwA, bw = bwA, lag = 1)
 
     @testset "the stored oracle, the well-conditioned fixture" begin
@@ -2226,8 +2184,7 @@ using Statistics
         ref_stability_id = [-0.4257338194977314, 0.11924492275222023, 0.18145249792020487]
         ref_stability_rw = [-0.25229769514274375, 0.0032308107079838436,
                             0.26713295230303086]
-        fs_id = factor_model_summary(csfmA; ppy = 252, step = 3,
-                                     weighting = IdentityMetric())
+        fs_id = factor_model_summary(csfmA; ppy = 252, step = 3, weighting = nothing)
         fs_rw = factor_model_summary(csfmA; ppy = 252, step = 3,
                                      weighting = RegressionWeightMetric())
         @test summary_agrees(fs_id.stability, ref_stability_id)
@@ -2252,24 +2209,24 @@ using Statistics
     # on two assets alone.
     rngB = StableRNG(24680)
     TB, NB, KB = 10, 6, 4
-    MsB = randn(rngB, TB, NB, KB)
+    MsB = permutedims(randn(rngB, TB, NB, KB), (2, 3, 1))
     fB = 0.02 * randn(rngB, TB, KB)
     epsB = 0.01 * randn(rngB, TB, NB)
     rwB = abs.(randn(rngB, TB, NB)) .+ 0.1
     bwB = fill(1 / NB, TB, NB)
     vsB = abs.(randn(rngB, TB, NB)) .+ 0.5
-    MsB[:, :, 3] .= 1.0
-    MsB[:, 3:6, 4] .= NaN
+    MsB[:, 3, :] .= 1.0
+    MsB[3:6, 4, :] .= NaN
     rwB[3, 2] = 0.0
     bwB[7, 4] = 0.0
-    MsB[2, 4, 1] = NaN
-    MsB[5, 1, 2] = NaN
-    MsB[5, 2, 2] = NaN
-    MsB[5, 3, 2] = NaN
-    MsB[5, 4, 2] = NaN
+    MsB[4, 1, 2] = NaN
+    MsB[1, 2, 5] = NaN
+    MsB[2, 2, 5] = NaN
+    MsB[3, 2, 5] = NaN
+    MsB[4, 2, 5] = NaN
 
     csrB = CrossSectionalRegression(; f = fB, eps = epsB, n = fill(NB, TB))
-    csfmB = CrossSectionalFactorModel(; M = MsB[TB, :, :], b = zeros(NB), csr = csrB,
+    csfmB = CrossSectionalFactorModel(; M = MsB[:, :, TB], b = zeros(NB), csr = csrB,
                                       Ms = MsB, vs = vsB, rw = rwB, bw = bwB, lag = 1)
 
     @testset "the stored oracle, the constant-exposure fixture" begin
@@ -2348,16 +2305,16 @@ using Statistics
     @testset "a block with no regression weights covers every asset" begin
         # The block was fitted on every asset, so the universe of the coverage is every
         # asset, in the summary and in the standalone verb.
-        blk = CrossSectionalFactorModel(; M = MsA[TA, :, :], b = zeros(NA), csr = csrA,
+        blk = CrossSectionalFactorModel(; M = MsA[:, :, TA], b = zeros(NA), csr = csrA,
                                         Ms = MsA, bw = bwA, lag = 1)
         fs = factor_model_summary(blk; ppy = 252, step = 3)
         @test fs.coverage == exposure_coverage(blk).X
         @test fs.coverage == exposure_coverage(MsA)
-        @test fs.coverage == exposure_coverage(blk; weighting = IdentityMetric()).X
+        @test fs.coverage == exposure_coverage(blk; weighting = nothing).X
     end
 
     @testset "a block with no exposure history carries five absent columns" begin
-        blk = CrossSectionalFactorModel(; M = MsA[TA, :, :], b = zeros(NA), csr = csrA,
+        blk = CrossSectionalFactorModel(; M = MsA[:, :, TA], b = zeros(NA), csr = csrA,
                                         rw = rwA, bw = bwA, lag = 1)
         fs = factor_model_summary(blk; ppy = 252, step = 3)
         @test isnothing(fs.mean_abs_t)
@@ -2381,7 +2338,7 @@ using Statistics
     @testset "a re-based block writes NaN on the factor the basis dropped" begin
         rng5 = StableRNG(19283746)
         Tr, Nr, Kr = 6, 5, 3
-        Msr = randn(rng5, Tr, Nr, Kr)
+        Msr = permutedims(randn(rng5, Tr, Nr, Kr), (2, 3, 1))
         # A fit under a re-basis estimates its factor returns on the reduced axis.
         fr = 0.02 * randn(rng5, Tr, Kr - 1)
         epsr = 0.01 * randn(rng5, Tr, Nr)
@@ -2391,8 +2348,8 @@ using Statistics
                                 ratios = reshape(collect(range(0.4, 0.9; length = Tr)), Tr,
                                                  1), K = Kr)
         csr_r = CrossSectionalRegression(; f = fr, eps = epsr, n = fill(Nr, Tr))
-        L = PortfolioOptimisers.reduce_loadings(fcb, Msr[Tr, :, :])
-        blk = CrossSectionalFactorModel(; M = Msr[Tr, :, :], L = L, b = zeros(Nr),
+        L = PortfolioOptimisers.reduce_loadings(fcb, Msr[:, :, Tr])
+        blk = CrossSectionalFactorModel(; M = Msr[:, :, Tr], L = L, b = zeros(Nr),
                                         csr = csr_r, Ms = Msr, rw = rwr, fcb = fcb, lag = 1,
                                         nf = ["value", "size", "momentum"],
                                         fam = ["industry", "industry", "style"])
@@ -2441,7 +2398,7 @@ using Statistics
         # carries the raw-axis history states its four return statistics.
         rng6 = StableRNG(56473829)
         Tr, Nr, Kr = 6, 5, 3
-        Msr = randn(rng6, Tr, Nr, Kr)
+        Msr = permutedims(randn(rng6, Tr, Nr, Kr), (2, 3, 1))
         fred = 0.02 * randn(rng6, Tr, Kr - 1)
         fcb = FactorFamilyBasis(; fnm = ["industry"], fi = [[1, 2]], di = [2],
                                 ratios = reshape(collect(range(0.4, 0.9; length = Tr)), Tr,
@@ -2449,8 +2406,8 @@ using Statistics
         fraw = PortfolioOptimisers.expand_factor_returns(fcb, fred)
         csr_r = CrossSectionalRegression(; f = fred, eps = 0.01 * randn(rng6, Tr, Nr),
                                          n = fill(Nr, Tr))
-        kw = (; M = Msr[Tr, :, :],
-              L = PortfolioOptimisers.reduce_loadings(fcb, Msr[Tr, :, :]), b = zeros(Nr),
+        kw = (; M = Msr[:, :, Tr],
+              L = PortfolioOptimisers.reduce_loadings(fcb, Msr[:, :, Tr]), b = zeros(Nr),
               csr = csr_r, Ms = Msr, rw = abs.(randn(rng6, Tr, Nr)) .+ 0.1, fcb = fcb,
               lag = 1, nf = ["value", "size", "momentum"])
         blk = CrossSectionalFactorModel(; kw..., fr = fraw)
@@ -2474,7 +2431,7 @@ using Statistics
 
     @testset "the refusals" begin
         # A block with no cross-sectional fit carries no factor return history.
-        blk = CrossSectionalFactorModel(; M = MsA[TA, :, :], b = zeros(NA), Ms = MsA,
+        blk = CrossSectionalFactorModel(; M = MsA[:, :, TA], b = zeros(NA), Ms = MsA,
                                         rw = rwA, bw = bwA, lag = 1)
         @test_throws PortfolioOptimisers.IsNothingError factor_model_summary(blk)
         # A non-positive annualisation factor has no meaning.
@@ -2483,7 +2440,7 @@ using Statistics
         # A re-based block that names no factor cannot be joined back to the raw axis.
         rng6 = StableRNG(5647382)
         Tn, Nn, Kn = 6, 5, 3
-        Msn = randn(rng6, Tn, Nn, Kn)
+        Msn = permutedims(randn(rng6, Tn, Nn, Kn), (2, 3, 1))
         fn = 0.02 * randn(rng6, Tn, Kn)
         epsn = 0.01 * randn(rng6, Tn, Nn)
         rwn = abs.(randn(rng6, Tn, Nn)) .+ 0.1
@@ -2491,8 +2448,8 @@ using Statistics
                                  ratios = reshape(collect(range(0.4, 0.9; length = Tn)), Tn,
                                                   1), K = Kn)
         csr_n = CrossSectionalRegression(; f = fn, eps = epsn, n = fill(Nn, Tn))
-        Ln = PortfolioOptimisers.reduce_loadings(fcbn, Msn[Tn, :, :])
-        blkn = CrossSectionalFactorModel(; M = Msn[Tn, :, :], L = Ln, b = zeros(Nn),
+        Ln = PortfolioOptimisers.reduce_loadings(fcbn, Msn[:, :, Tn])
+        blkn = CrossSectionalFactorModel(; M = Msn[:, :, Tn], L = Ln, b = zeros(Nn),
                                          csr = csr_n, Ms = Msn, rw = rwn, fcb = fcbn,
                                          lag = 1)
         @test_throws PortfolioOptimisers.IsNothingError factor_model_summary(blkn; step = 2,
@@ -2522,10 +2479,10 @@ using Statistics
         @test isnan(s[1])
         # A cross-section with no finite exposure has no variance, and a factor with no
         # finite cross-section anywhere is not constant.
-        E = fill(NaN, 2, 3, 1)
+        E = fill(NaN, 3, 1, 2)
         @test isnan(PortfolioOptimisers.factor_summary_exposure_variance(E, 1, 1))
         @test PortfolioOptimisers.factor_summary_constant_exposures(E) == falses(1)
-        @test PortfolioOptimisers.factor_summary_constant_exposures(ones(2, 3, 1)) ==
+        @test PortfolioOptimisers.factor_summary_constant_exposures(ones(3, 1, 2)) ==
               trues(1)
         # A statistic of the reduced axis maps onto the raw axis, and a dropped factor
         # takes a `NaN`.
@@ -2543,7 +2500,7 @@ using Statistics
         end
         # The cross-sectional variance is uncorrected, over the exposures that are not NaN.
         for t in 1:TA, k in 1:KA
-            b = filter(!isnan, MsA[t, :, k])
+            b = filter(!isnan, MsA[:, k, t])
             @test isapprox(PortfolioOptimisers.factor_summary_exposure_variance(MsA, t, k),
                            Statistics.var(b; corrected = false))
         end
@@ -2575,36 +2532,24 @@ using Statistics
                                                                                4, 1))[1])
     end
 
-    @testset "an integer history" begin
-        # An integer series holds neither a mean nor a NaN, so it computes in floating point
-        # and gives the answers of the same series in Float64.
-        fi = [1 2; 3 5; 4 1; 2 2]
-        ri, vi, si = PortfolioOptimisers.factor_summary_return_stats(fi, 12)
-        rf, vf, sf = PortfolioOptimisers.factor_summary_return_stats(Float64.(fi), 12)
-        @test ri == rf && vi == vf && si == sf
-        @test eltype(ri) == Float64
-        @test PortfolioOptimisers.factor_summary_autocorrelation(fi) ==
-              PortfolioOptimisers.factor_summary_autocorrelation(Float64.(fi))
-        Mi = reshape([1, 0, 1, 1, 0, 0, 1, 1, 0, 1, 0, 1], 2, 3, 2)
-        @test PortfolioOptimisers.factor_summary_exposure_variance(Mi, 1, 1) ≈ 2 / 9
-        @test PortfolioOptimisers.factor_summary_mapped([1, 2], [2, 0]) isa Vector{Float64}
-        # A Float32 history stays in Float32.
-        r32, v32, s32 = PortfolioOptimisers.factor_summary_return_stats(Float32.(fi), 12)
+    @testset "a Float32 history" begin
+        # Issue #1972 removed the integer case: integer data convert at the carrier.
+        fi = Float32[1 2; 3 5; 4 1; 2 2]
+        r32, v32, s32 = PortfolioOptimisers.factor_summary_return_stats(fi, 12)
         @test eltype(r32) == eltype(v32) == eltype(s32) == Float32
-        @test eltype(PortfolioOptimisers.factor_summary_autocorrelation(Float32.(fi))) ==
-              Float32
+        @test eltype(PortfolioOptimisers.factor_summary_autocorrelation(fi)) == Float32
     end
 end
 
 @testset "A summary of an observed factor states its returns and no regression column (#1367)" begin
     rng = StableRNG(1_367_10)
     T, N = 30, 6
-    Ms = randn(rng, T, N, 3)
+    Ms = permutedims(randn(rng, T, N, 3), (2, 3, 1))
     f = 0.02 * randn(rng, T, 2)
     fx = 0.01 * randn(rng, T, 1)
     csr = CrossSectionalRegression(; f = f, eps = 0.01 * randn(rng, T, N), n = fill(N, T))
     rw = abs.(randn(rng, T, N)) .+ 0.1
-    blk = CrossSectionalFactorModel(; M = Ms[T, :, :], b = zeros(N), csr = csr, Ms = Ms,
+    blk = CrossSectionalFactorModel(; M = Ms[:, :, T], b = zeros(N), csr = csr, Ms = Ms,
                                     rw = rw, bw = rw, lag = 1,
                                     nf = ["value", "size", "usd"], fx = fx)
     fs = factor_model_summary(blk; step = 2, weighting = RegressionWeightMetric())
@@ -2652,7 +2597,7 @@ end
     PO = PortfolioOptimisers
     seq = PO.FLoops.SequentialEx()
     T, N = 3, 40
-    Z0 = randn(StableRNG(1), T, N, 3)
+    Z0 = permutedims(randn(StableRNG(1), T, N, 3), (2, 3, 1))
     X = randn(StableRNG(3), T, N) ./ 100
     W = ones(T, N)
     noise = randn(StableRNG(2), T, N)
@@ -2664,7 +2609,7 @@ end
     tref = nothing
     for d in (1e-5, 1e-7, 1e-9, 1e-11)
         Z = copy(Z0)
-        Z[:, :, 3] = Z0[:, :, 1] .+ d .* noise
+        Z[:, 3, :] = Z0[:, 1, :] .+ d .* permutedims(noise)
         r = cross_sectional_regression(cre, Z, X, W)
         t = cs_regression_t_stats(Z, r.f, r.eps, W)
         @test all(isfinite, t)
@@ -2672,7 +2617,7 @@ end
         @test t≈tref rtol=1e-3
         vif = exposure_vif(Z, W)
         @test all(x -> 1 <= x < Inf, vif)
-        D = Z[1, :, :] .* sqrt.(W[1, :])
+        D = Z[:, :, 1] .* sqrt.(W[1, :])
         @test exposure_condition_number(Z, W)[1]≈LinearAlgebra.cond(D)^2 rtol=1e-6
         @test PO.cs_score_regressors(nothing, Z, W) == fill(3, T)
         # The Gram route stays for a caller that holds the Gram history alone. Its precision
@@ -2687,22 +2632,22 @@ end
         end
     end
     @test_throws DimensionMismatch cs_regression_t_stats(Z0, zeros(T, 3), zeros(T, N), W;
-                                                         G = zeros(T, 2, 2))
+                                                         G = zeros(2, 2, T))
     # Under `DependentColumnDrop()` an exactly dependent factor takes a return of zero by the
     # rule. The block reads the mask of the fit: the dropped factor has no t-statistic, and
     # the kept factors have those of the fit on the kept columns. Without the mask the
     # pseudo-inverse of the whole design leaves the group unidentified.
     Z = copy(Z0)
-    Z[:, :, 3] = Z0[:, :, 1]
+    Z[:, 3, :] = Z0[:, 1, :]
     r = cross_sectional_regression(CrossSectionalLinearRegression(;
                                                                   alg = DependentColumnDrop(),
                                                                   ex = seq), Z, X, W)
     @test r.dc == repeat([false false true], T)
-    blk = CrossSectionalFactorModel(; M = Z[T, :, :], b = zeros(N), csr = r, Ms = Z, rw = W,
+    blk = CrossSectionalFactorModel(; M = Z[:, :, T], b = zeros(N), csr = r, Ms = Z, rw = W,
                                     bw = fill(1 / N, T, N))
     t = cs_regression_t_stats(blk).X
-    r2 = cross_sectional_regression(cre, Z[:, :, 1:2], X, W)
-    @test t[:, 1:2] == cs_regression_t_stats(Z[:, :, 1:2], r2.f, r2.eps, W)
+    r2 = cross_sectional_regression(cre, Z[:, 1:2, :], X, W)
+    @test t[:, 1:2] == cs_regression_t_stats(Z[:, 1:2, :], r2.f, r2.eps, W)
     @test all(isnan, t[:, 3])
     @test all(isnan, cs_regression_t_stats(Z, r.f, r.eps, W)[:, [1, 3]])
     # The design keeps its own columns for the VIF, which describes the exposures.
@@ -2716,5 +2661,5 @@ end
     @test only(p for p in dd.P if first(p) == 1) ==
           (1 => P * LinearAlgebra.Diagonal([0, 1, 1]))
     @test only(p for p in dd.P if first(p) == 2) == (2 => P)
-    @test all(iszero, dd.B[1, :, 1]) && dd.B[2, :, 1] == Z[2, :, 1]
+    @test all(iszero, dd.B[:, 1, 1]) && dd.B[:, 1, 2] == Z[:, 1, 2]
 end

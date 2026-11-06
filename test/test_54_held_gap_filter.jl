@@ -293,8 +293,9 @@ end
                                   fb = nothing)
     @test PO.result_investable_mask(sres) == imsk
     kres = StackingResult(; pr = prk, wb = nothing, fees = nothing, resi = [nres],
-                          reso = nres, cv = nothing, retcode = OptimisationSuccess(),
-                          w = w_keep, imsk = imsk, fb = nothing)
+                          reso = nres, cv = nothing, scorer = nothing,
+                          retcode = OptimisationSuccess(), w = w_keep, imsk = imsk,
+                          fb = nothing)
     @test PO.result_investable_mask(kres) == imsk
     # The hierarchical core answers directly, and its two leaves answer through the core.
     hres = HierarchicalResult(; pr = prk, clr = nothing, wb = nothing, fees = nothing,
@@ -310,8 +311,8 @@ end
     @test PO.result_investable_mask(herc) == imsk
     ncres = NestedClusteredResult(; pr = prk, clr = nothing, wb = nothing, fees = nothing,
                                   resi = [nres], reso = nres, cv = nothing,
-                                  retcode = OptimisationSuccess(), w = w_keep, imsk = imsk,
-                                  fb = nothing)
+                                  scorer = nothing, retcode = OptimisationSuccess(),
+                                  w = w_keep, imsk = imsk, fb = nothing)
     @test PO.result_investable_mask(ncres) == imsk
     scres = SchurComplementHierarchicalRiskParityResult(; pr = prk, wb = nothing,
                                                         clr = nothing, fees = nothing,

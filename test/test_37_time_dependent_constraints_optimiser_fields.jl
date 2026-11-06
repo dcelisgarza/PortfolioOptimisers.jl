@@ -270,7 +270,7 @@ end
                                            l2 = L2Regularisation(; val = 1e-3)))
         res = optimise(iv, rd)
         cvw = IndexWalkForward(100, 50)  # 2 outer folds over the 200-row sample
-        cv3 = OptimisationCrossValidation(; cv = KFold(; n = 3))
+        cv3 = KFold(; n = 3)
         sex = PortfolioOptimisers.FLoops.SequentialEx()
         @testset "Construction: bind legality per position" begin
             # :nearest is legal on NestedClustered.opti — its inner CV is entered per
@@ -364,7 +364,9 @@ end
             @test PortfolioOptimisers.inner_fold_fields(NestedClustered(; opti = mr0,
                                                                         opto = mr0)) ==
                   (:opti,)
-            @test PortfolioOptimisers.inner_fold_fields(SubsetResampling(; opt = mr0)) == ()
+            @test PortfolioOptimisers.inner_fold_fields(SubsetResampling(;
+                                                                         subset_size = 0.8,
+                                                                         opt = mr0)) == ()
         end
         @testset "Per-field entitlement: the scan leaves :nearest opti for the inner CV" begin
             ncoX = NestedClustered(;
@@ -512,7 +514,7 @@ end
                                    seed = 11)
             @test length(cross_val_predict(srs, rd, cvw).pred) == 2
             srr = PortfolioOptimisers.reset_time_dependent_estimator(srs)
-            @test srr.subset_size == 0.8
+            @test srr.subset_size === PowerSubsetSize()
             @test srr.n_subsets == 2
             @test_throws TypeError SubsetResampling(; opt = mr0,
                                                     subset_size = TimeDependent([3, "a"]))
@@ -637,7 +639,8 @@ end
             # The always-carrying fields stay `TD`, not `TD_Option`.
             @test_throws TypeError NestedClustered(; opti = mr0, opto = mr0, pe = nothing)
             @test_throws TypeError Stacking(; opti = [mr0], opto = mr0, wf = nothing)
-            @test_throws TypeError SubsetResampling(; opt = ew, pe = nothing)
+            @test_throws TypeError SubsetResampling(; subset_size = 0.8, opt = ew,
+                                                    pe = nothing)
             # Entry substitution rejects a wrongly-typed entry at construction.
             @test_throws TypeError NestedClustered(; opti = mr0, opto = mr0,
                                                    pe = TimeDependent([EmpiricalPrior(),

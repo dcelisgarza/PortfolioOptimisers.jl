@@ -252,9 +252,8 @@ function exp_weighted_pass!(f, est::ExpWeightedVariance, X::MatNum, dims::Int,
     end
     N = size(X, setdiff((1, 2), (dims,))[1])
 
-    # The state takes the type of `X`, widened to a float only when it is an integer, so an
-    # integer panel gets a floating-point state and a `Float32` panel keeps a `Float32` one.
-    T = float_if_integer(eltype(X))
+    # The state takes the type of `X`, so a `Float32` panel keeps a `Float32` state.
+    T = eltype(X)
     cache = if isnothing(state)
         ExpWeightedVarianceState(zeros(T, N), fill(convert(T, NaN), N), zeros(Int, N),
                                  trues(N))
@@ -457,7 +456,7 @@ The fallback cannot answer this estimator. It slices `X` once per row and passes
 function variance_series(ce::ExpWeightedVariance, X::MatNum; dims::Int = 1,
                          active_mask::Option{<:AbstractMatrix{<:Bool}} = nothing, kwargs...)
     assert_dims(dims)
-    T = float_if_integer(eltype(X))
+    T = eltype(X)
     N = size(X, setdiff((1, 2), (dims,))[1])
     val = Matrix{T}(undef, size(X, dims), N)
     exp_weighted_pass!(ce, X, dims, active_mask) do i, cache
@@ -617,8 +616,7 @@ function partial_fit!(ce::ExpWeightedVariance{<:Any, <:Any, <:Any,
                       X::MatNum; dims::Int = 1,
                       active_mask::Option{<:AbstractMatrix{<:Bool}} = nothing, kwargs...)
     cache = exp_weighted_pass!(ce, X, dims, active_mask, ce.cache)
-    Accessors.@reset ce.cache = cache
-    return ce
+    return cache === ce.cache ? ce : rebuild_estimator(ce, (; cache = cache))
 end
 """
     partial_fit!(
@@ -900,11 +898,50 @@ The count tends to ``(1 + \\lambda) / (1 - \\lambda)`` as ``n_{i}`` grows, which
 """
 function exp_weighted_variance_count(decay::Number, X::MatNum, centring::AbstractCentring)
     m = map(axes(X, 2)) do i
-        lk = decay^centring_terms(centring, count(isfinite, view(X, :, i)))
-        return (one(lk) - lk) * (one(decay) + decay) /
-               ((one(decay) - decay) * (one(lk) + lk))
+        return exp_weighted_kish_count(decay,
+                                       centring_terms(centring,
+                                                      count(isfinite, view(X, :, i))))
     end
     return (; n = m .+ centring_lag(centring), m = m)
+end
+"""
+$(DocStringExtensions.TYPEDSIGNATURES)
+
+Return the Kish count of `K` exponential weights, the closed form of [`exp_weighted_variance_count`](@ref).
+
+The weights are proportional to ``\\lambda^{k}``, ``k = 0, \\ldots, K - 1``. The count is zero when `K` is zero.
+
+# Mathematical definition
+
+```math
+\\begin{align}
+\\kappa &= \\dfrac{\\left(\\sum_{k=0}^{K-1} \\lambda^{k}\\right)^{2}}{\\sum_{k=0}^{K-1} \\lambda^{2k}} = \\dfrac{\\left(1 - \\lambda^{K}\\right)\\left(1 + \\lambda\\right)}{\\left(1 - \\lambda\\right)\\left(1 + \\lambda^{K}\\right)}\\,.
+\\end{align}
+```
+
+Where:
+
+  - ``\\kappa``: Kish count of the weights.
+  - ``K``: Number of weights.
+  - $(math_dict[:lambda_ew])
+
+# Arguments
+
+  - `decay`: Decay of the recursion.
+  - `K`: Number of weights.
+
+# Returns
+
+  - `kappa::Number`: The Kish count.
+
+# Related
+
+  - [`exp_weighted_variance_count`](@ref)
+  - [`exp_weighted_covariance_count`](@ref)
+"""
+function exp_weighted_kish_count(decay::Number, K::Integer)
+    lk = decay^K
+    return (one(lk) - lk) * (one(decay) + decay) / ((one(decay) - decay) * (one(lk) + lk))
 end
 function variance_count(ve::ExpWeightedVariance, X::MatNum)
     return exp_weighted_variance_count(ve.decay, X, ve.centring)

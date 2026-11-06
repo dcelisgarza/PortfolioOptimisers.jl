@@ -7,7 +7,7 @@ A square root ``\\mathbf{L}`` of a covariance matrix ``\\mathbf{\\Sigma}`` satis
 
 # Interfaces
 
-In order to implement a new square-root algorithm that works with the library, subtype `AbstractMatrixSquareRootAlgorithm` with its parameters as fields, and implement the following method:
+To add a square-root algorithm, subtype `AbstractMatrixSquareRootAlgorithm`, keep its parameters in the fields of the struct, and add this method:
 
 ## `matrix_square_root`
 
@@ -52,7 +52,7 @@ $(DocStringExtensions.TYPEDEF)
 
 Adds a growing ridge to the diagonal of a covariance matrix until its Cholesky factor exists.
 
-The first try is the plain Cholesky factor of the lower triangle. Where it fails, each later try adds a ridge to the diagonal of the symmetrised matrix, so the square root reproduces the matrix to within the last ridge. A singular matrix, such as the covariance of two factors with one return series, gets a positive definite square root.
+The first try is the plain Cholesky factor of the lower triangle. Where it fails, each later try adds a ridge to the diagonal of the symmetrised matrix, so the square root reproduces the matrix to within the last ridge. A singular matrix, such as the covariance of two factors with one return series, has a square root of full rank. Every try factorises in the element type of the plain factor, so a `Float32` matrix gives a `Float32` square root.
 
 # Mathematical definition
 
@@ -70,12 +70,12 @@ Where:
   - ``N``: Number of rows of ``\\mathbf{\\Sigma}``.
   - ``\\Sigma_{ii}``: Variance ``i`` of the covariance matrix ``\\mathbf{\\Sigma}``.
   - ``r``: The relative ridge `ridge`.
-  - ``\\epsilon``: The machine epsilon of the element type, which keeps the ridge above zero when ``r`` is zero.
+  - ``\\epsilon``: The machine epsilon of the element type of the plain factor, which keeps the ridge above zero when ``r`` is zero, and above the rounding of that type when ``r`` is smaller.
   - ``\\lambda_{k}``: Ridge of try ``k``, for ``k = 1, \\ldots,`` `tries`.
   - ``\\mathbf{L}_{k}``: Lower Cholesky factor of try ``k``.
   - $(math_dict[:I_identity])
 
-The ridge is relative to ``s``, so the square root of ``c^2 \\mathbf{\\Sigma}`` is ``c`` times the square root of ``\\mathbf{\\Sigma}``.
+The ridge is relative to ``s``. Where ``s`` is the mean absolute variance, the square root of ``c^2 \\mathbf{\\Sigma}`` is ``c`` times the square root of ``\\mathbf{\\Sigma}``.
 
 # Fields
 
@@ -146,7 +146,7 @@ $(DocStringExtensions.TYPEDEF)
 
 Takes the square root of a positive semidefinite covariance matrix from its eigendecomposition where the matrix has no Cholesky factor.
 
-A positive definite matrix gives its lower Cholesky factor. A singular positive semidefinite matrix, such as a covariance of rank one, gives the square root of its eigendecomposition, which reproduces the matrix to rounding and adds no ridge. An indefinite matrix is refused.
+A positive definite matrix gives its lower Cholesky factor. A singular positive semidefinite matrix, such as a covariance of rank one, gives the square root of its eigendecomposition, which reproduces the matrix to rounding and adds no ridge. The algorithm refuses an indefinite matrix.
 
 # Mathematical definition
 
@@ -197,7 +197,7 @@ Factorises a covariance matrix under the ridge schedule of a [`RidgeCholeskySqua
 
  1. Try the plain Cholesky factorisation of the lower triangle of `sigma`. Return it where it succeeds.
  2. Symmetrise `sigma`, and take the mean absolute diagonal as the scale. Where that is not a finite positive number, take the largest absolute entry, and at least one.
- 3. Add a ridge of `max(alg.ridge * scale, eps * scale)` to the diagonal, and try again. Multiply the ridge by ten after each failure, for `alg.tries` tries in all.
+ 3. Add a ridge of `max(alg.ridge * scale, eps * scale)` to the diagonal, and try again. The ridge and `eps` take the element type of the plain factor of step 1. Multiply the ridge by ten after each failure, for `alg.tries` tries in all.
  4. Return `nothing` where every try fails.
 
 # Arguments
@@ -221,13 +221,15 @@ function ridge_cholesky(alg::RidgeCholeskySquareRoot, sigma::MatNum)
         return chol
     end
     S = (sigma + transpose(sigma)) / 2
+    # The ridge takes the type of the plain factor, so every try factorises in one type.
+    T = eltype(chol)
     base = Statistics.mean(abs, LinearAlgebra.diag(S))
     scale = if base > zero(base) && isfinite(base)
         base
     else
         max(maximum(abs, S), one(base))
     end
-    ridge = max(alg.ridge * scale, eps(typeof(scale)) * scale)
+    ridge = max(convert(T, alg.ridge) * scale, eps(T) * scale)
     for _ in 1:(alg.tries)
         chol = LinearAlgebra.cholesky(LinearAlgebra.Hermitian(S + ridge * LinearAlgebra.I,
                                                               :L); check = false)
@@ -245,18 +247,18 @@ end
 
 Takes a square root ``\\mathbf{L}`` of a covariance matrix, with ``\\mathbf{L} \\mathbf{L}^{\\intercal} = \\mathbf{\\Sigma}``.
 
-`nothing` takes the plain lower Cholesky factor. [`RidgeCholeskySquareRoot`](@ref) takes the Cholesky factor of the matrix with the first ridge that makes it positive definite. [`EigenFallbackSquareRoot`](@ref) takes the Cholesky factor where it exists, and the square root of the eigendecomposition of a positive semidefinite matrix otherwise. A [`FactorPrior`](@ref) and a [`CrossSectionalFactorPrior`](@ref) take the square root of their factor covariance through this function.
+`nothing` takes the plain lower Cholesky factor. [`RidgeCholeskySquareRoot`](@ref) takes the Cholesky factor of the matrix with the first ridge that makes it positive definite. [`EigenFallbackSquareRoot`](@ref) takes the Cholesky factor where it exists, and the square root of the eigendecomposition of a positive semidefinite matrix otherwise. Each `mtx_sqrt` field of the library names the algorithm that this function reads, in the factor priors such as [`FactorPrior`](@ref) and [`CrossSectionalFactorPrior`](@ref), in the uncertainty sets, and in the risk measures that read a square root.
 
 # Arguments
 
-  - `alg`: The square-root algorithm, or `nothing`.
+  - `alg`: The square-root algorithm, or `nothing` for the plain Cholesky factor.
   - `sigma`: The covariance matrix, `assets × assets`.
 
 # Validation
 
   - `nothing`: `sigma` has a Cholesky factor. Raises a `LinearAlgebra.PosDefException`.
   - [`RidgeCholeskySquareRoot`](@ref): one try of [`ridge_cholesky`](@ref) succeeds. Raises a `LinearAlgebra.PosDefException` with the `info` of the plain factorisation.
-  - [`EigenFallbackSquareRoot`](@ref): a matrix that has no Cholesky factor is Hermitian, and its smallest eigenvalue is at least ``-N \\epsilon \\max_i \\lvert \\lambda_i \\rvert``. Here ``N`` is the number of rows and ``\\epsilon`` is the machine epsilon of the element type. Raises `LinearAlgebra.PosDefException(-1)` and `LinearAlgebra.PosDefException(1)`.
+  - [`EigenFallbackSquareRoot`](@ref): a matrix that has no Cholesky factor is Hermitian, and its smallest eigenvalue is at least ``-N \\epsilon \\max_i \\lvert \\lambda_i \\rvert``. Here ``N`` is the number of rows and ``\\epsilon`` is the machine epsilon of the element type. Raises `LinearAlgebra.PosDefException(-1)` on a matrix that is not Hermitian, and `LinearAlgebra.PosDefException(1)` on a smaller eigenvalue.
 
 # Returns
 
@@ -264,7 +266,7 @@ Takes a square root ``\\mathbf{L}`` of a covariance matrix, with ``\\mathbf{L} \
 
 # Examples
 
-The three members differ only on a matrix that has no Cholesky factor.
+The three choices of `alg` differ only on a matrix that has no Cholesky factor.
 
 ```jldoctest
 julia> using LinearAlgebra

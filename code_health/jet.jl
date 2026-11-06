@@ -407,6 +407,9 @@ end
 # of it, so the command line runs only when this file is the program. `code_health/triage.jl`
 # includes it into a module of its own and calls `measure` directly.
 if abspath(PROGRAM_FILE) == @__FILE__
-    exit(CodeHealth.run_script(ARGS; name = NAME, measure = measure, verify = verify,
-                               render = render, publish = publish))
+    exit(CodeHealth.JuliaSlot.with_slot("jet.jl $(join(ARGS, ' '))") do
+             return CodeHealth.run_script(ARGS; name = NAME, measure = measure,
+                                          verify = verify, render = render,
+                                          publish = publish)
+         end)
 end

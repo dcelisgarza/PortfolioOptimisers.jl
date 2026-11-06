@@ -568,7 +568,7 @@ julia> round(nd; digits = 3), round(nu; digits = 3)
 
 # References
 
-  - $(ref_dict[:satterthwaite1946])
+  - $(ref_dict[:satterthwaite1946]) Section 2, Equation 6, page 111.
 """
 struct NullMomentLaw <: AbstractOverlapStudentLaw end
 """
@@ -948,7 +948,7 @@ julia> PortfolioOptimisers.mean_test(OverlapMeanTest(), [0.1, -0.2, 0.3, 0.2, Na
 
 # References
 
-  - $(ref_dict[:satterthwaite1946])
+  - $(ref_dict[:satterthwaite1946]) Section 2, Equation 6, page 111.
 """
 @concrete struct OverlapMeanTest <: AbstractMeanTestEstimator
     """
@@ -1463,7 +1463,7 @@ A series whose spread is round-off of its mean is constant: every entry of `d` i
   - [`round_off_unit`](@ref)
 """
 function mean_test_centred(c::VecNum, span::AbstractMeanTestSpan)
-    Tm = float_if_integer(real(eltype(c)))
+    Tm = real(eltype(c))
     n, s, i1, i2 = finite_sum_bounds(c, Tm)
     m = n > 0 ? s / n : Tm(NaN)
     P = iszero(n) ? 0 : i2 - i1 + 1

@@ -39,6 +39,10 @@ jobs:
     name: Julia ${{ inputs.version }} - ${{ inputs.os }} - ${{ inputs.arch }} - ${{ github.event_name }}
     runs-on: ${{ inputs.os }}
     continue-on-error: ${{ inputs.allow_failure }}
+    # The `coverage` job reads this output, so it runs when the suite is red too. A red suite hid
+    # the ratchet from 2026-10-27 to 2026-10-30, while the misses rose (#1912).
+    outputs:
+      lcov: ${{ steps.publish_lcov.outcome }}
 
     steps:
       - uses: actions/checkout@v7
@@ -50,8 +54,12 @@ jobs:
         uses: julia-actions/cache@v3
       - uses: julia-actions/julia-buildpkg@v1
       - uses: julia-actions/julia-runtest@v1
+        id: runtest
+      # A red suite still writes its `.cov` files, so the ratchet still reads them. A step that the
+      # build skipped wrote none, so the two steps below wait for the tests to run. Codecov reads a
+      # green suite alone.
       - uses: julia-actions/julia-processcoverage@v1
-        if: ${{ inputs.run_codecov }}
+        if: ${{ !cancelled() && inputs.run_codecov && steps.runtest.outcome != 'skipped' }}
       - uses: codecov/codecov-action@v7
         if: ${{ inputs.run_codecov }}
         with:
@@ -63,7 +71,8 @@ jobs:
       # 0077's version. The `coverage` job reads this artifact by name, so a rename there is a
       # rename here.
       - name: Publish lcov.info for the ratchet
-        if: ${{ inputs.run_codecov }}
+        id: publish_lcov
+        if: ${{ !cancelled() && inputs.run_codecov && steps.runtest.outcome != 'skipped' }}
         uses: actions/upload-artifact@v7
         with:
           name: lcov
@@ -77,17 +86,19 @@ jobs:
   # branch, which is GitHub's rule, and `main` is current to the last release. That form left the
   # gate silent on `dev` and on every pull request until a release carried it over.
   #
-  # The ratchet still must not turn the test check red. The suite's verdict and the coverage
-  # verdict are two claims about two things. The step below therefore carries
-  # `continue-on-error: true`: it runs, it reports, and it leaves this job, the calling workflow,
-  # and the pull request green. `coverage.jl` writes one `::error` annotation per offending file
-  # and a rise table to the run summary, so a trip is visible on the run's own page.
+  # The suite's verdict and the coverage verdict are two claims about two things, so they are two
+  # checks. A trip turns this job's check, `Coverage ratchet`, red, and it leaves the test check
+  # green. From 2026-08-27 to 2026-10-30 the ratchet step carried `continue-on-error: true`, so a
+  # trip turned nothing red, and 70 files rose with no reader (#1912, ADR 0082, amendment of
+  # 2026-10-30). `test/test_49_coverage_attribution_census.jl` pins the guards of this job.
   coverage:
     name: Coverage ratchet
     needs: test
     # The gate needs the `lcov.info` that the test job publishes, and only the matrix entry that
-    # measures coverage publishes one.
-    if: ${{ inputs.run_codecov }}
+    # measures coverage publishes one. It runs on a red suite too: a red streak must not hide a
+    # rise. A test that stopped early can leave lines uncounted, so the summary says when the
+    # suite was red.
+    if: ${{ !cancelled() && inputs.run_codecov && needs.test.outputs.lcov == 'success' }}
     runs-on: ubuntu-latest
     steps:
       # Checkout comes BEFORE setup-julia, because the Julia version is read out of the checkout.
@@ -118,23 +129,34 @@ jobs:
           path: coverage_download
       - name: Coverage ratchet
         id: ratchet
-        continue-on-error: true
         env:
           COVERAGE_LCOV: coverage_download/lcov.info
         run: julia --project=code_health code_health/coverage.jl check
+      # A step after a failed step runs only when its guard calls a status function, so each guard
+      # below reads `failure()` and the outcome of the ratchet step. A guard without `failure()`
+      # never runs here, and one without the outcome also runs when an earlier step failed.
       - name: Report a tripped ratchet
-        if: ${{ steps.ratchet.outcome == 'failure' }}
+        if: ${{ failure() && steps.ratchet.outcome == 'failure' }}
+        env:
+          SUITE: ${{ needs.test.result }}
         run: |
-          echo "::warning::The coverage ratchet tripped. The test check stays green on purpose."
+          echo "::error::The coverage ratchet tripped. Cover each line that rose, or exempt it (ADR 0082)."
           {
             echo "The coverage ratchet tripped. Read the annotations above for the files that"
-            echo "rose. The test check reports the suite alone and is green on purpose."
+            echo "rose. Cover each line, or add a Coverage Exemption (ADR 0082). Commit the"
+            echo "Refresh Artifact only for a line that the suite cannot reach."
+            if [ "$SUITE" != "success" ]; then
+              echo
+              echo "The suite was red (\`$SUITE\`). A test that stopped early leaves lines"
+              echo "uncounted, so a rise can come from the red test and not from the code."
+            fi
           } >> "$GITHUB_STEP_SUMMARY"
       # A run that trips publishes the Refresh Artifact: the baseline as `refresh --accept-rise`
       # would write it. A contributor drops it in place and commits it with no Julia at all.
-      # ADR 0075.
+      # ADR 0075. From 2026-09-15 to 2026-10-29 the guard read `failure()` alone, under a ratchet
+      # step with `continue-on-error`, so no run published the artifact (#1912).
       - name: Publish the Refresh Artifact
-        if: failure()
+        if: ${{ failure() && steps.ratchet.outcome == 'failure' }}
         uses: actions/upload-artifact@v7
         with:
           name: coverage-refresh

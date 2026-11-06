@@ -301,3 +301,192 @@ online arm ADR 0140 added.
 puts it inside: a search scores every candidate through `fit_and_predict(opt_i, rd, cv; ex =
 SequentialEx())`, and the `fit_and_score` families are deleted. Every cross-validation entry
 point, the searches included, now goes through the one loop.
+
+## Amendment (2026-11-02)
+
+Issue #1938. The folds of a prediction Result stay a `Vector{PredictionResult}`. The loop does
+not narrow them to the concrete type of the folds. This is a decision, not an omission.
+
+`ElT = PredictionResult` is a `UnionAll`, as the first amendment states. So a reader of the folds,
+for example `stacked_fold_weights`, `held_path_turnover` or `comparator_path_length`, infers its
+result abstractly. `log_wealth_regret(a, b)` with a multi-period comparator infers every field of
+its Result except `path_length`. `performance_summary` of a multi-period prediction infers every
+field except `turnover`. The values are correct, and each value has a concrete type at run time.
+
+### What the narrowing costs
+
+A narrowing to the concrete fold type, for example `concrete_typed_array(pred)` in the inner
+constructor of `MultiPeriodPredictionResult`, makes these readers infer. It also puts the type of
+the optimiser Result into the type of the prediction Result. Every verb that takes a
+`MultiPeriodPredictionResult` then compiles one time for each optimiser configuration, and not one
+time for all of them. The measure is `performance_summary(p)` followed by `log_wealth_regret(p, p)`
+on an `IndexWalkForward(30, 10)` over 120 rows and 4 assets, which gives 9 folds. The figures are
+for the first call on a `MeanRisk` with a risk measure that no earlier call used, over three such
+risk measures, and for a warm call. The tree is `dev` at `009482721d`, with 16 threads:
+
+| Folds | First call on a new optimiser type | Of which compile | Warm call |
+| :--- | ---: | ---: | ---: |
+| `Vector{PredictionResult}` | 24 ms | 23 ms | 58 µs |
+| narrowed to the fold type | 590 ms | 590 ms | 14 µs |
+
+The narrowing saves 44 µs on each warm call, and it costs about 0.57 s more compile time on each
+new optimiser type. The break-even is about 13 000 calls for each type. A warm `cross_val_predict`
+of the `MeanRisk` over the same folds takes about 12.6 ms. So the saved time is small next to the
+work that makes the Result. The compile time is spread over the verbs:
+
+| Function, narrowed | Compile on a new optimiser type |
+| :--- | ---: |
+| `stacked_fold_weights(p, fold_target)` | 0.29 s |
+| `held_path_turnover`, which adds `fold_held` | 0.13 s |
+| the body of `log_wealth_regret` | 0.16 s |
+| `performance_summary` and `comparator_path_length` | 0.01 s each |
+
+The cost does not stop at the fold readers. The body of `log_wealth_regret` reads no fold, and it
+compiles again because the type of its argument changes. A plot, a scorer and `expected_risk` of a
+multi-period prediction take the same kind of cost. This amendment did not measure them.
+
+### Where a narrowed element type pays
+
+The vector of folds is a type-erasure boundary. Under a batch scheme, every optimiser gives one
+`MultiPeriodPredictionResult` type for one returns data, so each verb that reads the Result
+compiles one time. Under an Online Scheme the Result holds the threaded estimator in `opt`, but
+since #1939 the type of `opt` is not a type parameter of the Result, so the same holds. Each fold
+reader dispatches on the fold at run time, and that dispatch compiles one small method for each
+new fold type, which is the 23 ms above. Since #1939 a new risk measure gives no new fold type.
+
+`concrete_typed_array` and `concrete_typed_array_if_abstract` narrow a vector that an estimator or
+a one-shot configuration holds. The library already compiles on the type of that holder, so the
+narrowing adds no new axis of compilation. Each library site is of this kind:
+
+| Site | Vector | Why the narrowing stays |
+| :--- | :--- | :--- |
+| `factory` and `port_opt_view` of `VecTnE_Tn` | the turnover constraints of an estimator | The estimator type holds each element type already. The narrowing changes only a mixed vector. |
+| `port_opt_view` of a vector of asset sets matrices | the membership matrices of an estimator | As for the turnover constraints. |
+| `rebuild_asset_panel` | the panel fields of the folds of one meta-optimisation | A comprehension gives a concrete element type when the folds share one type. The call changes only a mixed vector. |
+| `make_p_grid` of a randomised search | the trials of one search | Dispatch needs it. A `Vector{Pair}` does not match the `AbstractVector{<:Pair{<:Any, <:AbstractVector}}` of `lens_val_grid`. The call runs one time for each search. |
+
+The rule: narrow the element type of a vector whose holder the library compiles on already. Do not
+narrow a vector of a Result that many verbs read, because each new element type then compiles
+every one of those verbs again.
+
+### The type of an estimator in a holder (#1939)
+
+Issue #1939 measured each holder whose type parameters carried the type of an estimator, or of a
+part of one. Each figure is the first call on a new type, after a warm-up that compiled every part
+that the two forms share, and then a warm call. Each form ran in a fresh process with one thread,
+on `dev` at `e641c54bba`, with 200 rows and 6 assets. Each range covers five risk measures:
+`ConditionalValueatRisk`, `StandardDeviation`, `Range`, `WorstRealisation` and `MaximumDrawdown`.
+
+| Holder and measured call | Form | Compile on a new type | Warm call |
+| :--- | :--- | ---: | ---: |
+| `MultiPeriodPredictionResult.opt` of an online run: `performance_summary` and `log_wealth_regret` | type parameter | 326–344 ms | 118–211 µs |
+| | erased | 31–33 ms | 110–189 µs |
+| `MeanRiskResult.r`: `expected_risk` two times and `predict` | type parameter | 89–97 ms | 78–93 µs |
+| | erased | 0 ms | 31–68 µs |
+| `Stacking.opti`: `optimise` | narrowed to the union of the element types | 530–620 ms | 18.6–30.1 ms |
+| | `Vector{OptE_Opt_TD}` | 107–119 ms | 18.6–25.5 ms |
+
+The erased form of `opt` and of `r` is emulated: the Result is rebuilt with `opt = nothing`, or
+with the `r` of the warm-up. No verb reads either field, so the emulation compiles what the
+erased field compiles. No warm call is slower in an erased form, so no call count reaches a
+break-even. A compile of `optimise` on a new `MeanRisk` takes 0.7 to 3 s, and the erasure of `r`
+removes about 90 ms after it.
+
+The decisions:
+
+- `MultiPeriodPredictionResult` binds `opt` to `Union{Nothing, AbstractEstimator}`, and the
+  field leaves the type parameters. Only `Resume` reads `opt`. `Resume` now holds the same object in
+  a second field, `opt`, so its second type parameter is the type of the estimator.
+  `OptimiserResume`, `PipelineResume` and `Pipeline_OnlPipe` dispatch on that parameter.
+- `MeanRiskResult`, `RiskBudgetingResult`, `FactorRiskContributionResult`,
+  `NearOptimalCenteringResult`, `HierarchicalRiskParityResult` and
+  `SchurComplementHierarchicalRiskParityResult` keep the bound of `r` on the field, and the field
+  leaves the type parameters. `r` was the field that gave each risk measure its own fold type in
+  #1938.
+- `Stacking` stores a vector `opti` as a `Vector{OptE_Opt_TD}`, through `erase_optimiser_vector`
+  in both constructors. The loop over `opti` solves one optimisation for each element, so a
+  dispatch at run time costs nothing next to it. A lens write such as `@set st.opti[2] = x`
+  already gave an abstract element type, so the narrow type did not hold after a search wrote a
+  candidate. `StackingResult.resi` was a `Vector{NonFiniteAllocationOptimisationResult}` already.
+- `SearchCrossValidationResult.opt` keeps its type parameter. No verb reads that Result, so the
+  parameter compiles nothing.
+- `ProcessedJuMPOptimiserAttributes`, the `pa` of a `JuMPOptimisationResult`, holds `sca` and
+  `ret`, and `HierarchicalRiskParityResult` holds `sca`. A new risk measure did not change their
+  type, and #1939 did not measure them. The next section measures them.
+- The vectors of constraints that `factory` and `port_opt_view` narrow keep the narrowing, because
+  dispatch needs it. A `Vector{TnE_Tn}` of two `Turnover` values has no method of
+  `turnover_constraints` without sets, and the narrowed `Vector{Union{Turnover{…}, Turnover{…}}}`
+  takes the method for a `VecTn`. A user had to narrow such a literal by hand, because a mixed
+  literal such as `[Turnover(…), TurnoverEstimator(…)]` infers `Any`, and the bound of the field
+  refused it. The keyword constructors of `JuMPOptimiser` and `ProgrammeAllocationSet` (`lcse`,
+  `sgcarde`, `smtx`, `sgmtx`, `slt`, `sst`, `sglt`, `sgst`, `tn` and `ple`) and of
+  `FactorRiskContribution` (`frc_ple`) now narrow it through `narrow_mixed_vector`. The positional
+  constructors keep their bounds.
+- A vector of search grids whose types differ infers the element type `Vector`, and the bounds
+  of `GridSearchCrossValidation`, `RandomisedSearchCrossValidation` and `WeightMassScorer`
+  refused it. The search runs one time, so the narrow type pays nothing at run time, but
+  `lens_val_grid` dispatches on it. The outer constructors now narrow such a literal through
+  `narrow_mixed_vector`, and `make_p_grid` keeps its own narrowing of the trials for the same
+  dispatch.
+
+The rule becomes: a holder that many verbs read, or a meta-estimator over a vector of estimators,
+does not carry the type of an estimator in a type parameter, unless a measured verb pays for it.
+Narrow the element type of a vector only where dispatch needs it.
+
+### The parts of an estimator in a holder (#1941)
+
+Issue #1941 measured the holders that #1939 left: `ProcessedJuMPOptimiserAttributes.sca` and
+`.ret`, which every JuMP optimisation Result holds in `jr.pa`, and
+`HierarchicalRiskParityResult.sca`. `HierarchicalEqualRiskContributionResult` held `ri`, `ro`,
+`scai` and `scao` in type parameters by the same mechanism, so #1941 measured it too. The method
+is the method of #1939, on `dev` at `5d54b94ade` with the commits of #1939, two rounds for each
+form. The measured calls are `expected_risk` two times and `predict` on the Result, and
+`performance_summary` and `log_wealth_regret` on a `cross_val_predict` Result under
+`IndexWalkForward(40, 20)`.
+
+| Holder and new parts | Form | Compile, Result | Warm call, Result | Compile, cross-validation | Warm call, cross-validation |
+| :--- | :--- | ---: | ---: | ---: | ---: |
+| `pa` of a `MeanRiskResult`: `MaxScalariser`, `LogSumExpScalariser`, `LogarithmicReturn`, `NoReturn` | type parameter | 81–85 ms | 66–93 µs | 30–31 ms | 103–187 µs |
+| | erased | 0 ms | 29–69 µs | 0 ms | 75–190 µs |
+| `HierarchicalRiskParityResult.sca`: `MaxScalariser`, `LogSumExpScalariser`, `MinScalariser` | type parameter | 79–84 ms | 48–74 µs | 31–32 ms | 113–224 µs |
+| | erased | 0 ms | 13–57 µs | 0 ms | 78–199 µs |
+| `HierarchicalEqualRiskContributionResult`: a new `ri`, `ro`, `scai` or `scao` | type parameter | 77–86 ms | 44–64 µs | 31–38 ms | 111–147 µs |
+| | erased | 0 ms | 14–45 µs | 0 ms | 79–113 µs |
+
+The erased form is emulated as in #1939: the Result is rebuilt with the parts of the warm-up. The
+erased row of `pa` leaves out `LogSumExpScalariser`. Its solve failed, so the `retcode` of its
+Result had a new type, and the Result compiled 88–115 ms for that reason alone (#1942). A new
+`mu` of an `ArithmeticReturn` gave no new type, because the processing fills `mu` from the prior.
+
+No warm call is slower in an erased form, so no call count reaches a break-even. No verb reads
+the fields of the Result. The model builders read `attrs.ret` once for each `optimise` call, and
+once for each point of a frontier, so a dispatch at run time costs nothing next to the solve.
+
+The decisions:
+
+- `ProcessedJuMPOptimiserAttributes` binds `ret` to `JRE_VecJRE` and `sca` to `Scalariser` on the
+  field, and both fields leave the type parameters. So the Results of `MeanRisk`,
+  `RiskBudgeting`, `FactorRiskContribution` and `NearOptimalCentering` have one type for every
+  scalariser and every returns estimator.
+- `HierarchicalRiskParityResult` binds `sca` to `Scalariser`, and
+  `HierarchicalEqualRiskContributionResult` binds `ri` and `ro` to `BaseRM_VecBaseRM` and `scai`
+  and `scao` to `Scalariser`. These fields leave the type parameters.
+- The processed constraint Results in `pa` are data, and they keep their type parameters.
+
+### Consequences
+
+- `@inferred` is not a contract for a value that a reader takes from the folds of a prediction
+  Result. A test checks the type of that value at run time.
+- A user who calls a verb many times on one Result type, for example in a loop over many
+  scenarios, can narrow the folds with
+  `MultiPeriodPredictionResult(; pred = concrete_typed_array(p.pred), id = p.id, opt = p.opt)`.
+  The verbs accept both forms.
+- `fold_loop`, `parallel_folds` and `run_folds` do not change.
+- #1939 removes a type parameter from `MultiPeriodPredictionResult` and from the six optimisation
+  Results above, and adds one to `Resume`. Code that names the parameters of these types by
+  position breaks. A method that must dispatch on the type of the estimator of a Result takes
+  the field as an argument, or a wrapper holds the estimator in a field of its own, as `Resume`
+  does.
+- #1941 removes two type parameters from `ProcessedJuMPOptimiserAttributes`, one from
+  `HierarchicalRiskParityResult` and four from `HierarchicalEqualRiskContributionResult`. Code that
+  names the parameters of these types by position breaks.

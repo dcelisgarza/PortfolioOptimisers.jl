@@ -232,8 +232,8 @@ function CombinatorialCrossValidationResult(; train_idx::VecVecInt, test_idx::Ve
     return CombinatorialCrossValidationResult(train_idx, test_idx, path_ids)
 end
 """
-    const CombCVER = Union{<:CombinatorialCrossValidation,
-                           <:CombinatorialCrossValidationResult}
+    const CombCVER = Union{CombinatorialCrossValidation,
+                           CombinatorialCrossValidationResult}
 
 Alias for a combinatorial cross-validation estimator or result.
 
@@ -244,7 +244,7 @@ Matches either a [`CombinatorialCrossValidation`](@ref) estimator or a [`Combina
   - [`CombinatorialCrossValidation`](@ref)
   - [`CombinatorialCrossValidationResult`](@ref)
 """
-const CombCVER = Union{<:CombinatorialCrossValidation, <:CombinatorialCrossValidationResult}
+const CombCVER = Union{CombinatorialCrossValidation, CombinatorialCrossValidationResult}
 function n_splits(n_folds::Integer, n_test_folds::Integer)
     return binomial(n_folds, n_test_folds)
 end

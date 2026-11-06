@@ -10,7 +10,7 @@
                      settings = Dict("log_to_console" => false),
                      check_sol = (; allow_local = true, allow_almost = true))
     da = DiscreteAllocation(; slv = mip_slv)
-    ga = GreedyAllocation(; unit = 0.3, kwargs = (sigdigits = 1,))
+    ga = GreedyAllocation(; unit = LotUnit(0.3))
     mr = MeanRisk(; obj = MaximumRatio(; rf = 4.2 / 252 / 100),
                   opt = JuMPOptimiser(; sbgt = 1, bgt = 0.5,
                                       wb = WeightBounds(; lb = -1, ub = 1), slv = slv))
@@ -30,9 +30,11 @@
     @test isapprox(sum(res_ga.cost), 4206.9 * 0.5, rtol = 4e-2)
     @test isapprox(sum(res.w[res.w .< 0]), -1, rtol = 1e-4)
     @test isapprox(res_ga.shares .* vec(values(X[end])), res_ga.cost)
-    @test isapprox(rmsd(res.w, res_ga.w), 0.01048359738507303, rtol = 2e-3)
-    @test all(isapprox.(mod.(round.(mod.(abs.(res_ga.shares), 1), sigdigits = 1), ga.unit),
-                        0, atol = 1e-10))
+    # The first pass floors the lots of each target, where the old default rounded to whole
+    # shares (#1966), so the book tracks its target closer than the 0.0105 of v0.33.
+    @test isapprox(rmsd(res.w, res_ga.w), 0.004236803408908254, rtol = 2e-3)
+    @test all(isapprox.(abs.(res_ga.shares) ./ 0.3, round.(abs.(res_ga.shares) ./ 0.3);
+                        atol = 1e-8))
 
     mr = MeanRisk(; obj = MaximumRatio(; rf = 4.2 / 252 / 100),
                   opt = JuMPOptimiser(; sbgt = 1, bgt = 1.2,
@@ -43,9 +45,10 @@
                       FiniteAllocationInput(; w = res.w, prices = vec(values(X[end])),
                                             cash = 4206.9))
     # Each side's targets sum to its cash, so the book spends the budget down to a leftover
-    # that buys no further long share.
-    @test isapprox(sum(res_da.cost) + res_da.cash, 4206.9 * 1.2)
-    @test 0 <= res_da.cash < minimum(vec(values(X[end]))[res.w .>= 0])
+    # that buys no further long share. The cash is what the account holds: a net budget of
+    # 1.2 borrows 0.2 of the cash, so the leftover sits above `4206.9 * (1 - 1.2)`.
+    @test isapprox(sum(res_da.cost) + res_da.cash, 4206.9)
+    @test 0 <= res_da.cash - 4206.9 * (1 - 1.2) < minimum(vec(values(X[end]))[res.w .>= 0])
     @test isapprox(sum(res.w[res.w .< 0]), -1, rtol = 1e-3)
     @test isapprox(res_da.shares .* vec(values(X[end])), res_da.cost)
     @test isapprox(rmsd(res.w, res_da.w), 0.011295820717513184, rtol = 5e-4)
@@ -56,7 +59,7 @@
     @test isapprox(sum(res_ga.cost), 4206.9 * 1.2, rtol = 1e-2)
     @test isapprox(sum(res.w[res.w .< 0]), -1, rtol = 1e-3)
     @test isapprox(res_ga.shares .* vec(values(X[end])), res_ga.cost)
-    @test isapprox(rmsd(res.w, res_ga.w), 0.01640695936037548, rtol = 5e-5)
+    @test isapprox(rmsd(res.w, res_ga.w), 0.0035936195796180135, rtol = 5e-5)
 
     mr = MeanRisk(; obj = MaximumRatio(; rf = 4.2 / 252 / 100),
                   opt = JuMPOptimiser(; bgt = 0.8, slv = slv))
@@ -66,8 +69,9 @@
                       FiniteAllocationInput(; w = res.w, prices = vec(values(X[end])),
                                             cash = 4206.9))
 
-    @test isapprox(sum(res_da.cost) + res_da.cash, 4206.9 * 0.8)
-    @test 0 <= res_da.cash < minimum(vec(values(X[end]))[res.w .> 0])
+    # A budget of 0.8 keeps 0.2 of the cash out of the book, and the cash reports it (#1961).
+    @test isapprox(sum(res_da.cost) + res_da.cash, 4206.9)
+    @test 0 <= res_da.cash - 4206.9 * (1 - 0.8) < minimum(vec(values(X[end]))[res.w .> 0])
     @test isapprox(res_da.shares .* vec(values(X[end])), res_da.cost)
     @test isapprox(rmsd(res.w, res_da.w), 0.001331170818965931, rtol = 5e-2)
     res_ga = optimise(ga,
@@ -75,9 +79,9 @@
                                             cash = 4206.9))
     @test isapprox(sum(res_ga.cost), 4206.9 * 0.8, rtol = 1e-2)
     @test isapprox(res_ga.shares .* vec(values(X[end])), res_ga.cost)
-    @test isapprox(rmsd(res.w, res_ga.w), 0.0010146002336457861, rtol = 5e-3)
-    @test all(isapprox.(mod.(round.(mod.(abs.(res_ga.shares), 1), sigdigits = 1), ga.unit),
-                        0, atol = 1e-10))
+    @test isapprox(rmsd(res.w, res_ga.w), 0.00048462612411235027, rtol = 5e-3)
+    @test all(isapprox.(abs.(res_ga.shares) ./ 0.3, round.(abs.(res_ga.shares) ./ 0.3);
+                        atol = 1e-8))
 
     # `DiscreteAllocation` defaults `fb` to a `GreedyAllocation`, so every allocation
     # above goes through the generic `optimise` and its fallback chain. Only `fb =
@@ -101,7 +105,7 @@
     p_ov = [131.7, 47.3, 903.5, 12.9, 268.4]
     cash_ov = 10_000.0
     for u in (0.3, 1, 2, 5, 10)
-        r_ov = optimise(GreedyAllocation(; unit = u),
+        r_ov = optimise(GreedyAllocation(; unit = LotUnit(u)),
                         FiniteAllocationInput(; w = w_ov, prices = p_ov, cash = cash_ov))
         spent = dot(collect(r_ov.shares), p_ov)
         @test spent <= cash_ov + eps(cash_ov)
@@ -113,12 +117,6 @@
                        FiniteAllocationInput(; w = w_ov, prices = p_ov, cash = cash_ov))
     @test collect(r_unit1.shares) == [26.0, 52.0, 2.0, 93.0, 3.0]
     @test isapprox(r_unit1.cash, 304.30000000000075)
-
-    # `roundmult` truncates towards zero to a multiple of `prec` and then rounds that
-    # product. It is not a round to the nearest multiple: 8.0 is the nearest multiple of 2.
-    @test PortfolioOptimisers.roundmult(7.5, 2) == 6.0
-    @test PortfolioOptimisers.roundmult(26.58, 1) == 26.0
-    @test PortfolioOptimisers.roundmult(7.5, 2) != round(7.5 / 2) * 2
 end
 # Issue #900: a fee is a cost of the portfolio the allocator actually buys. It is priced
 # on `x .* p`, the money in each position, and it is charged inside the allocation rather
@@ -146,7 +144,7 @@ end
     # `252 * 2_000` turnover and `2 * 5.0` fixed. The deleted price-carrying family
     # charged `rate * dot(w, p)`, which is `1.5` and `0.3` per period.
     fmoney = Fees(; l = 0.01, fl = 5.0, tn = Turnover(; w = [0.0, 0.0], val = 0.002))
-    lsf, _ = PO.allocation_side_fees(fmoney, 252, 1e6, [true, true], Float64[])
+    lsf, _ = PO.allocation_side_fees(fmoney, 252, 1e6, [true, true], Float64[], falses(2))
     @test PO.allocation_fee(lsf, [100.0, 200.0], [5000.0, 2500.0]) ==
           252 * 0.01 * 1e6 + 252 * 0.002 * 1e6 + 10.0
     # A side that states no fee is charged nothing, whatever it holds.
@@ -179,7 +177,7 @@ end
         @test isapprox(sum(cost) + r.cash + r.fees, cash)
         @test r.cash >= 0
         # The same book, priced by the shared verb, is the number the result reports.
-        lsf2, _ = PO.allocation_side_fees(fee, T, cash, [true, true], Float64[])
+        lsf2, _ = PO.allocation_side_fees(fee, T, cash, [true, true], Float64[], falses(2))
         @test isapprox(r.fees, PO.allocation_fee(lsf2, p, shares))
     end
 
@@ -499,19 +497,21 @@ end
 
     # The two passes as the `# Mathematical definition` of `GreedyAllocation` states them,
     # on one long side. `F` is `allocation_fee`, and each `ΔF` is a difference of two
-    # whole fees, so this checks `greedy_fee_delta` as well.
-    function documented_greedy(w, p, C, unit, sf; kwargs = (;))
+    # whole fees, so this checks `greedy_fee_delta` as well. `unit` is the lot unit, one
+    # number for every asset or one value for each asset.
+    function documented_greedy(w, p, C, unit, sf)
         N = length(w)
         o = sortperm(w; rev = true)
         w = w[o] / sum(w[o])
         p = p[o]
+        l = isa(unit, Number) ? fill(unit, N) : unit[o]
         sfo = PO.permute_side_fees(sf, o)
         F = x -> PO.allocation_fee(sfo, p, x)
         x = zeros(N)
         r = C - F(x)
         for i in 1:N
             y = copy(x)
-            y[i] = round(floor(w[i] * C / (p[i] * unit)) * unit; kwargs...)
+            y[i] = l[i] * floor(w[i] * C / (p[i] * l[i]))
             c = y[i] * p[i] + F(y) - F(x)
             if c > r
                 break
@@ -525,8 +525,8 @@ end
             best = 0
             for i in 1:N
                 y = copy(x)
-                y[i] += unit
-                if p[i] * unit + F(y) - F(x) <= r &&
+                y[i] += l[i]
+                if p[i] * l[i] + F(y) - F(x) <= r &&
                    d[i] > 0 &&
                    (best == 0 || d[i] > d[best])
                     best = i
@@ -536,8 +536,8 @@ end
                 break
             end
             y = copy(x)
-            y[best] += unit
-            r -= p[best] * unit + F(y) - F(x)
+            y[best] += l[best]
+            r -= p[best] * l[best] + F(y) - F(x)
             x = y
         end
         xo = similar(x)
@@ -554,8 +554,11 @@ end
         w ./= sum(w)
         p = round.(1 .+ 300 * rand(rng, N); digits = 2)
         C = round(100 + 20_000 * rand(rng); digits = 2)
-        unit = rand(rng, (1, 2, 5, 0.5))
-        kw = unit == 0.5 ? (digits = 1,) : (;)
+        # A scalar lot unit, or one lot unit for each asset that mixes fractions and lots.
+        unit = rand(rng, (1, 2, 5, 0.5, 0.001, :vector))
+        if unit === :vector
+            unit = [rand(rng, (0.001, 0.5, 1.0, 10.0)) for _ in 1:N]
+        end
         T = rand(rng, (1, 3))
         w0 = rand(rng, N)
         w0 ./= sum(w0)
@@ -563,11 +566,11 @@ end
                    (nothing, Fees(; l = 0.001),
                     Fees(; l = rand(rng, N) / 500, fl = 2.0,
                          tn = Turnover(; w = w0, val = rand(rng, N) / 200))))
-        r = optimise(GreedyAllocation(; unit = unit, kwargs = kw),
+        r = optimise(GreedyAllocation(; unit = LotUnit(unit)),
                      FiniteAllocationInput(; w = w, prices = p, cash = C, horizon = T,
                                            fees = fee))
-        lsf, _ = PO.allocation_side_fees(fee, T, C, trues(N), Float64[])
-        x, cash = documented_greedy(w, p, C, unit, lsf; kwargs = kw)
+        lsf, _ = PO.allocation_side_fees(fee, T, C, trues(N), Float64[], falses(N))
+        x, cash = documented_greedy(w, p, C, unit, lsf)
         @test collect(r.shares) ≈ x
         @test isapprox(r.cash, cash; atol = 1e-8)
     end
@@ -587,33 +590,28 @@ end
                                         cash = 100.0))
     @test collect(rz.shares) == [-10.0, 0.0]
     @test collect(rz.w) == [-1.0, 0.0]
-    @test rz.cash == 0.0
+    # The short sale gives its 100 to the account, beside the cash of 100 (#1961).
+    @test rz.cash == 200.0
 
     # `finite_sub_allocation!` changes none of its arguments.
     ga = GreedyAllocation()
     wv = [0.3, 0.5]
-    PO.finite_sub_allocation!(view(wv, 1:2), [10.0, 20.0], 1000.0, 1.0, nothing, ga)
+    PO.finite_sub_allocation!(view(wv, 1:2), [10.0, 20.0], 1, 1000.0, 1.0, nothing, ga)
     @test wv == [0.3, 0.5]
     # An empty side still pays the forced exit, out of its cash.
     sf = (T = 1, prop = nothing, fixed = nothing, tn_val = nothing, prev_money = nothing,
           liq = 7.0)
-    re = PO.finite_sub_allocation!(Float64[], Float64[], 100.0, 0.0, sf, ga)
+    re = PO.finite_sub_allocation!(Float64[], Float64[], 1, 100.0, 0.0, sf, ga)
     @test isempty(re[1]) && isempty(re[2]) && isempty(re[3])
     @test re[4] == 93.0
     @test re[5] == 7.0
-
-    # `roundmult` rounds to an integer by default, so a `prec` below one can lose the
-    # multiple. `RoundDown` loses it too, and `digits` keeps it.
-    @test PO.roundmult(1.25, 0.3) == 1.0
-    @test PO.roundmult(1.25, 0.3, RoundDown) == 1.0
-    @test PO.roundmult(1.25, 0.3; digits = 1) == 1.2
 
     # The turnover term of `greedy_fee_delta` is negative when the purchase moves the
     # position towards the money it held before the trade, and the delta is still the
     # difference of two whole fees.
     f = Fees(; l = [0.01, 0.02], fl = [5.0, 3.0],
              tn = Turnover(; w = [0.4, 0.6], val = [0.002, 0.004]))
-    lsf, _ = PO.allocation_side_fees(f, 12, 1e4, [true, true], Float64[])
+    lsf, _ = PO.allocation_side_fees(f, 12, 1e4, [true, true], Float64[], falses(2))
     p = [100.0, 200.0]
     sh = [10.0, 0.0]
     @test isapprox(PO.greedy_fee_delta(lsf, p, sh, 1, 2.0),
@@ -660,8 +658,10 @@ using JuMP
                                                                                         "verbose" =>
                                                                                             false)),
                        check_sol = (; allow_local = true, allow_almost = true))
-    wfs = (AbsoluteErrorWeightFinaliser(), SquaredAbsoluteErrorWeightFinaliser(),
-           RelativeErrorWeightFinaliser(), SquaredRelativeErrorWeightFinaliser())
+    abs_dev = AbsoluteWeightDeviation()
+    wfs = (ErrorWeightFinaliser(; dev = abs_dev),
+           ErrorWeightFinaliser(; alg = L2Norm(), dev = abs_dev), ErrorWeightFinaliser(),
+           ErrorWeightFinaliser(; alg = L2Norm()))
     da(wf) = DiscreteAllocation(; slv = conic_slv, wf = wf, fb = nothing)
 
     @testset "validation" begin
@@ -676,14 +676,11 @@ using JuMP
         function objective(wf, w, p, C, x)
             we = map(v -> iszero(v) ? eps(eltype(w)) : v, w)
             r = C - dot(x, p)
-            return r + if isa(wf, AbsoluteErrorWeightFinaliser)
-                norm(w * C - x .* p, 1)
-            elseif isa(wf, SquaredAbsoluteErrorWeightFinaliser)
-                norm(w * C - x .* p, 2)
-            elseif isa(wf, RelativeErrorWeightFinaliser)
-                C * norm((x .* p) ./ (we * C) .- 1, 1)
+            q = isa(wf.alg, L1Norm) ? 1 : 2
+            return r + if isa(wf.dev, AbsoluteWeightDeviation)
+                norm(w * C - x .* p, q)
             else
-                C * norm((x .* p) ./ (we * C) .- 1, 2)
+                C * norm((x .* p) ./ (we * C) .- 1, q)
             end
         end
         function enumerate_best(wf, w, p, C)
@@ -711,32 +708,22 @@ using JuMP
             @test isapprox(JuMP.objective_value(r.l_model), obj; rtol = 1e-6)
             # The objective is `e + r`: `u` under an absolute error, `C u` under a relative one.
             m = r.l_model
-            e = JuMP.value(m[:u]) * (if isa(wf,
-                                            Union{RelativeErrorWeightFinaliser,
-                                                  SquaredRelativeErrorWeightFinaliser})
-                                         C
-                                     else
-                                         1
-                                     end)
+            e = JuMP.value(m[:u]) * (isa(wf.dev, RelativeWeightDeviation) ? C : 1)
             @test isapprox(JuMP.objective_value(m), e + JuMP.value(m[:r]); rtol = 1e-6)
-        end
-        # The row that `wf` names is the one in the model.
-        rows = [:cabs_err, :csqabs_err, :crel_err, :csqrel_err]
-        for (wf, row) in zip(wfs, rows)
-            m = optimise(da(wf), FiniteAllocationInput(; w = w, prices = p, cash = cash)).l_model
-            @test haskey(m, row)
-            @test all(!haskey(m, other) for other in setdiff(rows, [row]))
+            # The error row is registered as `cerr`, for every norm and deviation.
+            @test haskey(m, :cerr)
         end
     end
 
     @testset "a side's targets sum to its cash" begin
         # A long-only book with a budget of 0.8 spends the whole side cash, 1000 of 1250,
-        # and the exact book of the target is reachable.
+        # and the exact book of the target is reachable. The 250 outside the budget is the
+        # cash of the account (#1961).
         fai = FiniteAllocationInput(; w = [0.4, 0.4], prices = [10.0, 100.0], cash = 1250.0)
         for wf in wfs
             r = optimise(da(wf), fai)
             @test collect(r.shares) == [50.0, 5.0]
-            @test iszero(r.cash)
+            @test r.cash == 250.0
             @test collect(r.w) == [0.4, 0.4]
         end
         # A long-short book: each side's targets sum to its own cash.
@@ -779,7 +766,7 @@ using JuMP
                         end)
         wv = [0.5, 0.0, 0.5]
         err = PO.set_discrete_error!(model, wv, [10.0, 20.0, 100.0], 1000.0,
-                                     RelativeErrorWeightFinaliser())
+                                     ErrorWeightFinaliser())
         @test wv == [0.5, 0.0, 0.5]
         @test isequal(err, 1000.0 * u)
     end
@@ -794,7 +781,7 @@ using JuMP
         m = r.l_model
         for k in
             (:money, :fee_prop, :fee_tn, :fee_fixed, :fee, :t_ftn, :b, :cftn_ub, :cftn_lb,
-             :cb_ub, :cb_lb, :cr, :r, :x, :u, :sc, :so, :cabs_err)
+             :cb_ub, :cb_lb, :cr, :r, :x, :u, :sc, :so, :cerr)
             @test haskey(m, k)
         end
         x = JuMP.value.(m[:x])
@@ -805,7 +792,7 @@ using JuMP
         @test all(JuMP.value.(m[:t_ftn]) .>= abs.(money - 500.0 * w) .- 1e-6)
         # The model fee bounds the fee of the book, and the reported fee is the exact one:
         # 3 * 0.001 * 990 + 3 * 0.002 * 490 + 2 * 2 on this book.
-        lsf, _ = PO.allocation_side_fees(fee, 3, 500.0, [true, true], Float64[])
+        lsf, _ = PO.allocation_side_fees(fee, 3, 500.0, [true, true], Float64[], falses(2))
         @test JuMP.value(m[:fee]) >= r.fees - 1e-6
         @test r.fees == PO.allocation_fee(lsf, p, collect(r.shares))
         @test isapprox(r.fees, 3 * 0.001 * 990 + 3 * 0.002 * 490 + 2 * 2)
@@ -885,7 +872,7 @@ end
                     flq = Turnover(; w = [0.1, -0.2], val = [4.0, 6.0]))
         lidx = x .>= 0
         sidx = .!lidx
-        lsf, ssf = PO.allocation_side_fees(fees, T, Cp, lidx, sidx)
+        lsf, ssf = PO.allocation_side_fees(fees, T, Cp, lidx, sidx, falses(length(lidx)))
         F = PO.allocation_fee(lsf, p[lidx], x[lidx]) +
             PO.allocation_fee(ssf, p[sidx], -x[sidx])
         ref = Cp * T * PO.calc_periodic_fees(m / Cp, fees) +
@@ -893,12 +880,13 @@ end
         abs(F - ref) / abs(ref)
     end
     @test maximum(errs) < 1e-12
-    @test PO.allocation_side_fees(nothing, 3, 1e4, lidx, .!lidx) === (nothing, nothing)
+    @test PO.allocation_side_fees(nothing, 3, 1e4, lidx, .!lidx, falses(length(lidx))) ===
+          (nothing, nothing)
     @test iszero(PO.allocation_fee(nothing, [1.0, 2.0], [3.0, 4.0]))
     # The empty book owes the sale of what the side held, and the forced exit.
     fees = Fees(; tn = Turnover(; w = [0.3, 0.7], val = 0.01),
                 flq = Turnover(; w = [0.1], val = 4.0))
-    lsf, _ = PO.allocation_side_fees(fees, 2, 1e3, [true, true], Float64[])
+    lsf, _ = PO.allocation_side_fees(fees, 2, 1e3, [true, true], Float64[], falses(2))
     @test PO.allocation_fee(lsf, [10.0, 20.0], [0.0, 0.0]) ≈ 2 * 0.01 * 1e3 + 4.0
 
     # `permute_side_fees` does not change the fee.
@@ -908,7 +896,7 @@ end
     fees = Fees(; l = rand(rng, N) / 100, fl = rand(rng, N),
                 tn = Turnover(; w = rand(rng, N) / N, val = 0.01),
                 lq = Turnover(; w = [0.1], val = 0.02))
-    lsf, _ = PO.allocation_side_fees(fees, 7, 1e3, trues(N), Float64[])
+    lsf, _ = PO.allocation_side_fees(fees, 7, 1e3, trues(N), Float64[], falses(N))
     o = sortperm(rand(rng, N))
     @test PO.allocation_fee(PO.permute_side_fees(lsf, o), view(p, o), view(x, o)) ≈
           PO.allocation_fee(lsf, p, x)
@@ -960,6 +948,11 @@ end
     # A long-only book: no short cash, and the long target.
     @test iszero(pc([0.5, 0.5], p, C))
     @test pc([0.5, 0.5], p, C, 0.0, 0.0) ≈ 100.0
+    # The third method is the cash of the account, R = C + m_S - F_S - m_L - F_L (#1961).
+    @test pc(w, p, C, 50.0, 0.0, 120.0, 0.0) ≈ 30.0
+    @test pc(w, p, C, 30.0, 2.0, 90.0, 3.0) ≈ 100.0 + 30.0 - 2.0 - 90.0 - 3.0
+    # A long side that spends more than the cash borrows.
+    @test pc([1.5], [1.0], C, 0.0, 0.0, 150.0, 0.0) ≈ -50.0
 
     cc = CashCollateral()
     @test isnothing(cc.amount)
@@ -977,6 +970,10 @@ end
     @test iszero(cs(w, p, C, 30.0, 0.0))
     # A long-only book above a unit budget is capped at K.
     @test cc([0.9, 0.6], p, C, 0.0, 0.0) ≈ 100.0
+    # The third method is the cash of the account, R = C - m_S - F_S - m_L - F_L (#1961).
+    @test cc(w, p, C, 30.0, 2.0, 68.0, 0.0) ≈ 0.0 atol = 1e-12
+    @test ck(w, p, C, 50.0, 0.0, 120.0, 0.0) ≈ -70.0
+    @test cs(w, p, C, 30.0, 0.0, 0.0, 0.0) ≈ 70.0
     @test_throws DomainError CashCollateral(; amount = 0.0)
     @test_throws DomainError CashCollateral(; amount = -1)
 
@@ -1004,9 +1001,10 @@ end
     end
 
     # The cash identity of each algorithm, on books whose short side sells and pays a fee.
-    # `sum(cost)` is the long money less the short money, and `fees` holds both sides' fees,
-    # so the reported cash is the long cash less the long money and the long fee. A long
-    # cash floored at zero buys nothing and pays no fee here, so its cash is zero.
+    # `sum(cost)` is the long money less the short money, and `fees` holds both sides' fees.
+    # The reported cash is what the account holds (#1961): the proceeds model credits the
+    # short money, so the signed costs close the books, and the collateral model ties it
+    # up, so the absolute costs close them.
     rng = StableRNG(1337)
     fees = Fees(; l = 0.002, s = 0.003, fl = 0.5, fs = 0.7)
     for _ in 1:20
@@ -1018,13 +1016,17 @@ end
                                         fees = fees)
             r = optimise(ga, fai)
             cost = collect(r.cost)
-            @test r.cash ≈ max(0.0, C * sum(w) - sum(cost) - r.fees) atol = 1e-8
+            @test r.cash ≈ C - sum(cost) - r.fees atol = 1e-8
+            # The long side spends no more than its long cash.
+            @test r.cash >= C * (1 - sum(w)) - 1e-8 || iszero(sum(c -> max(c, 0.0), cost))
             K = 0.9 * C
             fai = FiniteAllocationInput(; w = w, prices = p, cash = C, horizon = 3,
                                         fees = fees, ca = CashCollateral(; amount = K))
             r = optimise(ga, fai)
             cost = collect(r.cost)
-            @test r.cash ≈ max(0.0, min(C * sum(abs, w), K) - sum(abs, cost) - r.fees) atol = 1e-8
+            @test r.cash ≈ C - sum(abs, cost) - r.fees atol = 1e-8
+            # The collateral that the book did not tie up stays in the account.
+            @test r.cash >= C - K - 1e-8
             @test sum(abs, cost) + r.fees <= min(C * sum(abs, w), K) + 1e-8
         end
     end
@@ -1037,4 +1039,311 @@ end
     r = @test_logs((:warn,), match_mode = :any, optimise(da0, fai))
     @test collect(r.shares) == collect(optimise(GreedyAllocation(), fai).shares)
     @test collect(r.shares) == [100.0, 0.0]
+
+    # A plain function with the three methods of the family is a collateral algorithm, and
+    # both allocators read it as they read the type it copies.
+    cash_fun(w, prices, cash) = CashCollateral()(w, prices, cash)
+    cash_fun(w, prices, cash, smoney, sfee) = CashCollateral()(w, prices, cash, smoney,
+                                                               sfee)
+    function cash_fun(w, prices, cash, smoney, sfee, lmoney, lfee)
+        return CashCollateral()(w, prices, cash, smoney, sfee, lmoney, lfee)
+    end
+    ffun = FiniteAllocationInput(; w = [1.2, -0.5], prices = [1.0, 1000.0], cash = 100.0,
+                                 ca = cash_fun)
+    @test ffun.ca === cash_fun
+    for alg in (GreedyAllocation(),
+                DiscreteAllocation(;
+                                   slv = Solver(; name = :highs1, solver = HiGHS.Optimizer,
+                                                settings = Dict("log_to_console" => false))))
+        @test collect(optimise(alg, ffun).shares) == collect(optimise(alg, fai).shares)
+    end
+end
+@testset "A NaN price marks an Unpriced Asset, and both allocators read one rule (#1950)" begin
+    using PortfolioOptimisers, Test, HiGHS
+    PO = PortfolioOptimisers
+    slv = Solver(; name = :highs1, solver = HiGHS.Optimizer,
+                 settings = Dict("log_to_console" => false),
+                 check_sol = (; allow_local = true, allow_almost = true))
+    da = DiscreteAllocation(; slv = slv, fb = nothing)
+    ga = GreedyAllocation()
+    p = [10.0, 20.0, NaN]
+
+    # Each allocator buys no Unpriced Asset, keeps every number finite, and agrees with the
+    # other. The issue's two cases are one: a zero weight has no weight to move.
+    expected = Dict((0.0, nothing) => [50.0, 25.0, 0.0],
+                    (0.0, ProportionalRedistribution()) => [50.0, 25.0, 0.0],
+                    (0.2, nothing) => [50.0, 15.0, 0.0],
+                    (0.2, ProportionalRedistribution()) => [62.0, 19.0, 0.0],
+                    (0.2, EvenRedistribution()) => [60.0, 20.0, 0.0],
+                    (0.2, AssetRedistribution(; idx = 2)) => [50.0, 25.0, 0.0])
+    for ((w3, upw), shares) in expected
+        w = w3 == 0 ? [0.5, 0.5, 0.0] : [0.5, 0.3, 0.2]
+        fai = FiniteAllocationInput(; w = w, prices = p, cash = 1000.0, upw = upw)
+        for alg in (ga, da)
+            r = optimise(alg, fai)
+            @test isa(r.retcode, OptimisationSuccess)
+            @test collect(r.shares) == shares
+            @test all(isfinite, r.cost) && all(isfinite, r.w) && isfinite(r.cash)
+            @test iszero(r.cost[3]) && iszero(r.w[3])
+        end
+    end
+
+    # `nothing` reads the weight as a zero weight: the book of a zero weight at a finite price.
+    a = optimise(ga,
+                 FiniteAllocationInput(; w = [0.5, 0.3, 0.2], prices = p, cash = 1000.0))
+    b = optimise(ga,
+                 FiniteAllocationInput(; w = [0.5, 0.3, 0.0], prices = [10.0, 20.0, 7.0],
+                                       cash = 1000.0))
+    @test collect(a.shares) == collect(b.shares)
+    @test a.cash == b.cash
+    @test collect(a.w) == collect(b.w)
+
+    # The rules against their `# Mathematical definition`: each side keeps its budget.
+    w = [0.6, 0.3, 0.3, -0.1, -0.1]
+    pls = [10.0, 20.0, NaN, 5.0, NaN]
+    umsk = isnan.(pls)
+    @test ProportionalRedistribution()(w, umsk) ≈ [0.8, 0.4, 0.0, -0.2, 0.0]
+    @test EvenRedistribution()(w, umsk) ≈ [0.75, 0.45, 0.0, -0.2, 0.0]
+    @test AssetRedistribution(; idx = [1, 4])(w, umsk) ≈ [0.9, 0.3, 0.0, -0.2, 0.0]
+    # A side with no recipient keeps the weight as a zero weight.
+    @test AssetRedistribution(; idx = 1)(w, umsk) ≈ [0.9, 0.3, 0.0, -0.1, 0.0]
+    # One rule per side: each side reads only its own entries of its own rule.
+    @test SideRedistribution(; l = ProportionalRedistribution())(w, umsk) ≈
+          [0.8, 0.4, 0.0, -0.1, 0.0]
+    @test SideRedistribution(; l = EvenRedistribution(),
+                             s = AssetRedistribution(; idx = 4))(w, umsk) ≈
+          [0.75, 0.45, 0.0, -0.2, 0.0]
+    @test SideRedistribution()(w, umsk) == PO.unpriced_weights(nothing, w, umsk)
+    # The rule of a side is checked as a whole rule is.
+    @test_throws ArgumentError SideRedistribution(; s = (w, m) -> w)(w, umsk)
+    # A nested SideRedistribution adds nothing, so the constructor refuses it on each side.
+    @test_throws ArgumentError SideRedistribution(; l = SideRedistribution())
+    @test_throws ArgumentError SideRedistribution(; s = SideRedistribution())
+    for alg in (ga, da)
+        r = optimise(alg,
+                     FiniteAllocationInput(; w = w, prices = pls, cash = 1000.0,
+                                           upw = SideRedistribution(;
+                                                                    l = ProportionalRedistribution())))
+        @test collect(r.shares) == [80.0, 20.0, 0.0, -20.0, 0.0]
+    end
+    @test EvenRedistribution()([0.5, 0.5, -0.2], [false, false, true]) ≈ [0.5, 0.5, 0.0]
+    @test ProportionalRedistribution()([0.5, 0.5, -0.2], [false, false, true]) ≈
+          [0.5, 0.5, 0.0]
+    # A zero weight takes no part of an even split. Issue #1972 removed the integer-weight
+    # case: the target weights are continuous.
+    @test EvenRedistribution()([0.5, 0.3, 0.2, 0.0], [false, false, true, false]) ≈
+          [0.6, 0.4, 0.0, 0.0]
+    @test ProportionalRedistribution()([1.0, 1, 0, 2], [false, false, false, true]) ==
+          [2.0, 2.0, 0.0, 0.0]
+    @test PO.unpriced_weights(nothing, [1.0, 2], [false, true]) == [1.0, 0.0]
+    for alg in (ga, da)
+        r = optimise(alg,
+                     FiniteAllocationInput(; w = w, prices = pls, cash = 1000.0,
+                                           upw = ProportionalRedistribution()))
+        @test collect(r.shares) == [80.0, 20.0, 0.0, -40.0, 0.0]
+        @test all(isfinite, r.cost)
+    end
+
+    # A held Unpriced Asset ends with no money: its turnover fee is the sale of its old
+    # position, 0.01 * 1000 * 0.3, and the price never enters.
+    fees = Fees(; tn = Turnover(; w = [0.4, 0.3, 0.3], val = 0.01))
+    f = FiniteAllocationInput(; w = [0.5, 0.3, 0.2], prices = p, cash = 1000.0, horizon = 1,
+                              fees = fees)
+    for alg in (ga, da)
+        r = optimise(alg, f)
+        sh = collect(r.shares)
+        @test r.fees ≈ 0.01 * (abs(sh[1] * 10 - 400) + abs(sh[2] * 20 - 300) + 300)
+        @test isfinite(r.cash)
+    end
+
+    # A plain function is a rule, and a rule must zero every Unpriced Asset.
+    fun = FiniteAllocationInput(; w = [0.5, 0.5], prices = [1.0, NaN], cash = 10.0,
+                                upw = (w, m) -> [1.0, 0.0])
+    @test collect(optimise(ga, fun).shares) == [10.0, 0.0]
+    bad = FiniteAllocationInput(; w = [0.5, 0.5], prices = [1.0, NaN], upw = (w, m) -> w)
+    @test_throws ArgumentError optimise(ga, bad)
+
+    # Validation.
+    @test_throws DomainError FiniteAllocationInput(; w = [1.0], prices = [Inf])
+    @test_throws IsEmptyError AssetRedistribution(; idx = Int[])
+    @test_throws DomainError AssetRedistribution(; idx = 0)
+    @test_throws BoundsError AssetRedistribution(; idx = 9)([0.5, 0.5], [false, true])
+end
+@testset "The cash of a finite allocation is the cash that the account holds (#1961)" begin
+    using PortfolioOptimisers, Test, HiGHS
+    slv = Solver(; name = :highs1, solver = HiGHS.Optimizer,
+                 settings = Dict("log_to_console" => false),
+                 check_sol = (; allow_local = true, allow_almost = true))
+    ga = GreedyAllocation()
+    da = DiscreteAllocation(; slv = slv, fb = nothing)
+    # The two books of the issue spend 700 of 1000. The weight of the Unpriced Asset under
+    # `upw = nothing`, and the weight outside a budget of 0.7, are 300 that no side gets,
+    # and the cash reports them.
+    books = [FiniteAllocationInput(; w = [0.5, 0.3, 0.2], prices = [10.0, NaN, 20.0],
+                                   cash = 1000.0),
+             FiniteAllocationInput(; w = [0.5, 0.2], prices = [10.0, 20.0], cash = 1000.0)]
+    for fai in books, alg in (ga, da)
+        r = optimise(alg, fai)
+        @test sum(collect(r.cost)) == 700.0
+        @test r.cash == 300.0
+        @test sum(collect(r.cost)) + r.cash + r.fees == 1000.0
+    end
+    # A rule that moves the weight spends it, so the cash holds only the leftover. The
+    # greedy walk stops with one share of 10 unbought, because no asset has a deficit left.
+    for alg in (ga, da)
+        r = optimise(alg,
+                     FiniteAllocationInput(; w = [0.5, 0.3, 0.2],
+                                           prices = [10.0, NaN, 20.0], cash = 1000.0,
+                                           upw = ProportionalRedistribution()))
+        @test 0 <= r.cash <= 10.0
+    end
+    # Under `CashCollateral` the short money ties up cash, so the absolute costs close the
+    # books, and the cash outside the gross budget of 0.8 stays in the account.
+    for alg in (ga, da)
+        r = optimise(alg,
+                     FiniteAllocationInput(; w = [0.5, -0.3], prices = [10.0, 10.0],
+                                           cash = 1000.0, ca = CashCollateral()))
+        @test collect(r.shares) == [50.0, -30.0]
+        @test r.cash == 200.0
+        @test sum(abs, collect(r.cost)) + r.cash + r.fees == 1000.0
+    end
+end
+# Issue #1966: a lot unit for each asset. A share count of an asset is a non-negative
+# integer multiple of its lot unit, for fractional shares and for board lots, in both
+# allocators. A `LotUnitEstimator` resolves the lot unit against `UniverseSets`.
+@testset "Finite allocation lot units" begin
+    using PortfolioOptimisers, HiGHS, Test
+    PO = PortfolioOptimisers
+    mip_slv = Solver(; name = :highs1, solver = HiGHS.Optimizer,
+                     settings = Dict("log_to_console" => false),
+                     check_sol = (; allow_local = true, allow_almost = true))
+    sets = UniverseSets(; dict = Dict("nx" => ["A", "B", "C"]))
+    w = [0.5, 0.3, 0.2]
+    p = [33.0, 71.0, 129.0]
+    fai = FiniteAllocationInput(; w = w, prices = p, cash = 1000.0)
+    # A share count is a whole number of lots, to within one rounding of a product.
+    is_lot_multiple(x, l) = all(isapprox.(x ./ l, round.(x ./ l); atol = 1e-9))
+
+    @testset "the result and the estimator" begin
+        @test LotUnit().val == 1
+        @test LotUnit(; val = [0.001, 100]).val == [0.001, 100]
+        @test_throws DomainError LotUnit(0)
+        @test_throws DomainError LotUnit([1.0, -1.0])
+        @test_throws DomainError LotUnit(Inf)
+        @test_throws PO.IsEmptyError LotUnit(Float64[])
+        @test_throws DomainError LotUnitEstimator(; val = Dict("A" => -1.0))
+        @test_throws DomainError LotUnitEstimator(; val = 0.5, dval = 0)
+        @test_throws PO.IsEmptyError LotUnitEstimator(; val = 0.5, key = "")
+        lu = LotUnit(0.01)
+        @test lot_unit_constraints(lu) === lu
+        @test lot_unit_constraints(lu, sets) === lu
+        # `nothing` fills one whole share, and a stated fill takes a fractional map value
+        # even when it is an integer.
+        @test lot_unit_constraints(LotUnitEstimator(;
+                                                    val = Dict("A" => 0.001, "C" => 100.0)),
+                                   sets).val == [0.001, 1.0, 100.0]
+        @test lot_unit_constraints(LotUnitEstimator(; val = "B" => 0.5, dval = 2), sets).val ==
+              [2.0, 0.5, 2.0]
+        @test lot_unit_constraints(LotUnitEstimator(; val = 0.25), sets).val == 0.25
+        @test_throws PO.IsNothingError lot_unit_constraints(LotUnitEstimator(; val = 0.25),
+                                                            nothing)
+        @test lot_unit_constraints(LotUnitEstimator(; val = Dict("A" => 0.001), dval = 1),
+                                   sets).val == [0.001, 1.0, 1.0]
+        @test_throws ArgumentError lot_unit_constraints(LotUnitEstimator(;
+                                                                         val = Dict("Z" =>
+                                                                                        0.1)),
+                                                        sets; strict = true)
+        # The shared resolver promoted an integer fill value for the threshold too.
+        @test threshold_constraints(ThresholdEstimator(; val = "A" => 0.05, dval = 0),
+                                    sets).val == [0.05, 0.0, 0.0]
+        @test threshold_constraints(ThresholdEstimator(; val = Dict("A" => 0.05, "B" => 1)),
+                                    sets).val == [0.05, 1.0, 0.0]
+        # The family is not a pipeline step.
+        @test PO.pipe_constraint_targets(LotUnitEstimator(; val = 0.5)) == ()
+    end
+
+    @testset "the allocators resolve and check the lot unit" begin
+        @test_throws PO.IsNothingError GreedyAllocation(;
+                                                        unit = LotUnitEstimator(;
+                                                                                val = 0.1))
+        @test_throws PO.IsNothingError DiscreteAllocation(; slv = mip_slv,
+                                                          unit = LotUnitEstimator(;
+                                                                                  val = 0.1))
+        @test_throws DimensionMismatch optimise(GreedyAllocation(; unit = LotUnit([1, 2])),
+                                                fai)
+        @test_throws DimensionMismatch optimise(DiscreteAllocation(; slv = mip_slv,
+                                                                   unit = LotUnit([1, 2]),
+                                                                   fb = nothing), fai)
+        @test PO.allocation_lot_unit(LotUnit(0.5), nothing, false, fai) == 0.5
+        @test PO.allocation_lot_unit(LotUnitEstimator(; val = Dict("C" => 10.0)), sets,
+                                     false, fai) == [1.0, 1.0, 10.0]
+        # The default fallback of the discrete allocator buys the same lots.
+        u = LotUnitEstimator(; val = Dict("C" => 10.0))
+        da = DiscreteAllocation(; slv = mip_slv, unit = u, sets = sets, strict = true)
+        @test da.fb.unit === u
+        @test da.fb.sets === sets
+        @test da.fb.strict
+    end
+
+    @testset "the greedy allocator buys whole lots" begin
+        # The reproduction of the issue. The first pass floored the lot count of the third
+        # asset, so it no longer rounds 1.5504 up to 2 shares and stops.
+        r = optimise(GreedyAllocation(; unit = LotUnit(0.01)), fai)
+        @test collect(r.shares) ≈ [15.15, 4.22, 1.55]
+        @test is_lot_multiple(collect(r.shares), 0.01)
+        @test r.cash >= 0
+        # One lot unit for each asset, as a vector and through the estimator. A lot of ten
+        # shares of the third asset costs more than the cash.
+        l = [0.001, 1.0, 10.0]
+        rv = optimise(GreedyAllocation(; unit = LotUnit(l)), fai)
+        re = optimise(GreedyAllocation(;
+                                       unit = LotUnitEstimator(;
+                                                               val = Dict("A" => 0.001,
+                                                                          "C" => 10.0)),
+                                       sets = sets), fai)
+        @test collect(rv.shares) == collect(re.shares)
+        @test is_lot_multiple(collect(rv.shares), l)
+        @test rv.shares[3] == 0
+        # A long-short book views the lot unit with the mask of each side.
+        fls = FiniteAllocationInput(; w = [0.8, -0.3, 0.5], prices = p, cash = 1000.0)
+        rl = optimise(GreedyAllocation(; unit = LotUnit([0.5, 0.25, 1.0])), fls)
+        @test collect(rl.shares) == [23.5, -4.0, 3.0]
+        @test is_lot_multiple(collect(rl.shares), [0.5, 0.25, 1.0])
+    end
+
+    @testset "the discrete allocator buys whole lots" begin
+        r = optimise(DiscreteAllocation(; slv = mip_slv, unit = LotUnit(0.001),
+                                        fb = nothing), fai)
+        @test isa(r.retcode, OptimisationSuccess)
+        @test is_lot_multiple(collect(r.shares), 0.001)
+        @test r.cash < 0.05
+        @test r.cash >= -1e-8
+        # The integer variable counts lots, so the integer whole shares are the default.
+        r1 = optimise(DiscreteAllocation(; slv = mip_slv, fb = nothing), fai)
+        @test eltype(r1.shares) <: Real
+        @test collect(r1.shares) == round.(collect(r1.shares))
+        # A board lot of ten shares of the third asset.
+        rb = optimise(DiscreteAllocation(; slv = mip_slv, unit = LotUnit([1, 1, 10]),
+                                         fb = nothing),
+                      FiniteAllocationInput(; w = w, prices = p, cash = 10_000.0))
+        @test is_lot_multiple(collect(rb.shares), [1, 1, 10])
+        @test rb.shares[3] > 0
+        # A held position of less than one share pays its fixed fee. The binary reads the
+        # lot count, so the row does not refuse a position of one lot of 0.001 shares.
+        ff = FiniteAllocationInput(; w = [1.0], prices = [500.0], cash = 100.0, horizon = 1,
+                                   fees = Fees(; fl = 1.0))
+        rf = optimise(DiscreteAllocation(; slv = mip_slv, unit = LotUnit(0.001),
+                                         fb = nothing), ff)
+        @test isa(rf.retcode, OptimisationSuccess)
+        @test rf.shares[1] ≈ 0.198
+        @test rf.fees == 1.0
+        @test rf.cash >= -1e-8
+        # A long-short book views the lot unit with the mask of each side.
+        fls = FiniteAllocationInput(; w = [0.8, -0.3, 0.5], prices = p, cash = 1000.0)
+        rl = optimise(DiscreteAllocation(; slv = mip_slv, unit = LotUnit([0.5, 0.25, 1.0]),
+                                         fb = nothing), fls)
+        @test isa(rl.retcode, OptimisationSuccess)
+        @test is_lot_multiple(collect(rl.shares), [0.5, 0.25, 1.0])
+        @test rl.shares[2] < 0
+    end
 end

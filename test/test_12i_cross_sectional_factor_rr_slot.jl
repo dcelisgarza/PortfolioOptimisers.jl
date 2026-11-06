@@ -112,8 +112,9 @@ end
         @test pr_csfm_reb.rr === csfm_reb
         # The positional constructor takes it too, not only the keyword one.
         @test isa(LowOrderPrior(pr_csfm_reb.X, nothing, pr_csfm_reb.mu, pr_csfm_reb.sigma,
-                                nothing, nothing, nothing, nothing, nothing, csfm_reb,
-                                pr_csfm_reb.fpr, nothing, nothing, nothing), LowOrderPrior)
+                                nothing, nothing, nothing, (nothing, nothing), nothing,
+                                nothing, csfm_reb, pr_csfm_reb.fpr, nothing, nothing,
+                                nothing), LowOrderPrior)
     end
 
     @testset "The block invariants still read rr.M" begin
@@ -701,7 +702,7 @@ function cscr_history(rr)
         if !(any(isfinite, view(H, t, :)))
             continue
         end
-        g, ap = cscr_split(H[t, :], rr.Ms[t, :, 1:K], rr.rw[t, :])
+        g, ap = cscr_split(H[t, :], rr.Ms[:, 1:K, t], rr.rw[t, :])
         G[:, t] = g
         AP[t, :] = ap
     end

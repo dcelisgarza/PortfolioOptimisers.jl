@@ -236,15 +236,15 @@ end
 """
     forecast_location(ce::Covariance, X::MatNum; dims::Int = 1, active_mask = nothing, kwargs...)
     forecast_location(ce::GeneralCovariance, X::MatNum; dims::Int = 1, kwargs...)
-    forecast_location(ce::Union{<:ExpWeightedCovariance, <:RegimeAdjustedExpWeightedCovariance}, X::MatNum; dims::Int = 1, active_mask = nothing, kwargs...)
-    forecast_location(ce::Union{<:PortfolioOptimisersCovariance, <:CorrelationCovariance}, X::MatNum; kwargs...)
+    forecast_location(ce::Union{ExpWeightedCovariance, RegimeAdjustedExpWeightedCovariance}, X::MatNum; dims::Int = 1, active_mask = nothing, kwargs...)
+    forecast_location(ce::Union{PortfolioOptimisersCovariance, CorrelationCovariance}, X::MatNum; kwargs...)
     forecast_location(ce::AbstractCovarianceEstimator, X::MatNum; dims::Int = 1, kwargs...)
     forecast_location(ce::AbstractCovarianceEstimator, X::MatNum, pnl::Option{<:AssetPanel}; dims::Int = 1, kwargs...)
-    forecast_location(ce::Union{<:ExpWeightedCovariance, <:RegimeAdjustedExpWeightedCovariance}, X::MatNum, pnl::Option{<:AssetPanel}; dims::Int = 1, kwargs...)
+    forecast_location(ce::Union{ExpWeightedCovariance, RegimeAdjustedExpWeightedCovariance}, X::MatNum, pnl::Option{<:AssetPanel}; dims::Int = 1, kwargs...)
     forecast_location(ce::PortfolioOptimisersCovariance, X::MatNum, pnl::Option{<:AssetPanel}; dims::Int = 1, kwargs...)
     forecast_location(ce::Covariance)
     forecast_location(ce::GeneralCovariance)
-    forecast_location(ce::Union{<:ExpWeightedCovariance, <:RegimeAdjustedExpWeightedCovariance})
+    forecast_location(ce::Union{ExpWeightedCovariance, RegimeAdjustedExpWeightedCovariance})
     forecast_location(ce::PortfolioOptimisersCovariance)
     forecast_location(ce::CorrelationCovariance{<:Any, Nothing})
     forecast_location(ce::AbstractCovarianceEstimator)
@@ -263,7 +263,7 @@ Each family has two arities. The data form answers for a batch fit over `X`. The
   - [`PortfolioOptimisersCovariance`](@ref) and [`CorrelationCovariance`](@ref) answer what the estimator that they hold answers, because a matrix transform moves no centre. A `StatsBase.CovarianceEstimator` that they hold is read as a [`GeneralCovariance`](@ref), as `cov` reads it.
   - Any other [`AbstractCovarianceEstimator`](@ref) answers the sample mean of the window, over the finite rows of each column. Its data-less form reads the state through [`forecast_state_location`](@ref), which refuses a state of a shape that it does not know.
   - Under [`Online`](@ref), every family answers its data form over the rows and masks of the buffer, because a buffer means the batch verb over its rows each time the estimate is made from the state.
-  - An [`AbstractPriorEstimator`](@ref) answers the centre of its `sigma` through [`prior_forecast_location`](@ref). That is the `mu` it publishes for a family that forms both moments about one mean. An [`EmpiricalPrior`](@ref) whose `me` shrinks the mean publishes the shrunk `mu`, but its `ce` centres the covariance on its own estimate of the mean, so it answers the location of its `ce`. A factor prior and a high-order prior answer the centre of the prior that they lift or wrap. The keyword `strict` reaches [`prior`](@ref) alone. The location reads the returns in the frame that the prior fits on, the source that `pe` states through [`returns_source`](@ref). Before the fit and before the location, [`shared_series_view`](@ref) drops the observations of a gap in a vector benchmark under [`ExcessSource`](@ref), and the observations at which a factor return is not finite when the tree of the prior reads the factor returns. So the fit and the location read the same observations.
+  - An [`AbstractPriorEstimator`](@ref) answers the centre of its `sigma` through [`prior_forecast_location`](@ref). That is the `mu` it publishes for a family that forms both moments about one mean. An [`EmpiricalPrior`](@ref) whose `me` shrinks the mean publishes the shrunk `mu`, but its `ce` centres the covariance on its own estimate of the mean, so it answers the location of its `ce`. A factor prior and a high-order prior answer the centre of the prior that they lift or wrap. The keyword `strict` reaches [`prior`](@ref) alone. The location reads the returns in the frame that the prior fits on, the source that `pe` states through [`returns_source`](@ref). Before the fit and before the location, [`shared_series_fit`](@ref) drops the observations of a gap in a vector benchmark under [`ExcessSource`](@ref), and the observations at which a factor return is not finite when the tree of the prior reads the factor returns. It drops the fixed observation weights of the same observations from the tree of the prior. So the fit and the location read the same observations.
 
 The Asset Panel form follows the Asset Panel method of the estimator's own `cov`. Under no policy it reduces the window to its Coverage Universe and frames the answer with `NaN` outside it. Under a policy, and for the two mask-aware exponentially weighted families, it hands the active mask of the panel to the estimator. A [`PortfolioOptimisersCovariance`](@ref) hands the panel to the estimator that it holds, as its `cov` does.
 
@@ -323,8 +323,8 @@ function forecast_location(ce::GeneralCovariance, X::MatNum; dims::Int = 1, kwar
         vec(Statistics.mean(X, w; dims = 1))
     end
 end
-function forecast_location(ce::Union{<:ExpWeightedCovariance,
-                                     <:RegimeAdjustedExpWeightedCovariance}, X::MatNum;
+function forecast_location(ce::Union{ExpWeightedCovariance,
+                                     RegimeAdjustedExpWeightedCovariance}, X::MatNum;
                            dims::Int = 1,
                            active_mask::Option{<:AbstractMatrix{<:Bool}} = nothing,
                            kwargs...)
@@ -332,8 +332,8 @@ function forecast_location(ce::Union{<:ExpWeightedCovariance,
     return forecast_location(partial_fit!(ce, X; dims = dims, active_mask = active_mask,
                                           kwargs...))
 end
-function forecast_location(ce::Union{<:PortfolioOptimisersCovariance,
-                                     <:CorrelationCovariance}, X::MatNum; kwargs...)
+function forecast_location(ce::Union{PortfolioOptimisersCovariance, CorrelationCovariance},
+                           X::MatNum; kwargs...)
     return forecast_location(library_covariance_estimator(ce.ce), X; kwargs...)
 end
 function forecast_location(::AbstractCovarianceEstimator, X::MatNum; dims::Int = 1,
@@ -346,8 +346,8 @@ function forecast_location(ce::AbstractCovarianceEstimator, X::MatNum,
                                  pnl, (m, cmsk) -> expand_moment(m, cmsk, 1); dims = dims,
                                  kwargs...)
 end
-function forecast_location(ce::Union{<:ExpWeightedCovariance,
-                                     <:RegimeAdjustedExpWeightedCovariance}, X::MatNum,
+function forecast_location(ce::Union{ExpWeightedCovariance,
+                                     RegimeAdjustedExpWeightedCovariance}, X::MatNum,
                            pnl::Option{<:AssetPanel}; dims::Int = 1, kwargs...)
     amsk, _ = dims_oriented(dims, panel_moment_masks(pnl)...)
     return forecast_location(ce, X; dims = dims, active_mask = amsk, kwargs...)
@@ -363,8 +363,8 @@ end
 function forecast_location(ce::GeneralCovariance)
     return forecast_state_location(ce, ce.cache)
 end
-function forecast_location(ce::Union{<:ExpWeightedCovariance,
-                                     <:RegimeAdjustedExpWeightedCovariance})
+function forecast_location(ce::Union{ExpWeightedCovariance,
+                                     RegimeAdjustedExpWeightedCovariance})
     return centring_report_location(ce.centring, forecast_state_location(ce, ce.cache))
 end
 function forecast_location(ce::PortfolioOptimisersCovariance)
@@ -378,7 +378,7 @@ function forecast_location(ce::AbstractCovarianceEstimator)
 end
 function forecast_location(pe::AbstractPriorEstimator, rd::ReturnsResult;
                            strict::Bool = false, kwargs...)
-    rd = shared_series_view(rd, returns_source(pe), reads_factor_returns(pe))
+    pe, rd = shared_series_fit(pe, rd, returns_source(pe), reads_factor_returns(pe))
     return prior_forecast_location(pe, prior(pe, rd; strict = strict, kwargs...), rd;
                                    kwargs...)
 end
@@ -390,7 +390,7 @@ end
     prior_forecast_location(pe::AbstractPriorEstimator, pr::AbstractPriorResult, X::MatNum, F::Option{<:MatNum}, pnl::Option{<:AssetPanel}; kwargs...)
     prior_forecast_location(pe::EmpiricalPrior, pr::AbstractPriorResult, X::MatNum, F::Option{<:MatNum}, pnl::Option{<:AssetPanel}; kwargs...)
     prior_forecast_location(pe::FactorPrior, pr::AbstractPriorResult, X::MatNum, F::MatNum, pnl::Option{<:AssetPanel}; kwargs...)
-    prior_forecast_location(pe::Union{<:HighOrderPriorEstimator, <:HighOrderFactorPriorEstimator}, pr::HighOrderPrior, X::MatNum, F::Option{<:MatNum}, pnl::Option{<:AssetPanel}; kwargs...)
+    prior_forecast_location(pe::Union{HighOrderPriorEstimator, HighOrderFactorPriorEstimator}, pr::HighOrderPrior, X::MatNum, F::Option{<:MatNum}, pnl::Option{<:AssetPanel}; kwargs...)
     prior_forecast_location(pe::AbstractPriorEstimator, pr::AbstractPriorResult; kwargs...)
     prior_forecast_location(pe::HighOrderPriorEstimator, pr::HighOrderPrior; kwargs...)
 
@@ -457,8 +457,8 @@ function prior_forecast_location(pe::FactorPrior, pr::AbstractPriorResult, ::Mat
     c = prior_forecast_location(pe.pe, fpr, F, nothing, nothing)
     return c === fpr.mu ? pr.mu : pr.mu + pr.rr.M * (c - fpr.mu)
 end
-function prior_forecast_location(pe::Union{<:HighOrderPriorEstimator,
-                                           <:HighOrderFactorPriorEstimator},
+function prior_forecast_location(pe::Union{HighOrderPriorEstimator,
+                                           HighOrderFactorPriorEstimator},
                                  pr::HighOrderPrior, X::MatNum, F::Option{<:MatNum},
                                  pnl::Option{<:AssetPanel}; kwargs...)
     return prior_forecast_location(pe.pe, pr.pr, X, F, pnl; kwargs...)
@@ -508,21 +508,23 @@ function prior_state_location(::AbstractPriorEstimator, pr::AbstractPriorResult,
 end
 function prior_state_location(pe::AbstractPriorEstimator, pr::AbstractPriorResult,
                               state::SampleBufferState; kwargs...)
-    state = shared_series_buffer(state)
+    pe, state = shared_series_buffer_fit(pe, state)
     return prior_forecast_location(pe, pr, sample_buffer(state), factor_buffer(state),
                                    nothing; sample_buffer_kwargs(state)..., kwargs...)
 end
 function prior_state_location(pe::EmpiricalPrior{<:Any, <:Any, Nothing},
                               ::AbstractPriorResult, state::PriorCarryState; kwargs...)
     buf = shared_series_buffer(state.buf)
-    return carried_location(pe.ce, sample_buffer(buf), buffer_asset_panel(buf);
+    return carried_location(buffer_refit_member(pe.ce, state.buf), sample_buffer(buf),
+                            buffer_asset_panel(buf);
                             implied_volatility_buffer_kwargs(buf)..., kwargs...)
 end
 function prior_state_location(pe::EmpiricalPrior{<:Any, <:Any, <:Number},
                               pr::AbstractPriorResult, state::PriorCarryState; kwargs...)
     buf = shared_series_buffer(state.buf)
-    c = carried_location(pe.ce, log1p.(sample_buffer(buf)), buffer_asset_panel(buf);
-                         implied_volatility_buffer_kwargs(buf)..., kwargs...)
+    c = carried_location(buffer_refit_member(pe.ce, state.buf), log1p.(sample_buffer(buf)),
+                         buffer_asset_panel(buf); implied_volatility_buffer_kwargs(buf)...,
+                         kwargs...)
     return horizon_location(c, pr, pe.horizon)
 end
 """
@@ -625,8 +627,8 @@ function forecast_state_location(::Any, state::CovarianceState)
     return state.mu
 end
 function forecast_state_location(::Any,
-                                 state::Union{<:ExpWeightedCovarianceState,
-                                              <:RegimeAdjustedCovarianceState})
+                                 state::Union{ExpWeightedCovarianceState,
+                                              RegimeAdjustedCovarianceState})
     return state.location
 end
 function forecast_state_location(ce, state::SampleBufferState)
@@ -654,7 +656,7 @@ Read the [`CoveragePolicy`](@ref) that decides the Asset Panel arm of [`forecast
   - [`forecast_location`](@ref)
   - [`coverage_policy`](@ref)
 """
-function forecast_coverage_policy(ce::Union{<:GeneralCovariance, <:Covariance})
+function forecast_coverage_policy(ce::Union{GeneralCovariance, Covariance})
     return coverage_policy(ce)
 end
 function forecast_coverage_policy(::Any)
@@ -770,8 +772,7 @@ function covariance_forecast_step(sigma::MatNum, Z::MatNum, c::VecNum,
                 vec(any(isfinite, Z; dims = 1)))
     if isempty(a)
         ws = resolve_forecast_weights(w, a, sigma[a, a], N)
-        nan = float_if_integer(promote_type(real(eltype(sigma)), real(eltype(Z)),
-                                            real(eltype(c))))(NaN)
+        nan = promote_type(real(eltype(sigma)), real(eltype(Z)), real(eltype(c)))(NaN)
         return (; n_valid = 0, mahalanobis_ratio = nan, diagonal_ratio = fill(nan, N),
                 qlike = nan, frobenius = nan, standardised_return = fill(nan, length(ws)),
                 portfolio_qlike = fill(nan, length(ws)))
@@ -934,8 +935,8 @@ function step_implied_volatility_kwargs(::Any, ::ReturnsResult)
     return (;)
 end
 """
-    is_time_dependent(est::Union{<:AbstractCovarianceEstimator, <:AbstractPriorEstimator, <:Online})
-    needs_previous_weights(est::Union{<:AbstractCovarianceEstimator, <:AbstractPriorEstimator, <:Online})
+    is_time_dependent(est::Union{AbstractCovarianceEstimator, AbstractPriorEstimator, Online})
+    needs_previous_weights(est::Union{AbstractCovarianceEstimator, AbstractPriorEstimator, Online})
 
 Answer the two per-type predicates that [`fold_loop`](@ref) reads, for an estimator that is not an optimiser.
 
@@ -946,12 +947,12 @@ No covariance estimator and no prior holds a [`TimeDependent`](@ref) schedule, a
   - [`fold_loop`](@ref)
   - [`covariance_forecast_evaluation`](@ref)
 """
-function is_time_dependent(::Union{<:AbstractCovarianceEstimator, <:AbstractPriorEstimator,
-                                   <:Online})
+function is_time_dependent(::Union{AbstractCovarianceEstimator, AbstractPriorEstimator,
+                                   Online})
     return false
 end
-function needs_previous_weights(::Union{<:AbstractCovarianceEstimator,
-                                        <:AbstractPriorEstimator, <:Online})
+function needs_previous_weights(::Union{AbstractCovarianceEstimator, AbstractPriorEstimator,
+                                        Online})
     return false
 end
 """
@@ -1130,7 +1131,7 @@ The arguments correspond to the fields of the struct, in the order of their decl
     location
 end
 """
-    covariance_forecast_evaluation(est::Union{<:AbstractCovarianceEstimator, <:AbstractPriorEstimator, <:Online},
+    covariance_forecast_evaluation(est::Union{AbstractCovarianceEstimator, AbstractPriorEstimator, Online},
                                    rd::ReturnsResult, cv::WFCVER; w::Option{<:VecNum_VecVecNum} = nothing,
                                    target::AbstractRealisedTarget = RealisedCovariance(),
                                    store_forecasts::Bool = false,
@@ -1147,7 +1148,7 @@ The verb runs through the one fold loop of the library. At each fold the callbac
 
 The verb reads none of these settings. So the online run gives the rows of the batch expanding run fold for fold, to the tolerance of the estimator's own fold. The date form, the purge, and a listing or a delisting need no code of their own.
 
-The verb is the outermost reader of the returns in the evaluation, because no estimator in the call receives the returns data of its own. So the verb states the source with `x_src`, and the estimator states none. With `x_src = ExcessSource()` the verb evaluates a forecast of the returns in excess of the benchmark, `X - B`, which is the covariance that a tracking-error portfolio reads. Every reader of the returns in the evaluation reads this one frame: the fit over a training window, the online step, and the test rows. So the verb gives the fold loop the returns data of [`prior_step_returns`](@ref), which holds `X - B` in `X` and keeps `B` and every other field. A vector `B` is one benchmark, which [`benchmark_relative_returns`](@ref) subtracts from every asset. A matrix `B` holds one benchmark per asset. An [`ImpliedVolatility`](@ref) estimator reads the surface `iv` of the assets beside `X - B`, as a prior in the Excess Frame does, because the returns data holds no surface of the excess returns. Under [`ExcessSource`](@ref) a gap in a vector `B` leaves no asset an excess return at its observation, so the verb drops that observation from the returns data before it splits the folds, with [`shared_series_view`](@ref), as every fit drops it. The Result records the frame that the verb read: [`DataSource`](@ref) for `x_src = nothing`, so two evaluations of one frame hold one value.
+The verb is the outermost reader of the returns in the evaluation, because no estimator in the call receives the returns data of its own. So the verb states the source with `x_src`, and the estimator states none. With `x_src = ExcessSource()` the verb evaluates a forecast of the returns in excess of the benchmark, `X - B`, which is the covariance that a tracking-error portfolio reads. Every reader of the returns in the evaluation reads this one frame: the fit over a training window, the online step, and the test rows. So the verb gives the fold loop the returns data of [`prior_step_returns`](@ref), which holds `X - B` in `X` and keeps `B` and every other field. A vector `B` is one benchmark, which [`benchmark_relative_returns`](@ref) subtracts from every asset. A matrix `B` holds one benchmark per asset. An [`ImpliedVolatility`](@ref) estimator reads the surface `iv` of the assets beside `X - B`, as a prior in the Excess Frame does, because the returns data holds no surface of the excess returns. Under [`ExcessSource`](@ref) a gap in a vector `B` leaves no asset an excess return at its observation, so the verb drops that observation from the returns data before it splits the folds, and the fixed observation weights of the same observation from `est`, with [`shared_series_fit`](@ref), as every fit drops it. The Result records the frame that the verb read: [`DataSource`](@ref) for `x_src = nothing`, so two evaluations of one frame hold one value.
 
 The loop receives the estimator as a configuration only. Under an Online Scheme it warms up one estimator on the first training window and folds the new rows of each fold into it. So the loop refuses an estimator that enters with a state or that cannot fold, with an error that names it. An estimator that cannot fold but has a `cache` field can be wrapped in [`Online`](@ref), which folds it from a buffer. Each estimate made from the state is then a batch fit over the rows of the buffer. An estimator with no `cache` field has nowhere to carry a buffer, and `Online` refuses it.
 
@@ -1200,8 +1201,8 @@ The loop receives the estimator as a configuration only. Under an Online Scheme 
   - [`OnlineDateWalkForward`](@ref)
   - [`Online`](@ref)
 """
-function covariance_forecast_evaluation(est::Union{<:AbstractCovarianceEstimator,
-                                                   <:AbstractPriorEstimator, <:Online},
+function covariance_forecast_evaluation(est::Union{AbstractCovarianceEstimator,
+                                                   AbstractPriorEstimator, Online},
                                         rd::ReturnsResult, cv::WFCVER;
                                         w::Option{<:VecNum_VecVecNum} = nothing,
                                         target::AbstractRealisedTarget = RealisedCovariance(),
@@ -1215,8 +1216,9 @@ function covariance_forecast_evaluation(est::Union{<:AbstractCovarianceEstimator
     # Every reader of the evaluation reads the frame of `x_src`, so under `ExcessSource()` the
     # fold loop folds and scores `X - B`, and the estimator, an inner reader, reads it as given.
     # A gap in a vector benchmark drops its observation before the split, as every fit drops
-    # it, and every later read of `rd`, the dates included, reads the kept observations.
-    rd = shared_series_view(rd, x_src, false)
+    # it, and every later read of `rd`, the dates included, reads the kept observations. The
+    # fixed observation weights of `est` lose the same observations (#1960).
+    est, rd = shared_series_fit(est, rd, x_src, false)
     rdb = prior_step_returns(rd, x_src)
     cv_res = split(cv, rdb)
     (; train_idx, test_idx) = cv_res

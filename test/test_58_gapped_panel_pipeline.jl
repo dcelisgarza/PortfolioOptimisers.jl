@@ -345,8 +345,10 @@ pr_all58 = price_ingestion(PriceIngestion(; span = all_listed58), Pta58)
         # way to ask for an unbounded fill is to declare that every asset is listed at every
         # observation -- and that declaration IS the active mask (ADR 0129, ADR 0132), so it
         # replaces the panel the layer derives from the very same table. The defence the
-        # caller was relying on is the very thing the request threw away.
-        @test all(res.ctx.returns.pnl.amsk)
+        # caller was relying on is the very thing the request threw away. With every price
+        # filled, the declared universe states nothing beyond finiteness, so the layer emits
+        # no panel at all (#1882).
+        @test isnothing(res.ctx.returns.pnl)
         @test count(Matrix(rd58.pnl.amsk)) == T58 * N58 - 60
         # So the fabricated prices are indistinguishable from real ones and the optimiser
         # buys them -- a delisted asset takes a quarter of the book.
@@ -364,10 +366,10 @@ pr_all58 = price_ingestion(PriceIngestion(; span = all_listed58), Pta58)
         rr = res.ctx.returns
         jc = findfirst(==("c"), rr.nx)
         # The all-listed declaration is the active mask, so `c` reads as live from the first
-        # observation and no mask filters anything.
-        @test findfirst(view(rr.pnl.amsk, :, jc)) == 1
+        # observation and no mask filters anything: the layer emits no panel (#1882).
+        @test isnothing(rr.pnl)
         t0 = 30                                # the return that reads c's first real price
-        @test rr.pnl.emsk[t0, jc]
+        @test isfinite(rr.X[t0, jc])
         @test rr.X[t0, jc] < -0.1              # c listed at ~105.6, filled at ~122.4
 
         w = t0:(t0 + 59)

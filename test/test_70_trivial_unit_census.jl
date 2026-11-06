@@ -62,24 +62,6 @@ end
 
     strip_lnn(args) = filter(a -> !(a isa LineNumberNode), args)
 
-    # The name under a signature, and whether it is module-qualified (`Base.show`). A
-    # functor `(r::T)(x)` has no name and is never a candidate.
-    function sig_name(sig)
-        while sig isa Expr && sig.head in (:where, :(::))
-            sig = sig.args[1]
-        end
-        sig isa Expr && sig.head === :call || return (nothing, false)
-        f = sig.args[1]
-        f isa Symbol && return (f, false)
-        if f isa Expr && f.head === :. && f.args[end] isa QuoteNode
-            return (f.args[end].value, true)
-        end
-        if f isa Expr && f.head === :curly
-            return sig_name(Expr(:call, f.args[1]))
-        end
-        return (nothing, false)
-    end
-
     # A leaf a forward may pass on: a name, a literal, `nothing`, a field chain on a name,
     # a splat of one, a keyword forward or a tuple of leaves.
     function is_leaf(e)
@@ -126,7 +108,7 @@ end
         e isa Expr || return nothing
         if e.head === :function || (e.head === :(=) && CH.is_signature(e.args[1]))
             length(e.args) >= 2 || return nothing
-            name, qual = sig_name(e.args[1])
+            name, qual = CH.signature_name(e.args[1])
             name === nothing && return nothing
             push!(get!(defs, name, Tuple{String, Int, Bool, Bool}[]),
                   (file, line, body_trivial(e.args[2]), qual))
@@ -150,117 +132,9 @@ end
 
     # ------------------------------------------------------------- references
 
-    #=
-    Every `Symbol` in reference position, counted once per occurrence. The positions that
-    are NOT references: a docstring's prose, an `export`/`public`/`import` line, a
-    definition's own name and argument names, a keyword's name, the left side of an
-    assignment, the name bound by `x::T`, a struct's field names and its supertype, and a
-    function's own name inside its own body. `Mod.name` counts `name`, and so does `x.field`,
-    because the two cannot be told apart here, which errs on the side of a use. The bounds of
-    a struct's own type parameters count: they are uses of the types they name.
-    =#
-    refs = Dict{Symbol, Int}()
-    count!(s::Symbol) = (refs[s] = get(refs, s, 0) + 1)
-    function count_refs!(e, self)
-        if e isa Symbol
-            e === self || count!(e)
-            return nothing
-        end
-        e isa Expr || return nothing
-        h = e.head
-        if h === :macrocall && CH.isdocstring(e)
-            count_refs!(e.args[end], self)
-        elseif h in (:export, :public, :import, :using, :inert, :abstract)
-            nothing
-        elseif h === :const
-            count_refs!(e.args[1].args[end], self)
-        elseif h === :function || (h === :(=) && CH.is_signature(e.args[1]))
-            name, _ = sig_name(e.args[1])
-            count_sig_refs!(e.args[1], name)
-            length(e.args) >= 2 && count_refs!(e.args[2], name)
-        elseif h === :struct
-            count_struct_refs!(e)
-        elseif h === :kw
-            count_refs!(e.args[2], self)
-        elseif h === :(=) &&
-               (e.args[1] isa Symbol || (e.args[1] isa Expr && e.args[1].head === :tuple))
-            count_refs!(e.args[2], self)
-        elseif h === :(::) && length(e.args) == 2 && e.args[1] isa Symbol
-            count_refs!(e.args[2], self)
-        elseif h === :.
-            count_refs!(e.args[1], self)
-            if length(e.args) == 2
-                if e.args[2] isa QuoteNode
-                    e.args[2].value isa Symbol && count_refs!(e.args[2].value, self)
-                else
-                    # A broadcast call `f.(args...)`: the tuple holds the arguments.
-                    count_refs!(e.args[2], self)
-                end
-            end
-        elseif h === :macrocall
-            foreach(a -> count_refs!(a, self), e.args[2:end])
-        else
-            foreach(a -> count_refs!(a, self), e.args)
-        end
-        return nothing
-    end
-    function count_sig_refs!(sig, self)
-        while sig isa Expr && sig.head in (:where, :(::))
-            if sig.head === :(::)
-                count_refs!(sig.args[end], self)
-            else
-                foreach(w -> count_refs!(w, self), sig.args[2:end])
-            end
-            sig = sig.args[1]
-        end
-        sig isa Expr && sig.head === :call || return nothing
-        foreach(a -> count_arg_refs!(a, self), sig.args[2:end])
-        return nothing
-    end
-    function count_arg_refs!(a, self)
-        if a isa Symbol
-            nothing
-        elseif a isa Expr && a.head === :parameters
-            foreach(x -> count_arg_refs!(x, self), a.args)
-        elseif a isa Expr && a.head === :kw
-            count_arg_refs!(a.args[1], self)
-            count_refs!(a.args[2], self)
-        elseif a isa Expr && a.head === :(...)
-            count_arg_refs!(a.args[1], self)
-        elseif a isa Expr && a.head === :(::)
-            if length(a.args) == 2
-                count_refs!(a.args[2], self)
-            else
-                count_refs!(a.args[1], self)
-            end
-        else
-            count_refs!(a, self)
-        end
-        return nothing
-    end
-    function count_struct_refs!(e)
-        head = e.args[2]
-        head isa Expr && head.head === :<: && (head = head.args[1])
-        if head isa Expr && head.head === :curly
-            for a in head.args[2:end]
-                a isa Expr && a.head === :<: && count_refs!(a.args[end], nothing)
-            end
-        end
-        for a in e.args[3].args
-            a isa Expr || continue
-            if a.head === :(::)
-                count_refs!(a.args[end], nothing)
-            elseif a.head === :function ||
-                   (a.head === :(=) && CH.is_signature(a.args[1])) ||
-                   a.head === :macrocall
-                count_refs!(a, nothing)
-            end
-        end
-        return nothing
-    end
-    for f in files
-        count_refs!(trees[f], nothing)
-    end
+    # `CH.reference_counts` states which positions are a reference. The dead abstract type
+    # census, `test_86_dead_abstract_type_census.jl`, reads the same counts.
+    refs = CH.reference_counts(trees[f] for f in files)
 
     # ------------------------------------------------------------- the function census
 
@@ -350,22 +224,16 @@ end
     kept_types = Dict{Symbol, String}(#
                                       :AbstractCrossSectionalRegressionResult => "a second cross-sectional regression result, a robust or a constrained fit",
                                       :AbstractJuMPResult => "a second JuMP result carrier, one that keeps the model",
-                                      :AbstractPipelineEstimator => "a second pipeline shape beside `Pipeline`",
-                                      :AbstractPipelineResult => "the result of a second pipeline shape",
+                                      :AbstractPenalisedRegressionTarget => "carries an `# Interfaces` section: an Open Family",
                                       :AbstractSearchCrossValidationResult => "carries an `# Interfaces` section: an Open Family",
-                                      :BaseClusteringOptimisationEstimator => "a second clustering optimiser beside `HierarchicalOptimiser`",
+                                      :AbstractShrunkExpectedReturnsEstimator => "a second shrinkage estimator beside `ShrunkExpectedReturns`, kept by default by #1859 (ADR 0222)",
                                       :BaseGerberIQCovariance => "carries an `# Interfaces` section: an Open Family",
                                       :BaseHierarchicalOptimisationResult => "carries an `# Interfaces` section: an Open Family",
                                       :BaseJuMPOptimisationResult => "a second JuMP optimisation result beside `JuMPOptimisationResult`",
-                                      :BaseSmythBrobyCovariance => "a second Smyth-Broby family member, as `BaseGerberIQCovariance` has",
-                                      :BaseStackingOptimisationEstimator => "a second stacking estimator beside `Stacking`",
-                                      :BaseSubsetResamplingOptimisationEstimator => "a second resampling estimator beside `SubsetResampling`",
+                                      :BaseSmythBrobyCovariance => "carries an `# Interfaces` section: an Open Family",
                                       :BootstrapUncertaintySetEstimator => "carries an `# Interfaces` section: an Open Family",
-                                      :BudgetEstimator => "a second budget estimator beside `BudgetRange`, a solver-driven one",
                                       :HierarchicalScalariser => "the max and sum scalarisers beside `MinScalariser`",
                                       :InverseMatrixSparsificationAlgorithm => "a second sparsification beside `LoGo`, a graphical lasso",
-                                      :NonOptimisationSequentialCrossValidationEstimator => "a second sequential non-optimisation scheme beside `MultipleRandomised`",
-                                      :NonOptimisationSequentialCrossValidationResult => "the result of a second sequential non-optimisation scheme",
                                       :OptimisationModelResult => "carries an `# Interfaces` section: an Open Family")
 
     # ------------------------------------------------------------- the assertions

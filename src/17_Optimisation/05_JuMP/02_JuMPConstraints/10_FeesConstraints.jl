@@ -34,7 +34,7 @@ Where:
   - [`set_liquidation_fees!`](@ref)
   - [`Fees`](@ref)
 """
-function add_to_fees!(model::JuMP.Model, expr::Union{<:Number, <:JuMP.AbstractJuMPScalar})
+function add_to_fees!(model::JuMP.Model, expr::Union{Number, JuMP.AbstractJuMPScalar})
     if !shared_has(model, :fees)
         # A number takes no later term in place, so the first term starts an affine
         # expression, whatever its own type.
@@ -84,7 +84,7 @@ Where:
   - [`add_fees_to_ret!`](@ref)
 """
 function add_to_one_time_fees!(model::JuMP.Model,
-                               expr::Union{<:Number, <:JuMP.AbstractJuMPScalar})
+                               expr::Union{Number, JuMP.AbstractJuMPScalar})
     if !shared_has(model, :one_time_fees)
         # A number takes no later term in place, so the first term starts an affine
         # expression, whatever its own type.
@@ -713,7 +713,7 @@ Where:
   - [`FirstObservationFees`](@ref)
 """
 function charge_one_time_fees(model::JuMP.Model, net, one_time, ::Number,
-                              ::Union{Nothing, <:FirstObservationFees})
+                              ::Union{Nothing, FirstObservationFees})
     # One entry is charged, so one entry is touched. Writing the charge as a selector vector
     # times `one_time` would build two arrays and put a zero multiple of the fee into every
     # other observation's expression, which the model then carries for nothing. `net` is

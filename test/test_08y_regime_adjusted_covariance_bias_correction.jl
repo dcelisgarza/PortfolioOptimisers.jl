@@ -80,7 +80,7 @@ function oracle_estimator(; kwargs...)
                                                regime_min_obs = 2,
                                                regime_lohi_mult = (0.7, 1.6),
                                                centring = PreCentred(), min_val = 1e-12,
-                                               debias = RawStatistic(), kwargs...)
+                                               debias = nothing, kwargs...)
 end
 
 #=
@@ -91,7 +91,7 @@ about 1e12, and that one value held the regime state for many half-lives. The es
 `debias = ExactDebias()` skips each row whose block has `n + 3` observations or fewer, where the variance
 of the statistic is not finite, and divides the rest by the bias factor of the regime method
 (#1431; the fixed point `mahalanobis_bias` was the factor of the mean alone).
-`debias = RawStatistic()` is the oracle's raw statistic, which the first testset pins. The keyword was a
+`debias = nothing` is the oracle's raw statistic, which the first testset pins. The keyword was a
 field of the target until #1428 moved it to the estimator.
 =#
 @testset "the Mahalanobis statistic is divided by the bias of its estimated block" begin
@@ -114,7 +114,7 @@ field of the target until #1428 moved it to the estimator.
     # On iid Normal returns, the squared multiplier of `RootMeanSquaredAdjusted` is the mean of
     # the statistic over its dimension, so a correct statistic gives one. Measured on this seed
     # after #1431: 0.957 with `debias = ExactDebias()` and 1.010 on the separate path, where the factor of
-    # the mean alone gave 0.951 and 1.009, and 3.8e10 with `debias = RawStatistic()`, from the ridge of
+    # the mean alone gave 0.951 and 1.009, and 3.8e10 with `debias = nothing`, from the ridge of
     # the singular rows. The testset of #1431 measures the calibration over 12 000 rows and a
     # regime half-life of 500.
     rng = StableRNG(1415)
@@ -134,7 +134,7 @@ field of the target until #1428 moved it to the estimator.
     end
     @test 0.9 < squared_multiplier(PO.MahalanobisTarget()) < 1.1
     @test 0.9 < squared_multiplier(PO.MahalanobisTarget(); cor_decay = 2.0^(-1 / 20)) < 1.1
-    @test squared_multiplier(PO.MahalanobisTarget(); debias = RawStatistic()) > 1e6
+    @test squared_multiplier(PO.MahalanobisTarget(); debias = nothing) > 1e6
 
     # The gate skips each row whose block has n + 3 observations or fewer, and does not count it.
     # The raw statistic scores every row after `min_obs`.
@@ -143,7 +143,7 @@ field of the target until #1428 moved it to the estimator.
                                                                              regime_target = target),
                                          R[1:60, :]).cache
     @test fit(PO.MahalanobisTarget()).n_regime_obs == 60 - (na + 4)
-    @test fit(PO.MahalanobisTarget(); debias = RawStatistic()).n_regime_obs == 60 - 5
+    @test fit(PO.MahalanobisTarget(); debias = nothing).n_regime_obs == 60 - 5
 end
 
 #=
@@ -179,7 +179,7 @@ by that moment, from the exact table `regime_bias_table`. `DiagonalTarget` divid
     @test PO.regime_bias!(nothing, PO.RootMeanSquaredAdjusted(), 0.9, 10) === one(0.9)
     @test !PO.regime_bias_open(ExactDebias(), 1, 0.9, 4, nothing) &&
           PO.regime_bias_open(ExactDebias(), 1, 0.9, 5, nothing) &&
-          PO.regime_bias_open(RawStatistic(), 1, 0.9, 1, nothing)
+          PO.regime_bias_open(nothing, 1, 0.9, 1, nothing)
 
     # On iid Normal returns the squared multiplier is the mean of the transformed statistic,
     # which is one when the statistic is correct. Measured on this seed, half-life 10:
@@ -210,8 +210,8 @@ by that moment, from the exact table `regime_bias_table`. `DiagonalTarget` divid
     for method in (PO.RootMeanSquaredAdjusted(), PO.FirstMomentRegimeAdjusted())
         @test 0.98 < variance_multiplier(method) < 1.02
         @test 0.98 < covariance_multiplier(fixed, method) < 1.02
-        @test variance_multiplier(method; debias = RawStatistic()) > 1.04
-        @test covariance_multiplier(fixed, method; debias = RawStatistic()) > 1.04
+        @test variance_multiplier(method; debias = nothing) > 1.04
+        @test covariance_multiplier(fixed, method; debias = nothing) > 1.04
     end
     # The diagonal target also divides the sum by the factor of its law for the root and the log
     # (#1432). Measured on this seed: 0.996 and 0.992 on both paths; 8 seeds read 0.941 and 0.962
@@ -222,7 +222,7 @@ by that moment, from the exact table `regime_bias_table`. `DiagonalTarget` divid
         @test 0.98 < covariance_multiplier(PO.DiagonalTarget(), method; extra...) < 1.02
     end
     @test covariance_multiplier(PO.DiagonalTarget(), PO.RootMeanSquaredAdjusted();
-                                debias = RawStatistic()) > 1.05
+                                debias = nothing) > 1.05
 
     # The gate skips an estimate of four observations or fewer. With `min_obs = 1` the raw
     # statistic scores every row after the first, and the debiased one every row after the fifth.
@@ -233,7 +233,7 @@ by that moment, from the exact table `regime_bias_table`. `DiagonalTarget` divid
                                                                          debias = if debias
                                                                              ExactDebias()
                                                                          else
-                                                                             RawStatistic()
+                                                                             nothing
                                                                          end), R[1:40, :]).cache
         @test state(true).n_regime_obs == 40 - 5
         @test state(false).n_regime_obs == 40 - 1
@@ -243,7 +243,7 @@ by that moment, from the exact table `regime_bias_table`. `DiagonalTarget` divid
                                                                     debias = if debias
                                                                         ExactDebias()
                                                                     else
-                                                                        RawStatistic()
+                                                                        nothing
                                                                     end), R[1:40, :]).cache
     @test vstate(true).n_regime_obs == 40 - 5
     @test vstate(false).n_regime_obs == 40 - 1
@@ -334,9 +334,9 @@ PO.centring_law(c::LawOfItsOwn) = c
     @test_throws MethodError PO.mahalanobis_level_bias(PO.FirstMomentRegimeAdjusted(), 0.9,
                                                        [20], 3, nothing, LawOfItsOwn())
     @test isequal(var(RegimeAdjustedExpWeightedVariance(; centring = LawOfItsOwn(),
-                                                        debias = RawStatistic()), X),
+                                                        debias = nothing), X),
                   var(RegimeAdjustedExpWeightedVariance(; centring = PreCentred(),
-                                                        debias = RawStatistic()), X))
+                                                        debias = nothing), X))
 end
 @testset "on the separate path the portfolio mixes the tables of the two decays (#1726)" begin
     # The convolution table against a direct sum of the squared convolution of the two sets of

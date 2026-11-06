@@ -76,35 +76,54 @@ Every Descriptor Estimator implements this function. It reads the Panel Fields t
 """
 function descriptor end
 """
+    descriptor_field_values(rd::ReturnsResult, x::Nothing) -> Matrix{<:Real}
     descriptor_field_values(rd::ReturnsResult, name::AbstractString) -> Matrix{<:Real}
     descriptor_field_values(rd::ReturnsResult,
                             terms::AbstractVector{<:Pair{<:AbstractString, <:Real}}) -> Matrix{<:Real}
+    descriptor_field_values(rd::ReturnsResult,
+                            names::AbstractVector{<:AbstractString}) -> Matrix{<:Real}
+    descriptor_field_values(rd::ReturnsResult, de::AbstractDescriptorEstimator) -> Matrix{<:Real}
 
-Read one numeric Panel Field, or a linear combination of numeric Panel Fields, out of a [`ReturnsResult`](@ref), for a Descriptor.
+Read one numeric Panel Field, a linear combination or a product of numeric Panel Fields, the absolute returns, or a Descriptor, out of a [`ReturnsResult`](@ref), for a Descriptor.
 
-Every Descriptor Estimator reads its Panel Fields through this function. A blank cell never reaches a `ReturnsResult`, because [`asset_panel`](@ref) resolves each one to a fill value and records the resolution in the observed-mask column of the field. A cell outside the universe holds a finite value too. This function writes `NaN` into both kinds of cell, through [`panel_field_values`](@ref) with `inactive = NaN`, so a Descriptor cannot mistake a fill value or the value of an inactive cell for data. A lag or a recursion that reaches back to a cell before a listing, or into a stretch where the asset is out of the universe, reads `NaN` there.
+A term takes five forms, and Julia selects the method from the form. Forms 2 to 4 are a [`PanelTermType`](@ref).
+
+ 1. `nothing` reads the absolute returns `abs.(rd.X)`. Returns are not a Panel Field, so this is how a side of an [`EWVolumeRatio`](@ref) names them.
+ 2. A name reads that one Panel Field.
+ 3. A vector of `name => coefficient` pairs reads their sum. `[\"a\" => 1, \"b\" => -1]` reads `a - b`.
+ 4. A vector of names reads their product. `[\"adj_close\", \"adj_volume\"]` reads a traded amount out of a price and a volume, which no single Panel Field carries.
+ 5. A Descriptor Estimator reads its Descriptor through [`descriptor`](@ref). The Descriptor is `NaN` outside the universe, as a Panel Field is.
+
+Every Descriptor Estimator reads its Panel Fields through this function, and so does a [`PanelFieldScorer`](@ref). A blank cell never reaches a `ReturnsResult`, because [`asset_panel`](@ref) resolves each one to a fill value and records the resolution in the observed-mask column of the field. A cell outside the universe holds a finite value too. This function writes `NaN` into both kinds of cell, through [`panel_field_values`](@ref) with `inactive = NaN`, so a Descriptor cannot mistake a fill value or the value of an inactive cell for data. A lag or a recursion that reaches back to a cell before a listing, or into a stretch where the asset is out of the universe, reads `NaN` there.
 
 # Algorithm
 
  1. Check that the Panel Field is numeric and time-varying.
- 2. Read it through [`panel_field_values`](@ref) with `inactive = NaN` and `unobserved = NaN`. An integer field reads in `Float64`, and a `Float32` field stays `Float32`.
+ 2. Read it through [`panel_field_values`](@ref) with `inactive = NaN` and `unobserved = NaN`. A `Float32` field stays `Float32`.
  3. For a vector of `name => coefficient` pairs, read each named field the same way and multiply it by its coefficient. Return the sum of those terms in the type that all of them promote to, so the order of the terms does not change the result. A `NaN` in any term is a `NaN` in the sum.
+ 4. For a vector of names, read each named field the same way. Return the product of those fields in the type that all of them promote to. A `NaN` in any field is a `NaN` in the product.
+
+`nothing` and a Descriptor Estimator skip the steps above. A Descriptor Estimator reads its Panel Fields through these steps inside its own [`descriptor`](@ref).
 
 # Arguments
 
-  - $(arg_dict[:rd]) It must carry an Asset Panel in `rd.pnl`.
+  - $(arg_dict[:rd]) It must carry an Asset Panel in `rd.pnl`, unless the term is `nothing`.
+  - `x`: `nothing`, for the absolute returns.
   - `name`: The Panel Field's name.
   - `terms`: The Panel Fields to combine, each paired with its coefficient. `[\"a\" => 1, \"b\" => -1]` reads `a - b`.
+  - `names`: The Panel Fields to multiply.
+  - `de`: The Descriptor Estimator.
 
 # Validation
 
   - `rd.pnl` is an [`AssetPanel`](@ref). Raises an [`IsNothingError`](@ref).
   - `name` names a Panel Field, and its kind is [`NumericPanelField`](@ref). Raises a `KeyError` or an `ArgumentError`.
-  - `!isempty(terms)`. Raises an [`IsEmptyError`](@ref).
+  - `!isempty(terms)` and `!isempty(names)`. Raises an [`IsEmptyError`](@ref).
+  - The rules of the [`descriptor`](@ref) of `de`.
 
 # Returns
 
-  - `V::Matrix{<:Real}`: The values, `observations × assets`, `NaN` where the Panel Field was not observed and where the asset is outside the universe.
+  - `V::Matrix{<:Real}`: The values, `observations × assets`, `NaN` where a Panel Field that the term names was not observed and where the asset is outside the universe.
 
 # Examples
 
@@ -125,6 +144,11 @@ julia> PortfolioOptimisers.descriptor_field_values(rd, [\"mcap\" => 1, \"debt\" 
 2×2 Matrix{Float64}:
    1.5  NaN
  NaN      6.0
+
+julia> PortfolioOptimisers.descriptor_field_values(rd, [\"mcap\", \"debt\"])
+2×2 Matrix{Float64}:
+   0.5  NaN
+ NaN      8.0
 ```
 
 # Related
@@ -135,7 +159,11 @@ julia> PortfolioOptimisers.descriptor_field_values(rd, [\"mcap\" => 1, \"debt\" 
   - [`asset_panel`](@ref)
   - [`AssetPanel`](@ref)
   - [`NumericPanelField`](@ref)
+  - [`assert_panel_terms`](@ref)
 """
+function descriptor_field_values(rd::ReturnsResult, ::Nothing)::Matrix{<:Real}
+    return abs.(rd.X)
+end
 function descriptor_field_values(rd::ReturnsResult, name::AbstractString)::Matrix{<:Real}
     pnl = rd.pnl
     @argcheck(!isnothing(pnl),
@@ -159,12 +187,28 @@ function descriptor_field_values(rd::ReturnsResult,
     end
     return V
 end
+function descriptor_field_values(rd::ReturnsResult,
+                                 names::AbstractVector{<:AbstractString})::Matrix{<:Real}
+    @argcheck(!isempty(names),
+              IsEmptyError("a Panel Field product needs at least one name"))
+    Vs = [descriptor_field_values(rd, name) for name in names]
+    V = similar(Vs[1], mapreduce(eltype, promote_type, Vs))
+    V .= Vs[1]
+    for k in 2:length(Vs)
+        V .*= Vs[k]
+    end
+    return V
+end
+function descriptor_field_values(rd::ReturnsResult,
+                                 de::AbstractDescriptorEstimator)::Matrix{<:Real}
+    return descriptor(de, rd)
+end
 """
     descriptor_asset_panel(rd::ReturnsResult) -> AssetPanel
 
 Read the Asset Panel a Descriptor needs out of a [`ReturnsResult`](@ref).
 
-[`descriptor_field_values`](@ref) refuses a `ReturnsResult` that holds no Asset Panel. A Descriptor over the returns reads no Panel Field, so it calls this function to get the same refusal and the active mask that [`descriptor_active_fill!`](@ref) reads.
+[`descriptor_field_values`](@ref) refuses a `ReturnsResult` that holds no Asset Panel. A Descriptor over the returns reads no Panel Field, so it calls this function to get the active mask that [`descriptor_active_fill!`](@ref) reads. A `ReturnsResult` with no panel gives the mask-only panel of [`returns_with_universe`](@ref), which the ingestion layer would have emitted.
 
 # Arguments
 
@@ -172,11 +216,11 @@ Read the Asset Panel a Descriptor needs out of a [`ReturnsResult`](@ref).
 
 # Validation
 
-  - `rd.pnl` is an [`AssetPanel`](@ref). Raises an [`IsNothingError`](@ref).
+  - `rd.pnl` is an [`AssetPanel`](@ref), or `rd.X` is not `nothing`. Raises an [`IsNothingError`](@ref).
 
 # Returns
 
-  - `pnl::AssetPanel`: The Asset Panel the `ReturnsResult` holds.
+  - `pnl::AssetPanel`: The Asset Panel the `ReturnsResult` holds, or the mask-only panel of its returns.
 
 # Related
 
@@ -186,9 +230,9 @@ Read the Asset Panel a Descriptor needs out of a [`ReturnsResult`](@ref).
   - [`AssetPanel`](@ref)
 """
 function descriptor_asset_panel(rd::ReturnsResult)::AssetPanel
-    pnl = rd.pnl
+    pnl = returns_with_universe(rd).pnl
     @argcheck(!isnothing(pnl),
-              IsNothingError("a Descriptor is `NaN` wherever the active mask of an Asset Panel is `false`, and rd.pnl is nothing. Build the ReturnsResult with the `pnl` that asset_panel returns."))
+              IsNothingError("a Descriptor is `NaN` wherever the active mask of an Asset Panel is `false`, and rd holds neither a panel nor asset returns. Build the ReturnsResult with its returns, or with the `pnl` that asset_panel returns."))
     return pnl
 end
 """
@@ -228,7 +272,7 @@ end
 
 Return `NaN` in the element type of an array that a fill writes into in place, and refuse an element type that cannot hold it.
 
-A fill changes an array that its caller owns, so it cannot widen the element type the way a function that allocates its result does with `float_if_integer`. An `Integer`, a `Rational` or a `Complex{Int}` holds no `NaN`, and the conversion would raise an `InexactError` at the first inactive cell. This function converts once, before the fill writes anything. Every element type that holds `NaN` passes, a number type from another package included. Every other type raises an `ArgumentError` whose message names the repair.
+A fill changes an array that its caller owns, so it cannot widen the element type. An `Integer`, a `Rational` or a `Complex{Int}` holds no `NaN`, and the conversion would raise an `InexactError` at the first inactive cell. This function converts once, before the fill writes anything. Every element type that holds `NaN` passes, a number type from another package included. Every other type raises an `ArgumentError` whose message names the repair.
 
 # Arguments
 
@@ -246,8 +290,7 @@ A fill changes an array that its caller owns, so it cannot widen the element typ
 
   - [`descriptor_active_fill!`](@ref)
   - [`exposure_active_fill!`](@ref)
-  - [`one_hot_level_fill!`](@ref)
-  - [`one_hot_observed_fill!`](@ref)
+  - [`one_hot_fill!`](@ref)
 """
 function nan_fill_value(A::AbstractArray{<:Number})::Number
     T = eltype(A)
@@ -257,7 +300,7 @@ function nan_fill_value(A::AbstractArray{<:Number})::Number
         if !(err isa InexactError)
             rethrow()
         end
-        throw(ArgumentError("a fill writes NaN into the cells that hold no value, in place, so the element type of the array must hold NaN, and $T does not. Convert the array to a floating point type before the call, for example with float_if_integer."))
+        throw(ArgumentError("a fill writes NaN into the cells that hold no value, in place, so the element type of the array must hold NaN, and $T does not. Convert the array to a floating point type before the call."))
     end
 end
 """
@@ -691,7 +734,7 @@ The vectors of a new state take the type of the returns and of the market return
 """
 function ew_beta_state(::Nothing, X::AbstractMatrix{<:Real}, rm::AbstractVector{<:Real},
                        decay::Real)::EWBetaState
-    Tf = float_if_integer(promote_type(eltype(X), eltype(rm)))
+    Tf = promote_type(eltype(X), eltype(rm))
     N = size(X, 2)
     Tm = promote_type(Tf, typeof(decay))
     return EWBetaState(fill(Tf(NaN), N), zeros(Tf, N), zeros(Tf, N), zeros(Int, N),

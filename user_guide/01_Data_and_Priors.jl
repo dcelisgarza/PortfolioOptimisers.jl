@@ -35,7 +35,8 @@ A real price table has gaps. An asset that lists or delists inside the sample ha
 or after it trades, a halted asset has no quotes, and two exchanges close on different holidays.
 [`price_ingestion`](@ref) reads the first and the last quote of each asset, its listing span.
 The conversion keeps every gap in the returns, and it returns an [`AssetPanel`](@ref) on
-`rd.pnl` that states which assets have data on each date. To fill a gap inside the listing span,
+`rd.pnl` that states which assets have data on each date. A table with no gap gives
+`rd.pnl === nothing`, because every asset has data on every date. To fill a gap inside the listing span,
 use [`PriceGapFill`](@ref). To drop the assets or the dates with too much missing data, use
 [`MissingDataFilter`](@ref). The page
 [Data preprocessing and the ingestion layer](@ref example-data-preprocessing-and-the-ingestion-layer)

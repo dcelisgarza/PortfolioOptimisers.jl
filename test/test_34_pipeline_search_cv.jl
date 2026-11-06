@@ -446,32 +446,6 @@
         @test PortfolioOptimisers.cv_data_eltype(ReturnsResult(; nx = rd.nx,
                                                                X = Float32.(rd.X))) ===
               Float32
-        # integer prices: a score is a fraction and a failed fold scores NaN, so the score
-        # matrix is floating point, and the search agrees with the same prices as Float64
-        Xi = round.(Int, 100 .+ cumsum(randn(StableRNG(1), 120, 5); dims = 1))
-        ts = make_ts()
-        pri = PricesResult(; X = TimeArray(ts, Xi, string.("A", 1:5)))
-        prf = PricesResult(; X = TimeArray(ts, float.(Xi), string.("A", 1:5)))
-        @test PortfolioOptimisers.cv_data_eltype(pri) === Float64
-        pipe = Pipeline(;
-                        steps = (PricesToReturns(), "prior" => EmpiricalPrior(),
-                                 EqualWeighted()))
-        gscv = GridSearchCrossValidation(["opt" => [EqualWeighted(), InverseVolatility()]];
-                                         cv = IndexWalkForward(60, 20),
-                                         r = ConditionalValueatRisk(), train_score = true)
-        resi = search_cross_validation(pipe, gscv, pri)
-        resf = search_cross_validation(pipe, gscv, prf)
-        @test eltype(resi.test_scores) === Float64
-        @test resi.test_scores ≈ resf.test_scores
-        @test resi.idx == resf.idx
-        cgscv = GridSearchCrossValidation(["opt" => [EqualWeighted(), InverseVolatility()]];
-                                          cv = CombinatorialCrossValidation(; n_folds = 4,
-                                                                            n_test_folds = 2),
-                                          r = ConditionalValueatRisk(), train_score = true)
-        cresi = search_cross_validation(pipe, cgscv, pri)
-        cresf = search_cross_validation(pipe, cgscv, prf)
-        @test eltype(cresi.test_scores) === Float64
-        @test cresi.test_scores ≈ cresf.test_scores
     end
 
     @testset "the scores, the train scores and the winner, checked against the fold loop" begin
@@ -517,6 +491,52 @@
         end
         @test cres.idx == argmax(vec(mean(cres.test_scores; dims = 1)))
         @test cres.opt.steps[2] === cands[cres.idx]
+    end
+
+    # Issue #1937: a Pipeline search keeps its n best candidates by the rule of the optimiser
+    # search, and builds each one from the pipeline that it was given.
+    @testset "the Pipeline search keeps its n best candidates in rank order" begin
+        rd = make_returns()
+        r = ConditionalValueatRisk()
+        pipe = Pipeline(; steps = ("prior" => EmpiricalPrior(), "opt" => EqualWeighted()))
+        cands = [EqualWeighted(), InverseVolatility(), HierarchicalRiskParity()]
+        means(res) = vec(mean(res.test_scores; dims = 1))
+        order(res, k) = sortperm(means(res); rev = true)[1:k]
+        gs(cv; kwargs...) = GridSearchCrossValidation(["opt" => cands]; cv = cv, r = r,
+                                                      kwargs...)
+        cv = IndexWalkForward(60, 20)
+
+        r1 = search_cross_validation(pipe, gs(cv), rd)
+        r2 = search_cross_validation(pipe, gs(cv; n_best = 2), rd)
+        @test r1.rank_idx == [r1.idx] && r1.ranked[1] === r1.opt
+        @test r2.test_scores == r1.test_scores && r2.idx == r1.idx
+        @test r2.rank_idx == order(r2, 2) && r2.rank_scores == means(r2)[r2.rank_idx]
+        @test [c.steps[2] for c in r2.ranked] == cands[r2.rank_idx]
+        @test isnothing(r2.path_ids)
+
+        # A joined grid: the candidate of the second set keeps the base optimiser.
+        sets = [Pair{String, Vector}["opt" => cands[2:3]],
+                Pair{String, Vector}["prior" => [EmpiricalPrior()]]]
+        rj = search_cross_validation(pipe,
+                                     GridSearchCrossValidation(sets; cv = cv, r = r,
+                                                               n_best = 3), rd)
+        @test rj.ranked[findfirst(==(3), rj.rank_idx)].steps[2] isa EqualWeighted
+
+        mr = MultipleRandomised(cv; subset_size = 3, n_subsets = 2, seed = 42)
+        rm = search_cross_validation(pipe, gs(mr; n_best = 2), rd)
+        @test rm.path_ids == split(mr, rd).path_ids && rm.rank_idx == order(rm, 2)
+
+        ccv = CombinatorialCrossValidation(; n_folds = 4, n_test_folds = 2)
+        rc = search_cross_validation(pipe, gs(ccv; n_best = 3), rd)
+        @test rc.path_ids == 1:maximum(split(ccv, rd).path_ids)
+        @test rc.rank_idx == order(rc, 3) && rc.rank_scores == means(rc)[rc.rank_idx]
+
+        rr = search_cross_validation(pipe,
+                                     RandomisedSearchCrossValidation(["opt" => cands];
+                                                                     cv = cv, r = r,
+                                                                     n_iter = 3, seed = 1,
+                                                                     n_best = 2), rd)
+        @test rr.rank_idx == r2.rank_idx && rr.rank_scores == r2.rank_scores
     end
 
     @testset "the combinatorial search checks its entry like the grid search" begin

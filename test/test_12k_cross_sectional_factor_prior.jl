@@ -88,7 +88,7 @@ function csfp_reconciliation(pr, rd, lag)
     d = 0.0
     n = 0
     for t in (lag + 1):T, i in 1:N
-        v = LinearAlgebra.dot(view(Ms, t - lag, i, :), view(f, t, :)) + eps[t, i]
+        v = LinearAlgebra.dot(view(Ms, i, :, t - lag), view(f, t, :)) + eps[t, i]
         if isfinite(v) && isfinite(X[t, i])
             d = max(d, abs(v - X[t, i]))
             n += 1
@@ -113,7 +113,7 @@ function csfp_zero_sum(rr, f, ind, lag)
         for k in ind
             c = 0.0
             for a in axes(bw, 2)
-                e = Ms[t, a, k]
+                e = Ms[a, k, t]
                 if isfinite(e)
                     c += bw[t, a] * e
                 end
@@ -130,11 +130,11 @@ end
 function csfp_orthogonality(rr, a, b)
     bw, Ms = rr.bw, rr.Ms
     o = 0.0
-    for t in axes(Ms, 1), p in a, q in b
+    for t in axes(Ms, 3), p in a, q in b
         s = 0.0
         for j in axes(bw, 2)
-            x = Ms[t, j, p]
-            y = Ms[t, j, q]
+            x = Ms[j, p, t]
+            y = Ms[j, q, t]
             if isfinite(x) && isfinite(y)
                 s += bw[t, j] * x * y
             end
@@ -222,6 +222,68 @@ end
         @test_throws PO.IsEmptyError CrossSectionalFactorPrior(; lambda = 1,
                                                                factors = Pair{String, Any}[])
     end
+    @testset "A rebuild holds the vectors it was built from (#1825)" begin
+        f = csfp_factors()
+        fam = ["industry" => nothing]
+        p = CrossSectionalFactorPrior(; lambda = 1, factors = f, families = fam)
+        @test p.factors === f
+        @test p.families === fam
+        r = PO.rebuild_estimator(p, (; cache = nothing))
+        @test r.factors === f
+        @test r.families === fam
+        # A dictionary, and a key that is not a String, are still collected.
+        d = Dict("industry" => nothing)
+        q = CrossSectionalFactorPrior(; lambda = 1, factors = f, families = d)
+        @test q.families == ["industry" => nothing]
+        @test q.families !== d
+        @test PO.rebuild_estimator(q, (; cache = nothing)).families === q.families
+        @test PO.string_key_pairs([:a => 1]) == ["a" => 1]
+    end
+    @testset "A pin has nothing to read from a buffer that fits nothing or holds no panel (#1912)" begin
+        # A pinned choice writes the dropped member of each family into `families` at the first
+        # fit of the refit route, and a step with nothing to fit leaves the family as written.
+        rdp = csfp_panel(; n_assets = 20, n_observations = 160, n_industries = 3,
+                         seed = 782_101).rd
+        rows(r, i) = PO.port_opt_view(r, i, :)
+        est(; kw...) = CrossSectionalFactorPrior(; lambda = 1, factors = csfp_factors(),
+                                                 families = ["industry" => nothing],
+                                                 choice = PinnedChoice(), minra = 5, kw...)
+        refit(e, r) = partial_fit!(PO.update_online_estimator(Online(e)), r)
+        # Too few rows follow the warm-up for a first fit, so there is nothing to pin yet.
+        @test only(refit(est(), rows(rdp, 1:2)).families) == ("industry" => nothing)
+        # The first fit pins the member, and the refit answers the batch fit.
+        o = refit(est(), rows(rdp, 1:150))
+        name = last(only(o.families))
+        @test startswith(name, "industry=")
+        b = prior(est(), rows(rdp, 1:150))
+        po = prior(o)
+        @test isequal(po.mu, b.mu)
+        @test isequal(po.sigma, b.sigma)
+        # Every observation is a gap of the Shared Series, so a fit keeps none: nothing pins.
+        rdg = ReturnsResult(; nx = rdp.nx, X = rdp.X, nb = ["BM"],
+                            B = fill(NaN, size(rdp.X, 1)), pnl = rdp.pnl, ts = rdp.ts)
+        og = refit(est(; x_src = ExcessSource()), rows(rdg, 1:50))
+        @test only(og.families) == ("industry" => nothing)
+        # The returns record no Asset Panel, which the exposures are read from.
+        rdn = ReturnsResult(; nx = rdp.nx, X = rdp.X)
+        @test only(refit(est(), rdn).families) == ("industry" => nothing)
+        # A family that names its dropped member is already pinned, and stays as written.
+        pinned = est(; families = ["industry" => name])
+        @test only(refit(pinned, rows(rdp, 1:150)).families) == ("industry" => name)
+        @test isequal(prior(refit(pinned, rows(rdp, 1:150))).mu, b.mu)
+        # A pin on a member that the fit does not choose stays as written too, and the refit
+        # answers the batch fit under that pin, not under the member the fit chooses (#1926).
+        # The basis honours a pinned member, so the exit for a set with every member pinned
+        # is a short cut: it gives the families that the steps after it give.
+        other = "industry=Banks"
+        @test other != name
+        pinned_other = est(; families = ["industry" => other])
+        o_other = refit(pinned_other, rows(rdp, 1:150))
+        @test only(o_other.families) == ("industry" => other)
+        b_other = prior(pinned_other, rows(rdp, 1:150))
+        @test isequal(prior(o_other).mu, b_other.mu)
+        @test !isequal(b_other.mu, b.mu)
+    end
     @testset "The scalar guards" begin
         f = csfp_factors()
         @test_throws DomainError CrossSectionalFactorPrior(; lambda = 1, factors = f,
@@ -279,7 +341,9 @@ end
         rd = csfp_panel(; n_assets = 10, n_observations = 20, n_industries = 2).rd
         @test_throws PO.IsNothingError prior(pe, rd.X)
         @test_throws PO.IsNothingError prior(pe, rd.X, nothing, nothing)
-        @test_throws PO.IsNothingError prior(pe, ReturnsResult(; nx = rd.nx, X = rd.X))
+        # A carrier with no panel reads the universe of its finiteness (#1882), and the
+        # exposure that reads a Panel Field names the field it does not find.
+        @test_throws KeyError prior(pe, ReturnsResult(; nx = rd.nx, X = rd.X))
         # The residual declaration has no shape that can express this estimator's block.
         @test_throws ArgumentError PO.factor_residual_config(pe)
     end
@@ -321,8 +385,9 @@ end
         # The factor axis keeps the order the caller wrote, whatever order the fit took.
         @test hist.nf == ["size2", "size", "market"]
         @test hist.fam == ["style", "style", "market"]
-        @test size(hist.Ms) == (size(rd.X, 1), size(rd.X, 2), 3)
-        @test isequal(hist.Ms[:, :, 1], factor_exposure(last(f[1]), rdb, hist.Ms[:, :, 2]))
+        @test size(hist.Ms) == (size(rd.X, 2), 3, size(rd.X, 1))
+        @test isequal(permutedims(hist.Ms[:, 1, :]),
+                      factor_exposure(last(f[1]), rdb, permutedims(hist.Ms[:, 2, :])))
     end
     @testset "An unknown source, a self-reference and a cycle are refused" begin
         @test_throws ArgumentError PO.cross_sectional_exposure_order(["a" =>
@@ -350,10 +415,10 @@ end
     @testset "A history that is all warm-up, and a blank market capitalisation" begin
         # Every exposure is NaN, so no observation carries a usable asset and the whole
         # history is warm-up.
-        Ms = fill(NaN, size(rd.X, 1), size(rd.X, 2), 2)
+        Ms = fill(NaN, size(rd.X, 2), 2, size(rd.X, 1))
         @test_throws ArgumentError PO.cross_sectional_warmup(rd.X, Ms, rd.pnl.emsk)
         # The first observation is warm, so the count of leading cold observations is zero.
-        Ms[1, 1, :] .= 0.0
+        Ms[1, :, 1] .= 0.0
         @test iszero(PO.cross_sectional_warmup(rd.X, Ms, rd.pnl.emsk))
         # A pair with no market capitalisation leaves the two weight masks.
         msk = trues(2, 2)
@@ -426,9 +491,9 @@ end
         @test iszero(rr.b)
     end
     @testset "The block carries the fourteen facts of the fit" begin
-        @test size(rr.Ms) == (size(rr.csr.f, 1), size(rd.X, 2), length(rr.nf))
+        @test size(rr.Ms) == (size(rd.X, 2), length(rr.nf), size(rr.csr.f, 1))
         # `isequal`, not `==`: an inactive asset carries a NaN Factor Exposure.
-        @test isequal(rr.Ms[end, :, :], rr.M)
+        @test isequal(rr.Ms[:, :, end], rr.M)
         @test size(rr.vs) == size(rr.rw) == size(rr.bw) == size(rr.csr.eps)
         @test rr.nf ==
               ["market", "industry=Real Estate", "industry=Software", "industry=Banks",
@@ -665,6 +730,83 @@ scenario mean.
         @test_throws ArgumentError EntropyPoolingPrior(; pe = pop1, sets = sets,
                                                        mu_views = views)
     end
+    @testset "A caller's w on a nested prior reaches the residual correlation of the refit (#1927)" begin
+        # A threshold above zero makes `ce` read the standardised idiosyncratic returns, and a
+        # `Covariance` reads observation weights. A nested entropy pooling prior fits the
+        # cross-sectional prior under its own `w`, so the `ce` of the fit that the views read
+        # carries `w`. An augmented Black-Litterman prior hands its asset prior to
+        # `scenario_factory`, whose refit holds `ce`, so the refit must carry `w` too. The
+        # refit without it reads a residual correlation that no view read, and moves `sigma`
+        # by 2.1e-5 against a largest entry of 6.7e-4.
+        PO = PortfolioOptimisers
+        F = randn(StableRNG(1927), size(rd.X, 1), 2) ./ 100
+        asets = UniverseSets(; xkey = "nx",
+                             dict = Dict("nx" => rd.nx, "nf" => ["F1", "F2"]))
+        v = collect(range(1, 3; length = T))
+        wn = StatsBase.aweights(v ./ sum(v))
+        csc(pe0, ce) = CrossSectionalFactorPrior(; lambda = 1, factors = csfp_factors(),
+                                                 minra = 5, th = 0.1, pe = pe0, ce = ce)
+        abl(a, f) = AugmentedBlackLittermanPrior(; a_pe = a, f_pe = f, sets = asets,
+                                                 re = DimensionReductionRegression(),
+                                                 a_views = LinearConstraintEstimator(;
+                                                                                     val = "$(rd.nx[2]) == 0.001"),
+                                                 f_views = LinearConstraintEstimator(;
+                                                                                     val = "F1 == 0.001"))
+        nested = EntropyPoolingPrior(; pe = csc(EmpiricalPrior(), Covariance()), w = wn)
+        av = LinearConstraintEstimator(; val = "$(rd.nx[1]) == 0.003")
+        for mk in (EntropyPoolingPrior, MeucciEntropyPoolingPrior)
+            pw = prior(mk(; pe = abl(nested, EmpiricalPrior()), sets = asets,
+                          mu_views = av), rd.X, F, rd.pnl)
+            w = pw.w
+            @test length(w) == T
+            # The reference states every weight of the refit. The factor prior of the asset
+            # prior reads the posterior `w`, and `ce` reads `wn`. The factor prior of the
+            # augmented prior reads every row of `F`, and the first row, which no scenario
+            # covers, takes a zero weight.
+            ref(ce) = prior(abl(csc(PO.factory(EmpiricalPrior(), w), ce),
+                                PO.factory(EmpiricalPrior(),
+                                           StatsBase.aweights(vcat(0.0, w)))), rd.X, F,
+                            rd.pnl)
+            pr1 = ref(PO.factory(Covariance(), wn))
+            @test isapprox(pw.mu, pr1.mu; rtol = 1e-12)
+            @test isapprox(pw.sigma, pr1.sigma; rtol = 1e-12)
+            pr0 = ref(Covariance())
+            @test !isapprox(pw.sigma, pr0.sigma; rtol = 1e-6)
+        end
+    end
+    @testset "A plain variance estimator reads the masks and the weights of its rows (#1928)" begin
+        # The fit hands `ve` both universe masks, one row for each row of the residuals, and a
+        # caller's `w` on a nested entropy pooling prior reaches `ve` too. The expanding series
+        # cuts all three to the rows of each fit, so row t is the variance of the residuals of
+        # the first t rows, under the weights those rows carry.
+        PO = PortfolioOptimisers
+        csv(ve) = CrossSectionalFactorPrior(; lambda = 1, factors = csfp_factors(),
+                                            minra = 5, ve = ve)
+        function vs_reference(ve, eps, w)
+            return permutedims(reduce(hcat,
+                                      [vec(var(if isnothing(w)
+                                                   ve
+                                               else
+                                                   PO.factory(ve,
+                                                              StatsBase.aweights(w[1:t]))
+                                               end, eps[1:t, :])) for t in axes(eps, 1)]))
+        end
+        for ve in (SimpleVariance(), Covariance())
+            p1 = csv(ve)
+            pv = prior(p1, rd)
+            # Row 1 is a fit on one residual, so it is NaN in both.
+            @test isapprox(pv.rr.vs, vs_reference(ve, pv.rr.csr.eps, nothing); rtol = 1e-12,
+                           nans = true)
+            v = collect(range(1, 3; length = size(pv.rr.csr.eps, 1)))
+            wn = StatsBase.aweights(v ./ sum(v))
+            for mk in (EntropyPoolingPrior, MeucciEntropyPoolingPrior)
+                pw = prior(mk(; pe = p1, sets = sets, mu_views = views, w = wn), rd)
+                @test isapprox(pw.rr.vs, vs_reference(ve, pw.rr.csr.eps, wn); rtol = 1e-12,
+                               nans = true)
+                @test !isapprox(pw.rr.vs[2:end, :], pv.rr.vs[2:end, :]; rtol = 1e-6)
+            end
+        end
+    end
 end
 
 @testset "A constrained Factor Family re-bases the fit" begin
@@ -720,8 +862,8 @@ end
     @test csfp_orthogonality(ctl.rr, sty, ind) > 1e3
     @test csfp_orthogonality(pr.rr, sty, ind) < 1e-8
     # The market and the industry blocks are untouched: only the key's columns are rewritten.
-    @test isequal(pr.rr.Ms[:, :, ind], ctl.rr.Ms[:, :, ind])
-    @test isequal(pr.rr.Ms[:, :, 1], ctl.rr.Ms[:, :, 1])
+    @test isequal(pr.rr.Ms[:, ind, :], ctl.rr.Ms[:, ind, :])
+    @test isequal(pr.rr.Ms[:, 1, :], ctl.rr.Ms[:, 1, :])
 end
 
 @testset "The weight policy, the overlay and the lag" begin
@@ -1303,7 +1445,7 @@ end
         a = Float64[]
         b = Float64[]
         for t in 2:T, i in axes(rr.csr.eps, 2)
-            u = LinearAlgebra.dot(view(rr.Ms, t - 1, i, :), view(pr.fpr.X, t, :))
+            u = LinearAlgebra.dot(view(rr.Ms, i, :, t - 1), view(pr.fpr.X, t, :))
             v = LinearAlgebra.dot(view(truth.B, i, :), view(tf, t, :))
             if isfinite(u) && isfinite(v)
                 push!(a, u)
@@ -1623,26 +1765,26 @@ function csfp_oracle(pe, rd; alpha = nothing)
                                                                                  BW)).Ms
     ell = pe.lag
     ts = (PO.cross_sectional_warmup(X, Z, emsk) + ell + 1):Tn
-    K = size(Z, 3)
+    K = size(Z, 2)
     F = zeros(length(ts), K)
     Q = zeros(length(ts), N)
     for (u, t) in enumerate(ts)
         for i in 1:N
             if emsk[t, i] &&
                isfinite(X[t, i]) &&
-               all(isfinite, view(Z, t - ell, i, :)) &&
+               all(isfinite, view(Z, i, :, t - ell)) &&
                isfinite(mcap[t - ell, i])
                 Q[u, i] = mcap[t - ell, i]^pe.wa.p
             end
         end
         e = findall(>(0), view(Q, u, :))
         s = sqrt.(Q[u, e])
-        F[u, :] = LinearAlgebra.pinv(s .* Z[t - ell, e, :]) * (s .* X[t, e])
+        F[u, :] = LinearAlgebra.pinv(s .* Z[e, :, t - ell]) * (s .* X[t, e])
     end
     fp = prior(pe.pe, F)
     muf = fp.mu
     Sf = fp.sigma
-    ZT = Z[Tn, :, :]
+    ZT = Z[:, :, Tn]
     g = zeros(K)
     b = zeros(N)
     if !isnothing(alpha)
@@ -1736,16 +1878,59 @@ end
                                                                             intercept = true))
         @test_throws ArgumentError prior(pe, rd)
     end
+    @testset "Each period spends the parameters that its fit spent (#1900)" begin
+        rdc = csfp_panel(; n_assets = 20, n_observations = 60, n_industries = 3,
+                         seed = 1_900).rd
+        mk(cre) = prior(CrossSectionalFactorPrior(; lambda = 1, factors = csfp_factors(),
+                                                  minra = 5, cre = cre), rdc)
+        pl = mk(CrossSectionalTargetRegression(; alg = DependentColumnDrop()))
+        en = ElasticNet(; strength = FixedStrength(; gamma = 0.05))
+        pn = mk(CrossSectionalTargetRegression(; tgt = en, alg = DependentColumnDrop()))
+        cl, cn = pl.rr.csr, pn.rr.csr
+        K = size(cl.f, 2)
+        # The market column is the sum of the industry columns, so a least-squares period
+        # spends K - 1 parameters, not the K columns that the count read before #1900.
+        @test cl.n .- cl.edof == fill(K - 1, length(cl.n))
+        # The linear member and a least-squares target spend the same.
+        @test mk(CrossSectionalLinearRegression()).rr.csr.edof == cl.edof
+        # The penalised fit spends less, and the prior scales the same count of its variance
+        # estimator by the fraction of each fit, which `test_08j_cross_sectional_regression_sweep`
+        # checks period by period against a refit.
+        @test all(cn.edof .> cl.edof)
+        @test pn.rr.edof ./ pl.rr.edof ≈
+              fill((sum(cn.edof) / sum(cn.n)) / (sum(cl.edof) / sum(cl.n)),
+                   length(pl.rr.edof))
+    end
+    @testset "A fit with no leverage check keeps the prior of a design with no pair to mark (#1971)" begin
+        rdc = csfp_panel(; n_assets = 20, n_observations = 60, n_industries = 3,
+                         seed = 1_971).rd
+        mk(cre; l1mask = MaskedLeverageOne()) = prior(CrossSectionalFactorPrior(;
+                                                                                factors = csfp_factors(),
+                                                                                minra = 5,
+                                                                                cre = cre,
+                                                                                l1mask = l1mask),
+                                                      rdc)
+        on = mk(CrossSectionalLinearRegression())
+        @test !any(on.rr.csr.h1)
+        # With no mark, both Leverage-One Masks read the same residuals, so the skip changes
+        # no moment. The market column is the sum of the industry columns, so
+        # `NormalEquationsSolve` gives every observation to the default and keeps it too.
+        for cre in (CrossSectionalLinearRegression(; leverage = false),
+                    CrossSectionalLinearRegression(; alg = NormalEquationsSolve(), leverage = false)),
+            l1mask in (MaskedLeverageOne(), UnmaskedLeverageOne())
+
+            off = mk(cre; l1mask = l1mask)
+            @test isnothing(off.rr.csr.h1)
+            @test isequal(off.mu, on.mu)
+            @test isequal(off.sigma, on.sigma)
+        end
+    end
 end
 
 #=
 Issue #828 swept `10_Base_CrossSectionalFactorPrior.jl`. Each testset below checks one closed form
 that a docstring of that file states, against a loop that writes the form out. The fixtures are
 small random arrays, so each check reads one helper alone.
-
-The integer testset fails on the code before the sweep. `cross_sectional_exposure_history`
-allocated the exposure history in the element type of the returns, so integer returns threw
-`InexactError` at the first fractional exposure.
 =#
 @testset "The docstrings of 10_Base_CrossSectionalFactorPrior.jl against numbers" begin
     PO = PortfolioOptimisers
@@ -1754,16 +1939,33 @@ allocated the exposure history in the element type of the returns, so integer re
         nT, nN, nK = 12, 7, 3
         X = randn(rng, nT, nN)
         X[rand(rng, nT, nN) .< 0.15] .= NaN
-        Ms = randn(rng, nT, nN, nK)
-        Ms[rand(rng, nT, nN, nK) .< 0.1] .= NaN
-        Ms[1:3, :, 1] .= NaN
+        Ms = permutedims(randn(rng, nT, nN, nK), (2, 3, 1))
+        Ms[permutedims(rand(rng, nT, nN, nK) .< 0.1, (2, 3, 1))] .= NaN
+        Ms[:, 1, 1:3] .= NaN
         emsk = rand(rng, nT, nN) .< 0.8
-        m = [emsk[t, i] && isfinite(X[t, i]) && all(isfinite, Ms[t, i, :])
+        m = [emsk[t, i] && isfinite(X[t, i]) && all(isfinite, Ms[i, :, t])
              for t in 1:nT, i in 1:nN]
         @test PO.cross_sectional_eligible(X, Ms, emsk) == m
         @test PO.cross_sectional_warmup(X, Ms, emsk) ==
               findfirst(t -> any(m[t, :]), 1:nT) - 1
         @test PO.cross_sectional_warmup(X, Ms, emsk) == 3
+        # Issue #1970: an observed block that the caller holds apart reads as the history that
+        # joins it, so the fit tests the two blocks with no copy. Its own generator keeps the
+        # fixtures below unchanged.
+        rz = StableRNG(1_970)
+        Zo = permutedims(randn(rz, nT, nN, 2), (2, 3, 1))
+        Zo[permutedims(rand(rz, nT, nN, 2) .< 0.1, (2, 3, 1))] .= NaN
+        Zo[:, 2, 4] .= NaN
+        J = cat(Ms, Zo; dims = 2)
+        @test PO.cross_sectional_finite_exposures(J) ==
+              [all(isfinite, J[i, :, t]) for t in 1:nT, i in 1:nN]
+        @test PO.cross_sectional_eligible(X, Ms, emsk, Zo) ==
+              PO.cross_sectional_eligible(X, J, emsk)
+        @test PO.cross_sectional_warmup(X, Ms, emsk, Zo) ==
+              PO.cross_sectional_warmup(X, J, emsk) >
+              PO.cross_sectional_warmup(X, Ms, emsk)
+        @test_throws DimensionMismatch PO.cross_sectional_eligible(X, Ms, emsk,
+                                                                   Zo[:, :, 1:(end - 1)])
         amsk = rand(rng, nN) .< 0.7
         L = randn(rng, nN, nK)
         L[2, 3] = NaN
@@ -1806,15 +2008,19 @@ allocated the exposure history in the element type of the returns, so integer re
         nT, nN, nK = 12, 7, 3
         n = rand(rng, 5:7, nT)
         cnt = (; n = 10 .* rand(rng, nN), m = rand(rng, nN))
+        # The fraction reads the residual count that the fit of each period records, a real
+        # count for a penalised fit (#1900).
+        nu = n .- nK .+ rand(rng, nT)
         csr = PO.CrossSectionalRegression(; f = randn(rng, nT, nK),
-                                          eps = randn(rng, nT, nN), n = n)
+                                          eps = randn(rng, nT, nN), n = n, edof = nu)
         c = PO.cross_sectional_variance_counts(cnt, csr)
-        @test c.edof ≈ (sum(n .- nK) / sum(n)) .* cnt.n
+        @test c.edof ≈ (sum(nu) / sum(n)) .* cnt.n
         @test c.ediv == cnt.m
-        # An intercept is one more parameter of each period.
-        csrb = PO.CrossSectionalRegression(; f = csr.f, eps = csr.eps, n = n, b = zeros(nT))
-        @test PO.cross_sectional_variance_counts(cnt, csrb).edof ≈
-              (sum(n .- nK .- 1) / sum(n)) .* cnt.n
+        # A fit that records no count, as one built by hand, states no degrees of freedom, as
+        # a time-series block with no `edof` does.
+        csr0 = PO.CrossSectionalRegression(; f = csr.f, eps = csr.eps, n = n)
+        @test PO.cross_sectional_variance_counts(cnt, csr0) ==
+              (; edof = nothing, ediv = cnt.m)
         @test PO.cross_sectional_variance_counts(nothing, csr) ==
               (; edof = nothing, ediv = nothing)
     end
@@ -1889,7 +2095,7 @@ allocated the exposure history in the element type of the returns, so integer re
         Li = L[idx, :]
         Cf = cholesky(Sf).L
         for (es, Di) in ((ev, Diagonal(ev[idx])), (D, D[idx, idx]))
-            lf = PO.cross_sectional_lift(NoSystematicRepair(), mp, L, muf, Sf, es, idx, Xs)
+            lf = PO.cross_sectional_lift(nothing, mp, L, muf, Sf, es, idx, Xs)
             @test lf.mu[idx] ≈ Li * muf
             @test lf.sigma[idx, idx] ≈ Li * Sf * Li' + Di
             @test lf.chol[:, idx]' * lf.chol[:, idx] ≈ lf.sigma[idx, idx]
@@ -1917,15 +2123,14 @@ allocated the exposure history in the element type of the returns, so integer re
         end
         # `chol` factorises the factor model before `mp` processes it, so a detoning `mp`
         # moves `sigma` and leaves `chol` where it was.
-        lf = PO.cross_sectional_lift(NoSystematicRepair(),
-                                     MatrixProcessing(; dt = Detone()), L, muf, Sf, ev, idx,
-                                     Xs)
+        lf = PO.cross_sectional_lift(nothing, MatrixProcessing(; dt = Detone()), L, muf, Sf,
+                                     ev, idx, Xs)
         @test lf.chol[:, idx]' * lf.chol[:, idx] ≈ Li * Sf * Li' + Diagonal(ev[idx])
         @test !isapprox(lf.chol[:, idx]' * lf.chol[:, idx], lf.sigma[idx, idx])
         # An asset with finite inputs that `idx` leaves out keeps a `NaN` variance, so the
         # Investable Mask of the answer is never wider than `idx`.
         idx2 = setdiff(idx, 8)
-        lf = PO.cross_sectional_lift(NoSystematicRepair(), mp, L, muf, Sf, ev, idx2, Xs)
+        lf = PO.cross_sectional_lift(nothing, mp, L, muf, Sf, ev, idx2, Xs)
         @test isfinite(lf.mu[8]) && isnan(lf.sigma[8, 8])
         @test findall(isfinite.(lf.mu) .& isfinite.(diag(lf.sigma))) == idx2
     end
@@ -1939,8 +2144,7 @@ allocated the exposure history in the element type of the returns, so integer re
         ev = rand(rng, nN) .+ 0.1
         idx = collect(1:nN)
         Xs = randn(rng, 30, nN)
-        @test CrossSectionalFactorPrior(; factors = csfp_factors()).srep ===
-              NoSystematicRepair()
+        @test CrossSectionalFactorPrior(; factors = csfp_factors()).srep === nothing
         # The systematic block has rank 3 of 8, so `LinearAlgebra.isposdef` refuses it, and
         # the `:pdm` step runs the Newton repair on it.
         si = PO.support_product(L, Sf, L)
@@ -1953,11 +2157,11 @@ allocated the exposure history in the element type of the returns, so integer re
         posdef!(mp.pdm, old)
         rep = PO.cross_sectional_lift(SystematicRepair(), mp, L, muf, Sf, ev, idx, Xs)
         @test rep.sigma == old
-        # `NoSystematicRepair` takes the symmetric part of the block under the default `mp`.
+        # `srep = nothing` takes the symmetric part of the block under the default `mp`.
         # The product is symmetric only to rounding, and `isposdef` refuses a matrix that is
         # not exactly symmetric, so the repair of the sum would run its Newton step without
         # it. The symmetric sum is positive definite, so its repair changes nothing.
-        no = PO.cross_sectional_lift(NoSystematicRepair(), mp, L, muf, Sf, ev, idx, Xs)
+        no = PO.cross_sectional_lift(nothing, mp, L, muf, Sf, ev, idx, Xs)
         sym = (si + si') / 2
         @test !issymmetric(si) && issymmetric(sym)
         @test isposdef(sym + D)
@@ -1967,17 +2171,17 @@ allocated the exposure history in the element type of the returns, so integer re
         @test no.sigma != rep.sigma
         @test maximum(abs, no.sigma - rep.sigma) / maximum(abs, rep.sigma) < 1e-11
         @test no.mu == rep.mu && no.chol == rep.chol
-        # `NoSystematicRepair` skips the `:pdm` step alone: it equals `SystematicRepair` under
+        # `srep = nothing` skips the `:pdm` step alone: it equals `SystematicRepair` under
         # an `mp` whose order leaves `:pdm` out, and it still runs every other step.
         dt = MatrixProcessing(; dt = Detone(; n = 1))
         nopdm = MatrixProcessing(; dt = Detone(; n = 1), order = (:dn, :dt, :alg))
-        a = PO.cross_sectional_lift(NoSystematicRepair(), dt, L, muf, Sf, ev, idx, Xs)
+        a = PO.cross_sectional_lift(nothing, dt, L, muf, Sf, ev, idx, Xs)
         b = PO.cross_sectional_lift(SystematicRepair(), nopdm, L, muf, Sf, ev, idx, Xs)
         @test a.sigma == b.sigma
         @test a.sigma != no.sigma
         # The verb runs the steps in place, and returns the block.
         s = copy(si)
-        @test PO.systematic_processing!(NoSystematicRepair(), mp, s, Xs) === s
+        @test PO.systematic_processing!(nothing, mp, s, Xs) === s
         @test s == sym
         s = copy(si)
         @test PO.systematic_processing!(SystematicRepair(), mp, s, Xs) === s
@@ -1985,9 +2189,9 @@ allocated the exposure history in the element type of the returns, so integer re
         # The default rule reads the steps of a `MatrixProcessing`, so the constructor refuses
         # another `mp` under it, where the fit would fail with a `MethodError`.
         cmp = CsfpCallerMatrixProcessing()
-        @test_throws "srep = NoSystematicRepair() runs the steps of mp one by one" CrossSectionalFactorPrior(;
-                                                                                                             factors = csfp_factors(),
-                                                                                                             mp = cmp)
+        @test_throws "srep = nothing runs the steps of mp one by one" CrossSectionalFactorPrior(;
+                                                                                                factors = csfp_factors(),
+                                                                                                mp = cmp)
         # Under `SystematicRepair` the lift still repairs the sum under the estimator that
         # `matrix_processing_posdef` gives, so the constructor refuses an `mp` that does not
         # state it, where the fit would fail with a `FieldError` (#1765).
@@ -2000,23 +2204,17 @@ allocated the exposure history in the element type of the returns, so integer re
                                         srep = SystematicRepair()).mp === smp
         @test PO.cross_sectional_lift(SystematicRepair(), smp, L, muf, Sf, ev, idx, Xs).sigma ==
               rep.sigma
-        @test isnothing(PO.assert_systematic_repair(NoSystematicRepair(), mp))
+        @test isnothing(PO.assert_systematic_repair(nothing, mp))
     end
-    @testset "Integer returns fit, and equal the fit of their float copy" begin
+    @testset "A non-investable asset carries NaN in every scenario" begin
+        # Issue #1972 removed the integer case: integer data convert at the carrier.
         rd = csfp_panel(; n_assets = 40, n_observations = 80, n_industries = 3,
                         seed = 828_002).rd
-        rdi = ReturnsResult(; nx = rd.nx,
-                            X = map(x -> isfinite(x) ? round(Int, 100 * x) : 0, rd.X),
+        rdf = ReturnsResult(; nx = rd.nx,
+                            X = map(x -> isfinite(x) ? round(100 * x) : 0.0, rd.X),
                             pnl = rd.pnl)
-        rdf = ReturnsResult(; nx = rd.nx, X = Float64.(rdi.X), pnl = rd.pnl)
         pe = CrossSectionalFactorPrior(; lambda = 1, factors = csfp_factors(), minra = 5)
-        pint = prior(pe, rdi)
         pflt = prior(pe, rdf)
-        @test eltype(pint.rr.Ms) == Float64
-        @test isequal(pint.mu, pflt.mu)
-        @test isequal(pint.sigma, pflt.sigma)
-        @test isequal(pint.X, pflt.X)
-        @test isequal(pint.rr.Ms, pflt.rr.Ms)
         # A non-investable asset carries NaN in every scenario, as it does on the diagonal of
         # sigma: its latest exposures or its latest idiosyncratic variance are NaN.
         j = setdiff(eachindex(pflt.mu), csfp_investable(pflt))
@@ -2041,12 +2239,12 @@ end
         end
     end
     rng = StableRNG(1407)
-    Z = randn(rng, 30, 20, 3)
+    Z = permutedims(randn(rng, 30, 20, 3), (2, 3, 1))
     X = randn(rng, 30, 20)
     W = rand(rng, 30, 20)
     # A pair with a non-finite entry must carry a zero weight, or the design check refuses it.
     X[3, 4] = NaN
-    Z[5, 6, 2] = NaN
+    Z[6, 2, 5] = NaN
     W[3, 4] = 0.0
     W[5, 6] = 0.0
     @testset "Both regressions fit every observation alike" begin
@@ -2067,8 +2265,8 @@ end
     @testset "A refusal is the one of the first observation that fails, unwrapped" begin
         # Observations 7 and 12 carry two equal columns, so the refusal names observation 7.
         Zd = copy(Z)
-        Zd[7, :, 3] = Zd[7, :, 2]
-        Zd[12, :, 3] = Zd[12, :, 2]
+        Zd[:, 3, 7] = Zd[:, 2, 7]
+        Zd[:, 3, 12] = Zd[:, 2, 12]
         mk(ex) = CrossSectionalLinearRegression(; alg = RankDeficiencyRefusal(), ex = ex)
         et = csfp_error(() -> cross_sectional_regression(mk(tex), Zd, X, W))
         es = csfp_error(() -> cross_sectional_regression(mk(sex), Zd, X, W))
@@ -2211,16 +2409,16 @@ refit reads it from the result of that fit, so it runs no regression (#1751, ADR
         @test isequal(cached.rr.c, full.rr.c)
         # The refit keeps the cache, so a later stage reads it too.
         @test PO.cross_sectional_cached_block(pe, cached, rd.X) === cached.rr
-        # The cached refit runs no regression. Measured on this panel: 0.6 MB and 0.2 MB in
-        # place of 5.3 MB and 6.7 MB. The Calibration Slots of the forecast read the factor
-        # moments, so they run again under the new weights, and the refit there allocates
-        # 8.1 MB in place of 12.8 MB.
+        # The cached refit runs no regression stage, so the full refit allocates about one
+        # stage more than it. A ratio of the two refits fails each time the stage gets cheaper
+        # (#1973), and this difference does not.
         f_full() = PO.scenario_prior(pe, w, nothing, rd.X, nothing, rd.pnl; kw...)
         f_cached() = PO.scenario_prior(pe, w, prc, rd.X, nothing, rd.pnl; kw...)
+        f_stage() = PO.cross_sectional_regression_stage(pe, rd.X, nothing, rd.pnl; kw...)
         f_full()
         f_cached()
-        @test @allocated(f_cached()) <
-              @allocated(f_full()) * (isnothing(pe.rfe) ? 1 / 4 : 9 / 10)
+        f_stage()
+        @test @allocated(f_full()) - @allocated(f_cached()) > @allocated(f_stage()) / 2
         # The estimator of the refit reads the same factor returns from the cache.
         a = PO.scenario_factory(pe, w, nothing, rd.X, nothing, rd.pnl; kw...)
         b = PO.scenario_factory(pe, w, prc, rd.X, nothing, rd.pnl; kw...)
@@ -2279,4 +2477,47 @@ refit reads it from the result of that fit, so it runs no regression (#1751, ADR
     pn = prior(EntropyPoolingPrior(; pe = inner, sets = sets, mu_views = outer), rd)
     @test nfit[] == 1
     @test isapprox(LinearAlgebra.dot(pn.w, pn.X[:, 1]), 0.0021; rtol = 1e-5)
+end
+
+@testset "The exposure history shares one backing with the observed exposures (#1973)" begin
+    PO = PortfolioOptimisers
+    Zo = permutedims(rand(StableRNG(197_301), 4, 3, 2), (2, 3, 1))
+    h = PO.cross_sectional_history_backing(Float64, 4, 3, 5, Zo)
+    @test h.Ms isa SubArray && h.Zo isa SubArray
+    @test parent(h.Ms) === parent(h.Zo)
+    @test size(h.Ms) == (3, 5, 4)
+    @test h.Zo == Zo
+    # The batch fit joins the rows it fitted, and the join of two views of the backing is a
+    # view of it, with no copy.
+    J = PO.cross_sectional_joined_exposures(view(h.Ms, :, :, 2:4), view(h.Zo, :, :, 2:4))
+    @test parent(J) === parent(h.Ms)
+    @test size(J) == (3, 7, 3)
+    # A backing holds one element type, so observed exposures of another type keep their own
+    # array, and the history keeps the type of its returns.
+    Zf = Float32.(Zo)
+    hf = PO.cross_sectional_history_backing(Float64, 4, 3, 5, Zf)
+    @test hf.Ms isa Array{Float64, 3}
+    @test hf.Zo === Zf
+    # Two views of different arrays, and two arrays, join by a copy.
+    Jv = PO.cross_sectional_joined_exposures(view(hf.Ms, :, :, 2:4), view(Zf, :, :, 2:4))
+    @test !isa(Jv, SubArray)
+    @test isequal(Jv, cat(hf.Ms[:, :, 2:4], Zf[:, :, 2:4]; dims = 2))
+    @test isequal(PO.cross_sectional_joined_exposures(hf.Ms, Zf), cat(hf.Ms, Zf; dims = 2))
+    h0 = PO.cross_sectional_history_backing(Float64, 4, 3, 5, nothing)
+    @test h0.Ms isa Array{Float64, 3} && size(h0.Ms) == (3, 5, 4)
+    @test isnothing(h0.Zo)
+    @test_throws DimensionMismatch PO.cross_sectional_history_backing(Float64, 5, 3, 5, Zo)
+    @test_throws DimensionMismatch PO.cross_sectional_history_backing(Float64, 4, 2, 5, Zf)
+    # Weights of any other kind divide by their sum as analytic weights.
+    w = PO.cross_sectional_scenario_weights(StatsBase.fweights([1, 2, 1]))
+    @test w isa StatsBase.AnalyticWeights
+    @test w ≈ [0.25, 0.5, 0.25]
+end
+
+@testset "the coverage error names an observed factor only where its return is NaN" begin
+    PO = PortfolioOptimisers
+    cb = (; nf = ["mkt", "fx"], R = [0.1 NaN; 0.2 0.3])
+    @test PO.cross_sectional_observed_gap(cb, 2) == ""
+    @test occursin("[\"fx\"]", PO.cross_sectional_observed_gap(cb, 1))
+    @test PO.cross_sectional_observed_gap(nothing, 1) == ""
 end

@@ -218,7 +218,7 @@ A cross-section whose finite entries are all equal has ``m_{pt} = 0`` for every 
   - [`idio_skewness`](@ref)
 """
 function idio_row_moments(z::MatNum, t::Integer)
-    Tf = float_if_integer(real(eltype(z)))
+    Tf = real(eltype(z))
     N = size(z, 2)
     n = 0
     s = zero(Tf)
@@ -307,7 +307,7 @@ The deviation is the sample one, so it divides by ``n_{t} - 1``. It is not defin
   - [`CrossSectionalFactorModel`](@ref)
 """
 function idio_calibration(z::MatNum)
-    Tf = typeof(sqrt(one(float_if_integer(real(eltype(z))))))
+    Tf = typeof(sqrt(one(real(eltype(z)))))
     T = size(z, 1)
     c = Vector{Tf}(undef, T)
     for t in 1:T
@@ -382,7 +382,7 @@ The rate is not defined for ``n_{t} = 0``. An entry that is not finite enters ne
   - [`CrossSectionalFactorModel`](@ref)
 """
 function idio_tail_rate(z::MatNum; threshold::Real = 3)
-    Tf = float_if_integer(real(eltype(z)))
+    Tf = real(eltype(z))
     T, N = size(z)
     r = Vector{Tf}(undef, T)
     for t in 1:T
@@ -432,7 +432,7 @@ Where:
   - $(math_dict[:F_t_idio])
   - $(math_dict[:z_ti_idio])
 
-It is the bias-corrected sample excess kurtosis, the estimator ``G_{2}`` of Joanes and Gill. It is not defined for ``n_{t} < 4``, or for a constant cross-section, where ``m_{2t} = 0``.
+It is the bias-corrected sample excess kurtosis, the estimator ``G_{2}`` of [joanesgill1998](@cite). It equals ``k_{4} / k_{2}^{2}``, the fourth k-statistic over the square of the second, and the sample moment ``m_{4t} / m_{2t}^{2} - 3`` is the estimator ``g_{2}`` of the same work. It is not defined for ``n_{t} < 4``, or for a constant cross-section, where ``m_{2t} = 0``.
 
 # Arguments
 
@@ -462,10 +462,10 @@ It is the bias-corrected sample excess kurtosis, the estimator ``G_{2}`` of Joan
 
 # References
 
-  - $(ref_dict[:joanesgill1998])
+  - $(ref_dict[:joanesgill1998]) Pages 183 to 189. $(ref_dict[:no_original_source])
 """
 function idio_kurtosis(z::MatNum)
-    Tf = float_if_integer(real(eltype(z)))
+    Tf = real(eltype(z))
     T = size(z, 1)
     k = Vector{Tf}(undef, T)
     for t in 1:T
@@ -513,7 +513,7 @@ Where:
   - $(math_dict[:F_t_idio])
   - $(math_dict[:z_ti_idio])
 
-It is the bias-corrected sample skewness, the estimator ``G_{1}`` of Joanes and Gill. It is not defined for ``n_{t} < 3``, or for a constant cross-section, where ``m_{2t} = 0``.
+It is the bias-corrected sample skewness, the estimator ``G_{1}`` of [joanesgill1998](@cite). It equals ``k_{3} / k_{2}^{3/2}``, the third k-statistic over the second to the power ``3/2``, and the sample moment ratio ``m_{3t} / m_{2t}^{3/2}`` is the estimator ``g_{1}`` of the same work. It is not defined for ``n_{t} < 3``, or for a constant cross-section, where ``m_{2t} = 0``.
 
 # Arguments
 
@@ -543,10 +543,10 @@ It is the bias-corrected sample skewness, the estimator ``G_{1}`` of Joanes and 
 
 # References
 
-  - $(ref_dict[:joanesgill1998])
+  - $(ref_dict[:joanesgill1998]) Pages 183 to 189. $(ref_dict[:no_original_source])
 """
 function idio_skewness(z::MatNum)
-    Tf = typeof(sqrt(one(float_if_integer(real(eltype(z))))))
+    Tf = typeof(sqrt(one(real(eltype(z)))))
     T = size(z, 1)
     s = Vector{Tf}(undef, T)
     for t in 1:T
@@ -793,7 +793,7 @@ The mean is not defined for an empty ``\\mathcal{A}``.
   - [`idio_nan_median`](@ref)
 """
 function idio_nan_mean(v::VecNum)
-    Tf = float_if_integer(real(eltype(v)))
+    Tf = real(eltype(v))
     s = zero(Tf)
     n = 0
     for x in v
@@ -841,7 +841,7 @@ The median is not defined for an empty ``\\mathcal{A}``.
   - [`idio_nan_mean`](@ref)
 """
 function idio_nan_median(v::VecNum)
-    Tf = float_if_integer(real(eltype(v)))
+    Tf = real(eltype(v))
     f = Vector{Tf}(undef, 0)
     sizehint!(f, length(v))
     for x in v

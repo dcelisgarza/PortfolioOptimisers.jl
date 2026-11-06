@@ -174,8 +174,8 @@ end
     fit_and_predict(opt, rd::ReturnsResult, cv::CombCVER; cols, ex) -> PopulationPredictionResult
     fit_and_predict(opt, rd::ReturnsResult; train_idx = nothing, test_idx, cols) -> PredictionResult
     fit_and_predict(res::NonFiniteAllocationOptimisationResult, rd::ReturnsResult; test_idx, cols) -> PredictionResult
-    fit_and_predict(pipe::Pipeline, data::Prices_RR; train_idx = nothing, test_idx, cols) -> PredictionResult
-    fit_and_predict(res::PipelineResult, data::Prices_RR; test_idx, cols) -> PredictionResult
+    fit_and_predict(pipe::AbstractPipelineEstimator, data::Prices_RR; train_idx = nothing, test_idx, cols) -> PredictionResult
+    fit_and_predict(res::AbstractPipelineResult, data::Prices_RR; test_idx, cols) -> PredictionResult
 
 Fit an optimisation estimator on training data and predict on test data using cross-validation.
 
@@ -187,7 +187,7 @@ The estimator form reads `train_idx = nothing` as *the estimator holds its windo
 
 The result form is fitted already, so it ignores `train_idx` and every keyword that [`predict`](@ref) does not take. The fold loop passes the same keywords to an estimator and to a result.
 
-The two [`Pipeline`](@ref) methods take price data or returns data. The `Pipeline` method fits the pipeline over the rows `train_idx` and the columns `cols` with [`pipeline_fold_fit`](@ref), or reads a stepped pipeline out when `train_idx` is `nothing`. It then predicts over `test_idx` with [`predict(res::PipelineResult, data::AbstractPricesResult, window)`](@ref). The [`PipelineResult`](@ref) method is fitted already, and predicts over `test_idx`.
+The two pipeline methods take price data or returns data. They call only `fit` and `predict`, so they serve every [`AbstractPipelineEstimator`](@ref) and every [`AbstractPipelineResult`](@ref). The estimator method fits the pipeline over the rows `train_idx` and the columns `cols` with [`pipeline_fold_fit`](@ref), or reads a stepped pipeline out when `train_idx` is `nothing`. It then predicts over `test_idx` with [`predict(res::PipelineResult, data::AbstractPricesResult, window)`](@ref). The result method is fitted already, and predicts over `test_idx`.
 
 # Algorithm
 
@@ -380,7 +380,7 @@ no executor, and its sibling [`parallel_folds`](@ref) runs every other case. `El
 """
 function run_folds(fit_fold, n::Integer, ::Type{ElT} = PredictionResult;
                    pws = nothing) where {ElT}
-    @info(cv_sequential_info())
+    @info(cv_sequential_info(), maxlog = log_limit(:info), _id = @log_id())
     predictions = Vector{ElT}(undef, n)
     prev = nothing
     for i in 1:n
@@ -614,6 +614,11 @@ run. The two path-level sites, of the optimiser and of the Pipeline, pass the
 time-ordered scheme, and a `Vector{PredictionResult}` for the multi-path combinatorial scheme.
 It is positional for the reason that [`parallel_folds`](@ref) gives.
 
+`PredictionResult` is a `UnionAll`, so a reader of the folds infers its result abstractly. The
+loop does not narrow the folds to their concrete type. A narrow type puts the type of the
+optimiser into the type of the prediction Result, and every verb that reads the Result then
+compiles again for each optimiser.
+
 # Algorithm
 
  1. When `est` [`is_time_dependent`](@ref), check the number of folds against its schedules with [`assert_time_dependent_fold_count`](@ref).
@@ -648,6 +653,8 @@ function fold_loop(fit_fold, est, n::Integer, ex::FLoops.Transducers.Executor,
                    ::Type{ElT} = PredictionResult; rd, train_idx, test_idx,
                    path_id = nothing, cv = nothing, fold_view = nothing,
                    pws = nothing) where {ElT}
+    # The folds stay a `Vector{ElT}` with `ElT = PredictionResult`, not their concrete type.
+    # ADR 0067, amendment of 2026-11-02, measures the compile cost of a narrow type.
     td_flag = is_time_dependent(est)
     if td_flag
         assert_time_dependent_fold_count(est, n)
@@ -770,3 +777,4 @@ function assert_prediction_series(A::MatNum, X::Option{<:VecNum_VecVecNum},
 end
 
 export fit, fit_predict
+public folds_are_time_ordered

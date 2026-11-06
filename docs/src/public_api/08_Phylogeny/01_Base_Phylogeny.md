@@ -1,5 +1,5 @@
 ```@meta
-Description = "Base Phylogeny, public API of PortfolioOptimisers.jl: HopCount, PathLength, LinearDecay, ExponentialDecay, ReciprocalDecay, NoDecay, factory, …"
+Description = "Base Phylogeny, public API of PortfolioOptimisers.jl: HopCount, PathLength, LinearDecay, ExponentialDecay, ReciprocalDecay, factory, separation_decay."
 ```
 
 # Base Phylogeny
@@ -10,7 +10,6 @@ PathLength
 LinearDecay
 ExponentialDecay
 ReciprocalDecay
-NoDecay
 factory(pl::PlE_Pl, args...; kwargs...)
 factory(alg::AbstractPhylogenyAlgorithm, args...; kwargs...)
 separation_decay

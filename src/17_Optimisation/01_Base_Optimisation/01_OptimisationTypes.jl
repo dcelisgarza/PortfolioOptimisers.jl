@@ -217,7 +217,7 @@ Alias for a vector of optimisation return codes.
 """
 const VecOptRetCode = AbstractVector{<:OptimisationReturnCode}
 """
-    const OptRetCode_VecOptRetCode = Union{<:OptimisationReturnCode, <:VecOptRetCode}
+    const OptRetCode_VecOptRetCode = Union{OptimisationReturnCode, VecOptRetCode}
 
 Alias for one optimisation return code, or a vector of return codes.
 
@@ -228,7 +228,7 @@ A result that holds a population of weight vectors holds one return code for eac
   - [`OptimisationReturnCode`](@ref)
   - [`VecOptRetCode`](@ref)
 """
-const OptRetCode_VecOptRetCode = Union{<:OptimisationReturnCode, <:VecOptRetCode}
+const OptRetCode_VecOptRetCode = Union{OptimisationReturnCode, VecOptRetCode}
 
 """
     set_retcode(res::NonFiniteAllocationOptimisationResult, retcode::OptRetCode_VecOptRetCode)
@@ -278,8 +278,8 @@ A subtype declares no method. A result holds it, and an optimiser does not retur
 """
 abstract type OptimisationModelResult <: AbstractResult end
 """
-    const OptE_Opt = Union{<:NonFiniteAllocationOptimisationEstimator,
-                           <:NonFiniteAllocationOptimisationResult}
+    const OptE_Opt = Union{NonFiniteAllocationOptimisationEstimator,
+                           NonFiniteAllocationOptimisationResult}
 
 Alias for a continuous optimisation estimator, or a continuous optimisation result.
 
@@ -291,10 +291,10 @@ An estimator states an optimiser. A result is a precomputed answer, which a fold
   - [`NonFiniteAllocationOptimisationResult`](@ref)
   - [`VecOptE_Opt`](@ref)
 """
-const OptE_Opt = Union{<:NonFiniteAllocationOptimisationEstimator,
-                       <:NonFiniteAllocationOptimisationResult}
+const OptE_Opt = Union{NonFiniteAllocationOptimisationEstimator,
+                       NonFiniteAllocationOptimisationResult}
 """
-    const FbChain = AbstractVector{<:Tuple{<:OptimisationEstimator, <:OptimisationResult}}
+    const FbChain = AbstractVector{<:Tuple{OptimisationEstimator, OptimisationResult}}
 
 Alias for a fallback chain, the record of the attempts that failed before an optimisation gave its result.
 
@@ -308,9 +308,9 @@ A result whose `fb` is a chain was given by a fallback. Then `fb[1][1]` is the e
   - [`FOptE_FOpt_FbChain`](@ref)
   - [`optimise`](@ref)
 """
-const FbChain = AbstractVector{<:Tuple{<:OptimisationEstimator, <:OptimisationResult}}
+const FbChain = AbstractVector{<:Tuple{OptimisationEstimator, OptimisationResult}}
 """
-    const OptE_Opt_FbChain = Union{<:OptE_Opt, <:FbChain}
+    const OptE_Opt_FbChain = Union{OptE_Opt, FbChain}
 
 Alias for the values that the field `fb` of a continuous optimisation result can hold.
 
@@ -322,7 +322,7 @@ The field holds a fallback estimator or a precomputed result ([`OptE_Opt`](@ref)
   - [`FbChain`](@ref)
   - [`NonFiniteAllocationOptimisationResult`](@ref)
 """
-const OptE_Opt_FbChain = Union{<:OptE_Opt, <:FbChain}
+const OptE_Opt_FbChain = Union{OptE_Opt, FbChain}
 """
     factory(res::NonFiniteAllocationOptimisationResult, fb::Option{<:OptE_Opt_FbChain})
 
@@ -577,8 +577,8 @@ The method that Julia selects is the algorithm.
   - [`returns_tracking_path`](@ref)
   - [`tree_path`](@ref)
 """
-function data_benchmark_path(est::Union{<:AbstractEstimator, <:AbstractResult,
-                                        <:AbstractAlgorithm})
+function data_benchmark_path(est::Union{AbstractEstimator, AbstractResult,
+                                        AbstractAlgorithm})
     paths = map(f -> data_benchmark_path(getfield(est, f)), fieldnames(typeof(est)))
     i = findfirst(!isnothing, paths)
     return if isnothing(i)

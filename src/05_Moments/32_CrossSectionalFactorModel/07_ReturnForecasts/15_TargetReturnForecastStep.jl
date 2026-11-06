@@ -78,7 +78,7 @@ function target_forecast_design(rfe::TargetReturnForecast, P::NamedTuple,
                                    target_forecast_variances(rfe.unit, csfm, rfe.calibrate),
                                    P.w, P.g, rows)
     Sa = if rfe.intercept
-        cat(al.S, fill(one(eltype(al.S)), size(al.S, 1), size(al.S, 2), 1); dims = 3)
+        cat(al.S, fill(one(eltype(al.S)), size(al.S, 1), 1, size(al.S, 3)); dims = 2)
     else
         al.S
     end
@@ -373,9 +373,9 @@ The rule of [`PrequentialCalibration`](@ref) is a fold over the observations in 
 function return_forecast_step(rfe::TargetReturnForecast, P::NamedTuple,
                               csfm::CrossSectionalFactorModel, fs::Option{<:NamedTuple},
                               cre::Option{<:AbstractCrossSectionalRegressionEstimator})::NamedTuple
-    d = target_forecast_design(rfe, P, csfm, return_forecast_rows(size(P.S, 1), csfm))
+    d = target_forecast_design(rfe, P, csfm, return_forecast_rows(size(P.S, 3), csfm))
     Sa = d.Sa
-    T, N, K = size(Sa)
+    N, K, T = size(Sa)
     g = forecast_target_gap(rfe)
     Sf, yf, ok = target_forecast_samples(Sa, d.y, d.w, max(T - g, 0))
     Tf = promote_type(real(eltype(Sf)), real(eltype(yf)))
@@ -386,7 +386,9 @@ function return_forecast_step(rfe::TargetReturnForecast, P::NamedTuple,
     # The uncalibrated prediction of each observation that matures, in return units.
     Pm = fill(Tf(NaN), max(T - g, 0), N)
     p = fill(Tf(NaN), N)
-    rows = Vector{Any}(undef, T - p0)
+    # Each step of the loop carries the state of the regression into the next, so the rows
+    # are not a comprehension. A row is a vector of numbers (#1979).
+    rows = Vector{VecNum}(undef, T - p0)
     for t in (p0 + 1):T
         if t > g
             m = normal_equations_add!(XtX, Xty, Sf, yf, ok, target_forecast_row(t - g, N))
@@ -400,7 +402,7 @@ function return_forecast_step(rfe::TargetReturnForecast, P::NamedTuple,
             B[t, :] = StatsAPI.coef(model)
         end
         Pl = forecast_return_units(rfe.unit,
-                                   target_forecast_latest(model, view(Sa, t:t, :, :)),
+                                   target_forecast_latest(model, view(Sa, :, :, t:t)),
                                    target_forecast_latest_row(csfm.vs, t - d.off, N))
         calib = target_forecast_calibrated(rfe.calibrate, model, cs, rfe.min_obs)
         rows[t - p0] = vec(rfe.scale .* target_forecast_multiplier(rfe.calibrate, calib) .*

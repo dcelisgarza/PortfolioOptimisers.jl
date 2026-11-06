@@ -3,7 +3,7 @@ $(DocStringExtensions.TYPEDEF)
 
 Shrinks the learning rate with the square root of the period count, and needs no horizon.
 
-The schedule reads the period count and nothing else. It is the schedule of Theorem 1 of [zinkevich2003](@cite) for online gradient descent, which gives an ``O(\\sqrt{T})`` regret under the Euclidean map. At ``c = \\sqrt{\\log N / (2 N)}`` it is the anytime Soft-Bayes rate of Theorem 10 of [orseau2017](@cite).
+The schedule reads the period count and nothing else. It is the schedule of Theorem 1 of [zinkevich2003](@cite) for online gradient descent, which gives an ``O(\\sqrt{T})`` regret under the Euclidean map. At ``c = \\sqrt{\\log N / (2 N)}`` it is the anytime Soft-Bayes rate of Theorem 10 of [orseau2017](@cite). That theorem states the rate for the Soft-Bayes step with the online correction of Equation 14 of [orseau2017](@cite).
 
 Under the entropic map, Theorem 4.1 of [helmbold1998](@cite) tunes a fixed rate, ``\\eta = 2 r \\sqrt{2 \\log N / T}``. That rate needs the horizon ``T`` and a lower bound ``r`` on each price relative as a fraction of the largest one of its period. An online rule knows neither, so the library states that rate here and does not implement it as a schedule.
 
@@ -50,9 +50,9 @@ InverseSquareRootRate
 
 # References
 
-  - $(ref_dict[:zinkevich2003])
-  - $(ref_dict[:orseau2017])
-  - $(ref_dict[:helmbold1998])
+  - $(ref_dict[:zinkevich2003]) Algorithm 1, Theorem 1.
+  - $(ref_dict[:orseau2017]) Section 6, Equation 14, Theorem 10.
+  - $(ref_dict[:helmbold1998]) Theorem 4.1.
 """
 @concrete struct InverseSquareRootRate <: AbstractLearningRateSchedule
     """
@@ -75,9 +75,9 @@ $(DocStringExtensions.TYPEDEF)
 
 Runs the rule in stages of growing length, and restarts it at the Start Allocation after the last period of each stage.
 
-This is the doubling trick of Corollary 4.3 of [helmbold1998](@cite) for the exponentiated gradient with the uniform mix. Each stage sets its uniform-mix share and its rate from its own length, as Theorem 4.2 of [helmbold1998](@cite) sets them from the horizon. The schedule sets both, so a [`MirrorDescent`](@ref) that holds it does not read its own `alpha`.
+This is the staged exponentiated gradient of Corollary 4.3 of [helmbold1998](@cite), with the uniform mix. It applies the doubling trick of Section 4.6 of [cesabianchi1997](@cite), which restarts the rule at a growing guess of the horizon. Each stage sets its uniform-mix share and its rate from its own length, as Theorem 4.2 of [helmbold1998](@cite) sets them from the horizon. The schedule sets both, so a [`MirrorDescent`](@ref) that holds it does not read its own `alpha`.
 
-From the uniform Start Allocation, the staged rule is universal. For every sequence of non-negative price relatives, with no lower bound on them, its regret against every constant rebalanced portfolio over ``T`` periods is at most ``6 N^2 \\log N (1 + (T / (2 N^2 \\log N))^{3/4})``. The bound holds under the entropic map. Under another map the schedule restarts the rule and sets its rate, and no bound is known.
+From the uniform Start Allocation, the staged rule is universal. For every sequence of non-negative price relatives, with no lower bound on them, its regret against every constant rebalanced portfolio over ``T`` periods is at most ``6 N^2 \\log N (1 + (T / (2 N^2 \\log N))^{3/4})``, which the proof of Corollary 4.3 of [helmbold1998](@cite) derives. The bound holds under the entropic map. Under another map the schedule restarts the rule and sets its rate, and no bound is known.
 
 # Mathematical definition
 
@@ -139,7 +139,8 @@ DoublingTrickRate
 
 # References
 
-  - $(ref_dict[:helmbold1998])
+  - $(ref_dict[:helmbold1998]) Section 4, Theorem 4.2, Corollary 4.3.
+  - $(ref_dict[:cesabianchi1997]) Section 4.6, Algorithm P*.
 """
 @concrete struct DoublingTrickRate <: AbstractLearningRateSchedule
     """
@@ -207,9 +208,9 @@ Reads the learning rate from the running excess of each period's best asset over
 
 This is the self-confident rate of Theorem 6 of [orseau2017](@cite). The state of the rule keeps the excess for the schedule, beside ``\\log N``. The excess is measured at the allocation the rule played, so under a [`MirrorDescent`](@ref) with a positive `alpha` it reads the mix.
 
-Theorem 6 of [orseau2017](@cite) bounds the regret of the Soft-Bayes step, [`ExpectationMaximisation`](@ref), against every constant rebalanced portfolio. At the fixed rate ``\\sqrt{2 \\log N / C_1}``, with ``C_1`` the excess of the whole run, the bound is ``\\min\\{C_1, \\sqrt{2 C_1 \\log N} + 2 T \\log N / C_1\\}``. It is small when one asset is the best predictor for long stretches. [orseau2017](@citet) note that the excess never falls, so the rate can be read online from the running excess. [orseau2017](@cite) states no bound for that online rate. Under a [`MirrorDescent`](@ref) the rate is read online in the same way, and no bound is known either.
+Theorem 6 of [orseau2017](@cite) bounds the regret of the Soft-Bayes step, [`ExpectationMaximisation`](@ref), against every constant rebalanced portfolio. At the fixed rate ``\\sqrt{2 \\log N / C_1}``, with ``C_1`` the excess of the whole run, the bound is ``\\min\\{C_1, \\sqrt{2 C_1 \\log N} + 2 T \\log N / C_1\\}``. It is small when one asset is the best predictor for long stretches. [orseau2017](@citet) note that the excess never falls, so the rate can be read online from the running excess. Remark 8 of [orseau2017](@cite) states no formal result for that online rate. Under a [`MirrorDescent`](@ref) the rate is read online in the same way, and no bound is known either.
 
-Under the online form of the Soft-Bayes step, this rate caps the pull towards the Start Allocation at ``\\sqrt{t / (t + 1)}``, as [orseau2017](@cite) advises ([`correction_ratio_cap`](@ref)). Without the cap, the rate stays almost constant while the mixture predicts well, and a weight can then decay exponentially.
+Under the online form of the Soft-Bayes step, this rate caps the pull towards the Start Allocation at ``\\sqrt{t / (t + 1)}``, as Remark 8 of [orseau2017](@cite) advises ([`correction_ratio_cap`](@ref)). Without the cap, the rate stays almost constant while the mixture predicts well, and a weight can then decay exponentially.
 
 The rate is capped at `eta_max`, because the excess is zero before the first row. The theorem needs a rate in ``(0, 1)``, and [orseau2017](@cite) states no cap, so the default cap is the end of that interval.
 
@@ -271,7 +272,7 @@ SelfConfidentRate
 
 # References
 
-  - $(ref_dict[:orseau2017])
+  - $(ref_dict[:orseau2017]) Section 5, Theorem 6. Section 6, Remark 8.
 """
 @concrete struct SelfConfidentRate <: AbstractLearningRateSchedule
     """
@@ -352,11 +353,11 @@ $(DocStringExtensions.TYPEDEF)
 
 Chooses the learning rate of each period from a set of rates, by the recent wealth of one exponentiated-gradient run per rate.
 
-This is the moving-window adaptive rate of [zhang2022maeg](@citet). Each rate in `etas` names an expert, the exponentiated gradient run at that rate from the Start Allocation. The rate of the period is the rate of the expert with the largest wealth over the last `window` periods. When `window` is `nothing`, the schedule compares the wealth over the whole history. [zhang2022maeg](@citet) call the first rule MAEG and the second AEG.
+This is the moving-window adaptive rate of Equations 7 to 9 of [zhang2022maeg](@cite). Each rate in `etas` names an expert, the exponentiated gradient run at that rate from the Start Allocation. The rate of the period is the rate of the expert with the largest wealth over the last `window` periods. When `window` is `nothing`, the schedule compares the wealth over the whole history. [zhang2022maeg](@citet) call the first rule MAEG and the second AEG, which is Equation 11 of that work.
 
-The experts are a statistic of the run, and the rule never plays them. Each expert takes the plain entropic step of [zhang2022maeg](@cite) over the simplex, from the rule's Start Allocation, whatever the rule's own geometry, Allocation Set, uniform mix, Gradient Transform and objective. The rule applies the chosen rate to its own step. So on another geometry the schedule chooses the rate by a replay of the exponentiated gradient.
+The experts are a statistic of the run, and the rule never plays them. Each expert takes the plain entropic step of Equation 10 of [zhang2022maeg](@cite) over the simplex, from the rule's Start Allocation, whatever the rule's own geometry, Allocation Set, uniform mix, Gradient Transform and objective. The rule applies the chosen rate to its own step. So on another geometry the schedule chooses the rate by a replay of the exponentiated gradient.
 
-[zhang2022maeg](@citet) take the rate set `0.001:0.001:0.2` from the practice of [helmbold1998](@citet). [zhang2022maeg](@citet) choose the window `30` over `7` on their own data. Over windows from `2` to `50`, [zhang2022maeg](@citet) report that the final wealth stays within a small range, and that the window must stay within a reasonable range. A period costs one entropic step per rate and one sum over the ring, which is `O((N + w) K)` at `K` rates. The online form of [`ExpectationMaximisation`](@ref) refuses this schedule by name, because that form also reads the rate of the next period.
+Section 5.2 of [zhang2022maeg](@cite) takes the rate set `0.001:0.001:0.2` from the practice of [helmbold1998](@citet), and chooses the window `30` over `7` on its data. Over windows from `2` to `50`, Section 5.4.2 of [zhang2022maeg](@cite) reports that the final wealth stays within a small range, and that the window must stay within a reasonable range. A period costs one entropic step per rate and one sum over the ring, which is `O((N + w) K)` at `K` rates. The online form of [`ExpectationMaximisation`](@ref) refuses this schedule by name, because that form also reads the rate of the next period.
 
 # Mathematical definition
 
@@ -422,8 +423,8 @@ WindowedBestRate
 
 # References
 
-  - $(ref_dict[:zhang2022maeg])
-  - $(ref_dict[:helmbold1998])
+  - $(ref_dict[:zhang2022maeg]) Section 4, Equations 7 to 11, Algorithm 2. Section 5.2. Section 5.4.2.
+  - $(ref_dict[:helmbold1998]) Section 5.2, Table 5.3.
 """
 @concrete struct WindowedBestRate <: AbstractLearningRateSchedule
     """
@@ -496,7 +497,7 @@ $(DocStringExtensions.TYPEDEF)
 
 Abstract supertype for the Gradient Transforms, which change the gradient of a first-order rule before its mirror step.
 
-A [`MirrorDescent`](@ref) rule applies its transform to the gradient of every period. The momentum transforms of [li2022egm](@citet) change the exponent of the multiplicative update, and do not change the form of the update.
+A [`MirrorDescent`](@ref) rule applies its transform to the gradient of every period. Its default `grad = nothing` applies no transform, so the mirror step reads the gradient of the period as it is. The momentum transforms of Section 4.2 of [li2022egm](@cite) change the exponent of the multiplicative update, and do not change the form of the update.
 
 # Interfaces
 
@@ -514,7 +515,6 @@ The head's state already slices and copies a transform state of the other three 
 
 # Related
 
-  - [`PlainGradient`](@ref)
   - [`GradientMomentum`](@ref)
   - [`RootMeanSquareGradient`](@ref)
   - [`AdaptiveMomentGradient`](@ref)
@@ -522,35 +522,15 @@ The head's state already slices and copies a transform state of the other three 
 
 # References
 
-  - $(ref_dict[:li2022egm])
+  - $(ref_dict[:li2022egm]) Section 4.2.
 """
 abstract type AbstractGradientTransform <: AbstractAlgorithm end
 """
 $(DocStringExtensions.TYPEDEF)
 
-Leaves the gradient unchanged, so the mirror step reads the period's gradient as it is.
-
-It is the default Gradient Transform of [`MirrorDescent`](@ref).
-
-# Examples
-
-```jldoctest
-julia> PlainGradient()
-PlainGradient()
-```
-
-# Related
-
-  - [`AbstractGradientTransform`](@ref)
-  - [`MirrorDescent`](@ref)
-"""
-struct PlainGradient <: AbstractGradientTransform end
-"""
-$(DocStringExtensions.TYPEDEF)
-
 Replaces the gradient with its exponential moving average, which gives the step a momentum.
 
-This is Eq. 7 of [li2022egm](@cite). Under the entropic map it is the EGE of [li2022egm](@citet), and Theorem 1 of [li2022egm](@cite) gives the regret ``O(\\sqrt{T \\log N})`` of the exponentiated gradient.
+This is Equation 7 of [li2022egm](@cite). Under the entropic map it is the EGE of [li2022egm](@citet). Equation 13 of Theorem 1 of [li2022egm](@cite) bounds the regret by ``O(\\sqrt{T \\log N})``, as for the exponentiated gradient, with constants that depend on the ratio of the transformed gradient to the raw one.
 
 # Mathematical definition
 
@@ -578,7 +558,7 @@ $(DocStringExtensions.FIELDS)
 
     GradientMomentum(; gamma1::Real = 0.99) -> GradientMomentum
 
-Keywords correspond to the struct's fields. The default comes from [li2022egm](@cite).
+Keywords correspond to the struct's fields. The default comes from Section 5.5.1 of [li2022egm](@cite).
 
 ## Validation
 
@@ -600,7 +580,7 @@ GradientMomentum
 
 # References
 
-  - $(ref_dict[:li2022egm])
+  - $(ref_dict[:li2022egm]) Section 4.2.1, Equation 7. Section 4.3, Theorem 1. Section 5.5.1.
 """
 @concrete struct GradientMomentum <: AbstractGradientTransform
     """
@@ -621,9 +601,9 @@ $(DocStringExtensions.TYPEDEF)
 
 Divides the gradient by the root of a moving average of its square, per asset.
 
-This is Eq. 8 of [li2022egm](@cite). Under the entropic map it is the EGR of [li2022egm](@citet).
+This is Equation 8 of [li2022egm](@cite). Under the entropic map it is the EGR of [li2022egm](@citet).
 
-**At the default ``\\gamma_2 = 0``, which [li2022egm](@cite) recommends, the rule under [`LogWealth`](@ref) stays at its Start Allocation, up to the offset ``\\epsilon``.** At ``\\gamma_2 = 0`` the transformed gradient is the sign of the gradient, up to ``\\epsilon``. Every entry of the log-wealth gradient is negative, so the step moves every asset by the same amount, and the normalisation undoes it. The rule is then the constant rebalanced portfolio at its Start Allocation, not buy-and-hold. A positive ``\\gamma_2`` gives the average a memory, and the rule then moves.
+**At the default ``\\gamma_2 = 0``, which Section 5.5.1 of [li2022egm](@cite) recommends, the rule under [`LogWealth`](@ref) stays at its Start Allocation, up to the offset ``\\epsilon``.** At ``\\gamma_2 = 0`` the transformed gradient is the sign of the gradient, up to ``\\epsilon``. Every entry of the log-wealth gradient is negative, so the step moves every asset by the same amount, and the normalisation undoes it. The rule is then the constant rebalanced portfolio at its Start Allocation, not buy-and-hold. A positive ``\\gamma_2`` gives the average a memory, and the rule then moves.
 
 # Mathematical definition
 
@@ -652,7 +632,7 @@ $(DocStringExtensions.FIELDS)
 
     RootMeanSquareGradient(; gamma2::Real = 0, eps::Real = 1e-8) -> RootMeanSquareGradient
 
-Keywords correspond to the struct's fields. The defaults come from [li2022egm](@cite).
+Keywords correspond to the struct's fields. The default `gamma2` comes from Section 5.5.1 of [li2022egm](@cite), and the default `eps` from Section 4.2.2.
 
 ## Validation
 
@@ -675,7 +655,7 @@ RootMeanSquareGradient
 
 # References
 
-  - $(ref_dict[:li2022egm])
+  - $(ref_dict[:li2022egm]) Section 4.2.2, Equation 8. Section 5.5.1.
 """
 @concrete struct RootMeanSquareGradient <: AbstractGradientTransform
     """
@@ -702,7 +682,7 @@ $(DocStringExtensions.TYPEDEF)
 
 Divides the moving average of the gradient by the root of the moving average of its square, per asset.
 
-This is Eq. 9 of [li2022egm](@cite), with both averages of [`GradientMomentum`](@ref) and [`RootMeanSquareGradient`](@ref) and no bias correction. Under the entropic map it is the EGA of [li2022egm](@citet).
+This is Equation 9 of [li2022egm](@cite), with both averages of [`GradientMomentum`](@ref) and [`RootMeanSquareGradient`](@ref) and no bias correction. Under the entropic map it is the EGA of [li2022egm](@citet). Algorithm 1 of [kingma2015](@cite) divides bias-corrected averages, with the decay rates ``\\beta_1 = 0.9`` and ``\\beta_2 = 0.999`` and the offset ``\\epsilon = 10^{-8}`` as defaults. This transform applies no correction, and its decay rates default to those of [li2022egm](@cite).
 
 # Mathematical definition
 
@@ -724,7 +704,7 @@ Where:
   - $(math_dict[:ghat_t])
   - $(math_dict[:eps_mom])
 
-At the default ``\\gamma_2 = 0``, which [li2022egm](@cite) recommends, the divisor is ``\\lvert \\boldsymbol{g}_t \\rvert + \\epsilon``. The step then reads the momentum in units of the size of the current gradient.
+At the default ``\\gamma_2 = 0``, which Section 5.5.1 of [li2022egm](@cite) recommends, the divisor is ``\\lvert \\boldsymbol{g}_t \\rvert + \\epsilon``. The step then reads the momentum in units of the size of the current gradient.
 
 # Fields
 
@@ -734,7 +714,7 @@ $(DocStringExtensions.FIELDS)
 
     AdaptiveMomentGradient(; gamma1::Real = 0.99, gamma2::Real = 0, eps::Real = 1e-8) -> AdaptiveMomentGradient
 
-Keywords correspond to the struct's fields. The defaults come from [li2022egm](@cite).
+Keywords correspond to the struct's fields. The defaults come from Sections 4.2.2 and 5.5.1 of [li2022egm](@cite).
 
 ## Validation
 
@@ -759,7 +739,8 @@ AdaptiveMomentGradient
 
 # References
 
-  - $(ref_dict[:li2022egm])
+  - $(ref_dict[:li2022egm]) Section 4.2.3, Equation 9. Section 5.5.1.
+  - $(ref_dict[:kingma2015]) Algorithm 1.
 """
 @concrete struct AdaptiveMomentGradient <: AbstractGradientTransform
     """
@@ -788,21 +769,21 @@ function AdaptiveMomentGradient(; gamma1::Real = 0.99, gamma2::Real = 0,
     return AdaptiveMomentGradient(gamma1, gamma2, eps)
 end
 """
-    gradient_state_seed(grad::PlainGradient, w::AbstractVector)
+    gradient_state_seed(::Nothing, w::AbstractVector)
     gradient_state_seed(grad::GradientMomentum, w::AbstractVector)
     gradient_state_seed(grad::RootMeanSquareGradient, w::AbstractVector)
     gradient_state_seed(grad::AdaptiveMomentGradient, w::AbstractVector)
 
 Seeds the state that a Gradient Transform keeps on the Rule State before the first row.
 
-The seed is `nothing` for [`PlainGradient`](@ref), the zero average for [`GradientMomentum`](@ref), the zero squared average for [`RootMeanSquareGradient`](@ref), and the pair of both for [`AdaptiveMomentGradient`](@ref).
+The seed is `nothing` for no transform, `grad = nothing`, the zero average for [`GradientMomentum`](@ref), the zero squared average for [`RootMeanSquareGradient`](@ref), and the pair of both for [`AdaptiveMomentGradient`](@ref).
 
 # Related
 
   - [`AbstractGradientTransform`](@ref)
   - [`transform_gradient!`](@ref)
 """
-function gradient_state_seed(::PlainGradient, ::AbstractVector)
+function gradient_state_seed(::Nothing, ::AbstractVector)
     return nothing
 end
 function gradient_state_seed(::GradientMomentum, w::AbstractVector)
@@ -815,14 +796,14 @@ function gradient_state_seed(::AdaptiveMomentGradient, w::AbstractVector)
     return (zeros(eltype(w), length(w)), zeros(eltype(w), length(w)))
 end
 """
-    transform_gradient!(grad::PlainGradient, gs, g::AbstractVector)
+    transform_gradient!(::Nothing, ::Nothing, g::AbstractVector)
     transform_gradient!(grad::GradientMomentum, v::AbstractVector, g::AbstractVector)
     transform_gradient!(grad::RootMeanSquareGradient, m::AbstractVector, g::AbstractVector)
     transform_gradient!(grad::AdaptiveMomentGradient, gs::Tuple, g::AbstractVector)
 
 Computes the transformed gradient of the period, and writes the updated state of the transform in place.
 
-[`PlainGradient`](@ref) returns `g` itself. [`GradientMomentum`](@ref) returns a copy of the updated average `v`. [`RootMeanSquareGradient`](@ref) returns `g` over the root of the updated squared average `m`, plus `eps`. [`AdaptiveMomentGradient`](@ref) returns the updated `v` over that root plus `eps`. The type docstrings state the formulas.
+`grad = nothing` applies no transform and returns `g` itself. [`GradientMomentum`](@ref) returns a copy of the updated average `v`. [`RootMeanSquareGradient`](@ref) returns `g` over the root of the updated squared average `m`, plus `eps`. [`AdaptiveMomentGradient`](@ref) returns the updated `v` over that root plus `eps`. The type docstrings state the formulas.
 
 # Related
 
@@ -830,7 +811,7 @@ Computes the transformed gradient of the period, and writes the updated state of
   - [`gradient_state_seed`](@ref)
   - [`MirrorDescent`](@ref)
 """
-function transform_gradient!(::PlainGradient, ::Nothing, g::AbstractVector)
+function transform_gradient!(::Nothing, ::Nothing, g::AbstractVector)
     return g
 end
 function transform_gradient!(grad::GradientMomentum, v::AbstractVector, g::AbstractVector)
@@ -1281,15 +1262,46 @@ end
 """
 $(DocStringExtensions.TYPEDEF)
 
+Abstract supertype for the Gradient Predictors, which give the hint of an optimistic step for the gradient of the next period.
+
+A [`MirrorDescent`](@ref) rule with a `predictor` takes its second half-step along the hint ``M_{t+1}``.
+
+# Interfaces
+
+To implement a new predictor, subtype `AbstractGradientPredictor` and implement:
+
+  - `predictor_state_seed(pred::AbstractGradientPredictor, w::AbstractVector)`: Returns the state that the predictor keeps on the Rule State before the first row, `nothing` by default. `w` is the Start Allocation, whose length and element type the state takes.
+  - `predict_gradient!(pred::AbstractGradientPredictor, ps, obj::AbstractOnlineObjective, g::AbstractVector, v::AbstractVector, x::AbstractVector, xm::AbstractVector, rows, t::Integer) -> Tuple`: Returns the state of the predictor after the period, and the hint. The arguments are the objective `obj` of the rule, the gradient `g` of the period at the played allocation, the secondary iterate `v` that the second half-step starts from, the price relative `x` of the period as traded, the same relative `xm` after the uniform mix of the rule, the rows that the head holds through the period, and the period count `t`. `g` reads `xm`, and `xm` is `x` where the rule does not mix. A predictor that reads the relative as a price folds `x`. A predictor that evaluates the loss of the rule again reads `xm`, so the hint sees the loss that `g` saw.
+  - `rows_needed(pred::AbstractGradientPredictor)`: The rows the predictor reads at a step, `0` by default.
+
+A predictor whose state is not `nothing`, a vector or a Partial Fit State also implements:
+
+  - `predictor_state_view(ps::MyPredictorState, i) -> MyPredictorState`: The state of the predictor, sliced to the assets `i`, as a copy.
+  - `copy_predictor_state(ps::MyPredictorState) -> MyPredictorState`: A copy of the state of the predictor that shares no array with it.
+
+The head's state already slices and copies a predictor state of the other three shapes.
+
+# Related
+
+  - [`LastGradient`](@ref)
+  - [`MeanGradient`](@ref)
+  - [`ForecastGradient`](@ref)
+  - [`MirrorDescent`](@ref)
+  - [`OptimisticMirrorDescentState`](@ref)
+"""
+abstract type AbstractGradientPredictor <: AbstractAlgorithm end
+"""
+$(DocStringExtensions.TYPEDEF)
+
 Takes one mirror-descent step on the period's gradient, then projects the result back onto the Allocation Set.
 
 This is the first-order Online Selection Rule of the family. The step and the projection both use the divergence of the rule's Projection Geometry.
 
 Each geometry gives a published rule.
 
-  - Under [`EntropicProjection`](@ref) the step is the multiplicative update of [helmbold1998](@citet), the exponentiated gradient. Its regret is ``O(\\sqrt{T \\log N})`` at ``\\eta = 2 r \\sqrt{2 \\log N / T}``, when every price relative is at least ``r`` times the largest one of its period.
-  - Under [`EuclideanProjection`](@ref) the step is additive, and the projection onto the simplex follows it. This is the online gradient descent of [zinkevich2003](@citet), with regret ``O(\\sqrt{T N})``. It is also the gradient projection of [helmbold1997](@citet), except that [helmbold1997](@citet) assume the projection and do not enforce it.
-  - Under [`TsallisProjection`](@ref) and [`LogBarrierProjection`](@ref) the step is the barrier step of [abernethy2015](@citet), of [zimmertseldin2021](@citet) and of Section 7 of [orseau2017](@cite). On the default set each projection is a scalar root.
+  - Under [`EntropicProjection`](@ref) the step is the multiplicative update of Equation 3.3 of [helmbold1998](@cite), the exponentiated gradient. Its regret is ``O(\\sqrt{T \\log N})`` at ``\\eta = 2 r \\sqrt{2 \\log N / T}``, when every price relative is at least ``r`` times the largest one of its period (Theorem 4.1 of [helmbold1998](@cite)).
+  - Under [`EuclideanProjection`](@ref) the step is additive, and the projection onto the simplex follows it. This is the greedy projection of Algorithm 1 of [zinkevich2003](@cite), with regret ``O(\\sqrt{T})`` at ``\\eta_t = 1 / \\sqrt{t}`` (Theorem 1). It is also the gradient projection of Equation 5 of [helmbold1997](@cite), except that [helmbold1997](@citet) assume the projection and do not enforce it.
+  - Under [`TsallisProjection`](@ref) and [`LogBarrierProjection`](@ref) the step is the barrier step of Section 3 of [abernethy2015](@cite), of Section 3.2 of [zimmertseldin2021](@cite) and of Section 7 of [orseau2017](@cite). On the default set each projection is a scalar root.
 
 The Euclidean map admits every Allocation Set the head admits. The other three maps are defined on the positive orthant, so they refuse a set with a negative lower bound. The tuned rates of the theorems need the horizon, which an online rule does not know, so the library states them as formulas only. The anytime rates are [`InverseSquareRootRate`](@ref), [`SelfConfidentRate`](@ref) and [`DoublingTrickRate`](@ref), on `eta`.
 
@@ -1299,9 +1311,13 @@ The mix lies in the Allocation Set when the uniform allocation does. Otherwise [
 
 A schedule can name a restart. The update of that period then returns the Start Allocation, re-entered onto the set from the book the fund holds by [`reprojection`](@ref). The update puts the statistic of the schedule back at its seed, and the averages of the Gradient Transform restart with it. The period count stays, because the stages are cumulative.
 
-The rule can also serve inside a mixture. As the weighting of an [`ExpertMixture`](@ref), it moves the weight over the experts on their period returns. As an expert of a mixture under [`BlendPoint`](@ref), the rule reads its gradient at the blend that the mixture played, and steps from its own iterate. The seven-argument [`online_update!`](@ref) hands it that Gradient Point. This is the shared gradient of [zhang2018ader](@citet) and of [zhao2020sword](@citet). On the head, and under [`OwnPoint`](@ref), the point is the iterate.
+The rule can also serve inside a mixture. As the weighting of an [`ExpertMixture`](@ref), it moves the weight over the experts on their period returns. As an expert of a mixture under [`BlendPoint`](@ref), the rule reads its gradient at the blend that the mixture played, and steps from its own iterate. The seven-argument [`online_update!`](@ref) hands it that Gradient Point. This is the shared gradient of Algorithm 4 of [zhang2018ader](@cite). The meta-algorithm of [zhao2020sword](@cite) also reads the gradient at the blend, as the linearised loss of its Equation 13. Each of its experts reads the gradient at its own iterate. On the head, and under [`OwnPoint`](@ref), the point is the iterate.
 
 `obj` is the loss. [`LogWealth`](@ref) is the loss of every rule above. A [`RiskLoss`](@ref) is a risk measure over the last `window` rows the head holds. The rule reads as many rows as its objective. Only the log-wealth gradient reads the mixed price relatives, because a risk measure reads returns and not price relatives. The mix of the played allocation applies under both.
+
+`predictor` makes the step optimistic. With a Gradient Predictor, the rule is the optimistic mirror descent (OMD) of [rakhlin2013colt](@cite) and [rakhlin2013nips](@cite). With a fixed rate and the last gradient as the hint, it is the algorithm of [chiang2012](@citet). Each period then takes two half-steps in the rule's geometry, and the second one follows the predictor's hint for the gradient of the next period. The state of the rule is then an [`OptimisticMirrorDescentState`](@ref), which holds two iterates. The secondary iterate is where the step of the next period starts, and the played allocation is one hint step ahead of it. At `predictor = nothing` the rule takes the plain step, and its state is a [`MirrorDescentState`](@ref).
+
+The optimistic step reads two gradients a period, so it applies no Gradient Transform, `grad = nothing`. A transform keeps a state that one gradient writes each period. The optimistic rule needs as many rows as the larger of the objective and the predictor. A schedule on `eta` counts the periods of the rule and reads its state, and [`HintResidualRate`](@ref) is the schedule that reads the hint residuals there.
 
 # Mathematical definition
 
@@ -1333,6 +1349,27 @@ Where:
 
 Under the entropic map the step is ``w_{t+1, i} \\propto w_{t, i} \\exp(-\\eta_t \\hat{g}_{t, i})``. Under the Euclidean map it is ``\\mathrm{Proj}_{\\mathcal{W}}(\\boldsymbol{w}_t - \\eta_t \\hat{\\boldsymbol{g}}_t)``. At ``\\alpha = 0``, ``\\tilde{\\boldsymbol{x}}_t = \\boldsymbol{x}_t`` and ``\\tilde{\\boldsymbol{w}}_{t+1} = \\boldsymbol{w}_{t+1}``.
 
+With a `predictor`, the rule takes two half-steps each period.
+
+```math
+\\begin{align}
+\\boldsymbol{v}_{t+1} &= \\underset{\\boldsymbol{v} \\in \\mathcal{W}}{\\arg\\min} \\; \\eta_t \\langle \\boldsymbol{g}_t, \\boldsymbol{v} \\rangle + D_\\Psi(\\boldsymbol{v}, \\boldsymbol{v}_t)\\,, \\\\
+\\boldsymbol{w}_{t+1} &= \\underset{\\boldsymbol{w} \\in \\mathcal{W}}{\\arg\\min} \\; \\eta_{t+1} \\langle M_{t+1}, \\boldsymbol{w} \\rangle + D_\\Psi(\\boldsymbol{w}, \\boldsymbol{v}_{t+1})\\,.
+\\end{align}
+```
+
+Where:
+
+  - $(math_dict[:v_t_sec])
+  - $(math_dict[:g_t_loss]) The rule takes it at ``\\boldsymbol{w}_t``. Under [`LogWealth`](@ref) it is ``-\\tilde{\\boldsymbol{x}}_t / \\langle \\boldsymbol{w}_t, \\tilde{\\boldsymbol{x}}_t \\rangle``.
+  - $(math_dict[:M_t_hint])
+  - $(math_dict[:t_period])
+  - $(math_dict[:dual_norm_geo])
+
+Here ``\\boldsymbol{w}_{t+1}`` is the played allocation before the uniform mix. The rates follow equation (1) of [rakhlin2013nips](@cite), which forms ``\\boldsymbol{w}_{t+1}`` at ``\\eta_{t+1}``. A fixed rate is one rate for both half-steps. Under the zero hint the second half-step returns ``\\boldsymbol{v}_{t+1}``, so the rule is the plain step.
+
+For a fixed rate ``\\eta`` and a comparator ``\\boldsymbol{w}^*`` with ``D_\\Psi(\\boldsymbol{w}^*, \\boldsymbol{v}_1) \\leq R^2``, Lemma 1 of [rakhlin2013nips](@cite), with its equation (3) at ``\\rho = \\eta``, bounds the regret by ``\\eta^{-1} R^2 + \\tfrac{\\eta}{2} \\sum_t \\lVert \\boldsymbol{g}_t - M_t \\rVert_*^2``. At the rate tuned to the residual sum, the bound is ``O(\\sqrt{\\sum_t \\lVert \\boldsymbol{g}_t - M_t \\rVert_*^2})``. The residual sum is the path length of the gradients under [`LastGradient`](@ref), and the spread of the gradients about their mean bounds it under [`MeanGradient`](@ref). [rakhlin2013colt](@citet) state that a hint that misses keeps the bound of mirror descent up to a constant, for hints no larger than the gradients in the dual norm. [`HintResidualRate`](@ref) on `eta` is the adaptive rate of [rakhlin2013nips](@cite).
+
 # Algorithm
 
 The seven-argument [`online_update!`](@ref) runs these steps at the period's row `x`. The six-argument form calls it with the iterate as the Gradient Point `point`. `st` is the state of the rule, the [`MirrorDescentState`](@ref) that the rule keeps from one update to the next.
@@ -1350,6 +1387,22 @@ The seven-argument [`online_update!`](@ref) runs these steps at the period's row
 11. Form the played allocation from `u` with [`played_allocation`](@ref). When `alpha` is positive, project it with [`reprojection`](@ref).
 12. Return the new state and the played allocation.
 
+With a `predictor`, the seven-argument form runs these steps instead. The six-argument form calls it with the unmixed played iterate `st.u` as the Gradient Point `point`. `st` is then an [`OptimisticMirrorDescentState`](@ref).
+
+ 1. Set the period `t = st.n + 1`, and form the Price-Adjusted Allocation `wh` of the book `w` after the row.
+ 2. When the schedule of `eta` names a restart at `t`, re-enter the Start Allocation `st.w0` onto the set from `wh` with [`reprojection`](@ref). Put both iterates at that allocation, and the states of the schedule and the predictor at their seeds, keep `t`, and return that allocation. Stop.
+ 3. When the schedule reads the period's row before the rate, write its statistic from `w` and `x`.
+ 4. Read the rate `eta` and the share `alpha` of period `t`.
+ 5. Mix the price relatives into `xm` with [`mixed_relatives`](@ref).
+ 6. Resolve `obj` against `wh` with [`factory`](@ref). Take the gradient `g` of that objective at `point`, from `xm` and the head's `rows`, with [`loss_gradient`](@ref).
+ 7. Take the first half-step from the secondary iterate `st.v` on `eta .* g` with [`half_step`](@ref), which gives the new secondary iterate `v`.
+ 8. Form the hint `m` and the state `ps` of the predictor with [`predict_gradient!`](@ref), from the resolved objective, `g`, `v`, `x` and `xm`.
+ 9. Measure the residual `r` of `g` against the last hint `st.m` with [`hint_residual`](@ref), and shift the residual sums into `res`.
+10. When the schedule reads the past alone, write its statistic `s` from `w` and `x`.
+11. Read the rate of period `t + 1` from a state of the rule that holds the period's row. Take the second half-step from `v` on that rate times `m`, which gives the unmixed played iterate `u`.
+12. Form the played allocation from `u` with [`played_allocation`](@ref). When `alpha` is positive, project it with [`reprojection`](@ref).
+13. Return the new state and the played allocation.
+
 # Fields
 
 $(DocStringExtensions.FIELDS)
@@ -1357,11 +1410,12 @@ $(DocStringExtensions.FIELDS)
 # Constructors
 
     MirrorDescent(;
-        eta::Union{<:Real, <:AbstractLearningRateSchedule} = 0.05,
-        proj::Union{<:EuclideanProjection, <:EntropicProjection, <:TsallisProjection, <:LogBarrierProjection} = EntropicProjection(),
+        eta::Union{Real, AbstractLearningRateSchedule} = 0.05,
+        proj::Union{EuclideanProjection, EntropicProjection, TsallisProjection, LogBarrierProjection} = EntropicProjection(),
         alpha::Real = 0,
         obj::AbstractOnlineObjective = LogWealth(),
-        grad::AbstractGradientTransform = PlainGradient()
+        grad::Option{<:AbstractGradientTransform} = nothing,
+        predictor::Option{<:AbstractGradientPredictor} = nothing
     ) -> MirrorDescent
 
 Keywords correspond to the struct's fields. The `proj` slot takes only the geometries whose projection onto the default set is a scalar root. [`ExponentiatedGradient`](@ref) fills it with the entropic map, and [`GradientProjection`](@ref) with the Euclidean map.
@@ -1370,17 +1424,23 @@ Keywords correspond to the struct's fields. The `proj` slot takes only the geome
 
   - If `eta` is a number: `eta > 0`. A `DomainError` is thrown otherwise.
   - `0 <= alpha < 1`. A `DomainError` is thrown otherwise.
+  - If `predictor` is not `nothing`: `grad` is `nothing`. An `ArgumentError` is thrown otherwise.
+
+## View parameters
+
+[`port_opt_view`](@ref) takes the view of `predictor` at the selected assets and carries the rest unchanged.
 
 # Examples
 
 ```jldoctest
 julia> MirrorDescent()
 MirrorDescent
-    eta ┼ Float64: 0.05
-   proj ┼ EntropicProjection()
-  alpha ┼ Int64: 0
-    obj ┼ LogWealth()
-   grad ┴ PlainGradient()
+        eta ┼ Float64: 0.05
+       proj ┼ EntropicProjection()
+      alpha ┼ Int64: 0
+        obj ┼ LogWealth()
+       grad ┼ nothing
+  predictor ┴ nothing
 ```
 
 # Related
@@ -1390,19 +1450,26 @@ MirrorDescent
   - [`ExponentiatedGradient`](@ref)
   - [`GradientProjection`](@ref)
   - [`MirrorDescentState`](@ref)
+  - [`OptimisticMirrorDescentState`](@ref)
   - [`AbstractLearningRateSchedule`](@ref)
   - [`AbstractGradientTransform`](@ref)
+  - [`AbstractGradientPredictor`](@ref)
+  - [`HintResidualRate`](@ref)
+  - [`port_opt_view`](@ref)
 
 # References
 
-  - $(ref_dict[:helmbold1998])
-  - $(ref_dict[:helmbold1997])
-  - $(ref_dict[:zinkevich2003])
-  - $(ref_dict[:abernethy2015])
-  - $(ref_dict[:zimmertseldin2021])
-  - $(ref_dict[:orseau2017])
-  - $(ref_dict[:zhang2018ader])
-  - $(ref_dict[:zhao2020sword])
+  - $(ref_dict[:helmbold1998]) Section 3, Equation 3.3. Section 4, Theorems 4.1 and 4.2, Corollary 4.3.
+  - $(ref_dict[:helmbold1997]) Section 3, Equation 5.
+  - $(ref_dict[:zinkevich2003]) Algorithm 1, Theorem 1.
+  - $(ref_dict[:abernethy2015]) Section 3.
+  - $(ref_dict[:zimmertseldin2021]) Section 3.2.
+  - $(ref_dict[:orseau2017]) Section 7.
+  - $(ref_dict[:zhang2018ader]) Section 3.4, Equation 12, Algorithms 3 and 4.
+  - $(ref_dict[:zhao2020sword]) Section 2.3, Equation 13.
+  - $(ref_dict[:rakhlin2013colt]) Section 2.2, Lemma 3.
+  - $(ref_dict[:rakhlin2013nips]) Section 2, Equation 1, Lemma 1 and Corollary 2.
+  - $(ref_dict[:chiang2012]) Algorithm 1 in Section 3.
 """
 @concrete struct MirrorDescent <: AbstractOnlinePortfolioSelectionAlgorithm
     """
@@ -1422,31 +1489,47 @@ MirrorDescent
     """
     obj
     """
-    The Gradient Transform applied before the mirror step.
+    The Gradient Transform applied before the mirror step, or `nothing` to apply none.
     """
     grad
-    function MirrorDescent(eta::T1, proj::T2, alpha::T3, obj::T4,
-                           grad::T5) where {T1 <:
-                                            Union{<:Real, <:AbstractLearningRateSchedule},
-                                            T2 <: Union{<:EuclideanProjection,
-                                                        <:EntropicProjection, <:TsallisProjection,
-                                                        <:LogBarrierProjection}, T3 <: Real,
-                                            T4 <: AbstractOnlineObjective,
-                                            T5 <: AbstractGradientTransform}
+    """
+    The Gradient Predictor whose hint the second half-step of the optimistic step follows, or `nothing` for the plain step.
+    """
+    predictor
+    function MirrorDescent(eta::T1, proj::T2, alpha::T3, obj::T4, grad::T5,
+                           predictor::T6) where {T1 <:
+                                                 Union{Real, AbstractLearningRateSchedule},
+                                                 T2 <: Union{EuclideanProjection,
+                                                             EntropicProjection,
+                                                             TsallisProjection,
+                                                             LogBarrierProjection},
+                                                 T3 <: Real, T4 <: AbstractOnlineObjective,
+                                                 T5 <: Option{<:AbstractGradientTransform},
+                                                 T6 <: Option{<:AbstractGradientPredictor}}
         if isa(eta, Real)
             @argcheck(eta > zero(eta), DomainError(eta, "eta must be positive"))
         end
         @argcheck(zero(alpha) <= alpha < one(alpha),
                   DomainError(alpha, "alpha must be in [0, 1)"))
-        return new{T1, T2, T3, T4, T5}(eta, proj, alpha, obj, grad)
+        if !isnothing(predictor)
+            @argcheck(isnothing(grad),
+                      ArgumentError("the optimistic step applies no Gradient Transform: a `$(typeof(grad).name.name)` keeps a state written once a period from one gradient, and the optimistic step reads two. Use `grad = nothing`, or `predictor = nothing`."))
+        end
+        return new{T1, T2, T3, T4, T5, T6}(eta, proj, alpha, obj, grad, predictor)
     end
 end
-function MirrorDescent(; eta::Union{<:Real, <:AbstractLearningRateSchedule} = 0.05,
-                       proj::Union{<:EuclideanProjection, <:EntropicProjection,
-                                   <:TsallisProjection, <:LogBarrierProjection} = EntropicProjection(),
+function MirrorDescent(; eta::Union{Real, AbstractLearningRateSchedule} = 0.05,
+                       proj::Union{EuclideanProjection, EntropicProjection,
+                                   TsallisProjection, LogBarrierProjection} = EntropicProjection(),
                        alpha::Real = 0, obj::AbstractOnlineObjective = LogWealth(),
-                       grad::AbstractGradientTransform = PlainGradient())::MirrorDescent
-    return MirrorDescent(eta, proj, alpha, obj, grad)
+                       grad::Option{<:AbstractGradientTransform} = nothing,
+                       predictor::Option{<:AbstractGradientPredictor} = nothing)::MirrorDescent
+    return MirrorDescent(eta, proj, alpha, obj, grad, predictor)
+end
+function port_opt_view(alg::MirrorDescent, i, args...)
+    return MirrorDescent(; eta = alg.eta, proj = alg.proj, alpha = alg.alpha, obj = alg.obj,
+                         grad = alg.grad,
+                         predictor = port_opt_view(alg.predictor, i, args...))
 end
 function rule_state_seed(alg::MirrorDescent, w::AbstractVector)
     return MirrorDescentState(0, copy(w), copy(w), schedule_state_seed(alg.eta, w),
@@ -1522,7 +1605,7 @@ The result is ``\\max_i x_i`` times the mix of [helmbold1998](@cite).
 
 # References
 
-  - $(ref_dict[:helmbold1998])
+  - $(ref_dict[:helmbold1998]) Section 4, Theorem 4.2.
 """
 function mixed_relatives(x::AbstractVector, alpha::Real)
     if iszero(alpha)
@@ -1604,11 +1687,13 @@ function reprojection(proj::AbstractProjectionGeometry, set::AbstractAllocationS
     return project(proj, set, q, w)
 end
 """
-    ExponentiatedGradient(; eta::Union{<:Real, <:AbstractLearningRateSchedule} = 0.05, alpha::Real = 0, obj::AbstractOnlineObjective = LogWealth(), grad::AbstractGradientTransform = PlainGradient())
+    ExponentiatedGradient(; eta::Union{Real, AbstractLearningRateSchedule} = 0.05, alpha::Real = 0, obj::AbstractOnlineObjective = LogWealth(), grad::Option{<:AbstractGradientTransform} = nothing, predictor::Option{<:AbstractGradientPredictor} = nothing)
 
-Builds the exponentiated gradient, a [`MirrorDescent`](@ref) rule under [`EntropicProjection`](@ref) (EG). It is the rule of [helmbold1998](@citet).
+Builds the exponentiated gradient, a [`MirrorDescent`](@ref) rule under [`EntropicProjection`](@ref) (EG). It is the rule of Equation 3.3 of [helmbold1998](@cite). [helmbold1997](@citet) derive the same update for mixture estimation, as Equation 6 of that work.
 
-The rule moves weight towards the assets that just did well. Its regret is ``O(\\sqrt{T \\log N})`` at a rate tuned to the horizon, and under the uniform mix `alpha` with the doubling trick it is universal. The default rate is the rate ``0.05`` of [helmbold1998](@cite). In Section 5.2 of [helmbold1998](@cite), rates from ``0.01`` to ``0.15`` all do well, and a rate above one loses money on the two-stock example. As the weighting of an [`ExpertMixture`](@ref), the rule takes the online gradient step over the vector of expert returns.
+The rule moves weight towards the assets that just did well. Its regret is ``O(\\sqrt{T \\log N})`` at a rate tuned to the horizon (Theorem 4.1 of [helmbold1998](@cite)), and under the uniform mix `alpha` with the doubling trick it is universal (Corollary 4.3). The default rate is the rate ``0.05`` of [helmbold1998](@cite). In Section 5.2 of [helmbold1998](@cite), rates from ``0.01`` to ``0.15`` all do well, and a rate above one loses money on the two-stock example. As the weighting of an [`ExpertMixture`](@ref), the rule takes the online gradient step over the vector of expert returns.
+
+With a `predictor`, the rule takes the optimistic step of [`MirrorDescent`](@ref). Under [`LastGradient`](@ref) it is the entropic form of the algorithm of [chiang2012](@citet).
 
 # Mathematical definition
 
@@ -1635,11 +1720,12 @@ The normalisation is the entropic projection onto the simplex.
 ```jldoctest
 julia> ExponentiatedGradient()
 MirrorDescent
-    eta ┼ Float64: 0.05
-   proj ┼ EntropicProjection()
-  alpha ┼ Int64: 0
-    obj ┼ LogWealth()
-   grad ┴ PlainGradient()
+        eta ┼ Float64: 0.05
+       proj ┼ EntropicProjection()
+      alpha ┼ Int64: 0
+        obj ┼ LogWealth()
+       grad ┼ nothing
+  predictor ┴ nothing
 ```
 
 # Related
@@ -1650,20 +1736,25 @@ MirrorDescent
 
 # References
 
-  - $(ref_dict[:helmbold1998])
+  - $(ref_dict[:helmbold1998]) Section 3, Equation 3.3. Section 4, Theorem 4.1, Corollary 4.3. Section 5.2.
+  - $(ref_dict[:helmbold1997]) Section 3, Equation 6.
+  - $(ref_dict[:chiang2012]) Algorithm 1 in Section 3, Section 4.2.
 """
-function ExponentiatedGradient(; eta::Union{<:Real, <:AbstractLearningRateSchedule} = 0.05,
+function ExponentiatedGradient(; eta::Union{Real, AbstractLearningRateSchedule} = 0.05,
                                alpha::Real = 0, obj::AbstractOnlineObjective = LogWealth(),
-                               grad::AbstractGradientTransform = PlainGradient())::MirrorDescent
+                               grad::Option{<:AbstractGradientTransform} = nothing,
+                               predictor::Option{<:AbstractGradientPredictor} = nothing)::MirrorDescent
     return MirrorDescent(; eta = eta, proj = EntropicProjection(), alpha = alpha, obj = obj,
-                         grad = grad)
+                         grad = grad, predictor = predictor)
 end
 """
-    GradientProjection(; eta::Union{<:Real, <:AbstractLearningRateSchedule} = 0.05, alpha::Real = 0, obj::AbstractOnlineObjective = LogWealth(), grad::AbstractGradientTransform = PlainGradient())
+    GradientProjection(; eta::Union{Real, AbstractLearningRateSchedule} = 0.05, alpha::Real = 0, obj::AbstractOnlineObjective = LogWealth(), grad::Option{<:AbstractGradientTransform} = nothing, predictor::Option{<:AbstractGradientPredictor} = nothing)
 
-Builds the gradient projection, a [`MirrorDescent`](@ref) rule under [`EuclideanProjection`](@ref) (GP, OGD). It is the rule of [helmbold1997](@citet).
+Builds the gradient projection, a [`MirrorDescent`](@ref) rule under [`EuclideanProjection`](@ref) (GP, OGD). It is the rule of Equation 5 of [helmbold1997](@cite).
 
-On the simplex this is the online gradient descent of [zinkevich2003](@citet). [helmbold1997](@citet) subtract the mean of the gradient to keep the budget, and assume that the weights stay non-negative. The projection keeps the budget and enforces the sign, and on the simplex it is the fixed-rate step of [zinkevich2003](@cite). The regret is ``O(\\sqrt{T})`` at ``\\eta \\propto 1 / \\sqrt{T}``, and [`InverseSquareRootRate`](@ref) is the anytime rate. Neither [helmbold1997](@cite) nor [zinkevich2003](@cite) states a rate for the portfolio problem, so the default is the rate of [`ExponentiatedGradient`](@ref).
+On the simplex this is the greedy projection of Algorithm 1 of [zinkevich2003](@cite). [helmbold1997](@citet) subtract the mean of the gradient to keep the budget, and assume that the weights stay non-negative (Section 4.2). The projection keeps the budget and enforces the sign. The regret is ``O(\\sqrt{T})`` at ``\\eta_t = 1 / \\sqrt{t}`` (Theorem 1 of [zinkevich2003](@cite)), and [`InverseSquareRootRate`](@ref) is the anytime rate. Neither [helmbold1997](@cite) nor [zinkevich2003](@cite) states a rate for the portfolio problem, so the default is the rate of [`ExponentiatedGradient`](@ref).
+
+With a `predictor`, the rule takes the optimistic step of [`MirrorDescent`](@ref). Under [`LastGradient`](@ref) it is the Euclidean form of the algorithm of [chiang2012](@citet).
 
 # Mathematical definition
 
@@ -1689,11 +1780,12 @@ On the simplex, the projection sets to zero every entry that the step leaves bel
 ```jldoctest
 julia> GradientProjection()
 MirrorDescent
-    eta ┼ Float64: 0.05
-   proj ┼ EuclideanProjection()
-  alpha ┼ Int64: 0
-    obj ┼ LogWealth()
-   grad ┴ PlainGradient()
+        eta ┼ Float64: 0.05
+       proj ┼ EuclideanProjection()
+      alpha ┼ Int64: 0
+        obj ┼ LogWealth()
+       grad ┼ nothing
+  predictor ┴ nothing
 ```
 
 # Related
@@ -1704,33 +1796,36 @@ MirrorDescent
 
 # References
 
-  - $(ref_dict[:helmbold1997])
-  - $(ref_dict[:zinkevich2003])
+  - $(ref_dict[:helmbold1997]) Section 3, Equation 5. Section 4.2, Theorem 3.
+  - $(ref_dict[:zinkevich2003]) Algorithm 1, Theorem 1.
+  - $(ref_dict[:chiang2012]) Algorithm 1 in Section 3, Section 4.1.
 """
-function GradientProjection(; eta::Union{<:Real, <:AbstractLearningRateSchedule} = 0.05,
+function GradientProjection(; eta::Union{Real, AbstractLearningRateSchedule} = 0.05,
                             alpha::Real = 0, obj::AbstractOnlineObjective = LogWealth(),
-                            grad::AbstractGradientTransform = PlainGradient())::MirrorDescent
+                            grad::Option{<:AbstractGradientTransform} = nothing,
+                            predictor::Option{<:AbstractGradientPredictor} = nothing)::MirrorDescent
     return MirrorDescent(; eta = eta, proj = EuclideanProjection(), alpha = alpha,
-                         obj = obj, grad = grad)
+                         obj = obj, grad = grad, predictor = predictor)
 end
 """
-    EGE(; eta::Union{<:Real, <:AbstractLearningRateSchedule} = 0.05, gamma1::Real = 0.99, alpha::Real = 0)
+    EGE(; eta::Union{Real, AbstractLearningRateSchedule} = 0.05, gamma1::Real = 0.99, alpha::Real = 0)
 
 Builds the exponentiated gradient with the momentum of an exponential moving average, [`ExponentiatedGradient`](@ref) under [`GradientMomentum`](@ref) (EGE).
 
-This is the EGE of [li2022egm](@citet). The rate of [li2022egm](@cite) is the rate ``2 r \\sqrt{2 \\log N / T}`` of [helmbold1998](@citet), with the doubling trick when the horizon is unknown. [`DoublingTrickRate`](@ref) on `eta` gives that trick. The default rate is the rate of [`ExponentiatedGradient`](@ref).
+This is the EGE of Equation 7 of [li2022egm](@cite). Section 5.5.1 of [li2022egm](@cite) takes the rate ``2 r \\sqrt{2 \\log N / T}`` of Theorem 4.1 of [helmbold1998](@cite), with the doubling trick when the horizon is unknown. [`DoublingTrickRate`](@ref) on `eta` gives that trick. The default rate is the rate of [`ExponentiatedGradient`](@ref).
 
 # Examples
 
 ```jldoctest
 julia> EGE()
 MirrorDescent
-    eta ┼ Float64: 0.05
-   proj ┼ EntropicProjection()
-  alpha ┼ Int64: 0
-    obj ┼ LogWealth()
-   grad ┼ GradientMomentum
-        │   gamma1 ┴ Float64: 0.99
+        eta ┼ Float64: 0.05
+       proj ┼ EntropicProjection()
+      alpha ┼ Int64: 0
+        obj ┼ LogWealth()
+       grad ┼ GradientMomentum
+            │   gamma1 ┴ Float64: 0.99
+  predictor ┴ nothing
 ```
 
 # Related
@@ -1742,33 +1837,34 @@ MirrorDescent
 
 # References
 
-  - $(ref_dict[:li2022egm])
-  - $(ref_dict[:helmbold1998])
+  - $(ref_dict[:li2022egm]) Section 4.2.1, Equation 7. Section 5.5.1.
+  - $(ref_dict[:helmbold1998]) Section 4, Theorem 4.1.
 """
-function EGE(; eta::Union{<:Real, <:AbstractLearningRateSchedule} = 0.05,
-             gamma1::Real = 0.99, alpha::Real = 0)::MirrorDescent
+function EGE(; eta::Union{Real, AbstractLearningRateSchedule} = 0.05, gamma1::Real = 0.99,
+             alpha::Real = 0)::MirrorDescent
     return ExponentiatedGradient(; eta = eta, alpha = alpha,
                                  grad = GradientMomentum(; gamma1 = gamma1))
 end
 """
-    EGR(; eta::Union{<:Real, <:AbstractLearningRateSchedule} = 0.05, gamma2::Real = 0, eps::Real = 1e-8, alpha::Real = 0)
+    EGR(; eta::Union{Real, AbstractLearningRateSchedule} = 0.05, gamma2::Real = 0, eps::Real = 1e-8, alpha::Real = 0)
 
 Builds the exponentiated gradient with a root-mean-square scale on the gradient, [`ExponentiatedGradient`](@ref) under [`RootMeanSquareGradient`](@ref) (EGR).
 
-This is the EGR of [li2022egm](@citet). At the default `gamma2 = 0`, which [li2022egm](@cite) recommends, the rule stays at its Start Allocation, up to `eps`. The transformed gradient is then the sign of the gradient, the same at every asset, so the update moves nothing, and the rule is the constant rebalanced portfolio at its Start Allocation. [`RootMeanSquareGradient`](@ref) states why.
+This is the EGR of Equation 8 of [li2022egm](@cite). At the default `gamma2 = 0`, which Section 5.5.1 of [li2022egm](@cite) recommends, the rule stays at its Start Allocation, up to `eps`. The transformed gradient is then the sign of the gradient, the same at every asset, so the update moves nothing, and the rule is the constant rebalanced portfolio at its Start Allocation. [`RootMeanSquareGradient`](@ref) states why.
 
 # Examples
 
 ```jldoctest
 julia> EGR()
 MirrorDescent
-    eta ┼ Float64: 0.05
-   proj ┼ EntropicProjection()
-  alpha ┼ Int64: 0
-    obj ┼ LogWealth()
-   grad ┼ RootMeanSquareGradient
-        │   gamma2 ┼ Int64: 0
-        │      eps ┴ Float64: 1.0e-8
+        eta ┼ Float64: 0.05
+       proj ┼ EntropicProjection()
+      alpha ┼ Int64: 0
+        obj ┼ LogWealth()
+       grad ┼ RootMeanSquareGradient
+            │   gamma2 ┼ Int64: 0
+            │      eps ┴ Float64: 1.0e-8
+  predictor ┴ nothing
 ```
 
 # Related
@@ -1780,34 +1876,35 @@ MirrorDescent
 
 # References
 
-  - $(ref_dict[:li2022egm])
+  - $(ref_dict[:li2022egm]) Section 4.2.2, Equation 8. Section 5.5.1.
 """
-function EGR(; eta::Union{<:Real, <:AbstractLearningRateSchedule} = 0.05, gamma2::Real = 0,
+function EGR(; eta::Union{Real, AbstractLearningRateSchedule} = 0.05, gamma2::Real = 0,
              eps::Real = 1e-8, alpha::Real = 0)::MirrorDescent
     return ExponentiatedGradient(; eta = eta, alpha = alpha,
                                  grad = RootMeanSquareGradient(; gamma2 = gamma2,
                                                                eps = eps))
 end
 """
-    EGA(; eta::Union{<:Real, <:AbstractLearningRateSchedule} = 0.05, gamma1::Real = 0.99, gamma2::Real = 0, eps::Real = 1e-8, alpha::Real = 0)
+    EGA(; eta::Union{Real, AbstractLearningRateSchedule} = 0.05, gamma1::Real = 0.99, gamma2::Real = 0, eps::Real = 1e-8, alpha::Real = 0)
 
 Builds the exponentiated gradient with an adaptive-moment scale on the gradient, [`ExponentiatedGradient`](@ref) under [`AdaptiveMomentGradient`](@ref) (EGA).
 
-This is the EGA of [li2022egm](@citet).
+This is the EGA of Equation 9 of [li2022egm](@cite).
 
 # Examples
 
 ```jldoctest
 julia> EGA()
 MirrorDescent
-    eta ┼ Float64: 0.05
-   proj ┼ EntropicProjection()
-  alpha ┼ Int64: 0
-    obj ┼ LogWealth()
-   grad ┼ AdaptiveMomentGradient
-        │   gamma1 ┼ Float64: 0.99
-        │   gamma2 ┼ Int64: 0
-        │      eps ┴ Float64: 1.0e-8
+        eta ┼ Float64: 0.05
+       proj ┼ EntropicProjection()
+      alpha ┼ Int64: 0
+        obj ┼ LogWealth()
+       grad ┼ AdaptiveMomentGradient
+            │   gamma1 ┼ Float64: 0.99
+            │   gamma2 ┼ Int64: 0
+            │      eps ┴ Float64: 1.0e-8
+  predictor ┴ nothing
 ```
 
 # Related
@@ -1819,11 +1916,10 @@ MirrorDescent
 
 # References
 
-  - $(ref_dict[:li2022egm])
+  - $(ref_dict[:li2022egm]) Section 4.2.3, Equation 9. Section 5.5.1.
 """
-function EGA(; eta::Union{<:Real, <:AbstractLearningRateSchedule} = 0.05,
-             gamma1::Real = 0.99, gamma2::Real = 0, eps::Real = 1e-8,
-             alpha::Real = 0)::MirrorDescent
+function EGA(; eta::Union{Real, AbstractLearningRateSchedule} = 0.05, gamma1::Real = 0.99,
+             gamma2::Real = 0, eps::Real = 1e-8, alpha::Real = 0)::MirrorDescent
     return ExponentiatedGradient(; eta = eta, alpha = alpha,
                                  grad = AdaptiveMomentGradient(; gamma1 = gamma1,
                                                                gamma2 = gamma2, eps = eps))
@@ -1833,20 +1929,21 @@ end
 
 Builds the moving-window adaptive exponential gradient, [`ExponentiatedGradient`](@ref) under a [`WindowedBestRate`](@ref) over `window` periods (MAEG).
 
-This is the MAEG of [zhang2022maeg](@citet). The defaults come from [zhang2022maeg](@cite). They are the rate set of [helmbold1998](@citet) and the window `30`. [zhang2022maeg](@citet) choose the window `30` over `7`.
+This is the MAEG of Algorithm 2 of [zhang2022maeg](@cite). The defaults come from Section 5.2 of [zhang2022maeg](@cite). They are the rate set of [helmbold1998](@citet) and the window `30`, which that section chooses over `7`.
 
 # Examples
 
 ```jldoctest
 julia> MAEG(; etas = [0.05, 0.1], window = 5)
 MirrorDescent
-    eta ┼ WindowedBestRate
-        │     etas ┼ Vector{Float64}: [0.05, 0.1]
-        │   window ┴ Int64: 5
-   proj ┼ EntropicProjection()
-  alpha ┼ Int64: 0
-    obj ┼ LogWealth()
-   grad ┴ PlainGradient()
+        eta ┼ WindowedBestRate
+            │     etas ┼ Vector{Float64}: [0.05, 0.1]
+            │   window ┴ Int64: 5
+       proj ┼ EntropicProjection()
+      alpha ┼ Int64: 0
+        obj ┼ LogWealth()
+       grad ┼ nothing
+  predictor ┴ nothing
 ```
 
 # Related
@@ -1857,8 +1954,8 @@ MirrorDescent
 
 # References
 
-  - $(ref_dict[:zhang2022maeg])
-  - $(ref_dict[:helmbold1998])
+  - $(ref_dict[:zhang2022maeg]) Section 4, Equations 7 to 10, Algorithm 2. Section 5.2.
+  - $(ref_dict[:helmbold1998]) Section 5.2, Table 5.3.
 """
 function MAEG(; etas::AbstractVector{<:Real} = 0.001:0.001:0.2, window::Integer = 30,
               alpha::Real = 0)::MirrorDescent
@@ -1870,20 +1967,21 @@ end
 
 Builds the adaptive exponential gradient, [`ExponentiatedGradient`](@ref) under a [`WindowedBestRate`](@ref) over the whole history (AEG).
 
-This is the AEG of [zhang2022maeg](@citet), the special case of [`MAEG`](@ref) whose window is the horizon.
+This is the AEG of Equation 11 of [zhang2022maeg](@cite), the special case of [`MAEG`](@ref) whose window is the horizon.
 
 # Examples
 
 ```jldoctest
 julia> AEG(; etas = [0.05, 0.1])
 MirrorDescent
-    eta ┼ WindowedBestRate
-        │     etas ┼ Vector{Float64}: [0.05, 0.1]
-        │   window ┴ nothing
-   proj ┼ EntropicProjection()
-  alpha ┼ Int64: 0
-    obj ┼ LogWealth()
-   grad ┴ PlainGradient()
+        eta ┼ WindowedBestRate
+            │     etas ┼ Vector{Float64}: [0.05, 0.1]
+            │   window ┴ nothing
+       proj ┼ EntropicProjection()
+      alpha ┼ Int64: 0
+        obj ┼ LogWealth()
+       grad ┼ nothing
+  predictor ┴ nothing
 ```
 
 # Related
@@ -1894,7 +1992,7 @@ MirrorDescent
 
 # References
 
-  - $(ref_dict[:zhang2022maeg])
+  - $(ref_dict[:zhang2022maeg]) Section 4, Equation 11.
 """
 function AEG(; etas::AbstractVector{<:Real} = 0.001:0.001:0.2,
              alpha::Real = 0)::MirrorDescent
@@ -1903,7 +2001,8 @@ function AEG(; etas::AbstractVector{<:Real} = 0.001:0.001:0.2,
 end
 export MirrorDescent, ExponentiatedGradient, GradientProjection, EGE, EGR, EGA, LogWealth,
        RiskLoss, InverseSquareRootRate, DoublingTrickRate, SelfConfidentRate,
-       WindowedBestRate, MAEG, AEG, PlainGradient, GradientMomentum, RootMeanSquareGradient,
+       WindowedBestRate, MAEG, AEG, GradientMomentum, RootMeanSquareGradient,
        AdaptiveMomentGradient
 public AbstractGradientTransform, gradient_state_seed, transform_gradient!,
-       gradient_state_view, copy_gradient_state, AbstractOnlineObjective, loss_gradient
+       gradient_state_view, copy_gradient_state, AbstractOnlineObjective, loss_gradient,
+       AbstractGradientPredictor

@@ -123,8 +123,7 @@ end
 function set_tracking_error_constraints!(model::JuMP.Model, i::Integer,
                                          pr::AbstractPriorResult,
                                          tr::TrackingError{<:Any, <:Any,
-                                                           <:Union{<:L2Norm,
-                                                                   <:SquaredL2Norm}},
+                                                           <:Union{L2Norm, SquaredL2Norm}},
                                          args...; prefix::Symbol = Symbol(""), kwargs...)
     X = pr.X
     k = get_k(model)
@@ -218,8 +217,8 @@ function set_tracking_error_constraints!(model::JuMP.Model, i::Integer,
                                          pr::AbstractPriorResult,
                                          tr::RiskTrackingError{<:Any, <:Any, <:Any,
                                                                <:IndependentVariableTracking},
-                                         opt::Union{<:JuMPOptimisationEstimator,
-                                                    <:AbstractProgrammeAllocationSet},
+                                         opt::Union{JuMPOptimisationEstimator,
+                                                    AbstractProgrammeAllocationSet},
                                          pl::Option{<:PlC_VecPlC}, fees::Option{<:Fees},
                                          args...; prefix::Symbol = Symbol(""), kwargs...)
     r = tr.r
@@ -240,8 +239,8 @@ function set_tracking_error_constraints!(model::JuMP.Model, i::Integer,
                                          pr::AbstractPriorResult,
                                          tr::RiskTrackingError{<:Any, <:Any, <:Any,
                                                                <:DependentVariableTracking},
-                                         opt::Union{<:JuMPOptimisationEstimator,
-                                                    <:AbstractProgrammeAllocationSet},
+                                         opt::Union{JuMPOptimisationEstimator,
+                                                    AbstractProgrammeAllocationSet},
                                          pl::Option{<:PlC_VecPlC}, fees::Option{<:Fees},
                                          args...; prefix::Symbol = Symbol(""), kwargs...)
     ri = tr.r

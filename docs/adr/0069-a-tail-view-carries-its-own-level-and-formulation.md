@@ -376,3 +376,43 @@ The error of the grid named the conic formulation for any positive combination, 
 formulation refuses an upper bound. It now names the conic formulation for a lower bound on a
 positive combination, and the sequential formulation for an upper bound or a relative view. The
 conic errors say that the grid holds a single asset.
+
+## Amendment (2026-10-28) — from #1872
+
+The amendment of 2026-09-03 made the sequential formulation the third formulation of every
+measure, and wrote it as one type per measure: `SequentialConditionalValueatRiskView`,
+`SequentialEntropicValueatRiskView` and `SequentialRelativisticValueatRiskView`. The grid was
+written the same way, as `GridEntropicValueatRiskView` and `GridRelativisticValueatRiskView`. The
+research of #1856 found that only the supertype told the copies apart. The fields and the checks
+were the same word for word, and the outer view group already named the measure.
+
+### One sequential type and one grid type
+
+`SequentialTailView(; iters, tol)` and `GridTailView(; pct, K, M, iters, tol, tilt_iters)`
+replace the five types. Each subtypes `AbstractEntropyPoolingViewFormulation` directly. The view
+group that holds the formulation gives the measure, and the lowering keeps one method per measure:
+`ep_add_cvar_view!`, `ep_add_evar_view!` and `ep_add_rlvar_view!` each dispatch on the shared type.
+The per-measure carriers under `AbstractSequentialTailViewConstraint` and the two grid carriers
+stay, because their fields differ by measure.
+
+### The refusal of a wrong measure stays at construction
+
+The family supertype had also bounded the `alg` field, so a grid on a CVaR view did not construct.
+Three aliases keep that refusal in the bound:
+
+```julia
+const CVaRVF = Union{AbstractConditionalValueatRiskViewFormulation, SequentialTailView}
+const EVaRVF = Union{AbstractEntropicValueatRiskViewFormulation, SequentialTailView, GridTailView}
+const RLVaRVF = Union{AbstractRelativisticValueatRiskViewFormulation, SequentialTailView,
+                      GridTailView}
+```
+
+A literal vector such as `[LinearConditionalValueatRiskView(), SequentialTailView()]` has the
+element type `AbstractEntropyPoolingViewFormulation`, so a vector bounded by `CVaRVF` refuses it.
+The vector bound is therefore the whole family, and the constructor of each view group checks that
+every entry is of its alias, with an `ArgumentError`. A single formulation of the wrong measure
+still fails at the bound of the keyword constructor, with a `TypeError`.
+
+The selectors `ep_cvar_formulation`, `ep_evar_formulation` and `ep_rlvar_formulation` return the
+shared types where they returned the per-measure ones, so no default changes and no posterior
+moves.

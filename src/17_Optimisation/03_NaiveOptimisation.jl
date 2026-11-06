@@ -257,7 +257,7 @@ $(DocStringExtensions.TYPEDEF)
 
 Allocates each asset a weight inversely proportional to its volatility, or to its variance when `sq = true`.
 
-The variances are the diagonal of the covariance matrix that the prior estimator `pe` gives, so every choice inside `pe` reaches the weights. The inverse-variance weights, `sq = true`, are the naive risk parity allocation. [`HierarchicalRiskParity`](@ref) gives the assets of each half these weights under [`Variance`](@ref), and the inverse-volatility weights under [`StandardDeviation`](@ref), when it measures the risk of the half.
+The variances are the diagonal of the covariance matrix that the prior estimator `pe` gives, so every choice inside `pe` reaches the weights. The inverse-variance weights, `sq = true`, are the naive risk parity allocation of Section 12.1.3 of [cajas2025](@cite). The inverse-volatility weights are the equal risk contribution weights when every pair of assets has the same correlation, Equation 3 of [maillard2008](@cite). The inverse-variance weights are the minimum variance weights when the covariance matrix is diagonal, Appendix A.2 of the online supplementary materials of [lopezdeprado2016](@cite). [`HierarchicalRiskParity`](@ref) gives the assets of each half these weights under [`Variance`](@ref), and the inverse-volatility weights under [`StandardDeviation`](@ref), when it measures the risk of the half.
 
 The weight finaliser `wf` then imposes the weight bounds, so the weights of the result equal the closed form below only when no bound binds.
 
@@ -298,27 +298,38 @@ Keywords correspond to the struct's fields. A field typed [`TD`](@ref), [`TD_Opt
 
 ## Validation
 
-  - If `wb` is a [`WeightBoundsEstimator`](@ref): `!isnothing(sets)`.
+  - If `wb` is keyed by name ([`name_keyed`](@ref)): `!isnothing(sets)`. A [`ScoreWeightBounds`](@ref) with a number or a vector of numbers in `val` names no asset and needs no sets.
   - If `fees` is a [`FeesEstimator`](@ref): `!isnothing(sets)`.
   - `fb` schedules: `bind !== :nearest`.
   - A reader that states no source and reads the raw returns data, beside a reader that states `x_src = ExcessSource()`, logs one warning that names its path, see [`warn_raw_readers`](@ref). The head then builds as configured.
 
 ## Propagated parameters
 
-When [`factory`](@ref) is called on this type, the following `@fprop`-tagged fields are automatically propagated:
+[`factory`](@ref) passes its arguments on to these `@fprop` fields:
 
-  - `fees`: Recursively updated via [`factory`](@ref).
-  - `fb`: Recursively updated via [`factory`](@ref).
+  - `fees`: Recursively updated through [`factory`](@ref).
+  - `fb`: Recursively updated through [`factory`](@ref).
+  - `cache`: Carried unchanged through [`factory`](@ref).
 
 ## View parameters
 
-When [`port_opt_view`](@ref) is called on this type, the following `@vprop`-tagged fields are automatically subset to the selected indices:
+[`port_opt_view`](@ref) takes the view of these `@vprop` fields at the selected indices:
 
-  - `pe`: Recursively viewed via [`port_opt_view`](@ref).
-  - `wb`: Recursively viewed via [`port_opt_view`](@ref).
-  - `fees`: Recursively viewed via [`port_opt_view`](@ref).
-  - `sets`: Sliced to the selected indices via [`port_opt_view`](@ref).
-  - `fb`: Recursively viewed via [`port_opt_view`](@ref), except a precomputed result, which is kept (see [`view_child`](@ref)).
+  - `pe`: Recursively viewed through [`port_opt_view`](@ref).
+  - `wb`: Recursively viewed through [`port_opt_view`](@ref).
+  - `fees`: Recursively viewed through [`port_opt_view`](@ref).
+  - `sets`: Sliced to the selected indices through [`port_opt_view`](@ref).
+  - `fb`: Recursively viewed through [`port_opt_view`](@ref), except a precomputed result, which is kept (see [`view_child`](@ref)).
+  - `cache`: Sliced to the selected assets through [`port_opt_view`](@ref).
+
+## Observation weight parameters
+
+[`obs_weights_view`](@ref) indexes these fields to the selected observations:
+
+  - `pe`: Recursively indexed through [`obs_weights_view`](@ref).
+  - `fees`: Recursively indexed through [`obs_weights_view`](@ref).
+  - `fb`: Recursively indexed through [`obs_weights_view`](@ref).
+  - `cache`: Removed by [`obs_weights_view`](@ref), because a state has no slice on the observation axis.
 
 # Examples
 
@@ -369,16 +380,19 @@ InverseVolatility
   - [`RandomWeighted`](@ref)
   - [`factory`](@ref)
   - [`port_opt_view`](@ref)
+  - [`obs_weights_view`](@ref)
 
 # References
 
-  - $(ref_dict[:cajas2025]) Section 12.1.3, footnote 5.
+  - $(ref_dict[:cajas2025]) Section 12.1.3, footnote 5. $(ref_dict[:no_original_source])
+  - $(ref_dict[:maillard2008]) Section 3.2, Equation 3.
+  - $(ref_dict[:lopezdeprado2016]) Online supplementary materials, Appendix A.2.
 """
 @propagatable @concrete struct InverseVolatility <: NaiveOptimisationEstimator
     """
     $(field_dict[:pe])
     """
-    @vprop pe
+    @vprop @oprop pe
     """
     $(field_dict[:wb])
     """
@@ -417,9 +431,9 @@ InverseVolatility
                                fb::TDO_Option{<:OptE_Opt}, sq::Bool, strict::Bool,
                                cache::Option{<:ReturnsBufferState})
         assert_no_nearest_bind_optimiser_schedule(fb, :fb, :InverseVolatility)
-        if isa(wb, WeightBoundsEstimator)
+        if name_keyed(wb)
             @argcheck(!isnothing(sets),
-                      IsNothingError("sets cannot be nothing when wb is a WeightBoundsEstimator"))
+                      IsNothingError("sets cannot be nothing when wb is keyed by name"))
         end
         if isa(fees, FeesEstimator)
             @argcheck(!isnothing(sets),
@@ -523,9 +537,8 @@ Run the inverse volatility portfolio optimisation.
 function _optimise(iv::InverseVolatility, rd::ReturnsResult = ReturnsResult(); kwargs...)
     iv = reset_time_dependent_estimator(iv)
     pr = prior(iv.pe, rd)
-    # A weight, a bound and a fee hold fractions and infinities, so an integer sample takes
-    # a float type for them, and every other sample keeps its own type.
-    Tf = float_if_integer(eltype(pr.X))
+    # A weight, a bound and a fee take the element type of the returns.
+    Tf = eltype(pr.X)
     # Resolve the fee on the caller's own universe, before `investable_reduction` below
     # narrows `sets`, for the reason the hierarchical heads do; `investable_fees_view` then
     # places it on the axes the mask leaves.
@@ -542,8 +555,8 @@ function _optimise(iv::InverseVolatility, rd::ReturnsResult = ReturnsResult(); k
     w = LinearAlgebra.diag(pr.sigma)
     w = inv.(!iv.sq ? sqrt.(w) : w)
     w /= sum(w)
-    wb = weight_bounds_constraints(iv.wb, iv.sets; N = size(X, 2), strict = iv.strict,
-                                   datatype = Tf)
+    wb = weight_bounds_constraints(iv.wb, iv.sets; rd = rd, N = size(X, 2),
+                                   strict = iv.strict, datatype = Tf)
     retcode, w = finalise_weight_bounds(iv.wf, wb, w)
     return NaiveOptimisationResult(; pr = pr, wb = wb, fees = fees, retcode = retcode,
                                    w = w, imsk = imsk, fb = nothing)
@@ -613,25 +626,27 @@ Keywords correspond to the struct's fields. A field typed [`TD`](@ref), [`TD_Opt
 
 ## Validation
 
-  - If `wb` is a [`WeightBoundsEstimator`](@ref): `!isnothing(sets)`.
+  - If `wb` is keyed by name ([`name_keyed`](@ref)): `!isnothing(sets)`. A [`ScoreWeightBounds`](@ref) with a number or a vector of numbers in `val` names no asset and needs no sets.
   - If `fees` is a [`FeesEstimator`](@ref): `!isnothing(sets)`.
   - `fb` schedules: `bind !== :nearest`.
 
 ## Propagated parameters
 
-When [`factory`](@ref) is called on this type, the following `@fprop`-tagged fields are automatically propagated:
+[`factory`](@ref) passes its arguments on to these `@fprop` fields:
 
-  - `fees`: Recursively updated via [`factory`](@ref).
-  - `fb`: Recursively updated via [`factory`](@ref).
+  - `fees`: Recursively updated through [`factory`](@ref).
+  - `fb`: Recursively updated through [`factory`](@ref).
+  - `cache`: Carried unchanged through [`factory`](@ref).
 
 ## View parameters
 
-When [`port_opt_view`](@ref) is called on this type, the following `@vprop`-tagged fields are automatically subset to the selected indices:
+[`port_opt_view`](@ref) takes the view of these `@vprop` fields at the selected indices:
 
-  - `wb`: Recursively viewed via [`port_opt_view`](@ref).
-  - `fees`: Recursively viewed via [`port_opt_view`](@ref).
-  - `sets`: Sliced to the selected indices via [`port_opt_view`](@ref).
-  - `fb`: Recursively viewed via [`port_opt_view`](@ref), except a precomputed result, which is kept (see [`view_child`](@ref)).
+  - `wb`: Recursively viewed through [`port_opt_view`](@ref).
+  - `fees`: Recursively viewed through [`port_opt_view`](@ref).
+  - `sets`: Sliced to the selected indices through [`port_opt_view`](@ref).
+  - `fb`: Recursively viewed through [`port_opt_view`](@ref), except a precomputed result, which is kept (see [`view_child`](@ref)).
+  - `cache`: Sliced to the selected assets through [`port_opt_view`](@ref).
 
 # Examples
 
@@ -693,9 +708,9 @@ EqualWeighted
                            fb::TDO_Option{<:OptE_Opt}, strict::Bool,
                            cache::Option{<:ReturnsBufferState})
         assert_no_nearest_bind_optimiser_schedule(fb, :fb, :EqualWeighted)
-        if isa(wb, WeightBoundsEstimator)
+        if name_keyed(wb)
             @argcheck(!isnothing(sets),
-                      IsNothingError("sets cannot be nothing when wb is a WeightBoundsEstimator"))
+                      IsNothingError("sets cannot be nothing when wb is keyed by name"))
         end
         if isa(fees, FeesEstimator)
             @argcheck(!isnothing(sets),
@@ -751,9 +766,8 @@ function _optimise(ew::EqualWeighted, rd::ReturnsResult; kwargs...)
     # The fee is resolved on the caller's own universe before `coverage_reduction` below
     # narrows `sets`, and placed on the axes the mask leaves after it.
     Nf = size(rd.X, 2)
-    # A weight, a bound and a fee hold fractions and infinities, so an integer sample takes
-    # a float type for them, and every other sample keeps its own type.
-    Tf = float_if_integer(eltype(rd.X))
+    # A weight, a bound and a fee take the element type of the returns.
+    Tf = eltype(rd.X)
     fees = fees_constraints(ew.fees, ew.sets; strict = ew.strict, datatype = Tf)
     # This head fits no prior, so it derives the Coverage Universe of its own window and
     # reduces once, here: the weight bounds and the sets are stated over the full universe
@@ -763,7 +777,8 @@ function _optimise(ew::EqualWeighted, rd::ReturnsResult; kwargs...)
     N = size(rd.X, 2)
     # The weight takes the type of the data, not the `Float64` of `inv(N)`.
     w = fill(one(Tf) / N, N)
-    wb = weight_bounds_constraints(ew.wb, ew.sets; N = N, strict = ew.strict, datatype = Tf)
+    wb = weight_bounds_constraints(ew.wb, ew.sets; rd = rd, N = N, strict = ew.strict,
+                                   datatype = Tf)
     retcode, w = finalise_weight_bounds(ew.wf, wb, w)
     return NaiveOptimisationResult(; pr = rd, wb = wb, fees = fees, retcode = retcode,
                                    w = w, imsk = cmsk, fb = nothing)
@@ -840,26 +855,28 @@ Keywords correspond to the struct's fields. A field typed [`TD`](@ref), [`TD_Opt
 ## Validation
 
   - `alpha`: non-empty, and every element is positive and finite.
-  - If `wb` is a [`WeightBoundsEstimator`](@ref): `!isnothing(sets)`.
+  - If `wb` is keyed by name ([`name_keyed`](@ref)): `!isnothing(sets)`. A [`ScoreWeightBounds`](@ref) with a number or a vector of numbers in `val` names no asset and needs no sets.
   - If `fees` is a [`FeesEstimator`](@ref): `!isnothing(sets)`.
   - `fb` schedules: `bind !== :nearest`.
 
 ## Propagated parameters
 
-When [`factory`](@ref) is called on this type, the following `@fprop`-tagged fields are automatically propagated:
+[`factory`](@ref) passes its arguments on to these `@fprop` fields:
 
-  - `fees`: Recursively updated via [`factory`](@ref).
-  - `fb`: Recursively updated via [`factory`](@ref).
+  - `fees`: Recursively updated through [`factory`](@ref).
+  - `fb`: Recursively updated through [`factory`](@ref).
+  - `cache`: Carried unchanged through [`factory`](@ref).
 
 ## View parameters
 
-When [`port_opt_view`](@ref) is called on this type, the following `@vprop`-tagged fields are automatically subset to the selected indices:
+[`port_opt_view`](@ref) takes the view of these `@vprop` fields at the selected indices:
 
-  - `alpha`: Sliced to the selected indices via [`port_opt_view`](@ref).
-  - `wb`: Recursively viewed via [`port_opt_view`](@ref).
-  - `fees`: Recursively viewed via [`port_opt_view`](@ref).
-  - `sets`: Sliced to the selected indices via [`port_opt_view`](@ref).
-  - `fb`: Recursively viewed via [`port_opt_view`](@ref), except a precomputed result, which is kept (see [`view_child`](@ref)).
+  - `alpha`: Sliced to the selected indices through [`port_opt_view`](@ref).
+  - `wb`: Recursively viewed through [`port_opt_view`](@ref).
+  - `fees`: Recursively viewed through [`port_opt_view`](@ref).
+  - `sets`: Sliced to the selected indices through [`port_opt_view`](@ref).
+  - `fb`: Recursively viewed through [`port_opt_view`](@ref), except a precomputed result, which is kept (see [`view_child`](@ref)).
+  - `cache`: Sliced to the selected assets through [`port_opt_view`](@ref).
 
 # Examples
 
@@ -936,9 +953,9 @@ RandomWeighted
                             strict::Bool, cache::Option{<:ReturnsBufferState})
         assert_no_nearest_bind_optimiser_schedule(fb, :fb, :RandomWeighted)
         assert_nonempty_gt0_finite_val(alpha, :alpha)
-        if isa(wb, WeightBoundsEstimator)
+        if name_keyed(wb)
             @argcheck(!isnothing(sets),
-                      IsNothingError("sets cannot be nothing when wb is a WeightBoundsEstimator"))
+                      IsNothingError("sets cannot be nothing when wb is keyed by name"))
         end
         if isa(fees, FeesEstimator)
             @argcheck(!isnothing(sets),
@@ -1017,9 +1034,8 @@ function _optimise(rw::RandomWeighted, rd::ReturnsResult; kwargs...)
     end
     # The fee is resolved on the caller's own universe before `coverage_reduction` below
     # narrows `sets`, and placed on the axes the mask leaves after it.
-    # A weight, a bound and a fee hold fractions and infinities, so an integer sample takes
-    # a float type for them, and every other sample keeps its own type.
-    Tf = float_if_integer(eltype(rd.X))
+    # A weight, a bound and a fee take the element type of the returns.
+    Tf = eltype(rd.X)
     fees = fees_constraints(rw.fees, rw.sets; strict = rw.strict, datatype = Tf)
     # This head fits no prior, so it derives the Coverage Universe of its own window and
     # reduces once, here: the concentrations, the weight bounds and the sets are stated over
@@ -1035,7 +1051,8 @@ function _optimise(rw::RandomWeighted, rd::ReturnsResult; kwargs...)
     end
     rng = resolve_rng(rw.rng, rw.seed)
     w = rand(rng, dist)
-    wb = weight_bounds_constraints(rw.wb, rw.sets; N = N, strict = rw.strict, datatype = Tf)
+    wb = weight_bounds_constraints(rw.wb, rw.sets; rd = rd, N = N, strict = rw.strict,
+                                   datatype = Tf)
     retcode, w = finalise_weight_bounds(rw.wf, wb, w)
     return NaiveOptimisationResult(; pr = rd, wb = wb, fees = fees, retcode = retcode,
                                    w = w, imsk = cmsk, fb = nothing)
@@ -1098,7 +1115,7 @@ Where:
   - ``g_i(\\boldsymbol{b})``: Multiplier of asset ``i`` at ``\\boldsymbol{b}``, the mean over the periods of the price relative of asset ``i`` divided by the gross return of ``\\boldsymbol{b}``.
   - ``\\boldsymbol{b}^{(k)}``: Iterate ``k`` of Cover's map.
 
-The objective is concave on the simplex, so its maximum is global. The multipliers satisfy ``\\sum_i b_i g_i(\\boldsymbol{b}) = 1``, so Cover's map keeps an iterate on the simplex. The map is a minorise-maximise step, so ``\\log S_T`` does not fall from one iterate to the next. An entry at zero stays at zero. At ``\\boldsymbol{b}^{\\star}`` every held asset has ``g_i = 1`` and every other asset has ``g_i \\leq 1``, which is the first-order condition. The last line holds at every ``\\boldsymbol{b}`` in the simplex, by concavity and Jensen's inequality, and its right side is zero at ``\\boldsymbol{b}^{\\star}``, a corner included.
+The objective is concave on the simplex, so its maximum is global. The update is Equation 1.3 of [cover1984](@cite), with the expectation over the periods taken as the mean over the ``T`` rows. The multipliers satisfy ``\\sum_i b_i g_i(\\boldsymbol{b}) = 1``, so the map keeps an iterate on the simplex. By Theorem 1 of [cover1984](@cite), ``\\log S_T`` does not fall from one iterate to the next. An entry at zero stays at zero. At ``\\boldsymbol{b}^{\\star}`` every held asset has ``g_i = 1`` and every other asset has ``g_i \\leq 1``, which are Equations 3.1 and 3.2 of [cover1984](@cite). The last line is Theorem 4 of [cover1984](@cite), scaled by ``T``. It holds at every ``\\boldsymbol{b}`` in the simplex, by concavity and Jensen's inequality, and its right side is zero at ``\\boldsymbol{b}^{\\star}``, a corner included.
 
 # Fields
 
@@ -1122,7 +1139,7 @@ Keywords correspond to the struct's fields. A field typed [`TD`](@ref), [`TD_Opt
 
 ## Validation
 
-  - If `wb` is a [`WeightBoundsEstimator`](@ref): `!isnothing(sets)`.
+  - If `wb` is keyed by name ([`name_keyed`](@ref)): `!isnothing(sets)`. A [`ScoreWeightBounds`](@ref) with a number or a vector of numbers in `val` names no asset and needs no sets.
   - If `fees` is a [`FeesEstimator`](@ref): `!isnothing(sets)`.
   - `fb` schedules: `bind !== :nearest`.
   - `iters > 0`.
@@ -1130,19 +1147,21 @@ Keywords correspond to the struct's fields. A field typed [`TD`](@ref), [`TD_Opt
 
 ## Propagated parameters
 
-When [`factory`](@ref) is called on this type, the following `@fprop`-tagged fields are automatically propagated:
+[`factory`](@ref) passes its arguments on to these `@fprop` fields:
 
-  - `fees`: Recursively updated via [`factory`](@ref).
-  - `fb`: Recursively updated via [`factory`](@ref).
+  - `fees`: Recursively updated through [`factory`](@ref).
+  - `fb`: Recursively updated through [`factory`](@ref).
+  - `cache`: Carried unchanged through [`factory`](@ref).
 
 ## View parameters
 
-When [`port_opt_view`](@ref) is called on this type, the following `@vprop`-tagged fields are automatically subset to the selected indices:
+[`port_opt_view`](@ref) takes the view of these `@vprop` fields at the selected indices:
 
-  - `wb`: Recursively viewed via [`port_opt_view`](@ref).
-  - `fees`: Recursively viewed via [`port_opt_view`](@ref).
-  - `sets`: Sliced to the selected indices via [`port_opt_view`](@ref).
-  - `fb`: Recursively viewed via [`port_opt_view`](@ref), except a precomputed result, which is kept (see [`view_child`](@ref)).
+  - `wb`: Recursively viewed through [`port_opt_view`](@ref).
+  - `fees`: Recursively viewed through [`port_opt_view`](@ref).
+  - `sets`: Sliced to the selected indices through [`port_opt_view`](@ref).
+  - `fb`: Recursively viewed through [`port_opt_view`](@ref), except a precomputed result, which is kept (see [`view_child`](@ref)).
+  - `cache`: Sliced to the selected assets through [`port_opt_view`](@ref).
 
 # Examples
 
@@ -1177,7 +1196,7 @@ BestConstantRebalancedPortfolio
 
 # References
 
-  - $(ref_dict[:cover1984])
+  - $(ref_dict[:cover1984]) Equation 1.3, Theorems 1 and 4, Equations 3.1 and 3.2.
 """
 @propagatable @concrete struct BestConstantRebalancedPortfolio <: NaiveOptimisationEstimator
     """
@@ -1224,9 +1243,9 @@ BestConstantRebalancedPortfolio
                                              tol::Number, strict::Bool,
                                              cache::Option{<:ReturnsBufferState})
         assert_no_nearest_bind_optimiser_schedule(fb, :fb, :BestConstantRebalancedPortfolio)
-        if isa(wb, WeightBoundsEstimator)
+        if name_keyed(wb)
             @argcheck(!isnothing(sets),
-                      IsNothingError("sets cannot be nothing when wb is a WeightBoundsEstimator"))
+                      IsNothingError("sets cannot be nothing when wb is keyed by name"))
         end
         if isa(fees, FeesEstimator)
             @argcheck(!isnothing(sets),
@@ -1361,9 +1380,8 @@ function _optimise(bcrp::BestConstantRebalancedPortfolio, rd::ReturnsResult; kwa
     # The fee is resolved on the caller's own universe before `coverage_reduction` below
     # narrows `sets`, and placed on the axes the mask leaves after it.
     Nf = size(rd.X, 2)
-    # A weight, a bound and a fee hold fractions and infinities, so an integer sample takes
-    # a float type for them, and every other sample keeps its own type.
-    Tf = float_if_integer(eltype(rd.X))
+    # A weight, a bound and a fee take the element type of the returns.
+    Tf = eltype(rd.X)
     fees = fees_constraints(bcrp.fees, bcrp.sets; strict = bcrp.strict, datatype = Tf)
     # This head fits no prior, so it derives the Coverage Universe of its own window and
     # reduces once, here, as `EqualWeighted` does. `NaiveOptimisationResult` expands back.
@@ -1372,7 +1390,7 @@ function _optimise(bcrp::BestConstantRebalancedPortfolio, rd::ReturnsResult; kwa
     X = one(eltype(rd.X)) .+ rd.X
     N = size(X, 2)
     fp = cover_fixed_point(X, bcrp.iters, bcrp.tol)
-    wb = weight_bounds_constraints(bcrp.wb, bcrp.sets; N = N, strict = bcrp.strict,
+    wb = weight_bounds_constraints(bcrp.wb, bcrp.sets; rd = rd, N = N, strict = bcrp.strict,
                                    datatype = Tf)
     retcode, w = finalise_weight_bounds(bcrp.wf, wb, fp.w)
     if isa(retcode, OptimisationSuccess)
@@ -1439,18 +1457,18 @@ Keywords correspond to the struct's fields. `fb` can hold a [`TimeDependent`](@r
 
 ## Propagated parameters
 
-When [`factory`](@ref) is called on this type, the following `@fprop`-tagged fields are automatically propagated:
+[`factory`](@ref) passes its arguments on to these `@fprop` fields:
 
-  - `fees`: Recursively updated via [`factory`](@ref).
-  - `fb`: Recursively updated via [`factory`](@ref).
+  - `fees`: Recursively updated through [`factory`](@ref).
+  - `fb`: Recursively updated through [`factory`](@ref).
 
 ## View parameters
 
-When [`port_opt_view`](@ref) is called on this type, the following `@vprop`-tagged fields are automatically subset to the selected indices:
+[`port_opt_view`](@ref) takes the view of these `@vprop` fields at the selected indices:
 
-  - `w`: Sliced to the selected indices via [`port_opt_view`](@ref).
-  - `fees`: Recursively viewed via [`port_opt_view`](@ref).
-  - `fb`: Recursively viewed via [`port_opt_view`](@ref), except a precomputed result, which is kept (see [`view_child`](@ref)).
+  - `w`: Sliced to the selected indices through [`port_opt_view`](@ref).
+  - `fees`: Recursively viewed through [`port_opt_view`](@ref).
+  - `fb`: Recursively viewed through [`port_opt_view`](@ref), except a precomputed result, which is kept (see [`view_child`](@ref)).
 
 # Examples
 
@@ -1576,7 +1594,7 @@ end
 
 Return the weights of a [`PreviousWeights`](@ref) that has nothing to hold.
 
-The weights are `NaN` at every column of `X`, or `nothing` when `X` is `nothing`. They take the element type of `X`, or a float type when `X` holds integers, because an integer cannot hold `NaN`.
+The weights are `NaN` at every column of `X`, or `nothing` when `X` is `nothing`. They take the element type of `X`, which must hold `NaN`.
 
 # Related
 
@@ -1587,9 +1605,7 @@ function failed_hold_weights(::Nothing)
     return nothing
 end
 function failed_hold_weights(X::MatNum)
-    # An integer sample cannot hold `NaN`, so it takes a float type, and every other sample
-    # keeps its own type.
-    return fill(convert(float_if_integer(eltype(X)), NaN), size(X, 2))
+    return fill(convert(eltype(X), NaN), size(X, 2))
 end
 """
     optimise(pw::PreviousWeights{<:Any, <:Any, Nothing}, rd::ReturnsResult = ReturnsResult();

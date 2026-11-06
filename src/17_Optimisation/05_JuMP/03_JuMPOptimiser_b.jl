@@ -93,8 +93,8 @@ function processed_jump_optimiser_attributes(opt::JuMPOptimiser, rd::ReturnsResu
     _, pr, opt, rd = investable_reduction(imsk, pr, opt, rd)
     X = pr.X
     datatype = eltype(X)
-    wb = weight_bounds_constraints(opt.wb, opt.sets; N = size(X, 2), strict = opt.strict,
-                                   datatype = datatype)
+    wb = weight_bounds_constraints(opt.wb, opt.sets; rd = rd, N = size(X, 2),
+                                   strict = opt.strict, datatype = datatype)
     lt = threshold_constraints(opt.lt, opt.sets; datatype = datatype, strict = opt.strict)
     st = threshold_constraints(opt.st, opt.sets; datatype = datatype, strict = opt.strict)
     lcsr = linear_constraints(opt.lcse, opt.sets; datatype = datatype, strict = opt.strict,
@@ -390,7 +390,8 @@ before calling this function. See `Model Assembly` in `GLOSSARY.md` and
 The tail of the sequence is [`assert_frontier_sweep_cap`](@ref): both frontier registries are
 complete here and no sweep solve has started, so this is the one point at which the **total**
 sweep — the product across every swept return term and every swept risk measure — is in hand
-and can be capped.
+and can be capped. [`assert_frontier_sweep_owner`](@ref) follows it, and refuses a frontier
+when the optimiser solves its model once.
 
 # Arguments
 
@@ -426,6 +427,7 @@ and can be capped.
   - [`processed_jump_optimiser_attributes`](@ref)
   - [`set_risk_and_scalarise!`](@ref)
   - [`assert_frontier_sweep_cap`](@ref)
+  - [`assert_frontier_sweep_owner`](@ref)
   - [`JuMPOptimiser`](@ref)
   - [`MeanRisk`](@ref)
   - [`RiskBudgeting`](@ref)
@@ -484,6 +486,7 @@ function assemble_jump_model!(model::JuMP.Model, optimiser::JuMPOptimisationEsti
     end
     add_custom_constraint!(model, opt.ccnt, optimiser, attrs)
     assert_frontier_sweep_cap(model)
+    assert_frontier_sweep_owner(model, optimiser)
     return nothing
 end
 """
@@ -509,8 +512,7 @@ function pipe_route(cfg::JuMPOptimiser, ::Val{:mu_ucs}, v)
                             else
                                 "cannot route a mean uncertainty set into a $(Base.typename(typeof(cfg.ret)).wrapper); expected returns uncertainty requires an ArithmeticReturn return estimator"
                             end))
-    return Accessors.set(cfg, Accessors.PropertyLens{:ret}(),
-                         Accessors.set(cfg.ret, Accessors.PropertyLens{:ucs}(), v))
+    return rebuild_estimator(cfg, (; ret = rebuild_estimator(cfg.ret, (; ucs = v))))
 end
 pipe_accepts(::JuMPOptimiser, ::Val{:mu_ucs})::Bool = true
 """

@@ -41,7 +41,7 @@ function exposure_forward_mean_return(R::MatNum, horizon::Integer)
     T, N = size(R)
     @argcheck(T > horizon,
               DimensionMismatch("R ($T observations) must carry more observations than horizon ($horizon)"))
-    Tf = float_if_integer(real(eltype(R)))
+    Tf = real(eltype(R))
     P = T - horizon
     y = Matrix{Tf}(undef, P, N)
     for i in 1:N, t in 1:P
@@ -101,7 +101,7 @@ A one-hot exposure, such as an industry, is a block of `0` and a block of `1`, s
 
 # Arguments
 
-  - `B`: Exposure history `observations × assets × factors`, unlagged.
+  - `B`: Exposure history `assets × factors × observations`, unlagged.
   - `R`: Asset return history `observations × assets`, on the observation axis of `B`.
   - `w`: Cross-sectional weight history `observations × assets`, or `nothing` for equal weights. The rank form reads no weights.
   - `horizon`: Forward window, in observations.
@@ -114,8 +114,8 @@ A one-hot exposure, such as an industry, is a block of `0` and a block of `1`, s
 # Validation
 
   - `!isempty(B)`.
-  - `size(R) == (size(B, 1), size(B, 2))`.
-  - `horizon >= 1` and `size(B, 1) > horizon`.
+  - `size(R) == (size(B, 3), size(B, 1))`.
+  - `horizon >= 1` and `size(B, 3) > horizon`.
   - `csfm.Ms` is not `nothing`, and without `rd` neither is `csfm.csr`. Otherwise the verb raises an `IsNothingError` that names the field.
   - With `rd`, the rules of [`exposure_ic_returns`](@ref).
   - The rules of [`cs_ranks`](@ref), when `rank`.
@@ -137,17 +137,16 @@ A one-hot exposure, such as an industry, is a block of `0` and a block of `1`, s
 function exposure_ic(B::Arr3Num, R::MatNum, w::Option{<:MatNum} = nothing;
                      horizon::Integer = 1, rank::Bool = true, ties::Symbol = :average)
     u = exposure_weights(B, w)
-    T, N, K = size(B)
+    N, K, T = size(B)
     @argcheck(size(R, 1) == T && size(R, 2) == N,
-              DimensionMismatch("R ($(size(R, 1))×$(size(R, 2))) must match B ($T×$N on its first two axes)"))
+              DimensionMismatch("R ($(size(R, 1))×$(size(R, 2))) must match B ($N assets, $T observations)"))
     @argcheck(horizon >= 1, DomainError(horizon, "horizon must be >= 1"))
     y = exposure_forward_mean_return(R, horizon)
-    Tf = typeof(sqrt(one(float_if_integer(promote_type(real(eltype(B)), real(eltype(y)),
-                                                       real(eltype(u)))))))
+    Tf = typeof(sqrt(one(promote_type(real(eltype(B)), real(eltype(y)), real(eltype(u))))))
     P = T - horizon
     ic = Matrix{Tf}(undef, P, K)
     for k in 1:K, t in 1:P
-        a = view(B, t, :, k)
+        a = view(B, :, k, t)
         b = view(y, t, :)
         ic[t, k] = if rank
             Tf(cs_spearman_correlation(a, b; ties = ties))
@@ -348,7 +347,7 @@ function exposure_ic_summary(ic::MatNum; lags::Integer = 0, window::Real = lags 
     @argcheck(!isempty(ic), IsEmptyError("ic cannot be empty"))
     resolve_mean_test_window(lags, window)
     P, K = size(ic)
-    Tm = float_if_integer(real(eltype(ic)))
+    Tm = real(eltype(ic))
     Ts = typeof(sqrt(one(Tm)))
     mean_ic = Vector{Tm}(undef, K)
     std_ic = Vector{Ts}(undef, K)
@@ -425,7 +424,7 @@ function exposure_ic_factor_summary(ic::MatNum, k::Integer; lags::Integer = 0,
                                     rng = mean_test_rng(mt))
     w = resolve_mean_test_window(lags, window)
     P = size(ic, 1)
-    Tm = float_if_integer(real(eltype(ic)))
+    Tm = real(eltype(ic))
     Ts = typeof(sqrt(one(Tm)))
     n = 0
     s = zero(Tm)
@@ -498,7 +497,7 @@ Without `rd`, the function reconstructs the asset returns from the systematic re
 
   - `csfm.Ms` is not `nothing`. Otherwise the verb raises an `IsNothingError` that names `Ms`.
   - Without `rd`, `csfm.csr` is not `nothing`. Otherwise the verb raises an `IsNothingError` that names `csr`.
-  - Without `rd`, `size(csfm.Ms, 1) > csfm.lag`, and the factor returns carry the observation axis of `csfm.Ms` and the factor axis of its reduced exposures.
+  - Without `rd`, `size(csfm.Ms, 3) > csfm.lag`, and the factor returns carry the observation axis of `csfm.Ms` and the factor axis of its reduced exposures.
   - With `rd`, the rules of [`exposure_ic_returns`](@ref).
 
 # Returns
@@ -520,7 +519,7 @@ function exposure_ic_data(csfm::CrossSectionalFactorModel, ::Nothing, reduced::B
 end
 function exposure_ic_data(csfm::CrossSectionalFactorModel, rd::ReturnsResult, reduced::Bool)
     Ms = cs_diagnostic_exposures(csfm)
-    R = exposure_ic_returns(csfm.idx, rd.X, size(Ms, 1))
+    R = exposure_ic_returns(csfm.idx, rd.X, size(Ms, 3))
     return exposure_ic_exposures(csfm.fcb, Ms, reduced), R, csfm.rw
 end
 function exposure_ic_data(::CrossSectionalFactorModel, ::Nothing,
@@ -533,16 +532,15 @@ end
 function exposure_ic_data(csfm::CrossSectionalFactorModel, Ms::Arr3Num,
                           csr::CrossSectionalRegression, reduced::Bool)
     lag = cs_regression_lag(csfm.lag)
-    T, N = size(Ms, 1), size(Ms, 2)
+    T, N = size(Ms, 3), size(Ms, 1)
     @argcheck(T > lag,
               DimensionMismatch("Ms ($T observations) must carry more observations than lag ($lag)"))
     Bd = exposure_ic_exposures(csfm.fcb, Ms, true)
     F = cross_sectional_factor_returns(csfm)
-    K = size(Bd, 3)
+    K = size(Bd, 2)
     @argcheck(size(F, 1) == T && size(F, 2) == K,
               DimensionMismatch("the factor returns ($(size(F, 1))×$(size(F, 2))) must match Ms ($T observations) and the reduced exposures ($K factors)"))
-    Tf = float_if_integer(promote_type(real(eltype(Ms)), real(eltype(F)),
-                                       real(eltype(csr.eps))))
+    Tf = promote_type(real(eltype(Ms)), real(eltype(F)), real(eltype(csr.eps)))
     start = max(1, lag)
     P = T - start + 1
     R = fill(Tf(NaN), P, N)
@@ -553,14 +551,14 @@ function exposure_ic_data(csfm::CrossSectionalFactorModel, Ms::Arr3Num,
             for i in 1:N
                 s = zero(Tf)
                 for k in 1:K
-                    s += Tf(Bd[j, i, k]) * Tf(F[tau, k])
+                    s += Tf(Bd[i, k, j]) * Tf(F[tau, k])
                 end
                 R[r, i] = s + Tf(csr.eps[tau, i])
             end
         end
     end
     Bf = exposure_ic_exposures(csfm.fcb, Ms, reduced)
-    return Bf[start:T, :, :], R, cs_lagged_rows(csfm.rw, start:T)
+    return Bf[:, :, start:T], R, cs_lagged_rows(csfm.rw, start:T)
 end
 """
     exposure_ic_returns(idx, X::Nothing, T::Integer)
@@ -617,7 +615,7 @@ A block that carries no family re-basis has one axis, so that case returns the h
 # Arguments
 
   - `fcb`: The `fcb` field of a [`CrossSectionalFactorModel`](@ref), or `nothing`.
-  - `Ms`: Unlagged exposure history `observations × assets × factors`.
+  - `Ms`: Unlagged exposure history `assets × factors × observations`.
   - `reduced`: Map the history through the re-basis.
 
 # Returns

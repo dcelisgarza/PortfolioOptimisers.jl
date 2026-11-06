@@ -22,7 +22,7 @@ Keywords correspond to the struct's fields. The default is the empty state that 
 
 ## View parameters
 
-When [`port_opt_view`](@ref) is called on this type, its fields are subset to the selected assets:
+[`port_opt_view`](@ref) takes the view of its fields at the selected assets:
 
   - `buf`: Sliced to the selected indices through [`port_opt_view`](@ref).
   - `named`: Renumbered onto the selected indices, so an asset named before the slice is still named after it.
@@ -111,7 +111,7 @@ function returns_buffer(state::AbstractPartialFitState)
 end
 """
     prior_returns_buffer(pe::AbstractPriorEstimator)
-    prior_returns_buffer(pe::Union{<:HighOrderPriorEstimator, <:BlackLittermanPrior})
+    prior_returns_buffer(pe::Union{HighOrderPriorEstimator, BlackLittermanPrior})
 
 Reads the buffer of asset returns out of the prior that owns the folded rows.
 
@@ -140,7 +140,7 @@ One prior in the chain owns the rows. [`HighOrderPriorEstimator`](@ref) and [`Bl
 function prior_returns_buffer(pe::AbstractPriorEstimator)
     return returns_buffer(partial_fit_cache(pe))
 end
-function prior_returns_buffer(pe::Union{<:HighOrderPriorEstimator, <:BlackLittermanPrior})
+function prior_returns_buffer(pe::Union{HighOrderPriorEstimator, BlackLittermanPrior})
     return prior_returns_buffer(pe.pe)
 end
 """
@@ -170,10 +170,10 @@ The method forwards to the fold of the buffer, with its keyword arguments. So a 
   - [`partial_fit!`](@ref)
 """
 function partial_fit!(state::PriorCarryState, x::VecNum; kwargs...)
-    return Accessors.@reset state.buf = partial_fit!(state.buf, x; kwargs...)
+    return PriorCarryState(partial_fit!(state.buf, x; kwargs...), state.named)
 end
 function partial_fit!(state::PriorCarryState, X::MatNum; dims::Int = 1, kwargs...)
-    return Accessors.@reset state.buf = partial_fit!(state.buf, X; dims = dims, kwargs...)
+    return PriorCarryState(partial_fit!(state.buf, X; dims = dims, kwargs...), state.named)
 end
 """
     fold_carry(cache::Option{<:PriorCarryState}, x::VecNum; kwargs...)
@@ -181,7 +181,7 @@ end
 
 Folds observations into a [`PriorCarryState`](@ref), and seeds an empty state where the prior carries none.
 
-It is [`fold_buffer`](@ref) with the named-asset set kept. The seed has no cap. The cap on the carried rows is the `max_scenarios` of an `EmpiricalPrior`, which `prior(pe)` with no data applies. A cap on the fit is the `max_history` of an [`Online`](@ref), which puts the prior on the refit route instead.
+The state folds its [`SampleBufferState`](@ref) and keeps the named-asset set. The seed has no cap. The cap on the carried rows is the `max_scenarios` of an `EmpiricalPrior`, which `prior(pe)` with no data applies. A cap on the fit is the `max_history` of an [`Online`](@ref), which puts the prior on the refit route instead.
 
 # Arguments
 
@@ -198,7 +198,7 @@ It is [`fold_buffer`](@ref) with the named-asset set kept. The seed has no cap. 
 # Related
 
   - [`PriorCarryState`](@ref)
-  - [`fold_buffer`](@ref)
+  - [`SampleBufferState`](@ref)
   - [`partial_fit!`](@ref)
 """
 function fold_carry(cache::Option{<:PriorCarryState}, x::VecNum; kwargs...)
@@ -360,7 +360,7 @@ function prior(pe::AbstractPriorEstimator; kwargs...)
     return stamp_returns_source(prior(pe, partial_fit_cache(pe); kwargs...), pe)
 end
 function prior(pe::AbstractPriorEstimator, state::SampleBufferState; kwargs...)
-    fit = shared_series_buffer(state)
+    pe, fit = shared_series_buffer_fit(pe, state)
     pr = buffer_prior(pe, fit, sample_buffer_panel(fit); kwargs...)
     return buffer_row_key(shared_series_record(pr, state), state.max_history)
 end
@@ -657,10 +657,10 @@ end
 function reads_panel_fields(pe::Online)
     return reads_panel_fields(pe.est)
 end
-function reads_panel_fields(pe::Union{<:HighOrderPriorEstimator, <:BlackLittermanPrior,
-                                      <:BayesianBlackLittermanPrior,
-                                      <:HighOrderFactorPriorEstimator,
-                                      <:MeucciEntropyPoolingPrior, <:EntropyPoolingPrior})
+function reads_panel_fields(pe::Union{HighOrderPriorEstimator, BlackLittermanPrior,
+                                      BayesianBlackLittermanPrior,
+                                      HighOrderFactorPriorEstimator,
+                                      MeucciEntropyPoolingPrior, EntropyPoolingPrior})
     return reads_panel_fields(pe.pe)
 end
 function reads_panel_fields(pe::AugmentedBlackLittermanPrior)
@@ -670,38 +670,46 @@ function reads_panel_fields(pe::OpinionPoolingPrior)
     return any(reads_panel_fields, (pe.pe1, pe.pe2, pe.pes...))
 end
 """
-    reads_exogenous_series(est::AbstractEstimator) -> false
-    reads_exogenous_series(est::Nothing) -> false
-    reads_exogenous_series(ests::AbstractVector) -> Bool
-    reads_exogenous_series(xe::Union{CurrencyExposure, ObservedExposure}) -> true
-    reads_exogenous_series(de::EWMacroSensitivity) -> Bool
-    reads_exogenous_series(xe::CompositeExposure) -> Bool
-    reads_exogenous_series(ds::DescriptorScores) -> Bool
+    reads_exogenous_series(est::AbstractEstimator, rd::Option{<:ReturnsResult} = nothing) -> false
+    reads_exogenous_series(est::Nothing, rd::Option{<:ReturnsResult} = nothing) -> false
+    reads_exogenous_series(ests::AbstractVector, rd::Option{<:ReturnsResult} = nothing) -> Bool
+    reads_exogenous_series(xe::ObservedExposure, rd::Option{<:ReturnsResult} = nothing) -> true
+    reads_exogenous_series(xe::CurrencyExposure, rd::Nothing = nothing) -> true
+    reads_exogenous_series(xe::CurrencyExposure, rd::ReturnsResult) -> Bool
+    reads_exogenous_series(de::EWMacroSensitivity, rd::Option{<:ReturnsResult} = nothing) -> Bool
+    reads_exogenous_series(xe::CompositeExposure, rd::Option{<:ReturnsResult} = nothing) -> Bool
+    reads_exogenous_series(ds::DescriptorScores, rd::Option{<:ReturnsResult} = nothing) -> Bool
     reads_exogenous_series(rfe::Union{FixedWeightedReturnForecast, ExpWeightedReturnForecast,
-                                      TargetReturnForecast}) -> Bool
-    reads_exogenous_series(pe::CrossSectionalFactorPrior) -> Bool
-    reads_exogenous_series(pe::Online) -> Bool
+                                      TargetReturnForecast},
+                           rd::Option{<:ReturnsResult} = nothing) -> Bool
+    reads_exogenous_series(pe::CrossSectionalFactorPrior, rd::Option{<:ReturnsResult} = nothing)
+        -> Bool
+    reads_exogenous_series(pe::Online, rd::Option{<:ReturnsResult} = nothing) -> Bool
     reads_exogenous_series(pe::Union{HighOrderPriorEstimator, BlackLittermanPrior,
                                      BayesianBlackLittermanPrior,
                                      HighOrderFactorPriorEstimator,
-                                     MeucciEntropyPoolingPrior, EntropyPoolingPrior}) -> Bool
-    reads_exogenous_series(pe::AugmentedBlackLittermanPrior) -> Bool
-    reads_exogenous_series(pe::OpinionPoolingPrior) -> Bool
+                                     MeucciEntropyPoolingPrior, EntropyPoolingPrior},
+                           rd::Option{<:ReturnsResult} = nothing) -> Bool
+    reads_exogenous_series(pe::AugmentedBlackLittermanPrior,
+                           rd::Option{<:ReturnsResult} = nothing) -> Bool
+    reads_exogenous_series(pe::OpinionPoolingPrior, rd::Option{<:ReturnsResult} = nothing)
+        -> Bool
 
-Answers whether the fit of an estimator reads the Exogenous Series `rd.E`, from its estimator tree.
+Answers whether the fit of an estimator reads the Exogenous Series `rd.E`, from its estimator tree, and on the data of a step when `rd` is given.
 
 A prior that reads the series needs it at every fitted row, so for it the series is sample and not fold context. The refit route of the online step and the carry fold of a [`CrossSectionalFactorPrior`](@ref) read this predicate. Each gives the series to the buffer of a prior whose tree reads it, and refuses a step of such a prior that brings no series. The buffer then records every column of the series, and the Fold Context reads the series back from it.
 
-The predicate is per type, so a member that reads the series answers for itself, whatever abstract type it has. An observed member, [`CurrencyExposure`](@ref) or [`ObservedExposure`](@ref), reads the return of its factor from the series. An [`EWMacroSensitivity`](@ref) that names a column in `series` reads its reference return from the series, and one with `series = nothing` reads none. A member that holds Descriptors answers for them, and so does a Return Forecast Estimator through its [`DescriptorScores`](@ref). A [`CrossSectionalFactorPrior`](@ref) answers for its factor list and its Return Forecast Estimator. Each outer prior answers for the prior it embeds, as [`reads_panel_fields`](@ref) does, and an [`Online`](@ref) answers for the estimator it wraps. A caller's own member that reads the series must define a method that answers `true`.
+The predicate is per type, so a member that reads the series answers for itself, whatever abstract type it has. An observed member, [`CurrencyExposure`](@ref) or [`ObservedExposure`](@ref), reads the return of its factor from the series. A [`CurrencyExposure`](@ref) reads no series when every level of its Panel Field is its base currency, and the levels come from the data. So without `rd` it answers `true`, and with `rd` it answers whether it names a series on `rd`, with [`observed_series`](@ref). Every other member answers the same with or without `rd`, and each node of the tree passes `rd` to its parts. An [`EWMacroSensitivity`](@ref) that names a column in `series` reads its reference return from the series, and one with `series = nothing` reads none. A member that holds Descriptors answers for them, and so does a Return Forecast Estimator through its [`DescriptorScores`](@ref). A [`CrossSectionalFactorPrior`](@ref) answers for its factor list and its Return Forecast Estimator. Each outer prior answers for the prior it embeds, as [`reads_panel_fields`](@ref) does, and an [`Online`](@ref) answers for the estimator it wraps. A caller's own member that reads the series must define a method that answers `true`.
 
 # Arguments
 
   - `est`: An estimator of the tree, or `nothing`.
   - `ests`: A vector of estimators.
+  - `rd`: The returns data of a step, or `nothing` to answer from the configuration alone.
 
 # Returns
 
-  - `reads::Bool`: `true` when the tree holds a member that reads the Exogenous Series.
+  - `reads::Bool`: `true` when the tree holds a member that reads the Exogenous Series, on `rd` when it is given.
 
 # Related
 
@@ -710,47 +718,58 @@ The predicate is per type, so a member that reads the series answers for itself,
   - [`exogenous_step_kwargs`](@ref)
   - [`ReturnsResult`](@ref)
 """
-function reads_exogenous_series(::AbstractEstimator)
+function reads_exogenous_series(::AbstractEstimator, ::Option{<:ReturnsResult} = nothing)
     return false
 end
-function reads_exogenous_series(::Nothing)
+function reads_exogenous_series(::Nothing, ::Option{<:ReturnsResult} = nothing)
     return false
 end
-function reads_exogenous_series(ests::AbstractVector)
-    return any(reads_exogenous_series, ests)
+function reads_exogenous_series(ests::AbstractVector, rd::Option{<:ReturnsResult} = nothing)
+    return any(e -> reads_exogenous_series(e, rd), ests)
 end
-function reads_exogenous_series(::Union{<:CurrencyExposure, <:ObservedExposure})
+function reads_exogenous_series(::ObservedExposure, ::Option{<:ReturnsResult} = nothing)
     return true
 end
-function reads_exogenous_series(de::EWMacroSensitivity)
+function reads_exogenous_series(::CurrencyExposure, ::Nothing = nothing)
+    return true
+end
+function reads_exogenous_series(xe::CurrencyExposure, rd::ReturnsResult)
+    return !isempty(observed_series(xe, rd))
+end
+function reads_exogenous_series(de::EWMacroSensitivity, ::Option{<:ReturnsResult} = nothing)
     return !isnothing(de.series)
 end
-function reads_exogenous_series(xe::Union{<:CompositeExposure, <:DescriptorScores})
-    return reads_exogenous_series(xe.descriptors)
+function reads_exogenous_series(xe::Union{CompositeExposure, DescriptorScores},
+                                rd::Option{<:ReturnsResult} = nothing)
+    return reads_exogenous_series(xe.descriptors, rd)
 end
-function reads_exogenous_series(rfe::Union{<:FixedWeightedReturnForecast,
-                                           <:ExpWeightedReturnForecast,
-                                           <:TargetReturnForecast})
-    return reads_exogenous_series(rfe.scores)
+function reads_exogenous_series(rfe::Union{FixedWeightedReturnForecast,
+                                           ExpWeightedReturnForecast, TargetReturnForecast},
+                                rd::Option{<:ReturnsResult} = nothing)
+    return reads_exogenous_series(rfe.scores, rd)
 end
-function reads_exogenous_series(pe::CrossSectionalFactorPrior)
-    return reads_exogenous_series(map(last, pe.factors)) || reads_exogenous_series(pe.rfe)
+function reads_exogenous_series(pe::CrossSectionalFactorPrior,
+                                rd::Option{<:ReturnsResult} = nothing)
+    return reads_exogenous_series(map(last, pe.factors), rd) ||
+           reads_exogenous_series(pe.rfe, rd)
 end
-function reads_exogenous_series(pe::Online)
-    return reads_exogenous_series(pe.est)
+function reads_exogenous_series(pe::Online, rd::Option{<:ReturnsResult} = nothing)
+    return reads_exogenous_series(pe.est, rd)
 end
-function reads_exogenous_series(pe::Union{<:HighOrderPriorEstimator, <:BlackLittermanPrior,
-                                          <:BayesianBlackLittermanPrior,
-                                          <:HighOrderFactorPriorEstimator,
-                                          <:MeucciEntropyPoolingPrior,
-                                          <:EntropyPoolingPrior})
-    return reads_exogenous_series(pe.pe)
+function reads_exogenous_series(pe::Union{HighOrderPriorEstimator, BlackLittermanPrior,
+                                          BayesianBlackLittermanPrior,
+                                          HighOrderFactorPriorEstimator,
+                                          MeucciEntropyPoolingPrior, EntropyPoolingPrior},
+                                rd::Option{<:ReturnsResult} = nothing)
+    return reads_exogenous_series(pe.pe, rd)
 end
-function reads_exogenous_series(pe::AugmentedBlackLittermanPrior)
-    return reads_exogenous_series(pe.a_pe)
+function reads_exogenous_series(pe::AugmentedBlackLittermanPrior,
+                                rd::Option{<:ReturnsResult} = nothing)
+    return reads_exogenous_series(pe.a_pe, rd)
 end
-function reads_exogenous_series(pe::OpinionPoolingPrior)
-    return any(reads_exogenous_series, (pe.pe1, pe.pe2, pe.pes...))
+function reads_exogenous_series(pe::OpinionPoolingPrior,
+                                rd::Option{<:ReturnsResult} = nothing)
+    return any(p -> reads_exogenous_series(p, rd), (pe.pe1, pe.pe2, pe.pes...))
 end
 """
 $(DocStringExtensions.TYPEDSIGNATURES)
@@ -781,7 +800,7 @@ A `pe` of `nothing` is an uncertainty set with no prior of its own. It reads no 
   - [`ReturnsResult`](@ref)
   - [`ucs_prior`](@ref)
 """
-function assert_factor_returns(pe::Union{<:AbstractPriorEstimator, <:Online},
+function assert_factor_returns(pe::Union{AbstractPriorEstimator, Online},
                                F::Option{<:VecNum_MatNum})::Nothing
     if needs_factor_returns(pe) === true
         @argcheck(!isnothing(F),
@@ -858,7 +877,7 @@ function partial_fit!(pe::AbstractPriorEstimator, X::VecNum_MatNum,
         partial_fit!(state, X, F; active_mask = active_mask,
                      estimation_mask = estimation_mask)
     end
-    return pin_buffer_choice(Accessors.@set(pe.cache = state))
+    return pin_buffer_choice(rebuild_estimator(pe, (; cache = state)))
 end
 """
     partial_fit!(pe::AbstractPriorEstimator, rd::ReturnsResult)
@@ -968,12 +987,15 @@ Applies the Choice Rule of each regression that a prior fits over the rows of it
 
 The two folds of the refit route call it: the matrix form of [`partial_fit!`](@ref) and [`fold_prior_step`](@ref). It gives [`pin_prior_choice`](@ref) the data that the call with no data, [`buffer_prior`](@ref), gives the batch verb: the rows that a fit keeps, which [`shared_series_buffer`](@ref) answers, the panel of [`sample_buffer_panel`](@ref), and the keywords of [`sample_buffer_fit_kwargs`](@ref). So a prior in the tree that reads a Panel Field, a mask or the Exogenous Series pins the choice of the batch fit over the same rows.
 
+A fixed weight vector in the tree, such as the `weights` of the target of a regression, holds one entry for each observation of the buffer. When the buffer marks an observation for a Shared Series gap, the fit drops it, and the weight of the observation must drop too, as [`observed_weights`](@ref) states. So the function pins a copy of `pe` cut at the kept observations, with [`shared_series_buffer_fit`](@ref). The step keeps its estimator for every later step, and a later buffer marks other observations, so the cut copy must not be the estimator that the step returns. [`adopt_pinned_choice`](@ref) writes the pinned choice of the copy into `pe`, and `pe` keeps its weights at the full length of the buffer.
+
 # Algorithm
 
  1. Return `pe` when [`pending_choice`](@ref) of `pe` is `false`, or when [`buffer_fits_none`](@ref) of `pe.cache` is `true`. The step then copies no row.
- 2. Read the rows that a fit keeps with [`shared_series_buffer`](@ref), giving `fit`.
+ 2. Read the estimator and the rows that a fit keeps with [`shared_series_buffer_fit`](@ref), giving `cut` and `fit`. `cut` is `pe` when the buffer marks no observation.
  3. Read the panel of `fit` with [`sample_buffer_panel`](@ref), and the keywords of `fit` with [`sample_buffer_fit_kwargs`](@ref).
- 4. Apply [`pin_prior_choice`](@ref) to `pe` over the returns and the factor returns of `fit`, with no weights, the panel and the keywords.
+ 4. Apply [`pin_prior_choice`](@ref) to `cut` over the returns and the factor returns of `fit`, with no weights, the panel and the keywords, giving `pinned`.
+ 5. Return `pinned` when `cut` is `pe`. Otherwise write the choice of `pinned` into `pe` with [`adopt_pinned_choice`](@ref).
 
 # Arguments
 
@@ -1001,21 +1023,22 @@ function pin_buffer_choice(pe::AbstractPriorEstimator)
     if !pending_choice(pe) || buffer_fits_none(state)
         return pe
     end
-    fit = shared_series_buffer(state)
+    cut, fit = shared_series_buffer_fit(pe, state)
     pnl = sample_buffer_panel(fit)
-    return pin_prior_choice(pe, sample_buffer(fit), factor_buffer(fit), nothing, pnl;
-                            sample_buffer_fit_kwargs(fit, pnl)...)
+    pinned = pin_prior_choice(cut, sample_buffer(fit), factor_buffer(fit), nothing, pnl;
+                              sample_buffer_fit_kwargs(fit, pnl)...)
+    return cut === pe ? pinned : adopt_pinned_choice(pe, pinned)
 end
 """
-    pin_prior_choice(pe::Union{Nothing, <:AbstractPriorEstimator}, X, F, w = nothing,
+    pin_prior_choice(pe::Union{Nothing, AbstractPriorEstimator}, X, F, w = nothing,
                      pnl = nothing; kwargs...)
-    pin_prior_choice(pe::Union{<:FactorPrior, <:FactorBlackLittermanPrior,
-                               <:AugmentedBlackLittermanPrior}, X::MatNum, F::MatNum,
+    pin_prior_choice(pe::Union{FactorPrior, FactorBlackLittermanPrior,
+                               AugmentedBlackLittermanPrior}, X::MatNum, F::MatNum,
                      w::Option{<:ObsWeights} = nothing,
                      pnl::Option{<:AssetPanel} = nothing; kwargs...)
-    pin_prior_choice(pe::Union{<:HighOrderPriorEstimator, <:HighOrderFactorPriorEstimator,
-                               <:BlackLittermanPrior, <:BayesianBlackLittermanPrior,
-                               <:EntropyPoolingPrior, <:MeucciEntropyPoolingPrior}, X, F,
+    pin_prior_choice(pe::Union{HighOrderPriorEstimator, HighOrderFactorPriorEstimator,
+                               BlackLittermanPrior, BayesianBlackLittermanPrior,
+                               EntropyPoolingPrior, MeucciEntropyPoolingPrior}, X, F,
                      w = nothing, pnl = nothing; kwargs...)
     pin_prior_choice(pe::OpinionPoolingPrior, X::MatNum, F::MatNum,
                      w::Option{<:ObsWeights} = nothing,
@@ -1075,12 +1098,12 @@ When `w` is not `nothing`, the method reads `factory(pe.pe1, w)` and `factory(pe
   - [`PinnedChoice`](@ref)
   - [`partial_fit!`](@ref)
 """
-function pin_prior_choice(pe::Union{Nothing, <:AbstractPriorEstimator}, ::Any, ::Any,
+function pin_prior_choice(pe::Union{Nothing, AbstractPriorEstimator}, ::Any, ::Any,
                           ::Any = nothing, ::Any = nothing; kwargs...)
     return pe
 end
-function pin_prior_choice(pe::Union{<:FactorPrior, <:FactorBlackLittermanPrior,
-                                    <:AugmentedBlackLittermanPrior}, X::MatNum, F::MatNum,
+function pin_prior_choice(pe::Union{FactorPrior, FactorBlackLittermanPrior,
+                                    AugmentedBlackLittermanPrior}, X::MatNum, F::MatNum,
                           w::Option{<:ObsWeights} = nothing,
                           ::Option{<:AssetPanel} = nothing; kwargs...)
     # The regression reads every row of `F`. Under a Scenario Cap, `w` weighs the
@@ -1089,11 +1112,10 @@ function pin_prior_choice(pe::Union{<:FactorPrior, <:FactorBlackLittermanPrior,
     re = pin_regression_choice(pe.re, X, F, scenario_weights(w, size(F, 1)))
     return re === pe.re ? pe : rebuild_estimator(pe, (; re = re))
 end
-function pin_prior_choice(pe::Union{<:HighOrderPriorEstimator,
-                                    <:HighOrderFactorPriorEstimator, <:BlackLittermanPrior,
-                                    <:BayesianBlackLittermanPrior, <:EntropyPoolingPrior,
-                                    <:MeucciEntropyPoolingPrior}, X, F, w = nothing,
-                          pnl = nothing; kwargs...)
+function pin_prior_choice(pe::Union{HighOrderPriorEstimator, HighOrderFactorPriorEstimator,
+                                    BlackLittermanPrior, BayesianBlackLittermanPrior,
+                                    EntropyPoolingPrior, MeucciEntropyPoolingPrior}, X, F,
+                          w = nothing, pnl = nothing; kwargs...)
     inner = pin_prior_choice(pe.pe, X, F, embedded_pin_weights(pe, w), pnl; kwargs...)
     return inner === pe.pe ? pe : rebuild_estimator(pe, (; pe = inner))
 end
@@ -1120,15 +1142,15 @@ function pin_prior_choice(pe::OpinionPoolingPrior, X::MatNum, F::MatNum,
                              (; pe2 = pin_prior_choice(pe.pe2, X1, F, wp, pnl; kwargs...)))
 end
 """
-    pending_choice(est::Union{Nothing, <:AbstractEstimator})
+    pending_choice(est::Union{Nothing, AbstractEstimator})
     pending_choice(re::StepwiseRegression{<:Any, <:Any, <:Any, <:PinnedChoice})
     pending_choice(re::DimensionReductionRegression{<:Any, <:Any, <:Any, <:PinnedChoice,
                                                     Nothing})
-    pending_choice(pe::Union{<:FactorPrior, <:FactorBlackLittermanPrior,
-                             <:AugmentedBlackLittermanPrior})
-    pending_choice(pe::Union{<:HighOrderPriorEstimator, <:HighOrderFactorPriorEstimator,
-                             <:BlackLittermanPrior, <:BayesianBlackLittermanPrior,
-                             <:EntropyPoolingPrior, <:MeucciEntropyPoolingPrior})
+    pending_choice(pe::Union{FactorPrior, FactorBlackLittermanPrior,
+                             AugmentedBlackLittermanPrior})
+    pending_choice(pe::Union{HighOrderPriorEstimator, HighOrderFactorPriorEstimator,
+                             BlackLittermanPrior, BayesianBlackLittermanPrior,
+                             EntropyPoolingPrior, MeucciEntropyPoolingPrior})
     pending_choice(pe::OpinionPoolingPrior)
 
 Answers whether a regression, or a regression in the tree of a prior, holds a choice under a [`PinnedChoice`](@ref) that no fit has pinned yet.
@@ -1160,21 +1182,86 @@ The method that Julia selects is the algorithm.
   - [`pin_regression_choice`](@ref)
   - [`PinnedChoice`](@ref)
 """
-function pending_choice(::Union{Nothing, <:AbstractEstimator})
+function pending_choice(::Union{Nothing, AbstractEstimator})
     return false
 end
-function pending_choice(pe::Union{<:FactorPrior, <:FactorBlackLittermanPrior,
-                                  <:AugmentedBlackLittermanPrior})
+function pending_choice(pe::Union{FactorPrior, FactorBlackLittermanPrior,
+                                  AugmentedBlackLittermanPrior})
     return pending_choice(pe.re)
 end
-function pending_choice(pe::Union{<:HighOrderPriorEstimator,
-                                  <:HighOrderFactorPriorEstimator, <:BlackLittermanPrior,
-                                  <:BayesianBlackLittermanPrior, <:EntropyPoolingPrior,
-                                  <:MeucciEntropyPoolingPrior})
+function pending_choice(pe::Union{HighOrderPriorEstimator, HighOrderFactorPriorEstimator,
+                                  BlackLittermanPrior, BayesianBlackLittermanPrior,
+                                  EntropyPoolingPrior, MeucciEntropyPoolingPrior})
     return pending_choice(pe.pe)
 end
 function pending_choice(pe::OpinionPoolingPrior)
     return pending_choice(pe.pe1) || any(pending_choice, pe.pes) || pending_choice(pe.pe2)
+end
+"""
+    adopt_pinned_choice(est, pinned)
+    adopt_pinned_choice(re::StepwiseRegression{<:Any, <:Any, <:Any, <:PinnedChoice},
+                        pinned::StepwiseRegression)
+    adopt_pinned_choice(re::DimensionReductionRegression{<:Any, <:Any, <:Any,
+                                                         <:PinnedChoice, Nothing},
+                        pinned::DimensionReductionRegression)
+    adopt_pinned_choice(pe::Union{FactorPrior, FactorBlackLittermanPrior,
+                                  AugmentedBlackLittermanPrior}, pinned)
+    adopt_pinned_choice(pe::Union{HighOrderPriorEstimator, HighOrderFactorPriorEstimator,
+                                  BlackLittermanPrior, BayesianBlackLittermanPrior,
+                                  EntropyPoolingPrior, MeucciEntropyPoolingPrior}, pinned)
+    adopt_pinned_choice(pe::OpinionPoolingPrior, pinned::OpinionPoolingPrior)
+
+Write the choice that [`pin_prior_choice`](@ref) pinned into `pinned` into the estimator `est`, and keep every other field of `est`.
+
+[`pin_buffer_choice`](@ref) pins a copy of the prior cut at the observations that a Shared Series gap keeps, because the fit that the pin runs drops the marked observations and their weights. The copy is the same tree as the prior, with its observation weights cut and with no `cache`. The pin writes only the choice fields, so this function reads the choice fields of the copy and writes them into the prior, which keeps its full weights and its buffer. The methods follow the tree of [`pending_choice`](@ref).
+
+# Algorithm
+
+The method that Julia selects on `est` is the algorithm.
+
+ 1. Any other value, `nothing` among them: return `est`. It holds no choice to pin. The method takes a value of any type, as the fallback of [`obs_weights_view`](@ref) does, because a field of a prior can hold a value that is not an estimator.
+ 2. A [`StepwiseRegression`](@ref) under a [`PinnedChoice`](@ref): return `re` rebuilt with `pinned.included`.
+ 3. A [`DimensionReductionRegression`](@ref) under a [`PinnedChoice`](@ref) whose `proj` is `nothing`: return `re` when `pinned.proj` is `nothing`, and otherwise `re` rebuilt with `pinned.proj`.
+ 4. A prior that fits `pe.re` on the returns: apply this function to `pe.re` and `pinned.re`, and rebuild `pe` with the answer when it differs.
+ 5. A prior that embeds a prior in `pe.pe`: apply this function to `pe.pe` and `pinned.pe`, and rebuild `pe` with the answer when it differs.
+ 6. An [`OpinionPoolingPrior`](@ref): apply this function to `pe.pe1`, to each prior of `pe.pes` and to `pe.pe2`, each with its counterpart in `pinned`, and rebuild `pe` with the answers.
+
+# Arguments
+
+  - `est`, `re`, `pe`: The estimator that the step keeps, or another value of its tree.
+  - `pinned`: The same estimator, cut at the kept observations, after [`pin_prior_choice`](@ref).
+
+# Returns
+
+  - `est`: The estimator with the pinned choice.
+
+# Related
+
+  - [`pin_buffer_choice`](@ref)
+  - [`pin_prior_choice`](@ref)
+  - [`pending_choice`](@ref)
+  - [`shared_series_buffer_fit`](@ref)
+"""
+function adopt_pinned_choice(est, ::Any)
+    return est
+end
+function adopt_pinned_choice(pe::Union{FactorPrior, FactorBlackLittermanPrior,
+                                       AugmentedBlackLittermanPrior}, pinned)
+    re = adopt_pinned_choice(pe.re, pinned.re)
+    return re === pe.re ? pe : rebuild_estimator(pe, (; re = re))
+end
+function adopt_pinned_choice(pe::Union{HighOrderPriorEstimator,
+                                       HighOrderFactorPriorEstimator, BlackLittermanPrior,
+                                       BayesianBlackLittermanPrior, EntropyPoolingPrior,
+                                       MeucciEntropyPoolingPrior}, pinned)
+    inner = adopt_pinned_choice(pe.pe, pinned.pe)
+    return inner === pe.pe ? pe : rebuild_estimator(pe, (; pe = inner))
+end
+function adopt_pinned_choice(pe::OpinionPoolingPrior, pinned::OpinionPoolingPrior)
+    pes = [adopt_pinned_choice(p, q) for (p, q) in zip(pe.pes, pinned.pes)]
+    return rebuild_estimator(pe,
+                             (; pe1 = adopt_pinned_choice(pe.pe1, pinned.pe1), pes = pes,
+                              pe2 = adopt_pinned_choice(pe.pe2, pinned.pe2)))
 end
 """
 $(DocStringExtensions.TYPEDSIGNATURES)
@@ -1306,7 +1393,7 @@ $(DocStringExtensions.TYPEDSIGNATURES)
 
 Reads the keywords that the refit route of a prior, and the carry fold of a [`CrossSectionalFactorPrior`](@ref), fold from the Exogenous Series of a step, and refuses a step that brings no series to a prior that reads it.
 
-A prior whose tree reads the series, as [`reads_exogenous_series`](@ref) answers, owns it on the online step. Its buffer records every column of `rd.E` and the names `rd.ne`, and the first step fixes the names. A step that brings no series would leave the buffer with rows that the fit cannot read, so it is refused. A prior that reads no series gives no keyword, and the Fold Context keeps the series. A non-finite value of the series is not refused here. The fit refuses it on the rows that it reads, and a later cap can drop such a row.
+A prior whose tree reads the series, as [`reads_exogenous_series`](@ref) answers, owns it on the online step. Its buffer records every column of `rd.E` and the names `rd.ne`, and the first step fixes the names. A step that brings no series would leave the buffer with rows that the fit cannot read, so it is refused when the fit reads a series on the data of the step, as `reads_exogenous_series(pe, rd)` answers. A [`CurrencyExposure`](@ref) whose every level is its base currency reads none, so such a step gives no keyword, and the buffer records no series. The first step fixes whether the buffer records the series, and the buffer refuses a later step that disagrees. A prior that reads no series gives no keyword, and the Fold Context keeps the series. A non-finite value of the series is not refused here. The fit refuses it on the rows that it reads, and a later cap can drop such a row.
 
 # Arguments
 
@@ -1315,11 +1402,11 @@ A prior whose tree reads the series, as [`reads_exogenous_series`](@ref) answers
 
 # Validation
 
-  - `rd.E` is not `nothing` when `reads_exogenous_series(pe)` is `true`. An `IsNothingError` is thrown otherwise.
+  - `rd.E` is not `nothing` when `reads_exogenous_series(pe, rd)` is `true`. An `IsNothingError` is thrown otherwise.
 
 # Returns
 
-  - `kwargs::NamedTuple`: `ne` and `E` of `rd` when the prior reads the series, and an empty `NamedTuple` otherwise.
+  - `kwargs::NamedTuple`: `ne` and `E` of `rd` when the prior reads the series and the step carries it, and an empty `NamedTuple` otherwise.
 
 # Related
 
@@ -1331,8 +1418,16 @@ function exogenous_step_kwargs(pe::AbstractPriorEstimator, rd::ReturnsResult)
     if !reads_exogenous_series(pe)
         return (;)
     end
-    @argcheck(!isnothing(rd.E),
+    return exogenous_step_kwargs(pe, rd, rd.E)
+end
+function exogenous_step_kwargs(pe::AbstractPriorEstimator, rd::ReturnsResult, ::Nothing)
+    # A tree can read no series on the data of a step, as a Currency Exposure whose every
+    # level is its base currency reads none, so only a step whose fit reads one is refused.
+    @argcheck(!reads_exogenous_series(pe, rd),
               IsNothingError("the estimator tree of `$(nameof(typeof(pe)))` reads the Exogenous Series, which its buffer records at every step, and this step carries no `rd.E`. Give every step the series, with one column per name that the first step fixed."))
+    return (;)
+end
+function exogenous_step_kwargs(::AbstractPriorEstimator, rd::ReturnsResult, ::MatNum)
     return (; ne = rd.ne, E = rd.E)
 end
 """
@@ -1350,7 +1445,7 @@ A buffer records the Panel Fields only for a prior whose tree reads them, as [`r
 
 # Validation
 
-  - `pnl.pf` is empty, or `reads_panel_fields(pe)` is `true`. An `ArgumentError` is thrown otherwise.
+  - `pnl.pf` is `nothing`, or `reads_panel_fields(pe)` is `true`. An `ArgumentError` is thrown otherwise.
 
 # Returns
 
@@ -1364,11 +1459,16 @@ A buffer records the Panel Fields only for a prior whose tree reads them, as [`r
 """
 function step_panel_fields(pe::AbstractPriorEstimator, pnl::AssetPanel,
                            route::AbstractString)::Bool
-    if isempty(pnl.pf)
-        return false
-    end
+    return step_panel_fields(pe, pnl, route, pnl.pf)
+end
+function step_panel_fields(::AbstractPriorEstimator, ::AssetPanel, ::AbstractString,
+                           ::Nothing)::Bool
+    return false
+end
+function step_panel_fields(pe::AbstractPriorEstimator, ::AssetPanel, route::AbstractString,
+                           pf::AbstractVector{<:AbstractPanelField})::Bool
     @argcheck(reads_panel_fields(pe),
-              ArgumentError("$route reads no Panel Field, and this Asset Panel holds $(length(pnl.pf)) Panel Field(s). A prior's buffer records the Panel Fields only when its estimator tree reads them, so the step has nowhere to keep these, and `optimise(opt)` with no returns could not rebuild the panel. Drop the fields from the panel handed to the step, or fit in batch."))
+              ArgumentError("$route reads no Panel Field, and this Asset Panel holds $(length(pf)) Panel Field(s). A prior's buffer records the Panel Fields only when its estimator tree reads them, so the step has nowhere to keep these, and `optimise(opt)` with no returns could not rebuild the panel. Drop the fields from the panel handed to the step, or fit in batch."))
     return true
 end
 """
@@ -1478,8 +1578,8 @@ Each step of the carry folds `pe.me` and `pe.ce` on the same observations, so th
 """
 function fold_carry_members(pe::EmpiricalPrior, X::VecNum_MatNum; kwargs...)
     assert_cold_carry_entry(pe, pe.cache, "EmpiricalPrior")
-    pe = Accessors.@reset pe.me = fold_member(pe.me, X; kwargs...)
-    return Accessors.@reset pe.ce = fold_member(pe.ce, X; kwargs...)
+    pe = rebuild_estimator(pe, (; me = fold_member(pe.me, X; kwargs...)))
+    return rebuild_estimator(pe, (; ce = fold_member(pe.ce, X; kwargs...)))
 end
 """
 $(DocStringExtensions.TYPEDSIGNATURES)
@@ -1581,8 +1681,8 @@ function partial_fit!(pe::EmpiricalPrior{<:Any, <:Any, Nothing, <:Any, <:Any,
                       ::Option{<:VecNum_MatNum} = nothing; iv::Option{<:VecNum} = nothing,
                       ivpa::Option{<:Num_VecNum} = nothing, kwargs...)
     pe = fold_carry_members(pe, x; kwargs...)
-    return Accessors.@reset pe.cache = fold_carry(pe.cache, x; iv = iv, ivpa = ivpa,
-                                                  kwargs...)
+    cache = fold_carry(pe.cache, x; iv = iv, ivpa = ivpa, kwargs...)
+    return rebuild_estimator(pe, (; cache = cache))
 end
 function partial_fit!(pe::EmpiricalPrior{<:Any, <:Any, Nothing, <:Any, <:Any,
                                          <:Option{<:PriorCarryState}}, X::MatNum,
@@ -1592,16 +1692,16 @@ function partial_fit!(pe::EmpiricalPrior{<:Any, <:Any, Nothing, <:Any, <:Any,
     X, iv = dims_oriented(dims, X, iv)
     Xm, kw = shared_series_member_rows(X, gaps; kwargs...)
     pe = fold_carry_members(pe, Xm; dims = 1, kw...)
-    return Accessors.@reset pe.cache = fold_carry(pe.cache, X; dims = 1, iv = iv,
-                                                  ivpa = ivpa, gaps = gaps, kwargs...)
+    cache = fold_carry(pe.cache, X; dims = 1, iv = iv, ivpa = ivpa, gaps = gaps, kwargs...)
+    return rebuild_estimator(pe, (; cache = cache))
 end
 function partial_fit!(pe::EmpiricalPrior{<:Any, <:Any, <:Number, <:Any, <:Any,
                                          <:Option{<:PriorCarryState}}, x::VecNum,
                       ::Option{<:VecNum_MatNum} = nothing; iv::Option{<:VecNum} = nothing,
                       ivpa::Option{<:Num_VecNum} = nothing, kwargs...)
     pe = fold_carry_members(pe, log1p.(x); kwargs...)
-    return Accessors.@reset pe.cache = fold_carry(pe.cache, x; iv = iv, ivpa = ivpa,
-                                                  kwargs...)
+    cache = fold_carry(pe.cache, x; iv = iv, ivpa = ivpa, kwargs...)
+    return rebuild_estimator(pe, (; cache = cache))
 end
 function partial_fit!(pe::EmpiricalPrior{<:Any, <:Any, <:Number, <:Any, <:Any,
                                          <:Option{<:PriorCarryState}}, X::MatNum,
@@ -1611,8 +1711,8 @@ function partial_fit!(pe::EmpiricalPrior{<:Any, <:Any, <:Number, <:Any, <:Any,
     X, iv = dims_oriented(dims, X, iv)
     Xm, kw = shared_series_member_rows(X, gaps; kwargs...)
     pe = fold_carry_members(pe, log1p.(Xm); dims = 1, kw...)
-    return Accessors.@reset pe.cache = fold_carry(pe.cache, X; dims = 1, iv = iv,
-                                                  ivpa = ivpa, gaps = gaps, kwargs...)
+    cache = fold_carry(pe.cache, X; dims = 1, iv = iv, ivpa = ivpa, gaps = gaps, kwargs...)
+    return rebuild_estimator(pe, (; cache = cache))
 end
 """
     fold_prior_step(pe::EmpiricalPrior{<:Any, <:Any, <:Any, <:Any, <:Any,
@@ -1745,242 +1845,4 @@ function step_active_kwargs(::AssetPanel{<:Any, Nothing, Nothing})
 end
 function step_active_kwargs(pnl::AssetPanel)
     return (; active_mask = pnl.amsk)
-end
-"""
-    prior(pe::EmpiricalPrior{<:Any, <:Any, Nothing, <:Any, <:Any,
-                             <:Option{<:PriorCarryState}}; strict::Bool = false, kwargs...)
-    prior(pe::EmpiricalPrior{<:Any, <:Any, <:Number, <:Any, <:Any,
-                             <:Option{<:PriorCarryState}}; strict::Bool = false, kwargs...)
-
-Reads an [`EmpiricalPrior`](@ref) out of its fold, with no data matrix.
-
-`mu` comes from `pe.me`, `sigma` comes from `pe.ce`, and `X` is the matrix that the carry state already holds, less the observations that it marks with a Shared Series gap. The members never folded those observations, and [`shared_series_buffer`](@ref) drops them from the rows, so the result is the batch fit over the observations that the batch fit keeps. The method copies the rows, and does not refit a member that folded. The horizon method then applies the algebra of the batch method through [`horizon_moments!`](@ref), which holds that algebra once.
-
-`pe.max_scenarios` cuts the rows that the result carries, as it does in batch, and the fill runs over the rows that remain. When the cap cuts, `ens` holds the number of observations folded, through [`scenario_ens`](@ref), so a consumer that prices a sample size reads ``T`` and not the number of rows carried. The named-asset set of the carry state limits the notice of the fill, so a walk-forward names an asset at the first step whose fill reaches it, and at no later step.
-
-A member that the method refits takes the [`AssetPanel`](@ref) that [`buffer_asset_panel`](@ref) rebuilds from the carried buffer, as the batch fit gives it `rd.pnl`. The buffer records the active mask of each step. So a member that the method refits answers on the Coverage Universe of a batch fit, on a gapped sample and under a time-varying panel. A member that folds read the active mask at each step of its fold, as the keyword form of its verb reads it.
-
-# Mathematical definition
-
-```math
-\\begin{align}
-\\mathcal{P}_T &= \\mathcal{P}(\\mathbf{X})\\,, \\\\
-\\mathbf{X} &= \\begin{bmatrix} \\boldsymbol{x}_1 & \\cdots & \\boldsymbol{x}_T \\end{bmatrix}^\\intercal\\,.
-\\end{align}
-```
-
-Where:
-
-  - $(math_dict[:P_fold_prior])
-  - $(math_dict[:P_batch_prior])
-  - $(math_dict[:X_returns])
-  - $(math_dict[:x_t_obs])
-  - $(math_dict[:T])
-
-The equality holds for `mu`, `sigma`, `X` and `ens`, with and without a horizon, and under a Scenario Cap. In floating point, the moments of a member that folds differ from the batch moments by rounding, and every other entry is equal.
-
-# Algorithm
-
- 1. Read the carry state with [`partial_fit_cache`](@ref), giving `state`.
- 2. Resolve the fill limit against the coverage floor of the members with [`resolve_fill_limit`](@ref), as the batch method does, giving `fill_limit`.
- 3. Drop the carried rows of a Shared Series gap with [`shared_series_buffer`](@ref), and read the rows that remain with [`sample_buffer`](@ref), giving `X`. Under the horizon method, take `log1p` of the rows, giving `Xl`.
- 4. Read `mu` and `sigma` through [`read_member`](@ref), which refits a member that did not fold over `X`, or over `Xl` under the horizon method. A member that it refits also takes the panel of [`buffer_asset_panel`](@ref), and the implied volatilities and `ivpa` that [`implied_volatility_buffer_kwargs`](@ref) reads from the carried buffer, as the batch verb gives `rd.pnl`, `rd.iv` and `rd.ivpa` to both members. A covariance that it refits is the [`library_covariance_estimator`](@ref) of `pe.ce`, as in the batch verb. An [`ImpliedVolatility`](@ref) has no fold, so it is such a member.
- 5. Under the horizon method, convert `mu` and `sigma` with [`horizon_moments!`](@ref).
- 6. Cut the carried rows to `pe.max_scenarios` with [`scenario_window`](@ref), and copy them into a new matrix `Xs`, because the next fold writes into the storage of the buffer.
- 7. Fill `Xs` with [`scenario_fill`](@ref), and build a [`LowOrderPrior`](@ref) whose `ens` [`scenario_ens`](@ref) reads from the rows before the cut.
- 8. Record the observations of the buffer that step 3 dropped with [`shared_series_record`](@ref), and return the prior.
-
-# Arguments
-
-  - `pe`: Empirical prior estimator carrying a [`PriorCarryState`](@ref).
-  - `strict`: Whether a zero-filled scenario raises rather than warns. It also reaches the covariance, where a peel of a [`CoveragePolicy`](@ref) refuses under `strict` and warns otherwise.
-  - `kwargs...`: Additional keyword arguments, forwarded to the batch verb of a member that did not fold.
-
-# Validation
-
-  - `pe.cache` is not `nothing`. An `ArgumentError` is thrown otherwise.
-  - Under `strict`, no investable column needs a fill. An `ArgumentError` is thrown otherwise.
-  - The rules of [`shared_series_buffer`](@ref).
-
-# Returns
-
-  - `pr::LowOrderPrior`: Result object containing asset returns, mean vector, and covariance matrix.
-
-# Related
-
-  - [`EmpiricalPrior`](@ref)
-  - [`PriorCarryState`](@ref)
-  - [`partial_fit!`](@ref)
-  - [`scenario_window`](@ref)
-  - [`scenario_fill`](@ref)
-  - [`horizon_moments!`](@ref)
-  - [`buffer_asset_panel`](@ref)
-"""
-function prior(pe::EmpiricalPrior{<:Any, <:Any, Nothing, <:Any, <:Any,
-                                  <:Option{<:PriorCarryState}}; strict::Bool = false,
-               kwargs...)
-    state = partial_fit_cache(pe)
-    fill_limit = resolve_fill_limit(pe.fill_limit, coverage_floor(pe))
-    buf = shared_series_buffer(state.buf)
-    X = sample_buffer(buf)
-    pnl = buffer_asset_panel(buf)
-    vols = implied_volatility_buffer_kwargs(buf)
-    mu = vec(read_member(Statistics.mean, pe.me, X, pnl; vols..., kwargs...))
-    # A raw `StatsBase` estimator has no Coverage Policy, so it peels nothing and takes no
-    # `strict`.
-    shared = isa(pe.ce, AbstractCovarianceEstimator) ? (; strict = strict) : (;)
-    sigma = read_member(Statistics.cov, pe.ce, X, pnl;
-                        batch = library_covariance_estimator(pe.ce), shared = shared,
-                        vols..., kwargs...)
-    # Materialised, not viewed: the buffer's backing matrix is written and reallocated by the
-    # next fold, and a Result holding a view of it would change under its holder.
-    Xs = Matrix(scenario_window(pe.max_scenarios, X))
-    pr = LowOrderPrior(; X = scenario_fill(Xs, mu, sigma, strict, fill_limit, state.named),
-                       mu = mu, sigma = sigma, ens = scenario_ens(pe.max_scenarios, X),
-                       x_src = pe.x_src)
-    return shared_series_record(pr, state.buf)
-end
-function prior(pe::EmpiricalPrior{<:Any, <:Any, <:Number, <:Any, <:Any,
-                                  <:Option{<:PriorCarryState}}; strict::Bool = false,
-               kwargs...)
-    state = partial_fit_cache(pe)
-    fill_limit = resolve_fill_limit(pe.fill_limit, coverage_floor(pe))
-    buf = shared_series_buffer(state.buf)
-    X = sample_buffer(buf)
-    # The arms were folded on the log-returns, so a member that did not fold is refitted on
-    # them too. The carried rows are the arithmetic ones the caller handed in.
-    Xl = log1p.(X)
-    pnl = buffer_asset_panel(buf)
-    vols = implied_volatility_buffer_kwargs(buf)
-    mu = vec(read_member(Statistics.mean, pe.me, Xl, pnl; vols..., kwargs...))
-    # A raw `StatsBase` estimator has no Coverage Policy, so it peels nothing and takes no
-    # `strict`.
-    shared = isa(pe.ce, AbstractCovarianceEstimator) ? (; strict = strict) : (;)
-    sigma = read_member(Statistics.cov, pe.ce, Xl, pnl;
-                        batch = library_covariance_estimator(pe.ce), shared = shared,
-                        vols..., kwargs...)
-    horizon_moments!(mu, sigma, pe.horizon)
-    Xs = Matrix(scenario_window(pe.max_scenarios, X))
-    pr = LowOrderPrior(; X = scenario_fill(Xs, mu, sigma, strict, fill_limit, state.named),
-                       mu = mu, sigma = sigma, ens = scenario_ens(pe.max_scenarios, X),
-                       x_src = pe.x_src)
-    return shared_series_record(pr, state.buf)
-end
-"""
-    partial_fit!(pe::BlackLittermanPrior, X, F = nothing; kwargs...)
-
-Folds observations into a [`BlackLittermanPrior`](@ref) by forwarding them to its embedded prior.
-
-The estimator keeps no buffer, for the reason that [`HighOrderPriorEstimator`](@ref) keeps none. It returns [`forward_prior`](@ref) of the result of its embedded prior, so the rows it needs are one level down. The factor observations go down with the rows, as the batch verb passes `F` down. The views are configuration, and they fold nothing.
-
-# Arguments
-
-  - `pe`: Black-Litterman prior estimator.
-  - `X`: Observations to fold, a matrix of rows or one observation.
-  - `F`: The factor observations beside `X`, or `nothing`. The method forwards them to the embedded prior.
-  - `kwargs...`: Additional keyword arguments, forwarded to the embedded prior.
-
-# Validation
-
-  - `pe.pe` folds. The embedded prior refuses the fold otherwise, with an error that names the wrapper that gives it a buffer.
-
-# Returns
-
-  - `pe`: The estimator, with its embedded prior folded.
-
-# Related
-
-  - [`BlackLittermanPrior`](@ref)
-  - [`prior`](@ref)
-  - [`bl_posterior`](@ref)
-"""
-function partial_fit!(pe::BlackLittermanPrior, X::VecNum_MatNum,
-                      F::Option{<:VecNum_MatNum} = nothing; kwargs...)
-    return rebuild_estimator(pe, (; pe = partial_fit!(pe.pe, X, F; kwargs...)))
-end
-"""
-    prior(pe::BlackLittermanPrior; strict::Bool = false, kwargs...)
-
-Reads a [`BlackLittermanPrior`](@ref) out of its fold, with no data matrix.
-
-The embedded prior answers first, and [`bl_posterior`](@ref) is the body of the batch method, unchanged. That body reads every number from the result and none from a returns matrix. These numbers are the number of observations behind `tau`, the asset axis, and the matrix that the processing runs over. So the fold and the batch fit run one body.
-
-# Mathematical definition
-
-```math
-\\begin{align}
-\\mathcal{P}_T &= \\mathcal{P}(\\mathbf{X})\\,.
-\\end{align}
-```
-
-Where:
-
-  - $(math_dict[:P_fold_prior])
-  - $(math_dict[:P_batch_prior])
-  - $(math_dict[:X_returns])
-
-# Algorithm
-
- 1. Read the embedded result `prior_model` out of `pe.pe` with [`prior`](@ref), passing `strict`.
- 2. Check the asset axis of the views against `prior_model.X` with [`assert_bl_views_axis`](@ref).
- 3. Compute the posterior with [`bl_posterior`](@ref), and return it.
-
-# Arguments
-
-  - `pe`: Black-Litterman prior estimator whose embedded prior carries a state.
-  - `strict`: Whether an unresolved view raises rather than warns.
-  - `kwargs...`: Additional keyword arguments, forwarded to the embedded prior and the processing.
-
-# Validation
-
-  - Every condition that `prior(pe.pe)` with no data checks.
-  - The views of a [`LinearConstraintEstimator`](@ref) name one entry per asset of `prior_model.X`. A `DimensionMismatch` is thrown otherwise.
-
-# Returns
-
-  - `pr::AbstractPriorResult`: The embedded result with its two moments replaced by the posteriors.
-
-# Related
-
-  - [`BlackLittermanPrior`](@ref)
-  - [`bl_posterior`](@ref)
-  - [`assert_bl_views_axis`](@ref)
-  - [`partial_fit!`](@ref)
-"""
-function prior(pe::BlackLittermanPrior; strict::Bool = false, kwargs...)
-    prior_model = prior(pe.pe; strict = strict, kwargs...)
-    assert_bl_views_axis(pe, prior_model.X)
-    return stamp_returns_source(bl_posterior(pe, prior_model, strict; kwargs...), pe)
-end
-"""
-    update_online_estimator(pe::Union{<:HighOrderPriorEstimator, <:BlackLittermanPrior})
-
-Resolves the [`Online`](@ref) declarations under the prior that a wrapping prior embeds, at warm-up.
-
-The generic method scans the fields of the wrapping prior alone, and a wrapping prior holds its embedded prior in its own `pe` field, so the wrapping prior defines the recursion itself. `HighOrderPriorEstimator(; pe = BlackLittermanPrior(; pe = Online(EmpiricalPrior()), ...))` resolves through this method. The generic scan of the own fields of the wrapping prior finds no wrapper there, because `pe` holds a plain prior, so the generic method would leave the wrapper two levels down unseeded. A wrapper in the own `pe` of the wrapping prior, as in `HighOrderPriorEstimator(; pe = Online(EmpiricalPrior()))`, is seeded the same way, because the recursion meets it at the first level. The generic method still scans the co-moments of a [`HighOrderPriorEstimator`](@ref).
-
-# Algorithm
-
- 1. Resolve every field that [`online_fields`](@ref) names with [`update_online_estimator`](@ref), giving `repl`.
- 2. Resolve `pe.pe` with [`update_online_estimator`](@ref), which recurses through a wrapping prior.
- 3. Rebuild the prior from `repl` and the resolved `pe.pe`, the second taking precedence for `pe`, and return it.
-
-# Arguments
-
-  - `pe`: The wrapping prior.
-
-# Returns
-
-  - `pe`: The prior, with every wrapper under its embedded prior resolved.
-
-# Related
-
-  - [`update_online_estimator`](@ref)
-  - [`Online`](@ref)
-"""
-function update_online_estimator(pe::Union{<:HighOrderPriorEstimator,
-                                           <:BlackLittermanPrior})
-    fns = online_fields(pe)
-    repl = NamedTuple{fns}(map(f -> update_online_estimator(getfield(pe, f)), fns))
-    return rebuild_estimator(pe, merge(repl, (; pe = update_online_estimator(pe.pe))))
 end

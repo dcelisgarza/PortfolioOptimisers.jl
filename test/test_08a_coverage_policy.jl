@@ -12,6 +12,37 @@ function PortfolioOptimisers.fold_inactive!(::AdmitEverything,
                                             ::AbstractVector{<:Bool})
     return state
 end
+using Statistics: Statistics
+# Estimators of a caller's, with no Asset Panel method of their own: they meet the generic roots.
+struct VarProbe <: PortfolioOptimisers.AbstractCovarianceEstimator end
+function Statistics.var(::VarProbe, X::PortfolioOptimisers.MatNum; dims::Int = 1, kwargs...)
+    return var(SimpleVariance(), X; dims = dims)
+end
+function Statistics.std(::VarProbe, X::PortfolioOptimisers.MatNum; dims::Int = 1, kwargs...)
+    return std(SimpleVariance(), X; dims = dims)
+end
+struct SkewProbe <: PortfolioOptimisers.CoskewnessEstimator end
+function PortfolioOptimisers.coskewness(::SkewProbe, X::PortfolioOptimisers.MatNum;
+                                        dims::Int = 1, kwargs...)
+    return coskewness(Coskewness(), X; dims = dims)
+end
+struct KurtProbe <: PortfolioOptimisers.CokurtosisEstimator end
+function PortfolioOptimisers.cokurtosis(::KurtProbe, X::PortfolioOptimisers.MatNum;
+                                        dims::Int = 1, kwargs...)
+    return cokurtosis(Cokurtosis(), X; dims = dims)
+end
+# A dynamic weight of a caller's: a decay over the length of the sample it reads (#1956).
+struct DecayProbe1956 <: PortfolioOptimisers.DynamicAbstractWeights end
+function PortfolioOptimisers.get_observation_weights(::DecayProbe1956,
+                                                     X::PortfolioOptimisers.VecNum;
+                                                     kwargs...)
+    return StatsBase.aweights(0.9 .^ ((length(X) - 1):-1:0))
+end
+function PortfolioOptimisers.get_observation_weights(::DecayProbe1956,
+                                                     X::PortfolioOptimisers.MatNum;
+                                                     dims::Int = 1, kwargs...)
+    return StatsBase.aweights(0.9 .^ ((size(X, dims) - 1):-1:0))
+end
 function coverage_panel(amsk)
     pf = [PortfolioOptimisers.NumericPanelField(; name = "mcap", vals = ones(size(amsk)...),
                                                 omsk = trues(size(amsk)...))]
@@ -118,9 +149,9 @@ end
     # The variance read-out and the covariance diagonal are the same numbers.
     @test LinearAlgebra.diag(sigma) == vec(var(Covariance(; cvg = cvg), X))
 end
-@testset "A pair with no shared observation is NaN under NoPeel, and the assets around it are not" begin
+@testset "A pair with no shared observation is NaN with no peel, and the assets around it are not" begin
     X = [1.0 NaN; NaN 2.0; 3.0 NaN; NaN 4.0]
-    cvg = CoveragePolicy(; peel = NoPeel())
+    cvg = CoveragePolicy(; peel = nothing)
     sigma = cov(Covariance(; cvg = cvg), X)
     @test isfinite(sigma[1, 1])
     @test isfinite(sigma[2, 2])
@@ -275,6 +306,51 @@ end
               (isa(whole.cvg.nu, AbstractMatrix) ? whole.cvg.nu[i, i] : whole.cvg.nu[i])
     end
 end
+@testset "A state under a policy merges an asset that neither block observed" begin
+    rng = StableRNG(1912)
+    X = randn(rng, 10, 3)
+    amsk = trues(10, 3)
+    amsk[:, 3] .= false
+    X[:, 3] .= NaN
+    cvg = CoveragePolicy()
+    for est in (SimpleExpectedReturns(; cvg = cvg), SimpleVariance(; cvg = cvg),
+                Covariance(; cvg = cvg))
+        a = partial_fit!(est, view(X, 1:5, :); active_mask = view(amsk, 1:5, :)).cache
+        b = partial_fit!(est, view(X, 6:10, :); active_mask = view(amsk, 6:10, :)).cache
+        m = PortfolioOptimisers.merge_states(a, b)
+        @test m.n == 10
+        # The asset with no observation in either block stays at the zero seed.
+        @test iszero(m.mu[3])
+        if hasproperty(m, :M)
+            @test if isa(m.M, AbstractMatrix)
+                all(iszero, m.M[3, :]) && all(iszero, m.M[:, 3])
+            else
+                iszero(m.M[3])
+            end
+        end
+    end
+end
+@testset "A state with no policy is given the counts of the policy of the estimator" begin
+    x = [1.0, 2.0, 3.0]
+    cvg = CoveragePolicy()
+    for (plain, seeded_est, seed) in
+        ((SimpleExpectedReturns(), SimpleExpectedReturns(; cvg = cvg),
+          PortfolioOptimisers.expected_returns_state_seed),
+         (SimpleVariance(), SimpleVariance(; cvg = cvg),
+          PortfolioOptimisers.variance_state_seed),
+         (Covariance(), Covariance(; cvg = cvg), PortfolioOptimisers.covariance_state_seed))
+        old = partial_fit!(plain, x).cache
+        @test isnothing(old.cvg)
+        @test seed(old, x) === old
+        s = seed(old, x, cvg)
+        @test !isnothing(s.cvg)
+        @test s.n == old.n && s.mu == old.mu
+        @test s !== old
+    end
+    # Every configuration of these estimators folds.
+    @test PortfolioOptimisers.supports_partial_fit(SimpleVariance())
+    @test PortfolioOptimisers.supports_partial_fit(PortfolioOptimisers.GeneralCovariance())
+end
 @testset "The Asset Panel seam hands a policed estimator the active mask" begin
     rng = StableRNG(777)
     T, N = 30, 3
@@ -306,6 +382,37 @@ end
     @test isfinite(series[end, 3])
     plain_series = PortfolioOptimisers.variance_series(SimpleVariance(), X, pnl)
     @test all(isnan, plain_series[:, 3])
+    cov_series = PortfolioOptimisers.variance_series(Covariance(), X, pnl)
+    @test size(cov_series) == size(plain_series)
+    @test all(isnan, cov_series[:, 3])
+    @test isapprox(cov_series, plain_series; nans = true)
+    # An estimator with no Asset Panel method of its own meets the generic roots, which reduce
+    # to the Coverage Universe, fit on it and expand with `NaN` for the asset left out.
+    wv = WindowedVariance(; window = T)
+    sv = var(SimpleVariance(), X[:, 1:2])
+    @test vec(var(wv, X, pnl))[1:2] ≈ vec(sv)
+    @test isnan(vec(var(wv, X, pnl))[3])
+    @test vec(std(wv, X, pnl))[1:2] ≈ sqrt.(vec(sv))
+    @test isnan(vec(std(wv, X, pnl))[3])
+    keep = [1, 2, 4, 5]
+    sk = first(coskewness(WindowedCoskewness(; window = T), X, pnl))
+    @test size(sk) == (3, 9)
+    @test all(isnan, sk[3, :])
+    @test sk[1:2, keep] ≈ first(coskewness(Coskewness(), X[:, 1:2]))
+    ku = cokurtosis(WindowedCokurtosis(; window = T), X, pnl)
+    @test size(ku) == (9, 9)
+    @test ku[keep, keep] ≈ cokurtosis(Cokurtosis(), X[:, 1:2])
+    # The same through estimators that state nothing of the panel.
+    @test vec(var(VarProbe(), X, pnl))[1:2] ≈ vec(sv)
+    @test isnan(vec(var(VarProbe(), X, pnl))[3])
+    @test vec(std(VarProbe(), X, pnl))[1:2] ≈ sqrt.(vec(sv))
+    @test isnan(vec(std(VarProbe(), X, pnl))[3])
+    pk = first(coskewness(SkewProbe(), X, pnl))
+    @test size(pk) == (3, 9) && all(isnan, pk[3, :])
+    @test pk[1:2, keep] ≈ first(coskewness(Coskewness(), X[:, 1:2]))
+    pku = cokurtosis(KurtProbe(), X, pnl)
+    @test size(pku) == (9, 9)
+    @test pku[keep, keep] ≈ cokurtosis(Cokurtosis(), X[:, 1:2])
 end
 @testset "An available-case fit refuses a centre and a weight it cannot reproduce" begin
     X = randn(StableRNG(5), 16, 3)
@@ -314,15 +421,155 @@ end
     @test_throws ArgumentError cov(Covariance(; cvg = cvg), X; mean = zeros(1, 3))
     @test_throws ArgumentError cov(Covariance(; alg = SemiMoment(), cvg = cvg), X;
                                    mean = zeros(1, 3))
-    @test_throws ArgumentError mean(SimpleExpectedReturns(;
-                                                          w = StatsBase.pweights(fill(1 /
-                                                                                      16,
-                                                                                      16)),
-                                                          cvg = cvg), X)
+    # A weight vector of equal weights states the unweighted fit (#1956).
+    @test mean(SimpleExpectedReturns(; w = StatsBase.pweights(fill(1 / 16, 16)), cvg = cvg),
+               X) ≈ mean(SimpleExpectedReturns(; cvg = cvg), X)
     @test_throws DimensionMismatch partial_fit!(SimpleExpectedReturns(; cvg = cvg),
                                                 view(X, 1, :); active_mask = trues(2))
     @test_throws DimensionMismatch partial_fit!(Covariance(; cvg = cvg), X;
                                                 active_mask = trues(2, 3))
+end
+#=
+Issue 1956. An estimator with observation weights and a policy refused its batch fit, with a
+message that told the caller to run the batch verb they ran. Now the available-case arm fits each
+asset, each pair and each cell of a co-moment over its own valid rows, with the weights of those
+rows, as ADR 0229 (#1959) states: a dropped row takes its weight with it, the kept weights keep
+their type, and a dynamic weight resolves on the rows that the fit reads.
+=#
+@testset "A policy fits under observation weights, each cell on its own rows (#1956)" begin
+    X = randn(StableRNG(1956), 40, 4) .* 0.02
+    X[1:6, 2] .= NaN
+    X[30:33, 4] .= NaN
+    X[12, 1] = NaN
+    F = isfinite.(X)
+    T, N = size(X)
+    cvg = CoveragePolicy()
+    mp0 = MatrixProcessing(; pdm = nothing)
+    # Equal weights state the unweighted fold, at every order and under both algorithms.
+    u = StatsBase.aweights(ones(T))
+    @test mean(SimpleExpectedReturns(; w = u, cvg = cvg), X) ≈
+          mean(SimpleExpectedReturns(; cvg = cvg), X)
+    @test var(SimpleVariance(; w = u, cvg = cvg), X) ≈ var(SimpleVariance(; cvg = cvg), X)
+    for alg in (FullMoment(), SemiMoment())
+        @test cov(Covariance(; w = u, alg = alg, cvg = cvg), X) ≈
+              cov(Covariance(; alg = alg, cvg = cvg), X)
+        @test coskewness(Coskewness(; w = u, alg = alg, cvg = cvg), X)[1] ≈
+              coskewness(Coskewness(; alg = alg, cvg = cvg), X)[1]
+        @test cokurtosis(Cokurtosis(; w = u, alg = alg, mp = mp0, cvg = cvg), X) ≈
+              cokurtosis(Cokurtosis(; alg = alg, mp = mp0, cvg = cvg), X)
+    end
+    # Each asset, pair and cell reads its own finite rows, with the weights of those rows.
+    w = StatsBase.aweights(rand(StableRNG(19561), T) .+ 0.1)
+    cen = [mean(X[F[:, j], j], w[F[:, j]]) for j in 1:N]
+    v = [var(X[F[:, j], j], w[F[:, j]]; corrected = true) for j in 1:N]
+    @test vec(mean(SimpleExpectedReturns(; w = w, cvg = cvg), X)) ≈ cen
+    @test vec(var(SimpleVariance(; w = w, cvg = cvg), X)) ≈ v
+    @test vec(std(SimpleVariance(; w = w, cvg = cvg), X)) ≈ sqrt.(v)
+    @test var(SimpleVariance(; w = w, cvg = cvg), X[:, 2]) ≈ v[2]
+    sigma = [(r = F[:, i] .& F[:, j]; cov(X[r, [i, j]], w[r], 1; corrected = true)[1, 2])
+             for i in 1:N, j in 1:N]
+    @test cov(Covariance(; w = w, cvg = cvg), X) ≈ sigma
+    @test cor(Covariance(; w = w, cvg = cvg), X) ≈
+          StatsBase.cov2cor(sigma, sqrt.(LinearAlgebra.diag(sigma)))
+    Ys = min.(X .- transpose(cen), 0.0)
+    semi = [(r = F[:, i] .& F[:, j];
+             sum(w[r] .* Ys[r, i] .* Ys[r, j]) * StatsBase.varcorrection(w[r], true))
+            for i in 1:N, j in 1:N]
+    @test cov(Covariance(; w = w, alg = SemiMoment(), cvg = cvg), X) ≈ semi
+    Y = X .- transpose(cen)
+    cell(idx) = (r = vec(all(F[:, idx]; dims = 2));
+                 sum(w[r] .* vec(prod(Y[r, idx]; dims = 2))) / sum(w[r]))
+    sk = coskewness(Coskewness(; w = w, cvg = cvg), X)[1]
+    kt = cokurtosis(Cokurtosis(; w = w, mp = mp0, cvg = cvg), X)
+    @test all(sk[a, (i - 1) * N + j] ≈ cell([a, i, j]) for a in 1:N, i in 1:N, j in 1:N)
+    @test all(kt[(a - 1) * N + b, (c - 1) * N + d] ≈ cell([a, b, c, d])
+              for a in 1:N, b in 1:N, c in 1:N, d in 1:N)
+    # A dynamic weight resolves on the rows of each asset, each pair and each cell.
+    dw(n) = StatsBase.aweights(0.9 .^ ((n - 1):-1:0))
+    @test vec(var(SimpleVariance(; w = DecayProbe1956(), cvg = cvg), X)) ≈
+          [var(X[F[:, j], j], dw(count(F[:, j])); corrected = true) for j in 1:N]
+    r24 = F[:, 2] .& F[:, 4]
+    @test cov(Covariance(; w = DecayProbe1956(), cvg = cvg), X)[2, 4] ≈
+          cov(X[r24, [2, 4]], dw(count(r24)), 1; corrected = true)[1, 2]
+    dcen = [mean(X[F[:, j], j], dw(count(F[:, j]))) for j in 1:N]
+    r124 = F[:, 1] .& F[:, 2] .& F[:, 4]
+    Yd = X .- transpose(dcen)
+    @test coskewness(Coskewness(; w = DecayProbe1956(), cvg = cvg), X)[1][1, N + 4] ≈
+          sum(dw(count(r124)) .* Yd[r124, 1] .* Yd[r124, 2] .* Yd[r124, 4]) /
+          sum(dw(count(r124)))
+    @test PortfolioOptimisers.variance_count(SimpleVariance(; w = DecayProbe1956()), X).n[2] ≈
+          PortfolioOptimisers.simple_variance_count(dw(count(F[:, 2])), true,
+                                                    trues(count(F[:, 2]))).n
+    # The weighted arm reads the valid rows, the floor and the peel of the unweighted arm.
+    am = trues(size(X))
+    am[15:18, 3] .= false
+    rc = CoveragePolicy(; alg = ResetCoverage())
+    @test cov(Covariance(; w = u, cvg = rc), X; active_mask = am) ≈
+          cov(Covariance(; cvg = rc), X; active_mask = am)
+    fl = CoveragePolicy(; min_coverage = 0.9)
+    @test isequal(isnan.(var(SimpleVariance(; w = w, cvg = fl), X)),
+                  isnan.(var(SimpleVariance(; cvg = fl), X)))
+    @test isnan(var(SimpleVariance(; w = w, cvg = fl), X[:, 2]))
+    Xp = copy(X)
+    Xp[1:20, 1] .= NaN
+    Xp[21:40, 3] .= NaN
+    @test isequal(isnan.(@test_logs((:warn, r"peeled the assets"),
+                                    cov(Covariance(; w = w, cvg = cvg), Xp))),
+                  isnan.(@test_logs((:warn, r"peeled the assets"),
+                                    cov(Covariance(; cvg = cvg), Xp))))
+    @test_throws r"peeled the assets" cov(Covariance(; w = w, cvg = cvg), Xp; strict = true)
+    # An asset with no row of positive weight has no value. Asset 3 is valid on rows 1 to 20.
+    w0 = StatsBase.pweights([zeros(20); ones(20)])
+    mu0 = mean(SimpleExpectedReturns(; w = w0, cvg = cvg), Xp)
+    @test isnan(mu0[3]) && isfinite(mu0[1])
+    v0 = var(SimpleVariance(; w = w0, cvg = cvg), Xp)
+    @test isnan(v0[3]) && isfinite(v0[1])
+    # Assets 1 and 3 share no row, so a cell of both has no observation of positive weight.
+    # The arm then refuses the cell inside its finite block, as the unweighted arm does.
+    Fp = isfinite.(Xp)
+    @test isnan(PortfolioOptimisers.weighted_comoment_cell(Xp, Xp, Fp, w, [1, 1, 3]))
+    @test isfinite(PortfolioOptimisers.weighted_comoment_cell(Xp, Xp, Fp, w, [1, 1, 2]))
+    @test_throws PortfolioOptimisers.IsNonFiniteError coskewness(Coskewness(; w = w,
+                                                                            cvg = cvg), Xp)
+    # A centre from the caller is refused, as the unweighted arm refuses it.
+    @test_throws r"cannot take a centre" var(SimpleVariance(; w = w, cvg = cvg), X;
+                                             mean = zeros(1, N))
+    @test_throws r"cannot take a centre" var(SimpleVariance(; w = w, cvg = cvg), X[:, 1];
+                                             mean = 0.0)
+    for alg in (FullMoment(), SemiMoment())
+        @test_throws r"cannot take a centre" cov(Covariance(; w = w, alg = alg, cvg = cvg),
+                                                 X; mean = zeros(1, N))
+    end
+    @test_throws r"cannot take a centre" coskewness(Coskewness(; w = w, cvg = cvg), X;
+                                                    mean = zeros(1, N))
+    @test_throws r"cannot take a centre" cokurtosis(Cokurtosis(; w = w, cvg = cvg), X;
+                                                    mean = zeros(1, N))
+    # `factory` gives the weights to an estimator with a policy, and the fit reads them.
+    @test vec(var(PortfolioOptimisers.factory(SimpleVariance(; cvg = cvg), w), X)) ≈ v
+    @test PortfolioOptimisers.factory(Covariance(; cvg = cvg), w).w === w
+    # The weights replace the weights of `me` and of the inner estimator, so both construct.
+    mew = SimpleExpectedReturns(; w = w)
+    @test Covariance(; me = mew, ce = GeneralCovariance(; w = w), w = w, cvg = cvg).w === w
+    # A bare `StatsBase.SimpleCovariance` states its correction to the weighted arm.
+    @test cov(Covariance(; ce = StatsBase.SimpleCovariance(; corrected = true), w = w,
+                         cvg = cvg), X) ≈ sigma
+    # The rules the constructor still holds, each with a message that names the fix.
+    @test_throws r"weighted available-case fit centres each asset" SimpleVariance(;
+                                                                                  me = ShrunkExpectedReturns(),
+                                                                                  w = w,
+                                                                                  cvg = cvg)
+    @test_throws r"Set `me = SimpleExpectedReturns\(\)`, or clear `cvg` and run the batch verb" SimpleVariance(;
+                                                                                                               me = mew,
+                                                                                                               cvg = cvg)
+    @test_throws r"Set the weights on the `Covariance`" Covariance(;
+                                                                   ce = GeneralCovariance(;
+                                                                                          w = w),
+                                                                   cvg = cvg)
+    for wc in (nothing, w)
+        @test_throws r"clear `cvg` and run the batch method" Covariance(;
+                                                                        ce = GerberCovariance(),
+                                                                        w = wc, cvg = cvg)
+    end
 end
 @testset "The one-asset arm of an available-case dispersion fit" begin
     x = [1.0, NaN, 3.0, 5.0, NaN, 7.0]
@@ -458,9 +705,9 @@ end
     @test_throws PortfolioOptimisers.IsNonFiniteError coskewness(Coskewness(; cvg = cvg), X)
     # The same law on a covariance frame: an empty pair among fully admitted assets reaches the
     # named refusal rather than LAPACK, which is what a complete diagonal used to short-circuit.
-    # `NoPeel` keeps the pair, which the default peel would remove at admission.
+    # `peel = nothing` keeps the pair, which the default peel would remove at admission.
     Xp = [1.0 NaN 3.0; NaN 2.0 5.0; 3.0 NaN 7.0; NaN 4.0 9.0]
-    sigma = cov(Covariance(; cvg = CoveragePolicy(; peel = NoPeel())), Xp)
+    sigma = cov(Covariance(; cvg = CoveragePolicy(; peel = nothing)), Xp)
     @test all(isfinite, LinearAlgebra.diag(sigma))
     @test isnan(sigma[1, 2])
     @test_throws PortfolioOptimisers.IsNonFiniteError PortfolioOptimisers.matrix_processing_block!(MatrixProcessing(),
@@ -667,8 +914,8 @@ An undetermined pair is a pair of admitted assets that each have a variance but 
 observations for a covariance. The pairs make a graph, and a set of assets removes every pair
 exactly when it is a vertex cover of that graph. `GreedyPeel` is the oracle's rule, max degree
 first and the smallest index on a tie. `MinimalPeel` is the minimum cover, and it keeps the
-greedy cover whenever that cover is minimum. `NoPeel` keeps the `NaN` for the matrix repair to
-refuse.
+greedy cover whenever that cover is minimum. `peel = nothing` skips the peel, and keeps the `NaN`
+for the matrix repair to refuse.
 =#
 include(joinpath(@__DIR__, "parity_harness.jl"))
 
@@ -748,7 +995,7 @@ end
         U = peel_graph(7, ((1, 2), (1, 3), (1, 4), (2, 5), (3, 6), (4, 7)))
         @test PortfolioOptimisers.peel_assets(GreedyPeel(), U) == [1, 2, 3, 4]
         @test PortfolioOptimisers.peel_assets(MinimalPeel(), U) == [2, 3, 4]
-        @test isempty(PortfolioOptimisers.peel_assets(NoPeel(), U))
+        @test isempty(PortfolioOptimisers.peel_assets(nothing, U))
         # A path: the greedy cover is minimum, so the minimal rule keeps it.
         P = peel_graph(5, ((1, 2), (2, 3), (3, 4), (4, 5)))
         @test PortfolioOptimisers.peel_assets(GreedyPeel(), P) == [2, 4]
@@ -803,10 +1050,11 @@ end
     @testset "Policy and interface" begin
         @test CoveragePolicy().peel === MinimalPeel()
         @test CoveragePolicy(; peel = GreedyPeel()).peel === GreedyPeel()
-        @test all(T -> T <: PortfolioOptimisers.AbstractPeel,
-                  (MinimalPeel, GreedyPeel, NoPeel))
-        @test all(s -> Base.isexported(PortfolioOptimisers, s),
-                  (:MinimalPeel, :GreedyPeel, :NoPeel))
+        # `nothing` skips the peel, as it turns other procedures off (#1867).
+        @test isnothing(CoveragePolicy(; peel = nothing).peel)
+        @test all(T -> T <: PortfolioOptimisers.AbstractPeel, (MinimalPeel, GreedyPeel))
+        @test all(s -> Base.isexported(PortfolioOptimisers, s), (:MinimalPeel, :GreedyPeel))
+        @test !isdefined(PortfolioOptimisers, :NoPeel)
         @test Base.ispublic(PortfolioOptimisers, :AbstractPeel)
         @test Base.ispublic(PortfolioOptimisers, :peel_assets)
         # A peel of the caller's own reaches the covariance through the interface.
@@ -829,7 +1077,7 @@ end
     end
     @testset "Covariance peels at admission" begin
         X = peel_disjoint_returns()
-        s0 = cov(peel_covariance(NoPeel()), X)
+        s0 = cov(peel_covariance(nothing), X)
         # Today's available-case answer: a NaN cell between two assets with a variance.
         @test isnan(s0[3, 4]) && isnan(s0[4, 3])
         @test all(isfinite, LinearAlgebra.diag(s0))
@@ -884,7 +1132,9 @@ end
         @test isequal((@test_logs (:warn,) cov(ow)), s1)
         @test_throws ArgumentError cov(ow; strict = true)
         @test_throws ArgumentError cor(ow; strict = true)
-        # A NoPeel matrix still meets the refusal of the matrix repair.
+        # The warning names `nothing` as the way to keep the cells, not the removed `NoPeel`
+        # (#1867), and an unpeeled matrix still meets the refusal of the matrix repair.
+        @test_logs (:warn, r"set `peel = nothing`") cov(peel_covariance(MinimalPeel()), X)
         @test_throws PortfolioOptimisers.IsNonFiniteError PortfolioOptimisers.matrix_processing_block!(MatrixProcessing(),
                                                                                                        copy(s0),
                                                                                                        X)
@@ -934,7 +1184,7 @@ end
         @test pr.mu[keep] == pr0.mu
         @test_throws "peeled the assets at indices [3]" prior(pe(MinimalPeel()), X;
                                                               strict = true)
-        @test_throws PortfolioOptimisers.IsNonFiniteError prior(pe(NoPeel()), X)
+        @test_throws PortfolioOptimisers.IsNonFiniteError prior(pe(nothing), X)
         # A log-return prior passes `strict` to its covariance too.
         @test_throws "peeled the assets at indices [3]" prior(pe(MinimalPeel();
                                                                  horizon = 1), X;
@@ -955,7 +1205,7 @@ end
         # the matrix it wrote.
         for case in ("Counterexample", "Windows")
             X = peel_parity_returns(Symbol(case))
-            s0 = cov(peel_covariance(NoPeel()), X)
+            s0 = cov(peel_covariance(nothing), X)
             @test parity_compare(s0, parity_load("peel", case, "Input");
                                  name = "peel $(case) Input").ok
             sg = @test_logs (:warn,) cov(peel_covariance(GreedyPeel()), X)

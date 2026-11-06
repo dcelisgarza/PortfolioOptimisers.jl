@@ -319,7 +319,9 @@ end
         ivr = ImpliedVolatility(; ppy = 252)
         ivp = ImpliedVolatility(; ppy = 252, alg = ImpliedVolatilityPremium())
         hopt(pe) = HierarchicalOptimiser(; pe = pe)
-        for r in (rdi, rdiv), t in (61, 80), ce in (ivr, ivp)
+        # The regression needs more than four windows of 20 rows (#1796), and 101 rows
+        # leave one row that no window covers.
+        for r in (rdi, rdiv), t in (101, 120), ce in (ivr, ivp)
             b = rows(r, 1:t)
             carry = EmpiricalPrior(; ce = ce)
             refit = po.Online(EmpiricalPrior(; ce = ce))
@@ -342,12 +344,12 @@ end
         opt = po.update_online_estimator(InverseVolatility(;
                                                            pe = po.Online(EmpiricalPrior(;
                                                                                          ce = ivr);
-                                                                          max_history = 70)))
-        o = step(opt, rdi, 110)
-        @test po.returns_result(o).iv == ivm[41:110, :]
+                                                                          max_history = 100)))
+        o = step(opt, rdi, 120)
+        @test po.returns_result(o).iv == ivm[21:120, :]
         @test isapprox(optimise(o).w,
                        optimise(InverseVolatility(; pe = EmpiricalPrior(; ce = ivr)),
-                                rows(rdi, 41:110)).w; rtol = 1e-12)
+                                rows(rdi, 21:120)).w; rtol = 1e-12)
         # The first step pins `ivpa`, and fixes whether the steps carry `iv`.
         o = step(InverseVolatility(; pe = EmpiricalPrior(; ce = ivp)), rdi, 10)
         r11 = rows(rdi, 11:11)
@@ -670,14 +672,15 @@ end
                                                 rows(rdn, 2:2))
         @test_throws ArgumentError partial_fit!(partial_fit!(InverseVolatility(), r1),
                                                 rows(rdv, 2:2))
-        # A mask that appears at a later step is refused by the buffer that holds the rows.
+        # A mask that appears at a later step joins the rows that came with none. Those rows
+        # state the universe of their finiteness, so they read as active (#1882).
         amsk = trues(T, N)
         amsk[1:10, 2] .= false
         Xg = copy(X)
         Xg[.!amsk] .= NaN
         rdg = ReturnsResult(; nx = nx, X = Xg, pnl = AssetPanel(; amsk = amsk, emsk = amsk))
-        @test_throws ArgumentError partial_fit!(partial_fit!(EqualWeighted(), r1),
-                                                rows(rdg, 2:2))
+        og = partial_fit!(partial_fit!(EqualWeighted(), r1), rows(rdg, 2:2))
+        @test Matrix(po.returns_result(og).pnl.amsk) == vcat(trues(1, N), amsk[2:2, :])
 
         # A head with no prior keeps the active mask alone. The estimation mask, a Panel
         # Field and the implied volatility are dropped, and the weights still equal batch.
@@ -692,7 +695,7 @@ end
         tv = AssetPanel(; pf = [NumericPanelField(; name = "cap", vals = ones(T, N))],
                         amsk = trues(T, N), emsk = trues(T, N))
         o = partial_fit!(EqualWeighted(), ReturnsResult(; nx = nx, X = X, pnl = tv))
-        @test isempty(po.returns_result(o).pnl.pf)
+        @test isnothing(po.returns_result(o).pnl.pf)
         o = partial_fit!(EqualWeighted(),
                          ReturnsResult(; nx = nx, X = X, iv = fill(0.2, T, N), ivpa = 1.0))
         # The surface travels with the rows, and the first step pins `ivpa` (#1632).
@@ -817,18 +820,18 @@ end
             @test isapprox(mo.ub, mb.ub; rtol = 1e-10)
         end
 
-        @testset "Under a Scenario Cap both routes read ens = t" begin
+        @testset "Under a Scenario Cap both routes read eoc = (t, t)" begin
             w = 30
             cap = mk(EmpiricalPrior(; max_scenarios = w), non_m, non_s)
             rb = optimise(cap, b)
-            @test rb.pr.ens == t
+            @test rb.pr.eoc == (t, t)
             @test size(rb.pr.X, 1) == w
             ro = optimise(step(cap, rd, t))
-            @test ro.pr.ens == t
+            @test ro.pr.eoc == (t, t)
             @test size(ro.pr.X, 1) == w
             # The normal set's `T` is the count behind the moments, so the capped set is the
             # uncapped set over the same observations.
-            @test po.choose_scaling_parameter(non_s, ro.pr) == t
+            @test po.choose_scaling_parameter(non_s, ro.pr, 1) == t
             unc = optimise(non, b).pr
             @test isapprox(ucs(non_s, rb.pr)[1].ub, ucs(non_s, unc)[1].ub; rtol = 1e-10)
             @test isapprox(ucs(non_s, ro.pr)[1].ub, ucs(non_s, unc)[1].ub; rtol = 1e-8)

@@ -52,7 +52,7 @@ Where:
   - $(math_dict[:T])
   - $(math_dict[:N])
 
-The Next-Period Allocation after ``T`` rows is ``\\boldsymbol{w}_{T+1}``. Both projections are one call of [`project`](@ref), so a [`ProgrammeAllocationSet`](@ref) adds its Objective Penalty to both objectives.
+The wealth ``S_T`` is the wealth of Equation 1.1 of [cover1991](@cite), earned in the protocol of Section 2 of [lihoi2014](@cite). The Next-Period Allocation after ``T`` rows is ``\\boldsymbol{w}_{T+1}``. Both projections are one call of [`project`](@ref), so a [`ProgrammeAllocationSet`](@ref) adds its Objective Penalty to both objectives.
 
 Under `x_src = ExcessSource()`, ``r_{tj}`` is the return of asset ``j`` in excess of the benchmark, ``r_{tj} - b_{tj}``, where ``b_{tj}`` is the benchmark return of period ``t`` for asset ``j``. A vector benchmark gives every asset the same ``b_{tj}``.
 
@@ -87,14 +87,14 @@ Keywords correspond to the struct's fields. `set`, `fees` and `fb` can hold a [`
 
 ## Propagated parameters
 
-When [`factory`](@ref) is called on this type, the following fields are propagated:
+[`factory`](@ref) passes its arguments on to these fields:
 
-  - `fees`: Recursively updated via [`factory`](@ref), which threads the previous weights into a turnover fee.
-  - `fb`: Recursively updated via [`factory`](@ref).
+  - `fees`: Recursively updated through [`factory`](@ref), which threads the previous weights into a turnover fee.
+  - `fb`: Recursively updated through [`factory`](@ref).
 
 ## View parameters
 
-When [`port_opt_view`](@ref) is called on this type, the fields with a per-asset axis are subset to the selected indices: `alg` and `set` recursively, `w0` sliced and renormalised, `fees` viewed at the indices, and `cache` through the state's own view.
+[`port_opt_view`](@ref) takes the view of the fields with a per-asset axis at the selected indices: `alg` and `set` recursively, `w0` sliced and renormalised, `fees` viewed at the indices, and `cache` through the state's own view.
 
 # Examples
 
@@ -102,11 +102,12 @@ When [`port_opt_view`](@ref) is called on this type, the fields with a per-asset
 julia> OnlinePortfolioSelection()
 OnlinePortfolioSelection
      alg ┼ MirrorDescent
-         │     eta ┼ Float64: 0.05
-         │    proj ┼ EntropicProjection()
-         │   alpha ┼ Int64: 0
-         │     obj ┼ LogWealth()
-         │    grad ┴ PlainGradient()
+         │         eta ┼ Float64: 0.05
+         │        proj ┼ EntropicProjection()
+         │       alpha ┼ Int64: 0
+         │         obj ┼ LogWealth()
+         │        grad ┼ nothing
+         │   predictor ┴ nothing
      set ┼ BoundedAllocationSet
          │     wb ┼ WeightBounds
          │        │   lb ┼ Float64: 0.0
@@ -133,7 +134,8 @@ OnlinePortfolioSelection
 
 # References
 
-  - $(ref_dict[:lihoi2014])
+  - $(ref_dict[:lihoi2014]) Section 2, Algorithm 1.
+  - $(ref_dict[:cover1991]) Section 1, Equation 1.1.
 """
 @concrete struct OnlinePortfolioSelection <: NaiveOptimisationEstimator
     """
@@ -725,7 +727,8 @@ function report_held_steps(held::AbstractVector{<:HeldStep}, ts)
     if isempty(held)
         return nothing
     end
-    @warn("Held Step at $(ts): $(join([h.reason for h in held], "; ")).")
+    @warn("Held Step at $(ts): $(join([h.reason for h in held], "; ")).",
+          maxlog = log_limit(:warn), _id = @log_id())
     return first(held)
 end
 """
@@ -769,7 +772,7 @@ function report_row_gaps(r::AbstractVector, w::AbstractVector,
         push!(held, (obs, i))
     end
     if !isempty(held)
-        strict_diagnostic(held_gap_msg(held, nx), strict)
+        strict_diagnostic(held_gap_msg(held, nx), strict; id = @log_id())
     end
     return nothing
 end
@@ -1042,7 +1045,7 @@ function held_timestamps(opt::OnlinePortfolioSelection)
     return isnothing(opt.cache) ? nothing : opt.cache.ts
 end
 """
-    update_online_estimator(opt::Union{<:OnlinePortfolioSelection, <:PreviousWeights})
+    update_online_estimator(opt::Union{OnlinePortfolioSelection, PreviousWeights})
 
 Resolves the [`Online`](@ref) wrappers in the fallback of the head, at the warm-up.
 
@@ -1054,18 +1057,18 @@ The two heads step their fallback through [`step_fallback`](@ref), so a wrapper 
   - [`step_fallback`](@ref)
   - [`online_unreached_path`](@ref)
 """
-function update_online_estimator(opt::Union{<:OnlinePortfolioSelection, <:PreviousWeights})
+function update_online_estimator(opt::Union{OnlinePortfolioSelection, PreviousWeights})
     return opt
 end
-function update_online_estimator(opt::Union{<:OnlinePortfolioSelection{<:Any, <:Any, <:Any,
-                                                                       <:Any,
-                                                                       <:OptimisationEstimator},
-                                            <:PreviousWeights{<:Any, <:Any,
-                                                              <:OptimisationEstimator}})
+function update_online_estimator(opt::Union{OnlinePortfolioSelection{<:Any, <:Any, <:Any,
+                                                                     <:Any,
+                                                                     <:OptimisationEstimator},
+                                            PreviousWeights{<:Any, <:Any,
+                                                            <:OptimisationEstimator}})
     return rebuild_estimator(opt, (; fb = update_online_estimator(opt.fb)))
 end
 """
-    online_unreached_path(opt::Union{<:OnlinePortfolioSelection, <:PreviousWeights})
+    online_unreached_path(opt::Union{OnlinePortfolioSelection, PreviousWeights})
 
 Names the first [`Online`](@ref) wrapper in the head that the warm-up leaves unresolved, or answers `nothing`.
 
@@ -1076,7 +1079,7 @@ The method runs the warm-up of [`update_online_estimator`](@ref) on the head, an
   - [`online_unreached_path`](@ref)
   - [`assert_online_entry`](@ref)
 """
-function online_unreached_path(opt::Union{<:OnlinePortfolioSelection, <:PreviousWeights})
+function online_unreached_path(opt::Union{OnlinePortfolioSelection, PreviousWeights})
     return online_wrapper_path(update_online_estimator(opt))
 end
 """

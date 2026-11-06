@@ -31,12 +31,10 @@ WeightsInput
 scalarise_combine
 scalarise_map
 scalarise_logsumexp
+Sca_VecToScaM
 nothing_scalar_array_selector
 deferred_factors
 fit_deferred_quantity
-deferred_centre
-centring_target
-fit_deferred_moment
 deferred_quantity
 fan_out_slot
 fan_out_pe
@@ -59,6 +57,7 @@ assert_observation_weights
 checked_observation_weights
 assert_half_open_unit_interval
 worst_positive_weight_loss
+positive_weight_rows
 weight_independent_target(::Nothing)
 weight_independent_target(::Number)
 weight_independent_target(::Any)

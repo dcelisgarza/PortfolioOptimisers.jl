@@ -24,10 +24,18 @@ calibration_series_matrix
 calibration_series_dispersion
 effective_sample_size
 stated_sample_size
+scenario_sample_size
 hill_tail_index
 series_end_sign
 whitening_factor
 radial_tail_index
 radial_series_inputs
 dual_norm_radius_scale
+```
+
+## References
+
+```@bibliography
+Pages = [@__FILE__]
+Canonical = false
 ```

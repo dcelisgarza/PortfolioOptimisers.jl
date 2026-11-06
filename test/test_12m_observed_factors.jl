@@ -65,8 +65,8 @@ end
         @test cor(rr.csr.f[:, 1], fx.fl[2:end]) > 0.99
         # The combined model reproduces the base-currency returns exactly.
         X = fx.rd.X
-        for t in 2:size(rr.Ms, 1)
-            @test X[t + 1, :] ≈ rr.Ms[t - 1, :, :] * pr.fpr.X[t, :] + rr.csr.eps[t, :]
+        for t in 2:size(rr.Ms, 3)
+            @test X[t + 1, :] ≈ rr.Ms[:, :, t - 1] * pr.fpr.X[t, :] + rr.csr.eps[t, :]
         end
         @test pr.o_X == X[2:end, :]
         # The axis a caller declares before the fit is the axis of the block.
@@ -155,9 +155,9 @@ end
         amsk[1:10, 1] .= false
         fx = obs_fixture(; amsk = amsk)
         rr = prior(obs_prior(), fx.rd).rr
-        @test all(isnan, rr.Ms[1:9, 1, 2:3])
-        @test all(isfinite, rr.Ms[10:end, 1, 2:3])
-        @test all(isfinite, rr.Ms[:, 2:end, 2:3])
+        @test all(isnan, rr.Ms[1, 2:3, 1:9])
+        @test all(isfinite, rr.Ms[1, 2:3, 10:end])
+        @test all(isfinite, rr.Ms[2:end, 2:3, :])
     end
 
     @testset "A gap in the rows the warm-up and the lag consume is accepted" begin
@@ -343,7 +343,7 @@ end
         pr = prior(obs_prior(; factors = fb), rd)
         @test pr.rr.nf == ["beta", "currency=EUR"]
         usd = findall(==(2), fz.code)
-        @test all(iszero, pr.rr.Ms[:, usd, 2])
+        @test all(iszero, pr.rr.Ms[usd, 2, :])
         @test all(isfinite, pr.sigma)
         @test cross_sectional_factor_axis(obs_prior(; factors = fb), rd).nf == pr.rr.nf
         # A factor of the base currency has no variance. The factor covariance keeps its zero
@@ -364,6 +364,71 @@ end
                                                                   CurrencyExposure(;
                                                                                    base = "GBP")]),
                                          rd)
+    end
+
+    @testset "A universe of the base currency alone gives no Currency Factor and reads no series (#1969)" begin
+        fx = obs_fixture()
+        T, N = size(fx.loc)
+        m = 0.004 .* randn(StableRNG(7), T)
+        pnl = asset_panel([NumericPanelInput(; name = "beta",
+                                             vals = repeat(transpose(fx.beta), T)),
+                           NumericPanelInput(; name = "market_cap", vals = ones(T, N)),
+                           NumericPanelInput(; name = "local", vals = fx.loc),
+                           CategoricalPanelInput(; name = "currency",
+                                                 vals = fill("USD", T, N))];
+                          amsk = trues(T, N), emsk = trues(T, N))
+        ccy = "currency" => CurrencyExposure(; base = "USD")
+        mkt = "mkt" => ObservedExposure(; xe = ConstantExposure(), series = "SPX")
+        f0 = ["beta" => obs_pass("beta", "style")]
+        # The member gives no factor, so the prior with it is the prior without it: with no
+        # Exogenous Series, with one that holds no column the member could read, and with a
+        # Panel Field of net returns that the fit no longer reads.
+        rds = (ReturnsResult(; nx = fx.rd.nx, X = fx.loc, pnl = pnl),
+               ReturnsResult(; nx = fx.rd.nx, X = fx.loc, ne = ["junk"], E = zeros(T, 1),
+                             pnl = pnl))
+        for rd in rds, kw in ((;), (; lx = "local"))
+            pr = prior(obs_prior(; factors = vcat(f0, ccy), kw...), rd)
+            p0 = prior(obs_prior(; factors = f0), rd)
+            @test pr.rr.nf == p0.rr.nf == ["beta"]
+            @test isnothing(pr.rr.fx)
+            @test pr.mu == p0.mu
+            @test pr.sigma == p0.sigma
+            @test cross_sectional_factor_axis(obs_prior(; factors = vcat(f0, ccy)), rd).nf ==
+                  pr.rr.nf
+        end
+        # Beside an observed member that reads returns, the member drops out of both stages,
+        # and the other member reads its own series alone.
+        rdm = ReturnsResult(; nx = fx.rd.nx, X = fx.loc .+ m, ne = ["SPX"],
+                            E = reshape(m, :, 1), pnl = pnl)
+        fm = vcat(f0, ccy, mkt)
+        pm = prior(obs_prior(; factors = fm), rdm)
+        pm0 = prior(obs_prior(; factors = vcat(f0, mkt)), rdm)
+        @test pm.rr.nf == pm0.rr.nf == ["beta", "mkt"]
+        @test pm.rr.fx == pm0.rr.fx == m[2:end, :]
+        @test pm.mu == pm0.mu
+        @test pm.sigma == pm0.sigma
+        # The configuration alone cannot tell, and the data of a step can.
+        @test PO.reads_exogenous_series(last(ccy))
+        @test !PO.reads_exogenous_series(last(ccy), rds[1])
+        @test !PO.reads_exogenous_series(obs_prior(; factors = vcat(f0, ccy)), rds[1])
+        # The carry fold and the refit under `Online` take steps with no Exogenous Series, the
+        # carry keeps the member in its folded list, and both equal the batch fit.
+        for (fl, rd, b) in
+            ((vcat(f0, ccy), rds[1], prior(obs_prior(; factors = f0), rds[1])),
+             (fm, rdm, pm0))
+            p = obs_prior(; factors = fl)
+            o = PO.update_online_estimator(Online(p))
+            for (a, z) in ((0, 40), (40, 60), (60, T))
+                p = partial_fit!(p, PO.port_opt_view(rd, (a + 1):z, :))
+                o = partial_fit!(o, PO.port_opt_view(rd, (a + 1):z, :))
+            end
+            @test isa(p.cache, PO.CrossSectionalCarryState)
+            @test any(x -> x isa CurrencyExposure, last.(p.cache.xf))
+            for q in (prior(p), prior(o))
+                @test q.mu ≈ b.mu
+                @test q.sigma ≈ b.sigma
+            end
+        end
     end
 
     @testset "A named Panel Field of local returns replaces the derived ones" begin

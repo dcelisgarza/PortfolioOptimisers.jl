@@ -14,10 +14,9 @@ on:
 # GitHub Pages refuses a site above 10 GiB. `gh-pages` passed that limit once, and every deployment
 # failed for two days (#1722). This job keeps the size of `gh-pages` bounded. It deletes two things:
 #
-# - A preview under `previews/PR<number>` whose pull request is not open, or does not carry the
-#   label `PREVIEW_LABEL`. `Docs.yml` builds a preview only for a pull request with that label.
-#   The job deletes every such preview, not only the one of the pull request that closed, so a
-#   preview that an earlier run missed still goes.
+# - A preview under `previews/PR<number>` whose pull request is not open. `Docs.yml` builds a
+#   preview for each pull request. The job deletes every such preview, not only the one of the pull
+#   request that closed, so a preview that an earlier run missed still goes.
 # - Every released version outside the `PAGES_KEEP_MINORS` newest minor series. Documenter never
 #   deletes a version, and Pages expands each alias link of a version into a full copy, so each
 #   release adds about twice the size of one build. `.github/pages_prune.py` holds that logic.
@@ -25,7 +24,6 @@ on:
 # A URL into a deleted version, such as `/v0.12/`, stops resolving. That is the price of the cap.
 # `PagesHealth.yml` watches the size of the site and the result of each deployment.
 env:
-  PREVIEW_LABEL: docs-preview
   PAGES_KEEP_MINORS: "5"
 
 concurrency:
@@ -73,9 +71,9 @@ jobs:
         run: |
           set -euo pipefail
           base="$(git rev-parse HEAD)"
-          # A failed listing stops the job here. It must never read as "no pull request asks for a
-          # preview", because that deletes every preview.
-          wanted="$(gh pr list --repo "${GITHUB_REPOSITORY}" --state open --label "${PREVIEW_LABEL}" \
+          # A failed listing stops the job here. It must never read as "no pull request is open",
+          # because that deletes every preview.
+          wanted="$(gh pr list --repo "${GITHUB_REPOSITORY}" --state open \
             --limit 1000 --json number --jq '.[] | "previews/PR\(.number)"')"
           previews=0
           for dir in previews/PR*; do

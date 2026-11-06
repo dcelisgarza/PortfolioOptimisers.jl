@@ -4,42 +4,42 @@
     _phylogeny_matrix(sep::PathLength, nte::AbstractNetworkEstimator,
                       g::Graphs.AbstractGraph)
 
-Internal dispatch helper carrying [`phylogeny_matrix`](@ref)'s per-separation body.
+Select the related pairs of a structure, through the branch of the separation `sep`.
 
-The neighbourhood [`phylogeny_matrix`](@ref) selects is a question about the separation, not about the estimator, so the split lives here rather than on the public method's argument. Dispatching on the estimator instead would pin the choice to `NetworkEstimator` and leave every other [`AbstractNetworkEstimator`](@ref) on one branch — and this family's other kernels, [`separation_matrix`](@ref) and [`separation_budget`](@ref), already take the separation first for the same reason.
+[`phylogeny_matrix`](@ref) calls this function for its body. The separation decides the neighbourhood that [`phylogeny_matrix`](@ref) selects, and the estimator does not. This function therefore dispatches on the separation, and the public method does not. A dispatch on the estimator ties the choice to `NetworkEstimator`, and puts every other [`AbstractNetworkEstimator`](@ref) on one branch. The other kernels of the family, [`separation_matrix`](@ref) and [`separation_budget`](@ref), also take the separation first, for the same reason.
 
-# The structure arrives built
+# The structure is already built
 
-`g` is [`separation_graph`](@ref)'s, built once by the public method and shared with [`resolve_separation`](@ref), so neither branch derives a distance of its own. `nte` stays for [`separation_budget`](@ref)'s estimator channel and is otherwise inert here.
+`g` comes from [`separation_graph`](@ref). The public method builds it one time, and also gives it to [`resolve_separation`](@ref). Neither branch computes a distance of its own. The function passes `nte` to [`separation_budget`](@ref), and reads it for no other purpose.
 
 # The two balls
 
-  - [`HopCount`](@ref): the **hop ball**, `sum(A^i for i in 0:n)` clamped to `0` or `1`, over `Graphs.adjacency_matrix(g)` — binary, because [`separation_graph`](@ref) hands a hop count a binarised structure and a power of a weighted matrix would sum products of distances. `sep.n` is read directly as a **matrix-power count** rather than through [`separation_budget`](@ref), which is what makes it a power count and not a budget.
-  - [`PathLength`](@ref): the **radius ball**, [`separation_matrix`](@ref) thresholded at [`separation_budget`](@ref). No second traversal.
+  - [`HopCount`](@ref): the hop ball, `sum(A^i for i in 0:n)` clamped to `0` or `1`, over `Graphs.adjacency_matrix(g)`. The matrix is binary, because [`separation_graph`](@ref) gives a hop count a binary structure, and a power of a weighted matrix sums products of distances. The function reads `sep.n` directly as a count of matrix powers, and not through [`separation_budget`](@ref).
+  - [`PathLength`](@ref): the radius ball, the matrix of [`separation_matrix`](@ref) with a threshold at [`separation_budget`](@ref). It needs no second traversal.
 
 # Algorithm
 
 **Under a [`HopCount`](@ref):**
 
- 1. Read `Graphs.adjacency_matrix` off `g`, giving the binary matrix `A`.
- 2. Accumulate `P` as the sum of `A^i` over `i in 0:sep.n`. Each entry counts the walks of length at most `sep.n` between its pair.
- 3. Clamp `P` to `0` or `1`, which turns the walk count into the selection, and subtract the identity to clear the diagonal.
+ 1. Read the binary matrix `A` from `g` with `Graphs.adjacency_matrix`.
+ 2. Add up `P` as the sum of `A^i` over `i in 0:sep.n`. Each entry counts the walks of length at most `sep.n` between its pair.
+ 3. Clamp `P` to `0` or `1`, which changes the count of walks into the selection. Subtract the identity to set the diagonal to zero.
 
 **Under a [`PathLength`](@ref):**
 
- 1. Measure the separations over `g` with [`separation_matrix`](@ref), giving `d`.
- 2. Resolve the budget with [`separation_budget`](@ref), giving `dmax`.
- 3. Select every pair [`is_related`](@ref) admits at `dmax`, and subtract the identity to clear the diagonal. [`is_related`](@ref) carries the unreachable sentinel as well as the budget.
+ 1. Measure the separations over `g` into `d` with [`separation_matrix`](@ref).
+ 2. Find the budget `dmax` with [`separation_budget`](@ref).
+ 3. Select every pair that [`is_related`](@ref) admits at `dmax`. Subtract the identity to set the diagonal to zero. [`is_related`](@ref) tests the unreachable sentinel as well as the budget.
 
 # Arguments
 
-  - `sep`: Separation algorithm, taken from `nte.sep` by the public method and resolved.
+  - `sep`: Resolved separation algorithm. The public method takes it from `nte.sep`.
   - $(arg_dict[:nte])
   - `g`: Structure to read, from [`separation_graph`](@ref).
 
 # Returns
 
-  - `P::Matrix{Int}`: Phylogeny matrix. `1` for a related pair, `0` otherwise, `0` on the diagonal.
+  - `P::Matrix{Int}`: Phylogeny matrix. An entry is `1` for a related pair and `0` otherwise, and the diagonal is `0`.
 
 # Related
 
@@ -76,13 +76,13 @@ end
 """
     phylogeny_matrix(nte::AbstractNetworkEstimator, X::MatNum; dims::Int = 1, kwargs...)
 
-Compute the phylogeny matrix for a network estimator.
+Compute the phylogeny matrix of the network that `nte` builds.
 
-Builds the network from `X` and returns the binary matrix of the pairs `nte.sep` counts as related, with self-loops removed. Which neighbourhood that is comes from the separation, through [`_phylogeny_matrix`](@ref): [`HopCount`](@ref) gives the **hop ball**, the clamped power sum `sum(A^i for i in 0:n)` the network family has always used; [`PathLength`](@ref) gives the **radius ball**, [`separation_matrix`](@ref) thresholded at [`separation_budget`](@ref).
+The method builds the network from `X`. It returns the binary matrix of the pairs that `nte.sep` counts as related, with a zero diagonal. The separation selects the neighbourhood, through [`_phylogeny_matrix`](@ref). [`HopCount`](@ref) gives the hop ball, the clamped sum of powers `sum(A^i for i in 0:n)`. [`PathLength`](@ref) gives the radius ball, the matrix of [`separation_matrix`](@ref) with a threshold at [`separation_budget`](@ref).
 
 # The hop ball is the range connection matrix
 
-The hop branch computes the range connection matrix of walks of length at most `n`, which is [`NetworkEstimator`](@ref)'s Equations 13.1 and 13.2. Writing ``\\mathbf{A}`` for the binary adjacency matrix and ``\\mathbf{I}_n`` for the identity,
+The hop branch computes the range connection matrix of the walks of length at most `n`, which is Equations 13.1 and 13.2 of [cajas2025](@cite). With the binary adjacency matrix ``\\mathbf{A}`` and the identity ``\\mathbf{I}_n``,
 
 ```math
 \\begin{align}
@@ -97,39 +97,41 @@ Where:
   - ``\\mathbf{B}_{k}``: Pairs joined by at least one walk of length exactly ``k``.
   - ``\\mathbf{B}_{1,\\,l}``: Pairs joined by at least one walk of length at most ``l``.
 
-The code accumulates `sum(A^i for i in 0:n)`, clamps to `0` or `1`, and subtracts the identity, which is the same selection written once rather than shell by shell.
+The code adds up `sum(A^i for i in 0:n)`, clamps it to `0` or `1`, and subtracts the identity. This is the same selection, written one time for all the shells.
 
 # The result is `Int` under either separation
 
-Selection changes; the values do not. [`PhylogenyResult`](@ref)'s matrix is `Int` here as everywhere else, because no consumer of one wants a number: [`SemiDefinitePhylogeny`](@ref) is weight-inert (`A ⊙ W == 0` is the same constraint at any magnitude), [`IntegerPhylogeny`](@ref) counts an integer cardinality, and [`centrality_vector`](@ref) binarises before any centrality algorithm runs. The graded reading of a separation lives on [`Proximity`](@ref) instead.
+The two separations select different pairs, and give values of the same kind. The matrix of the [`PhylogenyResult`](@ref) is `Int` here, as it is everywhere else, because no consumer needs a graded value. The values of the matrix do not change [`SemiDefinitePhylogeny`](@ref), because `A ⊙ W == 0` is the same constraint at any magnitude. [`IntegerPhylogeny`](@ref) counts an integer cardinality. [`centrality_vector`](@ref) removes the values before a centrality algorithm runs. [`Proximity`](@ref) gives the graded value of a separation.
 
-# What the radius ball buys, measured
+# What the radius ball gives, measured
 
-**It barely re-ranks, and on the PMFG not at all.** Compare a hop shell against the equal-cardinality prefix of the path-length ordering: on a 20-asset PMFG the two sets are **identical** at every shell — `0` pairs differ out of `54`, `121`, `165` and `186`. On the minimum spanning tree they are identical at the shells of `19` and `48`, and differ by `1`, `1`, `3` and `2` pairs at the shells of `84`, `115`, `144` and `170`. Both structures are selected by distance in the first place, so a path length **refines** a hop count rather than rivalling it. A reader who takes the radius ball for a conceptually different neighbourhood will be wrong.
+**It changes the ranking little, and on the PMFG not at all.** Compare a hop shell with the first pairs of the order of path lengths, at the same cardinality. On a PMFG of 20 assets, the two sets are the same at every shell. `0` pairs are different out of `54`, `121`, `165` and `186`. On the minimum spanning tree, they are the same at the shells of `19` and `48`. They are different by `1`, `1`, `3` and `2` pairs at the shells of `84`, `115`, `144` and `170`.
 
-What it buys is **intermediate cardinalities between the shells**. Over the same PMFG the hop knob relates `54`, then `121`, then `165` of the `190` pairs; a caller wanting about `100` cannot ask for it. Sweeping `dmax` across the same graph reaches `36`, `55`, `100`, `122`, `151` and `179`. That is the whole gain, and it is real for [`SemiDefinitePhylogeny`](@ref) and [`IntegerPhylogeny`](@ref), whose constraint strength is that cardinality.
+The distance selects both structures, so a path length refines a hop count and does not compete with it. The radius ball is not a different kind of neighbourhood.
 
-# `PathLength`'s default budget relates everything reachable
+It gives cardinalities between the shells. Over the same PMFG, the hop count relates `54`, then `121`, then `165` of the `190` pairs. A caller who wants about `100` pairs cannot ask for it. A sweep of `dmax` over the same graph reaches `36`, `55`, `100`, `122`, `151` and `179`. That is the only gain. It is real for [`SemiDefinitePhylogeny`](@ref) and [`IntegerPhylogeny`](@ref), because their constraint strength is that cardinality.
 
-`PathLength()` leaves `dmax = nothing`, which [`separation_budget`](@ref) resolves to the **observed diameter** — so no reachable pair sits outside it and the matrix is all ones off the diagonal. Measured: `190` of `190` pairs on both branches. This is the honest reading of an unstated budget rather than a fall-back, but it is the *opposite* end of the dial from [`HopCount`](@ref)'s default `n = 1`: a caller who swaps one separation for the other and changes nothing else gets the maximal ball where they had the minimal one. State a numeric `dmax` to select anything narrower.
+# The default budget of `PathLength` relates every reachable pair
+
+`PathLength()` sets `dmax = nothing`, and [`separation_budget`](@ref) resolves it to the observed diameter. No reachable pair is outside the budget, and every entry off the diagonal is one. The measured count is `190` of `190` pairs on both branches. This is the correct meaning of a budget that the caller does not state, but it is the opposite end of the scale from the default `n = 1` of [`HopCount`](@ref). A caller who replaces one separation by the other, and changes nothing else, gets the largest ball in place of the smallest. State a numeric `dmax` to select fewer pairs.
 
 # Algorithm
 
- 1. Build the structure `nte.sep` measures over with [`separation_graph`](@ref), giving `g`. One structure is built per call and both readers below share it.
- 2. Resolve `nte.sep` against `g` with [`resolve_separation`](@ref). A budget that is already a value passes through and builds nothing.
- 3. Select the related pairs with [`_phylogeny_matrix`](@ref), through the branch the resolved separation names.
- 4. Wrap the selection in a [`PhylogenyResult`](@ref).
+ 1. Build the structure `g` that `nte.sep` measures over, with [`separation_graph`](@ref). The method builds one structure for each call, and the two steps below share it.
+ 2. Resolve `nte.sep` against `g` with [`resolve_separation`](@ref). A budget that is a value passes through unchanged and builds nothing.
+ 3. Select the related pairs with [`_phylogeny_matrix`](@ref), through the branch that the resolved separation names.
+ 4. Return the selection in a [`PhylogenyResult`](@ref).
 
 # Arguments
 
-  - `nte`: NetworkEstimator estimator.
-  - `X`: Data matrix (observations × assets).
+  - $(arg_dict[:nte])
+  - $(arg_dict[:X])
   - $(arg_dict[:dims])
   - `kwargs...`: Additional keyword arguments.
 
 # Returns
 
-  - `plr::PhylogenyResult{<:Matrix{Int}}`: Phylogeny matrix representing asset relationships. `1` for a related pair, `0` otherwise, `0` on the diagonal.
+  - `plr::PhylogenyResult{<:Matrix{Int}}`: Phylogeny matrix of the assets. An entry is `1` for a related pair and `0` otherwise, and the diagonal is `0`.
 
 # Related
 
@@ -140,6 +142,10 @@ What it buys is **intermediate cardinalities between the shells**. Over the same
   - [`calc_adjacency`](@ref)
   - [`separation_matrix`](@ref)
   - [`separation_budget`](@ref)
+
+# References
+
+  - $(ref_dict[:cajas2025]) Section 13.1.2, Equations 13.1-13.2.
 """
 function phylogeny_matrix(nte::AbstractNetworkEstimator, X::MatNum; dims::Int = 1,
                           kwargs...)
@@ -155,29 +161,29 @@ end
                      X::MatNum; branchorder::Symbol = :optimal, dims::Int = 1,
                      kwargs...)
 
-Compute the phylogeny matrix for a clustering estimator or result.
+Compute the phylogeny matrix of a clustering estimator or result.
 
-This function clusterises the data, cuts the tree into the optimal number of clusters, and constructs a binary phylogeny matrix indicating shared cluster membership, with self-loops removed.
+The method clusters the data into the number of clusters that the estimator selects. It returns the binary phylogeny matrix whose entry is `1` for two assets in the same cluster, with a zero diagonal.
 
 # Algorithm
 
- 1. Partition the assets with [`clusterise`](@ref), giving the [`Clusters`](@ref) result `res`.
+ 1. Partition the assets into the [`Clusters`](@ref) result `res` with [`clusterise`](@ref).
  2. Read the cluster of every asset with [`assignments`](@ref).
  3. Build the `assets × res.k` membership matrix `P`, whose entry is one when the asset belongs to the cluster of its column.
- 4. Multiply `P` by its own transpose, which is one exactly for a pair that shares a cluster, and subtract the identity to clear the diagonal.
- 5. Wrap the selection in a [`PhylogenyResult`](@ref).
+ 4. Multiply `P` by its transpose. The product is one for a pair in the same cluster, and zero otherwise. Subtract the identity to set the diagonal to zero.
+ 5. Return the selection in a [`PhylogenyResult`](@ref).
 
 # Arguments
 
   - `cle`: Clustering estimator or result.
-  - `X`: Data matrix (observations × assets).
-  - `branchorder`: Branch ordering strategy for hierarchical clustering.
+  - $(arg_dict[:X])
+  - `branchorder`: Order method for the dendrogram branches, `:optimal` by default. [`branch_ordered_hclust`](@ref) and [`DBHTs`](@ref) state what each value does.
   - $(arg_dict[:dims])
   - `kwargs...`: Additional keyword arguments.
 
 # Returns
 
-  - `P::Matrix{Int}`: Phylogeny matrix representing cluster relationships.
+  - `plr::PhylogenyResult{<:Matrix{Int}}`: Phylogeny matrix of the clusters. An entry is `1` for two assets in the same cluster and `0` otherwise, and the diagonal is `0`.
 
 # Related
 
@@ -189,7 +195,8 @@ function phylogeny_matrix(cle::ClE_Cl, X::MatNum; branchorder::Symbol = :optimal
                           dims::Int = 1, kwargs...)
     res = clusterise(cle, X; branchorder = branchorder, dims = dims, kwargs...)
     clusters = assignments(res)
-    P = zeros(Int, size(X, 2), res.k)
+    # One row per asset. `size(X, 2)` counts the observations when `dims = 2`.
+    P = zeros(Int, length(clusters), res.k)
     for i in axes(P, 2)
         idx = clusters .== i
         P[idx, i] .= one(eltype(P))

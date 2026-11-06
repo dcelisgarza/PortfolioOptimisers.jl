@@ -18,6 +18,10 @@ include(joinpath(@__DIR__, "parity_harness.jl"))
 # A caller's covariance estimator with no location of its own, for the fallback. A struct is
 # declared at the top level because a testset body is a local scope.
 struct NoLocationCovariance <: PortfolioOptimisers.AbstractCovarianceEstimator end
+# One whose `cache` is a state that no `forecast_location` method reads.
+struct UnreadStateCovariance{T} <: PortfolioOptimisers.AbstractCovarianceEstimator
+    cache::T
+end
 @testset "Covariance forecast evaluation: one verb through the fold loop" begin
     using Test, PortfolioOptimisers, StableRNGs, Statistics, StatsBase, Dates, LinearAlgebra
     po = PortfolioOptimisers
@@ -225,7 +229,12 @@ struct NoLocationCovariance <: PortfolioOptimisers.AbstractCovarianceEstimator e
         Fm = randn(StableRNG(1327), T, 2) ./ 100 .+ 0.0002
         rdf = ReturnsResult(; nx = nx, X = X, nf = ["F1", "F2"], F = Fm, ts = ts)
         rdfv = po.port_opt_view(rdf, 1:60, :)
-        fp = FactorPrior(; pe = pe)
+        # Two factors give a James-Stein intensity that is not positive, and the default
+        # clamp then returns the sample mean (#1784). Bayes-Stein shrinks two factors.
+        fp = FactorPrior(;
+                         pe = EmpiricalPrior(;
+                                             me = ShrunkExpectedReturns(;
+                                                                        alg = BayesStein())))
         fpr = prior(fp, rdfv)
         cf = fpr.rr.M * vec(mean(Fm[1:60, :]; dims = 1)) + fpr.rr.b
         @test po.forecast_location(fp, rdfv) ≈ cf
@@ -330,9 +339,9 @@ struct NoLocationCovariance <: PortfolioOptimisers.AbstractCovarianceEstimator e
     end
 
     @testset "A bare covariance estimator reads the implied volatilities (#1643)" begin
-        # The regression reads windows of 20 rows and needs more than two of them, so the
-        # first training window is longer than the one above.
-        wv = 90
+        # The regression reads windows of 20 rows and needs more than four of them (#1796),
+        # so the first training window is longer than the one above.
+        wv = 102
         cvb = IndexWalkForward(wv, h; purged_size = p, expand_train = true)
         cvo = OnlineIndexWalkForward(wv, h; purged_size = p)
         iv = 0.2 .+ abs.(randn(StableRNG(1643), T, N)) ./ 50
@@ -344,7 +353,7 @@ struct NoLocationCovariance <: PortfolioOptimisers.AbstractCovarianceEstimator e
             r = ReturnsResult(; nx = nx, X = X, iv = iv, ivpa = ivpa, ts = ts)
             # Batch: the bare estimator answers what the prior that holds it answers.
             b = cfe(ce, r, cvb)
-            @test length(b.dates) == 14
+            @test length(b.dates) == 11
             for est in (EmpiricalPrior(; ce = ce), poc(ce))
                 bb = cfe(est, r, cvb)
                 for f in columns
@@ -441,8 +450,9 @@ struct NoLocationCovariance <: PortfolioOptimisers.AbstractCovarianceEstimator e
                 @test finite_max(getfield(a, f), getfield(z, f)) == 0
             end
         end
-        # An `ImpliedVolatility` reads the surface of the assets beside `X - B`.
-        wv = 90
+        # An `ImpliedVolatility` reads the surface of the assets beside `X - B`. Its first
+        # training window keeps more than four windows of 20 rows after the purge (#1796).
+        wv = 102
         cvb = IndexWalkForward(wv, h; purged_size = p, expand_train = true)
         iv = 0.2 .+ abs.(randn(StableRNG(1643), T, N)) ./ 50
         ce = ImpliedVolatility(; ppy = 252)
@@ -553,7 +563,7 @@ struct NoLocationCovariance <: PortfolioOptimisers.AbstractCovarianceEstimator e
         @test r.horizon == length.(split(bm, rd).test_idx)
         @test length(unique(r.horizon)) > 1
         s = covariance_forecast_summary(r)
-        @test s.n_steps == [length(r.horizon)]
+        @test s.n_steps == length(r.horizon)
         # A carrier with no timestamps labels a step by its first test row.
         rn = cfe(Covariance(), ReturnsResult(; nx = nx, X = X), batch_cv)
         @test rn.dates == first.(split(batch_cv, rd).test_idx)
@@ -592,14 +602,30 @@ struct NoLocationCovariance <: PortfolioOptimisers.AbstractCovarianceEstimator e
                               0.2726172060164678]; rtol = 1e-14,
                              name = "cfer mahalanobis ratio").ok
         s = covariance_forecast_summary(cfer)
-        @test s.names == ["forecast_1"]
+        # A summary of one evaluation holds scalars, entry 1 of the vector method on
+        # `[cfer]`, and `exceedance` is a vector over the levels (#1934).
+        @test s.names == "forecast_1"
+        s_one = covariance_forecast_summary([cfer])
+        for f in fieldnames(CovarianceForecastSummaryResult)
+            v = getfield(s_one, f)
+            want = if f === :levels
+                v
+            elseif isa(v, AbstractMatrix)
+                v[1, :]
+            elseif isa(v, AbstractVector)
+                v[1]
+            else
+                v
+            end
+            @test isequal(getfield(s, f), want)
+        end
+        @test s_one.names == ["forecast_1"]
         # The oracle's `summary()` rows and its `bias_statistic_summary()`, at full digits:
         # its own step kernel and summaries, run on this closed-form fixture.
-        ours = [s.mahalanobis_mean[1], s.mahalanobis_median[1], s.mahalanobis_p5[1],
-                s.mahalanobis_p95[1], s.diagonal_mean[1], s.diagonal_median[1],
-                s.diagonal_p5[1], s.diagonal_p95[1], s.portfolio_qlike_mean[1],
-                s.bias_statistic[1], s.bias_p5[1], s.bias_p25[1], s.bias_p75[1],
-                s.bias_p95[1]]
+        ours = [s.mahalanobis_mean, s.mahalanobis_median, s.mahalanobis_p5,
+                s.mahalanobis_p95, s.diagonal_mean, s.diagonal_median, s.diagonal_p5,
+                s.diagonal_p95, s.portfolio_qlike_mean, s.bias_statistic, s.bias_p5,
+                s.bias_p25, s.bias_p75, s.bias_p95]
         oracle = [0.36458202285745867, 0.315530814251327, 0.05594537562389196,
                   0.8248158884019055, 0.42592521496695807, 0.36461964662163726,
                   0.05789099926930382, 0.9886089390858581, -7.520415207825884,
@@ -609,15 +635,15 @@ struct NoLocationCovariance <: PortfolioOptimisers.AbstractCovarianceEstimator e
         @test parity_compare(ours, oracle; name = "cfe summary").ok
         # Its `exceedance_summary()` at (0.95, 0.99): no step exceeds.
         @test s.levels == (0.95, 0.99)
-        @test s.exceedance == [0.0 0.0]
-        @test s.n_steps == [M]
-        @test s.n_portfolios == [2]
+        @test s.exceedance == [0.0, 0.0]
+        @test s.n_steps == M
+        @test s.n_portfolios == 2
         # The Gaussian bands: `1 ± z √(2 / Σ dof)`, with `Σ dof = 4 M` under the horizon
         # return and `M` for one asset's ratio.
         z = 1.959963984540054
-        @test isapprox(s.mahalanobis_band_hi[1], 1 + z * sqrt(2 / (4M)); rtol = 1e-12)
-        @test isapprox(s.mahalanobis_band_lo[1], 1 - z * sqrt(2 / (4M)); rtol = 1e-12)
-        @test isapprox(s.diagonal_band_hi[1], 1 + z * sqrt(2 / M); rtol = 1e-12)
+        @test isapprox(s.mahalanobis_band_hi, 1 + z * sqrt(2 / (4M)); rtol = 1e-12)
+        @test isapprox(s.mahalanobis_band_lo, 1 - z * sqrt(2 / (4M)); rtol = 1e-12)
+        @test isapprox(s.diagonal_band_hi, 1 + z * sqrt(2 / M); rtol = 1e-12)
         @test s.alpha == 0.05
         # The realised covariance has `N h` degrees of freedom per step, so its band is
         # narrower by `√h` and its exceedance threshold sits at `χ²_{N h}`.
@@ -628,14 +654,14 @@ struct NoLocationCovariance <: PortfolioOptimisers.AbstractCovarianceEstimator e
                                                  cfer.frobenius, cfer.standardised_return,
                                                  cfer.portfolio_qlike, W, nothing, nothing)
         sr = covariance_forecast_summary(cfr; alpha = 0.1, levels = (0.5,))
-        @test isapprox(sr.mahalanobis_band_hi[1], 1 + 1.6448536269514722 * sqrt(2 / (12M));
+        @test isapprox(sr.mahalanobis_band_hi, 1 + 1.6448536269514722 * sqrt(2 / (12M));
                        rtol = 1e-12)
         @test sr.levels == (0.5,)
-        @test size(sr.exceedance) == (1, 1)
+        @test size(sr.exceedance) == (1,)
         # Two evaluations are one Result of length two, and the length-1 method agrees.
         s2 = covariance_forecast_summary([cfer, cfr]; names = ["a", "b"])
         @test s2.names == ["a", "b"]
-        @test s2.mahalanobis_mean[1] == s.mahalanobis_mean[1]
+        @test s2.mahalanobis_mean[1] == s.mahalanobis_mean
         @test s2.qlike_mean == fill(mean(cfer.qlike), 2)
         # Every column has one entry per evaluation.
         for f in fieldnames(CovarianceForecastSummaryResult)
@@ -646,41 +672,43 @@ struct NoLocationCovariance <: PortfolioOptimisers.AbstractCovarianceEstimator e
         end
     end
 
-    @testset "The comparison: Diebold–Mariano–West on the loss difference" begin
+    @testset "The comparison: a Mean Test on the loss difference (#1787)" begin
         bcv3 = IndexWalkForward(w, 3; expand_train = true)
         a = cfe(Covariance(), rd, bcv3; store_forecasts = true)
         b = cfe(ExpWeightedCovariance(; decay = 0.8), rd, bcv3)
-        cmp = covariance_forecast_compare(a, b)
+        mt = WildBootstrapMeanTest(; seed = 1787)
+        cmp = covariance_forecast_compare(a, b; mt = mt)
         @test cmp.names == ["qlike", "frobenius", "portfolio_qlike_1"]
-        @test cmp.lags == 2
         @test cmp.n_steps == length(a.dates)
         # On an i.i.d. panel the sample covariance is close to the truth and a fast decay
         # is noisy, so the first loses less: a negative mean difference, and a small `p`.
         @test all(cmp.mean_difference .< 0)
-        @test all(cmp.z .< 0)
-        @test all(cmp.p .< 0.05)
-        @test cmp.p ≈ 2 .* po.Distributions.ccdf.(po.Distributions.Normal(), abs.(cmp.z))
+        @test all(cmp.t_stat .< 0)
+        @test all(cmp.p_value .< 0.05)
+        @test all(cmp.mean_ci_upper .< 0)
+        # Each loss is the Mean Test of its difference at a window of one step, and the
+        # generator is resolved once for the call, so the losses take different draws.
+        ds = [a.qlike .- b.qlike, a.frobenius .- b.frobenius,
+              a.portfolio_qlike[:, 1] .- b.portfolio_qlike[:, 1]]
+        rng = po.mean_test_rng(mt)
+        for (i, d) in enumerate(ds)
+            @test (cmp.t_stat[i], cmp.p_value[i], cmp.mean_ci_lower[i],
+                   cmp.mean_ci_upper[i]) == values(po.mean_test(mt, d, 1, rng))
+        end
+        @test covariance_forecast_compare(a, b; mt = mt).p_value == cmp.p_value
+        # The rule of zero lags of Diebold and Mariano: the mean over its standard error.
+        ov = covariance_forecast_compare(a, b; mt = OverlapMeanTest())
+        @test ov.t_stat ≈ [mean(d) / (std(d) / sqrt(length(d))) for d in ds]
+        @test ov.mean_difference == cmp.mean_difference
         # The same forecast twice: no difference, and no statistic.
         same = covariance_forecast_compare(a, a)
         @test all(iszero, same.mean_difference)
-        @test all(iszero, same.variance)
-        @test all(isnan, same.z)
-        # The Newey–West variance at zero lags is the plain sample variance about the
-        # mean, and a lag adds Bartlett-weighted autocovariances.
-        d = a.qlike .- b.qlike
-        M = length(d)
-        @test po.newey_west_variance(d, 0) ≈ var(d; corrected = false)
-        e = d .- mean(d)
-        g1 = dot(e[2:end], e[1:(end - 1)]) / M
-        @test po.newey_west_variance(d, 1) ≈
-              var(d; corrected = false) + 2 * (1 - 1 / 2) * g1
-        @test covariance_forecast_compare(a, b; lags = 0).variance ≈
-              [var(a.qlike .- b.qlike; corrected = false),
-               var(a.frobenius .- b.frobenius; corrected = false),
-               var(a.portfolio_qlike[:, 1] .- b.portfolio_qlike[:, 1]; corrected = false)]
-        # The sign: swapping the arguments negates the statistic.
-        rev = covariance_forecast_compare(b, a)
-        @test rev.z ≈ -cmp.z
+        @test all(isnan, same.t_stat) && all(isnan, same.p_value)
+        @test all(isnan, same.mean_ci_lower) && all(isnan, same.mean_ci_upper)
+        # The sign: swapping the arguments negates the statistic, and keeps the p-value.
+        rev = covariance_forecast_compare(b, a; mt = mt)
+        @test rev.t_stat ≈ -cmp.t_stat
+        @test rev.p_value ≈ cmp.p_value
     end
 
     @testset "The re-projection equals a rerun with that portfolio" begin
@@ -730,12 +758,11 @@ struct NoLocationCovariance <: PortfolioOptimisers.AbstractCovarianceEstimator e
         one = cfe(Covariance(), rd, IndexWalkForward(T - h, h))
         @test length(one.dates) == 1
         s1 = covariance_forecast_summary(one)
-        @test s1.mahalanobis_mean == one.mahalanobis_ratio
-        @test s1.mahalanobis_p5 == one.mahalanobis_ratio
+        @test s1.mahalanobis_mean == only(one.mahalanobis_ratio)
+        @test s1.mahalanobis_p5 == only(one.mahalanobis_ratio)
         @test all(isnan,
-                  (s1.bias_statistic[1], s1.bias_p5[1], s1.bias_p25[1], s1.bias_p75[1],
-                   s1.bias_p95[1]))
-        @test isfinite(s1.portfolio_qlike_mean[1])
+                  (s1.bias_statistic, s1.bias_p5, s1.bias_p25, s1.bias_p75, s1.bias_p95))
+        @test isfinite(s1.portfolio_qlike_mean)
         @test isnan(po.summary_quantile([1.0, NaN, 3.0], 0.5))
         # The `NaN` is read off the column, so it keeps the element type of the data.
         @test po.summary_quantile(Float32[1, NaN, 3], 0.5) isa Float32
@@ -747,21 +774,44 @@ struct NoLocationCovariance <: PortfolioOptimisers.AbstractCovarianceEstimator e
         @test length(unique(g.n_valid)) > 1
         sg = covariance_forecast_summary(g)
         nu = g.n_valid .* g.horizon
-        @test sg.mahalanobis_mean[1] ≈ dot(nu, g.mahalanobis_ratio) / sum(nu)
-        @test !isapprox(sg.mahalanobis_mean[1], mean(g.mahalanobis_ratio); rtol = 1e-4)
+        @test sg.mahalanobis_mean ≈ dot(nu, g.mahalanobis_ratio) / sum(nu)
+        @test !isapprox(sg.mahalanobis_mean, mean(g.mahalanobis_ratio); rtol = 1e-4)
         dbar = [mean(filter(isfinite, r)) for r in eachrow(g.diagonal_ratio)]
-        @test sg.diagonal_mean[1] ≈ mean(dbar)
-        # The default lags are the largest horizon less one, capped at M - 1.
+        @test sg.diagonal_mean ≈ mean(dbar)
+        # One step has no long-run variance, so its test is `NaN`; two steps answer.
+        one_b = cfe(ExpWeightedCovariance(; decay = 0.8), rd, IndexWalkForward(T - h, h))
+        c1 = covariance_forecast_compare(one, one_b)
+        @test c1.n_steps == 1 && all(isnan, c1.p_value) && all(isfinite, c1.mean_difference)
         two = cfe(Covariance(), rd, IndexWalkForward(T - 2h, h))
         two_b = cfe(ExpWeightedCovariance(; decay = 0.8), rd, IndexWalkForward(T - 2h, h))
         @test length(two.dates) == 2
-        c2 = covariance_forecast_compare(two, two_b)
-        @test c2.lags == 1
-        @test c2.variance ≈ covariance_forecast_compare(two, two_b; lags = 1).variance
-        # The Bartlett weights keep the long-run variance non-negative, even on an
-        # alternating series whose autocovariances are all of the largest size.
-        alt = [(-1.0)^t for t in 1:9]
-        @test all(l -> po.newey_west_variance(alt, l) >= 0, 0:8)
+        @test all(isfinite, covariance_forecast_compare(two, two_b).t_stat)
+        # A scored loss that is not finite is a defect of the data, so its test is `NaN`,
+        # not a test of the other steps; the other losses keep their tests.
+        bad = deepcopy(two)
+        bad.qlike[1] = Inf
+        cb = covariance_forecast_compare(bad, two_b)
+        @test isinf(cb.mean_difference[1]) && isnan(cb.t_stat[1]) && isnan(cb.p_value[1])
+        @test all(isfinite, cb.t_stat[2:end])
+        # A step that a side did not score is missing at its position: the test reads the
+        # series with a `NaN` there, and a `NaN` outside the scored steps is no defect.
+        mt = WildBootstrapMeanTest(; seed = 3)
+        d = [0.3, -0.1, NaN, 0.5, -0.4, 0.1, 0.2]
+        k = .!isnan.(d)
+        @test po.loss_difference_test(mt, d, k, po.mean_test_rng(mt)) ==
+              po.mean_test(mt, d, 1, po.mean_test_rng(mt))
+        @test po.loss_difference_test(mt, d, k, po.mean_test_rng(mt)) !=
+              po.mean_test(mt, d[k], 1, po.mean_test_rng(mt))
+        @test all(isnan,
+                  values(po.loss_difference_test(mt, [0.1, Inf, 0.2], trues(3),
+                                                 po.mean_test_rng(mt))))
+        # The number type of the losses is kept, on the answer and on the `NaN` path.
+        d32 = Float32[0.3, -0.1, 0.2, 0.5, -0.4]
+        @test po.loss_difference_test(OverlapMeanTest(), d32, trues(5), nothing).t_stat isa
+              Float32
+        d32[2] = Inf32
+        @test po.loss_difference_test(OverlapMeanTest(), d32, trues(5), nothing).t_stat isa
+              Float32
     end
 
     @testset "The step weighting: the plain mean is one keyword away (#1513)" begin
@@ -783,17 +833,17 @@ struct NoLocationCovariance <: PortfolioOptimisers.AbstractCovarianceEstimator e
             dbar = po.covariance_diagonal_mean(r)[k]
             snu = po.target_step_dof.(Ref(r.target), r.horizon[k])
             # The plain mean, and the band of the plain mean: Var = 2 sum(1 / nu_t) / M^2.
-            @test se.mahalanobis_mean[1] ≈ mean(m) rtol = 1e-14
-            @test se.diagonal_mean[1] ≈ mean(dbar) rtol = 1e-14
+            @test se.mahalanobis_mean ≈ mean(m) rtol = 1e-14
+            @test se.diagonal_mean ≈ mean(dbar) rtol = 1e-14
             M = length(m)
-            @test se.mahalanobis_band_hi[1] - 1 ≈ z * sqrt(2 * sum(inv, nu)) / M rtol = 1e-14
-            @test 1 - se.diagonal_band_lo[1] ≈ z * sqrt(2 * sum(inv, snu)) / M rtol = 1e-14
+            @test se.mahalanobis_band_hi - 1 ≈ z * sqrt(2 * sum(inv, nu)) / M rtol = 1e-14
+            @test 1 - se.diagonal_band_lo ≈ z * sqrt(2 * sum(inv, snu)) / M rtol = 1e-14
             # The default band is the chi-squared variance 2 / sum(nu), to the last bit.
-            @test sd.mahalanobis_band_hi[1] == 1 + z * sqrt(2 / sum(nu))
-            @test sd.diagonal_band_lo[1] == 1 - z * sqrt(2 / sum(snu))
-            @test sd.mahalanobis_mean[1] == dot(nu, m) / sum(nu)
+            @test sd.mahalanobis_band_hi == 1 + z * sqrt(2 / sum(nu))
+            @test sd.diagonal_band_lo == 1 - z * sqrt(2 / sum(snu))
+            @test sd.mahalanobis_mean == dot(nu, m) / sum(nu)
             # The plain mean has the wider band: sum(1/nu) / M^2 >= 1 / sum(nu).
-            @test se.mahalanobis_band_hi[1] > sd.mahalanobis_band_hi[1]
+            @test se.mahalanobis_band_hi > sd.mahalanobis_band_hi
             # Every other column reads no weight.
             for f in (:mahalanobis_median, :mahalanobis_p5, :diagonal_p95, :bias_statistic,
                       :qlike_mean, :exceedance, :n_steps)
@@ -803,8 +853,8 @@ struct NoLocationCovariance <: PortfolioOptimisers.AbstractCovarianceEstimator e
         # The two rules agree when every step has the same degrees of freedom.
         r = cfe(Covariance(), rd, batch_cv)
         @test allequal(r.n_valid) && allequal(r.horizon)
-        @test covariance_forecast_summary(r; step_weighting = EqualStepWeighting()).mahalanobis_mean[1] ≈
-              covariance_forecast_summary(r).mahalanobis_mean[1] rtol = 1e-14
+        @test covariance_forecast_summary(r; step_weighting = EqualStepWeighting()).mahalanobis_mean ≈
+              covariance_forecast_summary(r).mahalanobis_mean rtol = 1e-14
         @test po.covariance_step_weights(DofStepWeighting(), [8, 8, 7]) == [8, 8, 7]
         @test po.covariance_step_weights(EqualStepWeighting(), [8, 8, 7]) == [1, 1, 1]
         @test DofStepWeighting() isa po.AbstractStepWeighting
@@ -892,6 +942,23 @@ struct NoLocationCovariance <: PortfolioOptimisers.AbstractCovarianceEstimator e
         @test occursin("no partial-fit state", e.value.msg)
         e = @test_throws ArgumentError po.forecast_location(PortfolioOptimisersCovariance())
         @test occursin("no partial-fit state", e.value.msg)
+        # A state that no method reads names the estimator and the state (#1912).
+        unread = UnreadStateCovariance(po.ForecasterState(nothing))
+        e = @test_throws ArgumentError po.forecast_location(unread)
+        @test occursin("`UnreadStateCovariance` carries a `ForecasterState`", e.value.msg)
+        @test occursin("forecast_location(ce::UnreadStateCovariance)", e.value.msg)
+        # A correlation estimator that has no processing and holds no state of its own reads
+        # the location of the stepped estimator it holds. No evaluation steps one, because the
+        # loop refuses a bare correlation estimator without a buffer, so this is a direct call.
+        fitted = po.partial_fit!(Covariance(), X[1:10, :])
+        @test po.forecast_location(po.CorrelationCovariance(; ce = fitted)) ==
+              po.forecast_location(fitted)
+        @test po.forecast_location(fitted) ≈ vec(mean(X[1:10, :]; dims = 1))
+        # The online loop reads a stepped estimator through `forecast_moments` with no window.
+        # The loop inlines the method, so the line of its signature has no counter in a run
+        # through the verb, and a direct call pins the same read.
+        sg, ct = po.forecast_moments(fitted, rd, nothing)
+        @test sg == cov(fitted) && ct == po.forecast_location(fitted)
         # The summary.
         r = cfe(Covariance(), rd, batch_cv)
         @test_throws po.IsEmptyError covariance_forecast_summary(CovarianceForecastEvaluationResult[])
@@ -904,8 +971,11 @@ struct NoLocationCovariance <: PortfolioOptimisers.AbstractCovarianceEstimator e
         @test occursin("do not share their steps", e.value.msg)
         r3 = cfe(Covariance(), rd, batch_cv; w = [fill(1 / N, N), fill(1 / N, N)])
         @test_throws DimensionMismatch covariance_forecast_compare(r, r3)
-        @test_throws DomainError covariance_forecast_compare(r, r; lags = length(r.dates))
-        @test_throws DomainError covariance_forecast_compare(r, r; lags = -1)
+        # Two evaluations that share no scored step have no difference to test.
+        r0 = deepcopy(r)
+        r0.n_valid .= 0
+        e = @test_throws po.IsEmptyError covariance_forecast_compare(r0, r)
+        @test occursin("share no scored step", e.value.msg)
         # The re-projection.
         e = @test_throws ArgumentError covariance_forecast_portfolio(r, rd, nothing)
         @test occursin("store_forecasts", e.value.msg)

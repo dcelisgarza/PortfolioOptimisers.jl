@@ -17,7 +17,7 @@ stencil_dot
 mahalanobis_lattice
 hac_log_det_path!
 hac_log_det_peak
-hac_log_det_slopes
+hac_log_det_slope
 hac_ldl_taylor_row!
 gauss_legendre_rule
 mahalanobis_cut!

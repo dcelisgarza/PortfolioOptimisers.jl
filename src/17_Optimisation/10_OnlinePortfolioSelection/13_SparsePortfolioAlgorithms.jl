@@ -41,7 +41,7 @@ L1Optimum()
 
 # References
 
-  - $(ref_dict[:lai2018sspo])
+  - $(ref_dict[:lai2018sspo]) Section 3.2, Equation 12.
 """
 struct L1Optimum <: AbstractSparsePortfolioAlgorithm end
 """
@@ -120,7 +120,7 @@ HuberOptimum
 
 # References
 
-  - $(ref_dict[:lai2018sspo])
+  - $(ref_dict[:lai2018sspo]) Section 3.3.1, Equations 13, 17 to 20 and 22, and Section 4.1.
 """
 @concrete struct HuberOptimum <: AbstractSparsePortfolioAlgorithm
     """
@@ -229,7 +229,7 @@ AlternatingDirectionMethod
 
 # References
 
-  - $(ref_dict[:lai2018sspo])
+  - $(ref_dict[:lai2018sspo]) Section 3.3.2, Equations 13, 27, 29 and 32, Algorithm 1 and Section 4.1.
 """
 @concrete struct AlternatingDirectionMethod <: AbstractSparsePortfolioAlgorithm
     """
@@ -293,7 +293,7 @@ Finds the unscaled target of a [`ShortTermSparsePortfolio`](@ref) step for the o
 
 # References
 
-  - $(ref_dict[:lai2018sspo])
+  - $(ref_dict[:lai2018sspo]) Equations 12, 27, 29 and 32 and Algorithm 1.
 """
 function sparse_portfolio_iterate(::L1Optimum, phi::AbstractVector, ::AbstractVector)
     return largest_forecast_split(phi)

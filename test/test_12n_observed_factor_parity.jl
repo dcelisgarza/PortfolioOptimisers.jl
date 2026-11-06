@@ -226,9 +226,9 @@ end
     end
 
     @testset "An exposure at a pair of zero weight does not make a factor live" begin
-        Z = zeros(3, 4, 2)
-        Z[:, :, 1] .= 1.0
-        Z[:, 4, 2] .= 5.0
+        Z = zeros(4, 2, 3)
+        Z[:, 1, :] .= 1.0
+        Z[4, 2, :] .= 5.0
         X = [0.01 0.02 0.03 0.04; -0.01 0.0 0.01 0.02; 0.02 0.01 0.0 -0.01]
         W = [1.0 1.0 1.0 0.0; 1.0 1.0 1.0 0.0; 1.0 1.0 1.0 0.0]
         (; csr, lv) = PO.cross_sectional_live_regression(CrossSectionalLinearRegression(),
@@ -241,7 +241,7 @@ end
         @test PO.cross_sectional_live_regression(CrossSectionalLinearRegression(), Z, X,
                                                  W).lv == [true, true]
         @test_throws ArgumentError PO.cross_sectional_live_regression(CrossSectionalLinearRegression(),
-                                                                      zeros(3, 4, 2), X, W)
+                                                                      zeros(4, 2, 3), X, W)
     end
 
     @testset "A factor prior of the live factors, placed on the whole factor axis" begin

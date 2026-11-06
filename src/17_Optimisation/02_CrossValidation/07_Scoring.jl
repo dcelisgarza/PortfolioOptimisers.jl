@@ -3,12 +3,15 @@ $(DocStringExtensions.TYPEDEF)
 
 Abstract supertype of the cross-validation scorers.
 
-A scorer reads the population of paths that a cross-validation scheme returns. [`PredictionScorer`](@ref) selects one path from it, and [`PopulationScorer`](@ref) scores the population as a whole.
+A scorer reads the scores of a cross-validation and selects one of the items it scored. The family has two branches:
+
+  - [`PredictionScorer`](@ref) selects one path from the population of paths that a cross-validation scheme returns.
+  - [`CrossValidationSearchScorer`](@ref) selects one candidate of a search from the matrix of its cross-validation scores.
 
 # Related
 
   - [`PredictionScorer`](@ref)
-  - [`PopulationScorer`](@ref)
+  - [`CrossValidationSearchScorer`](@ref)
 """
 abstract type AbstractCrossValidationScorer <: AbstractEstimator end
 """
@@ -26,22 +29,9 @@ A subtype is callable. It takes a [`PopulationPredictionResult`](@ref) and retur
 """
 abstract type PredictionScorer <: AbstractCrossValidationScorer end
 """
-$(DocStringExtensions.TYPEDEF)
+    const PredictionCrossValScorer = Union{PredictionScorer, Function}
 
-Abstract supertype of the scorers that score a population of predictions as a whole.
-
-The library defines no subtype of it, and no method dispatches on it.
-
-# Related
-
-  - [`AbstractCrossValidationScorer`](@ref)
-  - [`PopulationCrossValScorer`](@ref)
-"""
-abstract type PopulationScorer <: AbstractCrossValidationScorer end
-"""
-    const PredictionCrossValScorer = Union{<:PredictionScorer, <:Function}
-
-Union of the values that the `scorer` field of [`OptimisationCrossValidation`](@ref) accepts: a [`PredictionScorer`](@ref) or a plain function.
+Union of the values that the `scorer` field of [`NestedClustered`](@ref) and [`Stacking`](@ref) accepts: a [`PredictionScorer`](@ref) or a plain function.
 
 The union exists so that a caller can select a path with a function and write no type. The function takes a [`PopulationPredictionResult`](@ref) and returns one of its members, as a [`PredictionScorer`](@ref) does.
 
@@ -49,34 +39,166 @@ The union exists so that a caller can select a path with a function and write no
 
   - [`PredictionScorer`](@ref)
   - [`NearestQuantilePrediction`](@ref)
-  - [`OptimisationCrossValidation`](@ref)
+  - [`NestedClustered`](@ref)
+  - [`Stacking`](@ref)
 """
-const PredictionCrossValScorer = Union{<:PredictionScorer, <:Function}
+const PredictionCrossValScorer = Union{PredictionScorer, Function}
 """
-    const PopulationCrossValScorer = Union{<:PopulationScorer, <:Function}
+    oriented_score(r::BaseRM_VecBaseRM, p::PredRes_MultiPredRes;
+                   sca::Option{<:Sca_VecToScaM} = SumScalariser(), kwargs...)
+    oriented_score(sca::Option{<:Sca_VecToScaM}, r::BaseRM_VecBaseRM, p::PredRes_MultiPredRes;
+                   kwargs...)
 
-Union of a [`PopulationScorer`](@ref) and a plain function that scores a population of predictions as a whole.
+Score a prediction under one risk measure or a vector of them, so that a higher score is always better.
 
-It is the population counterpart of [`PredictionCrossValScorer`](@ref). No field or method of the library takes it.
-
-# Related
-
-  - [`PopulationScorer`](@ref)
-  - [`PredictionCrossValScorer`](@ref)
-"""
-const PopulationCrossValScorer = Union{<:PopulationScorer, <:Function}
-"""
-$(DocStringExtensions.TYPEDEF)
-
-Selects the path of a population whose risk is nearest to a target quantile of the population's risks.
-
-It is the default scorer of [`OptimisationCrossValidation`](@ref) under [`CombinatorialCrossValidation`](@ref). A path with a failed fold, or with a risk that is not finite, takes no part in the quantile, and the scorer never selects it.
+The function orients each measure before it reduces the vector. So a vector whose measures disagree on orientation gives a score with one orientation, and [`bigger_is_better`](@ref) of the vector is never read. Because the values are oriented, [`MaxScalariser`](@ref) and [`MaxValue`](@ref) give the score of the best measure, and [`MinScalariser`](@ref) and [`MinValue`](@ref) give the score of the worst. The function reads every reduction as "higher is better", so [`StdValue`](@ref) gives the highest score to the largest spread.
 
 # Mathematical definition
 
 ```math
 \\begin{align}
-\\rho_i &= s \\, \\mathcal{R}(P_i)\\,, \\quad i \\in \\mathcal{S}\\,, \\\\
+\\mathcal{O}(P) &= o \\, \\mathcal{R}(P)\\,, \\\\
+\\mathcal{O}(P) &= S\\left(o_1 s_1 \\mathcal{R}_1(P), \\, \\ldots, \\, o_n s_n \\mathcal{R}_n(P)\\right)\\,, \\\\
+o_k &= \\begin{cases} 1 & \\mathcal{R}_k \\ \\mathrm{bigger\\ is\\ better} \\\\ -1 & \\mathrm{otherwise} \\end{cases}\\,.
+\\end{align}
+```
+
+Where:
+
+  - ``\\mathcal{O}(P)``: Oriented score of the prediction ``P``. The first line is the case of one measure, and the second line the case of a vector.
+  - ``\\mathcal{R}(P)``, ``\\mathcal{R}_k(P)``: Expected risk of ``P`` under the measure, or under the ``k``-th measure of the vector.
+  - ``o``, ``o_k``: Orientation of the measure, from [`bigger_is_better`](@ref).
+  - $(math_dict[:s_k_scale]) A negative scale is a negative weight, so that measure counts against the score.
+  - ``S``: The reduction `sca`.
+  - $(math_dict[:n_rm_vec])
+
+One measure ignores `sca` and its scale, as [`expected_risk`](@ref) does.
+
+# Algorithm
+
+ 1. With the keyword form, take `sca` out of `kwargs` and call the positional form.
+ 2. One measure: return ``o \\, \\mathcal{R}(P)``, with ``\\mathcal{R}(P)`` from [`expected_risk`](@ref) with `kwargs`.
+ 3. A vector: read the return series of ``P`` once with [`prediction_returns`](@ref), and compute ``o_k s_k \\mathcal{R}_k(P)`` for each measure on that series, with [`oriented_member_score`](@ref) with `kwargs`.
+ 4. Reduce the values of step 3 by the type of `sca`:
+     1. A [`Scalariser`](@ref): through [`scalarise`](@ref).
+     2. A [`VectorToScalarMeasure`](@ref) or a function: collect the values into a vector, and apply [`vec_to_real_measure`](@ref).
+     3. `nothing`: return the vector of the values, so each measure keeps its own score.
+
+# Arguments
+
+  - `r`: One risk measure, or a vector of them.
+  - `p`: A prediction of one fold, a [`PredictionResult`](@ref), or of one path, a [`MultiPeriodPredictionResult`](@ref).
+  - `sca`: The reduction of a vector. A [`VectorToScalarMeasure`](@ref) or a function must take a vector of numbers.
+  - `kwargs...`: Keyword arguments forwarded to [`expected_risk`](@ref).
+
+# Returns
+
+  - `score::Number`: The oriented score. A vector under `sca = nothing` gives `scores::Vector`, one oriented score for each measure.
+
+# Related
+
+  - [`Sca_VecToScaM`](@ref)
+  - [`bigger_is_better`](@ref)
+  - [`prediction_returns`](@ref)
+  - [`sort_by_measure`](@ref): sorts the paths of a population by this score.
+  - [`quantile_by_measure`](@ref): selects a path by the quantile of the negated score.
+"""
+function oriented_score(r::BaseRM_VecBaseRM, p::PredRes_MultiPredRes;
+                        sca::Option{<:Sca_VecToScaM} = SumScalariser(), kwargs...)
+    return oriented_score(sca, r, p; kwargs...)
+end
+#=
+The orientation is a trait of the type, so the compiler drops each branch on it, and a
+negation in the caller cancels the one of a measure that a smaller value makes better. So one
+measure costs what `expected_risk` costs. The members of a mixed vector have an abstract type,
+and each call on a member dispatches at run time. A vector method therefore reads the returns
+of the prediction once and makes one call on each member, `oriented_member_score`, whose
+arithmetic is on concrete types. A call that passed the prediction would box it once for each
+member. One measure reads `expected_risk` on the prediction, so that a measure that refuses a
+prediction, such as `ExpectedReturn`, still refuses it.
+=#
+function oriented_score(::Option{<:Sca_VecToScaM}, r::AbstractBaseRiskMeasure,
+                        p::PredRes_MultiPredRes; kwargs...)
+    x = expected_risk(r, p; kwargs...)
+    return bigger_is_better(r) ? x : -x
+end
+function oriented_score(sca::Scalariser, rs::VecBaseRM, p::PredRes_MultiPredRes; kwargs...)
+    X = prediction_returns(p)
+    return scalarise(r -> oriented_member_score(r, X; kwargs...), sca, rs)
+end
+function oriented_score(sca::Union{VectorToScalarMeasure, Function}, rs::VecBaseRM,
+                        p::PredRes_MultiPredRes; kwargs...)
+    return vec_to_real_measure(sca, oriented_score(nothing, rs, p; kwargs...))
+end
+function oriented_score(::Nothing, rs::VecBaseRM, p::PredRes_MultiPredRes; kwargs...)
+    X = prediction_returns(p)
+    return map(r -> oriented_member_score(r, X; kwargs...), rs)
+end
+"""
+    oriented_member_score(r::AbstractBaseRiskMeasure, X::VecNum; kwargs...)
+
+Score one member of a vector of risk measures on a return series, oriented so that a higher value is better and multiplied by its scale.
+
+It is the value ``o_k s_k \\mathcal{R}_k(P)`` of [`oriented_score`](@ref), which reduces these values of a vector. The vector methods of [`oriented_score`](@ref) read the series of the prediction once with [`prediction_returns`](@ref), and call this function once for each member.
+
+# Arguments
+
+  - `r`: One member of the vector.
+  - `X`: The return series of the prediction.
+  - `kwargs...`: Keyword arguments forwarded to [`expected_risk_from_returns`](@ref).
+
+# Returns
+
+  - `score::Number`: The value of `r` on `X`, multiplied by `-1` when [`bigger_is_better`](@ref) does not hold for `r`, and by `r.settings.scale`.
+
+# Related
+
+  - [`oriented_score`](@ref)
+  - [`prediction_returns`](@ref)
+"""
+function oriented_member_score(r::AbstractBaseRiskMeasure, X::VecNum; kwargs...)
+    x = expected_risk_from_returns(r, X; kwargs...)
+    return (bigger_is_better(r) ? x : -x) * r.settings.scale
+end
+"""
+    prediction_returns(p::PredictionResult)
+    prediction_returns(p::MultiPeriodPredictionResult)
+
+Give the realised return series of a prediction, the series that [`expected_risk`](@ref) reads.
+
+A [`PredictionResult`](@ref) is one fold, and its series is `p.rd.X`. A [`MultiPeriodPredictionResult`](@ref) is one path, and its series is `p.mrd.X`, the folds of the path in one series.
+
+# Arguments
+
+  - `p`: A prediction of one fold or of one path.
+
+# Returns
+
+  - `X::VecNum`: The return series of `p`.
+
+# Related
+
+  - [`oriented_score`](@ref)
+  - [`expected_risk`](@ref)
+"""
+function prediction_returns(p::PredictionResult)
+    return p.rd.X
+end
+function prediction_returns(p::MultiPeriodPredictionResult)
+    return p.mrd.X
+end
+"""
+$(DocStringExtensions.TYPEDEF)
+
+Selects the path of a population whose risk is nearest to a target quantile of the population's risks.
+
+It is the scorer that [`NestedClustered`](@ref) and [`Stacking`](@ref) use under [`CombinatorialCrossValidation`](@ref) when their `scorer` is `nothing`. A path with a failed fold, or with a risk that is not finite, takes no part in the quantile, and the scorer never selects it.
+
+# Mathematical definition
+
+```math
+\\begin{align}
+\\rho_i &= -\\mathcal{O}(P_i)\\,, \\quad i \\in \\mathcal{S}\\,, \\\\
 i^{\\star} &= \\underset{i \\in \\mathcal{S}}{\\arg\\min} \\left| \\rho_i - Q_q\\left(\\{\\rho_j\\}_{j \\in \\mathcal{S}}\\right) \\right|\\,.
 \\end{align}
 ```
@@ -84,18 +206,18 @@ i^{\\star} &= \\underset{i \\in \\mathcal{S}}{\\arg\\min} \\left| \\rho_i - Q_q\
 Where:
 
   - ``P_i``: Path ``i`` of the population.
-  - ``\\mathcal{S}``: Set of the paths whose every fold solved and whose risk ``\\mathcal{R}(P_i)`` is finite.
-  - ``\\mathcal{R}(P_i)``: Expected risk of path ``i`` under `r`. The scalariser `r_kwargs.sca` reduces a vector of risk measures to one value, and the default is [`SumScalariser`](@ref).
-  - ``s \\in \\{1, -1\\}``: Orientation of the risk scale, the functor's `sign`.
+  - ``\\mathcal{S}``: Set of the paths whose every fold solved and whose ``\\rho_i`` is finite.
+  - ``\\mathcal{O}(P_i)``: Oriented score of path ``i`` under `r`, from [`oriented_score`](@ref), so a higher score is better. The reduction `r_kwargs.sca` reduces a vector of risk measures to one value, and the default is [`SumScalariser`](@ref).
+  - ``\\rho_i``: Risk of path ``i`` on a scale where a larger value is worse.
   - ``Q_q``: ``q``-th quantile of a set of values, as `Statistics.quantile` computes it with `q_kwargs`.
   - ``i^{\\star}``: Selected path.
 
-``q = 0`` selects the path of least ``\\rho_i`` and ``q = 1`` the path of greatest ``\\rho_i``, whatever the quantile definition. When `q_kwargs` keeps `alpha` equal to `beta`, as the default does, ``Q_q(\\{-\\rho_j\\}) = -Q_{1-q}(\\{\\rho_j\\})``, so ``s = -1`` selects the path that ``s = 1`` selects at ``1 - q``. A definition with `alpha` different from `beta` breaks this symmetry.
+``q = 0`` selects the best path and ``q = 1`` the worst path, whatever the quantile definition and whatever the orientation of `r`. For one risk measure ``\\rho_i`` is its expected risk, and for one measure of which a bigger value is better ``\\rho_i`` is the negated value.
 
 # Algorithm
 
  1. Keep the members of `ppred` whose every fold solved, through [`successful_members`](@ref), giving `pred`.
- 2. Compute `rks`, the vector of ``s \\, \\mathcal{R}(P_i)`` over `pred`, through [`expected_risk`](@ref) with `r_kwargs`.
+ 2. Compute `rks`, the vector of ``-\\mathcal{O}(P_i)`` over `pred`, through [`oriented_score`](@ref) with `r_kwargs`.
  3. Drop every entry of `rks` that is not finite, and the member of `pred` at its position.
  4. Compute `rkq`, the `q`-th quantile of `rks`, through `Statistics.quantile` with `q_kwargs`.
  5. Scan `rks` in population order for the entry nearest to `rkq`, giving `idx`. A tie goes to the first entry.
@@ -116,9 +238,9 @@ $(DocStringExtensions.FIELDS)
 
 ## Multiplicity
 
-`r` takes one risk measure or a vector of them, and the type has no scalariser field. [`expected_risk`](@ref) reads the scalariser from `r_kwargs`, so a caller writes `r_kwargs = (sca = MaxScalariser(),)`.
+`r` takes one risk measure or a vector of them, and the type has no reduction field. [`oriented_score`](@ref) reads the reduction from `r_kwargs`, so a caller writes `r_kwargs = (sca = MinScalariser(),)` or `r_kwargs = (sca = MedianValue(),)`. The reduction reads oriented scores, so [`MinScalariser`](@ref) selects by the worst measure of each path and [`MaxScalariser`](@ref) by the best.
 
-The scorer admits a vector whose members disagree on polarity, because [`quantile_by_measure`](@ref) takes an explicit `sign` and does not call [`bigger_is_better`](@ref).
+The scorer admits a vector whose members disagree on orientation, because [`oriented_score`](@ref) orients each member before the reduction.
 
 ## Validation
 
@@ -126,11 +248,9 @@ The scorer admits a vector whose members disagree on polarity, because [`quantil
 
 # Functor
 
-    (s::NearestQuantilePrediction)(ppred::PopulationPredictionResult, sign::Integer = 1)
+    (s::NearestQuantilePrediction)(ppred::PopulationPredictionResult)
 
 Selects a path of `ppred` through [`quantile_by_measure`](@ref) and returns it.
-
-`sign` is the orientation ``s`` of the risk scale. Use `1` when a larger risk is worse and `-1` when a larger value is better.
 
 When the population is empty, or every member has a failed fold or a risk that is not finite, `Statistics.quantile` receives no value and throws an `ArgumentError`.
 
@@ -170,10 +290,9 @@ function NearestQuantilePrediction(; r::BaseRM_VecBaseRM = ConditionalValueatRis
                                    q_kwargs::NamedTuple = (;))::NearestQuantilePrediction
     return NearestQuantilePrediction(r, q, r_kwargs, q_kwargs)
 end
-function (s::NearestQuantilePrediction)(ppred::PopulationPredictionResult,
-                                        sign::Integer = 1)
+function (s::NearestQuantilePrediction)(ppred::PopulationPredictionResult)
     return quantile_by_measure(ppred, s.r, s.q; r_kwargs = s.r_kwargs,
-                               q_kwargs = s.q_kwargs, sign = sign)
+                               q_kwargs = s.q_kwargs)
 end
 
 export NearestQuantilePrediction

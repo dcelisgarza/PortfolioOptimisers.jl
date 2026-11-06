@@ -152,7 +152,7 @@ $(DocStringExtensions.TYPEDFIELDS)
 # Constructors
 
     DescriptorScores(; descriptors::AbstractVector{<:AbstractDescriptorEstimator},
-                     neutralise::Option{<:Union{<:AbstractString, <:VecStr}} = nothing,
+                     neutralise::Option{<:Union{AbstractString, VecStr}} = nothing,
                      nw::AbstractNeutralisationWeights = EstimationMaskWeights(),
                      cre::AbstractCrossSectionalRegressionEstimator = CrossSectionalLinearRegression(;
                                                                                                      intercept = true),
@@ -204,7 +204,7 @@ $(DocStringExtensions.TYPEDFIELDS)
     """
     ex
     function DescriptorScores(descriptors::AbstractVector{<:AbstractDescriptorEstimator},
-                              neutralise::Option{<:Union{<:AbstractString, <:VecStr}},
+                              neutralise::Option{<:Union{AbstractString, VecStr}},
                               nw::AbstractNeutralisationWeights,
                               cre::AbstractCrossSectionalRegressionEstimator,
                               outlier::Option{<:AbstractCrossSectionalTransform},
@@ -229,7 +229,7 @@ $(DocStringExtensions.TYPEDFIELDS)
     end
 end
 function DescriptorScores(; descriptors::AbstractVector{<:AbstractDescriptorEstimator},
-                          neutralise::Option{<:Union{<:AbstractString, <:VecStr}} = nothing,
+                          neutralise::Option{<:Union{AbstractString, VecStr}} = nothing,
                           nw::AbstractNeutralisationWeights = EstimationMaskWeights(),
                           cre::AbstractCrossSectionalRegressionEstimator = CrossSectionalLinearRegression(;
                                                                                                           intercept = true),
@@ -326,7 +326,7 @@ end
                        groups::Option{<:AbstractMatrix{<:Integer}},
                        rows::AbstractUnitRange) -> nothing
     neutralise_scores!(S::AbstractArray{<:Real, 3},
-                       neutralise::Union{<:AbstractString, <:VecStr},
+                       neutralise::Union{AbstractString, VecStr},
                        cre::AbstractCrossSectionalRegressionEstimator,
                        csfm::CrossSectionalFactorModel, w::MatNum,
                        scoring::Option{<:AbstractCrossSectionalTransform},
@@ -347,7 +347,7 @@ The method that Julia selects is the algorithm. The method for a recipe that nam
 
 # Arguments
 
-  - `S`: The Descriptor scores, `observations × assets × descriptors`, on the observation axis of the returns data. The function changes it in place.
+  - `S`: The Descriptor scores, `assets × descriptors × observations`, on the observation axis of the returns data. The function changes it in place.
   - `neutralise`: The Neutralisation names, or `nothing`.
   - `cre`: Cross-Sectional Regression Estimator that fits the residualisation.
   - `csfm`: The fitted factor-model block.
@@ -382,7 +382,7 @@ function neutralise_scores!(::AbstractArray{<:Real, 3}, ::Nothing,
     return nothing
 end
 function neutralise_scores!(S::AbstractArray{<:Real, 3},
-                            neutralise::Union{<:AbstractString, <:VecStr},
+                            neutralise::Union{AbstractString, VecStr},
                             cre::AbstractCrossSectionalRegressionEstimator,
                             csfm::CrossSectionalFactorModel, w::MatNum,
                             scoring::Option{<:AbstractCrossSectionalTransform},
@@ -390,18 +390,19 @@ function neutralise_scores!(S::AbstractArray{<:Real, 3},
                             rows::AbstractUnitRange)::Nothing
     Ms, nf, fam = descriptor_scores_axis(csfm)
     tidx = neutralisation_targets(neutralisation_names(neutralise), nf, fam)
-    X = Ms[:, :, tidx]
+    X = Ms[:, tidx, :]
     gb = return_forecast_cut(groups, rows)
     Tf = eltype(S)
     @argcheck(first(rows) == 1 || !(Tf <: Union{Integer, Rational}),
               ArgumentError("a neutralised score is NaN on the $(first(rows) - 1) observations before the factor model block, and the element type $Tf of the scores cannot hold NaN. Convert the Panel Fields to a floating-point type, or hand in the returns data that the block was fitted on."))
-    for k in axes(S, 3)
-        y = S[rows, :, k]
+    for k in axes(S, 2)
+        # The response of the fit is `observations × assets`, as the returns of a fit are.
+        y = permutedims(view(S, :, k, rows))
         W = neutralisation_weights(y, X, w)
         csr = cross_sectional_regression(cre, X, y, W)
-        S[rows, :, k] = exposure_transform(scoring, csr.eps, w, gb)
+        S[:, k, rows] = transpose(exposure_transform(scoring, csr.eps, w, gb))
     end
-    S[1:(first(rows) - 1), :, :] .= Tf(NaN)
+    S[:, :, 1:(first(rows) - 1)] .= Tf(NaN)
     return nothing
 end
 """
@@ -416,7 +417,7 @@ The function computes the Descriptors over all the returns data. A Descriptor wi
 
  1. Read the cross-sectional weights off the estimation mask of the Asset Panel, the group labels off the named categorical Panel Field, and the block's rows with [`return_forecast_rows`](@ref). Steps 1 to 3, except the rows of the block, run in [`descriptor_panel_scores`](@ref).
  2. Compute each Descriptor over all the returns data under `ds.ex`, through [`cross_sectional_foreach`](@ref), and apply the outlier slot and then the scoring slot to it.
- 3. Stack the scores on a third axis of `S`, in the order of the Descriptors. The number type of `S` is the promotion of the number types of the scores and, when the recipe names Neutralisation targets, of the exposure history.
+ 3. Stack the scores on the second axis of `S`, in the order of the Descriptors, with the observations on the last axis. The number type of `S` is the promotion of the number types of the scores and, when the recipe names Neutralisation targets, of the exposure history.
  4. When the recipe names Neutralisation targets, residualise every score of the block's rows against those Factor Exposures under the base weights of [`neutralisation_base_weights`](@ref), score it once more, and write `NaN` on the rows before the block, with [`descriptor_neutralised_scores`](@ref).
 
 # Arguments
@@ -432,7 +433,7 @@ The function computes the Descriptors over all the returns data. A Descriptor wi
 
 # Returns
 
-  - `S::Array{<:Real, 3}`: The Descriptor scores, `observations × assets × descriptors`, on the observation axis of the returns data.
+  - `S::Array{<:Real, 3}`: The Descriptor scores, `assets × descriptors × observations`, on the observation axis of the returns data.
   - `rows::AbstractUnitRange`: The rows of the returns data that the block covers.
 
 # Examples
@@ -454,12 +455,12 @@ julia> ds = DescriptorScores(;
 julia> descriptor_scores(ds, rd, csfm).S
 2×2×2 Array{Float64, 3}:
 [:, :, 1] =
- 1.0  2.0
- 3.0  4.0
+ 1.0  5.0
+ 2.0  6.0
 
 [:, :, 2] =
- 5.0  6.0
- 7.0  8.0
+ 3.0  7.0
+ 4.0  8.0
 ```
 
 # Related
@@ -490,7 +491,7 @@ A score of an observation reads the last [`lookback`](@ref) rows of the panel, a
 
  1. Read the cross-sectional weights off the estimation mask of the Asset Panel with [`return_forecast_weights`](@ref), and the group labels off the named categorical Panel Field with [`exposure_group_labels`](@ref).
  2. Compute each Descriptor over all the returns data under `ds.ex`, through [`cross_sectional_foreach`](@ref), and apply the outlier slot and then the scoring slot to it with [`composite_score`](@ref).
- 3. Stack the scores on a third axis, in the order of the Descriptors.
+ 3. Stack the scores on the second axis, in the order of the Descriptors, with the observations on the last axis.
 
 # Arguments
 
@@ -503,7 +504,7 @@ A score of an observation reads the last [`lookback`](@ref) rows of the panel, a
 
 # Returns
 
-  - `S::Array{<:Real, 3}`: The scores before the Neutralisation, `observations × assets × descriptors`.
+  - `S::Array{<:Real, 3}`: The scores before the Neutralisation, `assets × descriptors × observations`.
   - `w::MatNum`: The cross-sectional weights, `observations × assets`.
   - `g::Option{<:AbstractMatrix{<:Integer}}`: The group labels, `observations × assets`, or `nothing`.
 
@@ -515,17 +516,20 @@ A score of an observation reads the last [`lookback`](@ref) rows of the panel, a
 function descriptor_panel_scores(ds::DescriptorScores, rd::ReturnsResult)
     w = return_forecast_weights(rd)
     groups = exposure_group_labels(rd, ds.group)
-    # Each Descriptor writes its own entry of `sc`. `stack` promotes the number types of the
-    # scores, whatever the element type of `sc`. It reads `sc` through a generator, because
-    # JET reads its method for a `Vector{Any}` as a call to an `Array` method that no type
-    # has. The bound on `S` keeps the `Nothing` method of `return_forecast_cut` out of every
-    # caller's inference, where a `stack` over an abstract Descriptor vector reads as `Any`.
-    sc = Vector{Any}(undef, length(ds.descriptors))
+    # Each Descriptor writes its own entry of `sc`, in parallel, so `sc` is filled out of
+    # order. `composite_score` returns a `MatNum`, and the Descriptors vary across the family,
+    # so `MatNum` is the element type (#1979). `stack` promotes the number types of the
+    # scores. It reads `sc` through a generator, because JET reads its method for a vector of
+    # an abstract element type as a call to an `Array` method that no type has. The bound on
+    # `S` keeps the `Nothing` method of `return_forecast_cut` out of every caller's
+    # inference, where a `stack` over an abstract Descriptor vector reads as `Any`. A score
+    # is `observations × assets`, and the stack puts the observations last.
+    sc = Vector{MatNum}(undef, length(ds.descriptors))
     cross_sectional_foreach(ds.ex, eachindex(ds.descriptors)) do k
         return sc[k] = composite_score(ds.descriptors[k], rd, ds.outlier, ds.scoring, w,
                                        groups)
     end
-    S::Arr3Num = stack(s for s in sc)
+    S::Arr3Num = stack((transpose(s) for s in sc); dims = 2)
     return (; S = S, w = w, g = groups)
 end
 """
@@ -551,7 +555,7 @@ Neutralise the scores of a [`DescriptorScores`](@ref) against the Factor Exposur
 
 # Returns
 
-  - `S::Array{<:Real, 3}`: The Descriptor scores, `observations × assets × descriptors`, on the rows of `P`.
+  - `S::Array{<:Real, 3}`: The Descriptor scores, `assets × descriptors × observations`, on the rows of `P`.
 
 # Related
 
@@ -579,8 +583,8 @@ function descriptor_neutralised_scores(ds::DescriptorScores, P::NamedTuple,
 end
 function descriptor_carry(ds::DescriptorScores, rd::ReturnsResult, m::Integer)
     cs = map(de -> descriptor_carry(de, rd, m), ds.descriptors)
-    return (; xf = Accessors.@set(ds.descriptors = map(c -> c.xf, cs)),
-            xv = Accessors.@set(ds.descriptors = map(c -> c.xv, cs)))
+    return (; xf = rebuild_estimator(ds, (; descriptors = map(c -> c.xf, cs))),
+            xv = rebuild_estimator(ds, (; descriptors = map(c -> c.xv, cs))))
 end
 
 export DescriptorScores, descriptor_scores, EstimationMaskWeights, BlockRegressionWeights

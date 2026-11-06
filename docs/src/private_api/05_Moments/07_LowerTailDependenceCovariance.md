@@ -8,3 +8,10 @@ Description = "Lower Tail Dependence Covariance, private API of PortfolioOptimis
 lower_tail_dependence
 PortfolioOptimisers.show_fields(::LowerTailDependenceCovariance)
 ```
+
+## References
+
+```@bibliography
+Pages = [@__FILE__]
+Canonical = false
+```

@@ -20,6 +20,7 @@ factory(r::StandardDeviation, pr::AbstractPriorResult, args...; kwargs...)
 factory(r::UncertaintySetVariance, pr::AbstractPriorResult, ::Any, ucs::Option{<:UcSE_UcS} = nothing, args...; kwargs...)
 factory(r::UncertaintySetVariance, pr::AbstractPriorResult, ucs::Option{<:UcSE_UcS} = nothing; kwargs...)
 factory(r::UncertaintySetVariance, ucs::UcSE_UcS, pr::Option{<:AbstractPriorResult} = nothing; kwargs...)
+obs_weights_view(r::UncertaintySetVariance, i)
 ```
 
 ## References

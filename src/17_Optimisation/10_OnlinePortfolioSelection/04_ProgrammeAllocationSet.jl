@@ -58,26 +58,26 @@ $(DocStringExtensions.FIELDS)
         slv::Slv_VecSlv,
         pe::AbstractPriorEstimator = EmpiricalPrior(),
         r::Option{<:RM_VecRM} = nothing,
-        wb::Option{<:WbE_Wb} = WeightBounds(),
+        wb::Option{<:NameWbE_Wb} = WeightBounds(),
         sbgt::Option{<:Num_BgtRg} = nothing,
         gbgt::Option{<:Num_BgtRg} = nothing,
         xbgt::Bool = false,
         lt::Option{<:BtE_Bt} = nothing,
         st::Option{<:BtE_Bt} = nothing,
-        lcse::Option{<:EcE_LcE_Lc_VecEcE_LcE_Lc} = nothing,
+        lcse::Option{<:Union{EcE_LcE_Lc, AbstractVector}} = nothing,
         cte::Option{<:Lc_CC_VecCC} = nothing,
         gcarde::Option{<:LcE_Lc} = nothing,
-        sgcarde::Option{<:LcE_Lc_VecLcE_Lc} = nothing,
-        smtx::Option{<:MatNum_ASetMatE_VecMatNum_ASetMatE} = nothing,
-        sgmtx::Option{<:MatNum_ASetMatE_VecMatNum_ASetMatE} = nothing,
-        slt::Option{<:BtE_Bt_VecOptBtE_Bt} = nothing,
-        sst::Option{<:BtE_Bt_VecOptBtE_Bt} = nothing,
-        sglt::Option{<:BtE_Bt_VecOptBtE_Bt} = nothing,
-        sgst::Option{<:BtE_Bt_VecOptBtE_Bt} = nothing,
-        tn::Option{<:TnE_Tn_VecTnE_Tn} = nothing,
+        sgcarde::Option{<:Union{LcE_Lc, AbstractVector}} = nothing,
+        smtx::Option{<:Union{MatNum_ASetMatE, AbstractVector}} = nothing,
+        sgmtx::Option{<:Union{MatNum_ASetMatE, AbstractVector}} = nothing,
+        slt::Option{<:Union{BtE_Bt, AbstractVector}} = nothing,
+        sst::Option{<:Union{BtE_Bt, AbstractVector}} = nothing,
+        sglt::Option{<:Union{BtE_Bt, AbstractVector}} = nothing,
+        sgst::Option{<:Union{BtE_Bt, AbstractVector}} = nothing,
+        tn::Option{<:Union{TnE_Tn, AbstractVector}} = nothing,
         sets::Option{<:UniverseSets} = nothing,
         tr::Option{<:Tr_VecTr} = nothing,
-        ple::Option{<:PlCE_PlC_VecPlCE_PlC} = nothing,
+        ple::Option{<:Union{PlCE_PlC, AbstractVector}} = nothing,
         ret::Option{<:JRE_VecJRE} = nothing,
         ccnt::Option{<:JuMPConstr_VecJuMPConstr} = nothing,
         cobj::Option{<:JuMPObj_VecJuMPObj} = nothing,
@@ -95,7 +95,7 @@ $(DocStringExtensions.FIELDS)
         linf::Option{<:Num_AmbRadCal} = nothing
     ) -> ProgrammeAllocationSet
 
-Keywords correspond to the struct's fields. `slv` has no default, because every projection onto the set is a programme.
+Keywords correspond to the struct's fields. `slv` has no default, because every projection onto the set is a programme. `lcse`, `sgcarde`, `smtx`, `sgmtx`, `slt`, `sst`, `sglt`, `sgst`, `tn` and `ple` take a vector that mixes the members of their element type, through [`narrow_mixed_vector`](@ref), as the keyword constructor of [`JuMPOptimiser`](@ref) does.
 
 ## Validation
 
@@ -103,11 +103,13 @@ Keywords correspond to the struct's fields. `slv` has no default, because every 
   - If `sbgt` or `gbgt` is a number: non-negative and finite. A `DomainError` is thrown otherwise.
   - If `gbgt` is given: `sbgt` is not a number, because the budget of one and a number in `sbgt` already fix the gross exposure. If `wb` is a [`WeightBounds`](@ref), one of its bounds admits a short weight. An `ArgumentError` is thrown otherwise.
   - If `r` is given: the `settings.ub` of every measure is a finite non-negative number, the ceiling, and no measure holds a [`ReturnsTracking`](@ref), because the ceiling reads rows that change at every step ([`assert_risk_ceiling`](@ref)). An `ArgumentError` is thrown otherwise, and an `IsEmptyError` for an empty vector.
+  - If `ret` is given: the `settings.lb` of every return term is `nothing` or a number, the floor, because the projection solves once and returns one allocation ([`assert_return_floor`](@ref)). An `ArgumentError` is thrown for a [`Frontier`](@ref) or a vector.
   - If `cte`, `tn`, `tr`, `l2`, `lp`, `lpc` or `ret` is a vector: `!isempty(x)`. An `IsEmptyError` is thrown otherwise.
   - If `card` is given: `card > 0` and finite. If `l2c`, `linfc`, `l1` or `linf` is a number: `> 0` and finite. A `DomainError` is thrown otherwise.
   - An [`LpRegularisation`](@ref) in `lp` holds no norm ceiling rule, and one in `lpc` holds no ambiguity radius rule. An `ArgumentError` is thrown otherwise.
   - The sub-group and sub-grouped MIP slots agree in shape ([`assert_subgroup_mip_fields`](@ref), [`assert_subgrouped_mip_fields`](@ref)).
   - If a slot holds an estimator keyed by name ([`name_keyed`](@ref)): `!isnothing(sets)`. An `IsNothingError` is thrown otherwise.
+  - `wb` is a [`NameWbE_Wb`](@ref). A bound that reads the returns, such as a [`ScoreWeightBounds`](@ref), would read rows after each Online Update, so the field bound refuses it with a `TypeError`.
   - If `tr` or `r` holds a [`DataBenchmarkTracking`](@ref): `pe` must not state `x_src = ExcessSource()`, see [`assert_data_benchmark_prior`](@ref).
 
 ## View parameters
@@ -366,7 +368,7 @@ ProgrammeAllocationSet
     """
     linf
     function ProgrammeAllocationSet(pe::AbstractPriorEstimator, slv::Slv_VecSlv,
-                                    r::Option{<:RM_VecRM}, wb::Option{<:WbE_Wb},
+                                    r::Option{<:RM_VecRM}, wb::Option{<:NameWbE_Wb},
                                     sbgt::Option{<:Num_BgtRg}, gbgt::Option{<:Num_BgtRg},
                                     xbgt::Bool, lt::Option{<:BtE_Bt}, st::Option{<:BtE_Bt},
                                     lcse::Option{<:EcE_LcE_Lc_VecEcE_LcE_Lc},
@@ -404,6 +406,7 @@ ProgrammeAllocationSet
         end
         assert_gross_budget_admissible(1, sbgt, gbgt, wb)
         assert_risk_ceiling(r)
+        assert_return_floor(ret)
         for (x, name) in
             ((cte, :cte), (tn, :tn), (tr, :tr), (l2, :l2), (lp, :lp), (lpc, :lpc),
              (ret, :ret))
@@ -453,25 +456,25 @@ end
 function ProgrammeAllocationSet(; slv::Slv_VecSlv,
                                 pe::AbstractPriorEstimator = EmpiricalPrior(),
                                 r::Option{<:RM_VecRM} = nothing,
-                                wb::Option{<:WbE_Wb} = WeightBounds(),
+                                wb::Option{<:NameWbE_Wb} = WeightBounds(),
                                 sbgt::Option{<:Num_BgtRg} = nothing,
                                 gbgt::Option{<:Num_BgtRg} = nothing, xbgt::Bool = false,
                                 lt::Option{<:BtE_Bt} = nothing,
                                 st::Option{<:BtE_Bt} = nothing,
-                                lcse::Option{<:EcE_LcE_Lc_VecEcE_LcE_Lc} = nothing,
+                                lcse::Option{<:Union{EcE_LcE_Lc, AbstractVector}} = nothing,
                                 cte::Option{<:Lc_CC_VecCC} = nothing,
                                 gcarde::Option{<:LcE_Lc} = nothing,
-                                sgcarde::Option{<:LcE_Lc_VecLcE_Lc} = nothing,
-                                smtx::Option{<:MatNum_ASetMatE_VecMatNum_ASetMatE} = nothing,
-                                sgmtx::Option{<:MatNum_ASetMatE_VecMatNum_ASetMatE} = nothing,
-                                slt::Option{<:BtE_Bt_VecOptBtE_Bt} = nothing,
-                                sst::Option{<:BtE_Bt_VecOptBtE_Bt} = nothing,
-                                sglt::Option{<:BtE_Bt_VecOptBtE_Bt} = nothing,
-                                sgst::Option{<:BtE_Bt_VecOptBtE_Bt} = nothing,
-                                tn::Option{<:TnE_Tn_VecTnE_Tn} = nothing,
+                                sgcarde::Option{<:Union{LcE_Lc, AbstractVector}} = nothing,
+                                smtx::Option{<:Union{MatNum_ASetMatE, AbstractVector}} = nothing,
+                                sgmtx::Option{<:Union{MatNum_ASetMatE, AbstractVector}} = nothing,
+                                slt::Option{<:Union{BtE_Bt, AbstractVector}} = nothing,
+                                sst::Option{<:Union{BtE_Bt, AbstractVector}} = nothing,
+                                sglt::Option{<:Union{BtE_Bt, AbstractVector}} = nothing,
+                                sgst::Option{<:Union{BtE_Bt, AbstractVector}} = nothing,
+                                tn::Option{<:Union{TnE_Tn, AbstractVector}} = nothing,
                                 sets::Option{<:UniverseSets} = nothing,
                                 tr::Option{<:Tr_VecTr} = nothing,
-                                ple::Option{<:PlCE_PlC_VecPlCE_PlC} = nothing,
+                                ple::Option{<:Union{PlCE_PlC, AbstractVector}} = nothing,
                                 ret::Option{<:JRE_VecJRE} = nothing,
                                 ccnt::Option{<:JuMPConstr_VecJuMPConstr} = nothing,
                                 cobj::Option{<:JuMPObj_VecJuMPObj} = nothing,
@@ -486,10 +489,19 @@ function ProgrammeAllocationSet(; slv::Slv_VecSlv,
                                 l2::Option{<:L2Reg_VecL2Reg} = nothing,
                                 lp::Option{<:LpReg_VecLpReg} = nothing,
                                 linf::Option{<:Num_AmbRadCal} = nothing)::ProgrammeAllocationSet
-    return ProgrammeAllocationSet(pe, slv, r, wb, sbgt, gbgt, xbgt, lt, st, lcse, cte,
-                                  gcarde, sgcarde, smtx, sgmtx, slt, sst, sglt, sgst, tn,
-                                  sets, tr, ple, ret, ccnt, cobj, sc, so, ss, card, scard,
-                                  l2c, lpc, linfc, l1, l2, lp, linf)
+    return ProgrammeAllocationSet(pe, slv, r, wb, sbgt, gbgt, xbgt, lt, st,
+                                  narrow_mixed_vector(lcse, EcE_LcE_Lc, :lcse), cte, gcarde,
+                                  narrow_mixed_vector(sgcarde, LcE_Lc, :sgcarde),
+                                  narrow_mixed_vector(smtx, MatNum_ASetMatE, :smtx),
+                                  narrow_mixed_vector(sgmtx, MatNum_ASetMatE, :sgmtx),
+                                  narrow_mixed_vector(slt, Option{<:BtE_Bt}, :slt),
+                                  narrow_mixed_vector(sst, Option{<:BtE_Bt}, :sst),
+                                  narrow_mixed_vector(sglt, Option{<:BtE_Bt}, :sglt),
+                                  narrow_mixed_vector(sgst, Option{<:BtE_Bt}, :sgst),
+                                  narrow_mixed_vector(tn, TnE_Tn, :tn), sets, tr,
+                                  narrow_mixed_vector(ple, PlCE_PlC, :ple), ret, ccnt, cobj,
+                                  sc, so, ss, card, scard, l2c, lpc, linfc, l1, l2, lp,
+                                  linf)
 end
 function port_opt_view(set::ProgrammeAllocationSet, i, args...)
     if set.smtx === set.sgmtx
@@ -561,7 +573,7 @@ end
 
 Tells whether a constraint slot holds an estimator that resolves its names over `sets`.
 
-The owner of such a slot must carry `sets`. The estimators are [`WeightBoundsEstimator`](@ref), [`LinearConstraintEstimator`](@ref), [`ExposureConstraintEstimator`](@ref), [`ThresholdEstimator`](@ref), [`AssetSetsMatrixEstimator`](@ref) and [`TurnoverEstimator`](@ref). A vector is keyed by name when one of its entries is.
+The owner of such a slot must carry `sets`. The estimators are every [`AbstractWeightBoundsEstimator`](@ref), [`LinearConstraintEstimator`](@ref), [`ExposureConstraintEstimator`](@ref), [`ThresholdEstimator`](@ref), [`AssetSetsMatrixEstimator`](@ref) and [`TurnoverEstimator`](@ref). A [`ScoreWeightBounds`](@ref) is the exception: it is keyed by name only when its `val` or its static bounds name assets. A vector is keyed by name when one of its entries is.
 
 # Returns
 
@@ -575,9 +587,9 @@ The owner of such a slot must carry `sets`. The estimators are [`WeightBoundsEst
 function name_keyed(::Any)
     return false
 end
-function name_keyed(::Union{<:WeightBoundsEstimator, <:LinearConstraintEstimator,
-                            <:ExposureConstraintEstimator, <:ThresholdEstimator,
-                            <:AssetSetsMatrixEstimator, <:TurnoverEstimator})
+function name_keyed(::Union{AbstractWeightBoundsEstimator, LinearConstraintEstimator,
+                            ExposureConstraintEstimator, ThresholdEstimator,
+                            AssetSetsMatrixEstimator, TurnoverEstimator})
     return true
 end
 function name_keyed(x::AbstractVector)
@@ -717,8 +729,8 @@ A precomputed [`LinearConstraint`](@ref), [`IntegerPhylogeny`](@ref) or [`SemiDe
 function fitted_on_rows(::Any)
     return false
 end
-function fitted_on_rows(::Union{<:AbstractCentralityConstraint,
-                                <:AbstractPhylogenyConstraintEstimator})
+function fitted_on_rows(::Union{AbstractCentralityConstraint,
+                                AbstractPhylogenyConstraintEstimator})
     return true
 end
 function fitted_on_rows(x::AbstractVector)
@@ -756,7 +768,7 @@ $(DocStringExtensions.TYPEDEF)
 
 Projects the raw step onto the Allocation Set in the Bregman divergence of the Tsallis potential of power `alpha`.
 
-This is the geometry of the Tsallis-entropy steps of [abernethy2015](@citet) and of the Tsallis-INF algorithm of [zimmertseldin2021](@citet). The potential of [abernethy2015](@citet) is ``\\alpha \\Psi_\\alpha`` plus a constant, and the potential of [zimmertseldin2021](@citet) is ``\\Psi_\\alpha`` plus an affine term. So each divergence is ``D_{\\Psi_\\alpha}`` times a constant factor, which a learning rate absorbs. [abernethy2015](@citet) and [zimmertseldin2021](@citet) both bound the regret of the multi-armed bandit with bounded losses. At the tuned rate, Corollary 3.2 of [abernethy2015](@cite) bounds the expected regret by ``\\sqrt{2 T N / (\\alpha (1 - \\alpha))}``. The log-wealth loss of a portfolio has no bounded gradient, so that bound does not apply to it as it stands. The geometry cannot set a positive entry to zero, and a zero entry stays zero. The geometry refuses a negative lower bound, because the potential is undefined below zero.
+This is the geometry of the Tsallis-entropy steps of Section 3 of [abernethy2015](@cite) and of the Tsallis-INF algorithm of Section 3.2 of [zimmertseldin2021](@cite). The potential of [abernethy2015](@citet) is ``\\alpha \\Psi_\\alpha`` plus a constant, and the potential of [zimmertseldin2021](@citet) is ``\\Psi_\\alpha`` plus an affine term, which is constant on the simplex. So each divergence is ``D_{\\Psi_\\alpha}`` times a constant factor, which a learning rate absorbs. [abernethy2015](@citet) and [zimmertseldin2021](@citet) both bound the regret of the multi-armed bandit with bounded losses. At the tuned rate, Corollary 3.2 of [abernethy2015](@cite) bounds the expected regret by ``\\sqrt{2 T N / (\\alpha (1 - \\alpha))}``. The log-wealth loss of a portfolio has no bounded gradient, so that bound does not apply to it as it stands. The geometry cannot set a positive entry to zero, and a zero entry stays zero. The geometry refuses a negative lower bound, because the potential is undefined below zero.
 
 # Mathematical definition
 
@@ -782,7 +794,7 @@ Where:
   - $(math_dict[:eta_t_lr])
   - $(math_dict[:g_t_loss])
 
-The mirror image is ``\\nabla \\Psi_\\alpha(\\boldsymbol{w})_i = w_i^{\\alpha - 1} / (\\alpha - 1)``, so the projection sets ``\\nabla \\Psi_\\alpha(\\boldsymbol{w}) - \\nabla \\Psi_\\alpha(\\boldsymbol{q})`` to one constant over the free entries. On a [`BoundedAllocationSet`](@ref) the projection is ``\\boldsymbol{w}(\\theta)`` at the root. A base ``q_i^{\\alpha - 1} + \\theta`` at or below zero puts its asset at ``u_i``. The budget ``\\sum_i w_i(\\theta)`` does not increase in ``\\theta``. The last line is a first-order step from ``\\boldsymbol{w}_t`` and its projection onto the simplex together, one scalar root. As ``\\alpha \\to 1``, ``D_{\\Psi_\\alpha}`` tends to the relative entropy of [`EntropicProjection`](@ref). As ``\\alpha \\to 0``, it tends to the Itakura–Saito divergence of [`LogBarrierProjection`](@ref). On a [`ProgrammeAllocationSet`](@ref) a weight that the set forces to zero stays zero, as under [`EntropicProjection`](@ref).
+The mirror image is ``\\nabla \\Psi_\\alpha(\\boldsymbol{w})_i = w_i^{\\alpha - 1} / (\\alpha - 1)``, so the projection sets ``\\nabla \\Psi_\\alpha(\\boldsymbol{w}) - \\nabla \\Psi_\\alpha(\\boldsymbol{q})`` to one constant over the free entries. On a [`BoundedAllocationSet`](@ref) the projection is ``\\boldsymbol{w}(\\theta)`` at the root. A base ``q_i^{\\alpha - 1} + \\theta`` at or below zero puts its asset at ``u_i``. The budget ``\\sum_i w_i(\\theta)`` does not increase in ``\\theta``. The last line is a first-order step from ``\\boldsymbol{w}_t`` and its projection onto the simplex together, one scalar root. As ``\\alpha \\to 1``, ``D_{\\Psi_\\alpha}`` tends to the relative entropy of [`EntropicProjection`](@ref). As ``\\alpha \\to 0``, it tends to the Itakura–Saito divergence of [`LogBarrierProjection`](@ref), as Section 3.2 of [zimmertseldin2021](@cite) shows for the potentials. On a [`ProgrammeAllocationSet`](@ref) a weight that the set forces to zero stays zero, as under [`EntropicProjection`](@ref).
 
 # Fields
 
@@ -792,7 +804,7 @@ $(DocStringExtensions.FIELDS)
 
     TsallisProjection(; alpha::Real = 0.5) -> TsallisProjection
 
-Keywords correspond to the struct's fields. The default is the ``\\alpha = 1/2`` of [zimmertseldin2021](@cite).
+Keywords correspond to the struct's fields. The default is the ``\\alpha = 1/2`` of Section 4.1 of [zimmertseldin2021](@cite).
 
 ## Validation
 
@@ -816,8 +828,8 @@ TsallisProjection
 
 # References
 
-  - $(ref_dict[:abernethy2015])
-  - $(ref_dict[:zimmertseldin2021])
+  - $(ref_dict[:abernethy2015]) Section 3, Theorem 3.1, Corollary 3.2.
+  - $(ref_dict[:zimmertseldin2021]) Section 3.2. Section 4.1, Theorem 1.
 """
 @concrete struct TsallisProjection <: AbstractProjectionGeometry
     """
@@ -883,7 +895,7 @@ LogBarrierProjection()
 
 # References
 
-  - $(ref_dict[:orseau2017])
+  - $(ref_dict[:orseau2017]) Section 7, Alternative approaches.
 """
 struct LogBarrierProjection <: AbstractProjectionGeometry end
 """
@@ -1186,8 +1198,8 @@ function assert_geometry_admits_set(::AbstractProjectionGeometry,
                                     ::AbstractAllocationSet)::Nothing
     return nothing
 end
-function assert_geometry_admits_set(proj::Union{<:EntropicProjection, <:TsallisProjection,
-                                                <:LogBarrierProjection},
+function assert_geometry_admits_set(proj::Union{EntropicProjection, TsallisProjection,
+                                                LogBarrierProjection},
                                     set::AbstractAllocationSet)::Nothing
     wb = set.wb
     if isa(wb, WeightBounds) && !isnothing(wb.lb)

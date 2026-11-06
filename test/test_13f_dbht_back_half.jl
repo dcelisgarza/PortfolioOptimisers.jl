@@ -433,12 +433,11 @@ euclidean(X) = [norm(X[:, i] - X[:, j]) for i in axes(X, 2), j in axes(X, 2)]
     end
 
     @testset "The numeric type comes from the distances" begin
-        # Integer and rational distances keep their type, and the sum is exact.
+        # Rational distances keep their type, and the sum is exact. The integer matrix `D`
+        # only builds them: issue #1972 removed the integer-distance case.
         D = [0 4 1 3; 4 0 2 5; 1 2 0 6; 3 5 6 0]
         ml, mr = [-1, -2, 1], [-3, -4, 2]
         best = brute_force_minimum(D, ml, mr)
-        o = PO.optimal_leaf_order!(copy(ml), copy(mr), D)
-        @test adjacent_sum(D, o) == best
         Dq = D .// 3
         oq = PO.optimal_leaf_order!(copy(ml), copy(mr), Dq)
         @test adjacent_sum(Dq, oq) == best // 3

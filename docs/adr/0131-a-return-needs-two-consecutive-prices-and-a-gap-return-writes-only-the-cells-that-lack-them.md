@@ -244,3 +244,10 @@ On prices near `1e5` with a return of `1e-9`, the old branch was about `1e8` ulp
 Nothing that this ADR decides moves. A zero price still gives `-Inf` on its observation and `Inf` on
 the next, because `log1p(-1) = -Inf` and `log1p(Inf) = Inf`. Every log return of the library changes
 in its last bits.
+
+## Amendment (2026-10-28, #1867)
+
+**`NoPanelFill` is removed.** The fill policy that refuses a blank is now `alg = nothing`, with
+the verb `panel_fill(::Nothing, v, name)`. ADR 0222 spells a skipped procedure as `nothing`, and
+ADR 0102 carries the full amendment. Where the decision above names `NoPanelFill`, read
+`alg = nothing`. Nothing that this ADR decides moves.

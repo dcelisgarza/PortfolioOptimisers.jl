@@ -200,12 +200,21 @@ end
     @test PO.prop_channel_active(:obs, wonly)
     @test !PO.prop_channel_active(:view, wonly)
     @test !PO.prop_channel_active(:prior, wonly)
-    # `@fprop` is in the observation channel's precedence but not its gate, so a struct with
-    # composed children and no weights of its own emits no `obs_weights_view` method and
-    # falls through to the identity.
+    # `@fprop` opens the observation channel too (#1960), so a cut of the observations
+    # reaches the weights of a child at any depth, through a wrapper with no weights of its
+    # own.
     fonly = merge(untagged, Dict(:fprop => [:a]))
     @test PO.prop_channel_active(:factory, fonly)
-    @test !PO.prop_channel_active(:obs, fonly)
+    @test PO.prop_channel_active(:obs, fonly)
+    # `@oprop` opens the observation channel alone, and only that channel reads it.
+    oonly = merge(untagged, Dict(:oprop => [:a]))
+    @test PO.prop_channel_active(:obs, oonly)
+    @test !PO.prop_channel_active(:factory, oonly)
+    @test !PO.prop_channel_active(:view, oonly)
+    @test !PO.prop_channel_active(:prior, oonly)
+    @test only(PO.prop_channel_pairs(:obs, oonly, [:a], :x, PO, (:i,))).args[2] ==
+          :($(PO).obs_weights_view(x.a, i))
+    @test only(PO.prop_channel_pairs(:factory, oonly, [:a], :x, PO, ())).args[2] == :(x.a)
     # The precedence is data, and the prior channel puts `@pprop` above `@fprop` (ADR 0012).
     pairs = PO.prop_channel_pairs(:prior, tagged, all_fields, :xr, PO, (:pr,))
     @test [p.args[1] for p in pairs] == all_fields
@@ -229,13 +238,13 @@ end
     @test [p.args[1] for p in obs_pairs] == all_fields
     # `@fprop` recurses, `@wprop` indexes, everything else is carried through.
     @test obs_pairs[1].args[2] == :($(PO).obs_weights_view(x.a, i))
-    @test obs_pairs[2].args[2] == :($(PO).nothing_scalar_array_getindex(x.w, i))
+    @test obs_pairs[2].args[2] == :($(PO).obs_weights_index(x.w, i))
     @test obs_pairs[4].args[2] == :(x.plain)
     # The same field, the same tag, a different channel, a different transform.
     factory_w = PO.prop_channel_pairs(:factory, wonly, [:w], :x, PO, ())[1].args[2]
     obs_w = PO.prop_channel_pairs(:obs, wonly, [:w], :x, PO, (:i,))[1].args[2]
     @test factory_w == :($(PO)._wprop(x.w, args...; kwargs...))
-    @test obs_w == :($(PO).nothing_scalar_array_getindex(x.w, i))
+    @test obs_w == :($(PO).obs_weights_index(x.w, i))
     @test factory_w != obs_w
     # Indexing, not viewing: a `view` of an `AbstractWeights` is a `SubArray`, which the
     # weighted `Statistics.std` methods do not accept.
@@ -338,6 +347,15 @@ end
     # The same call with a weights type that does support the correction answers a number.
     @test PO.vec_to_real_measure(factory(StandardisedValue(), aweights(wv)), v) ==
           wm / sqrt(10 / 7)
+    # Issue 1954. A corrected weighted reduction of one entry has a divisor of zero. It is
+    # `NaN`, as the unweighted reduction of one entry is, and not the `Inf` that the rounding of
+    # the weighted mean gives. So the standardised value of one entry is the entry itself.
+    for W in (aweights, pweights, fweights), x in (0.013, -0.37, 0.1)
+        @test isnan(PO.vec_to_real_measure(StdValue(; w = W([0.4])), [x]))
+        @test isnan(PO.vec_to_real_measure(VarValue(; w = W([0.4])), (x,)))
+        @test PO.vec_to_real_measure(factory(StandardisedValue(), W([0.4])), [x]) ≈ x
+    end
+    @test isnan(PO.vec_to_real_measure(StdValue(), [0.013]))
     #=
     ADR 0087, the consistency the written default buys. The variance path and the covariance
     path answer the same number over the same data, on both branches, and they refuse a plain
@@ -382,6 +400,92 @@ end
     @test PO.vec_to_real_measure(sum, v) == 10.0
     @test PO.vec_to_real_measure(sum, t) == 10.0
     @test PO.vec_to_real_measure(maximum, v) == 4.0
+end
+# Two `DynamicAbstractWeights` probes for the test set below. The first resolves a vector to
+# probability weights proportional to the position of each observation. The second has no
+# method, so it reaches the fallback that raises.
+using StatsBase: StatsBase
+struct RampProbeWeights <: PortfolioOptimisers.DynamicAbstractWeights end
+function PortfolioOptimisers.get_observation_weights(::RampProbeWeights, X::AbstractVector;
+                                                     kwargs...)
+    return StatsBase.pweights(collect(1.0:length(X)))
+end
+struct UnresolvedProbeWeights <: PortfolioOptimisers.DynamicAbstractWeights end
+@testset "VectorToScalarMeasure: a weighted measure resolves dynamic weights against the data" begin
+    using PortfolioOptimisers, Test, Statistics, StatsBase
+    PO = PortfolioOptimisers
+    #=
+    Issue #1824. The weighted value measures gave their `w` to `Statistics` as it was. Their
+    constructors take a `DynamicAbstractWeights`, and with one `median`, `std` and `var` raised
+    a `MethodError`, and `mean` read the vector as a function. JET found it when the alias
+    `ObsWeights` took the plain spelling, because it then split the union. Each measure now
+    resolves its weights against the data with `get_observation_weights`.
+    =#
+    v = [1.0, 2.0, 3.0, 4.0]
+    t = (1.0, 2.0, 3.0, 4.0)
+    w = pweights([1.0, 2.0, 3.0, 4.0])
+    for M in (MeanValue, MedianValue)
+        @test PO.vec_to_real_measure(M(; w = RampProbeWeights()), v) ==
+              PO.vec_to_real_measure(M(; w = w), v)
+        @test PO.vec_to_real_measure(M(; w = RampProbeWeights()), t) ==
+              PO.vec_to_real_measure(M(; w = w), v)
+    end
+    # The weighted mean of the ramp: (1 + 4 + 9 + 16) / (1 + 2 + 3 + 4).
+    @test PO.vec_to_real_measure(MeanValue(; w = RampProbeWeights()), v) == 3.0
+    for M in (StdValue, VarValue), corrected in (true, false)
+        @test PO.vec_to_real_measure(M(; w = RampProbeWeights(), corrected = corrected),
+                                     v) ==
+              PO.vec_to_real_measure(M(; w = w, corrected = corrected), v)
+        @test PO.vec_to_real_measure(M(; w = RampProbeWeights(), corrected = corrected),
+                                     t) ==
+              PO.vec_to_real_measure(M(; w = w, corrected = corrected), v)
+    end
+    # A dynamic weight with no method for a vector raises the error that names the method.
+    for M in (MeanValue, MedianValue, StdValue, VarValue)
+        @test_throws PO.ObservationWeightsError PO.vec_to_real_measure(M(;
+                                                                         w = UnresolvedProbeWeights()),
+                                                                       v)
+    end
+end
+@testset "finite_vec_to_real_measure skips the non-finite entries and their weights (#2004)" begin
+    using PortfolioOptimisers, Test, Statistics, StatsBase
+    PO = PortfolioOptimisers
+    #=
+    Issue #2004. The correlation with a constant column is NaN under a `ce` with no repair, so
+    the summary of every column of the correlation matrix was NaN. The summary now reads the
+    finite entries alone, and a weighted measure loses the weight of each skipped entry.
+    =#
+    v = [1.0, NaN, 3.0, Inf, 4.0]
+    f = [1.0, 3.0, 4.0]
+    fin = isfinite.(v)
+    wv = [1.0, 5.0, 3.0, 7.0, 2.0]
+    # A vector with every entry finite gives the value of the measure on the full vector.
+    for M in (MeanValue(), MedianValue(), StdValue(), MaxValue(), sum, 0.5)
+        @test PO.finite_vec_to_real_measure(M, f) == PO.vec_to_real_measure(M, f)
+        @test PO.finite_vec_to_real_measure(M, v) == PO.vec_to_real_measure(M, f)
+    end
+    # The fixed weights of each weighted measure lose the weights of the skipped entries.
+    for W in (aweights, pweights), M in (MeanValue, MedianValue)
+        @test PO.finite_vec_to_real_measure(M(; w = W(wv)), v) ==
+              PO.vec_to_real_measure(M(; w = W(wv[fin])), f)
+    end
+    for M in (StdValue, VarValue), corrected in (true, false)
+        @test PO.finite_vec_to_real_measure(M(; w = aweights(wv), corrected = corrected),
+                                            v) ==
+              PO.vec_to_real_measure(M(; w = aweights(wv[fin]), corrected = corrected), f)
+    end
+    # The weighted mean of the entries 1, 3 and 4 under the weights 1, 3 and 2.
+    @test PO.finite_vec_to_real_measure(MeanValue(; w = aweights(wv)), v) ==
+          (1 + 9 + 8) / (1 + 3 + 2)
+    # A composed measure cuts the weights of each of its parts.
+    @test PO.finite_vec_to_real_measure(factory(StandardisedValue(), aweights(wv)), v) ==
+          PO.vec_to_real_measure(factory(StandardisedValue(), aweights(wv[fin])), f)
+    # A dynamic weight stays, and resolves on the finite entries.
+    @test PO.finite_vec_to_real_measure(MeanValue(; w = RampProbeWeights()), v) ==
+          PO.vec_to_real_measure(MeanValue(; w = pweights([1.0, 2.0, 3.0])), f)
+    # A vector with no finite entry has no entry to skip to, and the measure reads it whole.
+    @test isnan(PO.finite_vec_to_real_measure(MeanValue(), [NaN, NaN]))
+    @test PO.finite_vec_to_real_measure(0.5, [NaN, NaN]) == 0.5
 end
 @testset "The view and index seam selects the axis its verb names" begin
     using PortfolioOptimisers, Test, StatsBase, LinearAlgebra
@@ -535,6 +639,8 @@ end
     counted.
     =#
     cts = PO.traverse_concrete_subtypes(PO.VectorToScalarMeasure)
+    # A struct type is a `DataType` or a `UnionAll`, so the default array holds `Type` (#1979).
+    @test cts isa Vector{Type}
     own = filter(T -> parentmodule(T) === PO, cts)
     @test !isempty(own)
     @test all(T -> T <: PO.VectorToScalarMeasure, own)
@@ -563,6 +669,40 @@ end
     already = [1.0, 2.0]
     @test PO.concrete_typed_array_if_abstract(already) === already
     @test eltype(PO.concrete_typed_array_if_abstract(Any[1, 2.0])) == Union{Float64, Int64}
+    # `isabstracttype` is false for a `Union` and for a `UnionAll`, so neither is narrowed (#440).
+    mixed = Union{Float64, Int64}[1, 2.0]
+    @test PO.concrete_typed_array_if_abstract(mixed) === mixed
+    nested = Vector[[1], [2.0]]
+    @test PO.concrete_typed_array_if_abstract(nested) === nested
+    # --- narrow_mixed_vector: a keyword constructor accepts a mixed literal (#1939) ---
+    @test PO.narrow_mixed_vector(already, Real, :x) === already
+    @test eltype(PO.narrow_mixed_vector(Any[1, 2.0], Real, :x)) == Union{Float64, Int64}
+    @test PO.narrow_mixed_vector(1.0, Real, :x) === 1.0
+    # A matrix and an estimator infer `Any`, which the bound refuses and the function narrows.
+    mats = [[1.0 0.0; 0.0 1.0], AssetSetsMatrixEstimator(; val = "a")]
+    @test !(mats isa PO.VecMatNum_ASetMatE)
+    @test PO.narrow_mixed_vector(mats, PO.MatNum_ASetMatE, :smtx) isa PO.VecMatNum_ASetMatE
+    # A threshold vector may hold `nothing`, so its element type is an `Option`.
+    w = fill(0.25, 4)
+    thr = [Threshold(; val = 0.1), nothing, ThresholdEstimator(; val = Dict("A" => 0.1))]
+    nthr = PO.narrow_mixed_vector(thr, PO.Option{<:PO.BtE_Bt}, :slt)
+    @test nthr isa PO.VecOptBtE_Bt
+    @test isequal(nthr, thr)
+    @test_throws ArgumentError PO.narrow_mixed_vector(Any[1, "a"], Real, :x)
+    msg = try
+        PO.narrow_mixed_vector(Any[1, "a"], Real, :tn)
+    catch e
+        sprint(showerror, e)
+    end
+    @test occursin("tn", msg) && occursin("String", msg)
+    # The keyword constructors take a mixed literal, which the positional bound refuses.
+    slv = Solver(; solver = nothing)
+    tnl = [Turnover(; w = w, val = 0.1), TurnoverEstimator(; w = w, val = Dict("A" => 0.1))]
+    sets = UniverseSets(; dict = Dict("nx" => ["A", "B", "C", "D"]))
+    jo = JuMPOptimiser(; slv = slv, tn = tnl, sets = sets)
+    @test jo.tn isa PO.VecTnE_Tn
+    @test ProgrammeAllocationSet(; slv = slv, tn = tnl, sets = sets).tn isa PO.VecTnE_Tn
+    @test_throws ArgumentError JuMPOptimiser(; slv = slv, tn = Any[tnl[1], 1.0])
     # --- float_if_integer: an integer type takes its float type, every other type is kept ---
     @test PO.float_if_integer(Int) === Float64
     @test PO.float_if_integer(Int32) === Float64
@@ -578,9 +718,19 @@ end
     @test length(fc) == 2
     @test fc[1].w === aw
     @test fc[2].w === aw
+    # factory_child recurses into estimators only. A `nothing` and a weights value come back
+    # with no change, because only `_wprop` replaces weights (#440).
+    @test PO.factory_child(nothing, aw) === nothing
+    @test PO.factory_child([1.0, 2.0], aw) == [1.0, 2.0]
     # --- resolve_deferred_quantities: the universal fallback returns its argument ---
     @test PO.resolve_deferred_quantities(7, nothing) === 7
     @test PO.resolve_deferred_quantities(MinValue(), nothing) == MinValue()
+    # --- the two examples that the /unslop pass of #440 wrote into the measure docstrings ---
+    # An exact zero deviation takes the guard `sqrt(eps)`.
+    @test PO.vec_to_real_measure(StandardisedValue(), [2.0, 2.0, 2.0]) ==
+          2 / sqrt(eps(Float64))
+    # A tie goes to the first value that reaches the highest count, not the first to appear.
+    @test PO.vec_to_real_measure(ModeValue(), [3.0, 1.0, 1.0, 3.0]) == 1.0
 end
 @testset "The propagation machinery reports its own broken rows" begin
     using PortfolioOptimisers, Test
@@ -597,6 +747,11 @@ end
     @test PO.extract_field_name(:a) === :a
     @test PO.extract_field_name(:(a::Int)) === :a
     @test_throws ErrorException PO.extract_field_name(1)
+    # The message names any tag, not `@fprop` alone (#440).
+    @test_throws "a propagation tag must precede" PO.extract_field_name(1)
+    # try_field_name tests the first argument of a `::` node as well as the head (#440).
+    @test PO.try_field_name(:(a::Int)) === :a
+    @test PO.try_field_name(:(a.b::Int)) === nothing
     # --- propagatable_bare_name: a name, a parametric name, a subtyped name ---
     @test PO.propagatable_bare_name(:A) === :A
     @test PO.propagatable_bare_name(:(A{T1})) === :A
@@ -1024,4 +1179,60 @@ using Accessors: Accessors
     s3 = Accessors.@set s.L = 1.5
     @test getfield(s3, :L) == 1.5
     @test s3 isa mk.KSwap{Float64}
+end
+using Dates
+@testset "A carrier converts integer data once, and fits as its float copy does (#1972)" begin
+    # Integer data are supported only where an integer is the natural type. The carriers
+    # that a user builds convert integer data at construction, so a continuous kernel
+    # reads floating-point data and takes its type with `eltype`.
+    PO = PortfolioOptimisers
+    Xi = [1 -2; -1 3; 2 -1; 0 1]
+    Xf = [1.0 -2.0; -1.0 3.0; 2.0 -1.0; 0.0 1.0]
+    # The array method copies an integer array, and keeps every other array as it is.
+    @test PO.float_if_integer(Xi) == Xf
+    @test PO.float_if_integer(Xi) isa Matrix{Float64}
+    @test PO.float_if_integer(Xf) === Xf
+    v = view(Xf, :, 1:1)
+    @test PO.float_if_integer(v) === v
+    @test PO.float_if_integer(Float32.(Xf)) isa Matrix{Float32}
+    @test PO.float_if_integer(Xi .// 2) isa Matrix{Rational{Int}}
+    @test isnothing(PO.float_if_integer(nothing))
+    # A lift converts its parent and stays lazy.
+    R = PO.float_if_integer(PO.RepeatedObservations([1, 2], 3))
+    @test R isa PO.RepeatedObservations{Float64}
+    @test R == [1.0 2.0; 1.0 2.0; 1.0 2.0]
+    # `ReturnsResult` converts every returns matrix, and a prior and an optimiser fit the
+    # integer input as they fit its float copy.
+    nx = ["A", "B"]
+    rdi = ReturnsResult(; nx = nx, X = Xi, nf = ["f"], F = Xi[:, 1:1], B = Xi[:, 2],
+                        ne = ["e"], E = Xi[:, 2:2], iv = abs.(Xi) .+ 1)
+    rdf = ReturnsResult(; nx = nx, X = Xf, nf = ["f"], F = Xf[:, 1:1], B = Xf[:, 2],
+                        ne = ["e"], E = Xf[:, 2:2], iv = abs.(Xf) .+ 1)
+    @test all(x -> eltype(x) === Float64, (rdi.X, rdi.F, rdi.B, rdi.E, rdi.iv))
+    pri = prior(EmpiricalPrior(), rdi)
+    prf = prior(EmpiricalPrior(), rdf)
+    @test isequal(pri.mu, prf.mu)
+    @test isequal(pri.sigma, prf.sigma)
+    @test optimise(InverseVolatility(), rdi).w == optimise(InverseVolatility(), rdf).w
+    # A view of float returns stays a view.
+    @test ReturnsResult(; nx = nx, X = view(Xf, :, :)).X isa SubArray
+    # `PricesResult` converts its time arrays and keeps their columns.
+    ts = Date(2020, 1, 1):Day(1):Date(2020, 1, 5)
+    P = [10 20; 11 19; 12 21; 13 22; 12 20]
+    ppi = PricesResult(; X = TimeArray(ts, P, [:A, :B]))
+    ppf = PricesResult(; X = TimeArray(ts, P .+ 0.0, [:A, :B]))
+    @test eltype(values(ppi.X)) === Float64
+    @test colnames(ppi.X) == [:A, :B]
+    @test isequal(prices_to_returns(ppi).X, prices_to_returns(ppf).X)
+    # The numeric Panel Fields convert their values.
+    fi = NumericPanelField(; name = "mc", vals = [1, 2])
+    @test fi.vals == [1.0, 2.0]
+    @test eltype(fi.vals) === Float64
+    ti = TensorPanelField(; name = "t", axis = "f", labels = ["x"],
+                          vals = reshape([1, 2], 2, 1))
+    @test eltype(ti.vals) === Float64
+    @test eltype(NumericPanelField(; name = "f32", vals = Float32[1, 2]).vals) === Float32
+    # The codes of a categorical field are a natural integer, and they stay one.
+    ci = CategoricalPanelField(; name = "sector", levels = ["a", "b"], codes = [1, 2, 1])
+    @test ci.codes isa Vector{Int}
 end

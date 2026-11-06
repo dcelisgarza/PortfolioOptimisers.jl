@@ -100,3 +100,65 @@ hook of ExplicitImports excludes its two checks of qualified accesses.
   internal.
 - What is public moves with the Julia version and with each release of a dependency, so the census
   states the version it measures, and an entry that becomes public is dropped.
+
+## Amendment (2026-10-26)
+
+[#1826](https://github.com/dcelisgarza/PortfolioOptimisers.jl/issues/1826) settles a conflict
+between the rebuild rule of this ADR and the rule of
+[#1806](https://github.com/dcelisgarza/PortfolioOptimisers.jl/issues/1806), which #1807 applied in
+`cf52bf7c92`. #1806 rules that a rebuild of a field that the code names calls the keyword
+constructor, so that every rule of construction runs again. The default
+`ConstructionBase.setproperties` calls `constructorof(T)(fields...)`, which is the positional
+constructor. On that route, a check or a derivation that only the keyword constructor runs does not
+run. #1806 is the later decision, and it rests on those checks.
+
+**The rebuild rule now reads: a generic rebuild of a field that the code names calls the keyword
+constructor, through `rebuild_estimator(x, (; f = new))`.** `Accessors.set` and
+`Accessors.setproperties` stay the route where the code cannot know the field in advance: the lens
+of a tuning search, and the `PropertyLens{target}()` of the pipe routing. § *Immutability and
+`Accessors.jl`* of `.github/instructions/julia-source-code.instructions.md` states the same rule.
+
+**The read of `.name.wrapper` in `rebuild_estimator`
+(`src/17_Optimisation/01_Base_Optimisation/03_TimeDependent.jl:967`) is a Keep, with the reason
+"no public route" and the Upstream mark (Julia).** #1500 gave it a Replace. The facts, measured on
+Julia 1.13.1:
+
+- No public function of Julia or of a direct dependency gives the keyword constructor of an
+  arbitrary type. `Base.typename` is a binding of `Core`, and it is not public in `Base` or in
+  `Core`. The field `.wrapper` of a `Core.TypeName` is never public, by rule 1.
+- `ConstructionBase.constructorof(T)` gives the same value, but its contract is a positional call,
+  and ConstructionBase is not a direct dependency.
+- `getfield(parentmodule(T), nameof(T))` reads only public names, but it reads the binding of the
+  name, not the type. After a redefinition of a struct, it gives the new type for an instance of
+  the old type, and `.name.wrapper` gives the type of the instance. So it does not give the same
+  result. On the 817 concrete types under `AbstractEstimator`, `AbstractAlgorithm` and
+  `AbstractResult`, the two routes give the same type, at the same cost and with the same inferred
+  return type.
+
+Two types raise a `MethodError` from `rebuild_estimator`, because their keyword constructor does not
+take every field: `Frontier` (the keyword constructor pins `factor`) and `LogRegimeAdjusted` (it
+derives `kappa`). No call in `src/` reaches either. A rebuild of one of them calls its own
+constructor by name.
+
+**The positional rebuilds stay Replace, and their route becomes `rebuild_estimator`.** Each of these
+sites names the field that it replaces, so the rule above reaches it:
+
+| Site | Function | The field it names |
+| --- | --- | --- |
+| `src/16_RiskMeasures/01_Base_RiskMeasures.jl:2324` | `rebuild_with_slots` | The slots of the risk measure |
+| `src/17_Optimisation/01_Base_Optimisation/01_OptimisationTypes.jl:349` | `factory` of a `NonFiniteAllocationOptimisationResult` | `fb` |
+| `src/17_Optimisation/07_FiniteAllocation/01_Base_FiniteAllocation.jl:518` | `factory` of a `FiniteAllocationOptimisationResult` | `fb` |
+| `src/05_Moments/26_Windowed/06_WindowedPreamble.jl:464` | `partial_fit!` of a `SeedWindowed` | The third field |
+| `src/17_Optimisation/09_OnlineOptimisation.jl:630`, `:642` | `set_result_prior` | The prior result |
+
+The keyword constructor of each type that these sites reach takes every field: the 15 optimisation
+results, the 57 risk measures and the 5 windowed estimators. #1500 asked for this check. The two
+sites of `set_result_prior` joined `src/` after #1500. The hand-off of
+[#1502](https://github.com/dcelisgarza/PortfolioOptimisers.jl/issues/1502) takes all six, and it
+measures the cost of each change on the online fold before it lands.
+
+The census of #1501 lists the Keep of `rebuild_estimator`. The draft request for a public route is
+on [#1504](https://github.com/dcelisgarza/PortfolioOptimisers.jl/issues/1504), as a comment on
+Julia issue 35543 ("Stable API to strip type parameters from type"). On that issue, Julia triage
+agreed on the name `basetype`, and no pull request exists. When a supported Julia gives
+`basetype`, `rebuild_estimator` calls `basetype(T)`, and the census drops the entry.

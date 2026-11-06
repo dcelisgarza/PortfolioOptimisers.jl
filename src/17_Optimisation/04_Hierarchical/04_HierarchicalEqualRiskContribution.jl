@@ -20,7 +20,7 @@ $(DocStringExtensions.TYPEDEF)
 
 Splits weight down the dendrogram between clusters by their outer risk `ro`, then splits each cluster's share between its assets by their inner risk `ri`.
 
-This is the Hierarchical Equal Risk Contribution algorithm. It differs from [`HierarchicalRiskParity`](@ref) in two ways. It stops at the optimal number of clusters, not at the individual assets, and it splits at the branches of the dendrogram, not at the halves of a leaf order. The name is the source's. The portfolio is not a risk parity portfolio, and the clusters do not contribute equally to risk. It solves no optimisation problem, so it accepts a risk measure that is not convex. The weight finaliser of `opt` acts on the result, and [`_optimise`](@ref) states the steps.
+This is the Hierarchical Equal Risk Contribution algorithm of Section 1 of [raffinot2018](@cite). It differs from [`HierarchicalRiskParity`](@ref) in two ways. It stops at the optimal number of clusters, not at the individual assets, and it splits at the branches of the dendrogram, not at the halves of a leaf order. The dendrogram split follows the hierarchical clustering based allocation of [raffinot2017](@cite), which [raffinot2018](@cite) reviews in the same section. The name is the source's. The portfolio is not a risk parity portfolio, and the clusters do not contribute equally to risk. It solves no optimisation problem, so it accepts a risk measure that is not convex. The weight finaliser of `opt` acts on the result, and [`_optimise`](@ref) states the steps.
 
 # Mathematical definition
 
@@ -50,6 +50,8 @@ Where:
   - ``W(C_k)``: Weight of cluster ``C_k``, the product of the split factors on the path from the root to ``C_k``.
   - ``v_i``: Share of asset ``i`` in the weight of its cluster.
   - $(math_dict[:w_i_asset])
+
+The split factor ``\\alpha_n`` is Step 2.4 of Section 12.2.2 of [cajas2025](@cite), where the risk of a branch is the sum of the risks of its clusters. The branch with the lower risk receives more weight. Step 3 of [raffinot2018](@cite) prints the factor of the first branch as ``\\mathcal{RC}_1 / (\\mathcal{RC}_1 + \\mathcal{RC}_2)``, which gives the first branch more weight when its risk is higher. This type does not follow that print. The shares ``v_i`` are the naive risk parity weights of Step 4 of [raffinot2018](@cite).
 
 When `ri` is a vector, [`herc_intra_cluster_weights`](@ref) states the shares ``v_i`` that the scalariser `scai` makes. When `ro` is a vector, [`herc_cluster_risk`](@ref) states the risk ``\\tilde{\\rho}_o(C_k)`` that the scalariser `scao` makes.
 
@@ -84,12 +86,12 @@ Keywords correspond to the struct's fields. Fields typed [`TD`](@ref) or [`TDO_O
 
 ## Propagated parameters
 
-When [`factory`](@ref) is called on this type, the following `@fprop`-tagged fields are automatically propagated:
+[`factory`](@ref) passes its arguments on to these `@fprop` fields:
 
-  - `opt`: Recursively updated via [`factory`](@ref).
-  - `ri`: Recursively updated via [`factory`](@ref).
-  - `ro`: Recursively updated via [`factory`](@ref).
-  - `fb`: Recursively updated via [`factory`](@ref).
+  - `opt`: Recursively updated through [`factory`](@ref).
+  - `ri`: Recursively updated through [`factory`](@ref).
+  - `ro`: Recursively updated through [`factory`](@ref).
+  - `fb`: Recursively updated through [`factory`](@ref).
 
 ## View parameters
 
@@ -218,8 +220,8 @@ HierarchicalEqualRiskContribution
 # References
 
   - $(ref_dict[:raffinot2017])
-  - $(ref_dict[:raffinot2018])
-  - $(ref_dict[:cajas2025]) Section 12.2.
+  - $(ref_dict[:raffinot2018]) Section 1, Steps 1 to 4.
+  - $(ref_dict[:cajas2025]) Section 12.2.2, Steps 2.1 to 3.
 """
 @propagatable @concrete struct HierarchicalEqualRiskContribution <:
                                ClusteringOptimisationEstimator
@@ -540,7 +542,7 @@ The risk of one measure carries no scale. Every cluster would carry the same sca
 """
 function herc_cluster_risk(sca::Scalariser, r::OptimisationRiskMeasure, rku::VecNum,
                            cl::VecInt, X::MatNum, fees::Option{<:Fees})
-    w = zeros(float_if_integer(eltype(X)), size(X, 2))
+    w = zeros(eltype(X), size(X, 2))
     w[cl] = herc_intra_cluster_weights(sca, r, rku, cl)
     return expected_risk(r, w, X, fees)
 end
@@ -588,9 +590,9 @@ function herc_risk(hec::HierarchicalEqualRiskContribution, pr::AbstractPriorResu
     riku = herc_unitary_risks(ri, X, fees)
     ro = hec.ri === hec.ro ? ri : factory(hec.ro, pr, hec.opt.slv)
     roku = hec.ri === hec.ro ? riku : herc_unitary_risks(ro, X, fees)
-    # A weight is a quotient of two risks, so an integer sample takes a float weight type,
-    # and every other sample keeps its own type.
-    T = float_if_integer(eltype(X))
+    # A weight is a quotient of two risks, so it takes the type of the returns. A `Float32`
+    # sample stays in `Float32`.
+    T = eltype(X)
     w = Vector{T}(undef, size(X, 2))
     rkcl = Vector{T}(undef, length(cls))
     FLoops.@floop hec.ex for (i, cl) in pairs(cls)
@@ -637,9 +639,9 @@ function _optimise(hec::HierarchicalEqualRiskContribution,
     # asset. A liquidation charge keyed by name cannot resolve at all once its `w` sits on
     # the complement while `sets` sits on the mask. `investable_fees_view` then places the
     # resolved fee on the axes the mask leaves.
-    # A weight is a quotient of two risks, so an integer sample takes a float weight type,
-    # and every other sample keeps its own type.
-    T = float_if_integer(eltype(pr.X))
+    # A weight is a quotient of two risks, so it takes the type of the returns. A `Float32`
+    # sample stays in `Float32`.
+    T = eltype(pr.X)
     # An asset that a `FeatureDistance` of the clustering cannot read in the window of its
     # Asset Panel departs with the non-investable assets (`feature_readable_mask`). So does
     # an asset with a gap in the rows that a plain graph reader reads (`graph_reader_mask`).
@@ -693,8 +695,8 @@ function _optimise(hec::HierarchicalEqualRiskContribution,
         empty!(lc)
         empty!(rc)
     end
-    wb = weight_bounds_constraints(hec.opt.wb, hec.opt.sets; N = N, strict = hec.opt.strict,
-                                   datatype = T)
+    wb = weight_bounds_constraints(hec.opt.wb, hec.opt.sets; rd = rd, N = N,
+                                   strict = hec.opt.strict, datatype = T)
     retcode, w = finalise_weight_bounds(hec.opt.wf, wb, w / sum(w))
     return HierarchicalEqualRiskContributionResult(;
                                                    hr = HierarchicalResult(; pr = pr,

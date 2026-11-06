@@ -67,9 +67,9 @@ PortfolioOptimisers.return_forecast_step(::OfitStepProbe, P, csfm, fs, cre) = :w
                                  alg = ForwardPanelFill())]
         pnl = asset_panel(inp; amsk = trues(T, N), emsk = trues(T, N))
         rd = ReturnsResult(; nx = ["A$i" for i in 1:N], X = zeros(T, N), pnl = pnl)
-        Ms = Array{Float64}(undef, T, N, 2)
+        Ms = Array{Float64}(undef, N, 2, T)
         for t in 1:T
-            Ms[t, :, :] = L
+            Ms[:, :, t] = L
         end
         csr = CrossSectionalRegression(; f = zeros(T, 2), eps = E, n = fill(N, T))
         csfm = CrossSectionalFactorModel(; M = L, b = zeros(N), csr = csr,
@@ -98,51 +98,53 @@ PortfolioOptimisers.return_forecast_step(::OfitStepProbe, P, csfm, fs, cre) = :w
         rng = StableRNG(14861)
         T, N = 6, 12
         Y = randn(rng, T, N)
-        Ms = cat(ones(T, N), randn(rng, T, N); dims = 3)
-        Ms[2, 3, 2] = NaN
+        Ms = permutedims(cat(ones(T, N), randn(rng, T, N); dims = 3), (2, 3, 1))
+        Ms[3, 2, 2] = NaN
         rw = 0.5 .+ rand(rng, T, N)
         rw[4, 5] = 0.0
         pnl = asset_panel([NumericPanelInput(; name = "y", vals = Y)]; amsk = trues(T, N),
                           emsk = trues(T, N))
         rd = ReturnsResult(; nx = ["A$i" for i in 1:N], X = zeros(T, N), pnl = pnl)
-        csfm = CrossSectionalFactorModel(; M = Ms[end, :, :], b = zeros(N), Ms = Ms,
+        csfm = CrossSectionalFactorModel(; M = Ms[:, :, end], b = zeros(N), Ms = Ms,
                                          rw = rw, nf = ["mkt", "ell"],
                                          fam = ["market", "style"])
         raw(; kw...) = DescriptorScores(; descriptors = [Passthrough(; field = "y")],
                                         neutralise = ["mkt", "ell"], outlier = nothing,
                                         scoring = nothing, kw...)
         @test raw().nw === EstimationMaskWeights()
-        Sb = descriptor_scores(raw(; nw = BlockRegressionWeights()), rd, csfm).S[:, :, 1]
-        Sm = descriptor_scores(raw(), rd, csfm).S[:, :, 1]
+        Sb = permutedims(descriptor_scores(raw(; nw = BlockRegressionWeights()), rd, csfm).S[:,
+                                                                                             1,
+                                                                                             :])
+        Sm = permutedims(descriptor_scores(raw(), rd, csfm).S[:, 1, :])
         Hb = similar(Y)
         Hm = similar(Y)
         for t in 1:T
-            Hb[t, :] = wls_residual(Y[t, :], Ms[t, :, :], rw[t, :])
-            Hm[t, :] = wls_residual(Y[t, :], Ms[t, :, :], ones(N))
+            Hb[t, :] = wls_residual(Y[t, :], Ms[:, :, t], rw[t, :])
+            Hm[t, :] = wls_residual(Y[t, :], Ms[:, :, t], ones(N))
         end
         @test isequal(isnan.(Sb), isnan.(Hb))
         @test parity_compare(Sb, Hb; name = "regression weights", scale = :array).ok
         @test parity_compare(Sm, Hm; name = "estimation mask", scale = :array).ok
         # The scoring step reads the same weights, and the exposures span the constant, so a
         # standardised score stays orthogonal to them under the regression weights.
-        Ss = descriptor_scores(raw(; nw = BlockRegressionWeights(),
-                                   scoring = CrossSectionalStandardiser(;
-                                                                        min_group_size = 2)),
-                               rd, csfm).S[:, :, 1]
+        Ss = permutedims(descriptor_scores(raw(; nw = BlockRegressionWeights(),
+                                               scoring = CrossSectionalStandardiser(;
+                                                                                    min_group_size = 2)),
+                                           rd, csfm).S[:, 1, :])
         for t in 1:T
             ok = isfinite.(Ss[t, :])
-            g = Ms[t, ok, :]' * (rw[t, ok] .* Ss[t, ok])
+            g = Ms[ok, :, t]' * (rw[t, ok] .* Ss[t, ok])
             @test maximum(abs, g) <= 1e-12 * sum(rw[t, ok] .* abs.(Ss[t, ok]))
         end
         # A block with no regression weights is refused only under a Neutralisation.
-        bare = CrossSectionalFactorModel(; M = Ms[end, :, :], b = zeros(N), Ms = Ms,
+        bare = CrossSectionalFactorModel(; M = Ms[:, :, end], b = zeros(N), Ms = Ms,
                                          nf = ["mkt", "ell"], fam = ["market", "style"])
         @test_throws po.IsNothingError descriptor_scores(raw(;
                                                              nw = BlockRegressionWeights()),
                                                          rd, bare)
         plain = DescriptorScores(; descriptors = [Passthrough(; field = "y")],
                                  nw = BlockRegressionWeights())
-        @test size(descriptor_scores(plain, rd, bare).S) == (T, N, 1)
+        @test size(descriptor_scores(plain, rd, bare).S) == (N, 1, T)
     end
 
     @testset "ScoreNeutralisation leaves no spanned part in a fitted member" begin
@@ -215,8 +217,7 @@ PortfolioOptimisers.return_forecast_step(::OfitStepProbe, P, csfm, fs, cre) = :w
                                                       p.csfm, 0)
         @test isa(k, Float32) && isnan(k)
         N = size(p.L, 1)
-        for kw in
-            ((; rw = ones(2, N)), (; Ms = permutedims(cat(p.L, p.L; dims = 3), (3, 1, 2))))
+        for kw in ((; rw = ones(2, N)), (; Ms = cat(p.L, p.L; dims = 3)))
             bare = CrossSectionalFactorModel(; M = p.L, b = zeros(N), kw...)
             @test_throws po.IsNothingError po.target_forecast_orthogonal_rows(cre,
                                                                               P[1:2, :],
@@ -231,6 +232,12 @@ PortfolioOptimisers.return_forecast_step(::OfitStepProbe, P, csfm, fs, cre) = :w
         long = TargetReturnForecast(; scores = scores(), half_life = 1e6)
         f = ofit_split(OrthogonalPartCalibration(), long, q).rf
         @test f.ocalib / f.calib ≈ 1 + var(q.L[:, 2]; corrected = false) rtol = 0.05
+        # A member that a cross-validation estimator calibrates is not a fold of the carry, so
+        # it reads `κ⊥` from the out-of-fold prediction of the batch fit.
+        kf = TargetReturnForecast(; scores = scores(), cv = KFold(; n = 3))
+        fk = ofit_split(OrthogonalPartCalibration(), kf, q).rf
+        @test isfinite(fk.calib) && isfinite(fk.ocalib)
+        @test fk.ocalib / fk.calib > 1
         # A ratio that is not finite is a warm-up, and gives the zero split.
         warm = TargetReturnForecastResult(; mu = [1.0, 2.0], calib = NaN, ocalib = NaN)
         z = po.orthogonal_forecast_rescale(OrthogonalPartCalibration(), warm, [1.0],
@@ -305,7 +312,7 @@ PortfolioOptimisers.return_forecast_step(::OfitStepProbe, P, csfm, fs, cre) = :w
             w = rr.rw[t, :]
             ok = isfinite.(h) .& (w .> 0)
             if count(ok) > 0
-                Lt = rr.Ms[t, ok, Ke]
+                Lt = rr.Ms[ok, Ke, t]
                 worst = max(worst,
                             maximum(abs, Lt' * (w[ok] .* h[ok])) /
                             sum(w[ok] .* abs.(h[ok])))

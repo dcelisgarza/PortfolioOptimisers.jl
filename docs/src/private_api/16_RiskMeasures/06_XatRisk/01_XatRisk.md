@@ -1,5 +1,5 @@
 ```@meta
-Description = "X at Risk, private API of PortfolioOptimisers.jl: ValueatRiskFormulation, CholRM, compute_value_at_risk_z, compute_value_at_risk_cz, …"
+Description = "X at Risk, private API of PortfolioOptimisers.jl: ValueatRiskFormulation, CholRM, compute_value_at_risk_z, compute_value_at_risk_cz, gain_tail_distribution, …"
 ```
 
 # X at Risk: private API
@@ -9,6 +9,7 @@ ValueatRiskFormulation
 CholRM
 compute_value_at_risk_z
 compute_value_at_risk_cz
+gain_tail_distribution
 resolve_deferred_quantities(x::ValueatRisk, pr::AbstractPriorResult)
 resolve_deferred_quantities(x::ValueatRiskRange, pr::AbstractPriorResult)
 absolute_drawdown_vec

@@ -26,9 +26,8 @@ end
 # eye, and computes no statistic the library does not already hold.
 function forecast_rolling_mean(x::AbstractVector{<:Real}, window::Integer)
     T = length(x)
-    # A mean holds a fraction and a `NaN`, so an integer series averages in `Float64`, and
-    # every other series keeps its own type: a `Float32` series stays in `Float32`.
-    Tf = PortfolioOptimisers.float_if_integer(eltype(x))
+    # The series keeps its own type: a `Float32` series stays in `Float32`.
+    Tf = eltype(x)
     out = fill(Tf(NaN), T)
     for t in window:T
         s = zero(Tf)
@@ -66,7 +65,7 @@ function PortfolioOptimisers.plot_forecast_cumulative_ic(fe::PortfolioOptimisers
 end
 function PortfolioOptimisers.plot_forecast_cumulative_ic(fe::PortfolioOptimisers.ForecastEvaluationResult,
                                                          csfm::PortfolioOptimisers.CrossSectionalFactorModel;
-                                                         weighting = PortfolioOptimisers.IdentityMetric(),
+                                                         weighting = nothing,
                                                          min_count::Integer = fe.min_count,
                                                          kwargs...)
     return PortfolioOptimisers.plot_forecast_cumulative_ic(fe,
@@ -117,8 +116,7 @@ function PortfolioOptimisers.plot_forecast_cumulative_ic(fes::AbstractVector{<:P
 end
 function PortfolioOptimisers.plot_forecast_cumulative_ic(fes::AbstractVector{<:PortfolioOptimisers.ForecastEvaluationResult},
                                                          csfm::PortfolioOptimisers.CrossSectionalFactorModel;
-                                                         weighting = PortfolioOptimisers.IdentityMetric(),
-                                                         kwargs...)
+                                                         weighting = nothing, kwargs...)
     return PortfolioOptimisers.plot_forecast_cumulative_ic(fes,
                                                            PortfolioOptimisers.cs_diagnostic_weights(weighting,
                                                                                                      csfm);
@@ -138,7 +136,7 @@ function PortfolioOptimisers.plot_forecast_rolling_ic(fe::PortfolioOptimisers.Fo
     end
     # The same derivation `forecast_rolling_mean` makes, over the same values, so the matrix
     # it fills and the vectors it answers agree on their element type.
-    Tf = PortfolioOptimisers.float_if_integer(real(eltype(ic)))
+    Tf = real(eltype(ic))
     roll = Matrix{Tf}(undef, T, 2)
     for k in 1:2
         roll[:, k] = forecast_rolling_mean(view(ic, :, k), window)
@@ -149,7 +147,7 @@ function PortfolioOptimisers.plot_forecast_rolling_ic(fe::PortfolioOptimisers.Fo
 end
 function PortfolioOptimisers.plot_forecast_rolling_ic(fe::PortfolioOptimisers.ForecastEvaluationResult,
                                                       csfm::PortfolioOptimisers.CrossSectionalFactorModel;
-                                                      weighting = PortfolioOptimisers.IdentityMetric(),
+                                                      weighting = nothing,
                                                       rolling::Integer = 0,
                                                       min_count::Integer = fe.min_count,
                                                       kwargs...)
@@ -224,7 +222,7 @@ function PortfolioOptimisers.plot_forecast_calibration(fe::PortfolioOptimisers.F
 end
 function PortfolioOptimisers.plot_forecast_calibration(fe::PortfolioOptimisers.ForecastEvaluationResult,
                                                        csfm::PortfolioOptimisers.CrossSectionalFactorModel;
-                                                       weighting = PortfolioOptimisers.IdentityMetric(),
+                                                       weighting = nothing,
                                                        bins::Integer = 10, kwargs...)
     return PortfolioOptimisers.plot_forecast_calibration(fe,
                                                          PortfolioOptimisers.cs_diagnostic_weights(weighting,
@@ -260,7 +258,7 @@ end
 function PortfolioOptimisers.plot_forecast_ic_by_holding_period(fe::PortfolioOptimisers.ForecastEvaluationResult,
                                                                 rd::ReturnsResult,
                                                                 csfm::PortfolioOptimisers.CrossSectionalFactorModel;
-                                                                weighting = PortfolioOptimisers.IdentityMetric(),
+                                                                weighting = nothing,
                                                                 n::Integer = 10,
                                                                 min_count::Integer = fe.min_count,
                                                                 kwargs...)
@@ -290,7 +288,7 @@ end
 function PortfolioOptimisers.plot_forecast_portfolio_by_holding_period(fe::PortfolioOptimisers.ForecastEvaluationResult,
                                                                        rd::ReturnsResult,
                                                                        csfm::PortfolioOptimisers.CrossSectionalFactorModel;
-                                                                       weighting = PortfolioOptimisers.IdentityMetric(),
+                                                                       weighting = nothing,
                                                                        n::Integer = 10,
                                                                        min_count::Integer = fe.min_count,
                                                                        ppy::Number = fe.ppy,
@@ -319,8 +317,7 @@ end
 function PortfolioOptimisers.plot_forecast_ic_decay(fe::PortfolioOptimisers.ForecastEvaluationResult,
                                                     rd::ReturnsResult,
                                                     csfm::PortfolioOptimisers.CrossSectionalFactorModel;
-                                                    weighting = PortfolioOptimisers.IdentityMetric(),
-                                                    n::Integer = 10,
+                                                    weighting = nothing, n::Integer = 10,
                                                     min_count::Integer = fe.min_count,
                                                     kwargs...)
     return PortfolioOptimisers.plot_forecast_ic_decay(fe,
@@ -347,7 +344,7 @@ end
 function PortfolioOptimisers.plot_forecast_portfolio_decay(fe::PortfolioOptimisers.ForecastEvaluationResult,
                                                            rd::ReturnsResult,
                                                            csfm::PortfolioOptimisers.CrossSectionalFactorModel;
-                                                           weighting = PortfolioOptimisers.IdentityMetric(),
+                                                           weighting = nothing,
                                                            n::Integer = 10,
                                                            min_count::Integer = fe.min_count,
                                                            ppy::Number = fe.ppy, kwargs...)
@@ -379,7 +376,7 @@ end
 function PortfolioOptimisers.plot_forecast_factor_correlation(fe::PortfolioOptimisers.ForecastEvaluationResult,
                                                               csfm::PortfolioOptimisers.CrossSectionalFactorModel;
                                                               nf::Option{<:AbstractVector} = nothing,
-                                                              weighting = PortfolioOptimisers.IdentityMetric(),
+                                                              weighting = nothing,
                                                               kwargs...)
     B = PortfolioOptimisers.cs_diagnostic_exposures(csfm)
     return PortfolioOptimisers.plot_forecast_factor_correlation(fe, B,
@@ -409,21 +406,28 @@ end
 const FORECAST_SUMMARY_LABELS = ["Spearman IC", "Spearman IR", "Pearson IC", "Pearson IR",
                                  "Rank Ann. Return", "Rank Sharpe", "Z-Score Ann. Return",
                                  "Z-Score Sharpe", "Calibration Slope", "Mean Coverage"]
+# A summary of one forecast holds scalar fields, and each spread is a vector over the tail
+# fractions (#1934). The two readers below put it on the axis of a summary of many.
+forecast_summary_name_axis(names::AbstractVector) = names
+forecast_summary_name_axis(name) = [name]
+forecast_summary_spread_column(S::AbstractMatrix, j::Integer) = S[:, j]
+forecast_summary_spread_column(S::AbstractVector, j::Integer) = S[j]
 function forecast_summary_columns(fs::PortfolioOptimisers.ForecastSummaryResult)
-    vals = Any[fs.spearman_mean_ic, fs.spearman_ic_ir, fs.pearson_mean_ic, fs.pearson_ic_ir,
-               fs.rank_ann_return, fs.rank_sharpe, fs.zscore_ann_return, fs.zscore_sharpe,
-               fs.calibration_slope, fs.mean_coverage]
     labels = copy(FORECAST_SUMMARY_LABELS)
     partial = isnothing(fs.spread_sharpe)
-    if !partial
-        S::MatNum = fs.spread_sharpe
+    spreads = if partial
+        ()
+    else
         qs::AbstractVector = fs.quantiles
-        for j in eachindex(qs)
-            push!(vals, S[:, j])
-            push!(labels, "Spread Sharpe q = $(qs[j])")
-        end
+        append!(labels, ["Spread Sharpe q = $(q)" for q in qs])
+        Tuple(forecast_summary_spread_column(fs.spread_sharpe, j) for j in eachindex(qs))
     end
-    K = length(fs.names)
+    # The figures and the spreads are joined in one literal, which takes their element
+    # type (#1979).
+    vals = [fs.spearman_mean_ic, fs.spearman_ic_ir, fs.pearson_mean_ic, fs.pearson_ic_ir,
+            fs.rank_ann_return, fs.rank_sharpe, fs.zscore_ann_return, fs.zscore_sharpe,
+            fs.calibration_slope, fs.mean_coverage, spreads...]
+    K = length(forecast_summary_name_axis(fs.names))
     M = Matrix{Float64}(undef, length(vals), K)
     for r in eachindex(vals)
         v = vals[r]
@@ -437,7 +441,7 @@ function PortfolioOptimisers.plot_forecast_evaluation_summary(fs::PortfolioOptim
                                                               kwargs...)
     M, labels, partial = forecast_summary_columns(fs)
     K = size(M, 2)
-    names::AbstractVector = fs.names
+    names::AbstractVector = forecast_summary_name_axis(fs.names)
     title = if partial
         "Forecast Evaluation Summary (no quantile spread)"
     else
@@ -459,7 +463,7 @@ function PortfolioOptimisers.plot_forecast_evaluation_summary(fes::AbstractVecto
 end
 function PortfolioOptimisers.plot_forecast_evaluation_summary(fes::AbstractVector{<:PortfolioOptimisers.ForecastEvaluationResult},
                                                               csfm::PortfolioOptimisers.CrossSectionalFactorModel;
-                                                              weighting = PortfolioOptimisers.IdentityMetric(),
+                                                              weighting = nothing,
                                                               names = nothing,
                                                               bins::Integer = 10,
                                                               quantiles = nothing,

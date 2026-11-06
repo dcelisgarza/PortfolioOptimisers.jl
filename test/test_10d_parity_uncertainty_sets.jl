@@ -35,11 +35,10 @@ include(joinpath(@__DIR__, "parity_grid.jl"))
                "style2" => mpass("style2")]
     pe = EmpiricalPrior(; me = ExpWeightedExpectedReturns(),
                         ce = RegimeAdjustedExpWeightedCovariance(; centring = PreCentred(),
-                                                                 debias = RawStatistic(),
+                                                                 debias = nothing,
                                                                  regime_lohi_mult = (0.7,
                                                                                      1.6)))
-    ve = RegimeAdjustedExpWeightedVariance(; centring = PreCentred(),
-                                           debias = RawStatistic(),
+    ve = RegimeAdjustedExpWeightedVariance(; centring = PreCentred(), debias = nothing,
                                            regime_lohi_mult = (0.7, 1.6), min_val = 0.0)
     est(; kw...) = CrossSectionalFactorPrior(; lambda = 1, factors = factors, pe = pe,
                                              ve = ve, kw...)
@@ -51,7 +50,7 @@ include(joinpath(@__DIR__, "parity_grid.jl"))
     prf = prior(grid_prior("FamTwo", rdg), rdg)
     metrics = ["InvIdio" => InverseIdiosyncraticVarianceMetric(),
                "Regression" => RegressionWeightMetric(),
-               "Benchmark" => BenchmarkWeightMetric(), "Identity" => IdentityMetric()]
+               "Benchmark" => BenchmarkWeightMetric(), "Identity" => nothing]
     slv = Solver(; name = :clarabel_1390, solver = Clarabel.Optimizer,
                  check_sol = (; allow_local = true, allow_almost = true),
                  settings = Dict("verbose" => false, "tol_gap_abs" => 1e-12,
@@ -67,8 +66,8 @@ include(joinpath(@__DIR__, "parity_grid.jl"))
         for (mn, m) in metrics
             case = "$(c)$(mn)"
             radius = loadv("OrthogonalUncertaintySet", case, "Radius")
-            for (out, s, k) in (("MuLLt", IdentityScaling(), 1),
-                                ("MuIdioLLt", IdiosyncraticVarianceScaling(), 2))
+            for (out, s, k) in
+                (("MuLLt", nothing, 1), ("MuIdioLLt", IdiosyncraticVarianceScaling(), 2))
                 mu = mu_ucs(OrthogonalUncertaintySet(; metric = m, scaling = s), pr)
                 L = mu.L[i, :]
                 # Measured maxscaled 2.2e-14 on the panels and 5.2e-14 on `FamTwo`. The check
@@ -565,8 +564,8 @@ include(joinpath(@__DIR__, "parity_grid.jl"))
             nu = rr.edof
             m = isnothing(rr.ediv) ? nu : rr.ediv
             rho = max.(m ./ quantile.(Chisq.(nu), 0.05) .- 1, 0)
-            for metric in (InverseIdiosyncraticVarianceMetric(), IdentityMetric(),
-                           RegressionWeightMetric())
+            for metric in
+                (InverseIdiosyncraticVarianceMetric(), nothing, RegressionWeightMetric())
                 ue = OrthogonalUncertaintySet(; kappa = ResidualInflation(),
                                               metric = metric)
                 s = sigma_ucs(ue, pr)

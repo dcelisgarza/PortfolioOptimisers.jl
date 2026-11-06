@@ -518,3 +518,24 @@ answer on the clean and on the poisoned copy. Its last test set checks that a fi
 axes, the selected assets and every Panel Field with its labels or levels. `asset_panel(df, mf)`
 reads an Asset Panel back from a table that `panel_dataframe` wrote, in the long or the wide
 layout, with its active and estimation masks. The `AssetPanel` constructor checks the result.
+
+## Amendment (2026-10-28, #1867)
+
+**`alg = nothing` refuses a blank, and `NoPanelFill` is removed.** `NoPanelFill()` named no rule.
+It filled no cell, and ADR 0222 spells a skipped procedure as `nothing`. So the `alg` field of
+`NumericPanelInput`, `CategoricalPanelInput` and `TensorPanelInput` is bound to
+`Option{<:AbstractPanelFillAlgorithm}`, with the default `nothing`. `panel_fill(::Nothing, v, name)`
+throws the same `ArgumentError` on a blank cell, and names the Panel Field and the position of the
+first blank in the whole column. A Panel Field whose policy is `nothing` still carries no observed
+mask. The numbers do not move. Where the decision above names `NoPanelFill`, read `alg = nothing`.
+The removal is a clean break with no deprecation, as ADR 0044 and ADR 0213 set.
+
+## Amendment (2026-11-04, #1973)
+
+**A time-varying tensor Panel Field and a time-varying Feature Matrix hold their observations
+last.** Where the decision above states `observations × assets × labels` or `observations × assets
+× features`, read `assets × labels × observations` and `assets × features × observations`. The
+label axis of a tensor Panel Field is its second axis in both shapes. The universe masks, a numeric
+Panel Field and a categorical Panel Field stay `observations × assets`. [ADR
+0230](0230-every-rank-3-array-holds-its-observations-on-its-last-axis.md) states the rule and its
+reason.

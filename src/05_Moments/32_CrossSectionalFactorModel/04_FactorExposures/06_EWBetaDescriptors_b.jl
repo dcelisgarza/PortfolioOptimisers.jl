@@ -146,7 +146,7 @@ The vectors take the type of the returns, of the market return and of the refere
 function ew_macro_sensitivity_state(X::AbstractMatrix{<:Real}, rm::AbstractVector{<:Real},
                                     rf::AbstractVector{<:Real},
                                     decay::Real)::EWMacroSensitivityState
-    Tf = float_if_integer(promote_type(eltype(X), eltype(rm), eltype(rf)))
+    Tf = promote_type(eltype(X), eltype(rm), eltype(rf))
     N = size(X, 2)
     z = zero(promote_type(Tf, typeof(decay)))
     return EWMacroSensitivityState(fill(Tf(NaN), N), zeros(Tf, N), zeros(Tf, N),
@@ -653,7 +653,7 @@ The co-moment of a new state takes the type of the returns and of the market ret
 function ew_downside_beta_state(::Nothing, X::AbstractMatrix{<:Real},
                                 rm::AbstractVector{<:Real},
                                 decay::Real)::EWDownsideBetaState
-    Tf = float_if_integer(promote_type(eltype(X), eltype(rm)))
+    Tf = promote_type(eltype(X), eltype(rm))
     N = size(X, 2)
     return EWDownsideBetaState(zeros(Tf, N), zeros(Int, N),
                                zero(promote_type(Tf, typeof(decay))), 0)
@@ -735,6 +735,8 @@ Exponentially weighted sensitivity of the returns to the falls of the market, at
 
 A beta that treats a rise and a fall alike does not show which of the two an asset follows. This Descriptor measures the falls alone, through the lower partial co-moment of the asset with the market. It is how far the asset falls when the market falls short of a target. An investor who fears a loss and not a gain uses it in place of the two-sided beta.
 
+Equation 10 of [estrada2002](@cite) defines the downside beta as the cosemivariance of the asset with the market over the semivariance of the market, and Equation 13 estimates it by a regression through the origin of the asset shortfall on the market shortfall. This Descriptor takes the shortfalls below one target `mar` for both, where that work takes each below its own mean, and it weights the observations exponentially. Both are this library's choices.
+
 # Mathematical definition
 
 ```math
@@ -805,8 +807,7 @@ EWDownsideBeta
 
 # References
 
-  - $(ref_dict[:angchenxing2006])
-  - $(ref_dict[:estrada2002])
+  - $(ref_dict[:estrada2002]) Equations 10 and 13.
 """
 @concrete struct EWDownsideBeta <: AbstractDescriptorEstimator
     """
@@ -1119,7 +1120,7 @@ The Descriptor of an observation equals the one of the batch call [`descriptor`]
 function descriptor_step(de::Union{EWBeta, EWMacroSensitivity, EWDownsideBeta},
                          rd::ReturnsResult)
     (; st, D) = ew_beta_fold(de, rd, de.cache)
-    return (; de = Accessors.@set(de.cache = st), D = D)
+    return (; de = rebuild_estimator(de, (; cache = st)), D = D)
 end
 """
     partial_fit!(de::Union{EWBeta, EWMacroSensitivity, EWDownsideBeta}, rd::ReturnsResult)

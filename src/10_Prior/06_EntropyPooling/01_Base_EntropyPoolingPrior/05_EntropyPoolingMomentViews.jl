@@ -1,11 +1,11 @@
 """
 $(DocStringExtensions.TYPEDEF)
 
-Carries a parsed correlation or covariance view together with the asset pairs it names.
+Holds a parsed correlation or covariance view and the asset pairs that it names.
 
-It extends [`ParsingResult`](@ref) with an `ij` field, which holds one index pair per term of the view, so a downstream routine can place the view in the covariance matrix without parsing the equation again. [`replace_coprior_views`](@ref) produces it from a view of the form `"(A, B) == 0.5"`, and the entropy pooling and Black-Litterman routines that read pair views consume it.
+It adds an `ij` field to [`ParsingResult`](@ref). The field holds one index pair for each term of the view, so a later routine can place the view in the covariance matrix and does not parse the equation again. [`replace_coprior_views`](@ref) makes it from a view of the form `"(A, B) == 0.5"`. [`ep_cov_views!`](@ref) and [`ep_rho_views!`](@ref) read it.
 
-A view over a pair of groups spans one asset pair per element of its `ij` entry, and emits one constraint row per pair. Its `rhs` is therefore a vector of the same length, one right-hand side per row. A view over a single asset pair keeps a scalar `rhs`.
+A view over a pair of groups spans one asset pair for each element of its `ij` entry, and makes one constraint row for each pair. Its `rhs` is therefore a vector of the same length, with one right-hand side for each row. A view over one asset pair keeps a scalar `rhs`.
 
 # Fields
 
@@ -17,13 +17,13 @@ $(DocStringExtensions.FIELDS)
         vars::VecStr,
         coef::VecNum,
         op::AbstractString,
-        rhs::Union{<:Number, <:VecNum},
+        rhs::Union{Number, VecNum},
         eqn::AbstractString,
-        ij::AbstractVector{<:Union{<:Tuple{<:Integer, <:Integer},
-                                   <:Tuple{<:VecInt, <:VecInt}}}
+        ij::AbstractVector{<:Union{Tuple{Integer, Integer},
+                                   Tuple{VecInt, VecInt}}}
     ) -> RhoParsingResult
 
-Positional arguments correspond to the struct's fields. There is no keyword constructor, because [`replace_coprior_views`](@ref) is the producer of this type.
+Positional arguments correspond to the struct's fields. The type has no keyword constructor, because [`replace_coprior_views`](@ref) makes it.
 
 ## Validation
 
@@ -48,7 +48,7 @@ RhoParsingResult
 
   - [`AbstractParsingResult`](@ref)
   - [`ParsingResult`](@ref)
-  - [`replace_coprior_views`](@ref): the producer of this type.
+  - [`replace_coprior_views`](@ref): makes this type.
   - [`replace_prior_views`](@ref)
   - [`ep_cov_views!`](@ref): reads `ij` to place a covariance view.
   - [`ep_rho_views!`](@ref): reads `ij` to place a correlation view.
@@ -79,9 +79,9 @@ RhoParsingResult
     """
     ij
     function RhoParsingResult(vars::VecStr, coef::VecNum, op::AbstractString,
-                              rhs::Union{<:Number, <:VecNum}, eqn::AbstractString,
-                              ij::AbstractVector{<:Union{<:Tuple{<:Integer, <:Integer},
-                                                         <:Tuple{<:VecInt, <:VecInt}}})
+                              rhs::Union{Number, VecNum}, eqn::AbstractString,
+                              ij::AbstractVector{<:Union{Tuple{Integer, Integer},
+                                                         Tuple{VecInt, VecInt}}})
         @argcheck(length(vars) == length(coef), DimensionMismatch)
         if isa(rhs, AbstractVector)
             @argcheck(!isempty(ij) &&
@@ -97,21 +97,21 @@ end
     get_pr_value(pr::AbstractPriorResult, i::Integer, ::Val{:cvar}, alpha::Number,
                  w::Option{<:ObsWeights} = nothing)
 
-Read the prior **conditional value at risk** of asset `i` at the level `alpha`.
+Read the prior conditional value at risk of asset `i` at the level `alpha`.
 
-`get_pr_value` is the dispatch table that resolves a `prior(...)` reference inside a view. This method reads the statistic the tag `Val(:cvar)` names, by applying [`ConditionalValueatRisk`](@ref) to the `i`-th column of `pr.X`. That is the conditional value at risk of the loss series under `w`, the observation weights the initial prior result was read at, and it rests on no distributional assumption. It reads `w` on the reasoning [`get_pr_value`](@ref) gives for the value at risk.
+`get_pr_value` is the dispatch table that resolves a `prior(...)` reference inside a view. This method reads the statistic that the tag `Val(:cvar)` names. It applies [`ConditionalValueatRisk`](@ref) to the `i`-th column of `pr.X`. That is the conditional value at risk of the loss series under `w`, the observation weights of the first prior result. It needs no assumption about the distribution. It reads `w` for the same reason as the value at risk method of [`get_pr_value`](@ref).
 
 # Arguments
 
-  - `pr`: Prior result containing asset return information.
+  - `pr`: Prior result that holds the asset returns.
   - `i`: Index of the asset.
-  - `::Val{:cvar}`: Dispatch tag for CVaR computation.
-  - `alpha`: Confidence level.
+  - `::Val{:cvar}`: Dispatch tag of the conditional value at risk.
+  - `alpha`: Significance level.
   - $(arg_dict[:oow])
 
 # Returns
 
-  - `cvar::Number`: Conditional Value-at-Risk for asset `i` at level `alpha`.
+  - `cvar::Number`: Prior conditional value at risk of asset `i` at the level `alpha`.
 
 # Related
 
@@ -127,20 +127,20 @@ end
 """
     get_pr_value(pr::AbstractPriorResult, i::Integer, ::Val{:sigma}, args...)
 
-Read the prior **variance** of asset `i`.
+Read the prior variance of asset `i`.
 
-`get_pr_value` is the dispatch table that resolves a `prior(...)` reference inside a view. This method reads the statistic the tag `Val(:sigma)` names, the `i`-th diagonal entry of `pr.sigma`. The tag is `:sigma` and the statistic is the variance, not the standard deviation and not the value at risk, which the tag `:var` names.
+`get_pr_value` is the dispatch table that resolves a `prior(...)` reference inside a view. This method reads the statistic that the tag `Val(:sigma)` names, the `i`-th diagonal entry of `pr.sigma`. The tag is `:sigma` and the statistic is the variance, not the standard deviation and not the value at risk, which the tag `:var` names.
 
 # Arguments
 
-  - `pr`: Prior result containing asset return information.
+  - `pr`: Prior result that holds the asset returns.
   - `i`: Index of the asset.
-  - `::Val{:sigma}`: Dispatch tag for variance extraction.
-  - `args...`: Additional arguments (ignored).
+  - `::Val{:sigma}`: Dispatch tag of the variance.
+  - `args...`: More arguments, which the method does not read.
 
 # Returns
 
-  - `sigma::Number`: Variance for asset `i`.
+  - `sigma::Number`: Prior variance of asset `i`.
 
 # Related
 
@@ -157,11 +157,11 @@ end
     scenario_residual_variances(rr, sigma::VecNum)
     scenario_residual_variances(rr::Regression, sigma::VecNum)
 
-Return the residual variance of each asset that `pr.sigma` carries and the scenarios `pr.X` do not.
+Return the residual variance of each asset that `pr.sigma` has and the scenarios `pr.X` do not have.
 
-A time-series factor prior makes its scenarios from the regression, `F * transpose(M) .+ transpose(b)`, and adds the residual block to the covariance alone: [`FactorPrior`](@ref) and [`FactorBlackLittermanPrior`](@ref) under `rsd = true`. The variance of asset ``i`` in `pr.sigma` is then the variance of its scenarios plus ``\\delta_{i}``. An entropy pooling view row reads the scenarios, so a row that states a moment of `pr.sigma` takes ``\\delta_{i}`` off its target, and a row that reads the variance of the scenarios reads ``\\sigma_{i}^{2} - \\delta_{i}``. [`scenario_factory`](@ref) holds the residual block of this fit in the posterior, so the posterior covariance meets the target of the view.
+A time-series factor prior makes its scenarios from the regression, `F * transpose(M) .+ transpose(b)`, and adds the residual block only to the covariance. [`FactorPrior`](@ref) and [`FactorBlackLittermanPrior`](@ref) do this under `rsd = true`. The variance of asset ``i`` in `pr.sigma` is then the variance of its scenarios plus ``\\delta_{i}``. An entropy pooling view row reads the scenarios. So a row that states a moment of `pr.sigma` subtracts ``\\delta_{i}`` from its target, and a row that reads the variance of the scenarios reads ``\\sigma_{i}^{2} - \\delta_{i}``. [`scenario_factory`](@ref) keeps the residual block of this fit in the posterior, so the posterior covariance meets the target of the view.
 
-A prior with no regression, and a cross-sectional factor prior, whose scenarios carry the idiosyncratic returns, add no block beyond the scenarios. Their answer is zero.
+A prior with no regression adds no block to the scenarios. A cross-sectional factor prior also adds none, because its scenarios hold the idiosyncratic returns. For these priors, the result is zero.
 
 # Mathematical definition
 
@@ -173,21 +173,21 @@ Where:
 
   - ``\\sigma_{i}^{2}``: The variance of asset ``i`` in `pr.sigma`.
   - ``\\mathrm{Var}[x_{i}]``: The variance of the scenarios of asset ``i``.
-  - ``\\delta_{i}``: The residual variance of asset ``i``, the answer.
+  - ``\\delta_{i}``: The residual variance of asset ``i``, which the function returns.
 
 # Algorithm
 
 The method that Julia selects is the algorithm.
 
  1. A prior result: apply this function to `pr.rr` and the diagonal of `pr.sigma`.
- 2. A [`Regression`](@ref) whose `esigma` is set: its [`idiosyncratic_variances`](@ref).
- 3. Anything else: zero for each asset.
+ 2. A [`Regression`](@ref) whose `esigma` is set: return its [`idiosyncratic_variances`](@ref).
+ 3. Any other value: return zero for each asset.
 
 # Arguments
 
-  - `pr`: Prior result containing asset return information.
+  - `pr`: Prior result that holds the asset returns.
   - `rr`: The loadings result of `pr`, or `nothing`.
-  - `sigma`: The variances of `pr.sigma`, which state the type and the size of a zero answer.
+  - `sigma`: The variances of `pr.sigma`, which set the type and the size of a zero result.
 
 # Returns
 
@@ -211,17 +211,19 @@ function scenario_residual_variances(rr::Regression, sigma::VecNum)
 end
 """
     ep_sigma_views!(sigma_views::LinearConstraintEstimator, epc::AbstractDict,
-                    pr::AbstractPriorResult, sets::UniverseSets; strict::Bool = false)
+                    pr::AbstractPriorResult, sets::UniverseSets,
+                    w::Option{<:ObsWeights} = nothing; strict::Bool = false,
+                    ledger::Option{<:AbstractVector} = nothing)
 
-Add the **variance** views of a group to the entropy pooling constraint dictionary.
+Add the variance views of a group to the entropy pooling constraint dictionary.
 
-`ep_sigma_views!` parses variance view equations from a [`LinearConstraintEstimator`](@ref), replaces any prior references with their actual values, and constructs the corresponding constraints for entropy pooling. The constraints are then added to the entropy pooling constraint dictionary `epc`. The statistic is the variance of the posterior distribution, not the value at risk, which the `var_views` family holds.
+`ep_sigma_views!` parses the variance view equations of a [`LinearConstraintEstimator`](@ref), replaces each prior reference with its value, and makes the constraints of the views. It adds the constraints to the entropy pooling constraint dictionary `epc`. The statistic is the variance of the posterior distribution, not the value at risk, which the `var_views` family holds.
 
-The variance is quadratic in the returns and linear in the posterior probabilities only once the mean is a constant. This method therefore returns the assets whose mean [`fix_mu!`](@ref) must hold at the prior, so a variance view does not move the mean it is measured about.
+The variance is quadratic in the returns and linear in the posterior probabilities only when the mean is a constant. So this method returns the assets whose mean [`fix_mu!`](@ref) must hold at the prior. A variance view then does not move the mean about which the view measures the variance.
 
 # Mathematical definition
 
-The row states the posterior second central moment about the **prior** mean, plus the residual variance that the scenarios do not carry, which is linear in the posterior probabilities:
+The row states the posterior second central moment about the prior mean, plus the residual variance that the scenarios do not have. This sum is linear in the posterior probabilities:
 
 ```math
 \\begin{align}
@@ -230,7 +232,7 @@ The row states the posterior second central moment about the **prior** mean, plu
 \\end{align}
 ```
 
-The identity holds only while the posterior mean of asset ``i`` equals ``\\mu_{i}``, which is why the assets this method names are handed to [`fix_mu!`](@ref). The constant ``\\delta_{i}`` moves to the right-hand side, so the row compares the scenarios against ``B_{k} - \\sum_{i} a_{k,\\,i} \\delta_{i}``.
+The identity holds only while the posterior mean of asset ``i`` equals ``\\mu_{i}``. So this method gives the assets that it names to [`fix_mu!`](@ref). The constant ``\\delta_{i}`` moves to the right-hand side, so the row compares the scenarios against ``B_{k} - \\sum_{i} a_{k,\\,i} \\delta_{i}``.
 
 Where:
 
@@ -240,42 +242,50 @@ Where:
   - $(math_dict[:T])
   - $(math_dict[:N])
   - $(math_dict[:B])
-  - ``a_{k,\\,i}``: Coefficient asset ``i`` takes in view ``k``.
-  - ``K``: Number of views the group states.
+  - ``a_{k,\\,i}``: Coefficient that asset ``i`` takes in view ``k``.
+  - ``K``: Number of views that the group states.
   - $(math_dict[:ep_delta_i])
 
 # Algorithm
 
- 1. Parse the view equations of `sigma_views.val`, giving one [`ParsingResult`](@ref) per view.
+ 1. Parse the view equations of `sigma_views.val` into one [`ParsingResult`](@ref) for each view.
  2. Replace every group name by the assets it spans.
  3. Replace every `prior(...)` reference by the prior variance, through [`replace_prior_views`](@ref).
- 4. Turn the parsed views into the linear constraint blocks `lcs`, one for `:ineq` and one for `:eq`. Under `strict = false` every row of the group can drop, and `lcs` is then `nothing`: the group states no view, and the call returns a `to_fix` that names no asset.
- 5. Build `tmp`, the squared deviations of every observation from the prior mean, transposed so a row of `lcs` multiplies it from the left. Read the residual variances `d` with [`scenario_residual_variances`](@ref).
- 6. For each block present, add `A * tmp` against `B - A * d` under that key with [`add_ep_constraint!`](@ref), and mark in `to_fix` every asset the block names.
+ 4. Turn the parsed views into the linear constraint blocks `lcs`, one for `:ineq` and one for `:eq`. Under `strict = false`, every row of the group can drop, and `lcs` is then `nothing`. The group then states no view, and the call returns a `to_fix` that names no asset.
+ 5. Build `tmp`, the squared deviations of every observation from the prior mean, transposed so that a row of `lcs` multiplies it from the left. Read the residual variances `d` with [`scenario_residual_variances`](@ref).
+ 6. For each block that `lcs` holds, refuse a row of `A * tmp` against `B - A * d` that no reweighting of the scenarios meets, with [`ep_assert_attainable_rows`](@ref).
+ 7. Add `A * tmp` against `B - A * d` under its key with [`add_ep_constraint!`](@ref), and mark in `to_fix` every asset that the block names.
 
 # Arguments
 
   - `sigma_views`: Variance view constraints.
-  - `epc`: Dictionary of entropy pooling constraints, mapping keys to `(lhs, rhs)` pairs.
-  - `pr`: Prior result containing asset return information.
-  - `sets`: Asset set mapping asset names to indices.
-  - `strict`: If `true`, throws error for missing assets; otherwise, issue warnings.
+  - `epc`: Dictionary of entropy pooling constraints, which maps each key to an `(lhs, rhs)` pair.
+  - `pr`: Prior result that holds the asset returns.
+  - `sets`: Universe sets that map the asset names to indices.
+  - $(arg_dict[:ep_view_support_w])
+  - `strict`: If `true`, raise an error for an asset that the universe does not hold. If `false`, warn.
+  - $(arg_dict[:ledger]) [`replace_group_by_assets`](@ref) and [`get_linear_constraints`](@ref) fill it.
+
+# Validation
+
+  - $(val_dict[:ep_attainable_row])
 
 # Returns
 
-  - `to_fix::BitVector`: Boolean vector indicating which assets require their mean to be fixed.
+  - `to_fix::BitVector`: Boolean vector that marks the assets whose mean must be fixed.
 
 # Related
 
   - [`add_ep_constraint!`](@ref)
   - [`replace_prior_views`](@ref)
-  - [`get_pr_value`](@ref): reads the prior variance a `prior(...)` reference resolves to.
-  - [`fix_mu!`](@ref): consumes the `to_fix` this method returns.
+  - [`get_pr_value`](@ref): reads the prior variance that a `prior(...)` reference resolves to.
+  - [`fix_mu!`](@ref): reads the `to_fix` that this method returns.
   - [`fix_sigma!`](@ref)
   - [`MeucciEntropyPoolingPrior`](@ref)
 """
 function ep_sigma_views!(sigma_views::LinearConstraintEstimator, epc::AbstractDict,
-                         pr::AbstractPriorResult, sets::UniverseSets; strict::Bool = false,
+                         pr::AbstractPriorResult, sets::UniverseSets,
+                         w::Option{<:ObsWeights} = nothing; strict::Bool = false,
                          ledger::Option{<:AbstractVector} = nothing)
     X = pr.X
     sigma_views = parse_equation(sigma_views.val; datatype = eltype(X))
@@ -301,8 +311,13 @@ function ep_sigma_views!(sigma_views::LinearConstraintEstimator, epc::AbstractDi
         if isnothing(getproperty(lcs, p))
             continue
         end
-        A = getproperty(lcs, p).A
-        add_ep_constraint!(epc, A * tmp, getproperty(lcs, p).B - A * d, p)
+        (; A, B) = getproperty(lcs, p)
+        # See the note at the same step in `ep_mu_views!` (#1920).
+        lhs = A * tmp
+        rhs = B - A * d
+        ep_assert_attainable_rows(lhs, rhs, p, get_observation_weights(w, X),
+                                  k -> ep_view_row_label(A, B, k, p, sets), "variance")
+        add_ep_constraint!(epc, lhs, rhs, p)
         to_fix .= to_fix .| dropdims(any(!iszero, A; dims = 1); dims = 1)
     end
     return to_fix
@@ -311,17 +326,17 @@ end
     fix_sigma!(epc::AbstractDict, fixed::AbstractVector, to_fix::BitVector,
                pr::AbstractPriorResult)
 
-Hold the **variance** of the named assets at the prior value.
+Hold the variance of the named assets at the prior value.
 
-`fix_sigma!` identifies assets in `to_fix` that are not yet fixed (i.e., not present in `fixed`), and adds constraints to the entropy pooling constraint dictionary `epc` to fix their variance to the prior value. This ensures that higher moment views (e.g., skewness, kurtosis, correlation) do not inadvertently alter the variance of these assets. The function updates `fixed` in-place to reflect the newly fixed assets.
+`fix_sigma!` finds the assets that `to_fix` names and `fixed` does not. It adds rows to the entropy pooling constraint dictionary `epc` that hold the variance of these assets at the prior value. With these rows, a view on a higher moment, such as the skewness or the correlation, does not move the variance of these assets. The function marks the new assets in `fixed`.
 
-The rows go in under the `:feq` key, which the optimiser relaxes with a penalised slack rather than enforcing exactly. A fixing row is a wish, not a view: it competes with the views that were asked for, and it yields where the two cannot both hold.
+The rows go under the `:feq` key. The optimiser relaxes the rows of this key with a penalised slack, and does not enforce them exactly. A fixing row is not a view. If a fixing row and a view cannot both hold, the optimiser lets the fixing row miss its target.
 
 The left side is the uncorrected moment of the scenarios, and the right side reads the diagonal of `pr.sigma`. The two agree only when the covariance estimator of the prior is uncorrected. Under a corrected estimator, the row holds the variance at the corrected value, which is larger by the correction factor.
 
 # Mathematical definition
 
-The posterior second central moment of every named asset, taken about the prior mean, is held at the prior variance of its scenarios:
+The rows hold the posterior second central moment of each named asset, about the prior mean, at the prior variance of its scenarios:
 
 ```math
 \\sum_{t=1}^{T} p_{t} \\left(x_{t,\\,i} - \\mu_{i}\\right)^{2} = \\sigma_{i}^{2} - \\delta_{i}\\,, \\quad \\forall\\, i \\in \\mathcal{F}\\,.
@@ -335,26 +350,26 @@ Where:
   - $(math_dict[:ep_sigma2_prior_i])
   - $(math_dict[:ep_delta_i])
   - $(math_dict[:T])
-  - ``\\mathcal{F}``: Assets named by `to_fix` that `fixed` does not already hold.
+  - ``\\mathcal{F}``: Assets that `to_fix` names and `fixed` does not already hold.
 
 # Algorithm
 
- 1. Read the prior variances of the scenarios into `sigma`: the diagonal of `pr.sigma`, less [`scenario_residual_variances`](@ref).
+ 1. Read the prior variances of the scenarios into `sigma`. They are the diagonal of `pr.sigma`, less [`scenario_residual_variances`](@ref).
  2. Read the assets that `to_fix` names and `fixed` does not already hold into `fix`.
  3. Return when `fix` names no asset.
- 4. Add one `:feq` row per named asset, the squared deviations of that asset from its prior mean against `sigma[fix]`, with [`add_ep_constraint!`](@ref).
+ 4. Add one `:feq` row for each named asset, the squared deviations of that asset from its prior mean against `sigma[fix]`, with [`add_ep_constraint!`](@ref).
  5. Mark the named assets in `fixed`, so a later call adds no second row for them.
 
 # Arguments
 
-  - `epc`: Dictionary of entropy pooling constraints, mapping keys to `(lhs, rhs)` pairs.
-  - `fixed`: Boolean vector indicating which assets have their variance fixed.
-  - `to_fix`: Boolean vector indicating which assets should have their variance fixed.
-  - `pr`: Prior result containing asset return information.
+  - `epc`: Dictionary of entropy pooling constraints, which maps each key to an `(lhs, rhs)` pair.
+  - `fixed`: Boolean vector that marks the assets whose variance is already fixed.
+  - `to_fix`: Boolean vector that marks the assets whose variance must be fixed.
+  - `pr`: Prior result that holds the asset returns.
 
 # Returns
 
-  - `nothing`: The function mutates `epc` and `fixed` in-place.
+  - `nothing`: The function mutates `epc` and `fixed` in place.
 
 # Related
 
@@ -376,66 +391,68 @@ function fix_sigma!(epc::AbstractDict, fixed::AbstractVector, to_fix::BitVector,
 end
 """
     replace_coprior_views(res::ParsingResult, pr::AbstractPriorResult, sets::UniverseSets, key::Symbol;
-                          strict::Bool = false)
+                          strict::Bool = false, ledger::Option{<:AbstractVector} = nothing)
 
-Replace correlation prior references in view parsing results with their corresponding prior values.
+Replace the prior references of a parsed correlation or covariance view with their prior values.
 
-`replace_coprior_views` scans a parsed correlation view constraint (`ParsingResult`) for references to prior values (e.g., `prior(A, B)`), and replaces them with the actual prior correlation value from the provided prior result object. This ensures that prior-based terms in correlation view constraints are treated as constants and not as variables in the optimisation.
+`replace_coprior_views` finds each reference of the form `prior(A, B)` in a parsed correlation or covariance view constraint, a [`ParsingResult`](@ref). It replaces the reference with the prior value that `pr` gives. The optimisation then reads such a term as a constant, not as a variable.
 
-It is the pair counterpart of [`replace_prior_views`](@ref), and it answers a [`RhoParsingResult`](@ref) rather than a [`ParsingResult`](@ref): a pair view carries the index pair of every term, which the verb that places the view in the covariance matrix reads back.
+It is the counterpart of [`replace_prior_views`](@ref) for asset pairs, and it returns a [`RhoParsingResult`](@ref), not a [`ParsingResult`](@ref). A pair view holds the index pair of every term, and the verb that places the view in the covariance matrix reads it.
 
 # Mathematical definition
 
-A parsed pair view is the row ``\\sum_{k} c_{k} v_{k} \\lessgtr b``, whose variables name asset pairs. A term whose variable is `prior(a, b)` carries a constant, so moving every such term to the right-hand side gives an equivalent row:
+A parsed pair view is the row ``\\sum_{k} c_{k} v_{k} \\lessgtr b``, whose variables name asset pairs. A term whose variable is `prior(a, b)` holds a constant. The function moves each such term to the right-hand side, which gives an equivalent row:
 
 ```math
 \\sum_{k \\notin \\mathcal{P}} c_{k} v_{k} \\lessgtr b - \\sum_{k \\in \\mathcal{P}} c_{k} \\pi_{a_{k},\\, b_{k}}\\,.
 ```
 
-A `prior(gA, gB)` reference over a pair of groups carries one constant per spanned asset pair, so the subtraction broadcasts and ``b`` widens to a vector of that length, one right-hand side per row the view emits.
+A `prior(gA, gB)` reference over a pair of groups holds one constant for each spanned asset pair. So the subtraction broadcasts, and ``b`` becomes a vector of that length, with one right-hand side for each row of the view.
 
 Where:
 
   - ``c_{k}``, ``v_{k}``: Coefficient and variable of the ``k``-th term of the view.
   - ``b``: Right-hand side of the view.
   - ``\\mathcal{P}``: Terms whose variable is a `prior(...)` reference.
-  - ``\\pi_{a,\\,b}``: Prior value of the statistic `key` for the asset pair ``(a, b)``, read by [`get_pr_value`](@ref).
+  - ``\\pi_{a,\\,b}``: Prior value of the statistic `key` for the asset pair ``(a, b)``, which [`get_pr_value`](@ref) reads.
 
 # Algorithm
 
  1. Match the pattern `prior(<asset1>, <asset2>)` against the variable of each term in turn.
  2. When a term does not match, read its own pair `(a, b)` instead. Raise when the term is not of the form `(a, b)`.
- 3. Find both names in the universe, reading a bracketed name as a group and every other as one asset. When either is absent, report it through `strict_diagnostic`, record the term for removal, and take the next term.
+ 3. Find both names in the universe. A name in brackets is a group, and every other name is one asset. When the universe does not hold one of the names, report it through `strict_diagnostic`, record the term for removal, and take the next term.
  4. Record the index pair in `jk_idx`, and take the next term.
- 5. For a term that does match, find both names the same way, subtract [`get_pr_value`](@ref) times the term's coefficient from `rhs` with the broadcasting operators, and record the term for removal.
- 6. Return a [`RhoParsingResult`](@ref) over the untouched terms when step 3 and step 5 recorded no term.
- 7. Drop the recorded terms from `vars` and `coef`, rebuild the equation string, and return a [`RhoParsingResult`](@ref) that carries the adjusted `rhs` and `jk_idx`.
+ 5. For a term that does match, find both names in the same way. If a name is on the Non-Investable Axis, record the drop in the Departure Ledger, and return a [`RhoParsingResult`](@ref) with no term.
+ 6. Subtract [`get_pr_value`](@ref) times the coefficient of the term from `rhs` with the broadcasting operators, and record the term for removal.
+ 7. Return a [`RhoParsingResult`](@ref) over the unchanged terms when steps 3, 5 and 6 recorded no term.
+ 8. Drop the recorded terms from `vars` and `coef`, make the equation string again, and return a [`RhoParsingResult`](@ref) that holds the adjusted `rhs` and `jk_idx`.
 
 # Arguments
 
-  - `res`: Parsed correlation view constraint containing variables and coefficients.
-  - `pr`: Prior result object containing prior correlation values.
-  - `sets`: Asset set mapping asset names to indices.
-  - `key`: Symbol representing whether it's a correlation or covariance view.
-  - `strict`: If `true`, throws error for missing assets; otherwise, issue warnings.
+  - `res`: Parsed correlation or covariance view constraint, with its variables and coefficients.
+  - `pr`: Prior result that gives the prior values.
+  - `sets`: Universe sets that map the asset names to indices.
+  - `key`: Tag of the statistic, `:rho` for a correlation view or `:cov` for a covariance view.
+  - `strict`: If `true`, raise an error for an asset that the universe does not hold. If `false`, warn.
+  - $(arg_dict[:ledger]) The function records in it each row that it drops for a name on the counterpart axis, through [`record_non_investable_drop!`](@ref).
 
 # Validation
 
   - Every term that is not a `prior(...)` reference must be of the form `(a, b)`. Any other form raises an `ArgumentError`.
   - Every `prior(...)` reference must be of the form `prior(a, b)`. Any other form raises an `ArgumentError`.
-  - An asset a reference names that the universe does not hold raises an `ArgumentError` when `strict` is `true`, and warns otherwise. The term is dropped either way.
-  - At least one term of the view must keep a variable of its own. A view whose every term is a `prior(...)` reference raises an `ArgumentError`.
+  - A reference to an asset that the universe does not hold raises an `ArgumentError` when `strict` is `true`, and warns otherwise. The method drops the term in both cases.
+  - At least one term of the view must keep a variable of its own. A view in which every term is a `prior(...)` reference raises an `ArgumentError`.
 
 # Returns
 
-  - `res::RhoParsingResult`: Updated parsing result with prior references replaced by their values and correlation indices.
+  - `res::RhoParsingResult`: The parsing result, with each prior reference replaced by its value, and with the index pairs of its terms.
 
 # Related
 
   - [`ParsingResult`](@ref)
   - [`RhoParsingResult`](@ref)
-  - [`replace_prior_views`](@ref): the single-asset counterpart.
-  - [`get_pr_value`](@ref): reads the prior value each reference is replaced by.
+  - [`replace_prior_views`](@ref): the counterpart for single assets.
+  - [`get_pr_value`](@ref): reads the prior value that replaces each reference.
   - [`LowOrderPrior`](@ref)
   - [`UniverseSets`](@ref)
   - [`prior`](@ref)
@@ -472,11 +489,11 @@ function replace_coprior_views(res::ParsingResult, pr::AbstractPriorResult,
                 k = findfirst(x -> x == asset2, nx)
                 if isnothing(j)
                     msg = unknown_variable_msg(asset1, nx, sets.xkey)
-                    strict_diagnostic(msg, strict)
+                    strict_diagnostic(msg, strict; id = @log_id(asset1, sets.xkey))
                 end
                 if isnothing(k)
                     msg = unknown_variable_msg(asset2, nx, sets.xkey)
-                    strict_diagnostic(msg, strict)
+                    strict_diagnostic(msg, strict; id = @log_id(asset2, sets.xkey))
                 end
                 if isnothing(j) || isnothing(k)
                     push!(idx_rm, i)
@@ -517,11 +534,11 @@ function replace_coprior_views(res::ParsingResult, pr::AbstractPriorResult,
             end
             if isnothing(j)
                 msg = unknown_variable_msg(asset1, nx, sets.xkey)
-                strict_diagnostic(msg, strict)
+                strict_diagnostic(msg, strict; id = @log_id(asset1, sets.xkey))
             end
             if isnothing(k)
                 msg = unknown_variable_msg(asset2, nx, sets.xkey)
-                strict_diagnostic(msg, strict)
+                strict_diagnostic(msg, strict; id = @log_id(asset2, sets.xkey))
             end
             if isnothing(j) || isnothing(k)
                 push!(idx_rm, i)
@@ -548,24 +565,24 @@ end
 """
     replace_coprior_views(res::VecPR, args...; kwargs...)
 
-Broadcast prior reference replacement across multiple view constraints.
+Replace the prior references of every pair view constraint of a group.
 
-`replace_coprior_views` applies [`replace_coprior_views`](@ref) to each element of a vector of parsed view constraints, replacing prior references with their corresponding prior values. [`parse_equation`](@ref) answers a group of view equations with a vector of results, so this is the shape every caller in this file meets.
+`replace_coprior_views` applies [`replace_coprior_views`](@ref) to each parsed view constraint of a vector. [`parse_equation`](@ref) returns a vector of results for a group of view equations, so every pair view verb gets this shape.
 
 # Algorithm
 
- 1. Broadcast the single-view method over `res`, forwarding `args...` and `kwargs...` to each call.
- 2. Return the vector of the results, one [`RhoParsingResult`](@ref) per element of `res`, in the order of `res`.
+ 1. Broadcast the method for one view over `res`, with `args...` and `kwargs...`.
+ 2. Return the vector of the results, one [`RhoParsingResult`](@ref) for each element of `res`, in the order of `res`.
 
 # Arguments
 
-  - `res:`: Vector of parsed view constraints.
-  - `args...`: Additional positional arguments forwarded to [`replace_coprior_views`](@ref).
-  - `kwargs...`: Additional keyword arguments forwarded to [`replace_coprior_views`](@ref).
+  - `res`: Vector of parsed view constraints.
+  - `args...`: The positional arguments that the method passes to [`replace_coprior_views`](@ref).
+  - `kwargs...`: The keyword arguments that the method passes to [`replace_coprior_views`](@ref).
 
 # Returns
 
-  - `res::Vector{<:ParsingResult}`: Vector of updated parsing results with prior references replaced by their values.
+  - `res::Vector{<:RhoParsingResult}`: One parsing result for each element of `res`, with each prior reference replaced by its value.
 
 # Related
 
@@ -580,22 +597,22 @@ end
     get_pr_value(pr::AbstractPriorResult, i::Integer, j::Integer, ::Val{:rho}, args...)
     get_pr_value(pr::AbstractPriorResult, i::Integer, j::Integer, ::Val{:cov}, args...)
 
-Read the prior **correlation** or **covariance** of the asset pair `(i, j)`.
+Read the prior correlation or covariance of the asset pair `(i, j)`.
 
-`get_pr_value` is the dispatch table that resolves a `prior(...)` reference inside a view. `Val(:cov)` names the entry `pr.sigma[i, j]`, and `Val(:rho)` names the same entry of `StatsBase.cov2cor(pr.sigma)`. These methods are used internally by [`replace_coprior_views`](@ref) to resolve a `prior(a, b)` reference.
+`get_pr_value` is the dispatch table that resolves a `prior(...)` reference inside a view. `Val(:cov)` names the entry `pr.sigma[i, j]`, and `Val(:rho)` names the same entry of `StatsBase.cov2cor(pr.sigma)`. [`replace_coprior_views`](@ref) calls them to resolve a `prior(a, b)` reference.
 
 # Arguments
 
-  - `pr`: Prior result containing asset return information.
+  - `pr`: Prior result that holds the asset returns.
   - `i`: Index of the first asset.
   - `j`: Index of the second asset.
-  - `::Val{:rho}`: Dispatch tag for correlation extraction.
-  - `::Val{:cov}`: Dispatch tag for covariance extraction.
-  - `args...`: Additional arguments (ignored).
+  - `::Val{:rho}`: Dispatch tag of the correlation.
+  - `::Val{:cov}`: Dispatch tag of the covariance.
+  - `args...`: More arguments, which the method does not read.
 
 # Returns
 
-  - `val::Number`: Correlation coefficient or covariance between assets `i` and `j`.
+  - `val::Number`: Prior correlation or prior covariance of the assets `i` and `j`.
 
 # Related
 
@@ -614,22 +631,22 @@ end
     get_pr_value(pr::AbstractPriorResult, i::VecInt, j::VecInt, ::Val{:rho}, args...)
     get_pr_value(pr::AbstractPriorResult, i::VecInt, j::VecInt, ::Val{:cov}, args...)
 
-Read the prior **correlations** or **covariances** of the asset pairs that two groups span.
+Read the prior correlations or covariances of the asset pairs that two groups span.
 
-`get_pr_value` is the dispatch table that resolves a `prior(...)` reference inside a view. These methods read the same statistics their scalar siblings do, once per spanned pair, in the order of `zip(i, j)`. A view over a pair of groups emits one constraint row per spanned pair, so a `prior(gA, gB)` reference inside such a view must give each row that pair's own prior value.
+`get_pr_value` is the dispatch table that resolves a `prior(...)` reference inside a view. These methods read the same statistics as the methods for one pair, once for each spanned pair, in the order of `zip(i, j)`. A view over a pair of groups makes one constraint row for each spanned pair. So a `prior(gA, gB)` reference inside such a view must give each row the prior value of its own pair.
 
 # Arguments
 
-  - `pr`: Prior result containing asset return information.
-  - `i`: Vector of indices for the first asset group.
-  - `j`: Vector of indices for the second asset group.
-  - `::Val{:rho}`: Dispatch tag for correlation extraction.
-  - `::Val{:cov}`: Dispatch tag for covariance extraction.
-  - `args...`: Additional arguments (ignored).
+  - `pr`: Prior result that holds the asset returns.
+  - `i`: Vector of the indices of the first asset group.
+  - `j`: Vector of the indices of the second asset group.
+  - `::Val{:rho}`: Dispatch tag of the correlation.
+  - `::Val{:cov}`: Dispatch tag of the covariance.
+  - `args...`: More arguments, which the method does not read.
 
 # Returns
 
-  - `val::Vector{<:Number}`: Correlation or covariance of each spanned pair, one entry per element of `zip(i, j)`.
+  - `val::Vector{<:Number}`: Prior correlation or prior covariance of each spanned pair, with one entry for each element of `zip(i, j)`.
 
 # Related
 
@@ -647,17 +664,19 @@ function get_pr_value(pr::AbstractPriorResult, i::VecInt, j::VecInt, ::Val{:cov}
 end
 """
     ep_cov_views!(cov_views::LinearConstraintEstimator, epc::AbstractDict,
-                  pr::AbstractPriorResult, sets::UniverseSets; strict::Bool = false)
+                  pr::AbstractPriorResult, sets::UniverseSets,
+                  w::Option{<:ObsWeights} = nothing; strict::Bool = false,
+                  ledger::Option{<:AbstractVector} = nothing)
 
-Add the **covariance** views of a group to the entropy pooling constraint dictionary.
+Add the covariance views of a group to the entropy pooling constraint dictionary.
 
-`ep_cov_views!` parses covariance view equations from a [`LinearConstraintEstimator`](@ref), replaces any prior references with their actual values, and constructs the corresponding linear constraints for entropy pooling. The constraints are then added to the entropy pooling constraint dictionary `epc`. The statistic is the covariance of the posterior distribution, not the correlation, which the `rho_views` family holds.
+`ep_cov_views!` parses the covariance view equations of a [`LinearConstraintEstimator`](@ref), replaces each prior reference with its value, and makes the linear constraints of the views. It adds the constraints to the entropy pooling constraint dictionary `epc`. The statistic is the covariance of the posterior distribution, not the correlation, which the `rho_views` family holds.
 
-The covariance is a product of returns and is linear in the posterior probabilities only once both means are constants. This method therefore returns the assets whose mean and variance [`fix_mu!`](@ref) and [`fix_sigma!`](@ref) must hold at the prior, so a covariance view holds the mean and the variance that the prior states. The variance is the one that the covariance estimator of the prior gives, as [`fix_sigma!`](@ref) states.
+The covariance is a product of returns and is linear in the posterior probabilities only when both means are constants. So this method returns the assets whose mean and variance [`fix_mu!`](@ref) and [`fix_sigma!`](@ref) must hold at the prior. A covariance view then keeps the mean and the variance that the prior states. The variance is the one that the covariance estimator of the prior gives, as [`fix_sigma!`](@ref) states.
 
 # Mathematical definition
 
-The row states the posterior cross moment about the **prior** means, plus the residual block that the scenarios do not carry, which is linear in the posterior probabilities:
+The row states the posterior cross moment about the prior means, plus the residual block that the scenarios do not have. This sum is linear in the posterior probabilities:
 
 ```math
 \\begin{align}
@@ -666,7 +685,7 @@ c\\, \\mathrm{Cov}_{\\boldsymbol{p}}[x_{i}, x_{j}] &\\lessgtr b\\,,
 \\end{align}
 ```
 
-which the body writes with the constants gathered on the right:
+which the method writes with the constants on the right:
 
 ```math
 \\begin{align}
@@ -682,52 +701,58 @@ Where:
   - $(math_dict[:ep_delta_i])
   - ``\\mathbb{1}_{i = j}``: One when the pair names one asset twice, and zero otherwise. The residual block is diagonal.
   - $(math_dict[:T])
-  - ``c``: Coefficient the view gives the pair.
-  - ``b``: Target of the view, one value per spanned asset pair.
-  - ``d``: Sign that [`comparison_sign_ineq_flag`](@ref) reads from the operator, so every inequality row reaches `epc` in the sense the `:ineq` key states.
+  - ``c``: Coefficient that the view gives the pair.
+  - ``b``: Target of the view, with one value for each spanned asset pair.
+  - ``d``: Sign that [`comparison_sign_ineq_flag`](@ref) reads from the operator, so every inequality row goes into `epc` in the sense of the `:ineq` key.
 
-The identity holds only while the posterior means of assets ``i`` and ``j`` equal ``\\mu_{i}`` and ``\\mu_{j}``, which is why the assets this method names are handed to [`fix_mu!`](@ref) and [`fix_sigma!`](@ref).
+The identity holds only while the posterior means of assets ``i`` and ``j`` equal ``\\mu_{i}`` and ``\\mu_{j}``. So this method gives the assets that it names to [`fix_mu!`](@ref) and [`fix_sigma!`](@ref).
 
 # Algorithm
 
- 1. Parse the view equations of `cov_views.val`, giving one [`ParsingResult`](@ref) per view.
- 2. Replace every group name by the assets it spans, keeping a pair view a pair view.
- 3. Replace every `prior(a, b)` reference by the prior covariance, through [`replace_coprior_views`](@ref). Each view is now a [`RhoParsingResult`](@ref) carrying its index pairs.
- 4. For each view in turn, drop it when step 3 left it with no pair, and raise unless it names exactly one.
+ 1. Parse the view equations of `cov_views.val` into one [`ParsingResult`](@ref) for each view.
+ 2. Replace every group name by the assets that it spans. A pair view stays a pair view.
+ 3. Replace every `prior(a, b)` reference by the prior covariance, through [`replace_coprior_views`](@ref). Each view is now a [`RhoParsingResult`](@ref) that holds its index pairs.
+ 4. For each view in turn, drop it when step 3 left it with no pair, and raise unless it names exactly one. Drop it through [`strict_diagnostic`](@ref) when the coefficient of its pair is zero.
  5. Read the sign `d` and the inequality flag from the operator with [`comparison_sign_ineq_flag`](@ref).
- 6. Read the index pair `(i, j)`, and build `Ai`, the product of the two return columns scaled by `d` and the view's coefficient.
- 7. Build `Bi`, the target moved by the product of the prior means less the entry of the residual block `E` at the pair, scaled the same way. `E` is the diagonal matrix of [`scenario_residual_variances`](@ref). A single asset pair gives a scalar, which is wrapped into a one-element vector; a group pair gives one entry per spanned pair.
- 8. Add the row against `Bi` under `:ineq` or `:eq` with [`add_ep_constraint!`](@ref), and mark both assets of the pair in `to_fix`.
+ 6. Read the index pair `(i, j)`, and build `Ai`, the product of the two return columns scaled by `d` and the coefficient of the view.
+ 7. Build `Bi`, the target moved by the product of the prior means less the entry of the residual block `E` at the pair, scaled the same way. `E` is the diagonal matrix of [`scenario_residual_variances`](@ref). A single asset pair gives a scalar, which the method puts in a vector of one element. A group pair gives one entry for each spanned pair.
+ 8. Refuse a row of `Ai` against `Bi` that no reweighting of the scenarios meets, with [`ep_assert_attainable_rows`](@ref).
+ 9. Add the row against `Bi` under `:ineq` or `:eq` with [`add_ep_constraint!`](@ref), and mark both assets of the pair in `to_fix`.
 
 # Arguments
 
   - `cov_views`: Covariance view constraints.
-  - `epc`: Dictionary of entropy pooling constraints, mapping keys to `(lhs, rhs)` pairs.
-  - `pr`: Prior result containing asset return information.
-  - `sets`: Asset set mapping asset names to indices.
-  - `strict`: If `true`, throws error for missing assets; otherwise, issue warnings.
+  - `epc`: Dictionary of entropy pooling constraints, which maps each key to an `(lhs, rhs)` pair.
+  - `pr`: Prior result that holds the asset returns.
+  - `sets`: Universe sets that map the asset names to indices.
+  - $(arg_dict[:ep_view_support_w])
+  - `strict`: If `true`, raise an error for an asset that the universe does not hold. If `false`, warn.
+  - $(arg_dict[:ledger]) [`replace_group_by_assets`](@ref) and [`replace_coprior_views`](@ref) fill it.
 
 # Validation
 
-  - Every view names exactly one asset pair. A view that mixes pairs raises an `ArgumentError`. A view left with no pair, because every pair it named holds an asset the universe does not, is dropped with a report under `strict = false`; `strict = true` has already raised by then.
+  - $(val_dict[:ep_attainable_row])
+  - Every view names exactly one asset pair. A view that mixes pairs raises an `ArgumentError`. If every pair of a view holds an asset that the universe does not hold, the view has no pair left. Under `strict = false`, [`replace_coprior_views`](@ref) already reported the unknown names, and the method drops such a view with no second report. Under `strict = true`, that function already raised an error.
+  - The coefficient of the pair is not zero. A pair whose coefficients cancel, as in `(A, B) - (A, B) == 0.1`, gives the row `0 == 0.1`, which no probabilities can meet. The method drops it, as [`get_linear_constraints`](@ref) drops a cancelled linear row: under `strict = false` it warns, and under `strict = true` it raises an [`IsZeroError`](@ref).
 
 # Returns
 
-  - `to_fix::BitVector`: Boolean vector indicating which assets require their mean and variance to be fixed.
+  - `to_fix::BitVector`: Boolean vector that marks the assets whose mean and variance must be fixed.
 
 # Related
 
   - [`add_ep_constraint!`](@ref)
   - [`replace_coprior_views`](@ref)
   - [`RhoParsingResult`](@ref)
-  - [`get_pr_value`](@ref): reads the prior covariance a `prior(a, b)` reference resolves to.
-  - [`fix_mu!`](@ref), [`fix_sigma!`](@ref): consume the `to_fix` this method returns.
+  - [`get_pr_value`](@ref): reads the prior covariance that a `prior(a, b)` reference resolves to.
+  - [`fix_mu!`](@ref), [`fix_sigma!`](@ref): read the `to_fix` that this method returns.
   - [`ep_rho_views!`](@ref): the same rule on the correlation.
   - [`MeucciEntropyPoolingPrior`](@ref)
   - [`comparison_sign_ineq_flag`](@ref)
 """
 function ep_cov_views!(cov_views::LinearConstraintEstimator, epc::AbstractDict,
-                       pr::AbstractPriorResult, sets::UniverseSets; strict::Bool = false,
+                       pr::AbstractPriorResult, sets::UniverseSets,
+                       w::Option{<:ObsWeights} = nothing; strict::Bool = false,
                        ledger::Option{<:AbstractVector} = nothing)
     X = pr.X
     cov_views = parse_equation(cov_views.val; datatype = eltype(X))
@@ -737,6 +762,7 @@ function ep_cov_views!(cov_views::LinearConstraintEstimator, epc::AbstractDict,
     to_fix = falses(size(X, 2))
     # The residual block is diagonal, so it reaches a pair of one asset alone (#1649).
     E = LinearAlgebra.Diagonal(scenario_residual_variances(pr))
+    ws = get_observation_weights(w, X)
     for cov_view in cov_views
         #! `replace_coprior_views` drops a pair naming an asset the universe does not hold,
         #! which leaves the view with no pair at all. Under `strict = false` that must drop
@@ -750,6 +776,16 @@ function ep_cov_views!(cov_views::LinearConstraintEstimator, epc::AbstractDict,
         end
         @argcheck(length(cov_view.vars) == 1,
                   "Cannot mix multiple covariance pairs in a single view `$(cov_view.eqn)`.")
+        #! A pair whose coefficients cancel gives the row `0 ⋄ b`, which no probabilities
+        #! can move, so it goes as `get_linear_constraints` drops it (#1797).
+        if iszero(cov_view.coef[1])
+            strict_diagnostic(empty_row_msg(cov_view.eqn, sets.dict[sets.xkey], sets.xkey;
+                                            noun = "view",
+                                            axis = universe_axis(sets, sets.xkey)), strict;
+                              id = @log_id(cov_view.eqn, sets.xkey),
+                              exception = IsZeroError)
+            continue
+        end
         d, flag = comparison_sign_ineq_flag(cov_view.op)
         i, j = cov_view.ij[1]
         Ai = d * cov_view.coef[1] * view(X, :, i) .* view(X, :, j)
@@ -758,24 +794,30 @@ function ep_cov_views!(cov_views::LinearConstraintEstimator, epc::AbstractDict,
         if !isa(i, AbstractVector)
             Bi = [Bi]
         end
-        add_ep_constraint!(epc, transpose(Ai), Bi, ifelse(flag, :ineq, :eq))
+        # See the note at the same step in `ep_mu_views!` (#1920).
+        key = ifelse(flag, :ineq, :eq)
+        ep_assert_attainable_rows(transpose(Ai), Bi, key, ws, _ -> cov_view.eqn,
+                                  "covariance")
+        add_ep_constraint!(epc, transpose(Ai), Bi, key)
         to_fix[union(i, j)] .= true
     end
     return to_fix
 end
 """
     ep_rho_views!(rho_views::LinearConstraintEstimator, epc::AbstractDict,
-                  pr::AbstractPriorResult, sets::UniverseSets; strict::Bool = false)
+                  pr::AbstractPriorResult, sets::UniverseSets,
+                  w::Option{<:ObsWeights} = nothing; strict::Bool = false,
+                  ledger::Option{<:AbstractVector} = nothing)
 
-Add the **correlation** views of a group to the entropy pooling constraint dictionary.
+Add the correlation views of a group to the entropy pooling constraint dictionary.
 
-`ep_rho_views!` parses correlation view equations from a [`LinearConstraintEstimator`](@ref), replaces any prior references with their actual values, and constructs the corresponding linear constraints for entropy pooling. The constraints are then added to the entropy pooling constraint dictionary `epc`. The statistic is the correlation of the posterior distribution, not the covariance, which the `cov_views` family holds.
+`ep_rho_views!` parses the correlation view equations of a [`LinearConstraintEstimator`](@ref), replaces each prior reference with its value, and makes the linear constraints of the views. It adds the constraints to the entropy pooling constraint dictionary `epc`. The statistic is the correlation of the posterior distribution, not the covariance, which the `cov_views` family holds.
 
-The correlation is a covariance divided by two standard deviations, and it is linear in the posterior probabilities only once both means and both variances are constants. This method therefore returns the assets whose mean and variance [`fix_mu!`](@ref) and [`fix_sigma!`](@ref) must hold at the prior, so a correlation view holds the mean and the variance that the prior states. The variance is the one that the covariance estimator of the prior gives, as [`fix_sigma!`](@ref) states.
+The correlation is a covariance divided by two standard deviations, and it is linear in the posterior probabilities only when both means and both variances are constants. So this method returns the assets whose mean and variance [`fix_mu!`](@ref) and [`fix_sigma!`](@ref) must hold at the prior. A correlation view then keeps the mean and the variance that the prior states. The variance is the one that the covariance estimator of the prior gives, as [`fix_sigma!`](@ref) states.
 
 # Mathematical definition
 
-The row states the posterior cross moment about the **prior** means, with the target multiplied by the **prior** standard deviations, which is linear in the posterior probabilities:
+The row states the posterior cross moment about the prior means, with the target multiplied by the prior standard deviations. This row is linear in the posterior probabilities:
 
 ```math
 \\begin{align}
@@ -784,7 +826,7 @@ c\\, \\rho_{\\boldsymbol{p}}[x_{i}, x_{j}] &\\lessgtr b\\,,
 \\end{align}
 ```
 
-which the body writes with the constants gathered on the right:
+which the method writes with the constants on the right:
 
 ```math
 \\begin{align}
@@ -802,55 +844,61 @@ Where:
   - ``\\mathbb{1}_{i = j}``: One when the pair names one asset twice, and zero otherwise. The residual block is diagonal.
   - $(math_dict[:T])
   - ``\\sigma_{i}``: Prior standard deviation of asset ``i``, the positive root of ``\\sigma_{i}^{2}``.
-  - ``c``: Coefficient the view gives the pair.
-  - ``b``: Target of the view, one value per spanned asset pair, in ``[-1, 1]``.
-  - ``d``: Sign that [`comparison_sign_ineq_flag`](@ref) reads from the operator, so every inequality row reaches `epc` in the sense the `:ineq` key states.
+  - ``c``: Coefficient that the view gives the pair.
+  - ``b``: Target of the view, with one value for each spanned asset pair, in ``[-1, 1]``.
+  - ``d``: Sign that [`comparison_sign_ineq_flag`](@ref) reads from the operator, so every inequality row goes into `epc` in the sense of the `:ineq` key.
 
-The identity holds only while the posterior means and variances of assets ``i`` and ``j`` equal the prior ones, which is why the assets this method names are handed to [`fix_mu!`](@ref) and [`fix_sigma!`](@ref).
+The identity holds only while the posterior means and variances of assets ``i`` and ``j`` equal the prior ones. So this method gives the assets that it names to [`fix_mu!`](@ref) and [`fix_sigma!`](@ref).
 
 # Algorithm
 
- 1. Parse the view equations of `rho_views.val`, giving one [`ParsingResult`](@ref) per view.
- 2. Replace every group name by the assets it spans, keeping a pair view a pair view.
- 3. Replace every `prior(a, b)` reference by the prior correlation, through [`replace_coprior_views`](@ref). Each view is now a [`RhoParsingResult`](@ref) carrying its index pairs.
+ 1. Parse the view equations of `rho_views.val` into one [`ParsingResult`](@ref) for each view.
+ 2. Replace every group name by the assets that it spans. A pair view stays a pair view.
+ 3. Replace every `prior(a, b)` reference by the prior correlation, through [`replace_coprior_views`](@ref). Each view is now a [`RhoParsingResult`](@ref) that holds its index pairs.
  4. Read the prior variances, the diagonal of `pr.sigma`, into `sigma`.
- 5. For each view in turn, drop it when step 3 left it with no pair, raise unless it names exactly one, and raise unless every target lies in ``[-1, 1]``.
+ 5. For each view in turn, drop it when step 3 left it with no pair, raise unless it names exactly one, and raise unless every target lies in ``[-1, 1]``. Drop it through [`strict_diagnostic`](@ref) when the coefficient of its pair is zero.
  6. Read the sign `d` and the inequality flag from the operator with [`comparison_sign_ineq_flag`](@ref).
  7. Read the index pair `(i, j)`, and build `sigma_ij`, the root of the product of the two prior variances.
- 8. Build `Ai`, the product of the two return columns scaled by `d` and the view's coefficient.
- 9. Build `Bi`, the target multiplied by `sigma_ij` and moved by the product of the prior means less the entry of the residual block `E` at the pair, scaled the same way. `E` is the diagonal matrix of [`scenario_residual_variances`](@ref). A single asset pair gives a scalar, which is wrapped into a one-element vector; a group pair gives one entry per spanned pair.
-10. Add the row against `Bi` under `:ineq` or `:eq` with [`add_ep_constraint!`](@ref), and mark both assets of the pair in `to_fix`.
+ 8. Build `Ai`, the product of the two return columns scaled by `d` and the coefficient of the view.
+ 9. Build `Bi`, the target multiplied by `sigma_ij` and moved by the product of the prior means less the entry of the residual block `E` at the pair, scaled the same way. `E` is the diagonal matrix of [`scenario_residual_variances`](@ref). A single asset pair gives a scalar, which the method puts in a vector of one element. A group pair gives one entry for each spanned pair.
+10. Refuse a row of `Ai` against `Bi` that no reweighting of the scenarios meets, with [`ep_assert_attainable_rows`](@ref).
+11. Add the row against `Bi` under `:ineq` or `:eq` with [`add_ep_constraint!`](@ref), and mark both assets of the pair in `to_fix`.
 
 # Arguments
 
   - `rho_views`: Correlation view constraints.
-  - `epc`: Dictionary of entropy pooling constraints, mapping keys to `(lhs, rhs)` pairs.
-  - `pr`: Prior result containing asset return information.
-  - `sets`: Asset set mapping asset names to indices.
-  - `strict`: If `true`, throws error for missing assets; otherwise, issue warnings.
+  - `epc`: Dictionary of entropy pooling constraints, which maps each key to an `(lhs, rhs)` pair.
+  - `pr`: Prior result that holds the asset returns.
+  - `sets`: Universe sets that map the asset names to indices.
+  - $(arg_dict[:ep_view_support_w])
+  - `strict`: If `true`, raise an error for an asset that the universe does not hold. If `false`, warn.
+  - $(arg_dict[:ledger]) [`replace_group_by_assets`](@ref) and [`replace_coprior_views`](@ref) fill it.
 
 # Validation
 
-  - Every view names exactly one asset pair. A view that mixes pairs raises an `ArgumentError`. A view left with no pair, because every pair it named holds an asset the universe does not, is dropped with a report under `strict = false`; `strict = true` has already raised by then.
+  - $(val_dict[:ep_attainable_row])
+  - Every view names exactly one asset pair. A view that mixes pairs raises an `ArgumentError`. If every pair of a view holds an asset that the universe does not hold, the view has no pair left. Under `strict = false`, [`replace_coprior_views`](@ref) already reported the unknown names, and the method drops such a view with no second report. Under `strict = true`, that function already raised an error.
   - Every target lies in ``[-1, 1]``. A target outside that range raises an `ArgumentError`.
+  - The coefficient of the pair is not zero. A pair whose coefficients cancel, as in `(A, B) - (A, B) == 0.0`, gives a row that no probabilities can move. The method drops it, as [`get_linear_constraints`](@ref) drops a cancelled linear row: under `strict = false` it warns, and under `strict = true` it raises an [`IsZeroError`](@ref).
 
 # Returns
 
-  - `to_fix::BitVector`: Boolean vector indicating which assets require their mean and variance to be fixed.
+  - `to_fix::BitVector`: Boolean vector that marks the assets whose mean and variance must be fixed.
 
 # Related
 
   - [`add_ep_constraint!`](@ref)
   - [`replace_coprior_views`](@ref)
   - [`RhoParsingResult`](@ref)
-  - [`get_pr_value`](@ref): reads the prior correlation a `prior(a, b)` reference resolves to.
-  - [`fix_mu!`](@ref), [`fix_sigma!`](@ref): consume the `to_fix` this method returns.
+  - [`get_pr_value`](@ref): reads the prior correlation that a `prior(a, b)` reference resolves to.
+  - [`fix_mu!`](@ref), [`fix_sigma!`](@ref): read the `to_fix` that this method returns.
   - [`ep_cov_views!`](@ref): the same rule on the covariance.
   - [`MeucciEntropyPoolingPrior`](@ref)
   - [`comparison_sign_ineq_flag`](@ref)
 """
 function ep_rho_views!(rho_views::LinearConstraintEstimator, epc::AbstractDict,
-                       pr::AbstractPriorResult, sets::UniverseSets; strict::Bool = false,
+                       pr::AbstractPriorResult, sets::UniverseSets,
+                       w::Option{<:ObsWeights} = nothing; strict::Bool = false,
                        ledger::Option{<:AbstractVector} = nothing)
     X = pr.X
     rho_views = parse_equation(rho_views.val; datatype = eltype(X))
@@ -861,6 +909,7 @@ function ep_rho_views!(rho_views::LinearConstraintEstimator, epc::AbstractDict,
     sigma = LinearAlgebra.diag(pr.sigma)
     # See the note at the same step in `ep_cov_views!` (#1649).
     E = LinearAlgebra.Diagonal(scenario_residual_variances(pr))
+    ws = get_observation_weights(w, X)
     for rho_view in rho_views
         #! See the twin note in `ep_cov_views!`: a pair naming an unknown asset leaves the
         #! view with no pair, and that drops the row, in silence.
@@ -871,6 +920,15 @@ function ep_rho_views!(rho_views::LinearConstraintEstimator, epc::AbstractDict,
                   "Cannot mix multiple correlation pairs in a single view `$(rho_view.eqn)`.")
         @argcheck(all(x -> -one(eltype(X)) <= x <= one(eltype(X)), rho_view.rhs),
                   "Correlation prior rho_view `$(rho_view.eqn)` must be in [-1, 1].")
+        #! See the twin note in `ep_cov_views!`: a cancelled pair drops its row.
+        if iszero(rho_view.coef[1])
+            strict_diagnostic(empty_row_msg(rho_view.eqn, sets.dict[sets.xkey], sets.xkey;
+                                            noun = "view",
+                                            axis = universe_axis(sets, sets.xkey)), strict;
+                              id = @log_id(rho_view.eqn, sets.xkey),
+                              exception = IsZeroError)
+            continue
+        end
         d, flag = comparison_sign_ineq_flag(rho_view.op)
         i, j = rho_view.ij[1]
         sigma_ij = if !isa(i, AbstractVector)
@@ -884,7 +942,11 @@ function ep_rho_views!(rho_views::LinearConstraintEstimator, epc::AbstractDict,
         if !isa(i, AbstractVector)
             Bi = [Bi]
         end
-        add_ep_constraint!(epc, transpose(Ai), Bi, ifelse(flag, :ineq, :eq))
+        # See the note at the same step in `ep_mu_views!` (#1920).
+        key = ifelse(flag, :ineq, :eq)
+        ep_assert_attainable_rows(transpose(Ai), Bi, key, ws, _ -> rho_view.eqn,
+                                  "correlation")
+        add_ep_constraint!(epc, transpose(Ai), Bi, key)
         to_fix[union(i, j)] .= true
     end
     return to_fix
@@ -893,23 +955,23 @@ end
     get_pr_value(pr::AbstractPriorResult, i::Integer, ::Val{:skew}, ::Nothing = nothing,
                  w::Option{<:ObsWeights} = nothing)
 
-Read the prior **skewness** of asset `i`.
+Read the prior skewness of asset `i`.
 
-`get_pr_value` is the dispatch table that resolves a `prior(...)` reference inside a view. This method reads the statistic the tag `Val(:skew)` names, by applying [`Skewness`](@ref) to the `i`-th column of `pr.X`. That is the standardised third central moment of the sample under `w`, the weights that `pr` was read at. The weights reach the mean and the variance estimator of [`Skewness`](@ref) too.
+`get_pr_value` is the dispatch table that resolves a `prior(...)` reference inside a view. This method reads the statistic that the tag `Val(:skew)` names. It applies [`ThirdCentralMoment`](@ref) with a [`SimpleVariance`](@ref) in `ve` to the `i`-th column of `pr.X`. That is the standardised third central moment of the sample under `w`, the weights of `pr`. [`ThirdCentralMoment`](@ref) also gives the weights to its mean and to its variance estimator.
 
-A refit prior does not carry its weights in `pr.w`, so the caller gives them, as for the value at risk method of [`get_pr_value`](@ref). Under a staged algorithm they are the weights of the prior of the stage.
+A refit prior does not keep its weights in `pr.w`, so the caller gives them, as for the value at risk method of [`get_pr_value`](@ref). Under a staged algorithm, they are the weights of the prior of the stage.
 
 # Arguments
 
-  - `pr`: Prior result containing asset return information.
+  - `pr`: Prior result that holds the asset returns.
   - `i`: Index of the asset.
-  - `::Val{:skew}`: Dispatch tag for skewness extraction.
+  - `::Val{:skew}`: Dispatch tag of the skewness.
   - `::Nothing`: The level slot of [`replace_prior_views`](@ref), which a skewness does not read.
   - $(arg_dict[:oow])
 
 # Returns
 
-  - `skew::Number`: Skewness for asset `i`.
+  - `skew::Number`: Prior skewness of asset `i`.
 
 # Related
 
@@ -921,22 +983,23 @@ A refit prior does not carry its weights in `pr.w`, so the caller gives them, as
 """
 function get_pr_value(pr::AbstractPriorResult, i::Integer, ::Val{:skew},
                       ::Nothing = nothing, w::Option{<:ObsWeights} = nothing)
-    return Skewness(; w = w)(view(pr.X, :, i))
+    return ThirdCentralMoment(; w = w, ve = SimpleVariance())(view(pr.X, :, i))
 end
 """
     ep_sk_views!(skew_views::LinearConstraintEstimator, epc::AbstractDict,
                  pr::AbstractPriorResult, sets::UniverseSets,
-                 w::Option{<:ObsWeights} = nothing; strict::Bool = false)
+                 w::Option{<:ObsWeights} = nothing; strict::Bool = false,
+                 ledger::Option{<:AbstractVector} = nothing)
 
-Add the **skewness** views of a group to the entropy pooling constraint dictionary.
+Add the skewness views of a group to the entropy pooling constraint dictionary.
 
-`ep_sk_views!` parses skewness view equations from a [`LinearConstraintEstimator`](@ref), replaces any prior references with their actual values, and constructs the corresponding linear constraints for entropy pooling. The constraints are then added to the entropy pooling constraint dictionary `epc`. The statistic is the standardised third central moment of the posterior distribution.
+`ep_sk_views!` parses the skewness view equations of a [`LinearConstraintEstimator`](@ref), replaces each prior reference with its value, and makes the linear constraints of the views. It adds the constraints to the entropy pooling constraint dictionary `epc`. The statistic is the standardised third central moment of the posterior distribution.
 
-The skewness is a third central moment divided by a cube of the standard deviation, and it is linear in the posterior probabilities only once the mean and the variance are constants. This method therefore returns the assets whose mean and variance [`fix_mu!`](@ref) and [`fix_sigma!`](@ref) must hold at the prior, so a skewness view holds the mean and the variance that the prior states. The variance is the one that the covariance estimator of the prior gives, as [`fix_sigma!`](@ref) states.
+The skewness is a third central moment divided by a cube of the standard deviation, and it is linear in the posterior probabilities only when the mean and the variance are constants. So this method returns the assets whose mean and variance [`fix_mu!`](@ref) and [`fix_sigma!`](@ref) must hold at the prior. A skewness view then keeps the mean and the variance that the prior states. The variance is the one that the covariance estimator of the prior gives, as [`fix_sigma!`](@ref) states.
 
 # Mathematical definition
 
-The third central moment expands into raw moments, and the two lowest of them are the **prior** constants, so what remains is linear in the posterior probabilities:
+The third central moment expands into raw moments, and the two lowest raw moments are prior constants. So the rest is linear in the posterior probabilities:
 
 ```math
 \\begin{align}
@@ -947,9 +1010,9 @@ The third central moment expands into raw moments, and the two lowest of them ar
 \\end{align}
 ```
 
-The second line uses ``\\sum_{t} p_{t} = 1`` to carry the two constants inside the sum, which is the form the body builds.
+The second line uses ``\\sum_{t} p_{t} = 1`` to put the two constants inside the sum, which is the form that the method builds.
 
-The expansion needs the variance of the scenarios that the sum reads, so ``\\sigma_{i}^{2}`` here is ``\\sigma_{i}^{2} - \\delta_{i}``, the variance that [`fix_sigma!`](@ref) holds. The view states the skewness of the scenarios. A `prior(...)` reference reads the sample skewness under `w` with [`Skewness`](@ref), which standardises by its own variance estimator.
+The expansion needs the variance of the scenarios that the sum reads, so ``\\sigma_{i}^{2}`` here is ``\\sigma_{i}^{2} - \\delta_{i}``, the variance that [`fix_sigma!`](@ref) holds. The view states the skewness of the scenarios. A `prior(...)` reference reads the sample skewness under `w` with [`Skewness`](@ref), which standardises with its own variance estimator.
 
 Where:
 
@@ -961,40 +1024,46 @@ Where:
   - $(math_dict[:T])
   - $(math_dict[:N])
   - $(math_dict[:B])
-  - ``a_{k,\\,i}``: Coefficient asset ``i`` takes in view ``k``.
-  - ``K``: Number of views the group states.
+  - ``a_{k,\\,i}``: Coefficient that asset ``i`` takes in view ``k``.
+  - ``K``: Number of views that the group states.
 
-The identity holds only while the posterior mean and variance of asset ``i`` equal ``\\mu_{i}`` and ``\\sigma_{i}^{2}``, which is why the assets this method names are handed to [`fix_mu!`](@ref) and [`fix_sigma!`](@ref).
+The identity holds only while the posterior mean and variance of asset ``i`` equal ``\\mu_{i}`` and ``\\sigma_{i}^{2}``. So this method gives the assets that it names to [`fix_mu!`](@ref) and [`fix_sigma!`](@ref).
 
 # Algorithm
 
- 1. Parse the view equations of `skew_views.val`, giving one [`ParsingResult`](@ref) per view.
+ 1. Parse the view equations of `skew_views.val` into one [`ParsingResult`](@ref) for each view.
  2. Replace every group name by the assets it spans.
  3. Replace every `prior(...)` reference by the prior skewness under `w`, through [`replace_prior_views`](@ref).
- 4. Turn the parsed views into the linear constraint blocks `lcs`, one for `:ineq` and one for `:eq`. Under `strict = false` every row of the group can drop, and `lcs` is then `nothing`: the group states no view, and the call returns a `to_fix` that names no asset.
- 5. Read the prior variances of the scenarios into `sigma`: the diagonal of `pr.sigma`, less [`scenario_residual_variances`](@ref).
- 6. Build `tmp`, the standardised third moment contribution of every observation, transposed so a row of `lcs` multiplies it from the left.
- 7. For each block present, add `A * tmp` against `B` under that key with [`add_ep_constraint!`](@ref), and mark in `to_fix` every asset the block names.
+ 4. Turn the parsed views into the linear constraint blocks `lcs`, one for `:ineq` and one for `:eq`. Under `strict = false`, every row of the group can drop, and `lcs` is then `nothing`. The group then states no view, and the call returns a `to_fix` that names no asset.
+ 5. Read the prior variances of the scenarios into `sigma`. They are the diagonal of `pr.sigma`, less [`scenario_residual_variances`](@ref).
+ 6. Build `tmp`, the contribution of every observation to the standardised third moment, transposed so that a row of `lcs` multiplies it from the left.
+ 7. For each block that `lcs` holds, refuse a row of `A * tmp` against `B` that no reweighting of the scenarios at a positive weight of `w` meets, with [`ep_assert_attainable_rows`](@ref).
+ 8. Add `A * tmp` against `B` under its key with [`add_ep_constraint!`](@ref), and mark in `to_fix` every asset that the block names.
 
 # Arguments
 
   - `skew_views`: Skewness view constraints.
-  - `epc`: Dictionary of entropy pooling constraints, mapping keys to `(lhs, rhs)` pairs.
-  - `pr`: Prior result containing asset return information.
-  - `sets`: Asset set mapping asset names to indices.
-  - `w`: The weights that `pr` was read at, or `nothing` for uniform weights. A `prior(...)` reference reads the skewness under them.
-  - `strict`: If `true`, throws error for missing assets; otherwise, issue warnings.
+  - `epc`: Dictionary of entropy pooling constraints, which maps each key to an `(lhs, rhs)` pair.
+  - `pr`: Prior result that holds the asset returns.
+  - `sets`: Universe sets that map the asset names to indices.
+  - `w`: The weights of `pr`, or `nothing` for uniform weights. A `prior(...)` reference reads the skewness under them, and only the scenarios at a positive weight bound a view.
+  - `strict`: If `true`, raise an error for an asset that the universe does not hold. If `false`, warn.
+  - $(arg_dict[:ledger]) [`replace_group_by_assets`](@ref) and [`get_linear_constraints`](@ref) fill it.
+
+# Validation
+
+  - $(val_dict[:ep_attainable_row])
 
 # Returns
 
-  - `to_fix::BitVector`: Boolean vector indicating which assets require their mean and variance to be fixed.
+  - `to_fix::BitVector`: Boolean vector that marks the assets whose mean and variance must be fixed.
 
 # Related
 
   - [`add_ep_constraint!`](@ref)
   - [`replace_prior_views`](@ref)
-  - [`get_pr_value`](@ref): reads the prior skewness a `prior(...)` reference resolves to.
-  - [`fix_mu!`](@ref), [`fix_sigma!`](@ref): consume the `to_fix` this method returns.
+  - [`get_pr_value`](@ref): reads the prior skewness that a `prior(...)` reference resolves to.
+  - [`fix_mu!`](@ref), [`fix_sigma!`](@ref): read the `to_fix` that this method returns.
   - [`ep_kt_views!`](@ref): the same rule, one moment higher.
   - [`MeucciEntropyPoolingPrior`](@ref)
 """
@@ -1026,8 +1095,12 @@ function ep_sk_views!(skew_views::LinearConstraintEstimator, epc::AbstractDict,
         if isnothing(getproperty(lcs, p))
             continue
         end
-        A = getproperty(lcs, p).A
-        add_ep_constraint!(epc, A * tmp, getproperty(lcs, p).B, p)
+        (; A, B) = getproperty(lcs, p)
+        # See the note at the same step in `ep_mu_views!` (#1920).
+        lhs = A * tmp
+        ep_assert_attainable_rows(lhs, B, p, get_observation_weights(w, X),
+                                  k -> ep_view_row_label(A, B, k, p, sets), "skewness")
+        add_ep_constraint!(epc, lhs, B, p)
         to_fix .= to_fix .| dropdims(any(!iszero, A; dims = 1); dims = 1)
     end
     return to_fix
@@ -1036,21 +1109,21 @@ end
     get_pr_value(pr::AbstractPriorResult, i::Integer, ::Val{:kurtosis},
                  ::Nothing = nothing, w::Option{<:ObsWeights} = nothing)
 
-Read the prior **kurtosis** of asset `i`.
+Read the prior kurtosis of asset `i`.
 
-`get_pr_value` is the dispatch table that resolves a `prior(...)` reference inside a view. This method reads the statistic the tag `Val(:kurtosis)` names, by applying [`HighOrderMoment`](@ref) with a [`StandardisedHighOrderMoment`](@ref) of [`FourthMoment`](@ref) to the `i`-th column of `pr.X`. That is the standardised fourth central moment of the sample under `w`, on the rule of the skewness method of [`get_pr_value`](@ref).
+`get_pr_value` is the dispatch table that resolves a `prior(...)` reference inside a view. This method reads the statistic that the tag `Val(:kurtosis)` names. It applies [`HighOrderMoment`](@ref) with [`FourthMoment`](@ref) and a `SimpleVariance` in `ve` to the `i`-th column of `pr.X`. That is the standardised fourth central moment of the sample under `w`. It reads `w` for the same reason as the skewness method of [`get_pr_value`](@ref).
 
 # Arguments
 
-  - `pr`: Prior result containing asset return information.
+  - `pr`: Prior result that holds the asset returns.
   - `i`: Index of the asset.
-  - `::Val{:kurtosis}`: Dispatch tag for kurtosis extraction.
+  - `::Val{:kurtosis}`: Dispatch tag of the kurtosis.
   - `::Nothing`: The level slot of [`replace_prior_views`](@ref), which a kurtosis does not read.
   - $(arg_dict[:oow])
 
 # Returns
 
-  - `kurtosis::Number`: Kurtosis for asset `i`.
+  - `kurtosis::Number`: Prior kurtosis of asset `i`.
 
 # Related
 
@@ -1062,25 +1135,24 @@ Read the prior **kurtosis** of asset `i`.
 """
 function get_pr_value(pr::AbstractPriorResult, i::Integer, ::Val{:kurtosis},
                       ::Nothing = nothing, w::Option{<:ObsWeights} = nothing)
-    return HighOrderMoment(; w = w,
-                           alg = StandardisedHighOrderMoment(; alg = FourthMoment()))(view(pr.X,
-                                                                                           :,
-                                                                                           i))
+    return HighOrderMoment(; w = w, alg = FourthMoment(),
+                           ve = SimpleVariance(; me = nothing))(view(pr.X, :, i))
 end
 """
     ep_kt_views!(kurtosis_views::LinearConstraintEstimator, epc::AbstractDict,
                  pr::AbstractPriorResult, sets::UniverseSets,
-                 w::Option{<:ObsWeights} = nothing; strict::Bool = false)
+                 w::Option{<:ObsWeights} = nothing; strict::Bool = false,
+                 ledger::Option{<:AbstractVector} = nothing)
 
-Add the **kurtosis** views of a group to the entropy pooling constraint dictionary.
+Add the kurtosis views of a group to the entropy pooling constraint dictionary.
 
-`ep_kt_views!` parses kurtosis view equations from a [`LinearConstraintEstimator`](@ref), replaces any prior references with their actual values, and constructs the corresponding linear constraints for entropy pooling. The constraints are then added to the entropy pooling constraint dictionary `epc`. The statistic is the standardised fourth central moment of the posterior distribution.
+`ep_kt_views!` parses the kurtosis view equations of a [`LinearConstraintEstimator`](@ref), replaces each prior reference with its value, and makes the linear constraints of the views. It adds the constraints to the entropy pooling constraint dictionary `epc`. The statistic is the standardised fourth central moment of the posterior distribution.
 
-The kurtosis is a fourth central moment divided by a square of the variance, and it is linear in the posterior probabilities only once the mean and the variance are constants. This method therefore returns the assets whose mean and variance [`fix_mu!`](@ref) and [`fix_sigma!`](@ref) must hold at the prior, so a kurtosis view holds the mean and the variance that the prior states. The variance is the one that the covariance estimator of the prior gives, as [`fix_sigma!`](@ref) states.
+The kurtosis is a fourth central moment divided by a square of the variance, and it is linear in the posterior probabilities only when the mean and the variance are constants. So this method returns the assets whose mean and variance [`fix_mu!`](@ref) and [`fix_sigma!`](@ref) must hold at the prior. A kurtosis view then keeps the mean and the variance that the prior states. The variance is the one that the covariance estimator of the prior gives, as [`fix_sigma!`](@ref) states.
 
 # Mathematical definition
 
-The fourth central moment expands into raw moments, and every constant of the expansion is a **prior** one, so what remains is linear in the posterior probabilities:
+The fourth central moment expands into raw moments, and every constant of the expansion is a prior constant. So the rest is linear in the posterior probabilities:
 
 ```math
 \\begin{align}
@@ -1090,9 +1162,9 @@ The fourth central moment expands into raw moments, and every constant of the ex
 \\end{align}
 ```
 
-The first line uses ``\\sum_{t} p_{t} = 1`` to carry the constant ``3 \\mu_{i}^{4}`` inside the sum, which is the form the body builds.
+The first line uses ``\\sum_{t} p_{t} = 1`` to put the constant ``3 \\mu_{i}^{4}`` inside the sum, which is the form that the method builds.
 
-The standardisation reads the variance of the scenarios, so ``\\sigma_{i}^{2}`` here is ``\\sigma_{i}^{2} - \\delta_{i}``, the variance that [`fix_sigma!`](@ref) holds. The view states the kurtosis of the scenarios. A `prior(...)` reference reads the sample kurtosis under `w` with [`HighOrderMoment`](@ref), which standardises by its own variance estimator.
+The standardisation reads the variance of the scenarios, so ``\\sigma_{i}^{2}`` here is ``\\sigma_{i}^{2} - \\delta_{i}``, the variance that [`fix_sigma!`](@ref) holds. The view states the kurtosis of the scenarios. A `prior(...)` reference reads the sample kurtosis under `w` with [`HighOrderMoment`](@ref), which standardises with its own variance estimator.
 
 Where:
 
@@ -1104,40 +1176,46 @@ Where:
   - $(math_dict[:T])
   - $(math_dict[:N])
   - $(math_dict[:B])
-  - ``a_{k,\\,i}``: Coefficient asset ``i`` takes in view ``k``.
-  - ``K``: Number of views the group states.
+  - ``a_{k,\\,i}``: Coefficient that asset ``i`` takes in view ``k``.
+  - ``K``: Number of views that the group states.
 
-The identity holds only while the posterior mean and variance of asset ``i`` equal ``\\mu_{i}`` and ``\\sigma_{i}^{2}``, which is why the assets this method names are handed to [`fix_mu!`](@ref) and [`fix_sigma!`](@ref).
+The identity holds only while the posterior mean and variance of asset ``i`` equal ``\\mu_{i}`` and ``\\sigma_{i}^{2}``. So this method gives the assets that it names to [`fix_mu!`](@ref) and [`fix_sigma!`](@ref).
 
 # Algorithm
 
- 1. Parse the view equations of `kurtosis_views.val`, giving one [`ParsingResult`](@ref) per view.
+ 1. Parse the view equations of `kurtosis_views.val` into one [`ParsingResult`](@ref) for each view.
  2. Replace every group name by the assets it spans.
  3. Replace every `prior(...)` reference by the prior kurtosis under `w`, through [`replace_prior_views`](@ref).
- 4. Turn the parsed views into the linear constraint blocks `lcs`, one for `:ineq` and one for `:eq`. Under `strict = false` every row of the group can drop, and `lcs` is then `nothing`: the group states no view, and the call returns a `to_fix` that names no asset.
+ 4. Turn the parsed views into the linear constraint blocks `lcs`, one for `:ineq` and one for `:eq`. Under `strict = false`, every row of the group can drop, and `lcs` is then `nothing`. The group then states no view, and the call returns a `to_fix` that names no asset.
  5. Build `X_sq` and `mu_sq`, the squares of the returns and of the prior means.
- 6. Build `tmp`, the fourth moment contribution of every observation, standardised by the prior variance of the scenarios, the diagonal of `pr.sigma` less [`scenario_residual_variances`](@ref), and transposed so a row of `lcs` multiplies it from the left.
- 7. For each block present, add `A * tmp` against `B` under that key with [`add_ep_constraint!`](@ref), and mark in `to_fix` every asset the block names.
+ 6. Build `tmp`, the contribution of every observation to the fourth moment, standardised by the prior variance of the scenarios. That variance is the diagonal of `pr.sigma` less [`scenario_residual_variances`](@ref). Transpose `tmp` so that a row of `lcs` multiplies it from the left.
+ 7. For each block that `lcs` holds, refuse a row of `A * tmp` against `B` that no reweighting of the scenarios at a positive weight of `w` meets, with [`ep_assert_attainable_rows`](@ref).
+ 8. Add `A * tmp` against `B` under its key with [`add_ep_constraint!`](@ref), and mark in `to_fix` every asset that the block names.
 
 # Arguments
 
   - `kurtosis_views`: Kurtosis view constraints.
-  - `epc`: Dictionary of entropy pooling constraints, mapping keys to `(lhs, rhs)` pairs.
-  - `pr`: Prior result containing asset return information.
-  - `sets`: Asset set mapping asset names to indices.
-  - `w`: The weights that `pr` was read at, or `nothing` for uniform weights. A `prior(...)` reference reads the kurtosis under them.
-  - `strict`: If `true`, throws error for missing assets; otherwise, issue warnings.
+  - `epc`: Dictionary of entropy pooling constraints, which maps each key to an `(lhs, rhs)` pair.
+  - `pr`: Prior result that holds the asset returns.
+  - `sets`: Universe sets that map the asset names to indices.
+  - `w`: The weights of `pr`, or `nothing` for uniform weights. A `prior(...)` reference reads the kurtosis under them, and only the scenarios at a positive weight bound a view.
+  - `strict`: If `true`, raise an error for an asset that the universe does not hold. If `false`, warn.
+  - $(arg_dict[:ledger]) [`replace_group_by_assets`](@ref) and [`get_linear_constraints`](@ref) fill it.
+
+# Validation
+
+  - $(val_dict[:ep_attainable_row])
 
 # Returns
 
-  - `to_fix::BitVector`: Boolean vector indicating which assets require their mean and variance to be fixed.
+  - `to_fix::BitVector`: Boolean vector that marks the assets whose mean and variance must be fixed.
 
 # Related
 
   - [`add_ep_constraint!`](@ref)
   - [`replace_prior_views`](@ref)
-  - [`get_pr_value`](@ref): reads the prior kurtosis a `prior(...)` reference resolves to.
-  - [`fix_mu!`](@ref), [`fix_sigma!`](@ref): consume the `to_fix` this method returns.
+  - [`get_pr_value`](@ref): reads the prior kurtosis that a `prior(...)` reference resolves to.
+  - [`fix_mu!`](@ref), [`fix_sigma!`](@ref): read the `to_fix` that this method returns.
   - [`ep_sk_views!`](@ref): the same rule, one moment lower.
   - [`MeucciEntropyPoolingPrior`](@ref)
 """
@@ -1172,8 +1250,12 @@ function ep_kt_views!(kurtosis_views::LinearConstraintEstimator, epc::AbstractDi
         if isnothing(getproperty(lcs, p))
             continue
         end
-        A = getproperty(lcs, p).A
-        add_ep_constraint!(epc, A * tmp, getproperty(lcs, p).B, p)
+        (; A, B) = getproperty(lcs, p)
+        # See the note at the same step in `ep_mu_views!` (#1920).
+        lhs = A * tmp
+        ep_assert_attainable_rows(lhs, B, p, get_observation_weights(w, X),
+                                  k -> ep_view_row_label(A, B, k, p, sets), "kurtosis")
+        add_ep_constraint!(epc, lhs, B, p)
         to_fix .= to_fix .| dropdims(any(!iszero, A; dims = 1); dims = 1)
     end
     return to_fix

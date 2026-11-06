@@ -99,7 +99,7 @@
       "description": "A comprehensive Julia package for portfolio optimization.",
       "guid": "portfolio-optimisers-jl",
       "licenses": [
-        "spdx:MIT"
+        "spdx:EUPL-1.2"
       ],
       "name": "PortfolioOptimisers.jl",
       "repositoryUrl": {

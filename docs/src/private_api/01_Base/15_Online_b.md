@@ -18,7 +18,7 @@ PortfolioOptimisers.assert_cold_carry_entry
 PortfolioOptimisers.online_wrapper_path
 PortfolioOptimisers.seed_window_path
 PortfolioOptimisers.assert_batch_entry
-PortfolioOptimisers.online_state_seed(::Union{<:PortfolioOptimisers.AbstractEstimator, <:StatsBase.CovarianceEstimator}, ::PortfolioOptimisers.Option{<:Integer})
+PortfolioOptimisers.online_state_seed(::Union{PortfolioOptimisers.AbstractEstimator, StatsBase.CovarianceEstimator}, ::PortfolioOptimisers.Option{<:Integer})
 PortfolioOptimisers.tree_path
 PortfolioOptimisers.element_path
 ```

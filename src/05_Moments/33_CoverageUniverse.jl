@@ -68,7 +68,7 @@ Where:
   - [`AssetPanel`](@ref)
   - [`IsEmptyError`](@ref)
 """
-function coverage_mask(X::MatNum, ::Union{Nothing, <:AssetPanel{<:Any, Nothing, Nothing}};
+function coverage_mask(X::MatNum, ::Union{Nothing, AssetPanel{<:Any, Nothing, Nothing}};
                        dims::Int = 1)::Option{BitVector}
     Xo = dims_oriented(dims, X)
     cmsk = trues(size(Xo, 2))
@@ -111,7 +111,7 @@ function coverage_mask(X::MatNum, amsk::AbstractMatrix{<:Bool};
 end
 """
     coverage_mask(X::MatNum, iv::MatNum,
-                  pnl::Union{Nothing, <:AssetPanel, <:AbstractMatrix{<:Bool}};
+                  pnl::Union{Nothing, AssetPanel, AbstractMatrix{<:Bool}};
                   dims::Int = 1) -> Option{BitVector}
 
 Derive the Coverage Universe of one [`ImpliedVolatility`](@ref) fit, which reads an implied volatility surface beside its returns.
@@ -171,7 +171,7 @@ Where:
   - [`expand_moment`](@ref)
 """
 function coverage_mask(X::MatNum, iv::MatNum,
-                       pnl::Union{Nothing, <:AssetPanel, <:AbstractMatrix{<:Bool}};
+                       pnl::Union{Nothing, AssetPanel, AbstractMatrix{<:Bool}};
                        dims::Int = 1)::Option{BitVector}
     Xo, ivo = dims_oriented(dims, X, iv)
     @argcheck(size(ivo, 2) == size(Xo, 2),
@@ -819,7 +819,7 @@ end
     expand_moment(sigma::MatNum, cmsk::BitVector) -> MatNum
     expand_moment(mu::VecNum, cmsk::BitVector, dims::Int) -> VecNum
     expand_moment(mu::MatNum, cmsk::BitVector, dims::Int) -> MatNum
-    expand_moment(skV::Tuple{<:MatNum, <:MatNum}, cmsk::BitVector) -> Tuple{MatNum, MatNum}
+    expand_moment(skV::Tuple{MatNum, MatNum}, cmsk::BitVector) -> Tuple{MatNum, MatNum}
     expand_moment(kt::MatNum, cmsk::BitVector, ::Val{:kt}) -> MatNum
 
 Write a moment estimated on the Coverage Universe back into a `NaN` frame of the full width.
@@ -916,7 +916,7 @@ function expand_moment(mu::MatNum, cmsk::BitVector, dims::Int)
         frame
     end
 end
-function expand_moment(skV::Tuple{<:MatNum, <:MatNum}, cmsk::BitVector)
+function expand_moment(skV::Tuple{MatNum, MatNum}, cmsk::BitVector)
     sk, V = skV
     N = length(cmsk)
     frame = coverage_nan_frame(sk, (N, N^2))
@@ -936,8 +936,6 @@ end
 Refuse a non-finite sample in a plain moment estimator, and name the two ways out.
 
 A plain moment estimator has no correct value for an asset whose window has a gap. So it refuses the whole sample, and does not return a number that looks like an estimate. The message names the two paths that a caller has. The caller can fit through a prior, which reduces the sample to the Coverage Universe and expands the result. Or the caller can use a mask-aware estimator, which takes the whole window and writes its own frame.
-
-A second per-asset series beside the returns follows the same rule. [`ImpliedVolatility`](@ref) refuses a gap in its implied volatility surface through this function, because its panel method excludes such an asset from the Coverage Universe, and a plain call that read past the gap would answer for it.
 
 This is [`assert_all_finite`](@ref) with a message for this refusal. The message of [`assert_all_finite`](@ref) names the count and the position of the non-finite entries alone. It tells a caller what is wrong, and not what to do.
 
@@ -1020,11 +1018,11 @@ A plain fold has one observation count for every asset, so it cannot skip one ce
 # Validation
 
   - `active_mask` must have the size of `x`.
-  - The type that [`float_if_integer`](@ref) gives for the element type of `x` must hold `NaN`. A `Rational` raises an `ArgumentError`.
+  - The element type of `x` must hold `NaN`. An `Integer` or a `Rational` raises an `ArgumentError`.
 
 # Returns
 
-  - `x` itself when `active_mask` is `nothing`, and otherwise a copy of `x` that carries `NaN` at each inactive cell. The copy takes the type of the data through [`float_if_integer`](@ref).
+  - `x` itself when `active_mask` is `nothing`, and otherwise a copy of `x` that carries `NaN` at each inactive cell. The copy takes the element type of `x`.
 
 # Related
 
@@ -1038,7 +1036,7 @@ end
 function inactive_as_nonfinite(x::ArrNum, active_mask::AbstractArray{<:Bool})
     @argcheck(size(active_mask) == size(x),
               DimensionMismatch("the active mask names one cell of the sample at each entry, so it must have the size of the sample, got $(size(active_mask)) for the active mask against $(size(x)) for the sample"))
-    xg = coverage_nan_frame(similar(x, float_if_integer(eltype(x))))
+    xg = coverage_nan_frame(similar(x, eltype(x)))
     xg .= ifelse.(active_mask, x, xg)
     return xg
 end
@@ -1076,13 +1074,13 @@ Allocate the `NaN` frame of a point-in-time variance series, and read the active
 
 Row `t` of the series is a fit on rows `1` to `t` of `X` and of the active mask, so the series pairs the two by position, and the mask must have the size of `X`. [`coverage_mask`](@ref) pairs no rows, and it lets the two observation axes differ.
 
-A variance divides, so the frame takes [`float_if_integer`](@ref) of the element type of `X`. An integer sample gives a `Float64` frame, and a `Float32` sample gives a `Float32` frame. A `Rational` sample keeps its type, which has no `NaN`, so [`coverage_nan_frame`](@ref) refuses it.
+A variance divides, so the frame takes the element type of `X`. A `Float32` sample gives a `Float32` frame. A `Rational` sample keeps its type, which has no `NaN`, so [`coverage_nan_frame`](@ref) refuses it.
 
 # Algorithm
 
  1. Read `amsk`, the active mask of `pnl`, with [`panel_moment_masks`](@ref).
  2. Check that `amsk` has the size of `X` when the panel carries one.
- 3. Allocate an array of the size of `X` with the element type [`float_if_integer`](@ref) of `eltype(X)`, and give it to [`coverage_nan_frame`](@ref), which refuses a type with no `NaN` and returns `val`, the array filled with `NaN`.
+ 3. Allocate an array of the size of `X` with the element type `eltype(X)`, and give it to [`coverage_nan_frame`](@ref), which refuses a type with no `NaN` and returns `val`, the array filled with `NaN`.
 
 # Arguments
 
@@ -1102,13 +1100,12 @@ A variance divides, so the frame takes [`float_if_integer`](@ref) of the element
 
   - [`coverage_variance_series`](@ref)
   - [`panel_moment_masks`](@ref)
-  - [`float_if_integer`](@ref)
 """
 function coverage_series_frame(X::MatNum, pnl::Option{<:AssetPanel})
     amsk, _ = panel_moment_masks(pnl)
     @argcheck(isnothing(amsk) || size(amsk) == size(X),
               DimensionMismatch("a variance series pairs row t of the active mask of the Asset Panel with row t of the returns matrix, so the two must be the same size, got $(size(X)) for X, oriented to observations × assets, against $(isnothing(amsk) ? nothing : size(amsk)) for pnl.amsk"))
-    val = coverage_nan_frame(similar(X, float_if_integer(eltype(X)), size(X)))
+    val = coverage_nan_frame(similar(X, eltype(X), size(X)))
     return val, amsk
 end
 """
@@ -1588,7 +1585,7 @@ It reduces each window to its own Coverage Universe, and fits the estimator on t
  3. For each observation `t`, take `Xt`, rows `1` to `t` of `X`.
  4. Set `cmsk` to the assets whose returns are finite at every row of `Xt` and, when `amsk` is not `nothing`, whose entries of `amsk` are `true` at every one of those rows.
  5. Skip row `t` when `cmsk` holds no asset, so the whole row keeps its `NaN`.
- 6. Otherwise fit the variance of the estimator on the columns `cmsk` of `Xt`, and write it into the entries `cmsk` of row `t` of `val`.
+ 6. Otherwise fit the variance of the estimator on the columns `cmsk` of `Xt`, and write it into the entries `cmsk` of row `t` of `val`. The fit reads the observation weights of the estimator at rows `1` to `t`, cut with [`obs_weights_view`](@ref).
  7. Return `val`, transposed when `dims == 2`.
 
 # Related
@@ -1610,7 +1607,8 @@ function coverage_variance_series(ce::AbstractCovarianceEstimator, ::Nothing, X:
         if !any(cmsk)
             continue
         end
-        val[t, cmsk] = vec(Statistics.var(ce, Xt[:, cmsk]; dims = 1, kwargs...))
+        val[t, cmsk] = vec(Statistics.var(obs_weights_view(ce, 1:t), Xt[:, cmsk]; dims = 1,
+                                          kwargs...))
     end
     return isone(dims) ? val : permutedims(val)
 end
@@ -1625,7 +1623,7 @@ It fits each window over the whole universe, and does not reduce it to its own C
 
  1. Orient `X` to `observations × assets` with [`dims_oriented`](@ref).
  2. Allocate `val`, the `NaN` frame, and read `amsk`, the active mask, with [`coverage_series_frame`](@ref). The active mask of an Asset Panel is `observations × assets` already.
- 3. For each observation `t`, fit the variance of the estimator on rows `1` to `t` of `X`, with rows `1` to `t` of `amsk` as its active mask, and write it into row `t` of `val`.
+ 3. For each observation `t`, fit the variance of the estimator on rows `1` to `t` of `X`, with rows `1` to `t` of `amsk` as its active mask, and write it into row `t` of `val`. The fit reads the observation weights of the estimator at the same rows, cut with [`obs_weights_view`](@ref).
  4. Return `val`, transposed when `dims == 2`.
 
 # Related
@@ -1640,7 +1638,7 @@ function coverage_variance_series(ce::AbstractCovarianceEstimator, ::CoveragePol
     X = dims_oriented(dims, X)
     val, amsk = coverage_series_frame(X, pnl)
     for t in axes(X, 1)
-        val[t, :] = vec(Statistics.var(ce, view(X, 1:t, :); dims = 1,
+        val[t, :] = vec(Statistics.var(obs_weights_view(ce, 1:t), view(X, 1:t, :); dims = 1,
                                        active_mask = if isnothing(amsk)
                                            nothing
                                        else

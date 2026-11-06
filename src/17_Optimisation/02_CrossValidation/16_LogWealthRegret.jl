@@ -3,7 +3,7 @@ $(DocStringExtensions.TYPEDEF)
 
 Holds the log-wealth regret of a strategy against a comparator, and the test of its per-row difference.
 
-[`log_wealth_regret`](@ref) returns it, over one sequence of rows. The regret is the comparator's log terminal wealth less the strategy's, so it is positive when the comparator wins. The per-row difference carries a Newey–West test of equal expected log growth, in the shape of [`CovarianceForecastComparisonResult`](@ref). A negative regret is common and is not a defect: a causal strategy that reads the market's structure can beat a constant portfolio, and a Hindsight Comparator is best only over the class it was chosen from.
+[`log_wealth_regret`](@ref) returns it, over one sequence of rows, one for each member when a prediction holds many members. The regret is the comparator's log terminal wealth less the strategy's, so it is positive when the comparator wins. The per-row difference carries a Mean Test of equal expected log growth, in the shape of [`CovarianceForecastComparisonResult`](@ref). A negative regret is common and is not a defect: a causal strategy that reads the market's structure can beat a constant portfolio, and a Hindsight Comparator is best only over the class it was chosen from.
 
 Two fields state the comparator's side of a dynamic-regret bound. `path_length` is ``P_T``, the summed Euclidean distance between the comparator's consecutive targets: zero for a constant comparator, and larger with every switch that a [`HindsightSplit`](@ref) comparator makes. `cumulative` is the running regret.
 
@@ -14,8 +14,8 @@ $(DocStringExtensions.FIELDS)
 # Constructors
 
     LogWealthRegretResult(
-        regret, regret_per_period, difference, cumulative, variance, z, p, lags,
-        n_periods, wealth_a, wealth_b, path_length
+        regret, regret_per_period, difference, cumulative, t_stat, p_value,
+        mean_ci_lower, mean_ci_upper, n_periods, wealth_a, wealth_b, path_length
     ) -> LogWealthRegretResult
 
 Arguments correspond to the struct's fields, in the order they are declared. The type is a Result: [`log_wealth_regret`](@ref) builds it and a caller reads it. It has no keyword constructor and validates nothing of its own.
@@ -46,21 +46,21 @@ Arguments correspond to the struct's fields, in the order they are declared. The
     """
     cumulative
     """
-    Newey–West long-run variance of `difference`, at `lags` lags.
+    t-statistic of the regret per period, the mean of `difference` over its long-run standard error.
     """
-    variance
+    t_stat
     """
-    Diebold–Mariano–West statistic of `difference`, asymptotically standard normal under equal expected log growth when the comparator did not read the rows.
+    Two-sided p-value of the t-statistic under equal expected log growth, against the law that the Mean Test reads. It is `NaN` when the two series coincide, because their difference has no variance.
     """
-    z
+    p_value
     """
-    Two-sided p-value of the statistic against the standard normal. It is `NaN` when the two series coincide, because their difference has no variance, and zero when the difference is a non-zero constant.
+    Lower bound of the confidence interval of the regret per period, at the level that the Mean Test sets.
     """
-    p
+    mean_ci_lower
     """
-    Number of lags of the Bartlett kernel.
+    Upper bound of the confidence interval of the regret per period, at the level that the Mean Test sets.
     """
-    lags
+    mean_ci_upper
     """
     Number of periods compared.
     """
@@ -84,7 +84,7 @@ end
 
 The realised return series and the timestamps a prediction result was scored on, as [`log_wealth_regret`](@ref) reads them.
 
-The series is the one [`performance_summary`](@ref) reads: the portfolio returns that [`predict`](@ref) stored, net of the fee the fold settled, and drifted where a Weight Drift ran. A population of paths gives its first path. A multi-period result gives its stacked returns and timestamps.
+The series is the one [`performance_summary`](@ref) reads: the portfolio returns that [`predict`](@ref) stored, net of the fee the fold settled, and drifted where a Weight Drift ran. A prediction whose optimiser gives many portfolios, such as a frontier sweep, holds one series for each member, and the reader gives all of them. A multi-period result gives its stacked returns and timestamps. All the members share the timestamps.
 
 # Arguments
 
@@ -92,21 +92,23 @@ The series is the one [`performance_summary`](@ref) reads: the portfolio returns
 
 # Returns
 
-  - `ret::VecNum`: The realised return series.
+  - `ret::VecNum_VecVecNum`: The realised return series, or one series for each member.
   - `ts::Option{<:AbstractVector}`: The timestamps of the rows, or `nothing` when the fold carried none.
 
 # Related
 
   - [`log_wealth_regret`](@ref)
+  - [`member_regret`](@ref)
+  - [`member_vector`](@ref)
   - [`performance_summary`](@ref)
 """
 function regret_series(pred::PredictionResult)
     rd = pred.rd
-    return isa(rd.X, VecVecNum) ? first(rd.X) : rd.X, rd.ts
+    return rd.X, rd.ts
 end
 function regret_series(pred::MultiPeriodPredictionResult)
     mrd = pred.mrd
-    return isa(mrd.X, VecVecNum) ? first(mrd.X) : mrd.X, mrd.ts
+    return mrd.X, mrd.ts
 end
 """
     regret_benchmark(pred::PredictionResult)
@@ -114,7 +116,7 @@ end
 
 The benchmark series of the rows a prediction result was scored on, as [`log_wealth_regret`](@ref) reads it when no comparator is given.
 
-Each fold keeps the benchmark of its test rows as one series: a benchmark series as it was given, and a benchmark matrix collapsed by the fold's weights, as [`collapse_benchmark`](@ref) states. A multi-period result stacks the series of its folds. The series shares the rows of [`regret_series`](@ref), because [`PredictionReturnsResult`](@ref) checks the length of `B` against `X` and `ts`. A population gives its first series, as `regret_series` gives its first path.
+Each fold keeps the benchmark of its test rows as one series: a benchmark series as it was given, and a benchmark matrix collapsed by the fold's weights, as [`collapse_benchmark`](@ref) states. A multi-period result stacks the series of its folds. The series shares the rows of [`regret_series`](@ref), because [`PredictionReturnsResult`](@ref) checks the length of `B` against `X` and `ts`. It also has the shape of the series: one series for each member when the prediction holds many members, because each member collapses a benchmark matrix by its own weights.
 
 # Arguments
 
@@ -122,7 +124,7 @@ Each fold keeps the benchmark of its test rows as one series: a benchmark series
 
 # Returns
 
-  - `B::Option{<:VecNum}`: The benchmark series, or `nothing` when the returns data carried no benchmark.
+  - `B::Option{<:VecNum_VecVecNum}`: The benchmark series, one series for each member, or `nothing` when the returns data carried no benchmark.
 
 # Related
 
@@ -131,52 +133,57 @@ Each fold keeps the benchmark of its test rows as one series: a benchmark series
   - [`collapse_benchmark`](@ref)
 """
 function regret_benchmark(pred::PredictionResult)
-    B = pred.rd.B
-    return isa(B, VecVecNum) ? first(B) : B
+    return pred.rd.B
 end
 function regret_benchmark(pred::MultiPeriodPredictionResult)
-    B = pred.mrd.B
-    return isa(B, VecVecNum) ? first(B) : B
+    return pred.mrd.B
 end
 """
-    first_member(w::VecNum)
-    first_member(w::VecVecNum)
+    member_vector(x::Nothing, j::Integer)
+    member_vector(x::VecNum, j::Integer)
+    member_vector(x::VecVecNum, j::Integer)
 
-The one weight vector of a fold, or the first member's under a population.
+The vector of member `j`: a weight vector of a fold, a return series or a benchmark series.
 
-A population result carries one vector per member, and the path readers of the regret take the first, as [`regret_series`](@ref) and [`performance_summary`](@ref) take the first path. A single vector is its own first member.
+A prediction whose optimiser gives many portfolios carries one vector for each member, and member `j` reads entry `j`. A single vector belongs to the one member of its prediction, so it is the answer for every `j`. An absent benchmark stays `nothing`.
 
 # Arguments
 
-  - `w`: Weights of a fold, one vector or one per member.
+  - `x`: The vector of each member, one vector, or `nothing`.
+  - `j`: The index of the member.
 
 # Returns
 
-  - `w::VecNum`: The vector read.
+  - `x::Option{<:VecNum}`: The vector of member `j`, or `nothing`.
 
 # Related
 
   - [`fold_target`](@ref)
   - [`regret_series`](@ref)
+  - [`member_regret`](@ref)
 """
-function first_member(w::VecNum)
-    return w
+function member_vector(::Nothing, ::Integer)
+    return nothing
 end
-function first_member(w::VecVecNum)
-    return first(w)
+function member_vector(x::VecNum, ::Integer)
+    return x
+end
+function member_vector(x::VecVecNum, j::Integer)
+    return x[j]
 end
 """
-    fold_target(pred::PredictionResult)
+    fold_target(pred::PredictionResult, j::Integer = 1)
 
 The weights a fold started from, and, through [`fold_held`](@ref), the weights it held after its last observation, on the fold's own asset names.
 
 On a fold with no Held Weights record, `fold_target` is the fold's target. On a fold with one, it is the record's `w0`, the start that [`held_start_weights`](@ref) names: the fold's own target when it solved, and the weights it was handed when it failed. `fold_held` is the target on a fold with no record, because a fold without a drift holds its target to the end. On a fold with a record it is the record's `w`, the drifted holding that the next fold trades from.
 
-Both read the first member of a population. Both are viewed at the fold's Investable Mask, so they sit on `pred.rd.nx`, the names of the fold's own universe, which [`stacked_fold_weights`](@ref) embeds by.
+Both read member `j` through [`member_vector`](@ref), when the optimiser of the fold gives many portfolios. The default is the first member, which [`held_path_turnover`](@ref) reads. Both are viewed at the fold's Investable Mask, so they sit on `pred.rd.nx`, the names of the fold's own universe, which [`stacked_fold_weights`](@ref) embeds by.
 
 # Arguments
 
   - `pred`: One fold's prediction result.
+  - `j`: The index of the member.
 
 # Returns
 
@@ -190,13 +197,13 @@ Both read the first member of a population. Both are viewed at the fold's Invest
   - [`result_investable_mask`](@ref)
   - [`investable_weights_view`](@ref)
 """
-function fold_target(pred::PredictionResult)
+function fold_target(pred::PredictionResult, j::Integer = 1)
     hw = pred.hw
-    w = first_member(isnothing(hw) ? pred.res.w : hw.w0)
+    w = member_vector(isnothing(hw) ? pred.res.w : hw.w0, j)
     return investable_weights_view(result_investable_mask(pred.res), w)
 end
 """
-    fold_held(pred::PredictionResult)
+    fold_held(pred::PredictionResult, j::Integer = 1)
 
 The weights a fold held after its last observation, on the fold's own asset names. [`fold_target`](@ref) documents the pair.
 
@@ -205,9 +212,9 @@ The weights a fold held after its last observation, on the fold's own asset name
   - [`fold_target`](@ref)
   - [`held_path_turnover`](@ref)
 """
-function fold_held(pred::PredictionResult)
+function fold_held(pred::PredictionResult, j::Integer = 1)
     hw = pred.hw
-    w = first_member(isnothing(hw) ? pred.res.w : hw.w)
+    w = member_vector(isnothing(hw) ? pred.res.w : hw.w, j)
     return investable_weights_view(result_investable_mask(pred.res), w)
 end
 """
@@ -220,9 +227,7 @@ The folds of a multi-period result need not share a universe. A [`Pipeline`](@re
 # Algorithm
 
  1. Read each fold's weights through `read`, giving `ws`.
- 2. Take the union of the folds' `rd.nx` in order of first appearance, giving `names`, and map each name to its column, giving `pos`.
- 3. Promote the element types of `ws`, giving `Tf`, and allocate `W`, a `folds × assets` matrix of zeros of type `Tf`.
- 4. For each fold `i`, check the length of `ws[i]` against its `rd.nx`, and write each weight into row `i` of `W`, at the column that `pos` gives its name.
+ 2. Embed `ws` on the union of the folds' `rd.nx` with [`weights_by_name`](@ref), and keep the matrix `W`.
 
 # Arguments
 
@@ -239,6 +244,7 @@ The folds of a multi-period result need not share a universe. A [`Pipeline`](@re
 
 # Related
 
+  - [`weights_by_name`](@ref)
   - [`fold_target`](@ref)
   - [`comparator_path_length`](@ref)
   - [`held_path_turnover`](@ref)
@@ -246,31 +252,65 @@ The folds of a multi-period result need not share a universe. A [`Pipeline`](@re
 """
 function stacked_fold_weights(pred::MultiPeriodPredictionResult, read)
     folds = pred.pred
-    ws = [read(f) for f in folds]
-    names = unique(mapreduce(f -> collect(f.rd.nx), vcat, folds))
+    return last(weights_by_name([read(f) for f in folds], [f.rd.nx for f in folds]))
+end
+"""
+    weights_by_name(ws::AbstractVector, nxs::AbstractVector) -> (names, W)
+
+Embed weight vectors that sit on different asset names on the union of their names.
+
+Each vector `ws[i]` holds one weight for each name of `nxs[i]`. The union axis holds every name once, in the order of first appearance. A vector puts each weight in the column of its name, and every other entry of its row is zero. [`stacked_fold_weights`](@ref) embeds the folds of a path with this function, and [`prediction_weights`](@ref) embeds the paths of a population.
+
+# Algorithm
+
+ 1. Take the union of the names of `nxs` in order of first appearance, giving `names`, and map each name to its column, giving `pos`.
+ 2. Promote the element types of `ws`, giving `Tf`, and allocate `W`, a `vectors × assets` matrix of zeros of type `Tf`.
+ 3. For each vector `i`, check the length of `ws[i]` against `nxs[i]`, and write each weight into row `i` of `W`, at the column that `pos` gives its name.
+
+# Arguments
+
+  - `ws`: The weight vectors.
+  - `nxs`: The asset names of each weight vector.
+
+# Validation
+
+  - `length(ws[i]) == length(nxs[i])` for each `i`. Otherwise the function raises a `DimensionMismatch`, because the embedding would misplace the weights.
+
+# Returns
+
+  - `names::Vector`: The union of the names.
+  - `W::MatNum`: `vectors × assets` weights on the union axis, one row for each vector of `ws`.
+
+# Related
+
+  - [`stacked_fold_weights`](@ref)
+  - [`prediction_weights`](@ref)
+"""
+function weights_by_name(ws::AbstractVector, nxs::AbstractVector)
+    names = unique(mapreduce(collect, vcat, nxs))
     pos = Dict(n => i for (i, n) in enumerate(names))
     Tf = mapreduce(eltype, promote_type, ws)
-    W = zeros(Tf, length(folds), length(names))
-    for (i, f) in enumerate(folds)
-        nx = f.rd.nx
+    W = zeros(Tf, length(ws), length(names))
+    for i in eachindex(ws, nxs)
+        nx = nxs[i]
         @argcheck(length(ws[i]) == length(nx),
-                  DimensionMismatch("fold $i carries $(length(ws[i])) weights over $(length(nx)) asset names, so its weights cannot be embedded by name"))
+                  DimensionMismatch("weight vector $i carries $(length(ws[i])) weights over $(length(nx)) asset names, so its weights cannot be embedded by name"))
         # `enumerate`, not `zip(nx, ws[i])`: the zip of two untyped values gives JET a false
         # report inside `Base.Iterators` (issue #1341).
         for (j, wn) in enumerate(ws[i])
             W[i, pos[nx[j]]] = wn
         end
     end
-    return W
+    return names, W
 end
 """
-    comparator_path_length(b::Nothing, ::Type{Tf})
-    comparator_path_length(b::PredictionResult, ::Type{Tf})
-    comparator_path_length(b::MultiPeriodPredictionResult, ::Type{Tf})
+    comparator_path_length(b::Nothing, j::Integer, ::Type{Tf})
+    comparator_path_length(b::PredictionResult, j::Integer, ::Type{Tf})
+    comparator_path_length(b::MultiPeriodPredictionResult, j::Integer, ::Type{Tf})
 
-The path length of a comparator's targets, as [`log_wealth_regret`](@ref) reports it.
+The path length of the targets of member `j` of a comparator, as [`log_wealth_regret`](@ref) reports it.
 
-A multi-period result has one target per fold, so the path is over the folds. At `test_size = 1` a fold is a row, and ``\\boldsymbol{u}_t`` is the comparator's target on row ``t``. A single prediction result holds one target and no path, and so does a multi-period result of one fold. A benchmark comparator, `nothing`, is a series with no weights, so it has no path either. All three answer `NaN`, in the number type `Tf` of the regret.
+A multi-period result has one target per fold, so the path is over the folds. At `test_size = 1` a fold is a row, and ``\\boldsymbol{u}_t`` is the comparator's target on row ``t``. A comparator whose optimiser gives many portfolios has one path for each member, and `j` names the member. A single prediction result holds one target and no path, and so does a multi-period result of one fold. A benchmark comparator, `nothing`, is a series with no weights, so it has no path either. All three answer `NaN`, in the number type `Tf` of the regret.
 
 # Mathematical definition
 
@@ -288,13 +328,14 @@ Where:
 
 # Algorithm
 
- 1. Read one target per fold through [`fold_target`](@ref), and embed the targets on one axis through [`stacked_fold_weights`](@ref), giving `W`, one row per fold.
+ 1. Read the target of member `j` on each fold through [`fold_target`](@ref), and embed the targets on one axis through [`stacked_fold_weights`](@ref), giving `W`, one row per fold.
  2. When `W` has fewer than two rows, return `NaN` of type `Tf`.
  3. Sum the Euclidean norms of the differences of consecutive rows of `W`.
 
 # Arguments
 
   - `b`: The comparator's prediction result, or `nothing` for the benchmark.
+  - `j`: The index of the member of `b`.
   - `Tf`: Number type of the answer when the comparator has no path.
 
 # Returns
@@ -308,11 +349,13 @@ Where:
   - [`stacked_fold_weights`](@ref)
   - [`HindsightSplit`](@ref)
 """
-function comparator_path_length(::Union{Nothing, PredictionResult}, ::Type{Tf}) where {Tf}
+function comparator_path_length(::Union{Nothing, PredictionResult}, ::Integer,
+                                ::Type{Tf}) where {Tf}
     return Tf(NaN)
 end
-function comparator_path_length(b::MultiPeriodPredictionResult, ::Type{Tf}) where {Tf}
-    W = stacked_fold_weights(b, fold_target)
+function comparator_path_length(b::MultiPeriodPredictionResult, j::Integer,
+                                ::Type{Tf}) where {Tf}
+    W = stacked_fold_weights(b, f -> fold_target(f, j))
     F = size(W, 1)
     if F < 2
         return Tf(NaN)
@@ -320,10 +363,14 @@ function comparator_path_length(b::MultiPeriodPredictionResult, ::Type{Tf}) wher
     return sum(LinearAlgebra.norm(view(W, i, :) - view(W, i - 1, :)) for i in 2:F)
 end
 """
-    log_wealth_regret(a::PredRes_MultiPredRes, b::PredRes_MultiPredRes; lags::Integer = 0) -> LogWealthRegretResult
-    log_wealth_regret(a::PredRes_MultiPredRes; lags::Integer = 0) -> LogWealthRegretResult
+    log_wealth_regret(a::PredRes_MultiPredRes, b::PredRes_MultiPredRes;
+                      mt::AbstractMeanTestEstimator = WildBootstrapMeanTest())
+    log_wealth_regret(a::PredRes_MultiPredRes;
+                      mt::AbstractMeanTestEstimator = WildBootstrapMeanTest())
 
 The log-wealth regret of strategy `a` against comparator `b` over one and the same sequence of rows. With no `b`, the comparator is the benchmark of `a`'s own rows.
+
+A prediction whose optimiser gives many portfolios, such as a frontier sweep, holds one series for each member. The verb then gives one [`LogWealthRegretResult`](@ref) for each member, in a vector, and [`member_regret`](@ref) pairs the members. Two sides with many members pair by index, so they must hold the same count. A side with one series pairs with every member of the other side. The benchmark of `a` has the shape of its series, so each member of `a` meets its own benchmark. The shape of the answer follows the types of the series, never their count: a one-series pair gives one Result, and every other pair gives a vector.
 
 Regret is defined over one sequence, so the verb refuses two prediction results that do not carry the same timestamps. Each series is read as it was scored: net of the fee the fold settled, and drifted where a Weight Drift ran. The comparator's fee policy is therefore the caller's, and a fee-free comparator against a fee-paying strategy measures the fee as regret.
 
@@ -342,8 +389,7 @@ No scorer and no summary column ship for regret. A hyperparameter search ranks o
 \\begin{align}
 \\delta_t &= \\log\\left(1 + r_{b,t}\\right) - \\log\\left(1 + r_{a,t}\\right)\\,, \\\\
 R &= \\sum_{t=1}^{T} \\delta_t\\,, \\quad \\bar{\\delta} = \\frac{R}{T}\\,, \\\\
-\\hat{\\omega}^2 &= \\hat{\\gamma}_0 + 2 \\sum_{k=1}^{\\ell} \\left(1 - \\frac{k}{\\ell + 1}\\right) \\hat{\\gamma}_k\\,, \\\\
-z &= \\frac{\\sqrt{T}\\, \\bar{\\delta}}{\\sqrt{\\hat{\\omega}^2}}\\,, \\\\
+t_{\\delta} &= \\frac{\\bar{\\delta}}{s_{\\delta}}\\,, \\\\
 P_T &= \\sum_{t=2}^{T} \\lVert \\boldsymbol{u}_t - \\boldsymbol{u}_{t-1} \\rVert_2\\,.
 \\end{align}
 ```
@@ -355,22 +401,23 @@ Where:
   - ``R``: Log-wealth regret, positive when the comparator wins.
   - ``\\bar{\\delta}``: Regret per period.
   - ``T``: Number of periods.
-  - ``\\hat{\\omega}^2``: Long-run variance of ``\\delta_t``, the Bartlett-kernel estimate with ``\\ell`` lags.
-  - ``\\hat{\\gamma}_k``: Sample autocovariance of ``\\delta_t`` at lag ``k``, about ``\\bar{\\delta}`` and divided by ``T``.
-  - ``\\ell``: Number of lags, ``0`` by default because the rows of a walk-forward at `test_size = 1` do not overlap.
-  - ``z``: Diebold–Mariano–West statistic.
+  - ``s_{\\delta}``: Long-run standard error of ``\\bar{\\delta}``, which the Mean Test `mt` defines.
+  - ``t_{\\delta}``: t-statistic of the regret per period. The p-value and the interval of `mt` read it.
   - $(math_dict[:P_T_path])
   - ``\\boldsymbol{u}_t``: Comparator's target on fold ``t``, embedded by asset name on the union of the folds' universes.
 
-Under equal expected log growth, ``z`` is asymptotically standard normal, and the two-sided `p` reads it against that law. The test is exact only for a comparator that did not read the rows it is scored on. Against a Hindsight Comparator it is optimistic by construction: the comparator was chosen on the sequence that the difference is tested over, so `p` overstates the evidence that the comparator is better.
+``R`` is the logarithm of the ratio of the two wealths. Against the best constant rebalanced portfolio in hindsight, ``-\\bar{\\delta}`` is the quantity of Equation 1.7 of [cover1991](@cite), and that equation states that it tends to zero for the universal portfolio. Equation 2 of [lihoi2014](@cite) names ``R`` the regret. ``t_{\\delta}`` is the statistic of the test of equal expected loss of Section 1.1 of [dieboldmariano1995](@cite), on the loss ``-\\log(1 + r_t)``. [`covariance_forecast_compare`](@ref) states why the default [`WildBootstrapMeanTest`](@ref) reads it, and not a fixed number of lags: the log growths of two strategies cluster with the volatility, so their difference can be correlated over many rows. Each row is one entry of the series, so the test reads a window of one, as [`loss_difference_test`](@ref) states. [`OverlapMeanTest`](@ref) gives the statistic of the rule of zero lags.
 
-Three degenerate series have a stated answer:
+Under equal expected log growth, the law that `mt` reads is the null law of ``t_{\\delta}`` when the estimates that the strategy reads do not move its variance. Theorem 4.1(a) of [west1996](@cite) states two such cases: the periods are few next to the rows of the first training window, or the expected gradient of the difference in the estimates is zero. Otherwise Theorem 4.1(b) of [west1996](@cite) adds terms to the variance, and ``s_{\\delta}`` omits them. The test is valid only for a comparator that did not read the rows it is scored on. Against a Hindsight Comparator it is optimistic by construction: the comparator was chosen on the sequence that the difference is tested over, so `p_value` overstates the evidence that the comparator is better.
 
-  - Two identical series have ``\\bar{\\delta} = 0`` and ``\\hat{\\omega}^2 = 0``, so ``z`` and `p` are `NaN`.
-  - A difference that is a non-zero constant has ``\\hat{\\omega}^2 = 0``, so ``z`` is infinite and `p` is zero. In floating point ``\\hat{\\omega}^2`` is round-off of about ``10^{-33}``, so ``z`` is a very large finite number.
-  - A return of ``-1`` is a total loss. Its log growth is ``-\\infty``, so ``R`` is infinite, and ``z`` and `p` are `NaN`.
+Four degenerate series have a stated answer:
 
-Dynamic regret is regret against a comparator that moves. Its bounds are stated in ``P_T``, so ``R`` and ``P_T`` are read together: a static comparator has ``P_T = 0`` and its regret is the static regret, and a moving comparator buys its lower regret with a path that the bound charges for. ``P_T`` is `NaN` when the comparator is one prediction result, which holds one target and no path, or the benchmark, which holds no weights. The literature states dynamic regret against three comparators, and each is the same estimator through its own scheme. On the three-row example ``\\boldsymbol{x}_1 = (1.2, 0.98)``, ``\\boldsymbol{x}_2 = (0.9, 1.1)``, ``\\boldsymbol{x}_3 = (1.3, 0.7)`` of price relatives:
+  - Two identical series have ``\\bar{\\delta} = 0`` and no long-run variance, so the t-statistic, the p-value and the interval are `NaN`.
+  - A difference that is a non-zero constant has no long-run variance. In exact arithmetic the test answers `NaN`. In floating point the round-off of the difference can be larger than the spread that the Mean Test reads as a constant series. Then the t-statistic is a very large finite number, and the p-value is the least that the test gives, `1 / (n_sim + 1)` under [`WildBootstrapMeanTest`](@ref).
+  - A return of ``-1`` is a total loss. Its log growth is ``-\\infty``, so ``R`` is infinite, and the test is `NaN`.
+  - A `NaN` return makes ``R`` and the test `NaN`.
+
+Dynamic regret is regret against a comparator that moves. Definition 7 of [zinkevich2003](@cite) states it, and Theorem 2 of [zinkevich2003](@cite) bounds it in the path length of Definition 6. Its bounds are stated in ``P_T``, so ``R`` and ``P_T`` are read together: a static comparator has ``P_T = 0`` and its regret is the static regret, and a moving comparator buys its lower regret with a path that the bound charges for. ``P_T`` is `NaN` when the comparator is one prediction result, which holds one target and no path, or the benchmark, which holds no weights. The literature states dynamic regret against three comparators, and each is the same estimator through its own scheme. On the three-row example ``\\boldsymbol{x}_1 = (1.2, 0.98)``, ``\\boldsymbol{x}_2 = (0.9, 1.1)``, ``\\boldsymbol{x}_3 = (1.3, 0.7)`` of price relatives:
 
   - **Static**: the best constant rebalanced portfolio over all three rows, `predict(optimise(est, rd), rd)`, is all-in on the first asset. Its wealth is ``1.2 \\cdot 0.9 \\cdot 1.3 = 1.404``, and ``P_T = 0``. `est` is [`BestConstantRebalancedPortfolio`](@ref), or [`MeanRisk`](@ref) under [`LogarithmicReturn`](@ref) and [`MaximumReturn`](@ref).
   - **Be-the-leader**: `cross_val_predict(est, rd, HindsightSplit())` plays on row ``t`` the best constant rebalanced portfolio over the rows through ``t``. The targets are ``\\boldsymbol{u}_1 = (1, 0)``, ``\\boldsymbol{u}_2 = (23/44, 21/44) \\approx (0.523, 0.477)`` and ``\\boldsymbol{u}_3 = (1, 0)``. The wealth is ``1.2 \\cdot 0.995 \\cdot 1.3 \\approx 1.553``, and ``P_T = 2 \\sqrt{2} \\cdot 21/44 \\approx 1.350``. The first fold trains on one row, so [`MeanRisk`](@ref) needs a prior that fits one row, which [`HindsightSplit`](@ref) states.
@@ -381,81 +428,141 @@ The bound also reads the other way. The regret at a given budget ``L`` is the ga
 # Algorithm
 
  1. Read the strategy's series and timestamps through [`regret_series`](@ref), giving `ra` and `tsa`.
- 2. With `b`, read the comparator's series and timestamps the same way, giving `rb` and `tsb`, and check that the two series share their timestamps and their length. With no `b`, read the benchmark of `a` through [`regret_benchmark`](@ref), giving `rb`, and check that it exists.
- 3. Pass `ra`, `rb`, `lags` and the comparator to [`series_regret`](@ref), which forms the regret, its test and the comparator's path length.
+ 2. With `b`, read the comparator's series and timestamps the same way, giving `rb` and `tsb`, and check that the two sides share their timestamps. With no `b`, read the benchmark of `a` through [`regret_benchmark`](@ref), giving `rb`, and check that it exists.
+ 3. Pass `ra`, `rb`, `mt` and the comparator to [`member_regret`](@ref). It pairs the members, and it gives each pair to [`series_regret`](@ref), which forms the regret, its test and the path length of the comparator's member.
 
 # Arguments
 
   - `a`: The strategy's prediction result.
   - `b`: The comparator's prediction result. Leave it out to compare against the benchmark of `a`.
-  - `lags`: Number of lags of the Bartlett kernel.
+  - `mt`: The Mean Test of the per-row difference.
 
 # Validation
 
-  - `a` and `b` carry the same timestamps and the same number of rows. An `ArgumentError` is thrown otherwise: two runs over different rows compare nothing.
+  - `a` and `b` carry the same timestamps, and each pair of series has the same number of rows. An `ArgumentError` is thrown otherwise: two runs over different rows compare nothing.
+  - When `a` and `b` both hold many members, they hold the same count of members. A `DimensionMismatch` that names both counts is thrown otherwise, because no pairing by index exists.
   - With no `b`, `a` carries a benchmark. An `ArgumentError` is thrown otherwise, because there is no comparator.
-  - `0 <= lags < n_periods`. A `DomainError` is thrown otherwise.
   - No return of either series is below ``-1``. A `DomainError` is thrown otherwise, because a negative wealth has no log. A `NaN` return passes, and its `NaN` reaches the regret.
 
 # Returns
 
-  - `reg::LogWealthRegretResult`: The regret, its per-period form, the per-row difference, its running sum and its test, the two terminal wealths, and the comparator's path length.
+  - `reg::LogWealthRegretResult`: When each side holds one series. The regret, its per-period form, the per-row difference, its running sum and its test, the two terminal wealths, and the comparator's path length.
+  - `reg::Vector{<:LogWealthRegretResult}`: When a side holds many members. Entry `j` is the regret of member `j`.
 
 # Related
 
   - [`LogWealthRegretResult`](@ref)
+  - [`member_regret`](@ref)
   - [`regret_benchmark`](@ref)
   - [`HindsightSplit`](@ref)
   - [`BudgetedHindsightPath`](@ref)
   - [`BestConstantRebalancedPortfolio`](@ref)
   - [`covariance_forecast_compare`](@ref)
-  - [`newey_west_variance`](@ref)
+  - [`loss_difference_test`](@ref)
+  - [`WildBootstrapMeanTest`](@ref)
   - [`performance_summary`](@ref)
   - [`cross_val_predict`](@ref)
 
 # References
 
-  - $(ref_dict[:lihoi2014])
+  - $(ref_dict[:cover1991]) Equations 1.2 and 1.7.
+  - $(ref_dict[:lihoi2014]) Section 3.1.3, Equation 2.
+  - $(ref_dict[:dieboldmariano1995]) Section 1.1.
+  - $(ref_dict[:west1996]) Section 2, Theorem 4.1.
+  - $(ref_dict[:demetrescu2026robust]) Section 3.1 and Section 4.
+  - $(ref_dict[:zinkevich2003]) Definitions 6 and 7, Theorem 2.
 """
 function log_wealth_regret(a::PredRes_MultiPredRes, b::PredRes_MultiPredRes;
-                           lags::Integer = 0)
+                           mt::AbstractMeanTestEstimator = WildBootstrapMeanTest())
     ra, tsa = regret_series(a)
     rb, tsb = regret_series(b)
-    @argcheck(isequal(tsa, tsb) && length(ra) == length(rb),
+    @argcheck(isequal(tsa, tsb),
               ArgumentError("the two prediction results do not share their rows: regret is defined over one sequence, so both must be scored over the same rows, with the same timestamps. Run both through `cross_val_predict` with the same `rd` and `cv`, or fit the comparator on the rows the strategy was scored on and predict it over them."))
-    return series_regret(ra, rb, lags, b)
+    return member_regret(ra, rb, mt, b)
 end
-function log_wealth_regret(a::PredRes_MultiPredRes; lags::Integer = 0)
+function log_wealth_regret(a::PredRes_MultiPredRes;
+                           mt::AbstractMeanTestEstimator = WildBootstrapMeanTest())
     ra, _ = regret_series(a)
     rb = regret_benchmark(a)
     @argcheck(!isnothing(rb),
               ArgumentError("the prediction result carries no benchmark, so there is no comparator: give the returns data a benchmark `B`, or pass a comparator's prediction result as the second argument."))
-    return series_regret(ra, rb, lags, nothing)
+    return member_regret(ra, rb, mt, nothing)
 end
 """
-    series_regret(ra::VecNum, rb::VecNum, lags::Integer, b::Union{Nothing, PredRes_MultiPredRes}) -> LogWealthRegretResult
+    member_regret(ra::VecNum, rb::VecNum, mt::AbstractMeanTestEstimator, b)
+    member_regret(ra::VecVecNum, rb::VecNum, mt::AbstractMeanTestEstimator, b)
+    member_regret(ra::VecNum, rb::VecVecNum, mt::AbstractMeanTestEstimator, b)
+    member_regret(ra::VecVecNum, rb::VecVecNum, mt::AbstractMeanTestEstimator, b)
 
-The log-wealth regret of the return series `ra` against the return series `rb`, which share their rows. Both methods of [`log_wealth_regret`](@ref) read their series and pass them here, and that verb's docstring states the mathematics.
+The log-wealth regret of each member of the strategy against its member of the comparator, as [`log_wealth_regret`](@ref) pairs them.
+
+A side with one series pairs with every member of the other side. Two sides with many members pair by index. The pair of two single series gives one [`LogWealthRegretResult`](@ref), and every other pair gives a vector with one entry for each pair. Thus the shape of the answer follows the types of `ra` and `rb`, and the method is type-stable. Each entry reads the path length of the member of `b` that it pairs with, through [`comparator_path_length`](@ref). A single comparator series is member `1` of `b`.
+
+# Arguments
+
+  - `ra`: The series of the strategy, or one series for each member.
+  - `rb`: The series of the comparator, or one series for each member.
+  - `mt`: The Mean Test of the per-row difference.
+  - `b`: The comparator's prediction result, or `nothing` for the benchmark.
+
+# Validation
+
+  - When both sides hold many members, they hold the same count. A `DimensionMismatch` that names both counts is thrown otherwise.
+
+# Returns
+
+  - `reg::LogWealthRegretResult`: When both sides hold one series.
+  - `reg::Vector{<:LogWealthRegretResult}`: When a side holds many members, one entry for each pair in the order of the members.
+
+# Related
+
+  - [`log_wealth_regret`](@ref)
+  - [`series_regret`](@ref)
+  - [`member_vector`](@ref)
+"""
+function member_regret(ra::VecNum, rb::VecNum, mt::AbstractMeanTestEstimator,
+                       b::Union{Nothing, PredRes_MultiPredRes})
+    return series_regret(ra, rb, mt, b, 1)
+end
+function member_regret(ra::VecVecNum, rb::VecNum, mt::AbstractMeanTestEstimator,
+                       b::Union{Nothing, PredRes_MultiPredRes})
+    return [series_regret(r, rb, mt, b, 1) for r in ra]
+end
+function member_regret(ra::VecNum, rb::VecVecNum, mt::AbstractMeanTestEstimator,
+                       b::Union{Nothing, PredRes_MultiPredRes})
+    return [series_regret(ra, r, mt, b, j) for (j, r) in enumerate(rb)]
+end
+function member_regret(ra::VecVecNum, rb::VecVecNum, mt::AbstractMeanTestEstimator,
+                       b::Union{Nothing, PredRes_MultiPredRes})
+    @argcheck(length(ra) == length(rb),
+              DimensionMismatch("the strategy holds $(length(ra)) members and the comparator holds $(length(rb)): two sides with many members pair by index, so they must hold the same count. Compare one member of a side through a prediction of that member alone."))
+    return [series_regret(ra[j], rb[j], mt, b, j) for j in eachindex(ra, rb)]
+end
+"""
+    series_regret(ra::VecNum, rb::VecNum, mt::AbstractMeanTestEstimator,
+                  b::Union{Nothing, PredRes_MultiPredRes}, j::Integer) -> LogWealthRegretResult
+
+The log-wealth regret of the return series `ra` against the return series `rb`, which share their rows. [`member_regret`](@ref) pairs the series of both methods of [`log_wealth_regret`](@ref) and passes each pair here, and that verb's docstring states the mathematics.
 
 # Algorithm
 
- 1. Check `lags` against the number of rows `T`, and check that no return is below ``-1``.
+ 1. Check that the two series have the same length, and that no return is below ``-1``.
  2. Take the log growth of each series, giving `la` and `lb`, and their difference `d`.
  3. Sum `d` cumulatively, giving `cumulative`. Its last entry is `regret`, and `regret / T` is `md`.
- 4. Estimate the long-run variance of `d` through [`newey_west_variance`](@ref), giving `v`.
- 5. Form the statistic `z` from `md` and `v`, and its two-sided p-value `p`.
- 6. Read the comparator's path length through [`comparator_path_length`](@ref).
+ 4. Test the mean of `d` against zero through [`loss_difference_test`](@ref) under `mt`, with every row scored.
+ 5. Read the path length of member `j` of the comparator through [`comparator_path_length`](@ref).
 
 # Arguments
 
   - `ra`: Realised return series of the strategy.
   - `rb`: Realised return series of the comparator, on the rows of `ra`.
-  - `lags`: Number of lags of the Bartlett kernel.
+  - `mt`: The Mean Test of the per-row difference.
   - `b`: The comparator's prediction result, or `nothing` for the benchmark.
+  - `j`: The index of the member of `b` that `rb` belongs to.
 
 # Validation
 
-  - `0 <= lags < T`. A `DomainError` is thrown otherwise.
+  - `ra` and `rb` have the same length. An `ArgumentError` is thrown otherwise, because two series over different rows compare nothing.
   - No return of either series is below ``-1``. A `DomainError` is thrown otherwise.
 
 # Returns
@@ -465,13 +572,16 @@ The log-wealth regret of the return series `ra` against the return series `rb`, 
 # Related
 
   - [`log_wealth_regret`](@ref)
+  - [`member_regret`](@ref)
   - [`LogWealthRegretResult`](@ref)
   - [`comparator_path_length`](@ref)
+  - [`loss_difference_test`](@ref)
 """
-function series_regret(ra::VecNum, rb::VecNum, lags::Integer,
-                       b::Union{Nothing, PredRes_MultiPredRes})
+function series_regret(ra::VecNum, rb::VecNum, mt::AbstractMeanTestEstimator,
+                       b::Union{Nothing, PredRes_MultiPredRes}, j::Integer)
     T = length(ra)
-    @argcheck(0 <= lags < T, DomainError(lags, "`lags` must lie in [0, n_periods)"))
+    @argcheck(T == length(rb),
+              ArgumentError("the strategy series has $T rows and the comparator series has $(length(rb)): regret is defined over one sequence, so both must be scored over the same rows. Run both through `cross_val_predict` with the same `rd` and `cv`."))
     @argcheck(!any(<(-1), ra) && !any(<(-1), rb),
               DomainError(minimum(filter(<(-1), vcat(ra, rb))),
                           "a return below -1 leaves a negative wealth, whose log is not defined, so the log-wealth regret cannot read it"))
@@ -483,78 +593,12 @@ function series_regret(ra::VecNum, rb::VecNum, lags::Integer,
     cumulative = cumsum(d)
     regret = last(cumulative)
     md = regret / T
-    v = newey_west_variance(d, lags)
-    z = sqrt(T) * md / sqrt(v)
-    p = 2 * Distributions.ccdf(Distributions.Normal(), abs(z))
-    return LogWealthRegretResult(regret, md, d, cumulative, v, z, p, lags, T, exp(sum(la)),
-                                 exp(sum(lb)), comparator_path_length(b, typeof(regret)))
+    res = loss_difference_test(mt, d, trues(T), mean_test_rng(mt))
+    return LogWealthRegretResult(regret, md, d, cumulative, res.t_stat, res.p_value,
+                                 res.mean_ci_lower, res.mean_ci_upper, T, exp(sum(la)),
+                                 exp(sum(lb)), comparator_path_length(b, j, typeof(regret)))
 end
 
-"""
-    path_norm_epigraph!(model::JuMP.Model, t, x, p::Number)
-
-Writes the epigraph ``t \\geq \\lVert \\boldsymbol{x} \\rVert_p`` of one step of a comparator path into a bare model.
-
-The cone is the norm's own at `p = 2`, `p = 1` and `p = Inf`. Every other order takes the power-cone form, one row per entry. It is the epigraph that [`norm_ball_dual_norm_epigraph!`](@ref) writes, without the model registry, which a bare programme does not use.
-
-# JuMP formulation
-
-## Variables
-
-  - `t`: read. It is the caller's epigraph variable.
-  - `r`: created at an order other than `1`, `2` and `Inf`, an anonymous vector of one variable per entry of ``\\boldsymbol{x}``.
-
-## Constraints
-
-Every row is registered under no name.
-
-  - At ``p = 2``, the second-order cone row ``t \\geq \\lVert \\boldsymbol{x} \\rVert_2``.
-  - At ``p = 1``, the norm-one cone row ``t \\geq \\lVert \\boldsymbol{x} \\rVert_1``.
-  - At ``p = \\infty``, the norm-infinity cone row ``t \\geq \\lVert \\boldsymbol{x} \\rVert_\\infty``.
-  - At any other ``p``, one power cone row per entry, ``r_j^{1/p}\\, t^{1 - 1/p} \\geq \\lvert x_j \\rvert`` with ``r_j \\geq 0`` and ``t \\geq 0``, and the row ``\\sum_j r_j - t = 0``.
-
-Where:
-
-  - ``t``: Epigraph variable of the step.
-  - ``\\boldsymbol{x}``: Affine expression whose norm is bounded, with entries ``x_j``.
-  - $(math_dict[:p_norm_order])
-  - ``r_j``: Auxiliary variable of entry ``j``.
-
-The power-cone rows are exact. Each row gives ``r_j \\geq \\lvert x_j \\rvert^p / t^{p-1}``, and the sum of the rows gives ``t^p \\geq \\sum_j \\lvert x_j \\rvert^p``, which is ``t \\geq \\lVert \\boldsymbol{x} \\rVert_p``.
-
-# Arguments
-
-  - $(arg_dict[:model])
-  - `t`: The epigraph variable.
-  - `x`: The affine expression whose norm is bounded, one entry per asset.
-  - `p`: The norm order, `1 <= p`.
-
-# Returns
-
-  - `nothing`.
-
-# Related
-
-  - [`path_budget_constraint!`](@ref)
-  - [`norm_ball_dual_norm_epigraph!`](@ref)
-"""
-function path_norm_epigraph!(model::JuMP.Model, t, x, p::Number)::Nothing
-    if p == 2
-        JuMP.@constraint(model, [t; x] in JuMP.SecondOrderCone())
-    elseif isone(p)
-        JuMP.@constraint(model, [t; x] in JuMP.MOI.NormOneCone(1 + length(x)))
-    elseif isinf(p)
-        JuMP.@constraint(model, [t; x] in JuMP.MOI.NormInfinityCone(1 + length(x)))
-    else
-        p_inv = inv(p)
-        r = JuMP.@variable(model, [1:length(x)])
-        for j in eachindex(x)
-            JuMP.@constraint(model, [r[j], t, x[j]] in JuMP.MOI.PowerCone(p_inv))
-        end
-        JuMP.@constraint(model, sum(r) - t == 0)
-    end
-    return nothing
-end
 """
     row_bound_view(b::Number, m::AbstractVector{Bool})
     row_bound_view(b::VecNum, m::AbstractVector{Bool})
@@ -583,44 +627,45 @@ function row_bound_view(b::VecNum, m::AbstractVector{Bool})
     return view(b, m)
 end
 """
-    path_row_constraints!(model::JuMP.Model, u, z, x, m::AbstractVector{Bool}, wb::WeightBounds)
+    path_row_constraints!(model::JuMP.Model, u, z, X, msk::AbstractMatrix{Bool}, wb::WeightBounds)
 
-Writes one row of the budgeted path programme on the row's investable assets.
+Writes the rows of every period of the budgeted path programme on each period's investable assets.
 
-The budget, the finite bounds and the log wealth of the row read the assets that `m` keeps. The allocation of every other asset is fixed at zero, because a row with no price relative for an asset cannot hold it.
+The budget, the finite bounds and the log wealth of period ``t`` read the assets that row ``t`` of `msk` keeps. The allocation of every other asset is fixed at zero, because a row with no price relative for an asset cannot hold it. Each kind of row is one JuMP container over the periods, the form that the JuMP manual recommends for an indexed family of rows.
 
 # JuMP formulation
 
 ## Variables
 
-  - `u`: read. It is the row's allocations, one per asset. Every entry outside `m` is fixed at zero with `JuMP.fix`, which sets the variable's bounds and adds no row.
-  - `z`: read. It is the row's log-wealth variable.
+  - `u`: read. It is the `T × N` allocations, one row per period. Every entry outside `msk` is fixed at zero with `JuMP.fix`, which sets the variable's bounds and adds no row.
+  - `z`: read. It is the `T` log-wealth variables, one per period.
 
 ## Constraints
 
-Every row is registered under no name, and each reads the assets in ``m`` alone.
+Every row is registered under no name, and the row of period ``t`` reads the assets in ``\\mathcal{M}_t`` alone.
 
-  - ``\\sum_{i \\in m} u_i = 1``.
-  - ``u_i - l_i \\geq 0`` for each ``i \\in m``, when an entry of ``\\boldsymbol{l}`` is finite.
-  - ``u_i - h_i \\leq 0`` for each ``i \\in m``, when an entry of ``\\boldsymbol{h}`` is finite.
-  - The exponential cone row ``\\left(z, 1, \\sum_{i \\in m} x_i u_i\\right) \\in \\mathcal{K}_{\\exp}``, which holds when ``z \\leq \\log \\sum_{i \\in m} x_i u_i``.
+  - ``\\sum_{i \\in \\mathcal{M}_t} u_{t,i} = 1``, for ``t = 1, \\ldots, T``.
+  - ``u_{t,i} - l_i \\geq 0`` for each ``i \\in \\mathcal{M}_t``, for ``t = 1, \\ldots, T``, when an entry of ``\\boldsymbol{l}`` is finite.
+  - ``u_{t,i} - h_i \\leq 0`` for each ``i \\in \\mathcal{M}_t``, for ``t = 1, \\ldots, T``, when an entry of ``\\boldsymbol{h}`` is finite.
+  - The exponential cone rows ``\\left(z_t, 1, \\sum_{i \\in \\mathcal{M}_t} x_{t,i} u_{t,i}\\right) \\in \\mathcal{K}_{\\exp}``, for ``t = 1, \\ldots, T``, which hold when ``z_t \\leq \\log \\sum_{i \\in \\mathcal{M}_t} x_{t,i} u_{t,i}``.
 
 Where:
 
-  - ``u_i``: Allocation of asset ``i`` on the row.
-  - ``z``: Log-wealth variable of the row.
-  - ``x_i``: Price relative of asset ``i`` on the row, one plus its return.
-  - ``m``: Set of the assets in the row's Investable Mask.
+  - ``u_{t,i}``: Allocation of asset ``i`` in period ``t``.
+  - ``z_t``: Log-wealth variable of period ``t``.
+  - ``x_{t,i}``: Price relative of asset ``i`` in period ``t``, one plus its return.
+  - ``\\mathcal{M}_t``: Set of the assets in the Investable Mask of period ``t``.
   - ``l_i``, ``h_i``: Resolved lower and upper weight bounds of asset ``i``, the entries of ``\\boldsymbol{l}`` and ``\\boldsymbol{h}``.
   - ``\\mathcal{K}_{\\exp} = \\mathrm{cl}\\,\\{(a, b, c) : b\\, e^{a / b} \\leq c,\\, b > 0\\}``: Exponential cone.
+  - $(math_dict[:T])
 
 # Arguments
 
   - $(arg_dict[:model])
-  - `u`: The row's allocation variables, one per asset.
-  - `z`: The row's log-wealth variable.
-  - `x`: The row's price relatives, finite where `m` holds.
-  - `m`: The row's Investable Mask, the Coverage Universe of the one-row window.
+  - `u`: The `T × N` allocation variables, one row per period.
+  - `z`: The `T` log-wealth variables, one per period.
+  - `X`: The `T × N` price relatives, finite where `msk` holds.
+  - `msk`: The `T × N` Investable Masks, one row per period. Row ``t`` is the Coverage Universe of the one-row window of period ``t``.
   - $(arg_dict[:wb])
 
 # Returns
@@ -633,20 +678,23 @@ Where:
   - [`path_budget_constraint!`](@ref)
   - [`row_bound_view`](@ref)
 """
-function path_row_constraints!(model::JuMP.Model, u, z, x, m::AbstractVector{Bool},
+function path_row_constraints!(model::JuMP.Model, u, z, X, msk::AbstractMatrix{Bool},
                                wb::WeightBounds)::Nothing
-    ui = view(u, m)
-    JuMP.@constraint(model, sum(ui) == 1)
+    T = size(u, 1)
+    ms = eachrow(msk)
+    JuMP.@constraint(model, [t = 1:T], sum(view(u, t, ms[t])) == 1)
     if w_finite_flag(wb.lb)
-        JuMP.@constraint(model, ui ⊖ row_bound_view(wb.lb, m) >= 0)
+        JuMP.@constraint(model, [t = 1:T],
+                         view(u, t, ms[t]) ⊖ row_bound_view(wb.lb, ms[t]) >= 0)
     end
     if w_finite_flag(wb.ub)
-        JuMP.@constraint(model, ui ⊖ row_bound_view(wb.ub, m) <= 0)
+        JuMP.@constraint(model, [t = 1:T],
+                         view(u, t, ms[t]) ⊖ row_bound_view(wb.ub, ms[t]) <= 0)
     end
-    JuMP.@constraint(model,
-                     [z, 1, LinearAlgebra.dot(view(x, m), ui)] in
+    JuMP.@constraint(model, [t = 1:T],
+                     [z[t], 1, LinearAlgebra.dot(view(X, t, ms[t]), view(u, t, ms[t]))] in
                      JuMP.MOI.ExponentialCone())
-    for i in findall(!, m)
+    for i in findall(!, msk)
         JuMP.fix(u[i], 0; force = true)
     end
     return nothing
@@ -656,7 +704,7 @@ end
 
 Writes the path-length budget of the budgeted path programme.
 
-Each step of the path takes one epigraph variable through [`path_norm_epigraph!`](@ref), and the sum of these variables is at most `L`. A path of one row has no step, so the function writes nothing.
+Each step of the path takes one epigraph variable through [`norm_epigraph!`](@ref), and the sum of these variables is at most `L`. The bare programme registers no constraint scale, so the rows take the scale `1`. A path of one row has no step, so the function writes nothing.
 
 # JuMP formulation
 
@@ -671,7 +719,7 @@ Each step of the path takes one epigraph variable through [`path_norm_epigraph!`
 Every row is registered under no name.
 
   - ``\\boldsymbol{d}_{t-1} = \\boldsymbol{u}_t - \\boldsymbol{u}_{t-1}``, for ``t = 2, \\ldots, T``, one row per entry.
-  - The rows of [`path_norm_epigraph!`](@ref) on ``s_{t-1} \\geq \\lVert \\boldsymbol{d}_{t-1} \\rVert_p``, for ``t = 2, \\ldots, T``.
+  - The rows of [`norm_epigraph!`](@ref) on ``s_{t-1} \\geq \\lVert \\boldsymbol{d}_{t-1} \\rVert_p``, for ``t = 2, \\ldots, T``.
   - ``\\sum_{t=1}^{T-1} s_t \\leq L``.
 
 Where:
@@ -709,7 +757,7 @@ function path_budget_constraint!(model::JuMP.Model, u, L::Number, p::Number)::No
     d = JuMP.@variable(model, [1:(T - 1), 1:size(u, 2)])
     for t in 2:T
         JuMP.@constraint(model, view(d, t - 1, :) .== view(u, t, :) - view(u, t - 1, :))
-        path_norm_epigraph!(model, s[t - 1], view(d, t - 1, :), p)
+        norm_epigraph!(model, s[t - 1], view(d, t - 1, :), p, 1)
     end
     JuMP.@constraint(model, sum(s) <= L)
     return nothing
@@ -719,7 +767,7 @@ $(DocStringExtensions.TYPEDEF)
 
 Fits the path of per-row allocations with the largest log wealth whose summed step length is at most `L`.
 
-Dynamic regret at a budget is the gap to this path. This path is the comparator of Definition 7 of [zinkevich2003](@cite). Neither per-row comparator that a [`HindsightSplit`](@ref) builds is this path: be-the-leader is one point at its own path length, and the per-period minimiser is the limit with no budget. The fit is one concave programme over the whole panel. The Lagrangian form, which puts a penalty on the path length in place of the budget, is the same programme with one term moved, and the library does not build it.
+Dynamic regret at a budget is the gap to this path. At `p = 2` this path is the comparator of Definition 7 of [zinkevich2003](@cite), at the cost ``c_t(\\boldsymbol{u}) = -\\log(\\boldsymbol{u} \\cdot \\boldsymbol{x}_t)``. Definition 6 of [zinkevich2003](@cite) measures the path in the Euclidean distance, so at any other `p` the budget bounds a different length. Neither per-row comparator that a [`HindsightSplit`](@ref) builds is this path: be-the-leader is one point at its own path length, and the per-period minimiser is the limit with no budget. The fit is one concave programme over the whole panel. The Lagrangian form, which puts a penalty on the path length in place of the budget, is the same programme with one term moved, and the library does not build it.
 
 The estimator follows the Hindsight Comparator rule of [`log_wealth_regret`](@ref), as every other comparator does. [`optimise`](@ref) returns a [`BudgetedHindsightPathResult`](@ref), which holds the path. [`predict`](@ref) over the same rows returns one fold per row, and it refuses any other rows. So `predict(optimise(est, rd_test), rd_test)` is a prediction result that the regret verb reads unchanged, and the verb reports its Euclidean path length beside the regret.
 
@@ -778,14 +826,14 @@ Keywords correspond to the struct's fields. `L` and `slv` are required: a budget
 
   - `0 <= L` and `1 <= p`. A `DomainError` is thrown otherwise.
   - A vector `slv` is not empty. An `IsEmptyError` is thrown otherwise.
-  - If `wb` is a [`WeightBoundsEstimator`](@ref): `!isnothing(sets)`. An `IsNothingError` is thrown otherwise.
+  - If `wb` is keyed by name ([`name_keyed`](@ref)): `!isnothing(sets)`. An `IsNothingError` is thrown otherwise.
 
 ## View parameters
 
-When [`port_opt_view`](@ref) is called on this type, the following `@vprop`-tagged fields are automatically subset to the selected indices:
+[`port_opt_view`](@ref) takes the view of these `@vprop` fields at the selected indices:
 
-  - `wb`: Recursively viewed via [`port_opt_view`](@ref).
-  - `sets`: Sliced to the selected indices via [`port_opt_view`](@ref).
+  - `wb`: Recursively viewed through [`port_opt_view`](@ref).
+  - `sets`: Sliced to the selected indices through [`port_opt_view`](@ref).
 
 # Examples
 
@@ -820,7 +868,7 @@ BudgetedHindsightPath
 
 # References
 
-  - $(ref_dict[:zinkevich2003])
+  - $(ref_dict[:zinkevich2003]) Definitions 6 and 7.
 """
 @propagatable @concrete struct BudgetedHindsightPath <: OptimisationEstimator
     """
@@ -859,9 +907,9 @@ BudgetedHindsightPath
         if isa(slv, VecSlv)
             @argcheck(!isempty(slv), IsEmptyError("slv cannot be empty"))
         end
-        if isa(wb, WeightBoundsEstimator)
+        if name_keyed(wb)
             @argcheck(!isnothing(sets),
-                      IsNothingError("sets cannot be nothing when wb is a WeightBoundsEstimator"))
+                      IsNothingError("sets cannot be nothing when wb is keyed by name"))
         end
         return new{typeof(L), typeof(p), typeof(wb), typeof(sets), typeof(strict),
                    typeof(slv), typeof(fb)}(L, p, wb, sets, strict, slv, fb)
@@ -1137,18 +1185,13 @@ function _optimise(est::BudgetedHindsightPath, rd::ReturnsResult; kwargs...)
     T, N = size(X)
     imsk = path_row_masks(rd)
     msk = isnothing(imsk) ? trues(T, N) : imsk
-    wb = weight_bounds_constraints(est.wb, est.sets; N = N, strict = est.strict,
+    wb = weight_bounds_constraints(est.wb, est.sets; rd = rd, N = N, strict = est.strict,
                                    datatype = eltype(X))
     model = JuMP.Model()
     JuMP.set_string_names_on_creation(model, false)
     u = JuMP.@variable(model, [1:T, 1:N])
     z = JuMP.@variable(model, [1:T])
-    # One scalar row per period rather than a JuMP container, which JET reads through the
-    # container closure and reports a builtin call on.
-    for t in 1:T
-        path_row_constraints!(model, view(u, t, :), z[t], view(X, t, :), view(msk, t, :),
-                              wb)
-    end
+    path_row_constraints!(model, u, z, X, msk, wb)
     path_budget_constraint!(model, u, est.L, est.p)
     JuMP.@objective(model, Max, sum(z))
     res = optimise_JuMP_model!(model, est.slv)
@@ -1237,4 +1280,4 @@ function path_row_fold(res::BudgetedHindsightPathResult, rd::ReturnsResult, t::I
 end
 
 export log_wealth_regret, LogWealthRegretResult, BudgetedHindsightPath,
-       BudgetedHindsightPathResult
+       BudgetedHindsightPathResult, fold_target, fold_held

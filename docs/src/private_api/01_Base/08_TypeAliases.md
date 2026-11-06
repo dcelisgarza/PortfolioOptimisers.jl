@@ -24,6 +24,7 @@ PairStrNum
 DictStrNum
 MultiEstValType
 EstValType
+VectorEstValType
 PairGSCV
 DictGSCV
 GSCVKey
@@ -50,4 +51,5 @@ Dict_Vec
 Sym_Str
 Str_Vec
 Func_VecNum
+PanelTermType
 ```

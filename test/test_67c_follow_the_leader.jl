@@ -299,6 +299,20 @@ using Test, PortfolioOptimisers, StableRNGs, LinearAlgebra, Statistics, Dates, C
                                                                                            rows(rd,
                                                                                                 1:30)).w
         @test maximum(abs.(wfp .- w30)) > 1e-2
+        # The warning keys its `maxlog = 1` on `iters` (#1690), so a second leader at the
+        # same budget does not warn again, and a leader at another budget does.
+        short_logs, _ = Test.collect_test_logs() do
+            optimise(OPS(; alg = FollowTheLeader()), rows(rd, 1:30))
+            optimise(OPS(; alg = FollowTheLeader()), rows(rd, 1:30))
+            return optimise(OPS(;
+                                alg = FollowTheLeader(;
+                                                      opt = BestConstantRebalancedPortfolio(;
+                                                                                            iters = 10))),
+                            rows(rd, 1:30))
+        end
+        @test [match(r"iters = (\d+)", string(l.message))[1]
+               for l in short_logs if occursin("solver-free leader", string(l.message))] ==
+              ["20000", "10"]
         # The flag is the certificate's: at the budget it reads `false`, and the certificate
         # bounds the shortfall of the log wealth from the leader's.
         r30 = optimise(BestConstantRebalancedPortfolio(), rows(rd, 1:30))

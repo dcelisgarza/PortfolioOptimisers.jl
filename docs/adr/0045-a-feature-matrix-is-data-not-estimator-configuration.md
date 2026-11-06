@@ -1211,3 +1211,20 @@ therefore adds `idx`, the `test_idx` of the fold, to `PredictionResult`. The ind
 records it, and the whole-sample `predict` records `nothing`. The timestamps stay the first key:
 the attribution matches by timestamp whenever both sides carry them, and by position otherwise.
 `fold_row_indices` is unchanged and still reads the timestamps.
+
+## Amendment (2026-10-28, #1867)
+
+**`NoDecay` is removed, and `decay = nothing` is the flat decay.** `Proximity(; decay = nothing)`
+is the neighbourhood indicator that `BinaryNeighbourhood` was. ADR 0222 spells a decay that does
+not fall off as `nothing`, and ADR 0048 carries the full amendment. Where the decision above
+names `Proximity(; decay = NoDecay())`, read `Proximity(; decay = nothing)`.
+
+## Amendment (2026-11-04, #1973)
+
+**A time-varying Feature Matrix holds its observations last.** Where the decision above states
+`Z :: obs × assets × features`, observation axis always leading, read `Z :: assets × features ×
+observations` (`features × assets × observations` at `dims = 2`). The reason of the rule was a
+convention, a rank-3 array that reads like the returns matrix. [ADR
+0230](0230-every-rank-3-array-holds-its-observations-on-its-last-axis.md) puts the observations
+last in every rank-3 array, so that the slice of one observation is one contiguous block. The
+static shape `assets × features` and the dispatch on `Arr3Num` do not change.

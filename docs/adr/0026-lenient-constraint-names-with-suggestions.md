@@ -33,7 +33,7 @@ typo is obvious while a legitimately-absent asset stays quiet.**
 
 - The "variable not in asset universe" message (both the `@warn` and the `strict` `ArgumentError`)
   gains a fuzzy `" (did you mean \`AAPL\`?)"` suggestion, produced by `did_you_mean`using
-  [`StringDistances.jl`](<https://github.com/matthieugomez/StringDistances.jl>).
+  [`StringDistances.jl`](<https://docs.juliahub.com/General/StringDistances/stable/>).
 - The suggestion is **threshold-gated**: it only appears when the nearest candidate clears a
   normalised-similarity cutoff (`findnearest(...; min_score)`). A typo (`APL` vs `AAPL`, score 0.75)
   fires; an asset that is simply absent from this subset has no close neighbour and draws *no*
@@ -121,6 +121,18 @@ a JuMP termination status stays visible), solver names sorted for deterministic 
 `:settings` entries never printed. The raw exceptions and settings remain available on
 `JuMPResult.trials` — the log is summarised, the data is not lost. Regression coverage in the
 "failed_solve_msg" testset of [test_01_structs.jl](../../test/test_01_structs.jl).
+
+## Amendment (2026-10-30): the termination status has a line of its own
+
+The amendment of 2026-07-06 said that the cut to 200 characters keeps a JuMP termination status
+visible. That is not true. The first line of the error of `JuMP.assert_is_solved_and_feasible`
+holds no status, so the warning never said that a problem was infeasible or unbounded.
+
+Each solve loop now records `JuMP.termination_status` under `:termination_status` in the trial of
+a failed solver. `failed_solve_msg` writes that key as one line, and `solve_status_msg` states in
+words what an infeasible or unbounded status means. The builder skips `:err`, the many lines of the
+solution summary, as it skips `:settings`. The loop of `JuMPOptimisationEstimator` warns through
+`failed_solve_msg` too, in place of a generic text. The raw data stays in the trials.
 
 Separately, the config idiom this ADR describes for `STRING_DISTANCE` ("global, mutable config …
 mirrors `COMPACT_SHOW`") has been superseded: the value is now an immutable `StringDistanceConfig`

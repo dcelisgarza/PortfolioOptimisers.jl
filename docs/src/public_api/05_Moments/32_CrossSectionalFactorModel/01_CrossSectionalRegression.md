@@ -13,6 +13,7 @@ RankDeficiencyRefusal
 UncheckedSolve
 MinimumNormSolve
 DependentColumnDrop
+NormalEquationsSolve
 AbstractUnseenMemberRule
 ZeroUnseenMember
 SolvedUnseenMember
@@ -26,10 +27,9 @@ CrossSectionalRegression
 ```@docs
 cross_sectional_regression
 StatsAPI.predict(csr::CrossSectionalRegression, Z::Arr3Num)
-cross_sectional_r2
-mean_cross_sectional_r2
 port_opt_view(csr::CrossSectionalRegression, i, args...)
 cross_sectional_solve
 cross_sectional_target_solve
 assert_cross_sectional_target_solve
+cross_sectional_rank
 ```

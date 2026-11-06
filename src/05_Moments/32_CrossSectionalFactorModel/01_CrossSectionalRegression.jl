@@ -3,7 +3,7 @@ $(DocStringExtensions.TYPEDEF)
 
 Abstract supertype for all cross-sectional solve algorithm types.
 
-A member decides what [`CrossSectionalLinearRegression`](@ref) and [`CrossSectionalTargetRegression`](@ref) do when the weighted design of an observation is rank deficient, and the members differ on two axes: whether a rank test runs at all, and what happens when it fails. The decision is a real one, because Julia's `\\` answers a deficient design in three different ways. A **square** design goes to an `LU` factorisation that throws `LinearAlgebra.SingularException` on an exactly zero pivot. A **non-square** one goes to a column-pivoted `QR` whose solve completes the orthogonal factorisation, so it returns the minimum-norm solution and agrees with a pseudo-inverse. A design that is only **nearly** dependent passes the rank test of every member and returns a badly conditioned answer that a pseudo-inverse would truncate.
+A member decides what [`CrossSectionalLinearRegression`](@ref) and [`CrossSectionalTargetRegression`](@ref) do when the weighted design of an observation is rank deficient. The members differ in whether a rank test runs at all, and in what happens when it fails. The choice changes the answer, because Julia's `\\` answers a deficient design in three ways. A **square** design goes to an `LU` factorisation that throws `LinearAlgebra.SingularException` on an exactly zero pivot. A **non-square** one goes to a column-pivoted `QR` whose solve completes the orthogonal factorisation, so it returns the minimum-norm solution and agrees with a pseudo-inverse. A design that is only **nearly** dependent passes the rank test of every member and returns a badly conditioned answer that a pseudo-inverse would truncate.
 
 A member means the same thing under both estimators, so the two give the same factor returns for a least-squares target. [`CrossSectionalTargetRegression`](@ref) refuses [`MinimumNormSolve`](@ref), whose answer on a target is the answer of [`PseudoInverseFallback`](@ref).
 
@@ -13,11 +13,13 @@ All concrete and/or abstract types representing cross-sectional solve algorithms
 
 In order to implement a new concrete type that works seamlessly with the library, subtype `AbstractCrossSectionalSolveAlgorithm` and implement the following methods. A member that only [`CrossSectionalLinearRegression`](@ref) reads needs only [`cross_sectional_solve`](@ref), and a member that only [`CrossSectionalTargetRegression`](@ref) reads needs only [`cross_sectional_target_solve`](@ref).
 
-A new member gets no mask of dropped columns: the regression keeps `dc` at `nothing` for every member except [`DependentColumnDrop`](@ref). So a new member that drops a column gives it no mark, and the regression diagnostics and the factor attribution read the pseudo-inverse of the full design of each observation for it.
+A new member gets no mask of dropped columns, because the regression keeps `dc` at `nothing` for every member except [`DependentColumnDrop`](@ref). So a new member that drops a column gives it no mark, and the regression diagnostics and the factor attribution read the pseudo-inverse of the full design of each observation for it.
+
+Each verb returns the factor returns and the residual count of the fit that it makes, because only the fit knows the parameters that it spent. A least-squares fit is a projection onto the span of the design, so it spends the rank of the design, and not its number of columns. Read that rank with [`cross_sectional_rank`](@ref), the rank test of every member of the library, so that the count of a new member agrees with theirs and with the t-statistics of [`cs_regression_t_stats`](@ref). A penalised fit spends fewer, and [`residual_count`](@ref) reads its count. The regression writes the count of each observation into `edof` of [`CrossSectionalRegression`](@ref).
 
 ## `cross_sectional_solve`
 
-  - [`cross_sectional_solve(alg::AbstractCrossSectionalSolveAlgorithm, A::MatNum, y::VecNum, t::Integer)`](@ref): Returns the factor returns of one observation of a [`CrossSectionalLinearRegression`](@ref).
+  - [`cross_sectional_solve(alg::AbstractCrossSectionalSolveAlgorithm, A::MatNum, y::VecNum, t::Integer)`](@ref): Returns the factor returns and the residual count of one observation of a [`CrossSectionalLinearRegression`](@ref).
 
 ### Arguments
 
@@ -28,21 +30,27 @@ A new member gets no mask of dropped columns: the regression keeps `dc` at `noth
 
 ### Returns
 
-  - `f::VecNum`: Factor returns of the observation, of length `size(A, 2)`.
+  - `(; f, edof)::NamedTuple`:
+
+      + `f::VecNum`: Factor returns of the observation, of length `size(A, 2)`.
+      + `edof::Real`: Residual count of the fit, `size(A, 1)` less the rank of the columns that the fit solves.
 
 ## `cross_sectional_target_solve`
 
-  - [`cross_sectional_target_solve(alg::AbstractCrossSectionalSolveAlgorithm, tgt::AbstractRegressionTarget, obs::NamedTuple)`](@ref): Returns the factor returns of one observation of a [`CrossSectionalTargetRegression`](@ref).
+  - [`cross_sectional_target_solve(alg::AbstractCrossSectionalSolveAlgorithm, tgt::AbstractRegressionTarget, obs::NamedTuple)`](@ref): Returns the factor returns and the residual count of one observation of a [`CrossSectionalTargetRegression`](@ref).
 
 ### Arguments
 
   - `alg`: The concrete subtype instance.
   - `tgt`: Regression target of the observation, which carries its weights. Fit it with `StatsAPI.fit(tgt, A, y)`.
-  - `obs`: The observation, `(; A, y, D, t)`: the exposures `A` and the returns `y` of the eligible assets, the weighted design `D` for a rank test, and the index `t` of the observation.
+  - `obs`: The observation, `(; A, y, D, t, F)`: the exposures `A` and the returns `y` of the eligible assets, the weighted design `D` for a rank test, the index `t` of the observation, and the column-pivoted `QR` `F` of `D` that the regression already took, or `nothing`.
 
 ### Returns
 
-  - `f::VecNum`: Factor returns of the observation, of length `size(obs.A, 2)`.
+  - `(; f, edof)::NamedTuple`:
+
+      + `f::VecNum`: Factor returns of the observation, of length `size(obs.A, 2)`.
+      + `edof::Real`: Residual count of the fit, [`residual_count`](@ref) of the fitted target and the design that it fitted.
 
 ## `assert_cross_sectional_target_solve`
 
@@ -74,6 +82,7 @@ MySolve()
   - [`UncheckedSolve`](@ref)
   - [`MinimumNormSolve`](@ref)
   - [`DependentColumnDrop`](@ref)
+  - [`NormalEquationsSolve`](@ref)
   - [`CrossSectionalLinearRegression`](@ref)
   - [`CrossSectionalTargetRegression`](@ref)
 """
@@ -83,7 +92,7 @@ $(DocStringExtensions.TYPEDEF)
 
 Solves the full-rank design directly and pseudo-inverts a rank-deficient one.
 
-This is the default of [`CrossSectionalLinearRegression`](@ref) and of [`CrossSectionalTargetRegression`](@ref). It never throws on a dependent factor set: a square design that `\\` would refuse reaches the pseudo-inverse instead, and a non-square one reaches the same minimum-norm answer through either route. The rank test is what it costs, because the design is factorised twice whenever it passes.
+This is the default of [`CrossSectionalLinearRegression`](@ref) and of [`CrossSectionalTargetRegression`](@ref). It never throws on a dependent factor set. A square design that `\\` would refuse reaches the pseudo-inverse instead, and a non-square one reaches the same minimum-norm answer through either route. The rank test costs a second factorisation of every design that passes it.
 
 A target has no pseudo-inverse, so on a rank-deficient design it fits the columns that [`DependentColumnDrop`](@ref) keeps, and the answer is projected onto the row space of the weighted design. Every coefficient vector that differs from the fit by a vector of the null space gives the same linear predictor, and the projection is the one of least norm among them. For a least-squares target it is the answer of [`CrossSectionalLinearRegression`](@ref). The projection reads the fit through the linear predictor alone, which is what [`is_basis_invariant`](@ref) states of a target, so the constructor refuses a target that answers `false`.
 
@@ -131,7 +140,7 @@ $(DocStringExtensions.TYPEDEF)
 
 Runs no rank test and takes whatever `\\` returns.
 
-It is the cheapest member, because it factorises the design once instead of twice. A rank-deficient **non-square** design reaches a column-pivoted `QR` whose solve returns the minimum-norm answer, so it agrees with [`MinimumNormSolve`](@ref) there. An exactly singular **square** design reaches an `LU` factorisation instead and throws `LinearAlgebra.SingularException`, which is the one case where taking the answer unchecked costs the fit.
+It is the cheapest member, because it factorises the design once instead of twice. A rank-deficient **non-square** design reaches a column-pivoted `QR` whose solve returns the minimum-norm answer, so it agrees with [`MinimumNormSolve`](@ref) there. An exactly singular **square** design reaches an `LU` factorisation instead and throws `LinearAlgebra.SingularException`. That is the one design on which the member fails.
 
 Under [`CrossSectionalTargetRegression`](@ref) the target sees the full design, and its own factorisation decides. `GLM` drops a collinear column by its own pivot and gives it a return of zero, and its pivot need not drop the column that the rank test of [`DependentColumnDrop`](@ref) drops. A factor set that is dependent to rounding alone can pass the pivot of `GLM` and fail its Cholesky factorisation, which throws `LinearAlgebra.PosDefException`. On the carry fold of a [`CrossSectionalFactorPrior`](@ref), a move solves an observation again when [`cross_sectional_rank`](@ref) finds it rank-deficient, so an observation that the pivot of `GLM` drops and the rank test keeps can keep the answer of the old basis.
 
@@ -155,7 +164,7 @@ $(DocStringExtensions.TYPEDEF)
 
 Always pseudo-inverts, so it runs no rank test and takes no threshold.
 
-Every observation takes the minimum-norm least-squares solution, whatever its rank, so the factor returns of two observations are comparable even when one of them lost a factor. It is the most expensive member. It parts from [`UncheckedSolve`](@ref) on a square design, which `\\` sends to an `LU` factorisation, and on a design that is only nearly dependent, where the pseudo-inverse truncates a singular value that `\\` keeps.
+Every observation takes the minimum-norm least-squares solution, whatever its rank, so one rule gives the factor returns of an observation that lost a factor and of one that did not. It is the most expensive member, because it takes a singular value decomposition of every design. It parts from [`UncheckedSolve`](@ref) on a square design, which `\\` sends to an `LU` factorisation, and on a design that is only nearly dependent, where the pseudo-inverse truncates a singular value that `\\` keeps.
 
 [`CrossSectionalTargetRegression`](@ref) refuses it. A target has no pseudo-inverse, and the projection of [`PseudoInverseFallback`](@ref) changes nothing on a design of full rank, so the member would be a second name for that one.
 
@@ -178,7 +187,7 @@ $(DocStringExtensions.TYPEDEF)
 
 Solves the full-rank design directly, and drops the dependent columns of a rank-deficient one.
 
-The member reads the rank `r` of the weighted design with [`cross_sectional_rank`](@ref). When `r` falls short of the factor count, it keeps the columns that the first `r` pivots of the column-pivoted `QR` of the design name, solves on them, and gives every other factor a return of zero. A design of rank zero gives zero to every factor. The answer is a basic solution, not the answer of least norm: the fitted values and the residuals are those of [`PseudoInverseFallback`](@ref), and the factor returns are not. The pivot prefers the column of larger weighted norm, so which factor takes zero depends on the scale of the exposures and on the basis of a Factor Family.
+The member reads the rank `r` of the weighted design with [`cross_sectional_rank`](@ref). When `r` falls short of the factor count, it keeps the columns that the first `r` pivots of the column-pivoted `QR` of the design name, solves on them, and gives every other factor a return of zero. A design of rank zero gives zero to every factor. The answer is a basic solution, not the answer of least norm. Its fitted values and its residuals are those of [`PseudoInverseFallback`](@ref), and its factor returns are not. The pivot prefers the column of larger weighted norm, so which factor takes zero depends on the scale of the exposures and on the basis of a Factor Family.
 
 The fit marks each dropped factor in the `dc` field of [`CrossSectionalRegression`](@ref). So the t-statistics of [`cs_regression_t_stats`](@ref) and the standard errors of a factor attribution give a dropped factor no estimation error, and read the kept factors on the columns that the fit solved, rather than the pseudo-inverse of the whole design.
 
@@ -200,6 +209,52 @@ struct DependentColumnDrop <: AbstractCrossSectionalSolveAlgorithm end
 """
 $(DocStringExtensions.TYPEDEF)
 
+Solves the normal equations of a well-conditioned design, and gives every other design to [`PseudoInverseFallback`](@ref).
+
+The member forms the Gram matrix ``\\mathbf{D}^{\\intercal} \\mathbf{D}`` of the weighted design and factorises it by a Cholesky factorisation with pivots. That costs about half of the column-pivoted `QR` that the other members take. The Gram matrix squares the condition number of the design, so the answer loses about twice the digits that the `QR` loses. The pivots of the factorisation estimate the condition number of the design. When that estimate is at most ``\\epsilon^{-1/4}``, about ``8 \\times 10^{3}`` in `Float64`, the member solves the normal equations, and it counts every column, as the rank test of [`cross_sectional_rank`](@ref) does on such a design. Otherwise it takes the answer and the count of [`PseudoInverseFallback`](@ref), so it never answers a nearly dependent design with the normal equations.
+
+!!! warning
+
+    The normal equations lose precision with the square of the condition number. Against the `QR` solve of [`PseudoInverseFallback`](@ref), the relative error of the factor returns of a `1600 × 28` design was about `3e-15` at a condition number of `10`, `9e-14` at `1e2`, `8e-12` at `1e3` and `5e-10` at `1e4`. The member is the default of no estimator. The leverage check of the regression takes its own `QR` of the design under this member, so the full gain of the member needs `leverage = false` on the estimator as well.
+
+Under [`CrossSectionalTargetRegression`](@ref), the member runs the same test on the weighted design. A design that passes goes to the target as it stands, so `GLM` factorises its own Gram matrix, and a design that fails takes the answer of [`PseudoInverseFallback`](@ref). So the constructor refuses a target that [`is_basis_invariant`](@ref) answers `false` for, as it does under [`PseudoInverseFallback`](@ref).
+
+# Mathematical definition
+
+```math
+\\begin{align}
+\\mathbf{\\Pi}^{\\intercal} \\mathbf{D}^{\\intercal} \\mathbf{D} \\mathbf{\\Pi} &= \\mathbf{U}^{\\intercal} \\mathbf{U}\\,, &
+\\hat{\\kappa} &= \\left| \\frac{U_{11}}{U_{KK}} \\right| \\le \\epsilon^{-1/4}\\,.
+\\end{align}
+```
+
+Where:
+
+  - ``\\mathbf{D}``: Weighted design of one observation, `eligible assets × factors`.
+  - ``\\mathbf{\\Pi}``, ``\\mathbf{U}``: Permutation and triangular factor of the pivoted Cholesky factorisation of the Gram matrix.
+  - ``\\hat{\\kappa}``: Estimate of the condition number of ``\\mathbf{D}``. The member solves the normal equations when it holds.
+  - $(math_dict[:K])
+  - ``\\epsilon``: Machine epsilon of the element type of ``\\mathbf{D}``.
+
+# Examples
+
+```jldoctest
+julia> NormalEquationsSolve()
+NormalEquationsSolve()
+```
+
+# Related
+
+  - [`AbstractCrossSectionalSolveAlgorithm`](@ref)
+  - [`PseudoInverseFallback`](@ref)
+  - [`CrossSectionalLinearRegression`](@ref)
+  - [`CrossSectionalTargetRegression`](@ref)
+  - [`NormalEquationsFit`](@ref)
+"""
+struct NormalEquationsSolve <: AbstractCrossSectionalSolveAlgorithm end
+"""
+$(DocStringExtensions.TYPEDEF)
+
 Abstract supertype for the Unseen Member rule of a [`CrossSectionalFactorPrior`](@ref), the rule that says what return an Unseen Member gets at an observation.
 
 An Unseen Member is a member of a constrained Factor Family that no asset of positive regression weight loads on at one observation. The exposures lag the returns, so the zero-sum condition of an observation reads the benchmark weights of an earlier one, which can still weight the member after its last asset delists. The data state nothing about its return there. The rule states the return, and with it the zero-sum condition of the observation.
@@ -218,13 +273,13 @@ In order to implement a new concrete type that works seamlessly with the library
 
   - `rule`: The member of the family.
   - `fcb`: The Factor Family Basis of the lagged exposures, one row per observation of `Zl`.
-  - `B`: Lagged exposures on the raw axis, `observations × assets × factors`.
-  - `Zl`: Lagged exposures on the reduced axis, which `fcb` gives from `B`.
+  - `B`: Lagged exposures on the raw axis, `assets × factors × observations`. Earlier releases held the observations on the first axis. A method written for them reads `B[t, :, :]`, and it must now read `B[:, :, t]`.
+  - `Zl`: Lagged exposures on the reduced axis, which `fcb` gives from `B`, in the same layout.
   - `W`: Cross-sectional weights matrix `observations × assets`. The pairs of positive weight are the sample of each observation.
 
 ### Returns
 
-  - `Z::Arr3Num`: The design to regress on.
+  - `Z::Arr3Num`: The design to regress on, `assets × factors × observations`.
   - `P`: One `t => P_t` pair per observation that the rule changes, where `P_t` is a `reduced factors × reduced factors` matrix, and the factor returns of `t` are `P_t` times the coefficients of `t`. It is empty when the rule changes no observation.
 
 # Related
@@ -294,14 +349,15 @@ $(DocStringExtensions.TYPEDEF)
 
 Holds the factor returns, the residuals, the eligible asset counts and the optional intercepts of a fitted cross-sectional regression.
 
-The result is a sibling of [`Regression`](@ref) rather than a widening of it, because the two disagree on what an asset index means: a [`Regression`](@ref) holds one row per asset and [`port_opt_view`](@ref) slices its rows, whereas this result holds one row per observation and one column per asset, so the same index slices its columns. It carries no loadings matrix, because the exposures are the regression's input and an Exposure Estimator produces them.
+The result is a sibling of [`Regression`](@ref) rather than a widening of it, because the two disagree on what an asset index means. A [`Regression`](@ref) holds one row per asset, and [`port_opt_view`](@ref) slices its rows. This result holds one row per observation and one column per asset, so the same index slices its columns. It carries no loadings matrix, because the exposures are the regression's input and an Exposure Estimator produces them.
 
 # Mathematical definition
 
 ```math
 \\begin{align}
-\\boldsymbol{f}_{t} &= \\underset{\\boldsymbol{f}}{\\arg\\min} \\sum_{i = 1}^{N} w_{t,i} \\left(x_{t,i} - b_{t} - \\boldsymbol{z}_{t,i}^{\\intercal} \\boldsymbol{f}\\right)^{2} \\\\
-\\boldsymbol{\\varepsilon}_{t} &= \\boldsymbol{x}_{t} - b_{t} \\boldsymbol{1} - \\mathbf{Z}_{t} \\boldsymbol{f}_{t}\\,.
+\\left(b_{t}, \\boldsymbol{f}_{t}\\right) &= \\underset{b, \\boldsymbol{f}}{\\arg\\min} \\sum_{i = 1}^{N} w_{t,i} \\left(x_{t,i} - b - \\boldsymbol{z}_{t,i}^{\\intercal} \\boldsymbol{f}\\right)^{2} \\\\
+\\boldsymbol{\\varepsilon}_{t} &= \\boldsymbol{x}_{t} - b_{t} \\boldsymbol{1} - \\mathbf{Z}_{t} \\boldsymbol{f}_{t}\\,, \\\\
+\\nu_{t} &= n_{t} - \\operatorname{tr}\\left(2 \\mathbf{S}_{t} - \\mathbf{S}_{t}^{\\intercal} \\mathbf{S}_{t}\\right)\\,.
 \\end{align}
 ```
 
@@ -313,11 +369,18 @@ Where:
   - ``\\mathbf{Z}_{t}``: Exposure slice of observation ``t``, ``N \\times K``, one row per asset.
   - ``\\boldsymbol{z}_{t,i}``: Exposures of asset ``i`` at observation ``t``, the ``i``-th row of ``\\mathbf{Z}_{t}``.
   - ``w_{t,i} \\geq 0``: Cross-sectional weight of asset ``i`` at observation ``t``. A weight of zero excludes the pair from the fit.
-  - ``b_{t}``: Intercept of observation ``t``, the ``t``-th entry of `b`. The term is absent when `b` is unset.
+  - ``b_{t}``: Intercept of observation ``t``, the ``t``-th entry of `b`. When `b` is unset, the minimisation holds ``b`` at zero.
+  - ``\\nu_{t}``: Residual count of observation ``t``, the ``t``-th entry of `edof`.
+  - ``n_{t}``: Number of eligible assets at observation ``t``, the ``t``-th entry of `n`.
+  - ``\\mathbf{S}_{t}``: Smoother of the fit of observation ``t``, the ``n_{t} \\times n_{t}`` matrix that maps the returns of the eligible assets to their fitted values.
   - $(math_dict[:N])
   - $(math_dict[:K])
 
-Each observation is one independent problem, so a factor return is a cross-sectional quantity and never a time-series one.
+Each observation is one independent problem, so a factor return is a cross-sectional quantity and never a time-series one. When the weighted design of an observation is rank deficient, the minimiser is not unique, and the solve algorithm of the estimator picks one of them.
+
+The minimisation is the fit of [`CrossSectionalLinearRegression`](@ref) and of a least-squares target. A [`CrossSectionalTargetRegression`](@ref) whose target is not least squares, such as a penalised target or a [`GeneralisedLinearModel`](@ref) whose link is not the identity, minimises the loss of its target with the same weights. Under an intercept, every fit reads the returns and the exposures centred on their weighted means, and ``b_{t}`` is the weighted mean of the returns less the weighted mean of the exposures times ``\\boldsymbol{f}_{t}``. For a least-squares fit, this is the joint minimiser above.
+
+The fit of an observation spends parameters on its eligible assets, and ``\\nu_{t}`` is the count that it leaves. It follows from ``\\mathbb{E}[\\mathrm{RSS}_{t}] = \\sigma^{2} \\operatorname{tr}((\\mathbf{I} - \\mathbf{S}_{t})^{\\intercal} (\\mathbf{I} - \\mathbf{S}_{t}))`` under a correct mean, so it is the count of the chi-squared law of the residuals. A least-squares fit is a projection onto the span of the weighted design, so ``\\mathbf{S}_{t}^{\\intercal} \\mathbf{S}_{t} = \\mathbf{S}_{t}``, and it spends the rank of the design, not its number of columns. A rank-deficient observation thus spends fewer parameters than ``K``, as the t-statistics of [`cs_regression_t_stats`](@ref) count it. A penalised fit spends fewer still, and [`residual_count`](@ref) reads its count. The intercept spends one more parameter at an observation with an eligible asset, because the design is centred on the weighted mean, and the fit of the centred design leaves the weighted mean alone. A Cross-Sectional Factor Prior reads `edof` for the degrees of freedom of each idiosyncratic variance, through [`cross_sectional_variance_counts`](@ref).
 
 A pair whose leverage is one has a direction of the design of its own, for example the only member of a level of a one-hot family. The fit reproduces its return whatever the return is, so its residual is zero by construction and tells nothing about its idiosyncratic risk. `h1` marks these pairs, and a least-squares fit writes an exact zero there in place of the round-off of the subtraction.
 
@@ -335,6 +398,7 @@ $(DocStringExtensions.FIELDS)
         f::MatNum,
         eps::MatNum,
         n::AbstractVector{<:Integer},
+        edof::Option{<:VecNum} = nothing,
         b::Option{<:VecNum} = nothing,
         h1::Option{<:AbstractMatrix{Bool}} = nothing,
         dc::Option{<:AbstractMatrix{Bool}} = nothing,
@@ -348,6 +412,7 @@ Keywords correspond to the struct's fields.
   - `!isempty(f)`, `!isempty(eps)` and `!isempty(n)`.
   - `size(f, 1) == size(eps, 1) == length(n)`.
   - `all(x -> x >= 0, n)`.
+  - If provided, `length(edof) == length(n)`.
   - If provided, `!isempty(b)`, and `length(b) == size(f, 1)`.
   - If provided, `size(h1) == size(eps)`.
   - If provided, `size(dc) == size(f)`.
@@ -358,21 +423,22 @@ Keywords correspond to the struct's fields.
 `CrossSectionalRegression` defines its own [`port_opt_view`](@ref) method rather than deriving one from field tags.
 
   - `eps` and `h1` are sliced on their **second** axis, which is the asset axis of a cross-sectional result.
-  - `f`, `n`, `b`, `dc` and `lv` pass through unchanged. Each is indexed by observation, by factor or by both, and neither axis follows an asset selection.
+  - `f`, `n`, `edof`, `b`, `dc` and `lv` pass through unchanged. Each is indexed by observation, by factor or by both, and neither axis follows an asset selection.
 
 # Examples
 
 ```jldoctest
 julia> CrossSectionalRegression(; f = [1.0 2.0; 3.0 4.0], eps = [0.1 0.2 0.3; 0.4 0.5 0.6],
-                                n = [3, 3])
+                                n = [3, 3], edof = [1, 1])
 CrossSectionalRegression
-    f ┼ 2×2 Matrix{Float64}
-  eps ┼ 2×3 Matrix{Float64}
-    n ┼ Vector{Int64}: [3, 3]
-    b ┼ nothing
-   h1 ┼ nothing
-   dc ┼ nothing
-   lv ┴ nothing
+     f ┼ 2×2 Matrix{Float64}
+   eps ┼ 2×3 Matrix{Float64}
+     n ┼ Vector{Int64}: [3, 3]
+  edof ┼ Vector{Int64}: [1, 1]
+     b ┼ nothing
+    h1 ┼ nothing
+    dc ┼ nothing
+    lv ┴ nothing
 ```
 
 # Related
@@ -398,6 +464,10 @@ CrossSectionalRegression
     """
     n
     """
+    Residual count of each fit, of length `observations`, or `nothing`. An entry is the count of assets of the fit less the parameters that the fit spent: the rank of the weighted design for a least-squares fit, the count that [`residual_count`](@ref) reads for every other fit, and one more for the intercept. `nothing` states no count, as a result that a caller builds by hand does, and a Cross-Sectional Factor Prior then states no degrees of freedom of its idiosyncratic variances.
+    """
+    edof
+    """
     $(arg_dict[:b])
     """
     b
@@ -414,7 +484,7 @@ CrossSectionalRegression
     """
     lv
     function CrossSectionalRegression(f::MatNum, eps::MatNum, n::AbstractVector{<:Integer},
-                                      b::Option{<:VecNum},
+                                      edof::Option{<:VecNum}, b::Option{<:VecNum},
                                       h1::Option{<:AbstractMatrix{Bool}},
                                       dc::Option{<:AbstractMatrix{Bool}},
                                       lv::Option{<:AbstractVector{Bool}})
@@ -425,6 +495,9 @@ CrossSectionalRegression
                   DimensionMismatch("f ($(size(f, 1)) rows), eps ($(size(eps, 1)) rows) and n ($(length(n))) must agree on the observation axis"))
         @argcheck(all(x -> x >= zero(x), n),
                   DomainError(n, "all entries of n must be >= 0"))
+        # A result with no count passes, because `n` stands in for it.
+        @argcheck(length(something(edof, n)) == length(n),
+                  DimensionMismatch("edof ($(length(something(edof, n)))) must have one entry per observation ($(length(n)))"))
         if isa(b, VecNum)
             @argcheck(!isempty(b), IsEmptyError("b cannot be empty"))
             @argcheck(length(b) == size(f, 1),
@@ -442,16 +515,17 @@ CrossSectionalRegression
             @argcheck(length(lv) == size(f, 2),
                       DimensionMismatch("lv ($(length(lv))) must have one entry per column of f ($(size(f, 2)))"))
         end
-        fs = (f, eps, n, b, h1, dc, lv)
+        fs = (f, eps, n, edof, b, h1, dc, lv)
         return new{map(typeof, fs)...}(fs...)
     end
 end
 function CrossSectionalRegression(; f::MatNum, eps::MatNum, n::AbstractVector{<:Integer},
+                                  edof::Option{<:VecNum} = nothing,
                                   b::Option{<:VecNum} = nothing,
                                   h1::Option{<:AbstractMatrix{Bool}} = nothing,
                                   dc::Option{<:AbstractMatrix{Bool}} = nothing,
                                   lv::Option{<:AbstractVector{Bool}} = nothing)::CrossSectionalRegression
-    return CrossSectionalRegression(f, eps, n, b, h1, dc, lv)
+    return CrossSectionalRegression(f, eps, n, edof, b, h1, dc, lv)
 end
 """
     port_opt_view(csr::CrossSectionalRegression, i, args...)
@@ -462,7 +536,7 @@ Return a view of a [`CrossSectionalRegression`](@ref) result, selecting only the
 
  1. Take a column view of `eps` over `i`, giving the residuals of the selected assets. The asset axis of a cross-sectional result is the **second** one, because a row of `eps` is one observation.
  2. Take the same view of `h1` when it is set, through [`nothing_scalar_array_view_odd_order`](@ref).
- 3. Build a new [`CrossSectionalRegression`](@ref) from the two views and the five untouched fields, which re-runs every guard of the constructor.
+ 3. Build a new [`CrossSectionalRegression`](@ref) from the two views and the six untouched fields, which re-runs every guard of the constructor.
 
 # Arguments
 
@@ -477,25 +551,27 @@ Return a view of a [`CrossSectionalRegression`](@ref) result, selecting only the
 # Examples
 
 ```jldoctest
-julia> csr = CrossSectionalRegression(; f = [1.0 2.0], eps = [0.1 0.2 0.3], n = [3])
+julia> csr = CrossSectionalRegression(; f = [1.0 2.0], eps = [0.1 0.2 0.3], n = [3], edof = [1])
 CrossSectionalRegression
-    f ┼ 1×2 Matrix{Float64}
-  eps ┼ 1×3 Matrix{Float64}
-    n ┼ Vector{Int64}: [3]
-    b ┼ nothing
-   h1 ┼ nothing
-   dc ┼ nothing
-   lv ┴ nothing
+     f ┼ 1×2 Matrix{Float64}
+   eps ┼ 1×3 Matrix{Float64}
+     n ┼ Vector{Int64}: [3]
+  edof ┼ Vector{Int64}: [1]
+     b ┼ nothing
+    h1 ┼ nothing
+    dc ┼ nothing
+    lv ┴ nothing
 
 julia> PortfolioOptimisers.port_opt_view(csr, [1, 3])
 CrossSectionalRegression
-    f ┼ 1×2 Matrix{Float64}
-  eps ┼ 1×2 SubArray{Float64, 2, Matrix{Float64}, Tuple{Base.Slice{Base.OneTo{Int64}}, Vector{Int64}}, false}
-    n ┼ Vector{Int64}: [3]
-    b ┼ nothing
-   h1 ┼ nothing
-   dc ┼ nothing
-   lv ┴ nothing
+     f ┼ 1×2 Matrix{Float64}
+   eps ┼ 1×2 SubArray{Float64, 2, Matrix{Float64}, Tuple{Base.Slice{Base.OneTo{Int64}}, Vector{Int64}}, false}
+     n ┼ Vector{Int64}: [3]
+  edof ┼ Vector{Int64}: [1]
+     b ┼ nothing
+    h1 ┼ nothing
+    dc ┼ nothing
+    lv ┴ nothing
 ```
 
 # Related
@@ -505,18 +581,82 @@ CrossSectionalRegression
 """
 function port_opt_view(csr::CrossSectionalRegression, i, args...)::CrossSectionalRegression
     return CrossSectionalRegression(; f = csr.f, eps = view(csr.eps, :, i), n = csr.n,
-                                    b = csr.b,
+                                    edof = csr.edof, b = csr.b,
                                     h1 = nothing_scalar_array_view_odd_order(csr.h1, :, i),
                                     dc = csr.dc, lv = csr.lv)
+end
+"""
+    cross_sectional_residual_dof(edof::Nothing, n::AbstractVector{<:Integer}, neff::VecNum)
+        -> Nothing
+    cross_sectional_residual_dof(edof::VecNum, n::AbstractVector{<:Integer}, neff::VecNum)
+        -> VecNum
+
+Return the degrees of freedom of each variance that reads the residuals of a cross-sectional fit, or `nothing` when the fit records no residual count.
+
+The fit spends its parameters on the assets of each observation, not on the observations of each asset. So the ``\\sum_{t} n_{t}`` residuals keep the fraction ``\\phi`` of their degrees of freedom, and a variance that reads ``n_{i}^{\\mathrm{eff}}`` effective observations of asset ``i`` keeps that fraction of them. The fraction spreads the spend evenly over the assets.
+
+# Mathematical definition
+
+```math
+\\begin{align}
+\\phi &= \\dfrac{\\sum_{t} \\nu_{t}}{\\sum_{t} n_{t}}\\,, \\\\
+\\nu_{i} &= \\phi \\, n_{i}^{\\mathrm{eff}}\\,.
+\\end{align}
+```
+
+Where:
+
+  - ``\\phi``: Fraction of the degrees of freedom that the fit leaves.
+  - ``\\nu_{t}``: Residual count of the fit of observation ``t``, the entry `t` of `edof`.
+  - ``n_{t}``: Number of eligible assets at observation ``t``, the entry `t` of `n`.
+  - ``\\nu_{i}``: Degrees of freedom of the variance of asset ``i``.
+  - ``n_{i}^{\\mathrm{eff}}``: Effective count of the observations of asset ``i``, the entry `i` of `neff`.
+
+On a balanced panel of ``T`` observations and ``N`` assets with no intercept and designs of full rank, ``\\nu_{i} = T (N - K) / N`` when ``n_{i}^{\\mathrm{eff}} = T``.
+
+# Algorithm
+
+The method that Julia selects is the algorithm.
+
+ 1. `edof` is `nothing`: the fit records no count, as a fit that a caller builds by hand does, so the degrees of freedom are not known.
+ 2. `edof` is a vector: take ``\\phi``, and scale `neff` by it.
+
+# Arguments
+
+  - `edof`: The residual count of each observation, the field of [`CrossSectionalRegression`](@ref), or `nothing`.
+  - `n`: The count of eligible assets of each observation.
+  - `neff`: The effective count of the observations of each asset that the variance reads.
+
+# Returns
+
+  - `nu::Option{<:VecNum}`: The degrees of freedom of each variance, or `nothing`.
+
+# Related
+
+  - [`CrossSectionalRegression`](@ref)
+  - [`cross_sectional_variance_counts`](@ref)
+"""
+function cross_sectional_residual_dof(::Nothing, ::AbstractVector{<:Integer}, ::VecNum)
+    return nothing
+end
+function cross_sectional_residual_dof(edof::VecNum, n::AbstractVector{<:Integer},
+                                      neff::VecNum)
+    return (sum(edof) / sum(n)) * neff
 end
 """
 $(DocStringExtensions.TYPEDEF)
 
 Fits one weighted least squares per observation across the assets, in closed form.
 
-The solve runs on the weighted design ``\\sqrt{w_{t,i}} \\, \\boldsymbol{z}_{t,i}`` rather than on the normal matrix ``\\mathbf{Z}_{t}^{\\intercal} \\mathbf{W}_{t} \\mathbf{Z}_{t}``, which halves the condition number in the exponent, and `alg` decides what happens when that design is rank deficient.
+The solve runs on the weighted design ``\\sqrt{w_{t,i}} \\, \\boldsymbol{z}_{t,i}`` rather than on the normal matrix ``\\mathbf{Z}_{t}^{\\intercal} \\mathbf{W}_{t} \\mathbf{Z}_{t}``. The condition number of the normal matrix is the square of the condition number of the weighted design. `alg` decides what happens when the weighted design is rank deficient.
 
-The square root sets the arithmetic of the solve. An integer and a `Rational` weight have a floating-point square root, so the solve of a `Rational` panel runs in floating point. `f` keeps the `Rational` type of the panel, and holds the floating-point answer written as a `Rational`, not the exact least-squares answer. A caller who needs the exact answer solves the weighted normal equations in `Rational` arithmetic.
+The square root sets the arithmetic of the solve. A `Rational` weight has a floating-point square root, so the solve of a `Rational` panel runs in floating point. `f` keeps the `Rational` type of the panel, and holds the floating-point answer written as a `Rational`, not the exact least-squares answer. A caller who needs the exact answer solves the weighted normal equations in `Rational` arithmetic.
+
+The leverage check and the solve read one column-pivoted `QR` of the weighted design, so the check costs a triangular solve on top of the factorisation of the solve. `leverage = false` skips the check, and with [`NormalEquationsSolve`](@ref) the fit then takes no `QR` of a well-conditioned design.
+
+!!! warning
+
+    `leverage = false` states that no eligible pair has a leverage of one. On a design with such a pair, for example the only member of a level of a one-hot family, the residual of the pair keeps the round-off of the subtraction rather than an exact zero, and no reader of the fit leaves it out. Its idiosyncratic variance is then a round-off too, and a standardised residual that divides by it is noise, under both members of [`AbstractLeverageOneMask`](@ref).
 
 # Algorithm
 
@@ -524,9 +664,10 @@ The square root sets the arithmetic of the solve. An integer and a `Rational` we
  2. For each observation `t`, gather the eligible assets, their weights `w`, their exposures `A` and their returns `y`.
  3. When `intercept` is `true`, subtract the weighted means `ybar` and `xbar` from `y` and from `A`, so the fit runs through the weighted centroid of the cross-section.
  4. Scale `A` and `y` by `sqrt.(w)`, giving the weighted design and the weighted target.
- 5. Solve the weighted design through the branch `alg` selects, giving the row `t` of `f`.
- 6. When `intercept` is `true`, set the entry `t` of `b` to `ybar - dot(f[t, :], xbar)`.
- 7. Subtract the systematic part from `X`, giving `eps`.
+ 5. When `leverage` is `true`, take the column-pivoted `QR` of the weighted design, and mark the pairs of leverage one through [`cross_sectional_leverage_one`](@ref).
+ 6. Solve the weighted design through the branch `alg` selects, on the same factorisation when the member reads one, giving the row `t` of `f`.
+ 7. When `intercept` is `true`, set the entry `t` of `b` to `ybar - dot(f[t, :], xbar)`.
+ 8. Subtract the systematic part from `X`, giving `eps`.
 
 # Fields
 
@@ -537,6 +678,7 @@ $(DocStringExtensions.FIELDS)
     CrossSectionalLinearRegression(;
         alg::AbstractCrossSectionalSolveAlgorithm = PseudoInverseFallback(),
         intercept::Bool = false,
+        leverage::Bool = true,
         ex::FLoops.Transducers.Executor = ThreadedEx()
     ) -> CrossSectionalLinearRegression
 
@@ -549,6 +691,7 @@ julia> CrossSectionalLinearRegression()
 CrossSectionalLinearRegression
         alg ┼ PseudoInverseFallback()
   intercept ┼ Bool: false
+   leverage ┼ Bool: true
          ex ┴ Transducers.ThreadedEx{@NamedTuple{}}: Transducers.ThreadedEx()
 ```
 
@@ -570,38 +713,48 @@ CrossSectionalLinearRegression
     """
     intercept
     """
+    $(arg_dict[:csrlev])
+    """
+    leverage
+    """
     $(field_dict[:ex]) It runs the fits of the observations, which are independent problems. Each fit writes its own row, so every executor gives the same result, and a refusal is the one of the first observation that fails.
     """
     ex
     function CrossSectionalLinearRegression(alg::AbstractCrossSectionalSolveAlgorithm,
-                                            intercept::Bool,
+                                            intercept::Bool, leverage::Bool,
                                             ex::FLoops.Transducers.Executor)
-        return new{typeof(alg), typeof(intercept), typeof(ex)}(alg, intercept, ex)
+        return new{typeof(alg), typeof(intercept), typeof(leverage), typeof(ex)}(alg,
+                                                                                 intercept,
+                                                                                 leverage,
+                                                                                 ex)
     end
 end
 function CrossSectionalLinearRegression(;
                                         alg::AbstractCrossSectionalSolveAlgorithm = PseudoInverseFallback(),
-                                        intercept::Bool = false,
+                                        intercept::Bool = false, leverage::Bool = true,
                                         ex::FLoops.Transducers.Executor = FLoops.ThreadedEx())::CrossSectionalLinearRegression
-    return CrossSectionalLinearRegression(alg, intercept, ex)
+    return CrossSectionalLinearRegression(alg, intercept, leverage, ex)
 end
 """
 $(DocStringExtensions.TYPEDEF)
 
 Fits one external regression model per observation across the assets.
 
-The cross-sectional weights reach the model as observation weights, through [`factory`](@ref) and the target's own `kwargs`, so any target the library carries — a [`LinearModel`](@ref) or a [`GeneralisedLinearModel`](@ref) — runs here unchanged. A caller's own target runs here too, when it states the methods of the `# Interfaces` section of [`AbstractRegressionTarget`](@ref). A target with no weight method is refused, because its fit would ignore the cross-sectional weights. Unlike [`CrossSectionalLinearRegression`](@ref), the fit **refuses** an observation with no eligible asset, because an external model has no cross-section to read.
+The cross-sectional weights reach the model as observation weights, through [`factory`](@ref) and the target's own `kwargs`, so both targets of the library, [`LinearModel`](@ref) and [`GeneralisedLinearModel`](@ref), run here unchanged. A caller's own target runs here too, when it states the methods of the `# Interfaces` section of [`AbstractRegressionTarget`](@ref). A target with no weight method is refused, because its fit would ignore the cross-sectional weights. Unlike [`CrossSectionalLinearRegression`](@ref), the fit **refuses** an observation with no eligible asset, because an external model has no cross-section to read.
 
-`alg` decides what the fit does with a rank-deficient weighted design, as it does for [`CrossSectionalLinearRegression`](@ref), and [`cross_sectional_target_solve`](@ref) states each member. The default [`PseudoInverseFallback`](@ref) fits the columns that the rank test keeps and projects the answer onto the row space of the weighted design, so a least-squares target gives the factor returns of [`CrossSectionalLinearRegression`](@ref). A rank test is needed because a factor set can be dependent to rounding alone, such as a beta that shrinks fully to the mean of its industry, and the factorisation of `GLM` refuses such a design with a `PosDefException`. A rank-deficient design is not a degenerate case: under [`SolvedUnseenMember`](@ref) the design of an observation with an Unseen Member is rank-deficient by construction.
+`alg` decides what the fit does with a rank-deficient weighted design, as it does for [`CrossSectionalLinearRegression`](@ref), and [`cross_sectional_target_solve`](@ref) states each member. The default [`PseudoInverseFallback`](@ref) fits the columns that the rank test keeps and projects the answer onto the row space of the weighted design, so a least-squares target gives the factor returns of [`CrossSectionalLinearRegression`](@ref). A rank test is needed because a factor set can be dependent to rounding alone, such as a beta that shrinks fully to the mean of its industry, and the factorisation of `GLM` refuses such a design with a `PosDefException`. A rank-deficient design also comes from ordinary use. Under [`SolvedUnseenMember`](@ref), the design of an observation with an Unseen Member is rank-deficient by construction.
 
 # Algorithm
 
  1. Check `Z`, `X` and `W`, and take the eligibility mask, per `# Validation` of [`cross_sectional_regression`](@ref).
  2. For each observation `t`, gather the eligible assets, their weights `w`, their exposures `A` and their returns `y`. Refuse when no asset is eligible.
  3. When `intercept` is `true`, subtract the weighted means `ybar` and `xbar` from `y` and from `A`. The target fits no intercept column of its own, so the intercept is recovered from the centroid rather than fitted.
- 4. Build the per-observation target with `factory(tgt, StatsBase.aweights(w))`, fit it through the branch `alg` selects, and read its coefficients into the row `t` of `f`.
- 5. When `intercept` is `true`, set the entry `t` of `b` to `ybar - dot(f[t, :], xbar)`.
- 6. Subtract the systematic part from `X`, giving `eps`.
+ 4. When `leverage` is `true`, take the column-pivoted `QR` of the weighted design `sqrt.(w) .* A`, and mark the pairs of leverage one through [`cross_sectional_leverage_one`](@ref). The rank test of `alg` reads the same factorisation.
+ 5. Build the per-observation target with `factory(tgt, StatsBase.aweights(w))`, fit it through the branch `alg` selects, and read its coefficients into the row `t` of `f`.
+ 6. When `intercept` is `true`, set the entry `t` of `b` to `ybar - dot(f[t, :], xbar)`.
+ 7. Subtract the systematic part from `X`, giving `eps`.
+
+The warning of [`CrossSectionalLinearRegression`](@ref) about `leverage = false` holds here too.
 
 # Fields
 
@@ -613,6 +766,7 @@ $(DocStringExtensions.FIELDS)
         tgt::AbstractRegressionTarget = LinearModel(),
         alg::AbstractCrossSectionalSolveAlgorithm = PseudoInverseFallback(),
         intercept::Bool = false,
+        leverage::Bool = true,
         ex::FLoops.Transducers.Executor = ThreadedEx()
     ) -> CrossSectionalTargetRegression
 
@@ -620,7 +774,7 @@ Keywords correspond to the struct's fields.
 
 ## Validation
 
-  - The rules of [`assert_cross_sectional_target_solve`](@ref): `alg` is not [`MinimumNormSolve`](@ref), and under [`PseudoInverseFallback`](@ref), [`is_basis_invariant`](@ref) answers `true` for `tgt`.
+  - The rules of [`assert_cross_sectional_target_solve`](@ref): `alg` is not [`MinimumNormSolve`](@ref), and under [`PseudoInverseFallback`](@ref) and [`NormalEquationsSolve`](@ref), [`is_basis_invariant`](@ref) answers `true` for `tgt`.
 
 # Examples
 
@@ -631,6 +785,7 @@ CrossSectionalTargetRegression
             │   kwargs ┴ @NamedTuple{}: NamedTuple()
         alg ┼ PseudoInverseFallback()
   intercept ┼ Bool: false
+   leverage ┼ Bool: true
          ex ┴ Transducers.ThreadedEx{@NamedTuple{}}: Transducers.ThreadedEx()
 ```
 
@@ -658,27 +813,32 @@ CrossSectionalTargetRegression
     """
     intercept
     """
+    $(arg_dict[:csrlev])
+    """
+    leverage
+    """
     $(field_dict[:ex]) It runs the fits of the observations, which are independent problems. Each fit writes its own row, so every executor gives the same result, and a refusal is the one of the first observation that fails.
     """
     ex
     function CrossSectionalTargetRegression(tgt::AbstractRegressionTarget,
                                             alg::AbstractCrossSectionalSolveAlgorithm,
-                                            intercept::Bool,
+                                            intercept::Bool, leverage::Bool,
                                             ex::FLoops.Transducers.Executor)
         assert_cross_sectional_target_solve(alg, tgt)
-        return new{typeof(tgt), typeof(alg), typeof(intercept), typeof(ex)}(tgt, alg,
-                                                                            intercept, ex)
+        return new{typeof(tgt), typeof(alg), typeof(intercept), typeof(leverage),
+                   typeof(ex)}(tgt, alg, intercept, leverage, ex)
     end
 end
 function CrossSectionalTargetRegression(; tgt::AbstractRegressionTarget = LinearModel(),
                                         alg::AbstractCrossSectionalSolveAlgorithm = PseudoInverseFallback(),
-                                        intercept::Bool = false,
+                                        intercept::Bool = false, leverage::Bool = true,
                                         ex::FLoops.Transducers.Executor = FLoops.ThreadedEx())::CrossSectionalTargetRegression
-    return CrossSectionalTargetRegression(tgt, alg, intercept, ex)
+    return CrossSectionalTargetRegression(tgt, alg, intercept, leverage, ex)
 end
 """
     assert_cross_sectional_target_solve(alg::MinimumNormSolve, tgt::AbstractRegressionTarget)
-    assert_cross_sectional_target_solve(alg::PseudoInverseFallback, tgt::AbstractRegressionTarget)
+    assert_cross_sectional_target_solve(alg::Union{PseudoInverseFallback, NormalEquationsSolve},
+                                        tgt::AbstractRegressionTarget)
     assert_cross_sectional_target_solve(alg::AbstractCrossSectionalSolveAlgorithm,
                                         tgt::AbstractRegressionTarget)
 
@@ -689,7 +849,7 @@ Check that a [`CrossSectionalTargetRegression`](@ref) can solve a rank-deficient
 The method that Julia selects is the algorithm.
 
  1. [`MinimumNormSolve`](@ref) is refused. On a target its answer is the answer of [`PseudoInverseFallback`](@ref).
- 2. [`PseudoInverseFallback`](@ref) is refused when [`is_basis_invariant`](@ref) answers `false` for `tgt`. Its projection keeps the linear predictor of the fit, so it is the answer of least norm only for a target that reads the design through the linear predictor alone.
+ 2. [`PseudoInverseFallback`](@ref) is refused when [`is_basis_invariant`](@ref) answers `false` for `tgt`. Its projection keeps the linear predictor of the fit, so it is the answer of least norm only for a target that reads the design through the linear predictor alone. [`NormalEquationsSolve`](@ref) gives a design that fails its test to [`PseudoInverseFallback`](@ref), so the same rule refuses it.
  3. Every other member passes.
 
 # Arguments
@@ -700,7 +860,7 @@ The method that Julia selects is the algorithm.
 # Validation
 
   - `!isa(alg, MinimumNormSolve)`. Raises an `ArgumentError`.
-  - Under [`PseudoInverseFallback`](@ref), `is_basis_invariant(tgt)`. Raises an `ArgumentError` that names the target.
+  - Under [`PseudoInverseFallback`](@ref) and [`NormalEquationsSolve`](@ref), `is_basis_invariant(tgt)`. Raises an `ArgumentError` that names the member and the target.
 
 # Returns
 
@@ -715,10 +875,11 @@ The method that Julia selects is the algorithm.
 function assert_cross_sectional_target_solve(::MinimumNormSolve, ::AbstractRegressionTarget)
     return throw(ArgumentError("MinimumNormSolve() has no meaning for a regression target: a target has no pseudo-inverse, and the answer of least norm of a target is the answer of PseudoInverseFallback(). Use PseudoInverseFallback()"))
 end
-function assert_cross_sectional_target_solve(::PseudoInverseFallback,
+function assert_cross_sectional_target_solve(alg::Union{PseudoInverseFallback,
+                                                        NormalEquationsSolve},
                                              tgt::AbstractRegressionTarget)
     @argcheck(is_basis_invariant(tgt),
-              ArgumentError("PseudoInverseFallback() projects the fit of $(nameof(typeof(tgt))) onto the row space of a rank-deficient design, which keeps the answer of the target only when the target reads the design through the linear predictor alone, and is_basis_invariant answers false for it. Use UncheckedSolve() to give the target the full design, DependentColumnDrop() to drop the dependent columns, RankDeficiencyRefusal() to refuse a rank-deficient design, or add a method of PortfolioOptimisers.is_basis_invariant that answers true"))
+              ArgumentError("$(nameof(typeof(alg)))() projects the fit of $(nameof(typeof(tgt))) onto the row space of a rank-deficient design, which keeps the answer of the target only when the target reads the design through the linear predictor alone, and is_basis_invariant answers false for it. Use UncheckedSolve() to give the target the full design, DependentColumnDrop() to drop the dependent columns, RankDeficiencyRefusal() to refuse a rank-deficient design, or add a method of PortfolioOptimisers.is_basis_invariant that answers true"))
     return nothing
 end
 function assert_cross_sectional_target_solve(::AbstractCrossSectionalSolveAlgorithm,
@@ -726,21 +887,22 @@ function assert_cross_sectional_target_solve(::AbstractCrossSectionalSolveAlgori
     return nothing
 end
 """
-$(DocStringExtensions.TYPEDSIGNATURES)
+    cross_sectional_rank(A::MatNum; R::MatNum = LinearAlgebra.qr(A, LinearAlgebra.ColumnNorm()).R) -> Int
 
 Return the numerical rank of `A`, read off the diagonal of a column-pivoted `QR`.
 
-The test is written out rather than delegated to `LinearAlgebra.rank(::QRPivoted)`, which needs Julia 1.12 while this package supports 1.11.
+The test is written out rather than delegated to `LinearAlgebra.rank(::QRPivoted)`, which needs Julia 1.12 while this package supports 1.11. A caller that already factorised `A` passes the triangular factor `R` of its factorisation, as [`UncheckedSolve`](@ref) does, so it factorises the design once.
 
 # Algorithm
 
- 1. Return `0` when `A` has no row or no column, because a factorisation of it has no pivot to read.
- 2. Take the column-pivoted `LinearAlgebra.qr` of `A`. The magnitudes of the diagonal of its `R` are non-increasing, so they rank the columns by how much each adds to the span.
+ 1. Take the triangular factor `R` of the column-pivoted `LinearAlgebra.qr` of `A`, unless the caller passes it.
+ 2. Return `0` when `R` has no row or no column, because the factorisation has no pivot to read. The magnitudes of the diagonal of its `R` are non-increasing, so they rank the columns by how much each adds to the span.
  3. Count the leading diagonal entries above `min(size(A)...) * eps(real(eltype(R))) * abs(R[1, 1])`, giving the numerical rank. The tolerance is the one `LinearAlgebra.rank` applies to a pivoted `QR`.
 
 # Arguments
 
   - `A::MatNum`: Weighted design of one observation, `eligible assets × factors`.
+  - `R::MatNum`: Triangular factor of the column-pivoted `QR` of `A`.
 
 # Returns
 
@@ -751,28 +913,37 @@ The test is written out rather than delegated to `LinearAlgebra.rank(::QRPivoted
   - [`AbstractCrossSectionalSolveAlgorithm`](@ref)
   - [`cross_sectional_solve`](@ref)
 """
-function cross_sectional_rank(A::MatNum)::Int
-    m = minimum(size(A))
+function cross_sectional_rank(A::MatNum;
+                              R::MatNum = LinearAlgebra.qr(A, LinearAlgebra.ColumnNorm()).R)::Int
+    m = minimum(size(R))
     if iszero(m)
         return 0
     end
-    R = LinearAlgebra.qr(A, LinearAlgebra.ColumnNorm()).R
     tol = m * eps(real(eltype(R))) * abs(R[1, 1])
     return something(findfirst(i -> abs(R[i, i]) <= tol, 1:m), m + 1) - 1
 end
 """
     cross_sectional_solve(alg::AbstractCrossSectionalSolveAlgorithm, A::MatNum, y::VecNum,
-                          t::Integer) -> VecNum
+                          t::Integer) -> NamedTuple
+    cross_sectional_solve(alg::AbstractCrossSectionalSolveAlgorithm, A::MatNum, y::VecNum,
+                          t::Integer, F) -> NamedTuple
+    cross_sectional_solve(alg::AbstractCrossSectionalSolveAlgorithm, A::MatNum, y::VecNum,
+                          t::Integer, F, ws::NamedTuple) -> NamedTuple
 
-Solve the weighted design `A` against the weighted target `y` through the branch `alg` selects.
+Solve the weighted design `A` against the weighted target `y` through the branch `alg` selects, and count the residual degrees of freedom of the fit.
+
+Every answer is a least-squares fit, so its fitted values are the projection of `y` onto the span of the columns that it solves. The projection spends the rank `r` of those columns, read by [`cross_sectional_rank`](@ref), and the count is `size(A, 1) - r`. The t-statistics of [`cs_regression_t_stats`](@ref) read the same rank.
+
+The fifth argument is the column-pivoted `QR` of `A` that [`cross_sectional_regression`](@ref) took, or `nothing`. A member of the library that reads a `QR` reads `F`, so the fit factorises the design once. The sixth argument is the workspace of the task, a `NamedTuple` whose optional fields a member reads with `get`: the work vector `b` of a solve through `F`, which [`cross_sectional_full_solve`](@ref) solves in, and the Gram matrix `gram` and the right side `v` of the normal equations, which [`cross_sectional_gram_factor`](@ref) and [`cross_sectional_normal_solve`](@ref) fill. Each gives the bits of the allocating form. The methods of the root drop `F` and `ws` and call the method of four arguments, so a member of a caller implements only that one.
 
 # Algorithm
 
- 1. [`UncheckedSolve`](@ref) returns `A \\ y`, with no rank test.
- 2. [`MinimumNormSolve`](@ref) returns `LinearAlgebra.pinv(A) * y`, with no rank test.
- 3. [`PseudoInverseFallback`](@ref) takes [`cross_sectional_rank`](@ref). It returns `A \\ y` when the rank equals the factor count, and `LinearAlgebra.pinv(A) * y` otherwise.
- 4. [`RankDeficiencyRefusal`](@ref) refuses a rank-deficient `A` with [`assert_cross_sectional_rank`](@ref), and returns `A \\ y` otherwise.
- 5. [`DependentColumnDrop`](@ref) takes [`cross_sectional_rank`](@ref). It returns `A \\ y` when the rank equals the factor count, and the answer of [`cross_sectional_column_drop`](@ref) otherwise.
+ 1. [`UncheckedSolve`](@ref) returns `A \\ y`, with no rank test. A square `A` that `\\` solves has full rank. On every other `A`, `\\` solves through the column-pivoted `QR` of `A`, so the method takes that factorisation, solves through it, and reads the rank off it, with one factorisation of the design.
+ 2. [`MinimumNormSolve`](@ref) returns `LinearAlgebra.pinv(A) * y`, and counts the rank that [`cross_sectional_rank`](@ref) reads.
+ 3. [`PseudoInverseFallback`](@ref) takes the column-pivoted `QR` of `A` and reads [`cross_sectional_rank`](@ref) off it. It returns [`cross_sectional_full_solve`](@ref), the answer of `A \\ y` through the same factorisation, when the rank equals the factor count, and `LinearAlgebra.pinv(A) * y` otherwise.
+ 4. [`RankDeficiencyRefusal`](@ref) takes the same factorisation, refuses a rank-deficient `A` with [`assert_cross_sectional_rank`](@ref), and returns [`cross_sectional_full_solve`](@ref) otherwise.
+ 5. [`DependentColumnDrop`](@ref) takes the same factorisation and reads the rank off it. It returns [`cross_sectional_full_solve`](@ref) when the rank equals the factor count, and the answer of [`cross_sectional_column_drop`](@ref) on the pivot of the factorisation otherwise.
+ 6. [`NormalEquationsSolve`](@ref) takes the pivoted Cholesky factorisation of the Gram matrix of `A` through [`cross_sectional_gram_factor`](@ref). It solves the normal equations through it with [`cross_sectional_normal_solve`](@ref) when the factorisation passes the test of the member, with a count of `size(A, 1) - size(A, 2)`. Otherwise it returns the answer of [`PseudoInverseFallback`](@ref), which reads `F` and `ws`. Its own solve reads no `QR`.
 
 # Arguments
 
@@ -780,6 +951,8 @@ Solve the weighted design `A` against the weighted target `y` through the branch
   - `A::MatNum`: Weighted design of one observation, `eligible assets × factors`.
   - `y::VecNum`: Weighted target of one observation, of length `eligible assets`.
   - `t::Integer`: Index of the observation, named by the refusal of [`RankDeficiencyRefusal`](@ref).
+  - `F`: Column-pivoted `QR` of `A`, as `LinearAlgebra.qr(A, LinearAlgebra.ColumnNorm())` returns it, or `nothing` to take it here.
+  - `ws::NamedTuple`: Workspace, `(; b, gram, v)` or any part of it, overwritten. `(;)` allocates every buffer.
 
 # Validation
 
@@ -787,7 +960,10 @@ Solve the weighted design `A` against the weighted target `y` through the branch
 
 # Returns
 
-  - `f::VecNum`: Factor returns of the observation, of length `size(A, 2)`.
+  - `(; f, edof)::NamedTuple`:
+
+      + `f::VecNum`: Factor returns of the observation, of length `size(A, 2)`.
+      + `edof::Integer`: Residual count of the fit, `size(A, 1)` less the rank of the columns that it solves.
 
 # Related
 
@@ -796,80 +972,93 @@ Solve the weighted design `A` against the weighted target `y` through the branch
   - [`cross_sectional_target_solve`](@ref)
   - [`cross_sectional_regression`](@ref)
 """
-function cross_sectional_solve(::UncheckedSolve, A::MatNum, y::VecNum, ::Integer)
-    return A \ y
+function cross_sectional_solve(alg::AbstractCrossSectionalSolveAlgorithm, A::MatNum,
+                               y::VecNum, t::Integer, ::Any)
+    return cross_sectional_solve(alg, A, y, t)
 end
-function cross_sectional_solve(::MinimumNormSolve, A::MatNum, y::VecNum, ::Integer)
-    return LinearAlgebra.pinv(A) * y
+function cross_sectional_solve(alg::AbstractCrossSectionalSolveAlgorithm, A::MatNum,
+                               y::VecNum, t::Integer, ::Any, ::Any)
+    return cross_sectional_solve(alg, A, y, t)
 end
-function cross_sectional_solve(::PseudoInverseFallback, A::MatNum, y::VecNum, ::Integer)
-    return cross_sectional_rank(A) == size(A, 2) ? A \ y : LinearAlgebra.pinv(A) * y
+function cross_sectional_solve(::UncheckedSolve, A::MatNum, y::VecNum, ::Integer,
+                               F = nothing, ws::NamedTuple = (;))
+    if size(A, 1) == size(A, 2)
+        return (; f = A \ y, edof = size(A, 1) - size(A, 2))
+    end
+    F = cross_sectional_qr(A, F)
+    return (; f = cross_sectional_full_solve(F, A, y, get(ws, :b, nothing)),
+            edof = size(A, 1) - cross_sectional_rank(A; R = F.R))
 end
-function cross_sectional_solve(::RankDeficiencyRefusal, A::MatNum, y::VecNum, t::Integer)
-    assert_cross_sectional_rank(A, t)
-    return A \ y
+function cross_sectional_solve(::MinimumNormSolve, A::MatNum, y::VecNum, ::Integer,
+                               F = nothing, ::NamedTuple = (;))
+    return (; f = LinearAlgebra.pinv(A) * y,
+            edof = size(A, 1) - cross_sectional_rank(A; R = cross_sectional_qr(A, F).R))
 end
-function cross_sectional_solve(::DependentColumnDrop, A::MatNum, y::VecNum, ::Integer)
-    r = cross_sectional_rank(A)
+function cross_sectional_solve(::PseudoInverseFallback, A::MatNum, y::VecNum, ::Integer,
+                               F = nothing, ws::NamedTuple = (;))
+    F = cross_sectional_qr(A, F)
+    r = cross_sectional_rank(A; R = F.R)
+    return (; f = if r == size(A, 2)
+                cross_sectional_full_solve(F, A, y, get(ws, :b, nothing))
+            else
+                LinearAlgebra.pinv(A) * y
+            end, edof = size(A, 1) - r)
+end
+function cross_sectional_solve(::RankDeficiencyRefusal, A::MatNum, y::VecNum, t::Integer,
+                               F = nothing, ws::NamedTuple = (;))
+    F = cross_sectional_qr(A, F)
+    assert_cross_sectional_rank(A, t; R = F.R)
+    return (; f = cross_sectional_full_solve(F, A, y, get(ws, :b, nothing)),
+            edof = size(A, 1) - size(A, 2))
+end
+function cross_sectional_solve(::DependentColumnDrop, A::MatNum, y::VecNum, ::Integer,
+                               F = nothing, ws::NamedTuple = (;))
+    F = cross_sectional_qr(A, F)
+    r = cross_sectional_rank(A; R = F.R)
     return if r == size(A, 2)
-        A \ y
+        (; f = cross_sectional_full_solve(F, A, y, get(ws, :b, nothing)),
+         edof = size(A, 1) - r)
     else
-        cross_sectional_column_drop(keep -> A[:, keep] \ y, A, y, r)
+        cross_sectional_column_drop(keep -> (; f = A[:, keep] \ y, edof = size(A, 1) - r),
+                                    A, y, r; F = F)
     end
 end
-"""
-$(DocStringExtensions.TYPEDSIGNATURES)
-
-Refuse the weighted design of one observation when its rank falls short of its factor count.
-
-[`RankDeficiencyRefusal`](@ref) reads it under both cross-sectional regression estimators, so the two refuse the same observation with the same message.
-
-# Arguments
-
-  - `D::MatNum`: Weighted design of one observation, `eligible assets × factors`.
-  - `t::Integer`: Index of the observation, named by the refusal.
-
-# Validation
-
-  - [`cross_sectional_rank`](@ref) of `D` equals `size(D, 2)`. The `ArgumentError` names the observation, the rank, the factor count and the count of eligible assets.
-
-# Returns
-
-  - `nothing`.
-
-# Related
-
-  - [`RankDeficiencyRefusal`](@ref)
-  - [`cross_sectional_solve`](@ref)
-  - [`cross_sectional_target_solve`](@ref)
-"""
-function assert_cross_sectional_rank(D::MatNum, t::Integer)::Nothing
-    r = cross_sectional_rank(D)
-    @argcheck(r == size(D, 2),
-              ArgumentError("the weighted design of observation $t has rank $r over $(size(D, 2)) factors and $(size(D, 1)) eligible assets, so its weighted least squares has no unique solution. Use PseudoInverseFallback() to take the minimum-norm solution, DependentColumnDrop() to give the dependent factors a return of zero, UncheckedSolve() to take the answer unchecked, or widen the eligible cross-section"))
-    return nothing
+function cross_sectional_solve(::NormalEquationsSolve, A::MatNum, y::VecNum, t::Integer,
+                               F = nothing, ws::NamedTuple = (;))
+    C = cross_sectional_gram_factor(A, get(ws, :gram, nothing))
+    if isnothing(C)
+        # The fallback takes the `QR` and the work vector that the caller passed, so it
+        # factorises the design once.
+        return cross_sectional_solve(PseudoInverseFallback(), A, y, t, F, ws)
+    end
+    return (; f = cross_sectional_normal_solve(C, A, y, get(ws, :v, nothing)),
+            edof = size(A, 1) - size(A, 2))
 end
 """
 $(DocStringExtensions.TYPEDSIGNATURES)
 
-Return the factor returns of a rank-deficient observation that fits only the columns its rank test keeps.
+Return the factor returns and the residual count of a rank-deficient observation that fits only the columns its rank test keeps.
 
 # Algorithm
 
- 1. Return zero for every factor when `r` is zero.
- 2. Take the column-pivoted `LinearAlgebra.qr` of `D`, and keep the columns that its first `r` pivots name, in their order on the factor axis.
- 3. Fit the kept columns with `fit_cols`, and give every other factor a return of zero.
+ 1. Return zero for every factor when `r` is zero. The fit spends no parameter, so its residual count is `size(D, 1)`.
+ 2. Keep the columns that the first `r` pivots of the column-pivoted `QR` `F` of `D` name, in their order on the factor axis, with [`cross_sectional_kept_columns`](@ref).
+ 3. Fit the kept columns with `fit_cols`, and give every other factor a return of zero. The residual count is the count of that fit.
 
 # Arguments
 
-  - `fit_cols`: Function of the kept column indices that returns their coefficients.
+  - `fit_cols`: Function of the kept column indices that returns their coefficients and the residual count of their fit, `(; f, edof)`.
   - `D::MatNum`: Weighted design of one observation, `eligible assets × factors`.
   - `y::VecNum`: Target of the observation. Its type and the type of `D` give the type of the zero answer of rank zero.
   - `r::Integer`: Rank of `D`, read by [`cross_sectional_rank`](@ref), below `size(D, 2)`.
+  - `F`: Column-pivoted `QR` of `D`, as `LinearAlgebra.qr(D, LinearAlgebra.ColumnNorm())` returns it. A caller that read the rank off a factorisation passes it, so the design is factorised once.
 
 # Returns
 
-  - `f::VecNum`: Factor returns of the observation, of length `size(D, 2)`, zero at each dropped factor.
+  - `(; f, edof)::NamedTuple`:
+
+      + `f::VecNum`: Factor returns of the observation, of length `size(D, 2)`, zero at each dropped factor.
+      + `edof::Real`: Residual count of the fit of the kept columns.
 
 # Related
 
@@ -877,15 +1066,17 @@ Return the factor returns of a rank-deficient observation that fits only the col
   - [`cross_sectional_solve`](@ref)
   - [`cross_sectional_target_solve`](@ref)
 """
-function cross_sectional_column_drop(fit_cols, D::MatNum, y::VecNum, r::Integer)::VecNum
+function cross_sectional_column_drop(fit_cols, D::MatNum, y::VecNum, r::Integer;
+                                     F = LinearAlgebra.qr(D, LinearAlgebra.ColumnNorm()))::NamedTuple
     if iszero(r)
-        return zeros(promote_type(eltype(D), eltype(y)), size(D, 2))
+        return (; f = zeros(promote_type(eltype(D), eltype(y)), size(D, 2)),
+                edof = size(D, 1))
     end
-    keep = cross_sectional_kept_columns(D, r)
+    keep = cross_sectional_kept_columns(D, r; F = F)
     c = fit_cols(keep)
-    f = zeros(eltype(c), size(D, 2))
-    f[keep] = c
-    return f
+    f = zeros(eltype(c.f), size(D, 2))
+    f[keep] = c.f
+    return (; f = f, edof = c.edof)
 end
 """
 $(DocStringExtensions.TYPEDSIGNATURES)
@@ -898,6 +1089,7 @@ They are the columns that the first `r` pivots of the column-pivoted `QR` of `D`
 
   - `D::MatNum`: Weighted design of one observation, `eligible assets × factors`.
   - `r::Integer`: Rank of `D`, read by [`cross_sectional_rank`](@ref).
+  - `F`: Column-pivoted `QR` of `D`, as `LinearAlgebra.qr(D, LinearAlgebra.ColumnNorm())` returns it. A caller that read the rank off a factorisation passes it, so the design is factorised once.
 
 # Returns
 
@@ -908,11 +1100,12 @@ They are the columns that the first `r` pivots of the column-pivoted `QR` of `D`
   - [`cross_sectional_column_drop`](@ref)
   - [`cross_sectional_mark_dropped!`](@ref)
 """
-function cross_sectional_kept_columns(D::MatNum, r::Integer)::Vector{Int}
+function cross_sectional_kept_columns(D::MatNum, r::Integer;
+                                      F = LinearAlgebra.qr(D, LinearAlgebra.ColumnNorm()))::Vector{Int}
     if iszero(r)
         return Int[]
     end
-    return sort!(LinearAlgebra.qr(D, LinearAlgebra.ColumnNorm()).p[1:r])
+    return sort!(F.p[1:r])
 end
 """
     cross_sectional_drop_mask(alg::AbstractCrossSectionalSolveAlgorithm, T::Integer,
@@ -974,9 +1167,11 @@ function cross_sectional_bit_mask(dc::AbstractMatrix{Bool})::BitMatrix
     return BitMatrix(dc)
 end
 """
-    cross_sectional_mark_dropped!(dc::Nothing, A::MatNum, w::VecNum, t::Integer) -> Nothing
+    cross_sectional_mark_dropped!(dc::Nothing, A::MatNum, w::VecNum, t::Integer;
+                                  D = nothing, F = nothing) -> Nothing
     cross_sectional_mark_dropped!(dc::AbstractMatrix{Bool}, A::MatNum, w::VecNum,
-                                  t::Integer) -> Nothing
+                                  t::Integer; D::MatNum = A .* sqrt.(w),
+                                  F = nothing) -> Nothing
 
 Mark the columns of one observation that [`DependentColumnDrop`](@ref) drops.
 
@@ -988,6 +1183,8 @@ The weighted design is the one that the solve reads, so the rank and the pivot a
   - `A::MatNum`: Exposures of the eligible assets, `eligible assets × factors`, already demeaned when an intercept is fitted.
   - `w::VecNum`: Cross-sectional weights of the eligible assets.
   - `t::Integer`: Row of the observation in `dc`.
+  - `D::MatNum`: Weighted design `sqrt.(w) .* A`. A caller that weighted the design already passes it.
+  - `F`: Column-pivoted `QR` of `D`, or `nothing` to take it here, through [`cross_sectional_qr`](@ref).
 
 # Returns
 
@@ -999,16 +1196,18 @@ The weighted design is the one that the solve reads, so the rank and the pivot a
   - [`cross_sectional_kept_columns`](@ref)
   - [`cross_sectional_regression`](@ref)
 """
-function cross_sectional_mark_dropped!(::Nothing, ::MatNum, ::VecNum, ::Integer)::Nothing
+function cross_sectional_mark_dropped!(::Nothing, ::MatNum, ::VecNum, ::Integer;
+                                       D = nothing, F = nothing)::Nothing
     return nothing
 end
 function cross_sectional_mark_dropped!(dc::AbstractMatrix{Bool}, A::MatNum, w::VecNum,
-                                       t::Integer)::Nothing
-    D = A .* sqrt.(w)
-    r = cross_sectional_rank(D)
+                                       t::Integer; D::MatNum = A .* sqrt.(w),
+                                       F = nothing)::Nothing
+    F = cross_sectional_qr(D, F)
+    r = cross_sectional_rank(D; R = F.R)
     if r < size(D, 2)
         dc[t, :] .= true
-        dc[t, cross_sectional_kept_columns(D, r)] .= false
+        dc[t, cross_sectional_kept_columns(D, r; F = F)] .= false
     end
     return nothing
 end
@@ -1057,21 +1256,26 @@ function cross_sectional_row_space(f::VecNum, D::MatNum, r::Integer)::VecNum
 end
 """
     cross_sectional_target_solve(alg::UncheckedSolve, tgt::AbstractRegressionTarget,
-                                 obs::NamedTuple) -> VecNum
+                                 obs::NamedTuple) -> NamedTuple
     cross_sectional_target_solve(alg::RankDeficiencyRefusal, tgt::AbstractRegressionTarget,
-                                 obs::NamedTuple) -> VecNum
+                                 obs::NamedTuple) -> NamedTuple
     cross_sectional_target_solve(alg::Union{DependentColumnDrop, PseudoInverseFallback},
-                                 tgt::AbstractRegressionTarget, obs::NamedTuple) -> VecNum
+                                 tgt::AbstractRegressionTarget, obs::NamedTuple) -> NamedTuple
+    cross_sectional_target_solve(alg::NormalEquationsSolve, tgt::AbstractRegressionTarget,
+                                 obs::NamedTuple) -> NamedTuple
 
-Fit the target of one observation of a [`CrossSectionalTargetRegression`](@ref) through the branch `alg` selects.
+Fit the target of one observation of a [`CrossSectionalTargetRegression`](@ref) through the branch `alg` selects, and read the residual count of the fit.
+
+The count is [`residual_count`](@ref) of the fitted target and the design that it fitted. An unpenalised fit on the columns that the rank test keeps spends one parameter for each of them, so a rank-deficient observation counts its rank, as [`cross_sectional_solve`](@ref) counts it. A penalised fit states its own count. Under [`UncheckedSolve`](@ref) the target fits the full design, and its own count decides: a fit of `GLM` counts the rank that its pivot keeps, and the fallback of [`residual_count`](@ref) counts every column.
 
 # Algorithm
 
  1. [`UncheckedSolve`](@ref) fits `tgt` to `A` and `y`, with no rank test.
- 2. [`RankDeficiencyRefusal`](@ref) refuses a rank-deficient `D` with [`assert_cross_sectional_rank`](@ref), and fits `tgt` to `A` and `y` through [`cross_sectional_target_coef`](@ref) otherwise.
- 3. [`DependentColumnDrop`](@ref) and [`PseudoInverseFallback`](@ref) take the rank `r` of `D` with [`cross_sectional_rank`](@ref). When `r` equals the factor count, they fit `tgt` to `A` and `y` through [`cross_sectional_target_coef`](@ref). Otherwise they fit `tgt` the same way to the columns of `A` that [`cross_sectional_column_drop`](@ref) keeps, and [`PseudoInverseFallback`](@ref) projects the answer onto the row space of `D` with [`cross_sectional_row_space`](@ref).
+ 2. [`RankDeficiencyRefusal`](@ref) takes the column-pivoted `QR` of `D`, refuses a rank-deficient `D` with [`assert_cross_sectional_rank`](@ref), and fits `tgt` to `A` and `y` through [`cross_sectional_target_coef`](@ref) on the same factorisation otherwise.
+ 3. [`DependentColumnDrop`](@ref) and [`PseudoInverseFallback`](@ref) take the column-pivoted `QR` of `D`, and read its rank `r` off it with [`cross_sectional_rank`](@ref). Every later step reads the same factorisation. When `r` equals the factor count, they fit `tgt` to `A` and `y` through [`cross_sectional_target_coef`](@ref). Otherwise they fit `tgt` the same way to the columns of `A` that [`cross_sectional_column_drop`](@ref) keeps, and [`PseudoInverseFallback`](@ref) projects the answer onto the row space of `D` with [`cross_sectional_row_space`](@ref).
+ 4. [`NormalEquationsSolve`](@ref) tests `D` through [`cross_sectional_gram_factor`](@ref). It fits `tgt` to `A` and `y` when `D` passes, so the target factorises its own Gram matrix, and it takes the answer of [`PseudoInverseFallback`](@ref) otherwise.
 
-So every member but [`UncheckedSolve`](@ref) fits a basis-invariant target at the rank and at the precision of `D`, which the fit of [`CrossSectionalLinearRegression`](@ref) reads too.
+A member that takes a `QR` of `D` reads `F` of `obs` when the regression already took it. So every member but [`UncheckedSolve`](@ref) and [`NormalEquationsSolve`](@ref) fits a basis-invariant target at the rank and at the precision of `D`, which the fit of [`CrossSectionalLinearRegression`](@ref) reads too.
 
 The constructor of [`CrossSectionalTargetRegression`](@ref) refuses [`MinimumNormSolve`](@ref), so no method takes it.
 
@@ -1081,12 +1285,13 @@ The constructor of [`CrossSectionalTargetRegression`](@ref) refuses [`MinimumNor
 
   - `tgt`: Regression target of the observation, which carries its weights.
 
-  - `obs::NamedTuple`: The observation, `(; A, y, D, t)`:
+  - `obs::NamedTuple`: The observation, `(; A, y, D, t, F)`:
 
       + `A::MatNum`: Exposures of the eligible assets, `eligible assets × factors`, already demeaned when an intercept is fitted.
       + `y::VecNum`: Returns of the eligible assets, already demeaned when an intercept is fitted.
       + `D::MatNum`: Weighted design `sqrt.(w) .* A`, which the rank test reads.
       + `t::Integer`: Index of the observation, named by the refusal of [`RankDeficiencyRefusal`](@ref).
+      + `F`: Column-pivoted `QR` of `D` that the regression took for its leverage check, or `nothing`. A tuple with no `F` reads as `nothing`.
 
 # Validation
 
@@ -1094,42 +1299,62 @@ The constructor of [`CrossSectionalTargetRegression`](@ref) refuses [`MinimumNor
 
 # Returns
 
-  - `f::VecNum`: Factor returns of the observation, of length `size(A, 2)`.
+  - `(; f, edof)::NamedTuple`:
+
+      + `f::VecNum`: Factor returns of the observation, of length `size(A, 2)`.
+      + `edof::Real`: Residual count of the fit.
 
 # Related
 
   - [`CrossSectionalTargetRegression`](@ref)
   - [`cross_sectional_solve`](@ref)
   - [`cross_sectional_coefficients`](@ref)
+  - [`residual_count`](@ref)
 """
 function cross_sectional_target_solve(::UncheckedSolve, tgt::AbstractRegressionTarget,
                                       obs::NamedTuple)
-    return StatsAPI.coef(StatsAPI.fit(tgt, obs.A, obs.y))
+    m = StatsAPI.fit(tgt, obs.A, obs.y)
+    return (; f = StatsAPI.coef(m), edof = residual_count(m, obs.A))
 end
 function cross_sectional_target_solve(::RankDeficiencyRefusal,
                                       tgt::AbstractRegressionTarget, obs::NamedTuple)
-    assert_cross_sectional_rank(obs.D, obs.t)
-    return cross_sectional_target_coef(tgt, obs.A, obs.y, obs.D)
+    F = cross_sectional_qr(obs.D, get(obs, :F, nothing))
+    assert_cross_sectional_rank(obs.D, obs.t; R = F.R)
+    return cross_sectional_target_coef(tgt, obs.A, obs.y, obs.D; F = F)
+end
+function cross_sectional_target_solve(::NormalEquationsSolve, tgt::AbstractRegressionTarget,
+                                      obs::NamedTuple)
+    if isnothing(cross_sectional_gram_factor(obs.D))
+        return cross_sectional_target_solve(PseudoInverseFallback(), tgt, obs)
+    end
+    m = StatsAPI.fit(tgt, obs.A, obs.y)
+    return (; f = StatsAPI.coef(m), edof = residual_count(m, obs.A))
 end
 function cross_sectional_target_solve(alg::Union{DependentColumnDrop,
                                                  PseudoInverseFallback},
                                       tgt::AbstractRegressionTarget, obs::NamedTuple)
     (; A, y, D) = obs
-    r = cross_sectional_rank(D)
+    F = cross_sectional_qr(D, get(obs, :F, nothing))
+    r = cross_sectional_rank(D; R = F.R)
     if r == size(A, 2)
-        return cross_sectional_target_coef(tgt, A, y, D)
+        return cross_sectional_target_coef(tgt, A, y, D; F = F)
     end
-    f = cross_sectional_column_drop(keep -> cross_sectional_target_coef(tgt, A[:, keep], y,
-                                                                        D[:, keep]), D, y,
-                                    r)
-    return isa(alg, PseudoInverseFallback) ? cross_sectional_row_space(f, D, r) : f
+    fit = cross_sectional_column_drop(keep -> cross_sectional_target_coef(tgt, A[:, keep],
+                                                                          y, D[:, keep]), D,
+                                      y, r; F = F)
+    # The projection keeps the fitted values, so it keeps the residual count.
+    return if isa(alg, PseudoInverseFallback)
+        (; f = cross_sectional_row_space(fit.f, D, r), edof = fit.edof)
+    else
+        fit
+    end
 end
 """
 $(DocStringExtensions.TYPEDSIGNATURES)
 
-Return the coefficients of a target fitted to a weighted design of full rank, at the precision of the design rather than of its Gram matrix.
+Return the coefficients and the residual count of a target fitted to a weighted design of full rank, at the precision of the design rather than of its Gram matrix.
 
-`GLM` factorises the Gram matrix ``\\mathbf{D}^{\\intercal} \\mathbf{D}`` of the weighted design, which squares its condition number. So a factor set whose design has a condition number above about ``10^{8}`` loses its precision in `GLM`, or `GLM` drops a column by its own pivot, while [`cross_sectional_rank`](@ref) keeps every column up to about ``10^{14} / K``. A target that [`is_basis_invariant`](@ref) states gives the same coefficients on any basis of the span of the design, mapped back. So the verb fits such a target to the design whose weighted Gram matrix is the identity, and maps the answer back. The solve then reads the triangular factor of `D`, as the solve of [`CrossSectionalLinearRegression`](@ref) does, and a least-squares target gives its factor returns to rounding. A target that is not invariant fits `A` itself, because a change of basis changes its answer.
+`GLM` factorises the Gram matrix ``\\mathbf{D}^{\\intercal} \\mathbf{D}`` of the weighted design, which squares its condition number. So a factor set whose design has a condition number above about ``10^{8}`` loses its precision in `GLM`, or `GLM` drops a column by its own pivot. [`cross_sectional_rank`](@ref) keeps every column up to a condition number of about ``1 / (K \\epsilon)``, where ``\\epsilon`` is the machine epsilon of the design. That is about ``10^{15}`` in `Float64` for up to eight factors. A target that [`is_basis_invariant`](@ref) states gives the same coefficients on any basis of the span of the design, mapped back. So the verb fits such a target to the design whose weighted Gram matrix is the identity, and maps the answer back. The solve then reads the triangular factor of `D`, as the solve of [`CrossSectionalLinearRegression`](@ref) does, and a least-squares target gives its factor returns to rounding. A target that is not invariant fits `A` itself, because a change of basis changes its answer.
 
 # Mathematical definition
 
@@ -1148,49 +1373,89 @@ Where:
   - ``\\hat{\\boldsymbol{c}}``: Coefficients of the target fitted to ``\\mathbf{A} \\mathbf{M}``.
   - ``\\boldsymbol{f}``: Coefficients on the columns of `A`.
 
+The residual count is [`residual_count`](@ref) of the fit and the design that it fitted. A target that is basis invariant gives the same fitted values on ``\\mathbf{A} \\mathbf{M}`` as on ``\\mathbf{A}``, so the change of basis keeps its count.
+
 # Arguments
 
   - `tgt`: Regression target of the observation, which carries its weights.
   - `A::MatNum`: Exposures of the eligible assets, `eligible assets × factors`, of full rank.
   - `y::VecNum`: Returns of the eligible assets.
   - `D::MatNum`: Weighted design `sqrt.(w) .* A`.
+  - `F`: Column-pivoted `QR` of `D`, or `nothing` to take it here. A caller that read the rank off a factorisation passes it, so the design is factorised once.
 
 # Returns
 
-  - `f::VecNum`: Coefficients of the target, of length `size(A, 2)`.
+  - `(; f, edof)::NamedTuple`:
+
+      + `f::VecNum`: Coefficients of the target, of length `size(A, 2)`.
+      + `edof::Real`: Residual count of the fit.
 
 # Related
 
   - [`cross_sectional_target_solve`](@ref)
   - [`is_basis_invariant`](@ref)
   - [`cross_sectional_rank`](@ref)
+  - [`residual_count`](@ref)
 """
 function cross_sectional_target_coef(tgt::AbstractRegressionTarget, A::MatNum, y::VecNum,
-                                     D::MatNum)::VecNum
+                                     D::MatNum; F = nothing)::NamedTuple
     if !is_basis_invariant(tgt)
-        return StatsAPI.coef(StatsAPI.fit(tgt, A, y))
+        m = StatsAPI.fit(tgt, A, y)
+        return (; f = StatsAPI.coef(m), edof = residual_count(m, A))
     end
-    F = LinearAlgebra.qr(D, LinearAlgebra.ColumnNorm())
+    # A target that is not basis invariant never reads the factorisation, so it is taken here.
+    F = cross_sectional_qr(D, F)
     M = F.P / LinearAlgebra.UpperTriangular(F.R)
-    return M * StatsAPI.coef(StatsAPI.fit(tgt, A * M, y))
+    AM = A * M
+    m = StatsAPI.fit(tgt, AM, y)
+    return (; f = M * StatsAPI.coef(m), edof = residual_count(m, AM))
+end
+"""
+$(DocStringExtensions.TYPEDSIGNATURES)
+
+Return the mask of the `(observation, asset)` pairs whose exposure to every factor is finite.
+
+The pass reads `Z` in its memory order: the observation axis is the outer loop, and the asset axis is the inner loop.
+
+# Arguments
+
+  - `Z::Arr3Num`: Exposure tensor `assets × factors × observations`.
+
+# Returns
+
+  - `fin::BitMatrix`: Mask `observations × assets`, true where every exposure of the pair is finite.
+
+# Related
+
+  - [`cross_sectional_design_mask`](@ref)
+  - [`cross_sectional_eligible`](@ref)
+"""
+function cross_sectional_finite_exposures(Z::Arr3Num)::BitMatrix
+    fin = trues(size(Z, 3), size(Z, 1))
+    for t in axes(Z, 3), k in axes(Z, 2), i in axes(Z, 1)
+        if !isfinite(Z[i, k, t])
+            fin[t, i] = false
+        end
+    end
+    return fin
 end
 """
 $(DocStringExtensions.TYPEDSIGNATURES)
 
 Return the eligibility mask of a cross-sectional design, after checking its three arrays.
 
-An `(observation, asset)` pair is eligible when its cross-sectional weight is positive. The weight is the one contract: a pair excluded by a zero weight may carry a missing return or a missing exposure, and a pair with a positive weight may not.
+An `(observation, asset)` pair is eligible when its cross-sectional weight is positive. The weight alone decides. A pair that a zero weight excludes may carry a missing return or a missing exposure, and a pair with a positive weight may not.
 
 # Arguments
 
-  - `Z::Arr3Num`: Exposure tensor `observations × assets × factors`.
+  - `Z::Arr3Num`: Exposure tensor `assets × factors × observations`.
   - `X::MatNum`: Asset returns matrix `observations × assets`.
   - `W::MatNum`: Cross-sectional weights matrix `observations × assets`.
 
 # Validation
 
   - `!isempty(Z)`, `!isempty(X)` and `!isempty(W)`.
-  - `size(Z, 1) == size(X, 1)` and `size(Z, 2) == size(X, 2)`.
+  - `size(Z, 3) == size(X, 1)` and `size(Z, 1) == size(X, 2)`.
   - `size(W) == size(X)`.
   - `all(isfinite, W)` and `all(x -> x >= 0, W)`.
   - Every pair with a positive weight carries a finite return and finite exposures. The `IsNonFiniteError` names the observation, the asset and the weight.
@@ -1208,17 +1473,18 @@ function cross_sectional_design_mask(Z::Arr3Num, X::MatNum, W::MatNum)::BitMatri
     @argcheck(!isempty(Z), IsEmptyError("Z cannot be empty"))
     @argcheck(!isempty(X), IsEmptyError("X cannot be empty"))
     @argcheck(!isempty(W), IsEmptyError("W cannot be empty"))
-    @argcheck(size(Z, 1) == size(X, 1) && size(Z, 2) == size(X, 2),
-              DimensionMismatch("Z ($(size(Z, 1))×$(size(Z, 2))×$(size(Z, 3))) must match X ($(size(X, 1))×$(size(X, 2))) on the observation and asset axes"))
+    @argcheck(size(Z, 3) == size(X, 1) && size(Z, 1) == size(X, 2),
+              DimensionMismatch("Z ($(size(Z, 1))×$(size(Z, 2))×$(size(Z, 3))) must match X ($(size(X, 1))×$(size(X, 2))) on the asset and observation axes"))
     @argcheck(size(W) == size(X),
               DimensionMismatch("W ($(size(W, 1))×$(size(W, 2))) must match X ($(size(X, 1))×$(size(X, 2)))"))
     @argcheck(all(isfinite, W), IsNonFiniteError("all entries of W must be finite"))
     @argcheck(all(x -> x >= zero(x), W), DomainError(W, "all entries of W must be >= 0"))
+    fin = cross_sectional_finite_exposures(Z)
     act = falses(size(X))
     for t in axes(X, 1), i in axes(X, 2)
         if W[t, i] > zero(eltype(W))
-            @argcheck(isfinite(X[t, i]) && all(isfinite, view(Z, t, i, :)),
-                      IsNonFiniteError("observation $t and asset $i carry the positive weight $(W[t, i]), so their return and all $(size(Z, 3)) of their exposures must be finite. Set the weight to zero to exclude the pair from the fit"))
+            @argcheck(isfinite(X[t, i]) && fin[t, i],
+                      IsNonFiniteError("observation $t and asset $i carry the positive weight $(W[t, i]), so their return and all $(size(Z, 2)) of their exposures must be finite. Set the weight to zero to exclude the pair from the fit"))
             act[t, i] = true
         end
     end
@@ -1227,7 +1493,7 @@ end
 """
 $(DocStringExtensions.TYPEDSIGNATURES)
 
-Return the factor returns of one observation, through the member's own solve.
+Return the factor returns and the residual count of one observation, through the member's own solve.
 
 [`CrossSectionalLinearRegression`](@ref) scales the design and the target by `sqrt.(w)` and hands them to [`cross_sectional_solve`](@ref). The square root of a `Rational` weight is a float, so that solve runs in floating point for a `Rational` panel. [`CrossSectionalTargetRegression`](@ref) refuses an empty cross-section, and hands the unscaled pair to [`cross_sectional_target_solve`](@ref), with `w` as the observation weights of the target and the weighted design `sqrt.(w) .* A` for the rank test of its solve algorithm.
 
@@ -1238,6 +1504,9 @@ Return the factor returns of one observation, through the member's own solve.
   - `y::VecNum`: Returns of the eligible assets, already demeaned when an intercept is fitted.
   - `w::VecNum`: Cross-sectional weights of the eligible assets.
   - `t::Integer`: Index of the observation.
+  - `D::MatNum`: Weighted design `sqrt.(w) .* A`. A caller that weighted the design already passes it.
+  - `F`: Column-pivoted `QR` of `D` that the caller already took, or `nothing`. The solve reads it when its member reads a `QR`.
+  - `ws::NamedTuple`: Workspace of the solve, as [`cross_sectional_solve`](@ref) reads it, or `(;)`. The target regression does not read it.
 
 # Validation
 
@@ -1246,7 +1515,10 @@ Return the factor returns of one observation, through the member's own solve.
 
 # Returns
 
-  - `f::VecNum`: Factor returns of the observation, of length `size(A, 2)`.
+  - `(; f, edof)::NamedTuple`:
+
+      + `f::VecNum`: Factor returns of the observation, of length `size(A, 2)`.
+      + `edof::Real`: Residual count of the fit of the factors, with no account of an intercept.
 
 # Related
 
@@ -1255,188 +1527,92 @@ Return the factor returns of one observation, through the member's own solve.
   - [`cross_sectional_regression`](@ref)
 """
 function cross_sectional_coefficients(cre::CrossSectionalLinearRegression, A::MatNum,
-                                      y::VecNum, w::VecNum, t::Integer)
-    sq = sqrt.(w)
-    return cross_sectional_solve(cre.alg, A .* sq, y .* sq, t)
+                                      y::VecNum, w::VecNum, t::Integer;
+                                      D::MatNum = A .* sqrt.(w), F = nothing,
+                                      ws::NamedTuple = (;))
+    return cross_sectional_solve(cre.alg, D, y .* sqrt.(w), t, F, ws)
 end
 function cross_sectional_coefficients(cre::CrossSectionalTargetRegression, A::MatNum,
-                                      y::VecNum, w::VecNum, t::Integer)
+                                      y::VecNum, w::VecNum, t::Integer;
+                                      D::MatNum = A .* sqrt.(w), F = nothing,
+                                      ws::NamedTuple = (;))
     @argcheck(!isempty(y),
               ArgumentError("observation $t has no asset with a positive cross-sectional weight, and $(nameof(typeof(cre.tgt))) has no cross-section to fit. Widen the eligible cross-section, or use CrossSectionalLinearRegression, which answers an empty observation with zero factor returns"))
     tgt = factory(cre.tgt, StatsBase.aweights(w))
-    return cross_sectional_target_solve(cre.alg, tgt,
-                                        (; A = A, y = y, D = A .* sqrt.(w), t = t))
+    return cross_sectional_target_solve(cre.alg, tgt, (; A = A, y = y, D = D, t = t, F = F))
 end
 """
-$(DocStringExtensions.TYPEDSIGNATURES)
+    cross_sectional_loop_buffers(intercept::Val{false}, Z::Arr3Num, X::MatNum, W::MatNum,
+                                 Tf::Type) -> NamedTuple
+    cross_sectional_loop_buffers(intercept::Val{true}, Z::Arr3Num, X::MatNum, W::MatNum,
+                                 Tf::Type) -> NamedTuple
 
-Return the mask of the eligible assets of one observation whose leverage in the weighted design is one.
+Allocate the buffers that one task of the loop of [`cross_sectional_regression`](@ref) gathers each observation into.
 
-The leverage of row ``i`` is the diagonal entry ``h_{i}`` of the projection onto the column span of the design. It is one exactly when the design gives the row a direction of its own, for example when the row is the only member of a level of a one-hot family. A least-squares fit then reproduces the target of that row whatever it is, so its residual is zero by construction and its variance under the design is zero too. The mask does not depend on the scale of the target, and it does not depend on a positive weight either, because a positive weight moves no row into or out of the span of the others.
-
-# Mathematical definition
-
-```math
-\\begin{align}
-h_{i} &= \\sum_{j = 1}^{r} Q_{ij}^{2}\\,, &
-\\text{mark}_{i} &= 1 - h_{i} \\le \\sqrt{\\epsilon}\\,.
-\\end{align}
-```
-
-Where:
-
-  - ``h_{i}``: Leverage of row ``i``.
-  - ``\\mathbf{Q}``: Orthonormal factor of the column-pivoted `QR` of the weighted design `sqrt.(w) .* A`, with the column `sqrt.(w)` in front under `intercept`.
-  - ``r``: Numerical rank of the design, read as [`cross_sectional_rank`](@ref) reads it.
-  - ``\\epsilon``: Machine epsilon of the element type of ``\\mathbf{Q}``.
-
-The tolerance ``\\sqrt{\\epsilon}`` absorbs the round-off of ``h_{i}``, which is of order ``m \\epsilon`` for ``m`` rows. A row whose leverage is below one by more than that keeps a residual variance that the data can estimate.
-
-# Algorithm
-
- 1. Scale the rows of `A` by `sqrt.(w)`, giving the weighted design `D`, and put the column `sqrt.(w)` in front of it when `intercept` is `true`.
- 2. Read the numerical rank `r` of `D` through [`cross_sectional_rank`](@ref), which answers zero for a design with no row or no column. Return an all-false mask at rank zero.
- 3. Take the column-pivoted `LinearAlgebra.qr` of `D` and the first `r` columns of its `Q`, and sum the squares of each row, giving the leverage `h`.
- 4. Mark each row whose `1 - h` is at most `sqrt(eps)`.
-
-# Arguments
-
-  - `A::MatNum`: Exposures of the eligible assets, `eligible assets × factors`, not demeaned.
-  - `w::VecNum`: Cross-sectional weights of the eligible assets.
-  - `intercept::Bool`: Whether the fit has an intercept.
-
-# Returns
-
-  - `mark::BitVector`: Leverage-one mask, one entry per eligible asset.
-
-# Related
-
-  - [`cross_sectional_regression`](@ref)
-  - [`cross_sectional_rank`](@ref)
-  - [`CrossSectionalRegression`](@ref)
-"""
-function cross_sectional_leverage_one(A::MatNum, w::VecNum, intercept::Bool)::BitVector
-    sq = sqrt.(w)
-    D = intercept ? hcat(sq, A .* sq) : A .* sq
-    r = cross_sectional_rank(D)
-    if iszero(r)
-        return falses(size(D, 1))
-    end
-    F = LinearAlgebra.qr(D, LinearAlgebra.ColumnNorm())
-    h = vec(sum(abs2, F.Q * Matrix{eltype(F.R)}(LinearAlgebra.I, size(D, 1), r); dims = 2))
-    return BitVector(one.(h) .- h .<= sqrt(eps(real(eltype(h)))))
-end
-"""
-    leverage_one_nan(h1::Nothing, A::MatNum) -> MatNum
-    leverage_one_nan(h1::AbstractMatrix{Bool}, A::MatNum) -> MatNum
-
-Return a history of a cross-sectional fit with `NaN` at every pair whose leverage is one.
-
-A pair that `h1` marks gives no observation of its idiosyncratic return: the fit reproduced its return, so its residual is zero by construction, and so is the variance that reads that residual. A reader that treats such a pair as data reads the design, not the asset. The function writes `NaN` over the pair, so every reader that skips a value that is not finite leaves the pair out. It never changes `A`.
+Each buffer holds every asset, and an observation reads its first rows, so one allocation serves every observation of the task. Each buffer takes the type of the copy that it replaces, so a fit of mixed element types computes in the types that a copy gives. The gathers keep the types of `Z`, `X` and `W`. The centred exposures and returns of an intercept take the working type `Tf`, as `A .- transpose(xbar)` gives it. The weighted design takes the type that `sqrt.(w)` widens its input to.
 
 # Algorithm
 
 The method that Julia selects is the algorithm.
 
- 1. `nothing`: a regression built by hand states no mask, so return `A`.
- 2. A mask: check its size, and return `A` when it marks no pair. Otherwise copy `A` into the type of a square root of its elements, which holds a `NaN` and the division the readers take, and write `NaN` at every marked pair.
+ 1. No intercept: the centred buffers have no row, and the weighted design widens the type of `Z`.
+ 2. An intercept: the centred buffers hold every asset in the type `Tf`, and the weighted design widens `Tf`.
 
 # Arguments
 
-  - `h1`: The leverage-one mask of [`CrossSectionalRegression`](@ref), `observations × assets`, or `nothing`.
-  - `A`: A history on the axes of `h1`, `observations × assets`.
-
-# Validation
-
-  - `size(h1) == size(A)`. Raises a `DimensionMismatch`.
-
-# Returns
-
-  - `A::MatNum`: `A` itself when no pair is marked, otherwise a copy with `NaN` at every marked pair.
-
-# Examples
-
-```jldoctest
-julia> PortfolioOptimisers.leverage_one_nan(BitMatrix([0 1; 0 0]), [0.1 0.0; 0.3 0.4])
-2×2 Matrix{Float64}:
- 0.1  NaN
- 0.3    0.4
-```
-
-# Related
-
-  - [`CrossSectionalRegression`](@ref)
-  - [`cross_sectional_leverage_one`](@ref)
-"""
-function leverage_one_nan(::Nothing, A::MatNum)::MatNum
-    return A
-end
-function leverage_one_nan(h1::AbstractMatrix{Bool}, A::MatNum)::MatNum
-    @argcheck(size(h1) == size(A),
-              DimensionMismatch("h1 ($(size(h1, 1))×$(size(h1, 2))) must match the history ($(size(A, 1))×$(size(A, 2)))"))
-    if !any(h1)
-        return A
-    end
-    B = typeof(sqrt(one(float_if_integer(real(eltype(A)))))).(A)
-    B[h1] .= NaN
-    return B
-end
-"""
-    cross_sectional_least_squares(cre::CrossSectionalLinearRegression) -> Bool
-    cross_sectional_least_squares(cre::CrossSectionalTargetRegression) -> Bool
-    cross_sectional_least_squares(tgt::LinearModel) -> Bool
-    cross_sectional_least_squares(tgt::GeneralisedLinearModel) -> Bool
-    cross_sectional_least_squares(tgt::AbstractRegressionTarget) -> Bool
-
-Return whether the fit of a cross-sectional regression reproduces the return of a pair whose leverage is one.
-
-[`cross_sectional_regression`](@ref) writes an exact zero residual at such a pair when this answers `true`. A least-squares fit projects the returns onto the span of the design, so the pair's residual is zero in exact arithmetic, and the subtraction leaves only its round-off. A generalised linear model with an identity link solves its score equations with the pair's own parameter, which also fits the pair exactly. Under any other link the fit reproduces the mean of the pair on the scale of the link, so the residual on the scale of the returns is not zero, and the verb answers `false`. So does a target the verb does not know.
-
-# Arguments
-
-  - `cre`: Cross-sectional regression estimator.
-  - `tgt`: Regression target of a [`CrossSectionalTargetRegression`](@ref).
+  - `intercept`: `Val(cre.intercept)` of the estimator.
+  - `Z::Arr3Num`: Exposure tensor `assets × factors × observations`.
+  - `X::MatNum`: Asset returns matrix `observations × assets`.
+  - `W::MatNum`: Cross-sectional weights matrix `observations × assets`.
+  - `Tf::Type`: The working type of the fit.
 
 # Returns
 
-  - `ls::Bool`: `true` when the residual of a leverage-one pair is zero by construction.
+  - `buf::NamedTuple`: `(; w, A, y, Ac, yc, D, Q, G, b, gram, v)`: the gathered weights, exposures and returns, the centred exposures and returns, the weighted design, the factors of its column-pivoted `QR`, the pivoted columns that the leverage check divides, the work vector of a solve through the `QR`, of length `max(assets, factors)`, and the Gram matrix and the right side of a solve of the normal equations. The tuple is also the workspace that [`cross_sectional_solve`](@ref) reads.
 
 # Related
 
-  - [`cross_sectional_leverage_one`](@ref)
   - [`cross_sectional_regression`](@ref)
-  - [`LinearModel`](@ref)
-  - [`GeneralisedLinearModel`](@ref)
+  - [`cross_sectional_foreach`](@ref)
 """
-function cross_sectional_least_squares(::CrossSectionalLinearRegression)::Bool
-    return true
+function cross_sectional_loop_buffers(::Val{false}, Z::Arr3Num, X::MatNum, W::MatNum,
+                                      ::Type{T}) where {T}
+    N, K = size(Z, 1), size(Z, 2)
+    Td = promote_type(eltype(Z), typeof(sqrt(oneunit(eltype(W)))))
+    return (; w = similar(W, N), A = similar(Z, N, K), y = similar(X, N),
+            Ac = Matrix{T}(undef, 0, K), yc = Vector{T}(undef, 0),
+            D = Matrix{Td}(undef, N, K), Q = Matrix{Td}(undef, N, K),
+            G = Matrix{Td}(undef, N, K), b = Vector{Td}(undef, max(N, K)),
+            gram = Matrix{Td}(undef, K, K), v = Vector{Td}(undef, K))
 end
-function cross_sectional_least_squares(cre::CrossSectionalTargetRegression)::Bool
-    return cross_sectional_least_squares(cre.tgt)
-end
-function cross_sectional_least_squares(::LinearModel)::Bool
-    return true
-end
-function cross_sectional_least_squares(tgt::GeneralisedLinearModel)::Bool
-    link = length(tgt.args) >= 2 ? tgt.args[2] : GLM.canonicallink(tgt.args[1])
-    return isa(link, GLM.IdentityLink)
-end
-function cross_sectional_least_squares(::AbstractRegressionTarget)::Bool
-    return false
+function cross_sectional_loop_buffers(::Val{true}, Z::Arr3Num, X::MatNum, W::MatNum,
+                                      ::Type{T}) where {T}
+    N, K = size(Z, 1), size(Z, 2)
+    Td = promote_type(T, typeof(sqrt(oneunit(eltype(W)))))
+    return (; w = similar(W, N), A = similar(Z, N, K), y = similar(X, N),
+            Ac = Matrix{T}(undef, N, K), yc = Vector{T}(undef, N),
+            D = Matrix{Td}(undef, N, K), Q = Matrix{Td}(undef, N, K),
+            G = Matrix{Td}(undef, N, K), b = Vector{Td}(undef, max(N, K)),
+            gram = Matrix{Td}(undef, K, K), v = Vector{Td}(undef, K))
 end
 """
     cross_sectional_foreach(f, ex::FLoops.Transducers.Executor, idx::AbstractVector) -> nothing
-    cross_sectional_foreach(f, ex::FLoops.SequentialEx, idx::AbstractVector) -> nothing
+    cross_sectional_foreach(f, ex::FLoops.Transducers.Executor, idx::AbstractVector,
+                            init) -> nothing
+    cross_sectional_foreach(f, ex::FLoops.SequentialEx, idx::AbstractVector, init) -> nothing
 
 Call `f` on every entry of `idx` under the executor `ex`, and raise the error of the first entry that fails.
 
 The calls must be independent, and each must write a slice of its own. A threaded executor wraps an error in a `TaskFailedException`, and the entry that fails first in time depends on the schedule. So each call records its own error, and after the loop the function raises the recorded error of the lowest position, unchanged. Every executor therefore raises the error that a serial loop raises. Under `SequentialEx` the function runs the serial loop itself, so the error keeps the backtrace of the call that raised it.
 
+With `init`, each task of the executor calls `init()` once, and every call of `f` that the task runs receives that state. The state holds the buffers of the calls, so a loop over many entries allocates them once per task. A call must not keep a buffer of the state after it returns, because the next call of the task writes it. The method with no `init` gives `f` no state.
+
 # Arguments
 
-  - `f`: Function of one entry of `idx`. Its return value is discarded.
+  - `f`: Function of one entry of `idx`, and of the state of the task when `init` is given. Its return value is discarded.
   - $(arg_dict[:ex])
   - `idx`: The entries, in the order of the serial loop.
+  - `init`: Function of no argument that returns the state of one task.
 
 # Returns
 
@@ -1450,10 +1626,17 @@ The calls must be independent, and each must write a slice of its own. A threade
 """
 function cross_sectional_foreach(f, ex::FLoops.Transducers.Executor,
                                  idx::AbstractVector)::Nothing
+    return cross_sectional_foreach((i, _) -> f(i), ex, idx, Returns(nothing))
+end
+function cross_sectional_foreach(f, ex::FLoops.Transducers.Executor, idx::AbstractVector,
+                                 init)::Nothing
+    # `Any` is the last resort (#1979): `throw` takes a value of any type, so a slot that holds
+    # the caught value must hold any type.
     err = Vector{Any}(nothing, length(idx))
     FLoops.@floop ex for j in eachindex(err)
+        FLoops.@init st = init()
         try
-            f(idx[begin + j - 1])
+            f(idx[begin + j - 1], st)
         catch e
             err[j] = e
         end
@@ -1464,8 +1647,12 @@ function cross_sectional_foreach(f, ex::FLoops.Transducers.Executor,
     end
     return nothing
 end
-function cross_sectional_foreach(f, ::FLoops.SequentialEx, idx::AbstractVector)::Nothing
-    foreach(f, idx)
+function cross_sectional_foreach(f, ::FLoops.SequentialEx, idx::AbstractVector,
+                                 init)::Nothing
+    st = init()
+    for i in idx
+        f(i, st)
+    end
     return nothing
 end
 """
@@ -1485,19 +1672,20 @@ A refusal names an observation by its row of `X`. The verb fits [`cross_sectiona
 # Algorithm
 
  1. Take the eligibility mask through [`cross_sectional_design_mask`](@ref).
- 2. For each observation `t`, gather the eligible assets, their weights `w`, their exposures `A` and their returns `y`, and record their count in `n`. The observations are independent problems, and `cre.ex` runs them through [`cross_sectional_foreach`](@ref). Each writes its own row, so every executor gives the same result.
- 3. Mark the eligible assets of leverage one in the row `t` of `h1`, through [`cross_sectional_leverage_one`](@ref).
- 4. When `cre.intercept` is `true`, take the weighted means `ybar` and `xbar` of `y` and of `A`, and subtract them. An observation with no eligible asset takes zero for both.
- 5. Take the factor returns of the observation through [`cross_sectional_coefficients`](@ref), and write them into the row `t` of `f`. An observation with no eligible asset takes zero factor returns under [`CrossSectionalLinearRegression`](@ref), except under [`RankDeficiencyRefusal`](@ref), whose rank test reads an empty design as rank zero and refuses it by name.
+ 2. For each observation `t`, gather the eligible assets, their weights `w`, their exposures `A` and their returns `y` into buffers of the task, and record their count in `n`. The observations are independent problems, and `cre.ex` runs them through [`cross_sectional_foreach`](@ref), which gives each task its buffers once. Each writes its own row, so every executor gives the same result.
+ 3. When `cre.intercept` is `true`, take the weighted means `ybar` and `xbar` of `y` and of `A`, and subtract them. An observation with no eligible asset takes zero for both.
+ 4. Scale `A` by `sqrt.(w)`, giving the weighted design. When `cre.leverage` is `true` or the solve algorithm is [`DependentColumnDrop`](@ref), take its column-pivoted `QR` once. When `cre.leverage` is `true`, mark the eligible assets of leverage one in the row `t` of `h1`, through [`cross_sectional_leverage_one`](@ref) on that factorisation. Otherwise `h1` is `nothing`.
+ 5. Take the factor returns and the residual count of the observation through [`cross_sectional_coefficients`](@ref), on the same factorisation, and write the factor returns into the row `t` of `f`. An observation with no eligible asset takes zero factor returns under [`CrossSectionalLinearRegression`](@ref), except under [`RankDeficiencyRefusal`](@ref), whose rank test reads an empty design as rank zero and refuses it by name.
  6. When `cre.intercept` is `true`, write `ybar - dot(f[t, :], xbar)` into the entry `t` of `b`. Under [`DependentColumnDrop`](@ref), mark the dropped columns of the observation in the row `t` of `dc`, through [`cross_sectional_mark_dropped!`](@ref).
- 7. Subtract the systematic part, through [`cross_sectional_systematic`](@ref), from `X`, giving `eps`.
- 8. When [`cross_sectional_least_squares`](@ref) answers `true`, write an exact zero into `eps` at every pair that `h1` marks. The fit reproduced the return of that pair, so zero is its residual in exact arithmetic.
+ 7. Write the residual count into the entry `t` of `edof`, less one for the intercept when `cre.intercept` is `true` and the observation has an eligible asset. `edof` takes the working type of `f`, because a penalised fit counts a real number of parameters, and the integer count of a least-squares fit is exact in that type.
+ 8. Subtract the systematic part, through [`cross_sectional_systematic`](@ref), from `X`, giving `eps`.
+ 9. When `h1` is set and [`cross_sectional_least_squares`](@ref) answers `true`, write an exact zero into `eps` at every pair that `h1` marks. The fit reproduced the return of that pair, so zero is its residual in exact arithmetic.
 
 # Arguments
 
   - `cre`: Cross-sectional regression estimator.
   - `csr`: A cross-sectional regression result.
-  - `Z::Arr3Num`: Exposure tensor `observations × assets × factors`.
+  - `Z::Arr3Num`: Exposure tensor `assets × factors × observations`.
   - `X::MatNum`: Asset returns matrix `observations × assets`.
   - `W::MatNum`: Cross-sectional weights matrix `observations × assets`.
   - `args...`: Additional positional arguments (ignored by the passthrough).
@@ -1513,17 +1701,18 @@ A refusal names an observation by its row of `X`. The verb fits [`cross_sectiona
 # Examples
 
 ```jldoctest
-julia> Z = reshape([1.0, 0.0, 0.5, 0.0, 1.0, 0.5], 1, 3, 2);
+julia> Z = reshape([1.0, 0.0, 0.5, 0.0, 1.0, 0.5], 3, 2, 1);
 
 julia> cross_sectional_regression(CrossSectionalLinearRegression(), Z, [1.0 2.0 1.5], ones(1, 3))
 CrossSectionalRegression
-    f ┼ 1×2 Matrix{Float64}
-  eps ┼ 1×3 Matrix{Float64}
-    n ┼ Vector{Int64}: [3]
-    b ┼ nothing
-   h1 ┼ 1×3 BitMatrix
-   dc ┼ nothing
-   lv ┴ nothing
+     f ┼ 1×2 Matrix{Float64}
+   eps ┼ 1×3 Matrix{Float64}
+     n ┼ Vector{Int64}: [3]
+  edof ┼ Vector{Float64}: [1.0]
+     b ┼ nothing
+    h1 ┼ 1×3 BitMatrix
+    dc ┼ nothing
+    lv ┴ nothing
 ```
 
 # Related
@@ -1565,7 +1754,7 @@ The algorithm of [`cross_sectional_regression`](@ref), with `t0 + t` as the inde
 # Arguments
 
   - `cre`: Cross-sectional regression estimator.
-  - `Z::Arr3Num`: Exposure tensor `observations × assets × factors`.
+  - `Z::Arr3Num`: Exposure tensor `assets × factors × observations`.
   - `X::MatNum`: Asset returns matrix `observations × assets`.
   - `W::MatNum`: Cross-sectional weights matrix `observations × assets`.
   - `t0::Integer`: Number of fitted observations before the block.
@@ -1594,50 +1783,70 @@ function cross_sectional_block_regression(cre::Union{CrossSectionalLinearRegress
                                           t0::Integer)::CrossSectionalRegression
     act = cross_sectional_design_mask(Z, X, W)
     # The coefficients answer a weighted least squares, so the working type is the inputs'
-    # own promotion, widened to a float only when it is an integer: an integer panel
-    # regresses in `Float64`, and a `Float32` panel in `Float32`. A `Rational` panel keeps
-    # its type in `f`, but it is not fitted exactly, issue #1352. The linear member scales
-    # by `sqrt.(w)`, which is a float, and the default target `LinearModel` fits in floating
+    # own promotion: a `Float32` panel regresses in `Float32`. A `Rational` panel keeps its
+    # type in `f`, but it is not fitted exactly, issue #1352. The linear member scales by
+    # `sqrt.(w)`, which is a float, and the default target `LinearModel` fits in floating
     # point too.
-    Ts = promote_type(real(eltype(Z)), real(eltype(X)), real(eltype(W)))
-    Tf = float_if_integer(Ts)
-    K = size(Z, 3)
+    Tf = promote_type(real(eltype(Z)), real(eltype(X)), real(eltype(W)))
+    K = size(Z, 2)
     f = zeros(Tf, size(X, 1), K)
     b = cre.intercept ? zeros(Tf, size(X, 1)) : nothing
     n = zeros(Int, size(X, 1))
-    # A `BitMatrix` packs 64 entries into one word, so two threads that write rows of one word
-    # would race. Each fit writes its row into a `Matrix{Bool}`, whose entries are bytes.
-    h1 = zeros(Bool, size(X))
+    h1 = cross_sectional_leverage_rows(cre, X)
     dc = cross_sectional_drop_mask(cre.alg, size(X, 1), K)
-    cross_sectional_foreach(cre.ex, axes(X, 1)) do t
+    # A penalised fit counts a real number of parameters, so the counts take the working type.
+    edof = zeros(Tf, size(X, 1))
+    # Each task gathers an observation into buffers of its own, and reads the first rows of
+    # each. The rows are a range, so every product of the loop reads a block of unit stride and
+    # runs in BLAS, and the loop allocates no gather. The slice of an observation is one
+    # contiguous block of `Z`, so the gather reads it in memory order (#1973).
+    init = () -> cross_sectional_loop_buffers(Val(cre.intercept), Z, X, W, Tf)
+    cross_sectional_foreach(cre.ex, axes(X, 1), init) do t, buf
         idx = findall(view(act, t, :))
         n[t] = length(idx)
-        w = Tf.(view(W, t, idx))
-        A = Tf.(view(Z, t, idx, :))
-        y = Tf.(view(X, t, idx))
-        h1[t, idx] = cross_sectional_leverage_one(A, w, cre.intercept)
+        w = view(buf.w, 1:n[t])
+        w .= view(W, t, idx)
+        A = view(buf.A, 1:n[t], :)
+        A .= view(Z, idx, :, t)
+        y = view(buf.y, 1:n[t])
+        y .= view(X, t, idx)
         ybar = zero(Tf)
         xbar = zeros(Tf, K)
+        # The fit of the centred design leaves the weighted mean, which the intercept spends
+        # when the observation has one.
+        spent = false
         if cre.intercept
             sw = sum(w)
             if sw > zero(sw)
                 ybar = LinearAlgebra.dot(w, y) / sw
                 xbar .= vec(transpose(A) * w) ./ sw
+                spent = true
             end
-            y = y .- ybar
-            A = A .- transpose(xbar)
+            yc = view(buf.yc, 1:n[t])
+            yc .= y .- ybar
+            y = yc
+            Ac = view(buf.Ac, 1:n[t], :)
+            Ac .= A .- transpose(xbar)
+            A = Ac
         end
-        fi = cross_sectional_coefficients(cre, A, y, w, t0 + t)
-        f[t, :] = fi
-        cross_sectional_mark_dropped!(dc, A, w, t)
+        D = view(buf.D, 1:n[t], :)
+        D .= A .* sqrt.(w)
+        F = cross_sectional_shared_qr(h1, dc, cre.alg, D, view(buf.Q, 1:n[t], :))
+        cross_sectional_mark_leverage!(h1, A, w, cre.intercept, t, idx; D = D, F = F,
+                                       G = view(buf.G, 1:n[t], :))
+        fi = cross_sectional_coefficients(cre, A, y, w, t0 + t; D = D, F = F, ws = buf)
+        f[t, :] = fi.f
+        cross_sectional_mark_dropped!(dc, A, w, t; D = D, F = F)
         if cre.intercept
-            b[t] = ybar - LinearAlgebra.dot(fi, xbar)
+            b[t] = ybar - LinearAlgebra.dot(fi.f, xbar)
         end
+        edof[t] = fi.edof - spent
+        return nothing
     end
-    eps = X - cross_sectional_systematic(f, b, Z)
-    # A fit that is not least squares keeps the residual of a marked pair, and only marks it.
-    eps[h1 .& cross_sectional_least_squares(cre)] .= zero(eltype(eps))
-    return CrossSectionalRegression(; f = f, eps = eps, n = n, b = b, h1 = BitMatrix(h1),
+    eps = cross_sectional_residuals(X, f, b, Z)
+    cross_sectional_zero_marked!(eps, h1, cross_sectional_least_squares(cre))
+    return CrossSectionalRegression(; f = f, eps = eps, n = n, edof = edof, b = b,
+                                    h1 = cross_sectional_bit_mask(h1),
                                     dc = cross_sectional_bit_mask(dc))
 end
 """
@@ -1664,11 +1873,11 @@ Where:
 
   - `f::MatNum`: Factor returns matrix `observations × factors`.
   - `b::Option{<:VecNum}`: Intercept vector, or `nothing` when none was fitted.
-  - `Z::Arr3Num`: Exposure tensor `observations × assets × factors`. The asset axis may differ from the one the fit saw; the observation and factor axes may not.
+  - `Z::Arr3Num`: Exposure tensor `assets × factors × observations`. The asset axis may differ from the one the fit saw. The observation axis and the factor axis must match `f`.
 
 # Validation
 
-  - `size(Z, 1) == size(f, 1)` and `size(Z, 3) == size(f, 2)`.
+  - `size(Z, 3) == size(f, 1)` and `size(Z, 2) == size(f, 2)`.
 
 # Returns
 
@@ -1681,20 +1890,68 @@ Where:
   - [`cross_sectional_regression`](@ref)
 """
 function cross_sectional_systematic(f::MatNum, b::Option{<:VecNum}, Z::Arr3Num)::MatNum
-    @argcheck(size(Z, 1) == size(f, 1) && size(Z, 3) == size(f, 2),
-              DimensionMismatch("Z ($(size(Z, 1))×$(size(Z, 2))×$(size(Z, 3))) must match f ($(size(f, 1))×$(size(f, 2))) on the observation and factor axes"))
-    Xh = similar(f, size(Z, 1), size(Z, 2))
-    for t in axes(Z, 1), i in axes(Z, 2)
-        Xh[t, i] = LinearAlgebra.dot(view(Z, t, i, :), view(f, t, :))
+    @argcheck(size(Z, 3) == size(f, 1) && size(Z, 2) == size(f, 2),
+              DimensionMismatch("Z ($(size(Z, 1))×$(size(Z, 2))×$(size(Z, 3))) must match f ($(size(f, 1))×$(size(f, 2))) on the factor and observation axes"))
+    Xh = similar(f, size(Z, 3), size(Z, 1))
+    for t in axes(Z, 3), i in axes(Z, 1)
+        Xh[t, i] = LinearAlgebra.dot(view(Z, i, :, t), view(f, t, :))
     end
     return isnothing(b) ? Xh : Xh .+ b
+end
+"""
+    cross_sectional_residuals(X::MatNum, f::MatNum, b::Option{<:VecNum}, Z::Arr3Num) -> MatNum
+
+Return the residuals of a cross-sectional regression, `observations × assets`: the returns `X` less the systematic part of [`cross_sectional_systematic`](@ref), in one pass.
+
+Each element takes the roundings of `X - cross_sectional_systematic(f, b, Z)` in the same order, so the two give the same bits. The pass allocates the residuals alone, where the two-step form also allocates the systematic part and, with an intercept, its shifted copy.
+
+# Algorithm
+
+ 1. For each observation `t` and asset `i`, take the dot product of the exposures `Z[i, :, t]` and the factor returns `f[t, :]`, in the element type of `f`.
+ 2. Add the intercept `b[t]` when one was fitted.
+ 3. Subtract the sum from `X[t, i]`.
+
+# Arguments
+
+  - `X::MatNum`: Returns matrix `observations × assets`.
+  - `f::MatNum`: Factor returns matrix `observations × factors`.
+  - `b::Option{<:VecNum}`: Intercept vector, or `nothing` when none was fitted.
+  - `Z::Arr3Num`: Exposure tensor `assets × factors × observations`.
+
+# Validation
+
+  - The rules of [`cross_sectional_systematic`](@ref), and `size(X) == (size(Z, 3), size(Z, 1))`.
+
+# Returns
+
+  - `eps::MatNum`: Residuals, `observations × assets`.
+
+# Related
+
+  - [`cross_sectional_systematic`](@ref)
+  - [`cross_sectional_regression`](@ref)
+"""
+function cross_sectional_residuals(X::MatNum, f::MatNum, b::Option{<:VecNum},
+                                   Z::Arr3Num)::MatNum
+    # `f` is `observations × factors` and `X` is `observations × assets`.
+    @argcheck((size(f), size(X)) == ((size(Z, 3), size(Z, 2)), (size(Z, 3), size(Z, 1))),
+              DimensionMismatch("X ($(size(X, 1))×$(size(X, 2))), f ($(size(f, 1))×$(size(f, 2))) and Z ($(size(Z, 1))×$(size(Z, 2))×$(size(Z, 3))) must agree on the asset, factor and observation axes"))
+    # The element types of the two-step form: the systematic part is stored in the type of
+    # `f`, the intercept promotes it, and the difference promotes again.
+    Ts = isnothing(b) ? eltype(f) : Base.promote_op(+, eltype(f), eltype(b))
+    eps = similar(X, Base.promote_op(-, eltype(X), Ts))
+    for t in axes(Z, 3), i in axes(Z, 1)
+        s = convert(eltype(f), LinearAlgebra.dot(view(Z, i, :, t), view(f, t, :)))
+        eps[t, i] = X[t, i] - (isnothing(b) ? s : s + b[t])
+    end
+    return eps
 end
 """
     StatsAPI.predict(csr::CrossSectionalRegression, Z::Arr3Num) -> MatNum
 
 Return the systematic part of a fitted cross-sectional regression, `observations × assets`.
 
-The residuals the result already carries are `X - predict(csr, Z)` for the `X` the fit saw, so this method earns its place on an exposure tensor the fit did not see.
+For the `X` that the fit saw, the residuals of the result are `X - predict(csr, Z)` already. The method gives the systematic part on an exposure tensor that the fit did not see.
 
 # Algorithm
 
@@ -1703,7 +1960,7 @@ The residuals the result already carries are `X - predict(csr, Z)` for the `X` t
 # Arguments
 
   - `csr`: A cross-sectional regression result.
-  - `Z::Arr3Num`: Exposure tensor `observations × assets × factors`. The asset axis may differ from the one the fit saw; the observation and factor axes may not.
+  - `Z::Arr3Num`: Exposure tensor `assets × factors × observations`. The asset axis may differ from the one the fit saw. The observation axis and the factor axis must match `csr.f`.
 
 # Validation
 
@@ -1716,7 +1973,7 @@ The residuals the result already carries are `X - predict(csr, Z)` for the `X` t
 # Examples
 
 ```jldoctest
-julia> Z = reshape([1.0, 0.0, 0.5, 0.0, 1.0, 0.5], 1, 3, 2);
+julia> Z = reshape([1.0, 0.0, 0.5, 0.0, 1.0, 0.5], 3, 2, 1);
 
 julia> csr = cross_sectional_regression(CrossSectionalLinearRegression(), Z, [1.0 2.0 1.5],
                                         ones(1, 3));
@@ -1736,155 +1993,13 @@ julia> predict(csr, Z)
 function StatsAPI.predict(csr::CrossSectionalRegression, Z::Arr3Num)::MatNum
     return cross_sectional_systematic(csr.f, csr.b, Z)
 end
-"""
-    cross_sectional_r2(csr::CrossSectionalRegression, Z::Arr3Num, X::MatNum,
-                       W::MatNum) -> VecNum
-
-Return the weighted coefficient of determination of every observation.
-
-An observation whose weighted total sum of squares is zero has no defined ratio, and its entry is `NaN`. [`mean_cross_sectional_r2`](@ref) is the scalar summary that skips those entries.
-
-# Mathematical definition
-
-```math
-\\begin{align}
-R^{2}_{t} &= 1 - \\frac{\\sum_{i} w_{t,i} \\left(x_{t,i} - \\hat{x}_{t,i}\\right)^{2}}{\\sum_{i} w_{t,i} \\left(x_{t,i} - \\bar{x}_{t}\\right)^{2}} \\\\
-\\bar{x}_{t} &= \\frac{\\sum_{i} w_{t,i} x_{t,i}}{\\sum_{i} w_{t,i}}\\,.
-\\end{align}
-```
-
-Where:
-
-  - ``R^{2}_{t}``: Weighted coefficient of determination of observation ``t``.
-  - ``x_{t,i}``: Return of asset ``i`` at observation ``t``.
-  - ``\\hat{x}_{t,i}``: Systematic return of asset ``i`` at observation ``t``.
-  - ``\\bar{x}_{t}``: Weighted mean return of observation ``t``.
-  - ``w_{t,i} \\geq 0``: Cross-sectional weight of asset ``i`` at observation ``t``. Both sums run over the eligible assets alone.
-
-# Algorithm
-
- 1. Take the eligibility mask through [`cross_sectional_design_mask`](@ref).
- 2. Take the systematic returns through [`StatsAPI.predict(csr::CrossSectionalRegression, Z::Arr3Num)`](@ref).
- 3. For each observation, sum the weighted squared residuals and the weighted squared deviations from the weighted mean, over the eligible assets alone.
- 4. Return `1 - rss / tss` per observation, and `NaN` where `tss` is not positive.
-
-# Arguments
-
-  - `csr`: A cross-sectional regression result.
-  - `Z::Arr3Num`: Exposure tensor `observations × assets × factors`.
-  - `X::MatNum`: Asset returns matrix `observations × assets`.
-  - `W::MatNum`: Cross-sectional weights matrix `observations × assets`.
-
-# Validation
-
-  - The rules of [`cross_sectional_design_mask`](@ref).
-
-# Returns
-
-  - `r2::VecNum`: Coefficient of determination of every observation, of length `observations`, in the type a division of the inputs lands in.
-
-# Examples
-
-```jldoctest
-julia> Z = reshape([1.0, 0.0, 0.5, 0.0, 1.0, 0.5], 1, 3, 2);
-
-julia> csr = cross_sectional_regression(CrossSectionalLinearRegression(), Z, [1.0 2.0 1.5],
-                                        ones(1, 3));
-
-julia> cross_sectional_r2(csr, Z, [1.0 2.0 1.5], ones(1, 3))
-1-element Vector{Float64}:
- 1.0
-```
-
-# Related
-
-  - [`CrossSectionalRegression`](@ref)
-  - [`mean_cross_sectional_r2`](@ref)
-  - [`cross_sectional_regression`](@ref)
-"""
-function cross_sectional_r2(csr::CrossSectionalRegression, Z::Arr3Num, X::MatNum,
-                            W::MatNum)::VecNum
-    act = cross_sectional_design_mask(Z, X, W)
-    Xh = StatsAPI.predict(csr, Z)
-    # The ratio keeps the type of the inputs, so a `Float32` fit answers a `Float32` ratio
-    # rather than one widened by a `Float64` `NaN`.
-    Ts = promote_type(real(eltype(Xh)), real(eltype(X)), real(eltype(W)))
-    Tf = float_if_integer(Ts)
-    r2 = fill(convert(Tf, NaN), size(X, 1))
-    for t in axes(X, 1)
-        idx = findall(view(act, t, :))
-        w = view(W, t, idx)
-        y = view(X, t, idx)
-        sw = sum(w)
-        if sw <= zero(sw)
-            continue
-        end
-        ybar = LinearAlgebra.dot(w, y) / sw
-        rss = sum(w[k] * abs2(y[k] - Xh[t, idx[k]]) for k in eachindex(idx))
-        tss = sum(w[k] * abs2(y[k] - ybar) for k in eachindex(idx))
-        if tss > zero(tss)
-            r2[t] = 1 - rss / tss
-        end
-    end
-    return r2
-end
-"""
-    mean_cross_sectional_r2(csr::CrossSectionalRegression, Z::Arr3Num, X::MatNum,
-                            W::MatNum) -> Number
-
-Return the mean weighted coefficient of determination across the observations.
-
-The mean skips every observation whose ratio is undefined, and it is `NaN` when no observation defines one.
-
-# Algorithm
-
- 1. Take the per-observation vector through [`cross_sectional_r2`](@ref).
- 2. Return the mean of its finite entries, and `NaN` when it holds none.
-
-# Arguments
-
-  - `csr`: A cross-sectional regression result.
-  - `Z::Arr3Num`: Exposure tensor `observations × assets × factors`.
-  - `X::MatNum`: Asset returns matrix `observations × assets`.
-  - `W::MatNum`: Cross-sectional weights matrix `observations × assets`.
-
-# Validation
-
-  - The rules of [`cross_sectional_design_mask`](@ref).
-
-# Returns
-
-  - `r2::Number`: Mean coefficient of determination across the observations.
-
-# Examples
-
-```jldoctest
-julia> Z = reshape([1.0, 0.0, 0.5, 0.0, 1.0, 0.5], 1, 3, 2);
-
-julia> csr = cross_sectional_regression(CrossSectionalLinearRegression(), Z, [1.0 2.0 1.5],
-                                        ones(1, 3));
-
-julia> mean_cross_sectional_r2(csr, Z, [1.0 2.0 1.5], ones(1, 3))
-1.0
-```
-
-# Related
-
-  - [`CrossSectionalRegression`](@ref)
-  - [`cross_sectional_r2`](@ref)
-"""
-function mean_cross_sectional_r2(csr::CrossSectionalRegression, Z::Arr3Num, X::MatNum,
-                                 W::MatNum)::Number
-    r2 = cross_sectional_r2(csr, Z, X, W)
-    keep = filter(isfinite, r2)
-    return isempty(keep) ? convert(eltype(r2), NaN) : sum(keep) / length(keep)
-end
 
 export CrossSectionalRegression, CrossSectionalLinearRegression,
        CrossSectionalTargetRegression, PseudoInverseFallback, RankDeficiencyRefusal,
-       UncheckedSolve, MinimumNormSolve, DependentColumnDrop, ZeroUnseenMember,
-       SolvedUnseenMember, cross_sectional_regression, cross_sectional_r2,
-       mean_cross_sectional_r2
+       UncheckedSolve, MinimumNormSolve, DependentColumnDrop, NormalEquationsSolve,
+       ZeroUnseenMember, SolvedUnseenMember, cross_sectional_regression
+# The `# Interfaces` section of the solve algorithm tells an implementer to count the rank of
+# its fit with `cross_sectional_rank` (#1900), so the helper is `public` too.
 public AbstractUnseenMemberRule, AbstractCrossSectionalSolveAlgorithm,
        cross_sectional_solve, cross_sectional_target_solve,
-       assert_cross_sectional_target_solve
+       assert_cross_sectional_target_solve, cross_sectional_rank

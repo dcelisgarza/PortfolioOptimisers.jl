@@ -51,6 +51,25 @@
     by a square root, is not a repair, so the pattern reads a division of a bare `one`,
     `zero` or `oneunit` by another of them or by a literal only.
 
+    Issue #1808. `AngularDist` took its working type from
+    `promote_type(eltype(a), eltype(b), Float64)`, and its `Distances.result_type` from
+    `promote_type(a, b, Float64)`. A concrete float type as an argument of `promote_type`
+    sets a floor on the width: a `Float32` feature matrix gave a `Float64` distance matrix
+    under every collapse of the default `FeatureDistance`. No pattern above read that
+    spelling. `PROMOTE_FLOAT` reads it. A type parameter such as `Vector{Float64}` names a
+    container and sets no floor, so the lookbehind refuses a `{` as `NAMED_FLOAT` does.
+
+    Issue #1972. The maintainer ruled on 2026-11-03 that integer data are supported only
+    where an integer is the natural type of the data. A continuous kernel reads returns,
+    prices, exposures, weights, moments, regressions or distances, and it no longer repairs
+    an integer type: before the ruling, `float_if_integer` had about 144 call sites in 61
+    files, and the worst of them copied and converted the data on every observation. The
+    carriers that a user builds now convert integer data once, at construction, and a
+    kernel downstream takes the type of its data with `eltype`. `ENTRY` lists every file
+    that may call `float_if_integer`, with the count of its calls. A new call is a new
+    entry point, or a site whose integer is a natural type, and each is a decision that a
+    reviewer must see. The file that defines the function is out of the count.
+
     What the census does not read is what carries no `(`: `zeros(Float64, n)` and its
     siblings name a concrete type for an allocation, and `convert(Float64, x)` names one
     for a conversion. Neither spelling stands in `src/` or `ext/` today. Add the pattern
@@ -89,10 +108,39 @@
     # A working type read off a division of constants, which repairs an integer input by
     # deciding the type of every input.
     DIVISION_TYPE = r"\btypeof\(\s*(?:one|zero|oneunit)\(.*?\)\s*/\s*(?:(?:one|zero|oneunit)\(|\d)"
+    # A concrete float type as an argument of `promote_type`, which sets a floor on the
+    # width of every input. The argument list may hold two levels of nested calls.
+    PROMOTE_FLOAT = r"\bpromote_type\((?:[^()]|\((?:[^()]|\([^()]*\))*\))*?(?<![\w.{])(?:Float16|Float32|Float64|BigFloat|ComplexF16|ComplexF32|ComplexF64)\b"
     # The one line that may call `float`: the guard that repairs an integer type and keeps
     # every other type.
     GUARD = ("src/02_Tools/03_TypeUtilities.jl",
              "float_if_integer(::Type{T}) where {T <: Integer} = float(T)")
+    # A call of the guard. A backtick or a dot before it is prose or a qualified name in a
+    # docstring, not a call in the code.
+    REPAIR = r"(?<![\w.`])float_if_integer\("
+    #=
+    Every file that may call `float_if_integer`, with the count of its calls (#1972).
+
+      - The four carriers that a user builds convert integer data at construction: the
+        Panel Fields (and the lazy lift `RepeatedObservations`), `PricesResult` and
+        `ReturnsResult`.
+      - The price ingestion layer floats an integer price type in `absence_type`.
+      - `panel_read_eltype` reads the integer codes of a `CategoricalPanelField`, which a
+        read can fill with a fraction.
+      - A feature distance averages the integer count of a metric such as `Hamming`.
+      - A graph traversal reads a `Bool` or integer connection matrix, and its distances
+        must hold `Inf`.
+    =#
+    ENTRY = Dict("src/03_InputData/01_AssetPanel.jl" => 2,
+                 "src/03_InputData/02_AssetPanelBuilder.jl" => 2,
+                 "src/03_InputData/06_PricesResult.jl" => 5,
+                 "src/03_InputData/07_PriceIngestion.jl" => 1,
+                 "src/03_InputData/10_ReturnsResult.jl" => 5,
+                 "src/03_InputData/20_PanelFieldValues.jl" => 1,
+                 "src/06_Distance/05_FeatureDistance.jl" => 1,
+                 "src/06_Distance/06_FeatureDistanceActiveRows.jl" => 2,
+                 "src/08_Phylogeny/06_DBHT/03_GraphTraversal.jl" => 1)
+    repairs = Dict{String, Vector{String}}()
 
     #=
     A site the rule owns and another ticket ships. Each entry maps a file to the fragment
@@ -104,17 +152,32 @@
     =#
     EXEMPT = Dict{String, String}()
 
+    #=
+    Issue #1827. The maintainer ruled that the library supports a type narrower than
+    `Float64` on a best-effort basis. Where that type cannot hold the answer, and a fix
+    would make the `Float64` default worse or cost a compromise that gives nothing back,
+    the site promotes the type with `promote_type(typeof(x), Float64)`, and a `!!! warning`
+    admonition in the docstring states it. This is not the breach of #1808: that site
+    widened a computation that `Float32` holds. Each entry maps a file to the fragment of
+    the one line the census admits there. The census asserts that the fragment is still
+    found and that the file still holds a warning, so a stale entry reds the build.
+    =#
+    RULED = Dict("src/05_Moments/30_RegimeAdjusted/09_MahalanobisLevelClosure.jl" => "promote_type(typeof(decay), Float64)")
+
     coerced = String[]
     rounded = String[]
     named = String[]
     broadcast = String[]
     filled = String[]
     divided = String[]
+    promoted = String[]
+    admitted = String[]
     forgiven = String[]
     guarded = String[]
     for f in files
         rel = relpath(f, ROOT)
         exempt = get(EXEMPT, replace(rel, '\\' => '/'), nothing)
+        ruled = get(RULED, replace(rel, '\\' => '/'), nothing)
         for (i, line) in enumerate(eachline(f))
             if occursin(COERCE, line)
                 if replace(rel, '\\' => '/') == GUARD[1] && strip(line) == GUARD[2]
@@ -123,8 +186,19 @@
                     push!(coerced, "$rel:$i: $(strip(line))")
                 end
             end
+            if occursin(REPAIR, line) && replace(rel, '\\' => '/') != GUARD[1]
+                push!(get!(repairs, replace(rel, '\\' => '/'), String[]),
+                      "$rel:$i: $(strip(line))")
+            end
             if occursin(DIVISION_TYPE, line)
                 push!(divided, "$rel:$i: $(strip(line))")
+            end
+            if occursin(PROMOTE_FLOAT, line)
+                if !isnothing(ruled) && occursin(ruled, line)
+                    push!(admitted, "$rel:$i: $(strip(line))")
+                else
+                    push!(promoted, "$rel:$i: $(strip(line))")
+                end
             end
             if occursin(ROUND_THEN_CONVERT, line)
                 push!(rounded, "$rel:$i: $(strip(line))")
@@ -177,8 +251,43 @@
     end
     @test isempty(divided)
 
+    if !isempty(promoted)
+        @info "Sites that promote with a concrete float type; derive the type off the operation that widens it, such as `typeof(acos(one(T)))`:\n" *
+              join(promoted, "\n")
+    end
+    @test isempty(promoted)
+    # The pattern reads the spelling that #1808 removed, and it lets a type parameter past.
+    @test occursin(PROMOTE_FLOAT, "T = promote_type(eltype(a), eltype(b), Float64)")
+    @test occursin(PROMOTE_FLOAT, "promote_type(a, b, Float64)")
+    @test !occursin(PROMOTE_FLOAT, "promote_type(Vector{Float64}, typeof(x))")
+    @test !occursin(PROMOTE_FLOAT, "typeof(acos(one(promote_type(a, b))))")
+
+    # Every ruled promotion is still a site, and its file still warns of it.
+    @test length(admitted) == length(RULED)
+    for f in keys(RULED)
+        @test occursin("!!! warning", read(joinpath(ROOT, f), String))
+    end
+
     # The guard is still where the census looks for it, so its one allowance is not stale.
     @test length(guarded) == 1
+
+    # Only the entry points and the sites of a natural integer repair an integer type, and
+    # each holds the count of calls that `ENTRY` states. A count that falls is a stale entry.
+    unlisted = String[]
+    for (f, hits) in repairs
+        if get(ENTRY, f, 0) != length(hits)
+            append!(unlisted, hits)
+        end
+    end
+    if !isempty(unlisted)
+        @info "Sites that repair an integer type outside the entry points of integer data. A continuous kernel takes the type of its data with `eltype`, and the carrier converts integer data at construction (#1972). A new entry point, or a site whose integer is a natural type, goes into `ENTRY`:\n" *
+              join(sort!(unlisted), "\n")
+    end
+    @test isempty(unlisted)
+    @test Set(keys(repairs)) == Set(keys(ENTRY))
+    @test occursin(REPAIR, "Tf = float_if_integer(eltype(X))")
+    @test !occursin(REPAIR, "the type `float_if_integer(T)` of the data")
+    @test !occursin(REPAIR, "PortfolioOptimisers.float_if_integer(Int)")
 
     # Every exemption is still a site. One that is not has been shipped, and the entry that
     # forgives it must go with it.

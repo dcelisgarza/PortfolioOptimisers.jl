@@ -69,7 +69,7 @@ slv = [Solver(; name = :clarabel1, solver = Clarabel.Optimizer,
 We tune a [`Stacking`](@ref) estimator, and the search works the same way for the other
 optimisation estimators, such as [`NestedClustered`](@ref). A key of the grid is a string with
 the property path to the parameter, such as `"opti[1].opt.l2.val"`. The search parses the
-string into an [`Accessors.jl`](https://github.com/JuliaObjects/Accessors.jl) lens, an object
+string into an [`Accessors.jl`](https://juliaobjects.github.io/Accessors.jl/stable/) lens, an object
 that returns a copy of the estimator with that one field changed.
 
 A search needs a risk measure, `r`, to score every fold, and a cross-validation scheme, `cv`,
@@ -99,25 +99,21 @@ randomised search, as section 2.2 explains.
 You can give a vector of grids. The search expands each grid on its own and joins the results
 into one list of candidates.
 
-A literal vector of grids whose values have different types has an abstract element type, and
-the constructor throws a `MethodError` for it. [`concrete_typed_array`](@ref) narrows the
-element type to the union of the types of the grids, which the constructor accepts. A vector
-of dictionaries needs the same call.
+A literal vector of grids whose values have different types has the element type `Vector`. The
+constructor accepts it, checks that each element is a grid, and narrows the element type to
+the union of the types of the grids. A vector of dictionaries works in the same way.
 
-We search four grids, and the search keeps the best candidate over all of them.
+We search four grids. `n_best = 3` keeps the three best candidates over all of them, in rank
+order. The default `n_best = 1` keeps the best one alone.
 =#
 
-p = concrete_typed_array([["opti[2].opt.l1" =>
-                               range(; start = 0.0005, stop = 0.0008, length = 3),
-                           "opti[1].opt.l2.val" =>
-                               range(; start = 0.0004, stop = 0.0007, length = 3)],
-                          ["opti[1].opt.l2.val" =>
-                               range(; start = 0.0004, stop = 0.0007, length = 3)],
-                          ["opti[2].opt.l1" =>
-                               range(; start = 0.0009, stop = 0.0012, length = 3)],
-                          ["opti[2]" => [MeanRisk(; opt = opt, obj = MaximumUtility()),
-                                         MeanRisk(; opt = opt, obj = MaximumRatio())]]])
-gs_cv = GridSearchCrossValidation(p; r = r)
+p = [["opti[2].opt.l1" => range(; start = 0.0005, stop = 0.0008, length = 3),
+      "opti[1].opt.l2.val" => range(; start = 0.0004, stop = 0.0007, length = 3)],
+     ["opti[1].opt.l2.val" => range(; start = 0.0004, stop = 0.0007, length = 3)],
+     ["opti[2].opt.l1" => range(; start = 0.0009, stop = 0.0012, length = 3)],
+     ["opti[2]" => [MeanRisk(; opt = opt, obj = MaximumUtility()),
+                    MeanRisk(; opt = opt, obj = MaximumRatio())]]]
+gs_cv = GridSearchCrossValidation(p; r = r, n_best = 3)
 #=
 We run the search. The four grids give `3 × 3 + 3 + 3 + 2 = 17` candidates. The result has
 these fields.
@@ -127,6 +123,11 @@ these fields.
   - `train_scores` is `nothing` unless you set `train_score = true`.
   - `lens_grid` and `val_grid` give the keys and the values of every candidate.
   - `idx` is the index of the best candidate.
+  - `ranked` holds the `n_best` best estimators, best first, so `ranked[1]` is `opt`.
+  - `rank_idx` holds the column of each one in `test_scores`, and `rank_scores` holds its mean
+    test score.
+  - `path_ids` gives the path of each row of `test_scores`. It is `nothing` here, because the
+    default scheme has one path.
 
 The best candidate has the highest mean test score. The search negates a measure for which a
 lower value is better, such as a risk measure, and keeps a ratio as it is. Here the measure is
@@ -156,40 +157,53 @@ res_gs1 = optimise(gs_res1.opt, rd)
 plot_composition(res_gs1, rd)
 
 #=
+The search keeps configurations, not fitted results. The table gives the column, the mean test
+score and the standard deviation of the test scores over the folds of each kept candidate. We
+optimise each kept candidate on the full data, as we did for `opt`.
+=#
+
+pretty_table(DataFrame("Rank" => eachindex(gs_res1.ranked), "Column" => gs_res1.rank_idx,
+                       "Mean score" => gs_res1.rank_scores,
+                       "Std score" =>
+                           vec(std(gs_res1.test_scores[:, gs_res1.rank_idx]; dims = 1))))
+
+res_ranked = [optimise(cand, rd) for cand in gs_res1.ranked]
+plot_composition(res_ranked[2], rd)
+
+#=
 ### 2.2 Randomised cross validation search
 
-[`RandomisedSearchCrossValidation`](@ref) samples values from the grid, and then runs a grid
-search over the samples with [`search_cross_validation`](@ref). It takes the same grids as
+[`RandomisedSearchCrossValidation`](@ref) draws `n_iter` trials from the grid, and then runs a
+grid search over the trials with [`search_cross_validation`](@ref). It takes the same grids as
 [`GridSearchCrossValidation`](@ref). A parameter can also take a
 [`Distributions.Distribution`](https://juliastats.org/Distributions.jl/latest/types/#Distributions)
 in place of a vector of values.
 
-The search samples every parameter on its own, and `n_iter` sets the number of samples.
+A trial is one candidate. It sets every parameter of one grid at the same time, so the search
+fits `n_iter` candidates, however many parameters it tunes.
 
-  - From a distribution, it draws `n_iter` values.
-  - From a vector, it draws `min(n_iter, length(v))` values. It draws without replacement,
-    unless the grid also holds a distribution. Then it draws with replacement, and it can draw
-    a value twice.
+  - If every value is a vector, the search draws `n_iter` distinct candidates of the grid
+    search, each with the same probability. It keeps them in the order of the grid search. If
+    the grid holds `n_iter` candidates or fewer, the search takes all of them.
+  - If a value is a distribution, each trial picks one grid with equal probability. Then it
+    draws one value from each distribution and one entry from each vector of that grid. Two
+    trials can then be the same.
 
-Then it takes the product of the samples in each grid, as the grid search does. A vector of
-grids works as it does for [`GridSearchCrossValidation`](@ref).
-
-The search draws from one random number generator, `rng`, grid by grid and parameter by
-parameter. The order of the grids and of the parameters therefore changes the samples. To repeat a
-search, keep that order fixed. Use an `OrderedDict` from
-[`OrderedCollections`](https://github.com/JuliaCollections/OrderedCollections.jl) or a vector
+The search draws from one random number generator, `rng`, trial by trial and parameter by
+parameter. The order of the grids and of the parameters therefore changes the trials. To repeat
+a search, keep that order fixed. Use an `OrderedDict` from
+[`OrderedCollections`](https://juliacollections.github.io/OrderedCollections.jl/stable/) or a vector
 for each grid.
 
 #### 2.2.1 Sampling from a predefined parameter space
 
-We sample from the same grids as before, with `n_iter = 2`. Every value is in a vector. The
-search draws two values for each parameter, without replacement.
+We sample from the same grids as before, with `n_iter = 8`. Every value is in a vector, so the
+search draws 8 of the 17 candidates of the grid search, without replacement.
 =#
-rs_cv1 = RandomisedSearchCrossValidation(p; rng = StableRNG(42), r = r, n_iter = 2)
+rs_cv1 = RandomisedSearchCrossValidation(p; rng = StableRNG(42), r = r, n_iter = 8)
 
 #=
-The first grid has two parameters and gives `2 × 2 = 4` candidates. The other three grids
-give 2 candidates each, for `4 + 2 + 2 + 2 = 10` in total.
+The search fits 8 candidates, where the grid search fitted 17.
 =#
 rs_res1 = search_cross_validation(st, rs_cv1, rd)
 
@@ -210,11 +224,8 @@ plot_composition(res_rs1, rd)
 #=
 #### 2.2.2 Sampling from a distribution
 
-We now mix vectors and distributions, with `n_iter = 5`. This grid needs no
-[`concrete_typed_array`](@ref). A distribution among the values makes the literal a vector of
-vectors of `Pair{String, Any}`, which the constructor of [`RandomisedSearchCrossValidation`](@ref)
-accepts. The constructor checks that every value is a vector or a distribution. A grid of vectors
-alone still needs `concrete_typed_array`.
+We now mix vectors and distributions, with `n_iter = 10`. The constructor of
+[`RandomisedSearchCrossValidation`](@ref) checks that every value is a vector or a distribution.
 =#
 p = [["opti[2].opt.l1" => range(; start = 0.0005, stop = 0.0008, length = 3),
       "opti[1].opt.l2.val" => LogUniform(0.0003, 0.1)],
@@ -223,14 +234,14 @@ p = [["opti[2].opt.l1" => range(; start = 0.0005, stop = 0.0008, length = 3),
      ["opti[2]" => [MeanRisk(; opt = opt, obj = MaximumUtility()),
                     MeanRisk(; opt = opt, obj = MaximumRatio())]]]
 
-rs_cv2 = RandomisedSearchCrossValidation(p; rng = StableRNG(42), r = r, n_iter = 5)
+rs_cv2 = RandomisedSearchCrossValidation(p; rng = StableRNG(42), r = r, n_iter = 10)
 
 #=
-The first grid holds a distribution. The search draws 5 values from it, and 3 values with
-replacement from the vector of three. The second grid gives 5 values from its distribution.
-The third and fourth grids hold only vectors and give their 3 and 2 values. That makes
-`3 × 5 + 5 + 3 + 2 = 25` candidates. A draw with replacement can repeat a value, and then
-two candidates are the same.
+Two grids hold a distribution, so each of the 10 trials picks one of the four grids with
+equal probability. A trial of the first grid draws one value of `opti[1].opt.l2.val` from its
+distribution and one of the three values of `opti[2].opt.l1`. A trial of the fourth grid picks
+one of the two estimators. That makes 10 candidates. Two trials of the fourth grid can pick the
+same estimator, and then two candidates are the same.
 =#
 rs_res2 = search_cross_validation(st, rs_cv2, rd)
 
