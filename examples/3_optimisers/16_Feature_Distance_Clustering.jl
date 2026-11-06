@@ -563,8 +563,9 @@ plot([distance(FeatureDistance(; alg = alg), Ztv; dims = 1)[1, :] for (_, alg) i
 
 A panel is one shape throughout, so a static input that joins a time-varying one gains an
 observation axis.
-[`asset_panel`](@ref) wraps its values in a [`RepeatedLeading`](@ref), which stores them once and
-indexes a leading observation axis. A classification that never moves therefore costs its own
+[`asset_panel`](@ref) wraps its values in a [`RepeatedObservations`](@ref), which stores them once
+and adds the observation axis where [`observation_axis`](@ref) puts it: first for a lifted vector,
+last for a lifted matrix. A classification that never moves therefore costs its own
 memory beside characteristics that move every day, rather than its own memory times the
 observation count.
 =#
@@ -574,7 +575,7 @@ pnl_mixed = asset_panel([panel_input(sets, taxonomy);
                          NumericPanelInput(; name = "momentum", vals = Zmom)])
 
 held(f) = isa(f, CategoricalPanelField) ? f.codes : f.vals
-stored(v) = isa(v, PortfolioOptimisers.RepeatedLeading) ? length(v.parent) : length(v)
+stored(v) = isa(v, PortfolioOptimisers.RepeatedObservations) ? length(v.parent) : length(v)
 
 pretty_table(DataFrame("Field" => [f.name for f in pnl_mixed.pf],
                        "Values type" =>
