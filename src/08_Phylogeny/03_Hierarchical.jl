@@ -594,9 +594,10 @@ Estimates the similarity and distance matrices from `X`, makes a dendrogram unde
 # Algorithm
 
  1. Estimate the similarity matrix `S` and the distance matrix `D` from `X` with [`cor_and_dist`](@ref), under `cle.de` and `cle.ce`.
- 2. Cluster `D` into the dendrogram `res` under the linkage `cle.alg.linkage` with [`branch_ordered_hclust`](@ref) on `Val(branchorder)`.
- 3. Select the number of clusters `k` with [`optimal_number_clusters`](@ref)`(cle.onc, res, D)`.
- 4. Return `Clusters(; res = res, S = S, D = D, k = k)`. The field `P` keeps its default, `nothing`, because the clustering ran on `D` itself.
+ 2. Refuse a `NaN` in `D`.
+ 3. Cluster `D` into the dendrogram `res` under the linkage `cle.alg.linkage` with [`branch_ordered_hclust`](@ref) on `Val(branchorder)`.
+ 4. Select the number of clusters `k` with [`optimal_number_clusters`](@ref)`(cle.onc, res, D)`.
+ 5. Return `Clusters(; res = res, S = S, D = D, k = k)`. The field `P` keeps its default, `nothing`, because the clustering ran on `D` itself.
 
 # Arguments
 
@@ -605,6 +606,10 @@ Estimates the similarity and distance matrices from `X`, makes a dendrogram unde
   - `branchorder`: The order of the branches. `:optimal` orders the leaves with [`optimal_leaf_order!`](@ref). `Clustering.hclust` takes any other value, and it accepts `:barjoseph` and `:r`.
   - $(arg_dict[:dims])
   - `kwargs...`: Keyword arguments for [`cor_and_dist`](@ref).
+
+# Validation
+
+  - `D` holds no `NaN`. Raises a `DomainError` that names the first `NaN` cell. A reader gives a `NaN` row for an asset whose correlation it cannot estimate: an asset with zero variance, or one that the `CoveragePolicy` of its `ce` refuses. `Clustering.hclust` would otherwise refuse `D` as not symmetric, because `NaN` is not equal to itself.
 
 # Returns
 
@@ -618,6 +623,10 @@ Estimates the similarity and distance matrices from `X`, makes a dendrogram unde
 function clusterise(cle::ClustersEstimator{<:Any, <:Any, <:HClustAlgorithm, <:Any},
                     X::MatNum; branchorder::Symbol = :optimal, dims::Int = 1, kwargs...)
     S, D = cor_and_dist(cle.de, cle.ce, X; dims = dims, kwargs...)
+    c = findfirst(isnan, D)
+    @argcheck(isnothing(c),
+              DomainError(D[c],
+                          "a dendrogram has no place for a NaN distance. The reader of this clustering gives a NaN row for an asset whose correlation it cannot estimate: an asset with zero variance, or one that the `CoveragePolicy` of its `ce` refuses while the prior keeps it. Give the reader the `CoveragePolicy` of the prior, or state the prior as its source, `x_src = PriorSource()`. Got\nD[$(c[1]), $(c[2])] => $(D[c])"))
     res = branch_ordered_hclust(D, cle.alg.linkage, Val(branchorder))
     k = optimal_number_clusters(cle.onc, res, D)
     return Clusters(; res = res, S = S, D = D, k = k)

@@ -932,6 +932,25 @@ end
     @test PO.plain_graph_reader((nothing, [CentralityConstraint()]))
 end
 
+@testset "A hierarchical clustering refuses the NaN row of an asset that its reader refuses" begin
+    # The prior keeps the young asset `d`, which holds 30 of the 60 observations. The reader's
+    # own policy asks for 60 %, so its correlation has a NaN row for `d`. The dendrogram has no
+    # place for it, and the error names the cell and the two remedies.
+    rd = ReturnsResult(; nx = nx, X = Xmix, pnl = pnl_mix)
+    sce = PortfolioOptimisersCovariance(;
+                                        ce = Covariance(;
+                                                        cvg = CoveragePolicy(;
+                                                                             min_coverage = 0.6)))
+    cle = ClustersEstimator(; ce = sce)
+    hrp = HierarchicalRiskParity(; opt = HierarchicalOptimiser(; pe = pe, cle = cle))
+    @test_throws DomainError optimise(hrp, rd)
+    @test_throws r"NaN distance.*`x_src = PriorSource\(\)`.*D\[3, 1\] => NaN"s optimise(hrp,
+                                                                                        rd)
+    # The direct verb refuses the same row, and a finite reader still clusters.
+    @test_throws DomainError clusterise(cle, Xmix[:, [1, 2, 4]])
+    @test isa(clusterise(cle, Xmix[:, [1, 2, 3]]), Clusters)
+end
+
 # The panel for a window of `t` observations over `N2` assets, so an expanding walk-forward can
 # be driven a fold at a time without the cross-validation machinery in the way: a fold's fit is
 # exactly this call.
