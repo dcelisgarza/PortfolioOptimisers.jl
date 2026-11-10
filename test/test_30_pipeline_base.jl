@@ -1464,10 +1464,10 @@ end
         # counts saturate rather than throwing, so a grid search over k survives
         @test all(PO.rule_keep(RankRule(; best = 99), s, false))
 
-        # quantile bounds are fractions of the universe
-        @test findall(PO.rule_keep(QuantileRule(; best = 0.4), s, false)) == [1, 2]
-        @test findall(PO.rule_keep(QuantileRule(; worst = 0.2, action = :drop), s, false)) ==
-              [1, 2, 3, 4]
+        # a fraction is a share of the universe
+        @test findall(PO.rule_keep(RankRule(; best = FractionOf(0.4)), s, false)) == [1, 2]
+        @test findall(PO.rule_keep(RankRule(; worst = FractionOf(0.2), action = :drop), s,
+                                   false)) == [1, 2, 3, 4]
 
         # thresholds are literal: they ignore bigger_is_better
         @test findall(PO.rule_keep(ThresholdRule(; lo = 1.5, hi = 4.5), s, false)) ==

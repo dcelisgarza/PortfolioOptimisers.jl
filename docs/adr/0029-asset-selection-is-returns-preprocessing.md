@@ -204,3 +204,23 @@ comes from a scorer that cannot score an asset, for example a fold scheme that n
 The two routes disagree on purpose. The interfaces of `AbstractSelectionRule` and
 `AbstractRedundancyAlgorithm` state the rule for a rule or an algorithm that a user adds: its
 keep-mask is `false` at every non-finite score.
+
+## Amendment (2026-11-10): one ordinal rule, and the wrapper states the reading (#2013)
+
+Decision 5 is amended. `QuantileRule` is gone, and `RankRule` takes a fraction as well as a
+count. Each of `best` and `worst` holds a `CountOf`, a `FractionOf` or `nothing`.
+
+The decision kept two types because `best = 1` (one asset) and `best = 1.0` (the whole universe)
+must not differ only by the type of a literal. That reason still holds, and #2013 meets it in a
+different way. The shared pair `CountOf` and `FractionOf` of `src/01_Base/18_CountFraction.jl`
+states the reading in the type of the wrapper, and not in the type of the number. A search grid
+promotes `[1, 0.5]` to `[1.0, 0.5]`, and the wrapper keeps its type in every container. So one
+rule can hold both readings without the trap, and it can take a count from one end and a
+fraction from the other, which the two rules could not state.
+
+A plain number stays a shorthand, through `count_or_fraction`. An `Integer` is a count and any
+other real number is a fraction. A plain `1.0` is refused, because a grid promotes the count `1`
+to it, and `FractionOf(1)` states the whole universe. A count is at least one, so a tail of zero
+is refused, and `nothing` states a tail that takes no asset. The rounding of a fraction does not
+change: `round(Int, f * n, RoundNearestTiesUp)` over the `n` finite scores, in the new reader
+`rule_tail_count`. Counts still saturate, as Decision 6 states.
