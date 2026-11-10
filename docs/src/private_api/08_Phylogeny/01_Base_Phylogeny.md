@@ -20,4 +20,5 @@ AbstractSeparationDecayAlgorithm
 PortfolioOptimisers.is_reachable
 PortfolioOptimisers.is_related
 PortfolioOptimisers.assert_separation_decay
+PortfolioOptimisers.assert_distance_reader_rows
 ```

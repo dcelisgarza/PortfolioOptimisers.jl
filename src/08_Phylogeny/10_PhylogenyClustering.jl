@@ -84,7 +84,7 @@ The fourth type parameter is bound to [`HopCount`](@ref), so a [`PathLength`](@r
 
 # Algorithm
 
- 1. Compute the correlation matrix `S` and the distance matrix `D` from `X` with `nte.nte.de` and `nte.nte.ce`.
+ 1. Compute the correlation matrix `S` and the distance matrix `D` from `X` with `nte.nte.de` and `nte.nte.ce`. Refuse each asset that the reader could not estimate with [`assert_distance_reader_rows`](@ref).
  2. Build the tree `G` over `D` with the entry point of [`calc_weighted_adjacency_graph`](@ref) that takes `alg`. Read its weighted adjacency matrix `A` with [`calc_weighted_adjacency`](@ref).
  3. Resolve `nte.nte.sep` with [`resolve_separation`](@ref), against the structure that [`separation_graph`](@ref) makes from `G`. Read the hop count `n` from the resolved separation.
  4. Add up the matrix of pseudo-distances `P` as the sum of `D^i - A^i` over `i in 0:n`.
@@ -100,6 +100,7 @@ The fourth type parameter is bound to [`HopCount`](@ref), so a [`PathLength`](@r
 
 # Validation
 
+  - No diagonal entry of `D` is `NaN`. Raises a [`DistanceReaderRefusalError`](@ref) that names the columns of the assets that the reader could not estimate. A fit catches it and drops those assets.
   - Throws a `DomainError` if an off-diagonal entry of `D` is negative or `NaN`, through [`graph_weight_matrix`](@ref).
 
 # Returns
@@ -121,6 +122,7 @@ function clusterise(nte::NetworkClustersEstimator{<:NetworkEstimator{<:Any, <:An
                                                                      <:HopCount}},
                     X::MatNum; dims::Int = 1, branchorder::Symbol = :optimal, kwargs...)
     S, D = cor_and_dist(nte.nte.de, nte.nte.ce, X; dims = dims, kwargs...)
+    assert_distance_reader_rows(D)
     P = zeros(eltype(D), size(D))
     # The distance is the tree branch's selecting quantity, and it is in hand already for
     # the power sum below, so the shared routine is entered at its two-argument form.
@@ -179,6 +181,7 @@ The fourth type parameter is bound to [`HopCount`](@ref), so a [`PathLength`](@r
 
 # Validation
 
+  - No diagonal entry of `D` is `NaN`. Raises a [`DistanceReaderRefusalError`](@ref) that names the columns of the assets that the reader could not estimate. A fit catches it and drops those assets.
   - Throws a `DomainError` if `D` leaves the domain of `nte.nte.alg`, through [`assert_similarity_domain`](@ref).
   - Throws a `DomainError` if a zero weight removes an edge of the triangulated maximally filtered graph, through [`assert_pmfg_weights`](@ref).
 
@@ -202,6 +205,7 @@ function clusterise(nte::NetworkClustersEstimator{<:NetworkEstimator{<:Any, <:An
                                                                      <:HopCount}},
                     X::MatNum; dims::Int = 1, branchorder::Symbol = :optimal, kwargs...)
     S, D = cor_and_dist(nte.nte.de, nte.nte.ce, X; dims = dims, kwargs...)
+    assert_distance_reader_rows(D)
     assert_similarity_domain(nte.nte.alg, nte.nte.de, D)
     P = zeros(eltype(D), size(D))
     S = distance_to_similarity(nte.nte.alg; S = S, D = D)

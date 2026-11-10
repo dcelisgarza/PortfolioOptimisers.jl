@@ -404,7 +404,8 @@ Run the Hierarchical Risk Parity optimisation for a single risk measure.
   - [`_optimise`](@ref)
 """
 function _optimise(hrp::HierarchicalRiskParity{<:Any, <:OptimisationRiskMeasure},
-                   rd::ReturnsResult = ReturnsResult(); kwargs...)
+                   rd::ReturnsResult = ReturnsResult(); rmsk::Option{BitVector} = nothing,
+                   kwargs...)
     hrp = reset_time_dependent_estimator(hrp)
     pr = prior(hrp.opt.pe, rd)
     # Resolve the fee on the caller's universe before `investable_reduction` narrows `sets`.
@@ -418,8 +419,8 @@ function _optimise(hrp::HierarchicalRiskParity{<:Any, <:OptimisationRiskMeasure}
     # An asset that a `FeatureDistance` of the clustering cannot read in the window of its
     # Asset Panel departs with the non-investable assets (`feature_readable_mask`). So does
     # an asset with a gap in the rows that a plain graph reader reads (`graph_reader_mask`).
-    imsk = feature_readable_mask(hrp.opt.cle, investable_mask(pr), rd)
-    imsk = graph_reader_mask(hrp.opt.cle, imsk, pr, rd, hrp.opt.strict)
+    # A fit again after a refusal of the distance reader passes its mask as `rmsk`.
+    imsk = distance_reader_entry_mask(hrp.opt.cle, pr, rd, hrp.opt.strict; rmsk = rmsk)
     fees = investable_fees_view(fees_constraints(hrp.opt.fees, hrp.opt.sets;
                                                  strict = hrp.opt.strict, datatype = T),
                                 imsk, pr.X)
@@ -432,12 +433,24 @@ function _optimise(hrp::HierarchicalRiskParity{<:Any, <:OptimisationRiskMeasure}
     # the distance the clustering is built from never sees a `NaN`, and the cluster count
     # is chosen on the investable universe. The weights are expanded back in
     # `HierarchicalResult`.
+    hrp0, pr0, rd0 = hrp, pr, rd
     _, pr, hrp, rd = investable_reduction(imsk, pr, hrp, rd)
     hrp = bind_data_benchmark(hrp, rd)
     X = pr.X
     # No `branchorder`: recursive bisection splits `clr.res.order`, so the leaf
     # permutation is the algorithm's input and must stay `:optimal` (ADR 0055).
-    clr = clusterise(hrp.opt.cle, pr; rd = rd, iv = rd.iv, ivpa = rd.ivpa)
+    # A distance reader that refuses an asset the prior kept raises before it clusters. Fit
+    # again from the same prior result, without that asset (`distance_reader_refusal_mask`).
+    clr = distance_reader_call(clusterise, hrp.opt.cle, pr; rd = rd, iv = rd.iv,
+                               ivpa = rd.ivpa)
+    if clr isa DistanceReaderRefusalError
+        return _optimise(rebuild_estimator(hrp0,
+                                           (;
+                                            opt = rebuild_estimator(hrp0.opt, (; pe = pr0)))),
+                         rd0;
+                         rmsk = distance_reader_refusal_mask(clr, imsk, rd0,
+                                                             hrp0.opt.strict), kwargs...)
+    end
     assert_clustering_universe(clr, size(X, 2))
     r = factory(hrp.r, pr, hrp.opt.slv)
     wu = Matrix{T}(undef, size(X, 2), 2)
@@ -570,7 +583,8 @@ Run the Hierarchical Risk Parity optimisation for a vector of risk measures, sca
   - [`_optimise`](@ref)
 """
 function _optimise(hrp::HierarchicalRiskParity{<:Any, <:VecOptRM},
-                   rd::ReturnsResult = ReturnsResult(); kwargs...)
+                   rd::ReturnsResult = ReturnsResult(); rmsk::Option{BitVector} = nothing,
+                   kwargs...)
     hrp = reset_time_dependent_estimator(hrp)
     pr = prior(hrp.opt.pe, rd)
     # Resolve the fee on the caller's universe before `investable_reduction` narrows `sets`.
@@ -584,8 +598,8 @@ function _optimise(hrp::HierarchicalRiskParity{<:Any, <:VecOptRM},
     # An asset that a `FeatureDistance` of the clustering cannot read in the window of its
     # Asset Panel departs with the non-investable assets (`feature_readable_mask`). So does
     # an asset with a gap in the rows that a plain graph reader reads (`graph_reader_mask`).
-    imsk = feature_readable_mask(hrp.opt.cle, investable_mask(pr), rd)
-    imsk = graph_reader_mask(hrp.opt.cle, imsk, pr, rd, hrp.opt.strict)
+    # A fit again after a refusal of the distance reader passes its mask as `rmsk`.
+    imsk = distance_reader_entry_mask(hrp.opt.cle, pr, rd, hrp.opt.strict; rmsk = rmsk)
     fees = investable_fees_view(fees_constraints(hrp.opt.fees, hrp.opt.sets;
                                                  strict = hrp.opt.strict, datatype = T),
                                 imsk, pr.X)
@@ -598,12 +612,24 @@ function _optimise(hrp::HierarchicalRiskParity{<:Any, <:VecOptRM},
     # the distance the clustering is built from never sees a `NaN`, and the cluster count
     # is chosen on the investable universe. The weights are expanded back in
     # `HierarchicalResult`.
+    hrp0, pr0, rd0 = hrp, pr, rd
     _, pr, hrp, rd = investable_reduction(imsk, pr, hrp, rd)
     hrp = bind_data_benchmark(hrp, rd)
     X = pr.X
     # No `branchorder`: recursive bisection splits `clr.res.order`, so the leaf
     # permutation is the algorithm's input and must stay `:optimal` (ADR 0055).
-    clr = clusterise(hrp.opt.cle, pr; rd = rd, iv = rd.iv, ivpa = rd.ivpa)
+    # A distance reader that refuses an asset the prior kept raises before it clusters. Fit
+    # again from the same prior result, without that asset (`distance_reader_refusal_mask`).
+    clr = distance_reader_call(clusterise, hrp.opt.cle, pr; rd = rd, iv = rd.iv,
+                               ivpa = rd.ivpa)
+    if clr isa DistanceReaderRefusalError
+        return _optimise(rebuild_estimator(hrp0,
+                                           (;
+                                            opt = rebuild_estimator(hrp0.opt, (; pe = pr0)))),
+                         rd0;
+                         rmsk = distance_reader_refusal_mask(clr, imsk, rd0,
+                                                             hrp0.opt.strict), kwargs...)
+    end
     assert_clustering_universe(clr, size(X, 2))
     r = factory(hrp.r, pr, hrp.opt.slv)
     wu = Matrix{T}(undef, size(X, 2), 2)

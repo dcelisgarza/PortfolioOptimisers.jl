@@ -18,5 +18,6 @@ ConflictingArgumentError
 ObservationWeightsError
 NonPositiveWealthError
 PosdefRepairError
+DistanceReaderRefusalError
 Base.showerror(io::IO, err::PortfolioOptimisersError)
 ```

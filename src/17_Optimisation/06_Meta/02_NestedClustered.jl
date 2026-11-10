@@ -657,7 +657,7 @@ An entry of a schedule in `opti` or `opto` must be an estimator, as the static v
     """
     @fprop fb
     """
-    $(field_dict[:strict_opt]) Under `true` the fit also refuses an asset with a gap in the rows that a plain graph reader reads, which it otherwise drops with a warning, see [`graph_reader_mask`](@ref).
+    $(field_dict[:strict_opt]) Under `true` the fit also refuses an asset with a gap in the rows that a plain graph reader reads, which it otherwise drops with a warning, see [`graph_reader_mask`](@ref). It also refuses an asset that a distance reader of the fit cannot estimate, which it otherwise drops with a warning, see [`distance_reader_refusal_mask`](@ref).
     """
     strict
     """
@@ -928,7 +928,8 @@ function _update_asset_sets(nco::NestedClustered, rdo::ReturnsResult)
     end
 end
 function _optimise(nco::NestedClustered, rd::ReturnsResult; branchorder::Symbol = :optimal,
-                   str_names::Bool = false, save::Bool = true, kwargs...)
+                   str_names::Bool = false, save::Bool = true,
+                   rmsk::Option{BitVector} = nothing, kwargs...)
     nco = reset_time_dependent_estimator(nco)
     pr = prior(nco.pe, rd)
     # A weight and a fee take the element type of the returns.
@@ -941,8 +942,8 @@ function _optimise(nco::NestedClustered, rd::ReturnsResult; branchorder::Symbol 
     # An asset that a `FeatureDistance` of the clustering cannot read in the window of its
     # Asset Panel departs with the non-investable assets (`feature_readable_mask`). So does
     # an asset with a gap in the rows that a plain graph reader reads (`graph_reader_mask`).
-    imsk = feature_readable_mask(nco.cle, investable_mask(pr), rd)
-    imsk = graph_reader_mask(nco.cle, imsk, pr, rd, nco.strict)
+    # A fit again after a refusal of the distance reader passes its mask as `rmsk`.
+    imsk = distance_reader_entry_mask(nco.cle, pr, rd, nco.strict; rmsk = rmsk)
     fees = investable_fees_view(fees_constraints(nco.fees, nco.sets; datatype = Tf,
                                                  strict = nco.strict), imsk, pr.X)
     # A forced exit is charged once, against the full-universe weight vector the fit
@@ -956,10 +957,19 @@ function _optimise(nco::NestedClustered, rd::ReturnsResult; branchorder::Symbol 
     # The reduced `rd` takes a name of its own. `rd` is assigned twice above, and a
     # variable that is reassigned and then captured by the fold's closure is boxed, which
     # FLoops reports as a correctness and performance problem on every call.
+    nco0, pr0 = nco, pr
     _, pr, nco, rdr = investable_reduction(imsk, pr, nco, rd)
     X = pr.X
-    clr = clusterise(nco.cle, pr; rd = rdr, iv = rdr.iv, ivpa = rdr.ivpa,
-                     branchorder = branchorder)
+    # A distance reader that refuses an asset the prior kept raises before it clusters. Fit
+    # again from the same prior result, without that asset (`distance_reader_refusal_mask`).
+    clr = distance_reader_call(clusterise, nco.cle, pr; rd = rdr, iv = rdr.iv,
+                               ivpa = rdr.ivpa, branchorder = branchorder)
+    if clr isa DistanceReaderRefusalError
+        return _optimise(rebuild_estimator(nco0, (; pe = pr0)), rd;
+                         branchorder = branchorder, str_names = str_names, save = save,
+                         rmsk = distance_reader_refusal_mask(clr, imsk, rd, nco0.strict),
+                         kwargs...)
+    end
     assert_clustering_universe(clr, size(X, 2))
     idx = assignments(clr)
     cls = [findall(x -> x == i, idx) for i in 1:(clr.k)]

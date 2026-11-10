@@ -170,6 +170,46 @@ function feature_readable_mask(x::CentralityConstraint, imsk::Option{<:BitVector
     return feature_readable_mask(x.A, imsk, rd)
 end
 """
+    distance_reader_entry_mask(x, pr::AbstractPriorResult, rd::ReturnsResult, strict::Bool;
+                               rmsk::Option{BitVector} = nothing) -> Option{BitVector}
+
+Compose the Investable Mask of a fit that reads distances, at its entry.
+
+Every fit that clusters or builds a phylogeny composes the mask of its prior with two rules before [`investable_reduction`](@ref): the assets that a [`FeatureDistance`](@ref) can read, [`feature_readable_mask`](@ref), and the assets that a plain graph reader can read, [`graph_reader_mask`](@ref). A distance reader can still refuse an asset after the reduction. The fit then fits again from the same prior result, and passes the mask of [`distance_reader_refusal_mask`](@ref) as `rmsk`. That mask already holds the two rules, so this function returns it as it is, and the two rules do not warn a second time.
+
+# Algorithm
+
+ 1. Return `rmsk` when it is a `BitVector`.
+ 2. Otherwise compose `investable_mask(pr)` with [`feature_readable_mask`](@ref), then with [`graph_reader_mask`](@ref).
+
+# Arguments
+
+  - `x`: The distance readers of the fit, one estimator or a `Tuple` of them.
+  - $(arg_dict[:pr])
+  - $(arg_dict[:rd])
+  - `strict`: The `strict` field of the optimiser.
+  - `rmsk`: The mask of a fit again after a refusal, or `nothing` on the first fit.
+
+# Returns
+
+  - `imsk::Option{BitVector}`: The composed mask, or `nothing` when every asset stays.
+
+# Related
+
+  - [`feature_readable_mask`](@ref)
+  - [`graph_reader_mask`](@ref)
+  - [`distance_reader_refusal_mask`](@ref)
+  - [`investable_reduction`](@ref)
+"""
+function distance_reader_entry_mask(x, pr::AbstractPriorResult, rd::ReturnsResult,
+                                    strict::Bool; rmsk::Option{BitVector} = nothing)
+    if !isnothing(rmsk)
+        return rmsk
+    end
+    return graph_reader_mask(x, feature_readable_mask(x, investable_mask(pr), rd), pr, rd,
+                             strict)
+end
+"""
 $(DocStringExtensions.TYPEDSIGNATURES)
 
 Derive the Coverage Universe of a window, and reduce a prior-free optimiser and its returns data to the assets it keeps.

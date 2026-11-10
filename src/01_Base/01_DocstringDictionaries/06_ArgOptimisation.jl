@@ -11,6 +11,7 @@ unique_key_dict!(arg_dict, :arg_dict,
                  :i_ret_term => "`i`: Index of the return term to maximise.",#
                  # Errors
                  :msg => "`msg`: Error message that states the condition that caused the exception.",#
+                 :idx_refused => "`idx`: The columns of the matrix that the distance reader read whose correlation is `NaN` on the diagonal, one for each asset that the reader refuses.",#
                  # Solver
                  :name => "`name`: The symbol or string that names the solver. [`optimise_JuMP_model!`](@ref) records a failure of the solver under this key in the `trials` of the [`JuMPResult`](@ref). Two solvers that share a name share one entry, and the later failure overwrites the earlier one. Give each solver of a vector its own name, because every solver has the default name `\"\"`.",#
                  :solver => "`solver`: The `optimizer_factory` argument of [`set_optimizer`](https://jump.dev/JuMP.jl/stable/api/JuMP/#JuMP.set_optimizer).",#

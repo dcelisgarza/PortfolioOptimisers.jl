@@ -16,6 +16,7 @@ All error types of `PortfolioOptimisers.jl` must subtype `PortfolioOptimisersErr
   - [`ObservationWeightsError`](@ref)
   - [`NonPositiveWealthError`](@ref)
   - [`PosdefRepairError`](@ref)
+  - [`DistanceReaderRefusalError`](@ref)
 """
 abstract type PortfolioOptimisersError <: Exception end
 """
@@ -364,6 +365,51 @@ Stacktrace:
     msg
 end
 """
+$(DocStringExtensions.TYPEDEF)
+
+Exception type thrown when a distance reader cannot estimate the correlation of one or more assets.
+
+A distance reader is the moment estimator and the distance estimator from which a clustering, a network or a phylogeny reads its distance matrix. It gives a `NaN` row and column, its diagonal entry included, for an asset whose correlation it cannot estimate. An asset with zero variance gives such a row. So does an asset that the `CoveragePolicy` of a mask-aware reader refuses while the prior keeps it, because the policy of the reader asks for more observations than the policy of the prior. A graph verb raises this error before it builds the tree or the graph. The field `idx` names the columns, so a fit can drop those assets from the Investable Mask and fit again, see [`distance_reader_refusal_mask`](@ref). A direct call of a graph verb has no fit to drop them from, so the error reaches the caller.
+
+# Fields
+
+$(DocStringExtensions.FIELDS)
+
+# Constructors
+
+    DistanceReaderRefusalError(msg, idx) -> DistanceReaderRefusalError
+
+Arguments correspond to the fields above.
+
+# Examples
+
+```jldoctest
+julia> throw(DistanceReaderRefusalError(\"the distance reader cannot estimate the correlation of 1 asset(s), at the columns [3]\",
+                                        [3]))
+ERROR: DistanceReaderRefusalError: the distance reader cannot estimate the correlation of 1 asset(s), at the columns [3]
+Stacktrace:
+ [1] top-level scope
+   @ none:1
+```
+
+# Related
+
+  - [`PortfolioOptimisersError`](@ref)
+  - [`assert_distance_reader_rows`](@ref)
+  - [`distance_reader_refusal_mask`](@ref)
+  - [`CoveragePolicy`](@ref)
+"""
+@concrete struct DistanceReaderRefusalError <: PortfolioOptimisersError
+    """
+    $(field_dict[:msg])
+    """
+    msg
+    """
+    $(field_dict[:idx_refused])
+    """
+    idx
+end
+"""
 $(DocStringExtensions.TYPEDSIGNATURES)
 
 Print a subtype of `PortfolioOptimisersError` to `io` as its type name and its message, with no type parameters.
@@ -396,4 +442,4 @@ end
 
 export IsEmptyError, IsNothingError, IsNonFiniteError, IsZeroError,
        ConflictingArgumentError, PropertyPathError, ObservationWeightsError,
-       NonPositiveWealthError, PosdefRepairError
+       NonPositiveWealthError, PosdefRepairError, DistanceReaderRefusalError

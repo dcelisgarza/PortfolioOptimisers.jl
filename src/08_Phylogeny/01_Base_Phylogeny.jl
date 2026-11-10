@@ -984,6 +984,45 @@ end
 function assert_separation_decay(::Nothing, ::Any, ::Number)::Nothing
     return nothing
 end
+"""
+    assert_distance_reader_rows(D::MatNum) -> Nothing
+
+Refuse the assets whose correlation a distance reader could not estimate, before a graph verb builds its tree or its graph.
+
+A distance reader gives a `NaN` row and column, its diagonal entry included, for an asset whose correlation it cannot estimate, see [`DistanceReaderRefusalError`](@ref). Every distance of a correlation keeps the `NaN`, so the distance matrix has a `NaN` diagonal entry for that asset and a finite one for every other asset. A dendrogram and a weighted graph have no place for such an asset. The function reads only the diagonal of `D`, so it costs one pass over `N` entries, against the `N^2 T` of the estimate. A `NaN` off the diagonal between two assets with a finite diagonal is an undetermined pair, and the verb that reads the distance refuses it with its own error.
+
+# Algorithm
+
+ 1. Find the columns `idx` whose diagonal entry of `D` is `NaN`.
+ 2. Return `nothing` when `idx` is empty. Otherwise throw a [`DistanceReaderRefusalError`](@ref) that carries `idx`.
+
+# Arguments
+
+  - `D`: The distance matrix of the reader, `N × N`.
+
+# Validation
+
+  - No diagonal entry of `D` is `NaN`. Raises a [`DistanceReaderRefusalError`](@ref) that names the columns. A fit catches it and drops the assets, see [`distance_reader_refusal_mask`](@ref).
+
+# Returns
+
+  - `nothing`.
+
+# Related
+
+  - [`DistanceReaderRefusalError`](@ref)
+  - [`distance_reader_refusal_mask`](@ref)
+  - [`cor_and_dist`](@ref)
+  - [`clusterise`](@ref)
+"""
+function assert_distance_reader_rows(D::MatNum)::Nothing
+    idx = findall(isnan, LinearAlgebra.diag(D))
+    if !isempty(idx)
+        throw(DistanceReaderRefusalError("the distance reader cannot estimate the correlation of $(length(idx)) asset(s), at the columns $(idx) of the matrix that it read. An asset with zero variance gives such a row, and so does an asset that the `CoveragePolicy` of the `ce` of the reader refuses while the prior keeps it. A fit drops these assets from the Investable Mask, and refuses them under `strict = true`. To keep them, give the reader the `CoveragePolicy` of the prior, or state the prior as its source, `x_src = PriorSource()`.",
+                                         idx))
+    end
+    return nothing
+end
 
 export HopCount, PathLength, LinearDecay, ExponentialDecay, ReciprocalDecay,
        separation_decay

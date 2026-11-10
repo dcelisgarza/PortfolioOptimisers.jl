@@ -197,7 +197,7 @@ The method computes the similarity and distance matrices of the data matrix `X` 
 
 # Algorithm
 
- 1. Take the correlation matrix `S` and the distance matrix `D` from `X` with `cle.ce` and `cle.de`, through [`cor_and_dist`](@ref).
+ 1. Take the correlation matrix `S` and the distance matrix `D` from `X` with `cle.ce` and `cle.de`, through [`cor_and_dist`](@ref). Refuse each asset that the reader could not estimate with [`assert_distance_reader_rows`](@ref).
  2. Check with [`assert_similarity_domain`](@ref) that `D` lies in the domain that `cle.alg.sim` needs.
  3. Map `D` to the non-negative similarity `S` with [`distance_to_similarity`](@ref), through the branch that `cle.alg.sim` selects.
  4. Run the pipeline with [`DBHTs`](@ref), and keep only its last output, the `Clustering.Hclust` dendrogram `res`.
@@ -211,6 +211,10 @@ The method computes the similarity and distance matrices of the data matrix `X` 
   - `branchorder`: Order method for the dendrogram branches, `:optimal` by default, `:barjoseph` or `:r`. [`DBHTs`](@ref) states what each value does, and what another value does.
   - $(arg_dict[:dims])
   - `kwargs...`: Keyword arguments that the method passes to [`cor_and_dist`](@ref).
+
+# Validation
+
+  - No diagonal entry of `D` is `NaN`. Raises a [`DistanceReaderRefusalError`](@ref) that names the columns of the assets that the reader could not estimate. A fit catches it and drops those assets.
 
 # Returns
 
@@ -227,6 +231,7 @@ The method computes the similarity and distance matrices of the data matrix `X` 
 function clusterise(cle::ClustersEstimator{<:Any, <:Any, <:DBHT, <:Any}, X::MatNum;
                     branchorder::Symbol = :optimal, dims::Int = 1, kwargs...)
     S, D = cor_and_dist(cle.de, cle.ce, X; dims = dims, kwargs...)
+    assert_distance_reader_rows(D)
     assert_similarity_domain(cle.alg.sim, cle.de, D)
     S = distance_to_similarity(cle.alg.sim; S = S, D = D)
     res = DBHTs(D, S; branchorder = branchorder, root = cle.alg.root, sim = cle.alg.sim)[end]

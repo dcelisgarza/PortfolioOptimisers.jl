@@ -1263,7 +1263,8 @@ Fit a Schur complement allocation with one bundle.
   - [`_optimise`](@ref)
 """
 function _optimise(sh::SchurComplementHierarchicalRiskParity{<:Any, <:Any},
-                   rd::ReturnsResult = ReturnsResult(); kwargs...)
+                   rd::ReturnsResult = ReturnsResult(); rmsk::Option{BitVector} = nothing,
+                   kwargs...)
     sh = reset_time_dependent_estimator(sh)
     pr = prior(sh.opt.pe, rd)
     # Resolve the fee on the caller's universe before `investable_reduction` narrows `sets`,
@@ -1273,8 +1274,8 @@ function _optimise(sh::SchurComplementHierarchicalRiskParity{<:Any, <:Any},
     # An asset that a `FeatureDistance` of the clustering cannot read in the window of its
     # Asset Panel departs with the non-investable assets (`feature_readable_mask`). So does
     # an asset with a gap in the rows that a plain graph reader reads (`graph_reader_mask`).
-    imsk = feature_readable_mask(sh.opt.cle, investable_mask(pr), rd)
-    imsk = graph_reader_mask(sh.opt.cle, imsk, pr, rd, sh.opt.strict)
+    # A fit again after a refusal of the distance reader passes its mask as `rmsk`.
+    imsk = distance_reader_entry_mask(sh.opt.cle, pr, rd, sh.opt.strict; rmsk = rmsk)
     # A split factor is a quotient of two risks, so the weights, their bounds and the fee
     # take the type of the returns. A `Float32` sample stays in `Float32`.
     T = eltype(pr.X)
@@ -1286,11 +1287,23 @@ function _optimise(sh::SchurComplementHierarchicalRiskParity{<:Any, <:Any},
     # augmented matrix the Schur complement builds is finite, and the leaf permutation
     # indexes the investable universe. The weights are expanded back in
     # `SchurComplementHierarchicalRiskParityResult`.
+    sh0, pr0, rd0 = sh, pr, rd
     _, pr, sh, rd = investable_reduction(imsk, pr, sh, rd)
     X = pr.X
     # No `branchorder`: recursive bisection splits `clr.res.order`, so the leaf
     # permutation is the algorithm's input and must stay `:optimal` (ADR 0055).
-    clr = clusterise(sh.opt.cle, pr; rd = rd, iv = rd.iv, ivpa = rd.ivpa)
+    # A distance reader that refuses an asset the prior kept raises before it clusters. Fit
+    # again from the same prior result, without that asset (`distance_reader_refusal_mask`).
+    clr = distance_reader_call(clusterise, sh.opt.cle, pr; rd = rd, iv = rd.iv,
+                               ivpa = rd.ivpa)
+    if clr isa DistanceReaderRefusalError
+        return _optimise(rebuild_estimator(sh0,
+                                           (;
+                                            opt = rebuild_estimator(sh0.opt, (; pe = pr0)))),
+                         rd0;
+                         rmsk = distance_reader_refusal_mask(clr, imsk, rd0,
+                                                             sh0.opt.strict), kwargs...)
+    end
     assert_clustering_universe(clr, size(X, 2))
     items = [clr.res.order]
     wb = weight_bounds_constraints(sh.opt.wb, sh.opt.sets; rd = rd, N = size(X, 2),
@@ -1334,7 +1347,8 @@ The denominator is the sum of the blended weights, because each ``\\boldsymbol{w
   - [`_optimise`](@ref)
 """
 function _optimise(sh::SchurComplementHierarchicalRiskParity{<:Any, <:AbstractVector},
-                   rd::ReturnsResult = ReturnsResult(); kwargs...)
+                   rd::ReturnsResult = ReturnsResult(); rmsk::Option{BitVector} = nothing,
+                   kwargs...)
     sh = reset_time_dependent_estimator(sh)
     pr = prior(sh.opt.pe, rd)
     # Resolve the fee on the caller's universe before `investable_reduction` narrows `sets`,
@@ -1344,8 +1358,8 @@ function _optimise(sh::SchurComplementHierarchicalRiskParity{<:Any, <:AbstractVe
     # An asset that a `FeatureDistance` of the clustering cannot read in the window of its
     # Asset Panel departs with the non-investable assets (`feature_readable_mask`). So does
     # an asset with a gap in the rows that a plain graph reader reads (`graph_reader_mask`).
-    imsk = feature_readable_mask(sh.opt.cle, investable_mask(pr), rd)
-    imsk = graph_reader_mask(sh.opt.cle, imsk, pr, rd, sh.opt.strict)
+    # A fit again after a refusal of the distance reader passes its mask as `rmsk`.
+    imsk = distance_reader_entry_mask(sh.opt.cle, pr, rd, sh.opt.strict; rmsk = rmsk)
     # A split factor is a quotient of two risks, so the weights, their bounds and the fee
     # take the type of the returns. A `Float32` sample stays in `Float32`.
     T = eltype(pr.X)
@@ -1357,11 +1371,23 @@ function _optimise(sh::SchurComplementHierarchicalRiskParity{<:Any, <:AbstractVe
     # augmented matrix the Schur complement builds is finite, and the leaf permutation
     # indexes the investable universe. The weights are expanded back in
     # `SchurComplementHierarchicalRiskParityResult`.
+    sh0, pr0, rd0 = sh, pr, rd
     _, pr, sh, rd = investable_reduction(imsk, pr, sh, rd)
     X = pr.X
     # No `branchorder`: recursive bisection splits `clr.res.order`, so the leaf
     # permutation is the algorithm's input and must stay `:optimal` (ADR 0055).
-    clr = clusterise(sh.opt.cle, pr; rd = rd, iv = rd.iv, ivpa = rd.ivpa)
+    # A distance reader that refuses an asset the prior kept raises before it clusters. Fit
+    # again from the same prior result, without that asset (`distance_reader_refusal_mask`).
+    clr = distance_reader_call(clusterise, sh.opt.cle, pr; rd = rd, iv = rd.iv,
+                               ivpa = rd.ivpa)
+    if clr isa DistanceReaderRefusalError
+        return _optimise(rebuild_estimator(sh0,
+                                           (;
+                                            opt = rebuild_estimator(sh0.opt, (; pe = pr0)))),
+                         rd0;
+                         rmsk = distance_reader_refusal_mask(clr, imsk, rd0,
+                                                             sh0.opt.strict), kwargs...)
+    end
     assert_clustering_universe(clr, size(X, 2))
     items = [clr.res.order]
     wb = weight_bounds_constraints(sh.opt.wb, sh.opt.sets; rd = rd, N = size(X, 2),

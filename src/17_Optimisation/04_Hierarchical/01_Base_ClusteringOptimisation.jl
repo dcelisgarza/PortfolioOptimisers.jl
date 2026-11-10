@@ -611,7 +611,7 @@ HierarchicalOptimiser
     """
     wf
     """
-    $(field_dict[:strict_opt]) Under `true` the fit also refuses an asset with a gap in the rows that a plain graph reader reads, which it otherwise drops with a warning, see [`graph_reader_mask`](@ref).
+    $(field_dict[:strict_opt]) Under `true` the fit also refuses an asset with a gap in the rows that a plain graph reader reads, which it otherwise drops with a warning, see [`graph_reader_mask`](@ref). It also refuses an asset that a distance reader of the fit cannot estimate, which it otherwise drops with a warning, see [`distance_reader_refusal_mask`](@ref).
     """
     strict
     """

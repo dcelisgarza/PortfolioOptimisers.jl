@@ -932,23 +932,102 @@ end
     @test PO.plain_graph_reader((nothing, [CentralityConstraint()]))
 end
 
-@testset "A hierarchical clustering refuses the NaN row of an asset that its reader refuses" begin
+@testset "A fit drops an asset that its distance reader refuses (#2015)" begin
     # The prior keeps the young asset `d`, which holds 30 of the 60 observations. The reader's
-    # own policy asks for 60 %, so its correlation has a NaN row for `d`. The dendrogram has no
-    # place for it, and the error names the cell and the two remedies.
+    # own policy asks for 60 %, so its correlation has a NaN row for `d`. The fit learns of it
+    # from the distance matrix it builds, drops `d`, and fits again from the same prior.
     rd = ReturnsResult(; nx = nx, X = Xmix, pnl = pnl_mix)
     sce = PortfolioOptimisersCovariance(;
                                         ce = Covariance(;
                                                         cvg = CoveragePolicy(;
                                                                              min_coverage = 0.6)))
     cle = ClustersEstimator(; ce = sce)
-    hrp = HierarchicalRiskParity(; opt = HierarchicalOptimiser(; pe = pe, cle = cle))
-    @test_throws DomainError optimise(hrp, rd)
-    @test_throws r"NaN distance.*`x_src = PriorSource\(\)`.*D\[3, 1\] => NaN"s optimise(hrp,
-                                                                                        rd)
-    # The direct verb refuses the same row, and a finite reader still clusters.
-    @test_throws DomainError clusterise(cle, Xmix[:, [1, 2, 4]])
+    nte = NetworkEstimator(; ce = sce)
+    hopt(s) = HierarchicalOptimiser(; pe = pe, cle = cle, strict = s)
+    jopt(s; kwargs...) = JuMPOptimiser(; pe = pe, slv = slv, strict = s, kwargs...)
+    heads = [s -> HierarchicalRiskParity(; opt = hopt(s)),
+             s -> HierarchicalRiskParity(; r = [Variance(), ConditionalValueatRisk()],
+                                         opt = hopt(s)),
+             s -> HierarchicalEqualRiskContribution(; opt = hopt(s)),
+             s -> SchurComplementHierarchicalRiskParity(; opt = hopt(s)),
+             s -> SchurComplementHierarchicalRiskParity(;
+                                                        params = [SchurComplementParams(),
+                                                                  SchurComplementParams(;
+                                                                                        gamma = 0.2)],
+                                                        opt = hopt(s)),
+             s -> NestedClustered(; pe = pe, cle = cle, strict = s,
+                                  opti = MeanRisk(; opt = JuMPOptimiser(; slv = slv)),
+                                  opto = MeanRisk(; opt = JuMPOptimiser(; slv = slv))),
+             s -> MeanRisk(;
+                           opt = jopt(s; ple = SemiDefinitePhylogenyEstimator(; pl = nte))),
+             s -> MeanRisk(;
+                           opt = jopt(s;
+                                      cte = CentralityConstraint(;
+                                                                 A = CentralityEstimator(;
+                                                                                         pl = nte),
+                                                                 B = MinValue(), comp = <=)))]
+    refused = (:warn,
+               r"distance reader of this optimiser cannot estimate the correlation of 1 asset\(s\) that the prior kept: \[\"d\"\].*`x_src = PriorSource\(\)`")
+    for h in heads
+        res = @test_logs refused match_mode = :any optimise(h(false), rd)
+        @test res.imsk == BitVector([1, 1, 0, 0])
+        w = res.w isa AbstractVector{<:Number} ? res.w : res.w[1]
+        @test iszero(w[3]) && iszero(w[4])
+        @test isapprox(sum(w), 1)
+        # Under `strict` the fit refuses the asset.
+        @test_throws IsNonFiniteError optimise(h(true), rd)
+    end
+    # The fit again equals the problem reduced to `a` and `b` by hand.
+    pr = prior(pe, rd)
+    hrp = HierarchicalRiskParity(; opt = hopt(false))
+    res = @test_logs refused match_mode = :any optimise(hrp, rd)
+    resk = optimise(HierarchicalRiskParity(;
+                                           opt = HierarchicalOptimiser(;
+                                                                       pe = PO.port_opt_view(pr,
+                                                                                             [1,
+                                                                                              2]),
+                                                                       cle = cle)),
+                    PO.port_opt_view(rd, [1, 2]))
+    @test res.w[[1, 2]] == resk.w
+    # A direct call has no fit to drop the asset from, so each verb refuses it and names the
+    # column of `d` in the matrix that it read.
+    Xd = Xmix[:, [1, 2, 4]]
+    for f in (() -> clusterise(cle, Xd),
+              () -> clusterise(ClustersEstimator(; ce = sce, alg = DBHT()), Xd),
+              () -> clusterise(ClustersEstimator(; ce = sce, alg = KMeansAlgorithm()), Xd),
+              () -> phylogeny_matrix(nte, Xd),
+              () -> phylogeny_matrix(NetworkEstimator(; ce = sce, alg = MaximumDistanceSimilarity()), Xd),
+              () -> centrality_vector(CentralityEstimator(;
+                                                          pl = NetworkEstimator(; ce = sce,
+                                                                                alg = MaximumDistanceSimilarity()),
+                                                          ct = ClosenessCentrality()), Xd),
+              () -> clusterise(NetworkClustersEstimator(; nte = nte), Xd),
+              () -> clusterise(NetworkClustersEstimator(;
+                                                        nte = NetworkEstimator(; ce = sce,
+                                                                               alg = MaximumDistanceSimilarity())),
+                               Xd))
+        err = try
+            f()
+        catch e
+            e
+        end
+        @test err isa DistanceReaderRefusalError
+        @test err.idx == [3]
+    end
     @test isa(clusterise(cle, Xmix[:, [1, 2, 3]]), Clusters)
+    # The fit catches the refusal alone. Every other error reaches the caller.
+    @test PO.distance_reader_call(clusterise, cle, Xd) isa DistanceReaderRefusalError
+    @test_throws ArgumentError PO.distance_reader_call(x -> throw(ArgumentError("other")),
+                                                       1)
+    # Two assets that share no observation are an undetermined pair: each has a variance, the
+    # pair has no correlation, and no peel removes it. A dendrogram refuses that cell.
+    Xp = copy(X0[:, 1:3])
+    Xp[1:30, 1] .= NaN
+    Xp[31:end, 2] .= NaN
+    cep = Covariance(; cvg = CoveragePolicy(; min_coverage = 0.4, peel = nothing))
+    @test_throws r"share too few observations.*D\[2, 1\] => NaN"s clusterise(ClustersEstimator(;
+                                                                                               ce = cep),
+                                                                             Xp)
 end
 
 # The panel for a window of `t` observations over `N2` assets, so an expanding walk-forward can

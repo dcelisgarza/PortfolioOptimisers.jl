@@ -126,6 +126,7 @@ The methods that take `alg` are for a caller that already holds that matrix. [`c
 
 # Validation
 
+  - On the entry points that take `nte`: no diagonal entry of `D` is `NaN`. Raises a [`DistanceReaderRefusalError`](@ref) that names the columns of the assets that the reader could not estimate, through [`assert_distance_reader_rows`](@ref). A fit catches it and drops those assets.
   - Tree branch: throws a `DomainError` if an off-diagonal entry of `D` is negative or `NaN`, through [`graph_weight_matrix`](@ref).
   - Similarity branch: throws a `DomainError` if a zero weight removes an edge of the triangulated maximally filtered graph, through [`assert_pmfg_weights`](@ref).
   - Similarity branch, on the entry point that takes `nte` only: throws a `DomainError` if `D` leaves the domain of `alg`, through [`assert_similarity_domain`](@ref). The entry point that takes `alg` receives `S` and does not read `D`.
@@ -157,14 +158,15 @@ end
 function calc_weighted_adjacency_graph(nte::NetworkEstimator{<:Any, <:Any,
                                                              <:AbstractTreeType}, X::MatNum;
                                        dims::Int = 1, kwargs...)
-    return calc_weighted_adjacency_graph(nte.alg,
-                                         distance(nte.de, nte.ce, X; dims = dims,
-                                                  kwargs...))
+    D = distance(nte.de, nte.ce, X; dims = dims, kwargs...)
+    assert_distance_reader_rows(D)
+    return calc_weighted_adjacency_graph(nte.alg, D)
 end
 function calc_weighted_adjacency_graph(nte::NetworkEstimator{<:Any, <:Any,
                                                              <:AbstractNonNegativeSimilarityMatrixAlgorithm},
                                        X::MatNum; dims::Int = 1, kwargs...)
     S, D = cor_and_dist(nte.de, nte.ce, X; dims = dims, kwargs...)
+    assert_distance_reader_rows(D)
     assert_similarity_domain(nte.alg, nte.de, D)
     return calc_weighted_adjacency_graph(nte.alg,
                                          distance_to_similarity(nte.alg; S = S, D = D))
@@ -295,6 +297,7 @@ A shortest path over the similarities is wrong. A shortest path minimises the su
 
 # Validation
 
+  - No diagonal entry of `D` is `NaN`. Raises a [`DistanceReaderRefusalError`](@ref) that names the columns of the assets that the reader could not estimate, through [`assert_distance_reader_rows`](@ref). A fit catches it and drops those assets.
   - Throws a `DomainError` if an off-diagonal entry of `D` is negative or `NaN`, through [`graph_weight_matrix`](@ref).
   - Similarity branch: throws a `DomainError` if `D` leaves the domain of `nte.alg`, through [`assert_similarity_domain`](@ref).
   - Similarity branch: throws a `DomainError` if a zero weight removes an edge of the triangulated maximally filtered graph, through [`assert_pmfg_weights`](@ref).
@@ -322,6 +325,7 @@ function calc_distance_weighted_graph(nte::NetworkEstimator{<:Any, <:Any,
                                                             <:AbstractNonNegativeSimilarityMatrixAlgorithm},
                                       X::MatNum; dims::Int = 1, kwargs...)
     S, D = cor_and_dist(nte.de, nte.ce, X; dims = dims, kwargs...)
+    assert_distance_reader_rows(D)
     assert_similarity_domain(nte.alg, nte.de, D)
     S = distance_to_similarity(nte.alg; S = S, D = D)
     # `PMFG_T2s` selects the edges from the similarity; `D` then supplies their lengths. The

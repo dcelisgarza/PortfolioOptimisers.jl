@@ -67,7 +67,7 @@ processing happens exactly once per `optimise` call.
   - [`processed_jump_optimiser`](@ref)
 """
 function processed_jump_optimiser_attributes(opt::JuMPOptimiser, rd::ReturnsResult;
-                                             kwargs...)
+                                             rmsk::Option{BitVector} = nothing, kwargs...)
     # `rd` keeps its raw `X` and `B`. Each reader below that reads the returns states its
     # own source, and subtracts the benchmark itself, at the point of use.
     assert_universe_axis_order(opt.sets, rd)
@@ -80,8 +80,8 @@ function processed_jump_optimiser_attributes(opt::JuMPOptimiser, rd::ReturnsResu
     # An asset that a `FeatureDistance` of the clustering cannot read in the window of its
     # Asset Panel departs with the non-investable assets (`feature_readable_mask`). So does
     # an asset with a gap in the rows that a plain graph reader reads (`graph_reader_mask`).
-    imsk = feature_readable_mask((opt.ple, opt.cte), investable_mask(pr), rd)
-    imsk = graph_reader_mask((opt.ple, opt.cte), imsk, pr, rd, opt.strict)
+    # A fit again after a refusal of a distance reader passes its mask as `rmsk`.
+    imsk = distance_reader_entry_mask((opt.ple, opt.cte), pr, rd, opt.strict; rmsk = rmsk)
     fees = investable_fees_view(fees_constraints(opt.fees, opt.sets;
                                                  datatype = eltype(pr.X),
                                                  strict = opt.strict), imsk, pr.X)
@@ -90,6 +90,7 @@ function processed_jump_optimiser_attributes(opt::JuMPOptimiser, rd::ReturnsResu
     # every builder below then states its constraint over the investable assets alone, on
     # inputs `port_opt_view` has sliced by the same index. The weights are expanded back
     # in `JuMPOptimisationResult`.
+    opt0, pr0, rd0 = opt, pr, rd
     _, pr, opt, rd = investable_reduction(imsk, pr, opt, rd)
     X = pr.X
     datatype = eltype(X)
@@ -99,8 +100,9 @@ function processed_jump_optimiser_attributes(opt::JuMPOptimiser, rd::ReturnsResu
     st = threshold_constraints(opt.st, opt.sets; datatype = datatype, strict = opt.strict)
     lcsr = linear_constraints(opt.lcse, opt.sets; datatype = datatype, strict = opt.strict,
                               rr = pr.rr, rd = rd)
-    ctr = centrality_constraints(opt.cte, pr; iv = rd.iv, ivpa = rd.ivpa, rd = rd,
-                                 strict = opt.strict, kwargs...)
+    # A refusal of the centrality reader is tested after the phylogeny reader, below.
+    ctr = distance_reader_call(centrality_constraints, opt.cte, pr; iv = rd.iv,
+                               ivpa = rd.ivpa, rd = rd, strict = opt.strict, kwargs...)
     gcardr = linear_constraints(opt.gcarde, opt.sets; datatype = Int, strict = opt.strict)
     sgcardr = linear_constraints(opt.sgcarde, opt.sets; datatype = Int, strict = opt.strict)
     # A name-keyed estimator follows `investable_reduction`: a name that left resolves on
@@ -138,7 +140,22 @@ function processed_jump_optimiser_attributes(opt::JuMPOptimiser, rd::ReturnsResu
                                      strict = opt.strict)
     end
     tn = turnover_constraints(opt.tn, opt.sets; datatype = datatype, strict = opt.strict)
-    plr = phylogeny_constraints(opt.ple, pr; iv = rd.iv, ivpa = rd.ivpa, rd = rd, kwargs...)
+    plr = distance_reader_call(phylogeny_constraints, opt.ple, pr; iv = rd.iv,
+                               ivpa = rd.ivpa, rd = rd, kwargs...)
+    # A distance reader that refuses an asset the prior kept raises before it builds its
+    # graph. Fit again from the same prior result, without that asset
+    # (`distance_reader_refusal_mask`). The two readers can refuse different assets, and the
+    # fit again meets the refusal of the other one.
+    err = ctr isa DistanceReaderRefusalError ? ctr : plr
+    if err isa DistanceReaderRefusalError
+        return processed_jump_optimiser_attributes(rebuild_estimator(opt0, (; pe = pr0)),
+                                                   rd0;
+                                                   rmsk = distance_reader_refusal_mask(err,
+                                                                                       imsk,
+                                                                                       rd0,
+                                                                                       opt0.strict),
+                                                   kwargs...)
+    end
     ret = factory(opt.ret, pr)
     return ProcessedJuMPOptimiserAttributes(; pr = pr, wb = wb, lt = lt, st = st,
                                             lcsr = lcsr, ctr = ctr, gcardr = gcardr,

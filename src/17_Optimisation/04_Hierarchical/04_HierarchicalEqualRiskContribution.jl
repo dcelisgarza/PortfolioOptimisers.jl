@@ -631,7 +631,7 @@ Run the Hierarchical Equal Risk Contribution optimisation.
 """
 function _optimise(hec::HierarchicalEqualRiskContribution,
                    rd::ReturnsResult = ReturnsResult(); branchorder::Symbol = :optimal,
-                   kwargs...)
+                   rmsk::Option{BitVector} = nothing, kwargs...)
     hec = reset_time_dependent_estimator(hec)
     pr = prior(hec.opt.pe, rd)
     # Resolve the fee on the caller's universe before `investable_reduction` narrows `sets`.
@@ -645,8 +645,8 @@ function _optimise(hec::HierarchicalEqualRiskContribution,
     # An asset that a `FeatureDistance` of the clustering cannot read in the window of its
     # Asset Panel departs with the non-investable assets (`feature_readable_mask`). So does
     # an asset with a gap in the rows that a plain graph reader reads (`graph_reader_mask`).
-    imsk = feature_readable_mask(hec.opt.cle, investable_mask(pr), rd)
-    imsk = graph_reader_mask(hec.opt.cle, imsk, pr, rd, hec.opt.strict)
+    # A fit again after a refusal of the distance reader passes its mask as `rmsk`.
+    imsk = distance_reader_entry_mask(hec.opt.cle, pr, rd, hec.opt.strict; rmsk = rmsk)
     fees = investable_fees_view(fees_constraints(hec.opt.fees, hec.opt.sets;
                                                  strict = hec.opt.strict, datatype = T),
                                 imsk, pr.X)
@@ -659,12 +659,23 @@ function _optimise(hec::HierarchicalEqualRiskContribution,
     # the distance the clustering is built from never sees a `NaN`, and the cluster count
     # is chosen on the investable universe. The weights are expanded back in
     # `HierarchicalResult`.
+    hec0, pr0, rd0 = hec, pr, rd
     _, pr, hec, rd = investable_reduction(imsk, pr, hec, rd)
     hec = bind_data_benchmark(hec, rd)
     X = pr.X
     N = size(X, 2)
-    clr = clusterise(hec.opt.cle, pr; rd = rd, iv = rd.iv, ivpa = rd.ivpa,
-                     branchorder = branchorder)
+    # A distance reader that refuses an asset the prior kept raises before it clusters. Fit
+    # again from the same prior result, without that asset (`distance_reader_refusal_mask`).
+    clr = distance_reader_call(clusterise, hec.opt.cle, pr; rd = rd, iv = rd.iv,
+                               ivpa = rd.ivpa, branchorder = branchorder)
+    if clr isa DistanceReaderRefusalError
+        return _optimise(rebuild_estimator(hec0,
+                                           (;
+                                            opt = rebuild_estimator(hec0.opt, (; pe = pr0)))),
+                         rd0; branchorder = branchorder,
+                         rmsk = distance_reader_refusal_mask(clr, imsk, rd0,
+                                                             hec0.opt.strict), kwargs...)
+    end
     assert_clustering_universe(clr, N)
     idx = assignments(clr)
     cls = [findall(x -> x == i, idx) for i in 1:(clr.k)]
