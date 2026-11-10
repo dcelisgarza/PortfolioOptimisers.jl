@@ -80,7 +80,7 @@ The method builds the tree from the distance matrix. It adds up the symmetric ma
 
 # The method admits only a hop count
 
-The fourth type parameter is bound to [`HopCount`](@ref), so a [`PathLength`](@ref) separation fails at dispatch. `nte.nte.sep.n` indexes the sum of powers, and a matrix power counts edges. A radius has no equivalent of ``\\mathbf{D}^i - \\mathbf{A}^i``, so the refusal is correct, and it is not a missing method. [`phylogeny_matrix`](@ref) has a method for a radius, so the two consumers of a network are different here on purpose.
+The fourth type parameter is bound to [`HopCount`](@ref), so a [`PathLength`](@ref) separation fails at dispatch. `nte.nte.sep.n.val` indexes the sum of powers, and a matrix power counts edges. A radius has no equivalent of ``\\mathbf{D}^i - \\mathbf{A}^i``, so the refusal is correct, and it is not a missing method. [`phylogeny_matrix`](@ref) has a method for a radius, so the two consumers of a network are different here on purpose.
 
 # Algorithm
 
@@ -138,7 +138,7 @@ function clusterise(nte::NetworkClustersEstimator{<:NetworkEstimator{<:Any, <:An
     # `VariationInfoDistance`; the binarisation `separation_graph` does instead is one pass
     # over the edges. That is the whole reason the two-argument entry point exists.
     n = resolve_separation(nte.nte.sep, nte.nte, X, separation_graph(nte.nte.sep, G);
-                           dims = dims, kwargs...).n
+                           dims = dims, kwargs...).n.val
     for i in 0:n
         P .+= D^i - A^i
     end
@@ -215,7 +215,7 @@ function clusterise(nte::NetworkClustersEstimator{<:NetworkEstimator{<:Any, <:An
     # See the tree method: a matrix-power count, not a budget, resolved before it is indexed
     # by, and resolved against the structure this method already built.
     n = resolve_separation(nte.nte.sep, nte.nte, X, separation_graph(nte.nte.sep, G);
-                           dims = dims, kwargs...).n
+                           dims = dims, kwargs...).n.val
     for i in 0:n
         P .+= S^i - Rpm^i
     end

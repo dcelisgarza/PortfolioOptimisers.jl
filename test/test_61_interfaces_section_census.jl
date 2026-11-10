@@ -322,9 +322,8 @@ end
                 :BudgetEstimator, :ClusteringOptimisationEstimator, :DBHTRootMethod,
                 :DimensionReductionTarget, :EntropyFormulation,
                 :FiniteAllocationOptimisationResult, :HierarchicalScalariser,
-                :HighOrderMomentMeasureAlgorithm, :HopCountAlgorithm,
-                :InverseMatrixSparsificationAlgorithm, :JuMPOptimisationEstimator,
-                :JuMPReturnsEstimator, :JuMPRiskMeasureSettings,
+                :HighOrderMomentMeasureAlgorithm, :InverseMatrixSparsificationAlgorithm,
+                :JuMPOptimisationEstimator, :JuMPReturnsEstimator, :JuMPRiskMeasureSettings,
                 :LowOrderMomentMeasureAlgorithm, :MedianCenteringFunction,
                 :NaiveOptimisationEstimator, :NearOptimalCenteringAlgorithm,
                 :NonHierarchicalScalariser, :NonOptimisationRiskMeasure,
@@ -332,15 +331,15 @@ end
                 :NonOptimisationSequentialCrossValidationResult,
                 :NonRiskJuMPOptimisationResult, :NonSequentialCrossValidationEstimator,
                 :NonSequentialCrossValidationResult, :ObjectiveFunction,
-                :OrderedWeightsArrayFormulation, :PathLengthAlgorithm,
-                :PortfolioOptimisersError, :PredictionScorer, :ProcessedAttributes,
-                :ProcessedRiskBudgetingAttributes, :RankCovarianceEstimator,
-                :RelaxedRiskBudgetingAlgorithm, :RiskBudgetingAlgorithm,
-                :RiskBudgetingFormulation, :RiskInputKind, :RiskJuMPOptimisationEstimator,
-                :RiskJuMPOptimisationResult, :SecondMomentFormulation,
-                :SequentialCrossValidationResult, :SmythBrobyCovarianceAlgorithm,
-                :SquaredOrderedWeightsArrayAlgorithm, :ValueatRiskFormulation,
-                :VariableTracking, :VarianceFormulation, :WalkForwardEstimator])
+                :OrderedWeightsArrayFormulation, :PortfolioOptimisersError,
+                :PredictionScorer, :ProcessedAttributes, :ProcessedRiskBudgetingAttributes,
+                :RankCovarianceEstimator, :RelaxedRiskBudgetingAlgorithm,
+                :RiskBudgetingAlgorithm, :RiskBudgetingFormulation, :RiskInputKind,
+                :RiskJuMPOptimisationEstimator, :RiskJuMPOptimisationResult,
+                :SecondMomentFormulation, :SequentialCrossValidationResult,
+                :SmythBrobyCovarianceAlgorithm, :SquaredOrderedWeightsArrayAlgorithm,
+                :ValueatRiskFormulation, :VariableTracking, :VarianceFormulation,
+                :WalkForwardEstimator])
 
     # Floors on the walk: the package declares far more abstract types than carry a
     # section, and most of them parent a concrete type.

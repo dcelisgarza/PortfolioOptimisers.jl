@@ -173,9 +173,9 @@ $(DocStringExtensions.TYPEDEF)
 
 Abstract supertype for all rules that compute a hop count from the network and the data.
 
-The caller usually states a [`HopCount`](@ref) budget as a number, but the budget can also be a rule. A subtype of `HopCountAlgorithm` is a callable struct in the `n` field. [`resolve_separation`](@ref) calls it with the network estimator and the data matrix.
+The caller usually states a [`HopCount`](@ref) budget as a [`CountOf`](@ref) of hops, or as a [`FractionOf`](@ref) of the reachable pairs to relate, but the budget can also be a rule. A subtype of `HopCountAlgorithm` is a callable struct in the `n` field. [`resolve_separation`](@ref) calls it with the network estimator and the data matrix.
 
-A rule lets the budget follow a universe whose size the caller does not know in advance. Examples are a cross-validation fold and a subproblem of a meta optimiser such as [`NestedClustered`](@ref).
+A rule lets the budget follow a universe whose size the caller does not know in advance. Examples are a cross-validation fold and a subproblem of a meta optimiser such as [`NestedClustered`](@ref). A [`FractionOf`](@ref) is the shipped form of such a budget, so the family ships no member, and it stays the extension point for a rule of another kind.
 
 # The extension contract
 
@@ -186,7 +186,7 @@ A subtype defines one method, the functor:
 
 `g` is the structure that [`separation_graph`](@ref) built for the separation that holds the rule. The rule reads what it needs from `g` through [`separation_matrix`](@ref), which takes `g` directly, so the rule builds no structure. It still runs the traversal of all pairs, as [`resolve_separation`](@ref) states.
 
-`nte` holds the separation, and `X` is the data that `g` comes from. The shipped rule reads neither. An extension reads them to get what the graph does not hold, for example the distance estimator, the number of observations or a covariance.
+`nte` holds the separation, and `X` is the data that `g` comes from. An extension reads them to get what the graph does not hold, for example the distance estimator, the number of observations or a covariance.
 
 The return value must be an `Integer`. The return type of a functor is not part of its signature, so the type system cannot state this requirement. [`resolve_separation`](@ref) checks the value instead. Three readers use `0:n` as a count of matrix powers, and `0:1.5` drops a power with no error.
 
@@ -195,7 +195,7 @@ The same field also accepts a bare `Function`, which has the same requirement. T
 # Related
 
   - [`HopCount`](@ref)
-  - [`HopCountQuantile`](@ref)
+  - [`FractionOf`](@ref)
   - [`HopCountRule`](@ref)
   - [`HopCountValue`](@ref)
   - [`PathLengthAlgorithm`](@ref)
@@ -225,7 +225,7 @@ A rule must return a `Number`, and `nothing` is not a `Number`. `nothing` in the
 # Related
 
   - [`PathLength`](@ref)
-  - [`PathLengthQuantile`](@ref)
+  - [`FractionOf`](@ref)
   - [`PathLengthRule`](@ref)
   - [`PathLengthValue`](@ref)
   - [`HopCountAlgorithm`](@ref)
@@ -237,7 +237,7 @@ abstract type PathLengthAlgorithm <: AbstractAlgorithm end
 
 Alias for the forms of a hop count that are rules.
 
-Matches the two forms that [`resolve_separation`](@ref) calls and does not read: a [`HopCountAlgorithm`](@ref) and a bare `Function`. The library dispatches on it. `HopCount{<:HopCountRule}` is an unresolved separation, and `HopCount{<:Integer}` is a resolved one.
+Matches the two forms that [`resolve_separation`](@ref) calls and does not read: a [`HopCountAlgorithm`](@ref) and a bare `Function`. The library dispatches on it. `HopCount{<:HopCountRule}` and `HopCount{<:FractionOf}` are unresolved separations, and `HopCount{<:CountOf}` is a resolved one. A [`FractionOf`](@ref) is not a rule of this alias, because the library does not call it. [`resolve_separation`](@ref) reads it.
 
 # Related
 
@@ -248,20 +248,21 @@ Matches the two forms that [`resolve_separation`](@ref) calls and does not read:
 """
 const HopCountRule = Union{HopCountAlgorithm, Function}
 """
-    const HopCountValue = Union{Integer, HopCountAlgorithm, Function}
+    const HopCountValue = Union{Real_CountFraction, HopCountAlgorithm, Function}
 
 Alias for every value that the `n` field of [`HopCount`](@ref) accepts.
 
-The field accepts a stated `Integer` and the rules of [`HopCountRule`](@ref). An `Integer` is the resolved form, and every reader reads it directly. [`resolve_separation`](@ref) resolves a rule before a reader gets it.
+The field accepts a [`CountOf`](@ref) of hops, a [`FractionOf`](@ref) of the reachable pairs, a plain number that [`count_or_fraction`](@ref) reads, and the rules of [`HopCountRule`](@ref). A [`CountOf`](@ref) is the resolved form, and every reader reads its `val`. [`resolve_separation`](@ref) resolves a fraction or a rule before a reader gets it.
 
 # Related
 
   - [`HopCount`](@ref)
   - [`HopCountRule`](@ref)
   - [`HopCountAlgorithm`](@ref)
+  - [`Real_CountFraction`](@ref)
   - [`PathLengthValue`](@ref)
 """
-const HopCountValue = Union{Integer, HopCountAlgorithm, Function}
+const HopCountValue = Union{Real_CountFraction, HopCountAlgorithm, Function}
 """
     const PathLengthRule = Union{PathLengthAlgorithm, Function}
 
@@ -278,21 +279,24 @@ This is the [`PathLength`](@ref) counterpart of [`HopCountRule`](@ref).
 """
 const PathLengthRule = Union{PathLengthAlgorithm, Function}
 """
-    const PathLengthValue = Union{Number, PathLengthAlgorithm, Function}
+    const PathLengthValue = Union{Number, FractionOf, PathLengthAlgorithm, Function}
 
 Alias for every value that the `dmax` field of [`PathLength`](@ref) accepts, except `nothing`.
 
 This is the [`PathLength`](@ref) counterpart of [`HopCountValue`](@ref), but the field is `Option{PathLengthValue}`. `nothing` in that field means the observed diameter. It is a stated budget, and a rule cannot return it. The alias leaves `nothing` out, so the check of [`resolve_separation`](@ref) is `isa(dmax, Number)` alone.
+
+A plain number is a radius in the units of the distance estimator, and not a fraction, so the field takes no plain shorthand of [`count_or_fraction`](@ref). A [`FractionOf`](@ref) states the radius that relates that fraction of the reachable pairs. The alias holds no [`CountOf`](@ref), because a count of members is no radius.
 
 # Related
 
   - [`PathLength`](@ref)
   - [`PathLengthRule`](@ref)
   - [`PathLengthAlgorithm`](@ref)
+  - [`FractionOf`](@ref)
   - [`HopCountValue`](@ref)
   - [`Option`](@ref)
 """
-const PathLengthValue = Union{Number, PathLengthAlgorithm, Function}
+const PathLengthValue = Union{Number, FractionOf, PathLengthAlgorithm, Function}
 """
 $(DocStringExtensions.TYPEDEF)
 
@@ -312,9 +316,13 @@ The original, [graphpo1](@cite), prints the indicator as ``\\mathbb{1}_{x > 1}``
 
 # The budget can be a rule
 
-`n` also accepts a [`HopCountAlgorithm`](@ref) or a bare `Function`. [`resolve_separation`](@ref) calls it as `n(nte, X, g; dims = dims, kwargs...)`, where `g` is the structure that the consumer built. A caller who cannot state the budget in advance gives the rule that calculates it. This applies when the universe is a cross-validation fold or a subproblem of a meta optimiser. [`HopCountQuantile`](@ref) is the shipped rule.
+`n` is a [`CountOf`](@ref) of hops, or a [`FractionOf`](@ref) of the reachable pairs that the budget relates. A caller who cannot state the budget in advance gives the fraction. This applies when the universe is a cross-validation fold or a subproblem of a meta optimiser. `HopCount(; n = FractionOf(0.25))` asks for the hop budget that relates about a quarter of the reachable pairs. [`resolve_separation`](@ref) measures the hop separations over the structure that the consumer built, takes their `0.25` quantile over the reachable pairs with [`separation_quantile`](@ref), and rounds it to the nearest `Int`. A plain `Integer` is a count, and any other plain real number is a fraction, through [`count_or_fraction`](@ref).
 
-After resolution, `n` is an `Integer` and never a `Real`. Three readers use `0:n` as a count of matrix powers, and `0:1.5` drops a power with no error. So [`resolve_separation`](@ref) checks the return value of the rule.
+A stated count keeps the number of hops constant, and the number of related pairs changes with the graph. A fraction keeps the number of related pairs near the fraction, and the number of hops changes. The strength of a downstream constraint follows the number of related pairs. A hop count is an `Integer` and a quantile is not, so the share of related pairs is near the fraction but not equal to it. On a small graph the shells are coarse, and the share can be far from it. The smallest off-diagonal hop separation is `1`, so the rounded quantile is never below one.
+
+`n` also accepts a [`HopCountAlgorithm`](@ref) or a bare `Function`. [`resolve_separation`](@ref) calls it as `n(nte, X, g; dims = dims, kwargs...)`, where `g` is the structure that the consumer built.
+
+After resolution, `n` is a [`CountOf`](@ref), and its `val` is an `Integer`. Three readers use `0:n.val` as a count of matrix powers, and `0:1.5` drops a power with no error. So [`resolve_separation`](@ref) checks the return value of a rule.
 
 # Fields
 
@@ -323,10 +331,10 @@ $(DocStringExtensions.FIELDS)
 # Constructors
 
     HopCount(;
-        n::HopCountValue = 1
+        n::HopCountValue = CountOf(1)
     ) -> HopCount
 
-Keywords correspond to the struct's fields.
+Keywords correspond to the struct's fields. The constructor reads a plain number through [`count_or_fraction`](@ref).
 
 ## Validation
 
@@ -337,12 +345,13 @@ Keywords correspond to the struct's fields.
 ```jldoctest
 julia> HopCount()
 HopCount
-  n ┴ Int64: 1
+  n ┼ CountOf
+    │   val ┴ Int64: 1
 
-julia> HopCount(; n = HopCountQuantile())
+julia> HopCount(; n = FractionOf(0.25))
 HopCount
-  n ┼ HopCountQuantile
-    │   q ┴ Float64: 0.25
+  n ┼ FractionOf
+    │   val ┴ Float64: 0.25
 ```
 
 # Related
@@ -351,7 +360,9 @@ HopCount
   - [`PathLength`](@ref)
   - [`HopCountValue`](@ref)
   - [`HopCountAlgorithm`](@ref)
-  - [`HopCountQuantile`](@ref)
+  - [`CountOf`](@ref)
+  - [`FractionOf`](@ref)
+  - [`separation_quantile`](@ref)
   - [`resolve_separation`](@ref)
   - [`separation_matrix`](@ref)
   - [`separation_budget`](@ref)
@@ -369,17 +380,18 @@ HopCount
     """
     n
     function HopCount(n::HopCountValue)
-        # A rule is a promise about a value that does not exist yet, so there is nothing to
-        # check here. `resolve_separation` checks what it returns -- and it returns it
-        # through this constructor, so the resource cap below covers a computed `n` too.
-        if isa(n, Integer)
-            @argcheck(n >= one(n), DomainError(n, "n must be >= 1"))
-            assert_resource_cap(n, RESOURCE_LIMITS[].max_hop_count, :n, :max_hop_count)
+        # A fraction or a rule is a promise about a value that does not exist yet, so there
+        # is nothing to check here. `resolve_separation` checks what it returns -- and it
+        # returns it through this constructor, so the resource cap below covers a computed
+        # `n` too. `CountOf` checks that the count is at least one.
+        n = maybe_count_or_fraction(n)
+        if isa(n, CountOf)
+            assert_resource_cap(n.val, RESOURCE_LIMITS[].max_hop_count, :n, :max_hop_count)
         end
         return new{typeof(n)}(n)
     end
 end
-function HopCount(; n::HopCountValue = 1)::HopCount
+function HopCount(; n::HopCountValue = CountOf(1))::HopCount
     return HopCount(n)
 end
 """
@@ -415,9 +427,13 @@ The default `dmax = nothing` means the whole connected component. The library us
 
 # The budget can be a rule
 
-`dmax` also accepts a [`PathLengthAlgorithm`](@ref) or a bare `Function`. [`resolve_separation`](@ref) calls it as `dmax(nte, X, g; dims = dims, kwargs...)`, where `g` is the structure that the consumer built. A rule helps a caller who cannot state a number. [`PathLengthQuantile`](@ref) gives the budget that relates a stated fraction of the reachable pairs. A caller can choose that fraction, and it means the same in each fold of a cross-validation and in each subproblem of a meta optimiser.
+`dmax` also accepts a [`FractionOf`](@ref) of the reachable pairs. A fraction helps a caller who cannot state a number. `PathLength(; dmax = FractionOf(0.25))` gives the radius that relates a quarter of the reachable pairs. [`resolve_separation`](@ref) measures the path separations over the structure that the consumer built, and takes their `0.25` quantile over the reachable pairs with [`separation_quantile`](@ref), with no rounding. A caller can choose that fraction, and it means the same in each fold of a cross-validation and in each subproblem of a meta optimiser. A plain number is a radius, so the field takes no plain shorthand for a fraction, and a [`CountOf`](@ref) is no radius.
 
-A fixed `dmax` and a rule keep different quantities constant. A fixed `dmax` keeps the radius constant, and the number of related pairs changes with the graph. A quantile rule keeps the number constant, and the radius changes. Neither keeps both constant across folds, because each fold fits a new graph.
+A fixed `dmax` and a fraction keep different quantities constant. A fixed `dmax` keeps the radius constant, and the number of related pairs changes with the graph. A fraction keeps the number constant, and the radius changes. Neither keeps both constant across folds, because each fold fits a new graph. For [`SemiDefinitePhylogeny`](@ref) and [`IntegerPhylogeny`](@ref), the strength of the constraint is the number of related pairs.
+
+A hop budget moves through a small number of shell cardinalities, and it cannot stop between them. A fraction of the path length is continuous, so `FractionOf(0.3)` asks for a cardinality, and the result is close to it. This is the one real gain of the radius ball over a hop count.
+
+`dmax` also accepts a [`PathLengthAlgorithm`](@ref) or a bare `Function`. [`resolve_separation`](@ref) calls it as `dmax(nte, X, g; dims = dims, kwargs...)`.
 
 # Fields
 
@@ -446,10 +462,10 @@ julia> PathLength(; dmax = 0.5)
 PathLength
   dmax ┴ Float64: 0.5
 
-julia> PathLength(; dmax = PathLengthQuantile(; q = 0.3))
+julia> PathLength(; dmax = FractionOf(0.3))
 PathLength
-  dmax ┼ PathLengthQuantile
-       │   q ┴ Float64: 0.3
+  dmax ┼ FractionOf
+       │   val ┴ Float64: 0.3
 ```
 
 # Related
@@ -458,7 +474,8 @@ PathLength
   - [`HopCount`](@ref)
   - [`PathLengthValue`](@ref)
   - [`PathLengthAlgorithm`](@ref)
-  - [`PathLengthQuantile`](@ref)
+  - [`FractionOf`](@ref)
+  - [`separation_quantile`](@ref)
   - [`resolve_separation`](@ref)
   - [`separation_matrix`](@ref)
   - [`separation_budget`](@ref)

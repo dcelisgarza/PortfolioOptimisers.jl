@@ -133,7 +133,8 @@ NetworkEstimator
         │     args ┼ Tuple{}: ()
         │   kwargs ┴ @NamedTuple{}: NamedTuple()
     sep ┼ HopCount
-        │   n ┴ Int64: 1
+        │   n ┼ CountOf
+        │     │   val ┴ Int64: 1
   x_src ┴ nothing
 ```
 
@@ -258,7 +259,8 @@ NetworkClustersEstimator
         │         │     args ┼ Tuple{}: ()
         │         │   kwargs ┴ @NamedTuple{}: NamedTuple()
         │     sep ┼ HopCount
-        │         │   n ┴ Int64: 1
+        │         │   n ┼ CountOf
+        │         │     │   val ┴ Int64: 1
         │   x_src ┴ nothing
     alg ┼ HClustAlgorithm
         │   linkage ┴ Symbol: :ward

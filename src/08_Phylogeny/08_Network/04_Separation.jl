@@ -162,11 +162,11 @@ The shipped members do not read `nte`. It lets the budget of an extension read t
 
 # Algorithm
 
- 1. Refuse a separation whose budget is a rule. A [`HopCount`](@ref) that holds a [`HopCountAlgorithm`](@ref), and a [`PathLength`](@ref) that holds a [`PathLengthAlgorithm`](@ref), each throw here.
+ 1. Refuse a separation whose budget is not resolved. A [`HopCount`](@ref) that holds a [`FractionOf`](@ref) or a [`HopCountAlgorithm`](@ref), and a [`PathLength`](@ref) that holds a [`FractionOf`](@ref) or a [`PathLengthAlgorithm`](@ref), each throw here.
 
  2. Return the budget, through the branch that `sep` selects.
 
-      + [`HopCount`](@ref): `sep.n`, the number of hops that the caller stated. The method does not read `d`.
+      + [`HopCount`](@ref): `sep.n.val`, the number of hops of its [`CountOf`](@ref). The method does not read `d`.
       + [`PathLength`](@ref): find `delta`, the largest entry of `d` that [`is_reachable`](@ref) admits. It is the observed diameter. Return `delta` when `sep.dmax` is `nothing`, and the smaller of `sep.dmax` and `delta` otherwise.
 
 # Arguments
@@ -177,7 +177,7 @@ The shipped members do not read `nte`. It lets the budget of an extension read t
 
 # Validation
 
-  - Throws an `ArgumentError` if `sep` holds a budget rule and not a value. Call [`resolve_separation`](@ref) first.
+  - Throws an `ArgumentError` if `sep` holds a fraction or a budget rule and not a value. Call [`resolve_separation`](@ref) first.
 
 # Returns
 
@@ -193,8 +193,9 @@ The shipped members do not read `nte`. It lets the budget of an extension read t
   - [`Proximity`](@ref)
 """
 function separation_budget end
-function separation_budget(sep::HopCount, ::AbstractNetworkEstimator, ::MatNum)::Number
-    return sep.n
+function separation_budget(sep::HopCount{<:CountOf}, ::AbstractNetworkEstimator,
+                           ::MatNum)::Number
+    return sep.n.val
 end
 function separation_budget(sep::PathLength, ::AbstractNetworkEstimator, d::MatNum)::Number
     # The diameter of what the graph turned out to be. The sentinel is excluded rather than
@@ -210,16 +211,16 @@ function separation_budget(sep::PathLength, ::AbstractNetworkEstimator, d::MatNu
     end
     return isnothing(sep.dmax) ? delta : min(sep.dmax, delta)
 end
-# An unresolved budget is a rule, and a rule cannot be compared against an entry of `d`.
-# Returning it would put a function where every caller expects a number, so it is refused
-# here rather than three frames later inside `d .<= dmax`.
-function separation_budget(sep::HopCount{<:HopCountRule}, ::AbstractNetworkEstimator,
-                           ::MatNum)
-    return throw(ArgumentError("separation_budget needs a resolved separation, and this HopCount carries the rule $(typeof(sep.n)) in `n`.\nCall resolve_separation(sep, nte, X) first; every shipped consumer of a network already does."))
+# An unresolved budget is a fraction or a rule, and neither can be compared against an entry
+# of `d`. Returning it would put a wrapper or a function where every caller expects a number,
+# so it is refused here rather than three frames later inside `d .<= dmax`.
+function separation_budget(sep::HopCount{<:Union{HopCountRule, FractionOf}},
+                           ::AbstractNetworkEstimator, ::MatNum)
+    return throw(ArgumentError("separation_budget needs a resolved separation, and this HopCount carries the budget $(typeof(sep.n)) in `n`.\nCall resolve_separation(sep, nte, X) first; every shipped consumer of a network already does."))
 end
-function separation_budget(sep::PathLength{<:PathLengthRule}, ::AbstractNetworkEstimator,
-                           ::MatNum)
-    return throw(ArgumentError("separation_budget needs a resolved separation, and this PathLength carries the rule $(typeof(sep.dmax)) in `dmax`.\nCall resolve_separation(sep, nte, X) first; every shipped consumer of a network already does."))
+function separation_budget(sep::PathLength{<:Union{PathLengthRule, FractionOf}},
+                           ::AbstractNetworkEstimator, ::MatNum)
+    return throw(ArgumentError("separation_budget needs a resolved separation, and this PathLength carries the budget $(typeof(sep.dmax)) in `dmax`.\nCall resolve_separation(sep, nte, X) first; every shipped consumer of a network already does."))
 end
 """
 $(DocStringExtensions.TYPEDSIGNATURES)
@@ -242,7 +243,7 @@ The function removes an unreachable pair from the population with [`is_reachable
 
   - `sep`: Separation algorithm that measured the matrix. The function passes it to [`is_reachable`](@ref).
   - `d`: Separation matrix from [`separation_matrix`](@ref).
-  - `q`: Quantile in `[0, 1]`.
+  - `q`: Quantile in `[0, 1]`. [`resolve_separation`](@ref) passes the `val` of a [`FractionOf`](@ref) budget.
 
 # Validation
 
@@ -254,8 +255,8 @@ The function removes an unreachable pair from the population with [`is_reachable
 
 # Related
 
-  - [`HopCountQuantile`](@ref)
-  - [`PathLengthQuantile`](@ref)
+  - [`resolve_separation`](@ref)
+  - [`FractionOf`](@ref)
   - [`separation_matrix`](@ref)
   - [`is_reachable`](@ref)
 """
@@ -267,184 +268,37 @@ function separation_quantile(sep::AbstractSeparationAlgorithm, d::MatNum, q::Num
     return Statistics.quantile(v, q)
 end
 """
-$(DocStringExtensions.TYPEDEF)
-
-Places the hop budget at a quantile of the observed hop separations.
-
-It is the shipped [`HopCountAlgorithm`](@ref). `HopCount(; n = HopCountQuantile(; q = 0.25))` asks for the hop budget that relates about a quarter of the reachable pairs. A stated number of hops can be correct for one set of assets and wrong for the next.
-
-# What it keeps constant
-
-A stated `n` keeps the number of hops constant, and the number of related pairs changes with the graph. This rule keeps the number of related pairs near `q` of the reachable pairs, and the number of hops changes. On a fold of a cross-validation, or on a subproblem of a meta-optimiser, the caller usually wants the second. The strength of a downstream constraint follows the number of related pairs, and not the number of hops.
-
-# The rounding makes the two different
-
-A hop count is an `Integer`, and the quantile is not. The rule rounds the budget to the nearest hop, and the share of related pairs is near `q` but not equal to it. On a small graph the shells are coarse, and the share can be far from `q`. A hop budget can select only a small number of cardinalities. [`PathLengthQuantile`](@ref) does not round, and its share is close to `q`. This is the largest practical difference between the two separations.
-
-# It costs a traversal, but not a structure
-
-To resolve this rule, the call runs [`separation_matrix`](@ref) one time. The hop branch of [`_phylogeny_matrix`](@ref) does not run it otherwise, because that branch sums matrix powers. A budget from a rule costs one traversal of all pairs, and a stated budget does not.
-
-It does not cost a second structure. The rule receives the graph that its consumer built through [`separation_graph`](@ref). The consumer computes the distance one time for each call, whether the budget is a rule or a number. Under [`VariationInfoDistance`](@ref), that computation is `98%` of the run time of [`clusterise`](@ref).
-
-# Algorithm
-
-These are the steps of the call operator, which [`resolve_separation`](@ref) calls.
-
- 1. Measure the hop separations over `g` into `d` with [`separation_matrix`](@ref). The call passes a default [`HopCount`](@ref), because that kernel dispatches on the type of the separation and reads no field of it.
- 2. Take the `q`-quantile of the reachable off-diagonal entries of `d` with [`separation_quantile`](@ref).
- 3. Round that quantile to the nearest `Int`, and return it as the hop budget. The smallest off-diagonal hop separation is `1`, so the quantile is never less than one. The rounded value is therefore never below the floor of [`HopCount`](@ref), and no clamp is necessary.
-
-# Fields
-
-$(DocStringExtensions.FIELDS)
-
-# Constructors
-
-    HopCountQuantile(;
-        q::Number = 0.25
-    ) -> HopCountQuantile
-
-Keywords correspond to the struct's fields.
-
-## Validation
-
-  - $(val_dict[:sepq])
-
-# Examples
-
-```jldoctest
-julia> HopCountQuantile()
-HopCountQuantile
-  q ┴ Float64: 0.25
-```
-
-# Related
-
-  - [`HopCountAlgorithm`](@ref)
-  - [`HopCount`](@ref)
-  - [`PathLengthQuantile`](@ref)
-  - [`resolve_separation`](@ref)
-  - [`separation_quantile`](@ref)
-"""
-@concrete struct HopCountQuantile <: HopCountAlgorithm
-    """
-    $(field_dict[:sepq])
-    """
-    q
-    function HopCountQuantile(q::Number)
-        @argcheck(zero(q) <= q <= one(q), DomainError(q, "q must be in [0, 1]"))
-        return new{typeof(q)}(q)
-    end
-end
-function HopCountQuantile(; q::Number = 0.25)::HopCountQuantile
-    return HopCountQuantile(q)
-end
-function (alg::HopCountQuantile)(::AbstractNetworkEstimator, ::MatNum,
-                                 g::Graphs.AbstractGraph; kwargs...)::Integer
-    # `separation_matrix` dispatches on the separation's *type* and reads no field of it, so
-    # a bare `HopCount()` here is a probe saying "measure in hops" rather than a budget. `g`
-    # is already the structure a hop count measures over, so nothing is rebuilt.
-    d = separation_matrix(HopCount(), g)
-    # The smallest off-diagonal hop separation is `1`, so the quantile never falls below one
-    # and the round never has to be clamped up to `HopCount`'s floor.
-    return round(Int, separation_quantile(HopCount(), d, alg.q))
-end
-"""
-$(DocStringExtensions.TYPEDEF)
-
-Places the path-length budget at a quantile of the observed path separations.
-
-It is the shipped [`PathLengthAlgorithm`](@ref). [`PathLength`](@ref) states that a sum of path lengths, in the units of an [`AbstractDistanceEstimator`](@ref), is difficult to choose. A caller cannot reason about `dmax = 0.37`. A caller can reason about the budget that relates a quarter of the reachable pairs.
-
-# What it keeps constant
-
-A stated `dmax` keeps the radius constant, and the number of related pairs changes with the graph. This rule keeps the number of related pairs constant, and the radius changes. Each fold fits both again, so neither is constant in both senses. Select the one that the downstream consumer is sensitive to. For [`SemiDefinitePhylogeny`](@ref) and [`IntegerPhylogeny`](@ref), the strength of the constraint is the number of related pairs.
-
-# It reaches the cardinalities that a hop count cannot reach
-
-This rule lets a caller ask for the one real gain of the radius ball. A hop budget moves through a small number of shell cardinalities, and it cannot stop between them. `q` is continuous, so `PathLengthQuantile(; q = 0.3)` asks for a cardinality, and the result is close to it.
-
-# Algorithm
-
-These are the steps of the call operator, which [`resolve_separation`](@ref) calls.
-
- 1. Measure the path separations over `g` into `d` with [`separation_matrix`](@ref). The call passes a default [`PathLength`](@ref), for the same reason as the hop rule.
- 2. Take the `q`-quantile of the reachable off-diagonal entries of `d` with [`separation_quantile`](@ref). Return that quantile as the radius budget, with no rounding.
-
-# Fields
-
-$(DocStringExtensions.FIELDS)
-
-# Constructors
-
-    PathLengthQuantile(;
-        q::Number = 0.25
-    ) -> PathLengthQuantile
-
-Keywords correspond to the struct's fields.
-
-## Validation
-
-  - $(val_dict[:sepq])
-
-# Examples
-
-```jldoctest
-julia> PathLengthQuantile()
-PathLengthQuantile
-  q ┴ Float64: 0.25
-```
-
-# Related
-
-  - [`PathLengthAlgorithm`](@ref)
-  - [`PathLength`](@ref)
-  - [`HopCountQuantile`](@ref)
-  - [`resolve_separation`](@ref)
-  - [`separation_quantile`](@ref)
-"""
-@concrete struct PathLengthQuantile <: PathLengthAlgorithm
-    """
-    $(field_dict[:sepq])
-    """
-    q
-    function PathLengthQuantile(q::Number)
-        @argcheck(zero(q) <= q <= one(q), DomainError(q, "q must be in [0, 1]"))
-        return new{typeof(q)}(q)
-    end
-end
-function PathLengthQuantile(; q::Number = 0.25)::PathLengthQuantile
-    return PathLengthQuantile(q)
-end
-function (alg::PathLengthQuantile)(::AbstractNetworkEstimator, ::MatNum,
-                                   g::Graphs.AbstractGraph; kwargs...)::Number
-    # A bare `PathLength()` is the probe here, for the same reason as on the hop rule.
-    d = separation_matrix(PathLength(), g)
-    return separation_quantile(PathLength(), d, alg.q)
-end
-"""
     resolve_separation(sep::AbstractSeparationAlgorithm, nte::AbstractNetworkEstimator,
                        X::MatNum, g::Graphs.AbstractGraph; dims::Int = 1, kwargs...)
     resolve_separation(sep::HopCount{<:HopCountRule}, nte::AbstractNetworkEstimator,
                        X::MatNum, g::Graphs.AbstractGraph; dims::Int = 1, kwargs...)
     resolve_separation(sep::PathLength{<:PathLengthRule}, nte::AbstractNetworkEstimator,
                        X::MatNum, g::Graphs.AbstractGraph; dims::Int = 1, kwargs...)
+    resolve_separation(sep::HopCount{<:FractionOf}, nte::AbstractNetworkEstimator,
+                       X::MatNum, g::Graphs.AbstractGraph; kwargs...)
+    resolve_separation(sep::PathLength{<:FractionOf}, nte::AbstractNetworkEstimator,
+                       X::MatNum, g::Graphs.AbstractGraph; kwargs...)
     resolve_separation(sep::AbstractSeparationAlgorithm, nte::AbstractNetworkEstimator,
                        X::MatNum; dims::Int = 1, kwargs...)
-    resolve_separation(sep::Union{HopCount{<:HopCountRule},
-                                  PathLength{<:PathLengthRule}},
+    resolve_separation(sep::Union{HopCount{<:Union{HopCountRule, FractionOf}},
+                                  PathLength{<:Union{PathLengthRule, FractionOf}}},
                        nte::AbstractNetworkEstimator, X::MatNum; dims::Int = 1, kwargs...)
 
-Replace a separation whose budget is a rule by one whose budget is a value.
+Replace a separation whose budget is a fraction or a rule by one whose budget is a value.
 
 This function is the fourth kernel of [`AbstractSeparationAlgorithm`](@ref), and the only one that an extension does not have to implement. The method on the abstract type returns `sep` unchanged. A member whose budget is a number costs nothing here, and needs no method of its own.
+
+# A fraction is a quantile of the separations
+
+A [`FractionOf`](@ref) budget names the share of the reachable pairs that the budget relates. The kernel measures the separations over `g` with [`separation_matrix`](@ref), and takes their quantile at `val` over the reachable off-diagonal pairs with [`separation_quantile`](@ref). [`HopCount`](@ref) rounds the quantile to the nearest `Int`, because a hop count is an `Integer`. The smallest off-diagonal hop separation is `1`, so the rounded value is never below one. [`PathLength`](@ref) takes the quantile as its radius, with no rounding.
+
+The fraction costs one traversal of all pairs, and a stated budget does not. The hop branch of [`_phylogeny_matrix`](@ref) does not run the traversal otherwise, because that branch sums matrix powers. The fraction does not cost a second structure, because it reads the graph that its consumer built. Under [`VariationInfoDistance`](@ref), the distance is `98%` of the run time of [`clusterise`](@ref).
 
 # The consumer calls it, and the other kernels do not
 
 Every shipped consumer of a network first resolves `nte.sep`. It then passes the resolved separation to [`separation_matrix`](@ref) and [`separation_budget`](@ref). The consumers are [`phylogeny_matrix`](@ref), both [`clusterise`](@ref) methods, and [`phylogeny_features`](@ref) for [`Proximity`](@ref).
 
-[`separation_budget`](@ref) cannot resolve a rule. It takes the separation matrix and not the data, so that [`HopCount`](@ref) does not pay for a reduction to a diameter that it does not read. A rule needs the structure, and the budget kernel does not have it. `separation_budget` refuses a separation that is not resolved, and this kernel resolves it while the structure is available.
+[`separation_budget`](@ref) cannot resolve a fraction or a rule. It takes the separation matrix and not the data, so that [`HopCount`](@ref) does not pay for a reduction to a diameter that it does not read. A fraction and a rule need the structure, and the budget kernel does not have it. `separation_budget` refuses a separation that is not resolved, and this kernel resolves it while the structure is available.
 
 # The rule receives the structure, and does not build one
 
@@ -454,24 +308,25 @@ The methods that take only `nte` and `X` are wrappers. The resolved case has a w
 
 # The check of the return value runs at run time, and it must
 
-The return type of a functor is not part of its signature, so the type system cannot make a [`HopCountAlgorithm`](@ref) return an `Integer`. This kernel checks the value, and throws if it is not an `Integer`. The check is necessary. Three readers use `0:n` as a count of matrix powers, and `0:1.5` removes a power with no error.
+The return type of a functor is not part of its signature, so the type system cannot make a [`HopCountAlgorithm`](@ref) return an `Integer`. This kernel checks the value, and throws if it is not an `Integer`. The check is necessary. Three readers use `0:n.val` as a count of matrix powers, and `0:1.5` removes a power with no error.
 
-The kernel builds the resolved member through its usual constructor. The answer of the rule meets the same checks as a stated budget: `n >= 1`, `n <= RESOURCE_LIMITS[].max_hop_count` and `dmax > 0`. For this reason, the resource cap needs no second check here. The same `assert_resource_cap` refuses a hop count that is too large, from a rule or from the caller.
+The kernel builds the resolved member through its usual constructor, which wraps a hop count in a [`CountOf`](@ref). The answer of a fraction or a rule meets the same checks as a stated budget: `n.val >= 1`, `n.val <= RESOURCE_LIMITS[].max_hop_count` and `dmax > 0`. For this reason, the resource cap needs no second check here. The same `assert_resource_cap` refuses a hop count that is too large, from a rule or from the caller.
 
 # Algorithm
 
  1. Return `sep` unchanged when its budget is a value. The wrapper has a method of its own for this case, so a stated budget builds no structure.
- 2. In the wrapper, build the structure that the rule measures over with [`separation_graph`](@ref). The methods that take `g` receive it and start at step 3.
- 3. Call the rule in the budget field with `nte`, `X` and `g`, and pass on `dims` and `kwargs`. The rule returns the budget.
- 4. Check the type of that answer. A [`HopCount`](@ref) rule must return an `Integer`, and a [`PathLength`](@ref) rule must return a `Number`. Throw an `ArgumentError` otherwise.
- 5. Build the member again through its usual constructor, with the answer as its budget.
+ 2. In the wrapper, build the structure that the fraction or the rule measures over with [`separation_graph`](@ref). The methods that take `g` receive it and start at step 3.
+ 3. For a [`FractionOf`](@ref), measure `d = separation_matrix(sep, g)` and take `separation_quantile(sep, d, val)`. Round it to the nearest `Int` for a [`HopCount`](@ref). Go to step 6.
+ 4. For a rule, call it with `nte`, `X` and `g`, and pass on `dims` and `kwargs`. The rule returns the budget.
+ 5. Check the type of that answer. A [`HopCount`](@ref) rule must return an `Integer`, and a [`PathLength`](@ref) rule must return a `Number`. Throw an `ArgumentError` otherwise.
+ 6. Build the member again through its usual constructor, with the answer as its budget.
 
 # Arguments
 
   - `sep`: Separation algorithm, resolved or not.
-  - `nte`: Network estimator that owns `sep`. The rule receives it, and can read from it what the graph does not hold.
+  - `nte`: Network estimator that owns `sep`. A rule receives it, and can read from it what the graph does not hold. A fraction does not read it.
   - $(arg_dict[:X])
-  - `g`: Structure that the rule measures over, from [`separation_graph`](@ref). The wrappers build it from `X`.
+  - `g`: Structure that the fraction or the rule measures over, from [`separation_graph`](@ref). The wrappers build it from `X`.
   - $(arg_dict[:dims])
   - `kwargs...`: Keyword arguments that the function passes to the rule.
 
@@ -479,6 +334,7 @@ The kernel builds the resolved member through its usual constructor. The answer 
 
   - A [`HopCountAlgorithm`](@ref) or `Function` in `HopCount`'s `n` must return an `Integer`.
   - A [`PathLengthAlgorithm`](@ref) or `Function` in `PathLength`'s `dmax` must return a `Number`. `nothing` is a stated budget, not a computed one.
+  - A fraction needs at least one reachable pair of distinct assets. [`separation_quantile`](@ref) throws an `ArgumentError` otherwise.
 
 # Returns
 
@@ -491,8 +347,8 @@ The kernel builds the resolved member through its usual constructor. The answer 
   - [`PathLength`](@ref)
   - [`HopCountAlgorithm`](@ref)
   - [`PathLengthAlgorithm`](@ref)
-  - [`HopCountQuantile`](@ref)
-  - [`PathLengthQuantile`](@ref)
+  - [`FractionOf`](@ref)
+  - [`separation_quantile`](@ref)
   - [`separation_graph`](@ref)
   - [`separation_matrix`](@ref)
   - [`separation_budget`](@ref)
@@ -521,14 +377,27 @@ function resolve_separation(sep::PathLength{<:PathLengthRule},
               ArgumentError("a path length rule must return a Number.\nGot $(dmax)::$(typeof(dmax)) from $(typeof(sep.dmax))."))
     return PathLength(dmax)
 end
+# `separation_matrix` dispatches on the separation's *type* and reads no field of it, so `sep`
+# itself, with its budget unresolved, measures the separations it is to be resolved over. `g`
+# is already the structure the member measures over, so nothing is rebuilt.
+function resolve_separation(sep::HopCount{<:FractionOf}, ::AbstractNetworkEstimator,
+                            ::MatNum, g::Graphs.AbstractGraph; kwargs...)::HopCount
+    d = separation_matrix(sep, g)
+    return HopCount(round(Int, separation_quantile(sep, d, sep.n.val)))
+end
+function resolve_separation(sep::PathLength{<:FractionOf}, ::AbstractNetworkEstimator,
+                            ::MatNum, g::Graphs.AbstractGraph; kwargs...)::PathLength
+    d = separation_matrix(sep, g)
+    return PathLength(separation_quantile(sep, d, sep.dmax.val))
+end
 # The resolved case takes the wrapper too, and builds nothing: a stated budget must not pay
 # for a structure to be told that it is already a value.
 function resolve_separation(sep::AbstractSeparationAlgorithm, ::AbstractNetworkEstimator,
                             ::MatNum; kwargs...)::AbstractSeparationAlgorithm
     return sep
 end
-function resolve_separation(sep::Union{HopCount{<:HopCountRule},
-                                       PathLength{<:PathLengthRule}},
+function resolve_separation(sep::Union{HopCount{<:Union{HopCountRule, FractionOf}},
+                                       PathLength{<:Union{PathLengthRule, FractionOf}}},
                             nte::AbstractNetworkEstimator, X::MatNum; dims::Int = 1,
                             kwargs...)::AbstractSeparationAlgorithm
     return resolve_separation(sep, nte, X,
@@ -536,5 +405,4 @@ function resolve_separation(sep::Union{HopCount{<:HopCountRule},
                               dims = dims, kwargs...)
 end
 
-export separation_matrix, separation_budget, resolve_separation, HopCountQuantile,
-       PathLengthQuantile
+export separation_matrix, separation_budget, resolve_separation

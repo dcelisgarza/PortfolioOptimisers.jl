@@ -906,7 +906,7 @@ in the sense of `CODING_STANDARDS.md`.
     files under `src/` carried a `# Details` section that no count below could see, and four
     more carried one the count read short.
 
-    A functor method, `(alg::HopCountQuantile)(x)`, is named after its TYPE and not after its
+    A functor method, `(alg::RateSignificance)(x)`, is named after its TYPE and not after its
     receiver variable. The copy that stood here named it `alg`, so every functor in a file
     that shares a receiver name collapsed onto one key. Issue #521.
     =#

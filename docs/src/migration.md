@@ -644,6 +644,8 @@ A field that takes the size of a part of a set holds a `CountOf` or a `FractionO
 | A plain `1.0` in one of these fields | Raises a `DomainError`, because a grid promotes the count `1` to it. Write `CountOf(1)` for one member, or `FractionOf(1)` for the whole set. |
 | `QuantileRule(; best = 0.2)` | `RankRule(; best = FractionOf(0.2))`, or the shorthand `RankRule(; best = 0.2)`. `QuantileRule` is gone. One rule can now take a count from one end and a fraction from the other. |
 | `RankRule(; best = 0, worst = 5)` | `RankRule(; worst = 5)`. A count is at least one, so `nothing` states a tail that takes no asset. |
+| `HopCount(; n = HopCountQuantile(; q = 0.25))` and `PathLength(; dmax = PathLengthQuantile(; q = 0.25))` | `HopCount(; n = FractionOf(0.25))` and `PathLength(; dmax = FractionOf(0.25))`. The budgets do not move. `HopCountQuantile` and `PathLengthQuantile` are gone. `q = 0` is refused, and `CountOf(1)` states that hop budget. |
+| `HopCount(; n = 2).n == 2` | `HopCount(; n = 2).n` is `CountOf(2)`. Read `.n.val` for the number of hops. A plain float, such as `HopCount(; n = 0.25)`, is a fraction, where v0.33 refused it. In `PathLength(; dmax = 0.25)` a plain number stays a radius. |
 | `WildBootstrapMeanTest(; min_periods = 2.5)`, and the same `OverlapMeanTest` | Raises a `TypeError`. `min_periods` is a count of windows, so it is an `Integer`. |
 | `ActiveAssetsUncertaintyAlgorithm(; active = 1 // 5)` | Calibrates. v0.33 built the algorithm, and the calibration then raised a `MethodError`. |
 

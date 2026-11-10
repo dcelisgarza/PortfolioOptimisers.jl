@@ -22,7 +22,7 @@ Select the related pairs of a structure, through the branch of the separation `s
 **Under a [`HopCount`](@ref):**
 
  1. Read the binary matrix `A` from `g` with `Graphs.adjacency_matrix`.
- 2. Add up `P` as the sum of `A^i` over `i in 0:sep.n`. Each entry counts the walks of length at most `sep.n` between its pair.
+ 2. Add up `P` as the sum of `A^i` over `i in 0:sep.n.val`. Each entry counts the walks of length at most `sep.n.val` between its pair.
  3. Clamp `P` to `0` or `1`, which changes the count of walks into the selection. Subtract the identity to set the diagonal to zero.
 
 **Under a [`PathLength`](@ref):**
@@ -56,9 +56,9 @@ function _phylogeny_matrix(sep::HopCount, ::AbstractNetworkEstimator,
                            g::Graphs.AbstractGraph)
     A = Graphs.adjacency_matrix(g)
     P = zeros(Int, size(A))
-    # A matrix-power count, hence `sep.n` directly rather than `separation_budget`: this is
+    # A matrix-power count, hence `sep.n.val` directly rather than `separation_budget`: this is
     # the hop branch, and a separation measuring anything else needs its own method.
-    for i in 0:(sep.n)
+    for i in 0:(sep.n.val)
         P .+= A^i
     end
     P .= clamp!(P, 0, 1) - LinearAlgebra.I

@@ -1319,7 +1319,7 @@
         function hop_oracle(nte, X)
             A = PortfolioOptimisers.calc_adjacency(nte, X; dims = 1)
             P = zeros(Int, size(A))
-            for i in 0:(nte.sep.n)
+            for i in 0:(nte.sep.n.val)
                 P .+= A^i
             end
             return clamp!(P, 0, 1) - I
@@ -2214,8 +2214,7 @@ end
     =#
     for alg in (KruskalTree(), ComplementSimilarity())
         de = CountingDistance(Distance(; alg = CanonicalDistance()))
-        nte = NetworkEstimator(; de = de, alg = alg,
-                               sep = HopCount(; n = HopCountQuantile(; q = 0.5)))
+        nte = NetworkEstimator(; de = de, alg = alg, sep = HopCount(; n = FractionOf(0.5)))
         clusterise(NetworkClustersEstimator(; nte = nte), Xc)
         @test de.n_cor_and_dist == 1
         @test de.n_distance == 0
@@ -2231,8 +2230,8 @@ end
     own counting fixture.
     =#
     Xc = randn(StableRNG(123456789), 200, 10)
-    seps = (HopCount(; n = 2), HopCount(; n = HopCountQuantile(; q = 0.5)), PathLength(),
-            PathLength(; dmax = PathLengthQuantile(; q = 0.5)))
+    seps = (HopCount(; n = 2), HopCount(; n = FractionOf(0.5)), PathLength(),
+            PathLength(; dmax = FractionOf(0.5)))
     for alg in (KruskalTree(), ComplementSimilarity()), sep in seps
         de = CountingDistance(Distance(; alg = CanonicalDistance()))
         nte = NetworkEstimator(; de = de, alg = alg, sep = sep)
@@ -2866,21 +2865,31 @@ end
         # `q` is the share of the reachable off-diagonal pairs the budget relates, so a
         # continuous budget lands on it and a discrete one cannot.
         for q in (0.1, 0.25, 0.5)
-            share = related(PathLength(; dmax = PathLengthQuantile(; q = q))) / n_pairs
+            share = related(PathLength(; dmax = FractionOf(q))) / n_pairs
             @test isapprox(share, q; atol = 0.01)
         end
         # The hop rule rounds to a shell, and three values of `q` collapse onto one budget
         # here. That is the unit, not a defect.
-        ns = [resolve_separation(HopCount(; n = HopCountQuantile(; q = q)), nte, X).n
+        ns = [resolve_separation(HopCount(; n = FractionOf(q)), nte, X).n
               for q in (0.1, 0.2, 0.25)]
-        @test all(isa.(ns, Integer))
+        @test all(isa.(ns, CountOf))
         @test allequal(ns)
         # Wider quantiles are never narrower budgets.
-        dmaxs = [resolve_separation(PathLength(; dmax = PathLengthQuantile(; q = q)), nte,
-                                    X).dmax for q in 0.1:0.1:0.9]
+        dmaxs = [resolve_separation(PathLength(; dmax = FractionOf(q)), nte, X).dmax
+                 for q in 0.1:0.1:0.9]
         @test issorted(dmaxs)
-        @test_throws DomainError PathLengthQuantile(; q = 1.5)
-        @test_throws DomainError HopCountQuantile(; q = -0.1)
+        @test_throws DomainError PathLength(; dmax = FractionOf(1.5))
+        @test_throws DomainError HopCount(; n = FractionOf(-0.1))
+        # Issue #2013: a plain float is a fraction in a hop budget, and a radius in a path
+        # length. A count is no radius, so the bound of `dmax` refuses it.
+        @test HopCount(; n = 0.25).n === FractionOf(0.25)
+        @test HopCount(; n = 2).n === CountOf(2)
+        @test PathLength(; dmax = 0.25).dmax === 0.25
+        @test_throws TypeError PathLength(; dmax = CountOf(2))
+        @test_throws ArgumentError separation_budget(HopCount(; n = FractionOf(0.5)), nte,
+                                                     zeros(2, 2))
+        @test_throws ArgumentError separation_budget(PathLength(; dmax = FractionOf(0.5)),
+                                                     nte, zeros(2, 2))
     end
 
     @testset "A quantile rule holds the pair count still across folds" begin
@@ -2888,10 +2897,9 @@ end
         # strength on every fold; the rule fixes the strength and moves the radius instead.
         folds = [1:63, 64:126, 127:189, 190:252]
         fixed = [related(PathLength(; dmax = 1.0107), X[f, :]) for f in folds]
-        ruled = [related(PathLength(; dmax = PathLengthQuantile(; q = 0.25)), X[f, :])
+        ruled = [related(PathLength(; dmax = FractionOf(0.25)), X[f, :]) for f in folds]
+        radii = [resolve_separation(PathLength(; dmax = FractionOf(0.25)), nte, X[f, :]).dmax
                  for f in folds]
-        radii = [resolve_separation(PathLength(; dmax = PathLengthQuantile(; q = 0.25)),
-                                    nte, X[f, :]).dmax for f in folds]
         @test !allequal(fixed)
         @test allequal(ruled)
         @test !allequal(radii)
@@ -4261,11 +4269,12 @@ Defined at top level because a `@testset` body becomes a function.
         # The diagonal would move it. `q = 0.25` is `1` without it and `0.75` with it.
         @test PortfolioOptimisers.separation_quantile(HopCount(), d4, 0.25) == 1
         @test Statistics.quantile(vec(d4), 0.25) == 0.75
-        # The rules round the same population: a hop count to a shell, a path length not.
-        @test HopCountQuantile(; q = 0.5)(NetworkEstimator(), zeros(0, 0), P4) ==
-              round(Int, Statistics.quantile(offd, 0.5))
-        @test PathLengthQuantile(; q = 0.5)(NetworkEstimator(), zeros(0, 0), P4) ==
-              Statistics.quantile(offd, 0.5)
+        # A fraction rounds the same population: a hop count to a shell, a path length not.
+        @test resolve_separation(HopCount(; n = FractionOf(0.5)), NetworkEstimator(),
+                                 zeros(0, 0), P4).n ===
+              CountOf(round(Int, Statistics.quantile(offd, 0.5)))
+        @test resolve_separation(PathLength(; dmax = FractionOf(0.5)), NetworkEstimator(),
+                                 zeros(0, 0), P4).dmax == Statistics.quantile(offd, 0.5)
     end
 
     @testset "The observed diameter is a ceiling, and a stated budget builds nothing" begin
