@@ -650,7 +650,7 @@ The reverse direction. A phylogeny is reused as a Panel Field, not consumed as o
 How far apart two assets are in a Network, and how far is too far. It has two members. `HopCount` is the number of edges on the shortest path, and `PathLength` is the summed distance along it.
 
 **Separation Budget Rule**
-A callable in the slot of the budget number of a Separation. It computes the number from the data, and does not state it in advance. The members are `HopCountQuantile` and `PathLengthQuantile`.
+A callable in the slot of the budget number of a Separation. It computes the number from the data, and does not state it in advance. The library ships no member. A `FractionOf` of the reachable pairs is the shipped budget that the data computes: `resolve_separation` takes that quantile of the observed separations (#2013). A rule is the extension point for a budget of another kind.
 
 **Separation Decay**
 The rule that turns a Separation into a score: `LinearDecay`, `ExponentialDecay`, `ReciprocalDecay`, or `nothing` for a flat score of one inside the budget.

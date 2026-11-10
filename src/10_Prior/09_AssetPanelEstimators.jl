@@ -524,7 +524,8 @@ PhylogenyPanel
       │         │     args ┼ Tuple{}: ()
       │         │   kwargs ┴ @NamedTuple{}: NamedTuple()
       │     sep ┼ HopCount
-      │         │   n ┴ Int64: 1
+      │         │   n ┼ CountOf
+      │         │     │   val ┴ Int64: 1
       │   x_src ┴ nothing
   alg ┼ Proximity
       │   decay ┴ LinearDecay()

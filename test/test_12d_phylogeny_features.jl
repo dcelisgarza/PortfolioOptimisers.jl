@@ -43,7 +43,7 @@ end
 
     # Graded keeps the step count `clamp!(P, 0, 1)` destroys: a direct neighbour scores `n`,
     # the asset itself `n + 1`, anything past `n` hops zero.
-    @test all(==(NTE.sep.n + 1), diag(Zg))
+    @test all(==(NTE.sep.n.val + 1), diag(Zg))
     @test sort(unique(Zg)) == [0.0, 1.0, 2.0, 3.0]
     @test Zg != Zb
     # Their supports agree: grading changes the values, not which pairs are within `n` hops.
@@ -254,8 +254,8 @@ end
 # the consumer that grades what it measures.
 @testset "HopCount carries the budget the network estimator used to" begin
     @test isa(HopCount(), PortfolioOptimisers.AbstractSeparationAlgorithm)
-    @test HopCount().n == 1
-    @test HopCount(; n = 4).n == 4
+    @test HopCount().n.val == 1
+    @test HopCount(; n = 4).n.val == 4
     # The budget moved off `NetworkEstimator` onto the member that states its unit, so the
     # old spelling is gone rather than deprecated.
     @test NetworkEstimator().sep == HopCount()
@@ -279,7 +279,7 @@ end
 
     # `separation_budget` is configured rather than observed for a hop count, so neither the
     # estimator nor the separations it produced can move it.
-    @test separation_budget(NTE.sep, NTE, d) == NTE.sep.n == 2
+    @test separation_budget(NTE.sep, NTE, d) == NTE.sep.n.val == 2
     @test separation_budget(HopCount(; n = 7), NTE, d) == 7
     @test separation_budget(HopCount(; n = 7), NTE, zeros(Int, 2, 2)) == 7
 end
@@ -503,16 +503,16 @@ end
         @test isa(Z, Matrix{Float64})             # the gemm path still
         @test issymmetric(Z)
         @test (Z .> 0) == (Zb .> 0)
-        @test all(==(separation_decay(dk, 0, NTE.sep.n)), diag(Z))
-        @test maximum(Z) == separation_decay(dk, 0, NTE.sep.n)
+        @test all(==(separation_decay(dk, 0, NTE.sep.n.val)), diag(Z))
+        @test maximum(Z) == separation_decay(dk, 0, NTE.sep.n.val)
     end
 
     # The exponential's fall-off, read off the matrix: the score at each hop level is
     # `exp(-rate * hops)`, and the diagonal is 1 rather than `n + 1`.
     Zg = phylogeny_features(Proximity(), NTE, rd.X)
     Ze = phylogeny_features(Proximity(; decay = ExponentialDecay(; rate = 0.9)), NTE, rd.X)
-    for h in 0:(NTE.sep.n)
-        m = Zg .== NTE.sep.n + 1 - h
+    for h in 0:(NTE.sep.n.val)
+        m = Zg .== NTE.sep.n.val + 1 - h
         @test any(m)
         @test all(≈(exp(-0.9 * h)), Ze[m])
     end

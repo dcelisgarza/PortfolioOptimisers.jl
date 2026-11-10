@@ -716,3 +716,26 @@ the probe for `nothing`, as it does for the shipped members. The budget still tr
 `Proximity(; decay = nothing)` is the indicator of the neighbourhood, not a matrix of ones. The
 numbers do not move. Where the decision above names `NoDecay`, read `decay = nothing`. The removal
 is a clean break with no deprecation, as ADR 0044 and ADR 0213 set.
+
+## Amendment (2026-11-10): a budget is a `CountOf` or a `FractionOf`, and the quantile rules are gone (#2013)
+
+The decision that `HopCount.n` stays an `Integer`, and the amendment of 2026-08-11 that ships
+`HopCountQuantile` and `PathLengthQuantile`, are amended. #2013 gives the library one shared pair
+for the size of a part of a set, `CountOf` and `FractionOf` (`src/01_Base/18_CountFraction.jl`).
+
+- **The resolved hop budget is a `CountOf`.** `HopCount.n` holds a `CountOf` of hops, and its
+  `val` is the `Integer` that the three readers use as `0:n.val`. So the reason of the decision,
+  a matrix-power count that `0:1.5` would truncate, still holds, and the type of the wrapper now
+  carries it. A plain `Integer` is read through `count_or_fraction` as a `CountOf`.
+- **A fraction of the reachable pairs is a budget of both members.** `HopCount(; n =
+  FractionOf(q))` and `PathLength(; dmax = FractionOf(q))` do what `HopCountQuantile(; q)` and
+  `PathLengthQuantile(; q)` did. `resolve_separation` takes the `q` quantile of the separations
+  over the structure that the consumer built, through `separation_quantile`. The hop budget rounds
+  it to the nearest `Int`, and the path length takes it as it is. The numbers do not move. The
+  two quantile rules are removed, and `HopCountAlgorithm` and `PathLengthAlgorithm` stay as the
+  extension points for a budget of another kind.
+- **A plain number keeps its reading in each member.** In `HopCount.n`, a plain float is a
+  `FractionOf`, through `count_or_fraction`. In `PathLength.dmax`, a plain number stays a radius,
+  so the field takes no plain shorthand for a fraction, and its bound refuses a `CountOf`.
+- **`q = 0` is gone.** The quantile rules admitted `q` in `[0, 1]`, and `FractionOf` takes
+  `(0, 1]`. The `0` quantile of the hop separations is `1`, so `CountOf(1)` states that budget.

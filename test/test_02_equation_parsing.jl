@@ -369,13 +369,13 @@ end
     end
     @test herr isa DomainError
     @test occursin("max_hop_count", herr.msg)
-    @test HopCount(; n = 3).n == 3
-    @test HopCount(; n = pe.HopCountQuantile()).n isa pe.HopCountQuantile  # a rule, uncapped
+    @test HopCount(; n = 3).n.val == 3
+    @test HopCount(; n = FractionOf(0.25)).n isa FractionOf  # a fraction, uncapped
     let nte = NetworkEstimator(), X = randn(50, 4)
         @test_throws DomainError pe.resolve_separation(HopCount(;
                                                                 n = (args...; kwargs...) -> 10^9),
                                                        nte, X)
-        @test pe.resolve_separation(HopCount(; n = (args...; kwargs...) -> 2), nte, X).n ==
+        @test pe.resolve_separation(HopCount(; n = (args...; kwargs...) -> 2), nte, X).n.val ==
               2
     end
     # A search grid is an Iterators.product: k parameters of N values are N^k candidates
@@ -428,7 +428,7 @@ end
         @test MutualInfoCovariance(; bins = 10_000_000).bins == 10_000_000
     end
     pe.with_resource_limits(; max_hop_count = 20_000_000) do
-        @test HopCount(; n = 10_000_000).n == 10_000_000
+        @test HopCount(; n = 10_000_000).n.val == 10_000_000
     end
     pe.with_resource_limits(; max_search_grid = 10^7) do
         @test length(pe.lens_val_grid(["a" => collect(1:100), "b" => collect(1:100)])[2]) ==
