@@ -608,6 +608,36 @@ The fixture is the online fold loop's, because the identities are structural.
             return vec(minimum(X; dims = 1))
         end
         @test po.finite_candidate_order(WorstFoldScore(), S, 2) == ([2, 3], [0.6, 0.6])
+        # R31 of #1817: the values must line up with the columns, and NaN has no place in an
+        # order. A short vector picked a wrong candidate at n_best = 1 with no error, a long
+        # one raised a BoundsError, and a NaN gave an order that depends on the sort. An
+        # infinite value keeps its place.
+        @eval struct ShortScore <: PortfolioOptimisers.CrossValidationSearchScorer end
+        @eval PortfolioOptimisers.candidate_scores(::ShortScore, X::AbstractMatrix) = [1.0]
+        @eval struct LongScore <: PortfolioOptimisers.CrossValidationSearchScorer end
+        @eval function PortfolioOptimisers.candidate_scores(::LongScore, X::AbstractMatrix)
+            return fill(1.0, size(X, 2) + 1)
+        end
+        @eval struct NaNScore <: PortfolioOptimisers.CrossValidationSearchScorer end
+        @eval function PortfolioOptimisers.candidate_scores(::NaNScore, X::AbstractMatrix)
+            return [1.0, NaN, 0.5, 0.25]
+        end
+        @eval struct InfScore <: PortfolioOptimisers.CrossValidationSearchScorer end
+        @eval function PortfolioOptimisers.candidate_scores(::InfScore, X::AbstractMatrix)
+            return [1.0, Inf, -Inf, 0.5]
+        end
+        for sc in (ShortScore(), LongScore()), nb in (1, 2)
+            @test_throws DimensionMismatch po.finite_candidate_order(sc, S, nb)
+        end
+        err = try
+            po.finite_candidate_order(NaNScore(), S, 2)
+            nothing
+        catch e
+            e
+        end
+        @test err isa IsNonFiniteError && occursin("NaNScore", err.msg)
+        @test po.finite_candidate_order(InfScore(), S, 4) ==
+              ([2, 1, 4, 3], [Inf, 1.0, 0.5, -Inf])
 
         # The Result refuses kept fields that do not agree.
         @test_throws DimensionMismatch SearchCrossValidationResult(; opt = hrp,

@@ -167,6 +167,18 @@ struct NoOrientationScorer <: PortfolioOptimisers.AbstractAssetScorer end
         @test PO.asset_scores(st, rd) ≈ vec(mean(abs.(W) .> t; dims = 2))
         @test_throws DomainError WeightMassScorer(; opt = iv, tol = -1.0)
         @test_throws DomainError WeightMassScorer(; opt = iv, min_folds = 0)
+        # R31 of #1817: an empty grid is refused as the grid search refuses it, and
+        # `nothing` states "no grid". Each form built, or reached a reducer error, before.
+        for p in (Any[], Pair{String, Vector}[], Vector{Pair{String, Vector}}[],
+                  Dict{String, Vector}())
+            err = try
+                WeightMassScorer(; opt = iv, p = p)
+                nothing
+            catch e
+                e
+            end
+            @test err isa IsEmptyError && occursin("p cannot be empty", err.msg)
+        end
     end
 
     @testset "WeightMassScorer reads each combinatorial split once" begin

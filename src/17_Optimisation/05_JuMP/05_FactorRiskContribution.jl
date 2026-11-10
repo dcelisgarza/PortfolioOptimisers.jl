@@ -200,7 +200,7 @@ Keywords correspond to the struct's fields. A field typed [`TD`](@ref), [`TD_Opt
 ## Validation
 
   - If `r` is a vector: `!isempty(r)`.
-  - If `wi` is a vector: `!isempty(wi)`.
+  - If `frc_ple` or `wi` is a vector: `!isempty`.
   - `fb` schedules: `bind !== :nearest`.
   - The risk expression is not identically zero. The problem is stated in the factor basis,
     so a model with no risk term bounds nothing. A [`NoRisk`](@ref) measure and
@@ -305,8 +305,10 @@ Keywords correspond to the struct's fields. A field typed [`TD`](@ref), [`TD_Opt
         end
         assert_risk_measure_required(r, :FactorRiskContribution;
                                      flag = zero_risk_expression_flag)
-        if isa(wi, VecNum)
-            @argcheck(!isempty(wi), IsEmptyError("wi cannot be empty"))
+        for (x, name) in ((frc_ple, :frc_ple), (wi, :wi))
+            if isa(x, AbstractVector)
+                @argcheck(!isempty(x), IsEmptyError("$name cannot be empty"))
+            end
         end
         assert_time_dependent_substitution(FactorRiskContribution,
                                            (; opt, re, r, obj, frc_ple, sets, wi, flag, fb),

@@ -364,6 +364,8 @@ narrowing adds no new axis of compilation. Each library site is of this kind:
 | `port_opt_view` of a vector of asset sets matrices | the membership matrices of an estimator | As for the turnover constraints. |
 | `rebuild_asset_panel` | the panel fields of the folds of one meta-optimisation | A comprehension gives a concrete element type when the folds share one type. The call changes only a mixed vector. |
 | `make_p_grid` of a randomised search | the trials of one search | Dispatch needs it. A `Vector{Pair}` does not match the `AbstractVector{<:Pair{<:Any, <:AbstractVector}}` of `lens_val_grid`. The call runs one time for each search. |
+| `narrow_mixed_vector` in a keyword constructor (#1939) | a vector field of the estimator that the constructor builds | The estimator type holds each element type already. The call changes only a vector whose element type the bound of the field refuses. |
+| `port_opt_view` of a vector of priors (#1957) | the opinions of an opinion-pool estimator | As for the turnover constraints. |
 
 The rule: narrow the element type of a vector whose holder the library compiles on already. Do not
 narrow a vector of a Result that many verbs read, because each new element type then compiles

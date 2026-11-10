@@ -41,7 +41,7 @@ It is the branch of [`AbstractCrossValidationScorer`](@ref) that selects a candi
 
 ## Returns
 
-  - `candidate_scores`: `VecNum`, one value per column of the matrix the scorer received, in the order of the columns.
+  - `candidate_scores`: `VecNum`, one value per column of the matrix the scorer received, in the order of the columns, and no value `NaN`. The search refuses a vector of another length with a `DimensionMismatch`, and a `NaN` with an [`IsNonFiniteError`](@ref).
   - The index form: `Int`, the index of the optimal parameter set, **as a position in the matrix the scorer received**.
 
 ## A scorer never sees a failed candidate
@@ -607,7 +607,7 @@ The sort is stable, so a tie keeps the order of the grid, as `argmax` does.
  1. Mark the columns of `test_scores` whose every entry is finite, giving `cols`.
  2. Throw an `IsNonFiniteError` when no column is finite.
  3. Take the view `X` of `test_scores` at `cols`, and call [`candidate_scores`](@ref) of `scorer` on it, giving `vals`.
- 4. If `vals` is a vector: take the first `min(n_best, length(cols))` positions of the descending order of `vals` through a partial sort, which breaks a tie by the position, and so gives the order of a stable sort. Return the columns of `cols` at those positions and their values.
+ 4. If `vals` is a vector: check that it holds one value per column of `cols` and no `NaN`. Then take the first `min(n_best, length(cols))` positions of the descending order of `vals` through a partial sort, which breaks a tie by the position, and so gives the order of a stable sort. Return the columns of `cols` at those positions and their values.
  5. If `vals` is `nothing`: refuse `n_best > 1`, call the index form `scorer(X)`, and return its column of `cols` and `nothing`.
 
 # Arguments
@@ -620,6 +620,8 @@ The sort is stable, so a tie keeps the order of the grid, as `argmax` does.
 
   - At least one candidate must have finished every fold. Otherwise an `IsNonFiniteError`.
   - A scorer that gives no [`candidate_scores`](@ref) keeps one candidate. Otherwise an `ArgumentError` names the type of the scorer and the method to add.
+  - The values of [`candidate_scores`](@ref) hold one entry per finite column. Otherwise a `DimensionMismatch`.
+  - No value of [`candidate_scores`](@ref) is `NaN`. Otherwise an [`IsNonFiniteError`](@ref). An infinite value has a place in the order, so it is kept.
 
 # Returns
 
@@ -646,6 +648,12 @@ end
 function finite_candidate_order(scorer::CrossValSearchScorer, X::MatNum,
                                 cols::AbstractVector{<:Integer}, n_best::Integer,
                                 vals::VecNum)
+    # A value per candidate must line up with the columns, and `NaN` has no place in an
+    # order, so the comparison below would give a wrong order with no error.
+    @argcheck(length(vals) == length(cols),
+              DimensionMismatch("`candidate_scores` of `$(typeof(scorer))` must return one value per column of the matrix that it receives: got $(length(vals)) values for $(length(cols)) columns."))
+    @argcheck(!any(isnan, vals),
+              IsNonFiniteError("`candidate_scores` of `$(typeof(scorer))` returned NaN for $(count(isnan, vals)) of the $(length(cols)) candidates that finished every fold, first at position $(findfirst(isnan, vals)). A NaN value cannot be ordered."))
     # A partial sort is not stable, so the order breaks a tie by the position in the grid,
     # which gives the order of a stable descending sort.
     keep = partialsort!(collect(eachindex(vals)), 1:min(n_best, length(cols));

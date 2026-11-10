@@ -703,6 +703,33 @@ end
     @test jo.tn isa PO.VecTnE_Tn
     @test ProgrammeAllocationSet(; slv = slv, tn = tnl, sets = sets).tn isa PO.VecTnE_Tn
     @test_throws ArgumentError JuMPOptimiser(; slv = slv, tn = Any[tnl[1], 1.0])
+    # R31 of #1817: an empty vector is refused at construction, as `tn` and `cte` refuse it.
+    # A typed empty vector failed late in `optimise`, and the narrowing let an empty literal
+    # build no constraint with no error.
+    for (k, typed) in
+        ((:lcse, LinearConstraintEstimator[]), (:smtx, AssetSetsMatrixEstimator[]),
+         (:sgmtx, AssetSetsMatrixEstimator[]), (:ple, SemiDefinitePhylogenyEstimator[])),
+        v in (Any[], typed)
+
+        for C in (JuMPOptimiser, ProgrammeAllocationSet)
+            err = try
+                C(; slv = slv, (k => v,)...)
+                nothing
+            catch e
+                e
+            end
+            @test err isa IsEmptyError && occursin("$k cannot be empty", err.msg)
+        end
+    end
+    for v in (Any[], SemiDefinitePhylogenyEstimator[])
+        err = try
+            FactorRiskContribution(; opt = JuMPOptimiser(; slv = slv), frc_ple = v)
+            nothing
+        catch e
+            e
+        end
+        @test err isa IsEmptyError && occursin("frc_ple cannot be empty", err.msg)
+    end
     # --- float_if_integer: an integer type takes its float type, every other type is kept ---
     @test PO.float_if_integer(Int) === Float64
     @test PO.float_if_integer(Int32) === Float64

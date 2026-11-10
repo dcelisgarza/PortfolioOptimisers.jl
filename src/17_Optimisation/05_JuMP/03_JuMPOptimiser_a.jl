@@ -470,7 +470,7 @@ Keywords correspond to the struct's fields. A field typed [`TD_Option`](@ref) or
   - If `sbgt` or `gbgt` is a number: it is finite and `>= 0`.
   - If `gbgt` is not `nothing`: `bgt` and `sbgt` are not both numbers, see [`assert_gross_budget_admissible`](@ref). Two numbers fix the gross budget of the model at `bgt + 2 * sbgt`, which is the row that `gbgt` writes. The realised gross exposure `norm(w, 1)` equals this budget when `xbgt` is `true`, and it can be smaller when `xbgt` is `false`.
   - If `gbgt` is not `nothing` and `wb` is a [`WeightBounds`](@ref): `wb` admits a negative weight. The check of an [`AbstractWeightBoundsEstimator`](@ref) waits for the solve.
-  - If `cte`, `tn`, `tr`, `l2`, `lp` or `lpc` is a vector: `!isempty`. An empty `l2`, `lp` or `lpc` builds no term, which is what `nothing` states.
+  - If `lcse`, `cte`, `smtx`, `sgmtx`, `tn`, `tr`, `ple`, `l2`, `lp` or `lpc` is a vector: `!isempty`. An empty `l2`, `lp` or `lpc` builds no term, which is what `nothing` states.
   - If `card`, `l2c`, `linfc`, `l1` or `linf` is a number: it is finite and `> 0`. `l1` and `linf` also take an ambiguity-radius rule, and `l2c` and `linfc` a norm-ceiling rule. A rule states no number at construction, so [`assemble_jump_model!`](@ref) checks the number that the rule returns.
   - The rule in each [`LpRegularisation`](@ref) agrees with the field that holds it. `lp` is a penalty, so it refuses a norm-ceiling rule, and `lpc` is a constraint, so it refuses an ambiguity-radius rule. The term has one field for both readings, so the constructor of the optimiser is the first point that knows the reading. The constructors of [`L2Regularisation`](@ref) and [`LpRegularisation`](@ref) check the other values of `l2`, `lp` and `lpc`.
   - The shapes of `scard`, `smtx`, `slt` and `sst` agree, see [`assert_subgroup_mip_fields`](@ref). The shapes of `sgcarde`, `sgmtx`, `sglt` and `sgst` agree, see [`assert_subgrouped_mip_fields`](@ref).
@@ -701,8 +701,8 @@ A value outside its bound raises an `IsEmptyError`, an `IsNonFiniteError`, a `Do
         end
         assert_gross_budget_admissible(bgt, sbgt, gbgt, wb)
         # `map` compiles one call for each slot, so the slots of different types are not boxed.
-        map(((cte, :cte), (tn, :tn), (tr, :tr), (l2, :l2), (lp, :lp), (lpc, :lpc))) do (x,
-                                                                                        name)
+        map(((lcse, :lcse), (cte, :cte), (smtx, :smtx), (sgmtx, :sgmtx), (tn, :tn),
+             (tr, :tr), (ple, :ple), (l2, :l2), (lp, :lp), (lpc, :lpc))) do (x, name)
             if isa(x, AbstractVector)
                 @argcheck(!isempty(x), IsEmptyError("$name cannot be empty"))
             end

@@ -686,6 +686,7 @@ Keywords correspond to the struct's fields. `p` takes a vector of parameter sets
 
   - If `tol` is a number, `tol >= 0`.
   - `min_folds >= 1`.
+  - If `p` is not `nothing`: `!isempty(p)`. An `IsEmptyError` is thrown otherwise.
   - Every candidate of `p` passes the checks of the search: the optimiser checks for an estimator, and the hold-out check for a [`Pipeline`](@ref).
 
 $(val_dict[:count_fraction_grid])
@@ -750,6 +751,9 @@ julia> round.(PortfolioOptimisers.asset_scores(s, rd); digits = 4)
                   DomainError(min_folds,
                               "min_folds must be at least one, got min_folds = $min_folds"))
         if !isnothing(p)
+            # The grid search refuses an empty grid, and `nothing` states "no grid" here.
+            @argcheck(!isempty(p),
+                      IsEmptyError("p cannot be empty, use p = nothing to score opt alone"))
             assert_search_candidates(opt, weight_mass_grid(opt, p)...)
         end
         return new{typeof(opt), typeof(p), typeof(cv), typeof(tol), typeof(min_folds),
