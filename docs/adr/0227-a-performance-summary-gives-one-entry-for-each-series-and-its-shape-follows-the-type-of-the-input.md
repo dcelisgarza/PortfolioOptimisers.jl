@@ -70,8 +70,10 @@ first member alone.
 
 **7. The risk-free rate is for each period.** `rf` is at the frequency of the returns, as in
 `probabilistic_sharpe_ratio`, `expected_ratio` and `MeanReturnRiskRatio`. It enters `sharpe`,
-`sharpe_stderr` and `sortino`, and no other figure. At `rf = 0` no released number moves, because
-`m - 0` is `m` exactly. `rf` must be finite.
+`sharpe_stderr` and `sortino`, and no other figure. The downside deviation of `sortino` is
+measured below `rf`, the target of its numerator, so the ratio reads the return against one
+target. At `rf = 0` no released number moves, because `m - 0` is `m` and `x - 0` is `x` exactly.
+`rf` must be finite.
 
 **8. `n_eff` is the concentration figure.** Weights, and one `OptimisationResult` on its
 investable view, give `number_effective_assets` of their weights. A weight path gives the mean over

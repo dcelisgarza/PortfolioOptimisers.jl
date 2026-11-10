@@ -239,7 +239,7 @@ The five headline statistics:
 \\mathrm{ann\\_return} &= m p\\\\
 \\mathrm{ann\\_volatility} &= s \\sqrt{p}\\\\
 \\mathrm{sharpe} &= \\dfrac{(m - r_{f}) p}{\\mathrm{ann\\_volatility}}\\\\
-\\mathrm{sortino} &= \\dfrac{(m - r_{f}) p}{\\sqrt{\\dfrac{p}{T} \\sum\\limits_{t=1}^{T} \\min(x_{t}, 0)^{2}}}\\\\
+\\mathrm{sortino} &= \\dfrac{(m - r_{f}) p}{\\sqrt{\\dfrac{p}{T} \\sum\\limits_{t=1}^{T} \\min(x_{t} - r_{f}, 0)^{2}}}\\\\
 \\mathrm{calmar} &= \\dfrac{\\mathrm{ann\\_return}}{\\left\\lvert \\min_{t} d_{t} \\right\\rvert}\\,.
 \\end{align}
 ```
@@ -293,7 +293,7 @@ Where:
 
 The turnover puts every weight vector on the union of the universes of the folds, by asset name. A weight is zero at an asset that its fold does not hold. Each term of the sum is the trade at one rebalance. [`calc_turnover`](@ref) reads that quantity at one step, and [`Turnover`](@ref) bounds it. The drift in a fold is not a trade, so it enters the turnover only through ``\\hat{\\boldsymbol{w}}_{f-1}``.
 
-The downside deviation of the Sortino ratio divides by ``T``, and not by the number of periods with a loss. This is the convention of Sortino and Price. With it, the ratios of two series with different frequencies of loss stay comparable.
+The downside deviation of the Sortino ratio divides by ``T``, and not by the number of periods with a loss. This is the convention of Sortino and Price. With it, the ratios of two series with different frequencies of loss stay comparable. The downside deviation is measured below ``r_{f}``, the target of the numerator, so the numerator and the denominator read the return against one target. A period that earns less than ``r_{f}`` is a shortfall, also when its return is positive. At ``r_{f} = 0`` the target is zero.
 
 The kurtosis term is ``(g_{2} + 2)/4``. Section 2.5 of [sharpe_stderr](@cite) states it as ``(\\gamma_{4} - 1)/4`` on the **raw** fourth standardised moment ``\\gamma_{4}``, and `StatsBase.kurtosis` gives the **excess** moment ``g_{2} = \\gamma_{4} - 3``. The two forms are equal. Only this form becomes the naive ``\\sqrt{(1 + \\mathrm{SR}^{2}/2)/T}`` on a normal series. Over 200,000 samples of 250 normal returns at a Sharpe ratio per period of 0.5, the sample standard deviation of the Sharpe ratio is **0.06728323**. This expression at the population moments gives **0.06721661**, and the same expression without the ``+2`` gives **0.06337243**.
 
@@ -309,7 +309,7 @@ Every method checks its keywords with [`summary_options`](@ref) first, so no fig
  2. Take `T`, the number of periods. Take `m`, the sample mean of `ret`, and clamp it to the least and the greatest entry of `ret`. Take `s`, the corrected sample standard deviation of `ret` about `m`. The clamp changes nothing in exact arithmetic. The rounded mean of a constant `ret` can differ from its common value, and the clamp makes `m` equal to that value, so `s` is exactly zero.
  3. Annualise `m` and `s`, to get `ann_ret` and `ann_vol`.
  4. Annualise `m - rf`, to get `ann_ex`. Divide `ann_ex` by `ann_vol`, to get `sharpe`. When `ann_vol` is not positive, `sharpe` is `NaN`.
- 5. Set every positive entry of `ret` to zero. Square the entries, average them over all `T` periods, annualise, and take the square root, to get the downside deviation `ddev`. Divide `ann_ex` by `ddev`, to get `sortino`. When `ddev` is not positive, `sortino` is `NaN`.
+ 5. Subtract `rf` from each entry of `ret`, and set every positive difference to zero. Square the entries, average them over all `T` periods, annualise, and take the square root, to get the downside deviation `ddev`. Divide `ann_ex` by `ddev`, to get `sortino`. When `ddev` is not positive, `sortino` is `NaN`.
  6. Build the cumulative wealth series with [`cumulative_returns`](@ref), and take its drawdown path with [`drawdowns`](@ref). Read `max_dd`, the minimum of that path. Divide `ann_ret` by the absolute value of `max_dd`, to get `calmar`. When `max_dd` is not negative, `calmar` is `NaN`.
  7. Compute [`ConditionalValueatRisk`](@ref) at `alpha` on `ret`, and change its sign, to get `cvar_val` in return space.
  8. Make the Sharpe ratio per period `sr_p`, from `m - rf` and `s`. Correct its variance `var_sr` for the sample skewness and the sample excess kurtosis of `ret`. Annualise the square root, to get `sharpe_se`. When `var_sr` is not positive, `sharpe_se` is `NaN`.
@@ -519,7 +519,9 @@ function summarise_returns(e::NamedTuple, opts::NamedTuple)::PerformanceSummaryR
     else
         oftype(one(ann_ex) / one(ann_vol), NaN)
     end
-    neg_ret = min.(ret, zero(eltype(ret)))
+    # The shortfall below the target of the numerator. At `rf = 0` it is `min.(ret, 0)`
+    # exactly, so no figure moves.
+    neg_ret = min.(ret .- opts.rf, zero(eltype(ret)))
     ddev = sqrt(mean(abs2, neg_ret) * ann)
     sortino = ddev > zero(ddev) ? ann_ex / ddev : oftype(one(ann_ex) / one(ddev), NaN)
     cret = cumulative_returns(ret, compound)

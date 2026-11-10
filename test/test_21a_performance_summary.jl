@@ -786,7 +786,16 @@ end
     s = std(ret)
     @test ps.rf == rf
     @test ps.sharpe ≈ (m - rf) * 12 / (s * sqrt(12))
-    @test ps.sortino ≈ (m - rf) * 12 / sqrt(mean(min.(ret, 0) .^ 2) * 12)
+    # The downside deviation is measured below `rf`, the target of the numerator (R32 of
+    # #1817).
+    @test ps.sortino ≈ (m - rf) * 12 / sqrt(mean(min.(ret .- rf, 0) .^ 2) * 12)
+    # A series that never loses but always earns less than `rf` has a shortfall in every
+    # period, so its Sortino ratio is negative and finite, not `NaN`.
+    low = [0.001, 0.002, 0.0015, 0.0005]
+    pl = performance_summary(low; ppy = 12, rf = 0.003)
+    @test pl.sortino ≈ (mean(low) - 0.003) * 12 / sqrt(mean((low .- 0.003) .^ 2) * 12)
+    @test pl.sortino < 0
+    @test isnan(performance_summary(low; ppy = 12).sortino)
     sr = (m - rf) / s
     v = PO.sharpe_ratio_variance_factor(sr, skewness(ret), kurtosis(ret)) /
         (length(ret) - 1)
