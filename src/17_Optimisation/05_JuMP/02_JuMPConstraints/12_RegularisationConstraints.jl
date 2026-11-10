@@ -800,6 +800,7 @@ The check is a set of methods rather than a list of types in one body, on the sa
  2. The occupant is an [`LpRegularisation`](@ref): check its `val`.
  3. The occupant is a vector of them: check each.
  4. The occupant is an [`AbstractNormCeilingCalibrationAlgorithm`](@ref): refuse.
+ 5. The occupant is a [`CountOf`](@ref) or a [`FractionOf`](@ref): refuse. In this slot the pair states a floor of effective assets, which [`calibrated_part`](@ref) turns into a ceiling.
 
 # Arguments
 
@@ -812,6 +813,7 @@ The check is a set of methods rather than a list of types in one body, on the sa
 # Related
 
   - [`LpRegularisation`](@ref)
+  - [`calibrated_part`](@ref)
   - [`assert_norm_ceiling_role`](@ref)
   - [`Num_AmbRadNormCeilCal`](@ref)
   - [`set_lp_regularisation!`](@ref)
@@ -827,6 +829,9 @@ function assert_penalty_coefficient_role(xs::AbstractVector{<:LpRegularisation})
 end
 function assert_penalty_coefficient_role(::AbstractNormCeilingCalibrationAlgorithm)
     return throw(ArgumentError("`LpRegularisation.val` holds a norm ceiling, an `$(nameof(AbstractNormCeilingCalibrationAlgorithm))`, in a slot that reads it as a penalty coefficient. `JuMPOptimiser.lp` adds `val * norm(w, p)` to the objective, and a ceiling is an upper bound on that norm instead: the two are different quantities. Move the term to `JuMPOptimiser.lpc`, which reads `val` as a ceiling, or state an `$(nameof(AbstractAmbiguityRadiusCalibrationAlgorithm))` or a plain number."))
+end
+function assert_penalty_coefficient_role(part::AbstractCountOrFraction)
+    return throw(ArgumentError("`LpRegularisation.val` holds a `$(nameof(typeof(part)))`, a floor of effective assets, in a slot that reads it as a penalty coefficient. `JuMPOptimiser.lp` adds `val * norm(w, p)` to the objective, and a floor of effective assets resolves to an upper bound on that norm instead: the two are different quantities. Move the term to `JuMPOptimiser.lpc`, which reads `val` as a ceiling, or state an `$(nameof(AbstractAmbiguityRadiusCalibrationAlgorithm))` or a plain number."))
 end
 """
     assert_norm_ceiling_role(x) -> Nothing

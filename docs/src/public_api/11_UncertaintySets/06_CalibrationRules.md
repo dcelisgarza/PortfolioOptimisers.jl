@@ -14,7 +14,6 @@ ReturnsSeries
 AbsoluteDrawdownSeries
 RelativeDrawdownSeries
 CalibrationContext
-ScenarioCount
 RateSignificance
 EntropyBudget
 HillTailDecay
@@ -24,7 +23,6 @@ RateRadius
 DimensionalRateRadius
 DualNormRadius
 TailTermParity
-EffectiveAssetFloor
 ```
 
 ## References

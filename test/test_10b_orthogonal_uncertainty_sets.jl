@@ -886,8 +886,7 @@ struct ProbeMatrixProcessing1955 <: PortfolioOptimisers.AbstractMatrixProcessing
             # The bound admits a number and a rule of this family, and refuses another's.
             # The refusal is the keyword constructor's own type annotation, so it is a
             # `TypeError` raised where the caller wrote the field.
-            @test_throws TypeError OrthogonalUncertaintySet(;
-                                                            kappa = ScenarioCount(; n = 10))
+            @test_throws TypeError OrthogonalUncertaintySet(; kappa = CountOf(10))
             # A number still meets the estimator's own range check.
             @test_throws DomainError OrthogonalUncertaintySet(; kappa = -1.0)
             @test_throws DomainError OrthogonalUncertaintySet(; kappa = Inf)

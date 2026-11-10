@@ -573,3 +573,33 @@ no weight source, so `metric = nothing` now spells the equal-weight metric of
 `OrthogonalUncertaintySet`. Read "under `IdentityMetric`" in the amendment of 2026-09-08 as "under
 `metric = nothing`". The units of the compact radius do not change: under `metric = nothing` it
 still carries the units of a variance.
+
+## Amendment (2026-11-10): a `CountOf` or a `FractionOf` stands in a slot, and two rules leave (#2013)
+
+`ScenarioCount` and `EffectiveAssetFloor` are removed. #2013 gives the library one shared pair
+for the size of a part of a set, `CountOf` and `FractionOf` (`src/01_Base/18_CountFraction.jl`),
+and the two rules each stated such a size. `ScenarioCount(; n)` held a count of the scenarios of
+the tail, and `EffectiveAssetFloor(; fraction)` held a fraction of the universe that stays
+effective. So the pair stands in the slot in their place:
+
+- `Num_SigCal` admits `AbstractCountOrFraction`. `alpha = CountOf(n)` resolves to
+  `n / scenario_sample_size(pr, w)`, the number that `ScenarioCount(; n)` gave, and
+  `alpha = FractionOf(f)` is the level `f`.
+- `Num_NormCeilCal` and `Num_AmbRadNormCeilCal` admit it too. `l2c = FractionOf(f)` resolves to
+  the ceiling of `m = f N` effective assets, the number that `EffectiveAssetFloor(; fraction = f)`
+  gave, and `l2c = CountOf(m)` states the floor as a count. A count above `N` is refused, because
+  no portfolio meets it. The penalty route of `LpRegularisation` refuses the pair, as it refuses a
+  ceiling rule.
+
+The decision that **the rule is in the bound** stands: each bound still names the families that
+have a meaning in its slot, and a deformation, radius or tail-weight slot refuses the pair. The
+pair is one occupant of two families, so the resolver needs the family. The context states it:
+every norm-ceiling site states the order `p` of its ceiling, and no significance site states one.
+`calibrated_part` reads the family off `ctx.p`, the field that `EffectiveAssetFloor` already read,
+and `resolve_calibration_slot` takes one method for the pair. `is_calibration_rule` is `true` for
+it, so the derived recursion resolves it, and a value-level entry point refuses it.
+
+A plain number keeps its reading in each slot: the level in a significance slot, and the ceiling
+in a ceiling slot. So these slots take no plain shorthand of `count_or_fraction`. The naming rule
+of the rule list loses two of its six method names, and the rule with no default keyword is now
+`EntropyBudget` alone.

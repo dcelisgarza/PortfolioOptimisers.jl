@@ -397,9 +397,9 @@ wrote, the value it holds, what the code does with it, and the range it must lie
 can act on the message alone.
 
 ```julia
-@argcheck(fraction <= one(fraction),
-          DomainError(fraction,
-                      "`EffectiveAssetFloor.fraction` is $fraction, and a fraction of the universe is at most one. The rule multiplies it by the asset count to get the floor, so a fraction above one names a floor above the universe. State a value in `(0, 1]`."))
+@argcheck(m <= N,
+          DomainError(m,
+                      "`$key` keeps a floor of $m effective assets, and the universe of the prior result holds $N. No portfolio has more effective assets than the universe, so the ceiling admits none. State a count of at most $N, or a `FractionOf` of the universe."))
 ```
 
 Two other spellings raise the same type and are refused:

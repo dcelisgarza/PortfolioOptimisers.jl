@@ -263,3 +263,11 @@ count of each moment in a new field `eoc`, and `ens` is a diagnostic of the weig
 no `w`, where it read `ens` beside no `w`. `choose_scaling_parameter` of the normal set reads the
 count of the moment of the set in `eoc`, and no longer reads `pr.ens`. With no cap and no weights,
 every number stays the same.
+
+## Amendment (2026-11-10): the tail count is a `CountOf` in the slot (#2013)
+
+`ScenarioCount` is removed, and `alpha = CountOf(n)` takes its place (ADR 0095, amendment of
+2026-11-10). The count that this decision fixed does not change: `calibrated_part` resolves the
+pair to `n / scenario_sample_size(pr, w)`, so it reads the rows that the measure carries when no
+weights are stated, and the Kish count of the weights otherwise. Where the amendment of
+2026-10-26 names `ScenarioCount`, read a `CountOf` in a significance slot.
