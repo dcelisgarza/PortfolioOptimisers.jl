@@ -25,6 +25,8 @@ calibration_series_dispersion
 effective_sample_size
 stated_sample_size
 scenario_sample_size
+calibrated_part
+effective_asset_floor
 hill_tail_index
 series_end_sign
 whitening_factor

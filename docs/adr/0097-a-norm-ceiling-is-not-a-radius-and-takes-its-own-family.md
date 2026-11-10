@@ -185,3 +185,14 @@ Prior instead of pasted.
 - **No rule computes a ceiling from anything but the universe size.** A rule that read the
     covariance matrix — a floor on effective *independent* bets rather than on assets — has a
     reading and no member. The family admits a caller's `Function` for it.
+
+## Amendment (2026-11-10): the floor is a `CountOf` or a `FractionOf`, and `EffectiveAssetFloor` leaves (#2013)
+
+The family stays, and its shipped rule leaves. `EffectiveAssetFloor(; fraction)` stated a fraction
+of the universe, and #2013 states a size of a part of a set with the shared pair `CountOf` and
+`FractionOf`. So a ceiling slot takes `FractionOf(f)`, which resolves to the ceiling of
+`m = f N` effective assets with the formula of this decision, and `CountOf(m)`, which states the
+floor as a count. `calibrated_part` holds the formula, and it reads the order from `ctx.p`, as the
+rule did. A count above the universe is refused. `AbstractNormCeilingCalibrationAlgorithm` stays
+the extension point for a ceiling of another kind. ADR 0095, amendment of 2026-11-10, states how
+the resolver tells the ceiling family from the significance family.

@@ -526,14 +526,14 @@
             pr = prior(EmpiricalPrior(), ReturnsResult(; nx = string.('A':'D'), X = X))
             opt = JuMPOptimiser(; pe = pr, slv = slv)
             fn_rule(::Symbol, ::PortfolioOptimisers.AbstractPriorResult, ::Any, ::Any, ::PortfolioOptimisers.CalibrationContext) = 0.1
-            # `ScenarioCount(; n = 6)` is a rule with alpha = 6 / 60 = 0.1.
+            # `CountOf(6)` is a rule with alpha = 6 / 60 = 0.1.
             cv(a) = OrderedWeightsArray(;
                                         w = OrderedWeightsArrayConditionalValueatRisk(;
                                                                                       alpha = a))
             resn = optimise(MeanRisk(; r = cv(0.1), obj = MinimumRisk(), opt = opt))
             ref = optimise(MeanRisk(; r = cv(0.05), obj = MinimumRisk(), opt = opt))
             @test !isapprox(resn.w, ref.w; rtol = 1e-3)
-            for alpha in (ScenarioCount(; n = 6), fn_rule)
+            for alpha in (CountOf(6), fn_rule)
                 res = optimise(MeanRisk(; r = cv(alpha), obj = MinimumRisk(), opt = opt))
                 @test isa(res.retcode, OptimisationSuccess)
                 @test isapprox(res.w, resn.w; rtol = 1e-6)
@@ -546,8 +546,7 @@
                                              w2 = reverse ∘
                                                   OrderedWeightsArrayConditionalValueatRisk(;
                                                                                             alpha = a))
-            resr = optimise(MeanRisk(; r = rg(ScenarioCount(; n = 6)), obj = MinimumRisk(),
-                                     opt = opt))
+            resr = optimise(MeanRisk(; r = rg(CountOf(6)), obj = MinimumRisk(), opt = opt))
             resn = optimise(MeanRisk(; r = rg(0.1), obj = MinimumRisk(), opt = opt))
             @test isapprox(resr.w, resn.w; rtol = 1e-6)
         end

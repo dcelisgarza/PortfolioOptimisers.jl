@@ -694,7 +694,7 @@ end
           "DomainError with 1.0:\n0 < alpha < 1 must hold. Got\nalpha => 1.0"
     # Both carry the varargs method that checks nothing, which is how a slot holding a
     # Calibration Rule passes a guard written for a number.
-    rule = ScenarioCount(; n = 5)
+    rule = CountOf(5)
     @test isnothing(pe.assert_unit_interval(nothing))
     @test isnothing(pe.assert_closed_unit_interval(nothing))
     @test isnothing(pe.assert_closed_unit_interval(rule, :n))

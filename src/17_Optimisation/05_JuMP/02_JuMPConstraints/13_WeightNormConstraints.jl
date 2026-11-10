@@ -69,7 +69,7 @@ Where:
   - [`set_weight_norm_p_constraints!`](@ref)
   - [`set_weight_norm_inf_constraints!`](@ref)
   - [`Num_NormCeilCal`](@ref)
-  - [`EffectiveAssetFloor`](@ref)
+  - [`calibrated_part`](@ref)
   - [`number_effective_assets`](@ref)
   - [`JuMPOptimiser`](@ref)
 
@@ -277,7 +277,7 @@ Where:
   - [`set_weight_norm_2_constraints!`](@ref)
   - [`set_weight_norm_p_constraints!`](@ref)
   - [`Num_NormCeilCal`](@ref)
-  - [`EffectiveAssetFloor`](@ref)
+  - [`calibrated_part`](@ref)
   - [`set_linf_regularisation!`](@ref): the ∞-norm penalty on the weights.
   - [`JuMPOptimiser`](@ref)
 """

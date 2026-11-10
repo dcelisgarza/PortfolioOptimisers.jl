@@ -644,6 +644,8 @@ A field that takes the size of a part of a set holds a `CountOf` or a `FractionO
 | `RankRule(; best = 0, worst = 5)` | `RankRule(; worst = 5)`. A count is at least one, so `nothing` states a tail that takes no asset. |
 | `HopCount(; n = HopCountQuantile(; q = 0.25))` and `PathLength(; dmax = PathLengthQuantile(; q = 0.25))` | `HopCount(; n = FractionOf(0.25))` and `PathLength(; dmax = FractionOf(0.25))`. The budgets do not move. `HopCountQuantile` and `PathLengthQuantile` are gone. `q = 0` is refused, and `CountOf(1)` states that hop budget. |
 | `HopCount(; n = 2).n == 2` | `HopCount(; n = 2).n` is `CountOf(2)`. Read `.n.val` for the number of hops. A plain float, such as `HopCount(; n = 0.25)`, is a fraction, where v0.33 refused it. In `PathLength(; dmax = 0.25)` a plain number stays a radius. |
+| `ConditionalValueatRisk(; alpha = ScenarioCount(; n = 25))`, and every other significance slot | `ConditionalValueatRisk(; alpha = CountOf(25))`. The level is `25 / T`, as before. `ScenarioCount` is gone. A plain number in `alpha` is still the level itself. |
+| `JuMPOptimiser(; l2c = EffectiveAssetFloor(; fraction = 0.5))`, and the same in `linfc`, `lpc` and `ProgrammeAllocationSet` | `JuMPOptimiser(; l2c = FractionOf(0.5))`. The ceiling does not move. `EffectiveAssetFloor` is gone, and `CountOf(m)` states the floor as `m` effective assets. A plain number in `l2c` is still the ceiling itself. |
 | `WildBootstrapMeanTest(; min_periods = 2.5)`, and the same `OverlapMeanTest` | Raises a `TypeError`. `min_periods` is a count of windows, so it is an `Integer`. |
 | `ActiveAssetsUncertaintyAlgorithm(; active = 1 // 5)` | Calibrates. v0.33 built the algorithm, and the calibration then raised a `MethodError`. |
 
