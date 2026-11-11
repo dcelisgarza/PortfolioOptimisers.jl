@@ -514,6 +514,16 @@ end
     # The coefficient scales both sides, so these two views are the same view.
     @test isapprox(ep_rho("2*(AAPL, XOM) >= 0.9")[1, end],
                    ep_rho("(AAPL, XOM) >= 0.45")[1, end], rtol = 5e-5)
+    # So the range check reads the target `b / c`, not the right-hand side `b`. The view
+    # below targets 0.75, and the check refused it while it read `b = 1.5`. The next view
+    # targets 1.8, and the check let it through to a posterior of 0.98.
+    @test isapprox(ep_rho("2*(AAPL, XOM) == 1.5")[1, end], 0.75, rtol = 5e-5)
+    @test_throws ArgumentError ep_rho("0.5*(AAPL, XOM) == 0.9")
+    @test_throws ArgumentError ep_rho("-2*(AAPL, XOM) <= 2.5")
+    # A correlation view can be negative, also as a negative multiple of the prior.
+    @test isapprox(ep_rho("(AAPL, XOM) == -0.1")[1, end], -0.1, rtol = 5e-5)
+    @test isapprox(ep_rho("(AAPL, XOM) == -0.5*prior(AAPL, XOM)")[1, end],
+                   -0.5 * rho0[1, end], rtol = 5e-5)
 
     # The covariance twin of each check. A covariance is not a ratio, so the constraint pins
     # the UNCORRECTED weighted second moment and `pr.sigma` reports the corrected one: the
