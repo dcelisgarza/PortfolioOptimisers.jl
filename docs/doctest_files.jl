@@ -208,13 +208,16 @@ function record_gate(gate::AbstractString = "doctest-files")
 end
 
 """
-    run_doctests(cmd) -> Int
+    run_doctests(cmd, po = Main.PortfolioOptimisers; record = record_gate) -> Int
 
 Run the doctests of `cmd` after the setup of the workflow has loaded the packages into `Main`. It
-returns the exit code: `0` when every block passes, `1` otherwise.
+returns the exit code: `0` when every block passes, `1` otherwise. A green run without `--fix`
+calls `record`, also when the named files hold no block: the push guard asks for the stamp of
+every change to the code, and a run with nothing to check is green. `po` and `record` are seams
+for `test/test_76_gate_tooling.jl`.
 """
-function run_doctests(cmd::Command)
-    po = Main.PortfolioOptimisers
+function run_doctests(cmd::Command, po::Module = Main.PortfolioOptimisers;
+                      record::Function = record_gate)
     scope, docstrings, blocks, files = scope_module(po, cmd.paths)
     for p in cmd.paths
         if isfile(p) && !(realpath(p) in files)
@@ -224,6 +227,9 @@ function run_doctests(cmd::Command)
     head = "DOCTEST files=$(length(files)) docstrings=$docstrings blocks=$blocks"
     if blocks == 0
         println(head, " status=green")
+        if !(cmd.fix)
+            record()
+        end
         return 0
     end
     Main.DocMeta.setdocmeta!(scope, :DocTestSetup,
@@ -241,7 +247,7 @@ function run_doctests(cmd::Command)
     println(head,
             " seconds=$(round(seconds; digits = 1)) status=$(green ? "green" : "red")")
     if green && !(cmd.fix)
-        record_gate()
+        record()
     end
     return green ? 0 : 1
 end

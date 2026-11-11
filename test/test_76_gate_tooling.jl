@@ -1055,6 +1055,30 @@ end
         @test_throws ErrorException DF.workflow_setup("- name: Run doctest\n  run: julia --project=docs -e 'x = 1'\n")
     end
 
+    @testset "doctest_files records the stamp of a green run with no block" begin
+        # The push guard asks for `doctest-files` on every change to the code. A run over files
+        # that hold no block printed `status=green` and returned before it recorded the stamp,
+        # so no run could satisfy the guard (R33 of #1817).
+        DF = DocFilesSeam.DoctestFiles
+        dir = mktempdir()
+        n = joinpath(dir, "n.jl")
+        put(dir, "n.jl", "\"h, with no block.\"\nh() = 0\n")
+        fixture = Module(:NoBlockFixture)
+        Base.include(fixture, n)
+        calls = Ref(0)
+        count_call() = (calls[] += 1; nothing)
+        code = redirect_stdout(devnull) do
+            return DF.run_doctests(DF.parse_command([n]), fixture; record = count_call)
+        end
+        @test code == 0 && calls[] == 1
+        # A run with `--fix` records no stamp, as a run with blocks does not.
+        code = redirect_stdout(devnull) do
+            return DF.run_doctests(DF.parse_command(["--fix", n]), fixture;
+                                   record = count_call)
+        end
+        @test code == 0 && calls[] == 1
+    end
+
     @testset "sweep_check names the declarations the package censuses read" begin
         #=
         `test/test_26_docs.jl` ("every choice is catalogued") and
