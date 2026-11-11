@@ -268,7 +268,13 @@ reports `invalid builtin function call` on `getfield`. Issue #1883 restored the 
 sites where a loop of scalar rows had replaced it to avoid the report. Affirmed against Julia \
 1.13.3, JET 0.13.1 and JuMP 1.32.1. The maintainer extended the rule to the dependencies of the \
 recommended package, and to the union split of a local that the dependency always assigns, on \
-2026-11-05. Affirmed against Julia 1.13.3 and JET 0.13.1."""
+2026-11-05. The dismissals of `src/03_InputData/11_PricesToReturns.jl` take the extension to a \
+dependency: `DataFrames.DataFrame(::TimeArray)`, the documented conversion of a `TimeArray` to a \
+table, reaches `@sync` of Base, whose locals `c_ex` and `racy` JET reads as maybe undefined. The \
+dismissals of `src/05_Moments/32_CrossSectionalFactorModel/13_CrossSectionalLeverage.jl` cite \
+the documented forms of LinearAlgebra, `mul!`, `ldiv!` and the pivoted QR, with the `τ` of its \
+LAPACK wrapper. No dismissal cites the union split of a local now. Affirmed against Julia 1.13.3, \
+JET 0.13.1 and DataFrames 1.8.2."""
 
 [rationale.a-union-split-that-loses-the-type-of-its-value]
 text = """
