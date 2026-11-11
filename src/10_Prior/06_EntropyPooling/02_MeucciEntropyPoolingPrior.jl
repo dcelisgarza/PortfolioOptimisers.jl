@@ -633,7 +633,7 @@ Where:
 
  1. Read the loss columns `X`, the targets `B`, the levels `alphas` and the search `d_opt` from `cvv`.
  2. Define `func(etas)`. At the candidate `etas`, it writes the second line above into `epc` under the key `:cvar_eq`. It solves the whole constraint set with [`entropy_pooling`](@ref) into `wi`, and returns `wi` and the residual of the third line. For one view, the residual is the posterior tail mass minus `alpha`. For more than one view, it is the [`norm_error`](@ref) over the views of the posterior conditional value at risk minus the target.
- 3. Search for the value at risk `res`. For one view, `Roots.find_zero` finds the root of the residual of `func` over `[0, B[1] * (1 - sqrt(eps))]`. For more than one view, `Optim.optimize` minimises the residual over the box `[0, B]` from the start `0.5 * B`.
+ 3. Search for the value at risk `res`. For one view, `Roots.find_zero` finds the root of the residual of `func` over `[0, B[1] * (1 - sqrt(eps))]`. For more than one view, `Optim.optimize` minimises the residual over the box `[0, B]` from the start `0.5 * B`. After the start, a trial point at which the inner solve fails gets the residual `Inf`, and the line search rejects that point.
  4. Call `func(res)` one more time, and return the posterior probability weights that it calculates.
 
 # Arguments
@@ -646,7 +646,7 @@ Where:
 # Validation
 
   - Every candidate value at risk is in `[0, B]`. A candidate outside the box raises a `DomainError`.
-  - The search must succeed. When `Roots.find_zero` or `Optim.optimize` raises an error, this method raises an `ErrorException` that holds it. An inner [`entropy_pooling`](@ref) solve that fails at one point of the search is such an error. When `Optim.converged` reports that `Optim.optimize` failed, this method raises an `ErrorException`.
+  - The search must succeed. When `Roots.find_zero` or `Optim.optimize` raises an error, this method raises an `ErrorException` that holds it. An inner [`entropy_pooling`](@ref) solve that fails at one point of the search for one view is such an error. With more than one view, the search rejects a trial point after the start at which the inner solve fails, so that failure does not raise. A failed inner solve at the start `0.5 * B` raises. When `Optim.converged` reports that `Optim.optimize` failed, this method raises an `ErrorException`. A failed inner solve at the last call, at the minimiser, raises its own error.
   - The method does not detect an infeasible view set. The residual of this search is the posterior tail mass minus `alpha`. A posterior with almost all of its mass on one observation has a small residual, but it can miss the view by a large amount. The warning of [`MeucciEntropyPoolingPrior`](@ref) states how to find such a result.
   - The method does not detect a missed feasible view. The search reads its own residual, not how closely the inner [`entropy_pooling`](@ref) solve meets the constraint of the view. With more than one view, `Optim.converged` accepts a solve that stopped on the step in `x` and not on stationarity. The warning of [`MeucciEntropyPoolingPrior`](@ref) states the mechanism, the measured sizes, and how to read the result.
 
@@ -710,9 +710,35 @@ function ep_cvar_views_solve!(cvv::NamedTuple, epc::AbstractDict, w::ScenarioPro
             throw(ErrorException("CVaR entropy pooling optimisation failed. Relax the view, increase alpha, use different solver parameters, use VaR views instead, or use a different prior.\n$(e)"))
         end
     else
+        #! The line search of the outer solve probes trial values of `etas`, and at some of
+        #! them the inner dual does not converge. The points it probes move with the rounding
+        #! of the host, through the finite-difference gradient, so one CI host met such a
+        #! point where the others did not. A failed trial point answers `Inf`: `HagerZhang`
+        #! shrinks a step whose value or slope is not finite, so the search moves on. Only
+        #! the failure of the inner solve is caught, which every inner solver raises as an
+        #! `ErrorException`. A failure before the first point that solves still raises: the
+        #! first point is the start, and with no finite value there `Fminbox` raises an
+        #! error about its barrier, and the message below would hold that error and not the
+        #! failure of the inner solve. The last call
+        #! `func(res)` stays strict, so a failure at the minimiser still raises.
+        #! `Roots.find_zero` of one view reads the sign of the residual, where `Inf` is a
+        #! wrong sign and not a rejected point, so that branch keeps the error. See issue
+        #! #2017.
+        solved = Ref(false)
+        trial = function (x)
+            try
+                err = func(x)[2]
+                solved[] = true
+                return err
+            catch e
+                if !(solved[] && e isa ErrorException)
+                    rethrow()
+                end
+                return typemax(eltype(B))
+            end
+        end
         res = try
-            Optim.optimize(x -> func(x)[2], zeros(N), B, 0.5 * B, d_opt.args...;
-                           d_opt.kwargs...)
+            Optim.optimize(trial, zeros(N), B, 0.5 * B, d_opt.args...; d_opt.kwargs...)
         catch e
             throw(ErrorException("CVaR entropy pooling optimisation failed. Relax the views, increase alpha, use different solver parameters, use VaR views instead, reduce the number of CVaR views, or use a different prior.\n$(e)"))
         end

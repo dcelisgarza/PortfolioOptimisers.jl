@@ -2961,3 +2961,72 @@ end
     @test isapprox(ConditionalValueatRisk(; w = pr.w)(X[:, 1]), 0.05; rtol = 1e-3)
     @test isapprox(ConditionalValueatRisk(; w = pr.w)(X[:, 2]), 0.06; rtol = 1e-3)
 end
+#=
+#2017: the line search of the multi-view CVaR search probes trial values of the value at risk,
+and at some of them the inner dual does not converge. Which points it probes moves with the
+rounding of the host, so the failure showed on one CI run only. `FailFarEP` makes such a point
+on every host: it raises `ex` when the posterior of a trial point misses a CVaR target by more
+than `tol`. At 0.003 that is one line-search probe of this view set, whose miss is 0.0036, and
+not the start, whose miss is 0.0025. At -1 it is every point, the start first.
+=#
+struct FailFarEP{O, C, T, E} <: PortfolioOptimisers.AbstractEntropyPoolingOptimiser
+    opt::O
+    cvv::C
+    tol::T
+    ex::E
+    fails::Base.RefValue{Int}
+end
+function cvar_view_miss(cvv, wi)
+    return maximum(abs(ConditionalValueatRisk(; alpha = cvv.alphas[i], w = wi)(view(cvv.X,
+                                                                                    :, i)) -
+                       cvv.B[i]) for i in eachindex(cvv.B))
+end
+function PortfolioOptimisers.entropy_pooling(w::PortfolioOptimisers.VecNum,
+                                             epc::AbstractDict, o::FailFarEP)
+    wi = PortfolioOptimisers.entropy_pooling(w, epc, o.opt)
+    if cvar_view_miss(o.cvv, wi) > o.tol
+        o.fails[] += 1
+        throw(o.ex)
+    end
+    return wi
+end
+@testset "A failed inner solve at a trial point of the multi-view CVaR search is rejected" begin
+    PO = PortfolioOptimisers
+    pr0 = prior(EmpiricalPrior(), rd)
+    epc() = Dict{Symbol, Tuple{<:PO.MatNum, <:PO.VecNum}}()
+    cvv = PO.ep_cvar_views_setup(ConditionalValueatRiskView(;
+                                                            views = LinearConstraintEstimator(;
+                                                                                              val = ["AAPL == 0.053",
+                                                                                                     "XOM == 0.045"])),
+                                 pr0, sets, w, nothing, nothing)
+    wref = PO.ep_cvar_views_solve!(cvv, epc(), w, OptimEntropyPooling())
+    ff = FailFarEP(OptimEntropyPooling(), cvv, 0.003,
+                   ErrorException("Entropy pooling optimisation failed. Relax the views, use different solver parameters, or use a different prior."),
+                   Ref(0))
+    wff = PO.ep_cvar_views_solve!(cvv, epc(), w, ff)
+    # The stand-in failed at least one trial point, and the search went past it to a
+    # posterior that meets both views.
+    @test ff.fails[] > 0
+    @test isapprox(ConditionalValueatRisk(; alpha = 0.05, w = wff)(rd.X[:, 1]), 0.053;
+                   rtol = 5e-5)
+    @test isapprox(ConditionalValueatRisk(; alpha = 0.05, w = wff)(rd.X[:, end]), 0.045;
+                   rtol = 5e-5)
+    @test isapprox(wff, wref; rtol = 1e-3)
+    # A failure at the start leaves no finite value to search from, so it raises, and the
+    # message holds the error of the inner solve, not the barrier error of `Fminbox`.
+    fs = FailFarEP(OptimEntropyPooling(), cvv, -1.0, ErrorException("inner solve failed"),
+                   Ref(0))
+    @test_throws r"^CVaR entropy pooling optimisation failed\..*\nErrorException\(\"inner solve failed\"\)"s PO.ep_cvar_views_solve!(cvv,
+                                                                                                                                     epc(),
+                                                                                                                                     w,
+                                                                                                                                     fs)
+    @test fs.fails[] == 1
+    # Only the failure of the inner solve is caught. Another error at the same probe raises.
+    fa = FailFarEP(OptimEntropyPooling(), cvv, 0.003, ArgumentError("not a solve failure"),
+                   Ref(0))
+    @test_throws r"^CVaR entropy pooling optimisation failed\..*\nArgumentError\(\"not a solve failure\"\)"s PO.ep_cvar_views_solve!(cvv,
+                                                                                                                                     epc(),
+                                                                                                                                     w,
+                                                                                                                                     fa)
+    @test fa.fails[] == 1
+end
