@@ -2934,3 +2934,30 @@ end
     # With no `sets`, no view resolves a name, and the guard reads nothing.
     @test isnothing(PO.assert_ep_views_axis(nothing, X))
 end
+@testset "A multi-view CVaR search names its failure, as the single-view search does" begin
+    #=
+    R36 of #1817. The search over more than one CVaR view did not catch a failure of an inner
+    entropy pooling solve, so the caller got the bare message of the inner solve, where the
+    search over one view names the CVaR views and their fixes. One CI run met such a failure
+    at one point of the line search (#2017).
+    =#
+    PO = PortfolioOptimisers
+    Optim = PO.Optim
+    X = randn(StableRNG(2017), 500, 2) ./ 50
+    sets = UniverseSets(; dict = Dict("nx" => ["A", "B"]))
+    cv = ConditionalValueatRiskView(;
+                                    views = LinearConstraintEstimator(;
+                                                                      val = ["A == 0.05",
+                                                                             "B == 0.06"]))
+    # One iteration of the inner solve cannot converge, so the first point of the search fails.
+    opt = OptimEntropyPooling(;
+                              args = (Optim.Fminbox(; mu0 = 1e-5),
+                                      Optim.Options(; iterations = 1, outer_iterations = 1)))
+    pe = MeucciEntropyPoolingPrior(; sets = sets, opt = opt, cvar_views = cv)
+    @test_throws r"^CVaR entropy pooling optimisation failed\..*\nErrorException\(\"Entropy pooling optimisation failed\."s prior(pe,
+                                                                                                                                  X)
+    # The default inner solve meets both views.
+    pr = prior(MeucciEntropyPoolingPrior(; sets = sets, cvar_views = cv), X)
+    @test isapprox(ConditionalValueatRisk(; w = pr.w)(X[:, 1]), 0.05; rtol = 1e-3)
+    @test isapprox(ConditionalValueatRisk(; w = pr.w)(X[:, 2]), 0.06; rtol = 1e-3)
+end

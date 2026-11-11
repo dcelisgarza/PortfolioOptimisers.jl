@@ -337,7 +337,7 @@ $(DocStringExtensions.TYPEDSIGNATURES)
 
 Computes the weighted available-case covariance of a [`Covariance`](@ref) with observation weights and a [`CoveragePolicy`](@ref). The two weighted methods of [`coverage_covariance`](@ref) call it.
 
-Each pair reads the observations that its two assets share, with their weights, through [`weighted_pair_covariance`](@ref). The arm reads the valid entries, the admission and the peel of the unweighted arms, so the two arms read one universe. The counts of the admission and the peel are counts of observations, and the weights do not change them.
+Each pair reads the observations that its two assets share, with their weights, through [`weighted_pair_covariance`](@ref). The arm reads the valid entries, the admission and the peel of the unweighted arms, so the two arms read one universe. The counts of the admission are counts of observations, and the weights do not change them. A pair whose weighted sample gives no covariance is `NaN`, also when it shares observations: every shared observation can have a weight of zero, or the divisor of the weights can be not positive. The peel counts no observation for such a pair, so the pair is undetermined, and the peel removes an asset of it or refuses it under `strict`, as it does for a pair with no shared observation.
 
 # Algorithm
 
@@ -345,7 +345,7 @@ Each pair reads the observations that its two assets share, with their weights, 
  2. Read the valid entries of the block and the bookkeeping of each asset with [`coverage_valid_block`](@ref).
  3. Take the sample and the centre of each pair with [`weighted_pair_sample`](@ref).
  4. Fill each entry of the upper triangle with [`weighted_pair_covariance`](@ref), and mirror it.
- 5. Admit the assets with [`coverage_admission`](@ref), and peel the assets of the undetermined pairs with [`coverage_peel`](@ref).
+ 5. Admit the assets with [`coverage_admission`](@ref), and peel the assets of the undetermined pairs with [`coverage_peel`](@ref). The peel reads a count of zero at each pair whose entry is `NaN`.
  6. Put the matrix in a frame with [`coverage_frame`](@ref). Rescale it to a unit diagonal when the verb is `Statistics.cor`, with [`coverage_correlation`](@ref).
 
 # Arguments
@@ -387,9 +387,12 @@ function weighted_coverage_covariance(f::F, ce::Covariance, cvg::CoveragePolicy,
                                                              corrected, m)
         nu[i, j] = nu[j, i] = count(t -> msk[t, i] & msk[t, j], axes(msk, 1))
     end
+    # A pair whose weighted sample gives no covariance is undetermined, also when the pair
+    # shares observations, so the peel counts no observation for it.
+    nd = map((s, n) -> isnan(s) ? zero(n) : n, sigma, nu)
     cmsk = coverage_peel(cvg,
                          coverage_admission(cvg, CoverageCounts(nu, nothing, active, stale),
-                                            size(Xo, 1)), nu, corrected, strict)
+                                            size(Xo, 1)), nd, corrected, strict)
     return coverage_correlation(f, coverage_frame(sigma, nu, cmsk))
 end
 """

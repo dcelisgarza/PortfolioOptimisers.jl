@@ -571,6 +571,36 @@ their type, and a dynamic weight resolves on the rows that the fit reads.
                                                                         w = wc, cvg = cvg)
     end
 end
+#=
+R36 of #1817. A weighted pair can share observations and still have no covariance: every shared
+observation can have a weight of zero. The pair was `NaN` inside the finite block, with no
+warning, and `strict = true` did not refuse it, because the peel read the count of shared
+observations. The peel now reads such a pair as undetermined, as it reads a pair with no shared
+observation.
+=#
+@testset "A weighted pair with no covariance is undetermined for the peel" begin
+    X = randn(StableRNG(5), 40, 3) .* 0.02
+    X[21:40, 1] .= NaN
+    X[1:14, 3] .= NaN
+    # Assets 1 and 3 share the rows 15 to 20, and each of those rows has a weight of zero.
+    w = StatsBase.pweights([ones(14); zeros(6); ones(20)])
+    cvg = CoveragePolicy()
+    for alg in (FullMoment(), SemiMoment())
+        ce = Covariance(; w = w, alg = alg, cvg = cvg)
+        s = @test_logs((:warn, r"peeled the assets at indices \[1\]"), cov(ce, X))
+        @test all(isnan, s[1, :]) && all(isnan, s[:, 1])
+        @test all(isfinite, s[2:3, 2:3])
+        @test_throws r"peeled the assets" cov(ce, X; strict = true)
+        rho = @test_logs((:warn, r"peeled the assets"), cor(ce, X))
+        @test all(isfinite, rho[2:3, 2:3])
+    end
+    # With no peel the cell stays `NaN`, as it does for a pair with no shared observation.
+    s0 = cov(Covariance(; w = w, cvg = CoveragePolicy(; peel = nothing)), X)
+    @test isnan(s0[1, 3]) && isfinite(s0[1, 1]) && isfinite(s0[3, 3])
+    # A weight of one on the shared rows gives the pair a covariance, and nothing is peeled.
+    s1 = @test_logs cov(Covariance(; w = StatsBase.pweights(ones(40)), cvg = cvg), X)
+    @test all(isfinite, s1)
+end
 @testset "The one-asset arm of an available-case dispersion fit" begin
     x = [1.0, NaN, 3.0, 5.0, NaN, 7.0]
     ve = SimpleVariance(; cvg = CoveragePolicy())

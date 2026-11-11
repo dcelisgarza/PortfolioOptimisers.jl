@@ -646,7 +646,7 @@ Where:
 # Validation
 
   - Every candidate value at risk is in `[0, B]`. A candidate outside the box raises a `DomainError`.
-  - The search must succeed. When `Roots.find_zero` raises an error, this method raises an `ErrorException` that holds it. When `Optim.converged` reports that `Optim.optimize` failed, this method raises an `ErrorException`.
+  - The search must succeed. When `Roots.find_zero` or `Optim.optimize` raises an error, this method raises an `ErrorException` that holds it. An inner [`entropy_pooling`](@ref) solve that fails at one point of the search is such an error. When `Optim.converged` reports that `Optim.optimize` failed, this method raises an `ErrorException`.
   - The method does not detect an infeasible view set. The residual of this search is the posterior tail mass minus `alpha`. A posterior with almost all of its mass on one observation has a small residual, but it can miss the view by a large amount. The warning of [`MeucciEntropyPoolingPrior`](@ref) states how to find such a result.
   - The method does not detect a missed feasible view. The search reads its own residual, not how closely the inner [`entropy_pooling`](@ref) solve meets the constraint of the view. With more than one view, `Optim.converged` accepts a solve that stopped on the step in `x` and not on stationarity. The warning of [`MeucciEntropyPoolingPrior`](@ref) states the mechanism, the measured sizes, and how to read the result.
 
@@ -710,8 +710,12 @@ function ep_cvar_views_solve!(cvv::NamedTuple, epc::AbstractDict, w::ScenarioPro
             throw(ErrorException("CVaR entropy pooling optimisation failed. Relax the view, increase alpha, use different solver parameters, use VaR views instead, or use a different prior.\n$(e)"))
         end
     else
-        res = Optim.optimize(x -> func(x)[2], zeros(N), B, 0.5 * B, d_opt.args...;
-                             d_opt.kwargs...)
+        res = try
+            Optim.optimize(x -> func(x)[2], zeros(N), B, 0.5 * B, d_opt.args...;
+                           d_opt.kwargs...)
+        catch e
+            throw(ErrorException("CVaR entropy pooling optimisation failed. Relax the views, increase alpha, use different solver parameters, use VaR views instead, reduce the number of CVaR views, or use a different prior.\n$(e)"))
+        end
         @argcheck(Optim.converged(res),
                   ErrorException("CVaR entropy pooling optimisation failed. Relax the view, increase alpha, use different solver parameters, use VaR views instead, reduce the number of CVaR views, or use a different prior."))
         Optim.minimizer(res)
