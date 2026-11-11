@@ -87,6 +87,21 @@
         @test_throws DomainError PO.score_bounds(wb, [0.5, -0.25, 0.3], true)
         @test_throws DomainError PO.score_bounds(WeightBounds([0.0, 0.3], [1.0, 1.0]),
                                                  [0.5, 0.25], true)
+        # R42 of #1817: under `symmetric = true`, a static upper bound below `-c` admits no
+        # weight. The check names the score bound, where the constructor of `WeightBounds`
+        # raised a message that names neither side.
+        short = WeightBounds([-1.0, -1.0], [-0.5, 1.0])
+        err = try
+            PO.score_bounds(short, [0.2, 0.2], true)
+        catch e
+            e
+        end
+        @test err isa DomainError
+        @test occursin("below the negative score bound at 1 assets", err.msg)
+        r = PO.score_bounds(short, [0.2, 0.2], false)
+        @test r.lb == [-1.0, -1.0] && r.ub == [-0.5, 0.2]
+        r = PO.score_bounds(WeightBounds([-1.0, -1.0], [-0.2, 1.0]), [0.2, 0.2], true)
+        @test r.lb == [-0.2, -0.2] && r.ub == [-0.2, 0.2]
     end
 
     @testset "weight_bounds_constraints reads the returns of the fit" begin
@@ -205,6 +220,25 @@
         # fold reads the scores of the rows after it.
         cv = IndexWalkForward(40, 20)
         p = cross_val_predict(EqualWeighted(; wb = swb, sets = sets), rd, cv)
+        tr = split(cv, rd).train_idx
+        for (i, pred) in pairs(p.pred)
+            @test pred.res.wb.ub ≈ min.(1.0, hand_cap(tr[i], 0.006))
+        end
+    end
+
+    @testset "a Pipeline step resolves the bound on the returns of its window" begin
+        # R42 of #1817: the step lands on `:wb`, and it scores the assets of the returns of
+        # the context, as the `wb` field of an optimiser does. A step that had a target and
+        # no step value built, and then raised a `MethodError` at the fit.
+        swb = ScoreWeightBounds(; score = s, val = 0.006)
+        cap = min.(1.0, hand_cap(1:T, 0.006))
+        res = fit(Pipeline(; steps = (swb, EqualWeighted())), rd)
+        @test res.ctx.constraints.ub ≈ cap
+        @test PO.inject_context(EqualWeighted(), res.ctx).wb.ub ≈ cap
+        @test all(res.w .<= cap .+ 1e-12)
+        # Each fold of a walk-forward runs the step on its own training rows.
+        cv = IndexWalkForward(40, 20)
+        p = cross_val_predict(Pipeline(; steps = (swb, EqualWeighted())), rd, cv)
         tr = split(cv, rd).train_idx
         for (i, pred) in pairs(p.pred)
             @test pred.res.wb.ub ≈ min.(1.0, hand_cap(tr[i], 0.006))

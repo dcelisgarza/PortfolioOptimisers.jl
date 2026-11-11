@@ -40,8 +40,10 @@ the fit cannot do this.
   absolute returns are not a Panel Field.
 - **`stat` follows the callable pattern of `Num_VecToScaM`.** It takes a `VectorToScalarMeasure`
   or a plain `Function`, and `vec_to_real_measure` applies it. The bound
-  `Union{VectorToScalarMeasure, Function}` is the one of `oriented_score` (ADR 0231). A number is
-  not a statistic, so the bound leaves it out.
+  `Union{VectorToScalarMeasure, Function}` is `Num_VecToScaM` with no `Number`. A number is not a
+  statistic, so the bound leaves it out. It is also `Sca_VecToScaM` of `oriented_score`
+  (ADR 0231) with no `Scalariser`, because a `Scalariser` reduces the values of several measures
+  through `scalarise`, and `vec_to_real_measure` does not apply it.
 - **A value counts only where it is finite.** The reader writes `NaN` outside the universe and at
   each cell that a fill policy wrote, because a filled volume is not a trade. A Descriptor is also
   `NaN` before its warm-up ends, and it reads the window alone, so its recursion starts again in

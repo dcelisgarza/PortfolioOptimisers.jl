@@ -194,7 +194,7 @@ Join the resolved static bounds `wb` with the score bounds `c`.
 
 # Algorithm
 
- 1. Check that no entry of `c` is negative, and that no lower bound of `wb` is above its entry of `c`.
+ 1. Check that no entry of `c` is negative, that no lower bound of `wb` is above its entry of `c`, and, when `symmetric` is `true`, that no upper bound of `wb` is below the negative of its entry of `c`.
  2. Take the lower side `max.(wb.lb, -c)` when `symmetric` is `true`, and `wb.lb` otherwise.
  3. Take the upper side `min.(wb.ub, c)`.
  4. Build the [`WeightBounds`](@ref) of the two sides.
@@ -209,6 +209,7 @@ Join the resolved static bounds `wb` with the score bounds `c`.
 
   - `all(c .>= 0)`. A score bound is a magnitude, so a negative score has no bound. A `DomainError` that names the count of the assets is thrown otherwise.
   - `all(wb.lb .<= c)`. A lower bound above the score bound admits no weight. A `DomainError` that names the count of the assets is thrown otherwise.
+  - If `symmetric`: `all(wb.ub .>= -c)`. An upper bound below the negative of the score bound admits no weight. A `DomainError` that names the count of the assets is thrown otherwise.
 
 # Returns
 
@@ -235,6 +236,9 @@ function score_bounds(wb::WeightBounds, c::VecNum, symmetric::Bool)::WeightBound
     @argcheck(all(map((l, x) -> l <= x, wb.lb, c)),
               DomainError((wb.lb, c),
                           "the lower bound of `wb` is above the score bound at $(count(map((l, x) -> !(l <= x), wb.lb, c))) assets, so no weight satisfies both. Lower the static lower bound of these assets, or raise their `val`."))
+    @argcheck(!symmetric || all(map((u, x) -> -x <= u, wb.ub, c)),
+              DomainError((wb.ub, c),
+                          "the upper bound of `wb` is below the negative score bound at $(count(map((u, x) -> !(-x <= u), wb.ub, c))) assets, so no weight satisfies both. Raise the static upper bound of these assets, raise their `val`, or use `symmetric = false`."))
     lb = symmetric ? max.(wb.lb, -c) : wb.lb
     return WeightBounds(; lb = lb, ub = min.(wb.ub, c))
 end
@@ -289,7 +293,7 @@ Resolve a [`ScoreWeightBounds`](@ref) on the returns of a fit.
   - `sets` is not `nothing` when the estimator is keyed by name ([`name_keyed`](@ref)). An [`IsNothingError`](@ref) is thrown otherwise.
   - `length(s) == N`. A `DimensionMismatch` is thrown otherwise.
   - With no sets, a vector of numbers in `wb.val` holds `N` entries. A `DimensionMismatch` is thrown otherwise.
-  - The checks of [`score_bounds`](@ref): no score bound is negative, and no static lower bound is above its score bound. A `DomainError` is thrown otherwise.
+  - The checks of [`score_bounds`](@ref): no score bound is negative, no static lower bound is above its score bound, and, when `wb.symmetric` is `true`, no static upper bound is below the negative of its score bound. A `DomainError` is thrown otherwise.
 
 # Returns
 

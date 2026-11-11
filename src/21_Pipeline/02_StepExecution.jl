@@ -343,7 +343,7 @@ Compute the value a constraint step contributes to the `constraints` slot.
 
 One method per constraint family, each calling that family's constraint-generation verb. The value is paired with its [routing target](@ref PIPELINE_ROUTING_TARGETS) by [`run_constraint_step`](@ref); this method decides only *what* is computed, never where it lands.
 
-A family that reads the returns reads them from the source that its own reader states, as it does in the slot of an optimiser. The phylogeny and centrality families pass `ctx.returns` to their verb, which reads the `x_src` of the estimator. An exposure constraint refits through the regression of its [`FactorSpace`](@ref), which states its own source.
+A family that reads the returns reads them from the source that its own reader states, as it does in the slot of an optimiser. The phylogeny and centrality families pass `ctx.returns` to their verb, which reads the `x_src` of the estimator. An exposure constraint refits through the regression of its [`FactorSpace`](@ref), which states its own source. An estimator of weight bounds gets `ctx.returns` as `rd`, as it does in the `wb` field of an optimiser, so a [`ScoreWeightBounds`](@ref) scores the assets of the window of the step. A [`WeightBoundsEstimator`](@ref) ignores `rd`.
 
 # Arguments
 
@@ -360,8 +360,8 @@ A family that reads the returns reads them from the source that its own reader s
   - [`pipe_constraint_targets`](@ref)
   - [`pipeline_asset_sets`](@ref)
 """
-function constraint_step_value(ce::WeightBoundsEstimator, ctx::PipelineContext)
-    return weight_bounds_constraints(ce, pipeline_asset_sets(ctx, ce))
+function constraint_step_value(ce::AbstractWeightBoundsEstimator, ctx::PipelineContext)
+    return weight_bounds_constraints(ce, pipeline_asset_sets(ctx, ce); rd = ctx.returns)
 end
 function constraint_step_value(ce::LinearConstraintEstimator, ctx::PipelineContext)
     return linear_constraints(ce, pipeline_asset_sets(ctx, ce))

@@ -3108,6 +3108,12 @@ end
               (:wb,)
         for S in families
             @test which(PO.pipe_constraint_targets, Tuple{S}) !== fallback
+            #=
+            "Implement both methods, or neither." A family with a target and no step value
+            passes the construction check and raises a `MethodError` at the fit, as
+            `ScoreWeightBounds` did after fcc522decd (R42 of #1817).
+            =#
+            @test hasmethod(PO.constraint_step_value, Tuple{S, PO.PipelineContext})
         end
         # Every declared target is a real one, and every choice is a legal annotation.
         @test all(t -> t in PO.PIPELINE_ROUTING_TARGETS, PO.PIPELINE_THRESHOLD_TARGETS)
