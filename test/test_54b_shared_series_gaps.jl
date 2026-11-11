@@ -926,3 +926,61 @@ end
     # A series of the wrong length raises, and is not cut short with no message.
     @test_throws DimensionMismatch PO.obs_weights_view(ReturnsTracking(; w = b[keep]), obs)
 end
+
+@testset "The cut reaches a phylogeny, a centrality constraint and a prior mean adapter (#1960, R35 of #1817)" begin
+    # R35 of #1817 found that the cut of #1960 stopped at five types outside the tags, so a
+    # covariance or a mean with fixed weights under them raised a bare `DimensionMismatch`
+    # at a Shared Series gap. The oracle is the same fit with the gapped observation removed
+    # by hand from the data and from the weights (ADR 0229).
+    slv = Solver(; name = :clarabel, solver = Clarabel.Optimizer,
+                 settings = Dict("verbose" => false))
+    Bg = copy(Bv0)
+    Bg[gap] = NaN
+    rdB = ReturnsResult(; nx = nx, X = X0, nb = ["BM"], B = Bg)
+    rdBk = ReturnsResult(; nx = nx, X = X0[keep, :], nb = ["BM"], B = Bv0[keep])
+    w = aweights(rand(StableRNG(18173501), T) .+ 0.1)
+    cov_w(w) = PortfolioOptimisersCovariance(; ce = Covariance(; w = w))
+    net(w) = NetworkEstimator(; ce = cov_w(w))
+    sdp(w) = SemiDefinitePhylogenyEstimator(; pl = net(w))
+    cnt(w) = CentralityConstraint(; A = CentralityEstimator(; pl = net(w)))
+    jo(; kwargs...) = JuMPOptimiser(; pe = EmpiricalPrior(; x_src = ExcessSource()),
+                                    slv = slv, kwargs...)
+    @testset "An optimiser with $name" for (name, f) in (("ple", w -> jo(; ple = sdp(w))),
+                                                         ("cte", w -> jo(; cte = cnt(w))))
+        o1 = optimise(MeanRisk(; opt = f(w)), rdB)
+        o2 = optimise(MeanRisk(; opt = f(w[keep])), rdBk)
+        @test isapprox(o1.w, o2.w; rtol = 1e-6)
+    end
+    @testset "A prior with a PriorExpectedReturns" begin
+        pe(w) = EmpiricalPrior(;
+                               me = PriorExpectedReturns(;
+                                                         pe = EmpiricalPrior(;
+                                                                             me = SimpleExpectedReturns(;
+                                                                                                        w = w))),
+                               x_src = ExcessSource())
+        @test prior(pe(w), rdB).mu ≈ prior(pe(w[keep]), rdBk).mu
+    end
+    obs = trues(T)
+    obs[gap] = false
+    @testset "The cut of $(nameof(typeof(x)))" for (x, get_w) in
+                                                   ((sdp(w), y -> y.pl.ce.ce.w),
+                                                    (IntegerPhylogenyEstimator(;
+                                                                               pl = net(w)),
+                                                     y -> y.pl.ce.ce.w),
+                                                    (CentralityEstimator(; pl = net(w)),
+                                                     y -> y.pl.ce.ce.w),
+                                                    (cnt(w), y -> y.A.pl.ce.ce.w),
+                                                    (PriorExpectedReturns(;
+                                                                          pe = EmpiricalPrior(;
+                                                                                              me = SimpleExpectedReturns(;
+                                                                                                                         w = w))),
+                                                     y -> y.pe.me.w))
+        @test get_w(PO.obs_weights_view(x, obs)) == w[keep]
+        @test get_w(PO.obs_weights_view(x, obs)) isa StatsBase.AnalyticWeights
+    end
+    # The bound of a centrality constraint weights the assets, so the cut leaves it whole.
+    wa = aweights(fill(1.0, N))
+    cc = CentralityConstraint(; A = CentralityEstimator(; pl = net(w)),
+                              B = MeanValue(; w = wa))
+    @test PO.obs_weights_view(cc, obs).B.w === wa
+end

@@ -716,6 +716,31 @@ function phylogeny_constraints(plcs::VecPlCE_PlC, args...; kwargs...)
     return [phylogeny_constraints(plc, args...; kwargs...) for plc in plcs]
 end
 """
+    obs_weights_view(plc::AbstractPhylogenyConstraintEstimator, i)
+
+Return the phylogeny constraint estimator with the observation weights of its children cut to the observations `i`.
+
+A phylogeny constraint estimator fits the phylogeny of its `pl` on the returns of the solve, and a covariance estimator in that phylogeny can hold fixed observation weights. A Shared Series gap drops observations from those returns, so the weights must lose the same observations, see [`shared_series_estimator`](@ref). The estimators are not [`@propagatable`](@ref), so this method cuts every field through [`obs_weights_fields`](@ref).
+
+# Arguments
+
+  - `plc`: The phylogeny constraint estimator. Its keyword constructor takes every field name, as the constructors of the library do.
+  - `i`: The observations to keep: a mask of the full sample, or their positions.
+
+# Returns
+
+  - `plc`: The estimator at the kept observations.
+
+# Related
+
+  - [`AbstractPhylogenyConstraintEstimator`](@ref)
+  - [`obs_weights_view`](@ref)
+  - [`shared_series_estimator`](@ref)
+"""
+function obs_weights_view(plc::AbstractPhylogenyConstraintEstimator, i)
+    return obs_weights_fields(plc, i)
+end
+"""
 $(DocStringExtensions.TYPEDEF)
 
 Abstract supertype for all centrality-based constraint types.
@@ -870,6 +895,31 @@ function returns_source(cc::CentralityConstraint)
 end
 function reader_frames(cc::CentralityConstraint, path::AbstractString, ::Bool)
     return source_frames(cc.x_src, path, true)
+end
+"""
+    obs_weights_view(cc::CentralityConstraint, i) -> CentralityConstraint
+
+Return the centrality constraint with the observation weights of its centrality estimator `A` cut to the observations `i`.
+
+`A` fits a phylogeny on the returns of the solve, and a covariance estimator in that phylogeny can hold fixed observation weights. A Shared Series gap drops observations from those returns, so the weights must lose the same observations, see [`shared_series_estimator`](@ref). The method cuts `A` alone. The bound `B` can be a [`VectorToScalarMeasure`](@ref) whose weights weight the assets, not the observations, so a cut of every field would cut them by the wrong axis.
+
+# Arguments
+
+  - `cc`: The centrality constraint.
+  - `i`: The observations to keep: a mask of the full sample, or their positions.
+
+# Returns
+
+  - `cc::CentralityConstraint`: The constraint at the kept observations.
+
+# Related
+
+  - [`CentralityConstraint`](@ref)
+  - [`obs_weights_view`](@ref)
+  - [`shared_series_estimator`](@ref)
+"""
+function obs_weights_view(cc::CentralityConstraint, i)::CentralityConstraint
+    return rebuild_estimator(cc, (; A = obs_weights_view(cc.A, i)))
 end
 """
     const VecCC = AbstractVector{<:CentralityConstraint}

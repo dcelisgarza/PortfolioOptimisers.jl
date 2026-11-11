@@ -87,6 +87,12 @@ entries of a prior, a regression, an uncertainty set, an optimiser, a pipeline g
 covariance forecast evaluation call it. ADR 0061 and ADR 0107 record the change of the walk: the
 observation channel opens on `@fprop`, and `@oprop` marks a child that only the cut reads.
 
+A type outside the tags that holds a child which reads the observations needs a hand-written
+`obs_weights_view`, or the walk stops at it. The optimiser, the uncertainty sets, the phylogeny and
+centrality estimators of a solve and `PriorExpectedReturns` have one. Most of them cut every field
+through `obs_weights_fields`. A field whose weights weight the assets is not cut. The bound `B` of
+a `CentralityConstraint` can be a `MeanValue` over the assets, so its method cuts `A` alone.
+
 A buffer fit of an online estimator drops the observations that its buffer marks, through
 `shared_series_buffer`. A member that refits on the buffer can hold a fixed weight vector with one
 entry for each buffered observation, so `shared_series_buffer_estimator` cuts it at the kept

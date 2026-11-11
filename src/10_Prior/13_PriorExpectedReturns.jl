@@ -110,6 +110,31 @@ function port_opt_view(me::PriorExpectedReturns, i, args...)
     return PriorExpectedReturns(; pe = port_opt_view(me.pe, i, args...))
 end
 """
+    obs_weights_view(me::PriorExpectedReturns, i) -> PriorExpectedReturns
+
+Return the adapter with the observation weights of its prior cut to the observations `i`.
+
+The prior of the adapter fits on the returns of the fit that holds the adapter, and an estimator in that prior can hold fixed observation weights. A Shared Series gap drops observations from those returns, so the weights must lose the same observations, see [`shared_series_estimator`](@ref). The adapter is not [`@propagatable`](@ref), so this method cuts its prior with [`obs_weights_view`](@ref).
+
+# Arguments
+
+  - `me`: The adapter.
+  - `i`: The observations to keep: a mask of the full sample, or their positions.
+
+# Returns
+
+  - `me::PriorExpectedReturns`: The adapter at the kept observations.
+
+# Related
+
+  - [`PriorExpectedReturns`](@ref)
+  - [`obs_weights_view`](@ref)
+  - [`shared_series_estimator`](@ref)
+"""
+function obs_weights_view(me::PriorExpectedReturns, i)::PriorExpectedReturns
+    return PriorExpectedReturns(; pe = obs_weights_view(me.pe, i))
+end
+"""
     Statistics.mean(me::PriorExpectedReturns, X::MatNum; dims::Int = 1, kwargs...)
     Statistics.mean(me::PriorExpectedReturns, X::MatNum, pnl::Option{<:AssetPanel}; dims::Int = 1, kwargs...)
     Statistics.mean(me::PriorExpectedReturns; kwargs...)

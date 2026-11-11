@@ -137,5 +137,30 @@ end
 function reader_frames(cte::CentralityEstimator, path::AbstractString, ::Bool)
     return source_frames(cte.x_src, path, true)
 end
+"""
+    obs_weights_view(cte::AbstractCentralityEstimator, i)
+
+Return the centrality estimator with the observation weights of its children cut to the observations `i`.
+
+A centrality estimator fits the network or the clusters of its `pl` on the returns of the solve, and a covariance estimator in that structure can hold fixed observation weights. A Shared Series gap drops observations from those returns, so the weights must lose the same observations, see [`shared_series_estimator`](@ref). The estimators are not [`@propagatable`](@ref), so this method cuts every field through [`obs_weights_fields`](@ref).
+
+# Arguments
+
+  - `cte`: The centrality estimator. Its keyword constructor takes every field name, as the constructors of the library do.
+  - `i`: The observations to keep: a mask of the full sample, or their positions.
+
+# Returns
+
+  - `cte`: The estimator at the kept observations.
+
+# Related
+
+  - [`AbstractCentralityEstimator`](@ref)
+  - [`obs_weights_view`](@ref)
+  - [`shared_series_estimator`](@ref)
+"""
+function obs_weights_view(cte::AbstractCentralityEstimator, i)
+    return obs_weights_fields(cte, i)
+end
 
 export CentralityEstimator
