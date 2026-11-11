@@ -61,9 +61,10 @@ end
             @test_throws DomainError ActiveAssetsUncertaintyAlgorithm(; active = 0)
             @test_throws DomainError ActiveAssetsUncertaintyAlgorithm(; active = 0.0)
             @test_throws DomainError ActiveAssetsUncertaintyAlgorithm(; active = 1.0)
-            # A `Rational` fraction was refused with a `MethodError`. Issue #2013: the
-            # constructor passed it, and `l1_active_count` then threw a `MethodError`,
-            # because it took only `Union{Integer, AbstractFloat}`.
+            # v0.33 refused a `Rational` fraction with a `TypeError` at the keyword
+            # constructor. Issue #2009 widened the bound, and `l1_active_count` then threw a
+            # `MethodError`, because it took only `Union{Integer, AbstractFloat}`. Issue
+            # #2013 fixed the reader.
             @test ActiveAssetsUncertaintyAlgorithm(; active = 1 // 5).active ===
                   FractionOf(1 // 5)
             @test PortfolioOptimisers.l1_active_count(FractionOf(1 // 5), 10) == 2

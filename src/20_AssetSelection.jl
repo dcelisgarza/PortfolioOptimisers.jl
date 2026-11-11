@@ -175,6 +175,8 @@ Keywords correspond to the struct's fields. The constructor reads a plain `best`
   - Every plain tail passes [`count_or_fraction`](@ref). A count is at least one, so `nothing` states a tail that takes no asset.
   - `action in (:keep, :drop)`.
 
+$(val_dict[:count_fraction_grid])
+
 # Examples
 
 ```jldoctest

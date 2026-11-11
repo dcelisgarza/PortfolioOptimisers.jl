@@ -123,9 +123,12 @@ of `src/01_Base/18_CountFraction.jl`. A plain number stays a shorthand through
 `train_size = 250` and `train_size = 0.25` keep their v0.33 meaning.
 
 The decision kept one estimator with two field types, because here the dangerous case died
-loudly. #2013 found a case that does not: a search grid promotes the elements of a vector
-literal, so a count can arrive as a float, and the library reads it as a fraction. The wrapper
-keeps its type in every container. ADR 0029 removes its own split for the same reason, so the
+loudly. That still holds. A search grid promotes the elements of a vector literal, so a count
+can arrive as a float, but the fraction branch of v0.33 refused every float outside `(0, 1)`
+with a `DomainError`, and a search refuses a pipeline that holds a `TrainTestSplit`. So no
+promoted count changed its reading here. #2013 moves the reading into a wrapper for one rule
+across the library: the wrapper keeps its type in every container, and every field of a part of
+a set now reads it the same way. ADR 0029 removes its own split for the same reason, so the
 asymmetry that this decision describes is gone.
 
 The range of a fraction is `(0, 1]` for `FractionOf`. A plain `1.0` is refused, because a grid

@@ -340,6 +340,8 @@ Keywords correspond to the struct's fields. The constructor reads a plain number
 
   - $(val_dict[:ntn])
 
+$(val_dict[:count_fraction_grid])
+
 # Examples
 
 ```jldoctest

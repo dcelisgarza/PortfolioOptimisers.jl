@@ -659,7 +659,7 @@ A field that takes the size of a part of a set holds a `CountOf` or a `FractionO
 | `ConditionalValueatRisk(; alpha = ScenarioCount(; n = 25))`, and every other significance slot | `ConditionalValueatRisk(; alpha = CountOf(25))`. The level is `25 / T`, as before. `ScenarioCount` is gone. A plain number in `alpha` is still the level itself. |
 | `JuMPOptimiser(; l2c = EffectiveAssetFloor(; fraction = 0.5))`, and the same in `linfc`, `lpc` and `ProgrammeAllocationSet` | `JuMPOptimiser(; l2c = FractionOf(0.5))`. The ceiling does not move. `EffectiveAssetFloor` is gone, and `CountOf(m)` states the floor as `m` effective assets. A plain number in `l2c` is still the ceiling itself. |
 | `WildBootstrapMeanTest(; min_periods = 2.5)`, and the same `OverlapMeanTest` | Raises a `TypeError`. `min_periods` is a count of windows, so it is an `Integer`. |
-| `ActiveAssetsUncertaintyAlgorithm(; active = 1 // 5)` | Calibrates. v0.33 built the algorithm, and the calibration then raised a `MethodError`. |
+| `ActiveAssetsUncertaintyAlgorithm(; active = 1 // 5)` | Builds and calibrates. v0.33 raised a `TypeError` when you built the algorithm, because `active` took an `Integer` or an `AbstractFloat` only. |
 
 ### [Arrays of rank three hold their observations last](@id migration-0-34-layout)
 

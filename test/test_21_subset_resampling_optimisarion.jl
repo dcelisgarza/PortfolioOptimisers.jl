@@ -200,6 +200,20 @@ end
         @test_throws DomainError PO.search_candidate(sr0, lens, ([1, 0.5][1],))
         vals = [CountOf(1), FractionOf(0.5)]
         @test [PO.search_candidate(sr0, lens, (v,)).subset_size for v in vals] == vals
+        # R43 of #1817: the literal of a whole grid promotes its pairs as well, to
+        # `Pair{String, Vector}`, and each value keeps its member through a full search.
+        grid = ["subset_size" => [CountOf(2), FractionOf(0.5)], "n_subsets" => [2, 3]]
+        @test eltype(grid) == Pair{String, Vector}
+        glenses, gvals = PO.lens_val_grid(grid)
+        @test first.(gvals) == [CountOf(2), FractionOf(0.5), CountOf(2), FractionOf(0.5)]
+        @test [PO.get_subset_size(PO.search_candidate(sr0, l, v).subset_size, rd6)
+               for (l, v) in zip(glenses, gvals)] == [2, 3, 2, 3]
+        gscv = GridSearchCrossValidation(grid; cv = KFold(; n = 3),
+                                         r = ConditionalValueatRisk())
+        res = search_cross_validation(SubsetResampling(; opt = InverseVolatility(),
+                                                       ex = seq, seed = 1), gscv, rd6)
+        @test size(res.test_scores) == (3, 4)
+        @test res.opt.subset_size in (CountOf(2), FractionOf(0.5))
     end
     @testset "the default subset size is a power of the number of assets" begin
         # shen2017 sizes a subset as `n^0.8` in its simulation study and as `n^0.7` in its
