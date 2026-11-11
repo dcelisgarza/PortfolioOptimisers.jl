@@ -953,7 +953,7 @@ FiniteAllocationInput
     """
     ca
     """
-    Rule for the target weight of an Unpriced Asset, an asset whose price is not finite. `nothing` reads the weight as a zero weight, so the allocation does not spend it, and its money stays in the `cash` of the result. A rule of [`AbstractUnpricedWeightAlgorithm`](@ref), or a plain function with its signature, moves the weight to priced assets of the same side.
+    Rule for the target weight of an Unpriced Asset, an asset whose price is `NaN`. `nothing` reads the weight as a zero weight, so the allocation does not spend it, and its money stays in the `cash` of the result. A rule of [`AbstractUnpricedWeightAlgorithm`](@ref), or a plain function with its signature, moves the weight to priced assets of the same side.
     """
     upw
     function FiniteAllocationInput(w::VecNum, prices::VecNum, cash::Number,
