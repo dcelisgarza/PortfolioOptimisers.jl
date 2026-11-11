@@ -76,7 +76,12 @@ the exact count of the variance of a weighted mean of independent draws.
      joint set reads each count for its own half.
    - A calibration rule does not know which moment it prices. With no weights it reads the smaller
      of entries 1 and 2, because the sample is worth no more than its less informed moment. It
-     reads no `eoc` next to a `w`, as it read no `ens` next to a `w`.
+     reads no `eoc` next to a `w`, as it read no `ens` next to a `w`. A rule that prices the error
+     of the mean alone, such as `PrecisionBlend`, would read entry 1 exactly. The smaller count
+     differs from entry 1 only when the covariance counts fewer observations than the mean. It then
+     gives the rule a larger estimate of that error, and the rule trusts the mean less. The
+     decision accepts that cost, because to overstate an uncertainty is safer than to understate
+     it (R38 of #1817).
 
 ## Considered options
 
