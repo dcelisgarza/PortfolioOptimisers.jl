@@ -18,13 +18,19 @@
 # the stamp of a gate the change cannot reach. Run `check` by hand after each rebase: it answers
 # before the push does.
 #
-# Three refinements keep the guard to the gates a move can reach:
+# These refinements keep the guard to the gates a move can reach:
 #
 #   - A commit this worktree pushed is its own, not a sibling's. A passed `check` of a push records
 #     the pushed commits, and a later `check` leaves their files out.
 #   - A shared ledger file, which nearly every ticket edits, stales only the gates that read it.
 #     `readers` names them, and `test/test_76_gate_tooling.jl` holds the list against the tests
 #     that name the file.
+#   - A stamp goes stale only on a sibling's change that can alter what the gate measured. A page
+#     of prose, a `.md` file, stales the prose gate, the test files, and the full doctest run when
+#     it is a manual page under docs/src/. It stales no gate that measures the code. A sibling's
+#     change to the Julia code under src/ or ext/ stales `jet`, `coverage` and a doctest stamp only
+#     when its class, as `code_health/gate_reach.jl` names it, reaches that gate, as `reached`
+#     reads the class for a push.
 #   - A push that changes a `.jl` file under src/ or ext/ needs a stamp of each gate in
 #     GATE_STAMP_REQUIRED, the gates of the `sweep-conform` skill, that the change reaches.
 #     `code_health/gate_reach.jl` names the class of the change. A change to docstring prose
@@ -169,15 +175,46 @@ readers() {
     esac
 }
 
-# Whether the gate "$1" reads the file "$2".
+# Whether the gate "$1" reads the file "$2". A page of prose, a `.md` file that is no ledger, is
+# read by the prose gate and by a test file, which can read any page, and by the full doctest run
+# when it is a manual page under docs/src/. No gate that measures the code reads one.
 reads() {
     local r
     r=$(readers "$2")
-    [ "$r" = "*" ] && return 0
+    if [ "$r" = "*" ]; then
+        case "$2" in
+        *.md) reads_page "$1" "$2" ;;
+        *) return 0 ;;
+        esac
+        return
+    fi
     case " $r " in
     *" $1 "*) return 0 ;;
     esac
     return 1
+}
+
+# Whether the gate "$1" reads the page "$2", a `.md` file that is no ledger.
+reads_page() {
+    case "$1" in
+    prose | test/*) return 0 ;;
+    doctest)
+        case "$2" in
+        docs/src/*) return 0 ;;
+        esac
+        ;;
+    esac
+    return 1
+}
+
+# Whether a change of the class "$2" reaches the gate "$1", as `reached` reads it. A stamp of the
+# full doctest run and a stamp of the scoped run are both doctest stamps here.
+class_reaches() {
+    local gate=$1
+    if [ "$gate" = doctest-files ]; then
+        gate=doctest
+    fi
+    [ -n "$(reached "$gate" "$2")" ]
 }
 
 # Whether the file "$1" holds a line for the gate "$2".
@@ -266,16 +303,34 @@ check() {
     dirs=$(printf '%s\n' "$own" | { grep -E '^(src|ext)/.*\.jl$' || true; } |
         xargs -r -n 1 dirname | sort -u)
 
-    local stale="" names=""
+    local stale="" names="" class_base="" class_moved=""
     if [ -s "$stamps" ]; then
         while IFS=$'\t' read -r gate base; do
             [ -n "$gate" ] || continue
             [ "$base" != "$from" ] || continue
-            local moved hit
+            local moved hit code_reaches=1
             moved=$(moved_files "$base" "$from") || moved=""
+            # A gate that reads the class of a change goes stale on a sibling's change to the
+            # Julia code under src/ or ext/ only when that class reaches it: a change to
+            # docstring prose stales neither `jet`, `coverage` nor a doctest stamp. One call of
+            # the classifier serves every gate measured on the same base.
+            case "$gate" in
+            jet | coverage | doctest | doctest-files)
+                if [ "$class_base" != "$base" ]; then
+                    class_moved=$(reach_class "$base" "$from")
+                    class_base=$base
+                fi
+                class_reaches "$gate" "$class_moved" || code_reaches=0
+                ;;
+            esac
             hit=$(printf '%s\n' "$moved" | while read -r f; do
                 [ -n "$f" ] || continue
                 reads "$gate" "$f" || continue
+                if [ "$code_reaches" = 0 ]; then
+                    case "$f" in
+                    src/*.jl | ext/*.jl) continue ;;
+                    esac
+                fi
                 if grep -qxF -- "$f" <<<"$own" ||
                     grep -qxF -- "$(dirname "$f")" <<<"$dirs"; then
                     echo "$f"

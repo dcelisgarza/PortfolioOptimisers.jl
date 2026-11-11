@@ -425,6 +425,43 @@ end
         @test occursin("prose src/a/one.jl\nreach prose\ngates size\n", out)
     end
 
+    @testset "a stamp goes stale only on a change that can alter what the gate measured" begin
+        # The branch changes the code of `src/a/one.jl` and a manual page, and records a stamp
+        # of each kind of gate.
+        dir, c0, _ = reach_repo(reach_text(; body = "x + 2"))
+        put(dir, "docs/src/page.md", "work\n")
+        head = commit(dir, "a page on work")
+        gates = ("jet", "coverage", "doctest", "doctest-files", "size", "prose",
+                 "test/t.jl")
+        @test first(stamp(dir, "record", gates...)) == 0
+        # The sibling commits `change` on `trunk`. Return the gates the guard names as stale.
+        function stale_on(change)
+            git(dir, "checkout", "-q", "trunk")
+            git(dir, "reset", "-q", "--hard", c0)
+            change()
+            from = commit(dir, "a sibling change")
+            git(dir, "checkout", "-q", "work")
+            _, out = stamp(dir, "check"; PRE_COMMIT_FROM_REF = from,
+                           PRE_COMMIT_TO_REF = head,
+                           PRE_COMMIT_REMOTE_BRANCH = "refs/heads/dev")
+            return Set(m.captures[1] for m in eachmatch(r"^  (\S+), measured on"m, out))
+        end
+        # A page of prose stales the prose gate, the test files and the full doctest run, and
+        # no gate that measures the code.
+        @test stale_on(() -> put(dir, "docs/src/page.md", "trunk\n")) ==
+              Set(["prose", "test/t.jl", "doctest"])
+        # A change to docstring prose in a file the branch changes stales neither JET, coverage
+        # nor a doctest stamp.
+        @test stale_on(() -> put(dir, "src/a/one.jl", reach_text(; doc = "Other prose."))) ==
+              Set(["size", "prose", "test/t.jl"])
+        # A changed block stales both doctest stamps, and neither JET nor coverage.
+        @test stale_on(() -> put(dir, "src/a/one.jl", reach_text(; out = "3"))) ==
+              Set(["doctest", "doctest-files", "size", "prose", "test/t.jl"])
+        # A change to the code stales every gate.
+        @test stale_on(() -> put(dir, "src/a/one.jl", reach_text(; body = "x + 3"))) ==
+              Set(gates)
+    end
+
     @testset "a commit this worktree pushed is not a sibling's change" begin
         dir, c0, c1, c2 = fixture_repo()
         @test first(stamp(dir, "record", "jet")) == 0

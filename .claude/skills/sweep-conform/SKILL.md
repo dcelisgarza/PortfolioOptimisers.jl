@@ -162,7 +162,11 @@ the push in two cases, and the refusal names what to do:
 - `dev` moved, after a gate ran, in a file or a `src/` directory your branch changes. Re-run only
   the gates your change can reach, and paste the `drop` line that the refusal prints for the rest.
   Your own pushed commits and a sibling's edit to a ledger file that a gate does not read do not
-  count.
+  count. A stamp goes stale only on a change that can alter what its gate measured. A sibling's
+  `.md` page stales the prose gate, the test files, and the full doctest run for a page under
+  `docs/src/`, and no gate that measures the code. A sibling's change to docstring prose under
+  `src/` stales neither `jet`, `coverage` nor a doctest stamp, and a changed `jldoctest` block
+  stales the doctest stamps alone of the three.
 - The push changes a `.jl` file under `src/` or `ext/`, and no stamp records a gate that the
   change reaches: `size`, `complexity` and `perf` always, and `jet`, `doctest-files` or
   `coverage` as `gate_stamp.sh reach` names them. Run the gate. If it cannot apply, record
