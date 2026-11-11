@@ -170,7 +170,7 @@ currency can hold it. With log returns the split has no cross term.
 
 ## Amendment (2026-11-03)
 
-**`currency_excess_index` holds a cash index across a gap inside its span.** Fact 7 defines the
+**`currency_excess_index` holds a cash index across a gap inside its span.** Point 7 defines the
 index as `FX_C(t) * cash_C(t) / cash_base(t)`, and a cash total-return index accumulates the cash
 rate of each period. A deposit accrues interest on every day, a holiday of its market included.
 So the index has a value at every observation from its first published value to its last one,
