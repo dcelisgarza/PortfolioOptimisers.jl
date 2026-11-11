@@ -33,7 +33,8 @@ the index form and keeps one candidate, as it did before, and it refuses `n_best
 `ArgumentError` that names the type and the method to add. A function scorer gives what a subtype
 gives, in the same form: one value per column, or the index of one winner. The search reads the
 form from the type of the return of its one call, and an index takes the same path as the index
-form of a subtype (ADR 0233).
+form of a subtype (ADR 0233). Build ticket #2000 builds this rule. Until then a function scorer
+gives an index and takes the fallback, as a subtype with only the index form does.
 
 Issue #1937 asked for a fallback that throws. A fallback that returns `nothing` keeps the same
 refusal at `n_best > 1`, and it lets the search read the values of every scorer that has them,
@@ -45,10 +46,10 @@ rank 1 comes from the same order at every `n_best`. The library spells "no value
 
 `GridSearchCrossValidation` and `RandomisedSearchCrossValidation` take `n_best::Integer = 1` after
 `scorer`. The constructor checks `n_best > 0`. A function scorer that returns an index is refused
-with `n_best > 1` when the search runs, because only its return shows its form (ADR 0233). The
-randomised search forwards `n_best` to
-the grid search of its trials. Its trials come from `rng`, so its order is the same in two runs only
-when `seed` is set.
+with `n_best > 1` when the search runs, because only its return shows its form (ADR 0233). Until
+build ticket #2000 lands, the constructor refuses every function scorer with `n_best > 1`. The
+randomised search forwards `n_best` to the grid search of its trials. Its trials come from `rng`,
+so its order is the same in two runs only when `seed` is set.
 
 ### 3. The order, the cap and the failed candidates
 

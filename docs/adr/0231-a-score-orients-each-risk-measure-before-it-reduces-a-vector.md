@@ -34,8 +34,8 @@ The readers of a risk do not change.**
 | Item | Rule |
 | --- | --- |
 | The readers of a risk | `expected_risk`, its value siblings, the derivative readers and the optimisers keep `sca::Scalariser`. `JuMPOptimiser.sca` keeps `NonHierarchicalScalariser`. `nothing` is not a value of their `sca`. |
-| The score | `oriented_score(sca, r, p; kwargs...)`, internal, in `07_Scoring.jl`. The caller holds the reduction and passes it first. A keyword form that took `sca` out of `kwargs` is removed (ADR 0232). For member `k` it reads `o_k * expected_risk(r_k, p; kwargs...) * r_k.settings.scale`, with `o_k = 1` when `bigger_is_better(r_k)` holds and `-1` otherwise. |
-| The bound | `const Sca_VecToScaM = Union{Scalariser, VectorToScalarMeasure, Function}`, after the precedent `Num_VecToScaM`. A slot that admits `nothing` binds `Option{<:Sca_VecToScaM}`. A `Number` is not a member, because it gives one score to every candidate. |
+| The score | `oriented_score(sca, r, p; kwargs...)`, internal, in `07_Scoring.jl`. The caller holds the reduction and passes it first. ADR 0232 removes the keyword form `oriented_score(r, p; sca, kwargs...)`, which takes `sca` out of `kwargs`. Build ticket #1997 removes it, and until then the code holds both forms. For member `k` it reads `o_k * expected_risk(r_k, p; kwargs...) * r_k.settings.scale`, with `o_k = 1` when `bigger_is_better(r_k)` holds and `-1` otherwise. |
+| The bound | `const Sca_VecToScaM = Union{Scalariser, VectorToScalarMeasure, Function}`, after the precedent `Num_VecToScaM`. A slot that admits `nothing` binds `Option{<:Sca_VecToScaM}`. The `r_sca` of a search also takes `PerCandidate(sca)` (ADR 0234). A `Number` is not a member, because it gives one score to every candidate. |
 | The seams | Neither seam changes. A `Scalariser` reduces the values through `scalarise` (ADR 0024). A `VectorToScalarMeasure` or a function reduces the vector of values through `vec_to_real_measure`. |
 | The orientation | Every value is "higher is better" before the reduction. So a vector of mixed orientation has one score, and no outer sign exists. `MaxScalariser` and `MaxValue` give the best member, and `MinScalariser` and `MinValue` the worst. The score reads every reduction as "higher is better", so `StdValue` gives the highest score to the largest spread. |
 | A negative scale | Used as given. It is a negative weight, so that member counts against the score. |
@@ -51,9 +51,11 @@ The scorers of paths take the score now:
   their job. A caller who followed the old docstring, `sign = -1` for a measure of which a
   bigger value is better, would invert that measure a second time.
 
-The two searches and `FoldRiskScorer` take the same score in the build tickets of map #1980.
-ADR 0232 (#1983) decides where a search holds the reduction of its risk measures, its default,
-and the shape of the scores under `nothing`. Issue #1984 decides the same for the search scorers.
+The two searches and `FoldRiskScorer` take the same score in the build tickets of map #1980,
+ticket #1998 for the searches and ticket #1999 for `FoldRiskScorer`. ADR 0232 (#1983) decides
+where a search holds the reduction of its risk measures, its default, and the shape of the scores
+under `nothing`. ADR 0233 (#1984) decides the same for the search scorers, and ADR 0234 (#1985)
+decides the selection when a candidate has more than one value.
 
 ## Considered options
 
@@ -73,12 +75,19 @@ and the shape of the scores under `nothing`. Issue #1984 decides the same for th
 
 - The defect of `quantile_by_measure` and `NearestQuantilePrediction` on a vector of mixed
   orientation is fixed, with a regression test in `test/test_24_cross_validation.jl`.
-- One measure, and a vector under `SumScalariser`, select and sort as before, bit for bit:
-  negation is exact, and a stable sort keeps the order of ties. A vector under `MaxScalariser`,
-  `MinScalariser` or `LogSumExpScalariser` moves, because the reduction reads oriented values.
-  `MinScalariser` gives the old `MaxScalariser` path. One measure of which a bigger value is
-  better, under the old default `sign = 1`, now reads `q = 1` as its worst path. The migration
-  guide names each break.
+- The result of a configuration that the old code admitted depends on the orientation of its
+  measures. Negation is exact, and a stable sort keeps the order of ties, so "as before" means
+  bit for bit.
+  - Measures of which a smaller value is better, one or a vector: under `SumScalariser` the
+    scorers select and sort as before. A vector under `MaxScalariser`, `MinScalariser` or
+    `LogSumExpScalariser` moves, because the reduction reads oriented values. `MinScalariser`
+    gives the old `MaxScalariser` result, and `MaxScalariser` the old `MinScalariser` result.
+  - Measures of which a bigger value is better, one or a vector: the oriented values are the
+    raw values, so `sort_by_measure` sorts as before under every reduction. Under the old default
+    `sign = 1`, `quantile_by_measure` now reads `q = 1` as the worst path, and `1 - q` selects
+    the old path when `q_kwargs` keeps `alpha` equal to `beta`.
+
+  The migration guide names each break.
 - `NearestQuantilePrediction`, `sort_by_measure` and `quantile_by_measure` admit a
   `VectorToScalarMeasure` or a function as the reduction of a vector, through `sca`.
 - No released number of a search moves, because both searches refuse a vector of measures now.

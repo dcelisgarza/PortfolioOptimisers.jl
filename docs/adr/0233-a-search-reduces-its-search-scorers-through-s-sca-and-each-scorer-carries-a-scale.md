@@ -78,6 +78,10 @@ Under `s_sca = nothing`, `rank_scores` holds one entry for each scorer.**
 
 ## Consequences
 
+- **The build tickets of map #1980.** The code holds none of this decision until they land.
+  Ticket #2000 gives the searches a vector of search scorers, `s_sca`, the scale of each scorer,
+  the two forms of a function scorer, and the `n_best` refusal at the run. Ticket #2001 builds
+  `rank_scores` under `s_sca = nothing` and its selection (ADR 0234).
 - **A breaking change, for the build.** The released docstring of `CrossValSearchScorer` says
   that a function returns an integer. The build widens it to the two forms. A released index
   function keeps its meaning. A released call of `HighestMeanScore()` keeps its meaning, because

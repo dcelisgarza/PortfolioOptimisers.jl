@@ -34,7 +34,7 @@ Four facts bore on the answer.
 
 | Item | Rule |
 | --- | --- |
-| The field | `r_sca::Option{<:Sca_VecToScaM}` on `GridSearchCrossValidation` and `RandomisedSearchCrossValidation`. The bound also takes `PerCandidate(sca)`, which combines the measures once per candidate after the search scorer (ADR 0234). The constructor refuses a `kwargs.sca`, and the error names `r_sca`. The reduction of the vector of search scorers is `s_sca` (#1984). |
+| The field | `r_sca::Option{<:Sca_VecToScaM}` on `GridSearchCrossValidation` and `RandomisedSearchCrossValidation`. The bound also takes `PerCandidate(sca)`, which combines the measures once per candidate after the search scorer (ADR 0234). The constructor refuses a `kwargs.sca`, and the error names `r_sca`. The reduction of the vector of search scorers is `s_sca` (ADR 0233). |
 | The name of a slot | A type that holds one reduction names its field `sca`. A type that holds two names them `r_sca`, for the risk measures, and `s_sca`, for the search scorers. So `NearestQuantilePrediction` and `FoldRiskScorer` each hold a field `sca`, and `NearestQuantilePrediction` refuses `r_kwargs.sca`. |
 | The default | `SumScalariser()`, as `expected_risk`, `oriented_score` and every reader bound to `BaseRM_VecBaseRM`. For one measure the slot is inert, so no search of one measure changes. |
 | The orientation | ADR 0231. Each measure is oriented before the reduction, so a higher score is better. The local `sgn` of each method goes away. A train score is oriented in the same way, so the build gives `oriented_score` a form for a fitted result. |
@@ -63,6 +63,12 @@ Four facts bore on the answer.
 
 ## Consequences
 
+- **The build tickets of map #1980.** The code holds none of this decision until they land.
+  Ticket #1997 gives `NearestQuantilePrediction` its field `sca`, gives `sort_by_measure` and
+  `quantile_by_measure` their keyword `sca`, and removes the keyword form of `oriented_score`.
+  Ticket #1998 gives the two searches `r_sca`, the one writer and the one allocator.
+  Ticket #1999 gives `FoldRiskScorer` its field `sca`. Ticket #2001 builds the shape under
+  `nothing` and its selection (ADR 0234).
 - **A breaking change, for the build.** The released `quantile_by_measure` and
   `NearestQuantilePrediction` pass `r_kwargs` to `expected_risk`, so a released caller can write
   `r_kwargs = (sca = MaxScalariser(),)`. That spelling is now refused, and the error names the

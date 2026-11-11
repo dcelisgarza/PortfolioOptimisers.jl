@@ -127,6 +127,11 @@ of the search states this as the form of the `refit` of sklearn.
 
 ## Consequences
 
+- **The build tickets of map #1980.** The code holds none of this decision until they land.
+  Ticket #2001 builds the shape of the Result under `r_sca = nothing` or `s_sca = nothing`, the
+  empty entry and its checks. Ticket #2002 builds `PerCandidate`. Ticket #2003 shows a search
+  with a vector of risk measures and a vector of search scorers in the tuning example and the
+  user guide.
 - **A breaking change, for the build.** Under `r_sca = nothing` or `s_sca = nothing` with a vector,
   `opt`, `idx`, `ranked`, `rank_idx` and `rank_scores` change type. These are new configurations,
   so they reach no released caller. The bound of `r_sca` widens to take `PerCandidate`.
