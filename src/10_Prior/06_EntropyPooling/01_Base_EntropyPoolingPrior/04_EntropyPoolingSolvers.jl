@@ -419,15 +419,23 @@ function entropy_pooling(w::VecNum, epc::AbstractDict,
     #! The box is halved before the clamp because `Optim` also refuses a start that sits
     #! *on* a boundary. Halving leaves the infinite bounds and the `:ineq` zero untouched.
     x0 = clamp.(fill(factor, size(A, 1)), view(wb, :, 1) / 2, view(wb, :, 2) / 2)
-    G = similar(x0)
     last_x = similar(x0)
-    grad = similar(G)
+    grad = similar(x0)
     y = similar(w)
+    function update!(x)
+        copy!(last_x, x)
+        y .= w .* exp.(-transpose(A) * x .- one(eltype(w)))
+        grad .= B - A * y
+        return nothing
+    end
+    #! The cache starts filled at `x0`. `similar` gives uninitialised memory, and a freed
+    #! array of an earlier fit can hold the values of `x0` exactly. `common_op` then skips
+    #! the update at the first point and reads a stale `y` and `grad`, so two equal calls
+    #! give two results. See issue #2031.
+    update!(x0)
     function common_op(x)
         if x != last_x
-            copy!(last_x, x)
-            y .= w .* exp.(-transpose(A) * x .- one(eltype(w)))
-            grad .= B - A * y
+            update!(x)
         end
     end
     function f(x)
@@ -511,17 +519,23 @@ function entropy_pooling(w::VecNum, epc::AbstractDict,
     #! The box is halved before the clamp because `Optim` also refuses a start that sits
     #! *on* a boundary. Halving leaves the infinite bounds and the `:ineq` zero untouched.
     x0 = clamp.(fill(factor, size(A, 1)), view(wb, :, 1) / 2, view(wb, :, 2) / 2)
-    G = similar(x0)
     last_x = similar(x0)
-    grad = similar(G)
+    grad = similar(x0)
     log_x = similar(log_p)
     y = similar(log_p)
+    function update!(x)
+        copy!(last_x, x)
+        log_x .= log_p .- (one(eltype(log_p)) .+ transpose(A) * x)
+        y .= exp.(log_x)
+        grad .= B - A * y
+        return nothing
+    end
+    #! The cache starts filled at `x0`, for the reason that the `ExpEntropyPooling` method
+    #! states. See issue #2031.
+    update!(x0)
     function common_op(x)
         if x != last_x
-            copy!(last_x, x)
-            log_x .= log_p .- (one(eltype(log_p)) .+ transpose(A) * x)
-            y .= exp.(log_x)
-            grad .= B - A * y
+            update!(x)
         end
     end
     function f(x)

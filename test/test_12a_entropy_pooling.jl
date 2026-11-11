@@ -3042,3 +3042,35 @@ end
                                                                                                                                      fa)
     @test fa.fails[] == 1
 end
+#=
+Issue #2031. The two dual methods of `entropy_pooling` cache the point of the last
+evaluation in `last_x`, and skip the update of `y` and `grad` when `x == last_x`. The cache
+started as `similar(x0)`, which is uninitialised memory. A freed array that held the values
+of `x0` could fill it, and the first evaluation then read a stale `y` and `grad`, so two
+equal calls gave two posteriors. The loop frees many arrays that hold `x0` before each call,
+and alternates an incremental and a full collection. On the old code, in two runs, 24 to 46
+of 100 calls of `ExpEntropyPooling` and 46 to 64 of 100 of `LogEntropyPooling` gave a
+different posterior. A loop with one kind of collection alone gave no difference.
+=#
+@testset "Two equal dual entropy pooling calls give one posterior" begin
+    pr0 = prior(EmpiricalPrior(), rd)
+    epc = Dict{Symbol, Tuple{<:PortfolioOptimisers.MatNum, <:PortfolioOptimisers.VecNum}}()
+    PortfolioOptimisers.ep_mu_views!(LinearConstraintEstimator(;
+                                                               val = "AAPL == prior(AAPL)*1.5"),
+                                     epc, pr0, sets)
+    T = size(pr0.X, 1)
+    w0 = fill(inv(T), T)
+    x0 = fill(inv(sqrt(T)), 1 + sum(length(last(v)) for v in values(epc)))
+    for alg in (ExpEntropyPooling(), LogEntropyPooling())
+        opt = OptimEntropyPooling(; alg = alg)
+        p_ref = collect(PortfolioOptimisers.entropy_pooling(w0, epc, opt))
+        n_diff = 0
+        for i in 1:100
+            junk = [copy(x0) for _ in 1:2000]
+            junk = nothing
+            GC.gc(isodd(i))
+            n_diff += collect(PortfolioOptimisers.entropy_pooling(w0, epc, opt)) != p_ref
+        end
+        @test n_diff == 0
+    end
+end
