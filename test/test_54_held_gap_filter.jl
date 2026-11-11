@@ -1030,6 +1030,44 @@ end
                                                                              Xp)
 end
 
+@testset "A clustering refuses a NaN pair by name, and a zero variance is one cause (R44 of #1817)" begin
+    # k-means gave the NaN of an undetermined pair to `Clustering.kmeans`, which refused it as
+    # a weight and named neither the cell nor the cause.
+    Xp = copy(X0[:, 1:3])
+    Xp[1:30, 1] .= NaN
+    Xp[31:end, 2] .= NaN
+    cep = Covariance(; cvg = CoveragePolicy(; min_coverage = 0.4, peel = nothing))
+    @test_throws r"a k-means partition has no place for a NaN distance.*D\[2, 1\] => NaN"s clusterise(ClustersEstimator(;
+                                                                                                                        ce = cep,
+                                                                                                                        alg = KMeansAlgorithm()),
+                                                                                                      Xp)
+    # An asset with zero variance has a correlation of one with itself and a NaN with every
+    # other asset. Its diagonal entry is finite, so it is not a refused row and a fit does not
+    # drop it. Each clustering refuses the pair, and the message names a zero variance.
+    Xz = copy(X0)
+    Xz[:, 3] .= 0.0
+    S, D = cor_and_dist(Distance(), Covariance(), Xz)
+    @test isone(S[3, 3]) && iszero(D[3, 3])
+    @test all(isnan, D[3, [1, 2, 4]])
+    @test isnothing(PO.assert_distance_reader_rows(D))
+    for alg in (HClustAlgorithm(), KMeansAlgorithm())
+        @test_throws r"zero variance.*D\[3, 1\] => NaN"s clusterise(ClustersEstimator(;
+                                                                                      ce = Covariance(),
+                                                                                      alg = alg),
+                                                                    Xz)
+    end
+    # The refusal of a row names the readers that drop it and no zero variance, which gives
+    # no such row.
+    err = try
+        PO.assert_distance_reader_rows([NaN 0.0; 0.0 0.0])
+    catch e
+        e
+    end
+    @test err isa DistanceReaderRefusalError && err.idx == [1]
+    @test occursin("Every other caller receives this error", err.msg)
+    @test !occursin("zero variance", err.msg)
+end
+
 # The panel for a window of `t` observations over `N2` assets, so an expanding walk-forward can
 # be driven a fold at a time without the cross-validation machinery in the way: a fold's fit is
 # exactly this call.

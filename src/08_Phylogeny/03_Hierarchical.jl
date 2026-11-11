@@ -610,7 +610,7 @@ Estimates the similarity and distance matrices from `X`, makes a dendrogram unde
 # Validation
 
   - No diagonal entry of `D` is `NaN`. Raises a [`DistanceReaderRefusalError`](@ref) that names the columns of the assets that the reader could not estimate. A fit catches it and drops those assets.
-  - `D` holds no other `NaN`. Raises a `DomainError` that names the first `NaN` cell, an undetermined pair. Without the check, `Clustering.hclust` refuses `D` as not symmetric, because `NaN` is not equal to itself.
+  - `D` holds no other `NaN`. Raises a `DomainError` that names the first `NaN` cell, a pair, through [`assert_no_nan_distance`](@ref). An asset with zero variance gives such a pair at every other asset. Without the check, `Clustering.hclust` refuses `D` as not symmetric, because `NaN` is not equal to itself.
 
 # Returns
 
@@ -625,10 +625,7 @@ function clusterise(cle::ClustersEstimator{<:Any, <:Any, <:HClustAlgorithm, <:An
                     X::MatNum; branchorder::Symbol = :optimal, dims::Int = 1, kwargs...)
     S, D = cor_and_dist(cle.de, cle.ce, X; dims = dims, kwargs...)
     assert_distance_reader_rows(D)
-    c = findfirst(isnan, D)
-    @argcheck(isnothing(c),
-              DomainError(D[c],
-                          "a dendrogram has no place for a NaN distance. Two assets whose correlations the reader estimated share too few observations for a correlation of the pair. Give the `CoveragePolicy` of the reader a `peel` that removes the pair. Got\nD[$(c[1]), $(c[2])] => $(D[c])"))
+    assert_no_nan_distance(D, "a dendrogram")
     res = branch_ordered_hclust(D, cle.alg.linkage, Val(branchorder))
     k = optimal_number_clusters(cle.onc, res, D)
     return Clusters(; res = res, S = S, D = D, k = k)

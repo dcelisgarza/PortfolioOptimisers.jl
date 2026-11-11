@@ -1008,7 +1008,7 @@ end
 
 Refuse the assets whose correlation a distance reader could not estimate, before a graph verb builds its tree or its graph.
 
-A distance reader gives a `NaN` row and column, its diagonal entry included, for an asset whose correlation it cannot estimate, see [`DistanceReaderRefusalError`](@ref). Every distance of a correlation keeps the `NaN`, so the distance matrix has a `NaN` diagonal entry for that asset and a finite one for every other asset. A dendrogram and a weighted graph have no place for such an asset. The function reads only the diagonal of `D`, so it costs one pass over `N` entries, against the `N^2 T` of the estimate. A `NaN` off the diagonal between two assets with a finite diagonal is an undetermined pair, and the verb that reads the distance refuses it with its own error.
+A distance reader gives a `NaN` row and column, its diagonal entry included, for an asset whose correlation it cannot estimate, see [`DistanceReaderRefusalError`](@ref). Every distance of a correlation keeps the `NaN`, so the distance matrix has a `NaN` diagonal entry for that asset and a finite one for every other asset. A dendrogram and a weighted graph have no place for such an asset. The function reads only the diagonal of `D`, so it costs one pass over `N` entries, against the `N^2 T` of the estimate. A `NaN` off the diagonal between two assets with a finite diagonal has another cause, and the verb that reads the distance refuses it with its own error, see [`assert_no_nan_distance`](@ref). An asset with zero variance gives such a `NaN`, and not a `NaN` diagonal entry, because the correlation estimators set the diagonal to one.
 
 # Algorithm
 
@@ -1037,9 +1037,52 @@ A distance reader gives a `NaN` row and column, its diagonal entry included, for
 function assert_distance_reader_rows(D::MatNum)::Nothing
     idx = findall(isnan, LinearAlgebra.diag(D))
     if !isempty(idx)
-        throw(DistanceReaderRefusalError("the distance reader cannot estimate the correlation of $(length(idx)) asset(s), at the columns $(idx) of the matrix that it read. An asset with zero variance gives such a row, and so does an asset that the `CoveragePolicy` of the `ce` of the reader refuses while the prior keeps it. A fit drops these assets from the Investable Mask, and refuses them under `strict = true`. To keep them, give the reader the `CoveragePolicy` of the prior, or state the prior as its source, `x_src = PriorSource()`.",
+        throw(DistanceReaderRefusalError("the distance reader cannot estimate the correlation of $(length(idx)) asset(s), at the columns $(idx) of the matrix that it read. An asset that the `CoveragePolicy` of the `ce` of the reader refuses while the prior keeps it gives such a row. A fit of a hierarchical optimiser or of `NestedClustered`, and the `ple` and `cte` readers of a `JuMPOptimiser`, drop these assets from the Investable Mask, and refuses them under `strict = true`. Every other caller receives this error. To keep the assets, give the reader the `CoveragePolicy` of the prior, or state the prior as its source, `x_src = PriorSource()`.",
                                          idx))
     end
+    return nothing
+end
+"""
+    assert_no_nan_distance(D::MatNum, what::AbstractString) -> Nothing
+
+Refuse a `NaN` distance between two assets, before a clustering reads `D`.
+
+Call it after [`assert_distance_reader_rows`](@ref), so every diagonal entry of `D` is finite and each `NaN` is a pair. Two causes give one:
+
+  - Two assets share too few observations for a correlation of the pair, while the reader estimates each of them. A `peel` of the `CoveragePolicy` of the reader removes one asset of such a pair.
+  - An asset has zero variance. The correlation of a constant is `0 / 0`, so the reader gives it a `NaN` at every other asset. The correlation estimators set the diagonal to one, so [`assert_distance_reader_rows`](@ref) does not see the asset, and a fit does not drop it.
+
+`Clustering.hclust` refuses a `NaN` as a matrix that is not symmetric, because `NaN` is not equal to itself, and `Clustering.kmeans` refuses it as a weight. Neither error names the cell or the cause. `Inf` stays, because [`LogDistance`](@ref) gives it for two uncorrelated assets.
+
+# Algorithm
+
+ 1. Find the first cell `c` of `D` that is `NaN`, in column order.
+ 2. Return `nothing` when `c` is `nothing`. Otherwise throw a `DomainError` that names `c`.
+
+# Arguments
+
+  - `D`: The distance matrix of the reader, `N × N`.
+  - `what`: The structure that the caller builds, for the message, such as `"a dendrogram"`.
+
+# Validation
+
+  - `D` holds no `NaN`. Raises a `DomainError` that names the first `NaN` cell and the two causes.
+
+# Returns
+
+  - `nothing`.
+
+# Related
+
+  - [`assert_distance_reader_rows`](@ref)
+  - [`clusterise`](@ref)
+  - [`CoveragePolicy`](@ref)
+"""
+function assert_no_nan_distance(D::MatNum, what::AbstractString)::Nothing
+    c = findfirst(isnan, D)
+    @argcheck(isnothing(c),
+              DomainError(D[c],
+                          "$(what) has no place for a NaN distance. Each asset has a finite diagonal entry, so the NaN is a pair, and two causes give one. Two assets whose correlations the reader estimated share too few observations for a correlation of the pair: give the `CoveragePolicy` of the reader a `peel` that removes the pair. Or an asset has zero variance, so its correlation with every other asset is undefined: remove the asset from the data. Got\nD[$(c[1]), $(c[2])] => $(D[c])"))
     return nothing
 end
 

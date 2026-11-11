@@ -241,7 +241,7 @@ Estimates the similarity and distance matrices from `X`, then passes `D` to [`op
 
 # Algorithm
 
- 1. Estimate the similarity matrix `S` and the distance matrix `D` from `X` with [`cor_and_dist`](@ref), under `cle.de` and `cle.ce`. Refuse each asset that the reader could not estimate with [`assert_distance_reader_rows`](@ref).
+ 1. Estimate the similarity matrix `S` and the distance matrix `D` from `X` with [`cor_and_dist`](@ref), under `cle.de` and `cle.ce`. Refuse each asset that the reader could not estimate with [`assert_distance_reader_rows`](@ref). Then refuse any other `NaN` in `D` with [`assert_no_nan_distance`](@ref).
  2. Pass `D` and the algorithm `cle.alg` to [`optimal_number_clusters`](@ref)`(cle.onc, cle.alg, D)`, which returns the partition `res` and its count `k`. No other clustering runs, because `res` is the partition at the selected count.
  3. Return `Clusters(; res = res, S = S, D = D, k = k)`. The field `P` keeps its default, `nothing`, because the clustering ran on `D` itself.
 
@@ -255,6 +255,7 @@ Estimates the similarity and distance matrices from `X`, then passes `D` to [`op
 # Validation
 
   - No diagonal entry of `D` is `NaN`. Raises a [`DistanceReaderRefusalError`](@ref) that names the columns of the assets that the reader could not estimate. A fit catches it and drops those assets.
+  - `D` holds no other `NaN`. Raises a `DomainError` that names the first `NaN` cell, a pair, through [`assert_no_nan_distance`](@ref). An asset with zero variance gives such a pair at every other asset. Without the check, `Clustering.kmeans` refuses the `NaN` as a weight, and names neither the cell nor the cause.
 
 # Returns
 
@@ -271,6 +272,7 @@ function clusterise(cle::ClustersEstimator{<:Any, <:Any,
                                            <:Any}, X::MatNum; dims::Int = 1, kwargs...)
     S, D = cor_and_dist(cle.de, cle.ce, X; dims = dims, kwargs...)
     assert_distance_reader_rows(D)
+    assert_no_nan_distance(D, "a k-means partition")
     res, k = optimal_number_clusters(cle.onc, cle.alg, D)
     return Clusters(; res = res, S = S, D = D, k = k)
 end
