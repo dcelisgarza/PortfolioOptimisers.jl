@@ -590,6 +590,30 @@ end
         @test we ≈ [3.5, 2.8, 2.7] ./ 9
         @test kl(we, w3) < kl(wi, w3)
     end
+    @testset "An absent bound is an infinity, so integer weights raise (R40 of #1817)" begin
+        # `typemin(Int)` is finite, so an absent bound bounded integer weights, and
+        # `[0, -5]` under `ub = 0` projected to `-9.2e18` with no error (#1972 removed the
+        # float step that guarded it). Integer weights are outside the domain, so they raise.
+        bound = PortfolioOptimisers.absent_weight_bound
+        @test bound(typemin, Float64) === -Inf
+        @test bound(typemax, Float32) === Inf32
+        @test bound(typemax, Rational{Int}) == 1 // 0
+        @test_throws ArgumentError bound(typemin, Int)
+        euc = PortfolioOptimisers.euclidean_weight_projection
+        ent = PortfolioOptimisers.entropic_weight_projection
+        @test_throws ArgumentError euc([0, -5], WeightBounds(; lb = nothing, ub = 0))
+        @test_throws ArgumentError ent([4, 1], WeightBounds(; lb = -3, ub = nothing))
+        for wf in (IterativeWeightFinaliser(), EuclideanWeightFinaliser(),
+                   EntropicWeightFinaliser())
+            @test_throws ArgumentError PortfolioOptimisers.finalise_weight_bounds(wf,
+                                                                                  WeightBounds(;
+                                                                                               lb = nothing,
+                                                                                               ub = 1),
+                                                                                  [2, 1, 0])
+        end
+        # A float vector under the same bounds projects, as before.
+        @test euc([0.0, -5.0], WeightBounds(; lb = nothing, ub = 0)) == [0.0, -5.0]
+    end
     @testset "A Rational weight vector meets its bounds exactly (#1349)" begin
         # `weights_meet_bounds` took `sqrt(eps(T))`, and `Rational` has no `eps`, so every
         # finaliser threw on `Rational` weights, also with no bounds at all.

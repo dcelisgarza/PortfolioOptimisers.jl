@@ -265,6 +265,8 @@ So the layer is one of the few entry points of integer data, and this record kee
 `PricesResult`, `NumericPanelField` and `TensorPanelField`. Each converts an integer element type
 once, at construction, through the array method of `float_if_integer`, and keeps every other array
 as it is. The amendment of 2026-09-26 called `float_if_integer` the one guard of every site. It is
-now the one guard of the entry points, and `test/test_55_numeric_coercion_census.jl` holds the list
-of the files that may call it. A verb called with a bare integer matrix is outside the supported
+now the one guard of the entry points. Three sites outside the carriers keep it, because their
+integer is natural: the codes of a `CategoricalPanelField` (`panel_read_eltype`), the integer count
+of a metric such as Hamming in a feature distance, and the `Bool` adjacency of the DBHT graph
+traversal. `test/test_55_numeric_coercion_census.jl` holds the list of the files that may call it. A verb called with a bare integer matrix is outside the supported
 domain. `Rational` is a separate decision, and this amendment does not take it.

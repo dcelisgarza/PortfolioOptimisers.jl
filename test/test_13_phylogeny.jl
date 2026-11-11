@@ -502,6 +502,11 @@
             @test isapprox(Se, one(eltype(De)) .- De)
             # `dims` retargets to `Z`, so a transposed matrix gives the same answer.
             @test isapprox(distance(de, permutedims(Zc); dims = 2), distance(de, Zc))
+            # An integer adjacency, such as the `Int` result of `phylogeny_matrix`, is a natural
+            # integer (#1972), so the distance floats it and equals the distance of its float copy.
+            Zn = [1 0 1; 0 1 1; 1 1 0]
+            @test eltype(distance(de, Zn)) === Float64
+            @test distance(de, Zn) == distance(de, float.(Zn))
             # Asset views are `SubArray`s and need no `collect`.
             Zi = [1.0 0.0 1.0; 0.0 1.0 1.0; 1.0 1.0 0.0]
             @test isapprox(distance(de, view(Zi, 1:2, :)), distance(de, Zi[1:2, :]))

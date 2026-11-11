@@ -23,7 +23,8 @@ end
     these spellings of a container of `Any`:
 
     - a container type with `Any` as a parameter, such as `Vector{Any}`, `Dict{Symbol, Any}` or
-      `Tuple{String, Any}`. A bound `<:Any` is not `Any`, so a method signature passes;
+      `Tuple{String, Any}`, and `Vararg{Any}`, so `Tuple{Vararg{Any}}`. A bound `<:Any` is not
+      `Any`, so a method signature passes;
     - a typed literal or comprehension, `Any[…]` and `Any[x for x in v]`;
     - an empty untyped literal `[]`, and a constructor with no type parameter and no argument,
       `Dict()`, `Set()`, `IdDict()` and `Vector()`;
@@ -47,7 +48,7 @@ end
 
     CONTAINERS = (:Vector, :Matrix, :Array, :AbstractVector, :AbstractMatrix,
                   :AbstractArray, :Dict, :AbstractDict, :IdDict, :Set, :Ref, :Pair, :Tuple,
-                  :NTuple)
+                  :NTuple, :Vararg)
     EMPTY_CONSTRUCTORS = (:Dict, :Set, :IdDict, :Vector)
     ANY_ARGUMENT = (:collect, :similar, :fill, :zeros, :Array)
 
@@ -187,6 +188,8 @@ end
     @test spell("Dict{Symbol, Any}()") == "Dict{…Any…}"
     @test spell("Base.Dict{Symbol, Any}") == "Base.Dict{…Any…}"
     @test spell("Tuple{String, Any, Any}") == "Tuple{…Any…}"
+    # `Tuple{Vararg{Any}}` is the plain `Tuple`, a tuple of any values.
+    @test spell("Tuple{Vararg{Any}}") == "Vararg{…Any…}"
     @test spell("Any[1, 2]") == "Any[…]"
     @test spell("Any[x for x in v]") == "Any[…]"
     @test spell("[]") == "[]"

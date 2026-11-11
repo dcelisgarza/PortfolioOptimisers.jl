@@ -246,7 +246,7 @@
     @test isempty(filled)
 
     if !isempty(divided)
-        @info "Sites that read a working type off a division; take the type of the data and pass it to `float_if_integer`:\n" *
+        @info "Sites that read a working type off a division; take the type of the data with `eltype`:\n" *
               join(divided, "\n")
     end
     @test isempty(divided)

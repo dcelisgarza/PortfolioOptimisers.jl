@@ -401,7 +401,7 @@ A set of bounds that cannot hold the budget has no feasible vector. Four weights
 The steps are those of [`opt_weight_bounds`](@ref) for this type.
 
  1. Return `w` unchanged when it breaks no bound.
- 2. Read the budget `s1` as `sum(w)`, and keep the input as `w0`. Read an absent bound as `typemin` or `typemax` of the element type of `w`, which becomes a float type when it is an integer type.
+ 2. Read the budget `s1` as `sum(w)`, and keep the input as `w0`. Read an absent bound as `typemin` or `typemax` of the element type of `w`, which must be infinite, through [`absent_weight_bound`](@ref).
  3. Clip `w` to the bounds.
  4. Mark the free entries `idx`, which lie strictly inside their bounds after the clip.
  5. Subtract the mass that the clip added below `lb` from the mass that it removed above `ub`, giving `delta`.

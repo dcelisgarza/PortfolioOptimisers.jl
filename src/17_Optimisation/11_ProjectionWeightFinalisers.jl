@@ -105,6 +105,38 @@ function weights_break_bounds(wb::WeightBounds, w::VecNum)::Bool
            any(Broadcast.instantiate(Broadcast.broadcasted(>, w, wb.ub)))
 end
 """
+    absent_weight_bound(f, T::Type) -> T
+
+Reads an absent weight bound as `f(T)`, where `f` is `typemin` for a lower bound and `typemax` for an upper bound, and `T` is the element type of the weights.
+
+An absent bound bounds nothing, so it must be an infinity of `T`. `typemin(Float64)` is `-Inf`, and `typemax(Rational{Int})` is `1//0`. An integer type has a finite `typemin` and a finite `typemax`, which bound the weights and overflow in `w .- ub`. Integer weights are outside the domain of a weight finaliser, so a finite read raises, and the finaliser does not return a wrong weight.
+
+# Arguments
+
+  - `f`: `typemin` or `typemax`.
+  - `T`: The element type of the weights.
+
+# Validation
+
+  - `f(T)` is not finite, else an `ArgumentError` that names `T` and tells you to convert the weights to a floating-point type.
+
+# Returns
+
+  - `b::T`: The infinity `f(T)`.
+
+# Related
+
+  - [`euclidean_weight_projection`](@ref)
+  - [`entropic_weight_projection`](@ref)
+  - [`IterativeWeightFinaliser`](@ref)
+"""
+function absent_weight_bound(f::Union{typeof(typemin), typeof(typemax)}, T::Type)
+    b = f(T)
+    @argcheck(!isfinite(b),
+              ArgumentError("an absent weight bound is read as $f($T), which must be infinite, but it is $b. Integer weights are outside the domain of a weight finaliser. Convert the weights to a floating-point type."))
+    return b
+end
+"""
     euclidean_weight_projection(w::VecNum, wb::WeightBounds) -> VecNum
 
 Projects `w` in the Euclidean norm onto the weights that lie in the bounds `wb` and sum to `sum(w)`.
@@ -114,7 +146,7 @@ Projects `w` in the Euclidean norm onto the weights that lie in the bounds `wb` 
 # Algorithm
 
  1. Read the budget `s` as `sum(w)`.
- 2. Read the bounds `lb` and `ub`. An absent bound is the infinity of the type that a division of two weights returns, so it adds no kink.
+ 2. Read the bounds `lb` and `ub`. An absent bound is the infinity of the element type of `w`, which [`absent_weight_bound`](@ref) reads, so it adds no kink.
  3. Collect the kinks `w .- ub` and `w .- lb`. At a kink, one weight reaches one of its bounds. Between two neighbouring kinks, the sum of `clamp.(w .- theta, lb, ub)` is linear in `theta` and does not increase.
  4. Find the shift `theta` at which that sum equals `s`, with [`breakpoint_root`](@ref) over the kinks.
  5. Return `clamp.(w .- theta, lb, ub)`.
@@ -136,10 +168,10 @@ Projects `w` in the Euclidean norm onto the weights that lie in the bounds `wb` 
 """
 function euclidean_weight_projection(w::VecNum, wb::WeightBounds)
     s = sum(w)
-    # An absent bound is an infinity of the type the root lands in, so it adds no kink.
+    # An absent bound is an infinity of the element type of `w`, so it adds no kink.
     T = eltype(w)
-    lb = isnothing(wb.lb) ? typemin(T) : wb.lb
-    ub = isnothing(wb.ub) ? typemax(T) : wb.ub
+    lb = isnothing(wb.lb) ? absent_weight_bound(typemin, T) : wb.lb
+    ub = isnothing(wb.ub) ? absent_weight_bound(typemax, T) : wb.ub
     # `Σ clip(w − θ, lb, ub)` is piecewise linear and non-increasing in `θ`, with its kinks
     # at `w − ub` and `w − lb`. `breakpoint_root` finds where a function crosses one, so the
     # budget `s` is moved to one.
@@ -226,7 +258,7 @@ Projects `w` in relative entropy onto the weights that lie in the bounds `wb` an
 # Algorithm
 
  1. Read the budget `s` as `sum(w)`.
- 2. Spread the bounds over the assets as `lb` and `ub`. An absent lower bound is zero, which changes no clip of a non-negative weight. An absent upper bound is the infinity of the type that a division of two weights returns.
+ 2. Spread the bounds over the assets as `lb` and `ub`. An absent lower bound is zero, which changes no clip of a non-negative weight. An absent upper bound is the infinity of the element type of `w`, which [`absent_weight_bound`](@ref) reads.
  3. When the entropic projection is not defined, return the projection from [`euclidean_weight_projection`](@ref). The projection is not defined when a weight or a lower bound is negative, or when `s` is not positive. It is also not defined when `s` is at most `sum(lb)`, or above the sum of `ub` over the positive weights and `lb` over the zero weights. At `s = sum(lb)`, the only feasible vector is `lb`, and the Euclidean projection returns it.
  4. Collect the kinks `lb ./ w` and `ub ./ w`. At a kink, one weight reaches one of its bounds. Between two neighbouring kinks, the sum of `clamp.(t .* w, lb, ub)` is linear in the scale `t` and does not decrease.
  5. Find the scale `t` at which that sum equals `s`, with [`breakpoint_root`](@ref) over the negated kinks. [`breakpoint_root`](@ref) needs a sum that does not increase, so it searches in `-t`.
@@ -252,7 +284,7 @@ function entropic_weight_projection(w::VecNum, wb::WeightBounds)
     # `zero(w) .+ b` spreads a scalar bound over the assets.
     T = eltype(w)
     lb = isnothing(wb.lb) ? zero(w) : zero(w) .+ wb.lb
-    ub = isnothing(wb.ub) ? zero(w) .+ typemax(T) : zero(w) .+ wb.ub
+    ub = isnothing(wb.ub) ? zero(w) .+ absent_weight_bound(typemax, T) : zero(w) .+ wb.ub
     if !(s > zero(s) &&
          all(x -> x >= zero(x), w) &&
          all(x -> x >= zero(x), lb) &&
@@ -370,8 +402,8 @@ function opt_weight_bounds(wf::IterativeWeightFinaliser, wb::WeightBounds, w::Ve
         return w
     end
     T = eltype(w)
-    lb = isnothing(wb.lb) ? typemin(T) : wb.lb
-    ub = isnothing(wb.ub) ? typemax(T) : wb.ub
+    lb = isnothing(wb.lb) ? absent_weight_bound(typemin, T) : wb.lb
+    ub = isnothing(wb.ub) ? absent_weight_bound(typemax, T) : wb.ub
     w0 = w
     s1 = sum(w)
     for _ in 1:(wf.iter)
