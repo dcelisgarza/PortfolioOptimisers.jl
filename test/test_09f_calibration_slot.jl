@@ -4523,6 +4523,11 @@ end
                                                                                    val = crule))
     @test_throws ArgumentError PO.assert_penalty_coefficient_role([LpRegularisation(;
                                                                                     val = crule)])
+    # The family of ceiling rules has no member in the library since #2013 removed
+    # `EffectiveAssetFloor`, so a rule of a user is the one that reaches this refusal.
+    @test_throws ArgumentError PO.assert_penalty_coefficient_role(ProbeCeilingValue(0.5))
+    @test_throws ArgumentError PO.assert_penalty_coefficient_role(LpRegularisation(;
+                                                                                   val = ProbeCeilingValue(0.5)))
 
     # A radius has no reading as a ceiling, so the constraint route refuses it.
     @test isnothing(PO.assert_norm_ceiling_role(1e-3))

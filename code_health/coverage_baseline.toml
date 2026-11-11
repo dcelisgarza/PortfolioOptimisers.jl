@@ -425,7 +425,7 @@ commit = "391be5e"
 "src/21_Pipeline/04_PredictionCV.jl" = { lines = 136, misses = 0 }
 "src/21_Pipeline/05_SearchCrossValidation.jl" = { lines = 105, misses = 0 }
 "src/21_Pipeline/06_OnlinePipeline.jl" = { lines = 254, misses = 0 }
-"src/21_Pipeline/07_AssetScorers.jl" = { lines = 137, misses = 0 }
+"src/21_Pipeline/07_AssetScorers.jl" = { lines = 139, misses = 1 }
 "src/21_Pipeline/08_ScoreWeightBounds.jl" = { lines = 32, misses = 0 }
 "src/22_Plotting.jl" = { lines = 45, misses = 1 }
 "src/23_Aliases.jl" = { lines = 43, misses = 0 }

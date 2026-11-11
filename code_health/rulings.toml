@@ -856,6 +856,17 @@ definition = "coverage_regression"
 misses = 1
 rationale = "a-signature-line-counter-on-a-method-whose-body-is-reached"
 
+# Run 42928050611 (ebde4ddb88, R31 of #1817): the `function` line of the `::Any` method reads 0
+# while its `return` line runs, through the grid over a `MeanRisk` in `test_30b_asset_scorers.jl`.
+# A local `run_files.jl --coverage` of that file alone gives the same single miss, on that line.
+# ebde4ddb88 added a second caller, the constructor of `WeightMassScorer`. The file had no miss
+# before it.
+[[coverage_exemption]]
+path = "src/21_Pipeline/07_AssetScorers.jl"
+definition = "weight_mass_grid"
+misses = 1
+rationale = "a-signature-line-counter-on-a-method-whose-body-is-reached"
+
 # --- JET dismissals --------------------------------------------------------
 #
 # Keyed (file, kind, message), ADR 0071. A Dismissal matches every report of its fingerprint in
