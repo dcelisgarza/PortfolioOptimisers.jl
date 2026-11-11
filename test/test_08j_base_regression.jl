@@ -2192,6 +2192,26 @@ struct BareTestRegression <: PortfolioOptimisers.AbstractCrossSectionalRegressio
             @test eltype(csrr.f) == Rational{Int}
             @test csrr.f[1] ≈ 13 / 14
         end
+        # Inputs of mixed types fit in their promotion, bit for bit as the promoted data do.
+        # Gathers in the type of each input solved a `Float32` design against `Float64`
+        # returns, gave `GLM` vectors of two types, and overflowed `Rational` weights in the
+        # weighted mean of an intercept (R37 of #1817).
+        rng = StableRNG(181737)
+        Zm, Xm, Wm = randn(rng, 30, 3, 4), randn(rng, 4, 30), 0.5 .+ rand(rng, 4, 30)
+        mixes = ((Float32.(Zm), Xm, Float32.(Wm)), (Zm, Float32.(Xm), Wm),
+                 (Zm, Xm, rationalize.(Wm; tol = 1e-6)))
+        for (Z, X, W) in mixes, intercept in (false, true),
+            mk in (CrossSectionalLinearRegression, CrossSectionalTargetRegression)
+
+            T = promote_type(eltype(Z), eltype(X), eltype(W))
+            cre = mk(; intercept)
+            a = cross_sectional_regression(cre, Z, X, W)
+            b = cross_sectional_regression(cre, T.(Z), T.(X), T.(W))
+            @test eltype(a.f) == T
+            @test a.f == b.f
+            @test a.eps == b.eps
+            @test isequal(a.b, b.b)
+        end
     end
 end
 

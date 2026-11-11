@@ -211,11 +211,11 @@ $(DocStringExtensions.TYPEDEF)
 
 Solves the normal equations of a well-conditioned design, and gives every other design to [`PseudoInverseFallback`](@ref).
 
-The member forms the Gram matrix ``\\mathbf{D}^{\\intercal} \\mathbf{D}`` of the weighted design and factorises it by a Cholesky factorisation with pivots. That costs about half of the column-pivoted `QR` that the other members take. The Gram matrix squares the condition number of the design, so the answer loses about twice the digits that the `QR` loses. The pivots of the factorisation estimate the condition number of the design. When that estimate is at most ``\\epsilon^{-1/4}``, about ``8 \\times 10^{3}`` in `Float64`, the member solves the normal equations, and it counts every column, as the rank test of [`cross_sectional_rank`](@ref) does on such a design. Otherwise it takes the answer and the count of [`PseudoInverseFallback`](@ref), so it never answers a nearly dependent design with the normal equations.
+The member forms the Gram matrix ``\\mathbf{D}^{\\intercal} \\mathbf{D}`` of the weighted design and factorises it by a Cholesky factorisation with pivots. That costs about half of the column-pivoted `QR` that the other members take. The Gram matrix squares the condition number of the design, so the answer loses about twice the digits that the `QR` loses. The triangular factor of the factorisation has the condition number of the design, and [`cross_sectional_gram_conditioned`](@ref) estimates it in the 1-norm. When the factorisation has full rank and that estimate is at most ``\\epsilon^{-1/4}``, about ``8 \\times 10^{3}`` in `Float64`, the member solves the normal equations, and it counts every column, as the rank test of [`cross_sectional_rank`](@ref) does on such a design. Otherwise it takes the answer and the count of [`PseudoInverseFallback`](@ref), so it never answers a nearly dependent design with the normal equations. The ratio of the pivots is not the test, because it can be far below the condition number of the design.
 
 !!! warning
 
-    The normal equations lose precision with the square of the condition number. Against the `QR` solve of [`PseudoInverseFallback`](@ref), the relative error of the factor returns of a `1600 × 28` design was about `3e-15` at a condition number of `10`, `9e-14` at `1e2`, `8e-12` at `1e3` and `5e-10` at `1e4`. The member is the default of no estimator. The leverage check of the regression takes its own `QR` of the design under this member, so the full gain of the member needs `leverage = false` on the estimator as well.
+    The normal equations lose precision with the square of the condition number. Against the `QR` solve of [`PseudoInverseFallback`](@ref), the largest relative error of the factor returns over 20 random `1600 × 28` designs was `5e-15` at a condition number of `10`, `2e-13` at `1e2` and `2e-11` at `1e3`. At `3e3` the member solved 4 of the 20 designs by the normal equations, and at `1e4` none. The member is the default of no estimator. The leverage check of the regression takes its own `QR` of the design under this member, so the full gain of the member needs `leverage = false` on the estimator as well.
 
 Under [`CrossSectionalTargetRegression`](@ref), the member runs the same test on the weighted design. A design that passes goes to the target as it stands, so `GLM` factorises its own Gram matrix, and a design that fails takes the answer of [`PseudoInverseFallback`](@ref). So the constructor refuses a target that [`is_basis_invariant`](@ref) answers `false` for, as it does under [`PseudoInverseFallback`](@ref).
 
@@ -224,7 +224,7 @@ Under [`CrossSectionalTargetRegression`](@ref), the member runs the same test on
 ```math
 \\begin{align}
 \\mathbf{\\Pi}^{\\intercal} \\mathbf{D}^{\\intercal} \\mathbf{D} \\mathbf{\\Pi} &= \\mathbf{U}^{\\intercal} \\mathbf{U}\\,, &
-\\hat{\\kappa} &= \\left| \\frac{U_{11}}{U_{KK}} \\right| \\le \\epsilon^{-1/4}\\,.
+\\hat{\\kappa} &\\approx \\lVert \\mathbf{U} \\rVert_{1} \\lVert \\mathbf{U}^{-1} \\rVert_{1} \\le \\epsilon^{-1/4}\\,.
 \\end{align}
 ```
 
@@ -232,7 +232,7 @@ Where:
 
   - ``\\mathbf{D}``: Weighted design of one observation, `eligible assets × factors`.
   - ``\\mathbf{\\Pi}``, ``\\mathbf{U}``: Permutation and triangular factor of the pivoted Cholesky factorisation of the Gram matrix.
-  - ``\\hat{\\kappa}``: Estimate of the condition number of ``\\mathbf{D}``. The member solves the normal equations when it holds.
+  - ``\\hat{\\kappa}``: Estimate of the condition number of ``\\mathbf{U}`` in the 1-norm, within a factor of ``K`` of the condition number of ``\\mathbf{D}``. The member solves the normal equations when it holds and the factorisation has full rank.
   - $(math_dict[:K])
   - ``\\epsilon``: Machine epsilon of the element type of ``\\mathbf{D}``.
 
@@ -1549,14 +1549,14 @@ end
 
 Allocate the buffers that one task of the loop of [`cross_sectional_regression`](@ref) gathers each observation into.
 
-Each buffer holds every asset, and an observation reads its first rows, so one allocation serves every observation of the task. Each buffer takes the type of the copy that it replaces, so a fit of mixed element types computes in the types that a copy gives. The gathers keep the types of `Z`, `X` and `W`. The centred exposures and returns of an intercept take the working type `Tf`, as `A .- transpose(xbar)` gives it. The weighted design takes the type that `sqrt.(w)` widens its input to.
+Each buffer holds every asset, and an observation reads its first rows, so one allocation serves every observation of the task. The gathers of `Z`, `X` and `W` take the working type `Tf`, the promotion of the three types, so a fit of mixed element types computes in one type. The gather copies the data anyway, so the conversion costs no allocation, and data of one type keep their type. The centred exposures and returns of an intercept take `Tf` too. The weighted design takes the type that `sqrt` widens `Tf` to, so a `Rational` panel factorises in floating point.
 
 # Algorithm
 
 The method that Julia selects is the algorithm.
 
- 1. No intercept: the centred buffers have no row, and the weighted design widens the type of `Z`.
- 2. An intercept: the centred buffers hold every asset in the type `Tf`, and the weighted design widens `Tf`.
+ 1. No intercept: the gathers take the type `Tf`, the centred buffers have no row, and the weighted design widens `Tf`.
+ 2. An intercept: the gathers and the centred buffers hold every asset in the type `Tf`, and the weighted design widens `Tf`.
 
 # Arguments
 
@@ -1578,8 +1578,10 @@ The method that Julia selects is the algorithm.
 function cross_sectional_loop_buffers(::Val{false}, Z::Arr3Num, X::MatNum, W::MatNum,
                                       ::Type{T}) where {T}
     N, K = size(Z, 1), size(Z, 2)
-    Td = promote_type(eltype(Z), typeof(sqrt(oneunit(eltype(W)))))
-    return (; w = similar(W, N), A = similar(Z, N, K), y = similar(X, N),
+    # A gather in the type of each input solved a `Float32` design against `Float64` returns
+    # at the precision of `Float32`, and gave `GLM` vectors of two types (R37 of #1817).
+    Td = promote_type(T, typeof(sqrt(oneunit(T))))
+    return (; w = similar(W, T, N), A = similar(Z, T, N, K), y = similar(X, T, N),
             Ac = Matrix{T}(undef, 0, K), yc = Vector{T}(undef, 0),
             D = Matrix{Td}(undef, N, K), Q = Matrix{Td}(undef, N, K),
             G = Matrix{Td}(undef, N, K), b = Vector{Td}(undef, max(N, K)),
@@ -1588,8 +1590,8 @@ end
 function cross_sectional_loop_buffers(::Val{true}, Z::Arr3Num, X::MatNum, W::MatNum,
                                       ::Type{T}) where {T}
     N, K = size(Z, 1), size(Z, 2)
-    Td = promote_type(T, typeof(sqrt(oneunit(eltype(W)))))
-    return (; w = similar(W, N), A = similar(Z, N, K), y = similar(X, N),
+    Td = promote_type(T, typeof(sqrt(oneunit(T))))
+    return (; w = similar(W, T, N), A = similar(Z, T, N, K), y = similar(X, T, N),
             Ac = Matrix{T}(undef, N, K), yc = Vector{T}(undef, N),
             D = Matrix{Td}(undef, N, K), Q = Matrix{Td}(undef, N, K),
             G = Matrix{Td}(undef, N, K), b = Vector{Td}(undef, max(N, K)),

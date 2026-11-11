@@ -403,6 +403,29 @@ end
         # The test reads the condition number of the design: 1e3 passes and 1e5 fails.
         @test !isnothing(PO.cross_sectional_gram_factor(csrs_conditioned(rng, 40, 5, 1e3)))
         @test isnothing(PO.cross_sectional_gram_factor(csrs_conditioned(rng, 40, 5, 1e5)))
+        # A design on a Kahan matrix has a ratio of the pivots far below its condition number:
+        # 385 against 3.2e7 here, and the normal equations would keep two digits (R37 of
+        # #1817). The estimate of the triangular factor refuses it. The bound is the one of
+        # the element type, so in `BigFloat`, whose epsilon^(-1/4) is about 2.7e19, it passes.
+        K, s, c = 28, sin(1.0), cos(1.0)
+        Rk = Diagonal([s^(i - 1) * (1 - 1e-10)^(i - 1) for i in 1:K]) *
+             (Matrix(1.0I, K, K) .- c .* triu(ones(K, K), 1))
+        Dk = Matrix(qr(randn(rng, 60, K)).Q)[:, 1:K] * Rk
+        yk = randn(rng, 60)
+        Ck = cholesky(Hermitian(Dk' * Dk), RowMaximum(); check = false)
+        @test Ck.rank == K && abs(Ck.U[1, 1] / Ck.U[K, K]) < 1e3 && cond(Dk) > 1e7
+        @test !PO.cross_sectional_gram_conditioned(Ck, K)
+        @test isnothing(PO.cross_sectional_gram_factor(Dk))
+        @test isnothing(PO.cross_sectional_gram_factor(Dk, zeros(K, K)))
+        @test !isnothing(PO.cross_sectional_gram_factor(big.(Dk)))
+        @test PO.cross_sectional_solve(NE, Dk, yk, 1) ==
+              PO.cross_sectional_solve(PIF, Dk, yk, 1)
+        # A rank below the column count is refused before the estimate reads the factor.
+        Gd = Hermitian(Ad' * Ad)
+        Cd = cholesky(Gd, RowMaximum(); tol = sqrt(eps()) * maximum(diag(Gd)),
+                      check = false)
+        @test Cd.rank == 4
+        @test !PO.cross_sectional_gram_conditioned(Cd, 5)
         # A whole fit agrees with the default to rounding, under both members and both
         # leverage settings, and the target falls back on a rank-deficient observation.
         for intercept in (false, true), leverage in (false, true)

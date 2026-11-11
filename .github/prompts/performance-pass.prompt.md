@@ -6,9 +6,10 @@ description: Make a hot path of PortfolioOptimisers.jl faster with bit-identical
 A **performance pass** makes one hot path faster and keeps every output bit-identical. The rules
 it applies are in [`.github/instructions/julia-source-code.instructions.md`](../instructions/julia-source-code.instructions.md)
 § *A hot path is measured, and its results stay bit-identical*. This file is the order of the
-work. Issue #1973 is the worked case: in five parts, the default fit of a
-`CrossSectionalFactorPrior` went from 2.44 s to 1.26 s and its fastest configuration from 1.91 s
-to 0.85 s. Each part kept 211 probe cases bit-identical.
+work. Issues #1970, #1971 and #1973 are the worked case. Measured in one run on one machine slot (R37
+of #1817), the default fit of a `CrossSectionalFactorPrior` of the case of #1971 went from 4.10 s
+and 3.16 GiB before #1970 to 1.28 s and 0.64 GiB after #1973. The fast path of #1971 takes
+0.90 s. Each part kept 211 probe cases bit-identical.
 
 Run every Julia process single-threaded, with `julia -t 1` and `BLAS.set_num_threads(1)`, in a
 fresh process. `CLAUDE.md` § *Running Julia* owns the rest of how to run Julia.
@@ -63,7 +64,7 @@ at the base, and the time of the other library when the issue compares with one.
 
 Issue #1973 found its savings in this order, which is a fair prior for a similar fit. The times come
 from several sessions on a shared machine, so read the order and the size of each step, not the
-exact values:
+exact values. The measure of one run is in the first paragraph of this file:
 
 | Part | Mechanism | Time of the default fit |
 | --- | --- | --- |

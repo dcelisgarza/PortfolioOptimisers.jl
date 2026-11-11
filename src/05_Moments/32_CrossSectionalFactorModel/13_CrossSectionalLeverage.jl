@@ -400,7 +400,7 @@ end
 
 Return the pivoted Cholesky factorisation of the Gram matrix of a weighted design, or `nothing` when [`NormalEquationsSolve`](@ref) must not solve the normal equations of the design.
 
-The ratio of the first to the last diagonal entry of the factor estimates the condition number of the design, as the diagonal of the `R` of a column-pivoted `QR` does. The verb passes the factorisation when the estimate is at most ``\\epsilon^{-1/4}``. The condition number of the Gram matrix is then at most ``\\epsilon^{-1/2}``, so the normal equations keep at least about half of the digits of the element type.
+The verb passes the factorisation when it has full rank and [`cross_sectional_gram_conditioned`](@ref) estimates a condition number of the triangular factor of at most ``\\epsilon^{-1/4}``. The condition number of the Gram matrix is the square of the condition number of the design, so the normal equations keep about half of the digits of the element type.
 
 `LinearAlgebra.cholesky` factorises a copy of the Gram matrix. With a buffer `gram` of the element type of a design of BLAS type, the verb forms the Gram matrix in the buffer and factorises it there, which is the same computation, so a loop over observations allocates neither matrix.
 
@@ -408,7 +408,7 @@ The ratio of the first to the last diagonal entry of the factor estimates the co
 
  1. Return `nothing` for a design with no row or no column.
  2. Form the Gram matrix `G = D' * D`, in `gram` when it is a buffer of the element type of `D` and `D` is of BLAS type, and take its factorisation with `LinearAlgebra.RowMaximum()` and the tolerance `sqrt(eps) * maximum(diag(G))` on the pivots, in place in that buffer. A pivot is the square of a diagonal entry of the factor, so the tolerance bounds the ratio of the entries by ``\\epsilon^{-1/4}``.
- 3. Return the factorisation when its rank is the factor count, and `nothing` otherwise.
+ 3. Return the factorisation when [`cross_sectional_gram_conditioned`](@ref) passes it, and `nothing` otherwise.
 
 # Arguments
 
@@ -433,7 +433,7 @@ function cross_sectional_gram_factor(D::MatNum)
     G = LinearAlgebra.Hermitian(D' * D)
     tol = sqrt(eps(real(eltype(G)))) * maximum(real, LinearAlgebra.diag(G))
     C = LinearAlgebra.cholesky(G, LinearAlgebra.RowMaximum(); tol = tol, check = false)
-    return C.rank == size(D, 2) ? C : nothing
+    return cross_sectional_gram_conditioned(C, size(D, 2)) ? C : nothing
 end
 function cross_sectional_gram_factor(D::MatNum, ::Any)
     return cross_sectional_gram_factor(D)
@@ -448,7 +448,39 @@ function cross_sectional_gram_factor(D::StridedMatrix{T},
     tol = sqrt(eps(real(T))) * maximum(real, LinearAlgebra.diag(gram))
     C = LinearAlgebra.cholesky!(LinearAlgebra.Hermitian(gram), LinearAlgebra.RowMaximum();
                                 tol = tol, check = false)
-    return C.rank == size(D, 2) ? C : nothing
+    return cross_sectional_gram_conditioned(C, size(D, 2)) ? C : nothing
+end
+"""
+    cross_sectional_gram_conditioned(C::LinearAlgebra.CholeskyPivoted, K::Integer) -> Bool
+
+Return `true` when [`NormalEquationsSolve`](@ref) can solve the normal equations through the pivoted Cholesky factorisation `C` of the Gram matrix of a design of `K` columns.
+
+The test is the estimate of the condition number of the triangular factor ``\\mathbf{U}`` in the 1-norm, which `LinearAlgebra.cond` takes from `LAPACK.trcon!` for a BLAS type and computes from the inverse for every other type. The condition number of ``\\mathbf{U}`` in the 2-norm is the condition number of the design. The two norms differ by a factor of at most ``K``, so the test bounds the condition number of the design by about ``K \\epsilon^{-1/4}``. The ratio of the pivots alone is not the test, because it can be far below the condition number. A `1600 × 28` design built on a Kahan matrix has a condition number of `3.2e7` and a ratio of the pivots of `385`, and its normal equations lose all but two digits.
+
+# Algorithm
+
+ 1. Return `false` when the rank of `C` is less than `K`, so the estimate never reads a factor that the factorisation did not finish.
+ 2. Return `true` when the estimate is at most ``\\epsilon^{-1/4}`` of the element type of `C`, and `false` otherwise.
+
+# Arguments
+
+  - `C::LinearAlgebra.CholeskyPivoted`: Pivoted Cholesky factorisation of the Gram matrix of a weighted design.
+  - `K::Integer`: Column count of the design.
+
+# Returns
+
+  - `ok::Bool`: `true` when the normal equations of the design keep at least about half of the digits of the element type.
+
+# Related
+
+  - [`NormalEquationsSolve`](@ref)
+  - [`cross_sectional_gram_factor`](@ref)
+"""
+function cross_sectional_gram_conditioned(C::LinearAlgebra.CholeskyPivoted,
+                                          K::Integer)::Bool
+    return C.rank == K &&
+           LinearAlgebra.cond(LinearAlgebra.UpperTriangular(C.U), 1) <=
+           inv(sqrt(sqrt(eps(real(eltype(C))))))
 end
 """
     cross_sectional_normal_solve(C, A::MatNum, y::VecNum, v) -> VecNum
