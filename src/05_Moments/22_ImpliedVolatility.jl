@@ -842,7 +842,7 @@ That round trip is the identity only in exact arithmetic. In floating point, the
  2. Check that `X` and `iv` have the same size, so that row `t` of `iv` is the implied volatility of observation `t` of `X`. Refuse a gap in `X` with [`assert_finite_sample`](@ref). Refuse a gap or a negative entry in `iv` with [`assert_nonempty_nonneg_finite_val`](@ref).
  3. Call `Statistics.cor(library_covariance_estimator(ce.ce), X; dims = 1, mean = mean, iv = iv, kwargs...)`. The result is `rho`, the base correlation matrix. The call forwards the oriented `iv`, so a base estimator that reads its own implied volatility series receives it. A nested [`ImpliedVolatility`](@ref) is such an estimator.
  4. Call [`predict_realised_vols`](@ref) with `ce.alg` and `iv / sqrt(ce.ppy)`, and discard the result. The call runs only for its errors. It divides `iv` by `sqrt(ce.ppy)`, as `cov` does.
- 5. Normalise `rho` in place with `StatsBase.cov2cor!`. It divides the entry in row `i` and column `j` by the square roots of the diagonal entries `i` and `j`. It also copies the lower triangle into the upper triangle, clamps each off-diagonal entry into `[-1, 1]`, and sets each diagonal entry to one. A wrapper needs that diagonal of ones, because [`matrix_processing!`](@ref) reads the diagonal to find whether the matrix is a correlation matrix or a covariance matrix.
+ 5. Normalise `rho` in place with [`cov2cor_nan!`](@ref). It divides the entry in row `i` and column `j` by the square roots of the diagonal entries `i` and `j`. It also copies the lower triangle into the upper triangle, clamps each off-diagonal entry into `[-1, 1]`, and sets each diagonal entry to one. A wrapper needs that diagonal of ones, because [`matrix_processing!`](@ref) reads the diagonal to find whether the matrix is a correlation matrix or a covariance matrix. The one exception is an asset whose base correlation is `NaN` on the diagonal, such as an asset with a zero variance: its diagonal entry stays `NaN`.
 
 # Arguments
 
@@ -885,8 +885,7 @@ function Statistics.cor(ce::ImpliedVolatility, X::MatNum; dims::Int = 1, mean = 
                          iv = iv, kwargs...)
     # The prediction is discarded. It runs so that `cor` refuses what `cov` refuses.
     predict_realised_vols(ce.alg, iv / sqrt(ce.ppy), X, ivpa)
-    StatsBase.cov2cor!(rho)
-    return rho
+    return cov2cor_nan!(rho)
 end
 """
     coverage_reduced_ivpa(ivpa::Option{<:Number}, cmsk) -> Option{<:Number}

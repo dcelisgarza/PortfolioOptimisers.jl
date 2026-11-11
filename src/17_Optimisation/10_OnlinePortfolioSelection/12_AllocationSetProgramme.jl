@@ -1030,13 +1030,8 @@ Where:
 
  1. Read the rows `X` of the current [`ProjectionStep`](@ref).
  2. When [`allocation_set_ready`](@ref) gives a reason, record the Held Step with it and return a copy of `w`. Stop.
- 3. Fit the set's prior `pr` on `X` with [`allocation_set_prior`](@ref), and read its Investable Mask `imsk`.
- 4. Reduce `set`, `X` and `pr` to the mask with [`programme_investable_reduction`](@ref). Reduce the geometry and `q` to the mask with [`investable_geometry_view`](@ref), and view `w` at the mask, which gives `wr`.
- 5. Make a bare model with the set's two scales and the row count of `X`, zero when there are no rows. Register `k = 1`, and the vector `w` of weight variables.
- 6. Add the set's constraints with [`set_allocation_set_constraints!`](@ref), with `wr` as the reference.
- 7. Add the set's custom objective terms with [`add_custom_objective_term!`](@ref), with the geometry as the objective and the set as the owner.
- 8. Set the objective with [`set_projection_objective!`](@ref).
- 9. Solve on [`projection_solver`](@ref) with [`solve_projection_programme!`](@ref), which solves a second stage only under a geometry whose divergence has many minimisers. When the solve gives an allocation, return it with a zero at every asset outside the mask. Otherwise record the Held Step with the solver trials, and return a copy of `w`.
+ 3. Fit the set's prior `pr` on `X` with [`allocation_set_prior`](@ref), and read its Investable Mask `imsk` with [`prior_investable_mask`](@ref).
+ 4. Build and solve the programme at `imsk` with the seven-argument method, and return its value. It reduces the set, the rows, the prior, the geometry, `q` and `w` to the mask, adds the set's constraints, the custom objective terms and the objective, and solves on [`projection_solver`](@ref) with [`solve_projection_programme!`](@ref), which solves a second stage only under a geometry whose divergence has many minimisers. A distance reader of the set that refuses an asset makes it build again without that asset. A solve that gives an allocation returns it with a zero at every asset outside the mask. Otherwise the method records the Held Step with the solver trials, and returns a copy of `w`.
 
 # JuMP formulation
 
@@ -1079,20 +1074,91 @@ function projection_programme(proj::AbstractProjectionGeometry, set::AbstractAll
         return copy(w)
     end
     pr = allocation_set_prior(set, X)
-    imsk = prior_investable_mask(pr)
-    set, X, pr = programme_investable_reduction(imsk, set, X, pr)
-    proj, q = investable_geometry_view(imsk, proj, q)
+    return projection_programme(proj, set, q, w, X, pr, prior_investable_mask(pr))
+end
+"""
+    projection_programme(proj::AbstractProjectionGeometry, set::AbstractAllocationSet,
+                         q::AbstractVector, w::AbstractVector, X::Option{<:ReturnsResult},
+                         pr::Option{<:AbstractPriorResult}, imsk::Option{BitVector})
+
+Builds and solves the projection programme of one step at the Investable Mask `imsk`, from the prior result `pr` that the step fitted once.
+
+A distance reader of the set, its `ple` or its `cte`, can refuse an asset that the prior keeps, see [`DistanceReaderRefusalError`](@ref). The programme learns of the refusal only when it adds the set's constraints, after the reduction. So the method catches the refusal around [`set_allocation_set_constraints!`](@ref) with [`distance_reader_call`](@ref), composes the mask with [`distance_reader_refusal_mask`](@ref), and builds the model again at that mask. The prior is not fitted again, so the step reads the same moments. This is the rule of a batch JuMP head. The refused asset takes a zero weight at the step, as an asset that the prior cannot price does, and the warning of [`distance_reader_refusal_mask`](@ref) names it. The Investable Mask of the Recursion Result does not change, because it is the active mask of the last row. Under the `strict` flag of the step the method refuses the asset. The two readers can refuse different assets, and the build again meets the refusal of the other one.
+
+# Algorithm
+
+ 1. Reduce `set`, `X` and `pr` to `imsk` with [`programme_investable_reduction`](@ref). Reduce the geometry and `q` to the mask with [`investable_geometry_view`](@ref), and view `w` at the mask, which gives `wr`.
+ 2. Make a bare model with the set's two scales and the row count of `X`, zero when there are no rows. Register `k = 1`, and the vector `w` of weight variables.
+ 3. Add the set's constraints with [`set_allocation_set_constraints!`](@ref) through [`distance_reader_call`](@ref), with `wr` as the reference. When a distance reader refuses an asset, call this method again with the mask of [`distance_reader_refusal_mask`](@ref) under [`projection_step_strict`](@ref), and return its value.
+ 4. Add the set's custom objective terms with [`add_custom_objective_term!`](@ref), with the geometry as the objective and the set as the owner.
+ 5. Set the objective with [`set_projection_objective!`](@ref).
+ 6. Solve on [`projection_solver`](@ref) with [`solve_projection_programme!`](@ref). When the solve gives an allocation, return it with a zero at every asset outside the mask. Otherwise record the Held Step with the solver trials, and return a copy of `w`.
+
+# JuMP formulation
+
+## Variables
+
+  - `w`: created, with the base name `w`, one variable for each asset in the mask. It is registered in the Model State under the key `w`.
+
+## Expressions
+
+  - `k`: the constant one.
+
+Where:
+
+  - $(math_dict[:w_port])
+  - $(math_dict[:k_budget])
+
+# Arguments
+
+  - `proj`: The geometry.
+  - `set`: The set, resolved.
+  - `q`: The raw step.
+  - `w`: The Price-Adjusted Allocation the step trades from.
+  - `X`: The rows of the step, or `nothing`.
+  - `pr`: The set's prior result on `X`, or `nothing` when the set reads no rows.
+  - `imsk`: The Investable Mask of the step, or `nothing` when every asset is investable.
+
+# Validation
+
+  - Under the `strict` flag of the step, no distance reader refuses an asset. Raises an [`IsNonFiniteError`](@ref).
+  - At least one asset stays. Raises an [`IsEmptyError`](@ref).
+
+# Returns
+
+  - `w'::Vector`: The projected allocation, or `w` copied on a Held Step.
+
+# Related
+
+  - [`distance_reader_refusal_mask`](@ref)
+  - [`distance_reader_call`](@ref)
+  - [`programme_investable_reduction`](@ref)
+  - [`processed_jump_optimiser_attributes`](@ref)
+"""
+function projection_programme(proj::AbstractProjectionGeometry, set::AbstractAllocationSet,
+                              q::AbstractVector, w::AbstractVector,
+                              X::Option{<:ReturnsResult}, pr::Option{<:AbstractPriorResult},
+                              imsk::Option{BitVector})
+    setr, Xr, prr = programme_investable_reduction(imsk, set, X, pr)
+    projr, qr = investable_geometry_view(imsk, proj, q)
     wr = investable_weights_view(imsk, w)
     model = JuMP.Model()
-    set_model_scales!(model, projection_scale(set, :sc), projection_scale(set, :so))
-    set_model_observations!(model, isnothing(X) ? 0 : size(X.X, 1))
+    set_model_scales!(model, projection_scale(setr, :sc), projection_scale(setr, :so))
+    set_model_observations!(model, isnothing(Xr) ? 0 : size(Xr.X, 1))
     JuMP.@expression(model, k, 1)
     wv = state_set!(model, Symbol(""), :w,
-                    JuMP.@variable(model, [1:length(q)], base_name = "w"))
-    set_allocation_set_constraints!(model, set, wr, X, pr)
-    add_custom_objective_term!(model, proj, allocation_set_cobj(set), set, nothing)
-    set_projection_objective!(model, proj, q)
-    res, wn = solve_projection_programme!(model, proj, q, projection_solver(proj, set))
+                    JuMP.@variable(model, [1:length(qr)], base_name = "w"))
+    err = distance_reader_call(set_allocation_set_constraints!, model, setr, wr, Xr, prr)
+    if err isa DistanceReaderRefusalError
+        # Only a set that reads rows calls a reader, so a refusal comes with rows.
+        return projection_programme(proj, set, q, w, X, pr,
+                                    distance_reader_refusal_mask(err, imsk,
+                                                                 X::ReturnsResult,
+                                                                 projection_step_strict()))
+    end
+    add_custom_objective_term!(model, projr, allocation_set_cobj(setr), setr, nothing)
+    set_projection_objective!(model, projr, qr)
+    res, wn = solve_projection_programme!(model, projr, qr, projection_solver(projr, setr))
     if !isnothing(wn)
         return expand_investable_weights(imsk, wn)
     end

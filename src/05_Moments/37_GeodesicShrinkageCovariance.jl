@@ -745,39 +745,6 @@ function geodesic_shrinkage!(ce::GeodesicShrinkageCovariance, sigma::MatNum)
     return sigma
 end
 """
-$(DocStringExtensions.TYPEDSIGNATURES)
-
-Rescales a covariance matrix to its correlation matrix in place, and keeps the `NaN` of an asset whose variance is not finite.
-
-`StatsBase.cov2cor!` writes one on the whole diagonal, so it turns the `NaN` variance of an asset outside the Coverage Universe into a correlation of one. The entries off the diagonal of such an asset are already `NaN`, so this function writes the `NaN` back on the diagonal alone.
-
-# Algorithm
-
- 1. Take the standard deviations `s` from the diagonal of `sigma`.
- 2. Rescale `sigma` with `StatsBase.cov2cor!` and `s`.
- 3. Write `s[i]` back onto the diagonal wherever `s[i]` is not finite.
-
-# Arguments
-
-  - $(arg_dict[:sigrho])
-
-# Returns
-
-  - `rho::MatNum`: The input matrix, rescaled in place to a correlation matrix.
-
-# Related
-
-  - [`GeodesicShrinkageCovariance`](@ref)
-"""
-function frame_cov2cor!(sigma::MatNum)
-    s = sqrt.(LinearAlgebra.diag(sigma))
-    StatsBase.cov2cor!(sigma, s)
-    for i in findall(!isfinite, s)
-        sigma[i, i] = s[i]
-    end
-    return sigma
-end
-"""
     Statistics.cov(ce::GeodesicShrinkageCovariance, X::MatNum; dims::Int = 1, kwargs...)
     Statistics.cor(ce::GeodesicShrinkageCovariance, X::MatNum; dims::Int = 1, kwargs...)
 
@@ -791,7 +758,7 @@ Computes the covariance matrix with `ce.ce`, and shrinks it towards `ce.tgt` alo
  2. Compute `sigma` with `Statistics.cov(library_covariance_estimator(ce.ce), X; kwargs...)`.
  3. Copy `sigma` into a new `Matrix`, because step 4 writes in place and the inner estimator can return an immutable matrix.
  4. Repair and shrink the finite block of `sigma` with [`geodesic_shrinkage!`](@ref).
- 5. `cov` returns `sigma`. `cor` rescales it to a correlation matrix with [`frame_cov2cor!`](@ref) and returns it, so the correlation is that of the shrunk covariance.
+ 5. `cov` returns `sigma`. `cor` rescales it to a correlation matrix with [`cov2cor_nan!`](@ref) and returns it, so the correlation is that of the shrunk covariance.
 
 # Arguments
 
@@ -823,7 +790,7 @@ end
 function Statistics.cor(ce::GeodesicShrinkageCovariance, X::MatNum; dims::Int = 1,
                         kwargs...)
     sigma = Statistics.cov(ce, X; dims = dims, kwargs...)
-    return frame_cov2cor!(sigma)
+    return cov2cor_nan!(sigma)
 end
 """
     Statistics.cov(ce::GeodesicShrinkageCovariance, X::MatNum,
@@ -841,7 +808,7 @@ This method overrides the reduce-and-expand root. The inner estimator does the r
  2. Compute `sigma` with the inner estimator, forwarding `pnl` as its third positional argument.
  3. Copy `sigma` into a new `Matrix`, because step 4 writes in place and the inner estimator can return an immutable matrix.
  4. Repair and shrink the finite block of `sigma` with [`geodesic_shrinkage!`](@ref).
- 5. `cov` returns `sigma`. `cor` rescales it to a correlation matrix with [`frame_cov2cor!`](@ref) and returns it.
+ 5. `cov` returns `sigma`. `cor` rescales it to a correlation matrix with [`cov2cor_nan!`](@ref) and returns it.
 
 # Arguments
 
@@ -876,7 +843,7 @@ end
 function Statistics.cor(ce::GeodesicShrinkageCovariance, X::MatNum,
                         pnl::Option{<:AssetPanel}; dims::Int = 1, kwargs...)
     sigma = Statistics.cov(ce, X, pnl; dims = dims, kwargs...)
-    return frame_cov2cor!(sigma)
+    return cov2cor_nan!(sigma)
 end
 """
     gap_fill_value(ce::GeodesicShrinkageCovariance) -> Number
@@ -959,7 +926,7 @@ Reads the shrunk covariance, or its correlation, of a folded [`GeodesicShrinkage
  1. Read the folded matrix `sigma` of `ce.ce` with the one-argument `Statistics.cov`.
  2. Copy `sigma` into a new `Matrix`, because step 3 writes in place and the inner estimator can return an immutable matrix.
  3. Repair and shrink the finite block of `sigma` with [`geodesic_shrinkage!`](@ref).
- 4. `cov` returns `sigma`. `cor` rescales it to a correlation matrix with [`frame_cov2cor!`](@ref) and returns it.
+ 4. `cov` returns `sigma`. `cor` rescales it to a correlation matrix with [`cov2cor_nan!`](@ref) and returns it.
 
 # Arguments
 
@@ -987,7 +954,7 @@ end
 function Statistics.cor(ce::GeodesicShrinkageCovariance{<:Any, <:Any, <:Any, <:Any,
                                                         Nothing}; kwargs...)
     sigma = Statistics.cov(ce; kwargs...)
-    return frame_cov2cor!(sigma)
+    return cov2cor_nan!(sigma)
 end
 """
 $(DocStringExtensions.TYPEDSIGNATURES)

@@ -1041,23 +1041,23 @@ end
                                                                                                                         ce = cep,
                                                                                                                         alg = KMeansAlgorithm()),
                                                                                                       Xp)
-    # An asset with zero variance has a correlation of one with itself and a NaN with every
-    # other asset. Its diagonal entry is finite, so it is not a refused row and a fit does not
-    # drop it. Each clustering refuses the pair, and the message names a zero variance.
+    # An asset with zero variance has a correlation of 0 / 0 with every asset, itself included
+    # (#2029). Its diagonal entry is NaN, so it is a refused row, and each clustering raises
+    # the refusal that a fit catches.
     Xz = copy(X0)
     Xz[:, 3] .= 0.0
     S, D = cor_and_dist(Distance(), Covariance(), Xz)
-    @test isone(S[3, 3]) && iszero(D[3, 3])
+    @test isnan(S[3, 3]) && isnan(D[3, 3])
     @test all(isnan, D[3, [1, 2, 4]])
-    @test isnothing(PO.assert_distance_reader_rows(D))
     for alg in (HClustAlgorithm(), KMeansAlgorithm())
-        @test_throws r"zero variance.*D\[3, 1\] => NaN"s clusterise(ClustersEstimator(;
-                                                                                      ce = Covariance(),
-                                                                                      alg = alg),
-                                                                    Xz)
+        err = try
+            clusterise(ClustersEstimator(; ce = Covariance(), alg = alg), Xz)
+        catch e
+            e
+        end
+        @test err isa DistanceReaderRefusalError && err.idx == [3]
     end
-    # The refusal of a row names the readers that drop it and no zero variance, which gives
-    # no such row.
+    # The refusal of a row names both causes and the readers that drop it.
     err = try
         PO.assert_distance_reader_rows([NaN 0.0; 0.0 0.0])
     catch e
@@ -1065,7 +1065,147 @@ end
     end
     @test err isa DistanceReaderRefusalError && err.idx == [1]
     @test occursin("Every other caller receives this error", err.msg)
-    @test !occursin("zero variance", err.msg)
+    @test occursin("zero variance", err.msg)
+end
+
+@testset "A fit drops an asset with zero variance (#2029)" begin
+    # Cash at a zero return is a constant column. The prior keeps it, and its correlation is
+    # 0 / 0 at every asset, itself included. So the default reader of each head gives it a
+    # NaN row, its diagonal included, and the fit drops it as it drops a refused asset.
+    Xc = 0.01 .* randn(StableRNG(7), 200, 5) .+ 0.0005
+    Xc[:, 4] .= 0.0
+    rdc = ReturnsResult(; nx = ["a", "b", "c", "d", "e"], X = Xc)
+    pec = EmpiricalPrior()
+    keepc = [1, 2, 3, 5]
+    hopt(s) = HierarchicalOptimiser(; pe = pec, strict = s)
+    jopt(s; kwargs...) = JuMPOptimiser(; pe = pec, slv = slv, strict = s, kwargs...)
+    heads = [s -> HierarchicalRiskParity(; opt = hopt(s)),
+             s -> HierarchicalRiskParity(; r = [Variance(), ConditionalValueatRisk()],
+                                         opt = hopt(s)),
+             s -> HierarchicalEqualRiskContribution(; opt = hopt(s)),
+             s -> SchurComplementHierarchicalRiskParity(; opt = hopt(s)),
+             s -> SchurComplementHierarchicalRiskParity(;
+                                                        params = [SchurComplementParams(),
+                                                                  SchurComplementParams(;
+                                                                                        gamma = 0.2)],
+                                                        opt = hopt(s)),
+             s -> NestedClustered(; pe = pec, strict = s,
+                                  opti = MeanRisk(; opt = JuMPOptimiser(; slv = slv)),
+                                  opto = MeanRisk(; opt = JuMPOptimiser(; slv = slv))),
+             s -> MeanRisk(;
+                           opt = jopt(s;
+                                      ple = SemiDefinitePhylogenyEstimator(;
+                                                                           pl = NetworkEstimator()))),
+             s -> MeanRisk(;
+                           opt = jopt(s;
+                                      cte = CentralityConstraint(;
+                                                                 A = CentralityEstimator(;
+                                                                                         pl = NetworkEstimator()),
+                                                                 B = MinValue(), comp = <=)))]
+    refused = (:warn,
+               r"distance reader of this optimiser cannot estimate the correlation of 1 asset\(s\) that the prior kept: \[\"d\"\]")
+    for h in heads
+        res = @test_logs refused match_mode = :any optimise(h(false), rdc)
+        @test res.imsk == BitVector([1, 1, 1, 0, 1])
+        w = res.w isa AbstractVector{<:Number} ? res.w : res.w[1]
+        @test iszero(w[4])
+        @test isapprox(sum(w), 1)
+        @test_throws IsNonFiniteError optimise(h(true), rdc)
+    end
+    # The fit again equals the problem reduced to the other assets by hand.
+    prc = prior(pec, rdc)
+    res = @test_logs refused match_mode = :any optimise(HierarchicalRiskParity(;
+                                                                               opt = hopt(false)),
+                                                        rdc)
+    resk = optimise(HierarchicalRiskParity(;
+                                           opt = HierarchicalOptimiser(;
+                                                                       pe = PO.port_opt_view(prc,
+                                                                                             keepc))),
+                    PO.port_opt_view(rdc, keepc))
+    @test res.w[keepc] == resk.w
+    # Each estimator whose correlation of a constant is 0 / 0 gives the asset a NaN row, its
+    # diagonal included, and keeps a unit diagonal for every other asset.
+    for ce in (Covariance(), Covariance(; cvg = CoveragePolicy()), GeneralCovariance(),
+               SpearmanCovariance(), KendallCovariance(), ExpWeightedCovariance(),
+               MutualInfoCovariance(), DistanceCovariance(), PortfolioOptimisersCovariance(),
+               GeodesicShrinkageCovariance())
+        S = cor(ce, Xc)
+        if ce isa GeodesicShrinkageCovariance
+            # The shrinkage gives the constant asset a defined correlation, so nothing is NaN.
+            @test all(isfinite, S)
+            continue
+        end
+        @test all(isnan, S[4, :]) && all(isnan, S[:, 4])
+        @test all(i -> isapprox(S[i, i], 1), keepc)
+        @test all(isfinite, S[keepc, keepc])
+    end
+    # An estimator that defines the dependence of a constant keeps its own values.
+    @test isone(cor(GerberCovariance(), Xc)[4, 4])
+    # A covariance with a zero variance becomes a correlation with the NaN row, and a
+    # correlation that holds the row keeps its other rows as they are.
+    sc = cov(Covariance(), Xc)
+    rc = PO._as_correlation(sc)
+    @test all(isnan, rc[4, :]) && isapprox(rc[keepc, keepc], cor(Xc[:, keepc]))
+    rr = cor(Covariance(), Xc)
+    @test isequal(PO._as_correlation(rr), rr)
+    # A constant asset has no edge in a redundancy graph, so it keeps its own group.
+    @test PO.redundancy_keep(CorrelationComponents(; t = 0.5), rdc, nothing, false)[4]
+    @test 4 in PO.find_uncorrelated_indices(Xc; t = 0.5)
+    # A standard deviation that is not finite gives the NaN diagonal too.
+    m = [1.0 0.5 0.2; 0.5 Inf 0.1; 0.2 0.1 4.0]
+    @test isnan(PO.cov2cor_nan!(copy(m))[2, 2])
+    @test isone(PO.cov2cor_nan!(copy(m))[3, 3])
+end
+
+@testset "A programme set drops an asset that its distance reader refuses (#2028)" begin
+    # The asset `e` holds the last 60 of 120 observations. The prior of the set keeps it with
+    # its fill, and the reader asks for 60 %, so it refuses `e` at every step after row 60.
+    rng8 = StableRNG(424242)
+    T8, N8 = 120, 8
+    F8 = randn(rng8, T8, 2)
+    X8 = (F8 * randn(rng8, 2, N8) .+ randn(rng8, T8, N8)) ./ 100 .+ 0.0005
+    X8[1:60, 5] .= NaN
+    amsk8 = trues(T8, N8)
+    amsk8[1:60, 5] .= false
+    rd8 = ReturnsResult(; nx = string.('a':'h'), X = X8,
+                        pnl = AssetPanel(; pf = nothing, amsk = amsk8, emsk = amsk8))
+    pe8 = EmpiricalPrior(; me = ExpWeightedExpectedReturns(; decay = 0.9, min_obs = 2),
+                         ce = ExpWeightedCovariance(; decay = 0.9, min_obs = 2,
+                                                    centring = PreCentred()),
+                         fill_limit = 1)
+    sce8 = PortfolioOptimisersCovariance(;
+                                         ce = Covariance(;
+                                                         cvg = CoveragePolicy(;
+                                                                              min_coverage = 0.6)))
+    nte8 = NetworkEstimator(; ce = sce8)
+    plset(pe) = ProgrammeAllocationSet(; slv = slv, pe = pe,
+                                       ple = SemiDefinitePhylogenyEstimator(; pl = nte8))
+    ctset(pe) = ProgrammeAllocationSet(; slv = slv, pe = pe,
+                                       cte = CentralityConstraint(;
+                                                                  A = CentralityEstimator(;
+                                                                                          pl = nte8),
+                                                                  B = MinValue(),
+                                                                  comp = <=))
+    ops(set; strict = false) = OnlinePortfolioSelection(; alg = ExponentiatedGradient(),
+                                                        set = set, strict = strict)
+    refused = (:warn,
+               r"distance reader of this optimiser cannot estimate the correlation of 1 asset\(s\) that the prior kept: \[\"e\"\]")
+    for mk in (plset, ctset)
+        r = @test_logs refused match_mode = :any optimise(ops(mk(pe8)), rd8)
+        @test iszero(r.w[5])
+        @test isapprox(sum(r.w), 1)
+        # A plain prior drops `e` at the same steps for its gap, and the programme reads no
+        # moment of the prior. So the fit equals the one whose prior reduced the problem.
+        @test r.w == optimise(ops(mk(EmpiricalPrior())), rd8).w
+        # Under the strict flag of the step, the programme refuses the asset.
+        @test_throws IsNonFiniteError optimise(ops(mk(pe8); strict = true), rd8)
+        # The fold step by step gives the batch weights.
+        o = ops(mk(pe8))
+        @test_logs refused match_mode = :any for t in 1:T8
+            o = PO.partial_fit!(o, PO.port_opt_view(rd8, t:t, :))
+        end
+        @test optimise(o).w == r.w
+    end
 end
 
 # The panel for a window of `t` observations over `N2` assets, so an expanding walk-forward can

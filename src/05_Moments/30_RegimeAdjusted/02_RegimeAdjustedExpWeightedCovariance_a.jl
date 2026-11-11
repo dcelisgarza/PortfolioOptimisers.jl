@@ -1973,9 +1973,10 @@ $(DocStringExtensions.TYPEDSIGNATURES)
 Rescales a regime-adjusted covariance matrix to a unit diagonal.
 
 An asset that the covariance blanks has a `NaN` variance, so its row, its column and its
-diagonal entry stay `NaN`. An asset with a zero variance, a constant return, has a `NaN`
-correlation with every other asset and one on its diagonal, as `Statistics.cor` gives. A finite
-entry outside `[-1, 1]` is round-off, and the function clamps it.
+diagonal entry stay `NaN`. An asset with a zero variance, a constant return, gets the same `NaN`
+row: its correlation with every asset, itself included, is `0 / 0`. `Statistics.cor` writes one
+on that diagonal entry, and the library writes `NaN`, see [`cov2cor_nan!`](@ref). A finite entry
+outside `[-1, 1]` is round-off, and the function clamps it.
 
 # Arguments
 
@@ -1989,13 +1990,14 @@ entry outside `[-1, 1]` is round-off, and the function clamps it.
 
   - [`regime_adjusted_covariance`](@ref)
   - [`RegimeAdjustedExpWeightedCovariance`](@ref)
+  - [`cov2cor_nan!`](@ref)
 """
 function regime_adjusted_correlation(sigma::MatNum)
     T = eltype(sigma)
     d = LinearAlgebra.diag(sigma)
     inv_vol = inv.(sqrt.(d))
     rho = clamp.(sigma .* (inv_vol .* transpose(inv_vol)), -one(T), one(T))
-    rho[LinearAlgebra.diagind(rho)] .= ifelse.(isfinite.(d), one(T), T(NaN))
+    rho[LinearAlgebra.diagind(rho)] .= ifelse.(isfinite.(d) .& .!iszero.(d), one(T), d ./ d)
 
     return rho
 end

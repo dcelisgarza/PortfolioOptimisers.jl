@@ -442,7 +442,7 @@ function distance_reader_refusal_mask(err::DistanceReaderRefusalError,
     cols = findall(keep)[err.idx]
     keep[cols] .= false
     assets = isnothing(rd.nx) ? cols : rd.nx[cols]
-    msg = "a distance reader of this optimiser cannot estimate the correlation of $(length(cols)) asset(s) that the prior kept: $(assets). The `CoveragePolicy` of the `ce` of the reader refuses them"
+    msg = "a distance reader of this optimiser cannot estimate the correlation of $(length(cols)) asset(s) that the prior kept: $(assets). An asset with zero variance gives such a row, and so does an asset that the `CoveragePolicy` of the `ce` of the reader refuses"
     remedy = "To keep them, give the reader the `CoveragePolicy` of the prior, or state the prior as its source, `x_src = PriorSource()`."
     @argcheck(!strict,
               IsNonFiniteError("$(msg), and `strict = true` refuses them. $(remedy)"))

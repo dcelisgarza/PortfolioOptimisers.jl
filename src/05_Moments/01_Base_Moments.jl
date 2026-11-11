@@ -1126,6 +1126,70 @@ function demean_returns(X::MatNum, me::AbstractExpectedReturnsEstimator; dims::I
                         mean = nothing, kwargs...)
     return X .- weighted_centre(X, me, nothing; dims = dims, mean = mean, kwargs...)
 end
+"""
+    cov2cor_nan!(sigma::MatNum, s::VecNum = sqrt.(LinearAlgebra.diag(sigma))) -> MatNum
+
+Rescale a covariance matrix to its correlation matrix in place, with a `NaN` diagonal entry for each asset whose correlation is not defined.
+
+The correlation of asset ``i`` with itself is ``\\sigma_{ii} / (s_i s_i)``. A zero standard deviation, the one of a constant return, makes it ``0 / 0``. A standard deviation that is not finite, the one of an asset outside the Coverage Universe, makes it `NaN` too. `StatsBase.cov2cor!` writes one on the whole diagonal, so it gives such an asset a correlation of one with itself and `NaN` with every other asset. This function writes the `NaN` back on the diagonal. The row of the asset is then `NaN` at every entry, as the row of an asset that a distance reader refuses is, see [`DistanceReaderRefusalError`](@ref).
+
+# Algorithm
+
+ 1. Rescale `sigma` with `StatsBase.cov2cor!` and `s`.
+ 2. Write `NaN` on the diagonal wherever `s[i]` is zero or not finite, with [`undefined_correlation_diagonal!`](@ref).
+
+# Arguments
+
+  - $(arg_dict[:sigrho])
+  - `s`: The standard deviations, the square roots of the diagonal of `sigma` by default.
+
+# Returns
+
+  - `rho::MatNum`: The input matrix, rescaled in place to a correlation matrix.
+
+# Related
+
+  - [`undefined_correlation_diagonal!`](@ref)
+  - [`DistanceReaderRefusalError`](@ref)
+  - [`assert_distance_reader_rows`](@ref)
+  - [`GeodesicShrinkageCovariance`](@ref)
+"""
+function cov2cor_nan!(sigma::MatNum, s::VecNum = sqrt.(LinearAlgebra.diag(sigma)))
+    return undefined_correlation_diagonal!(StatsBase.cov2cor!(sigma, s), s)
+end
+"""
+    undefined_correlation_diagonal!(rho::AbstractMatrix, s::VecNum) -> AbstractMatrix
+
+Write `NaN` on the diagonal entry of each asset whose correlation with itself is not defined, in a correlation matrix whose diagonal a rescale set to one.
+
+The correlation of asset ``i`` with itself is ``\\sigma_{ii} / (s_i s_i)``. It is ``0 / 0`` when the scale `s[i]` is zero, and `NaN` when `s[i]` is not finite. A standard deviation and a variance are zero together and finite together, so `s` can hold either of them. The rescale of `StatsBase` writes one on such an entry, and the entries of the row off the diagonal are already `NaN`.
+
+# Algorithm
+
+ 1. For each `i` whose `s[i]` is zero or not finite, write `s[i] / s[i]` on `rho[i, i]`. The quotient is `NaN` in the number type of `s`.
+ 2. Return `rho`.
+
+# Arguments
+
+  - `rho`: The correlation matrix, `assets × assets`. It must be mutable.
+  - `s`: The standard deviations or the variances of the assets.
+
+# Returns
+
+  - `rho::AbstractMatrix`: The input matrix, with a `NaN` diagonal entry for each undefined correlation.
+
+# Related
+
+  - [`cov2cor_nan!`](@ref)
+  - [`cor(ce::GeneralCovariance, X::MatNum; dims::Int = 1, mean = nothing, kwargs...)`](@ref)
+"""
+function undefined_correlation_diagonal!(rho::AbstractMatrix, s::VecNum)
+    idx = findall(x -> iszero(x) || !isfinite(x), s)
+    for i in idx
+        rho[i, i] = s[i] / s[i]
+    end
+    return rho
+end
 # ---------------------------------------------------------------------------
 # @windowed_estimator — one declaration per windowed moment estimator (ADR 0039)
 # ---------------------------------------------------------------------------

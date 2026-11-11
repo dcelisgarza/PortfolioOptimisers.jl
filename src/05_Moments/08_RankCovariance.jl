@@ -127,7 +127,8 @@ Without ties, ``n_x = n_y = 0`` and ``\\hat{\\tau}^b`` reduces to ``\\tau_a = (C
 
  1. Orient `X` with [`dims_oriented`](@ref), which transposes it when `dims` is `2` and refuses any other value.
  2. Refuse a gapped sample with [`assert_finite_sample`](@ref).
- 3. Return `StatsBase.corkendall(X)`, the tie-corrected ``\\tau_b`` of each pair of columns. The method does not scale or clamp the result. The diagonal is exactly `1`, also for a constant column, and the other entries of a constant column are `NaN`.
+ 3. Return `StatsBase.corkendall(X)`, the tie-corrected ``\\tau_b`` of each pair of columns. The method does not scale or clamp the result. The entries of a constant column off the diagonal are `NaN`.
+ 4. Write `NaN` on the diagonal entry of each constant column with [`constant_column_correlation!`](@ref), and return the matrix. A constant column has no ranks to correlate, so its correlation with itself is `0 / 0`.
 
 # Arguments
 
@@ -163,7 +164,7 @@ julia> cor(KendallCovariance(), X)
 function Statistics.cor(::KendallCovariance, X::MatNum; dims::Int = 1, kwargs...)
     X = dims_oriented(dims, X)
     assert_finite_sample(X)
-    return StatsBase.corkendall(X)
+    return constant_column_correlation!(StatsBase.corkendall(X), X)
 end
 """
 $(DocStringExtensions.TYPEDEF)
@@ -298,7 +299,8 @@ Without ties, this is equal to the closed form ``1 - 6 \\sum_t d_t^2 / (T(T^2 - 
 
  1. Orient `X` with [`dims_oriented`](@ref), which transposes it when `dims` is `2` and refuses any other value.
  2. Refuse a gapped sample with [`assert_finite_sample`](@ref).
- 3. Return `StatsBase.corspearman(X)`, the Pearson correlation of the mid-ranked columns. The method does not scale or clamp the result. The diagonal is exactly `1`, also for a constant column, and the other entries of a constant column are `NaN`.
+ 3. Return `StatsBase.corspearman(X)`, the Pearson correlation of the mid-ranked columns. The method does not scale or clamp the result. The entries of a constant column off the diagonal are `NaN`.
+ 4. Write `NaN` on the diagonal entry of each constant column with [`constant_column_correlation!`](@ref), and return the matrix. A constant column has no ranks to correlate, so its correlation with itself is `0 / 0`.
 
 # Arguments
 
@@ -334,6 +336,42 @@ julia> cor(SpearmanCovariance(), X)
 function Statistics.cor(::SpearmanCovariance, X::MatNum; dims::Int = 1, kwargs...)
     X = dims_oriented(dims, X)
     assert_finite_sample(X)
-    return StatsBase.corspearman(X)
+    return constant_column_correlation!(StatsBase.corspearman(X), X)
+end
+"""
+    constant_column_correlation!(rho::MatNum, X::MatNum) -> MatNum
+
+Write `NaN` on the diagonal entry of each constant column of `X`, after `StatsBase` computed the rank correlation matrix `rho`.
+
+The ranks of a constant column are all tied, so its rank correlation is `0 / 0`. `StatsBase.corkendall` and `StatsBase.corspearman` give it `NaN` at every other column and one on the diagonal. The library gives such an asset a `NaN` row, its diagonal entry included, see [`cov2cor_nan!`](@ref). The test reads the data and not `rho`, because a row of `NaN` alone does not name the asset: with two assets and one constant, both rows are `NaN` off the diagonal.
+
+# Algorithm
+
+ 1. For each column `i` of `X` whose entries are all equal, write `zero(T) / zero(T)` on `rho[i, i]`, where `T` is the element type of `rho`.
+ 2. Return `rho`.
+
+# Arguments
+
+  - `rho`: The rank correlation matrix, `assets × assets`.
+  - `X`: The data matrix, `observations × assets`.
+
+# Returns
+
+  - `rho::MatNum`: The input matrix, with a `NaN` diagonal entry for each constant column.
+
+# Related
+
+  - [`KendallCovariance`](@ref)
+  - [`SpearmanCovariance`](@ref)
+  - [`cov2cor_nan!`](@ref)
+"""
+function constant_column_correlation!(rho::MatNum, X::MatNum)
+    T = eltype(rho)
+    for i in axes(X, 2)
+        if allequal(view(X, :, i))
+            rho[i, i] = zero(T) / zero(T)
+        end
+    end
+    return rho
 end
 export KendallCovariance, SpearmanCovariance

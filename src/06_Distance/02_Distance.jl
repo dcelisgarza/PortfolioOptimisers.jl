@@ -180,7 +180,7 @@ The conversion round-trips. Build a covariance matrix from a correlation matrix 
  2. Read the diagonal of `rho` into `s`. `LinearAlgebra.diag` allocates, so the function never writes to `rho`.
  3. When every entry of `s` is one, return `rho` itself. Steps 4 and 5 do not run.
  4. Otherwise replace `s` with its square roots. These are the standard deviations.
- 5. Divide `rho` by the outer product of `s` with `StatsBase.cov2cor`. The result is a new correlation matrix.
+ 5. Divide a copy of `rho` by the outer product of `s` with [`cov2cor_nan!`](@ref). The result is a new correlation matrix. An asset with a zero variance, or with a `NaN` diagonal entry, gets a `NaN` row, its diagonal entry included, so a distance reader refuses it, see [`assert_distance_reader_rows`](@ref). A correlation matrix with such a row passes this step too, and its other rows are divided by one, so they do not change.
 
 # Arguments
 
@@ -205,7 +205,7 @@ function _as_correlation(rho::MatNum, sym::Symbol = :rho)
     s = LinearAlgebra.diag(rho)
     if any(!isone, s)
         s .= sqrt.(s)
-        rho = StatsBase.cov2cor(rho, s)
+        rho = cov2cor_nan!(copy(rho), s)
     end
     return rho
 end

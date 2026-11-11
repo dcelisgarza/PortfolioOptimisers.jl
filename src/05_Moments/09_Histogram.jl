@@ -493,8 +493,9 @@ The [`BinWidthBins`](@ref) method turns a bin width into a bin count.
 The [`HacineGharbiRavier`](@ref) method reads the pair instead of a width.
 
  1. Take the Pearson correlation of the pair into `corr`.
- 2. Select the closed form of [`HacineGharbiRavier`](@ref) that `corr` falls under.
- 3. Round the selected value to the nearest integer, and return it.
+ 2. Return one bin when `corr` is `NaN`. The correlation of a pair is `0 / 0` when one variable is constant, and one bin holds a constant, as in step 1 of the [`BinWidthBins`](@ref) method.
+ 3. Select the closed form of [`HacineGharbiRavier`](@ref) that `corr` falls under.
+ 4. Round the selected value to the nearest integer, and return it.
 
 The `Integer` method returns `bins` unchanged.
 
@@ -539,6 +540,10 @@ end
 function calc_num_bins(::HacineGharbiRavier, xj::VecNum, xi::VecNum, j::Integer, i::Integer,
                        T::Integer)
     corr = Statistics.cor(xj, xi)
+    # A constant variable makes `corr` 0 / 0, and one bin holds it.
+    if isnan(corr)
+        return 1
+    end
     #=
     The bi-histogram formula divides by `1 - corr^2`, so it is singular at BOTH ends of the
     correlation range. `isone(abs(corr))` catches them together: a perfectly anti-correlated

@@ -610,7 +610,7 @@ Estimates the similarity and distance matrices from `X`, makes a dendrogram unde
 # Validation
 
   - No diagonal entry of `D` is `NaN`. Raises a [`DistanceReaderRefusalError`](@ref) that names the columns of the assets that the reader could not estimate. A fit catches it and drops those assets.
-  - `D` holds no other `NaN`. Raises a `DomainError` that names the first `NaN` cell, a pair, through [`assert_no_nan_distance`](@ref). An asset with zero variance gives such a pair at every other asset. Without the check, `Clustering.hclust` refuses `D` as not symmetric, because `NaN` is not equal to itself.
+  - `D` holds no other `NaN`. Raises a `DomainError` that names the first `NaN` cell, a pair, through [`assert_no_nan_distance`](@ref). An undetermined pair gives it, and an asset with zero variance does not, because the first check refuses its `NaN` row. Without the check, `Clustering.hclust` refuses `D` as not symmetric, because `NaN` is not equal to itself.
 
 # Returns
 

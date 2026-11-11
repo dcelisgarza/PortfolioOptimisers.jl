@@ -2316,10 +2316,11 @@ struct UnimplementedRedundancy <: PortfolioOptimisers.AbstractRedundancyAlgorith
         rd = ReturnsResult(; nx = ["A", "B", "C", "D"], X = X)
         rd3 = ReturnsResult(; nx = ["A", "B", "C"], X = X[:, 1:3])
         rho = cor(Covariance(), X)
-        @test all(isnan, rho[1:3, 4]) && rho[4, 4] == 1
+        # The column of D is NaN at every entry, its diagonal included (#2029).
+        @test all(isnan, rho[:, 4])
         for m in (MeanValue(), MeanValue(; w = aweights([1.0, 2.0, 3.0, 4.0])))
             s = [POx.finite_vec_to_real_measure(m, c) for c in eachcol(rho)]
-            @test all(isfinite, s)
+            @test all(isfinite, s[1:3]) && isnan(s[4])
             # The member of the pair A, B with the lower summary survives, and C and D have
             # no partner. A tie would remove both members, so the data must not tie.
             @test s[1] != s[2]

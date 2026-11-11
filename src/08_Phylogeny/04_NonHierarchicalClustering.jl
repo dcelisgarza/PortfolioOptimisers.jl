@@ -255,7 +255,7 @@ Estimates the similarity and distance matrices from `X`, then passes `D` to [`op
 # Validation
 
   - No diagonal entry of `D` is `NaN`. Raises a [`DistanceReaderRefusalError`](@ref) that names the columns of the assets that the reader could not estimate. A fit catches it and drops those assets.
-  - `D` holds no other `NaN`. Raises a `DomainError` that names the first `NaN` cell, a pair, through [`assert_no_nan_distance`](@ref). An asset with zero variance gives such a pair at every other asset. Without the check, `Clustering.kmeans` refuses the `NaN` as a weight, and names neither the cell nor the cause.
+  - `D` holds no other `NaN`. Raises a `DomainError` that names the first `NaN` cell, a pair, through [`assert_no_nan_distance`](@ref). An undetermined pair gives it, and an asset with zero variance does not, because the first check refuses its `NaN` row. Without the check, `Clustering.kmeans` refuses the `NaN` as a weight, and names neither the cell nor the cause.
 
 # Returns
 

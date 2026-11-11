@@ -415,7 +415,7 @@ Return the weighted covariance or correlation matrix that `ce` computed, or `NaN
 The weighted mean of one observation can differ from it by one unit in the last place, so the deviations of a weighted fit on one observation are not zero. The unweighted fit on one observation has deviations of exactly zero, and its moments are `NaN` where a division by zero makes them undefined. The function gives the weighted fit the same values.
 
   - **Covariance.** The method returns `NaN` in each entry when the divisor of the weights is not positive, with [`weighted_moment_guard`](@ref). Without the guard, a corrected fit on one observation of positive weight is `Inf`.
-  - **Correlation.** A correlation needs two observations of positive weight. With fewer, the method writes `NaN` off the diagonal and keeps the diagonal of `rho`, as the unweighted fit on one observation does. Without the guard, the rounding gives an entry of `1` or `-1`.
+  - **Correlation.** A correlation needs two observations of positive weight. With fewer, the method writes `NaN` at every entry, as the unweighted fit on one observation does: its variances are zero, so each correlation is `0 / 0`. Without the guard, the rounding gives an entry of `1` or `-1`.
   - **Other estimators.** The library does not know the divisor of a `StatsBase.CovarianceEstimator` other than `StatsBase.SimpleCovariance`, so the fallback returns `val` without change.
 
 # Arguments
@@ -442,12 +442,7 @@ end
 function weighted_comoment_guard(::typeof(Statistics.cor), ::StatsBase.SimpleCovariance,
                                  rho::AbstractMatrix, w::StatsBase.AbstractWeights)
     if count(>(zero(eltype(w))), w) < 2
-        nan = convert(eltype(rho), NaN)
-        for j in axes(rho, 2), i in axes(rho, 1)
-            if i != j
-                rho[i, j] = nan
-            end
-        end
+        rho .= convert(eltype(rho), NaN)
     end
     return rho
 end
@@ -535,7 +530,8 @@ The method calls [`robust_cor`](@ref) with or without observation weights, as `c
  1. Refuse a gapped sample with [`assert_finite_sample`](@ref).
  2. Get the observation weights `w` from `ce.w` and `X`.
  3. When `w` is `nothing`, call [`robust_cor`](@ref) with `ce.ce` and `X` only.
- 4. Otherwise call [`robust_cor`](@ref) with the estimator of [`weighted_correlation_estimator`](@ref), `X` and `w`. Write `NaN` where the sample gives the correlation no value, with [`weighted_comoment_guard`](@ref). A `StatsBase.SimpleCovariance` on one observation of positive weight is then `NaN` off the diagonal, as the unweighted fit is.
+ 4. Otherwise call [`robust_cor`](@ref) with the estimator of [`weighted_correlation_estimator`](@ref), `X` and `w`. Write `NaN` where the sample gives the correlation no value, with [`weighted_comoment_guard`](@ref). A `StatsBase.SimpleCovariance` on one observation of positive weight is then `NaN` at every entry, as the unweighted fit is.
+ 5. When `rho` holds a `NaN`, read the variances `v` from the diagonal of the covariance of the same fit, and write `NaN` on the diagonal entry of each zero variance with [`undefined_correlation_diagonal!`](@ref). The correlation of a constant return is `0 / 0`, and `StatsBase` computes a correlation as `cov2cor!(cov(...))`, which writes one on its diagonal. A zero variance makes each entry of its row `NaN`, so a matrix with no `NaN` needs no second fit. The step reads the variances and not the rows of `NaN`, because a row alone does not name the asset: with two assets and one constant, both rows are `NaN` off the diagonal.
 
 # Arguments
 
@@ -571,13 +567,19 @@ function Statistics.cor(ce::GeneralCovariance, X::MatNum; dims::Int = 1, mean = 
                         kwargs...)
     assert_finite_sample(X)
     w = get_observation_weights(ce.w, X; dims = dims, kwargs...)
-    return if isnothing(w)
+    rho = if isnothing(w)
         robust_cor(ce.ce, X; dims = dims, mean = mean, kwargs...)
     else
         weighted_comoment_guard(Statistics.cor, ce.ce,
                                 robust_cor(weighted_correlation_estimator(ce.ce, w), X, w;
                                            dims = dims, mean = mean, kwargs...), w)
     end
+    # A zero variance makes its row `NaN`, so a matrix with no `NaN` has none to mark.
+    if any(isnan, rho)
+        v = LinearAlgebra.diag(Statistics.cov(ce, X; dims = dims, mean = mean, kwargs...))
+        undefined_correlation_diagonal!(rho, v)
+    end
+    return rho
 end
 """
     library_covariance_estimator(ce::AbstractCovarianceEstimator) -> AbstractCovarianceEstimator

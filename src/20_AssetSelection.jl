@@ -1192,7 +1192,7 @@ Keep one representative of each correlated group under [`CorrelationComponents`]
 
  1. Compute the correlation matrix `rho` of `rd.X` with the `ce` of the algorithm.
  2. When `absolute` is `true`, replace each entry of `rho` with its absolute value. This step comes **before** the threshold, so a strongly negative correlation is an edge.
- 3. When `scores` is `nothing`, collapse the finite entries of each column of `rho` with `measure` into the fallback score `s`, through [`finite_vec_to_real_measure`](@ref), and set `sbib` to `false`. The summary skips the undefined correlation with a constant column, so that column does not make every score `NaN`. A lower summary correlation is then better, so the representative that survives is the asset least correlated with the rest of the universe. Otherwise take `s` from `scores` and `sbib` from `bib`.
+ 3. When `scores` is `nothing`, collapse the finite entries of each column of `rho` with `measure` into the fallback score `s`, through [`finite_vec_to_real_measure`](@ref), and set `sbib` to `false`. The summary skips the undefined correlation with a constant column, so that column does not make every score `NaN`. The column of a constant asset is `NaN` at every entry, its diagonal included, so its summary is `NaN`. Such an asset has no edge, and step 4 gives it a group of its own. Its score is set to zero, so it survives, because [`groups_argbest`](@ref) keeps no asset with a score that is not finite. A lower summary correlation is then better, so the representative that survives is the asset least correlated with the rest of the universe. Otherwise take `s` from `scores` and `sbib` from `bib`.
  4. Group the assets with [`correlation_components`](@ref) on `rho` and `t`.
  5. Return the mask that [`groups_argbest`](@ref) admits for those groups under `s` and `sbib`.
 
@@ -1221,7 +1221,9 @@ function redundancy_keep(alg::CorrelationComponents, rd::AbstractReturnsResult,
         rho = abs.(rho)
     end
     s, sbib = if isnothing(scores)
-        [finite_vec_to_real_measure(alg.measure, x) for x in eachcol(rho)], false
+        # A constant asset has a `NaN` column and no edge, so a zero keeps it in its own group.
+        [ifelse(isfinite(v), v, zero(v))
+         for v in (finite_vec_to_real_measure(alg.measure, x) for x in eachcol(rho))], false
     else
         scores, bib
     end

@@ -325,7 +325,7 @@ The method computes the correlation matrix of `X` with the inner estimator `ce.c
  1. Check `dims` and orient `X` to `observations × assets`. Transpose it when `dims == 2`.
  2. Compute `rho` with `Statistics.cor(library_covariance_estimator(ce.ce), X; kwargs...)`.
  3. When `rho` is immutable, copy it into a `Matrix`, because step 4 writes in place.
- 4. Apply [`sample_matrix_processing!`](@ref) with `ce.mp`, `X` and the count `T` of [`processing_observation_count`](@ref) to `rho`, in place. If `ce.ce` is gap-aware, apply [`matrix_processing_block!`](@ref) instead, as the covariance method does.
+ 4. Apply [`matrix_processing_block!`](@ref) with `ce.mp`, `X` and the count `T` of [`processing_observation_count`](@ref) to `rho`, in place. When every diagonal entry of `rho` is finite, it applies [`sample_matrix_processing!`](@ref) to the whole matrix. A gap-aware `ce.ce` gives a `NaN` row for an asset outside the Coverage Universe, and an estimator that rescales a covariance, or that ranks, gives one for an asset with a zero variance, see [`cov2cor_nan!`](@ref). The processing then runs on the other assets, and the `NaN` row stays for the distance reader to refuse, see [`assert_distance_reader_rows`](@ref).
  5. Return `rho`.
 
 `ce.ce` runs before `ce.mp`. `ce.mp.order` sets the order of the steps inside the processing. Step
@@ -367,11 +367,7 @@ function Statistics.cor(ce::PortfolioOptimisersCovariance, X::MatNum; dims = 1,
         rho = Matrix(rho)
     end
     T = processing_observation_count(ce, X; kw...)
-    if plain
-        sample_matrix_processing!(ce.mp, rho, X, T; kwargs...)
-    else
-        matrix_processing_block!(ce.mp, rho, X, T; kwargs...)
-    end
+    matrix_processing_block!(ce.mp, rho, X, T; kwargs...)
     return rho
 end
 """

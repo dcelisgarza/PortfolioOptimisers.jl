@@ -1986,7 +1986,8 @@ end
 
 @testset "Dependence covariances: a constant series" begin
     # A constant column has a distance variance of zero, so its distance correlations are
-    # 0 / 0. The rank correlations keep a unit diagonal and are NaN off it.
+    # 0 / 0. The rank correlations of a constant are 0 / 0 too, its diagonal included (#2029),
+    # and the other column keeps its unit diagonal.
     Xc = [1.0 2.0; 1.0 4.0; 1.0 6.0; 1.0 3.0]
     ce = DistanceCovariance(; ex = FLoops.SequentialEx())
     @test all(isnan, cor(ce, Xc)[1, :])
@@ -1996,7 +1997,7 @@ end
     @test isnan(PortfolioOptimisers.cor_distance(ce, Xc[:, 1], Xc[:, 2]))
     for est in (KendallCovariance(), SpearmanCovariance())
         R = cor(est, Xc)
-        @test all(isone, diag(R))
+        @test isnan(R[1, 1]) && isone(R[2, 2])
         @test isnan(R[1, 2]) && isnan(R[2, 1])
     end
 end

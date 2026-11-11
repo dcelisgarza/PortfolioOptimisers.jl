@@ -16,6 +16,8 @@ gap_fill_value(::StatsBase.CovarianceEstimator)
 moment_window_and_weights
 weighted_centre
 demean_returns
+cov2cor_nan!
+undefined_correlation_diagonal!
 ```
 
 ## Windowed estimator generation
