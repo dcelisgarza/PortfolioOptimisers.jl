@@ -1221,10 +1221,19 @@ names `Proximity(; decay = NoDecay())`, read `Proximity(; decay = nothing)`.
 
 ## Amendment (2026-11-04, #1973)
 
-**A time-varying Feature Matrix holds its observations last.** Where the decision above states
-`Z :: obs × assets × features`, observation axis always leading, read `Z :: assets × features ×
-observations` (`features × assets × observations` at `dims = 2`). The reason of the rule was a
+**A time-varying Feature Matrix holds its observations last.** Where this record states the
+time-varying shape with the observations first, read `assets × features × observations`
+(`features × assets × observations` at `dims = 2`). The record states that shape in four places:
+`Z :: obs × assets × features`, observation axis always leading, in the decision;
+`observations × assets × features` in the fold path of the amendment of 2026-07-29 and in the two
+amendments of 2026-09-05 on the derived matrix and its verb; and `T × N × nassets` in the table of
+the amendment of 2026-08-04 on the cross-validated collapse. The reason of the rule was a
 convention, a rank-3 array that reads like the returns matrix. [ADR
 0230](0230-every-rank-3-array-holds-its-observations-on-its-last-axis.md) puts the observations
 last in every rank-3 array, so that the slice of one observation is one contiguous block. The
 static shape `assets × features` and the dispatch on `Arr3Num` do not change.
+
+**The lazy lift puts the observation axis where the rule puts it.** Where the amendments of
+2026-09-05 and 2026-09-06 state that the lift "indexes a leading observation axis" through
+`RepeatedLeading`, read `RepeatedObservations`: a lifted vector is `observations × assets`, and a
+lifted matrix is `assets × labels × observations`.

@@ -49,10 +49,12 @@ observation, `view(A, :, :, t)`, is one contiguous block, and it reaches BLAS wi
 2. **The label axis of a tensor Panel Field is its second axis in both shapes**: `assets × labels`
    when static and `assets × labels × observations` when time-varying. The static shape did not
    change.
-3. **A mask that goes with a rank-3 array keeps the shape of the panel axes**, `observations ×
-   assets`, as the active mask does. A reader that meets the two transposes the mask, through
-   `panel_column_transpose` or `panel_tensor_mask`. So the readers of the universe masks do not
-   change.
+3. **A universe mask that a reader of a rank-3 array meets keeps the shape of the panel axes**,
+   `observations × assets`, as the active mask does. A reader that meets the two transposes the
+   mask, through `panel_column_transpose` or `panel_tensor_mask`. So the readers of the universe
+   masks do not change. The observed mask and the placeholder mask of a tensor Panel Field are
+   not universe masks: each has the size of the values, so a time-varying one is `assets × labels
+   × observations`.
 4. **The lazy lift of a static Panel Field puts the observation axis where the rule puts it.**
    `RepeatedObservations` replaces `RepeatedLeading`: a lifted vector is `observations × assets`,
    and a lifted matrix is `assets × labels × observations`.
@@ -73,17 +75,25 @@ observation, `view(A, :, :, t)`, is one contiguous block, and it reaches BLAS wi
   whose contiguous slice now reaches BLAS, or that reduces along another axis, can move the last
   bits: the stack of `expand_factor_covariance`, the slices of a realised attribution, the panel
   collapse of a meta-optimiser (a relative difference up to `5e-15`), and the mean of
-  `AggregateFeatures` (up to `5e-16`).
+  `AggregateFeatures` (up to `5e-16`). A distance near zero amplifies the change of that mean:
+  on a panel of 60 assets, 24 features and 300 observations, the angular distance of
+  `FeatureDistance(; alg = AggregateFeatures())` moves by `1e-13` relative to its largest entry,
+  where the mean moves by `4e-16`. `AggregateDistances` at `dims = 2` moves by `3e-15` (R38 of
+  #1817).
 - **The speed.** On the case of #1971, the fit of a `CrossSectionalFactorPrior` runs 8 to 12 %
   faster than with parts A to D alone, with the same allocations: the default regression 1.43 s
   to 1.32 s, and the normal equations without the leverage check 0.97 s to 0.86 s (medians of 5
   fits, one thread, both trees in one run).
 - **A breaking change.** Every public verb that takes or returns a rank-3 array changes its
-  layout: `cross_sectional_regression` and `predict` (`Z`), `cs_gram`, the exposure and the
-  regression diagnostics over a history, `factor_exposure` of a member of several factors,
-  `descriptor_scores`, `forecast_factor_correlation`, `factor_attribution` over an exposure
-  history, `TensorPanelField` and `TensorPanelInput`, and `feature_matrix` of a time-varying
-  panel. The docstring of each interface that a user implements (`cross_sectional_regression`,
+  layout: `cross_sectional_regression`, `predict`, `cross_sectional_r2` and
+  `mean_cross_sectional_r2` (`Z`), `cs_gram`, the exposure and the regression diagnostics over a
+  history, `factor_exposure` of a member of several factors, `cross_sectional_groups`,
+  `factor_family_basis`, `reduce_exposures`, `reduce_loadings`, `reduce_factor_covariance` and
+  `expand_factor_covariance` over a stack, `dropped_factor_weights` with no observation index,
+  `descriptor_scores`, `forecast_factor_correlation` and its plot, `factor_attribution` over an
+  exposure history, `TensorPanelField`, `TensorPanelInput` and `panel_field_values` of a tensor
+  field, and `feature_matrix`, `panel_feature_matrix`, `distance` and `cor_and_dist` of a
+  time-varying panel. The migration guide lists them. The docstring of each interface that a user implements (`cross_sectional_regression`,
   `unseen_member_design`, `factor_exposure` of an observed member, `attribution_leverage_split`)
   states the break.
 - **Out of scope.** The bootstrap covariance stacks `assets × assets × draws`, the lattice of an

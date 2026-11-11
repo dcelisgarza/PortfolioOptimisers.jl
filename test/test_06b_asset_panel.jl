@@ -641,12 +641,15 @@ end
     bv, bo = PortfolioOptimisers.panel_resolve(bad)
     @test_throws ArgumentError PortfolioOptimisers.panel_input_field(bad, bv, bo)
 
-    ten = TensorPanelInput(; name = "beta", vals = reshape([1.0, NaN, 3.0, 4.0], 1, 2, 2),
+    # One asset, two labels, two observations. The blank is label `"a"` at the second
+    # observation, as in the v0.33 case `observations × assets × labels` it permutes.
+    ten = TensorPanelInput(; name = "beta", vals = reshape([1.0, 3.0, NaN, 4.0], 1, 2, 2),
                            axis = "factor", labels = ["a", "b"],
                            alg = ConstantPanelFill(; val = 0.0))
     tv, to = PortfolioOptimisers.panel_resolve(ten)
-    @test tv == reshape([1.0, 0.0, 3.0, 4.0], 1, 2, 2)
-    @test to == reshape([true, false, true, true], 1, 2, 2)
+    @test tv == reshape([1.0, 3.0, 0.0, 4.0], 1, 2, 2)
+    @test to == reshape([true, true, false, true], 1, 2, 2)
+    @test !to[1, 1, 2] && tv[1, 1, 2] == 0.0
     @test PortfolioOptimisers.panel_input_field(ten, tv, to).labels == ["a", "b"]
 
     # A static input carries one axis fewer, and resolves cell by cell.

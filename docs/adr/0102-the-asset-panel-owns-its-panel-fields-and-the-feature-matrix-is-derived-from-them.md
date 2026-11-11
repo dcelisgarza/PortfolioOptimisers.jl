@@ -539,3 +539,10 @@ label axis of a tensor Panel Field is its second axis in both shapes. The univer
 Panel Field and a categorical Panel Field stay `observations × assets`. [ADR
 0230](0230-every-rank-3-array-holds-its-observations-on-its-last-axis.md) states the rule and its
 reason.
+
+**The lazy lift puts the observation axis where the rule puts it.** Where § *A static input joins
+a time-varying panel by a lazy lift* states that the lift "indexes a leading observation axis", read
+that it indexes the observation axis of the lifted shape: a lifted vector is `observations ×
+assets`, so `f.vals[t, i]` holds, and a lifted matrix is `assets × labels × observations`, read as
+`f.vals[i, l, t]`. The type is `RepeatedObservations`. Where the Consequences and the amendment of
+2026-10-06 (#1508) name `RepeatedLeading`, read `RepeatedObservations`.
