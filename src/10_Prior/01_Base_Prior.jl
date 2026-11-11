@@ -411,12 +411,13 @@ Compute a prior result from the returns data with a prior estimator.
 
  1. Check that `rd` carries asset returns, so that the estimator does not receive `nothing` for `X`.
  2. When [`needs_factor_returns`](@ref) answers `true`, check that `rd` carries factor returns. The predicate reads the whole tree, so it finds a factor estimator inside an outer estimator whose factor argument is optional. The check runs here, so the caller gets a named error about `rd.F`. Without it, the caller gets a `MethodError` from the inner estimator one call later.
- 3. Read the source that `pe` states with [`returns_source`](@ref). Call it `x_src`.
- 4. Drop the observations of a Shared Series gap with [`shared_series_view`](@ref). These are a gap of a vector benchmark under `x_src = ExcessSource()`, and a gap of the factor returns when [`needs_factor_returns`](@ref) answers `true`. Every field of `rd` loses the same observations, and every fixed observation weight in the tree of `pe` loses them too, through [`shared_series_estimator`](@ref).
- 5. Read the asset returns `X` with [`benchmark_relative_returns`](@ref) under `x_src`. `X` is `rd.X`, or `rd.X - rd.B` under `ExcessSource()`.
- 6. Call the returns-matrix method of the estimator with `X`, `rd.F` and `rd.pnl`. Pass `rd.iv`, `rd.ivpa`, `rd.ne`, `rd.E`, `strict` and `cache_reg` as keyword arguments. A wrapper prior passes its keyword arguments to the estimator that it holds. The Exogenous Series gets to a [`CrossSectionalFactorPrior`](@ref) whose observed factors read it, and every other estimator ignores it. The call passes `dims = 1`, because a `ReturnsResult` holds its observations along the rows. The keyword `dims` has no effect.
- 7. Record the observations that step 4 dropped with [`shared_series_record`](@ref). A reader that holds `rd` then pairs the rows of `X` with the correct observations.
- 8. Record `x_src` in the prior result with [`stamp_returns_source`](@ref).
+ 3. Check that every [`UniverseSets`](@ref) on the asset axis of the tree of `pe` names the columns of `rd`, in order, with [`assert_universe_axis_order`](@ref). The returns-matrix method resolves a name to a column by its position alone, so a universe in another order binds each view to the wrong asset.
+ 4. Read the source that `pe` states with [`returns_source`](@ref). Call it `x_src`.
+ 5. Drop the observations of a Shared Series gap with [`shared_series_view`](@ref). These are a gap of a vector benchmark under `x_src = ExcessSource()`, and a gap of the factor returns when [`needs_factor_returns`](@ref) answers `true`. Every field of `rd` loses the same observations, and every fixed observation weight in the tree of `pe` loses them too, through [`shared_series_estimator`](@ref).
+ 6. Read the asset returns `X` with [`benchmark_relative_returns`](@ref) under `x_src`. `X` is `rd.X`, or `rd.X - rd.B` under `ExcessSource()`.
+ 7. Call the returns-matrix method of the estimator with `X`, `rd.F` and `rd.pnl`. Pass `rd.iv`, `rd.ivpa`, `rd.ne`, `rd.E`, `strict` and `cache_reg` as keyword arguments. A wrapper prior passes its keyword arguments to the estimator that it holds. The Exogenous Series gets to a [`CrossSectionalFactorPrior`](@ref) whose observed factors read it, and every other estimator ignores it. The call passes `dims = 1`, because a `ReturnsResult` holds its observations along the rows. The keyword `dims` has no effect.
+ 8. Record the observations that step 5 dropped with [`shared_series_record`](@ref). A reader that holds `rd` then pairs the rows of `X` with the correct observations.
+ 9. Record `x_src` in the prior result with [`stamp_returns_source`](@ref).
 
 The Asset Panel is the third positional argument for the same reason that `rd.F` is the second. A wrapper prior holds no `ReturnsResult`. It can hold an estimator that fits on a panel only if the panel gets to the returns-matrix method of that estimator. Every returns-matrix method takes the argument. Every wrapper prior passes it unchanged to the estimator that it holds over the assets. An estimator that reads no panel ignores it.
 
@@ -433,6 +434,7 @@ The Asset Panel is the third positional argument for the same reason that `rd.F`
   - `!isnothing(rd.X)`.
   - The rules of [`benchmark_relative_returns`](@ref).
   - `!isnothing(rd.F)`, when `needs_factor_returns(pe) === true`.
+  - The rules of [`assert_universe_axis_order`](@ref).
   - The rules of [`shared_series_rows`](@ref).
 
 # Returns
@@ -452,6 +454,7 @@ function prior(pe::AbstractPriorEstimator, rd::ReturnsResult; strict::Bool = fal
                dims::Int = 1, cache_reg::Bool = false)
     @argcheck(!isnothing(rd.X), IsNothingError)
     assert_factor_returns(pe, rd.F)
+    assert_universe_axis_order(pe, rd)
     x_src = returns_source(pe)
     rf = needs_factor_returns(pe) === true
     T = size(rd.X, 1)

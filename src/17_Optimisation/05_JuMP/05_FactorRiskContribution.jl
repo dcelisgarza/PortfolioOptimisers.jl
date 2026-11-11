@@ -382,6 +382,14 @@ function port_opt_view(frc::FactorRiskContribution, i, X::MatNum,
                                   frc_ple = frc.frc_ple, sets = frc.sets, wi = frc.wi,
                                   flag = frc.flag, fb = view_child(frc.fb, i, X))
 end
+# The fields that the view slices are on the asset axis. `sets` names the factors, because the
+# head solves for the factor weights, so the check reads it against the factor names.
+function asset_axis_fields(::FactorRiskContribution)
+    return (:opt, :re, :r, :fb)
+end
+function factor_axis_fields(::FactorRiskContribution)
+    return (:sets,)
+end
 """
     set_factor_risk_contribution_constraints!(model, re, rd, pr, flag, wi; hedge = false)
 

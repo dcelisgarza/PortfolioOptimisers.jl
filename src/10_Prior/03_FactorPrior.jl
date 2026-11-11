@@ -675,10 +675,11 @@ This method passes the fields of `rd` to the returns-matrix method, which runs t
 # Algorithm
 
  1. Check that `rd` carries asset returns and factor returns.
- 2. Drop the observations of a Shared Series gap with [`shared_series_view`](@ref): a gap of the factor returns, and a gap of a vector benchmark under `pe.x_src = ExcessSource()`. The factor prior, the regression and the reconstruction then read the same observations.
- 3. Read the asset returns with [`benchmark_relative_returns`](@ref) under `pe.x_src`, giving `X`.
- 4. Call the returns-matrix method with `X`, `rd.F` and `rd.pnl`, forwarding `rd.iv`, `rd.ivpa`, `rd.ne`, `rd.E`, `rd.ts`, `strict` and `cache_reg` as keyword arguments, and `dims = 1`, because a `ReturnsResult` holds its observations along the rows.
- 5. Record the observations that step 2 dropped with [`shared_series_record`](@ref), and `pe.x_src` with [`stamp_returns_source`](@ref).
+ 2. Check that every [`UniverseSets`](@ref) of the tree of `pe` names the columns that it reads, with [`assert_universe_axis_order`](@ref). A universe in the factor prior names the factors of `rd`, because that prior reads the factor returns.
+ 3. Drop the observations of a Shared Series gap with [`shared_series_view`](@ref): a gap of the factor returns, and a gap of a vector benchmark under `pe.x_src = ExcessSource()`. The factor prior, the regression and the reconstruction then read the same observations.
+ 4. Read the asset returns with [`benchmark_relative_returns`](@ref) under `pe.x_src`, giving `X`.
+ 5. Call the returns-matrix method with `X`, `rd.F` and `rd.pnl`, forwarding `rd.iv`, `rd.ivpa`, `rd.ne`, `rd.E`, `rd.ts`, `strict` and `cache_reg` as keyword arguments, and `dims = 1`, because a `ReturnsResult` holds its observations along the rows.
+ 6. Record the observations that step 3 dropped with [`shared_series_record`](@ref), and `pe.x_src` with [`stamp_returns_source`](@ref).
 
 # Arguments
 
@@ -693,6 +694,7 @@ This method passes the fields of `rd` to the returns-matrix method, which runs t
   - `rd.X` is not `nothing`. Otherwise the method raises an [`IsNothingError`](@ref).
   - The rules of [`benchmark_relative_returns`](@ref).
   - `rd.F` is not `nothing`, through [`assert_factor_returns`](@ref).
+  - The rules of [`assert_universe_axis_order`](@ref).
   - The rules of the returns-matrix method.
 
 # Returns
@@ -710,6 +712,7 @@ function prior(pe::FactorPrior, rd::ReturnsResult; strict::Bool = false, dims::I
                cache_reg::Bool = false)
     @argcheck(!isnothing(rd.X), IsNothingError)
     assert_factor_returns(pe, rd.F)
+    assert_universe_axis_order(pe, rd)
     T = size(rd.X, 1)
     rows = shared_series_rows(rd, pe.x_src, true)
     rd = shared_series_view(rd, pe.x_src, true)

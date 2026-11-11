@@ -103,10 +103,11 @@ The mask stays a `BitVector` because the expansion needs the length of the full 
 # Algorithm
 
  1. Derive the Investable Mask from the fitted prior with [`investable_mask`](@ref).
- 2. Return the mask, the prior, the optimiser and the returns data unchanged when the mask is `nothing`.
- 3. Otherwise read the departed names `ni` off the *unreduced* `rd.nx` with [`non_investable_names`](@ref), and announce them once with [`announce_non_investable`](@ref).
- 4. Take a [`port_opt_view`](@ref) of each of the three at `findall(imsk)`.
- 5. Declare the Non-Investable Axis on the viewed optimiser with [`non_investable_universe`](@ref), and return it beside the mask and the other two views. The axis is declared after the view because the view drops it, so a name-keyed constraint stated for a departed asset resolves here and nowhere deeper.
+ 2. Check that every [`UniverseSets`](@ref) in the tree of the optimiser names the columns of the *unreduced* `rd`, in order, with [`assert_universe_axis_order`](@ref). Both methods that take a mask do it, because a caller can pass a mask that it composed itself.
+ 3. Return the mask, the prior, the optimiser and the returns data unchanged when the mask is `nothing`.
+ 4. Otherwise read the departed names `ni` off the *unreduced* `rd.nx` with [`non_investable_names`](@ref), and announce them once with [`announce_non_investable`](@ref).
+ 5. Take a [`port_opt_view`](@ref) of each of the three at `findall(imsk)`.
+ 6. Declare the Non-Investable Axis on the viewed optimiser with [`non_investable_universe`](@ref), and return it beside the mask and the other two views. The axis is declared after the view because the view drops it, so a name-keyed constraint stated for a departed asset resolves here and nowhere deeper.
 
 # Arguments
 
@@ -117,6 +118,7 @@ The mask stays a `BitVector` because the expansion needs the length of the full 
 # Validation
 
   - At least one asset must be investable. [`investable_mask`](@ref) throws an `IsEmptyError` otherwise.
+  - The rules of [`assert_universe_axis_order`](@ref).
 
 # Returns
 
@@ -137,10 +139,12 @@ function investable_reduction(pr::AbstractPriorResult, opt::AbstractOptimisation
 end
 function investable_reduction(::Nothing, pr::AbstractPriorResult,
                               opt::AbstractOptimisationEstimator, rd::ReturnsResult)
+    assert_universe_axis_order(opt, rd)
     return nothing, pr, opt, rd
 end
 function investable_reduction(imsk::BitVector, pr::AbstractPriorResult,
                               opt::AbstractOptimisationEstimator, rd::ReturnsResult)
+    assert_universe_axis_order(opt, rd)
     idx = findall(imsk)
     # Read the departed names before the view, declare them after it: the view drops the
     # Non-Investable Axis, so this function is the one place a name-keyed constraint stated
@@ -223,10 +227,11 @@ The branch is dispatch rather than a condition, over three methods, as in [`inve
 # Algorithm
 
  1. Derive the Coverage Universe `cmsk` of `rd.X` and `rd.pnl` with [`coverage_mask`](@ref), with `dims = 1`, because a `ReturnsResult` holds its observations along the rows.
- 2. Return the mask, the optimiser and the returns data unchanged when the mask is `nothing`.
- 3. Otherwise read the departed names `ni` off the *unreduced* `rd.nx` with [`non_investable_names`](@ref), and announce them once with [`announce_non_investable`](@ref).
- 4. Take a [`port_opt_view`](@ref) of the optimiser and of the returns data at `findall(cmsk)`.
- 5. Declare the Non-Investable Axis on the viewed optimiser with [`non_investable_universe`](@ref), and return it beside the mask and the viewed returns data.
+ 2. Check the universes of the optimiser against the *unreduced* `rd` with [`assert_universe_axis_order`](@ref), as in [`investable_reduction`](@ref).
+ 3. Return the mask, the optimiser and the returns data unchanged when the mask is `nothing`.
+ 4. Otherwise read the departed names `ni` off the *unreduced* `rd.nx` with [`non_investable_names`](@ref), and announce them once with [`announce_non_investable`](@ref).
+ 5. Take a [`port_opt_view`](@ref) of the optimiser and of the returns data at `findall(cmsk)`.
+ 6. Declare the Non-Investable Axis on the viewed optimiser with [`non_investable_universe`](@ref), and return it beside the mask and the viewed returns data.
 
 # Arguments
 
@@ -236,6 +241,7 @@ The branch is dispatch rather than a condition, over three methods, as in [`inve
 # Validation
 
   - At least one asset must be in the Coverage Universe. [`coverage_mask`](@ref) throws an `IsEmptyError` otherwise, so every prior-free head refuses an all-dead window in one place.
+  - The rules of [`assert_universe_axis_order`](@ref).
 
 # Returns
 
@@ -253,10 +259,12 @@ function coverage_reduction(opt::AbstractOptimisationEstimator, rd::ReturnsResul
 end
 function coverage_reduction(::Nothing, opt::AbstractOptimisationEstimator,
                             rd::ReturnsResult)
+    assert_universe_axis_order(opt, rd)
     return nothing, opt, rd
 end
 function coverage_reduction(cmsk::BitVector, opt::AbstractOptimisationEstimator,
                             rd::ReturnsResult)
+    assert_universe_axis_order(opt, rd)
     idx = findall(cmsk)
     # As in `investable_reduction`: the Coverage Universe and the Investable Mask are the
     # same object downstream, so a prior-free head declares the Non-Investable Axis exactly

@@ -6,7 +6,7 @@
 [provenance]
 julia = "1.13.3"
 julia_syntax = "1.0.2"
-commit = "66930ae688"
+commit = "6143058140"
 
 [file]
 "ext/PortfolioOptimisersPlotsExt/01_CumulativeReturnsPlots.jl" = { code = 287, doc = 0, comment = 12, blank = 2, total = 301 }
@@ -319,6 +319,7 @@ commit = "66930ae688"
 "src/17_Optimisation/01_Base_Optimisation/05_InvestableUniverse.jl" = { code = 125, doc = 254, comment = 15, blank = 135, total = 529 }
 "src/17_Optimisation/01_Base_Optimisation/06_PanelCollapse.jl" = { code = 288, doc = 482, comment = 14, blank = 221, total = 1005 }
 "src/17_Optimisation/01_Base_Optimisation/07_ResultInvestableView.jl" = { code = 66, doc = 128, comment = 10, blank = 61, total = 265 }
+"src/17_Optimisation/01_Base_Optimisation/08_UniverseAxisOrder.jl" = { code = 92, doc = 135, comment = 0, blank = 75, total = 302 }
 "src/17_Optimisation/02_CrossValidation/01_Base_CrossValidation_a.jl" = { code = 486, doc = 936, comment = 23, blank = 393, total = 1838 }
 "src/17_Optimisation/02_CrossValidation/01_Base_CrossValidation_b.jl" = { code = 198, doc = 409, comment = 22, blank = 143, total = 772 }
 "src/17_Optimisation/02_CrossValidation/02_KFold.jl" = { code = 85, doc = 125, comment = 0, blank = 49, total = 259 }

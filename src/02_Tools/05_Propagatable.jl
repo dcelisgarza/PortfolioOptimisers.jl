@@ -1118,6 +1118,45 @@ function propagatable_contract_violations(@nospecialize(T::Type), pprops, pool)
     return msgs
 end
 """
+    asset_axis_fields(x) -> Tuple{Vararg{Symbol}}
+
+Return the names of the fields of `x` whose values lie on the asset axis of the data that `x` reads.
+
+A child on the asset axis reads the same columns as its parent, so a [`UniverseSets`](@ref) in that child must name the same assets. [`assert_universe_axis_order`](@ref) walks these fields to find each such universe. A child on another axis, such as the factor prior of a [`FactorPrior`](@ref), which reads the factor returns, is not on this list.
+
+# Algorithm
+
+The method that Julia selects is the algorithm.
+
+ 1. A [`@propagatable`](@ref) struct with at least one [`@vprop`](@ref) field: return the names of its `@vprop` fields, in the order of the declaration. The macro makes this method. A `@vprop` field is a field that [`port_opt_view`](@ref) views at the asset index, so the tag already states that the field lies on the asset axis.
+ 2. Any other value: return the names of the fields whose declared type can hold an estimator, an algorithm or a vector. A `@concrete` struct records the type of each value in a type parameter, so a field that holds a number, a matrix or a `nothing` gives no name. The answer comes from the type alone, so the compiler computes it once for each type.
+
+A struct with no `@vprop` field, such as a struct with a hand-written view, takes step 2, which reads all of its children. If such a struct holds a child on another axis, it must define its own method of this function, which leaves that child out. Otherwise the check reads the universe of the child against the asset names, and refuses a correct universe.
+
+# Arguments
+
+  - `x`: The estimator, algorithm or value to read.
+
+# Returns
+
+  - `fields::Tuple{Vararg{Symbol}}`: The names of the fields on the asset axis.
+
+# Related
+
+  - [`assert_universe_axis_order`](@ref)
+  - [`@vprop`](@ref)
+  - [`port_opt_view`](@ref)
+"""
+@generated function asset_axis_fields(::T) where {T}
+    fns = Tuple(f
+                for f in fieldnames(T)
+                if typeintersect(fieldtype(T, f),
+                                 Union{AbstractEstimator, AbstractAlgorithm,
+                                       StatsBase.CovarianceEstimator, AbstractVector}) !==
+                   Union{})
+    return :($fns)
+end
+"""
     @propagatable expr
 
 Define a struct, and make its propagation methods from six field tags. The tags are
@@ -1136,7 +1175,9 @@ independent, and a field can carry more than one:
   - [`@vprop`](@ref) (view propagation): a view of the struct at an index selection
     calls [`port_opt_view`](@ref) on each tagged field. The call recurses into composed
     children and views data arrays. The macro makes a `port_opt_view` method **only when
-    at least one field carries `@vprop`**.
+    at least one field carries `@vprop`**. With it, the macro makes an
+    [`asset_axis_fields`](@ref) method that names the tagged fields, because a field that
+    the asset index views is a field on the asset axis.
   - [`@pprop`](@ref) (prior selection): the prior method selects each tagged field
     against the field of the same name of a prior result, through
     `sel(getfield(x, :f), getproperty(pr, :f))`.
@@ -1209,8 +1250,8 @@ A weights field needs no second tag to join the view on the observation axis. Th
 observation method also opens on a `@fprop` or an `@oprop` field, and it recurses into each
 of them, so a cut reaches a weights field at any depth of the tree.
 
-The macro adds the generated `factory`, `port_opt_view` and `obs_weights_view` methods to
-the functions of `PortfolioOptimisers`. So `@propagatable` also works for a type that an
+The macro adds the generated `factory`, `port_opt_view`, `asset_axis_fields` and
+`obs_weights_view` methods to the functions of `PortfolioOptimisers`. So `@propagatable` also works for a type that an
 external package defines.
 
 `Base.@__doc__` forwards a docstring on the declaration to the struct.
@@ -1223,7 +1264,7 @@ external package defines.
  4. Build `new_struct` from `new_body`, and `chain` from `rebuild(new_struct)`. `chain` is the original declaration without the tags, so `@concrete` and Julia both see an ordinary struct.
  5. Bind `POMOD` to the module that **defines** the macro, and qualify every emitted name with it. A bare name resolves in the module of the caller. There, `function factory(…)` declares a new function of the caller, and the method never gets to `PortfolioOptimisers.factory`. That failure gives no error, because the declaration compiles and the type never joins the propagation chain.
  6. Emit the `factory` method. When [`prop_channel_active`](@ref) holds for the `factory` channel, the body is a call to the keyword constructor, with the pairs from [`prop_channel_pairs`](@ref). Otherwise, the body is `x`. **The macro always emits this method**, so a [`@propagatable`](@ref) struct with no tags returns itself from [`factory`](@ref).
- 7. When the `view` channel is active, emit `port_opt_view(x::StructName, i, args...)`. Its channel threads `i` before `args...`.
+ 7. When the `view` channel is active, emit `port_opt_view(x::StructName, i, args...)`. Its channel threads `i` before `args...`. Also emit `asset_axis_fields(::StructName)`, which returns the names of the `@vprop` fields as a tuple of symbols.
  8. When the `obs` channel is active, emit `obs_weights_view(x::StructName, i)`. Its channel threads `i` and takes no tail. A `@wprop`, a `@fprop` or an `@oprop` field opens the channel.
  9. When the `prior` channel is active, emit `factory(x::StructName, pr::AbstractPriorResult, args...; kwargs...)`. Its body selects every tagged field from `x`, and then gives the selected struct to [`resolve_deferred_quantities`](@ref), which makes **the Deferred-Quantity resolution the last operation**. A Deferred Quantity and a **Calibration Rule** see the solver, the observation weights and the children in the state that the optimisation gave them, and a rule can call [`ERM`](@ref) or [`RRM`](@ref). This method is more specific than the method of step 6, so Julia selects it for a call that threads a prior.
 10. Build `pprop_tuple`, the names of the `@pprop` fields as a tuple of quoted symbols.
@@ -1275,6 +1316,7 @@ macro propagatable(expr)
     POMOD = @__MODULE__
     _factory = :($POMOD.factory)
     _port_opt_view = :($POMOD.port_opt_view)
+    _asset_axis_fields = :($POMOD.asset_axis_fields)
     _obs_weights_view = :($POMOD.obs_weights_view)
     _resolve_fn = :($POMOD.resolve_deferred_quantities)
     _prior_result = :($POMOD.AbstractPriorResult)
@@ -1311,7 +1353,14 @@ macro propagatable(expr)
                 return $view_body
             end
         end
-        push!(defs, view_def)
+        # The fields that the view slices are the fields on the asset axis.
+        vprop_tuple = Expr(:tuple, QuoteNode.(tagged[:vprop])...)
+        axis_def = quote
+            function $_asset_axis_fields(::$struct_name)
+                return $vprop_tuple
+            end
+        end
+        push!(defs, view_def, axis_def)
     end
 
     # --- observation-weights view (@wprop, @fprop, @oprop) — emit when a field opts in ---
@@ -1414,4 +1463,4 @@ function check_propagatable_contracts(contracts = PROPAGATABLE_CONTRACTS,
     return nothing
 end
 
-public @propagatable, @fprop, @vprop, @pprop, @cprop, @wprop, @oprop
+public @propagatable, @fprop, @vprop, @pprop, @cprop, @wprop, @oprop, asset_axis_fields

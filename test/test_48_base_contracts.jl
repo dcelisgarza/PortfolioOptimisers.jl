@@ -453,13 +453,18 @@ end
     @test occursin("over 4 assets", pe.gross_budget_bounds_msg(0.0, ones(4)))
     @test occursin("over 4 assets", pe.gross_budget_bounds_msg(zeros(4), 1.0))
     # A misaligned universe has two shapes, and the message tells them apart. A length
-    # mismatch names both counts; an order mismatch names the first position that differs.
+    # mismatch names both counts; an order or a name mismatch names the first position
+    # that differs.
     ml = pe.misaligned_axis_msg(["A", "B"], ["A", "B", "C"], "asset", "nx", :nx)
     @test occursin("2 assets are declared, but the data has 3", ml)
     @test occursin("Set `sets.dict[\"nx\"]` to `rd.nx`", ml)
-    mo = pe.misaligned_axis_msg(["A", "B"], ["A", "C"], "asset", "nx", :nx)
-    @test occursin("both have 2 assets but the order differs, first at position 2: `B` vs `C`",
+    mo = pe.misaligned_axis_msg(["A", "B"], ["B", "A"], "asset", "nx", :nx)
+    @test occursin("both have 2 assets but the order differs, first at position 1: `A` vs `B`",
                    mo)
+    # Equal lengths with a name that the data does not have is not an order mismatch.
+    mn = pe.misaligned_axis_msg(["A", "B"], ["A", "C"], "asset", "nx", :nx)
+    @test occursin("both have 2 assets but the names differ, first at position 2: `B` vs `C`",
+                   mn)
     mf = pe.misaligned_axis_msg(["f1"], ["f1", "f2"], "factor", "nf", :nf)
     @test occursin("the factor universe declared under key `nf`", mf)
     @test occursin("1 factors are declared, but the data has 2", mf)

@@ -98,6 +98,21 @@ end
     # The declaration was throwaway, so drop it again and leave the checked registry as found.
     pop!(PO.PROPAGATABLE_CONTRACTS)
     @test length(PO.PROPAGATABLE_CONTRACTS) == n_registered
+    # A `@vprop` field also gives an `asset_axis_fields` method on this package's function,
+    # which names the tagged fields.
+    Base.eval(foreign,
+              quote
+                  @propagatable struct ForeignAxisProbe{T1, T2}
+                      @vprop sets::T1
+                      other::T2
+                  end
+                  ForeignAxisProbe(; sets = nothing, other = nothing) = ForeignAxisProbe(sets,
+                                                                                         other)
+              end)
+    @test count(m -> m.module === foreign, methods(PO.asset_axis_fields)) == 1
+    @test PO.asset_axis_fields(foreign.ForeignAxisProbe(; sets = 1, other = 2)) == (:sets,)
+    pop!(PO.PROPAGATABLE_CONTRACTS)
+    @test length(PO.PROPAGATABLE_CONTRACTS) == n_registered
     pool = PO.prior_result_property_pool()
     # `HighOrderPrior` forwards the whole of its `pr`, so the low-order names are in the
     # pool without being its fields.

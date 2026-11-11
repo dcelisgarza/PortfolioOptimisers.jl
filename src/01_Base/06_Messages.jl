@@ -319,13 +319,13 @@ Build the error text for a universe, declared under `key`, that does not agree w
 
 The position is the only link between a name and a column. A disagreement attaches every constraint row, bound and group to the wrong column, and the optimisation succeeds with the wrong answer. The message therefore names the repair, and not only the fault.
 
-The message reports two kinds of disagreement differently, because they have different causes. Different lengths mean that the two describe different universes. The usual cause is old `sets` with new sliced data. Equal lengths mean that the two describe the same universe in a different order, and the first position that differs is the full diagnosis. The message names the sizes and the first pair that differs, and never one of the universes in full. [`unknown_variable_msg`](@ref) follows the same rule to leak no data.
+The message reports three kinds of disagreement differently, because they have different causes. Different lengths mean that the two describe different universes. The usual cause is old `sets` with new sliced data. Equal lengths with the same names mean that the two describe the same universe in a different order. Equal lengths with other names mean that the declared universe holds a name that the data does not have. In both cases the first position that differs is the full diagnosis. The message names the sizes and the first pair that differs, and never one of the universes in full. [`unknown_variable_msg`](@ref) follows the same rule to leak no data.
 
 # Algorithm
 
  1. Build `detail` through the branch that the two lengths select.
  2. When the lengths differ, `detail` names both counts and nothing more, because the two describe different universes.
- 3. When the lengths are equal, find `i`, the first position at which the two differ. `detail` then names the common count, `i`, and the pair at `i`.
+ 3. When the lengths are equal, find `i`, the first position at which the two differ. `detail` then names the common count, whether the order or the names differ, `i`, and the pair at `i`. The order differs when the two hold the same names, as `issetequal` finds.
  4. Build the message from `detail`, the axis, the key, and the repair to make.
 
 # Arguments
@@ -350,7 +350,8 @@ function misaligned_axis_msg(declared, names, axis, key, sym)
         "$(length(declared)) $(axis)s are declared, but the data has $(length(names))"
     else
         i = findfirst(declared .!= names)
-        "both have $(length(names)) $(axis)s but the order differs, first at position $(i): `$(declared[i])` vs `$(names[i])`"
+        what = issetequal(declared, names) ? "the order differs" : "the names differ"
+        "both have $(length(names)) $(axis)s but $(what), first at position $(i): `$(declared[i])` vs `$(names[i])`"
     end
     return "the $(axis) universe declared under key `$(key)` does not describe the returns data: $(detail). Position is the only link between a name and a column, so this attaches constraints, bounds and groups to the wrong $(axis) rather than failing. Set `sets.dict[\"$(key)\"]` to `rd.$(sym)`, or slice the sets to match the data."
 end

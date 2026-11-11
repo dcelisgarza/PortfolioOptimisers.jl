@@ -1707,6 +1707,8 @@ the row names no asset.
 @testset "A fit whose every family is empty answers the prior" begin
     lce(v) = LinearConstraintEstimator(; val = v)
     nsets = UniverseSets(; dict = Dict("nx" => string.(1:size(rd.X, 2))))
+    # The universe of numeric names describes returns data with the same names.
+    rdn = ReturnsResult(; nx = nsets.dict["nx"], X = rd.X)
     pr0 = prior(EmpiricalPrior(), rd)
     T0 = size(rd.X, 1)
     with_logger(SimpleLogger(stderr, Logging.Error)) do
@@ -1721,7 +1723,7 @@ the row names no asset.
                                              cvar_views = ConditionalValueatRiskView(;
                                                                                      views = lce("1 == 0.04"),
                                                                                      alpha = 0.05)))
-            pr = prior(pe, rd)
+            pr = prior(pe, rdn)
             @test iszero(pr.kld)
             @test isapprox(pr.ens, T0, rtol = 1e-12)
             @test collect(pr.w) == collect(range(inv(T0), inv(T0); length = T0))
@@ -1744,10 +1746,10 @@ the row names no asset.
     # The whole point of the issue: the fit answers rather than raising, and it warns.
     @test_logs (:warn,) match_mode = :any prior(EntropyPoolingPrior(; sets = nsets,
                                                                     mu_views = lce("1 == 0.004")),
-                                                rd)
+                                                rdn)
     # #1797: strict raises IsZeroError at the drop of an all-zero row.
     @test_throws IsZeroError prior(EntropyPoolingPrior(; sets = nsets,
-                                                       mu_views = lce("1 == 0.004")), rd;
+                                                       mu_views = lce("1 == 0.004")), rdn;
                                    strict = true)
 end
 

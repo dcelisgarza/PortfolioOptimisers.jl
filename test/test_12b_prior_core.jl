@@ -635,8 +635,21 @@ end
     # The pre-migration shape — factor names under `xkey`, no factor axis at all. The naive
     # migration failure would be an *asset*-axis complaint about a user who never wrote an
     # asset name, so the message has to name the factor universe.
+    # The pre-migration shape, factor names under `xkey`, declares a wrong asset axis. The
+    # entry refuses it, and the message names the factor key where the factors go.
     msg = try
         prior(BayesianBlackLittermanPrior(; sets = fsets, views = f_views), rd)
+    catch e
+        sprint(showerror, e)
+    end
+    @test occursin("Declare the factors under the factor key `nf`", msg)
+    @test_throws DimensionMismatch prior(BayesianBlackLittermanPrior(; sets = fsets,
+                                                                     views = f_views), rd)
+    # A universe of the assets alone declares no factor axis, and the message names the
+    # factor universe.
+    asets = UniverseSets(; dict = Dict("nx" => rd.nx))
+    msg = try
+        prior(BayesianBlackLittermanPrior(; sets = asets, views = f_views), rd)
     catch e
         sprint(showerror, e)
     end
@@ -644,7 +657,7 @@ end
     @test occursin("required by BayesianBlackLittermanPrior", msg)
     @test occursin("it is not optional here", msg)
     @test !occursin("asset", msg)
-    @test_throws KeyError prior(BayesianBlackLittermanPrior(; sets = fsets,
+    @test_throws KeyError prior(BayesianBlackLittermanPrior(; sets = asets,
                                                             views = f_views), rd)
     # Declared, but not the axis `F` describes.
     shortf = UniverseSets(; dict = Dict("nx" => rd.nx, "nf" => rd.nf[1:2]))
@@ -656,7 +669,9 @@ end
     catch e
         sprint(showerror, e)
     end
-    @test occursin("declared factor axis disagree", msg)
+    # The entry compares the factor axis with `rd.nf` before the fit reads it.
+    @test occursin("the factor universe declared under key `nf`", msg)
+    @test occursin("2 factors are declared, but the data has $(length(rd.nf))", msg)
     # An *asset* name is now the thing that cannot resolve, and the message says so.
     msg = try
         prior(BayesianBlackLittermanPrior(; sets = xfsets,
@@ -700,7 +715,11 @@ end
     # And the views still resolve after the slice: the axis they are written against did
     # not move.
     rdi = ReturnsResult(; nx = rd.nx[i], X = rd.X[:, i], nf = rd.nf, F = rd.F)
-    @test isapprox(prior(pev, rdi).mu, prior(pe, rdi).mu)
+    hand = UniverseSets(; dict = Dict("nx" => rd.nx[i], "nf" => rd.nf))
+    @test isapprox(prior(pev, rdi).mu,
+                   prior(BayesianBlackLittermanPrior(; sets = hand, views = f_views), rdi).mu)
+    # The universe that is not sliced does not describe the sliced data.
+    @test_throws DimensionMismatch prior(pe, rdi)
     # The consistency identity of ADR 0046 is a property of the update, not of the lookup:
     # it must survive the migration exactly.
     pr = prior(BayesianBlackLittermanPrior(; sets = xfsets, views = f_views), rd)
@@ -773,8 +792,21 @@ end
     # The pre-migration shape — factor names under `xkey`, no factor axis at all — is the
     # error worth getting right, because the naive migration failure is an *asset*-axis
     # complaint about a user who never wrote an asset name.
+    # The pre-migration shape, factor names under `xkey`, declares a wrong asset axis. The
+    # entry refuses it, and the message names the factor key where the factors go.
     msg = try
         prior(FactorBlackLittermanPrior(; sets = fsets, views = f_views), rd)
+    catch e
+        sprint(showerror, e)
+    end
+    @test occursin("Declare the factors under the factor key `nf`", msg)
+    @test_throws DimensionMismatch prior(FactorBlackLittermanPrior(; sets = fsets,
+                                                                   views = f_views), rd)
+    # A universe of the assets alone declares no factor axis, and the message names the
+    # factor universe.
+    asets = UniverseSets(; dict = Dict("nx" => rd.nx))
+    msg = try
+        prior(FactorBlackLittermanPrior(; sets = asets, views = f_views), rd)
     catch e
         sprint(showerror, e)
     end
@@ -782,7 +814,7 @@ end
     @test occursin("required by FactorBlackLittermanPrior", msg)
     @test occursin("it is not optional here", msg)
     @test !occursin("asset", msg)
-    @test_throws KeyError prior(FactorBlackLittermanPrior(; sets = fsets, views = f_views),
+    @test_throws KeyError prior(FactorBlackLittermanPrior(; sets = asets, views = f_views),
                                 rd)
     # Declared, but not the axis `F` describes.
     shortf = UniverseSets(; dict = Dict("nx" => rd.nx, "nf" => rd.nf[1:2]))
@@ -831,12 +863,12 @@ end
     @test pev.sets.dict["nf_family"] == string.("fam", eachindex(rd.nf))
     # And the views still resolve after the slice: the axis they are written against did
     # not move.
-    @test isapprox(prior(pev,
-                         ReturnsResult(; nx = rd.nx[i], X = rd.X[:, i], nf = rd.nf,
-                                       F = rd.F)).mu,
-                   prior(pe,
-                         ReturnsResult(; nx = rd.nx[i], X = rd.X[:, i], nf = rd.nf,
-                                       F = rd.F)).mu)
+    rdi = ReturnsResult(; nx = rd.nx[i], X = rd.X[:, i], nf = rd.nf, F = rd.F)
+    hand = UniverseSets(; dict = Dict("nx" => rd.nx[i], "nf" => rd.nf))
+    @test isapprox(prior(pev, rdi).mu,
+                   prior(FactorBlackLittermanPrior(; sets = hand, views = f_views), rdi).mu)
+    # The universe that is not sliced does not describe the sliced data.
+    @test_throws DimensionMismatch prior(pe, rdi)
 end
 
 @testset "Augmented Black Litterman" begin
@@ -924,11 +956,21 @@ end
                          rd).mu,
                    prior(AugmentedBlackLittermanPrior(; sets = xfsets, a_views = a_blv,
                                                       f_views = f_blv), rd).mu)
-    # The pre-migration factor shape — factor names under `xkey`, no factor axis declared — is
-    # the error worth getting right. Muting the asset half keeps the asset check out of the
-    # way, so what is reported is the *factor* universe the user never declared.
+    # The pre-migration factor shape, factor names under `xkey`, declares a wrong asset axis.
+    # The entry refuses it, and the message names the factor key where the factors go.
     msg = try
         prior(AugmentedBlackLittermanPrior(; sets = fsets, a_views = a_blv,
+                                           f_views = f_views), rd)
+    catch e
+        sprint(showerror, e)
+    end
+    @test occursin("Declare the factors under the factor key `nf`", msg)
+    # A universe of the assets alone declares no factor axis. Muting the asset half keeps the
+    # asset check out of the way, so what is reported is the *factor* universe the user never
+    # declared.
+    asets = UniverseSets(; dict = Dict("nx" => rd.nx))
+    msg = try
+        prior(AugmentedBlackLittermanPrior(; sets = asets, a_views = a_blv,
                                            f_views = f_views), rd)
     catch e
         sprint(showerror, e)
@@ -936,7 +978,7 @@ end
     @test occursin("nf (the factor universe)", msg)
     @test occursin("required by AugmentedBlackLittermanPrior", msg)
     @test occursin("`f_views` are written in factor names", msg)
-    @test_throws KeyError prior(AugmentedBlackLittermanPrior(; sets = fsets,
+    @test_throws KeyError prior(AugmentedBlackLittermanPrior(; sets = asets,
                                                              a_views = a_blv,
                                                              f_views = f_views), rd)
     # Declared, but not the axis `F` describes.

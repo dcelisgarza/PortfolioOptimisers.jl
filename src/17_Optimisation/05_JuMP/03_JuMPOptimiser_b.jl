@@ -1,39 +1,4 @@
 """
-    assert_universe_axis_order(sets::Nothing, rd::ReturnsResult) -> Nothing
-    assert_universe_axis_order(sets::UniverseSets, rd::ReturnsResult) -> Nothing
-
-Assert that every axis [`UniverseSets`](@ref) declares agrees, name for name and in order, with the returns data it is about to be used against.
-
-Nothing else in the library ties a declared universe to the data's column order. Names resolve to *positions* in `sets.dict[sets.xkey]`, and those positions index the columns of `pr.X`; if the two disagree the model is still feasible and still solves — it just constrains the wrong assets. Converting the one silent-wrong-answer failure mode into an error is the whole point, which is why this runs even though no supported path is expected to trip it.
-
-Both axes are checked, but only where both sides exist: `rd.nx` and `rd.nf` are optional on [`ReturnsResult`](@ref), and the factor axis is optional on [`UniverseSets`](@ref). The factor check is redundant with the one [`constraint_space_basis`](@ref) makes against the loadings and costs nothing when a caller copies `rd.nf` into the dict; the asset check is new behaviour on a path that has nothing to do with factors, and it may surface pre-existing misconfigurations — that is intended.
-
-`_update_asset_sets` rebuilds `sets.dict[sets.xkey]` from `rdo.nx` before a [`NestedClustered`](@ref) outer solve, and [`port_opt_view`](@ref) slices the asset axis alongside the data, so the synthetic-universe and subset paths satisfy this by construction.
-
-# Related
-
-  - [`UniverseSets`](@ref)
-  - [`misaligned_axis_msg`](@ref)
-  - [`processed_jump_optimiser_attributes`](@ref)
-"""
-function assert_universe_axis_order(::Nothing, ::ReturnsResult)
-    return nothing
-end
-function assert_universe_axis_order(sets::UniverseSets, rd::ReturnsResult)
-    for (axis, key, names, sym) in
-        (("asset", sets.xkey, rd.nx, "nx"), ("factor", sets.tfkey, rd.nf, "nf"))
-        if isnothing(names) || !haskey(sets.dict, key)
-            continue
-        end
-        declared = sets.dict[key]
-        @argcheck(length(declared) == length(names),
-                  DimensionMismatch(misaligned_axis_msg(declared, names, axis, key, sym)))
-        @argcheck(declared == names,
-                  ArgumentError(misaligned_axis_msg(declared, names, axis, key, sym)))
-    end
-    return nothing
-end
-"""
     processed_jump_optimiser_attributes(
         opt::JuMPOptimiser,
         rd::ReturnsResult;
@@ -70,7 +35,6 @@ function processed_jump_optimiser_attributes(opt::JuMPOptimiser, rd::ReturnsResu
                                              rmsk::Option{BitVector} = nothing, kwargs...)
     # `rd` keeps its raw `X` and `B`. Each reader below that reads the returns states its
     # own source, and subtracts the benchmark itself, at the point of use.
-    assert_universe_axis_order(opt.sets, rd)
     pr = prior(opt.pe, rd)
     # Resolve the fee on the caller's universe before `investable_reduction` narrows `sets`.
     # A name stated over that universe must not be refused because the data delisted the

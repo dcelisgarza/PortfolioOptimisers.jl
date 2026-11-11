@@ -219,11 +219,12 @@ The function does not report the reduction, because [`investable_reduction`](@re
 
 # Algorithm
 
- 1. When `imsk` is `nothing`, every asset is investable. Return `optimiser` and `rd` unchanged, with no allocation.
- 2. Take the returns matrix `X` from `rd.X`, or from `pr.X` when `rd` holds no matrix. When the head holds a fitted prior, [`port_opt_view`](@ref) reads the matrix of that prior and ignores `X`, so the two choices give the same view.
- 3. Find the positions `idx = findall(imsk)` of the investable assets. Every other caller of [`port_opt_view`](@ref) passes an index vector, so the function passes one too.
- 4. View `optimiser` at `idx` with [`port_opt_view`](@ref). Then declare the names that the mask leaves out on the Non-Investable Axis of the sets that the head holds, with [`non_investable_universe`](@ref). The generic method returns a head with no such sets unchanged. A risk budget keyed by name resolves after this step.
- 5. View `rd` at `idx`, and return the two views.
+ 1. Check that every [`UniverseSets`](@ref) in the tree of the head names the columns of `rd`, in order, with [`assert_universe_axis_order`](@ref). The bundle checks the universes of the [`JuMPOptimiser`](@ref) of the head. This step reaches the universes that the head holds outside it, such as the universe of a risk budget.
+ 2. When `imsk` is `nothing`, every asset is investable. Return `optimiser` and `rd` unchanged, with no allocation.
+ 3. Take the returns matrix `X` from `rd.X`, or from `pr.X` when `rd` holds no matrix. When the head holds a fitted prior, [`port_opt_view`](@ref) reads the matrix of that prior and ignores `X`, so the two choices give the same view.
+ 4. Find the positions `idx = findall(imsk)` of the investable assets. Every other caller of [`port_opt_view`](@ref) passes an index vector, so the function passes one too.
+ 5. View `optimiser` at `idx` with [`port_opt_view`](@ref). Then declare the names that the mask leaves out on the Non-Investable Axis of the sets that the head holds, with [`non_investable_universe`](@ref). The generic method returns a head with no such sets unchanged. A risk budget keyed by name resolves after this step.
+ 6. View `rd` at `idx`, and return the two views.
 
 # Arguments
 
@@ -231,6 +232,10 @@ The function does not report the reduction, because [`investable_reduction`](@re
   - $(arg_dict[:rd])
   - $(arg_dict[:pr])
   - $(arg_dict[:imsk])
+
+# Validation
+
+  - The rules of [`assert_universe_axis_order`](@ref).
 
 # Returns
 
@@ -244,10 +249,12 @@ The function does not report the reduction, because [`investable_reduction`](@re
 """
 function investable_view(optimiser::JuMPOptimisationEstimator, rd::ReturnsResult,
                          ::AbstractPriorResult, ::Nothing)
+    assert_universe_axis_order(optimiser, rd)
     return optimiser, rd
 end
 function investable_view(optimiser::JuMPOptimisationEstimator, rd::ReturnsResult,
                          pr::AbstractPriorResult, imsk::BitVector)
+    assert_universe_axis_order(optimiser, rd)
     X = isnothing(rd.X) ? pr.X : rd.X
     idx = findall(imsk)
     # The head takes the view that `investable_reduction` took of the optimiser for the

@@ -1,5 +1,5 @@
 ```@meta
-Description = "Propagatable, public API of PortfolioOptimisers.jl: @propagatable, @fprop, @vprop, @pprop, @wprop, @cprop, @oprop, factory."
+Description = "Propagatable, public API of PortfolioOptimisers.jl: @propagatable, @fprop, @vprop, @pprop, @wprop, @cprop, @oprop, asset_axis_fields, factory."
 ```
 
 # Propagatable
@@ -14,6 +14,7 @@ Description = "Propagatable, public API of PortfolioOptimisers.jl: @propagatable
 @wprop
 @cprop
 @oprop
+asset_axis_fields
 ```
 
 ## Summary statistics

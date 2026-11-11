@@ -449,12 +449,13 @@ This is the Block Step, and a fold of the whole Returns Result from no state is 
 
 # Algorithm
 
- 1. Read the returns of the block in the head's frame through [`benchmark_relative_returns`](@ref), giving `R`. `R` is `rd.X - rd.B` when the head's `x_src` is [`ExcessSource`](@ref), and `rd.X` otherwise.
- 2. Read the active mask of `rd` through [`step_active_mask`](@ref), giving `amsk`.
- 3. Resolve the Allocation Set over the pinned universe through [`resolve_allocation_set`](@ref), giving `set`.
- 4. Seed the state on the first block, or pin and check the carried state, through [`online_selection_pin`](@ref), giving `state`.
- 5. Fold each row in order through [`online_selection_row!`](@ref), under the timestamp that [`row_timestamp`](@ref) gives it. The row's returns are its row of `R`, and the row of the raw returns data is viewed as a Returns Result of one observation through [`port_opt_view`](@ref). Each row updates the state `st` of the rule, the allocation `w`, the buffer `X` and the hold record `hold`, and adds one to the row count `n`. `st` is the state of the rule: what the rule keeps from one update to the next, such as a Gram matrix or a belief covariance, or `nothing` for a rule that keeps nothing.
- 6. Return the state with the new `n`, `w`, `st`, `X` and `hold`, the active mask of the last row, and the timestamps folded so far.
+ 1. Check that every [`UniverseSets`](@ref) in the tree of the head and in `set` names the columns of `rd`, in order, through [`assert_universe_axis_order`](@ref). A rule that holds an optimiser checks that optimiser when it runs on the rows.
+ 2. Read the returns of the block in the head's frame through [`benchmark_relative_returns`](@ref), giving `R`. `R` is `rd.X - rd.B` when the head's `x_src` is [`ExcessSource`](@ref), and `rd.X` otherwise.
+ 3. Read the active mask of `rd` through [`step_active_mask`](@ref), giving `amsk`.
+ 4. Resolve the Allocation Set over the pinned universe through [`resolve_allocation_set`](@ref), giving `set`.
+ 5. Seed the state on the first block, or pin and check the carried state, through [`online_selection_pin`](@ref), giving `state`.
+ 6. Fold each row in order through [`online_selection_row!`](@ref), under the timestamp that [`row_timestamp`](@ref) gives it. The row's returns are its row of `R`, and the row of the raw returns data is viewed as a Returns Result of one observation through [`port_opt_view`](@ref). Each row updates the state `st` of the rule, the allocation `w`, the buffer `X` and the hold record `hold`, and adds one to the row count `n`. `st` is the state of the rule: what the rule keeps from one update to the next, such as a Gram matrix or a belief covariance, or `nothing` for a rule that keeps nothing.
+ 7. Return the state with the new `n`, `w`, `st`, `X` and `hold`, the active mask of the last row, and the timestamps folded so far.
 
 # Arguments
 
@@ -466,6 +467,7 @@ This is the Block Step, and a fold of the whole Returns Result from no state is 
 # Validation
 
   - `rd.X` is not `nothing`. An `IsNothingError` is thrown otherwise.
+  - The rules of [`assert_universe_axis_order`](@ref).
   - The head's `x_src` is not [`ExcessSource`](@ref), or `rd` carries a benchmark. An `ArgumentError` is thrown otherwise, through [`benchmark_relative_returns`](@ref).
   - Everything [`step_active_mask`](@ref) and [`assert_pinned_context`](@ref) refuse.
   - A non-finite cell at an active asset, under `strict`. An `ArgumentError` is thrown.
@@ -486,6 +488,8 @@ function fold_online_selection(opt::OnlinePortfolioSelection,
                                rd::ReturnsResult,
                                set::AbstractAllocationSet = static_allocation_set(opt))
     @argcheck(!isnothing(rd.X), IsNothingError("rd.X cannot be nothing"))
+    assert_universe_axis_order(opt, rd)
+    assert_universe_axis_order(set, rd)
     R = benchmark_relative_returns(rd, opt.x_src)
     amsk = step_active_mask(rd)
     set = resolve_allocation_set(set, size(rd.X, 2), opt.strict, eltype(rd.X))

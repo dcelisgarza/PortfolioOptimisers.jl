@@ -1122,7 +1122,7 @@ Every call reaches this method through [`optimise`](@ref), which walks `est.fb` 
 
 # Algorithm
 
- 1. Check that `rd.X` is not `nothing`.
+ 1. Check that `rd.X` is not `nothing`, and that `est.sets` names the columns of `rd`, in order, through [`assert_universe_axis_order`](@ref).
  2. Add one to the returns, giving the price relatives `X`, of size `T × N`.
  3. Derive the rows' Investable Masks through [`path_row_masks`](@ref), giving `imsk`, and `msk`, which is all `true` when `imsk` is `nothing`.
  4. Resolve the weight bounds through [`weight_bounds_constraints`](@ref), giving `wb`.
@@ -1164,6 +1164,7 @@ Where:
 # Validation
 
   - `!isnothing(rd.X)`. An `IsNothingError` is thrown otherwise.
+  - The rules of [`assert_universe_axis_order`](@ref).
   - Every row has at least one asset in its Coverage Universe, through [`path_row_masks`](@ref).
 
 # Returns
@@ -1181,6 +1182,7 @@ Where:
 """
 function _optimise(est::BudgetedHindsightPath, rd::ReturnsResult; kwargs...)
     @argcheck(!isnothing(rd.X), IsNothingError("rd.X cannot be nothing"))
+    assert_universe_axis_order(est, rd)
     X = one(eltype(rd.X)) .+ rd.X
     T, N = size(X)
     imsk = path_row_masks(rd)

@@ -163,13 +163,23 @@ end
     ## A `RiskBudgetEstimator` still requires sets, and the message names the factor axis.
     @test_throws IsNothingError FactorRiskBudgeting(; re = rr, rkb = rkbe)
 
-    ## The pre-migration shape — factor names under the asset key, no factor axis declared —
-    ## is now a missing-axis error, reported against `sets.tfkey` rather than a `KeyError`
-    ## about an asset universe the user never wrote in.
+    ## The pre-migration shape, factor names under the asset key, declares a wrong asset
+    ## axis. The head refuses it, and the message names the factor key where the factors go.
+    msg = try
+        optimise(RiskBudgeting(;
+                               rba = FactorRiskBudgeting(; re = rr, rkb = rkbe,
+                                                         sets = fsets), opt = opt), rd)
+    catch e
+        sprint(showerror, e)
+    end
+    @test occursin("Declare the factors under the factor key `nf`", msg)
+    ## A universe of the assets alone declares no factor axis: a missing-axis error, reported
+    ## against `sets.tfkey`.
+    asets = UniverseSets(; dict = Dict("nx" => rd.nx))
     @test_throws KeyError optimise(RiskBudgeting(;
                                                  rba = FactorRiskBudgeting(; re = rr,
                                                                            rkb = rkbe,
-                                                                           sets = fsets),
+                                                                           sets = asets),
                                                  opt = opt), rd)
 
     ## A declared factor axis of the wrong length is caught against `rr.L`.
@@ -187,7 +197,7 @@ end
                                      rba = FactorRiskBudgeting(; re = rr,
                                                                rkb = RiskBudget(;
                                                                                 val = 1:5),
-                                                               sets = fsets), opt = opt),
+                                                               sets = asets), opt = opt),
                        rd).retcode, OptimisationSuccess)
 
     ## `sets` is `@vprop`: a view slices the asset axis and leaves the factor axis and the

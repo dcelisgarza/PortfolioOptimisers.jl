@@ -5,7 +5,7 @@
 julia = "1.13.3"
 code_complexity = "0.2.0"
 julia_syntax = "1.0.2"
-commit = "66930ae688"
+commit = "6143058140"
 
 [file]
 "ext/PortfolioOptimisersPlotsExt/01_CumulativeReturnsPlots.jl" = { cyc = 5, cog = 7, arg = 8, cyc_sum = 53, cog_sum = 57, arg_sum = 99, macros = [] }
@@ -318,6 +318,7 @@ commit = "66930ae688"
 "src/17_Optimisation/01_Base_Optimisation/05_InvestableUniverse.jl" = { cyc = 5, cog = 4, arg = 5, cyc_sum = 36, cog_sum = 15, arg_sum = 77, macros = [] }
 "src/17_Optimisation/01_Base_Optimisation/06_PanelCollapse.jl" = { cyc = 5, cog = 6, arg = 6, cyc_sum = 84, cog_sum = 54, arg_sum = 203, macros = [] }
 "src/17_Optimisation/01_Base_Optimisation/07_ResultInvestableView.jl" = { cyc = 3, cog = 3, arg = 5, cyc_sum = 18, cog_sum = 9, arg_sum = 48, macros = [] }
+"src/17_Optimisation/01_Base_Optimisation/08_UniverseAxisOrder.jl" = { cyc = 5, cog = 6, arg = 7, cyc_sum = 28, cog_sum = 16, arg_sum = 37, macros = [] }
 "src/17_Optimisation/02_CrossValidation/01_Base_CrossValidation_a.jl" = { cyc = 17, cog = 23, arg = 11, cyc_sum = 111, cog_sum = 75, arg_sum = 188, macros = ["@forward_properties"] }
 "src/17_Optimisation/02_CrossValidation/01_Base_CrossValidation_b.jl" = { cyc = 10, cog = 14, arg = 12, cyc_sum = 34, cog_sum = 25, arg_sum = 76, macros = [] }
 "src/17_Optimisation/02_CrossValidation/02_KFold.jl" = { cyc = 6, cog = 9, arg = 7, cyc_sum = 12, cog_sum = 11, arg_sum = 14, macros = [] }
