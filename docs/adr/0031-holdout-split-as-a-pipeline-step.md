@@ -113,3 +113,22 @@ one would force a prices-fed pipeline to convert before it could split.
 - New concepts `Holdout Split` and `Embargo` are in `GLOSSARY.md`.
 - `docs/paper/paper.jl` continues to work unchanged: it uses the one `safe_index` branch that
   was already correct.
+
+## Amendment (2026-11-10): a size states its reading in a wrapper (#2013)
+
+Decision 7 is amended. The Integer/Float duality is no longer the reading. `train_size` and
+`test_size` hold a `CountOf` of rows or a `FractionOf` of the observations, from the shared pair
+of `src/01_Base/18_CountFraction.jl`. A plain number stays a shorthand through
+`count_or_fraction`: an `Integer` is a count and any other real number is a fraction. So
+`train_size = 250` and `train_size = 0.25` keep their v0.33 meaning.
+
+The decision kept one estimator with two field types, because here the dangerous case died
+loudly. #2013 found a case that does not: a search grid promotes the elements of a vector
+literal, so a count can arrive as a float, and the library reads it as a fraction. The wrapper
+keeps its type in every container. ADR 0029 removes its own split for the same reason, so the
+asymmetry that this decision describes is gone.
+
+The range of a fraction is `(0, 1]` for `FractionOf`. A plain `1.0` is refused, because a grid
+promotes the count `1` to it. `FractionOf(1)` takes every row, and the non-empty guard of
+`safe_index` then refuses the split, as the Consequences state for `1.0`. `split_count` takes a
+`CountOf` or a `FractionOf`, and its `name` argument is gone.

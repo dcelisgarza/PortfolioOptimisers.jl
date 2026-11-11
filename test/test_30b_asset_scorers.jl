@@ -136,7 +136,8 @@ struct NoOrientationScorer <: PortfolioOptimisers.AbstractAssetScorer end
         fs = PO.asset_scores(f, rd3)
         @test findall(isnan, fs) == [4]
         @test findall(PO.select_assets(ScoreSelector(; score = f,
-                                                     rule = QuantileRule(; best = 0.2)),
+                                                     rule = RankRule(;
+                                                                     best = FractionOf(0.2))),
                                        rd3)) == [argmax(replace(fs, NaN => -Inf))]
         # With no scored asset, the scores take the number type of the returns.
         none = PO.asset_scores(FoldRiskScorer(; r = SCM(), cv = cv, min_folds = 99), rd3)
@@ -259,7 +260,8 @@ struct NoOrientationScorer <: PortfolioOptimisers.AbstractAssetScorer end
         # The score is a reward, so the NaN is at the best end. Before #1933 the tail took
         # it and kept no asset. Now the rule ranks the five finite scores alone.
         @test findall(PO.select_assets(ScoreSelector(; score = s,
-                                                     rule = QuantileRule(; best = 0.2)),
+                                                     rule = RankRule(;
+                                                                     best = FractionOf(0.2))),
                                        rd)) == [argmax(replace(sc, NaN => -Inf))]
         # `:drop` drops the worst finite asset, and does not keep the unscored one.
         keep = PO.select_assets(ScoreSelector(; score = s,
@@ -313,7 +315,7 @@ struct NoOrientationScorer <: PortfolioOptimisers.AbstractAssetScorer end
 
     @testset "the selectors take a scorer in a Pipeline" begin
         wm = WeightMassScorer(; opt = InverseVolatility(), cv = KFold(; n = 2))
-        rule = QuantileRule(; best = 0.5)
+        rule = RankRule(; best = FractionOf(0.5))
         sel = ScoreSelector(; score = wm, rule = rule)
         # The acceptance identity: the public verbs give the score and its orientation.
         @test PO.select_assets(sel, rd) ==
