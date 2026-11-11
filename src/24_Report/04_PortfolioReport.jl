@@ -35,7 +35,7 @@ The overview holds the table of [`DataFrames.DataFrame(ps::PerformanceSummaryRes
 A taxonomy column is a key of `sets.dict`, such as `"nx_sector"`, that holds one group label for each asset of `sets.dict[sets.xkey]`, in that order. [`asset_sets_matrix`](@ref) reads the same column. Each name of `taxonomy` gives one subsection, and each member of the prediction gives one table in it. The section reads the rows of [`prediction_weights`](@ref), and it maps an asset to its label by name, so a fold that holds a part of the universe is correct. An asset that the universe does not name, or whose label is `missing`, counts in the group `(none)`, so the groups of a row sum to its weights. The section computes no statistic other than the sums.
 
   - **One row of weights**, a single fold: one row for each group, with the columns `long`, the sum of the positive weights, `short`, the sum of the negative weights, and `net`, their sum. The rows are sorted by the absolute value of `net`, and the caption gives the gross exposure. With a finite allocation, the columns `alloc_long`, `alloc_short` and `alloc_net` sum the realised weights of the allocation in the same way.
-  - **Many rows of weights**, a path or a population: one row for each fold of the path or each path of the population, with the column `portfolio` that holds the label of the row, one column of net exposure for each group, and the column `gross`. With a finite allocation of a path, the last row `allocation` sums the realised weights of the allocation.
+  - **Many rows of weights**, a path or a population: one row for each fold of the path or each path of the population, with the column `portfolio` that holds the label of the row, one column of net exposure for each group, and the column `gross`. A group whose label is `portfolio` or `gross` takes the column name of its label with the suffix `_1`. With a finite allocation of a path, the last row `allocation` sums the realised weights of the allocation.
 
 The allocation is the allocation of the first member, as in the Allocation section. A `NaN` weight gives a `NaN` sum for its group, on both sides.
 
@@ -766,7 +766,7 @@ end
 
 The Exposure table of many rows of weights: one row for each portfolio of the prediction, with the column `portfolio`, one column of net exposure for each group, and the column `gross`.
 
-With an allocation, the last row `allocation` sums its realised weights.
+With an allocation, the last row `allocation` sums its realised weights. A group whose label is `portfolio` or `gross` takes the column name of its label with the suffix `_1`, so the two fixed columns keep their names.
 
 # Arguments
 
@@ -800,10 +800,13 @@ function exposure_row_table(groups::AbstractVector, sums::AbstractVector,
     end
     cols = [groups[k] => [first(r)[k] + last(r)[k] for r in rows]
             for k in eachindex(groups)]
-    df = DataFrames.DataFrame("portfolio" => rlabels, cols...,
-                              "gross" => [sum(first(r)) - sum(last(r)) for r in rows];
-                              makeunique = true)
-    return ReportTable(df; caption = caption, sortable = true)
+    # The two fixed columns come first, so `makeunique` renames a group whose label is
+    # `portfolio` or `gross`, and not the fixed column. Then the groups move between them.
+    df = DataFrames.DataFrame("portfolio" => rlabels,
+                              "gross" => [sum(first(r)) - sum(last(r)) for r in rows],
+                              cols...; makeunique = true)
+    return ReportTable(df[:, [1; 3:DataFrames.ncol(df); 2]]; caption = caption,
+                       sortable = true)
 end
 """
     report_allocation(pred::AbstractPredictionResult, alloc::Nothing)

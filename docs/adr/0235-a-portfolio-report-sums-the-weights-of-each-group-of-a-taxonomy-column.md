@@ -48,7 +48,9 @@ group, and the section does not hide it. The sums take the element type of the w
 **4. The layout follows `statistics_table`.** One row of weights, a single fold, gives a sortable
 table with one row for each group and the columns `long`, `short` and `net`, and the caption gives
 the gross exposure. Many rows, a path or a population, give a sortable table with one row for each
-fold or path, one column of net exposure for each group, and the column `gross`. A reader then
+fold or path, one column of net exposure for each group, and the column `gross`. A group whose
+label is `portfolio` or `gross` takes its label with the suffix `_1`, so the two fixed columns
+keep their names and a reader of `gross` reads the gross exposure. A reader then
 sees how stable the tilt of a candidate is over its folds. A prediction with many members gives
 one table for each member, as the Weights section does.
 

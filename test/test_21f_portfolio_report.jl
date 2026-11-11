@@ -274,6 +274,20 @@ end
                               "nx_sector").blocks)
         @test DataFrames.nrow(t0.df) == length(RP_PATH.pred)
         @test !occursin("allocation", t0.caption)
+        # A group with the label of a fixed column takes the suffix, and the fixed column keeps
+        # its name. The column `gross` held the net of the group `gross` (R33 of #1817).
+        sg = UniverseSets(;
+                          dict = Dict("nx" => ["A", "B", "C", "D"],
+                                      "nx_s" => ["gross", "gross", "portfolio", "v"]))
+        tg = only(rp_exposure(portfolio_report(RP_PATH; sets = sg, taxonomy = ["nx_s"]).entries[1],
+                              "nx_s").blocks)
+        @test names(tg.df) == ["portfolio", "gross_1", "portfolio_1", "v", "gross"]
+        for (k, f) in enumerate(RP_PATH.pred)
+            w = PO.fold_target(f)
+            @test tg.df.portfolio[k] == string(first(f.rd.ts))
+            @test tg.df.gross[k] ≈ sum(abs, w)
+            @test tg.df.gross_1[k] ≈ w[1] + w[2] && tg.df.portfolio_1[k] ≈ w[3]
+        end
     end
     @testset "a population gives one row for each path" begin
         t = only(rp_exposure(portfolio_report(RP_POP; sets = RP_SETS,
@@ -499,8 +513,46 @@ end
     @test count("](data:image/", read(m, String)) == 15
     hp = write_report(joinpath(dir, "rp.html"), r; figure_mime = MIME"image/png"())
     @test count("src=\"data:image/png;base64,", read(hp, String)) == 15
-    # The composition of a path and of a population draws the union of the names.
-    @test plot_composition(RP_POP) isa StatsPlots.Plots.Plot
-    @test plot_stacked_area_composition(RP_POP) isa StatsPlots.Plots.Plot
-    @test plot_stacked_area_composition(RP_PATH) isa StatsPlots.Plots.Plot
+end
+
+@testset "#1943: the composition of a path and of a population draws each weight under its own name" begin
+    # The rows are built by hand from the weights and the names of each fold, so the test
+    # does not read `prediction_weights`. A bar series holds `NaN` separators, so the values
+    # compare one entry at a time.
+    labels(p) = [s[:label] for s in p.series_list]
+    function same_plot(p, q)
+        return labels(p) == labels(q) &&
+               all(all(isapprox.(a[:y], b[:y]; nans = true, atol = 1e-12))
+                   for (a, b) in zip(p.series_list, q.series_list))
+    end
+    # The paths of the population hold the subsets [1, 2, 4], [1, 3, 4] and [1, 2, 4], and the
+    # mean of a path sits on the union of the names, in the order of first appearance. The old
+    # plot put the weights of every path on the names of the first path.
+    paths = RP_POP.pred
+    nms = unique(reduce(vcat, [collect(f.rd.nx) for p in paths for f in p.pred]))
+    @test nms == ["A", "B", "D", "C"]
+    rows = map(paths) do p
+        m = zeros(length(nms))
+        for f in p.pred, (i, n) in enumerate(f.rd.nx)
+            m[findfirst(==(n), nms)] += f.res.w[i] / length(p.pred)
+        end
+        return m
+    end
+    @test same_plot(plot_composition(RP_POP), plot_stacked_bar_composition(rows, nms))
+    @test same_plot(plot_stacked_area_composition(RP_POP),
+                    plot_stacked_area_composition(rows, nms))
+    # Asset D has no returns over the fit window of the first fold, so the Investable Mask
+    # drops it there. The weights of a fold sit on the universe of the caller, with a zero for
+    # D, and the old plot read them beside the four names of the first fold.
+    Xg = copy(RP_X)
+    Xg[1:25, 4] .= NaN
+    rdg = ReturnsResult(; nx = ["A", "B", "C", "D"], X = Xg, ts = RP_TS)
+    pg = cross_val_predict(InverseVolatility(), rdg, IndexWalkForward(20, 10))
+    @test collect(pg.pred[1].rd.nx) == ["A", "B", "C"]
+    wg = [f.res.w for f in pg.pred]
+    @test iszero(wg[1][4]) && !iszero(wg[end][4])
+    @test same_plot(plot_composition(pg),
+                    plot_stacked_bar_composition(wg, ["A", "B", "C", "D"]))
+    @test same_plot(plot_stacked_area_composition(pg),
+                    plot_stacked_area_composition(wg, ["A", "B", "C", "D"]))
 end
