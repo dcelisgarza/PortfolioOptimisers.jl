@@ -1,0 +1,40 @@
+name: JOSS paper draft
+
+# Builds the draft PDF of the Journal of Open Source Software paper (`docs/paper/joss/paper.md`)
+# with the Open Journals draft action, the build that the JOSS author guide names. Download
+# `paper.pdf` from the artifacts of the run. The job runs only when the JOSS paper changes, or by
+# hand. Issue #2026.
+
+on:
+  push:
+    branches:
+      - main
+      - dev*
+    paths:
+      - "docs/paper/joss/**"
+      - ".github/workflows/JOSS.yml"
+  workflow_dispatch:
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  paper:
+    name: JOSS paper draft
+    runs-on: ubuntu-latest
+    # The build reads the repository and writes nothing back.
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@v7
+      - name: Build the draft PDF
+        uses: openjournals/openjournals-draft-action@master
+        with:
+          journal: joss
+          paper-path: docs/paper/joss/paper.md
+      - name: Upload the draft PDF
+        uses: actions/upload-artifact@v7
+        with:
+          name: joss-paper
+          path: docs/paper/joss/paper.pdf
