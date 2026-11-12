@@ -122,6 +122,14 @@ of cost, the fast ones first, and the slow ones once, on the tree you will push:
    gate: `julia --project=code_health code_health/<gate>.jl check --against origin/dev` for size,
    complexity, perf and expansion. A scoped run names the foreign rows and does not fail on them.
    A foreign row that is red on `dev` is a defect. File it once.
+   **A gate that trips on your own row asks for a decision, not a smaller number.** Lower the
+   number only when the lower form is also the better design. When the correct form gives the
+   higher number, record the rise with `refresh --accept-rise --files <path>`. The correct form
+   is the precedent of the library, a signature that a test can call, or the file of the subject.
+   The number must stay within its threshold in `code_health/rulings.toml`. Name the rise and its
+   reason in the commit message and in your report. Never remove an argument, loosen a type bound
+   or move a function only to pass a ratchet (#2060). `docs/src/contribute/3-code-health.md`
+   § *When the correct form raises a number* states the rule.
 3. **A new file enters JET at 0** (`code_health/rulings.toml`), and the fix of a report edits
    `src/`. So run `julia --project=code_health code_health/jet.jl refresh --files <new file>` as
    soon as the new file compiles. Do not keep JET for the end when a file is new.

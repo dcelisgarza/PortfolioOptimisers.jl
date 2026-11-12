@@ -1204,6 +1204,30 @@ end
         @test err isa ErrorException
         @test occursin("issue #2 names `src/old/c.jl`, `02_D.jl`", err.msg)
     end
+    @testset "the routes of a tripped gate let the design pick the route (#2060)" begin
+        #=
+        The message put "Lower the number" first, in order, and stated no condition. In the work
+        of #2043 a session removed an argument that the siblings of the helper take, and read a
+        scoped value in its place, to pass the `arg` ratchet. Each route now states when it
+        applies, and the last line forbids that change. The JET message keeps the Dismissal as
+        route 2 and numbers the rise 3. The other messages number the rise 2.
+        =#
+        CH = GateScopeSeam.CodeHealth
+        for (dismissal, rise) in ((true, "3"), (false, "2"))
+            msg = CH.routes(; dismissal = dismissal)
+            @test !occursin("in order", msg)
+            @test occursin("The design picks the route, not the number.", msg)
+            @test occursin("1. Lower the number, when the lower form is also the better design.",
+                           msg)
+            @test occursin("$rise. Record the rise, when the higher number comes from the correct form",
+                           msg)
+            @test occursin("Name the rise and its reason in", msg)
+            @test occursin("Never change a signature, a type bound or the home of a function only to pass a ratchet.",
+                           msg)
+            @test occursin("Add a Dismissal", msg) == dismissal
+            @test endswith(msg, "See docs/src/contribute/3-code-health.md.")
+        end
+    end
     @testset "retry prints the output of the run that succeeded alone" begin
         #=
         `sweep_issues.sh apply` reads the database id of a new issue through `retry`, because the

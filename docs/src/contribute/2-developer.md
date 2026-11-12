@@ -148,11 +148,19 @@ number the baseline records for it, so a file under 500 code lines is free to gr
 `docs/adr/0101-the-size-gate-counts-code-lines-and-binds-over-a-threshold.md`.
 
 When one turns red, the run names every offending file, the metric, the baseline number and the new
-one. Take one of three routes, in order.
+one. The design picks the route, not the number. Take one of three routes.
 
- 1. **Lower the number.** This is the route to take whenever you can. For a complexity number the
-    file's number is the maximum over its definitions, so only the worst definition moves it. For
-    the size ratchet, move code out of the file or delete it. A docstring costs nothing there.
+!!! warning "Never change a correct design to pass a ratchet"
+
+    Do not change a signature, a type bound or the home of a function only to pass a ratchet. The
+    gate then goes green, and the design gets worse. An argument removed for a read of a scoped
+    value hides a dependency, and a direct test of the function must then set the scope (#2060).
+    See [When the correct form raises a number](@ref code_health_correct_form).
+
+ 1. **Lower the number, when the lower form is also the better design.** For a complexity number
+    the file's number is the maximum over its definitions, so only the worst definition moves it.
+    For the size ratchet, move code to the file of its subject, or delete it. A docstring costs
+    nothing there.
 
  2. **Dismiss the report**, for `JET` alone. A Dismissal says that a class of report is not a real
     defect. It cites a **Rationale** by name, and the two halves have different owners: citing an
@@ -160,8 +168,11 @@ one. Take one of three routes, in order.
     claim that some code is correct. See
     [Dismissing a JET report](@ref code_health_dismissal).
 
- 3. **Record the rise.** A number may rise, but only through a diff that a person approved. Run the
-    refresh with the flag that names the act:
+ 3. **Record the rise, when the higher number comes from the correct form.** The correct form
+    follows the precedent of the library, keeps a signature that a test can call, and keeps the
+    code in the file of its subject. The number must stay within its threshold in
+    `code_health/rulings.toml`. Name the rise and its reason in the commit. A number may rise, but
+    only through a diff that a person approved. Run the refresh with the flag that names the act:
 
     ```bash
     julia --project=code_health code_health/complexity.jl refresh --accept-rise

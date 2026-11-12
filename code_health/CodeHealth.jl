@@ -1402,34 +1402,43 @@ end
 """
     routes(; dismissal) -> String
 
-ADR 0075's one message for everyone, in its three ordered routes. Route 2 is named in CI rather
-than left to the documentation, because a new Rationale needs the maintainer and that is the one
-route a contributor without write access cannot finish alone. The complexity message drops it,
-because a Dismissal is a JET-only instrument.
+ADR 0075's one message for everyone, in its three routes. Route 2 is named in CI rather than left
+to the documentation, because a new Rationale needs the maintainer and that is the one route a
+contributor without write access cannot finish alone. The complexity message drops it, because a
+Dismissal is a JET-only instrument.
+
+The design picks the route, not the number (ADR 0075, amendment of 2026-11-12, #2060). Route 1
+applies when the lower form is also the better design. The record of the rise applies when the
+higher number comes from the correct form. The last line forbids the change of a signature, a type
+bound or the home of a function only to pass a ratchet.
 """
 function routes(; dismissal::Bool)
     io = IOBuffer()
-    println(io, "A refresh is not the fix. Take one of these routes, in order.")
-    println(io, "  1. Lower the number.")
-    if dismissal
+    println(io,
+            "A refresh by reflex is not the fix. The design picks the route, not the number.")
+    println(io, "  1. Lower the number, when the lower form is also the better design.")
+    rise = if dismissal
         println(io,
                 "  2. Add a Dismissal to code_health/rulings.toml citing an approved Rationale.")
         println(io,
                 "     Say so in the pull request if the Rationale is new: a new one needs the maintainer.")
-        println(io,
-                "  3. Record the rise. Download the Refresh Artifact from this run, put the file at")
-        println(io,
-                "     its committed path under code_health/, and commit it. Locally the same act is")
-        println(io,
-                "     `julia --project=code_health code_health/<tool>.jl refresh --accept-rise`.")
+        3
     else
-        println(io,
-                "  2. Record the rise. Download the Refresh Artifact from this run, put the file at")
-        println(io,
-                "     its committed path under code_health/, and commit it. Locally the same act is")
-        println(io,
-                "     `julia --project=code_health code_health/<tool>.jl refresh --accept-rise`.")
+        2
     end
+    println(io,
+            "  $rise. Record the rise, when the higher number comes from the correct form: the precedent")
+    println(io,
+            "     of the library, a testable signature, the right file for the subject. The number must")
+    println(io,
+            "     stay within its threshold in code_health/rulings.toml. Name the rise and its reason in")
+    println(io,
+            "     the commit. Download the Refresh Artifact from this run, put the file at its committed")
+    println(io, "     path under code_health/, and commit it. Locally the same act is")
+    println(io,
+            "     `julia --project=code_health code_health/<tool>.jl refresh --accept-rise`.")
+    println(io,
+            "Never change a signature, a type bound or the home of a function only to pass a ratchet.")
     print(io, "See docs/src/contribute/3-code-health.md.")
     return String(take!(io))
 end
