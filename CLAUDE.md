@@ -160,7 +160,6 @@ child map's *Not yet specified* section, and take steps 3 and 4 when the design 
   entry in a `.bib` file can link the repository of the work it cites. A comment that cites a
   source file of another repository names the package, the commit and the path in prose.
   `test/test_64_docs_page_metadata_census.jl` fails on a link to an external repository.
-- Branch before committing if you are on the default branch.
 - **A session that works an issue commits without being asked.** It commits, rebases and pushes
   `dev` as § *Parallel sessions* states. Any other session commits only when asked.
 - **Assign an issue to your `gh` account when you start to fix it.** Run
