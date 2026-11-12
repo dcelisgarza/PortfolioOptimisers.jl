@@ -1030,22 +1030,22 @@ function projection_programme(proj::AbstractProjectionGeometry, set::AbstractAll
 end
 """
     programme_investable_reduction(imsk::Nothing, set::AbstractAllocationSet, X::Option{<:ReturnsResult}, pr)
-    programme_investable_reduction(imsk::BitVector, set::AbstractAllocationSet, X::ReturnsResult, pr::AbstractPriorResult)
+    programme_investable_reduction(imsk::BitVector, set::AbstractAllocationSet, X::ReturnsResult, pr::Option{<:AbstractPriorResult})
     programme_investable_reduction(imsk::BitVector, set::AbstractAllocationSet, X, pr)
 
 Reduces the set, the rows that the head holds and the set's prior to the prior's Investable Mask.
 
-The projection programme then runs on the assets the prior can price, as a batch head does with [`investable_reduction`](@ref). The caller views the raw step and the Price-Adjusted Allocation at the same mask with [`investable_weights_view`](@ref).
+The projection programme then runs on the assets the prior can price, as a batch head does with [`investable_reduction`](@ref). The caller views the raw step and the Price-Adjusted Allocation at the same mask with [`investable_weights_view`](@ref). The entry of a JuMP head reduces the block of a set to the mask of every block in the same way, [`resolve_allocation_set_block`](@ref).
 
-Dispatch selects one of three methods. A `nothing` mask means that every asset is investable, which is true at every step on a static panel and at every step of a set that reads no rows. That method returns its arguments unchanged. The `BitVector` method takes the views at `findall(imsk)`. The third method refuses a mask with no rows or no prior, because a mask comes from a prior fitted on the rows, so this pair does not occur in the library. The set is viewed against the full returns matrix of the rows, because a view of a tracking estimator needs it. After the view, the method declares the names outside the mask on the Non-Investable Axis of the set's `sets`, with [`non_investable_universe`](@ref), as [`investable_reduction`](@ref) does for a head. So a row of `lcse` or `gcarde` that names such an asset drops at stage 2 of the block, and `strict` does not refuse the name. The Price-Adjusted Allocation is cut to the mask and is not renormalised, as the batch reduction cuts a turnover reference. So an asset the prior cannot price leaves the reference, and the programme allocates the budget of one over the investable assets. The function writes no warning for such an asset, because the Investable Mask of the Recursion Result already shows it at every step.
+Dispatch selects one of three methods. A `nothing` mask means that every asset is investable, which is true at every step on a static panel and at every step of a set that reads no rows. That method returns its arguments unchanged. The `BitVector` method takes the views at `findall(imsk)`. A set that reads no rows has no prior, and the method views the set and the rows alone. This pair occurs at the entry of a JuMP head, whose own prior gives the mask. The third method refuses a mask with no rows, because a mask is read on the rows. The set is viewed against the full returns matrix of the rows, because a view of a tracking estimator needs it. After the view, the method declares the names outside the mask on the Non-Investable Axis of the set's `sets`, with [`non_investable_universe`](@ref), as [`investable_reduction`](@ref) does for a head. So a row of `lcse` or `gcarde` that names such an asset drops at stage 2 of the block, and `strict` does not refuse the name. The Price-Adjusted Allocation is cut to the mask and is not renormalised, as the batch reduction cuts a turnover reference. So an asset the prior cannot price leaves the reference, and the programme allocates the budget of one over the investable assets. The function writes no warning for such an asset, because the Investable Mask of the Recursion Result already shows it at every step.
 
 # Validation
 
-  - A mask with no rows or no prior. An `IsNothingError` is thrown.
+  - A mask with no rows. An `IsNothingError` is thrown.
 
 # Returns
 
-  - `(set, X, pr)::Tuple`: The three reduced to the mask, or unchanged.
+  - `(set, X, pr)::Tuple`: The three reduced to the mask, or unchanged. `pr` stays `nothing` when the set has no prior.
 
 # Related
 
@@ -1060,7 +1060,7 @@ function programme_investable_reduction(::Nothing, set::AbstractAllocationSet,
     return set, X, pr
 end
 function programme_investable_reduction(imsk::BitVector, set::AbstractAllocationSet,
-                                        X::ReturnsResult, pr::AbstractPriorResult)
+                                        X::ReturnsResult, pr::Option{<:AbstractPriorResult})
     idx = findall(imsk)
     # The view drops the Non-Investable Axis, so the set declares it after the view, as
     # `investable_reduction` declares it for a head. Stage 2 of the block then drops a row
@@ -1070,7 +1070,7 @@ function programme_investable_reduction(imsk::BitVector, set::AbstractAllocation
            port_opt_view(pr, idx)
 end
 function programme_investable_reduction(::BitVector, ::AbstractAllocationSet, ::Any, ::Any)
-    return throw(IsNothingError("an Investable Mask is derived from a prior fitted on the rows that the head holds, so a mask with no rows or no prior result cannot be reduced on."))
+    return throw(IsNothingError("an Investable Mask is read on the rows that the head holds, so a mask with no rows cannot be reduced on."))
 end
 """
     investable_geometry_view(imsk::Nothing, proj::AbstractProjectionGeometry, q::AbstractVector)

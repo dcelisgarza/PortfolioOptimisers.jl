@@ -1208,6 +1208,125 @@ end
     end
 end
 
+@testset "The entry of a JuMP head drops the assets that the readers of each block refuse (#2043)" begin
+    # The head reads the rows 61 to 120, and the block of the set reads all 120 rows, as the
+    # leader of a follow-the-leader rule does. The asset `f` is constant on the rows of the
+    # head, so the reader of the head refuses it. The asset `e` holds only the rows of the
+    # head, so the reader of the set, which asks for 60 %, refuses it.
+    rng9 = StableRNG(20432043)
+    T9, N9 = 120, 6
+    X9 = 0.01 .* randn(rng9, T9, N9) .+ 0.0005
+    X9[1:60, 5] .= NaN
+    X9[61:end, 6] .= 0.0
+    amsk9 = trues(T9, N9)
+    amsk9[1:60, 5] .= false
+    rd9 = ReturnsResult(; nx = string.('a':'f'), X = X9,
+                        pnl = AssetPanel(; pf = nothing, amsk = amsk9, emsk = amsk9))
+    rdh = PO.port_opt_view(rd9, 61:T9, :)
+    pe9 = EmpiricalPrior(; me = ExpWeightedExpectedReturns(; decay = 0.9, min_obs = 2),
+                         ce = ExpWeightedCovariance(; decay = 0.9, min_obs = 2,
+                                                    centring = PreCentred()),
+                         fill_limit = 1)
+    sce9 = PortfolioOptimisersCovariance(;
+                                         ce = Covariance(;
+                                                         cvg = CoveragePolicy(;
+                                                                              min_coverage = 0.6)))
+    cte9 = CentralityConstraint(; A = CentralityEstimator(; pl = NetworkEstimator()),
+                                B = MinValue(), comp = <=)
+    head(s) = MeanRisk(; opt = JuMPOptimiser(; slv = slv, strict = s, cte = cte9))
+    stage1(set) = PO.resolve_allocation_set(set, N9, false, Float64)
+    set9 = stage1(ProgrammeAllocationSet(; slv = slv, pe = pe9,
+                                         ple = SemiDefinitePhylogenyEstimator(;
+                                                                              pl = NetworkEstimator(;
+                                                                                                    ce = sce9))))
+    refused(a) = (:warn,
+                  Regex("distance reader of this optimiser cannot estimate the correlation of 1 asset\\(s\\) that the prior kept: \\[\"$a\"\\]"))
+    res = @test_logs refused("f") refused("e") match_mode = :any optimise(head(false), rdh;
+                                                                          blocks = ((set9,
+                                                                                     rd9),))
+    @test res.imsk == BitVector([1, 1, 1, 1, 0, 0])
+    @test iszero(res.w[5]) && iszero(res.w[6])
+    @test isapprox(sum(res.w), 1)
+    # The bundle holds one block Result for each block, the block of the head first, and
+    # each block keeps the prior of its own rows.
+    cbr = res.jor.cbr
+    @test length(cbr) == 2
+    @test PO.owner_block(cbr) === cbr[1]
+    for f in
+        (:wb, :lt, :st, :lcsr, :ctr, :gcardr, :sgcardr, :smtx, :sgmtx, :slt, :sst, :sglt,
+         :sgst, :tn, :plr)
+        @test getproperty(res.jor, f) === getproperty(cbr[1], f)
+    end
+    @test size(cbr[1].rd.X, 1) == 60 && size(cbr[2].rd.X, 1) == T9
+    @test size(cbr[2].pr.X, 2) == 4
+    # The head with one block is the head of today.
+    res1 = @test_logs refused("f") match_mode = :any optimise(head(false), rdh)
+    @test res1.imsk == BitVector([1, 1, 1, 1, 1, 0])
+    @test res1.jor.cbr isa ResolvedConstraintBlock
+    # The flag of the head refuses the asset of its own reader, and the flag of the online
+    # head that holds the set refuses the asset of the reader of the set.
+    @test_throws IsNonFiniteError optimise(head(true), rdh; blocks = ((set9, rd9),))
+    @test_throws IsNonFiniteError PO.with_projection_step(() -> optimise(head(false), rdh;
+                                                                         blocks = ((set9,
+                                                                                    rd9),)),
+                                                          rd9, 1; strict = true)
+    # A plain prior of the set cannot price `e`, so `e` departs with the warning of the set
+    # prior, before any reader of the set runs. The ceiling makes the set read its rows.
+    setp = stage1(ProgrammeAllocationSet(; slv = slv, pe = EmpiricalPrior(),
+                                         r = Variance(;
+                                                      settings = RiskMeasureSettings(;
+                                                                                     ub = 1.0))))
+    priced = (:warn,
+              r"prior of the Allocation Set cannot price 1 asset\(s\) that the programme keeps: \[\"e\"\]")
+    resp = @test_logs priced match_mode = :any optimise(head(false), rdh;
+                                                        blocks = ((setp, rd9),))
+    @test resp.imsk == BitVector([1, 1, 1, 1, 0, 0])
+    @test_throws IsNonFiniteError PO.with_projection_step(() -> optimise(head(false), rdh;
+                                                                         blocks = ((setp,
+                                                                                    rd9),)),
+                                                          rd9, 1; strict = true)
+    # The prior of the set that prices no asset of the head leaves no asset.
+    rd2 = PO.port_opt_view(rd9, :, 1:2)
+    ma = BitVector([1, 0])
+    mb = BitVector([0, 1])
+    @test_logs (:warn, r"\[\"a\"\]") @test_throws IsEmptyError PO.allocation_set_priced_mask(ma,
+                                                                                             mb,
+                                                                                             rd2,
+                                                                                             false)
+    @test (@test_logs (:warn, r"\[\"b\"\]") PO.allocation_set_priced_mask(nothing, ma, rd2,
+                                                                          false)) == ma
+    # A prior of the set that prices every asset that the head keeps adds no warning.
+    @test PO.allocation_set_priced_mask(ma, ma, rd2, true) == ma
+    # The argument refuses the asset in a direct call, with no step.
+    @test_throws IsNonFiniteError PO.allocation_set_priced_mask(nothing, ma, rd2, true)
+    # A set that reads no rows fits no prior, and its block resolves at the mask of the head.
+    setn = stage1(ProgrammeAllocationSet(; slv = slv,
+                                         wb = WeightBounds(; lb = 0, ub = 0.5)))
+    resn = @test_logs refused("f") match_mode = :any optimise(head(false), rdh;
+                                                              blocks = ((setn, rd9),))
+    @test resn.imsk == BitVector([1, 1, 1, 1, 1, 0])
+    @test isnothing(resn.jor.cbr[2].pr) && length(resn.jor.cbr[2].wb.ub) == 5
+    # The entry of a sub-problem holds the set and the rows viewed at the mask, and the
+    # prior of the block, so it fits no prior again and resolves to the same block.
+    steps = PO.constraint_block_steps(((set9, rd9),), res.jor)
+    s1, Xs, ps = only(steps)
+    @test ps === cbr[2].pr && size(Xs.X, 2) == 4
+    @test PO.fit_allocation_set_block(only(steps)) === only(steps)
+    @test isnothing(PO.allocation_set_entry_mask(nothing, only(steps)))
+    @test PO.resolve_allocation_set_block(only(steps), nothing).plr == cbr[2].plr
+    @test PO.constraint_block_steps((), res1.jor) === ()
+    # A sub-problem of `NearOptimalCentering` reads the reduced blocks.
+    noc = NearOptimalCentering(; opt = JuMPOptimiser(; slv = slv, cte = cte9))
+    resc = @test_logs refused("f") refused("e") match_mode = :any optimise(noc, rdh;
+                                                                           blocks = ((set9,
+                                                                                      rd9),))
+    @test resc.imsk == BitVector([1, 1, 1, 1, 0, 0])
+    @test iszero(resc.w[5]) && iszero(resc.w[6])
+    # The prior of a cut replaces the prior of the block of the head alone.
+    jor = PO.set_result_prior(res.jor, identity)
+    @test jor.cbr[1].pr === res.jor.pr && jor.cbr[2] === cbr[2]
+end
+
 # The panel for a window of `t` observations over `N2` assets, so an expanding walk-forward can
 # be driven a fold at a time without the cross-validation machinery in the way: a fold's fit is
 # exactly this call.

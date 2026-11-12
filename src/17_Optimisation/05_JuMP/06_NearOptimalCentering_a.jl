@@ -685,13 +685,14 @@ function NearOptimalSetup(; w_opt::VecNum_VecVecNum, rk_opt::Union{Number, VecNu
                             w_opt_retcode, w_max_retcode)
 end
 """
-    near_optimal_centering_setup(noc::NearOptimalCentering, rd::ReturnsResult; kwargs...)
+    near_optimal_centering_setup(noc::NearOptimalCentering, rd::ReturnsResult;
+                                 blocks::Tuple = (), kwargs...)
 
 Solve the anchors of [`NearOptimalCentering`](@ref), and compute the bounds of its near optimal region.
 
 # Algorithm
 
- 1. Process the optimiser into its attributes with [`resolve_jump_optimiser`](@ref), reduce `noc` and `rd` to the investable universe, and bind a data benchmark to the rows of the view.
+ 1. Process the optimiser into its attributes with [`resolve_jump_optimiser`](@ref), with the blocks of `blocks`, reduce `noc` and `rd` to the investable universe, and bind a data benchmark to the rows of the view. Give the blocks after the first of the bundle to every anchor sub-problem below, viewed at the investable universe, with [`constraint_block_steps`](@ref).
  2. If an anchor of minimum risk or of maximum return is missing, if the variant is [`UnconstrainedNearOptimalCentering`](@ref), or if a return term holds a [`Frontier`](@ref), make the copies of the risk measures and of the optimiser without bounds. `ucs_flag` selects whether they keep their uncertainty sets.
  3. Solve each missing anchor as a [`MeanRisk`](@ref) problem. The anchors of minimum risk and of maximum return solve with the copies without bounds, and the anchor of `obj` solves with `r` and `opt` as they are.
  4. Compute the risks of the anchors with [`near_optimal_centering_risks`](@ref), and their returns with [`expected_return`](@ref).
@@ -703,6 +704,7 @@ Solve the anchors of [`NearOptimalCentering`](@ref), and compute the bounds of i
 
   - `noc::NearOptimalCentering`: The estimator.
   - $(arg_dict[:rd])
+  - `blocks`: The blocks after the block of `noc.opt`, the keyword `blocks` of [`resolve_jump_optimiser`](@ref).
   - `kwargs...`: Keyword arguments passed to [`resolve_jump_optimiser`](@ref).
 
 # Returns
@@ -716,7 +718,7 @@ Solve the anchors of [`NearOptimalCentering`](@ref), and compute the bounds of i
   - [`near_optimal_centering_risks`](@ref)
 """
 function near_optimal_centering_setup(noc::NearOptimalCentering, rd::ReturnsResult;
-                                      kwargs...)
+                                      blocks::Tuple = (), kwargs...)
     w_min = noc.w_min
     w_opt = noc.w_opt
     w_max = noc.w_max
@@ -728,7 +730,10 @@ function near_optimal_centering_setup(noc::NearOptimalCentering, rd::ReturnsResu
     w_max_retcode = OptimisationSuccess()
     unconstrained = isa(noc.alg, UnconstrainedNearOptimalCentering)
     r = ucs_risk_measure(noc.r, rd)
-    attrs = resolve_jump_optimiser(noc.opt, rd; kwargs...)
+    attrs = resolve_jump_optimiser(noc.opt, rd; blocks = blocks, kwargs...)
+    # An optimiser holds one block, so the other blocks reach each corner solve as the
+    # keyword of its entry, reduced to the universe of the bundle.
+    sblocks = constraint_block_steps(blocks, attrs)
     # The corner solves below run the head's own `opt`, `r` and anchor weights against
     # `rd`, so the head is reduced before any of them, and before the optimiser is
     # repackaged from the bundle. `_optimise` takes the same view of its own locals.
@@ -748,19 +753,19 @@ function near_optimal_centering_setup(noc::NearOptimalCentering, rd::ReturnsResu
     end
     if w_min_flag
         res_min = optimise(MeanRisk(; r = nb_r, obj = MinimumRisk(), opt = nb_opt,
-                                    wi = noc.w_min_ini), rd; save = false)
+                                    wi = noc.w_min_ini), rd; save = false, blocks = sblocks)
         w_min_retcode = res_min.retcode
         w_min = res_min.w
     end
     if w_opt_flag
         res_opt = optimise(MeanRisk(; r = r, obj = noc.obj, opt = opt, wi = noc.w_opt_ini),
-                           rd; save = false)
+                           rd; save = false, blocks = sblocks)
         w_opt_retcode = res_opt.retcode
         w_opt = res_opt.w
     end
     if w_max_flag
         res_max = optimise(MeanRisk(; r = nb_r, obj = MaximumReturn(), opt = nb_opt,
-                                    wi = noc.w_max_ini), rd; save = false)
+                                    wi = noc.w_max_ini), rd; save = false, blocks = sblocks)
         w_max_retcode = res_max.retcode
         w_max = res_max.w
     end
@@ -775,7 +780,8 @@ function near_optimal_centering_setup(noc::NearOptimalCentering, rd::ReturnsResu
     rt_ends = if isempty(swept)
         nothing
     else
-        return_term_ends(swept, attrs.ret, nb_r, nb_opt, rd, pr, fees, w_min, noc.w_max_ini)
+        return_term_ends(swept, attrs.ret, nb_r, nb_opt, rd, pr, fees, w_min, noc.w_max_ini;
+                         blocks = sblocks)
     end
     ibins = if isnothing(noc.bins)
         T, N = size(pr.X)
@@ -817,7 +823,7 @@ function frontier_return_terms(ret::VecJRE)
     return [i for (i, r) in enumerate(ret) if isa(r.settings.lb, Frontier)]
 end
 """
-    return_term_ends(swept, ret, nb_r, nb_opt, rd, pr, fees, w_min, w_ini)
+    return_term_ends(swept, ret, nb_r, nb_opt, rd, pr, fees, w_min, w_ini; blocks = ())
 
 Return the span of each return term that holds a [`Frontier`](@ref).
 
@@ -828,7 +834,7 @@ of term ``i`` depends on the `scale` of the other terms, and it can be below the
 
 # Algorithm
 
- 1. For each index ``i`` in `swept`, solve a [`MeanRisk`](@ref) problem with the objective [`MaximumElementReturn`](@ref)`(i)`, the risk measures `nb_r`, the optimiser `nb_opt` and the initial weights `w_ini`.
+ 1. For each index ``i`` in `swept`, solve a [`MeanRisk`](@ref) problem with the objective [`MaximumElementReturn`](@ref)`(i)`, the risk measures `nb_r`, the optimiser `nb_opt`, the initial weights `w_ini` and the blocks `blocks`.
  2. Make the pair `i => (rt_min_i, rt_max_i)` of the returns of term ``i`` at `w_min` and at that solution.
 
 # Arguments
@@ -842,6 +848,7 @@ of term ``i`` depends on the `scale` of the other terms, and it can be below the
   - `fees`: Fees, or `nothing`.
   - `w_min::VecNum`: Anchor of minimum risk.
   - `w_ini`: Initial weights of each solve, or `nothing`.
+  - `blocks`: The blocks after the block of `nb_opt`, on the reduced universe, from [`constraint_block_steps`](@ref).
 
 # Validation
 
@@ -859,12 +866,12 @@ of term ``i`` depends on the `scale` of the other terms, and it can be below the
 """
 function return_term_ends(swept::VecInt, ret::JRE_VecJRE, nb_r, nb_opt::JuMPOptimiser,
                           rd::ReturnsResult, pr::AbstractPriorResult, fees::Option{<:Fees},
-                          w_min::VecNum, w_ini)
+                          w_min::VecNum, w_ini; blocks::Tuple = ())
     ends = Pair{Int, Tuple{Number, Number}}[]
     for i in swept
         rt = return_term(ret, i)
         res = optimise(MeanRisk(; r = nb_r, obj = MaximumElementReturn(i), opt = nb_opt,
-                                wi = w_ini), rd; save = false)
+                                wi = w_ini), rd; save = false, blocks = blocks)
         @argcheck(isa(res.retcode, OptimisationSuccess),
                   ArgumentError("maximum-return solve for return term $i failed with retcode $(res.retcode)"))
         push!(ends,

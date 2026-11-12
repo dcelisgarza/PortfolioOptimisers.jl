@@ -561,8 +561,11 @@ end
         @test po.prior_investable_mask(prn) == [false, true, true]
         @test_throws po.IsNothingError po.programme_investable_reduction(trues(3), bset,
                                                                          nothing, prn)
-        @test_throws po.IsNothingError po.programme_investable_reduction(trues(3), bset,
-                                                                         rdn, nothing)
+        # A set that reads no rows has no prior beside the mask of a JuMP head, and the
+        # reduction views the set and the rows alone (#2043).
+        bsetr, rdnr, prnr = po.programme_investable_reduction(BitVector([0, 1, 1]), bset,
+                                                              rdn, nothing)
+        @test isnothing(prnr) && rdnr.nx == ["B", "C"] && bsetr isa BoundedAllocationSet
         # A prior with no rows does not occur, and stage 2 of the block refuses it.
         @test_throws po.IsNothingError po.resolve_constraint_block(tset.cbe, prn, nothing;
                                                                    slv = tset.slv)

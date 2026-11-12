@@ -5,7 +5,9 @@ Holds the Result of the resolution of a JuMP head: the prior result, the fees, t
 
 [`resolve_jump_optimiser`](@ref) makes the bundle once for each `optimise` call, and [`assemble_jump_model!`](@ref) reads it. So each builder of the model reads a result, and no builder resolves an estimator again. The constraints of the feasible set are in the [`ResolvedConstraintBlock`](@ref) in `cbr`. The owner keeps the fees, the return terms and the scalariser, because the objective reads them.
 
-A named forward rule keeps the reads of the resolved constraints on the bundle, so `jor.wb` reads `jor.cbr.wb`. The rule forwards `wb`, `lt`, `st`, `lcsr`, `ctr`, `gcardr`, `sgcardr`, `smtx`, `sgmtx`, `slt`, `sst`, `sglt`, `sgst`, `tn` and `plr`, the constraint fields that the bundle held before it held the block. Every other field of the block is read through `cbr`.
+`cbr` holds the block Result of the head, or a vector of block Results when the head has more than one block. The block of the head is then the first, and [`owner_block`](@ref) gives it.
+
+A named forward rule keeps the reads of the resolved constraints on the bundle, so `jor.wb` reads `owner_block(jor.cbr).wb`. The rule forwards `wb`, `lt`, `st`, `lcsr`, `ctr`, `gcardr`, `sgcardr`, `smtx`, `sgmtx`, `slt`, `sst`, `sglt`, `sgst`, `tn` and `plr`, the constraint fields that the bundle held before it held the block. Every other field of the block is read through `cbr`.
 
 Every JuMP optimisation Result holds the bundle. So the types of `ret` and `sca` are not type parameters of the bundle, and the Results of two returns estimators or of two scalarisers have one type. A verb that reads them compiles one time.
 
@@ -89,9 +91,24 @@ function ResolvedJuMPOptimiser(; pr::AbstractPriorResult, fees::Option{<:Fees},
 end
 # The bundle held one field for each resolved constraint before it held the block, and the
 # tests, the examples and the methods of a custom term read them, such as `jor.wb` (ADR 0237).
+# `cbr` holds a vector when the head has more than one block, and a path of fields cannot
+# read the first entry of a vector, so each rule reads the block of the owner by a function.
 @forward_properties ResolvedJuMPOptimiser begin
-    forward(cbr, wb, lt, st, lcsr, ctr, gcardr, sgcardr, smtx, sgmtx, slt, sst, sglt, sgst,
-            tn, plr)
+    compute(wb, x -> owner_block(getfield(x, :cbr)).wb)
+    compute(lt, x -> owner_block(getfield(x, :cbr)).lt)
+    compute(st, x -> owner_block(getfield(x, :cbr)).st)
+    compute(lcsr, x -> owner_block(getfield(x, :cbr)).lcsr)
+    compute(ctr, x -> owner_block(getfield(x, :cbr)).ctr)
+    compute(gcardr, x -> owner_block(getfield(x, :cbr)).gcardr)
+    compute(sgcardr, x -> owner_block(getfield(x, :cbr)).sgcardr)
+    compute(smtx, x -> owner_block(getfield(x, :cbr)).smtx)
+    compute(sgmtx, x -> owner_block(getfield(x, :cbr)).sgmtx)
+    compute(slt, x -> owner_block(getfield(x, :cbr)).slt)
+    compute(sst, x -> owner_block(getfield(x, :cbr)).sst)
+    compute(sglt, x -> owner_block(getfield(x, :cbr)).sglt)
+    compute(sgst, x -> owner_block(getfield(x, :cbr)).sgst)
+    compute(tn, x -> owner_block(getfield(x, :cbr)).tn)
+    compute(plr, x -> owner_block(getfield(x, :cbr)).plr)
 end
 """
 $(DocStringExtensions.TYPEDSIGNATURES)

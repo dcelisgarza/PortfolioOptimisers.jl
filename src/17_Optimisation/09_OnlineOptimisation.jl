@@ -595,6 +595,7 @@ end
                                 SchurComplementHierarchicalRiskParityResult,
                                 HierarchicalResult, ResolvedConstraintBlock},
                      f::Function)
+    set_result_prior(res::VecRcb, f::Function)
     set_result_prior(res::ResolvedJuMPOptimiser, f::Function)
     set_result_prior(res::JuMPOptimisationResult, f::Function)
     set_result_prior(res::Union{RiskJuMPOptimisationResult,
@@ -612,7 +613,7 @@ Rebuild an optimisation result with the prior result `f(pr)` in place of its own
 The method that Julia selects is the algorithm.
 
  1. A result that holds the prior `pr` in its first field, and a [`ResolvedConstraintBlock`](@ref): rebuild it through its positional constructor with `f(pr)` as the first field.
- 2. The [`ResolvedJuMPOptimiser`](@ref) of a JuMP head: compute `f(pr)` once, and rebuild the bundle with it in its first field. Rebuild its block Result in `cbr` with the same prior, by step 1, so that the block and the bundle hold one prior.
+ 2. The [`ResolvedJuMPOptimiser`](@ref) of a JuMP head: compute `f(pr)` once, and rebuild the bundle with it in its first field. Rebuild its block Result in `cbr` with the same prior, by step 1, so that the block and the bundle hold one prior. When `cbr` is a vector of block Results, rebuild its first entry, the block of the head, by step 1. Each later block keeps its own prior, because it resolved against the prior of its own block on its own rows.
  3. The shared core of a JuMP head: rebuild it with the bundle of step 2, through the inner constructor, as [`set_retcode`](@ref) does.
  4. A JuMP head, or a hierarchical head, that holds the core in its first field `jr` or `hr`: rebuild it through its positional constructor with the core of step 1 or step 2.
 
@@ -636,6 +637,9 @@ function set_result_prior(res::Union{NaiveOptimisationResult, NestedClusteredRes
                           f::Function)
     flds = ntuple(i -> getfield(res, i), Val(fieldcount(typeof(res))))
     return (typeof(res).name.wrapper)(f(first(flds)), Base.tail(flds)...)
+end
+function set_result_prior(res::VecRcb, f::Function)
+    return [set_result_prior(first(res), f), res[2:end]...]
 end
 function set_result_prior(res::ResolvedJuMPOptimiser, f::Function)
     # The block Result of the head holds the prior of the bundle, so both take the one prior.

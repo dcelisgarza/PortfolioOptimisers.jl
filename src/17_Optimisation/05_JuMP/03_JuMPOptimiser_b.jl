@@ -3,6 +3,7 @@
         opt::JuMPOptimiser,
         rd::ReturnsResult;
         rmsk::Option{BitVector} = nothing,
+        blocks::Tuple = (),
         kwargs...
     ) -> ResolvedJuMPOptimiser
 
@@ -10,31 +11,35 @@ Resolves a [`JuMPOptimiser`](@ref) against the returns data `rd`, to the [`Resol
 
 The function fits the prior, resolves the fees and the return terms, and resolves the [`ConstraintBlock`](@ref) of `opt` in two stages. Stage 1, [`resolve_constraint_block_names`](@ref), resolves the names of the block over the universe of the caller. The reduction to the Investable Mask then views the block, the prior and the rows. Stage 2, [`resolve_constraint_block`](@ref), resolves the block against the reduced prior and rows, to its [`ResolvedConstraintBlock`](@ref). [`assemble_jump_model!`](@ref) reads the bundle, and the Result of the head stores it in `jor`, so the resolution runs once for each `optimise` call.
 
-A distance reader of the block, its `cte` or its `ple`, can refuse an asset that the prior keeps, see [`DistanceReaderRefusalError`](@ref). Then the function fits again from the same prior result, without that asset, with the mask of [`distance_reader_refusal_mask`](@ref) in `rmsk`. The two readers can refuse different assets, and the fit again meets the refusal of the other one.
+The entry takes a list of blocks. The block of `opt` is the first, and the keyword `blocks` gives the others. Each entry of `blocks` is the [`ProgrammeAllocationSet`](@ref) of an online head and the rows `X` that the head holds, see [`fit_allocation_set_block`](@ref). Each block resolves against its own prior on its own rows, because a merge of two blocks changes the moments that their readers and their ceilings read. The Investable Mask of the bundle is the intersection of the masks of every block, so an asset that one block cannot read departs from all of them. The bundle then holds the vector of the block Results in `cbr`, the block of `opt` first. The entry takes `blocks` by name, so the keyword does not reach the readers through `kwargs...`.
 
-**Breaking change.** The verb was `processed_jump_optimiser_attributes`, and it returned `ProcessedJuMPOptimiserAttributes`, which held one field for each resolved constraint. The constraints are now in the block Result in `cbr`. The calibrated slots `l2c`, `lpc`, `linfc`, `l1`, `l2`, `lp` and `linf` resolve at stage 2, and not in [`assemble_jump_model!`](@ref).
+A distance reader of a block, its `cte` or its `ple`, can refuse an asset that its prior keeps, see [`DistanceReaderRefusalError`](@ref). One refusal branch covers every reader of every block. On a refusal, the function fits again from the same prior results, without that asset, with the mask of [`distance_reader_refusal_mask`](@ref) in `rmsk`. Two readers can refuse different assets, and the fit again meets the refusal of the other one. The readers of `opt` refuse under `opt.strict`, and the readers of a set refuse under the `strict` flag of the online head that holds the set, [`projection_step_strict`](@ref).
+
+**Breaking change.** The verb was `processed_jump_optimiser_attributes`, and it returned `ProcessedJuMPOptimiserAttributes`, which held one field for each resolved constraint. The constraints are now in the block Result in `cbr`. The calibrated slots `l2c`, `lpc`, `linfc`, `l1`, `l2`, `lp` and `linf` resolve at stage 2, and not in [`assemble_jump_model!`](@ref). A method of a custom constraint that reads `attrs.cbr` reads a vector when the head has more than one block, and [`owner_block`](@ref) gives the block of `opt`.
 
 # Algorithm
 
- 1. Fit the prior `pr` of `opt.pe` on `rd`.
- 2. Compose the Investable Mask `imsk` with [`distance_reader_entry_mask`](@ref), or take `rmsk` on a fit again.
+ 1. Fit the prior `pr` of `opt.pe` on `rd`. Fit the prior of each entry of `blocks` on its rows with [`fit_allocation_set_block`](@ref).
+ 2. Compose the Investable Mask `imsk` with [`distance_reader_entry_mask`](@ref). Intersect it with the mask of each entry of `blocks`, [`allocation_set_entry_mask`](@ref). On a fit again, take `rmsk`.
  3. Resolve the fees on the universe of the caller with [`fees_constraints`](@ref), and place them on the axes that the mask leaves with [`investable_fees_view`](@ref).
  4. Resolve stage 1 of the block of `opt` over the universe of the caller, with [`resolve_constraint_block_names`](@ref).
  5. Reduce the prior, the optimiser and `rd` to the mask with [`investable_reduction`](@ref). The reduction views the block of stage 1, and it declares the Non-Investable Axis on its `sets`.
- 6. Resolve stage 2 of the reduced block with [`resolve_constraint_block`](@ref), through [`distance_reader_call`](@ref). On a [`DistanceReaderRefusalError`](@ref), fit again from step 2 with the mask of [`distance_reader_refusal_mask`](@ref), and return its value.
- 7. Resolve the return terms against the prior with [`factory`](@ref), and return the bundle.
+ 6. Resolve stage 2 of the reduced block with [`resolve_constraint_block`](@ref), through [`distance_reader_call`](@ref). Resolve each entry of `blocks` at the mask with [`resolve_allocation_set_block`](@ref).
+ 7. If a block gives a [`DistanceReaderRefusalError`](@ref), fit again from step 2 with the mask of [`distance_reader_refusal_mask`](@ref) and the fitted entries of step 1, and return its value. The first refusal in the order of the blocks wins.
+ 8. Resolve the return terms against the prior with [`factory`](@ref), and return the bundle. Its `cbr` is the block Result of `opt` when `blocks` is empty, and the vector of every block Result otherwise.
 
 # Arguments
 
   - `opt::JuMPOptimiser`: JuMP optimiser configuration.
   - $(arg_dict[:rd])
   - `rmsk`: The mask of a fit again after a refusal, or `nothing` on the first fit.
-  - `kwargs...`: Keyword arguments passed to the centrality and phylogeny constraint estimators.
+  - `blocks`: The blocks after the block of `opt`. Each entry is a `Tuple` `(set, X)` or `(set, X, pr)`, as [`fit_allocation_set_block`](@ref) states. The empty `Tuple` gives one block.
+  - `kwargs...`: Keyword arguments passed to the centrality and phylogeny constraint estimators of `opt`.
 
 # Validation
 
   - The rules of [`resolve_constraint_block`](@ref), such as [`assert_investable_constraint_width`](@ref) for a precomputed constraint.
-  - Under `opt.strict`, no distance reader refuses an asset. The rule of [`distance_reader_refusal_mask`](@ref) raises otherwise.
+  - Under `opt.strict`, no distance reader of `opt` refuses an asset. Under [`projection_step_strict`](@ref), no distance reader of a set refuses an asset, and the prior of a set prices every asset that the head keeps. The rules of [`distance_reader_refusal_mask`](@ref) and [`allocation_set_entry_mask`](@ref) raise otherwise.
 
 # Returns
 
@@ -46,14 +51,18 @@ A distance reader of the block, its `cte` or its `ple`, can refuse an asset that
   - [`ResolvedJuMPOptimiser`](@ref)
   - [`ResolvedConstraintBlock`](@ref)
   - [`resolve_constraint_block`](@ref)
+  - [`resolve_allocation_set_block`](@ref)
   - [`assemble_jump_model!`](@ref)
   - [`processed_jump_optimiser`](@ref)
 """
 function resolve_jump_optimiser(opt::JuMPOptimiser, rd::ReturnsResult;
-                                rmsk::Option{BitVector} = nothing, kwargs...)
+                                rmsk::Option{BitVector} = nothing, blocks::Tuple = (),
+                                kwargs...)
     # `rd` keeps its raw `X` and `B`. Each reader below that reads the returns states its
     # own source, and subtracts the benchmark itself, at the point of use.
     pr = prior(opt.pe, rd)
+    # The prior of each set is fitted once. A fit again reads the fitted entries.
+    blocks = map(fit_allocation_set_block, blocks)
     # Resolve the fee on the caller's universe before `investable_reduction` narrows `sets`.
     # A name stated over that universe must not be refused because the data delisted the
     # asset. A liquidation charge keyed by name cannot resolve at all once its `w` sits on
@@ -62,8 +71,12 @@ function resolve_jump_optimiser(opt::JuMPOptimiser, rd::ReturnsResult;
     # An asset that a `FeatureDistance` of the clustering cannot read in the window of its
     # Asset Panel departs with the non-investable assets (`feature_readable_mask`). So does
     # an asset with a gap in the rows that a plain graph reader reads (`graph_reader_mask`).
-    # A fit again after a refusal of a distance reader passes its mask as `rmsk`.
+    # A fit again after a refusal of a distance reader passes its mask as `rmsk`, which
+    # already holds the masks of every block.
     imsk = distance_reader_entry_mask((opt.ple, opt.cte), pr, rd, opt.strict; rmsk = rmsk)
+    if isnothing(rmsk)
+        imsk = foldl(allocation_set_entry_mask, blocks; init = imsk)
+    end
     datatype = eltype(pr.X)
     fees = investable_fees_view(fees_constraints(opt.fees, opt.sets; datatype = datatype,
                                                  strict = opt.strict), imsk, pr.X)
@@ -74,16 +87,22 @@ function resolve_jump_optimiser(opt::JuMPOptimiser, rd::ReturnsResult;
     cbe = resolve_constraint_block_names(opt.cbe, opt.strict, datatype)
     _, prr, optr, rdr = investable_reduction(imsk, pr,
                                              rebuild_estimator(opt, (; cbe = cbe)), rd)
-    cbr = distance_reader_call(resolve_constraint_block, optr.cbe, prr, rdr; slv = optr.slv,
-                               strict = optr.strict, kwargs...)
-    if cbr isa DistanceReaderRefusalError
+    cbrs = (distance_reader_call(resolve_constraint_block, optr.cbe, prr, rdr;
+                                 slv = optr.slv, strict = optr.strict, kwargs...),
+            map(b -> resolve_allocation_set_block(b, imsk), blocks)...)
+    i = findfirst(x -> x isa DistanceReaderRefusalError, cbrs)
+    if !isnothing(i)
         # A distance reader that refuses an asset the prior kept raises before it builds its
-        # graph. Fit again from the same prior result, without that asset.
+        # graph. Fit again from the same prior results, without that asset. The block of
+        # `opt` refuses under the flag of the head, and the block of a set under the flag of
+        # the online head that holds the set.
+        strict = isone(i) ? opt.strict : projection_step_strict()
         return resolve_jump_optimiser(rebuild_estimator(opt, (; pe = pr)), rd;
-                                      rmsk = distance_reader_refusal_mask(cbr, imsk, rd,
-                                                                          opt.strict),
-                                      kwargs...)
+                                      rmsk = distance_reader_refusal_mask(cbrs[i], imsk, rd,
+                                                                          strict),
+                                      blocks = blocks, kwargs...)
     end
+    cbr = isempty(blocks) ? first(cbrs) : [cbrs...]
     return ResolvedJuMPOptimiser(; pr = prr, fees = fees, ret = factory(optr.ret, prr),
                                  sca = optr.sca, imsk = imsk, cbr = cbr)
 end
@@ -137,9 +156,9 @@ end
 
 Repackages a [`ResolvedJuMPOptimiser`](@ref) into a [`JuMPOptimiser`](@ref).
 
-The function maps the fields of the bundle onto the fields of the optimiser: `pr` onto `pe`, and `fees`, `ret` and `sca` onto the fields of the same name. It maps the block Result `cbr` onto the block `cbe` with [`constraint_block_from_resolved`](@ref), which holds the rename table of the block (`lcsr` to `lcse`, `ctr` to `cte`, …). Every other field of `opt` keeps its value. The list of fields comes from the fields of the bundle, so the function drops no field. The Investable Mask `imsk` has no field on the optimiser, and the function leaves it out.
+The function maps the fields of the bundle onto the fields of the optimiser: `pr` onto `pe`, and `fees`, `ret` and `sca` onto the fields of the same name. It maps the block Result of the owner, [`owner_block`](@ref) of `cbr`, onto the block `cbe` with [`constraint_block_from_resolved`](@ref), which holds the rename table of the block (`lcsr` to `lcse`, `ctr` to `cte`, …). Every other field of `opt` keeps its value. The list of fields comes from the fields of the bundle, so the function drops no field. The Investable Mask `imsk` has no field on the optimiser, and the function leaves it out.
 
-[`near_optimal_centering_setup`](@ref) calls it to build the optimiser of its sub-problems, while it gives the same `attrs` to [`assemble_jump_model!`](@ref). So the resolution runs once, and no sub-problem resolves a slot again.
+[`near_optimal_centering_setup`](@ref) calls it to build the optimiser of its sub-problems, while it gives the same `attrs` to [`assemble_jump_model!`](@ref). So the resolution runs once, and no sub-problem resolves a slot again. An optimiser holds one block, so the blocks after the first reach a sub-problem as the keyword `blocks` of the entry, from [`constraint_block_steps`](@ref).
 
 # Arguments
 
@@ -174,12 +193,43 @@ function jump_optimiser_from_attributes(opt::JuMPOptimiser, attrs::ResolvedJuMPO
     af = filter(!=(:imsk), fieldnames(ResolvedJuMPOptimiser))
     vals = map(af) do f
         return if f === :cbr
-            constraint_block_from_resolved(opt.cbe, attrs.cbr)
+            constraint_block_from_resolved(opt.cbe, owner_block(attrs.cbr))
         else
             getfield(attrs, f)
         end
     end
     return rebuild_estimator(opt, NamedTuple{map(f -> get(rename, f, f), af)}(vals))
+end
+"""
+    constraint_block_steps(blocks::Tuple{}, attrs::ResolvedJuMPOptimiser) -> Tuple{}
+    constraint_block_steps(blocks::Tuple, attrs::ResolvedJuMPOptimiser) -> Tuple
+
+Gives the blocks after the first of a resolved bundle, as the keyword `blocks` of a sub-problem on the reduced universe.
+
+A sub-problem of [`NearOptimalCentering`](@ref) solves on the prior and the rows that the bundle reduced, and its optimiser comes from [`jump_optimiser_from_attributes`](@ref). An optimiser holds one block, so this function gives the other blocks to the sub-problem through the keyword of the entry. Each entry holds the set viewed at the Investable Mask, its rows on the mask, and the prior Result of its block, as [`allocation_set_block_step`](@ref) gives them. So a sub-problem reads the reduced blocks, and it fits no prior of a set again.
+
+# Arguments
+
+  - `blocks`: The entries that the bundle resolved, in the keyword `blocks` of [`resolve_jump_optimiser`](@ref).
+  - `attrs`: The bundle. Its `cbr` holds the block Result of each entry after the block of the owner.
+
+# Returns
+
+  - `steps::Tuple`: One entry `(set, X, pr)` for each entry of `blocks`, or the empty `Tuple`.
+
+# Related
+
+  - [`jump_optimiser_from_attributes`](@ref)
+  - [`resolve_jump_optimiser`](@ref)
+  - [`near_optimal_centering_setup`](@ref)
+"""
+function constraint_block_steps(::Tuple{}, ::ResolvedJuMPOptimiser)
+    return ()
+end
+function constraint_block_steps(blocks::Tuple, attrs::ResolvedJuMPOptimiser)
+    cbr = attrs.cbr
+    return ntuple(i -> allocation_set_block_step(blocks[i], cbr[i + 1], attrs.imsk),
+                  length(blocks))
 end
 """
     processed_jump_optimiser(
@@ -371,7 +421,10 @@ function assemble_jump_model!(model::JuMP.Model, optimiser::JuMPOptimisationEsti
                               rd::ReturnsResult, r::Option{<:RM_VecRM} = nothing,
                               obj::ObjectiveFunction = MinimumRisk(),
                               b1::Option{<:MatNum} = nothing)
-    (; pr, fees, ret, cbr) = attrs
+    (; pr, fees, ret) = attrs
+    # The builder of a block after the first adds its rows (ADR 0237). Until it lands, the
+    # model holds the rows of the block of the owner, and the other blocks narrow the mask.
+    cbr = owner_block(attrs.cbr)
     (; wb, lt, st, lcsr, ctr, gcardr, sgcardr, smtx, sgmtx, slt, sst, sglt, sgst, tn, plr) = cbr
     set_linear_weight_constraints!(model, lcsr, :lcs_ineq_, :lcs_eq_)
     set_linear_weight_constraints!(model, ctr, :cent_ineq_, :cent_eq_)

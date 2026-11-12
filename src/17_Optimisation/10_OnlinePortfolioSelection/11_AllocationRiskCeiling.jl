@@ -250,6 +250,228 @@ function assert_set_prior_priced(pr::AbstractPriorResult, X::ReturnsResult)::Not
     return throw(ArgumentError("the Allocation Set's prior cannot price $(non_investable_names(X.nx, imsk)), which the programme trades: an asset outside the set prior's Coverage Universe over the rows it was fitted on has no covariance, no mean and no loadings for a ceiling, a floor or a tracking error to read. Give the set a `pe` whose universe covers the programme's — a mask-aware one under a `CoveragePolicy`, or the held estimator's own — or shorten the window the set reads."))
 end
 """
+    fit_allocation_set_block(b::Tuple{<:ProgrammeAllocationSet, <:ReturnsResult})
+    fit_allocation_set_block(b::Tuple{<:ProgrammeAllocationSet, <:ReturnsResult, <:Option{<:AbstractPriorResult}})
+
+Fits the prior of an entry of the keyword `blocks` of [`resolve_jump_optimiser`](@ref), and gives the entry with its prior.
+
+An entry is the block of a [`ProgrammeAllocationSet`](@ref) beside the block of a JuMP head. It is the set after stage 1, [`resolve_allocation_set`](@ref), and after `factory(set, w)`, with the rows `X` that the online head holds. The set reads its risk ceilings `r`, its return floor `ret` and the slots of its block against its own prior on `X`, so the entry carries the rows and no Result of a step lives in an estimator. An entry with a third value carries the prior result of the set already. The entry of a fit again after a refusal has one, and so has an entry for a sub-problem, from [`allocation_set_block_step`](@ref). The function fits nothing for such an entry.
+
+# Arguments
+
+  - `b`: The entry, `(set, X)` or `(set, X, pr)`.
+
+# Returns
+
+  - `(set, X, pr)::Tuple`: The entry with the prior result of the set, [`allocation_set_prior`](@ref) of the set on `X`. `pr` is `nothing` when the set reads no rows.
+
+# Related
+
+  - [`resolve_jump_optimiser`](@ref)
+  - [`allocation_set_prior`](@ref)
+  - [`allocation_set_entry_mask`](@ref)
+  - [`resolve_allocation_set_block`](@ref)
+"""
+function fit_allocation_set_block(b::Tuple{<:ProgrammeAllocationSet, <:ReturnsResult})
+    set, X = b
+    return (set, X, allocation_set_prior(set, X))
+end
+function fit_allocation_set_block(b::Tuple{<:ProgrammeAllocationSet, <:ReturnsResult,
+                                           <:Option{<:AbstractPriorResult}})
+    return b
+end
+"""
+    allocation_set_priced_mask(imsk::Option{BitVector}, pmsk::Nothing, X::ReturnsResult, strict::Bool)
+    allocation_set_priced_mask(imsk::Option{BitVector}, pmsk::BitVector, X::ReturnsResult, strict::Bool)
+
+Intersects the Investable Mask of a JuMP head with the assets that the prior of a block of a set prices.
+
+The prior of a set reads the rows of the online head, and the prior of the head reads its own rows. A young asset that the head keeps can then have no price in the prior of the set, when the `pe` of the set is plain and the prior of the head is mask-aware. A ceiling, a floor or a tracking error of the set would read `NaN` at that asset. So the asset departs from every block, as an asset that a distance reader refuses departs, see [`distance_reader_refusal_mask`](@ref). The function warns once, and it names the assets and the remedies. Under `strict` it refuses them. An asset that the head already left out raises no warning.
+
+**Breaking change.** Before the entry took a list of blocks, the leader re-solve of [`FollowTheLeader`](@ref) refused such a set prior with the `ArgumentError` of [`assert_set_prior_priced`](@ref).
+
+# Algorithm
+
+ 1. When `pmsk` is `nothing`, the prior of the set prices every asset. Return `imsk`.
+ 2. Find the assets that `imsk` keeps and `pmsk` leaves out. A `nothing` mask keeps every asset. When there is none, return the intersection of the two masks.
+ 3. Refuse the assets under `strict`. Otherwise warn, and name them from `X.nx`, or by their indices when `X` has no names.
+ 4. Return the intersection of the two masks.
+
+# Arguments
+
+  - `imsk`: The Investable Mask of the head and of the blocks before this one, or `nothing` when every asset is investable.
+  - `pmsk`: The Investable Mask of the prior of the set, [`investable_mask`](@ref).
+  - `X`: The rows of the set, read for the asset names.
+  - `strict`: The `strict` flag of the online head that holds the set, [`projection_step_strict`](@ref).
+
+# Validation
+
+  - Under `strict = true`, the prior of the set prices every asset that `imsk` keeps. Raises an [`IsNonFiniteError`](@ref).
+  - At least one asset stays. Raises an [`IsEmptyError`](@ref).
+
+# Returns
+
+  - `imsk::Option{BitVector}`: The intersected mask.
+
+# Related
+
+  - [`allocation_set_entry_mask`](@ref)
+  - [`distance_reader_refusal_mask`](@ref)
+  - [`investable_mask`](@ref)
+"""
+function allocation_set_priced_mask(imsk::Option{BitVector}, ::Nothing, ::ReturnsResult,
+                                    ::Bool)
+    return imsk
+end
+function allocation_set_priced_mask(imsk::Option{BitVector}, pmsk::BitVector,
+                                    X::ReturnsResult, strict::Bool)
+    held = something(imsk, trues(length(pmsk)))
+    keep = held .& pmsk
+    gap = held .& .!pmsk
+    if !any(gap)
+        return keep
+    end
+    assets = something(X.nx, eachindex(gap))[gap]
+    msg = "the prior of the Allocation Set cannot price $(count(gap)) asset(s) that the programme keeps: $(assets). An asset outside the Coverage Universe of the set prior over the rows that it reads has no mean, no covariance and no loadings for a ceiling, a floor or a tracking error to read"
+    remedy = "To keep them, give the set a `pe` whose universe covers the programme's, a mask-aware one under a `CoveragePolicy` or the prior of the held estimator, or shorten the window that the set reads."
+    @argcheck(!strict,
+              IsNonFiniteError("$(msg), and `strict = true` refuses them. $(remedy)"))
+    @warn("$(msg), so the fit leaves these assets out of the Investable Mask and gives each a zero weight. $(remedy) Pass `strict = true` to refuse them.",
+          maxlog = log_limit(:warn), _id = @log_id())
+    @argcheck(any(keep),
+              IsEmptyError("the prior of the Allocation Set prices no asset that the programme keeps, so the fit has no asset left. $(remedy)"))
+    return keep
+end
+"""
+    allocation_set_entry_mask(imsk::Option{BitVector}, b::Tuple{<:ProgrammeAllocationSet, <:ReturnsResult, Nothing})
+    allocation_set_entry_mask(imsk::Option{BitVector}, b::Tuple{<:ProgrammeAllocationSet, <:ReturnsResult, <:AbstractPriorResult})
+
+Intersects the Investable Mask of a JuMP head with the mask of a block of a set, at the entry of the head.
+
+[`resolve_jump_optimiser`](@ref) folds the function over the entries of its keyword `blocks`, after it composes the mask of its own block with [`distance_reader_entry_mask`](@ref). The mask of the block of a set follows the same rules as the mask of the head, on the prior and the rows of the set. So an asset that one block cannot read departs from every block. A set that reads no rows fits no prior and has no distance reader, so its block keeps the mask.
+
+# Algorithm
+
+ 1. When the prior `pr` of the entry is `nothing`, return `imsk`.
+ 2. Read the `strict` flag of the online head with [`projection_step_strict`](@ref).
+ 3. Intersect `imsk` with the assets that `pr` prices, with [`allocation_set_priced_mask`](@ref).
+ 4. Compose the result with the assets that a [`FeatureDistance`](@ref) of the readers `ple` and `cte` of the set can read, [`feature_readable_mask`](@ref), on `X`.
+ 5. Compose the result with the assets that a plain graph reader of the set can read, [`graph_reader_mask`](@ref), on `pr` and `X`, and return it.
+
+# Arguments
+
+  - `imsk`: The Investable Mask of the head and of the blocks before this one, or `nothing` when every asset is investable.
+  - `b`: The fitted entry `(set, X, pr)`, from [`fit_allocation_set_block`](@ref).
+
+# Validation
+
+  - The rules of [`allocation_set_priced_mask`](@ref), [`feature_readable_mask`](@ref) and [`graph_reader_mask`](@ref), under the `strict` flag of the online head.
+
+# Returns
+
+  - `imsk::Option{BitVector}`: The intersected mask.
+
+# Related
+
+  - [`resolve_jump_optimiser`](@ref)
+  - [`distance_reader_entry_mask`](@ref)
+  - [`allocation_set_priced_mask`](@ref)
+  - [`resolve_allocation_set_block`](@ref)
+"""
+function allocation_set_entry_mask(imsk::Option{BitVector},
+                                   ::Tuple{<:ProgrammeAllocationSet, <:ReturnsResult,
+                                           Nothing})
+    return imsk
+end
+function allocation_set_entry_mask(imsk::Option{BitVector},
+                                   b::Tuple{<:ProgrammeAllocationSet, <:ReturnsResult,
+                                            <:AbstractPriorResult})
+    set, X, pr = b
+    strict = projection_step_strict()
+    readers = (set.ple, set.cte)
+    pmsk = allocation_set_priced_mask(imsk, investable_mask(pr), X, strict)
+    return graph_reader_mask(readers, feature_readable_mask(readers, pmsk, X), pr, X,
+                             strict)
+end
+"""
+$(DocStringExtensions.TYPEDSIGNATURES)
+
+Resolves the block of a set at the Investable Mask of a JuMP head, to its [`ResolvedConstraintBlock`](@ref), or to the refusal of one of its distance readers.
+
+[`resolve_jump_optimiser`](@ref) calls it for each entry of its keyword `blocks`, after the mask holds the masks of every block. The block resolves against the prior of the set on the rows of the set, and not against the prior of the head. A distance reader of the set can still refuse an asset that the prior of the set keeps. The function then returns the [`DistanceReaderRefusalError`](@ref), and the one refusal branch of the entry fits again without the asset.
+
+# Algorithm
+
+ 1. Reduce the set, its rows `X` and its prior `pr` to `imsk` with [`programme_investable_reduction`](@ref). The reduction declares the Non-Investable Axis on the `sets` of the set.
+ 2. Resolve stage 2 of the reduced block with [`resolve_constraint_block`](@ref), through [`distance_reader_call`](@ref). The block reads the solver of the set, and the `strict` flag of the online head, [`projection_step_strict`](@ref).
+ 3. Return the block Result, or the refusal.
+
+# Arguments
+
+  - `b`: The fitted entry `(set, X, pr)`, from [`fit_allocation_set_block`](@ref).
+  - `imsk`: The Investable Mask of the entry, or `nothing` when every asset is investable.
+
+# Validation
+
+  - The rules of [`resolve_constraint_block`](@ref).
+
+# Returns
+
+  - `cbr::Union{ResolvedConstraintBlock, DistanceReaderRefusalError}`: The block Result, or the refusal of a distance reader.
+
+# Related
+
+  - [`resolve_jump_optimiser`](@ref)
+  - [`resolve_constraint_block`](@ref)
+  - [`distance_reader_call`](@ref)
+  - [`allocation_set_entry_mask`](@ref)
+"""
+function resolve_allocation_set_block(b::Tuple{<:ProgrammeAllocationSet, <:ReturnsResult,
+                                               <:Option{<:AbstractPriorResult}},
+                                      imsk::Option{BitVector})
+    set, X, pr = b
+    setr, Xr, prr = programme_investable_reduction(imsk, set, X, pr)
+    return distance_reader_call(resolve_constraint_block, setr.cbe, prr, Xr; slv = set.slv,
+                                strict = projection_step_strict())
+end
+"""
+$(DocStringExtensions.TYPEDSIGNATURES)
+
+Gives an entry of the keyword `blocks` for a sub-problem on the reduced universe, from the block Result that the entry resolved to.
+
+[`constraint_block_steps`](@ref) calls it for each block after the first of a bundle. A sub-problem of [`NearOptimalCentering`](@ref) solves on the reduced prior and rows of the head. So its entry holds the set and the rows viewed at the Investable Mask, the reduced prior of the block, and the resolved slots of the block. The entry then fits no prior again, its mask keeps every asset, and its readers hold their results, so no reader runs again. The risk ceilings `r` and the return floor `ret` of the set are viewed at the mask with the rest of the set.
+
+# Algorithm
+
+ 1. View the set and its rows `X` at `imsk` with [`programme_investable_reduction`](@ref), with no prior. The block Result already holds the reduced prior.
+ 2. Put the resolved slots of `cbr` into the block of the viewed set with [`constraint_block_from_resolved`](@ref).
+ 3. Return the set, the viewed rows and the prior of `cbr`.
+
+# Arguments
+
+  - `b`: The entry that the bundle resolved, `(set, X)` or `(set, X, pr)`.
+  - `cbr`: The block Result of the entry.
+  - `imsk`: The Investable Mask of the bundle, or `nothing` when every asset is investable.
+
+# Returns
+
+  - `(set, X, pr)::Tuple`: The entry for the sub-problem.
+
+# Related
+
+  - [`constraint_block_steps`](@ref)
+  - [`fit_allocation_set_block`](@ref)
+  - [`jump_optimiser_from_attributes`](@ref)
+"""
+function allocation_set_block_step(b::Tuple{<:ProgrammeAllocationSet, <:ReturnsResult,
+                                            Vararg}, cbr::ResolvedConstraintBlock,
+                                   imsk::Option{BitVector})
+    setr, Xr, _ = programme_investable_reduction(imsk, b[1], b[2], nothing)
+    return (rebuild_estimator(setr,
+                              (; cbe = constraint_block_from_resolved(setr.cbe, cbr))), Xr,
+            cbr.pr)
+end
+"""
     set_allocation_risk_ceiling!(model::JuMP.Model, r::Nothing, set::ProgrammeAllocationSet, pr, pl; prefix::Symbol = Symbol(""))
     set_allocation_risk_ceiling!(model::JuMP.Model, r::RiskMeasure, set::ProgrammeAllocationSet, pr, pl; prefix::Symbol = Symbol(""))
     set_allocation_risk_ceiling!(model::JuMP.Model, rs::VecRM, set::ProgrammeAllocationSet, pr::Nothing, pl; prefix::Symbol = Symbol(""))

@@ -854,6 +854,48 @@ One [`ResolvedConstraintBlock`](@ref), or a vector of them. The field `cbr` of [
 """
 const Rcb_VecRcb = Union{ResolvedConstraintBlock, VecRcb}
 """
+    owner_block(cbr::ResolvedConstraintBlock) -> ResolvedConstraintBlock
+    owner_block(cbr::VecRcb) -> ResolvedConstraintBlock
+
+Gives the block Result of the owner of a programme, the first block of the programme.
+
+The field `cbr` of [`ResolvedJuMPOptimiser`](@ref) holds one block Result, or one for each block when the head has more than one block. The block of the owner is the first. The readers of the bundle that mean the block of the head read it through this function: the forward rule of the bundle, `jor.wb`, the builders of [`assemble_jump_model!`](@ref), and [`jump_optimiser_from_attributes`](@ref).
+
+# Arguments
+
+  - `cbr`: One block Result, or a vector of them with the block of the owner first.
+
+# Returns
+
+  - `cbr::ResolvedConstraintBlock`: The block Result of the owner.
+
+# Examples
+
+```jldoctest
+julia> pr = prior(EmpiricalPrior(),
+                  ReturnsResult(; nx = [\"a\", \"b\"], X = [0.1 -0.2; -0.1 0.2; 0.05 0.1]));
+
+julia> cbr = PortfolioOptimisers.resolve_constraint_block(ConstraintBlock(), pr,
+                                                          ReturnsResult(; nx = [\"a\", \"b\"],
+                                                                        X = pr.X); slv = nothing);
+
+julia> PortfolioOptimisers.owner_block([cbr, cbr]) === PortfolioOptimisers.owner_block(cbr)
+true
+```
+
+# Related
+
+  - [`Rcb_VecRcb`](@ref)
+  - [`ResolvedJuMPOptimiser`](@ref)
+  - [`resolve_jump_optimiser`](@ref)
+"""
+function owner_block(cbr::ResolvedConstraintBlock)::ResolvedConstraintBlock
+    return cbr
+end
+function owner_block(cbr::VecRcb)::ResolvedConstraintBlock
+    return first(cbr)
+end
+"""
 $(DocStringExtensions.TYPEDSIGNATURES)
 
 Resolves the slots of a [`ConstraintBlock`](@ref) that hold a name or an estimator over `sets`. This is stage 1 of the resolution.
