@@ -101,7 +101,7 @@ Keywords correspond to the struct's fields. `slv` has no default, because every 
 
   - If `slv` is a vector: `!isempty(slv)`. An `IsEmptyError` is thrown otherwise.
   - If `sbgt` or `gbgt` is a number: non-negative and finite. A `DomainError` is thrown otherwise.
-  - If `gbgt` is given: `sbgt` is not a number, because the budget of one and a number in `sbgt` already fix the gross exposure. If `wb` is a [`WeightBounds`](@ref), one of its bounds admits a short weight. An `ArgumentError` is thrown otherwise.
+  - If `gbgt` is given: `sbgt` is not a number, because the budget of one and a number in `sbgt` already fix the gross exposure. If `wb` is a [`WeightBounds`](@ref), one of its bounds admits a short weight. If `gbgt` has an upper end, it is at least one, because the gross exposure is at least the budget of one. An `ArgumentError` is thrown otherwise.
   - If `r` is given: the `settings.ub` of every measure is a finite non-negative number, the ceiling, and no measure holds a [`ReturnsTracking`](@ref), because the ceiling reads rows that change at every step ([`assert_risk_ceiling`](@ref)). An `ArgumentError` is thrown otherwise, and an `IsEmptyError` for an empty vector.
   - If `ret` is given: the `settings.lb` of every return term is `nothing` or a number, the floor, because the projection solves once and returns one allocation ([`assert_return_floor`](@ref)). An `ArgumentError` is thrown for a [`Frontier`](@ref) or a vector.
   - If `lcse`, `cte`, `smtx`, `sgmtx`, `tn`, `tr`, `ple`, `l2`, `lp`, `lpc` or `ret` is a vector: `!isempty(x)`. An `IsEmptyError` is thrown otherwise.

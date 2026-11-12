@@ -156,3 +156,40 @@ and an `ExpertMixture` over `FollowTheLeader` experts apply both rulings per exp
   [#1162](https://github.com/dcelisgarza/PortfolioOptimisers.jl/issues/1162), writes its set
   builders so that they take a model and add to it, since the adapter calls them on a model it did
   not build.
+
+## Amendment (2026-11-12): the budget has one home, and the constructor refuses a held budget that excludes one
+
+The Decision states that "both homes hold", and that a bound in both places is a redundant row,
+not a clash. That holds for every constraint kind except the budget. ADR 0159 gives the budget to
+the head: `Σw = 1` holds on every set, and cash is a column. The adapter writes that budget into
+the leader's model as the row `Σw = k`. So a net budget on `opt` meets it in one model. The
+reproduction of issue #2034 measured the result: a held `bgt = 0.5` gives an infeasible leader at
+steps 2 to 40, each a Held Step, under a programme set and under the default bounded set.
+
+`FollowTheLeader` now refuses at construction every held budget that excludes one, because the
+configuration alone decides the result (`assert_leader_budget`):
+
+- `bgt` must be `nothing`, one, or a `BudgetRange` that holds one. A range that holds one is a
+  redundant row, as any other bound in both homes is.
+- `bgt` must not be a `BudgetCostEstimator`, in any form. Such an estimator charges its cost
+  against the budget, `Σw + c(w) ∈ k · [lb, ub]`. With the head's row this is
+  `c(w) ∈ k · [lb − 1, ub − 1]`, a band on the cost that the wealth recursion never pays. Its
+  reference `w` is the caller's fixed vector, because `factory` does not reach `bgt`. Measured on
+  the reproduction of #2034: `bgt = 1` pins the leader to the reference at every step,
+  `bgt = 0.98` holds every step, and `bgt = 1.002` keeps the leader on an L1 ball of radius 0.2
+  about the reference. None of these is a cost charged against the budget. A cost that the series
+  pays is the head's `fees` (ADR 0160). A cost that the leader weighs is the `fees` of `opt`, which
+  `factory` measures from `ŵ_t`, and a ceiling on the trade is a `Turnover`.
+- `sbgt`, `gbgt` and `wb` of `opt` pass `assert_gross_budget_admissible` with a net budget of one,
+  as a `ProgrammeAllocationSet` checks its own. So a `gbgt` beside a number in `sbgt`
+  over-determines the gross exposure, and a `gbgt` below one leaves no feasible weights, because
+  the gross exposure is at least `|Σw|`.
+- Each entry and the explicit `default` of a `TimeDependent` schedule in these fields meets the
+  same rules.
+
+The same mechanism reached `JuMPOptimiser` and the set: a gross budget below the least magnitude
+of the net budget is infeasible. `assert_gross_budget_admissible` now refuses it for all three
+owners. Part 2 of #2034, the row `Σw = k` that the head keeps in the leader's model when the
+block of map #1213 replaces the adapter, belongs to #2047. Issue #2049 records that a schedule
+inside a held optimiser never resolves at a fold, and #2050 records that `factory` does not reach
+the reference of a cost estimator.

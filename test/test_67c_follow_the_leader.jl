@@ -334,6 +334,58 @@ using Test, PortfolioOptimisers, StableRNGs, LinearAlgebra, Statistics, Dates, C
                        w30; atol = 1e-8)
     end
 
+    @testset "The held budgets meet the head's budget of one (#2034)" begin
+        # The leader's model holds the head's row `sum(w) == k` beside the held optimiser's
+        # rows. A held budget that excludes one held every step at `dc3d282e50`.
+        ftl(; kw...) = FollowTheLeader(; opt = logopt(; kw...))
+        ls = WeightBounds(; lb = -1.0, ub = 1.0)
+        w0 = fill(1 / N, N)
+        @test_throws DomainError ftl(; bgt = 0.5)
+        @test_throws "owns the budget of one" ftl(; bgt = 0.5)
+        @test_throws DomainError ftl(; bgt = BudgetRange(; lb = 1.1, ub = 1.2))
+        @test_throws DomainError ftl(; bgt = BudgetRange(; lb = nothing, ub = 0.9))
+        # A cost estimator is refused in every form: with the head's row its cost is a band
+        # about its fixed reference, which the wealth recursion never pays.
+        @test_throws ArgumentError ftl(; bgt = BudgetCosts(; bgt = 1.0, w = w0))
+        @test_throws "BudgetCostEstimator" ftl(;
+                                               bgt = BudgetMarketImpact(;
+                                                                        bgt = BudgetRange(;
+                                                                                          lb = 0.9,
+                                                                                          ub = 1.1),
+                                                                        w = w0))
+        # Each entry and the explicit default of a schedule meet the same rules.
+        @test_throws DomainError ftl(; bgt = TimeDependent([1.0, 0.5]))
+        @test_throws DomainError ftl(; bgt = TimeDependent([1.0, 1.0]; default = 0.5))
+        @test_throws ArgumentError ftl(; bgt = TimeDependent([1.0, BudgetCosts(; w = w0)]))
+        # The gross budget meets a net budget of one, as on a programme set.
+        @test_throws ArgumentError ftl(; bgt = nothing, gbgt = 0.8, wb = ls)
+        @test_throws ArgumentError ftl(; bgt = nothing, gbgt = TimeDependent([1.2, 0.8]),
+                                       wb = ls)
+        @test_throws "over-determined" ftl(; bgt = nothing, sbgt = 0.1, gbgt = 1.5, wb = ls)
+        # A budget that holds one, a function schedule and the solver-free leader pass.
+        for kw in
+            ((; bgt = 1), (; bgt = nothing), (; bgt = BudgetRange(; lb = 0.8, ub = 1.2)),
+             (; bgt = BudgetRange(; lb = nothing, ub = 1.5)),
+             (; bgt = TimeDependent(ctx -> 0.5)), (; bgt = TimeDependent([1.0, nothing])),
+             (; bgt = nothing, gbgt = 1.2, wb = ls),
+             (; bgt = nothing, sbgt = BudgetRange(; lb = 0.0, ub = 0.2), gbgt = 1.5,
+              wb = ls))
+            @test isa(ftl(; kw...), FollowTheLeader)
+        end
+        @test isa(FollowTheLeader(), FollowTheLeader)
+        # A view rebuilds the rule through its constructor and keeps an admitted budget.
+        @test po.port_opt_view(ftl(; bgt = nothing), [1, 2]).opt.opt.bgt === nothing
+        # The budgets that hold one solve on every step and play a leader that sums to one,
+        # the leader of the default budget.
+        r1 = optimise(OPS(; alg = ftl()), rows(rd, 1:10))
+        for kw in ((; bgt = nothing), (; bgt = BudgetRange(; lb = 0.8, ub = 1.2)))
+            r = optimise(OPS(; alg = ftl(; kw...)), rows(rd, 1:10))
+            @test !isa(r.retcode.res, po.HeldStep)
+            @test isapprox(sum(r.w), 1; atol = 1e-8)
+            @test isapprox(r.w, r1.w; atol = 1e-6)
+        end
+    end
+
     @testset "A leader in the Excess Frame fits the excess returns its rows carry (#1646)" begin
         # The rows buffer of the head keeps every field of the rows, the benchmark among
         # them, so the leader picks `X - B` as a batch fit over the same window does

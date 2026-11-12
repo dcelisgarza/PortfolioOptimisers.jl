@@ -1053,6 +1053,19 @@ end
             @test_throws Exception ProgrammeAllocationSet(; slv = slv, gbgt = -1,
                                                           wb = WeightBounds(; lb = -1,
                                                                             ub = 1))
+            # The gross exposure is at least the budget of one (#2034).
+            @test_throws "least magnitude of the net budget" ProgrammeAllocationSet(;
+                                                                                    slv = slv,
+                                                                                    gbgt = 0.9,
+                                                                                    wb = WeightBounds(;
+                                                                                                      lb = -1,
+                                                                                                      ub = 1))
+            @test_throws ArgumentError ProgrammeAllocationSet(; slv = slv,
+                                                              gbgt = BudgetRange(;
+                                                                                 lb = nothing,
+                                                                                 ub = 0.9),
+                                                              wb = WeightBounds(; lb = -1,
+                                                                                ub = 1))
             # The sub-group and the sub-grouped slots are viewed and resolved apart when
             # they differ, and once when they are the same object.
             apart = ProgrammeAllocationSet(; slv = slv, sets = sets3, scard = 1,

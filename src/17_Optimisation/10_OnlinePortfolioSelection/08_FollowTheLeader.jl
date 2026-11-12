@@ -906,7 +906,7 @@ The objective is the held estimator's. [`BestConstantRebalancedPortfolio`](@ref)
 
 The solver-free default runs Cover's fixed point, which stops on a certificate, a bound on the shortfall of its log wealth from the leader's. At a leader that drops an asset, the weight of that asset decays slowly. So the default budget can stop before the certificate meets `tol`, and the rule then warns once and names the certificate. On the first 30 rows of the returns `0.02 .* randn(StableRNG(11), 40, 4)` the default stops 0.066 from the leader in weight and 6.2e-5 short of it in log wealth. At `iters = 10_000_000` the certificate meets `tol = 1e-12` after 1 437 030 steps, 1.6e-9 from the leader in weight. A JuMP head solves the leader to the solver's tolerance, and the two forms agree to that tolerance at a leader inside the simplex.
 
-**The re-solve takes the head's Allocation Set as its feasible region.** The rule wraps the set, the Price-Adjusted Allocation and the head's rows into an [`AllocationSetConstraint`](@ref), and appends it to the `ccnt` of the held JuMP estimator for the solve. It passes the Price-Adjusted Allocation through [`factory`](@ref) as a fold loop does, so a turnover term or a fee on `opt` reads the same book. It plays the optimum with no projection, because the projected leader is not the leader. The solver-free estimator has no model. So a [`BoundedAllocationSet`](@ref) goes into its `wb` and `sets`, and the rule plays its repaired fixed point. The head refuses a [`ProgrammeAllocationSet`](@ref) over the solver-free estimator at construction. Under a programme set the constrained leader is [`MeanRisk`](@ref) under [`LogarithmicReturn`](@ref).
+**The re-solve takes the head's Allocation Set as its feasible region.** The rule wraps the set, the Price-Adjusted Allocation and the head's rows into an [`AllocationSetConstraint`](@ref), and appends it to the `ccnt` of the held JuMP estimator for the solve. It passes the Price-Adjusted Allocation through [`factory`](@ref) as a fold loop does, so a turnover term or a fee on `opt` reads the same book. It plays the optimum with no projection, because the projected leader is not the leader. A constraint of the set and one of the held estimator meet in one model, and a bound in both places is a redundant row. The budget is the exception, because the head owns it. The leader's model holds the head's row `Σw = k`, so the held estimator takes `bgt = nothing`, a budget of one, or a [`BudgetRange`](@ref) that holds one, and a gross budget that the budget of one can reach. The constructor refuses every other budget and every [`BudgetCostEstimator`](@ref), see [`assert_leader_budget`](@ref). The solver-free estimator has no model. So a [`BoundedAllocationSet`](@ref) goes into its `wb` and `sets`, and the rule plays its repaired fixed point. The head refuses a [`ProgrammeAllocationSet`](@ref) over the solver-free estimator at construction. Under a programme set the constrained leader is [`MeanRisk`](@ref) under [`LogarithmicReturn`](@ref).
 
 **The rule projects the damped mix alone.** It uses the Euclidean geometry on `proj`, with the Price-Adjusted Allocation as the reference. On a static convex set the projection returns the mix unchanged. A turnover ceiling or a MIP kind needs the repair on a day when the mix leaves the set. The rule skips the projection by type on a [`BoundedAllocationSet`](@ref), and at `gamma = 0`. An empty sample, or a sample too small for the estimator, gives the uniform portfolio projected onto the set, as in [gyorfischafer2003,gyorfi2006,gyorfi2008,li2011corn](@cite). A JuMP head fits a covariance, so it needs two rows. A re-solve that fails after the fallback chain of the held estimator is a Held Step. The rule then plays the Price-Adjusted Allocation, so the fund trades nothing that period.
 
@@ -975,6 +975,11 @@ Keywords correspond to the struct's fields.
 ## Validation
 
   - `0 <= gamma <= 1`. A `DomainError` is thrown otherwise.
+  - The budgets of a JuMP estimator on `opt` admit the budget of one of the head, see [`assert_leader_budget`](@ref):
+      + `bgt` is `nothing`, one, or a [`BudgetRange`](@ref) that holds one. A `DomainError` is thrown otherwise.
+      + `bgt` is not a [`BudgetCostEstimator`](@ref). An `ArgumentError` is thrown otherwise.
+      + `sbgt`, `gbgt` and `wb` pass [`assert_gross_budget_admissible`](@ref) with a net budget of one. So `gbgt` reaches one, and it is not given beside a number in `sbgt`. An `ArgumentError` is thrown otherwise.
+      + The same holds for each entry and the explicit `default` of a [`TimeDependent`](@ref) schedule in these fields.
 
 ## View parameters
 
@@ -1047,6 +1052,7 @@ FollowTheLeader
                                               T4 <: EuclideanProjection}
         @argcheck(zero(gamma) <= gamma <= one(gamma),
                   DomainError(gamma, "gamma must lie in [0, 1]"))
+        assert_leader_budget(opt)
         return new{T1, T2, T3, T4}(sel, opt, gamma, proj)
     end
 end
@@ -1067,6 +1073,135 @@ function assert_rule_admits_set(alg::FollowTheLeader{<:Any,
                                                      <:BestConstantRebalancedPortfolio},
                                 ::ProgrammeAllocationSet)::Nothing
     return throw(ArgumentError("a `FollowTheLeader` over the solver-free `BestConstantRebalancedPortfolio` has no model a `ProgrammeAllocationSet` can enter: the constrained leader under a programme set is `MeanRisk` under `LogarithmicReturn` and `MaximumReturn`, with the set's solver, on `opt`."))
+end
+"""
+    assert_leader_budget(opt::BestConstantRebalancedPortfolio)
+    assert_leader_budget(opt::JuMPOptimisationEstimator)
+
+Assert that the budgets of the held estimator of a [`FollowTheLeader`](@ref) rule admit the budget of one that the online head owns.
+
+The head owns the budget: `Σw = 1` holds on every Allocation Set, and cash is an asset with price relative one. The re-solve keeps that budget as the row `Σw = k`, which [`add_allocation_set_bounds!`](@ref) writes into the leader's model beside the rows of the held optimiser. So every budget of the held optimiser meets the budget of one in one model. A budget that excludes one leaves an empty feasible set, and every step is a Held Step. The configuration alone decides it, so the constructor refuses it.
+
+The solver-free estimator states no budget, because its fixed point lies on the simplex. A JuMP estimator is checked through the budgets of its [`JuMPOptimiser`](@ref) with [`leader_budget_admits_one`](@ref). Each entry and the explicit `default` of a [`TimeDependent`](@ref) schedule in `bgt`, `sbgt`, `gbgt` or `wb` are checked with the other fields at their static values, through [`assert_time_dependent_substitution`](@ref). A function schedule has a value only at a fold, so the check reads it only through its `default`.
+
+# Algorithm
+
+The JuMP method:
+
+ 1. Collect `args`, the `bgt`, `sbgt`, `gbgt` and `wb` of `jo`, the [`JuMPOptimiser`](@ref) of `opt`.
+ 2. Check the values in `args` with [`leader_budget_admits_one`](@ref). A schedule passes this step.
+ 3. Check each entry and the explicit `default` of each schedule in `args` with [`leader_budget_admits_one`](@ref), through [`assert_time_dependent_substitution`](@ref). The other fields take their static values, and `jump_optimiser_td_defaults` gives the static defaults.
+
+# Arguments
+
+  - `opt`: The held estimator.
+
+# Validation
+
+  - The rules of [`leader_budget_admits_one`](@ref) for the budgets of a JuMP estimator.
+
+# Returns
+
+  - `nothing`.
+
+# Related
+
+  - [`FollowTheLeader`](@ref)
+  - [`leader_budget_admits_one`](@ref)
+  - [`assert_net_budget_admits_one`](@ref)
+"""
+function assert_leader_budget(::BestConstantRebalancedPortfolio)::Nothing
+    return nothing
+end
+function assert_leader_budget(opt::JuMPOptimisationEstimator)::Nothing
+    jo = opt.opt
+    args = (; bgt = jo.bgt, sbgt = jo.sbgt, gbgt = jo.gbgt, wb = jo.wb)
+    leader_budget_admits_one(; args...)
+    assert_time_dependent_substitution(leader_budget_admits_one, args,
+                                       jump_optimiser_td_defaults())
+    return nothing
+end
+"""
+$(DocStringExtensions.TYPEDSIGNATURES)
+
+Assert that the static budgets of a held optimiser admit the budget of one of the online head.
+
+The net budget goes through [`assert_net_budget_admits_one`](@ref). The short and the gross budgets go through [`assert_gross_budget_admissible`](@ref) with the net budget of one in the place of `bgt`, as a [`ProgrammeAllocationSet`](@ref) checks its own. The head fixes the net exposure at one. So a number in `sbgt` and any `gbgt` over-determine the gross exposure, and a gross budget below one leaves no feasible weights.
+
+# Arguments
+
+  - `bgt`: The net budget of the held optimiser.
+  - `sbgt`: The short budget of the held optimiser.
+  - `gbgt`: The gross budget of the held optimiser.
+  - `wb`: The weight bounds of the held optimiser.
+
+# Validation
+
+  - The rules of [`assert_net_budget_admits_one`](@ref) for `bgt`.
+  - The rules of [`assert_gross_budget_admissible`](@ref) for `1`, `sbgt`, `gbgt` and `wb`.
+
+# Related
+
+  - [`assert_leader_budget`](@ref)
+"""
+function leader_budget_admits_one(; bgt, sbgt, gbgt, wb)::Nothing
+    assert_net_budget_admits_one(bgt)
+    assert_gross_budget_admissible(1, sbgt, gbgt, wb)
+    return nothing
+end
+"""
+    assert_net_budget_admits_one(bgt::Number)
+    assert_net_budget_admits_one(bgt::BudgetRange)
+    assert_net_budget_admits_one(bgt::BudgetCostEstimator)
+    assert_net_budget_admits_one(bgt)
+
+Assert that the net budget `bgt` of the held optimiser of a [`FollowTheLeader`](@ref) rule admits the budget of one.
+
+The leader's model holds the head's row `Σw = k` beside the rows of `bgt`. A number writes `Σw = k · bgt`, so it admits one only when it is one. A [`BudgetRange`](@ref) writes `k · lb ≤ Σw ≤ k · ub`, so it admits one when its interval holds one. Its row is then redundant, as `nothing` is.
+
+A [`BudgetCostEstimator`](@ref) is refused in every form. It charges its cost against the budget, `Σw + c(w) ∈ k · [lb, ub]`, with `c(w) ≥ 0` the cost of the move from its reference `w`. The head's row turns this into `c(w) ∈ k · [lb − 1, ub − 1]`, a band on the cost that the wealth recursion of the head never pays. The reference is the caller's fixed vector, because [`factory`](@ref) does not reach `bgt`, so it is not the book that the step trades from. A budget of one pins the leader to that reference, a budget below one leaves no feasible weights, and a budget above one bounds the cost of the move from the reference. None of these is a cost charged against the budget. A cost that the series pays is the `fees` of the head. A cost that the leader weighs is the `fees` of the held [`JuMPOptimiser`](@ref), which `factory` measures from the Price-Adjusted Allocation of the step, and a ceiling on the trade is a [`Turnover`](@ref) on `tn`.
+
+`nothing`, a [`TimeDependent`](@ref) schedule and any other [`BudgetEstimator`](@ref) pass. [`assert_leader_budget`](@ref) checks the entries of a schedule.
+
+# Arguments
+
+  - `bgt`: The net budget of the held optimiser.
+
+# Validation
+
+  - A number is one. A `DomainError` is thrown otherwise.
+  - The interval of a `BudgetRange` holds one. A `DomainError` is thrown otherwise.
+  - `bgt` is not a `BudgetCostEstimator`. An `ArgumentError` is thrown otherwise.
+
+# Returns
+
+  - `nothing`.
+
+# Related
+
+  - [`assert_leader_budget`](@ref)
+  - [`set_budget_constraints!`](@ref)
+  - [`add_allocation_set_bounds!`](@ref)
+"""
+function assert_net_budget_admits_one(bgt::Number)::Nothing
+    @argcheck(isone(bgt),
+              DomainError(bgt,
+                          "the held optimiser of a `FollowTheLeader` has the net budget `bgt = $bgt`. The online head owns the budget of one, and the leader's model holds its row `sum(w) == k` beside the row `sum(w) == k * bgt` of the held optimiser, so no weights meet both, and every step would be a Held Step. Set `bgt = nothing` or `bgt = 1` on the held `JuMPOptimiser`. A budget below one is a cash column with price relative one, and a leverage cap is a `gbgt` of at least one."))
+    return nothing
+end
+function assert_net_budget_admits_one(bgt::BudgetRange)::Nothing
+    lb = bgt.lb
+    ub = bgt.ub
+    @argcheck((isnothing(lb) || lb <= one(lb)) && (isnothing(ub) || one(ub) <= ub),
+              DomainError((lb, ub),
+                          "the held optimiser of a `FollowTheLeader` has the net budget range `lb = $lb`, `ub = $ub`, which excludes one. The online head owns the budget of one, and the leader's model holds its row `sum(w) == k` beside the rows of the range, so no weights meet both, and every step would be a Held Step. Use a range that holds one, `bgt = nothing` or `bgt = 1` on the held `JuMPOptimiser`."))
+    return nothing
+end
+function assert_net_budget_admits_one(::BudgetCostEstimator)::Nothing
+    return throw(ArgumentError("the held optimiser of a `FollowTheLeader` has a `BudgetCostEstimator` in `bgt`. It charges its cost against the budget, `sum(w) + c(w)` in `k * [lb, ub]`, but the online head owns the budget of one, and the leader's model holds its row `sum(w) == k`. Together they leave `c(w)` in `k * [lb - 1, ub - 1]`, a band on the cost of the move from the estimator's fixed reference `w`, which the head's wealth recursion never pays. A budget of one pins the leader to that reference, and a budget below one leaves no feasible weights. A cost that the series pays is the `fees` of the head. A cost that the leader weighs is the `fees` of the held `JuMPOptimiser`, measured from the step's Price-Adjusted Allocation, and a ceiling on the trade is a `Turnover` on `tn`."))
+end
+function assert_net_budget_admits_one(::Any)::Nothing
+    return nothing
 end
 """
     leader_min_rows(opt::LeaderOptimiser)

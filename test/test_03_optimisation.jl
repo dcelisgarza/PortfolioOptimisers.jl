@@ -1950,6 +1950,35 @@ end
         @test_throws ArgumentError JuMPOptimiser(; slv, bgt = nothing, gbgt = 1.5)
         @test_throws ArgumentError JuMPOptimiser(; slv, bgt = 1.0, sbgt = 0.3, gbgt = 1.6,
                                                  wb = WeightBounds(; lb = -1, ub = 1))
+        # The gross exposure is at least abs(sum(w)), so a gross budget below the least
+        # magnitude of the net budget leaves no feasible weights (#2034).
+        let ls = WeightBounds(; lb = -1, ub = 1)
+            @test_throws "least magnitude of the net budget" JuMPOptimiser(; slv, bgt = 1.0,
+                                                                           gbgt = 0.5,
+                                                                           wb = ls)
+            @test_throws ArgumentError JuMPOptimiser(; slv, bgt = -1.2, gbgt = 1.0, wb = ls)
+            @test_throws ArgumentError JuMPOptimiser(; slv,
+                                                     bgt = BudgetRange(; lb = 0.7,
+                                                                       ub = 2.0),
+                                                     gbgt = 0.6, wb = ls)
+            @test_throws ArgumentError JuMPOptimiser(; slv,
+                                                     bgt = BudgetRange(; lb = -2.0,
+                                                                       ub = -1.2),
+                                                     gbgt = BudgetRange(; lb = nothing,
+                                                                        ub = 1.0), wb = ls)
+            @test_throws "below zero" JuMPOptimiser(; slv, bgt = nothing,
+                                                    gbgt = BudgetRange(; lb = nothing,
+                                                                       ub = -0.1), wb = ls)
+            # An interval that holds zero, and a gross budget with no upper end, pass.
+            @test isa(JuMPOptimiser(; slv, bgt = BudgetRange(; lb = 0.5, ub = 2.0),
+                                    gbgt = 0.6, wb = ls), JuMPOptimiser)
+            @test isa(JuMPOptimiser(; slv, bgt = BudgetRange(; lb = -0.5, ub = 0.5),
+                                    gbgt = 0.1, wb = ls), JuMPOptimiser)
+            @test isa(JuMPOptimiser(; slv, bgt = 1.0,
+                                    gbgt = BudgetRange(; lb = 1.2, ub = nothing), wb = ls),
+                      JuMPOptimiser)
+            @test PortfolioOptimisers.gross_budget_ceiling(nothing) === nothing
+        end
         # Two numbers pin the gross budget of the model, not the realised gross exposure,
         # which is smaller under `xbgt = false` (#685, R14 of #1817).
         @test_throws "pin the gross budget at bgt + 2 * sbgt" JuMPOptimiser(; slv,

@@ -739,16 +739,16 @@ end
 """
 $(DocStringExtensions.TYPEDSIGNATURES)
 
-Checks each entry of the schedules in `args` with the keyword constructor of `T`.
+Checks each entry of the schedules in `args` with the keyword constructor of `T`, or with the keyword function `T`.
 
-The constructor of an optimiser calls this function, so a type error or an error between two fields shows at construction and not in the middle of a backtest. The argument `args` holds the arguments of the constructor, and `defaults` holds the static defaults that [`time_dependent_field_defaults`](@ref) gives. A call that the check makes holds no schedule, so the recursion stops.
+The constructor of an optimiser calls this function, so a type error or an error between two fields shows at construction and not in the middle of a backtest. The argument `args` holds the arguments of the constructor, and `defaults` holds the static defaults that [`time_dependent_field_defaults`](@ref) gives. A call that the check makes holds no schedule, so the recursion stops. A check that reads only some fields of an estimator passes a keyword function of those fields as `T`, as the budget check of a [`FollowTheLeader`](@ref) leader does.
 
 # Algorithm
 
  1. Collect the names `tdfs` of the arguments that hold a [`TimeDependent`](@ref). Return when there is none.
  2. Find a static value for each of them with [`time_dependent_stand_in`](@ref). Return with no check when one of them has none. That is a function schedule in a required field, whose value exists only at a fold.
  3. Replace each schedule in `args` with its static value, giving `base`.
- 4. For each name in `tdfs`, call the keyword constructor of `T` with `base`, once for each entry of the schedule and once for its explicit `default`, see [`substitute_time_dependent_entries`](@ref).
+ 4. For each name in `tdfs`, call `T` with `base` as keywords, once for each entry of the schedule and once for its explicit `default`, see [`substitute_time_dependent_entries`](@ref).
 
 # Related
 
@@ -756,8 +756,9 @@ The constructor of an optimiser calls this function, so a type error or an error
   - [`time_dependent_fields`](@ref)
   - [`time_dependent_stand_in`](@ref)
 """
-function assert_time_dependent_substitution(::Type{T}, args::NamedTuple,
-                                            defaults::NamedTuple)::Nothing where {T}
+function assert_time_dependent_substitution(T::F, args::NamedTuple,
+                                            defaults::NamedTuple)::Nothing where {F <:
+                                                                                  Base.Callable}
     tdfs = filter(f -> isa(args[f], TimeDependent), keys(args))
     if isempty(tdfs)
         return nothing
@@ -773,10 +774,10 @@ function assert_time_dependent_substitution(::Type{T}, args::NamedTuple,
     return nothing
 end
 """
-    substitute_time_dependent_entries(::Type{T}, base::NamedTuple, f::Symbol, td::TimeDependent) where {T}
-    substitute_time_dependent_entries(::Type, ::NamedTuple, ::Symbol, ::Any)
+    substitute_time_dependent_entries(T::Base.Callable, base::NamedTuple, f::Symbol, td::TimeDependent)
+    substitute_time_dependent_entries(::Base.Callable, ::NamedTuple, ::Symbol, ::Any)
 
-Calls the keyword constructor of `T` with each vector entry of the schedule `td`, and with its explicit `default`, in the field `f` of `base`.
+Calls the keyword constructor of `T`, or the keyword function `T`, with each vector entry of the schedule `td`, and with its explicit `default`, in the field `f` of `base`.
 
 The second method takes a value that is not a schedule, and calls nothing. [`assert_time_dependent_substitution`](@ref) passes only schedules. The second method states this fact to a static analyser, which cannot read the filter at a call whose arguments hold no schedule.
 
@@ -785,8 +786,9 @@ The second method takes a value that is not a schedule, and calls nothing. [`ass
   - [`assert_time_dependent_substitution`](@ref)
   - [`TimeDependent`](@ref)
 """
-function substitute_time_dependent_entries(::Type{T}, base::NamedTuple, f::Symbol,
-                                           td::TimeDependent)::Nothing where {T}
+function substitute_time_dependent_entries(T::F, base::NamedTuple, f::Symbol,
+                                           td::TimeDependent)::Nothing where {F <:
+                                                                              Base.Callable}
     v = td.val
     if isa(v, AbstractVector)
         for x in v
@@ -799,7 +801,8 @@ function substitute_time_dependent_entries(::Type{T}, base::NamedTuple, f::Symbo
     end
     return nothing
 end
-function substitute_time_dependent_entries(::Type, ::NamedTuple, ::Symbol, ::Any)::Nothing
+function substitute_time_dependent_entries(::Base.Callable, ::NamedTuple, ::Symbol,
+                                           ::Any)::Nothing
     return nothing
 end
 """

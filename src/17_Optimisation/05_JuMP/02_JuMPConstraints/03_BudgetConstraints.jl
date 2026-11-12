@@ -596,9 +596,11 @@ $(DocStringExtensions.TYPEDSIGNATURES)
 
 Assert that a gross budget is admissible alongside the net and short budgets.
 
-`bgt` and `sbgt` constrain the net and gross exposures only *together*. When both are numbers, the long budget is `sum(lw) == bgt + sbgt` and the short budget is `sum(sw) == sbgt`, so the gross budget `sum(lw) + sum(sw)` is `bgt + 2 * sbgt`, the row that `gbgt` writes. The realised gross exposure `norm(w, 1)` equals it when `xbgt` is `true`, and it can be smaller when `xbgt` is `false`. `gbgt` exists for the combination they cannot reach — gross pinned with net free — so it is rejected when they already determine the gross exposure, and when the weight bounds forbid short positions (whereupon gross and net coincide and `bgt` already owns the constraint).
+`bgt` and `sbgt` constrain the net and gross exposures only *together*. When both are numbers, the long budget is `sum(lw) == bgt + sbgt` and the short budget is `sum(sw) == sbgt`, so the gross budget `sum(lw) + sum(sw)` is `bgt + 2 * sbgt`, the row that `gbgt` writes. The realised gross exposure `norm(w, 1)` equals it when `xbgt` is `true`, and it can be smaller when `xbgt` is `false`. `gbgt` exists for the combination they cannot reach — gross pinned with net free — so it is rejected when they already determine the gross exposure, and when the weight bounds forbid short positions (whereupon gross and net coincide and `bgt` already owns the constraint). A gross budget whose upper end lies below the magnitude of the net budget is rejected too, see [`assert_gross_budget_reaches_net`](@ref).
 
 Only the statically-decidable contradictions are caught. Ranges may still conflict at solve time, surfacing as infeasibility, and a [`WeightBoundsEstimator`](@ref) is not resolved until then. [`TimeDependent`](@ref) schedules are reached through [`assert_time_dependent_substitution`](@ref).
+
+A [`ProgrammeAllocationSet`](@ref) and the held optimiser of a [`FollowTheLeader`](@ref) rule pass `bgt = 1`, the budget of one that the online head owns.
 
 # Related
 
@@ -606,6 +608,7 @@ Only the statically-decidable contradictions are caught. Ranges may still confli
   - [`set_gross_budget_constraints!`](@ref)
   - [`set_long_short_budget_constraints!`](@ref)
   - [`gross_budget_bounds_msg`](@ref)
+  - [`assert_gross_budget_reaches_net`](@ref)
 """
 function assert_gross_budget_admissible(bgt, sbgt, gbgt, wb)::Nothing
     @argcheck(!(isa(bgt, Number) && isa(sbgt, Number)),
@@ -614,6 +617,106 @@ function assert_gross_budget_admissible(bgt, sbgt, gbgt, wb)::Nothing
         @argcheck(w_neg_flag(wb.lb) || w_neg_flag(wb.ub),
                   ArgumentError(gross_budget_bounds_msg(wb.lb, wb.ub)))
     end
+    assert_gross_budget_reaches_net(bgt, gbgt)
+    return nothing
+end
+"""
+$(DocStringExtensions.TYPEDSIGNATURES)
+
+Assert that the gross budget `gbgt` can reach the magnitude of the net budget `bgt`.
+
+The gross row reads the long and short parts of the weights, and each part bounds its side of the weight, `lw_i >= max(w_i, 0)` and `sw_i >= max(-w_i, 0)`. This holds under both decomposition contracts. So the gross exposure is at least the magnitude of the net exposure, and a gross budget whose upper end lies below the least magnitude that the net budget admits leaves no feasible weights. The bound holds at every `k`, because both rows scale with it.
+
+# Mathematical definition
+
+```math
+\\begin{align}
+\\sum_i lw_i + \\sum_i sw_i &\\geq \\sum_i \\lvert w_i \\rvert \\geq \\Bigl\\lvert \\sum_i w_i \\Bigr\\rvert\\,.
+\\end{align}
+```
+
+Where:
+
+  - ``lw_i``, ``sw_i``: The long and short parts of weight ``i``.
+  - $(math_dict[:w_port])
+
+# Validation
+
+  - The upper end of `gbgt` is non-negative. An `ArgumentError` is thrown otherwise.
+  - The upper end of `gbgt` is at least [`net_budget_floor`](@ref) of `bgt`. An `ArgumentError` is thrown otherwise.
+
+A `gbgt` with no upper end, a `bgt` whose interval holds zero, `nothing`, a [`BudgetCostEstimator`](@ref) and a [`TimeDependent`](@ref) schedule state no static floor or ceiling, so they pass.
+
+# Related
+
+  - [`assert_gross_budget_admissible`](@ref)
+  - [`net_budget_floor`](@ref)
+  - [`set_gross_budget_constraints!`](@ref)
+"""
+function assert_gross_budget_reaches_net(bgt, gbgt)::Nothing
+    hi = gross_budget_ceiling(gbgt)
+    if isnothing(hi)
+        return nothing
+    end
+    @argcheck(zero(hi) <= hi,
+              ArgumentError("gross budget (gbgt) has the upper end $hi, below zero: the gross exposure sum(lw) + sum(sw) is at least norm(w, 1), so it is never negative."))
+    lo = net_budget_floor(bgt)
+    if !isnothing(lo)
+        @argcheck(lo <= hi,
+                  ArgumentError("gross budget (gbgt) has the upper end $hi, below $lo, the least magnitude of the net budget (bgt = $bgt): the gross exposure sum(lw) + sum(sw) is at least norm(w, 1), which is at least abs(sum(w)), so no weights meet both budgets. Raise gbgt to at least $lo, or let bgt admit a smaller magnitude."))
+    end
+    return nothing
+end
+"""
+    net_budget_floor(bgt::Number)
+    net_budget_floor(bgt::BudgetRange)
+    net_budget_floor(bgt)
+
+Returns the least magnitude `abs(sum(w))` that the net budget `bgt` admits, or `nothing` when it states no positive floor.
+
+A number admits its own magnitude. A [`BudgetRange`](@ref) admits the distance from zero to its interval: its lower bound when that is positive, the negative of its upper bound when that is negative, and no floor when the interval holds zero. Every other value, `nothing`, a [`BudgetCostEstimator`](@ref) and a [`TimeDependent`](@ref) schedule among them, states no floor.
+
+# Related
+
+  - [`assert_gross_budget_reaches_net`](@ref)
+"""
+function net_budget_floor(bgt::Number)
+    return abs(bgt)
+end
+function net_budget_floor(bgt::BudgetRange)
+    lb = bgt.lb
+    ub = bgt.ub
+    return if !isnothing(lb) && lb > zero(lb)
+        lb
+    elseif !isnothing(ub) && ub < zero(ub)
+        -ub
+    else
+        nothing
+    end
+end
+function net_budget_floor(::Any)
+    return nothing
+end
+"""
+    gross_budget_ceiling(gbgt::Number)
+    gross_budget_ceiling(gbgt::BudgetRange)
+    gross_budget_ceiling(gbgt)
+
+Returns the upper end of the gross budget `gbgt`, or `nothing` when it states none.
+
+A number is its own upper end, and a [`BudgetRange`](@ref) has its `ub`. Every other value, `nothing` and a [`TimeDependent`](@ref) schedule among them, states none.
+
+# Related
+
+  - [`assert_gross_budget_reaches_net`](@ref)
+"""
+function gross_budget_ceiling(gbgt::Number)
+    return gbgt
+end
+function gross_budget_ceiling(gbgt::BudgetRange)
+    return gbgt.ub
+end
+function gross_budget_ceiling(::Any)
     return nothing
 end
 # No gross budget, or a schedule that `assert_time_dependent_substitution` reaches, has
