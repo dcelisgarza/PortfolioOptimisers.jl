@@ -193,85 +193,86 @@ Keywords correspond to the struct's fields. A field of the type [`TD`](@ref), [`
 julia> MeanRisk(; opt = JuMPOptimiser(; slv = Solver(; solver = nothing)))
 MeanRisk
   opt ┼ JuMPOptimiser
-      │        pe ┼ EmpiricalPrior
-      │           │           ce ┼ PortfolioOptimisersCovariance
-      │           │              │   ce ┼ Covariance
-      │           │              │      │    me ┼ SimpleExpectedReturns
-      │           │              │      │       │   w ┴ nothing
-      │           │              │      │    ce ┼ GeneralCovariance
-      │           │              │      │       │   ce ┼ StatsBase.SimpleCovariance: StatsBase.SimpleCovariance(true)
-      │           │              │      │       │    w ┴ nothing
-      │           │              │      │   alg ┼ FullMoment()
-      │           │              │      │     w ┴ nothing
-      │           │              │   mp ┼ MatrixProcessing
-      │           │              │      │     pdm ┼ Posdef
-      │           │              │      │         │      alg ┼ UnionAll: NearestCorrelationMatrix.Newton
-      │           │              │      │         │   kwargs ┴ @NamedTuple{}: NamedTuple()
-      │           │              │      │      dn ┼ nothing
-      │           │              │      │      dt ┼ nothing
-      │           │              │      │     alg ┼ nothing
-      │           │              │      │   order ┴ NTuple{4, Symbol}: (:pdm, :dn, :dt, :alg)
-      │           │           me ┼ SimpleExpectedReturns
-      │           │              │   w ┴ nothing
-      │           │      horizon ┼ nothing
-      │           │   fill_limit ┼ nothing
-      │           │        x_src ┴ nothing
-      │       slv ┼ Solver
-      │           │          name ┼ String: ""
-      │           │        solver ┼ nothing
-      │           │      settings ┼ nothing
-      │           │     check_sol ┼ @NamedTuple{}: NamedTuple()
-      │           │   add_bridges ┴ Bool: true
-      │        wb ┼ WeightBounds
-      │           │   lb ┼ Float64: 0.0
-      │           │   ub ┴ Float64: 1.0
-      │       bgt ┼ Float64: 1.0
-      │      sbgt ┼ nothing
-      │      gbgt ┼ nothing
-      │        lt ┼ nothing
-      │        st ┼ nothing
-      │      lcse ┼ nothing
-      │       cte ┼ nothing
-      │    gcarde ┼ nothing
-      │   sgcarde ┼ nothing
-      │      smtx ┼ nothing
-      │     sgmtx ┼ nothing
-      │       slt ┼ nothing
-      │       sst ┼ nothing
-      │      sglt ┼ nothing
-      │      sgst ┼ nothing
-      │        tn ┼ nothing
-      │      fees ┼ nothing
-      │      sets ┼ nothing
-      │        tr ┼ nothing
-      │       ple ┼ nothing
-      │       ret ┼ ArithmeticReturn
-      │           │   settings ┼ JuMPReturnsSettings
-      │           │            │   scale ┼ Float64: 1.0
-      │           │            │      lb ┼ nothing
-      │           │            │     rte ┼ Bool: true
-      │           │            │     fee ┼ Bool: true
-      │           │            │     mic ┴ Bool: true
-      │           │        ucs ┼ nothing
-      │           │         mu ┼ nothing
-      │           │   mtx_sqrt ┴ EigenFallbackSquareRoot()
-      │       sca ┼ SumScalariser()
-      │      ccnt ┼ nothing
-      │      cobj ┼ nothing
-      │        sc ┼ Int64: 1
-      │        so ┼ Int64: 1
-      │        ss ┼ nothing
-      │      card ┼ nothing
-      │     scard ┼ nothing
-      │       l2c ┼ nothing
-      │       lpc ┼ nothing
-      │     linfc ┼ nothing
-      │        l1 ┼ nothing
-      │        l2 ┼ nothing
-      │        lp ┼ nothing
-      │      linf ┼ nothing
-      │      xbgt ┼ Bool: false
-      │    strict ┴ Bool: false
+      │       pe ┼ EmpiricalPrior
+      │          │           ce ┼ PortfolioOptimisersCovariance
+      │          │              │   ce ┼ Covariance
+      │          │              │      │    me ┼ SimpleExpectedReturns
+      │          │              │      │       │   w ┴ nothing
+      │          │              │      │    ce ┼ GeneralCovariance
+      │          │              │      │       │   ce ┼ StatsBase.SimpleCovariance: StatsBase.SimpleCovariance(true)
+      │          │              │      │       │    w ┴ nothing
+      │          │              │      │   alg ┼ FullMoment()
+      │          │              │      │     w ┴ nothing
+      │          │              │   mp ┼ MatrixProcessing
+      │          │              │      │     pdm ┼ Posdef
+      │          │              │      │         │      alg ┼ UnionAll: NearestCorrelationMatrix.Newton
+      │          │              │      │         │   kwargs ┴ @NamedTuple{}: NamedTuple()
+      │          │              │      │      dn ┼ nothing
+      │          │              │      │      dt ┼ nothing
+      │          │              │      │     alg ┼ nothing
+      │          │              │      │   order ┴ NTuple{4, Symbol}: (:pdm, :dn, :dt, :alg)
+      │          │           me ┼ SimpleExpectedReturns
+      │          │              │   w ┴ nothing
+      │          │      horizon ┼ nothing
+      │          │   fill_limit ┼ nothing
+      │          │        x_src ┴ nothing
+      │      slv ┼ Solver
+      │          │          name ┼ String: ""
+      │          │        solver ┼ nothing
+      │          │      settings ┼ nothing
+      │          │     check_sol ┼ @NamedTuple{}: NamedTuple()
+      │          │   add_bridges ┴ Bool: true
+      │      cbe ┼ ConstraintBlock
+      │          │        wb ┼ WeightBounds
+      │          │           │   lb ┼ Float64: 0.0
+      │          │           │   ub ┴ Float64: 1.0
+      │          │      sbgt ┼ nothing
+      │          │      gbgt ┼ nothing
+      │          │        lt ┼ nothing
+      │          │        st ┼ nothing
+      │          │      lcse ┼ nothing
+      │          │       cte ┼ nothing
+      │          │    gcarde ┼ nothing
+      │          │   sgcarde ┼ nothing
+      │          │      smtx ┼ nothing
+      │          │     sgmtx ┼ nothing
+      │          │       slt ┼ nothing
+      │          │       sst ┼ nothing
+      │          │      sglt ┼ nothing
+      │          │      sgst ┼ nothing
+      │          │        tn ┼ nothing
+      │          │      sets ┼ nothing
+      │          │        tr ┼ nothing
+      │          │       ple ┼ nothing
+      │          │      ccnt ┼ nothing
+      │          │      cobj ┼ nothing
+      │          │        ss ┼ nothing
+      │          │      card ┼ nothing
+      │          │     scard ┼ nothing
+      │          │       l2c ┼ nothing
+      │          │       lpc ┼ nothing
+      │          │     linfc ┼ nothing
+      │          │        l1 ┼ nothing
+      │          │        l2 ┼ nothing
+      │          │        lp ┼ nothing
+      │          │      linf ┼ nothing
+      │          │      xbgt ┴ Bool: false
+      │      bgt ┼ Float64: 1.0
+      │     fees ┼ nothing
+      │      ret ┼ ArithmeticReturn
+      │          │   settings ┼ JuMPReturnsSettings
+      │          │            │   scale ┼ Float64: 1.0
+      │          │            │      lb ┼ nothing
+      │          │            │     rte ┼ Bool: true
+      │          │            │     fee ┼ Bool: true
+      │          │            │     mic ┴ Bool: true
+      │          │        ucs ┼ nothing
+      │          │         mu ┼ nothing
+      │          │   mtx_sqrt ┴ EigenFallbackSquareRoot()
+      │      sca ┼ SumScalariser()
+      │       sc ┼ Int64: 1
+      │       so ┼ Int64: 1
+      │   strict ┴ Bool: false
     r ┼ Variance
       │    settings ┼ RiskMeasureSettings
       │             │   scale ┼ Float64: 1.0

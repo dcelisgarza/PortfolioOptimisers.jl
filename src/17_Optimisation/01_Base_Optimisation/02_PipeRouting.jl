@@ -9,12 +9,13 @@ A target has the name of the field that receives it, for example `:pe`, `:cle`, 
 
 Two targets have methods of their own, because they check their value and name no plain field. `:mu_ucs` needs an [`ArithmeticReturn`](@ref), and goes into `ret.ucs`. `:sigma_ucs` goes into the [`UncertaintySetVariance`](@ref) measures of `r`, see [`@pipe_route_sigma_ucs`](@ref).
 
-An optimiser that holds its configuration in a field declares [`@pipe_delegates`](@ref). A target with no field in `x` goes to [`unroutable_target`](@ref), which ignores the [optional](@ref PIPELINE_OPTIONAL_TARGETS) targets and throws for the others.
+An optimiser that holds its configuration in a field declares [`@pipe_delegates`](@ref). An optimiser that holds a [`ConstraintBlock`](@ref) names its field with [`pipe_block_field`](@ref), and a target that is a slot of the block goes into the block. The optimiser keeps its own fields, `pe` among them. A target with no field in `x` or in its block goes to [`unroutable_target`](@ref), which ignores the [optional](@ref PIPELINE_OPTIONAL_TARGETS) targets and throws for the others.
 
 # Algorithm
 
  1. When the type of `x` has a field named `target`, return `x` with `v` in that field.
- 2. Else return `unroutable_target(x, Val(target), v)`.
+ 2. When the block of `x` accepts `target`, return `x` with the block rebuilt by this function.
+ 3. Else return `unroutable_target(x, Val(target), v)`.
 
 The test is `hasfield` and not `hasproperty`, because the rebuild writes the field. A name that only property forwarding reaches can be read but not written.
 
@@ -34,11 +35,14 @@ The test is `hasfield` and not `hasproperty`, because the rebuild writes the fie
   - [`@pipe_delegates`](@ref)
   - [`inject_context`](@ref)
 """
-function pipe_route(x, ::Val{target}, v) where {target}
+function pipe_route(x, t::Val{target}, v) where {target}
     return if hasfield(typeof(x), target)
         Accessors.set(x, Accessors.PropertyLens{target}(), v)
+    elseif pipe_block_accepts(x, t)
+        b = something(pipe_block_field(x))
+        Accessors.set(x, Accessors.PropertyLens{b}(), pipe_route(getfield(x, b), t, v))
     else
-        unroutable_target(x, Val(target), v)
+        unroutable_target(x, t, v)
     end
 end
 """
@@ -46,15 +50,43 @@ end
 
 Returns `true` if `x` has a field for a [Routing Target](@ref PIPELINE_ROUTING_TARGETS).
 
-For a target that has the name of a field, the answer is `hasfield`, which is the test of [`pipe_route`](@ref). So `pipe_accepts` returns `true` exactly for the targets that `pipe_route` puts into a field. The targets `:mu_ucs`, `:sigma_ucs` and `:rkb`, and the optimisers that declare [`@pipe_delegates`](@ref), have methods of their own.
+For a target that has the name of a field, the answer is `hasfield`, which is the test of [`pipe_route`](@ref). A target that is a slot of the [`ConstraintBlock`](@ref) of `x` also gives `true`, see [`pipe_block_field`](@ref). So `pipe_accepts` returns `true` exactly for the targets that `pipe_route` puts into a field. The targets `:mu_ucs`, `:sigma_ucs` and `:rkb`, and the optimisers that declare [`@pipe_delegates`](@ref), have methods of their own.
 
 # Related
 
   - [`pipe_route`](@ref)
   - [`unroutable_target`](@ref)
 """
-function pipe_accepts(x, ::Val{target})::Bool where {target}
-    return hasfield(typeof(x), target)
+function pipe_accepts(x, t::Val{target})::Bool where {target}
+    return hasfield(typeof(x), target) || pipe_block_accepts(x, t)
+end
+"""
+    pipe_block_field(x) -> Union{Nothing, Symbol}
+
+Returns the name of the field that holds the [`ConstraintBlock`](@ref) of `x`, or `nothing` when `x` holds none.
+
+[`pipe_route`](@ref), [`pipe_accepts`](@ref) and the walks of the paths of a [`Pipeline`](@ref) read the slots of the block through this field. The slots of a block are properties of its owner and not fields, so `hasfield` on the owner does not find them. [`JuMPOptimiser`](@ref) names its field `cbe`.
+
+# Related
+
+  - [`pipe_route`](@ref)
+  - [`pipe_config_field`](@ref)
+  - [`ConstraintBlock`](@ref)
+"""
+pipe_block_field(::Any) = nothing
+"""
+    pipe_block_accepts(x, t::Val) -> Bool
+
+Returns `true` when `x` holds a [`ConstraintBlock`](@ref) and the block accepts the [Routing Target](@ref PIPELINE_ROUTING_TARGETS) `t`.
+
+# Related
+
+  - [`pipe_block_field`](@ref)
+  - [`pipe_accepts`](@ref)
+"""
+function pipe_block_accepts(x, t::Val)::Bool
+    b = pipe_block_field(x)
+    return !isnothing(b) && pipe_accepts(getfield(x, b), t)
 end
 """
     unroutable_target(x, ::Val{target}, v)

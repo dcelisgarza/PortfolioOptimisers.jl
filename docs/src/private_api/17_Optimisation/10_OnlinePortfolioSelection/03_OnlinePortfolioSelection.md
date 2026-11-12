@@ -24,7 +24,6 @@ PortfolioOptimisers.fees_carry_turnover
 PortfolioOptimisers.assert_online_fee_source(opt::OnlinePortfolioSelection, pws)
 PortfolioOptimisers.online_portfolio_selection_td_defaults
 PortfolioOptimisers.is_time_dependent(opt::OnlinePortfolioSelection)
-PortfolioOptimisers.needs_previous_weights(opt::OnlinePortfolioSelection)
 PortfolioOptimisers.static_allocation_set
 PortfolioOptimisers.online_step_fold(opt::OnlinePortfolioSelection{<:Any, <:Any, <:Any, <:Any, <:Any, <:Any, <:Any, <:PortfolioOptimisers.Option{<:PortfolioOptimisers.OnlinePortfolioSelectionState}}, ctx::PortfolioOptimisers.TimeDependentContext, rd::ReturnsResult)
 PortfolioOptimisers.pinned_benchmark_names

@@ -489,6 +489,9 @@ function pipe_route(cfg::JuMPOptimiser, ::Val{:mu_ucs}, v)
     return rebuild_estimator(cfg, (; ret = rebuild_estimator(cfg.ret, (; ucs = v))))
 end
 pipe_accepts(::JuMPOptimiser, ::Val{:mu_ucs})::Bool = true
+# A routing target that is a slot of the Constraint Block, such as `:wb` or `:ple`, goes into
+# the block, and `:pe` stays on the optimiser (ADR 0237).
+pipe_block_field(::JuMPOptimiser)::Symbol = :cbe
 """
     reader_frames(opt::JuMPOptimiser, path::AbstractString, refit::Bool) -> ReturnsFrames
     group_frames(opt::JuMPOptimiser) -> ReturnsFrames

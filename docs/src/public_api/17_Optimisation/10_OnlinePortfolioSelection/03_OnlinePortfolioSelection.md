@@ -19,6 +19,7 @@ Online(::OnlinePortfolioSelection, args...)
 _optimise(opt::OnlinePortfolioSelection, rd::ReturnsResult; dims::Int = 1, kwargs...)
 PortfolioOptimisers.rows_needed(opt::OnlinePortfolioSelection)
 PortfolioOptimisers.rows_needed(td::TimeDependent)
+PortfolioOptimisers.needs_previous_weights(opt::OnlinePortfolioSelection)
 ```
 
 ## References

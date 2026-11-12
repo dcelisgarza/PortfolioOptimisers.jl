@@ -391,28 +391,31 @@ $(DocStringExtensions.TYPEDSIGNATURES)
 
 Returns the static defaults of the [`JuMPOptimiser`](@ref) fields that can hold a [`TimeDependent`](@ref).
 
-The constructor reads them when it checks each entry of a schedule, and [`time_dependent_field_defaults`](@ref) returns them. So the value of a field outside every fold loop is declared once. A field whose static default is `nothing` is not in the tuple.
+The constructor reads them when it checks each entry of a schedule, and [`time_dependent_field_defaults`](@ref) returns them. So the value of a field outside every fold loop is declared once. A field whose static default is `nothing` is not in the tuple. A slot of the [`ConstraintBlock`](@ref) in `cbe` takes the default of [`constraint_block_td_defaults`](@ref), under its flat name.
 
 # Returns
 
-  - `NamedTuple`: The defaults of `pe`, `wb`, `bgt`, `ret` and `sca`.
+  - `NamedTuple`: The defaults of `pe`, `bgt`, `ret` and `sca`, and of the slot `wb` of the block.
 
 # Related
 
   - [`JuMPOptimiser`](@ref)
   - [`time_dependent_field_defaults`](@ref)
   - [`assert_time_dependent_substitution`](@ref)
+  - [`constraint_block_td_defaults`](@ref)
 """
 function jump_optimiser_td_defaults()::NamedTuple
-    return (; pe = EmpiricalPrior(), wb = WeightBounds(), bgt = 1.0,
-            ret = ArithmeticReturn(), sca = SumScalariser())
+    return merge((; pe = EmpiricalPrior(), bgt = 1.0, ret = ArithmeticReturn(),
+                  sca = SumScalariser()), constraint_block_td_defaults())
 end
 """
 $(DocStringExtensions.TYPEDEF)
 
 Holds the problem definition and the solver settings that every JuMP optimiser shares.
 
-It holds the prior estimator, the solvers, the budgets, the bounds, the constraints, the fees, the tracking and the regularisation. Give it to a JuMP optimiser such as [`MeanRisk`](@ref) or [`RiskBudgeting`](@ref), which adds the objective and the risk measure.
+It holds the prior estimator, the solvers, the net budget, the fees, the return term, the scalariser and the execution settings. The [`ConstraintBlock`](@ref) in its field `cbe` holds the feasible set of the weights: the bounds, the leverage caps, the constraints, the tracking and the regularisation. Give it to a JuMP optimiser such as [`MeanRisk`](@ref) or [`RiskBudgeting`](@ref), which adds the objective and the risk measure.
+
+Each slot of the block is a property of the optimiser, so `opt.wb` reads `opt.cbe.wb`. `Accessors.set(opt, @optic(_.wb), v)` and a search key such as `"opt.wb"` replace that slot of the block, and a [`Pipeline`](@ref) routes a target such as `:wb` into the block, see [`pipe_block_field`](@ref).
 
 # Fields
 
@@ -423,53 +426,29 @@ $(DocStringExtensions.FIELDS)
     JuMPOptimiser(;
         pe::Onl{<:TD{<:PrE_Pr}} = EmpiricalPrior(),
         slv::Slv_VecSlv,
-        wb::TD_Option{<:WbE_Wb} = WeightBounds(),
+        cbe::Option{<:ConstraintBlock} = nothing,
         bgt::TD_Option{<:Num_BgtCE} = 1.0,
-        sbgt::TD_Option{<:Num_BgtRg} = nothing,
-        gbgt::TD_Option{<:Num_BgtRg} = nothing,
-        lt::TD_Option{<:BtE_Bt} = nothing,
-        st::TD_Option{<:BtE_Bt} = nothing,
-        lcse::TD_Option{<:Union{EcE_LcE_Lc, AbstractVector}} = nothing,
-        cte::TD_Option{<:Lc_CC_VecCC} = nothing,
-        gcarde::TD_Option{<:LcE_Lc} = nothing,
-        sgcarde::TD_Option{<:Union{LcE_Lc, AbstractVector}} = nothing,
-        smtx::TD_Option{<:Union{MatNum_ASetMatE, AbstractVector}} = nothing,
-        sgmtx::TD_Option{<:Union{MatNum_ASetMatE, AbstractVector}} = nothing,
-        slt::TD_Option{<:Union{BtE_Bt, AbstractVector}} = nothing,
-        sst::TD_Option{<:Union{BtE_Bt, AbstractVector}} = nothing,
-        sglt::TD_Option{<:Union{BtE_Bt, AbstractVector}} = nothing,
-        sgst::TD_Option{<:Union{BtE_Bt, AbstractVector}} = nothing,
-        tn::TD_Option{<:Union{TnE_Tn, AbstractVector}} = nothing,
         fees::TD_Option{<:FeesE_Fees} = nothing,
-        sets::TD_Option{<:UniverseSets} = nothing,
-        tr::TD_Option{<:Tr_VecTr} = nothing,
-        ple::TD_Option{<:Union{PlCE_PlC, AbstractVector}} = nothing,
         ret::TD{<:JRE_VecJRE} = ArithmeticReturn(),
         sca::TD{<:NonHierarchicalScalariser} = SumScalariser(),
-        ccnt::TD_Option{<:JuMPConstr_VecJuMPConstr} = nothing,
-        cobj::TD_Option{<:JuMPObj_VecJuMPObj} = nothing,
         sc::Number = 1,
         so::Number = 1,
-        ss::TD_Option{<:Number} = nothing,
-        card::TD_Option{<:Integer} = nothing,
-        scard::TD_Option{<:Int_VecInt} = nothing,
-        l2c::TD_Option{<:Num_NormCeilCal} = nothing,
-        lpc::TD_Option{<:LpReg_VecLpReg} = nothing,
-        linfc::TD_Option{<:Num_NormCeilCal} = nothing,
-        l1::TD_Option{<:Num_AmbRadCal} = nothing,
-        l2::TD_Option{<:L2Reg_VecL2Reg} = nothing,
-        lp::TD_Option{<:LpReg_VecLpReg} = nothing,
-        linf::TD_Option{<:Num_AmbRadCal} = nothing,
-        xbgt::Bool = false,
         strict::Bool = false,
         cache::Option{<:ReturnsBufferState} = nothing,
+        slots...,
     ) -> JuMPOptimiser
 
-Keywords correspond to the struct's fields. A field typed [`TD_Option`](@ref) or [`TD`](@ref) can hold a [`TimeDependent`](@ref) schedule in place of a static value. A cross-validation fold loop resolves the schedule at each fold, and an `optimise` call outside a fold loop reads the static default of the field. So the prior estimator, the returns model, the scalariser, the asset sets and the constraints can change from fold to fold. The execution settings `slv`, `sc`, `so` and `strict` are static.
+Keywords correspond to the struct's fields and to the slots of [`ConstraintBlock`](@ref). `slots...` takes each keyword of the block with its type and its default: `wb`, `sbgt`, `gbgt`, `lt`, `st`, `lcse`, `cte`, `gcarde`, `sgcarde`, `smtx`, `sgmtx`, `slt`, `sst`, `sglt`, `sgst`, `tn`, `sets`, `tr`, `ple`, `ccnt`, `cobj`, `ss`, `card`, `scard`, `l2c`, `lpc`, `linfc`, `l1`, `l2`, `lp`, `linf` and `xbgt`. The constructor builds the block in `cbe` from these flat keywords, with the defaults of the block. When the caller gives `cbe`, a flat keyword replaces that slot of the given block, and a slot that the caller does not name keeps its value, see [`constraint_block`](@ref). So the default of a flat keyword never overwrites a slot of a given block. A name that is neither a field nor a slot raises a `MethodError`.
 
-`lcse`, `sgcarde`, `smtx`, `sgmtx`, `slt`, `sst`, `sglt`, `sgst`, `tn` and `ple` take a vector that mixes the members of their element type, such as `[Turnover(…), TurnoverEstimator(…)]`. Such a literal infers an element type that the positional constructor refuses, so the keyword constructor narrows it through [`narrow_mixed_vector`](@ref), and the caller writes no [`concrete_typed_array`](@ref).
+A field or a slot typed [`TD_Option`](@ref) or [`TD`](@ref) can hold a [`TimeDependent`](@ref) schedule in place of a static value. A cross-validation fold loop resolves the schedule at each fold, and an `optimise` call outside a fold loop reads the static default of the field. So the prior estimator, the returns model, the scalariser, the asset sets and the constraints can change from fold to fold. The execution settings `slv`, `sc`, `so` and `strict` are static.
+
+`lcse`, `sgcarde`, `smtx`, `sgmtx`, `slt`, `sst`, `sglt`, `sgst`, `tn` and `ple` take a vector that mixes the members of their element type, such as `[Turnover(…), TurnoverEstimator(…)]`. Such a literal infers an element type that the positional constructor refuses, so the keyword constructor of the block narrows it through [`narrow_mixed_vector`](@ref), and the caller writes no [`concrete_typed_array`](@ref).
+
+The positional constructor takes the fields in the order of the struct: `pe`, `slv`, `cbe`, `bgt`, `fees`, `ret`, `sca`, `sc`, `so`, `strict` and `cache`. Before the block, it took one argument for each slot.
 
 ## Validation
+
+The constructor of [`ConstraintBlock`](@ref) checks each slot on its own. This constructor checks the fields and the rules that read a field and a slot together.
 
   - If `slv` is a vector: `!isempty(slv)`.
   - If `bgt` is a number: `isfinite(bgt)`.
@@ -480,11 +459,11 @@ Keywords correspond to the struct's fields. A field typed [`TD_Option`](@ref) or
   - If `gbgt` has an upper end: it is non-negative, and it is at least the least magnitude that `bgt` admits, see [`assert_gross_budget_reaches_net`](@ref). The gross exposure is at least `abs(sum(w))`, so a smaller gross budget leaves no feasible weights. An `ArgumentError` is thrown otherwise.
   - If `lcse`, `cte`, `smtx`, `sgmtx`, `tn`, `tr`, `ple`, `l2`, `lp` or `lpc` is a vector: `!isempty`. An empty `l2`, `lp` or `lpc` builds no term, which is what `nothing` states.
   - If `card`, `l2c`, `linfc`, `l1` or `linf` is a number: it is finite and `> 0`. `l1` and `linf` also take an ambiguity-radius rule, and `l2c` and `linfc` a norm-ceiling rule. A rule states no number at construction, so [`assemble_jump_model!`](@ref) checks the number that the rule returns.
-  - The rule in each [`LpRegularisation`](@ref) agrees with the field that holds it. `lp` is a penalty, so it refuses a norm-ceiling rule, and `lpc` is a constraint, so it refuses an ambiguity-radius rule. The term has one field for both readings, so the constructor of the optimiser is the first point that knows the reading. The constructors of [`L2Regularisation`](@ref) and [`LpRegularisation`](@ref) check the other values of `l2`, `lp` and `lpc`.
+  - The rule in each [`LpRegularisation`](@ref) agrees with the field that holds it. `lp` is a penalty, so it refuses a norm-ceiling rule, and `lpc` is a constraint, so it refuses an ambiguity-radius rule. The term has one field for both readings, so the constructor of the block is the first point that knows the reading. The constructors of [`L2Regularisation`](@ref) and [`LpRegularisation`](@ref) check the other values of `l2`, `lp` and `lpc`.
   - The shapes of `scard`, `smtx`, `slt` and `sst` agree, see [`assert_subgroup_mip_fields`](@ref). The shapes of `sgcarde`, `sgmtx`, `sglt` and `sgst` agree, see [`assert_subgrouped_mip_fields`](@ref).
   - If a slot holds an estimator keyed by name ([`name_keyed`](@ref)), or `fees` is a [`FeesEstimator`](@ref): `!isnothing(sets)`.
   - If `tr` holds a [`DataBenchmarkTracking`](@ref): `pe` does not state `x_src = ExcessSource()`, see [`assert_data_benchmark_prior`](@ref).
-  - If a field holds a [`TimeDependent`](@ref): the constructor runs again once for each entry of the schedule, with the other schedules at their static defaults, see [`assert_time_dependent_substitution`](@ref). So a type error or a conflict between two fields shows at construction. A check that couples a schedule to a static field runs again when each fold rebuilds the optimiser.
+  - If a field or a slot holds a [`TimeDependent`](@ref): the constructor runs again once for each entry of the schedule, with the other schedules at their static defaults, see [`assert_time_dependent_substitution`](@ref). So a type error or a conflict between two fields shows at construction. A check that couples a schedule to a static field runs again when each fold rebuilds the optimiser.
 
 A value outside its bound raises an `IsEmptyError`, an `IsNonFiniteError`, a `DomainError`, an `IsNothingError`, an `ArgumentError` or a `DimensionMismatch`, as the helper that checks it states.
 
@@ -505,89 +484,17 @@ A value outside its bound raises an `IsEmptyError`, an `IsNonFiniteError`, a `Do
     """
     slv
     """
-    $(field_dict[:wb_jmp])
+    $(field_dict[:cbe])
     """
-    wb
+    cbe
     """
     $(field_dict[:bgt])
     """
     bgt
     """
-    $(field_dict[:sbgt])
-    """
-    sbgt
-    """
-    $(field_dict[:gbgt])
-    """
-    gbgt
-    """
-    $(field_dict[:lt])
-    """
-    lt
-    """
-    $(field_dict[:st])
-    """
-    st
-    """
-    $(field_dict[:lcse])
-    """
-    lcse
-    """
-    $(field_dict[:cte_jmp])
-    """
-    cte
-    """
-    $(field_dict[:gcarde])
-    """
-    gcarde
-    """
-    $(field_dict[:sgcarde])
-    """
-    sgcarde
-    """
-    $(field_dict[:smtx])
-    """
-    smtx
-    """
-    $(field_dict[:sgmtx])
-    """
-    sgmtx
-    """
-    $(field_dict[:slt])
-    """
-    slt
-    """
-    $(field_dict[:sst])
-    """
-    sst
-    """
-    $(field_dict[:sglt])
-    """
-    sglt
-    """
-    $(field_dict[:sgst])
-    """
-    sgst
-    """
-    $(field_dict[:tn_jmp])
-    """
-    tn
-    """
     $(field_dict[:fees_jmp])
     """
     fees
-    """
-    $(field_dict[:sets])
-    """
-    sets
-    """
-    $(field_dict[:tr_jmp])
-    """
-    tr
-    """
-    $(field_dict[:ple_jmp])
-    """
-    ple
     """
     $(field_dict[:ret_jmp])
     """
@@ -597,14 +504,6 @@ A value outside its bound raises an `IsEmptyError`, an `IsNonFiniteError`, a `Do
     """
     sca
     """
-    $(field_dict[:ccnt])
-    """
-    ccnt
-    """
-    $(field_dict[:cobj])
-    """
-    cobj
-    """
     $(field_dict[:sc])
     """
     sc
@@ -613,50 +512,6 @@ A value outside its bound raises an `IsEmptyError`, an `IsNonFiniteError`, a `Do
     """
     so
     """
-    $(field_dict[:ss])
-    """
-    ss
-    """
-    $(field_dict[:card])
-    """
-    card
-    """
-    $(field_dict[:scard])
-    """
-    scard
-    """
-    $(field_dict[:l2c])
-    """
-    l2c
-    """
-    $(field_dict[:lpc])
-    """
-    lpc
-    """
-    $(field_dict[:linfc])
-    """
-    linfc
-    """
-    $(field_dict[:l1])
-    """
-    l1
-    """
-    $(field_dict[:l2])
-    """
-    l2
-    """
-    $(field_dict[:lp])
-    """
-    lp
-    """
-    $(field_dict[:linf])
-    """
-    linf
-    """
-    $(field_dict[:xbgt])
-    """
-    xbgt
-    """
     $(field_dict[:strict_opt]) Under `true` the fit also refuses an asset with a gap in the rows that a plain graph reader reads, which it otherwise drops with a warning, see [`graph_reader_mask`](@ref). It also refuses an asset that a distance reader of the fit cannot estimate, which it otherwise drops with a warning, see [`distance_reader_refusal_mask`](@ref).
     """
     strict
@@ -664,33 +519,10 @@ A value outside its bound raises an `IsEmptyError`, an `IsNonFiniteError`, a `Do
     $(field_dict[:cache_opt])
     """
     cache
-    function JuMPOptimiser(pe::Onl{<:TD{<:PrE_Pr}}, slv::Slv_VecSlv,
-                           wb::TD_Option{<:WbE_Wb}, bgt::TD_Option{<:Num_BgtCE},
-                           sbgt::TD_Option{<:Num_BgtRg}, gbgt::TD_Option{<:Num_BgtRg},
-                           lt::TD_Option{<:BtE_Bt}, st::TD_Option{<:BtE_Bt},
-                           lcse::TD_Option{<:EcE_LcE_Lc_VecEcE_LcE_Lc},
-                           cte::TD_Option{<:Lc_CC_VecCC}, gcarde::TD_Option{<:LcE_Lc},
-                           sgcarde::TD_Option{<:LcE_Lc_VecLcE_Lc},
-                           smtx::TD_Option{<:MatNum_ASetMatE_VecMatNum_ASetMatE},
-                           sgmtx::TD_Option{<:MatNum_ASetMatE_VecMatNum_ASetMatE},
-                           slt::TD_Option{<:BtE_Bt_VecOptBtE_Bt},
-                           sst::TD_Option{<:BtE_Bt_VecOptBtE_Bt},
-                           sglt::TD_Option{<:BtE_Bt_VecOptBtE_Bt},
-                           sgst::TD_Option{<:BtE_Bt_VecOptBtE_Bt},
-                           tn::TD_Option{<:TnE_Tn_VecTnE_Tn}, fees::TD_Option{<:FeesE_Fees},
-                           sets::TD_Option{<:UniverseSets}, tr::TD_Option{<:Tr_VecTr},
-                           ple::TD_Option{<:PlCE_PlC_VecPlCE_PlC}, ret::TD{<:JRE_VecJRE},
-                           sca::TD{<:NonHierarchicalScalariser},
-                           ccnt::TD_Option{<:JuMPConstr_VecJuMPConstr},
-                           cobj::TD_Option{<:JuMPObj_VecJuMPObj}, sc::Number, so::Number,
-                           ss::TD_Option{<:Number}, card::TD_Option{<:Integer},
-                           scard::TD_Option{<:Int_VecInt},
-                           l2c::TD_Option{<:Num_NormCeilCal},
-                           lpc::TD_Option{<:LpReg_VecLpReg},
-                           linfc::TD_Option{<:Num_NormCeilCal},
-                           l1::TD_Option{<:Num_AmbRadCal}, l2::TD_Option{<:L2Reg_VecL2Reg},
-                           lp::TD_Option{<:LpReg_VecLpReg},
-                           linf::TD_Option{<:Num_AmbRadCal}, xbgt::Bool, strict::Bool,
+    function JuMPOptimiser(pe::Onl{<:TD{<:PrE_Pr}}, slv::Slv_VecSlv, cbe::ConstraintBlock,
+                           bgt::TD_Option{<:Num_BgtCE}, fees::TD_Option{<:FeesE_Fees},
+                           ret::TD{<:JRE_VecJRE}, sca::TD{<:NonHierarchicalScalariser},
+                           sc::Number, so::Number, strict::Bool,
                            cache::Option{<:ReturnsBufferState})
         if isa(slv, VecSlv)
             @argcheck(!isempty(slv), IsEmptyError("slv cannot be empty"))
@@ -698,129 +530,62 @@ A value outside its bound raises an `IsEmptyError`, an `IsNonFiniteError`, a `Do
         if isa(bgt, Number)
             @argcheck(isfinite(bgt), IsNonFiniteError("bgt must be finite, got $bgt"))
         elseif isa(bgt, BudgetCostEstimator)
-            @argcheck(isnothing(sbgt),
-                      ConflictingArgumentError("sbgt must be nothing when bgt is a BudgetCostEstimator, got sbgt = $sbgt"))
+            @argcheck(isnothing(cbe.sbgt),
+                      ConflictingArgumentError("sbgt must be nothing when bgt is a BudgetCostEstimator, got sbgt = $(cbe.sbgt)"))
         end
-        if isa(sbgt, Number)
-            assert_nonempty_nonneg_finite_val(sbgt, :sbgt)
-        end
-        if isa(gbgt, Number)
-            assert_nonempty_nonneg_finite_val(gbgt, :gbgt)
-        end
-        assert_gross_budget_admissible(bgt, sbgt, gbgt, wb)
-        # `map` compiles one call for each slot, so the slots of different types are not boxed.
-        map(((lcse, :lcse), (cte, :cte), (smtx, :smtx), (sgmtx, :sgmtx), (tn, :tn),
-             (tr, :tr), (ple, :ple), (l2, :l2), (lp, :lp), (lpc, :lpc))) do (x, name)
-            if isa(x, AbstractVector)
-                @argcheck(!isempty(x), IsEmptyError("$name cannot be empty"))
-            end
-            return nothing
-        end
-        assert_data_benchmark_prior(tr, pe, :tr, :JuMPOptimiser)
-        # The method for a value other than a number checks nothing, so `nothing`, a schedule
-        # and a calibration rule pass these calls.
-        assert_nonempty_gt0_finite_val(card, :card)
-        assert_nonempty_gt0_finite_val(l2c, :l2c)
-        assert_nonempty_gt0_finite_val(linfc, :linfc)
-        assert_nonempty_gt0_finite_val(l1, :l1)
-        assert_nonempty_gt0_finite_val(linf, :linf)
-        # `LpRegularisation.val` is read as a coefficient in `lp` and as a ceiling in
-        # `lpc`, and one field cannot carry two bounds. This is the first point at which
-        # the reading is known, so it is where the wrong role is refused. A `TimeDependent`
-        # needs no guard: it is not a term, so it meets the permissive fallback, and the
-        # constructor test-substitutes each of its entries through this same check.
-        assert_penalty_coefficient_role(lp)
-        assert_norm_ceiling_role(lpc)
-        assert_subgroup_mip_fields(scard, smtx, slt, sst)
-        assert_subgrouped_mip_fields(sgcarde, sgmtx, sglt, sgst)
-        if isa(fees, FeesEstimator) || any(name_keyed,
-                                           (wb, lt, st, lcse, gcarde, sgcarde, smtx, sgmtx, slt, sst, sglt, sgst, tn))
-            @argcheck(!isnothing(sets),
+        # The checks below read a field of the optimiser and a slot of its block. The
+        # constructor of the block checks each slot on its own.
+        assert_gross_budget_admissible(bgt, cbe.sbgt, cbe.gbgt, cbe.wb)
+        assert_data_benchmark_prior(cbe.tr, pe, :tr, :JuMPOptimiser)
+        if isa(fees, FeesEstimator)
+            @argcheck(!isnothing(cbe.sets),
                       IsNothingError("sets cannot be nothing when estimator-type fields are provided"))
         end
+        # The slots go in as flat keywords, so each call of the check builds a static block.
         assert_time_dependent_substitution(JuMPOptimiser,
-                                           (; pe, slv, wb, bgt, sbgt, gbgt, lt, st, lcse,
-                                            cte, gcarde, sgcarde, smtx, sgmtx, slt, sst,
-                                            sglt, sgst, tn, fees, sets, tr, ple, ret, sca,
-                                            ccnt, cobj, sc, so, ss, card, scard, l2c, lpc,
-                                            linfc, l1, l2, lp, linf, xbgt, strict),
+                                           merge((; pe, slv, bgt, fees, ret, sca, sc, so,
+                                                  strict), constraint_block_slots(cbe)),
                                            jump_optimiser_td_defaults())
-        return new{typeof(pe), typeof(slv), typeof(wb), typeof(bgt), typeof(sbgt),
-                   typeof(gbgt), typeof(lt), typeof(st), typeof(lcse), typeof(cte),
-                   typeof(gcarde), typeof(sgcarde), typeof(smtx), typeof(sgmtx),
-                   typeof(slt), typeof(sst), typeof(sglt), typeof(sgst), typeof(tn),
-                   typeof(fees), typeof(sets), typeof(tr), typeof(ple), typeof(ret),
-                   typeof(sca), typeof(ccnt), typeof(cobj), typeof(sc), typeof(so),
-                   typeof(ss), typeof(card), typeof(scard), typeof(l2c), typeof(lpc),
-                   typeof(linfc), typeof(l1), typeof(l2), typeof(lp), typeof(linf),
-                   typeof(xbgt), typeof(strict), typeof(cache)}(pe, slv, wb, bgt, sbgt,
-                                                                gbgt, lt, st, lcse, cte,
-                                                                gcarde, sgcarde, smtx,
-                                                                sgmtx, slt, sst, sglt, sgst,
-                                                                tn, fees, sets, tr, ple,
-                                                                ret, sca, ccnt, cobj, sc,
-                                                                so, ss, card, scard, l2c,
-                                                                lpc, linfc, l1, l2, lp,
-                                                                linf, xbgt, strict, cache)
+        return new{typeof(pe), typeof(slv), typeof(cbe), typeof(bgt), typeof(fees),
+                   typeof(ret), typeof(sca), typeof(sc), typeof(so), typeof(strict),
+                   typeof(cache)}(pe, slv, cbe, bgt, fees, ret, sca, sc, so, strict, cache)
     end
 end
 function JuMPOptimiser(; pe::Onl{<:TD{<:PrE_Pr}} = EmpiricalPrior(), slv::Slv_VecSlv,
-                       wb::TD_Option{<:WbE_Wb} = WeightBounds(),
+                       cbe::Option{<:ConstraintBlock} = nothing,
                        bgt::TD_Option{<:Num_BgtCE} = 1.0,
-                       sbgt::TD_Option{<:Num_BgtRg} = nothing,
-                       gbgt::TD_Option{<:Num_BgtRg} = nothing,
-                       lt::TD_Option{<:BtE_Bt} = nothing, st::TD_Option{<:BtE_Bt} = nothing,
-                       lcse::TD_Option{<:Union{EcE_LcE_Lc, AbstractVector}} = nothing,
-                       cte::TD_Option{<:Lc_CC_VecCC} = nothing,
-                       gcarde::TD_Option{<:LcE_Lc} = nothing,
-                       sgcarde::TD_Option{<:Union{LcE_Lc, AbstractVector}} = nothing,
-                       smtx::TD_Option{<:Union{MatNum_ASetMatE, AbstractVector}} = nothing,
-                       sgmtx::TD_Option{<:Union{MatNum_ASetMatE, AbstractVector}} = nothing,
-                       slt::TD_Option{<:Union{BtE_Bt, AbstractVector}} = nothing,
-                       sst::TD_Option{<:Union{BtE_Bt, AbstractVector}} = nothing,
-                       sglt::TD_Option{<:Union{BtE_Bt, AbstractVector}} = nothing,
-                       sgst::TD_Option{<:Union{BtE_Bt, AbstractVector}} = nothing,
-                       tn::TD_Option{<:Union{TnE_Tn, AbstractVector}} = nothing,
                        fees::TD_Option{<:FeesE_Fees} = nothing,
-                       sets::TD_Option{<:UniverseSets} = nothing,
-                       tr::TD_Option{<:Tr_VecTr} = nothing,
-                       ple::TD_Option{<:Union{PlCE_PlC, AbstractVector}} = nothing,
                        ret::TD{<:JRE_VecJRE} = ArithmeticReturn(),
                        sca::TD{<:NonHierarchicalScalariser} = SumScalariser(),
-                       ccnt::TD_Option{<:JuMPConstr_VecJuMPConstr} = nothing,
-                       cobj::TD_Option{<:JuMPObj_VecJuMPObj} = nothing, sc::Number = 1,
-                       so::Number = 1, ss::TD_Option{<:Number} = nothing,
-                       card::TD_Option{<:Integer} = nothing,
-                       scard::TD_Option{<:Int_VecInt} = nothing,
-                       l2c::TD_Option{<:Num_NormCeilCal} = nothing,
-                       lpc::TD_Option{<:LpReg_VecLpReg} = nothing,
-                       linfc::TD_Option{<:Num_NormCeilCal} = nothing,
-                       l1::TD_Option{<:Num_AmbRadCal} = nothing,
-                       l2::TD_Option{<:L2Reg_VecL2Reg} = nothing,
-                       lp::TD_Option{<:LpReg_VecLpReg} = nothing,
-                       linf::TD_Option{<:Num_AmbRadCal} = nothing, xbgt::Bool = false,
-                       strict::Bool = false,
-                       cache::Option{<:ReturnsBufferState} = nothing)::JuMPOptimiser
-    return JuMPOptimiser(pe, slv, wb, bgt, sbgt, gbgt, lt, st,
-                         narrow_mixed_vector(lcse, EcE_LcE_Lc, :lcse), cte, gcarde,
-                         narrow_mixed_vector(sgcarde, LcE_Lc, :sgcarde),
-                         narrow_mixed_vector(smtx, MatNum_ASetMatE, :smtx),
-                         narrow_mixed_vector(sgmtx, MatNum_ASetMatE, :sgmtx),
-                         narrow_mixed_vector(slt, Option{<:BtE_Bt}, :slt),
-                         narrow_mixed_vector(sst, Option{<:BtE_Bt}, :sst),
-                         narrow_mixed_vector(sglt, Option{<:BtE_Bt}, :sglt),
-                         narrow_mixed_vector(sgst, Option{<:BtE_Bt}, :sgst),
-                         narrow_mixed_vector(tn, TnE_Tn, :tn), fees, sets, tr,
-                         narrow_mixed_vector(ple, PlCE_PlC, :ple), ret, sca, ccnt, cobj, sc,
-                         so, ss, card, scard, l2c, lpc, linfc, l1, l2, lp, linf, xbgt,
-                         strict, cache)
+                       sc::Number = 1, so::Number = 1, strict::Bool = false,
+                       cache::Option{<:ReturnsBufferState} = nothing,
+                       slots...)::JuMPOptimiser
+    return JuMPOptimiser(pe, slv, constraint_block(cbe; slots...), bgt, fees, ret, sca, sc,
+                         so, strict, cache)
+end
+# Each slot of the block is a property of the optimiser, and a patch of `Accessors.set` can
+# set it, so `opt.wb` and the search key `"opt.wb"` keep their meaning (ADR 0237).
+@forward_properties JuMPOptimiser begin
+    forward(cbe, wb, sbgt, gbgt, lt, st, lcse, cte, gcarde, sgcarde, smtx, sgmtx, slt, sst,
+            sglt, sgst, tn, sets, tr, ple, ccnt, cobj, ss, card, scard, l2c, lpc, linfc, l1,
+            l2, lp, linf, xbgt; settable)
+end
+function time_dependent_candidate_fields(opt::JuMPOptimiser)::Tuple
+    return (typed_time_dependent_fields(opt)..., typed_time_dependent_fields(opt.cbe)...)
+end
+function time_dependent_slot(opt::JuMPOptimiser, f::Symbol)
+    return getproperty(opt, f)
+end
+function schedule_reads_previous_weights(opt::JuMPOptimiser)::Bool
+    return any(f -> schedule_reads_previous_weights(time_dependent_slot(opt, f)),
+               time_dependent_candidate_fields(opt))
 end
 """
 $(DocStringExtensions.TYPEDSIGNATURES)
 
 Returns `true` if a field of `opt` reads the portfolio weights of the previous fold.
 
-The function asks `tn`, `fees`, `tr`, `ccnt` and `cobj`. It also asks every field that holds a [`TimeDependent`](@ref) that the fold loop resolves, see [`time_dependent_fields`](@ref). A schedule reads the previous weights when it holds a [`PreviousWeightsFunction`](@ref) or an entry that reads them.
+The function asks `bgt` and `fees`, and the [`ConstraintBlock`](@ref) in `cbe` through its own method, which asks `tn`, `tr`, `ccnt` and `cobj`. It also asks every field and every slot that holds a [`TimeDependent`](@ref) that the fold loop resolves, see [`time_dependent_fields`](@ref). A schedule reads the previous weights when it holds a [`PreviousWeightsFunction`](@ref) or an entry that reads them.
 
 # Arguments
 
@@ -845,12 +610,10 @@ false
 """
 function needs_previous_weights(opt::JuMPOptimiser)
     return (needs_previous_weights(opt.bgt) ||
-            needs_previous_weights(opt.tn) ||
             needs_previous_weights(opt.fees) ||
-            needs_previous_weights(opt.tr) ||
-            needs_previous_weights(opt.ccnt) ||
-            needs_previous_weights(opt.cobj) ||
-            any(f -> needs_previous_weights(getfield(opt, f)), time_dependent_fields(opt)))
+            needs_previous_weights(opt.cbe) ||
+            any(f -> needs_previous_weights(time_dependent_slot(opt, f)),
+                time_dependent_fields(opt)))
 end
 function time_dependent_field_defaults(::JuMPOptimiser)::NamedTuple
     return jump_optimiser_td_defaults()
@@ -860,7 +623,7 @@ $(DocStringExtensions.TYPEDSIGNATURES)
 
 Returns a copy of `opt` whose fields that read previous weights hold the weights `w`.
 
-The function calls `factory(x, w)` on `bgt`, `tn`, `fees`, `tr`, `ccnt` and `cobj`, and it keeps every other field. So a cost budget on `bgt` measures its cost from `w`, unless it is `fixed`, see [`factory(bgt::BudgetCosts, w::VecNum)`](@ref). A [`TimeDependent`](@ref) in one of these fields applies `factory` to each of its entries. The keyword constructor of [`JuMPOptimiser`](@ref) checks the new fields.
+The function calls `factory(x, w)` on `bgt` and `fees`, and on the [`ConstraintBlock`](@ref) in `cbe`, whose method rebuilds `tn`, `tr`, `ccnt` and `cobj`. It keeps every other field. So a cost budget on `bgt` measures its cost from `w`, unless it is `fixed`, see [`factory(bgt::BudgetCosts, w::VecNum)`](@ref). A [`TimeDependent`](@ref) in one of these fields applies `factory` to each of its entries. The keyword constructor of [`JuMPOptimiser`](@ref) checks the new fields.
 
 # Arguments
 
@@ -869,7 +632,7 @@ The function calls `factory(x, w)` on `bgt`, `tn`, `fees`, `tr`, `ccnt` and `cob
 
 # Returns
 
-  - `JuMPOptimiser`: The optimiser with the six fields rebuilt for `w`.
+  - `JuMPOptimiser`: The optimiser with the two fields and the block rebuilt for `w`.
 
 # Examples
 
@@ -887,9 +650,8 @@ true
 """
 function factory(opt::JuMPOptimiser, w::AbstractVector)::JuMPOptimiser
     return rebuild_estimator(opt,
-                             (; bgt = factory(opt.bgt, w), tn = factory(opt.tn, w),
-                              fees = factory(opt.fees, w), tr = factory(opt.tr, w),
-                              ccnt = factory(opt.ccnt, w), cobj = factory(opt.cobj, w)))
+                             (; bgt = factory(opt.bgt, w), fees = factory(opt.fees, w),
+                              cbe = factory(opt.cbe, w)))
 end
 """
     obs_weights_view(opt::JuMPOptimiser, i) -> JuMPOptimiser
@@ -934,10 +696,11 @@ A hierarchical optimiser calls it to build the optimiser of one cluster, and the
 # Algorithm
 
  1. When `opt.pe` is a prior result, replace `X` with `opt.pe.X`.
- 2. View at `i` the fields that can hold a value for each asset: `pe`, `wb`, `bgt`, `lt`, `st`, `smtx`, `sgmtx`, `slt`, `sst`, `sglt`, `sgst`, `tn`, `lcse`, `sets`, `ret`, `ccnt`, `cobj` and `cache`. When `smtx` and `sgmtx` hold the same object, view it once, so that the two views are one object too. The same holds for `slt` and `sglt`, and for `sst` and `sgst`.
- 3. View `fees` and `tr` at `i` with `X`. A fee finds the assets outside `i`, which its liquidation charges read, from the width of `X`. A tracking measure gives `X` to the risk measure that it tracks.
- 4. Keep every other field. An estimator in `cte`, `gcarde` or `sgcarde` resolves its names against the viewed `sets`. A precomputed constraint in one of them keeps its width, because no view can narrow its matrix, see `port_opt_view(::LinearConstraint, i)`. `ple` reads the viewed prior. The other fields hold no value for each asset.
- 5. Rebuild the optimiser with its keyword constructor, which checks the viewed fields again.
+ 2. View at `i` the fields that can hold a value for each asset: `pe`, `bgt`, `ret` and `cache`.
+ 3. View `fees` at `i` with `X`. A fee finds the assets outside `i`, which its liquidation charges read, from the width of `X`.
+ 4. View the [`ConstraintBlock`](@ref) in `cbe` at `i` with `X`, through its own method, `port_opt_view(cbe::ConstraintBlock, i, X)`. It views the slots that hold a value for each asset, and its tracking errors read `X`.
+ 5. Keep every other field. They hold no value for each asset.
+ 6. Rebuild the optimiser with its keyword constructor, which checks the viewed fields again.
 
 # Arguments
 
@@ -967,44 +730,17 @@ true
 """
 function port_opt_view(opt::JuMPOptimiser, i, X::MatNum, args...)::JuMPOptimiser
     X = isa(opt.pe, AbstractPriorResult) ? opt.pe.X : X
-    pe = port_opt_view(opt.pe, i)
-    wb = port_opt_view(opt.wb, i)
-    bgt = port_opt_view(opt.bgt, i)
-    lt = port_opt_view(opt.lt, i)
-    st = port_opt_view(opt.st, i)
-    if opt.smtx === opt.sgmtx
-        smtx = sgmtx = port_opt_view(opt.smtx, i)
-    else
-        smtx = port_opt_view(opt.smtx, i)
-        sgmtx = port_opt_view(opt.sgmtx, i)
-    end
-    if opt.slt === opt.sglt
-        slt = sglt = port_opt_view(opt.slt, i)
-    else
-        slt = port_opt_view(opt.slt, i)
-        sglt = port_opt_view(opt.sglt, i)
-    end
-    if opt.sst === opt.sgst
-        sst = sgst = port_opt_view(opt.sst, i)
-    else
-        sst = port_opt_view(opt.sst, i)
-        sgst = port_opt_view(opt.sgst, i)
-    end
-    tn = port_opt_view(opt.tn, i)
-    lcse = port_opt_view(opt.lcse, i)
-    sets = port_opt_view(opt.sets, i)
     # A fee has two axes. Its five fields for each asset are on the kept assets, and its two
     # liquidation charges are on the other assets. Its view finds the other assets from the
-    # width of the unreduced `X`, so it is the one constraint that needs the matrix.
-    fees = port_opt_view(opt.fees, i, X)
-    tr = port_opt_view(opt.tr, i, X)
-    ret = port_opt_view(opt.ret, i)
-    ccnt = port_opt_view(opt.ccnt, i)
-    cobj = port_opt_view(opt.cobj, i)
-    cache = port_opt_view(opt.cache, i)
+    # width of the unreduced `X`, so it needs the matrix, as the tracking errors of the
+    # block do.
     return rebuild_estimator(opt,
-                             (; pe, wb, bgt, lt, st, lcse, smtx, sgmtx, slt, sst, sglt,
-                              sgst, tn, fees, sets, tr, ret, ccnt, cobj, cache))
+                             (; pe = port_opt_view(opt.pe, i),
+                              cbe = port_opt_view(opt.cbe, i, X),
+                              bgt = port_opt_view(opt.bgt, i),
+                              fees = port_opt_view(opt.fees, i, X),
+                              ret = port_opt_view(opt.ret, i),
+                              cache = port_opt_view(opt.cache, i)))
 end
 function non_investable_universe(opt::JuMPOptimiser, ni::VecStr)::JuMPOptimiser
     return rebuild_estimator(opt, (; sets = non_investable_sets(opt.sets, ni)))

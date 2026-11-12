@@ -8,7 +8,7 @@ jet = "0.13.1"
 filter = "AnyFrameModule"
 attribution = "deepest_repository_frame"
 load_set = ["GraphRecipes", "StatsPlots"]
-commit = "6143058140"
+commit = "519d0bc548"
 
 [run.main]
 load_set = ["GraphRecipes", "StatsPlots"]
@@ -366,6 +366,7 @@ load_set = ["GraphRecipes", "StatsPlots"]
 "src/17_Optimisation/05_JuMP/02_JuMPConstraints/11_TrackingErrorConstraints.jl" = { raw = 2, reviewed = 0 }
 "src/17_Optimisation/05_JuMP/02_JuMPConstraints/12_RegularisationConstraints.jl" = { raw = 2, reviewed = 0 }
 "src/17_Optimisation/05_JuMP/02_JuMPConstraints/13_WeightNormConstraints.jl" = { raw = 4, reviewed = 0 }
+"src/17_Optimisation/05_JuMP/02_JuMPConstraints/14_ConstraintBlock.jl" = { raw = 0, reviewed = 0 }
 "src/17_Optimisation/05_JuMP/03_JuMPOptimiser_a.jl" = { raw = 0, reviewed = 0 }
 "src/17_Optimisation/05_JuMP/03_JuMPOptimiser_b.jl" = { raw = 0, reviewed = 0 }
 "src/17_Optimisation/05_JuMP/04_MeanRisk.jl" = { raw = 0, reviewed = 0 }
@@ -799,6 +800,7 @@ load_set = ["GraphRecipes", "StatsPlots"]
 "src/17_Optimisation/05_JuMP/02_JuMPConstraints/11_TrackingErrorConstraints.jl" = { raw = 0, reviewed = 0 }
 "src/17_Optimisation/05_JuMP/02_JuMPConstraints/12_RegularisationConstraints.jl" = { raw = 0, reviewed = 0 }
 "src/17_Optimisation/05_JuMP/02_JuMPConstraints/13_WeightNormConstraints.jl" = { raw = 0, reviewed = 0 }
+"src/17_Optimisation/05_JuMP/02_JuMPConstraints/14_ConstraintBlock.jl" = { raw = 0, reviewed = 0 }
 "src/17_Optimisation/05_JuMP/03_JuMPOptimiser_a.jl" = { raw = 0, reviewed = 0 }
 "src/17_Optimisation/05_JuMP/03_JuMPOptimiser_b.jl" = { raw = 0, reviewed = 0 }
 "src/17_Optimisation/05_JuMP/04_MeanRisk.jl" = { raw = 0, reviewed = 0 }

@@ -2045,8 +2045,12 @@ end
         f = PO.factory(o, w1)
         @test f.tn.w == w1
         @test f.tn.val == 0.1
-        @test all(n -> n in (:tn, :fees, :tr, :ccnt, :cobj) ||
-                       getfield(f, n) === getfield(o, n), fieldnames(JuMPOptimiser))
+        # The owner rebuilds `bgt`, `fees` and its block, and the block rebuilds four slots.
+        @test all(n -> n in (:bgt, :fees, :cbe) || getfield(f, n) === getfield(o, n),
+                  fieldnames(JuMPOptimiser))
+        @test all(n -> n in (:tn, :tr, :ccnt, :cobj) ||
+                       getfield(f.cbe, n) === getfield(o.cbe, n),
+                  fieldnames(ConstraintBlock))
 
         lt5 = Threshold(; val = [0.01, 0.02, 0.03, 0.04, 0.05])
         st5 = Threshold(; val = [0.11, 0.12, 0.13, 0.14, 0.15])
@@ -2135,5 +2139,118 @@ end
         @test rbv.rba.sets.dict["ni"] == ["C"]
         @test rbv.rba.sets.dict["nx"] == ["A", "B", "D", "E"]
         @test rdv.nx == ["A", "B", "D", "E"]
+    end
+    @testset "the Constraint Block holds the slots behind the released keywords (#2039)" begin
+        using Accessors, Clarabel
+        csl = Solver(; name = :clarabel, solver = Clarabel.Optimizer,
+                     settings = Dict("verbose" => false),
+                     check_sol = (; allow_local = true, allow_almost = true))
+        wb3 = WeightBounds(; lb = 0.0, ub = 0.3)
+        o = JuMPOptimiser(; slv, wb = wb3, card = 3, l1 = 0.1)
+        # The flat keywords build the block, and each slot reads through the owner.
+        @test o.cbe isa ConstraintBlock
+        @test o.wb === o.cbe.wb === wb3
+        @test (o.card, o.l1, o.xbgt) == (3, 0.1, false)
+        @test fieldnames(JuMPOptimiser) ==
+              (:pe, :slv, :cbe, :bgt, :fees, :ret, :sca, :sc, :so, :strict, :cache)
+        @test all(in(propertynames(o)), fieldnames(ConstraintBlock))
+        # The positional constructor takes the block as one argument.
+        p = JuMPOptimiser(o.pe, o.slv, o.cbe, o.bgt, o.fees, o.ret, o.sca, o.sc, o.so,
+                          o.strict, o.cache)
+        @test p.cbe === o.cbe
+        # A flat keyword replaces that slot of a given block, and the default of a flat
+        # keyword leaves every other slot as it is.
+        cbe = ConstraintBlock(; wb = WeightBounds(; lb = 0.0, ub = 0.4), card = 3)
+        ob = JuMPOptimiser(; slv, cbe, card = 4)
+        @test (ob.wb.ub, ob.card) == (0.4, 4)
+        @test JuMPOptimiser(; slv, cbe).cbe === cbe
+        @test PO.constraint_block(cbe) === cbe
+        @test_throws MethodError JuMPOptimiser(; slv, cbe, cardd = 4)
+        # The checks of the block run in its constructor, and the checks of a field and a
+        # slot together run in the constructor of the owner.
+        @test_throws DomainError ConstraintBlock(; card = 0)
+        @test_throws IsNothingError JuMPOptimiser(; slv, fees = FeesEstimator())
+        @test_throws ConflictingArgumentError JuMPOptimiser(; slv,
+                                                            bgt = BudgetCosts(;
+                                                                              w = fill(1 /
+                                                                                       N,
+                                                                                       N)),
+                                                            cbe = ConstraintBlock(;
+                                                                                  sbgt = 0.2))
+        # `Accessors.set`, `rebuild_estimator` and a search key replace one slot.
+        # The function form: a macro of a package that the testset loads cannot expand.
+        o2 = Accessors.set(o, PO.parse_lens("wb"), WeightBounds(; lb = 0.0, ub = 0.5))
+        @test (o2.wb.ub, o2.card, o2.l1) == (0.5, 3, 0.1)
+        @test PO.rebuild_estimator(o, (; card = 2)).cbe ==
+              PO.rebuild_estimator(o.cbe, (; card = 2))
+        mr = MeanRisk(; opt = JuMPOptimiser(; slv = csl, wb = wb3))
+        for (key, v) in (("opt.wb", WeightBounds(; lb = 0.0, ub = 0.25)), ("opt.l1", 0.01),
+                         ("opt.l2", L2Regularisation(; val = 0.01)))
+            ms = Accessors.set(mr, PO.parse_lens(key), v)
+            name = Symbol(last(split(key, ".")))
+            ref = MeanRisk(;
+                           opt = JuMPOptimiser(; slv = csl, wb = wb3,
+                                               NamedTuple{(name,)}((v,))...))
+            @test isapprox(optimise(ms, rd).w, optimise(ref, rd).w; atol = 1e-8)
+        end
+        # A pipeline routes `wb` into the block, and `pe` stays on the owner.
+        @test PO.pipe_accepts(o, Val(:wb)) && PO.pipe_accepts(o, Val(:pe))
+        @test !PO.pipe_accepts(ConstraintBlock(), Val(:pe))
+        @test PO.pipe_route(o, Val(:wb), WeightBounds(; lb = 0.0, ub = 0.7)).wb.ub == 0.7
+        @test PO.pipe_route(o, Val(:pe), EmpiricalPrior()).cbe === o.cbe
+        # A target that neither the owner nor its block holds: an optional one is dropped,
+        # and the refusal of any other names the owner, not the block.
+        @test PO.pipe_route(o, Val(:cle), nothing) === o
+        @test_throws "JuMPOptimiser: it has no :rkb field" PO.pipe_route(o, Val(:rkb),
+                                                                         nothing)
+        @test PO.pipe_target_paths(o, Val(:ple)) == ["cbe.ple"]
+        @test PO.pipe_target_paths(mr, Val(:wb)) == ["opt.cbe.wb"]
+        @test PO.pipe_target_paths(o, Val(:pe)) == ["pe"]
+        pipe = Pipeline(;
+                        steps = (WeightBoundsEstimator(; lb = 0.0, ub = 0.25),
+                                 MeanRisk(; opt = JuMPOptimiser(; slv = csl))))
+        ref = MeanRisk(;
+                       opt = JuMPOptimiser(; slv = csl,
+                                           wb = WeightBounds(; lb = 0.0, ub = 0.25)))
+        @test isapprox(fit(pipe, rd).w, optimise(ref, rd).w; atol = 1e-8)
+        # A data benchmark in the block names its path through the block.
+        dbt = JuMPOptimiser(; slv,
+                            tr = TrackingError(; tr = DataBenchmarkTracking(), err = 0.01))
+        @test PO.pipe_data_benchmark_path(dbt) == "cbe.tr.tr"
+        # The frame walk enters the block, so a reader in a slot joins the group.
+        fr = PO.group_frames(JuMPOptimiser(; slv, ple = SemiDefinitePhylogenyEstimator()))
+        @test any(startswith("cbe.ple"), fr.raw)
+        # A schedule in a slot is a scheduled name of the owner, and it resolves, resets and
+        # counts its folds under that name.
+        td = TimeDependent([WeightBounds(; ub = 0.3), WeightBounds(; ub = 0.5)])
+        otd = JuMPOptimiser(; slv, wb = td, bgt = TimeDependent([1.0, 1.0]))
+        @test PO.time_dependent_fields(otd) == (:bgt, :wb)
+        @test PO.time_dependent_slot(otd, :wb) === td
+        ctx = TimeDependentContext(; i = 2, n = 2, rd = rd, train_idx = [1:100, 1:150],
+                                   test_idx = [101:150, 151:200])
+        @test PO.update_time_dependent_estimator(otd, ctx).wb.ub == 0.5
+        @test PO.reset_time_dependent_estimator(otd).wb == WeightBounds()
+        @test_throws DimensionMismatch PO.assert_time_dependent_fold_count(otd, 3)
+        @test_throws TypeError JuMPOptimiser(; slv,
+                                             wb = TimeDependent([Threshold(; val = 0.1)]))
+        pwf = TimeDependent(PreviousWeightsFunction(; f = ctx -> nothing))
+        @test PO.schedule_reads_previous_weights(JuMPOptimiser(; slv, tn = pwf))
+        @test !PO.schedule_reads_previous_weights(otd)
+        @test PO.needs_previous_weights(JuMPOptimiser(; slv, tn = pwf))
+        @test PO.needs_previous_weights(ConstraintBlock(; cobj = TimeDependent(pwf.val)))
+        # The block views its own slots, and its owner cuts its observations through it.
+        tr5 = TrackingError(; tr = WeightsTracking(; w = fill(0.2, N)), err = 0.01)
+        v = PO.port_opt_view(JuMPOptimiser(; slv, tr = tr5, wb = wb3), [1, 3], X)
+        @test v.tr.tr.w == fill(0.2, 2)
+        @test PO.obs_weights_view(o, 1:10).cbe == o.cbe
+        # The rebuilds that list the fields by reflection give the same optimiser.
+        nb = PO.no_bounds_optimiser(o)
+        @test nb.cbe === o.cbe
+        pr = prior(EmpiricalPrior(), rd)
+        attrs = PO.processed_jump_optimiser_attributes(o, rd)
+        fo = PO.jump_optimiser_from_attributes(o, attrs)
+        @test fo.wb == attrs.wb
+        @test (fo.card, fo.l1) == (3, 0.1)
+        @test fo.pe isa PO.AbstractPriorResult
     end
 end

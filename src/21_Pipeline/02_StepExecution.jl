@@ -672,6 +672,8 @@ end
 
 Return the paths of [`pipe_target_paths`](@ref) in the configuration of `x`, after the name of the field that holds it, or an empty vector when `x` delegates to no configuration.
 
+A target that the [`ConstraintBlock`](@ref) of `x` accepts goes into the block, as [`pipe_route`](@ref) puts it there. So its path starts with the field that [`pipe_block_field`](@ref) names, such as `"cbe.ple"`, which is the path that the frame walk gives to the slot.
+
 Internal machinery — not part of the user-facing API.
 
 # Arguments
@@ -689,7 +691,7 @@ Internal machinery — not part of the user-facing API.
   - [`pipe_config_field`](@ref)
 """
 function pipe_config_paths(x, t::Val)::Vector{String}
-    f = pipe_config_field(x)
+    f = pipe_block_accepts(x, t) ? pipe_block_field(x) : pipe_config_field(x)
     return if isnothing(f)
         String[]
     else
@@ -1120,7 +1122,8 @@ Internal machinery — not part of the user-facing API.
 # Algorithm
 
  1. For each of the fields `tr`, `r`, `ri` and `ro` of `x`, in order, return the path that [`data_benchmark_path`](@ref) finds below it, after the name of the field.
- 2. Otherwise return the answer for the configuration of `x`, after the name of its field. An `x` with no configuration answers for `nothing`, which is `nothing`.
+ 2. Otherwise return the answer for the [`ConstraintBlock`](@ref) of `x`, after the name of its field, see [`pipe_block_field`](@ref). The block holds the tracking errors `tr` of a [`JuMPOptimiser`](@ref).
+ 3. An `x` with no block returns the answer for its configuration, after the name of its field. An `x` with neither answers for `nothing`, which is `nothing`.
 
 # Arguments
 
@@ -1142,7 +1145,7 @@ function pipe_data_benchmark_path(x)::Option{<:String}
             return tree_path(f, p)
         end
     end
-    c = pipe_config_field(x)
+    c = something(pipe_block_field(x), Some(pipe_config_field(x)))
     p = pipe_data_benchmark_path(isnothing(c) ? nothing : getfield(x, c))
     return isnothing(p) ? nothing : tree_path(something(c), p)
 end

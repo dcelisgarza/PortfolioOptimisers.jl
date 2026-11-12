@@ -76,10 +76,16 @@ end
     end
     @testset "Candidate fields narrow the scan without changing it" begin
         # The scan only visits the fields whose type admits a schedule, so it must agree with
-        # a scan of every field of the host, on static and scheduled hosts alike.
+        # a scan of every field of the host, on static and scheduled hosts alike. The slots of
+        # the Constraint Block of a `JuMPOptimiser` are scheduled names of the host too.
         function full_scan(opt, all_binds::Bool = true)
-            return filter(fieldnames(typeof(opt))) do f
-                x = getfield(opt, f)
+            names = if isa(opt, JuMPOptimiser)
+                (fieldnames(typeof(opt))..., fieldnames(typeof(opt.cbe))...)
+            else
+                fieldnames(typeof(opt))
+            end
+            return filter(names) do f
+                x = PortfolioOptimisers.time_dependent_slot(opt, f)
                 return isa(x, TimeDependent) &&
                        (PortfolioOptimisers.entitled(opt, f, all_binds) ||
                         x.bind === :outermost)
@@ -779,7 +785,8 @@ end
         @testset "Widened fields, defaults and required-field types" begin
             opt = JuMPOptimiser(; slv = slv, pe = tdpe, ret = tdret, sca = tdsca,
                                 sets = tdsets)
-            @test PortfolioOptimisers.time_dependent_fields(opt) == (:pe, :sets, :ret, :sca)
+            # The fields of the optimiser come first, then the slots of its block.
+            @test PortfolioOptimisers.time_dependent_fields(opt) == (:pe, :ret, :sca, :sets)
             # Fold-less: each field falls back to its registered static default.
             r0 = PortfolioOptimisers.reset_time_dependent_estimator(opt)
             @test r0.pe == EmpiricalPrior()

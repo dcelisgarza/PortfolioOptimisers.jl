@@ -879,7 +879,7 @@ end
         opts = ((MeanRisk(;
                           opt = JuMPOptimiser(; slv = slv,
                                               tr = TrackingError(; tr = dbt, err = 0.01))),
-                 "`opt.tr.tr`"),
+                 "`opt.cbe.tr.tr`"),
                 (MeanRisk(; r = TrackingRiskMeasure(; tr = dbt),
                           opt = JuMPOptimiser(; slv = slv)), "`r.tr`"),
                 (MeanRisk(; r = [Variance(), TrackingRiskMeasure(; tr = dbt)],

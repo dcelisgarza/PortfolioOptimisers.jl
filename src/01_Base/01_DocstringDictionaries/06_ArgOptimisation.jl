@@ -96,6 +96,7 @@ unique_key_dict!(arg_dict, :arg_dict,
                  :ret_jmp => "`ret`: Return term, or vector of return terms, for the `JuMP` model. Several terms are weighted-summed into the model's single scalar return expression, in the same way [`MeanRisk`](@ref)'s `r` takes several risk measures.",#
                  :ccnt => "`ccnt`: Custom `JuMP` constraint.",#
                  :cobj => "`cobj`: Custom `JuMP` objective.",#
+                 :cbe => "`cbe`: Constraint Block that holds the feasible set of the weights and the terms of the Objective Penalty, see [`ConstraintBlock`](@ref). Its slots are flat keywords and properties of the owner.",#
                  :sc => "`sc`: Constraint scale factor.",#
                  :so => "`so`: Objective scale factor.",#
                  :ss => "`ss`: Optional scalar shrinkage parameter.",#

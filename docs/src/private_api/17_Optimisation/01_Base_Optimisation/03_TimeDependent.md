@@ -19,7 +19,9 @@ assert_special_nco_requirements(opt::VecOptE_Opt)
 assert_nearest_optimiser_schedule
 inner_fold_fields
 time_dependent_value
+typed_time_dependent_fields
 time_dependent_candidate_fields
+time_dependent_slot
 time_dependent_fields
 time_dependent_entries
 time_dependent_entry_needs_previous_weights

@@ -314,6 +314,14 @@ definition = "ProgrammeAllocationSet"
 metric = "arg"
 rationale = "keyword-constructor-arity"
 
+# The Constraint Block of ADR 0237 takes the 32 slots that `JuMPOptimiser` held before it, so its
+# constructor carries the arity that the constructor of `JuMPOptimiser` carried.
+[[exemption]]
+path = "src/17_Optimisation/05_JuMP/02_JuMPConstraints/14_ConstraintBlock.jl"
+definition = "ConstraintBlock"
+metric = "arg"
+rationale = "keyword-constructor-arity"
+
 # The split of `03_Preprocessing.jl` into the price-to-returns run. Each of these three definitions
 # moved byte-for-byte, and each now drives the maximum of a smaller file rather than sitting under
 # the row that grandfathered it. ADR 0074's entry test reads the new file as an addition, so the

@@ -845,7 +845,7 @@ end
     function head_sets(h)
         return if hasproperty(h, :rba)
             h.rba.sets
-        elseif hasproperty(h, :sets) && isa(getfield(h, :sets), UniverseSets)
+        elseif hasproperty(h, :sets) && isa(h.sets, UniverseSets)
             h.sets
         else
             h.opt.sets

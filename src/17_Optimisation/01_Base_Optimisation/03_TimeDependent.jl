@@ -721,25 +721,58 @@ function inner_fold_fields(::Any)::Tuple
     return ()
 end
 """
-    time_dependent_candidate_fields(opt)
+    typed_time_dependent_fields(opt)
 
 Returns the names of the fields of `opt` whose type can hold a [`TimeDependent`](@ref).
 
-[`time_dependent_fields`](@ref) reads the values of these fields only. The type of a field decides whether it can hold a schedule. A constructor that takes a schedule, see [`TD_Option`](@ref), records it in a type parameter. So a field that holds no schedule has a type whose intersection with `TimeDependent` is empty.
+The type of a field decides whether it can hold a schedule. A constructor that takes a schedule, see [`TD_Option`](@ref), records it in a type parameter. So a field that holds no schedule has a type whose intersection with `TimeDependent` is empty.
 
-A generated function computes the tuple once for each type of optimiser. For a `JuMPOptimiser` that holds no schedule, the tuple is empty at compile time, so `split` and `_optimise` read none of its fields. The tuple comes from the field types, and no list of fields is written by hand.
+A generated function computes the tuple once for each type, from the field types, and no list of fields is written by hand. [`time_dependent_candidate_fields`](@ref) returns this tuple, and an owner of a [`ConstraintBlock`](@ref) adds the slots of its block to it.
+
+# Related
+
+  - [`time_dependent_candidate_fields`](@ref)
+  - [`TD_Option`](@ref)
+"""
+@generated function typed_time_dependent_fields(::T) where {T}
+    fns = Tuple(f
+                for f in fieldnames(T)
+                if typeintersect(fieldtype(T, f), TimeDependent) !== Union{})
+    return :($fns)
+end
+"""
+    time_dependent_candidate_fields(opt)
+
+Returns the names under which `opt` can hold a [`TimeDependent`](@ref).
+
+[`time_dependent_fields`](@ref) reads the values of these names only. The fallback returns the fields of [`typed_time_dependent_fields`](@ref). An owner of a [`ConstraintBlock`](@ref), such as [`JuMPOptimiser`](@ref), also returns the slots of its block that can hold a schedule, under their flat names. [`time_dependent_slot`](@ref) reads such a name, and [`rebuild_estimator`](@ref) passes it to the keyword constructor of the owner, which replaces that slot of the block.
+
+For a `JuMPOptimiser` that holds no schedule, the tuple is empty at compile time, so `split` and `_optimise` read none of its fields.
 
 # Related
 
   - [`TimeDependent`](@ref)
   - [`TD_Option`](@ref)
   - [`time_dependent_fields`](@ref)
+  - [`time_dependent_slot`](@ref)
 """
-@generated function time_dependent_candidate_fields(::T) where {T}
-    fns = Tuple(f
-                for f in fieldnames(T)
-                if typeintersect(fieldtype(T, f), TimeDependent) !== Union{})
-    return :($fns)
+function time_dependent_candidate_fields(opt)::Tuple
+    return typed_time_dependent_fields(opt)
+end
+"""
+    time_dependent_slot(opt, f::Symbol)
+
+Returns the value that `opt` holds under the name `f` of [`time_dependent_candidate_fields`](@ref).
+
+The fallback reads the field `f`. An owner of a [`ConstraintBlock`](@ref) reads a slot of its block under the flat name of the slot, as `opt.wb` reads it. The walks of the schedules read every value through this function, so a schedule in a slot of the block resolves, resets and counts its folds as a schedule in a field does.
+
+# Related
+
+  - [`time_dependent_candidate_fields`](@ref)
+  - [`time_dependent_fields`](@ref)
+"""
+function time_dependent_slot(opt, f::Symbol)
+    return getfield(opt, f)
 end
 """
     entitled(opt, f::Symbol, all_binds::Bool)
@@ -789,7 +822,7 @@ So every ordinary fold loop passes `all_binds = true`. Such a loop is the outerm
 function time_dependent_fields(opt, all_binds::Bool = true)
     fns = time_dependent_candidate_fields(opt)
     return filter(f -> begin
-                      x = getfield(opt, f)
+                      x = time_dependent_slot(opt, f)
                       if isa(x, TimeDependent)
                           (entitled(opt, f, all_binds) || x.bind === :outermost)
                       else
@@ -947,7 +980,7 @@ Checks the fold count of each field of an optimiser that holds a [`TimeDependent
 function assert_time_dependent_fields_fold_count(opt, n::Integer,
                                                  all_binds::Bool = true)::Nothing
     for f in time_dependent_fields(opt, all_binds)
-        assert_time_dependent_fold_count(getfield(opt, f), n, f)
+        assert_time_dependent_fold_count(time_dependent_slot(opt, f), n, f)
     end
     return nothing
 end
@@ -1111,7 +1144,8 @@ function update_time_dependent_fields(opt, ctx::TimeDependentContext,
     if isempty(tdfs)
         return opt
     end
-    repl = NamedTuple{tdfs}(map(f -> time_dependent_value(getfield(opt, f), ctx), tdfs))
+    repl = NamedTuple{tdfs}(map(f -> time_dependent_value(time_dependent_slot(opt, f), ctx),
+                                tdfs))
     return rebuild_estimator(opt, repl)
 end
 """
@@ -1213,8 +1247,8 @@ function reset_time_dependent_fields(opt)
         return opt
     end
     defaults = time_dependent_field_defaults(opt)
-    repl = NamedTuple{tdfs}(map(f -> time_dependent_reset_value(getfield(opt, f), defaults,
-                                                                f, opt), tdfs))
+    repl = NamedTuple{tdfs}(map(f -> time_dependent_reset_value(time_dependent_slot(opt, f),
+                                                                defaults, f, opt), tdfs))
     return rebuild_estimator(opt, repl)
 end
 #! End: Overload these for all estimators which can use time-dependent constraints.

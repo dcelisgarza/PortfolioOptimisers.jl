@@ -455,11 +455,11 @@ end
               occursin("$(t + 2) rows", err.msg)
         # The step refuses the series before it folds a row, expanding and under a rolling
         # window, whose rows keep the length of the series but not its rows.
-        cases = (mk(EmpiricalPrior()) => "opt.tr.tr",
-                 po.update_online_estimator(mk(po.Online(EmpiricalPrior(); max_history = t))) => "opt.tr.tr",
+        cases = (mk(EmpiricalPrior()) => "opt.cbe.tr.tr",
+                 po.update_online_estimator(mk(po.Online(EmpiricalPrior(); max_history = t))) => "opt.cbe.tr.tr",
                  MeanRisk(; r = trm, opt = JuMPOptimiser(; pe = EmpiricalPrior(), slv = slv)) => "r.tr",
                  HierarchicalRiskParity(; r = trm, opt = HierarchicalOptimiser(; pe = EmpiricalPrior())) => "r.tr",
-                 NestedClustered(; opti = mk(EmpiricalPrior()), opto = MeanRisk(; opt = JuMPOptimiser(; pe = EmpiricalPrior(), slv = slv))) => "opti.opt.tr.tr")
+                 NestedClustered(; opti = mk(EmpiricalPrior()), opto = MeanRisk(; opt = JuMPOptimiser(; pe = EmpiricalPrior(), slv = slv))) => "opti.opt.cbe.tr.tr")
         for (opt, path) in cases
             err = try
                 partial_fit!(opt, rows(rdv, 1:t))
