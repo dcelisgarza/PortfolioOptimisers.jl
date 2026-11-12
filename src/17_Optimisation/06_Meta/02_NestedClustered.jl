@@ -157,7 +157,7 @@ end
 
 Report whether a slot of an estimator holds a value of type `T`.
 
-The predicate reads the value in the slot and each entry of a vector in the slot. For a [`TimeDependent`](@ref) schedule in the slot, it reads each vector entry and the `default`, through [`time_dependent_entries`](@ref). A callable schedule has no value until it runs, so the predicate reads its `default` alone. The refusals of a nested optimiser pass a result type as `T`, so one predicate finds a precomputed result in each shape that a slot accepts.
+The predicate reads the value in the slot and each entry of a vector in the slot. For a [`TimeDependent`](@ref) schedule in the slot, it reads each vector entry and the `default`, through [`time_dependent_entries`](@ref). A callable schedule has no value until it runs, so the predicate reads its `default` alone. The refusals of a nested optimiser pass a result type as `T`, so one predicate finds a precomputed result in each shape that a slot accepts. [`FactorRiskContribution`](@ref) passes the two semidefinite kinds of a phylogeny, so it finds one in each shape that `opt.ple` accepts.
 
 # Arguments
 
@@ -173,6 +173,7 @@ The predicate reads the value in the slot and each entry of a vector in the slot
   - [`assert_internal_optimiser`](@ref)
   - [`assert_external_optimiser`](@ref)
   - [`assert_estimated_prior`](@ref)
+  - [`FactorRiskContribution`](@ref)
 """
 function holds_precomputed(x, ::Type{T})::Bool where {T}
     entries = isa(x, TimeDependent) ? time_dependent_entries(x) : (x,)

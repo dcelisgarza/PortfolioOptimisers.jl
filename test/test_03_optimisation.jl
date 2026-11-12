@@ -815,8 +815,7 @@ end
     # Run the head + assembler for `mr`, stop before solving, return the set of registered
     # Model-State key names. `r`/`b1`/`obj`/… default to the optimiser's own values but can
     # be overridden to probe a single branch in isolation.
-    function assemble_keys(mr; r = mr.r, b1 = nothing, obj = mr.obj,
-                           sdp_asset_phylogeny = true)
+    function assemble_keys(mr; r = mr.r, b1 = nothing, obj = mr.obj)
         attrs = PO.processed_jump_optimiser_attributes(mr.opt, rd)
         model = JuMP.Model()
         PO.set_model_scales!(model, mr.opt.sc, mr.opt.so)
@@ -828,8 +827,7 @@ end
         PO.set_maximum_ratio_factor_variables!(model, obj)
         PO.set_w!(model, attrs.pr.X, mr.wi)
         PO.set_weight_constraints!(model, attrs.wb, mr.opt)
-        PO.assemble_jump_model!(model, mr, mr.opt, attrs, rd, r, obj, b1,
-                                sdp_asset_phylogeny)
+        PO.assemble_jump_model!(model, mr, mr.opt, attrs, rd, r, obj, b1)
         return Set(string.(keys(JuMP.object_dictionary(model))))
     end
 

@@ -207,6 +207,7 @@ Keywords correspond to the struct's fields. A field typed [`TD`](@ref), [`TD_Opt
     `settings.rke = false` on every measure are the two ways to get such a model.
   - If `r` holds a [`DataBenchmarkTracking`](@ref): `opt.pe` must not state `x_src = ExcessSource()`, see [`assert_data_benchmark_prior`](@ref).
   - Each estimator of `frc_ple` states no source, because it reads the factor returns that the head picks, see [`assert_inner_reader`](@ref).
+  - `opt.ple` holds no [`SemiDefinitePhylogeny`](@ref) and no [`SemiDefinitePhylogenyEstimator`](@ref), directly, in a vector or in a schedule, see [`holds_precomputed`](@ref). The head writes no lift of the asset weights, so the phylogeny would add no rows. A phylogeny of the factors goes in `frc_ple`. An [`IntegerPhylogeny`](@ref) in `opt.ple` applies.
   - A reader that states no source and reads the raw returns data, beside a reader that states `x_src = ExcessSource()`, logs one warning that names its path, see [`warn_raw_readers`](@ref). The head then builds as configured.
 
 ## Propagated parameters
@@ -314,6 +315,12 @@ Keywords correspond to the struct's fields. A field typed [`TD`](@ref), [`TD_Opt
                                            (; opt, re, r, obj, frc_ple, sets, wi, flag, fb),
                                            factor_risk_contribution_td_defaults())
         assert_data_benchmark_prior(r, opt.pe, :r, :FactorRiskContribution, "opt.pe")
+        # The head writes no lift of the asset weights, so a semidefinite asset phylogeny
+        # would add no rows (#2033).
+        @argcheck(!holds_precomputed(opt.ple,
+                                     Union{SemiDefinitePhylogeny,
+                                           SemiDefinitePhylogenyEstimator}),
+                  ArgumentError("the `opt.ple` of `FactorRiskContribution` cannot hold a semidefinite phylogeny. The head solves for the factor weights and writes no lift of the asset weights, so the phylogeny would add no rows. Put a phylogeny of the factors in `frc_ple`. An `IntegerPhylogeny` in `opt.ple` applies."))
         # The factor phylogeny reads the factor returns that the head picks, so each of its
         # estimators is an inner reader.
         foreach(x -> assert_inner_reader(x, :frc_ple, :FactorRiskContribution),
@@ -506,7 +513,7 @@ Build the model of a [`FactorRiskContribution`](@ref), solve it, and return its 
  5. Build a new model. Register the scales with [`set_model_scales!`](@ref), the number of observations with [`set_model_observations!`](@ref), the homogenisation variables of a ratio with [`set_maximum_ratio_factor_variables!`](@ref) and the corner of a lifted variance with [`set_sdp_lift_corner!`](@ref).
  6. Create the factor weights and register `w` with [`set_factor_risk_contribution_constraints!`](@ref), giving `b1`, `b2` and `rr`. `b` is `b1`, or `[b1 b2]` when `flag = true`, the basis of the whole decision vector.
  7. Add the weight bounds with [`set_weight_constraints!`](@ref).
- 8. Add the constraints, the return terms and the risk measures with [`assemble_jump_model!`](@ref), which reads `b` and adds no asset phylogeny of the semidefinite kind.
+ 8. Add the constraints, the return terms and the risk measures with [`assemble_jump_model!`](@ref), which reads `b`. The constructor refuses an asset phylogeny of the semidefinite kind, so the assembly adds the rows of an integer one alone.
  9. Resolve `frc.frc_ple` on the factor returns with [`phylogeny_constraints`](@ref), giving `frc_plr`. Add its rows with [`set_sdp_frc_phylogeny_constraints!`](@ref) and [`set_frc_iplg_constraints!`](@ref).
 10. Set the objective with [`set_portfolio_objective_function!`](@ref), and solve with [`optimise_JuMP_model!`](@ref), giving `retcode` and `sol`.
 11. Build the result. It holds `attrs`, `retcode`, `sol`, the model when `save` is `true`, the risk measures resolved against the prior, `rr` and `frc_plr`.
@@ -551,7 +558,7 @@ function _optimise(frc::FactorRiskContribution, rd::ReturnsResult = ReturnsResul
     # `flag = true` prices the off-factor weights too (#1350).
     b = isnothing(b2) ? b1 : hcat(b1, b2)
     set_weight_constraints!(model, attrs.wb, frc.opt)
-    assemble_jump_model!(model, frc, frc.opt, attrs, rd, frc.r, frc.obj, b, false)
+    assemble_jump_model!(model, frc, frc.opt, attrs, rd, frc.r, frc.obj, b)
     # After the model is assembled, so the factor phylogeny reads the marks that the
     # variance builders and `mark_risk_minimised!` write, as the asset phylogeny does.
     # A factor phylogeny reads the factor returns, so it drops their gaps as the loadings do,

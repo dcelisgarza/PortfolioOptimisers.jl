@@ -356,8 +356,7 @@ end
         rd::ReturnsResult,
         r::Option{<:RM_VecRM} = nothing,
         obj::ObjectiveFunction = MinimumRisk(),
-        b1::Option{<:MatNum} = nothing,
-        sdp_asset_phylogeny::Bool = true
+        b1::Option{<:MatNum} = nothing
     ) -> Nothing
 
 Run the invariant model-assembly sequence shared by all single-JuMP-model optimisers.
@@ -394,9 +393,6 @@ when the optimiser solves its model once.
     constraints and scalarisation (the [`RelaxedRiskBudgeting`](@ref) path).
   - `obj::ObjectiveFunction = MinimumRisk()`: Objective used by the return constraints.
   - $(arg_dict[:b1_opt])
-  - `sdp_asset_phylogeny::Bool = true`: Whether to apply the standard asset-space SDP phylogeny
-    constraints. [`FactorRiskContribution`](@ref) passes `false` and applies its own
-    factor-space variant in its tail instead.
 
 # Returns
 
@@ -420,8 +416,7 @@ function assemble_jump_model!(model::JuMP.Model, optimiser::JuMPOptimisationEsti
                               opt::JuMPOptimiser, attrs::ProcessedJuMPOptimiserAttributes,
                               rd::ReturnsResult, r::Option{<:RM_VecRM} = nothing,
                               obj::ObjectiveFunction = MinimumRisk(),
-                              b1::Option{<:MatNum} = nothing,
-                              sdp_asset_phylogeny::Bool = true)
+                              b1::Option{<:MatNum} = nothing)
     (; pr, wb, lt, st, lcsr, ctr, gcardr, sgcardr, smtx, sgmtx, slt, sst, sglt, sgst, tn, fees, plr, ret) = attrs
     set_linear_weight_constraints!(model, lcsr, :lcs_ineq_, :lcs_eq_)
     set_linear_weight_constraints!(model, ctr, :cent_ineq_, :cent_eq_)
@@ -462,9 +457,7 @@ function assemble_jump_model!(model::JuMP.Model, optimiser::JuMPOptimisationEsti
     # every semidefinite phylogeny, including a programme set's in `add_custom_constraint!`.
     mark_risk_minimised!(model, obj)
     set_iplg_constraints!(model, plr)
-    if sdp_asset_phylogeny
-        set_sdp_phylogeny_constraints!(model, plr)
-    end
+    set_sdp_phylogeny_constraints!(model, plr)
     add_custom_constraint!(model, opt.ccnt, optimiser, attrs)
     assert_frontier_sweep_cap(model)
     assert_frontier_sweep_owner(model, optimiser)
