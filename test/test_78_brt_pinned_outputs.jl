@@ -114,10 +114,12 @@ Pipeline), which the decision tickets of the map can change.
                            ::Any, rg)
         return po.rebuild_estimator(re, (; x_src = rg))
     end
+    # The graph readers and the exposure rows of a head sit in the slots of its Constraint
+    # Block since #2039 and #2040, so the walk enters the block as it enters a field.
     function excess_reader(x::Union{<:ArithmeticReturn, <:UncertaintySetVariance,
                                     <:po.AbstractUncertaintySetEstimator,
                                     <:ExposureConstraintEstimator, <:FactorSpace,
-                                    <:FactorRiskBudgeting}, g, rg)
+                                    <:FactorRiskBudgeting, <:ConstraintBlock}, g, rg)
         return excess_fields(x, g, rg)
     end
     function excess_fields(x, g, rg)

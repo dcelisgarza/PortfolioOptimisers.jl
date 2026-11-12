@@ -6,7 +6,7 @@
 [provenance]
 julia = "1.13.3"
 julia_syntax = "1.0.2"
-commit = "519d0bc548"
+commit = "19ed69fece"
 
 [file]
 "ext/PortfolioOptimisersPlotsExt/01_CumulativeReturnsPlots.jl" = { code = 287, doc = 0, comment = 12, blank = 2, total = 301 }
@@ -404,7 +404,7 @@ commit = "519d0bc548"
 "src/17_Optimisation/10_OnlinePortfolioSelection/01_Base_OnlinePortfolioSelection.jl" = { code = 415, doc = 1069, comment = 15, blank = 444, total = 1943 }
 "src/17_Optimisation/10_OnlinePortfolioSelection/02_OnlineSelectionRules.jl" = { code = 309, doc = 805, comment = 7, blank = 296, total = 1417 }
 "src/17_Optimisation/10_OnlinePortfolioSelection/03_OnlinePortfolioSelection.jl" = { code = 360, doc = 557, comment = 8, blank = 236, total = 1161 }
-"src/17_Optimisation/10_OnlinePortfolioSelection/04_ProgrammeAllocationSet.jl" = { code = 393, doc = 629, comment = 2, blank = 177, total = 1201 }
+"src/17_Optimisation/10_OnlinePortfolioSelection/04_ProgrammeAllocationSet.jl" = { code = 233, doc = 506, comment = 9, blank = 180, total = 928 }
 "src/17_Optimisation/10_OnlinePortfolioSelection/05_ForecastRules.jl" = { code = 444, doc = 858, comment = 0, blank = 307, total = 1609 }
 "src/17_Optimisation/10_OnlinePortfolioSelection/06_SecondSetRules.jl" = { code = 313, doc = 740, comment = 10, blank = 297, total = 1360 }
 "src/17_Optimisation/10_OnlinePortfolioSelection/07_MirrorDescent.jl" = { code = 442, doc = 1052, comment = 8, blank = 410, total = 1912 }

@@ -25,7 +25,7 @@ Holds the feasible set of the weights of a programme, and the terms that the pro
 
 The block is the Constraint Block of the glossary. It holds the slots that a JuMP optimiser and a programme Allocation Set share: the weight bounds, the leverage caps, the linear, cardinality, threshold and phylogeny constraints, the turnover and tracking constraints, the norm ceilings, the custom constraints and the four regularisation penalties. A slot never writes the objective. The owner of the block holds the net budget, the fees, the return term and the scalariser.
 
-[`JuMPOptimiser`](@ref) holds a block in its field `cbe`. Its keyword constructor takes each slot of the block as a flat keyword, and `opt.wb` reads the slot of the block. So build a block directly only to give one feasible set to more than one optimiser.
+[`JuMPOptimiser`](@ref) and [`ProgrammeAllocationSet`](@ref) each hold a block in their field `cbe`. The keyword constructor of each owner takes each slot of the block as a flat keyword, and `opt.wb` reads the slot of the block. So build a block directly only to give one feasible set to more than one owner.
 
 # Fields
 
@@ -360,7 +360,7 @@ end
 
 Returns the [`ConstraintBlock`](@ref) that the keyword constructor of an owner holds, from the block that the caller gives and the slots that the caller names as flat keywords.
 
-The keyword constructor of [`JuMPOptimiser`](@ref) calls it. A flat keyword replaces that slot of a given block, and a slot that the caller does not name keeps its value. So the default of a flat keyword never overwrites a slot of a given block. [`rebuild_estimator`](@ref) and `Accessors.set` pass the block and a new slot in one call, and they rely on this rule.
+The keyword constructors of [`JuMPOptimiser`](@ref) and [`ProgrammeAllocationSet`](@ref) call it. A flat keyword replaces that slot of a given block, and a slot that the caller does not name keeps its value. So the default of a flat keyword never overwrites a slot of a given block. [`rebuild_estimator`](@ref) and `Accessors.set` pass the block and a new slot in one call, and they rely on this rule.
 
 # Algorithm
 
@@ -503,12 +503,12 @@ $(DocStringExtensions.TYPEDSIGNATURES)
 
 Returns a copy of `cbe` restricted to the assets at the indices `i`.
 
-The method of the owner calls it, see `port_opt_view(opt::JuMPOptimiser, i, X)`.
+The method of the owner calls it, see `port_opt_view(opt::JuMPOptimiser, i, X)` and `port_opt_view(set::ProgrammeAllocationSet, i, args...)`. A [`JuMPOptimiser`](@ref) passes the returns matrix `X`. A [`ProgrammeAllocationSet`](@ref) passes the arguments that it takes after `i`, and an online head can pass none.
 
 # Algorithm
 
  1. View at `i` the slots that can hold a value for each asset: `wb`, `lt`, `st`, `smtx`, `sgmtx`, `slt`, `sst`, `sglt`, `sgst`, `tn`, `lcse`, `sets`, `ccnt` and `cobj`. When `smtx` and `sgmtx` hold the same object, view it once, so that the two views are one object too. The same holds for `slt` and `sglt`, and for `sst` and `sgst`.
- 2. View `tr` at `i` with `X`. A tracking measure gives `X` to the risk measure that it tracks.
+ 2. View `tr` at `i` with `args`. A tracking measure gives the returns matrix `X` in `args` to the risk measure that it tracks.
  3. Keep every other slot. An estimator in `cte`, `gcarde` or `sgcarde` resolves its names against the viewed `sets`. A precomputed constraint in one of them keeps its width, because no view can narrow its matrix, see `port_opt_view(::LinearConstraint, i)`. `ple` reads the viewed prior of the owner. The other slots hold no value for each asset.
  4. Rebuild the block with its keyword constructor, which checks the viewed slots again.
 
@@ -516,7 +516,7 @@ The method of the owner calls it, see `port_opt_view(opt::JuMPOptimiser, i, X)`.
 
   - `cbe::ConstraintBlock`: The block.
   - `i`: The indices of the assets that the view keeps.
-  - `X::MatNum`: The returns matrix of the full universe, with one column for each asset.
+  - `args...`: The arguments that the tracking errors `tr` read, such as the returns matrix `X` of the full universe, with one column for each asset.
 
 # Returns
 
@@ -527,7 +527,7 @@ The method of the owner calls it, see `port_opt_view(opt::JuMPOptimiser, i, X)`.
   - [`ConstraintBlock`](@ref)
   - [`port_opt_view`](@ref)
 """
-function port_opt_view(cbe::ConstraintBlock, i, X::MatNum)::ConstraintBlock
+function port_opt_view(cbe::ConstraintBlock, i, args...)::ConstraintBlock
     smtx, sgmtx = shared_pair_view(cbe.smtx, cbe.sgmtx, i)
     slt, sglt = shared_pair_view(cbe.slt, cbe.sglt, i)
     sst, sgst = shared_pair_view(cbe.sst, cbe.sgst, i)
@@ -537,7 +537,7 @@ function port_opt_view(cbe::ConstraintBlock, i, X::MatNum)::ConstraintBlock
                               lcse = port_opt_view(cbe.lcse, i), smtx, sgmtx, slt, sst,
                               sglt, sgst, tn = port_opt_view(cbe.tn, i),
                               sets = port_opt_view(cbe.sets, i),
-                              tr = port_opt_view(cbe.tr, i, X),
+                              tr = port_opt_view(cbe.tr, i, args...),
                               ccnt = port_opt_view(cbe.ccnt, i),
                               cobj = port_opt_view(cbe.cobj, i)))
 end

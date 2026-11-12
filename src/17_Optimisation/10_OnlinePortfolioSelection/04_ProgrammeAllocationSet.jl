@@ -3,7 +3,7 @@ $(DocStringExtensions.TYPEDEF)
 
 Constrains an online allocation with every constraint kind of a JuMP optimiser, and projects onto the set with a solver.
 
-The set takes the field names and the type bounds of [`JuMPOptimiser`](@ref), and the direct objective penalties of the optimiser. A projection onto the set is a programme, so `slv` has no default. The budget is one, and the set has no budget field. Cash is an asset whose price relative is one, and the rule allocates it as any other asset.
+The set holds its constraint kinds and its direct objective penalties in a [`ConstraintBlock`](@ref), the block that [`JuMPOptimiser`](@ref) holds, in its field `cbe`. Each slot of the block is a keyword and a property of the set, so `set.wb` reads `set.cbe.wb`. The risk ceilings `r` and the return floor `ret` are fields of the set, and not slots of the block. A projection onto the set is a programme, so `slv` has no default. The budget is one, and the set owns it, so the set has no budget field. Cash is an asset whose price relative is one, and the rule allocates it as any other asset.
 
 The projection is a bare JuMP model with the variables and rows of the Weight Finaliser, which are `w`, `k = 1`, `Σw = 1`, the constraint scale and the objective scale. [`set_allocation_set_constraints!`](@ref) adds the constraint kinds through the builders of the optimiser, in the order that [`assemble_jump_model!`](@ref) runs them. [`set_projection_objective!`](@ref) sets the objective, the divergence of the rule's Projection Geometry plus the set's penalties.
 
@@ -23,7 +23,7 @@ The readers of the set join the group of the head, see [`group_frames`](@ref). A
 
 A set that reads the rows, for which [`rows_needed`](@ref) returns `nothing`, fits its prior once over the whole prefix at every step, and then solves its programme. A caller who wants a window states it on `pe`. A covariance of one observation does not exist. So while the head holds fewer than two rows, the set fits no prior, and the step is a Held Step with its reason recorded ([`allocation_set_ready`](@ref)). A caller who wants a covariance ceiling from the first row gives `r` its matrix. A MIP projection is not unique. So the identity between the Causal Pass and the Recursion Result is a property of the code path, the same solves in the same order on the same rows, and it holds exactly only with a deterministic solver.
 
-The set has no field for a budget, fees, the return term as an objective, the scalariser, the execution settings of the optimiser or a `TimeDependent` schedule. At construction [`assert_risk_ceiling`](@ref) refuses a frontier or a per-asset `ub` on a measure, because a ceiling is one number. The set does not read the `rke` or the `scale` of a measure. The ceiling is a constraint, and the objective is the divergence plus the penalties. The Euclidean, Gram and diagonal geometries admit a negative lower bound. The entropic, Tsallis and log-barrier geometries refuse it, at the head's construction when the bound is a value ([`assert_geometry_admits_set`](@ref)) and at the projection when an estimator resolves it. The wealth factor of a leveraged allocation can reach zero on an extreme day. At that point the log wealth and the next gradient are undefined, and the set does not guard against it.
+The set has no field for a budget, fees, the return term as an objective, the scalariser or the execution settings of the optimiser, and no slot of its block holds a `TimeDependent` schedule. At construction [`assert_risk_ceiling`](@ref) refuses a frontier or a per-asset `ub` on a measure, because a ceiling is one number. The set does not read the `rke` or the `scale` of a measure. The ceiling is a constraint, and the objective is the divergence plus the penalties. The Euclidean, Gram and diagonal geometries admit a negative lower bound. The entropic, Tsallis and log-barrier geometries refuse it, at the head's construction when the bound is a value ([`assert_geometry_admits_set`](@ref)) and at the projection when an estimator resolves it. The wealth factor of a leveraged allocation can reach zero on an extreme day. At that point the log wealth and the next gradient are undefined, and the set does not guard against it.
 
 # Mathematical definition
 
@@ -57,69 +57,39 @@ $(DocStringExtensions.FIELDS)
     ProgrammeAllocationSet(;
         slv::Slv_VecSlv,
         pe::AbstractPriorEstimator = EmpiricalPrior(),
+        cbe::Option{<:ConstraintBlock} = nothing,
         r::Option{<:RM_VecRM} = nothing,
-        wb::Option{<:NameWbE_Wb} = WeightBounds(),
-        sbgt::Option{<:Num_BgtRg} = nothing,
-        gbgt::Option{<:Num_BgtRg} = nothing,
-        xbgt::Bool = false,
-        lt::Option{<:BtE_Bt} = nothing,
-        st::Option{<:BtE_Bt} = nothing,
-        lcse::Option{<:Union{EcE_LcE_Lc, AbstractVector}} = nothing,
-        cte::Option{<:Lc_CC_VecCC} = nothing,
-        gcarde::Option{<:LcE_Lc} = nothing,
-        sgcarde::Option{<:Union{LcE_Lc, AbstractVector}} = nothing,
-        smtx::Option{<:Union{MatNum_ASetMatE, AbstractVector}} = nothing,
-        sgmtx::Option{<:Union{MatNum_ASetMatE, AbstractVector}} = nothing,
-        slt::Option{<:Union{BtE_Bt, AbstractVector}} = nothing,
-        sst::Option{<:Union{BtE_Bt, AbstractVector}} = nothing,
-        sglt::Option{<:Union{BtE_Bt, AbstractVector}} = nothing,
-        sgst::Option{<:Union{BtE_Bt, AbstractVector}} = nothing,
-        tn::Option{<:Union{TnE_Tn, AbstractVector}} = nothing,
-        sets::Option{<:UniverseSets} = nothing,
-        tr::Option{<:Tr_VecTr} = nothing,
-        ple::Option{<:Union{PlCE_PlC, AbstractVector}} = nothing,
         ret::Option{<:JRE_VecJRE} = nothing,
-        ccnt::Option{<:JuMPConstr_VecJuMPConstr} = nothing,
-        cobj::Option{<:JuMPObj_VecJuMPObj} = nothing,
         sc::Number = 1,
         so::Number = 1,
-        ss::Option{<:Number} = nothing,
-        card::Option{<:Integer} = nothing,
-        scard::Option{<:Int_VecInt} = nothing,
-        l2c::Option{<:Num_NormCeilCal} = nothing,
-        lpc::Option{<:LpReg_VecLpReg} = nothing,
-        linfc::Option{<:Num_NormCeilCal} = nothing,
-        l1::Option{<:Num_AmbRadCal} = nothing,
-        l2::Option{<:L2Reg_VecL2Reg} = nothing,
-        lp::Option{<:LpReg_VecLpReg} = nothing,
-        linf::Option{<:Num_AmbRadCal} = nothing
+        slots...,
     ) -> ProgrammeAllocationSet
 
-Keywords correspond to the struct's fields. `slv` has no default, because every projection onto the set is a programme. `lcse`, `sgcarde`, `smtx`, `sgmtx`, `slt`, `sst`, `sglt`, `sgst`, `tn` and `ple` take a vector that mixes the members of their element type, through [`narrow_mixed_vector`](@ref), as the keyword constructor of [`JuMPOptimiser`](@ref) does.
+Keywords correspond to the struct's fields and to the slots of [`ConstraintBlock`](@ref). `slv` has no default, because every projection onto the set is a programme. `slots...` takes each keyword of the block with its type and its default: `wb`, `sbgt`, `gbgt`, `lt`, `st`, `lcse`, `cte`, `gcarde`, `sgcarde`, `smtx`, `sgmtx`, `slt`, `sst`, `sglt`, `sgst`, `tn`, `sets`, `tr`, `ple`, `ccnt`, `cobj`, `ss`, `card`, `scard`, `l2c`, `lpc`, `linfc`, `l1`, `l2`, `lp`, `linf` and `xbgt`. The constructor builds the block in `cbe` from these flat keywords, as the keyword constructor of [`JuMPOptimiser`](@ref) does. When the caller gives `cbe`, a flat keyword replaces that slot of the given block, and a slot that the caller does not name keeps its value, see [`constraint_block`](@ref). A name that is neither a field nor a slot raises a `MethodError`.
+
+`lcse`, `sgcarde`, `smtx`, `sgmtx`, `slt`, `sst`, `sglt`, `sgst`, `tn` and `ple` take a vector that mixes the members of their element type. The keyword constructor of the block narrows it through [`narrow_mixed_vector`](@ref).
+
+The positional constructor takes the fields in the order of the struct: `pe`, `slv`, `cbe`, `r`, `ret`, `sc` and `so`. Before the block, it took one argument for each slot.
 
 ## Validation
 
+The constructor of [`ConstraintBlock`](@ref) checks each slot on its own: the values of `sbgt`, `gbgt`, `card`, `l2c`, `linfc`, `l1` and `linf`, an empty vector in a slot, the roles of `lp` and `lpc`, the shapes of the sub-group MIP slots, and `sets` beside a slot keyed by name ([`name_keyed`](@ref)). This constructor checks the fields of the set, and the rules that read the set and its block together.
+
   - If `slv` is a vector: `!isempty(slv)`. An `IsEmptyError` is thrown otherwise.
-  - If `sbgt` or `gbgt` is a number: non-negative and finite. A `DomainError` is thrown otherwise.
-  - If `gbgt` is given: `sbgt` is not a number, because the budget of one and a number in `sbgt` already fix the gross exposure. If `wb` is a [`WeightBounds`](@ref), one of its bounds admits a short weight. If `gbgt` has an upper end, it is at least one, because the gross exposure is at least the budget of one. An `ArgumentError` is thrown otherwise.
+  - `wb` is a [`NameWbE_Wb`](@ref). A bound that reads the returns, such as a [`ScoreWeightBounds`](@ref), would read rows after each Online Update, so the constructor refuses it with a `TypeError`.
+  - No slot of `cbe` holds a [`TimeDependent`](@ref). No fold loop resolves a schedule inside an Allocation Set, so the constructor refuses it with an `ArgumentError`. Schedule the whole set instead, `OnlinePortfolioSelection(; set = TimeDependent([…]))`.
+  - If `gbgt` is given: `sbgt` is not a number, because the budget of one and a number in `sbgt` already fix the gross exposure. If `wb` is a [`WeightBounds`](@ref), one of its bounds admits a short weight. If `gbgt` has an upper end, it is at least one, because the gross exposure is at least the budget of one ([`assert_gross_budget_admissible`](@ref)). An `ArgumentError` is thrown otherwise.
   - If `r` is given: the `settings.ub` of every measure is a finite non-negative number, the ceiling, and no measure holds a [`ReturnsTracking`](@ref), because the ceiling reads rows that change at every step ([`assert_risk_ceiling`](@ref)). An `ArgumentError` is thrown otherwise, and an `IsEmptyError` for an empty vector.
-  - If `ret` is given: the `settings.lb` of every return term is `nothing` or a number, the floor, because the projection solves once and returns one allocation ([`assert_return_floor`](@ref)). An `ArgumentError` is thrown for a [`Frontier`](@ref) or a vector.
-  - If `lcse`, `cte`, `smtx`, `sgmtx`, `tn`, `tr`, `ple`, `l2`, `lp`, `lpc` or `ret` is a vector: `!isempty(x)`. An `IsEmptyError` is thrown otherwise.
-  - If `card` is given: `card > 0` and finite. If `l2c`, `linfc`, `l1` or `linf` is a number: `> 0` and finite. A `DomainError` is thrown otherwise.
-  - An [`LpRegularisation`](@ref) in `lp` holds no norm ceiling rule, and one in `lpc` holds no ambiguity radius rule. An `ArgumentError` is thrown otherwise.
-  - The sub-group and sub-grouped MIP slots agree in shape ([`assert_subgroup_mip_fields`](@ref), [`assert_subgrouped_mip_fields`](@ref)).
-  - If a slot holds an estimator keyed by name ([`name_keyed`](@ref)): `!isnothing(sets)`. An `IsNothingError` is thrown otherwise.
-  - `wb` is a [`NameWbE_Wb`](@ref). A bound that reads the returns, such as a [`ScoreWeightBounds`](@ref), would read rows after each Online Update, so the field bound refuses it with a `TypeError`.
+  - If `ret` is given: the `settings.lb` of every return term is `nothing` or a number, the floor, because the projection solves once and returns one allocation ([`assert_return_floor`](@ref)). An `ArgumentError` is thrown for a [`Frontier`](@ref) or a vector. An empty vector raises an `IsEmptyError`.
   - If `tr` or `r` holds a [`DataBenchmarkTracking`](@ref): `pe` must not state `x_src = ExcessSource()`, see [`assert_data_benchmark_prior`](@ref).
 
 ## View parameters
 
 `ProgrammeAllocationSet` defines its own [`port_opt_view`](@ref) method rather than deriving one from field tags.
 
-  - The method passes the arguments after `i` to the tracking errors `tr` alone. It views the risk ceilings `r` with `nothing` in place of those arguments.
-  - The prior estimator `pe`, the per-asset slots `wb`, `lt`, `st`, `lcse`, `smtx`, `sgmtx`, `slt`, `sst`, `sglt`, `sgst`, `tn`, `sets`, `ret`, `ccnt` and `cobj`, and the ceilings and tracking errors recurse through [`port_opt_view`](@ref), as the fields of [`JuMPOptimiser`](@ref) do.
-  - The centrality rows `cte`, the grouped cardinality slots `gcarde` and `sgcarde`, and the phylogeny kinds `ple` pass through unchanged, as they do on the optimiser. A precomputed [`LinearConstraint`](@ref) is the identity under a view.
-  - When a sub-group slot and its sub-grouped slot hold one object, such as `smtx` and `sgmtx`, the method views it once, and the two slots stay one object.
+  - The method views the block through `port_opt_view(cbe::ConstraintBlock, i, args...)`, which passes the arguments after `i` to the tracking errors `tr` alone. It views the risk ceilings `r` with `nothing` in place of those arguments.
+  - The prior estimator `pe`, the return floor `ret` and the risk ceilings recurse through [`port_opt_view`](@ref). The block views its per-asset slots, and keeps `cte`, `gcarde`, `sgcarde` and `ple`, as it does in [`JuMPOptimiser`](@ref). A precomputed [`LinearConstraint`](@ref) is the identity under a view.
+  - When a sub-group slot and its sub-grouped slot hold one object, such as `smtx` and `sgmtx`, the block views it once, and the two slots stay one object.
 
 # Examples
 
@@ -127,76 +97,77 @@ Keywords correspond to the struct's fields. `slv` has no default, because every 
 julia> ProgrammeAllocationSet(; slv = Solver(; solver = nothing),
                               tn = Turnover(; w = fill(0.25, 4), val = 0.1))
 ProgrammeAllocationSet
-       pe ┼ EmpiricalPrior
-          │           ce ┼ PortfolioOptimisersCovariance
-          │              │   ce ┼ Covariance
-          │              │      │    me ┼ SimpleExpectedReturns
-          │              │      │       │   w ┴ nothing
-          │              │      │    ce ┼ GeneralCovariance
-          │              │      │       │   ce ┼ StatsBase.SimpleCovariance: StatsBase.SimpleCovariance(true)
-          │              │      │       │    w ┴ nothing
-          │              │      │   alg ┼ FullMoment()
-          │              │      │     w ┴ nothing
-          │              │   mp ┼ MatrixProcessing
-          │              │      │     pdm ┼ Posdef
-          │              │      │         │      alg ┼ UnionAll: NearestCorrelationMatrix.Newton
-          │              │      │         │   kwargs ┴ @NamedTuple{}: NamedTuple()
-          │              │      │      dn ┼ nothing
-          │              │      │      dt ┼ nothing
-          │              │      │     alg ┼ nothing
-          │              │      │   order ┴ NTuple{4, Symbol}: (:pdm, :dn, :dt, :alg)
-          │           me ┼ SimpleExpectedReturns
-          │              │   w ┴ nothing
-          │      horizon ┼ nothing
-          │   fill_limit ┼ nothing
-          │        x_src ┴ nothing
-      slv ┼ Solver
-          │          name ┼ String: \"\"
-          │        solver ┼ nothing
-          │      settings ┼ nothing
-          │     check_sol ┼ @NamedTuple{}: NamedTuple()
-          │   add_bridges ┴ Bool: true
-        r ┼ nothing
-       wb ┼ WeightBounds
-          │   lb ┼ Float64: 0.0
-          │   ub ┴ Float64: 1.0
-     sbgt ┼ nothing
-     gbgt ┼ nothing
-     xbgt ┼ Bool: false
-       lt ┼ nothing
-       st ┼ nothing
-     lcse ┼ nothing
-      cte ┼ nothing
-   gcarde ┼ nothing
-  sgcarde ┼ nothing
-     smtx ┼ nothing
-    sgmtx ┼ nothing
-      slt ┼ nothing
-      sst ┼ nothing
-     sglt ┼ nothing
-     sgst ┼ nothing
-       tn ┼ Turnover
-          │       w ┼ Vector{Float64}: [0.25, 0.25, 0.25, 0.25]
-          │     val ┼ Float64: 0.1
-          │   fixed ┴ Bool: false
-     sets ┼ nothing
-       tr ┼ nothing
-      ple ┼ nothing
-      ret ┼ nothing
-     ccnt ┼ nothing
-     cobj ┼ nothing
-       sc ┼ Int64: 1
-       so ┼ Int64: 1
-       ss ┼ nothing
-     card ┼ nothing
-    scard ┼ nothing
-      l2c ┼ nothing
-      lpc ┼ nothing
-    linfc ┼ nothing
-       l1 ┼ nothing
-       l2 ┼ nothing
-       lp ┼ nothing
-     linf ┴ nothing
+   pe ┼ EmpiricalPrior
+      │           ce ┼ PortfolioOptimisersCovariance
+      │              │   ce ┼ Covariance
+      │              │      │    me ┼ SimpleExpectedReturns
+      │              │      │       │   w ┴ nothing
+      │              │      │    ce ┼ GeneralCovariance
+      │              │      │       │   ce ┼ StatsBase.SimpleCovariance: StatsBase.SimpleCovariance(true)
+      │              │      │       │    w ┴ nothing
+      │              │      │   alg ┼ FullMoment()
+      │              │      │     w ┴ nothing
+      │              │   mp ┼ MatrixProcessing
+      │              │      │     pdm ┼ Posdef
+      │              │      │         │      alg ┼ UnionAll: NearestCorrelationMatrix.Newton
+      │              │      │         │   kwargs ┴ @NamedTuple{}: NamedTuple()
+      │              │      │      dn ┼ nothing
+      │              │      │      dt ┼ nothing
+      │              │      │     alg ┼ nothing
+      │              │      │   order ┴ NTuple{4, Symbol}: (:pdm, :dn, :dt, :alg)
+      │           me ┼ SimpleExpectedReturns
+      │              │   w ┴ nothing
+      │      horizon ┼ nothing
+      │   fill_limit ┼ nothing
+      │        x_src ┴ nothing
+  slv ┼ Solver
+      │          name ┼ String: \"\"
+      │        solver ┼ nothing
+      │      settings ┼ nothing
+      │     check_sol ┼ @NamedTuple{}: NamedTuple()
+      │   add_bridges ┴ Bool: true
+  cbe ┼ ConstraintBlock
+      │        wb ┼ WeightBounds
+      │           │   lb ┼ Float64: 0.0
+      │           │   ub ┴ Float64: 1.0
+      │      sbgt ┼ nothing
+      │      gbgt ┼ nothing
+      │        lt ┼ nothing
+      │        st ┼ nothing
+      │      lcse ┼ nothing
+      │       cte ┼ nothing
+      │    gcarde ┼ nothing
+      │   sgcarde ┼ nothing
+      │      smtx ┼ nothing
+      │     sgmtx ┼ nothing
+      │       slt ┼ nothing
+      │       sst ┼ nothing
+      │      sglt ┼ nothing
+      │      sgst ┼ nothing
+      │        tn ┼ Turnover
+      │           │       w ┼ Vector{Float64}: [0.25, 0.25, 0.25, 0.25]
+      │           │     val ┼ Float64: 0.1
+      │           │   fixed ┴ Bool: false
+      │      sets ┼ nothing
+      │        tr ┼ nothing
+      │       ple ┼ nothing
+      │      ccnt ┼ nothing
+      │      cobj ┼ nothing
+      │        ss ┼ nothing
+      │      card ┼ nothing
+      │     scard ┼ nothing
+      │       l2c ┼ nothing
+      │       lpc ┼ nothing
+      │     linfc ┼ nothing
+      │        l1 ┼ nothing
+      │        l2 ┼ nothing
+      │        lp ┼ nothing
+      │      linf ┼ nothing
+      │      xbgt ┴ Bool: false
+    r ┼ nothing
+  ret ┼ nothing
+   sc ┼ Int64: 1
+   so ┴ Int64: 1
 ```
 
 # Related
@@ -224,101 +195,17 @@ ProgrammeAllocationSet
     """
     slv
     """
+    $(field_dict[:cbe]) In a programme set, the turnover ceilings `tn` and a [`WeightsTracking`](@ref) in `tr` that is not `fixed` take the Price-Adjusted Allocation of the step as their reference. A [`ReturnsTracking`](@ref) series in `tr` that is stated over the fold is cut to the prefix that the head has folded, and the centrality rows `cte` are resolved on the head's rows at every step.
+    """
+    cbe
+    """
     The risk ceilings, a [`RiskMeasure`](@ref) or a vector of them, each with `settings.ub` the ceiling, or `nothing`.
     """
     r
     """
-    $(field_dict[:wb_jmp])
-    """
-    wb
-    """
-    $(field_dict[:sbgt])
-    """
-    sbgt
-    """
-    $(field_dict[:gbgt])
-    """
-    gbgt
-    """
-    $(field_dict[:xbgt])
-    """
-    xbgt
-    """
-    $(field_dict[:lt])
-    """
-    lt
-    """
-    $(field_dict[:st])
-    """
-    st
-    """
-    $(field_dict[:lcse])
-    """
-    lcse
-    """
-    The centrality rows: a [`CentralityConstraint`](@ref), a vector of them, or an already-generated [`LinearConstraint`](@ref), resolved on the head's rows at every step.
-    """
-    cte
-    """
-    $(field_dict[:gcarde])
-    """
-    gcarde
-    """
-    $(field_dict[:sgcarde])
-    """
-    sgcarde
-    """
-    $(field_dict[:smtx])
-    """
-    smtx
-    """
-    $(field_dict[:sgmtx])
-    """
-    sgmtx
-    """
-    $(field_dict[:slt])
-    """
-    slt
-    """
-    $(field_dict[:sst])
-    """
-    sst
-    """
-    $(field_dict[:sglt])
-    """
-    sglt
-    """
-    $(field_dict[:sgst])
-    """
-    sgst
-    """
-    The turnover ceilings: a [`Turnover`](@ref), a [`TurnoverEstimator`](@ref) that resolves over `sets`, or a vector of them. At every step the set replaces the reference of each ceiling with the Price-Adjusted Allocation, unless the ceiling is `fixed`.
-    """
-    tn
-    """
-    $(field_dict[:sets])
-    """
-    sets
-    """
-    The tracking errors, any [`AbstractTracking`](@ref) or a vector of them, over the head's rows: a [`WeightsTracking`](@ref) that is not `fixed` tracks the Price-Adjusted Allocation, and a [`ReturnsTracking`](@ref) series stated over the fold is cut to the prefix the head has folded so far.
-    """
-    tr
-    """
-    $(field_dict[:ple_jmp])
-    """
-    ple
-    """
     The return floor: a return term, or a vector of them, whose `settings.lb` bounds the prior's expected return of the projected allocation from below; the term's objective role is not read.
     """
     ret
-    """
-    $(field_dict[:ccnt])
-    """
-    ccnt
-    """
-    $(field_dict[:cobj])
-    """
-    cobj
     """
     $(field_dict[:sc])
     """
@@ -327,227 +214,62 @@ ProgrammeAllocationSet
     $(field_dict[:so])
     """
     so
-    """
-    $(field_dict[:ss])
-    """
-    ss
-    """
-    $(field_dict[:card])
-    """
-    card
-    """
-    $(field_dict[:scard])
-    """
-    scard
-    """
-    $(field_dict[:l2c])
-    """
-    l2c
-    """
-    $(field_dict[:lpc])
-    """
-    lpc
-    """
-    $(field_dict[:linfc])
-    """
-    linfc
-    """
-    $(field_dict[:l1])
-    """
-    l1
-    """
-    $(field_dict[:l2])
-    """
-    l2
-    """
-    $(field_dict[:lp])
-    """
-    lp
-    """
-    $(field_dict[:linf])
-    """
-    linf
     function ProgrammeAllocationSet(pe::AbstractPriorEstimator, slv::Slv_VecSlv,
-                                    r::Option{<:RM_VecRM}, wb::Option{<:NameWbE_Wb},
-                                    sbgt::Option{<:Num_BgtRg}, gbgt::Option{<:Num_BgtRg},
-                                    xbgt::Bool, lt::Option{<:BtE_Bt}, st::Option{<:BtE_Bt},
-                                    lcse::Option{<:EcE_LcE_Lc_VecEcE_LcE_Lc},
-                                    cte::Option{<:Lc_CC_VecCC}, gcarde::Option{<:LcE_Lc},
-                                    sgcarde::Option{<:LcE_Lc_VecLcE_Lc},
-                                    smtx::Option{<:MatNum_ASetMatE_VecMatNum_ASetMatE},
-                                    sgmtx::Option{<:MatNum_ASetMatE_VecMatNum_ASetMatE},
-                                    slt::Option{<:BtE_Bt_VecOptBtE_Bt},
-                                    sst::Option{<:BtE_Bt_VecOptBtE_Bt},
-                                    sglt::Option{<:BtE_Bt_VecOptBtE_Bt},
-                                    sgst::Option{<:BtE_Bt_VecOptBtE_Bt},
-                                    tn::Option{<:TnE_Tn_VecTnE_Tn},
-                                    sets::Option{<:UniverseSets}, tr::Option{<:Tr_VecTr},
-                                    ple::Option{<:PlCE_PlC_VecPlCE_PlC},
-                                    ret::Option{<:JRE_VecJRE},
-                                    ccnt::Option{<:JuMPConstr_VecJuMPConstr},
-                                    cobj::Option{<:JuMPObj_VecJuMPObj}, sc::Number,
-                                    so::Number, ss::Option{<:Number},
-                                    card::Option{<:Integer}, scard::Option{<:Int_VecInt},
-                                    l2c::Option{<:Num_NormCeilCal},
-                                    lpc::Option{<:LpReg_VecLpReg},
-                                    linfc::Option{<:Num_NormCeilCal},
-                                    l1::Option{<:Num_AmbRadCal},
-                                    l2::Option{<:L2Reg_VecL2Reg},
-                                    lp::Option{<:LpReg_VecLpReg},
-                                    linf::Option{<:Num_AmbRadCal})
+                                    cbe::ConstraintBlock, r::Option{<:RM_VecRM},
+                                    ret::Option{<:JRE_VecJRE}, sc::Number, so::Number)
         if isa(slv, VecSlv)
             @argcheck(!isempty(slv), IsEmptyError("slv cannot be empty"))
         end
-        if isa(sbgt, Number)
-            assert_nonempty_nonneg_finite_val(sbgt, :sbgt)
+        # The constructor of the block checks each slot on its own. The checks below read a
+        # field of the set, or a rule that the set adds to the slots of the block. The type
+        # bounds of the block admit a bound that reads the returns and a schedule, and the
+        # bounds of the keywords of the set refused both before the set held a block.
+        if !isa(cbe.wb, Option{NameWbE_Wb})
+            throw(TypeError(:ProgrammeAllocationSet, "wb", Option{NameWbE_Wb}, cbe.wb))
         end
-        if isa(gbgt, Number)
-            assert_nonempty_nonneg_finite_val(gbgt, :gbgt)
-        end
-        assert_gross_budget_admissible(1, sbgt, gbgt, wb)
+        tdfs = typed_time_dependent_fields(cbe)
+        @argcheck(isempty(tdfs),
+                  ArgumentError("the slot `$(first(tdfs))` of a `ProgrammeAllocationSet` holds a `TimeDependent` schedule, and no fold loop resolves a schedule inside an Allocation Set: the online head resolves a schedule of the whole set. Schedule the set, `OnlinePortfolioSelection(; set = TimeDependent([...]))`, and give each entry a static slot."))
+        assert_gross_budget_admissible(1, cbe.sbgt, cbe.gbgt, cbe.wb)
         assert_risk_ceiling(r)
         assert_return_floor(ret)
-        for (x, name) in
-            ((lcse, :lcse), (cte, :cte), (smtx, :smtx), (sgmtx, :sgmtx), (tn, :tn),
-             (tr, :tr), (ple, :ple), (l2, :l2), (lp, :lp), (lpc, :lpc), (ret, :ret))
-            if isa(x, AbstractVector)
-                @argcheck(!isempty(x), IsEmptyError("$name cannot be empty"))
-            end
+        if isa(ret, AbstractVector)
+            @argcheck(!isempty(ret), IsEmptyError("ret cannot be empty"))
         end
-        if !isnothing(card)
-            assert_nonempty_gt0_finite_val(card, :card)
-        end
-        for (x, name) in ((l2c, :l2c), (linfc, :linfc), (l1, :l1), (linf, :linf))
-            if !isnothing(x)
-                assert_nonempty_gt0_finite_val(x, name)
-            end
-        end
-        assert_penalty_coefficient_role(lp)
-        assert_norm_ceiling_role(lpc)
-        assert_subgroup_mip_fields(scard, smtx, slt, sst)
-        assert_subgrouped_mip_fields(sgcarde, sgmtx, sglt, sgst)
-        if any(name_keyed,
-               (wb, lt, st, lcse, cte, gcarde, sgcarde, smtx, sgmtx, slt, sst, sglt, sgst,
-                tn))
-            @argcheck(!isnothing(sets),
-                      IsNothingError("sets cannot be nothing when a slot holds an estimator keyed by name"))
-        end
-        assert_data_benchmark_prior(tr, pe, :tr, :ProgrammeAllocationSet)
+        assert_data_benchmark_prior(cbe.tr, pe, :tr, :ProgrammeAllocationSet)
         assert_data_benchmark_prior(r, pe, :r, :ProgrammeAllocationSet)
-        return new{typeof(pe), typeof(slv), typeof(r), typeof(wb), typeof(sbgt),
-                   typeof(gbgt), typeof(xbgt), typeof(lt), typeof(st), typeof(lcse),
-                   typeof(cte), typeof(gcarde), typeof(sgcarde), typeof(smtx),
-                   typeof(sgmtx), typeof(slt), typeof(sst), typeof(sglt), typeof(sgst),
-                   typeof(tn), typeof(sets), typeof(tr), typeof(ple), typeof(ret),
-                   typeof(ccnt), typeof(cobj), typeof(sc), typeof(so), typeof(ss),
-                   typeof(card), typeof(scard), typeof(l2c), typeof(lpc), typeof(linfc),
-                   typeof(l1), typeof(l2), typeof(lp), typeof(linf)}(pe, slv, r, wb, sbgt,
-                                                                     gbgt, xbgt, lt, st,
-                                                                     lcse, cte, gcarde,
-                                                                     sgcarde, smtx, sgmtx,
-                                                                     slt, sst, sglt, sgst,
-                                                                     tn, sets, tr, ple, ret,
-                                                                     ccnt, cobj, sc, so, ss,
-                                                                     card, scard, l2c, lpc,
-                                                                     linfc, l1, l2, lp,
-                                                                     linf)
+        return new{typeof(pe), typeof(slv), typeof(cbe), typeof(r), typeof(ret), typeof(sc),
+                   typeof(so)}(pe, slv, cbe, r, ret, sc, so)
     end
 end
 function ProgrammeAllocationSet(; slv::Slv_VecSlv,
                                 pe::AbstractPriorEstimator = EmpiricalPrior(),
+                                cbe::Option{<:ConstraintBlock} = nothing,
                                 r::Option{<:RM_VecRM} = nothing,
-                                wb::Option{<:NameWbE_Wb} = WeightBounds(),
-                                sbgt::Option{<:Num_BgtRg} = nothing,
-                                gbgt::Option{<:Num_BgtRg} = nothing, xbgt::Bool = false,
-                                lt::Option{<:BtE_Bt} = nothing,
-                                st::Option{<:BtE_Bt} = nothing,
-                                lcse::Option{<:Union{EcE_LcE_Lc, AbstractVector}} = nothing,
-                                cte::Option{<:Lc_CC_VecCC} = nothing,
-                                gcarde::Option{<:LcE_Lc} = nothing,
-                                sgcarde::Option{<:Union{LcE_Lc, AbstractVector}} = nothing,
-                                smtx::Option{<:Union{MatNum_ASetMatE, AbstractVector}} = nothing,
-                                sgmtx::Option{<:Union{MatNum_ASetMatE, AbstractVector}} = nothing,
-                                slt::Option{<:Union{BtE_Bt, AbstractVector}} = nothing,
-                                sst::Option{<:Union{BtE_Bt, AbstractVector}} = nothing,
-                                sglt::Option{<:Union{BtE_Bt, AbstractVector}} = nothing,
-                                sgst::Option{<:Union{BtE_Bt, AbstractVector}} = nothing,
-                                tn::Option{<:Union{TnE_Tn, AbstractVector}} = nothing,
-                                sets::Option{<:UniverseSets} = nothing,
-                                tr::Option{<:Tr_VecTr} = nothing,
-                                ple::Option{<:Union{PlCE_PlC, AbstractVector}} = nothing,
-                                ret::Option{<:JRE_VecJRE} = nothing,
-                                ccnt::Option{<:JuMPConstr_VecJuMPConstr} = nothing,
-                                cobj::Option{<:JuMPObj_VecJuMPObj} = nothing,
-                                sc::Number = 1, so::Number = 1,
-                                ss::Option{<:Number} = nothing,
-                                card::Option{<:Integer} = nothing,
-                                scard::Option{<:Int_VecInt} = nothing,
-                                l2c::Option{<:Num_NormCeilCal} = nothing,
-                                lpc::Option{<:LpReg_VecLpReg} = nothing,
-                                linfc::Option{<:Num_NormCeilCal} = nothing,
-                                l1::Option{<:Num_AmbRadCal} = nothing,
-                                l2::Option{<:L2Reg_VecL2Reg} = nothing,
-                                lp::Option{<:LpReg_VecLpReg} = nothing,
-                                linf::Option{<:Num_AmbRadCal} = nothing)::ProgrammeAllocationSet
-    return ProgrammeAllocationSet(pe, slv, r, wb, sbgt, gbgt, xbgt, lt, st,
-                                  narrow_mixed_vector(lcse, EcE_LcE_Lc, :lcse), cte, gcarde,
-                                  narrow_mixed_vector(sgcarde, LcE_Lc, :sgcarde),
-                                  narrow_mixed_vector(smtx, MatNum_ASetMatE, :smtx),
-                                  narrow_mixed_vector(sgmtx, MatNum_ASetMatE, :sgmtx),
-                                  narrow_mixed_vector(slt, Option{<:BtE_Bt}, :slt),
-                                  narrow_mixed_vector(sst, Option{<:BtE_Bt}, :sst),
-                                  narrow_mixed_vector(sglt, Option{<:BtE_Bt}, :sglt),
-                                  narrow_mixed_vector(sgst, Option{<:BtE_Bt}, :sgst),
-                                  narrow_mixed_vector(tn, TnE_Tn, :tn), sets, tr,
-                                  narrow_mixed_vector(ple, PlCE_PlC, :ple), ret, ccnt, cobj,
-                                  sc, so, ss, card, scard, l2c, lpc, linfc, l1, l2, lp,
-                                  linf)
+                                ret::Option{<:JRE_VecJRE} = nothing, sc::Number = 1,
+                                so::Number = 1, slots...)::ProgrammeAllocationSet
+    return ProgrammeAllocationSet(pe, slv, constraint_block(cbe; slots...), r, ret, sc, so)
+end
+# Each slot of the block is a property of the set, and a patch of `Accessors.set` can set
+# it, so `set.wb` keeps its meaning (ADR 0237). `r` and `ret` are fields of the set.
+@forward_properties ProgrammeAllocationSet begin
+    forward(cbe, wb, sbgt, gbgt, lt, st, lcse, cte, gcarde, sgcarde, smtx, sgmtx, slt, sst,
+            sglt, sgst, tn, sets, tr, ple, ccnt, cobj, ss, card, scard, l2c, lpc, linfc, l1,
+            l2, lp, linf, xbgt; settable)
 end
 function port_opt_view(set::ProgrammeAllocationSet, i, args...)
-    if set.smtx === set.sgmtx
-        smtx = sgmtx = port_opt_view(set.smtx, i)
-    else
-        smtx = port_opt_view(set.smtx, i)
-        sgmtx = port_opt_view(set.sgmtx, i)
-    end
-    if set.slt === set.sglt
-        slt = sglt = port_opt_view(set.slt, i)
-    else
-        slt = port_opt_view(set.slt, i)
-        sglt = port_opt_view(set.sglt, i)
-    end
-    if set.sst === set.sgst
-        sst = sgst = port_opt_view(set.sst, i)
-    else
-        sst = port_opt_view(set.sst, i)
-        sgst = port_opt_view(set.sgst, i)
-    end
-    return ProgrammeAllocationSet(; pe = port_opt_view(set.pe, i), slv = set.slv,
-                                  r = port_opt_view(set.r, i, nothing),
-                                  wb = port_opt_view(set.wb, i), sbgt = set.sbgt,
-                                  gbgt = set.gbgt, xbgt = set.xbgt,
-                                  lt = port_opt_view(set.lt, i),
-                                  st = port_opt_view(set.st, i),
-                                  lcse = port_opt_view(set.lcse, i), cte = set.cte,
-                                  gcarde = set.gcarde, sgcarde = set.sgcarde, smtx = smtx,
-                                  sgmtx = sgmtx, slt = slt, sst = sst, sglt = sglt,
-                                  sgst = sgst, tn = port_opt_view(set.tn, i),
-                                  sets = port_opt_view(set.sets, i),
-                                  tr = port_opt_view(set.tr, i, args...), ple = set.ple,
-                                  ret = port_opt_view(set.ret, i),
-                                  ccnt = port_opt_view(set.ccnt, i),
-                                  cobj = port_opt_view(set.cobj, i), sc = set.sc,
-                                  so = set.so, ss = set.ss, card = set.card,
-                                  scard = set.scard, l2c = set.l2c, lpc = set.lpc,
-                                  linfc = set.linfc, l1 = set.l1, l2 = set.l2, lp = set.lp,
-                                  linf = set.linf)
+    return rebuild_estimator(set,
+                             (; pe = port_opt_view(set.pe, i),
+                              cbe = port_opt_view(set.cbe, i, args...),
+                              r = port_opt_view(set.r, i, nothing),
+                              ret = port_opt_view(set.ret, i)))
 end
 """
     reader_frames(set::ProgrammeAllocationSet, path::AbstractString, refit::Bool) -> ReturnsFrames
 
 Walk the readers of a [`ProgrammeAllocationSet`](@ref) for the group of the head that holds it.
 
-The set holds no source of its own. Its prior `pe`, each graph slot in `cte` and `ple`, the regression of each exposure slot in `lcse`, and the readers inside its measures are the outermost readers of the head's rows, so the walk counts each one. [`field_frames`](@ref) walks every field. The walk reads the refit rule of the set's own prior, because a regression reader of the set reads the loadings of that prior, see [`refits_regression`](@ref).
+The set holds no source of its own. Its prior `pe`, each graph slot in `cte` and `ple`, the regression of each exposure slot in `lcse`, and the readers inside its measures are the outermost readers of the head's rows, so the walk counts each one. [`field_frames`](@ref) walks every field, and it enters the [`ConstraintBlock`](@ref) in `cbe` through `reader_frames(cbe::ConstraintBlock, path, refit)`. So the path of a slot passes through the block, as `"set.cbe.ple"`. The walk reads the refit rule of the set's own prior, because a regression reader of the set reads the loadings of that prior, see [`refits_regression`](@ref).
 
 # Arguments
 
@@ -611,7 +333,7 @@ This is the first stage of the set's resolution. It resolves each slot to a valu
  5. Resolve the sub-group thresholds `slt` and `sglt`, then `sst` and `sgst`, with [`threshold_constraints`](@ref), in the same way.
  6. Resolve the turnover ceilings `tn` with [`turnover_constraints`](@ref).
  7. When `lcse` holds no exposure estimator ([`exposure_keyed`](@ref)), resolve it with [`linear_constraints`](@ref). Otherwise keep it for the second stage, because an exposure row needs the loadings of the prior.
- 8. Return a new set that holds the resolved slots and every other slot of `set`.
+ 8. Return `set` rebuilt with [`rebuild_estimator`](@ref). The resolved slots replace their slots of the block in `cbe`, and every other slot and field keeps its value.
 
 # Arguments
 
@@ -671,17 +393,10 @@ function resolve_allocation_set(set::ProgrammeAllocationSet, N::Integer, strict:
     else
         linear_constraints(set.lcse, sets; datatype = datatype, strict = strict)
     end
-    return ProgrammeAllocationSet(; pe = set.pe, slv = set.slv, r = set.r, wb = wb,
-                                  sbgt = set.sbgt, gbgt = set.gbgt, xbgt = set.xbgt,
-                                  lt = lt, st = st, lcse = lcse, cte = set.cte,
-                                  gcarde = gcarde, sgcarde = sgcarde, smtx = smtx,
-                                  sgmtx = sgmtx, slt = slt, sst = sst, sglt = sglt,
-                                  sgst = sgst, tn = tn, sets = sets, tr = set.tr,
-                                  ple = set.ple, ret = set.ret, ccnt = set.ccnt,
-                                  cobj = set.cobj, sc = set.sc, so = set.so, ss = set.ss,
-                                  card = set.card, scard = set.scard, l2c = set.l2c,
-                                  lpc = set.lpc, linfc = set.linfc, l1 = set.l1,
-                                  l2 = set.l2, lp = set.lp, linf = set.linf)
+    # The resolved slots go in as flat keywords, so each replaces its slot of the block.
+    return rebuild_estimator(set,
+                             (; wb, lt, st, lcse, gcarde, sgcarde, smtx, sgmtx, slt, sst,
+                              sglt, sgst, tn))
 end
 """
     exposure_keyed(x)

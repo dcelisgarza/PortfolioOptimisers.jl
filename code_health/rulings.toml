@@ -300,17 +300,12 @@ parameter as a static parameter, `x::X where {X}`, gives none. The maintainer st
 # The seventeen below are issue #356's, written before the scheduled job first runs. They name
 # every constructor standing above the argument-count threshold of 10, not only the one that drives
 # its file, because `src/17_Optimisation/05_JuMP/03_JuMPOptimiser_a.jl` holds a second at 19. Nineteen
-# definitions sit over seventeen keys, because the key holds no line.
+# definitions sit over seventeen keys, because the key holds no line. Issue #2040 removed the key of
+# `ProgrammeAllocationSet`: the set holds a Constraint Block, and its constructor takes 7 arguments.
 
 [[exemption]]
 path = "src/03_InputData/10_ReturnsResult.jl"
 definition = "ReturnsResult"
-metric = "arg"
-rationale = "keyword-constructor-arity"
-
-[[exemption]]
-path = "src/17_Optimisation/10_OnlinePortfolioSelection/04_ProgrammeAllocationSet.jl"
-definition = "ProgrammeAllocationSet"
 metric = "arg"
 rationale = "keyword-constructor-arity"
 

@@ -7,7 +7,7 @@ Description = "Constraint Block, public API of PortfolioOptimisers.jl: Constrain
 ```@docs
 ConstraintBlock
 factory(cbe::ConstraintBlock, w::AbstractVector)
-port_opt_view(cbe::ConstraintBlock, i, X::MatNum)
+port_opt_view(cbe::ConstraintBlock, i, args...)
 needs_previous_weights(cbe::ConstraintBlock)
 obs_weights_view(cbe::ConstraintBlock, i)
 ```

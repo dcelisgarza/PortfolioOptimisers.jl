@@ -10,7 +10,7 @@ programme under a slack linear constraint equals the closed form in both geometr
 Gram programme on the bare simplex matches a hand-written quadratic programme.
 =#
 using Test, PortfolioOptimisers, StableRNGs, LinearAlgebra, Statistics, Dates, Clarabel,
-      HiGHS, Pajarito, JuMP
+      HiGHS, Pajarito, JuMP, Accessors
 # Two custom terms with the set as their owner (#1206).
 struct FirstAtMost <: PortfolioOptimisers.CustomJuMPConstraint
     ub::Float64
@@ -162,6 +162,65 @@ end
                                                                                      0.8))),
                      3)
         @test isa(rs.lcse, po.LinearConstraint)
+    end
+
+    @testset "The set holds its slots in a ConstraintBlock (#2040)" begin
+        tn = Turnover(; w = fill(1 / 3, 3), val = 0.5)
+        ret = ArithmeticReturn(; settings = JuMPReturnsSettings(; lb = 0.0))
+        s = ProgrammeAllocationSet(; slv = slv, tn = tn, l2 = L2Regularisation(; val = 0.1),
+                                   ret = ret, sc = 2)
+        @test fieldnames(typeof(s)) == (:pe, :slv, :cbe, :r, :ret, :sc, :so)
+        @test isa(s.cbe, ConstraintBlock)
+        @test s.tn === s.cbe.tn === tn
+        @test s.ret === ret && s.sc == 2 && s.so == 1
+        @test s.wb === s.cbe.wb && isa(s.wb, WeightBounds)
+        # The positional constructor takes the fields in their order.
+        sp = ProgrammeAllocationSet(s.pe, slv, s.cbe, nothing, ret, 2, 1)
+        @test sp.cbe === s.cbe
+        # A flat keyword replaces that slot of a given block, and the other slots keep theirs.
+        cbe = ConstraintBlock(; tn = tn, card = 2)
+        sb = ProgrammeAllocationSet(; slv = slv, cbe = cbe, card = 3)
+        @test sb.card == 3 && sb.tn === tn
+        @test ProgrammeAllocationSet(; slv = slv, cbe = cbe).cbe === cbe
+        # A patch of `Accessors.set` replaces one slot of the block.
+        sa = Accessors.set(s, Accessors.@optic(_.tn),
+                           Turnover(; w = fill(1 / 3, 3), val = 0.2))
+        @test sa.tn.val == 0.2 && sa.l2 === s.l2 && sa.ret === ret
+        # The block admits a bound that reads the returns and a schedule, and the set refuses
+        # both, as the bounds of its keywords did before.
+        sets = UniverseSets(; dict = Dict("nx" => ["A", "B", "C"]))
+        swb = ScoreWeightBounds(; score = SCM())
+        @test_throws TypeError ProgrammeAllocationSet(; slv = slv, wb = swb, sets = sets)
+        @test_throws TypeError ProgrammeAllocationSet(; slv = slv,
+                                                      cbe = ConstraintBlock(; wb = swb,
+                                                                            sets = sets))
+        err = try
+            ProgrammeAllocationSet(; slv = slv, card = TimeDependent([2, 3]))
+        catch e
+            e
+        end
+        @test isa(err, ArgumentError) && occursin("the slot `card`", err.msg)
+        @test_throws MethodError ProgrammeAllocationSet(; slv = slv, lcs = nothing)
+        @test_throws po.IsEmptyError ProgrammeAllocationSet(; slv = slv,
+                                                            ret = ArithmeticReturn[])
+        # The view of the set views its block, with and without the returns matrix.
+        m = [1 0 1; 0 1 1]
+        sm = ProgrammeAllocationSet(; slv = slv, tn = tn, smtx = m, sgmtx = m, scard = 1)
+        for v in (po.port_opt_view(sm, [1, 3]), po.port_opt_view(sm, [1, 3], rand(4, 3)))
+            @test v.tn.w == fill(1 / 3, 2)
+            @test v.smtx == [1 1; 0 1] && v.smtx === v.sgmtx
+            @test v.slv === slv
+        end
+        # The resolution of a fold rebuilds the block and keeps the fields of the set.
+        rs = resolve(s, 3)
+        @test rs.ret === ret && rs.sc == 2 && rs.l2 === s.l2
+        @test rs.wb.lb == zeros(3) && rs.wb.ub == ones(3)
+        # A set built from a block projects as the set built from the flat keywords.
+        sk = resolve(ProgrammeAllocationSet(; slv = slv, tn = tn), 3)
+        sc = resolve(ProgrammeAllocationSet(; slv = slv, cbe = ConstraintBlock(; tn = tn)),
+                     3)
+        @test isapprox(po.project(EuclideanProjection(), sc, q, wh),
+                       po.project(EuclideanProjection(), sk, q, wh))
     end
 
     @testset "Parity 1 and 2: the scalar roots against the sort and normalisation" begin
@@ -998,7 +1057,7 @@ end
                                           ret = ArithmeticReturn(;
                                                                  settings = JuMPReturnsSettings(;
                                                                                                 lb = 0.0)))
-            @test fieldnames(typeof(full))[1:4] == (:pe, :slv, :r, :wb)
+            @test fieldnames(typeof(full))[1:4] == (:pe, :slv, :cbe, :r)
             @test isnothing(po.rows_needed(full))
             @test po.rows_needed(ProgrammeAllocationSet(; slv = slv, sbgt = 0.2,
                                                         wb = WeightBounds(; lb = -0.2,
@@ -2053,10 +2112,11 @@ end
         end
         # A batch walk-forward refuses a returns series in the set: each fold restarts the
         # head at its first training row, so the cut to the first rows misaligns (#1669).
-        # The walk enters the set, which is an algorithm, and names the field.
+        # The walk enters the set, which is an algorithm, and names the field. The slot `tr`
+        # is in the block of the set (#2040).
         rtw = ReturnsTracking(; w = R * wb)
         @test po.returns_tracking_path(OPS(; alg = PassiveAggressiveMeanReversion(),
-                                           set = sets[1](rtw))) == "set.tr.tr"
+                                           set = sets[1](rtw))) == "set.cbe.tr.tr"
         for set in sets
             @test_throws ArgumentError cross_val_predict(OPS(;
                                                              alg = PassiveAggressiveMeanReversion(),
@@ -2156,7 +2216,7 @@ end
         gset(; kw...) = ProgrammeAllocationSet(; slv = slv,
                                                pe = EmpiricalPrior(; x_src = xs),
                                                sets = sets4, kw...)
-        raw = r"read the raw returns data: `set.cte`, `set.ple`\."
+        raw = r"read the raw returns data: `set.cbe.cte`, `set.cbe.ple`\."
         @test_logs (:warn, raw) OPS(; x_src = xs,
                                     set = gset(; cte = CentralityConstraint(),
                                                ple = SemiDefinitePhylogenyEstimator()))
@@ -2170,7 +2230,7 @@ end
                                           lce = LinearConstraintEstimator(;
                                                                           val = "F1 <= 1"))
         fr = po.group_frames(OPS(; x_src = xs, set = gset(; lcse = ece)))
-        @test fr.excess && fr.raw == ["set.lcse.space.re"]
+        @test fr.excess && fr.raw == ["set.cbe.lcse.space.re"]
         fr = po.group_frames(OPS(; x_src = xs,
                                  set = gset(; pe = FactorPrior(; x_src = xs), lcse = ece)))
         @test fr.excess && isempty(fr.raw)
