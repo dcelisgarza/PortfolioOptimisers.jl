@@ -192,6 +192,24 @@
         @test !any(s -> startswith(s[:label], "Normal"), p_noref.series_list)
     end
 
+    @testset "plot_histogram reads only the finite returns (#2056)" begin
+        # A fold that failed to solve has `NaN` returns. The figure draws the finite returns,
+        # and every series, the bins, the lines and the Normal density, equals the figure of
+        # the finite returns alone.
+        ret = X * w
+        ret_nan = copy(ret)
+        ret_nan[7] = NaN
+        ret_nan[40] = Inf
+        same(p, q) = length(p.series_list) == length(q.series_list) &&
+                     all(a[:label] == b[:label] &&
+                         isequal(a[:x], b[:x]) &&
+                         isequal(a[:y], b[:y])
+                         for (a, b) in zip(p.series_list, q.series_list))
+        @test same(plot_histogram(ret_nan), plot_histogram(ret_nan[isfinite.(ret_nan)]))
+        @test !same(plot_histogram(ret_nan), plot_histogram(ret))
+        @test_throws DomainError plot_histogram([NaN, Inf, -Inf])
+    end
+
     @testset "plot_network" begin
         ne = NetworkEstimator()
         @test is_plot(plot_network(ne, X, nx))

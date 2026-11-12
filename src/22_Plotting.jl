@@ -690,7 +690,9 @@ Plot the histogram of the returns of a portfolio, with a vertical line for each 
 
 The histogram is normalised to a density. Vertical lines mark, in this order: the mean ``\\bar{r}``, and ``\\bar{r}`` less the standard deviation, less the mean absolute deviation, and less the Gini mean difference; the negated value at risk, conditional value at risk and tail Gini; with `slv`, the negated entropic and relativistic values at risk; and the worst return. A population draws the mean of the return series of its members. The package extension `PortfolioOptimisersPlotsExt` implements the methods, and it loads after `using GraphRecipes, StatsPlots`.
 
-A gapped panel reaches this figure only through the returns that the caller gives it. A prediction arity is finite already, because the fold set the Held Gap to zero once in [`predict`](@ref). A `w, X` or `w, rd` arity computes on the matrix that the caller holds and checks nothing, and `X * w` is `NaN` at a gap even where the weight is zero. Score a gapped panel through `predict(res, rd)` and plot the prediction.
+The figure reads only the finite returns, as [`plot_exposure_distribution`](@ref) does. A return that is `NaN` or infinite is absent: the bins, the mean, the moments, every vertical line and the fitted Normal law read the finite returns, and ``T`` counts them. A walk-forward fold that failed to solve has `NaN` weights, so its returns are absent, and the figure of a [`portfolio_report`](@ref) still draws.
+
+A gapped panel reaches this figure only through the returns that the caller gives it. A prediction arity is finite at a gap, because the fold set the Held Gap to zero once in [`predict`](@ref). A `w, X` or `w, rd` arity computes on the matrix that the caller holds, and `X * w` is `NaN` at a gap even where the weight is zero, so the figure drops each such row. Score a gapped panel through `predict(res, rd)` and plot the prediction.
 
 # Mathematical definition
 
@@ -704,7 +706,7 @@ P &= \\begin{cases} \\lceil 4 \\sqrt{T} \\rceil & p = 0\\,, \\\\ p & p > 0\\,, \
 
 Where:
 
-  - ``r_t``: Net portfolio return at observation ``t``.
+  - ``r_t``: Net portfolio return at observation ``t``, over the finite returns only.
   - ``p``: The `points` keyword.
   - ``P``: Number of points of the grid, evenly spaced from the worst to the best return, on which the figure evaluates the Normal density.
   - ``\\hat{\\mu}``, ``\\hat{\\sigma}^2``: Maximum likelihood mean and variance of the fitted Normal law. The divisor is ``T``, so ``\\hat{\\sigma}`` is not the standard deviation of the line, whose divisor is ``T - 1``.
@@ -730,6 +732,7 @@ Where:
   - `0 < alpha < 1`, else a `DomainError` is raised.
   - `0 < kappa < 1`, else a `DomainError` is raised.
   - `points >= 0`, else a `DomainError` is raised.
+  - The return series holds at least one finite return, else a `DomainError` is raised.
 
 # Returns
 

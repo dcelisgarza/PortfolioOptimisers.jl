@@ -515,6 +515,21 @@ end
     @test count("src=\"data:image/png;base64,", read(hp, String)) == 15
 end
 
+@testset "#2056: the default figures draw a prediction with a NaN return" begin
+    # A walk-forward fold that fails to solve has `NaN` weights, and so `NaN` returns for its
+    # test rows. The histogram of the returns read the whole series and threw, which stopped
+    # the build of the report.
+    path = deepcopy(RP_PATH)
+    path.mrd.X[5] = NaN
+    pop = deepcopy(RP_POP)
+    pop.pred[1].mrd.X[3] = NaN
+    f = default_report_figures()
+    r = portfolio_report([path, pop]; names = ["path", "pop"],
+                         overview_figures = f.overview, entry_figures = f.entry)
+    nfig(k) = length(rp_section(r.entries[k], "Figures").blocks)
+    @test nfig(1) == 3 && nfig(2) == 3
+end
+
 @testset "#1943: the composition of a path and of a population draws each weight under its own name" begin
     # The rows are built by hand from the weights and the names of each fold, so the test
     # does not read `prediction_weights`. A bar series holds `NaN` separators, so the values
