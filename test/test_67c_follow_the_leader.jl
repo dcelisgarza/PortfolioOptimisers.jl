@@ -444,6 +444,52 @@ using Test, PortfolioOptimisers, StableRNGs, LinearAlgebra, Statistics, Dates, C
         @test po.update_time_dependent_estimator(plain, ctx) === plain
     end
 
+    @testset "A leader schedule that reads the previous weights gets them in a batch (#2054)" begin
+        # At `ce1298948e` the head answered `needs_previous_weights` from its own fields
+        # and `fb` alone. So a batch walk-forward ran its folds in parallel, and a schedule
+        # in the leader read `ctx.w_prev = nothing` at every fold.
+        ftl(; kw...) = FollowTheLeader(; opt = logopt(; kw...))
+        lo = WeightBounds(; lb = 0.0, ub = 0.3)
+        hi = WeightBounds(; lb = 0.0, ub = 1.0)
+        pwf = po.PreviousWeightsFunction(; f = ctx -> (isnothing(ctx.w_prev) ? hi : lo))
+        head = OPS(; alg = ftl(; wb = TimeDependent(pwf)))
+        @test po.needs_previous_weights(head)
+        @test po.schedule_reads_previous_weights(head)
+        experts = [BuyAndHold(), ftl(; wb = TimeDependent(pwf))]
+        @test po.needs_previous_weights(OPS(; alg = ExpertMixture(; experts = experts)))
+        # A turnover of the leader measures from the Price-Adjusted Allocation of the step,
+        # which `factory` gives it inside the rule. So a cost-aware leader still runs its
+        # folds in parallel, and so does a schedule whose entries are fixed values.
+        tn = Turnover(; w = zeros(N), val = 0.2)
+        @test po.needs_previous_weights(ftl(; tn = tn).opt)
+        @test !po.needs_previous_weights(OPS(; alg = ftl(; tn = tn)))
+        @test !po.needs_previous_weights(OPS(; alg = ftl(; wb = TimeDependent([lo, hi]))))
+        @test !po.needs_previous_weights(OPS(; alg = ftl()))
+        @test !po.schedule_reads_previous_weights(OPS(; alg = ftl()))
+        # The walk enters an optimiser entry of a schedule, and a vector of optimisers.
+        lead = logopt(; wb = TimeDependent(pwf))
+        @test po.schedule_reads_previous_weights(TimeDependent([logopt(), lead]))
+        @test !po.schedule_reads_previous_weights(TimeDependent([logopt(), logopt()]))
+        @test po.schedule_reads_previous_weights([logopt(), lead])
+        @test !po.schedule_reads_previous_weights([logopt(), logopt()])
+        # Fold 1 reads no previous weights and solves on `hi`. Every later fold reads the
+        # weights of the fold before it and solves on `lo`, in the batch arm as in the
+        # online arm. A Prefix leader at `gamma = 0` keeps no state.
+        r = rows(rd, 2:11)
+        for cv in
+            (OnlineIndexWalkForward(5, 1), IndexWalkForward(5, 1; expand_train = true))
+            n = length(po.split(cv, r).train_idx)
+            p = cross_val_predict(head, r, cv)
+            pl = cross_val_predict(OPS(; alg = ftl(; wb = lo)), r, cv)
+            ph = cross_val_predict(OPS(; alg = ftl(; wb = hi)), r, cv)
+            @test p.pred[1].res.w == ph.pred[1].res.w
+            for i in 2:n
+                @test p.pred[i].res.w == pl.pred[i].res.w
+            end
+            @test maximum(ph.pred[2].res.w) > 0.9
+        end
+    end
+
     @testset "A leader in the Excess Frame fits the excess returns its rows carry (#1646)" begin
         # The rows buffer of the head keeps every field of the rows, the benchmark among
         # them, so the leader picks `X - B` as a batch fit over the same window does

@@ -605,6 +605,67 @@ end
 function time_dependent_entry_needs_previous_weights(x::TimeDependent)::Bool
     return needs_previous_weights(x)
 end
+"""
+    schedule_reads_previous_weights(x)
+
+Returns `true` if a schedule in `x` reads the weights of the previous fold from its context.
+
+[`needs_previous_weights`](@ref) answers a wider question. It also counts a turnover, a fee, a tracking input, a cost budget or a risk measure that [`factory`](@ref) gives the previous weights. This function counts only a schedule that reads `ctx.w_prev` itself, see [`TimeDependentContext`](@ref). An estimator whose [`factory`](@ref) receives its weights from a source other than the fold loop asks this question of the parts that `factory` reaches. The leader of a [`FollowTheLeader`](@ref) is such an estimator. Its `factory` receives the Price-Adjusted Allocation of the step, so only a schedule in it reads the weights of the loop.
+
+The walk reads every schedule, whatever its `bind`. A schedule that a loop nearer to it resolves still reads its context there, so the answer is `true` for it too, and the loop runs its folds in sequence.
+
+# Algorithm
+
+ 1. A [`TimeDependent`](@ref) whose value is a vector returns `true` if one of its entries does, by this function. An entry is a fixed value, so it reads no context. An optimiser entry can hold a schedule of its own.
+ 2. Any other [`TimeDependent`](@ref) answers as [`needs_previous_weights`](@ref) does: `true` for a [`PreviousWeightsFunction`](@ref), the answer of a [`TimeDependentCallable`](@ref), and `false` for a bare function.
+ 3. An optimisation estimator returns `true` if one of the fields of [`schedule_tree_fields`](@ref) does. An [`OnlinePortfolioSelection`](@ref) adds its rule tree on `alg`, and a rule walks the fields of [`rule_tree_fields`](@ref).
+ 4. A vector of optimisers or of rules returns `true` if one of its elements does.
+ 5. Every other value returns `false`.
+
+# Related
+
+  - [`needs_previous_weights`](@ref)
+  - [`schedule_tree_fields`](@ref)
+  - [`TimeDependent`](@ref)
+  - [`PreviousWeightsFunction`](@ref)
+"""
+function schedule_reads_previous_weights(::Any)::Bool
+    return false
+end
+function schedule_reads_previous_weights(td::TimeDependent)::Bool
+    v = td.val
+    if isa(v, AbstractVector)
+        return any(schedule_reads_previous_weights, v)
+    end
+    return needs_previous_weights(td)
+end
+function schedule_reads_previous_weights(opt::AbstractOptimisationEstimator)::Bool
+    return any(f -> schedule_reads_previous_weights(getfield(opt, f)),
+               schedule_tree_fields(opt))
+end
+function schedule_reads_previous_weights(opt::VecOptE_Opt_TD)::Bool
+    return any(schedule_reads_previous_weights, opt)
+end
+"""
+    schedule_tree_fields(opt)
+
+Returns the names of the fields of `opt` whose type can hold a [`TimeDependent`](@ref), an optimisation estimator, or a vector of optimisers.
+
+[`schedule_reads_previous_weights`](@ref) walks these fields alone. A generated function computes the tuple once for each type, from the field types, as [`time_dependent_candidate_fields`](@ref) does. So an optimiser that holds no schedule and no inner optimiser gives an empty tuple at compile time.
+
+# Related
+
+  - [`schedule_reads_previous_weights`](@ref)
+  - [`time_dependent_candidate_fields`](@ref)
+"""
+@generated function schedule_tree_fields(::T) where {T}
+    fns = Tuple(f
+                for f in fieldnames(T)
+                if typeintersect(fieldtype(T, f),
+                                 Union{TimeDependent, AbstractOptimisationEstimator,
+                                       VecOptE_Opt_TD}) !== Union{})
+    return :($fns)
+end
 function port_opt_view(td::TimeDependent, i, args...)
     v = td.val
     if isa(v, AbstractVector)

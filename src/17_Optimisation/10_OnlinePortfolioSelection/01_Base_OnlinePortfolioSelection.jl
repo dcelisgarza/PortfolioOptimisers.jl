@@ -1322,6 +1322,13 @@ end
 function is_time_dependent(v::AbstractVector{<:AbstractOnlinePortfolioSelectionAlgorithm})
     return any(is_time_dependent, v)
 end
+function schedule_reads_previous_weights(alg::AbstractOnlinePortfolioSelectionAlgorithm)::Bool
+    return any(f -> schedule_reads_previous_weights(getfield(alg, f)),
+               rule_tree_fields(alg))
+end
+function schedule_reads_previous_weights(v::AbstractVector{<:AbstractOnlinePortfolioSelectionAlgorithm})::Bool
+    return any(schedule_reads_previous_weights, v)
+end
 function assert_time_dependent_fold_count(alg::AbstractOnlinePortfolioSelectionAlgorithm,
                                           n::Integer, all_binds::Bool = true)::Nothing
     for f in rule_tree_fields(alg)

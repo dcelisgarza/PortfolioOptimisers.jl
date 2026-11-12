@@ -13,7 +13,7 @@ The head is a naive optimiser. It fits no moment and solves no programme of its 
 
 A given `w0` is over the pinned names, and the head pins and views it with them. The first step projects it once onto the Allocation Set in the rule's geometry, as it projects the uniform start, so a start outside the set becomes feasible and is never refused. A set that reads the head's rows has no constraints before the first row, so it holds the start as given until the first update. The start reaches the first Online Update as `w`. A rule that steps from `w` continues from it. A rule whose next allocation is not a step from `w` replaces it at that update. The constant rebalanced portfolio returns its own `w`, an expert mixture returns the mix of its experts, and the Newton step solves its Gram. Such a rule can still carry `w0` forward. The gradient of the Newton step reads `w`, and an expert that steps from `w` starts at `w0`. Under every rule, the fund holds `w0` for exactly one period.
 
-**The Online Update reads the recursion's own allocation, and no flag changes that.** The previous weights of the loop reach the head through [`factory`](@ref) alone. They go into `fees` and `fb`, and never into the recursion. The fund's held book is the one base against which a turnover fee on this family measures a trade. So the online arm of the fold loop refuses a head whose `fees` carry a `tn` term when the Previous-Weights Source of the walk-forward is `nothing`. It throws an `ArgumentError` before any fold, and `pws = DriftedWeights()` is the whole configuration. A head with no `tn` fee is not checked.
+**The Online Update reads the recursion's own allocation, and no flag changes that.** The previous weights of the loop reach the head through [`factory`](@ref), into `fees` and `fb`, and the recursion never reads them as its allocation. A schedule in a field of a leader in the rule tree can also read them from `ctx.w_prev`, to select the configuration of the leader at the fold. The head then [`needs_previous_weights`](@ref), so a walk-forward runs its folds in sequence, see [`schedule_reads_previous_weights`](@ref). The fund's held book is the one base against which a turnover fee on this family measures a trade. So the online arm of the fold loop refuses a head whose `fees` carry a `tn` term when the Previous-Weights Source of the walk-forward is `nothing`. It throws an `ArgumentError` before any fold, and `pws = DriftedWeights()` is the whole configuration. A head with no `tn` fee is not checked.
 
 **Under `x_src = ExcessSource()` the head selects in the Excess Frame.** The rule's step reads the price relative of the return in excess of the benchmark, `x = 1 + r - b`. Here `b` is the benchmark return of the row, one value that every asset shares for a vector benchmark, and one value per asset for a matrix benchmark. Every reader of the rows inside a rule reads the same frame through [`head_frame_returns`](@ref): the refit and the fold of a forecaster, the scale of a [`ForecastReversion`](@ref), the window of an [`AntiCorrelation`](@ref) and the row selector of a [`FollowTheLeader`](@ref). The rows buffer keeps the raw returns and the benchmark, so the prior of a Risk Loss, the prior and each graph or exposure slot of a programme set, and a leader read the raw rows and state their own source. The source of the step, the readers of a Risk Loss and the readers of a programme set form one group. When one of them states `ExcessSource()` and another states no source and reads the raw rows, the head warns once, see [`warn_raw_readers`](@ref). A leader and the fallback are heads with their own groups. A gap in the benchmark is a gap in the frame, which the step reads as one and the head reports as a Held Gap. `predict(res, rd)` reports the raw wealth of the fund, because the fund holds the assets. Returns data with no benchmark is refused with an `ArgumentError`.
 
@@ -327,6 +327,30 @@ function update_time_dependent_estimator(opt::OnlinePortfolioSelection,
                               fb = update_time_dependent_estimator(opt.fb, ctx, all_binds),
                               alg = update_time_dependent_estimator(opt.alg, ctx,
                                                                     all_binds)))
+end
+"""
+$(DocStringExtensions.TYPEDSIGNATURES)
+
+Returns `true` if the fold loop must give the head the weights of the previous fold.
+
+The previous weights reach the head on two paths. [`factory`](@ref) gives them to `fees` and to `fb`, so the head reads the turnover and fee terms of those two fields, and every schedule in its own fields, as a naive optimiser does. A schedule in a leader of the rule tree on `alg` can read them from `ctx.w_prev` of its context. The head reads `alg` through [`schedule_reads_previous_weights`](@ref) alone. A turnover or a fee of a leader measures its trade from the Price-Adjusted Allocation of the step, which `factory` gives the leader inside the rule, so it needs no weights from the loop.
+
+# Related
+
+  - [`needs_previous_weights`](@ref)
+  - [`schedule_reads_previous_weights`](@ref)
+  - [`FollowTheLeader`](@ref)
+"""
+function needs_previous_weights(opt::OnlinePortfolioSelection)::Bool
+    return (any(f -> needs_previous_weights(getfield(opt, f)),
+                time_dependent_fields(opt)) ||
+            needs_previous_weights(opt.fees) ||
+            needs_previous_weights(opt.fb) ||
+            schedule_reads_previous_weights(opt.alg))
+end
+function schedule_reads_previous_weights(opt::OnlinePortfolioSelection)::Bool
+    return (any(f -> schedule_reads_previous_weights(getfield(opt, f)),
+                schedule_tree_fields(opt)) || schedule_reads_previous_weights(opt.alg))
 end
 """
     factory(opt::OnlinePortfolioSelection, w::VecNum)
