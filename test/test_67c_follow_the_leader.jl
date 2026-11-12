@@ -386,6 +386,64 @@ using Test, PortfolioOptimisers, StableRNGs, LinearAlgebra, Statistics, Dates, C
         end
     end
 
+    @testset "A schedule in a leader resolves at each fold (#2049)" begin
+        # The leader solves at each step, and its `optimise` resets a schedule to its
+        # fold-less value. At `a449f96722` the fold loop read the head's own fields alone, so
+        # every fold solved on the static `wb` and the entries never ran.
+        ftl(; kw...) = FollowTheLeader(; opt = logopt(; kw...))
+        lo = WeightBounds(; lb = 0.0, ub = 0.3)
+        hi = WeightBounds(; lb = 0.0, ub = 1.0)
+        r = rows(rd, 2:11)
+        # Fold `i` of the alternating schedule is fold `i` of the static run on entry `i`, in
+        # the online arm and in the batch arm. A Prefix leader at `gamma = 0` keeps no state,
+        # so each fold reads the entry of its own fold alone.
+        for cv in
+            (OnlineIndexWalkForward(5, 1), IndexWalkForward(5, 1; expand_train = true))
+            n = length(po.split(cv, r).train_idx)
+            sched = [isodd(i) ? lo : hi for i in 1:n]
+            p = cross_val_predict(OPS(; alg = ftl(; wb = TimeDependent(sched))), r, cv)
+            pl = cross_val_predict(OPS(; alg = ftl(; wb = lo)), r, cv)
+            ph = cross_val_predict(OPS(; alg = ftl(; wb = hi)), r, cv)
+            for i in 1:n
+                @test p.pred[i].res.w == (isodd(i) ? pl : ph).pred[i].res.w
+            end
+            @test all(i -> maximum(p.pred[i].res.w) <= 0.3 + 1e-8, 1:2:n)
+            @test all(i -> maximum(p.pred[i].res.w) > 0.9, 2:2:n)
+        end
+        # The walk enters a rule over rules: a leader among the experts of a mixture.
+        cv = OnlineIndexWalkForward(5, 1)
+        n = length(po.split(cv, r).train_idx)
+        mix(wb) = OPS(; alg = ExpertMixture(; experts = [BuyAndHold(), ftl(; wb = wb)]))
+        head = mix(TimeDependent(fill(lo, n)))
+        @test po.is_time_dependent(head)
+        pm = cross_val_predict(head, r, cv)
+        pm0 = cross_val_predict(mix(lo), r, cv)
+        @test all(i -> pm.pred[i].res.w == pm0.pred[i].res.w, 1:n)
+        # A schedule in a leader is held to the fold count, and the error names the field.
+        @test_throws DimensionMismatch cross_val_predict(mix(TimeDependent([lo, hi])), r,
+                                                         cv)
+        @test_throws "time-dependent entries for wb (2)" cross_val_predict(mix(TimeDependent([lo,
+                                                                                              hi])),
+                                                                           r, cv)
+        # A solve with no fold reads the explicit default, else the static default.
+        wl = optimise(OPS(; alg = ftl(; wb = lo)), r).w
+        @test optimise(OPS(; alg = ftl(; wb = TimeDependent([hi, hi]; default = lo))), r).w ==
+              wl
+        @test optimise(OPS(; alg = ftl(; wb = TimeDependent([lo, lo]))), r).w ==
+              optimise(OPS(; alg = ftl()), r).w
+        # A rule that holds no schedule comes back as the same object.
+        ctx = po.TimeDependentContext(; i = 1, n = 1, rd = r, train_idx = [1:5],
+                                      test_idx = [6:6])
+        for alg in (ftl(), ExpertMixture(; experts = [BuyAndHold(), ftl()]), BuyAndHold(),
+                    [BuyAndHold(), ftl()])
+            @test !po.is_time_dependent(alg)
+            @test po.update_time_dependent_estimator(alg, ctx) === alg
+        end
+        plain = OPS(; alg = ftl())
+        @test !po.is_time_dependent(plain)
+        @test po.update_time_dependent_estimator(plain, ctx) === plain
+    end
+
     @testset "A leader in the Excess Frame fits the excess returns its rows carry (#1646)" begin
         # The rows buffer of the head keeps every field of the rows, the benchmark among
         # them, so the leader picks `X - B` as a batch fit over the same window does

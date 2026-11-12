@@ -57,7 +57,7 @@ end
 
 Folds the rows that a fold gained into the estimator that the online arm threads. The step reads each of its schedules at the entry of that fold.
 
-The default is [`partial_fit!`](@ref), and every family except one takes it. [`assert_stateless_schedule`](@ref) lets a schedule reach only a field that carries no state. On every other family the step reads none of those fields. The call with no data that fits the fold reads them, and it resolves them itself. For example, the programme that this call solves reads a scheduled weight bound, and the buffer that the step fills never reads it. [`OnlinePortfolioSelection`](@ref) is the exception. Its step is the optimisation, because the step projects every row onto `set`, so the head has its own method.
+The default is [`partial_fit!`](@ref), and every family except one takes it. [`assert_stateless_schedule`](@ref) lets a schedule reach only a field that carries no state. On every other family the step reads none of those fields. The call with no data that fits the fold reads them, and it resolves them itself. For example, the programme that this call solves reads a scheduled weight bound, and the buffer that the step fills never reads it. [`OnlinePortfolioSelection`](@ref) is the exception. Its step is the optimisation, because the step projects every row onto `set`, and a leader in its rule tree solves at every row. So the head has its own method, which resolves the schedules on `set` and in the rule tree.
 
 `ctx` is `nothing` when the estimator carries no schedule, which is the usual case. The loop then builds no context.
 

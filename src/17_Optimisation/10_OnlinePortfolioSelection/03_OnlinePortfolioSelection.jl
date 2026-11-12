@@ -73,7 +73,7 @@ $(DocStringExtensions.FIELDS)
         cache::Option{<:OnlinePortfolioSelectionState} = nothing
     ) -> OnlinePortfolioSelection
 
-Keywords correspond to the struct's fields. `set`, `fees` and `fb` can hold a [`TimeDependent`](@ref) per-fold schedule. `alg`, `w0`, `x_src` and `strict` are static.
+Keywords correspond to the struct's fields. `set`, `fees` and `fb` can hold a [`TimeDependent`](@ref) per-fold schedule. `alg`, `w0`, `x_src` and `strict` are static. A field of an optimiser that the rule tree on `alg` holds, such as the leader of a [`FollowTheLeader`](@ref), can hold a schedule too. The fold loop resolves it at each fold, before the step of the fold reads the leader, see [`online_step_fold`](@ref).
 
 ## Validation
 
@@ -267,6 +267,66 @@ function online_portfolio_selection_td_defaults()::NamedTuple
 end
 function time_dependent_field_defaults(::OnlinePortfolioSelection)::NamedTuple
     return online_portfolio_selection_td_defaults()
+end
+"""
+    is_time_dependent(opt::OnlinePortfolioSelection)
+    assert_time_dependent_fold_count(opt::OnlinePortfolioSelection, n::Integer, all_binds::Bool = true)
+    update_time_dependent_estimator(opt::OnlinePortfolioSelection, ctx::TimeDependentContext, all_binds::Bool = true)
+
+Reads the schedules of the head: those in its own fields, in its fallback `fb`, and in the optimisers of its rule tree on `alg`.
+
+The methods of a naive optimiser read the fields and the fallback. The head adds `alg`, because a leader in the rule tree solves at each step, and a schedule in a field of the leader must resolve at the fold, see [`rule_tree_fields`](@ref). The update rebuilds the head through its keyword constructor, so the constructor checks every resolved value. A rule that holds no schedule comes back as the same object.
+
+# Algorithm
+
+The update of the head:
+
+ 1. Return `opt` unchanged when [`is_time_dependent`](@ref) is `false` for it.
+ 2. Replace each scheduled field of `opt` with its value at the fold, through [`update_time_dependent_fields`](@ref), giving the new `opt`.
+ 3. Resolve the fallback `opt.fb` and the rule `opt.alg` of the new `opt` at the same `ctx`.
+ 4. Rebuild `opt` with the two resolved values through [`rebuild_estimator`](@ref).
+
+# Arguments
+
+  - `opt`: The head.
+  - `n`: The number of folds.
+  - `ctx`: The context of the fold.
+  - `all_binds`: As [`update_time_dependent_estimator`](@ref) takes it.
+
+# Validation
+
+  - Each vector schedule of the head, of its fallback and of its rule tree has `n` entries, else a `DimensionMismatch` that names the field is thrown.
+
+# Related
+
+  - [`OnlinePortfolioSelection`](@ref)
+  - [`online_step_fold`](@ref)
+  - [`is_time_dependent`](@ref)
+  - [`update_time_dependent_estimator`](@ref)
+"""
+function is_time_dependent(opt::OnlinePortfolioSelection)
+    return (!isempty(time_dependent_fields(opt)) ||
+            is_time_dependent(opt.fb) ||
+            is_time_dependent(opt.alg))
+end
+function assert_time_dependent_fold_count(opt::OnlinePortfolioSelection, n::Integer,
+                                          all_binds::Bool = true)::Nothing
+    assert_time_dependent_fields_fold_count(opt, n, all_binds)
+    assert_time_dependent_fold_count(opt.fb, n, all_binds)
+    assert_time_dependent_fold_count(opt.alg, n, all_binds)
+    return nothing
+end
+function update_time_dependent_estimator(opt::OnlinePortfolioSelection,
+                                         ctx::TimeDependentContext, all_binds::Bool = true)
+    if !is_time_dependent(opt)
+        return opt
+    end
+    opt = update_time_dependent_fields(opt, ctx, all_binds)
+    return rebuild_estimator(opt,
+                             (;
+                              fb = update_time_dependent_estimator(opt.fb, ctx, all_binds),
+                              alg = update_time_dependent_estimator(opt.alg, ctx,
+                                                                    all_binds)))
 end
 """
     factory(opt::OnlinePortfolioSelection, w::VecNum)
@@ -819,9 +879,9 @@ end
 """
     online_step_fold(opt::OnlinePortfolioSelection, ctx::TimeDependentContext, rd::ReturnsResult)
 
-Folds the fold's rows into the head inside the fold's own Allocation Set.
+Folds the fold's rows into the head inside the fold's own Allocation Set and the fold's own rule tree.
 
-The head is the one family whose online step is the optimisation. The Constrained Update projects the raw step of every row onto `set`, so the step reads a schedule on `set`, and not only `optimise(opt)` with no data. So the method resolves the entry here, in the same fold and before `optimise(opt)` with no data resolves the other schedules. The head that the loop threads on keeps the schedule, so fold `i + 1` resolves from the schedule and not from entry `i`. The step writes no field but the state and the fallback, so the method returns the head with its `cache` rebound and its fallback stepped through [`step_fallback`](@ref).
+The head is the one family whose online step is the optimisation. The Constrained Update projects the raw step of every row onto `set`, so the step reads a schedule on `set`, and not only `optimise(opt)` with no data. A leader in the rule tree on `alg` solves at each row, so the step also reads each schedule in a field of the leader, see [`rule_tree_fields`](@ref). So the method resolves the entry of `set` and the schedules of `alg` here, in the same fold and before `optimise(opt)` with no data resolves the other schedules. The rows fold through a head that holds the resolved rule. A rule that holds no schedule comes back as the same object, and the head is then not rebuilt. The head that the loop threads on keeps every schedule, so fold `i + 1` resolves from the schedule and not from entry `i`. The step writes no field but the state and the fallback, so the method returns the head with its `cache` rebound and its fallback stepped through [`step_fallback`](@ref).
 
 # Arguments
 
@@ -846,8 +906,10 @@ function online_step_fold(opt::OnlinePortfolioSelection{<:Any, <:Any, <:Any, <:A
                           ctx::TimeDependentContext, rd::ReturnsResult)
     set = opt.set
     set = isa(set, TimeDependent) ? time_dependent_value(set, ctx) : set
+    alg = update_time_dependent_estimator(opt.alg, ctx)
+    step = alg === opt.alg ? opt : rebuild_estimator(opt, (; alg = alg))
     return rebuild_estimator(opt,
-                             (; cache = fold_online_selection(opt, opt.cache, rd, set),
+                             (; cache = fold_online_selection(step, opt.cache, rd, set),
                               fb = step_fallback(opt.fb, rd)))
 end
 """
