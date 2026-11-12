@@ -80,9 +80,9 @@ end
     @test isapprox(sum(res1.w), 1)
     @test isapprox(sum(res1.w[res1.w .< zero(eltype(res1.w))]), -1)
     @test isapprox(sum(res1.w[res1.w .>= zero(eltype(res1.w))]), 2)
-    @test all(res1.pa.wb.lb[1:2:end] .<= res1.w[1:2:end])
-    @test all(abs.(res1.w[1:2:end] .- res1.pa.wb.ub[1:2:end]) .< 5e-10)
-    @test all(res1.pa.wb.lb[2:2:end] .<= res1.w[2:2:end] .<= res1.pa.wb.ub[2:2:end])
+    @test all(res1.jor.wb.lb[1:2:end] .<= res1.w[1:2:end])
+    @test all(abs.(res1.w[1:2:end] .- res1.jor.wb.ub[1:2:end]) .< 5e-10)
+    @test all(res1.jor.wb.lb[2:2:end] .<= res1.w[2:2:end] .<= res1.jor.wb.ub[2:2:end])
 end
 
 @testset "Buy-in threshold" begin
@@ -711,8 +711,9 @@ end
                           opt = MeanRisk(; opt = JuMPOptimiser(; pe = epx, slv = s1)))
     @test PO.group_source(sr) === nothing
     @test PO.group_frames(InverseVolatility(; pe = epx)).excess
+    # The slot is a slot of the Constraint Block, so its path passes through the block (#2039).
     @test PO.group_frames(JuMPOptimiser(; pe = epx, slv = s1, cte = CentralityConstraint())).raw ==
-          ["cte"]
+          ["cbe.cte"]
     @test PO.group_frames(HierarchicalOptimiser(; pe = epx)).raw == ["cle"]
     rb = RiskBudgeting(; opt = JuMPOptimiser(; pe = eraw, slv = s1),
                        rba = FactorRiskBudgeting(; re = StepwiseRegression(; x_src = xs)))

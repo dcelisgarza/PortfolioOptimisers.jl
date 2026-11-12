@@ -600,7 +600,7 @@ end
 
     opt = JuMPOptimiser(; slv = slv, pe = pr)
     mr = MeanRisk(; r = r, opt = opt)
-    attrs = PO.processed_jump_optimiser_attributes(mr.opt, rd)
+    attrs = PO.resolve_jump_optimiser(mr.opt, rd)
     model = JuMP.Model()
     PO.set_model_scales!(model, mr.opt.sc, mr.opt.so)
     PO.set_model_observations!(model, size(attrs.pr.X, 1))
@@ -621,7 +621,7 @@ end
     # A vector of measures takes the same route, and the second overload threads the same
     # solver.
     mrv = MeanRisk(; r = [SolverProbe(; alpha = rule)], opt = opt)
-    attrsv = PO.processed_jump_optimiser_attributes(mrv.opt, rd)
+    attrsv = PO.resolve_jump_optimiser(mrv.opt, rd)
     modelv = JuMP.Model()
     PO.set_model_scales!(modelv, mrv.opt.sc, mrv.opt.so)
     PO.set_model_observations!(modelv, size(attrsv.pr.X, 1))
@@ -636,7 +636,7 @@ end
     # the weights beside it.
     own = Solver(; name = :own, solver = Clarabel.Optimizer)
     mro = MeanRisk(; r = SolverProbe(; slv = own, alpha = rule), opt = opt)
-    attrso = PO.processed_jump_optimiser_attributes(mro.opt, rd)
+    attrso = PO.resolve_jump_optimiser(mro.opt, rd)
     modelo = JuMP.Model()
     PO.set_model_scales!(modelo, mro.opt.sc, mro.opt.so)
     PO.set_model_observations!(modelo, size(attrso.pr.X, 1))
@@ -3390,7 +3390,7 @@ end
     # Assembly resolves all four against the optimisation's own prior result, so the
     # coefficient the model carries is the calibrated number and not the rule.
     mr = MeanRisk(; r = Variance(), opt = opt)
-    attrs = PO.processed_jump_optimiser_attributes(mr.opt, rd)
+    attrs = PO.resolve_jump_optimiser(mr.opt, rd)
     model = JuMP.Model()
     PO.set_model_scales!(model, mr.opt.sc, mr.opt.so)
     PO.set_model_observations!(model, size(attrs.pr.X, 1))
@@ -3405,7 +3405,7 @@ end
     # caller who names one.
     optn = JuMPOptimiser(; slv = slv, pe = PR60_H, l1 = r_num)
     mrn = MeanRisk(; r = Variance(), opt = optn)
-    attrsn = PO.processed_jump_optimiser_attributes(mrn.opt, rd)
+    attrsn = PO.resolve_jump_optimiser(mrn.opt, rd)
     modeln = JuMP.Model()
     PO.set_model_scales!(modeln, mrn.opt.sc, mrn.opt.so)
     PO.set_model_observations!(modeln, size(attrsn.pr.X, 1))
@@ -3699,7 +3699,7 @@ end
     # One rule, stated on both coefficients of one optimiser.
     opt = JuMPOptimiser(; slv = slv, pe = PR60_H, l1 = rule, linf = rule)
     mr = MeanRisk(; r = Variance(), opt = opt)
-    attrs = PO.processed_jump_optimiser_attributes(mr.opt, rd)
+    attrs = PO.resolve_jump_optimiser(mr.opt, rd)
     model = JuMP.Model()
     PO.set_model_scales!(model, mr.opt.sc, mr.opt.so)
     PO.set_model_observations!(model, size(attrs.pr.X, 1))
@@ -4142,7 +4142,7 @@ the calibrated path alone: a stated number takes the fallback method and meets n
     rd = ReturnsResult(; nx = string.(1:4), X = X60_H)
     function assemble_with(opt)
         mr = MeanRisk(; r = Variance(), opt = opt)
-        attrs = PO.processed_jump_optimiser_attributes(mr.opt, rd)
+        attrs = PO.resolve_jump_optimiser(mr.opt, rd)
         model = JuMP.Model()
         PO.set_model_scales!(model, mr.opt.sc, mr.opt.so)
         PO.set_model_observations!(model, size(attrs.pr.X, 1))
@@ -4599,7 +4599,7 @@ end
     crule = FractionOf(0.5)
     function build(opt)
         mr = MeanRisk(; r = Variance(), opt = opt)
-        attrs = PO.processed_jump_optimiser_attributes(mr.opt, RD60)
+        attrs = PO.resolve_jump_optimiser(mr.opt, RD60)
         model = JuMP.Model()
         PO.set_model_scales!(model, mr.opt.sc, mr.opt.so)
         PO.set_model_observations!(model, size(attrs.pr.X, 1))
@@ -4735,26 +4735,24 @@ and ADR 0095 grants none.
           [joinpath("src", "17_Optimisation", "05_JuMP", "02_JuMPConstraints",
                     "12_RegularisationConstraints.jl")]
 
-    # -- Both entry points, and no third path. Each builder is called from two sites, the
-    # optimiser's and the programme Allocation Set's (ADR 0159), and each site wraps the
-    # term in its own route's verb, so no term reaches a builder unchecked. The optimiser
-    # wraps at the call. The set wraps in `resolve_allocation_set_rows`, which binds the
-    # wrapped term to the name its call passes; its `::Nothing` arm runs when no slot reads
-    # the head's rows, so the term it passes is already a value. A definition line and a
-    # docstring signature both carry `::`, so the filter keeps the calls alone.
+    # -- One resolution site, and no second path. Each builder is called from two sites, the
+    # optimiser's and the programme Allocation Set's (ADR 0159). Both read the term of the
+    # Resolved Constraint Block, and stage 2 of the block, `resolve_constraint_block`, is the
+    # one site that wraps the term in its route's verb (#2042). So no term reaches a builder
+    # unchecked. The `::Nothing` arm of stage 2 runs when no slot reads the rows, so the term
+    # it keeps is already a value. A definition line and a docstring signature both carry
+    # `::`, so the filter keeps the calls alone.
     calls(tok) = [strip(l) for f in srcfiles
                   for l in eachline(f) if occursin(tok, l) && !occursin("::", l)]
     lp_calls = calls("set_lp_regularisation!(model")
     lpc_calls = calls("set_weight_norm_p_constraints!(model")
     @test length(lp_calls) == 2
     @test length(lpc_calls) == 2
-    @test count(l -> occursin("factory(opt.lp,", l), lp_calls) == 1
-    @test count(l -> occursin("norm_ceiling_factory(opt.lpc,", l), lpc_calls) == 1
-    @test count(==("set_lp_regularisation!(model, lp; prefix = prefix)"), lp_calls) == 1
-    @test count(==("set_weight_norm_p_constraints!(model, lpc; prefix = prefix)"),
-                lpc_calls) == 1
-    @test length(calls("lp = factory(set.lp,")) == 1
-    @test length(calls("lpc = norm_ceiling_factory(set.lpc,")) == 1
+    @test all(l -> occursin("cbr.lp", l), lp_calls)
+    @test all(l -> occursin("cbr.lpc", l), lpc_calls)
+    @test length(calls("lp = factory(cbe.lp,")) == 1
+    @test length(calls("lpc = norm_ceiling_factory(cbe.lpc,")) == 1
+    @test isempty(calls("factory(opt.lp")) && isempty(calls("factory(set.lp"))
 
     # -- The `TimeDependent` case. The constructor calls the two guards with no wrapper
     # check, because a schedule is not a term and meets the permissive fallback. It is the
@@ -4888,7 +4886,7 @@ path alone: a stated ceiling takes the fallback method and meets no check.
 @testset "Norm ceiling calibration: a calibrated ceiling meets the stated ceiling's check" begin
     function assemble_with(opt)
         mr = MeanRisk(; r = Variance(), opt = opt)
-        attrs = PO.processed_jump_optimiser_attributes(mr.opt, RD60)
+        attrs = PO.resolve_jump_optimiser(mr.opt, RD60)
         model = JuMP.Model()
         PO.set_model_scales!(model, mr.opt.sc, mr.opt.so)
         PO.set_model_observations!(model, size(attrs.pr.X, 1))
@@ -5486,7 +5484,7 @@ end
 
     # Each fold holds a plain number, not the rule, so the resolution really ran per fold.
     alphas = [p.res.r.alpha for p in res.pred]
-    Ts = [size(p.res.pa.pr.X, 1) for p in res.pred]
+    Ts = [size(p.res.jor.pr.X, 1) for p in res.pred]
     @test Ts == [60, 90]
     @test all(isa.(alphas, Number))
     @test alphas ≈ [3 / 60, 3 / 90]

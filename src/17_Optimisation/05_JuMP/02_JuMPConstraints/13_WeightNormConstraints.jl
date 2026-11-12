@@ -54,12 +54,8 @@ Where:
 # Arguments
 
   - $(arg_dict[:model])
-  - `val::Number`: Ceiling on the 2-norm of the weights.
+  - `val::Number`: Ceiling on the 2-norm of the weights. [`resolve_constraint_block`](@ref) checks that it is finite and `> 0`, so the builder checks nothing.
   - $(arg_dict[:prefix_kw])
-
-# Validation
-
-  - `isfinite(val)` and `val > 0`, else a `DomainError` that names `l2c`.
 
 # Returns
 
@@ -83,7 +79,6 @@ function set_weight_norm_2_constraints!(args...; prefix::Symbol = Symbol(""))
 end
 function set_weight_norm_2_constraints!(model::JuMP.Model, val::Number;
                                         prefix::Symbol = Symbol(""))
-    assert_nonempty_gt0_finite_val(val, :l2c)
     w = get_w(model, prefix)
     k = get_k(model)
     sc = get_constraint_scale(model)
@@ -265,12 +260,8 @@ Where:
 # Arguments
 
   - $(arg_dict[:model])
-  - `val::Number`: Ceiling on the largest absolute weight.
+  - `val::Number`: Ceiling on the largest absolute weight. [`resolve_constraint_block`](@ref) checks that it is finite and `> 0`, so the builder checks nothing.
   - $(arg_dict[:prefix_kw])
-
-# Validation
-
-  - `isfinite(val)` and `val > 0`, else a `DomainError` that names `linfc`.
 
 # Returns
 
@@ -290,7 +281,6 @@ function set_weight_norm_inf_constraints!(args...; prefix::Symbol = Symbol(""))
 end
 function set_weight_norm_inf_constraints!(model::JuMP.Model, val::Number;
                                           prefix::Symbol = Symbol(""))
-    assert_nonempty_gt0_finite_val(val, :linfc)
     w = get_w(model, prefix)
     k = get_k(model)
     sc = get_constraint_scale(model)

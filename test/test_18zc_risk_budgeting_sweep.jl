@@ -147,7 +147,7 @@ end
         res = optimise(RiskBudgeting(; opt = opt, rba = rba), RBS_RD)
         @test isa(res.retcode, OptimisationSuccess)
         w = res.w
-        L = res.prb.rr.L
+        L = res.rbr.rr.L
         # Theorem 1 of roncalliweisang2012: the contribution of factor j is y_j (L^+ dR/dx)_j,
         # with the factor exposures y = L' w.
         y = transpose(L) * w
@@ -169,7 +169,7 @@ end
     opt = JuMPOptimiser(; pe = RBS_PR, slv = RBS_SLV)
     rba = FactorRiskBudgeting(; rkb = RiskBudget(; val = bf), hedge = true)
     res = optimise(RiskBudgeting(; opt = opt, rba = rba), RBS_RD)
-    L = res.prb.rr.L
+    L = res.rbr.rr.L
     g = transpose(nullspace(Matrix(transpose(L)))) * (S * res.w)
     @test norm(g) <= 1e-8 * norm(S * res.w)
 end
@@ -242,7 +242,7 @@ end
     @test_throws IsEmptyError LogRiskBudgeting(; z = Int[])
     @test_throws ArgumentError LogRiskBudgeting(; z = [1, 2])
     res = rbs_solve(LogRiskBudgeting())
-    @test isa(res.prb, PO.ProcessedAssetRiskBudgetingAttributes)
+    @test isa(res.rbr, PO.ResolvedAssetRiskBudgeting)
     @test res.rkb.val == RBS_B
     res2 = PO.set_retcode(res, OptimisationFailure(; res = nothing))
     @test isa(res2.retcode, OptimisationFailure)

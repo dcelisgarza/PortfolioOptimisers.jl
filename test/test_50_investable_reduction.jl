@@ -196,9 +196,8 @@ end
     @test size(res.pr.X, 2) == N
     @test isapprox(sum(res.w), 1; rtol = 1e-8)
     # And the bundle keeps its own default, so a caller building one by hand states nothing.
-    attrs = PortfolioOptimisers.processed_jump_optimiser_attributes(JuMPOptimiser(; pe = pr,
-                                                                                  slv = slv),
-                                                                    rd)
+    attrs = PortfolioOptimisers.resolve_jump_optimiser(JuMPOptimiser(; pe = pr, slv = slv),
+                                                       rd)
     @test isnothing(attrs.imsk)
 end
 

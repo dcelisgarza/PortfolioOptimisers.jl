@@ -1,38 +1,56 @@
 """
-    processed_jump_optimiser_attributes(
+    resolve_jump_optimiser(
         opt::JuMPOptimiser,
         rd::ReturnsResult;
+        rmsk::Option{BitVector} = nothing,
         kwargs...
-    ) -> ProcessedJuMPOptimiserAttributes
+    ) -> ResolvedJuMPOptimiser
 
-Compute all constraint and prior results needed for model assembly.
+Resolves a [`JuMPOptimiser`](@ref) against the returns data `rd`, to the [`ResolvedJuMPOptimiser`](@ref) that a JuMP model reads.
 
-Resolves every estimator field of `opt` against `rd` — running priors, weight bounds,
-thresholds, linear constraints, centrality, cardinality, turnover, fees, and phylogeny
-— and returns the fully processed bundle as a
-[`ProcessedJuMPOptimiserAttributes`](@ref). The result is consumed directly by
-[`assemble_jump_model!`](@ref) and also stored in the per-optimiser Result struct, so
-processing happens exactly once per `optimise` call.
+The function fits the prior, resolves the fees and the return terms, and resolves the [`ConstraintBlock`](@ref) of `opt` in two stages. Stage 1, [`resolve_constraint_block_names`](@ref), resolves the names of the block over the universe of the caller. The reduction to the Investable Mask then views the block, the prior and the rows. Stage 2, [`resolve_constraint_block`](@ref), resolves the block against the reduced prior and rows, to its [`ResolvedConstraintBlock`](@ref). [`assemble_jump_model!`](@ref) reads the bundle, and the Result of the head stores it in `jor`, so the resolution runs once for each `optimise` call.
+
+A distance reader of the block, its `cte` or its `ple`, can refuse an asset that the prior keeps, see [`DistanceReaderRefusalError`](@ref). Then the function fits again from the same prior result, without that asset, with the mask of [`distance_reader_refusal_mask`](@ref) in `rmsk`. The two readers can refuse different assets, and the fit again meets the refusal of the other one.
+
+**Breaking change.** The verb was `processed_jump_optimiser_attributes`, and it returned `ProcessedJuMPOptimiserAttributes`, which held one field for each resolved constraint. The constraints are now in the block Result in `cbr`. The calibrated slots `l2c`, `lpc`, `linfc`, `l1`, `l2`, `lp` and `linf` resolve at stage 2, and not in [`assemble_jump_model!`](@ref).
+
+# Algorithm
+
+ 1. Fit the prior `pr` of `opt.pe` on `rd`.
+ 2. Compose the Investable Mask `imsk` with [`distance_reader_entry_mask`](@ref), or take `rmsk` on a fit again.
+ 3. Resolve the fees on the universe of the caller with [`fees_constraints`](@ref), and place them on the axes that the mask leaves with [`investable_fees_view`](@ref).
+ 4. Resolve stage 1 of the block of `opt` over the universe of the caller, with [`resolve_constraint_block_names`](@ref).
+ 5. Reduce the prior, the optimiser and `rd` to the mask with [`investable_reduction`](@ref). The reduction views the block of stage 1, and it declares the Non-Investable Axis on its `sets`.
+ 6. Resolve stage 2 of the reduced block with [`resolve_constraint_block`](@ref), through [`distance_reader_call`](@ref). On a [`DistanceReaderRefusalError`](@ref), fit again from step 2 with the mask of [`distance_reader_refusal_mask`](@ref), and return its value.
+ 7. Resolve the return terms against the prior with [`factory`](@ref), and return the bundle.
 
 # Arguments
 
   - `opt::JuMPOptimiser`: JuMP optimiser configuration.
   - $(arg_dict[:rd])
+  - `rmsk`: The mask of a fit again after a refusal, or `nothing` on the first fit.
   - `kwargs...`: Keyword arguments passed to the centrality and phylogeny constraint estimators.
+
+# Validation
+
+  - The rules of [`resolve_constraint_block`](@ref), such as [`assert_investable_constraint_width`](@ref) for a precomputed constraint.
+  - Under `opt.strict`, no distance reader refuses an asset. The rule of [`distance_reader_refusal_mask`](@ref) raises otherwise.
 
 # Returns
 
-  - [`ProcessedJuMPOptimiserAttributes`](@ref): Fully resolved constraint and prior bundle.
+  - `jor::ResolvedJuMPOptimiser`: The resolved bundle.
 
 # Related
 
   - [`JuMPOptimiser`](@ref)
-  - [`ProcessedJuMPOptimiserAttributes`](@ref)
+  - [`ResolvedJuMPOptimiser`](@ref)
+  - [`ResolvedConstraintBlock`](@ref)
+  - [`resolve_constraint_block`](@ref)
   - [`assemble_jump_model!`](@ref)
   - [`processed_jump_optimiser`](@ref)
 """
-function processed_jump_optimiser_attributes(opt::JuMPOptimiser, rd::ReturnsResult;
-                                             rmsk::Option{BitVector} = nothing, kwargs...)
+function resolve_jump_optimiser(opt::JuMPOptimiser, rd::ReturnsResult;
+                                rmsk::Option{BitVector} = nothing, kwargs...)
     # `rd` keeps its raw `X` and `B`. Each reader below that reads the returns states its
     # own source, and subtracts the benchmark itself, at the point of use.
     pr = prior(opt.pe, rd)
@@ -46,87 +64,28 @@ function processed_jump_optimiser_attributes(opt::JuMPOptimiser, rd::ReturnsResu
     # an asset with a gap in the rows that a plain graph reader reads (`graph_reader_mask`).
     # A fit again after a refusal of a distance reader passes its mask as `rmsk`.
     imsk = distance_reader_entry_mask((opt.ple, opt.cte), pr, rd, opt.strict; rmsk = rmsk)
-    fees = investable_fees_view(fees_constraints(opt.fees, opt.sets;
-                                                 datatype = eltype(pr.X),
+    datatype = eltype(pr.X)
+    fees = investable_fees_view(fees_constraints(opt.fees, opt.sets; datatype = datatype,
                                                  strict = opt.strict), imsk, pr.X)
-    # The prior fits on the coverage universe and returns a result on the full asset
-    # universe, where an asset it could not estimate carries `NaN`. Reduce once, here:
-    # every builder below then states its constraint over the investable assets alone, on
-    # inputs `port_opt_view` has sliced by the same index. The weights are expanded back
-    # in `JuMPOptimisationResult`.
-    opt0, pr0, rd0 = opt, pr, rd
-    _, pr, opt, rd = investable_reduction(imsk, pr, opt, rd)
-    X = pr.X
-    datatype = eltype(X)
-    wb = weight_bounds_constraints(opt.wb, opt.sets; rd = rd, N = size(X, 2),
-                                   strict = opt.strict, datatype = datatype)
-    lt = threshold_constraints(opt.lt, opt.sets; datatype = datatype, strict = opt.strict)
-    st = threshold_constraints(opt.st, opt.sets; datatype = datatype, strict = opt.strict)
-    lcsr = linear_constraints(opt.lcse, opt.sets; datatype = datatype, strict = opt.strict,
-                              rr = pr.rr, rd = rd)
-    # A refusal of the centrality reader is tested after the phylogeny reader, below.
-    ctr = distance_reader_call(centrality_constraints, opt.cte, pr; iv = rd.iv,
-                               ivpa = rd.ivpa, rd = rd, strict = opt.strict, kwargs...)
-    gcardr = linear_constraints(opt.gcarde, opt.sets; datatype = Int, strict = opt.strict)
-    sgcardr = linear_constraints(opt.sgcarde, opt.sets; datatype = Int, strict = opt.strict)
-    # A name-keyed estimator follows `investable_reduction`: a name that left resolves on
-    # the Non-Investable Axis. A precomputed constraint cannot, because its `A` is bound to
-    # its columns by position. Say so here rather than let the model meet two numbers.
-    # `sgcardr` is not checked: its columns are the rows of `sgmtx`, one for each sub-group,
-    # and a departed asset removes a column of `sgmtx`, never a sub-group.
-    if !isnothing(imsk)
-        N = size(X, 2)
-        assert_investable_constraint_width(lcsr, N, "lcse")
-        assert_investable_constraint_width(gcardr, N, "gcarde")
+    # Stage 1 resolves the names over the caller's universe, as the fee does, and the
+    # reduction views its values. An online head runs the same stage once for each fold,
+    # before it knows the mask of a step, so both owners order the names and the reduction
+    # by one rule (ADR 0237).
+    cbe = resolve_constraint_block_names(opt.cbe, opt.strict, datatype)
+    _, prr, optr, rdr = investable_reduction(imsk, pr,
+                                             rebuild_estimator(opt, (; cbe = cbe)), rd)
+    cbr = distance_reader_call(resolve_constraint_block, optr.cbe, prr, rdr; slv = optr.slv,
+                               strict = optr.strict, kwargs...)
+    if cbr isa DistanceReaderRefusalError
+        # A distance reader that refuses an asset the prior kept raises before it builds its
+        # graph. Fit again from the same prior result, without that asset.
+        return resolve_jump_optimiser(rebuild_estimator(opt, (; pe = pr)), rd;
+                                      rmsk = distance_reader_refusal_mask(cbr, imsk, rd,
+                                                                          opt.strict),
+                                      kwargs...)
     end
-    if opt.smtx === opt.sgmtx
-        smtx = sgmtx = asset_sets_matrix(opt.smtx, opt.sets)
-    else
-        smtx = asset_sets_matrix(opt.smtx, opt.sets)
-        sgmtx = asset_sets_matrix(opt.sgmtx, opt.sets)
-    end
-    if opt.slt === opt.sglt
-        slt = sglt = threshold_constraints(opt.slt, opt.sets; datatype = datatype,
-                                           strict = opt.strict)
-    else
-        slt = threshold_constraints(opt.slt, opt.sets; datatype = datatype,
-                                    strict = opt.strict)
-        sglt = threshold_constraints(opt.sglt, opt.sets; datatype = datatype,
-                                     strict = opt.strict)
-    end
-    if opt.sst === opt.sgst
-        sst = sgst = threshold_constraints(opt.sst, opt.sets; datatype = datatype,
-                                           strict = opt.strict)
-    else
-        sst = threshold_constraints(opt.sst, opt.sets; datatype = datatype,
-                                    strict = opt.strict)
-        sgst = threshold_constraints(opt.sgst, opt.sets; datatype = datatype,
-                                     strict = opt.strict)
-    end
-    tn = turnover_constraints(opt.tn, opt.sets; datatype = datatype, strict = opt.strict)
-    plr = distance_reader_call(phylogeny_constraints, opt.ple, pr; iv = rd.iv,
-                               ivpa = rd.ivpa, rd = rd, kwargs...)
-    # A distance reader that refuses an asset the prior kept raises before it builds its
-    # graph. Fit again from the same prior result, without that asset
-    # (`distance_reader_refusal_mask`). The two readers can refuse different assets, and the
-    # fit again meets the refusal of the other one.
-    err = ctr isa DistanceReaderRefusalError ? ctr : plr
-    if err isa DistanceReaderRefusalError
-        return processed_jump_optimiser_attributes(rebuild_estimator(opt0, (; pe = pr0)),
-                                                   rd0;
-                                                   rmsk = distance_reader_refusal_mask(err,
-                                                                                       imsk,
-                                                                                       rd0,
-                                                                                       opt0.strict),
-                                                   kwargs...)
-    end
-    ret = factory(opt.ret, pr)
-    return ProcessedJuMPOptimiserAttributes(; pr = pr, wb = wb, lt = lt, st = st,
-                                            lcsr = lcsr, ctr = ctr, gcardr = gcardr,
-                                            sgcardr = sgcardr, smtx = smtx, sgmtx = sgmtx,
-                                            slt = slt, sst = sst, sglt = sglt, sgst = sgst,
-                                            tn = tn, fees = fees, plr = plr, ret = ret,
-                                            sca = opt.sca, imsk = imsk)
+    return ResolvedJuMPOptimiser(; pr = prr, fees = fees, ret = factory(optr.ret, prr),
+                                 sca = optr.sca, imsk = imsk, cbr = cbr)
 end
 """
     no_bounds_optimiser(opt::JuMPOptimiser, args...) -> JuMPOptimiser
@@ -173,22 +132,20 @@ end
 """
     jump_optimiser_from_attributes(
         opt::JuMPOptimiser,
-        attrs::ProcessedJuMPOptimiserAttributes
+        attrs::ResolvedJuMPOptimiser
     ) -> JuMPOptimiser
 
-Repackage a [`ProcessedJuMPOptimiserAttributes`](@ref) into a [`JuMPOptimiser`](@ref).
+Repackages a [`ResolvedJuMPOptimiser`](@ref) into a [`JuMPOptimiser`](@ref).
 
-Maps result-named fields onto the optimiser's estimator-named slots (`lcsr` → `lcse`,
-`plr` → `ple`, `pr` → `pe`, …) and carries all remaining settings through from `opt`.
-Used where a processed optimiser object is needed for inner sub-problems (e.g.
-[`near_optimal_centering_setup`](@ref)) while the same `attrs` is also passed directly to
-[`assemble_jump_model!`](@ref) — so processing happens once and is never round-tripped.
+The function maps the fields of the bundle onto the fields of the optimiser: `pr` onto `pe`, and `fees`, `ret` and `sca` onto the fields of the same name. It maps the block Result `cbr` onto the block `cbe` with [`constraint_block_from_resolved`](@ref), which holds the rename table of the block (`lcsr` to `lcse`, `ctr` to `cte`, …). Every other field of `opt` keeps its value. The list of fields comes from the fields of the bundle, so the function drops no field. The Investable Mask `imsk` has no field on the optimiser, and the function leaves it out.
+
+[`near_optimal_centering_setup`](@ref) calls it to build the optimiser of its sub-problems, while it gives the same `attrs` to [`assemble_jump_model!`](@ref). So the resolution runs once, and no sub-problem resolves a slot again.
 
 # Arguments
 
   - `opt::JuMPOptimiser`: Source optimiser supplying solver, scalar settings, and any
     fields not present in `attrs`.
-  - `attrs::ProcessedJuMPOptimiserAttributes`: Pre-computed constraint and prior bundle.
+  - `attrs::ResolvedJuMPOptimiser`: Pre-computed constraint and prior bundle.
 
 # Returns
 
@@ -196,33 +153,33 @@ Used where a processed optimiser object is needed for inner sub-problems (e.g.
 
 # Related
 
-  - [`ProcessedJuMPOptimiserAttributes`](@ref)
+  - [`ResolvedJuMPOptimiser`](@ref)
   - [`processed_jump_optimiser`](@ref)
-  - [`processed_jump_optimiser_attributes`](@ref)
+  - [`resolve_jump_optimiser`](@ref)
   - [`assemble_jump_model!`](@ref)
 """
-function jump_optimiser_from_attributes(opt::JuMPOptimiser,
-                                        attrs::ProcessedJuMPOptimiserAttributes)
+function jump_optimiser_from_attributes(opt::JuMPOptimiser, attrs::ResolvedJuMPOptimiser)
     # The remap is derived by reflection so it can never silently drop a field (a hand-written
     # pull-through once omitted `scard`, disabling sub-group cardinality in constrained-NOC;
-    # fixed in 9ff28d6). Every `opt` field flows through by name (`base`); every `attrs` result
-    # field overrides its optimiser slot. Six result fields carry a different name than their
-    # slot — listed in `rename` — the other twelve match by name and map automatically.
+    # fixed in 9ff28d6). Every `attrs` field overrides its optimiser field, and the block
+    # Result maps onto the block through the rename table of the block.
     #
     # There is deliberately no inverse. A head that needs the bundle back keeps the `attrs` it
     # already holds (both `NearOptimalCentering` heads do), because a reverse hand list is the
     # same drop the comment above records — only pointing the other way.
-    rename = (; pr = :pe, lcsr = :lcse, ctr = :cte, gcardr = :gcarde, sgcardr = :sgcarde,
-              plr = :ple)
-    of = fieldnames(JuMPOptimiser)
-    # `imsk` is the one bundle field that is not a constraint result: it is the Investable
-    # Mask the reduction derived, and `JuMPOptimiser` declares no slot for it. A sub-problem
-    # built from this optimiser reads an already-reduced prior, so it derives no mask of its
-    # own and needs none carried in.
-    af = filter(!=(:imsk), fieldnames(ProcessedJuMPOptimiserAttributes))
-    base = NamedTuple{of}(getfield.(opt, of))
-    overrides = NamedTuple{map(f -> get(rename, f, f), af)}(getfield.(attrs, af))
-    return JuMPOptimiser(; merge(base, overrides)...)
+    rename = (; pr = :pe, cbr = :cbe)
+    # `imsk` is the one bundle field with no field on the optimiser: it is the Investable
+    # Mask the reduction derived. A sub-problem built from this optimiser reads an
+    # already-reduced prior, so it derives no mask of its own and needs none carried in.
+    af = filter(!=(:imsk), fieldnames(ResolvedJuMPOptimiser))
+    vals = map(af) do f
+        return if f === :cbr
+            constraint_block_from_resolved(opt.cbe, attrs.cbr)
+        else
+            getfield(attrs, f)
+        end
+    end
+    return rebuild_estimator(opt, NamedTuple{map(f -> get(rename, f, f), af)}(vals))
 end
 """
     processed_jump_optimiser(
@@ -233,7 +190,7 @@ end
 
 Build a fully-processed [`JuMPOptimiser`](@ref) from raw configuration and returns data.
 
-Calls [`processed_jump_optimiser_attributes`](@ref) then repackages the result via
+Calls [`resolve_jump_optimiser`](@ref) then repackages the result via
 [`jump_optimiser_from_attributes`](@ref). Used where a processed optimiser is needed for
 inner sub-problems (e.g. [`NearOptimalCentering`](@ref)) while the `attrs` bundle is
 reused directly by [`assemble_jump_model!`](@ref).
@@ -242,7 +199,7 @@ reused directly by [`assemble_jump_model!`](@ref).
 
   - `opt::JuMPOptimiser`: Raw optimiser configuration.
   - $(arg_dict[:rd])
-  - `kwargs...`: Keyword arguments passed to [`processed_jump_optimiser_attributes`](@ref).
+  - `kwargs...`: Keyword arguments passed to [`resolve_jump_optimiser`](@ref).
 
 # Returns
 
@@ -251,12 +208,12 @@ reused directly by [`assemble_jump_model!`](@ref).
 # Related
 
   - [`JuMPOptimiser`](@ref)
-  - [`ProcessedJuMPOptimiserAttributes`](@ref)
-  - [`processed_jump_optimiser_attributes`](@ref)
+  - [`ResolvedJuMPOptimiser`](@ref)
+  - [`resolve_jump_optimiser`](@ref)
   - [`jump_optimiser_from_attributes`](@ref)
 """
 function processed_jump_optimiser(opt::JuMPOptimiser, rd::ReturnsResult; kwargs...)
-    attrs = processed_jump_optimiser_attributes(opt, rd; kwargs...)
+    attrs = resolve_jump_optimiser(opt, rd; kwargs...)
     return jump_optimiser_from_attributes(opt, attrs)
 end
 """
@@ -352,7 +309,7 @@ end
         model::JuMP.Model,
         optimiser::JuMPOptimisationEstimator,
         opt::JuMPOptimiser,
-        attrs::ProcessedJuMPOptimiserAttributes,
+        attrs::ResolvedJuMPOptimiser,
         rd::ReturnsResult,
         r::Option{<:RM_VecRM} = nothing,
         obj::ObjectiveFunction = MinimumRisk(),
@@ -378,16 +335,13 @@ when the optimiser solves its model once.
   - $(arg_dict[:model])
   - `optimiser::JuMPOptimisationEstimator`: Dispatch object for risk, tracking, and custom
     constraint builders.
-  - `opt::JuMPOptimiser`: Supplies scalar settings (`l2c`, `lpc`, `linfc`, `l1`, `l2`,
-    `lp`, `linf`, `card`, `scard`, `tr`, `ccnt`, `sca`, `ss`). The four regularisation
-    coefficients and the three norm ceilings are the one place a **Calibration Rule**
-    reaches the model builders, so they are resolved against `attrs.pr` here rather than
-    by [`processed_jump_optimiser_attributes`](@ref): the bundle carries no slot for them
-    and this is where both the prior result and the optimiser are in hand. A ceiling is
-    read against one norm order, so each of the three sites states its own order in the
-    [`CalibrationContext`](@ref) it resolves the slot against.
-  - `attrs::ProcessedJuMPOptimiserAttributes`: Pre-computed constraint and prior bundle
-    produced by [`processed_jump_optimiser_attributes`](@ref).
+  - `opt::JuMPOptimiser`: Supplies the tracking errors `tr`, which the head binds to its
+    rows, and the scalariser `sca` of the risk step.
+  - `attrs::ResolvedJuMPOptimiser`: The resolved bundle of [`resolve_jump_optimiser`](@ref).
+    The builders read the prior, the fees and the return terms of the bundle, and every
+    constraint, setting and calibrated slot of the [`ResolvedConstraintBlock`](@ref) in
+    `attrs.cbr`. A Calibration Rule in a norm ceiling or a penalty resolved at stage 2 of
+    the block, [`resolve_constraint_block`](@ref), so no builder resolves it here.
   - $(arg_dict[:rd])
   - `r::Option{<:RM_VecRM} = nothing`: Risk measure(s), or `nothing` to skip risk
     constraints and scalarisation (the [`RelaxedRiskBudgeting`](@ref) path).
@@ -400,8 +354,8 @@ when the optimiser solves its model once.
 
 # Related
 
-  - [`ProcessedJuMPOptimiserAttributes`](@ref)
-  - [`processed_jump_optimiser_attributes`](@ref)
+  - [`ResolvedJuMPOptimiser`](@ref)
+  - [`resolve_jump_optimiser`](@ref)
   - [`set_risk_and_scalarise!`](@ref)
   - [`assert_frontier_sweep_cap`](@ref)
   - [`assert_frontier_sweep_owner`](@ref)
@@ -413,43 +367,30 @@ when the optimiser solves its model once.
   - [`NearOptimalCentering`](@ref)
 """
 function assemble_jump_model!(model::JuMP.Model, optimiser::JuMPOptimisationEstimator,
-                              opt::JuMPOptimiser, attrs::ProcessedJuMPOptimiserAttributes,
+                              opt::JuMPOptimiser, attrs::ResolvedJuMPOptimiser,
                               rd::ReturnsResult, r::Option{<:RM_VecRM} = nothing,
                               obj::ObjectiveFunction = MinimumRisk(),
                               b1::Option{<:MatNum} = nothing)
-    (; pr, wb, lt, st, lcsr, ctr, gcardr, sgcardr, smtx, sgmtx, slt, sst, sglt, sgst, tn, fees, plr, ret) = attrs
+    (; pr, fees, ret, cbr) = attrs
+    (; wb, lt, st, lcsr, ctr, gcardr, sgcardr, smtx, sgmtx, slt, sst, sglt, sgst, tn, plr) = cbr
     set_linear_weight_constraints!(model, lcsr, :lcs_ineq_, :lcs_eq_)
     set_linear_weight_constraints!(model, ctr, :cent_ineq_, :cent_eq_)
-    set_mip_constraints!(model, wb, opt.card, gcardr, plr, lt, st, fees, opt.ss, opt.xbgt)
-    set_smip_constraints!(model, wb, opt.scard, sgcardr, smtx, sgmtx, slt, sst, sglt, sgst,
-                          opt.ss)
+    set_mip_constraints!(model, wb, cbr.card, gcardr, plr, lt, st, fees, cbr.ss, cbr.xbgt)
+    set_smip_constraints!(model, wb, cbr.scard, sgcardr, smtx, sgmtx, slt, sst, sglt, sgst,
+                          cbr.ss)
     set_turnover_constraints!(model, tn)
+    # The head binds a data benchmark of its tracking errors to its rows, so `tr` is read
+    # from the head and not from the block Result.
     set_tracking_error_constraints!(model, pr, opt.tr, optimiser, plr, fees, b1; rd = rd)
-    # The three norm ceilings each take a Calibration Rule, and each resolves here. A
-    # ceiling is read against one norm order, which belongs to the constraint and not to
-    # the rule, so each site states its own order in the context. `lpc` holds estimators
-    # and carries one order per term, so it goes through `norm_ceiling_factory`.
-    #
-    # These four slots are the ones that reach the model raw. Every other slot is rebuilt
-    # by its owner's constructor, which states the range of the number. There is no term to
-    # rebuild here, so each of the four builders states the range of the number it is
-    # handed, whatever produced it.
-    l2c = resolve_calibration_slot(opt.l2c, :l2c, pr, pr.w, opt.slv,
-                                   CalibrationContext(; p = 2))
-    linfc = resolve_calibration_slot(opt.linfc, :linfc, pr, pr.w, opt.slv,
-                                     CalibrationContext(; p = Inf))
-    set_weight_norm_2_constraints!(model, l2c)
-    set_weight_norm_p_constraints!(model, norm_ceiling_factory(opt.lpc, pr, opt.slv))
-    set_weight_norm_inf_constraints!(model, linfc)
-    # The four regularisation coefficients are the ambiguity radii of the four ground
-    # metrics, so each takes a Calibration Rule and each resolves here, against the
-    # optimisation's own prior result and effective solver. `l2` and `lp` hold estimators,
-    # so their own `factory` methods resolve them; `l1` and `linf` hold the number itself.
-    set_l1_regularisation!(model, resolve_calibration_slot(opt.l1, :l1, pr, pr.w, opt.slv))
-    set_l2_regularisation!(model, factory(opt.l2, pr, opt.slv))
-    set_lp_regularisation!(model, factory(opt.lp, pr, opt.slv))
-    set_linf_regularisation!(model,
-                             resolve_calibration_slot(opt.linf, :linf, pr, pr.w, opt.slv))
+    # The norm ceilings and the penalties resolved their Calibration Rules at stage 2 of the
+    # block, `resolve_constraint_block`, which also checked the range of each number.
+    set_weight_norm_2_constraints!(model, cbr.l2c)
+    set_weight_norm_p_constraints!(model, cbr.lpc)
+    set_weight_norm_inf_constraints!(model, cbr.linfc)
+    set_l1_regularisation!(model, cbr.l1)
+    set_l2_regularisation!(model, cbr.l2)
+    set_lp_regularisation!(model, cbr.lp)
+    set_linf_regularisation!(model, cbr.linf)
     set_non_fixed_fees!(model, fees)
     set_risk_and_scalarise!(model, r, optimiser, opt, pr, plr, fees, b1; rd = rd)
     set_return_constraints!(model, ret, obj, pr; rd = rd)
@@ -458,7 +399,7 @@ function assemble_jump_model!(model::JuMP.Model, optimiser::JuMPOptimisationEsti
     mark_risk_minimised!(model, obj)
     set_iplg_constraints!(model, plr)
     set_sdp_phylogeny_constraints!(model, plr)
-    add_custom_constraint!(model, opt.ccnt, optimiser, attrs)
+    add_custom_constraint!(model, cbr.ccnt, optimiser, attrs)
     assert_frontier_sweep_cap(model)
     assert_frontier_sweep_owner(model, optimiser)
     return nothing

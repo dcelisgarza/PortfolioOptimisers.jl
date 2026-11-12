@@ -1146,7 +1146,7 @@ end
         res = optimise(MeanRisk(;
                                 opt = JuMPOptimiser(; pe = FactorPrior(), slv = oslv,
                                                     sets = osets, lcse = oece)), rdo)
-        Mf = res.pa.pr.rr.M
+        Mf = res.jor.pr.rr.M
         # The mandate binds: momentum exposure sits on the cap it was written against.
         @test isapprox(dot(Mf[:, 1], res.w), 0.3; atol = 1e-6)
         # What reached the model is an ordinary asset-space constraint — one row, one column
@@ -1187,12 +1187,12 @@ end
                               rdo)
         held = ratio(MaximumRatio())
         @test isa(held.retcode, PortfolioOptimisers.OptimisationSuccess)
-        @test dot(held.pa.pr.rr.M[:, 1], held.w) >= 0.9 - 1e-5
+        @test dot(held.jor.pr.rr.M[:, 1], held.w) >= 0.9 - 1e-5
         # Which the collapsed scale did not: a floor below the ray reports the same success
         # and hands back weights that break the mandate the caller wrote.
         broken = ratio(MaximumRatio(; kmin = 1e-12))
         @test isa(broken.retcode, PortfolioOptimisers.OptimisationSuccess)
-        @test dot(broken.pa.pr.rr.M[:, 1], broken.w) < 0.9 - 1e-3
+        @test dot(broken.jor.pr.rr.M[:, 1], broken.w) < 0.9 - 1e-3
     end
 
     @testset "Every JuMP optimiser inherits it" begin
@@ -1202,7 +1202,7 @@ end
             res = optimise(est(;
                                opt = JuMPOptimiser(; pe = FactorPrior(), slv = oslv,
                                                    sets = osets, lcse = oece)), rdo)
-            @test dot(res.pa.pr.rr.M[:, 1], res.w) <= 0.3 + 1e-6
+            @test dot(res.jor.pr.rr.M[:, 1], res.w) <= 0.3 + 1e-6
         end
         # Near Optimal Centering round-trips `lcsr` back into an `lcse` slot through
         # `jump_optimiser_from_attributes`, where the pass-through method for a precomputed
@@ -1214,7 +1214,7 @@ end
                                             opt = JuMPOptimiser(; pe = FactorPrior(),
                                                                 slv = oslv, sets = osets,
                                                                 lcse = oece)), rdo)
-        @test isapprox(dot(noc.pa.pr.rr.M[:, 1], noc.w), 0.3; atol = 1e-6)
+        @test isapprox(dot(noc.jor.pr.rr.M[:, 1], noc.w), 0.3; atol = 1e-6)
     end
     @testset "Missing loadings throw at the optimiser, ignoring `strict`" begin
         # `strict` governs recoverable per-row name failures. Dropping every row of a factor
@@ -1293,11 +1293,11 @@ end
         @test length(preds.pred) == 2
         for (k, cap) in enumerate((0.3, 0.05))
             r = preds.pred[k].res
-            @test dot(r.pa.pr.rr.M[:, 1], r.w) <= cap + 1e-6
+            @test dot(r.jor.pr.rr.M[:, 1], r.w) <= cap + 1e-6
         end
         # The loadings are refit per fold, which is the whole reason the constraint is
         # re-based at generation time rather than written out once by the caller.
-        @test preds.pred[1].res.pa.pr.rr.M != preds.pred[2].res.pa.pr.rr.M
+        @test preds.pred[1].res.jor.pr.rr.M != preds.pred[2].res.jor.pr.rr.M
     end
     # A space carries the *source* of its basis (ADR 0047, amended). `FactorSpace` stopped
     # being a singleton and gained `re`, whose precedence is `resolve_factor_regression`'s —
@@ -1366,7 +1366,7 @@ end
                                 opt = JuMPOptimiser(; pe = EmpiricalPrior(), slv = oslv,
                                                     sets = osets, lcse = ece_fit)), rdo)
         # The prior really carries none: the basis came from the refit and nowhere else.
-        @test isnothing(res.pa.pr.rr)
+        @test isnothing(res.jor.pr.rr)
         fitted = regression(StepwiseRegression(), rdo)
         @test vec(res.lcsr.ineq.A) ≈ fitted.M[:, 1]
         # And it binds, measured against the loadings the refit produced.
@@ -1383,7 +1383,7 @@ end
                                                                                                             re = pin)))),
                         rdo)
         @test vec(resp.lcsr.ineq.A) == pin.M[:, 1]
-        @test vec(resp.lcsr.ineq.A) != resp.pa.pr.rr.M[:, 1]
+        @test vec(resp.lcsr.ineq.A) != resp.jor.pr.rr.M[:, 1]
     end
     @testset "A stated basis is viewed where the universe is sliced" begin
         # The loadings are assets-major, so a subset of assets is a subset of rows and the

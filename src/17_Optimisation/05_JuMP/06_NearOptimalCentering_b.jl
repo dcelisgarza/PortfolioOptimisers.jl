@@ -43,8 +43,8 @@ function solve_noc!(noc::NearOptimalCentering{<:Any, <:Any, <:Any, <:Any, <:Any,
                                               <:ConstrainedNearOptimalCentering},
                     model::JuMP.Model, rk_opts::VecNum, rt_opts::VecNum, s_rk::Number,
                     s_rt::Number, opt::BaseJuMPOptimisationEstimator,
-                    attrs::ProcessedJuMPOptimiserAttributes, ::Any, ::Any, ::Any,
-                    w_min::VecNum, w_max::VecNum, ::Val{false}, ::Val{true}, args...)
+                    attrs::ResolvedJuMPOptimiser, ::Any, ::Any, ::Any, w_min::VecNum,
+                    w_max::VecNum, ::Val{false}, ::Val{true}, args...)
     risk_frontier = compute_risk_ubs(model, noc, opt.pe, opt.fees, w_min, w_max, args...)
     risk_axis = set_risk_frontier_parameters!(model, risk_frontier)
     p_rk, p_rt, rk_units, rt_units = set_noc_anchor_parameters!(model, noc, attrs, rk_opts,
@@ -59,9 +59,8 @@ function solve_noc!(noc::NearOptimalCentering{<:Any, <:Any, <:Any, <:Any, <:Any,
                                               <:ConstrainedNearOptimalCentering},
                     model::JuMP.Model, rk_opts::VecNum, rt_opts::VecNum, s_rk::Number,
                     s_rt::Number, opt::BaseJuMPOptimisationEstimator,
-                    attrs::ProcessedJuMPOptimiserAttributes, ::Any, ::Any,
-                    rt_ends::Option{<:VecPair}, w_min::VecNum, w_max::VecNum, ::Val{true},
-                    ::Val{true}, args...)
+                    attrs::ResolvedJuMPOptimiser, ::Any, ::Any, rt_ends::Option{<:VecPair},
+                    w_min::VecNum, w_max::VecNum, ::Val{true}, ::Val{true}, args...)
     ret_frontier = compute_ret_lbs(shared_get(model, :ret_frontier), rt_ends)
     risk_frontier = compute_risk_ubs(model, noc, opt.pe, opt.fees, w_min, w_max, args...)
     risk_axis = set_risk_frontier_parameters!(model, risk_frontier)
@@ -291,7 +290,7 @@ function _optimise(noc::NearOptimalCentering, rd::ReturnsResult = ReturnsResult(
     noc_retcode, sol = solve_near_optimal_centering!(noc.alg, model, noc, setup)
     retcode = get_overall_retcode(w_min_retcode, w_opt_retcode, w_max_retcode, noc_retcode)
     return NearOptimalCenteringResult(;
-                                      jr = JuMPOptimisationResult(; pa = attrs,
+                                      jr = JuMPOptimisationResult(; jor = attrs,
                                                                   retcode = retcode,
                                                                   sol = sol,
                                                                   model = ifelse(save,

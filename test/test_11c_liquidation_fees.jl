@@ -244,8 +244,8 @@
         @test length(res.w) == N
         @test iszero(res.w[k])
         @test isapprox(sum(res.w), 1; atol = 1e-8)
-        @test res.jr.pa.imsk == imsk
-        used = res.jr.pa.fees
+        @test res.jr.jor.imsk == imsk
+        used = res.jr.jor.fees
         @test length(used.l) == length(keep)
         @test collect(used.l) == lval[keep]
         @test collect(used.lq.w) == [w[k]]

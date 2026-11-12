@@ -123,8 +123,8 @@ It is the result-side twin of [`BaseJuMPOptimisationEstimator`](@ref). It is not
 """
 abstract type BaseJuMPOptimisationResult <: AbstractResult end
 # The concrete core `JuMPOptimisationResult` is defined in 03_JuMPOptimiser_a.jl, after
-# `ProcessedJuMPOptimiserAttributes` and `JuMPOptimiser` — it is the result-side analogue
-# of `JuMPOptimiser` and its typed constructor binds `pa::ProcessedJuMPOptimiserAttributes`,
+# `ResolvedJuMPOptimiser` and `JuMPOptimiser` — it is the result-side analogue
+# of `JuMPOptimiser` and its typed constructor binds `jor::ResolvedJuMPOptimiser`,
 # which must be in scope.
 """
 $(DocStringExtensions.TYPEDEF)
@@ -133,7 +133,7 @@ Abstract supertype for the JuMP optimisation results that carry a resolved risk 
 
 It is the result-side twin of [`RiskJuMPOptimisationEstimator`](@ref), and [`NonRiskJuMPOptimisationResult`](@ref) is its sibling for the results that carry no risk measure. A concrete subtype holds an embedded [`JuMPOptimisationResult`](@ref) in its first field `jr`, then its own fields, then the fallback `fb`. Every subtype carries a resolved `r`.
 
-The default `getproperty` of [`RJR_NRJR`](@ref) reads a field of the subtype directly and forwards every other name, `w` and the fields of `pa` among them, to `jr`. A subtype that holds a composed result in a field overrides it and forwards into that field first.
+The default `getproperty` of [`RJR_NRJR`](@ref) reads a field of the subtype directly and forwards every other name, `w` and the fields of `jor` among them, to `jr`. A subtype that holds a composed result in a field overrides it and forwards into that field first.
 
 # Related
 
@@ -179,7 +179,7 @@ Read the property `sym` of a JuMP optimisation result.
 # Algorithm
 
  1. When `sym` is a field of the result, return that field.
- 2. Otherwise return `getproperty` of the embedded [`JuMPOptimisationResult`](@ref) `jr`, which in turn reads the fields of `pa`.
+ 2. Otherwise return `getproperty` of the embedded [`JuMPOptimisationResult`](@ref) `jr`, which in turn reads the fields of `jor`.
 """
 function Base.getproperty(r::RJR_NRJR, sym::Symbol)
     return if sym in fieldnames(typeof(r))
@@ -193,7 +193,7 @@ $(DocStringExtensions.TYPEDSIGNATURES)
 
 Return the names that the default `getproperty` of [`RJR_NRJR`](@ref) reads.
 
-The tuple holds the field names of the result, then the property names of the embedded [`JuMPOptimisationResult`](@ref) `jr` that are not field names of the result. The names of `jr` include the fields of `pa`. A subtype that overrides `getproperty` through [`@forward_properties`](@ref) gets its own `propertynames` from that macro.
+The tuple holds the field names of the result, then the property names of the embedded [`JuMPOptimisationResult`](@ref) `jr` that are not field names of the result. The names of `jr` include the fields of `jor`. A subtype that overrides `getproperty` through [`@forward_properties`](@ref) gets its own `propertynames` from that macro.
 """
 function Base.propertynames(r::RJR_NRJR)
     return Tuple(unique((fieldnames(typeof(r))..., propertynames(getfield(r, :jr))...)))
@@ -275,7 +275,7 @@ To add a constraint, subtype `CustomJuMPConstraint` with the parameters of the c
 
 ## `add_custom_constraint!`
 
-  - `add_custom_constraint!(model::JuMP.Model, ccnt::MyConstraint, optimiser, attrs::ProcessedJuMPOptimiserAttributes) -> Nothing`: Add the constraint to `model`. The verb has no fallback for a subtype, so a subtype with no method of its own raises. Multiply the constraint by [`get_constraint_scale`](@ref). Multiply a constant bound by [`get_k`](@ref), the homogenisation variable, so that the bound holds on the reported weights under a ratio objective.
+  - `add_custom_constraint!(model::JuMP.Model, ccnt::MyConstraint, optimiser, attrs::ResolvedJuMPOptimiser) -> Nothing`: Add the constraint to `model`. The verb has no fallback for a subtype, so a subtype with no method of its own raises. Multiply the constraint by [`get_constraint_scale`](@ref). Multiply a constant bound by [`get_k`](@ref), the homogenisation variable, so that the bound holds on the reported weights under a ratio objective.
 
 ### Arguments
 
@@ -334,7 +334,7 @@ To add a penalty or a reward, subtype `CustomJuMPObjective` with the parameters 
 
 ## `add_custom_objective_term!`
 
-  - `add_custom_objective_term!(model::JuMP.Model, obj::ObjectiveFunction, cobj::MyObjective, optimiser, attrs::ProcessedJuMPOptimiserAttributes) -> Nothing`: Add the term to the objective of `model`. The verb has no fallback for a subtype, so a subtype with no method of its own raises. Add the term through [`add_to_objective_penalty!`](@ref), and do not write the objective expression. The model adds the accumulated penalty with the sign that the sense of the objective needs, so a positive term always makes the objective worse, and a reward is a negative term. A term that is not homogeneous of degree one in the weights multiplies its constants by [`get_k`](@ref).
+  - `add_custom_objective_term!(model::JuMP.Model, obj::ObjectiveFunction, cobj::MyObjective, optimiser, attrs::ResolvedJuMPOptimiser) -> Nothing`: Add the term to the objective of `model`. The verb has no fallback for a subtype, so a subtype with no method of its own raises. Add the term through [`add_to_objective_penalty!`](@ref), and do not write the objective expression. The model adds the accumulated penalty with the sign that the sense of the objective needs, so a positive term always makes the objective worse, and a reward is a negative term. A term that is not homogeneous of degree one in the weights multiplies its constants by [`get_k`](@ref).
 
 ### Arguments
 
@@ -433,7 +433,7 @@ A term that is not homogeneous of degree one in `w` multiplies each constant by 
   - `obj`: The [`ObjectiveFunction`](@ref) that the model builds. Inside a [`Frontier`](@ref) sweep it is not the objective that the user declared, because the sweep builds the sub-problems of its end points as [`MinimumRisk`](@ref) and [`MaximumReturn`](@ref).
   - `cobj`: The custom term, the argument to dispatch on.
   - `optimiser`: The outer optimiser, for example the [`MeanRisk`](@ref). Its `opt` field is the [`JuMPOptimiser`](@ref).
-  - `attrs::ProcessedJuMPOptimiserAttributes`: The processed problem data: the prior `attrs.pr`, the returns estimator `attrs.ret`, the weight bounds `attrs.wb` and the rest.
+  - `attrs::ResolvedJuMPOptimiser`: The processed problem data: the prior `attrs.pr`, the returns estimator `attrs.ret`, the weight bounds `attrs.wb` and the rest.
 
 # Validation
 
@@ -501,7 +501,7 @@ Implement this verb for a subtype of [`CustomJuMPConstraint`](@ref) to impose a 
   - `model::JuMP.Model`: The JuMP model while it is built.
   - `ccnt`: The custom constraint, the argument to dispatch on.
   - `optimiser`: The outer optimiser, for example the [`MeanRisk`](@ref).
-  - `attrs::ProcessedJuMPOptimiserAttributes`: The processed problem data.
+  - `attrs::ResolvedJuMPOptimiser`: The processed problem data.
 
 # Validation
 

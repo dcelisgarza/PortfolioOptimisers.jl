@@ -302,6 +302,9 @@ parameter as a static parameter, `x::X where {X}`, gives none. The maintainer st
 # its file, because `src/17_Optimisation/05_JuMP/03_JuMPOptimiser_a.jl` holds a second at 19. Nineteen
 # definitions sit over seventeen keys, because the key holds no line. Issue #2040 removed the key of
 # `ProgrammeAllocationSet`: the set holds a Constraint Block, and its constructor takes 7 arguments.
+# Issue #2042 removed the key of `ProcessedJuMPOptimiserAttributes`, the second constructor of
+# `03_JuMPOptimiser_a.jl`: its successor `ResolvedJuMPOptimiser` holds the block Result, and its
+# constructor takes 6 arguments.
 
 [[exemption]]
 path = "src/03_InputData/10_ReturnsResult.jl"
@@ -314,6 +317,14 @@ rationale = "keyword-constructor-arity"
 [[exemption]]
 path = "src/17_Optimisation/05_JuMP/02_JuMPConstraints/14_ConstraintBlock.jl"
 definition = "ConstraintBlock"
+metric = "arg"
+rationale = "keyword-constructor-arity"
+
+# The Resolved Constraint Block of ADR 0237 holds one field for each slot of the block, and its
+# prior and rows, so its constructor takes 32 arguments (#2042).
+[[exemption]]
+path = "src/17_Optimisation/05_JuMP/02_JuMPConstraints/14_ConstraintBlock.jl"
+definition = "ResolvedConstraintBlock"
 metric = "arg"
 rationale = "keyword-constructor-arity"
 
@@ -420,12 +431,6 @@ rationale = "keyword-constructor-arity"
 [[exemption]]
 path = "src/17_Optimisation/05_JuMP/03_JuMPOptimiser_a.jl"
 definition = "JuMPOptimiser"
-metric = "arg"
-rationale = "keyword-constructor-arity"
-
-[[exemption]]
-path = "src/17_Optimisation/05_JuMP/03_JuMPOptimiser_a.jl"
-definition = "ProcessedJuMPOptimiserAttributes"
 metric = "arg"
 rationale = "keyword-constructor-arity"
 

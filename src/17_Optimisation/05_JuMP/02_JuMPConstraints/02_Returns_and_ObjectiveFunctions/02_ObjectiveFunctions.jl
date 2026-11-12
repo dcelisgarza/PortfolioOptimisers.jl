@@ -901,7 +901,7 @@ Where:
   - `model::JuMP.Model`: JuMP optimisation model.
   - `obj::ObjectiveFunction`: Portfolio objective, such as [`MinimumRisk`](@ref) or [`MaximumUtility`](@ref). It is the objective that the method builds, which in a [`Frontier`](@ref) sweep is not the one the user declared.
   - `optimiser::JuMPOptimisationEstimator`: The outer optimisation estimator, such as the [`MeanRisk`](@ref) itself. Its `optimiser.opt.cobj` holds the custom objective terms.
-  - `attrs::ProcessedJuMPOptimiserAttributes`: Pre-computed constraint and prior bundle.
+  - `attrs::ResolvedJuMPOptimiser`: Pre-computed constraint and prior bundle.
 
 # Returns
 

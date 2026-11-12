@@ -453,7 +453,7 @@ The first `Val` is `true` when the model holds a `:ret_frontier` registry, and t
   - `::Val{Bool}`: `true` for a return frontier.
   - `::Val{Bool}`: `true` for a risk frontier.
   - $(arg_dict[:fees_opt])
-  - `attrs::ProcessedJuMPOptimiserAttributes`: The processed attributes of the optimiser, which hold the return terms.
+  - `attrs::ResolvedJuMPOptimiser`: The processed attributes of the optimiser, which hold the return terms.
 
 # Returns
 
@@ -468,7 +468,7 @@ The first `Val` is `true` when the model holds a `:ret_frontier` registry, and t
 """
 function solve_mean_risk!(model::JuMP.Model, mr::MeanRisk, pr::AbstractPriorResult,
                           ::Val{false}, ::Val{false}, ::Option{<:Fees},
-                          attrs::ProcessedJuMPOptimiserAttributes)
+                          attrs::ResolvedJuMPOptimiser)
     set_portfolio_objective_function!(model, mr.obj, mr, attrs)
     return optimise_JuMP_model!(model, mr, eltype(pr.X))
 end
@@ -518,7 +518,7 @@ The high end of term `i` comes from a portfolio that maximises term `i` alone. T
   - `mr::MeanRisk`: The optimiser.
   - $(arg_dict[:pr])
   - $(arg_dict[:fees_opt])
-  - `attrs::ProcessedJuMPOptimiserAttributes`: The processed attributes of the optimiser, which hold the return terms.
+  - `attrs::ResolvedJuMPOptimiser`: The processed attributes of the optimiser, which hold the return terms.
 
 # Validation
 
@@ -538,7 +538,7 @@ The high end of term `i` comes from a portfolio that maximises term `i` alone. T
   - [`solve_mean_risk!`](@ref)
 """
 function compute_ret_lbs(model::JuMP.Model, mr::MeanRisk, pr::AbstractPriorResult,
-                         fees::Option{<:Fees}, attrs::ProcessedJuMPOptimiserAttributes)
+                         fees::Option{<:Fees}, attrs::ResolvedJuMPOptimiser)
     ret_frontier = shared_get(model, :ret_frontier)
     idx = Vector{Int}(undef, 0)
     for (j, rtf) in enumerate(ret_frontier)
@@ -573,7 +573,7 @@ function compute_ret_lbs(model::JuMP.Model, mr::MeanRisk, pr::AbstractPriorResul
 end
 function solve_mean_risk!(model::JuMP.Model, mr::MeanRisk, pr::AbstractPriorResult,
                           ::Val{true}, ::Val{false}, fees::Option{<:Fees},
-                          attrs::ProcessedJuMPOptimiserAttributes)
+                          attrs::ResolvedJuMPOptimiser)
     ret_frontier = compute_ret_lbs(model, mr, pr, fees, attrs)
     ret_axis = set_ret_frontier_parameters!(model, ret_frontier)
     set_portfolio_objective_function!(model, mr.obj, mr, attrs)
@@ -651,7 +651,7 @@ Two corner portfolios bound every span, and the method solves each of them once.
   - $(arg_dict[:fees_opt])
   - `risk_frontier::VecPair`: The `:risk_frontier` registry.
   - `idx::VecInt`: Registry positions that need a rebuild, as [`unresolved_risk_frontier`](@ref) returns them.
-  - `attrs::ProcessedJuMPOptimiserAttributes`: The processed attributes of the optimiser.
+  - `attrs::ResolvedJuMPOptimiser`: The processed attributes of the optimiser.
 
 # Validation
 
@@ -670,7 +670,7 @@ Two corner portfolios bound every span, and the method solves each of them once.
 """
 function rebuild_risk_frontier(model::JuMP.Model, mr::MeanRisk, pr::AbstractPriorResult,
                                fees::Option{<:Fees}, risk_frontier::VecPair, idx::VecInt,
-                               attrs::ProcessedJuMPOptimiserAttributes)
+                               attrs::ResolvedJuMPOptimiser)
     X = pr.X
     risk_frontier = copy(risk_frontier)
     set_portfolio_objective_function!(model, MinimumRisk(), mr, attrs)
@@ -723,7 +723,7 @@ function unresolved_risk_frontier(model::JuMP.Model)
 end
 """
     compute_risk_ubs(model::JuMP.Model, mr::MeanRisk, pr::AbstractPriorResult,
-                     fees::Option{<:Fees}, attrs::ProcessedJuMPOptimiserAttributes)
+                     fees::Option{<:Fees}, attrs::ResolvedJuMPOptimiser)
 
 Resolve the sweep points of the risk frontier of the model.
 
@@ -741,7 +741,7 @@ Resolve the sweep points of the risk frontier of the model.
   - `mr::MeanRisk`: The optimiser.
   - $(arg_dict[:pr])
   - $(arg_dict[:fees_opt])
-  - `attrs::ProcessedJuMPOptimiserAttributes`: The processed attributes of the optimiser.
+  - `attrs::ResolvedJuMPOptimiser`: The processed attributes of the optimiser.
 
 # Returns
 
@@ -755,7 +755,7 @@ Resolve the sweep points of the risk frontier of the model.
   - [`unresolved_risk_frontier`](@ref)
 """
 function compute_risk_ubs(model::JuMP.Model, mr::MeanRisk, pr::AbstractPriorResult,
-                          fees::Option{<:Fees}, attrs::ProcessedJuMPOptimiserAttributes)
+                          fees::Option{<:Fees}, attrs::ResolvedJuMPOptimiser)
     risk_frontier, idx = unresolved_risk_frontier(model)
     if isempty(idx)
         return risk_frontier
@@ -764,7 +764,7 @@ function compute_risk_ubs(model::JuMP.Model, mr::MeanRisk, pr::AbstractPriorResu
 end
 function solve_mean_risk!(model::JuMP.Model, mr::MeanRisk, pr::AbstractPriorResult,
                           ::Val{false}, ::Val{true}, fees::Option{<:Fees},
-                          attrs::ProcessedJuMPOptimiserAttributes)
+                          attrs::ResolvedJuMPOptimiser)
     risk_frontier = compute_risk_ubs(model, mr, pr, fees, attrs)
     risk_axis = set_risk_frontier_parameters!(model, risk_frontier)
     set_portfolio_objective_function!(model, mr.obj, mr, attrs)
@@ -772,7 +772,7 @@ function solve_mean_risk!(model::JuMP.Model, mr::MeanRisk, pr::AbstractPriorResu
 end
 function solve_mean_risk!(model::JuMP.Model, mr::MeanRisk, pr::AbstractPriorResult,
                           ::Val{true}, ::Val{true}, fees::Option{<:Fees},
-                          attrs::ProcessedJuMPOptimiserAttributes)
+                          attrs::ResolvedJuMPOptimiser)
     ret_frontier = compute_ret_lbs(model, mr, pr, fees, attrs)
     risk_frontier = compute_risk_ubs(model, mr, pr, fees, attrs)
     risk_axis = set_risk_frontier_parameters!(model, risk_frontier)
@@ -782,7 +782,7 @@ function solve_mean_risk!(model::JuMP.Model, mr::MeanRisk, pr::AbstractPriorResu
                            frontier_sweep_axes(ret_axis, risk_axis))
 end
 """
-    build_mean_risk_model(mr::MeanRisk, attrs::ProcessedJuMPOptimiserAttributes,
+    build_mean_risk_model(mr::MeanRisk, attrs::ResolvedJuMPOptimiser,
                           rd::ReturnsResult, str_names::Bool)
 
 Build the model of a [`MeanRisk`](@ref), with every constraint, return term and risk measure, and with no objective.
@@ -798,7 +798,7 @@ Build the model of a [`MeanRisk`](@ref), with every constraint, return term and 
 # Arguments
 
   - `mr::MeanRisk`: The optimiser, already reduced to the investable assets.
-  - `attrs::ProcessedJuMPOptimiserAttributes`: The processed attributes of the optimiser.
+  - `attrs::ResolvedJuMPOptimiser`: The processed attributes of the optimiser.
   - $(arg_dict[:rd])
   - `str_names::Bool`: `true` gives each variable and each row of the model its string name.
 
@@ -812,7 +812,7 @@ Build the model of a [`MeanRisk`](@ref), with every constraint, return term and 
   - [`resolve_ratio_frontier!`](@ref)
   - [`assemble_jump_model!`](@ref)
 """
-function build_mean_risk_model(mr::MeanRisk, attrs::ProcessedJuMPOptimiserAttributes,
+function build_mean_risk_model(mr::MeanRisk, attrs::ResolvedJuMPOptimiser,
                                rd::ReturnsResult, str_names::Bool)
     model = JuMP.Model()
     JuMP.set_string_names_on_creation(model, str_names)
@@ -863,7 +863,7 @@ function set_frontier_spans!(model::JuMP.Model, name::Symbol, resolved::VecPair)
 end
 """
     resolve_ratio_frontier!(model::JuMP.Model, mr::MeanRisk,
-                            attrs::ProcessedJuMPOptimiserAttributes, rd::ReturnsResult)
+                            attrs::ResolvedJuMPOptimiser, rd::ReturnsResult)
 
 Resolve each [`Frontier`](@ref) of the model of a [`MaximumRatio`](@ref) on a model that is not homogenised, and write the spans into the registries of `model`.
 
@@ -887,7 +887,7 @@ The cost is one more model build. Only a `MaximumRatio` pays it, and only when a
 
   - $(arg_dict[:model])
   - `mr::MeanRisk`: The optimiser, already reduced to the investable assets.
-  - `attrs::ProcessedJuMPOptimiserAttributes`: The processed attributes of the optimiser.
+  - `attrs::ResolvedJuMPOptimiser`: The processed attributes of the optimiser.
   - $(arg_dict[:rd])
 
 # Validation
@@ -907,13 +907,13 @@ The cost is one more model build. Only a `MaximumRatio` pays it, and only when a
   - [`compute_ret_lbs`](@ref)
   - [`compute_risk_ubs`](@ref)
 """
-function resolve_ratio_frontier!(::JuMP.Model, ::MeanRisk,
-                                 ::ProcessedJuMPOptimiserAttributes, ::ReturnsResult)
+function resolve_ratio_frontier!(::JuMP.Model, ::MeanRisk, ::ResolvedJuMPOptimiser,
+                                 ::ReturnsResult)
     return nothing
 end
 function resolve_ratio_frontier!(model::JuMP.Model,
                                  mr::MeanRisk{<:Any, <:Any, <:MaximumRatio},
-                                 attrs::ProcessedJuMPOptimiserAttributes, rd::ReturnsResult)
+                                 attrs::ResolvedJuMPOptimiser, rd::ReturnsResult)
     names = filter((:ret_frontier, :risk_frontier)) do name
         return shared_has(model, name) &&
                any(entry -> !isa(entry.second[2], VecNum), shared_get(model, name))
@@ -945,7 +945,7 @@ Build the model of a [`MeanRisk`](@ref), solve it, and return its result.
 # Algorithm
 
  1. Replace each schedule of `mr` with its static default through [`reset_time_dependent_estimator`](@ref).
- 2. Process the attributes of `mr.opt` against `rd` with [`processed_jump_optimiser_attributes`](@ref), giving `attrs`. It holds the prior, the weight bounds, the fees, the return terms and the Investable Mask.
+ 2. Process the attributes of `mr.opt` against `rd` with [`resolve_jump_optimiser`](@ref), giving `attrs`. It holds the prior, the weight bounds, the fees, the return terms and the Investable Mask.
  3. Take the view of `mr` and of `rd` at the investable assets with [`investable_view`](@ref). Both are unchanged when every asset is investable.
  4. Bind the benchmark of each [`DataBenchmarkTracking`](@ref) measure to `rd` with [`bind_data_benchmark`](@ref).
  5. Build the model with [`build_mean_risk_model`](@ref).
@@ -959,7 +959,7 @@ Build the model of a [`MeanRisk`](@ref), solve it, and return its result.
   - $(arg_dict[:rd])
   - `str_names::Bool`: `true` gives each variable and each row of the model its string name.
   - `save::Bool`: `true` keeps the model in the result.
-  - `kwargs...`: Passed on to [`processed_jump_optimiser_attributes`](@ref).
+  - `kwargs...`: Passed on to [`resolve_jump_optimiser`](@ref).
 
 # Returns
 
@@ -976,7 +976,7 @@ Build the model of a [`MeanRisk`](@ref), solve it, and return its result.
 function _optimise(mr::MeanRisk, rd::ReturnsResult = ReturnsResult();
                    str_names::Bool = false, save::Bool = true, kwargs...)
     mr = reset_time_dependent_estimator(mr)
-    attrs = processed_jump_optimiser_attributes(mr.opt, rd; kwargs...)
+    attrs = resolve_jump_optimiser(mr.opt, rd; kwargs...)
     # The bundle reduced what it carries. The head carries the rest — an initial weight
     # vector, a risk measure holding per-asset data, tracking, a custom term — and hands
     # them to `assemble_jump_model!` itself, so it takes the same view of itself and of
@@ -990,7 +990,7 @@ function _optimise(mr::MeanRisk, rd::ReturnsResult = ReturnsResult();
                                     Val(shared_has(model, :risk_frontier)), attrs.fees,
                                     attrs)
     return MeanRiskResult(;
-                          jr = JuMPOptimisationResult(; pa = attrs, retcode = retcode,
+                          jr = JuMPOptimisationResult(; jor = attrs, retcode = retcode,
                                                       sol = sol,
                                                       model = ifelse(save, model, nothing)),
                           r = factory(mr.r, attrs.pr, mr.opt.slv), fb = nothing)

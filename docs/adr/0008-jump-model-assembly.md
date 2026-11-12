@@ -409,3 +409,14 @@ reads them in the same call. It registers no bundle, so the asset bits stay the 
 takes its bounds from the asset weight bounds through `w1 = Bᵀw`, and the builder refuses asset
 bounds that are not finite. Verified in `test_19_factor_risk_contribution.jl`, "An integer factor
 phylogeny gates the factor weights".
+
+## Amendment 6 (2026-11-12)
+
+The bundle is `ResolvedJuMPOptimiser`, which `resolve_jump_optimiser` makes, and it holds the
+constraints in a `ResolvedConstraintBlock` in `cbr` (ADR 0237, #2042). The middle reads the
+resolved constraints, the settings `card`, `scard`, `ss`, `xbgt` and `ccnt`, and the norm ceilings
+and the penalties from `cbr`. The norm ceilings and the penalties resolve their Calibration Rules
+at stage 2 of the block, `resolve_constraint_block`, and not in the middle, so the middle resolves
+nothing. Stage 2 also checks the range of the four numbers that reach the model raw, and the four
+builders no longer check it. The middle still reads `tr` and `sca` from `opt`, because the head
+binds its tracking errors to its rows. The order of the builders does not change.

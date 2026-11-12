@@ -1,31 +1,13 @@
 """
 $(DocStringExtensions.TYPEDEF)
 
-Abstract supertype for the processed attributes of an optimiser.
+Holds the Result of the resolution of a JuMP head: the prior result, the fees, the return terms, the scalariser, the Investable Mask and the Resolved Constraint Block.
 
-A subtype holds the results that one optimiser family makes once for each `optimise` call. The
-family gives them to the code that builds its model. Every bundle of processed optimiser
-attributes subtypes `ProcessedAttributes`.
+[`resolve_jump_optimiser`](@ref) makes the bundle once for each `optimise` call, and [`assemble_jump_model!`](@ref) reads it. So each builder of the model reads a result, and no builder resolves an estimator again. The constraints of the feasible set are in the [`ResolvedConstraintBlock`](@ref) in `cbr`. The owner keeps the fees, the return terms and the scalariser, because the objective reads them.
 
-# Related
+A named forward rule keeps the reads of the resolved constraints on the bundle, so `jor.wb` reads `jor.cbr.wb`. The rule forwards `wb`, `lt`, `st`, `lcsr`, `ctr`, `gcardr`, `sgcardr`, `smtx`, `sgmtx`, `slt`, `sst`, `sglt`, `sgst`, `tn` and `plr`, the constraint fields that the bundle held before it held the block. Every other field of the block is read through `cbr`.
 
-  - [`ProcessedJuMPOptimiserAttributes`](@ref)
-  - [`ProcessedRiskBudgetingAttributes`](@ref)
-  - [`JuMPOptimiser`](@ref)
-"""
-abstract type ProcessedAttributes <: AbstractResult end
-"""
-$(DocStringExtensions.TYPEDEF)
-
-Holds the prior result and every processed constraint result that a JuMP model reads.
-
-[`processed_jump_optimiser_attributes`](@ref) makes the bundle once for each `optimise` call,
-and [`assemble_jump_model!`](@ref) reads it. So each builder of the model reads a result, and no
-builder processes an estimator again.
-
-Every JuMP optimisation Result holds the bundle. So the types of `ret` and `sca` are not type
-parameters of the bundle, and the Results of two returns estimators or of two scalarisers have
-one type. A verb that reads them compiles one time.
+Every JuMP optimisation Result holds the bundle. So the types of `ret` and `sca` are not type parameters of the bundle, and the Results of two returns estimators or of two scalarisers have one type. A verb that reads them compiles one time.
 
 # Fields
 
@@ -33,23 +15,14 @@ $(DocStringExtensions.FIELDS)
 
 # Constructors
 
-    ProcessedJuMPOptimiserAttributes(;
-        pr::AbstractPriorResult, wb::Option{<:WeightBounds}, lt::Option{<:Threshold},
-        st::Option{<:Threshold}, lcsr::Option{<:Lc_VecLc}, ctr::Option{<:Lc_CC_VecCC},
-        gcardr::Option{<:LinearConstraint}, sgcardr::Option{<:Lc_VecLc},
-        smtx::Option{<:MatNum_VecMatNum}, sgmtx::Option{<:MatNum_VecMatNum},
-        slt::Option{<:Bt_VecOptBt}, sst::Option{<:Bt_VecOptBt}, sglt::Option{<:Bt_VecOptBt},
-        sgst::Option{<:Bt_VecOptBt}, tn::Option{<:Tn_VecTn}, fees::Option{<:Fees},
-        plr::Option{<:Union{AbstractPhylogenyConstraintResult,
-                            AbstractVector{<:AbstractPhylogenyConstraintResult}}},
-        ret::JRE_VecJRE, sca::Scalariser, imsk::Option{<:BitVector} = nothing
-    ) -> ProcessedJuMPOptimiserAttributes
+    ResolvedJuMPOptimiser(;
+        pr::AbstractPriorResult, fees::Option{<:Fees}, ret::JRE_VecJRE, sca::Scalariser,
+        imsk::Option{<:BitVector} = nothing, cbr::Rcb_VecRcb
+    ) -> ResolvedJuMPOptimiser
 
-Keywords correspond to the struct's fields. Each field holds the result of the slot of the
-same name in [`JuMPOptimiser`](@ref), and not the estimator. `ret` is the exception, because a
-returns estimator has no result form. Make the bundle with
-[`processed_jump_optimiser_attributes`](@ref). The constructor checks the types of the fields
-and no value, because the processing checked the values.
+Keywords correspond to the struct's fields. Make the bundle with [`resolve_jump_optimiser`](@ref). The constructor checks the types of the fields and no value, because the resolution checked the values.
+
+`ret` is a returns estimator and not a result, because a returns estimator has no result form. Before the bundle held the block, it held one field for each resolved constraint. Those fields are now fields of `cbr`, and the forward rule reads them.
 
 # Examples
 
@@ -57,92 +30,34 @@ and no value, because the processing checked the values.
 julia> pr = prior(EmpiricalPrior(),
                   ReturnsResult(; nx = [\"a\", \"b\"], X = [0.1 -0.2; -0.1 0.2; 0.05 0.1]));
 
-julia> ProcessedJuMPOptimiserAttributes(; pr = pr, wb = nothing, lt = nothing, st = nothing,
-                                        lcsr = nothing, ctr = nothing, gcardr = nothing,
-                                        sgcardr = nothing, smtx = nothing, sgmtx = nothing,
-                                        slt = nothing, sst = nothing, sglt = nothing,
-                                        sgst = nothing, tn = nothing, fees = nothing,
-                                        plr = nothing, ret = ArithmeticReturn(),
-                                        sca = SumScalariser()) isa ProcessedJuMPOptimiserAttributes
+julia> cbr = PortfolioOptimisers.resolve_constraint_block(ConstraintBlock(), pr,
+                                                          ReturnsResult(; nx = [\"a\", \"b\"],
+                                                                        X = pr.X); slv = nothing);
+
+julia> jor = ResolvedJuMPOptimiser(; pr = pr, fees = nothing, ret = ArithmeticReturn(),
+                                   sca = SumScalariser(), cbr = cbr);
+
+julia> jor.wb === jor.cbr.wb
 true
 ```
 
 # Related
 
+  - [`ResolvedConstraintBlock`](@ref)
   - [`JuMPOptimiser`](@ref)
-  - [`processed_jump_optimiser_attributes`](@ref)
+  - [`resolve_jump_optimiser`](@ref)
   - [`assemble_jump_model!`](@ref)
   - [`MeanRisk`](@ref)
 """
-@concrete struct ProcessedJuMPOptimiserAttributes <: ProcessedAttributes
+@concrete struct ResolvedJuMPOptimiser <: AbstractResolved
     """
     $(field_dict[:pr])
     """
     pr
     """
-    $(field_dict[:wb])
-    """
-    wb
-    """
-    $(field_dict[:lt])
-    """
-    lt
-    """
-    $(field_dict[:st])
-    """
-    st
-    """
-    $(field_dict[:lcsr])
-    """
-    lcsr
-    """
-    $(field_dict[:ctr])
-    """
-    ctr
-    """
-    $(field_dict[:gcardr])
-    """
-    gcardr
-    """
-    $(field_dict[:sgcardr])
-    """
-    sgcardr
-    """
-    $(field_dict[:smtx])
-    """
-    smtx
-    """
-    $(field_dict[:sgmtx])
-    """
-    sgmtx
-    """
-    $(field_dict[:slt])
-    """
-    slt
-    """
-    $(field_dict[:sst])
-    """
-    sst
-    """
-    $(field_dict[:sglt])
-    """
-    sglt
-    """
-    $(field_dict[:sgst])
-    """
-    sgst
-    """
-    $(field_dict[:tnr])
-    """
-    tn
-    """
     $(field_dict[:feesr])
     """
     fees
-    """
-    $(field_dict[:plr])
-    """
-    plr
     """
     $(field_dict[:ret_jmp])
     """
@@ -155,65 +70,35 @@ true
     $(field_dict[:imsk])
     """
     imsk
-    function ProcessedJuMPOptimiserAttributes(pr::AbstractPriorResult,
-                                              wb::Option{<:WeightBounds},
-                                              lt::Option{<:Threshold},
-                                              st::Option{<:Threshold},
-                                              lcsr::Option{<:Lc_VecLc},
-                                              ctr::Option{<:Lc_CC_VecCC},
-                                              gcardr::Option{<:LinearConstraint},
-                                              sgcardr::Option{<:Lc_VecLc},
-                                              smtx::Option{<:MatNum_VecMatNum},
-                                              sgmtx::Option{<:MatNum_VecMatNum},
-                                              slt::Option{<:Bt_VecOptBt},
-                                              sst::Option{<:Bt_VecOptBt},
-                                              sglt::Option{<:Bt_VecOptBt},
-                                              sgst::Option{<:Bt_VecOptBt},
-                                              tn::Option{<:Tn_VecTn}, fees::Option{<:Fees},
-                                              plr::Option{<:Union{AbstractPhylogenyConstraintResult,
-                                                                  AbstractVector{<:AbstractPhylogenyConstraintResult}}},
-                                              ret::JRE_VecJRE, sca::Scalariser,
-                                              imsk::Option{<:BitVector})
-        return new{typeof(pr), typeof(wb), typeof(lt), typeof(st), typeof(lcsr),
-                   typeof(ctr), typeof(gcardr), typeof(sgcardr), typeof(smtx),
-                   typeof(sgmtx), typeof(slt), typeof(sst), typeof(sglt), typeof(sgst),
-                   typeof(tn), typeof(fees), typeof(plr), typeof(imsk)}(pr, wb, lt, st,
-                                                                        lcsr, ctr, gcardr,
-                                                                        sgcardr, smtx,
-                                                                        sgmtx, slt, sst,
-                                                                        sglt, sgst, tn,
-                                                                        fees, plr, ret, sca,
-                                                                        imsk)
+    """
+    $(field_dict[:cbr])
+    """
+    cbr
+    function ResolvedJuMPOptimiser(pr::AbstractPriorResult, fees::Option{<:Fees},
+                                   ret::JRE_VecJRE, sca::Scalariser,
+                                   imsk::Option{<:BitVector}, cbr::Rcb_VecRcb)
+        return new{typeof(pr), typeof(fees), typeof(imsk), typeof(cbr)}(pr, fees, ret, sca,
+                                                                        imsk, cbr)
     end
 end
-function ProcessedJuMPOptimiserAttributes(; pr::AbstractPriorResult,
-                                          wb::Option{<:WeightBounds},
-                                          lt::Option{<:Threshold}, st::Option{<:Threshold},
-                                          lcsr::Option{<:Lc_VecLc},
-                                          ctr::Option{<:Lc_CC_VecCC},
-                                          gcardr::Option{<:LinearConstraint},
-                                          sgcardr::Option{<:Lc_VecLc},
-                                          smtx::Option{<:MatNum_VecMatNum},
-                                          sgmtx::Option{<:MatNum_VecMatNum},
-                                          slt::Option{<:Bt_VecOptBt},
-                                          sst::Option{<:Bt_VecOptBt},
-                                          sglt::Option{<:Bt_VecOptBt},
-                                          sgst::Option{<:Bt_VecOptBt},
-                                          tn::Option{<:Tn_VecTn}, fees::Option{<:Fees},
-                                          plr::Option{<:Union{AbstractPhylogenyConstraintResult,
-                                                              AbstractVector{<:AbstractPhylogenyConstraintResult}}},
-                                          ret::JRE_VecJRE, sca::Scalariser,
-                                          imsk::Option{<:BitVector} = nothing)::ProcessedJuMPOptimiserAttributes
-    return ProcessedJuMPOptimiserAttributes(pr, wb, lt, st, lcsr, ctr, gcardr, sgcardr,
-                                            smtx, sgmtx, slt, sst, sglt, sgst, tn, fees,
-                                            plr, ret, sca, imsk)
+function ResolvedJuMPOptimiser(; pr::AbstractPriorResult, fees::Option{<:Fees},
+                               ret::JRE_VecJRE, sca::Scalariser,
+                               imsk::Option{<:BitVector} = nothing,
+                               cbr::Rcb_VecRcb)::ResolvedJuMPOptimiser
+    return ResolvedJuMPOptimiser(pr, fees, ret, sca, imsk, cbr)
+end
+# The bundle held one field for each resolved constraint before it held the block, and the
+# tests, the examples and the methods of a custom term read them, such as `jor.wb` (ADR 0237).
+@forward_properties ResolvedJuMPOptimiser begin
+    forward(cbr, wb, lt, st, lcsr, ctr, gcardr, sgcardr, smtx, sgmtx, slt, sst, sglt, sgst,
+            tn, plr)
 end
 """
 $(DocStringExtensions.TYPEDSIGNATURES)
 
 Restricts an optimiser head and its returns data to the assets that an Investable Mask keeps.
 
-[`processed_jump_optimiser_attributes`](@ref) restricts the prior result and every constraint result of the bundle. It cannot restrict the values that the head holds outside the bundle, such as an initial weight vector, a risk measure with data for each asset, a tracking estimator or a custom constraint. These go from the head to [`assemble_jump_model!`](@ref) directly. So each head calls this function on itself and on `rd` before it builds a model.
+[`resolve_jump_optimiser`](@ref) restricts the prior result and every constraint result of the bundle. It cannot restrict the values that the head holds outside the bundle, such as an initial weight vector, a risk measure with data for each asset, a tracking estimator or a custom constraint. These go from the head to [`assemble_jump_model!`](@ref) directly. So each head calls this function on itself and on `rd` before it builds a model.
 
 The function does not report the reduction, because [`investable_reduction`](@ref) reports it once for the bundle.
 
@@ -244,7 +129,7 @@ The function does not report the reduction, because [`investable_reduction`](@re
 # Related
 
   - [`investable_mask`](@ref)
-  - [`processed_jump_optimiser_attributes`](@ref)
+  - [`resolve_jump_optimiser`](@ref)
   - [`port_opt_view`](@ref)
 """
 function investable_view(optimiser::JuMPOptimisationEstimator, rd::ReturnsResult,
@@ -280,7 +165,7 @@ Holds the fields that every JuMP optimisation result shares.
 
 Each concrete JuMP result holds it as its first field, `jr`, as each JuMP optimiser holds a [`JuMPOptimiser`](@ref) as `opt`. The concrete result adds its own fields and the last field `fb`.
 
-The result holds the weights on the full asset universe of the caller. The solver solves over the investable assets alone, and `model` keeps that reduced problem when the head saves the model. The property `w` reads the weights of `sol`, and a vector of solutions gives a vector of weight vectors. A property name that is neither `w` nor a field reads the field of `pa` of the same name.
+The result holds the weights on the full asset universe of the caller. The solver solves over the investable assets alone, and `model` keeps that reduced problem when the head saves the model. The property `w` reads the weights of `sol`, and a vector of solutions gives a vector of weight vectors. A property name that is neither `w` nor a field reads the field of `jor` of the same name.
 
 # Fields
 
@@ -289,17 +174,17 @@ $(DocStringExtensions.FIELDS)
 # Constructors
 
     JuMPOptimisationResult(;
-        pa::ProcessedJuMPOptimiserAttributes,
+        jor::ResolvedJuMPOptimiser,
         retcode::OptRetCode_VecOptRetCode,
         sol::JuMPOptSol_VecJuMPOptSol,
         model::Option{<:JuMP.Model}
     ) -> JuMPOptimisationResult
 
-Keywords correspond to the struct's fields. The keyword constructor expands the weights of `sol` from the investable assets to the full asset universe with [`expand_investable_weights`](@ref), at the mask `pa.imsk`. An asset outside the mask gets the weight zero. When `pa.imsk` is `nothing`, `sol` is kept unchanged.
+Keywords correspond to the struct's fields. The keyword constructor expands the weights of `sol` from the investable assets to the full asset universe with [`expand_investable_weights`](@ref), at the mask `jor.imsk`. An asset outside the mask gets the weight zero. When `jor.imsk` is `nothing`, `sol` is kept unchanged.
 
 ## Validation
 
-  - When `pa.imsk` is a mask, each weight vector of `sol` holds one weight for each `true` entry of the mask. Otherwise the constructor raises a `DimensionMismatch`.
+  - When `jor.imsk` is a mask, each weight vector of `sol` holds one weight for each `true` entry of the mask. Otherwise the constructor raises a `DimensionMismatch`.
 
 # Related
 
@@ -310,9 +195,9 @@ Keywords correspond to the struct's fields. The keyword constructor expands the 
 """
 @concrete struct JuMPOptimisationResult <: BaseJuMPOptimisationResult
     """
-    $(field_dict[:pa])
+    $(field_dict[:jor])
     """
-    pa
+    jor
     """
     $(field_dict[:retcode])
     """
@@ -326,16 +211,16 @@ Keywords correspond to the struct's fields. The keyword constructor expands the 
     """
     model
     # The type is declared here and not beside its supertype `BaseJuMPOptimisationResult`, so
-    # that this constructor can bind `ProcessedJuMPOptimiserAttributes` and the solution types.
-    function JuMPOptimisationResult(pa::ProcessedJuMPOptimiserAttributes,
+    # that this constructor can bind `ResolvedJuMPOptimiser` and the solution types.
+    function JuMPOptimisationResult(jor::ResolvedJuMPOptimiser,
                                     retcode::OptRetCode_VecOptRetCode,
                                     sol::JuMPOptSol_VecJuMPOptSol,
                                     model::Option{<:JuMP.Model})
-        return new{typeof(pa), typeof(retcode), typeof(sol), typeof(model)}(pa, retcode,
-                                                                            sol, model)
+        return new{typeof(jor), typeof(retcode), typeof(sol), typeof(model)}(jor, retcode,
+                                                                             sol, model)
     end
 end
-function JuMPOptimisationResult(; pa::ProcessedJuMPOptimiserAttributes,
+function JuMPOptimisationResult(; jor::ResolvedJuMPOptimiser,
                                 retcode::OptRetCode_VecOptRetCode,
                                 sol::JuMPOptSol_VecJuMPOptSol,
                                 model::Option{<:JuMP.Model})::JuMPOptimisationResult
@@ -343,13 +228,13 @@ function JuMPOptimisationResult(; pa::ProcessedJuMPOptimiserAttributes,
     # is here. `MeanRisk`, `RiskBudgeting`, `RelaxedRiskBudgeting`, `FactorRiskContribution`
     # and `NearOptimalCentering` all call it. The expansion is not in the inner constructor,
     # because a new value of `sol` there makes the inferred field types wider.
-    return JuMPOptimisationResult(pa, retcode, expand_investable_weights(pa.imsk, sol),
+    return JuMPOptimisationResult(jor, retcode, expand_investable_weights(jor.imsk, sol),
                                   model)
 end
 # The JuMP families carry the mask on the processed attribute bundle, and every concrete JuMP
 # result embeds the shared core as `jr`, so two methods cover the whole side.
 function result_investable_mask(res::JuMPOptimisationResult)
-    return res.pa.imsk
+    return res.jor.imsk
 end
 function result_investable_mask(res::Union{RiskJuMPOptimisationResult,
                                            NonRiskJuMPOptimisationResult})
@@ -378,13 +263,13 @@ The rebuild calls the positional constructor, not the keyword constructor. The k
   - [`JuMPOptimisationResult`](@ref)
 """
 function set_retcode(res::JuMPOptimisationResult, retcode::OptRetCode_VecOptRetCode)
-    return JuMPOptimisationResult(res.pa, retcode, res.sol, res.model)
+    return JuMPOptimisationResult(res.jor, retcode, res.sol, res.model)
 end
 # Virtual property `:w` extracts portfolio weights from `sol` (a single solution or a vector
-# of them, hence the broadcast); unknown properties forward to `pa` (see [`@forward_properties`](@ref)).
+# of them, hence the broadcast); unknown properties forward to `jor` (see [`@forward_properties`](@ref)).
 @forward_properties JuMPOptimisationResult begin
     compute(w, sol.w; broadcast)
-    forward(pa)
+    forward(jor)
 end
 """
 $(DocStringExtensions.TYPEDSIGNATURES)
@@ -746,4 +631,4 @@ function non_investable_universe(opt::JuMPOptimiser, ni::VecStr)::JuMPOptimiser
     return rebuild_estimator(opt, (; sets = non_investable_sets(opt.sets, ni)))
 end
 
-export ProcessedJuMPOptimiserAttributes, JuMPOptimiser
+export ResolvedJuMPOptimiser, JuMPOptimiser

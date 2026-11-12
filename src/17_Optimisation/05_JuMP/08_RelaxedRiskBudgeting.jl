@@ -334,7 +334,7 @@ $(DocStringExtensions.TYPEDEF)
 
 Holds the solution, the budget and the fallback chain of a relaxed risk budgeting optimisation.
 
-[`optimise`](@ref) returns it for a [`RelaxedRiskBudgeting`](@ref). The model reads the covariance matrix of the prior and resolves no risk measure, so the result has no `r`, and it is a [`NonRiskJuMPOptimisationResult`](@ref). A name that is not a field resolves through `prb` first, so `res.rkb` is the budget of the model. Every other name, and the property `w`, then resolves through `jr`, the [`JuMPOptimisationResult`](@ref) that the result holds.
+[`optimise`](@ref) returns it for a [`RelaxedRiskBudgeting`](@ref). The model reads the covariance matrix of the prior and resolves no risk measure, so the result has no `r`, and it is a [`NonRiskJuMPOptimisationResult`](@ref). A name that is not a field resolves through `rbr` first, so `res.rkb` is the budget of the model. Every other name, and the property `w`, then resolves through `jr`, the [`JuMPOptimisationResult`](@ref) that the result holds.
 
 # Fields
 
@@ -344,7 +344,7 @@ $(DocStringExtensions.FIELDS)
 
     RelaxedRiskBudgetingResult(;
         jr::JuMPOptimisationResult,
-        prb::ProcessedRiskBudgetingAttributes,
+        rbr::AbstractResolvedRiskBudgeting,
         fb::Option{<:OptE_Opt_FbChain}
     ) -> RelaxedRiskBudgetingResult
 
@@ -363,30 +363,30 @@ Keywords correspond to the struct's fields.
     """
     jr
     """
-    $(field_dict[:prb])
+    $(field_dict[:rbr])
     """
-    prb
+    rbr
     """
     $(field_dict[:fb_res])
     """
     fb
     function RelaxedRiskBudgetingResult(jr::JuMPOptimisationResult,
-                                        prb::ProcessedRiskBudgetingAttributes,
+                                        rbr::AbstractResolvedRiskBudgeting,
                                         fb::Option{<:OptE_Opt_FbChain})
-        return new{typeof(jr), typeof(prb), typeof(fb)}(jr, prb, fb)
+        return new{typeof(jr), typeof(rbr), typeof(fb)}(jr, rbr, fb)
     end
 end
 function RelaxedRiskBudgetingResult(; jr::JuMPOptimisationResult,
-                                    prb::ProcessedRiskBudgetingAttributes,
+                                    rbr::AbstractResolvedRiskBudgeting,
                                     fb::Option{<:OptE_Opt_FbChain})::RelaxedRiskBudgetingResult
-    return RelaxedRiskBudgetingResult(jr, prb, fb)
+    return RelaxedRiskBudgetingResult(jr, rbr, fb)
 end
 """
     set_retcode(res::RelaxedRiskBudgetingResult, retcode::OptRetCode_VecOptRetCode)
 
 Rebuild a [`RelaxedRiskBudgetingResult`](@ref) with a different return code.
 
-`retcode` is not a field of this result. It resolves through `jr`, the [`JuMPOptimisationResult`](@ref) that the result holds. So the method rebuilds `jr` with the new return code, and keeps `prb` and `fb` unchanged.
+`retcode` is not a field of this result. It resolves through `jr`, the [`JuMPOptimisationResult`](@ref) that the result holds. So the method rebuilds `jr` with the new return code, and keeps `rbr` and `fb` unchanged.
 
 # Arguments
 
@@ -404,12 +404,12 @@ Rebuild a [`RelaxedRiskBudgetingResult`](@ref) with a different return code.
   - [`RelaxedRiskBudgetingResult`](@ref)
 """
 function set_retcode(res::RelaxedRiskBudgetingResult, retcode::OptRetCode_VecOptRetCode)
-    return RelaxedRiskBudgetingResult(set_retcode(res.jr, retcode), res.prb, res.fb)
+    return RelaxedRiskBudgetingResult(set_retcode(res.jr, retcode), res.rbr, res.fb)
 end
-# Unique field `prb` resolves directly; unknown properties forward into `prb` first, then
-# into the embedded [`JuMPOptimisationResult`](@ref) `jr` (the virtual `:w` and `pa` fall-through).
+# Unique field `rbr` resolves directly; unknown properties forward into `rbr` first, then
+# into the embedded [`JuMPOptimisationResult`](@ref) `jr` (the virtual `:w` and `jor` fall-through).
 @forward_properties RelaxedRiskBudgetingResult begin
-    forward(prb)
+    forward(rbr)
     forward(jr)
 end
 """
@@ -716,7 +716,7 @@ Where:
 
 # Returns
 
-  - [`ProcessedAssetRiskBudgetingAttributes`](@ref) for [`AssetRiskBudgeting`](@ref), and [`ProcessedFactorRiskBudgetingAttributes`](@ref) for [`FactorRiskBudgeting`](@ref).
+  - [`ResolvedAssetRiskBudgeting`](@ref) for [`AssetRiskBudgeting`](@ref), and [`ResolvedFactorRiskBudgeting`](@ref) for [`FactorRiskBudgeting`](@ref).
 
 # Related
 
@@ -751,7 +751,7 @@ function set_relaxed_risk_budgeting_constraints!(model::JuMP.Model,
                                                                                 P)))
     end
     set_weight_constraints!(model, wb, rrb.opt)
-    return ProcessedFactorRiskBudgetingAttributes(; rkb = rkb, b1 = b1, rr = rr)
+    return ResolvedFactorRiskBudgeting(; rkb = rkb, b1 = b1, rr = rr)
 end
 function set_relaxed_risk_budgeting_constraints!(model::JuMP.Model,
                                                  rrb::RelaxedRiskBudgeting{<:Any,
@@ -764,7 +764,7 @@ function set_relaxed_risk_budgeting_constraints!(model::JuMP.Model,
     w = get_w(model)
     rkb = _set_relaxed_risk_budgeting_constraints!(model, rrb, w, pr.sigma, w, pr.sigma,
                                                    pr.chol)
-    return ProcessedAssetRiskBudgetingAttributes(; rkb = rkb)
+    return ResolvedAssetRiskBudgeting(; rkb = rkb)
 end
 """
     _optimise(rrb::RelaxedRiskBudgeting, rd::ReturnsResult = ReturnsResult();
@@ -777,14 +777,14 @@ Build the model of a [`RelaxedRiskBudgeting`](@ref), solve it, and return its re
 # Algorithm
 
  1. Replace each schedule of `rrb` with its static default through [`reset_time_dependent_estimator`](@ref).
- 2. Process the attributes of `rrb.opt` against `rd` with [`processed_jump_optimiser_attributes`](@ref), giving `attrs`. It holds the prior, the weight bounds, the fees, the return terms and the Investable Mask.
+ 2. Process the attributes of `rrb.opt` against `rd` with [`resolve_jump_optimiser`](@ref), giving `attrs`. It holds the prior, the weight bounds, the fees, the return terms and the Investable Mask.
  3. Take the view of `rrb` and of `rd` at the investable assets with [`investable_view`](@ref). Both are unchanged when every asset is investable.
  4. Bind the benchmark of each [`DataBenchmarkTracking`](@ref) term to `rd` with [`bind_data_benchmark`](@ref).
  5. Build a new model. Register the scales with [`set_model_scales!`](@ref), the number of observations with [`set_model_observations!`](@ref), and the expression `k = 1` with [`set_maximum_ratio_factor_variables!`](@ref), because [`MinimumRisk`](@ref) does not scale the weights.
- 6. Add the weights, the cones and the weight constraints with [`set_relaxed_risk_budgeting_constraints!`](@ref), giving `prb`.
+ 6. Add the weights, the cones and the weight constraints with [`set_relaxed_risk_budgeting_constraints!`](@ref), giving `rbr`.
  7. Add the constraints and the return terms of `rrb.opt` with [`assemble_jump_model!`](@ref).
  8. Set the objective [`MinimumRisk`](@ref), which minimises `risk`, and solve with [`optimise_JuMP_model!`](@ref), giving `retcode` and `sol`.
- 9. Build the result. It holds `attrs`, `retcode`, `sol`, the model when `save` is `true`, and `prb`.
+ 9. Build the result. It holds `attrs`, `retcode`, `sol`, the model when `save` is `true`, and `rbr`.
 
 # Arguments
 
@@ -792,7 +792,7 @@ Build the model of a [`RelaxedRiskBudgeting`](@ref), solve it, and return its re
   - $(arg_dict[:rd])
   - `str_names::Bool`: `true` gives each variable and each row of the model its string name.
   - `save::Bool`: `true` keeps the model in the result.
-  - `kwargs...`: Passed on to [`processed_jump_optimiser_attributes`](@ref).
+  - `kwargs...`: Passed on to [`resolve_jump_optimiser`](@ref).
 
 # Returns
 
@@ -807,7 +807,7 @@ Build the model of a [`RelaxedRiskBudgeting`](@ref), solve it, and return its re
 function _optimise(rrb::RelaxedRiskBudgeting, rd::ReturnsResult = ReturnsResult();
                    str_names::Bool = false, save::Bool = true, kwargs...)
     rrb = reset_time_dependent_estimator(rrb)
-    attrs = processed_jump_optimiser_attributes(rrb.opt, rd; kwargs...)
+    attrs = resolve_jump_optimiser(rrb.opt, rd; kwargs...)
     # The bundle reduced what it carries. The head carries the rest — an initial weight
     # vector, a risk measure holding per-asset data, tracking, a custom term — and hands
     # them to `assemble_jump_model!` itself, so it takes the same view of itself and of
@@ -819,13 +819,13 @@ function _optimise(rrb::RelaxedRiskBudgeting, rd::ReturnsResult = ReturnsResult(
     set_model_scales!(model, rrb.opt.sc, rrb.opt.so)
     set_model_observations!(model, size(attrs.pr.X, 1))
     set_maximum_ratio_factor_variables!(model, MinimumRisk())
-    prb = set_relaxed_risk_budgeting_constraints!(model, rrb, attrs.pr, attrs.wb, rd)
+    rbr = set_relaxed_risk_budgeting_constraints!(model, rrb, attrs.pr, attrs.wb, rd)
     assemble_jump_model!(model, rrb, rrb.opt, attrs, rd)
     set_portfolio_objective_function!(model, MinimumRisk(), rrb, attrs)
     retcode, sol = optimise_JuMP_model!(model, rrb, eltype(attrs.pr.X))
-    jr = JuMPOptimisationResult(; pa = attrs, retcode = retcode, sol = sol,
+    jr = JuMPOptimisationResult(; jor = attrs, retcode = retcode, sol = sol,
                                 model = ifelse(save, model, nothing))
-    return RelaxedRiskBudgetingResult(; jr = jr, prb = prb, fb = nothing)
+    return RelaxedRiskBudgetingResult(; jr = jr, rbr = rbr, fb = nothing)
 end
 """
     optimise(rrb::RelaxedRiskBudgeting{<:Any, <:Any, <:Any, <:Any, Nothing},

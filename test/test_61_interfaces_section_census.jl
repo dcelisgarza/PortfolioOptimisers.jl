@@ -332,7 +332,7 @@ end
                 :NonRiskJuMPOptimisationResult, :NonSequentialCrossValidationEstimator,
                 :NonSequentialCrossValidationResult, :ObjectiveFunction,
                 :OrderedWeightsArrayFormulation, :PortfolioOptimisersError,
-                :PredictionScorer, :ProcessedAttributes, :ProcessedRiskBudgetingAttributes,
+                :PredictionScorer, :AbstractResolved, :AbstractResolvedRiskBudgeting,
                 :RankCovarianceEstimator, :RelaxedRiskBudgetingAlgorithm,
                 :RiskBudgetingAlgorithm, :RiskBudgetingFormulation, :RiskInputKind,
                 :RiskJuMPOptimisationEstimator, :RiskJuMPOptimisationResult,

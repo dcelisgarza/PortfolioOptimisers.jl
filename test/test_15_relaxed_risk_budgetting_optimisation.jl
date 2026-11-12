@@ -151,7 +151,7 @@
                                       rba = FactorRiskBudgeting(; re = rr))
             res = optimise(rb, rd)
             rkc = factor_risk_contribution(factory(r, pr, slv), res.w, pr.X;
-                                           re = res.prb.rr)
+                                           re = res.rbr.rr)
             # The heavy penalty of item 4 trades the budget away, so its pin holds it.
             if i != 4
                 v1 = minimum(rkc[1:5])
@@ -181,7 +181,7 @@
                                                                                  val = 1:5)))
             res = optimise(rb, rd)
             rkc = factor_risk_contribution(factory(r, pr, slv), res.w, pr.X;
-                                           re = res.prb.rr)
+                                           re = res.rbr.rr)
             if i != 4
                 v1 = minimum(rkc[1:5])
                 v2 = maximum(rkc[1:5])
@@ -231,7 +231,7 @@
         @test isapprox(rbh.w, rb.w; rtol = 1e-4)
         @test isapprox(rrbh.w, rb.w; rtol = 1e-4)
         rkc = factor_risk_contribution(factory(Variance(), pr, slv), rrbh.w, pr.X;
-                                       re = rrbh.prb.rr)
+                                       re = rrbh.rbr.rr)
         @test isapprox(rkc[1:5] / sum(rkc), fill(0.2, 5); rtol = 1e-5)
         @test isapprox(rkc[6] / sum(rkc), 0; atol = 1e-8)
     end

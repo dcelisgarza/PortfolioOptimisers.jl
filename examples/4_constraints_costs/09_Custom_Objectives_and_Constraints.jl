@@ -95,7 +95,7 @@ add_custom_objective_term!(model, obj, cobj, optimiser, attrs)
   - `cobj` is your estimator, and your method dispatches on its type.
   - `optimiser` is the optimisation estimator, for example the [`MeanRisk`](@ref) itself. Its
     `opt` field is the [`JuMPOptimiser`](@ref).
-  - `attrs` is a [`ProcessedJuMPOptimiserAttributes`](@ref), the data of the problem after
+  - `attrs` is a [`ResolvedJuMPOptimiser`](@ref), the data of the problem after
     processing. It holds the prior in `attrs.pr`, the returns estimator in `attrs.ret`, the
     weight bounds in `attrs.wb`, and more. Read it if your term computes its numbers from the
     data.

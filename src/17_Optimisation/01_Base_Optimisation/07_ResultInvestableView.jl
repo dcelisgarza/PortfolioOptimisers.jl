@@ -3,7 +3,7 @@ $(DocStringExtensions.TYPEDSIGNATURES)
 
 Returns the prior result for a risk calculation from an optimisation result.
 
-A `pr` that the caller gives has priority. Else the function tests `hasproperty(res, :pr)`, which property forwarding answers for a nested result. For example, a JuMP result holds its prior at `res.jr.pa.pr`, and `res.pr` resolves to it.
+A `pr` that the caller gives has priority. Else the function tests `hasproperty(res, :pr)`, which property forwarding answers for a nested result. For example, a JuMP result holds its prior at `res.jr.jor.pr`, and `res.pr` resolves to it.
 
 The prior of a result is on the universe that the fit solved, and `res.w` is on the universe of the caller. So a consumer that reads the prior with `res.w` reads both through [`result_investable_view`](@ref), and not through this function alone.
 

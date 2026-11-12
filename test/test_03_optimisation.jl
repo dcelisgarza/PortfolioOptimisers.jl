@@ -816,7 +816,7 @@ end
     # Model-State key names. `r`/`b1`/`obj`/… default to the optimiser's own values but can
     # be overridden to probe a single branch in isolation.
     function assemble_keys(mr; r = mr.r, b1 = nothing, obj = mr.obj)
-        attrs = PO.processed_jump_optimiser_attributes(mr.opt, rd)
+        attrs = PO.resolve_jump_optimiser(mr.opt, rd)
         model = JuMP.Model()
         PO.set_model_scales!(model, mr.opt.sc, mr.opt.so)
         PO.set_model_observations!(model, size(attrs.pr.X, 1))
@@ -1181,7 +1181,7 @@ struct InertObjective <: PO.CustomJuMPObjective end
         @test length(main) == 1
         @test main[1].obj isa PO.ObjectiveFunction
         @test main[1].optimiser isa MeanRisk
-        @test main[1].attrs isa ProcessedJuMPOptimiserAttributes
+        @test main[1].attrs isa ResolvedJuMPOptimiser
 
         noc = spy_log(spy -> optimise(NearOptimalCentering(; r = StandardDeviation(),
                                                            obj = MinimumRisk(),
@@ -1198,7 +1198,7 @@ struct InertObjective <: PO.CustomJuMPObjective end
         @test any(e -> isa(e.optimiser, NearOptimalCentering), noc)
         @test all(e -> e.obj isa PO.ObjectiveFunction, noc)
         @test all(e -> e.optimiser isa PO.OptimisationEstimator, noc)
-        @test all(e -> e.attrs isa ProcessedJuMPOptimiserAttributes, noc)
+        @test all(e -> e.attrs isa ResolvedJuMPOptimiser, noc)
     end
 
     @testset "fallback: a subtype with no builder method raises" begin
@@ -1520,10 +1520,10 @@ struct HookObjective03d <: PortfolioOptimisers.CustomJuMPObjective end
         @test k > 0 && !isapprox(k, 1)
         @test res.w ≈ JuMP.value.(res.model[:w]) / k
         @test sum(res.w) ≈ 1
-        # The default `getproperty` forwards `w` and the fields of `pa` to `jr`.
+        # The default `getproperty` forwards `w` and the fields of `jor` to `jr`.
         @test res.w === getfield(res, :jr).w
         @test res.r === getfield(res, :r)
-        @test :w in propertynames(res) && :pa in propertynames(res)
+        @test :w in propertynames(res) && :jor in propertynames(res)
         # Every solver fails, so the weights are `NaN`.
         all_bad = MeanRisk(; r = Variance(), opt = JuMPOptimiser(; slv = bad))
         failed = @test_logs (:warn, r"bad: set_optimizer → no solver") match_mode = :any optimise(all_bad,
@@ -2093,34 +2093,29 @@ end
         pr = prior(EmpiricalPrior(),
                    ReturnsResult(; nx = ["a", "b", "c"],
                                  X = [0.1 -0.2 0.0; -0.1 0.2 0.01; 0.05 0.1 -0.02]))
+        cbr = PO.resolve_constraint_block(ConstraintBlock(; wb = nothing), nothing, nothing)
         function attrs(imsk)
-            return ProcessedJuMPOptimiserAttributes(; pr = pr, wb = nothing, lt = nothing,
-                                                    st = nothing, lcsr = nothing,
-                                                    ctr = nothing, gcardr = nothing,
-                                                    sgcardr = nothing, smtx = nothing,
-                                                    sgmtx = nothing, slt = nothing,
-                                                    sst = nothing, sglt = nothing,
-                                                    sgst = nothing, tn = nothing,
-                                                    fees = nothing, plr = nothing,
-                                                    ret = ArithmeticReturn(),
-                                                    sca = SumScalariser(), imsk = imsk)
+            return ResolvedJuMPOptimiser(; pr = pr, fees = nothing,
+                                         ret = ArithmeticReturn(), sca = SumScalariser(),
+                                         imsk = imsk, cbr = cbr)
         end
-        pa = attrs(BitVector([1, 0, 1]))
+        jor = attrs(BitVector([1, 0, 1]))
         sol = PO.JuMPOptimisationSolution(; w = [0.4, 0.6])
-        res = JuMPOptimisationResult(; pa, retcode = OptimisationSuccess(), sol,
+        res = JuMPOptimisationResult(; jor, retcode = OptimisationSuccess(), sol,
                                      model = nothing)
         @test res.w == [0.4, 0.0, 0.6]
         @test res.imsk == BitVector([1, 0, 1])
-        resv = JuMPOptimisationResult(; pa, retcode = OptimisationSuccess(),
+        resv = JuMPOptimisationResult(; jor, retcode = OptimisationSuccess(),
                                       sol = [sol,
                                              PO.JuMPOptimisationSolution(; w = [1.0, 0.0])],
                                       model = nothing)
         @test resv.w == [[0.4, 0.0, 0.6], [1.0, 0.0, 0.0]]
-        @test JuMPOptimisationResult(; pa = attrs(nothing), retcode = OptimisationSuccess(),
-                                     sol, model = nothing).w == [0.4, 0.6]
+        @test JuMPOptimisationResult(; jor = attrs(nothing),
+                                     retcode = OptimisationSuccess(), sol,
+                                     model = nothing).w == [0.4, 0.6]
         # `set_retcode` keeps the expanded weights, and a second expansion raises.
         @test PO.set_retcode(res, OptimisationFailure()).w == res.w
-        @test_throws DimensionMismatch JuMPOptimisationResult(; pa,
+        @test_throws DimensionMismatch JuMPOptimisationResult(; jor,
                                                               retcode = OptimisationSuccess(),
                                                               sol = res.sol,
                                                               model = nothing)
@@ -2247,10 +2242,129 @@ end
         nb = PO.no_bounds_optimiser(o)
         @test nb.cbe === o.cbe
         pr = prior(EmpiricalPrior(), rd)
-        attrs = PO.processed_jump_optimiser_attributes(o, rd)
+        attrs = PO.resolve_jump_optimiser(o, rd)
         fo = PO.jump_optimiser_from_attributes(o, attrs)
         @test fo.wb == attrs.wb
         @test (fo.card, fo.l1) == (3, 0.1)
         @test fo.pe isa PO.AbstractPriorResult
+    end
+    @testset "a block resolves in two stages to its Resolved Constraint Block (#2042)" begin
+        using Clarabel
+        csl = Solver(; name = :clarabel, solver = Clarabel.Optimizer,
+                     settings = Dict("verbose" => false))
+        sets = UniverseSets(; dict = Dict("nx" => nx, "g" => ["A", "B"]))
+        pr = prior(EmpiricalPrior(), rd)
+        o = JuMPOptimiser(; slv, sets, lt = ThresholdEstimator(; val = Dict("A" => 0.01)),
+                          lcse = LinearConstraintEstimator(; val = ["A + B <= 0.3"]),
+                          tn = Turnover(; w = fill(0.2, N), val = 0.5), card = 3, l1 = 0.1,
+                          l2c = (k, p, w, s, c) -> 0.9)
+        # Stage 1 resolves the names into the slots of a block, and holds no Result.
+        cbe = PO.resolve_constraint_block_names(o.cbe, false, Float64)
+        @test cbe isa ConstraintBlock
+        @test cbe.lt isa Threshold && cbe.lt.val == [0.01, 0.0, 0.0, 0.0, 0.0]
+        @test cbe.lcse === o.lcse && cbe.wb === o.wb
+        # Stage 2 resolves the rest against the prior and the rows, to the block Result.
+        cbr = PO.resolve_constraint_block(cbe, pr, rd; slv = slv)
+        @test cbr isa ResolvedConstraintBlock && cbr isa PO.AbstractResolved
+        @test cbr.pr === pr && cbr.rd === rd
+        @test cbr.lcsr.ineq.A == [1.0 1.0 0.0 0.0 0.0]
+        @test (cbr.l2c, cbr.l1, cbr.card, cbr.xbgt) == (0.9, 0.1, 3, false)
+        @test cbr.lt === cbe.lt && cbr.tn === cbe.tn
+        # A block that skipped stage 1 is refused by the type of the Result.
+        @test_throws TypeError PO.resolve_constraint_block(o.cbe, pr, rd; slv = slv)
+        # A rule that gives a number out of range is refused at stage 2, where it resolves.
+        @test_throws DomainError PO.resolve_jump_optimiser(JuMPOptimiser(; slv,
+                                                                         l1 = (k, p, w, s, c) -> 0.0),
+                                                           rd)
+        @test_throws DomainError PO.resolve_jump_optimiser(JuMPOptimiser(; slv,
+                                                                         linfc = (k, p, w, s, c) -> Inf),
+                                                           rd)
+        # The bundle holds the block Result, and the forward rule keeps the old reads.
+        jor = PO.resolve_jump_optimiser(o, rd)
+        @test fieldnames(ResolvedJuMPOptimiser) == (:pr, :fees, :ret, :sca, :imsk, :cbr)
+        @test jor.cbr isa ResolvedConstraintBlock
+        @test jor.wb === jor.cbr.wb && jor.tn === jor.cbr.tn && jor.lcsr === jor.cbr.lcsr
+        @test jor.cbr.pr === jor.pr && jor.cbr.l2c == 0.9
+        # A block with no prior keeps its prior-reading slots, and holds no prior and no rows.
+        # A rule needs a prior, so a block that holds one and has none gives no Result.
+        @test_throws TypeError PO.resolve_constraint_block(cbe, nothing, nothing)
+        cb0 = PO.resolve_constraint_block_names(ConstraintBlock(; sets, lcse = o.lcse,
+                                                                l1 = 0.1), false, Float64)
+        cbn = PO.resolve_constraint_block(cb0, nothing, nothing)
+        @test isnothing(cbn.pr) && isnothing(cbn.rd)
+        @test cbn.lcsr.ineq.A == [1.0 1.0 0.0 0.0 0.0] && cbn.l1 == 0.1
+        cbw = PO.resolve_constraint_block(cb0, nothing, rd)
+        @test eltype(cbw.lcsr.ineq.A) == eltype(rd.X) && isnothing(cbw.rd)
+        lcw = LinearConstraint(;
+                               ineq = PartialLinearConstraint(; A = ones(1, 3), B = [1.0]))
+        @test_throws DimensionMismatch PO.resolve_constraint_block(ConstraintBlock(;
+                                                                                   lcse = lcw),
+                                                                   nothing, rd)
+        # The rename table of the block drops no field of the Result.
+        back = PO.constraint_block_from_resolved(o.cbe, jor.cbr)
+        @test back.lcse === jor.lcsr && back.lt === jor.lt && back.l2c == 0.9
+        @test back.sets === o.sets && back.card == 3
+        fo = PO.jump_optimiser_from_attributes(o, jor)
+        @test fo.pe === jor.pr && fo.cbe.l2c == 0.9 && fo.ret === jor.ret
+        pj = PO.processed_jump_optimiser(o, rd)
+        @test pj.cbe.l2c == 0.9 && pj.lcse.ineq.A == jor.lcsr.ineq.A
+        # A new prior reaches the bundle and its block as one object.
+        pr2 = prior(EmpiricalPrior(), rd)
+        jor2 = PO.set_result_prior(jor, _ -> pr2)
+        @test jor2.pr === pr2 && jor2.cbr.pr === pr2 && jor2.cbr.wb === jor.wb
+        # One rule orders the names and the reduction for both owners. Asset "C" leaves the
+        # investable universe. A row that names it drops, and a precomputed constraint of the
+        # caller's width is refused by name in both arms.
+        k = 3
+        mu = collect(pr.mu)
+        sigma = collect(pr.sigma)
+        Xn = collect(pr.X)
+        mu[k] = NaN
+        sigma[k, :] .= NaN
+        sigma[:, k] .= NaN
+        Xn[:, k] .= NaN
+        prn = LowOrderPrior(; X = Xn, mu = mu, sigma = sigma)
+        imsk = BitVector([1, 1, 0, 1, 1])
+        lce = LinearConstraintEstimator(; val = ["C <= 0.05", "A + B <= 0.3"])
+        lcp = LinearConstraint(;
+                               ineq = PartialLinearConstraint(; A = ones(1, N), B = [1.0]))
+        gcp = LinearConstraint(;
+                               ineq = PartialLinearConstraint(; A = ones(1, N), B = [3.0]))
+        jn = PO.resolve_jump_optimiser(JuMPOptimiser(; pe = prn, slv, sets, lcse = lce,
+                                                     strict = true), rd)
+        @test jn.imsk == imsk && jn.lcsr.ineq.A == [1.0 1.0 0.0 0.0]
+        for (kw, name) in (((; lcse = lcp), "lcse"), ((; gcarde = gcp), "gcarde"))
+            err = try
+                PO.resolve_jump_optimiser(JuMPOptimiser(; pe = prn, slv, sets, kw...), rd)
+            catch e
+                e
+            end
+            @test err isa DimensionMismatch && occursin("`$name`", err.msg)
+        end
+        q = fill(0.2, N)
+        wq = fill(0.2, N)
+        setn = PO.resolve_allocation_set(ProgrammeAllocationSet(; slv = csl, sets,
+                                                                lcse = lce), N, true,
+                                         Float64)
+        wn = @test_logs min_level = Base.CoreLogging.Warn PO.projection_programme(EuclideanProjection(),
+                                                                                  setn, q,
+                                                                                  wq, rd,
+                                                                                  pr, imsk)
+        @test iszero(wn[k]) && isapprox(sum(wn), 1; atol = 1e-6)
+        @test wn[1] + wn[2] <= 0.3 + 1e-6
+        for (kw, name) in (((; lcse = lcp), "lcse"), ((; gcarde = gcp), "gcarde"))
+            setp = PO.resolve_allocation_set(ProgrammeAllocationSet(; slv = csl, sets,
+                                                                    kw...), N, false,
+                                             Float64)
+            err = try
+                PO.projection_programme(EuclideanProjection(), setp, q, wq, rd, pr, imsk)
+            catch e
+                e
+            end
+            @test err isa DimensionMismatch && occursin("`$name`", err.msg)
+        end
+        # The reduction of the set declares the departed names on its `sets`.
+        setr, _, _ = PO.programme_investable_reduction(imsk, setn, rd, pr)
+        @test setr.sets.dict["ni"] == ["C"]
     end
 end

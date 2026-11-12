@@ -13,7 +13,7 @@ A Calibration Rule resolves against the prior result, so a calibrated slot reads
 # Related
 
   - [`rows_needed`](@ref)
-  - [`resolve_allocation_set_rows`](@ref)
+  - [`resolve_constraint_block`](@ref)
   - [`is_calibration_rule`](@ref)
 """
 function calibrated(x::Any)
@@ -21,81 +21,6 @@ function calibrated(x::Any)
 end
 function calibrated(x::AbstractVector)
     return any(calibrated, x)
-end
-"""
-$(DocStringExtensions.TYPEDSIGNATURES)
-
-Resolves the slots of a [`ProgrammeAllocationSet`](@ref) that read the head's rows, at every step.
-
-This is the second stage of the set's resolution. [`resolve_allocation_set`](@ref) resolves the slots keyed by name once per fold. This function resolves the rest on the prior result `pr` that is fitted on the rows `rd` that the head holds, as [`processed_jump_optimiser_attributes`](@ref) and [`assemble_jump_model!`](@ref) resolve them for a batch head. Each reader of the rows reads its own source, as the same reader of a JuMP head does. A set that reads no rows has no prior, and its slots come back as they are.
-
-# Algorithm
-
-The method on a prior result runs these steps.
-
- 1. Read `strict` from the current [`ProjectionStep`](@ref).
- 2. When `lcse` is keyed by exposure, build `lcsr` from it through [`linear_constraints`](@ref) with the prior's factor regression `pr.rr` and the rows. The regression of its constraint space states its own source. Otherwise `lcsr` is `lcse`.
- 3. Fit the centrality rows `ctr` and the phylogeny result `plr`, as a [`JuMPOptimiser`](@ref) does. Each estimator reads the rows or the prior, as its own `x_src` states. The prior goes to them as `pr`, and the implied volatilities `rd.iv` and their adjustment `rd.ivpa` go to them as `iv` and `ivpa`, so an [`ImpliedVolatility`](@ref) in a slot reads the surface of the rows.
- 4. Resolve the return floor `ret` against the prior.
- 5. Resolve the Calibration Rules of the norm ceilings `l2c`, `linfc` and `lpc`, and of the penalties `l1`, `l2`, `lp` and `linf`, against the prior and the set's solver.
- 6. Return the resolved slots and `rd`.
-
-# Arguments
-
-  - `set`: The programme set, resolved once per fold.
-  - `pr`: The prior result fitted on `rd`, or `nothing` when the set reads no rows.
-  - `rd`: The rows the head holds, a [`ReturnsResult`](@ref).
-
-# Validation
-
-  - A prior result with no rows. An `IsNothingError` is thrown. The prior is fitted on the rows, so this pair does not occur in the library.
-
-# Returns
-
-  - `attrs::NamedTuple`: `lcsr`, `ctr`, `plr`, `ret`, `l2c`, `lpc`, `linfc`, `l1`, `l2`, `lp`, `linf`, and the rows `rd`, which are `nothing` when the set reads no rows.
-
-# Related
-
-  - [`resolve_allocation_set`](@ref)
-  - [`set_allocation_set_constraints!`](@ref)
-  - [`linear_constraints`](@ref)
-  - [`centrality_constraints`](@ref)
-  - [`phylogeny_constraints`](@ref)
-  - [`resolve_calibration_slot`](@ref)
-"""
-function resolve_allocation_set_rows(::ProgrammeAllocationSet, ::AbstractPriorResult,
-                                     ::Nothing)
-    return throw(IsNothingError("a programme set's prior result is fitted on the rows that the head holds, so a result with no rows cannot resolve the row-reading slots."))
-end
-function resolve_allocation_set_rows(set::ProgrammeAllocationSet, ::Nothing, ::Any)
-    return (; lcsr = set.lcse, ctr = set.cte, plr = set.ple, ret = set.ret, l2c = set.l2c,
-            lpc = set.lpc, linfc = set.linfc, l1 = set.l1, l2 = set.l2, lp = set.lp,
-            linf = set.linf, rd = nothing)
-end
-function resolve_allocation_set_rows(set::ProgrammeAllocationSet, pr::AbstractPriorResult,
-                                     rd::ReturnsResult)
-    strict = projection_step_strict()
-    slv = set.slv
-    lcsr = if exposure_keyed(set.lcse)
-        linear_constraints(set.lcse, set.sets; datatype = eltype(rd.X), strict = strict,
-                           rr = pr.rr, rd = rd)
-    else
-        set.lcse
-    end
-    ctr = centrality_constraints(set.cte, pr; iv = rd.iv, ivpa = rd.ivpa, rd = rd,
-                                 strict = strict)
-    plr = phylogeny_constraints(set.ple, pr; iv = rd.iv, ivpa = rd.ivpa, rd = rd)
-    ret = factory(set.ret, pr)
-    l2c = resolve_calibration_slot(set.l2c, :l2c, pr, pr.w, slv,
-                                   CalibrationContext(; p = 2))
-    linfc = resolve_calibration_slot(set.linfc, :linfc, pr, pr.w, slv,
-                                     CalibrationContext(; p = Inf))
-    lpc = norm_ceiling_factory(set.lpc, pr, slv)
-    l1 = resolve_calibration_slot(set.l1, :l1, pr, pr.w, slv)
-    l2 = factory(set.l2, pr, slv)
-    lp = factory(set.lp, pr, slv)
-    linf = resolve_calibration_slot(set.linf, :linf, pr, pr.w, slv)
-    return (; lcsr, ctr, plr, ret, l2c, lpc, linfc, l1, l2, lp, linf, rd)
 end
 """
     set_allocation_set_constraints!(model::JuMP.Model, set::BoundedAllocationSet, w::AbstractVector, X, pr = nothing)
@@ -212,16 +137,16 @@ Both arms call it after they add the bounds. The bare projection model passes th
 # Algorithm
 
  1. Check that the prior prices every asset in `X` with [`assert_set_prior_priced`](@ref).
- 2. Resolve the slots that read the rows with [`resolve_allocation_set_rows`](@ref). This gives `lcsr`, `ctr`, `plr`, `ret`, `l2c`, `lpc`, `linfc`, `l1`, `l2`, `lp`, `linf` and `rd`.
+ 2. Resolve stage 2 of the set's block against `pr` and `X` with [`resolve_constraint_block`](@ref), under the solver of the set and the `strict` flag of the current [`ProjectionStep`](@ref). This gives the block Result `cbr`. The builders below read its slots, its prior `cbr.pr` and its rows `cbr.rd`.
  3. When `prefix` is not empty, register the model's `w` under it, with the owner `w_owner = Symbol("")`. Then [`weights_prefix`](@ref) keeps the lifted `W`, `variance_flag` and `rc_variance` in the bare namespace, because the weights are the leader's.
  4. Add the linear rows `lcsr`, then the centrality rows `ctr`.
  5. Add the MIP kinds, then the sub-group MIP kinds.
  6. Add the turnover ceilings, each with its reference replaced by `w`, through [`set_turnover_constraints!`](@ref).
- 7. When the set has tracking errors, resolve each against `w`, so that a benchmark that is not fixed takes `w`. Cut each benchmark series to the row count of the prior with [`prefix_tracking_benchmark`](@ref). Bind each [`DataBenchmarkTracking`](@ref) to the benchmark of the rows `rd` with [`bind_data_benchmark`](@ref), and add the rows.
+ 7. When the set has tracking errors, resolve each against `w`, so that a benchmark that is not fixed takes `w`. Cut each benchmark series to the row count of the prior with [`prefix_tracking_benchmark`](@ref). Bind each [`DataBenchmarkTracking`](@ref) to the benchmark of the rows `cbr.rd` with [`bind_data_benchmark`](@ref), and add the rows.
  8. Add the norm ceilings `l2c`, `lpc` and `linfc`.
  9. Add the penalties `l1`, `l2`, `lp` and `linf` to the Objective Penalty.
-10. Resolve the risk ceilings against `w` with [`factory`](@ref), so that a [`WeightsTracking`](@ref) benchmark or a [`TurnoverRiskMeasure`](@ref) reference that is not fixed takes `w`, as in steps 6 and 7. A measure that holds neither stays as it is. Bind each [`DataBenchmarkTracking`](@ref) of the ceilings to the benchmark of the rows `rd`, and add the ceilings with [`set_allocation_risk_ceiling!`](@ref).
-11. Add the return floor `ret` with [`set_allocation_return_floor!`](@ref), with the rows.
+10. Resolve the risk ceilings against `w` with [`factory`](@ref), so that a [`WeightsTracking`](@ref) benchmark or a [`TurnoverRiskMeasure`](@ref) reference that is not fixed takes `w`, as in steps 6 and 7. A measure that holds neither stays as it is. Bind each [`DataBenchmarkTracking`](@ref) of the ceilings to the benchmark of the rows `cbr.rd`, and add the ceilings with [`set_allocation_risk_ceiling!`](@ref).
+11. Resolve the return floor `ret` against the prior `cbr.pr` with [`factory`](@ref), and add it with [`set_allocation_return_floor!`](@ref), with the rows.
 12. Add the integer phylogeny rows and the semidefinite phylogeny rows of `plr`.
 13. Add the custom constraints.
 
@@ -242,7 +167,7 @@ Both arms call it after they add the bounds. The bare projection model passes th
 
   - [`set_allocation_set_constraints!`](@ref)
   - [`add_allocation_set_constraints!`](@ref)
-  - [`resolve_allocation_set_rows`](@ref)
+  - [`resolve_constraint_block`](@ref)
 """
 function assemble_allocation_set!(model::JuMP.Model, set::ProgrammeAllocationSet,
                                   w::AbstractVector, X::Option{<:ReturnsResult},
@@ -250,20 +175,20 @@ function assemble_allocation_set!(model::JuMP.Model, set::ProgrammeAllocationSet
                                   prefix::Symbol)::Nothing
     bare = prefix == Symbol("")
     assert_set_prior_priced(pr, X)
-    (; lcsr, ctr, plr, ret, l2c, lpc, linfc, l1, l2, lp, linf, rd) = resolve_allocation_set_rows(set,
-                                                                                                 pr,
-                                                                                                 X)
+    cbr = resolve_constraint_block(set.cbe, pr, X; slv = set.slv,
+                                   strict = projection_step_strict())
+    (; wb, lt, st, lcsr, ctr, gcardr, sgcardr, smtx, sgmtx, slt, sst, sglt, sgst, plr, ss, rd) = cbr
     if !bare
         state_build!(() -> get_w(model), model, prefix, :w)
         state_build!(() -> Symbol(""), model, prefix, :w_owner)
     end
     set_linear_weight_constraints!(model, lcsr, :lcs_ineq_, :lcs_eq_; prefix = prefix)
     set_linear_weight_constraints!(model, ctr, :cent_ineq_, :cent_eq_; prefix = prefix)
-    set_mip_constraints!(model, set.wb, set.card, set.gcarde, plr, set.lt, set.st, nothing,
-                         set.ss, set.xbgt; prefix = prefix)
-    set_smip_constraints!(model, set.wb, set.scard, set.sgcarde, set.smtx, set.sgmtx,
-                          set.slt, set.sst, set.sglt, set.sgst, set.ss; prefix = prefix)
-    set_turnover_constraints!(model, factory(set.tn, w); prefix = prefix)
+    set_mip_constraints!(model, wb, cbr.card, gcardr, plr, lt, st, nothing, ss, cbr.xbgt;
+                         prefix = prefix)
+    set_smip_constraints!(model, wb, cbr.scard, sgcardr, smtx, sgmtx, slt, sst, sglt, sgst,
+                          ss; prefix = prefix)
+    set_turnover_constraints!(model, factory(cbr.tn, w); prefix = prefix)
     if !isnothing(set.tr)
         # The constructor refuses a data benchmark under a prior of the Excess Frame, so a
         # data benchmark binds to the raw rows that the set's prior reads.
@@ -271,19 +196,22 @@ function assemble_allocation_set!(model::JuMP.Model, set::ProgrammeAllocationSet
                                                            size(pr.X, 1)), rd)
         set_tracking_error_constraints!(model, pr, tr, set, plr, nothing; prefix = prefix)
     end
-    set_weight_norm_2_constraints!(model, l2c; prefix = prefix)
-    set_weight_norm_p_constraints!(model, lpc; prefix = prefix)
-    set_weight_norm_inf_constraints!(model, linfc; prefix = prefix)
-    set_l1_regularisation!(model, l1; prefix = prefix)
-    set_l2_regularisation!(model, l2; prefix = prefix)
-    set_lp_regularisation!(model, lp; prefix = prefix)
-    set_linf_regularisation!(model, linf; prefix = prefix)
-    set_allocation_risk_ceiling!(model, bind_data_benchmark(factory(set.r, w), rd), set, pr,
-                                 plr; prefix = prefix)
-    set_allocation_return_floor!(model, ret, pr; prefix = prefix, rd = rd)
+    set_weight_norm_2_constraints!(model, cbr.l2c; prefix = prefix)
+    set_weight_norm_p_constraints!(model, cbr.lpc; prefix = prefix)
+    set_weight_norm_inf_constraints!(model, cbr.linfc; prefix = prefix)
+    set_l1_regularisation!(model, cbr.l1; prefix = prefix)
+    set_l2_regularisation!(model, cbr.l2; prefix = prefix)
+    set_lp_regularisation!(model, cbr.lp; prefix = prefix)
+    set_linf_regularisation!(model, cbr.linf; prefix = prefix)
+    # The risk ceilings and the return floor are fields of the set, and not slots of the
+    # block, so they read the prior and the rows of the block Result (ADR 0237).
+    set_allocation_risk_ceiling!(model, bind_data_benchmark(factory(set.r, w), rd), set,
+                                 cbr.pr, plr; prefix = prefix)
+    set_allocation_return_floor!(model, factory(set.ret, cbr.pr), cbr.pr; prefix = prefix,
+                                 rd = rd)
     set_iplg_constraints!(model, plr; prefix = prefix)
     set_sdp_phylogeny_constraints!(model, plr; prefix = prefix)
-    add_custom_constraint!(model, set.ccnt, set, nothing)
+    add_custom_constraint!(model, cbr.ccnt, set, nothing)
     return nothing
 end
 """
@@ -1067,7 +995,7 @@ Where:
   - [`distance_reader_refusal_mask`](@ref)
   - [`distance_reader_call`](@ref)
   - [`programme_investable_reduction`](@ref)
-  - [`processed_jump_optimiser_attributes`](@ref)
+  - [`resolve_jump_optimiser`](@ref)
 """
 function projection_programme(proj::AbstractProjectionGeometry, set::AbstractAllocationSet,
                               q::AbstractVector, w::AbstractVector,
@@ -1109,7 +1037,7 @@ Reduces the set, the rows that the head holds and the set's prior to the prior's
 
 The projection programme then runs on the assets the prior can price, as a batch head does with [`investable_reduction`](@ref). The caller views the raw step and the Price-Adjusted Allocation at the same mask with [`investable_weights_view`](@ref).
 
-Dispatch selects one of three methods. A `nothing` mask means that every asset is investable, which is true at every step on a static panel and at every step of a set that reads no rows. That method returns its arguments unchanged. The `BitVector` method takes the views at `findall(imsk)`. The third method refuses a mask with no rows or no prior, because a mask comes from a prior fitted on the rows, so this pair does not occur in the library. The set is viewed against the full returns matrix of the rows, because a view of a tracking estimator needs it. The Price-Adjusted Allocation is cut to the mask and is not renormalised, as the batch reduction cuts a turnover reference. So an asset the prior cannot price leaves the reference, and the programme allocates the budget of one over the investable assets. The function writes no warning for such an asset, because the Investable Mask of the Recursion Result already shows it at every step.
+Dispatch selects one of three methods. A `nothing` mask means that every asset is investable, which is true at every step on a static panel and at every step of a set that reads no rows. That method returns its arguments unchanged. The `BitVector` method takes the views at `findall(imsk)`. The third method refuses a mask with no rows or no prior, because a mask comes from a prior fitted on the rows, so this pair does not occur in the library. The set is viewed against the full returns matrix of the rows, because a view of a tracking estimator needs it. After the view, the method declares the names outside the mask on the Non-Investable Axis of the set's `sets`, with [`non_investable_universe`](@ref), as [`investable_reduction`](@ref) does for a head. So a row of `lcse` or `gcarde` that names such an asset drops at stage 2 of the block, and `strict` does not refuse the name. The Price-Adjusted Allocation is cut to the mask and is not renormalised, as the batch reduction cuts a turnover reference. So an asset the prior cannot price leaves the reference, and the programme allocates the budget of one over the investable assets. The function writes no warning for such an asset, because the Investable Mask of the Recursion Result already shows it at every step.
 
 # Validation
 
@@ -1134,7 +1062,12 @@ end
 function programme_investable_reduction(imsk::BitVector, set::AbstractAllocationSet,
                                         X::ReturnsResult, pr::AbstractPriorResult)
     idx = findall(imsk)
-    return port_opt_view(set, idx, X.X), port_opt_view(X, idx), port_opt_view(pr, idx)
+    # The view drops the Non-Investable Axis, so the set declares it after the view, as
+    # `investable_reduction` declares it for a head. Stage 2 of the block then drops a row
+    # that names a departed asset, and does not refuse the name.
+    return non_investable_universe(port_opt_view(set, idx, X.X),
+                                   non_investable_names(X.nx, imsk)), port_opt_view(X, idx),
+           port_opt_view(pr, idx)
 end
 function programme_investable_reduction(::BitVector, ::AbstractAllocationSet, ::Any, ::Any)
     return throw(IsNothingError("an Investable Mask is derived from a prior fitted on the rows that the head holds, so a mask with no rows or no prior result cannot be reduced on."))

@@ -237,10 +237,19 @@ because RRB is `RelaxedRiskBudgeting`.
   the floor of the set kept `rte`. The set stays the Risk Constraint Owner of its ceilings.
 - **`NearOptimalCentering` keeps the slots of a block, and the `r` and `ret` of the set, in its
   anchor sub-problems**, as it keeps `wb`.
-- **One rule orders the names and the investable reduction.** The head resolves the names after
-  `investable_reduction` and refuses a precomputed constraint of the wrong width. The set resolves
-  them first and cuts the constraint. The resolver ticket states one rule, and a test covers both
-  arms.
+- **One rule orders the names and the investable reduction (#2042).** Stage 1,
+  `resolve_constraint_block_names`, holds only the slots whose value follows a view at the
+  Investable Mask: the thresholds, `sgcarde`, the sub-group matrices and thresholds, and `tn`. It
+  resolves them over the universe of the caller, before the reduction, in both owners, and the
+  reduction views the values. Stage 2, `resolve_constraint_block`, resolves after the reduction,
+  over the `sets` that carry the Non-Investable Axis: `wb` and `lcse`, whose resolvers read `rd`;
+  `gcarde`, because a linear constraint over the assets does not follow a view; and the slots that
+  read the prior. So a row that names a departed asset drops in both owners, and
+  `assert_investable_constraint_width` refuses a precomputed `lcse` or `gcarde` of the wrong width
+  in every block. Before #2042 the set resolved `lcse` and `gcarde` once for each fold, and it did
+  not cut them: the reduction kept their width, and the model raised a bare `DimensionMismatch`.
+  The set now declares the Non-Investable Axis on its `sets` in `programme_investable_reduction`,
+  as `investable_reduction` does for a head. A test covers both arms.
 - **`ScoreWeightBounds` in a `ProgrammeAllocationSet`.** The set refuses it now. A stage 2 slot
   reads `rd` at each step, so the set can take it after the resolver lands. Map #1213 records it
   under *Not yet specified*.

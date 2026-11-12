@@ -661,7 +661,7 @@ $(DocStringExtensions.FIELDS)
                               rt_min::Union{Number, VecNum}, rt_max::Union{Number, VecNum},
                               rt_ends::Option{<:VecPair}, w_min::VecNum_VecVecNum,
                               w_max::VecNum_VecVecNum, r::RM_VecRM, opt::JuMPOptimiser,
-                              attrs::ProcessedJuMPOptimiserAttributes,
+                              attrs::ResolvedJuMPOptimiser,
                               w_min_retcode::OptimisationReturnCode,
                               w_opt_retcode::OptRetCode_VecOptRetCode,
                               w_max_retcode::OptimisationReturnCode)
@@ -676,7 +676,7 @@ function NearOptimalSetup(; w_opt::VecNum_VecVecNum, rk_opt::Union{Number, VecNu
                           rt_max::Union{Number, VecNum},
                           rt_ends::Option{<:VecPair} = nothing, w_min::VecNum_VecVecNum,
                           w_max::VecNum_VecVecNum, r::RM_VecRM, opt::JuMPOptimiser,
-                          attrs::ProcessedJuMPOptimiserAttributes,
+                          attrs::ResolvedJuMPOptimiser,
                           w_min_retcode::OptimisationReturnCode,
                           w_opt_retcode::OptRetCode_VecOptRetCode,
                           w_max_retcode::OptimisationReturnCode)::NearOptimalSetup
@@ -691,7 +691,7 @@ Solve the anchors of [`NearOptimalCentering`](@ref), and compute the bounds of i
 
 # Algorithm
 
- 1. Process the optimiser into its attributes with [`processed_jump_optimiser_attributes`](@ref), reduce `noc` and `rd` to the investable universe, and bind a data benchmark to the rows of the view.
+ 1. Process the optimiser into its attributes with [`resolve_jump_optimiser`](@ref), reduce `noc` and `rd` to the investable universe, and bind a data benchmark to the rows of the view.
  2. If an anchor of minimum risk or of maximum return is missing, if the variant is [`UnconstrainedNearOptimalCentering`](@ref), or if a return term holds a [`Frontier`](@ref), make the copies of the risk measures and of the optimiser without bounds. `ucs_flag` selects whether they keep their uncertainty sets.
  3. Solve each missing anchor as a [`MeanRisk`](@ref) problem. The anchors of minimum risk and of maximum return solve with the copies without bounds, and the anchor of `obj` solves with `r` and `opt` as they are.
  4. Compute the risks of the anchors with [`near_optimal_centering_risks`](@ref), and their returns with [`expected_return`](@ref).
@@ -703,7 +703,7 @@ Solve the anchors of [`NearOptimalCentering`](@ref), and compute the bounds of i
 
   - `noc::NearOptimalCentering`: The estimator.
   - $(arg_dict[:rd])
-  - `kwargs...`: Keyword arguments passed to [`processed_jump_optimiser_attributes`](@ref).
+  - `kwargs...`: Keyword arguments passed to [`resolve_jump_optimiser`](@ref).
 
 # Returns
 
@@ -728,7 +728,7 @@ function near_optimal_centering_setup(noc::NearOptimalCentering, rd::ReturnsResu
     w_max_retcode = OptimisationSuccess()
     unconstrained = isa(noc.alg, UnconstrainedNearOptimalCentering)
     r = ucs_risk_measure(noc.r, rd)
-    attrs = processed_jump_optimiser_attributes(noc.opt, rd; kwargs...)
+    attrs = resolve_jump_optimiser(noc.opt, rd; kwargs...)
     # The corner solves below run the head's own `opt`, `r` and anchor weights against
     # `rd`, so the head is reduced before any of them, and before the optimiser is
     # repackaged from the bundle. `_optimise` takes the same view of its own locals.
@@ -1038,7 +1038,7 @@ The centring solve minimises the barrier, so the objective that it gives to a Cu
   - `alg`: [`UnconstrainedNearOptimalCentering`](@ref) or [`ConstrainedNearOptimalCentering`](@ref).
   - $(arg_dict[:model])
   - `noc::NearOptimalCentering`: The estimator, which the Custom Objective Terms receive.
-  - `attrs::ProcessedJuMPOptimiserAttributes`: The processed attributes of the optimiser.
+  - `attrs::ResolvedJuMPOptimiser`: The processed attributes of the optimiser.
   - `m_rk::Number`, `m_rt::Number`: The scales of the anchor cones of [`set_near_optimal_centering_constraints!`](@ref).
 
 # Returns
@@ -1053,8 +1053,8 @@ The centring solve minimises the barrier, so the objective that it gives to a Cu
 """
 function set_near_optimal_objective_function!(::UnconstrainedNearOptimalCentering,
                                               model::JuMP.Model, ::NearOptimalCentering,
-                                              attrs::ProcessedJuMPOptimiserAttributes,
-                                              m_rk::Number, m_rt::Number)
+                                              attrs::ResolvedJuMPOptimiser, m_rk::Number,
+                                              m_rt::Number)
     so = get_objective_scale(model)
     obj_expr = set_near_optimal_centering_constraints!(model, attrs.wb, m_rk, m_rt)
     JuMP.@objective(model, Min, so * obj_expr)
@@ -1062,8 +1062,8 @@ function set_near_optimal_objective_function!(::UnconstrainedNearOptimalCenterin
 end
 function set_near_optimal_objective_function!(::ConstrainedNearOptimalCentering,
                                               model::JuMP.Model, noc::NearOptimalCentering,
-                                              attrs::ProcessedJuMPOptimiserAttributes,
-                                              m_rk::Number, m_rt::Number)
+                                              attrs::ResolvedJuMPOptimiser, m_rk::Number,
+                                              m_rt::Number)
     so = get_objective_scale(model)
     obj_expr = set_near_optimal_centering_constraints!(model, attrs.wb, m_rk, m_rt)
     add_custom_objective_term!(model, MinimumRisk(), noc.opt.cobj, noc, attrs)
@@ -1105,7 +1105,7 @@ The method dispatches on the type of the bounds, on the variant, and on the fron
   - `s_rk::Number`: The [`anchor_cone_scale`](@ref) of `rk_delta` of [`NearOptimalSetup`](@ref), which divides the risk cone of the barrier.
   - `s_rt::Number`: The [`anchor_cone_scale`](@ref) of `rt_delta` of [`NearOptimalSetup`](@ref), which divides the return cone of the barrier.
   - `opt::BaseJuMPOptimisationEstimator`: The optimiser of the centring model.
-  - `attrs::ProcessedJuMPOptimiserAttributes`: The processed attributes of the optimiser.
+  - `attrs::ResolvedJuMPOptimiser`: The processed attributes of the optimiser.
   - `args...`: For the constrained variant, the returns of the anchors, the spans of [`return_term_ends`](@ref), the anchors of minimum risk and of maximum return, and one `Val` flag for each frontier registry.
 
 # Returns
@@ -1120,8 +1120,8 @@ The method dispatches on the type of the bounds, on the variant, and on the fron
 """
 function solve_noc!(noc::NearOptimalCentering, model::JuMP.Model, rk_opt::Number,
                     rt_opt::Number, s_rk::Number, s_rt::Number,
-                    opt::BaseJuMPOptimisationEstimator,
-                    attrs::ProcessedJuMPOptimiserAttributes, args...)
+                    opt::BaseJuMPOptimisationEstimator, attrs::ResolvedJuMPOptimiser,
+                    args...)
     JuMP.@expression(model, noc_rk, rk_opt)
     JuMP.@expression(model, noc_rt, rt_opt)
     set_near_optimal_objective_function!(noc.alg, model, noc, attrs, s_rk, s_rt)
@@ -1132,7 +1132,7 @@ function solve_noc!(noc::NearOptimalCentering{<:Any, <:Any, <:Any, <:Any, <:Any,
                                               <:UnconstrainedNearOptimalCentering},
                     model::JuMP.Model, rk_opts::VecNum, rt_opts::VecNum, s_rk::Number,
                     s_rt::Number, opt::BaseJuMPOptimisationEstimator,
-                    attrs::ProcessedJuMPOptimiserAttributes, args...)
+                    attrs::ResolvedJuMPOptimiser, args...)
     p_rk, p_rt, rk_units, rt_units = set_noc_anchor_parameters!(model, noc, attrs, rk_opts,
                                                                 rt_opts, s_rk, s_rt)
     return frontier_sweep!(model, noc, eltype(opt.pe.X), length(rk_opts)) do i
@@ -1170,7 +1170,7 @@ The constant is the [`bound_scale`](@ref) of the bounds, so each parameter takes
 
   - $(arg_dict[:model])
   - `noc::NearOptimalCentering`: The estimator, which selects the objective.
-  - `attrs::ProcessedJuMPOptimiserAttributes`: The processed attributes of the optimiser.
+  - `attrs::ResolvedJuMPOptimiser`: The processed attributes of the optimiser.
   - `rk_opts::VecNum`: The risk ceilings, one for each point of the sweep.
   - `rt_opts::VecNum`: The return floors, one for each point of the sweep.
   - `s_rk::Number`, `s_rt::Number`: The scales of the anchor cones, which [`set_near_optimal_objective_function!`](@ref) receives.
@@ -1187,9 +1187,8 @@ The constant is the [`bound_scale`](@ref) of the bounds, so each parameter takes
   - [`bound_scale`](@ref)
 """
 function set_noc_anchor_parameters!(model::JuMP.Model, noc::NearOptimalCentering,
-                                    attrs::ProcessedJuMPOptimiserAttributes,
-                                    rk_opts::VecNum, rt_opts::VecNum, s_rk::Number,
-                                    s_rt::Number)
+                                    attrs::ResolvedJuMPOptimiser, rk_opts::VecNum,
+                                    rt_opts::VecNum, s_rk::Number, s_rt::Number)
     m_rk, m_rt = bound_scale(rk_opts), bound_scale(rt_opts)
     p_rk = JuMP.@variable(model, base_name = "noc_rk_unit",
                           set = JuMP.Parameter(zero(eltype(rk_opts))))
@@ -1312,9 +1311,8 @@ function solve_noc!(noc::NearOptimalCentering{<:Any, <:Any, <:Any, <:Any, <:Any,
                                               <:ConstrainedNearOptimalCentering},
                     model::JuMP.Model, rk_opts::VecNum, rt_opts::VecNum, s_rk::Number,
                     s_rt::Number, opt::BaseJuMPOptimisationEstimator,
-                    attrs::ProcessedJuMPOptimiserAttributes, ::Any, ::Any,
-                    rt_ends::Option{<:VecPair}, ::Any, ::Any, ::Val{true}, ::Val{false},
-                    args...)
+                    attrs::ResolvedJuMPOptimiser, ::Any, ::Any, rt_ends::Option{<:VecPair},
+                    ::Any, ::Any, ::Val{true}, ::Val{false}, args...)
     ret_frontier = compute_ret_lbs(shared_get(model, :ret_frontier), rt_ends)
     ret_axis = set_ret_frontier_parameters!(model, ret_frontier)
     p_rk, p_rt, rk_units, rt_units = set_noc_anchor_parameters!(model, noc, attrs, rk_opts,

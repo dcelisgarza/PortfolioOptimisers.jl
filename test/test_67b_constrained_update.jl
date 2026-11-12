@@ -161,7 +161,11 @@ end
                                                                                      B <=
                                                                                      0.8))),
                      3)
-        @test isa(rs.lcse, po.LinearConstraint)
+        # `lcse` reads the rows, so it keeps its estimator at stage 1, and stage 2 of the block
+        # resolves it at each step (#2042).
+        @test isa(rs.lcse, LinearConstraintEstimator)
+        @test isa(po.resolve_constraint_block(rs.cbe, nothing, nothing).lcsr,
+                  po.LinearConstraint)
     end
 
     @testset "The set holds its slots in a ConstraintBlock (#2040)" begin
@@ -559,7 +563,9 @@ end
                                                                          nothing, prn)
         @test_throws po.IsNothingError po.programme_investable_reduction(trues(3), bset,
                                                                          rdn, nothing)
-        @test_throws po.IsNothingError po.resolve_allocation_set_rows(tset, prn, nothing)
+        # A prior with no rows does not occur, and stage 2 of the block refuses it.
+        @test_throws po.IsNothingError po.resolve_constraint_block(tset.cbe, prn, nothing;
+                                                                   slv = tset.slv)
     end
 
     @testset "The Held Step" begin
@@ -1163,7 +1169,7 @@ end
                                                                                          0.8))),
                          3)
             @test isa(rs.tn, Turnover) && rs.tn.val == [0.1, 0.5, 0.5]
-            @test isa(rs.smtx, AbstractMatrix) && isa(rs.lcse, po.LinearConstraint)
+            @test isa(rs.smtx, AbstractMatrix) && isa(rs.lcse, LinearConstraintEstimator)
         end
         @testset "The turnover and the tracking kinds" begin
             # A turnover object: the reference is the step's book unless fixed.
@@ -2055,8 +2061,8 @@ end
         # the free path, which stays near equal weights, so it is feasible and it binds.
         cte = CentralityConstraint(; A = ce, B = (minimum(cv) + sum(cv) / N) / 2, comp = <=)
         ple = SemiDefinitePhylogenyEstimator(; pl = NetworkEstimator(; ce = ivc))
-        a = po.resolve_allocation_set_rows(ProgrammeAllocationSet(; slv = slv, cte = cte,
-                                                                  ple = ple), pr, rd)
+        sa = ProgrammeAllocationSet(; slv = slv, cte = cte, ple = ple)
+        a = po.resolve_constraint_block(sa.cbe, pr, rd; slv = slv)
         c = centrality_constraints(cte, pr; iv = rd.iv, ivpa = rd.ivpa, rd = rd)
         p = phylogeny_constraints(ple, pr; iv = rd.iv, ivpa = rd.ivpa, rd = rd)
         @test a.ctr.A_ineq == c.A_ineq && a.ctr.B_ineq == c.B_ineq

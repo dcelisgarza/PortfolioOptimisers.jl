@@ -9,7 +9,7 @@ unique_key_dict!(arg_dict, :arg_dict,
                  :plr => "`plr`: Phylogeny result.",#
                  :nte => "`nte`: Network estimator.",#
                  :cte => "`cte`: Centrality estimator.",#
-                 :cte_jmp => "`cte`: Centrality constraint(s). A `CentralityConstraint`, a vector of them, or an already-generated `LinearConstraint`. Resolved by `centrality_constraints` into the `ctr` slot of [`ProcessedJuMPOptimiserAttributes`](@ref).",#
+                 :cte_jmp => "`cte`: Centrality constraint(s). A `CentralityConstraint`, a vector of them, or an already-generated `LinearConstraint`. Resolved by `centrality_constraints` into the `ctr` slot of [`ResolvedJuMPOptimiser`](@ref).",#
                  :cta => "`ct`: Centrality algorithm.",#
                  :ctr => "`ctr`: Centrality constraint result. The `LinearConstraint` the centrality constraints resolve to.",#
                  :ctargs => "`args`: Positional arguments for the centrality function.",#

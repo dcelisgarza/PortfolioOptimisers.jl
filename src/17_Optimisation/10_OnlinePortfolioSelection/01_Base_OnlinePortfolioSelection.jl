@@ -1575,7 +1575,7 @@ Returns the head's `strict` flag that the current [`ProjectionStep`](@ref) carri
 # Related
 
   - [`ProjectionStep`](@ref)
-  - [`resolve_allocation_set_rows`](@ref)
+  - [`resolve_constraint_block`](@ref)
 """
 function projection_step_strict()
     step = PROJECTION_STEP[]

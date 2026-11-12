@@ -196,3 +196,10 @@ omission — does not obviously settle whether an objective term belongs in it. 
 formulation question for a later decision, not a defect fix. `UnconstrainedNearOptimalCentering`
 and `set_near_optimal_objective_function!` now state the behaviour, and ADR 0008's amendment 3
 records the wider census of what that variant reads.
+
+## Amendment (2026-11-12)
+
+The bundle that a Custom Objective Term and a Custom Constraint receive is `ResolvedJuMPOptimiser`
+(ADR 0237, #2042). It holds `pr`, `fees`, `ret`, `sca`, `imsk` and the Resolved Constraint Block
+`cbr`, and a named forward rule keeps the reads of v0.33, such as `attrs.wb` and `attrs.plr`. The
+bundle stays the extension point of decision 4.

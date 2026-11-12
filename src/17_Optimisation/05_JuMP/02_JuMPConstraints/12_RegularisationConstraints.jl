@@ -44,12 +44,8 @@ Where:
 # Arguments
 
   - $(arg_dict[:model])
-  - `l1_val::Number`: L1 penalty coefficient.
+  - `l1_val::Number`: L1 penalty coefficient. [`resolve_constraint_block`](@ref) checks that it is finite and `> 0`, so the builder checks nothing.
   - $(arg_dict[:prefix_kw])
-
-# Validation
-
-  - `l1_val > 0` and finite.
 
 # Returns
 
@@ -239,12 +235,8 @@ Where:
 # Arguments
 
   - $(arg_dict[:model])
-  - `linf::Number`: L∞ penalty coefficient.
+  - `linf::Number`: L∞ penalty coefficient. [`resolve_constraint_block`](@ref) checks that it is finite and `> 0`, so the builder checks nothing.
   - $(arg_dict[:prefix_kw])
-
-# Validation
-
-  - `linf > 0` and finite.
 
 # Returns
 
@@ -263,7 +255,6 @@ function set_linf_regularisation!(args...; prefix::Symbol = Symbol(""))
 end
 function set_l1_regularisation!(model::JuMP.Model, l1_val::Number;
                                 prefix::Symbol = Symbol(""))
-    assert_nonempty_gt0_finite_val(l1_val, :l1)
     w = get_w(model, prefix)
     sc = get_constraint_scale(model)
     t_l1 = state_set!(model, prefix, :t_l1, JuMP.@variable(model))
@@ -1059,7 +1050,6 @@ function set_lp_regularisation!(model::JuMP.Model, lps::LpReg_VecLpReg;
 end
 function set_linf_regularisation!(model::JuMP.Model, linf::Number;
                                   prefix::Symbol = Symbol(""))
-    assert_nonempty_gt0_finite_val(linf, :linf)
     w = get_w(model, prefix)
     sc = get_constraint_scale(model)
     t_linf = state_set!(model, prefix, :t_linf, JuMP.@variable(model))

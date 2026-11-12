@@ -172,21 +172,24 @@ end
 end
 
 @testset "Weight norm ceilings refuse a value that is not positive and finite" begin
-    model = JuMP.Model()
-    PO.set_model_scales!(model, 1.0, 1.0)
-    for (f, name) in ((PO.set_weight_norm_2_constraints!, "l2c"),
-                      (PO.set_weight_norm_inf_constraints!, "linfc")),
-        val in (0.0, -1.0, Inf)
-
+    # The constructor of the block refuses a number, and a rule states no number, so stage 2
+    # of the block checks the number that a rule gives (#2042).
+    rdn = ReturnsResult(; nx = ["a", "b", "c"],
+                        X = [0.1 -0.2 0.0; -0.1 0.2 0.01; 0.05 0.1 -0.02])
+    prn = prior(EmpiricalPrior(), rdn)
+    for name in (:l2c, :linfc), val in (0.0, -1.0, Inf)
+        cbe = ConstraintBlock(; NamedTuple{(name,)}(((k, p, w, s, c) -> val,))...)
         err = try
-            f(model, val)
+            PO.resolve_constraint_block(cbe, prn, rdn; slv = nothing)
             nothing
         catch e
             e
         end
         @test isa(err, DomainError)
-        @test occursin(name, sprint(showerror, err))
+        @test occursin(string(name), sprint(showerror, err))
     end
+    model = JuMP.Model()
+    PO.set_model_scales!(model, 1.0, 1.0)
     # Any other argument adds nothing to the model.
     @test isnothing(PO.set_weight_norm_2_constraints!(model, nothing))
     @test isnothing(PO.set_weight_norm_p_constraints!(model, nothing))
@@ -373,9 +376,17 @@ end
     end
 end
 
-@testset "The builders refuse a coefficient that is not positive and finite" begin
-    @test_throws DomainError PortfolioOptimisers.set_l1_regularisation!(JuMP.Model(), 0.0)
-    @test_throws DomainError PortfolioOptimisers.set_linf_regularisation!(JuMP.Model(), Inf)
+@testset "Stage 2 of the block refuses a coefficient that is not positive and finite" begin
+    rdn = ReturnsResult(; nx = ["a", "b"], X = [0.1 -0.2; -0.1 0.2; 0.05 0.1])
+    prn = prior(EmpiricalPrior(), rdn)
+    @test_throws DomainError PortfolioOptimisers.resolve_constraint_block(ConstraintBlock(;
+                                                                                          l1 = (k, p, w, s, c) -> 0.0),
+                                                                          prn, rdn;
+                                                                          slv = nothing)
+    @test_throws DomainError PortfolioOptimisers.resolve_constraint_block(ConstraintBlock(;
+                                                                                          linf = (k, p, w, s, c) -> Inf),
+                                                                          prn, rdn;
+                                                                          slv = nothing)
     @test_throws DomainError LpRegularisation(; p = 1)
     @test_throws IsNonFiniteError LpRegularisation(; p = Inf)
     @test_throws DomainError L2Regularisation(; val = -1.0)

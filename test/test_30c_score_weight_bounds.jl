@@ -195,7 +195,7 @@
         end
         res = optimise(MeanRisk(; opt = JuMPOptimiser(; slv = slv, wb = swb, sets = sets)),
                        rd)
-        @test res.pa.wb.ub ≈ cap
+        @test res.jor.wb.ub ≈ cap
         @test all(res.w .<= cap .+ 1e-6)
         # Issue #2008: a bound that names no asset needs no sets in any holder.
         hn = HierarchicalOptimiser(; wb = swb)
@@ -211,7 +211,7 @@
             @test optimise(opt, rd).wb.ub ≈ cap
         end
         res = optimise(MeanRisk(; opt = JuMPOptimiser(; slv = slv, wb = swb)), rd)
-        @test res.pa.wb.ub ≈ cap
+        @test res.jor.wb.ub ≈ cap
         # The two online sets still take a bound that reads only names.
         wbe = WeightBoundsEstimator(; ub = Dict("A" => 0.5))
         @test BoundedAllocationSet(; wb = wbe, sets = sets).wb === wbe

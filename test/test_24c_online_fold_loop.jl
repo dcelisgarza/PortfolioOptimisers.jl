@@ -527,7 +527,7 @@ assets is what keeps the JuMP families cheap.
                                                 tn = Turnover(; w = tnw, val = 0.5),
                                                 wb = sched(k), sets = sets), fb = fb)
         end
-        threaded(p) = p.res.jr.pa.tn.w
+        threaded(p) = p.res.jr.jor.tn.w
         sfd = SelfFinancingDrift()
         online_d = OnlineIndexWalkForward(w, t; purged_size = p, wd = sfd,
                                           pws = DriftedWeights())

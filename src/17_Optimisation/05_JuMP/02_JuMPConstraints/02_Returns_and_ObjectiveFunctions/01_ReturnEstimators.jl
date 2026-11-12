@@ -304,7 +304,7 @@ $(DocStringExtensions.TYPEDSIGNATURES)
 
 Resolve a Deferred Quantity in [`ArithmeticReturn`](@ref)'s `mu` slot against prior result `pr`.
 
-The estimator has one slot that the prior can supply, so the slot itself admits the Estimator, and the method resolves that one slot. Every `JuMP` path calls it through [`factory`](@ref), which [`processed_jump_optimiser_attributes`](@ref) calls on `opt.ret` before it builds a model. A risk measure has a second entry point, and a return term needs none.
+The estimator has one slot that the prior can supply, so the slot itself admits the Estimator, and the method resolves that one slot. Every `JuMP` path calls it through [`factory`](@ref), which [`resolve_jump_optimiser`](@ref) calls on `opt.ret` before it builds a model. A risk measure has a second entry point, and a return term needs none.
 
 # Algorithm
 

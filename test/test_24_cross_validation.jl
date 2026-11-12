@@ -2456,7 +2456,7 @@
                 @test out24.retcode === rcf
                 @test out24.w == res24.w
             end
-            rrb = RelaxedRiskBudgetingResult(resr.jr, resr.prb, nothing)
+            rrb = RelaxedRiskBudgetingResult(resr.jr, resr.rbr, nothing)
             @test PO.set_retcode(rrb, rcf).retcode === rcf
         end
         @testset "the meta results rebuild themselves" begin
@@ -2535,7 +2535,7 @@
                             opt = JuMPOptimiser(; slv = slv, tn = tn, wb = sched(k),
                                                 sets = sets), fb = fb)
         end
-        threaded(p) = p.res.jr.pa.tn.w
+        threaded(p) = p.res.jr.jor.tn.w
         @testset "batch, no drift: the fold after a failure reads the last solved fold" begin
             res = cross_val_predict(mk(2), rd, cv)
             p1, p2, p3 = res.pred[1], res.pred[2], res.pred[3]

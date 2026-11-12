@@ -105,7 +105,7 @@ end
         :AbstractShrunkExpectedReturnsEstimator => "#1859, a second shrinkage estimator beside `ShrunkExpectedReturns`",
         :InverseMatrixSparsificationAlgorithm => "#1874, a second sparsification beside `LoGo`, a graphical lasso",
         :NonOptimisationCrossValidationResult => "#1875, the result side of the estimator family that ADR 0143 names",
-        :ProcessedAttributes => "#1875, the bundle that one optimiser family makes for each `optimise` call",
+        :AbstractResolved => "#1875, the bundle that one optimiser family makes for each `optimise` call",
     )
     #! format: on
 

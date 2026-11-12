@@ -7,13 +7,18 @@ The set holds its constraint kinds and its direct objective penalties in a [`Con
 
 The projection is a bare JuMP model with the variables and rows of the Weight Finaliser, which are `w`, `k = 1`, `Σw = 1`, the constraint scale and the objective scale. [`set_allocation_set_constraints!`](@ref) adds the constraint kinds through the builders of the optimiser, in the order that [`assemble_jump_model!`](@ref) runs them. [`set_projection_objective!`](@ref) sets the objective, the divergence of the rule's Projection Geometry plus the set's penalties.
 
-The kinds read their data at two times. Once per fold, [`resolve_allocation_set`](@ref) resolves the kinds that hold the caller's object or a name over `sets`. These are `wb`, `sbgt`, `gbgt`, `xbgt`, `lt`, `st`, `lcse`, `gcarde`, `sgcarde`, `smtx`, `sgmtx`, `slt`, `sst`, `sglt`, `sgst`, `tn`, `card`, `scard`, `ss`, `l2c`, `lpc`, `linfc`, `ccnt`, `l1`, `l2`, `lp`, `linf` and `cobj`. Each goes to the builder that [`JuMPOptimiser`](@ref) gives it to. At every step, [`resolve_allocation_set_rows`](@ref) resolves the kinds that read the head's rows, on the prior result of `pe` fitted on those rows:
+The block resolves in the two stages of a JuMP head. Once per fold, [`resolve_allocation_set`](@ref) runs stage 1, [`resolve_constraint_block_names`](@ref), and resolves `wb`: the slots that hold a name over `sets` and whose value follows a view at the Investable Mask. These are `wb`, `lt`, `st`, `sgcarde`, `smtx`, `sgmtx`, `slt`, `sst`, `sglt`, `sgst` and `tn`. At every step, [`assemble_allocation_set!`](@ref) runs stage 2, [`resolve_constraint_block`](@ref), on the set viewed at the mask of the step and on the prior result of `pe` fitted on the head's rows. It gives the [`ResolvedConstraintBlock`](@ref) of the set, which the builders read. Stage 2 resolves these kinds:
+
+  - `lcse` and `gcarde`, the linear rows. A linear constraint does not follow a view at the mask, so they resolve after it, over the `sets` that carry the Non-Investable Axis. An exposure row in `lcse` takes its loadings by the precedence of [`factor_space_regression`](@ref): the result that its `FactorSpace` states, else the loadings `rr` of the set's prior, else a fit of the regression of the space on the head's rows.
+  - `cte`, the centrality rows, and `ple`, the integer and semidefinite phylogeny kinds.
+  - A Calibration Rule in `l2c`, `lpc`, `linfc`, `l1`, `l2`, `lp` or `linf`, against the prior and the solver `slv`.
+
+The settings `sbgt`, `gbgt`, `xbgt`, `card`, `scard`, `ss`, `ccnt` and `cobj` need no resolution. Each kind goes to the builder that [`JuMPOptimiser`](@ref) gives it to. The fields of the set read the prior and the rows of its block Result at every step:
 
   - `r`, the risk ceilings. Each measure goes through its own JuMP builder, with the set as the [`RiskConstraintOwner`](@ref) and `settings.ub` as the ceiling. [`factory`](@ref) first materialises the measure against the prior, so a moment that the measure carries is the moment its row uses. A [`Variance`](@ref) or [`StandardDeviation`](@ref) that holds its matrix reads no rows and no prior. It goes through the same builder with no prior, so the source of the matrix does not change the formulation ([`set_allocation_risk_ceiling!`](@ref)).
-  - `tr`, the tracking errors, and `cte`, the centrality rows.
-  - `ple`, the integer and semidefinite phylogeny kinds.
-  - An exposure row in `lcse`. The row goes through the loadings that its `FactorSpace` fixes, because the rows carry no factor returns to fit the loadings again.
   - `ret`, a floor on the prior's expected return of the allocation.
+
+The tracking errors `tr` also read the prior and the rows of the block Result.
 
 At every step [`factory`](@ref) replaces the reference of a turnover ceiling, and of a [`WeightsTracking`](@ref), with the Price-Adjusted Allocation of the step. That is the book the fund trades from. A `fixed` object keeps the caller's reference.
 
@@ -180,7 +185,7 @@ ProgrammeAllocationSet
   - [`set_allocation_set_constraints!`](@ref)
   - [`set_projection_objective!`](@ref)
   - [`resolve_allocation_set`](@ref)
-  - [`resolve_allocation_set_rows`](@ref)
+  - [`resolve_constraint_block`](@ref)
   - [`HeldStep`](@ref)
   - [`OnlinePortfolioSelection`](@ref)
   - [`port_opt_view`](@ref)
@@ -264,6 +269,12 @@ function port_opt_view(set::ProgrammeAllocationSet, i, args...)
                               r = port_opt_view(set.r, i, nothing),
                               ret = port_opt_view(set.ret, i)))
 end
+# The set declares the Non-Investable Axis on its `sets` after the view at the mask of a step,
+# as a JuMP head does in `investable_reduction` (`programme_investable_reduction`).
+function non_investable_universe(set::ProgrammeAllocationSet,
+                                 ni::VecStr)::ProgrammeAllocationSet
+    return rebuild_estimator(set, (; sets = non_investable_sets(set.sets, ni)))
+end
 """
     reader_frames(set::ProgrammeAllocationSet, path::AbstractString, refit::Bool) -> ReturnsFrames
 
@@ -322,81 +333,44 @@ $(DocStringExtensions.TYPEDSIGNATURES)
 
 Resolves the slots of a [`ProgrammeAllocationSet`](@ref) that hold a name or an estimator, once per fold.
 
-This is the first stage of the set's resolution. It resolves each slot to a value over the `N` assets through `sets`, as [`processed_jump_optimiser_attributes`](@ref) resolves the same slot of a [`JuMPOptimiser`](@ref). The slots that read the head's rows go unchanged to the second stage, [`resolve_allocation_set_rows`](@ref), which runs at every step.
+This is stage 1 of the resolution of the set's block, [`resolve_constraint_block_names`](@ref), the stage that a [`JuMPOptimiser`](@ref) runs on its own block. The online head runs it once for each fold, before it knows the Investable Mask of a step. At every step, [`assemble_allocation_set!`](@ref) runs stage 2, [`resolve_constraint_block`](@ref), on the set viewed at the mask of the step. So the set orders the names and the reduction by the rule of a JuMP head.
+
+The weight bounds `wb` are a stage 2 slot of the block, because their resolver reads the rows. The set also resolves them here, over the `N` assets, because the type bound of the set admits no bound that reads the rows, and the closed-form projections and [`FollowTheLeader`](@ref) read `set.wb` as a [`WeightBounds`](@ref). Stage 2 then gives the resolved bounds back unchanged.
+
+**Breaking change.** Before the block Result, this function also resolved `lcse` and `gcarde`, and `resolve_allocation_set_rows` resolved the slots that read the rows. A linear constraint does not follow a view at the mask, so `lcse` and `gcarde` now resolve at each step, after the reduction, over the `sets` that carry the Non-Investable Axis.
 
 # Algorithm
 
  1. Resolve the weight bounds `wb` over the `N` assets with [`weight_bounds_constraints`](@ref).
- 2. Resolve the thresholds `lt` and `st` with [`threshold_constraints`](@ref).
- 3. Resolve the grouped cardinality constraints `gcarde` and `sgcarde` with [`linear_constraints`](@ref), with integer values.
- 4. Resolve the sub-group matrices `smtx` and `sgmtx` with [`asset_sets_matrix`](@ref). When the two slots hold one object, resolve it once and give the result to both slots.
- 5. Resolve the sub-group thresholds `slt` and `sglt`, then `sst` and `sgst`, with [`threshold_constraints`](@ref), in the same way.
- 6. Resolve the turnover ceilings `tn` with [`turnover_constraints`](@ref).
- 7. When `lcse` holds no exposure estimator ([`exposure_keyed`](@ref)), resolve it with [`linear_constraints`](@ref). Otherwise keep it for the second stage, because an exposure row needs the loadings of the prior.
- 8. Return `set` rebuilt with [`rebuild_estimator`](@ref). The resolved slots replace their slots of the block in `cbe`, and every other slot and field keeps its value.
+ 2. Resolve stage 1 of the block with [`resolve_constraint_block_names`](@ref): the thresholds, `sgcarde`, the sub-group matrices and thresholds, and the turnover ceilings `tn`.
+ 3. Return `set` rebuilt with [`rebuild_estimator`](@ref), with the resolved block in `cbe` and the resolved bounds in its slot `wb`. Every other field keeps its value.
 
 # Arguments
 
   - `set`: The programme set.
   - `N`: The number of assets.
   - $(arg_dict[:strict])
-  - `datatype`: The element type of the resolved values. The grouped cardinality constraints take `Int`.
+  - `datatype`: The element type of the resolved values. The sub-grouped cardinality constraints take `Int`.
 
 # Returns
 
-  - `set'::ProgrammeAllocationSet`: The set with its named slots resolved.
+  - `set'::ProgrammeAllocationSet`: The set with its stage 1 slots resolved.
 
 # Related
 
   - [`ProgrammeAllocationSet`](@ref)
-  - [`resolve_allocation_set_rows`](@ref)
+  - [`resolve_constraint_block_names`](@ref)
+  - [`resolve_constraint_block`](@ref)
   - [`weight_bounds_constraints`](@ref)
-  - [`linear_constraints`](@ref)
-  - [`threshold_constraints`](@ref)
-  - [`asset_sets_matrix`](@ref)
-  - [`turnover_constraints`](@ref)
 """
 function resolve_allocation_set(set::ProgrammeAllocationSet, N::Integer, strict::Bool,
                                 datatype::DataType)
-    sets = set.sets
-    wb = weight_bounds_constraints(set.wb, sets; N = N, strict = strict,
+    wb = weight_bounds_constraints(set.wb, set.sets; N = N, strict = strict,
                                    datatype = datatype)
-    lt = threshold_constraints(set.lt, sets; datatype = datatype, strict = strict)
-    st = threshold_constraints(set.st, sets; datatype = datatype, strict = strict)
-    gcarde = linear_constraints(set.gcarde, sets; datatype = Int, strict = strict)
-    sgcarde = linear_constraints(set.sgcarde, sets; datatype = Int, strict = strict)
-    if set.smtx === set.sgmtx
-        smtx = sgmtx = asset_sets_matrix(set.smtx, sets)
-    else
-        smtx = asset_sets_matrix(set.smtx, sets)
-        sgmtx = asset_sets_matrix(set.sgmtx, sets)
-    end
-    if set.slt === set.sglt
-        slt = sglt = threshold_constraints(set.slt, sets; datatype = datatype,
-                                           strict = strict)
-    else
-        slt = threshold_constraints(set.slt, sets; datatype = datatype, strict = strict)
-        sglt = threshold_constraints(set.sglt, sets; datatype = datatype, strict = strict)
-    end
-    if set.sst === set.sgst
-        sst = sgst = threshold_constraints(set.sst, sets; datatype = datatype,
-                                           strict = strict)
-    else
-        sst = threshold_constraints(set.sst, sets; datatype = datatype, strict = strict)
-        sgst = threshold_constraints(set.sgst, sets; datatype = datatype, strict = strict)
-    end
-    tn = turnover_constraints(set.tn, sets; datatype = datatype, strict = strict)
-    # An exposure row needs the prior's loadings, so `lcse` is resolved on the rows unless
-    # it holds no exposure estimator, in which case it resolves here as the optimiser's does.
-    lcse = if exposure_keyed(set.lcse)
-        set.lcse
-    else
-        linear_constraints(set.lcse, sets; datatype = datatype, strict = strict)
-    end
-    # The resolved slots go in as flat keywords, so each replaces its slot of the block.
-    return rebuild_estimator(set,
-                             (; wb, lt, st, lcse, gcarde, sgcarde, smtx, sgmtx, slt, sst,
-                              sglt, sgst, tn))
+    cbe = resolve_constraint_block_names(set.cbe, strict, datatype)
+    # The block and its slot `wb` go in one call, so the flat keyword replaces that slot of
+    # the resolved block.
+    return rebuild_estimator(set, (; cbe = cbe, wb = wb))
 end
 """
     exposure_keyed(x)
@@ -413,7 +387,7 @@ An exposure estimator writes its rows in the basis of the factors, and the loadi
 # Related
 
   - [`resolve_allocation_set`](@ref)
-  - [`resolve_allocation_set_rows`](@ref)
+  - [`resolve_constraint_block`](@ref)
 """
 function exposure_keyed(::Any)
     return false
@@ -439,7 +413,7 @@ A precomputed [`LinearConstraint`](@ref), [`IntegerPhylogeny`](@ref) or [`SemiDe
 # Related
 
   - [`rows_needed`](@ref)
-  - [`resolve_allocation_set_rows`](@ref)
+  - [`resolve_constraint_block`](@ref)
 """
 function fitted_on_rows(::Any)
     return false

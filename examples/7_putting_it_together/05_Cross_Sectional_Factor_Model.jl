@@ -584,7 +584,7 @@ walk = IndexWalkForward(252, 63)
 folds = cross_val_predict(strategy, rd, walk)
 
 size_k = findfirst(isequal("size"), rr.nf)
-fold_priors = [p.res.pa.pr for p in folds.pred]
+fold_priors = [p.res.jor.pr for p in folds.pred]
 fold_sets = [sigma_ucs(OrthogonalUncertaintySet(), prf) for prf in fold_priors]
 
 pretty_table(DataFrame("Fold" => eachindex(folds.pred),
@@ -613,7 +613,7 @@ takes a return series and decomposes what happened.
 =#
 
 final = book(; kappa = 100.0, constraint = mandate)
-predicted = factor_attribution(final.w, final.pa.pr; assets = true)
+predicted = factor_attribution(final.w, final.jor.pr; assets = true)
 
 #=
 The realised call needs returns. Our panel lists a fifth of its assets late, and a held asset can
@@ -622,7 +622,7 @@ and zeroes those pairs, and under `strict = true` it raises. The warning names t
 the pairs, so you can see when the total is understated.
 =#
 
-realised = factor_attribution(final.w, final.pa.pr, rd.X; assets = true, strict = false)
+realised = factor_attribution(final.w, final.jor.pr, rd.X; assets = true, strict = false)
 
 #=
 The cell below prints five residuals per decomposition. It measures the systematic, idiosyncratic

@@ -594,5 +594,561 @@ The graph readers `cte` and `ple`, the regressions of `lcse` and the readers ins
 function reader_frames(cbe::ConstraintBlock, path::AbstractString, refit::Bool)
     return field_frames(cbe, path, refit)
 end
+"""
+$(DocStringExtensions.TYPEDEF)
 
-export ConstraintBlock
+Abstract supertype of the data that a resolver gives once for each `optimise` call.
+
+A subtype holds the results that a configuration resolves to against the prior and the rows of one fit. A builder of the model reads them, and no builder resolves the configuration again. [`ResolvedConstraintBlock`](@ref) is the Result of one [`ConstraintBlock`](@ref), [`ResolvedJuMPOptimiser`](@ref) is the Result of a JuMP head, and the subtypes of [`AbstractResolvedRiskBudgeting`](@ref) hold the resolved budget of a risk budgeting model.
+
+# Related
+
+  - [`ResolvedConstraintBlock`](@ref)
+  - [`ResolvedJuMPOptimiser`](@ref)
+  - [`AbstractResolvedRiskBudgeting`](@ref)
+"""
+abstract type AbstractResolved <: AbstractResult end
+"""
+$(DocStringExtensions.TYPEDEF)
+
+Holds the Resolved Constraint Block of the glossary: the data that a [`ConstraintBlock`](@ref) gives when it resolves against its own prior and rows.
+
+[`resolve_constraint_block`](@ref) makes it at stage 2 of the resolution, and a builder adds it to a programme. The JuMP head reads it in [`assemble_jump_model!`](@ref), and a [`ProgrammeAllocationSet`](@ref) reads it in [`assemble_allocation_set!`](@ref). So no builder resolves a slot again.
+
+The Result holds three kinds of data:
+
+ 1. The prior result `pr` and the rows `rd` of its block. A block that reads no rows holds `nothing` in both.
+ 2. The resolved slots. Each field holds the result of the slot of the block, and the five slots that change their name take the `r` of a result: `lcse` gives `lcsr`, `cte` gives `ctr`, `gcarde` gives `gcardr`, `sgcarde` gives `sgcardr` and `ple` gives `plr`. A Calibration Rule in `l2c`, `lpc`, `linfc`, `l1`, `l2`, `lp` or `linf` is resolved to its value.
+ 3. The settings that need no resolution: `card`, `scard`, `ss`, `xbgt`, `sbgt`, `gbgt`, `ccnt` and `cobj`.
+
+The tracking errors `tr` and the names `sets` are not fields. The builder of the tracking errors binds them to the rows of the Result, and no builder reads `sets`.
+
+# Fields
+
+$(DocStringExtensions.FIELDS)
+
+# Constructors
+
+    ResolvedConstraintBlock(; pr, rd, wb, lt, st, lcsr, ctr, gcardr, sgcardr, smtx, sgmtx, slt,
+                            sst, sglt, sgst, tn, plr, l2c, lpc, linfc, l1, l2, lp, linf, card,
+                            scard, ss, xbgt, sbgt, gbgt, ccnt, cobj) -> ResolvedConstraintBlock
+
+Keywords correspond to the struct's fields, and each keyword has no default. Make the Result with [`resolve_constraint_block`](@ref). The constructor checks the type of each field, so a slot that holds an estimator raises a `TypeError`. It checks no value, because the resolution checked the values.
+
+# Related
+
+  - [`ConstraintBlock`](@ref)
+  - [`resolve_constraint_block`](@ref)
+  - [`resolve_constraint_block_names`](@ref)
+  - [`ResolvedJuMPOptimiser`](@ref)
+"""
+@concrete struct ResolvedConstraintBlock <: AbstractResolved
+    """
+    $(field_dict[:pr]) The prior of the block, or `nothing` when the block reads no rows.
+    """
+    pr
+    """
+    $(field_dict[:rd]) The rows of the block, or `nothing` when the block reads no rows.
+    """
+    rd
+    """
+    $(field_dict[:wb])
+    """
+    wb
+    """
+    $(field_dict[:lt])
+    """
+    lt
+    """
+    $(field_dict[:st])
+    """
+    st
+    """
+    $(field_dict[:lcsr])
+    """
+    lcsr
+    """
+    $(field_dict[:ctr])
+    """
+    ctr
+    """
+    $(field_dict[:gcardr])
+    """
+    gcardr
+    """
+    $(field_dict[:sgcardr])
+    """
+    sgcardr
+    """
+    $(field_dict[:smtx])
+    """
+    smtx
+    """
+    $(field_dict[:sgmtx])
+    """
+    sgmtx
+    """
+    $(field_dict[:slt])
+    """
+    slt
+    """
+    $(field_dict[:sst])
+    """
+    sst
+    """
+    $(field_dict[:sglt])
+    """
+    sglt
+    """
+    $(field_dict[:sgst])
+    """
+    sgst
+    """
+    $(field_dict[:tnr])
+    """
+    tn
+    """
+    $(field_dict[:plr])
+    """
+    plr
+    """
+    $(field_dict[:l2c])
+    """
+    l2c
+    """
+    $(field_dict[:lpc])
+    """
+    lpc
+    """
+    $(field_dict[:linfc])
+    """
+    linfc
+    """
+    $(field_dict[:l1])
+    """
+    l1
+    """
+    $(field_dict[:l2])
+    """
+    l2
+    """
+    $(field_dict[:lp])
+    """
+    lp
+    """
+    $(field_dict[:linf])
+    """
+    linf
+    """
+    $(field_dict[:card])
+    """
+    card
+    """
+    $(field_dict[:scard])
+    """
+    scard
+    """
+    $(field_dict[:ss])
+    """
+    ss
+    """
+    $(field_dict[:xbgt])
+    """
+    xbgt
+    """
+    $(field_dict[:sbgt])
+    """
+    sbgt
+    """
+    $(field_dict[:gbgt])
+    """
+    gbgt
+    """
+    $(field_dict[:ccnt])
+    """
+    ccnt
+    """
+    $(field_dict[:cobj])
+    """
+    cobj
+    function ResolvedConstraintBlock(pr::Option{<:AbstractPriorResult},
+                                     rd::Option{<:ReturnsResult},
+                                     wb::Option{<:WeightBounds}, lt::Option{<:Threshold},
+                                     st::Option{<:Threshold}, lcsr::Option{<:Lc_VecLc},
+                                     ctr::Option{<:Lc_CC_VecCC},
+                                     gcardr::Option{<:LinearConstraint},
+                                     sgcardr::Option{<:Lc_VecLc},
+                                     smtx::Option{<:MatNum_VecMatNum},
+                                     sgmtx::Option{<:MatNum_VecMatNum},
+                                     slt::Option{<:Bt_VecOptBt}, sst::Option{<:Bt_VecOptBt},
+                                     sglt::Option{<:Bt_VecOptBt},
+                                     sgst::Option{<:Bt_VecOptBt}, tn::Option{<:Tn_VecTn},
+                                     plr::Option{<:PlC_VecPlC}, l2c::Option{<:Number},
+                                     lpc::Option{<:LpReg_VecLpReg}, linfc::Option{<:Number},
+                                     l1::Option{<:Number}, l2::Option{<:L2Reg_VecL2Reg},
+                                     lp::Option{<:LpReg_VecLpReg}, linf::Option{<:Number},
+                                     card::Option{<:Integer}, scard::Option{<:Int_VecInt},
+                                     ss::Option{<:Number}, xbgt::Bool,
+                                     sbgt::Option{<:Num_BgtRg}, gbgt::Option{<:Num_BgtRg},
+                                     ccnt::Option{<:JuMPConstr_VecJuMPConstr},
+                                     cobj::Option{<:JuMPObj_VecJuMPObj})
+        return new{typeof(pr), typeof(rd), typeof(wb), typeof(lt), typeof(st), typeof(lcsr),
+                   typeof(ctr), typeof(gcardr), typeof(sgcardr), typeof(smtx),
+                   typeof(sgmtx), typeof(slt), typeof(sst), typeof(sglt), typeof(sgst),
+                   typeof(tn), typeof(plr), typeof(l2c), typeof(lpc), typeof(linfc),
+                   typeof(l1), typeof(l2), typeof(lp), typeof(linf), typeof(card),
+                   typeof(scard), typeof(ss), typeof(xbgt), typeof(sbgt), typeof(gbgt),
+                   typeof(ccnt), typeof(cobj)}(pr, rd, wb, lt, st, lcsr, ctr, gcardr,
+                                               sgcardr, smtx, sgmtx, slt, sst, sglt, sgst,
+                                               tn, plr, l2c, lpc, linfc, l1, l2, lp, linf,
+                                               card, scard, ss, xbgt, sbgt, gbgt, ccnt,
+                                               cobj)
+    end
+end
+function ResolvedConstraintBlock(; pr::Option{<:AbstractPriorResult},
+                                 rd::Option{<:ReturnsResult}, wb::Option{<:WeightBounds},
+                                 lt::Option{<:Threshold}, st::Option{<:Threshold},
+                                 lcsr::Option{<:Lc_VecLc}, ctr::Option{<:Lc_CC_VecCC},
+                                 gcardr::Option{<:LinearConstraint},
+                                 sgcardr::Option{<:Lc_VecLc},
+                                 smtx::Option{<:MatNum_VecMatNum},
+                                 sgmtx::Option{<:MatNum_VecMatNum},
+                                 slt::Option{<:Bt_VecOptBt}, sst::Option{<:Bt_VecOptBt},
+                                 sglt::Option{<:Bt_VecOptBt}, sgst::Option{<:Bt_VecOptBt},
+                                 tn::Option{<:Tn_VecTn}, plr::Option{<:PlC_VecPlC},
+                                 l2c::Option{<:Number}, lpc::Option{<:LpReg_VecLpReg},
+                                 linfc::Option{<:Number}, l1::Option{<:Number},
+                                 l2::Option{<:L2Reg_VecL2Reg}, lp::Option{<:LpReg_VecLpReg},
+                                 linf::Option{<:Number}, card::Option{<:Integer},
+                                 scard::Option{<:Int_VecInt}, ss::Option{<:Number},
+                                 xbgt::Bool, sbgt::Option{<:Num_BgtRg},
+                                 gbgt::Option{<:Num_BgtRg},
+                                 ccnt::Option{<:JuMPConstr_VecJuMPConstr},
+                                 cobj::Option{<:JuMPObj_VecJuMPObj})::ResolvedConstraintBlock
+    return ResolvedConstraintBlock(pr, rd, wb, lt, st, lcsr, ctr, gcardr, sgcardr, smtx,
+                                   sgmtx, slt, sst, sglt, sgst, tn, plr, l2c, lpc, linfc,
+                                   l1, l2, lp, linf, card, scard, ss, xbgt, sbgt, gbgt,
+                                   ccnt, cobj)
+end
+"""
+    const VecRcb = AbstractVector{<:ResolvedConstraintBlock}
+
+Every abstract vector whose elements are [`ResolvedConstraintBlock`](@ref)s. A programme with more than one Constraint Block holds one Result for each block.
+
+# Related
+
+  - [`ResolvedConstraintBlock`](@ref)
+  - [`Rcb_VecRcb`](@ref)
+"""
+const VecRcb = AbstractVector{<:ResolvedConstraintBlock}
+"""
+    const Rcb_VecRcb = Union{ResolvedConstraintBlock, VecRcb}
+
+One [`ResolvedConstraintBlock`](@ref), or a vector of them. The field `cbr` of [`ResolvedJuMPOptimiser`](@ref) takes this type, as `plr` takes one phylogeny Result or a vector.
+
+# Related
+
+  - [`ResolvedConstraintBlock`](@ref)
+  - [`VecRcb`](@ref)
+  - [`ResolvedJuMPOptimiser`](@ref)
+"""
+const Rcb_VecRcb = Union{ResolvedConstraintBlock, VecRcb}
+"""
+$(DocStringExtensions.TYPEDSIGNATURES)
+
+Resolves the slots of a [`ConstraintBlock`](@ref) that hold a name or an estimator over `sets`. This is stage 1 of the resolution.
+
+Stage 1 is configuration. It gives the block with values in its slots, and it holds no Result. It runs before the reduction to the Investable Mask, over the universe of the caller, where every name of `sets` is an asset of the caller. The reduction then views each value at the mask, see `port_opt_view(cbe::ConstraintBlock, i, args...)`. A JuMP head runs it once for each `optimise` call, and an online head runs it once for each fold, in [`resolve_allocation_set`](@ref).
+
+A slot is a stage 1 slot when its value follows a view at the mask, so the two orders of the names and the reduction give one value. The other slots resolve at stage 2, in [`resolve_constraint_block`](@ref), after the reduction:
+
+  - `wb` and `lcse`, because their resolvers read the rows `rd`.
+  - `gcarde`, because it resolves to a [`LinearConstraint`](@ref) over the assets, and a view does not narrow its matrix. At stage 2 it resolves over the `sets` that carry the Non-Investable Axis.
+  - `cte`, `ple` and the slots that can hold a Calibration Rule, because they read the prior.
+
+# Algorithm
+
+ 1. Resolve the thresholds `lt` and `st` with [`threshold_constraints`](@ref).
+ 2. Resolve the sub-grouped cardinality constraint `sgcarde` with [`linear_constraints`](@ref), with integer values. Its columns are the sub-groups and not the assets, so a view does not change it.
+ 3. Resolve the sub-group matrices `smtx` and `sgmtx` with [`asset_sets_matrix`](@ref), and the sub-group thresholds `slt`, `sst`, `sglt` and `sgst` with [`threshold_constraints`](@ref). When the two slots of a pair hold one object, resolve it once with [`shared_pair_resolution`](@ref).
+ 4. Resolve the turnover constraints `tn` with [`turnover_constraints`](@ref).
+ 5. Return `cbe` rebuilt with the resolved slots, with [`rebuild_estimator`](@ref).
+
+# Arguments
+
+  - `cbe`: The block.
+  - $(arg_dict[:strict])
+  - `datatype`: The element type of the resolved values.
+
+# Returns
+
+  - `cbe'::ConstraintBlock`: The block with its stage 1 slots resolved.
+
+# Related
+
+  - [`resolve_constraint_block`](@ref)
+  - [`ConstraintBlock`](@ref)
+  - [`resolve_jump_optimiser`](@ref)
+  - [`resolve_allocation_set`](@ref)
+"""
+function resolve_constraint_block_names(cbe::ConstraintBlock, strict::Bool,
+                                        datatype::DataType)::ConstraintBlock
+    sets = cbe.sets
+    thr = x -> threshold_constraints(x, sets; datatype = datatype, strict = strict)
+    smtx, sgmtx = shared_pair_resolution(x -> asset_sets_matrix(x, sets), cbe.smtx,
+                                         cbe.sgmtx)
+    slt, sglt = shared_pair_resolution(thr, cbe.slt, cbe.sglt)
+    sst, sgst = shared_pair_resolution(thr, cbe.sst, cbe.sgst)
+    return rebuild_estimator(cbe,
+                             (; lt = thr(cbe.lt), st = thr(cbe.st),
+                              sgcarde = linear_constraints(cbe.sgcarde, sets;
+                                                           datatype = Int, strict = strict),
+                              smtx, sgmtx, slt, sst, sglt, sgst,
+                              tn = turnover_constraints(cbe.tn, sets; datatype = datatype,
+                                                        strict = strict)))
+end
+"""
+$(DocStringExtensions.TYPEDSIGNATURES)
+
+Resolves two slots of a [`ConstraintBlock`](@ref) that can hold the same object, with one resolver.
+
+When the two slots hold one object, the function resolves it once, so the two results are one object too. The check of the shapes of a sub-group slot and its sub-grouped twin then sees one object, as [`shared_pair_view`](@ref) keeps it for a view.
+
+# Arguments
+
+  - `f`: The resolver of one slot.
+  - `a`, `b`: The values of the two slots.
+
+# Returns
+
+  - `(ra, rb)::Tuple`: The results of `a` and `b`.
+
+# Related
+
+  - [`resolve_constraint_block_names`](@ref)
+  - [`shared_pair_view`](@ref)
+"""
+function shared_pair_resolution(f, a, b)::Tuple
+    if a === b
+        v = f(a)
+        return v, v
+    end
+    return f(a), f(b)
+end
+"""
+    resolve_constraint_block(cbe::ConstraintBlock, pr::AbstractPriorResult, rd::ReturnsResult;
+                             slv, strict::Bool = false, kwargs...) -> ResolvedConstraintBlock
+    resolve_constraint_block(cbe::ConstraintBlock, pr::Nothing, rd::Option{<:ReturnsResult};
+                             strict::Bool = false, kwargs...) -> ResolvedConstraintBlock
+    resolve_constraint_block(cbe::ConstraintBlock, pr::AbstractPriorResult, rd::Nothing;
+                             kwargs...)
+
+Resolves a [`ConstraintBlock`](@ref) against its own prior and rows, to its [`ResolvedConstraintBlock`](@ref). This is stage 2 of the resolution.
+
+Both owners of a block call it. [`resolve_jump_optimiser`](@ref) calls it once for each `optimise` call, and [`assemble_allocation_set!`](@ref) calls it at each step of an online head. The block must hold the result of stage 1, [`resolve_constraint_block_names`](@ref), viewed at the Investable Mask of `pr`. So `pr`, `rd` and the block are on the investable assets. A slot that still holds an estimator of stage 1 raises a `TypeError` in the constructor of the Result.
+
+One rule orders the names and the reduction for every block. Stage 1 resolves before the reduction, and a view at the mask follows its values. This function resolves after the reduction, over the `sets` of the block, which carry the Non-Investable Axis. So a name that left the investable universe drops its row and is not refused, and a precomputed constraint keeps its width. [`assert_investable_constraint_width`](@ref) then refuses a precomputed `lcse` or `gcarde` whose width is not the number of assets of the block.
+
+The method for `pr = nothing` is the method of a programme set that reads no rows, see [`rows_needed`](@ref). Its prior-reading slots hold values that read no prior, so it resolves the slots that read names alone, and keeps every other slot. Its Result holds no prior and no rows.
+
+# Algorithm
+
+The method on a prior result runs these steps.
+
+ 1. Resolve the weight bounds `wb` with [`weight_bounds_constraints`](@ref), with the rows `rd` and the `N` assets of `pr.X`.
+ 2. Resolve `lcse` with [`linear_constraints`](@ref), with the factor regression `pr.rr` and the rows, and `gcarde` with integer values. Check the width of both results with [`assert_investable_constraint_width`](@ref).
+ 3. Fit the centrality rows `ctr` with [`centrality_constraints`](@ref) and the phylogeny result `plr` with [`phylogeny_constraints`](@ref). Each reads the prior, the rows and the implied volatilities `rd.iv` and `rd.ivpa`. A reader that cannot estimate an asset raises a [`DistanceReaderRefusalError`](@ref), which the caller catches.
+ 4. Resolve each Calibration Rule against the prior and the solver `slv`. The norm ceilings `l2c` and `linfc` state their norm order in a [`CalibrationContext`](@ref), and `lpc` goes through [`norm_ceiling_factory`](@ref). The penalties `l1` and `linf` go through [`resolve_calibration_slot`](@ref), and `l2` and `lp` through their own `factory`.
+ 5. Check the four slots that hold a number, `l2c`, `linfc`, `l1` and `linf`, with [`assert_nonempty_gt0_finite_val`](@ref). A rule states no number at construction, so this is the first point that knows the number.
+ 6. Return the Result, with the stage 1 slots and the settings of `cbe`, `pr` and `rd`.
+
+# Arguments
+
+  - `cbe`: The block, after stage 1 and the view at the mask.
+  - `pr`: The prior result of the block, or `nothing` when the block reads no rows.
+  - `rd`: The rows of the block. The method for `pr = nothing` reads only their element type and their width, and it takes `nothing` outside an Online Update.
+  - `slv`: The solver of the owner, which a Calibration Rule resolves against.
+  - $(arg_dict[:strict])
+  - `kwargs...`: Passed to [`centrality_constraints`](@ref) and [`phylogeny_constraints`](@ref).
+
+# Validation
+
+  - The rules of [`assert_investable_constraint_width`](@ref) for `lcsr` and `gcardr`. The method for `pr = nothing` checks them when it has rows.
+  - `l2c`, `linfc`, `l1` and `linf` are `nothing` or finite and `> 0` after the resolution. A `DomainError` or an `IsNonFiniteError` is thrown otherwise.
+  - A prior result with no rows. An `IsNothingError` is thrown. The prior of a block is fitted on its rows, so this pair does not occur in the library.
+
+# Returns
+
+  - `cbr::ResolvedConstraintBlock`: The Result of the block.
+
+# Related
+
+  - [`ResolvedConstraintBlock`](@ref)
+  - [`resolve_constraint_block_names`](@ref)
+  - [`resolve_jump_optimiser`](@ref)
+  - [`assemble_allocation_set!`](@ref)
+"""
+function resolve_constraint_block(cbe::ConstraintBlock, pr::AbstractPriorResult,
+                                  rd::ReturnsResult; slv, strict::Bool = false,
+                                  kwargs...)::ResolvedConstraintBlock
+    datatype = eltype(pr.X)
+    N = size(pr.X, 2)
+    sets = cbe.sets
+    lcsr = linear_constraints(cbe.lcse, sets; datatype = datatype, strict = strict,
+                              rr = pr.rr, rd = rd)
+    gcardr = linear_constraints(cbe.gcarde, sets; datatype = Int, strict = strict)
+    assert_investable_constraint_width(lcsr, N, "lcse")
+    assert_investable_constraint_width(gcardr, N, "gcarde")
+    l2c = resolve_calibration_slot(cbe.l2c, :l2c, pr, pr.w, slv,
+                                   CalibrationContext(; p = 2))
+    linfc = resolve_calibration_slot(cbe.linfc, :linfc, pr, pr.w, slv,
+                                     CalibrationContext(; p = Inf))
+    l1 = resolve_calibration_slot(cbe.l1, :l1, pr, pr.w, slv)
+    linf = resolve_calibration_slot(cbe.linf, :linf, pr, pr.w, slv)
+    # A rule states no number at construction, so the four numbers that reach the model raw
+    # are checked here, where the rule first gives them.
+    map(((l2c, :l2c), (linfc, :linfc), (l1, :l1), (linf, :linf))) do (x, name)
+        return assert_nonempty_gt0_finite_val(x, name)
+    end
+    vals = (;
+            wb = weight_bounds_constraints(cbe.wb, sets; rd = rd, N = N, strict = strict,
+                                           datatype = datatype), lcsr, gcardr,
+            ctr = centrality_constraints(cbe.cte, pr; iv = rd.iv, ivpa = rd.ivpa, rd = rd,
+                                         strict = strict, kwargs...),
+            plr = phylogeny_constraints(cbe.ple, pr; iv = rd.iv, ivpa = rd.ivpa, rd = rd,
+                                        kwargs...), l2c,
+            lpc = norm_ceiling_factory(cbe.lpc, pr, slv), linfc, l1,
+            l2 = factory(cbe.l2, pr, slv), lp = factory(cbe.lp, pr, slv), linf)
+    return resolved_constraint_block(cbe, pr, rd, vals)
+end
+function resolve_constraint_block(::ConstraintBlock, ::AbstractPriorResult, ::Nothing;
+                                  kwargs...)
+    return throw(IsNothingError("the prior result of a block is fitted on its rows, so a block with a prior and no rows cannot resolve the slots that read the rows."))
+end
+function resolve_constraint_block(cbe::ConstraintBlock, ::Nothing,
+                                  rd::Option{<:ReturnsResult}; strict::Bool = false,
+                                  kwargs...)::ResolvedConstraintBlock
+    sets = cbe.sets
+    lcsr = linear_constraints(cbe.lcse, sets; strict = strict, rows_datatype(rd)...)
+    gcardr = linear_constraints(cbe.gcarde, sets; datatype = Int, strict = strict)
+    assert_rows_constraint_width(lcsr, gcardr, rd)
+    vals = (; wb = cbe.wb, lcsr, gcardr, ctr = cbe.cte, plr = cbe.ple, l2c = cbe.l2c,
+            lpc = cbe.lpc, linfc = cbe.linfc, l1 = cbe.l1, l2 = cbe.l2, lp = cbe.lp,
+            linf = cbe.linf)
+    return resolved_constraint_block(cbe, nothing, nothing, vals)
+end
+"""
+    rows_datatype(rd::Nothing)
+    rows_datatype(rd::ReturnsResult)
+
+Returns the element type of the rows of a block that reads no prior, as a keyword of a resolver.
+
+A block with no prior and no rows passes no keyword, so the resolver takes its own default.
+
+# Returns
+
+  - `kw::NamedTuple`: `(; datatype = eltype(rd.X))`, or an empty tuple when `rd` is `nothing`.
+
+# Related
+
+  - [`resolve_constraint_block`](@ref)
+"""
+function rows_datatype(::Nothing)::NamedTuple
+    return (;)
+end
+function rows_datatype(rd::ReturnsResult)::NamedTuple
+    return (; datatype = eltype(rd.X))
+end
+"""
+    assert_rows_constraint_width(lcsr, gcardr, rd::Nothing)
+    assert_rows_constraint_width(lcsr, gcardr, rd::ReturnsResult)
+
+Checks the width of the linear constraints of a block that reads no prior, against the columns of its rows.
+
+A block with no rows has no width to check against, and the model refuses a wrong width.
+
+# Validation
+
+  - The rules of [`assert_investable_constraint_width`](@ref), with `N = size(rd.X, 2)`.
+
+# Returns
+
+  - `nothing`.
+
+# Related
+
+  - [`resolve_constraint_block`](@ref)
+"""
+function assert_rows_constraint_width(::Any, ::Any, ::Nothing)::Nothing
+    return nothing
+end
+function assert_rows_constraint_width(lcsr, gcardr, rd::ReturnsResult)::Nothing
+    N = size(rd.X, 2)
+    assert_investable_constraint_width(lcsr, N, "lcse")
+    assert_investable_constraint_width(gcardr, N, "gcarde")
+    return nothing
+end
+"""
+$(DocStringExtensions.TYPEDSIGNATURES)
+
+Builds the [`ResolvedConstraintBlock`](@ref) from the values of stage 2 and the slots of the block that stage 2 does not resolve.
+
+Both methods of [`resolve_constraint_block`](@ref) call it, so the list of the stage 1 slots and of the settings is written once.
+
+# Arguments
+
+  - `cbe`: The block, after stage 1 and the view at the mask.
+  - `pr`: The prior result of the block, or `nothing`.
+  - `rd`: The rows of the block, or `nothing`.
+  - `vals`: The values of stage 2: `wb`, `lcsr`, `gcardr`, `ctr`, `plr`, `l2c`, `lpc`, `linfc`, `l1`, `l2`, `lp` and `linf`.
+
+# Returns
+
+  - `cbr::ResolvedConstraintBlock`: The Result of the block.
+
+# Related
+
+  - [`resolve_constraint_block`](@ref)
+"""
+function resolved_constraint_block(cbe::ConstraintBlock, pr, rd,
+                                   vals::NamedTuple)::ResolvedConstraintBlock
+    return ResolvedConstraintBlock(; pr = pr, rd = rd, vals..., lt = cbe.lt, st = cbe.st,
+                                   sgcardr = cbe.sgcarde, smtx = cbe.smtx,
+                                   sgmtx = cbe.sgmtx, slt = cbe.slt, sst = cbe.sst,
+                                   sglt = cbe.sglt, sgst = cbe.sgst, tn = cbe.tn,
+                                   card = cbe.card, scard = cbe.scard, ss = cbe.ss,
+                                   xbgt = cbe.xbgt, sbgt = cbe.sbgt, gbgt = cbe.gbgt,
+                                   ccnt = cbe.ccnt, cobj = cbe.cobj)
+end
+"""
+$(DocStringExtensions.TYPEDSIGNATURES)
+
+Returns a copy of `cbe` whose slots hold the values of its [`ResolvedConstraintBlock`](@ref).
+
+[`jump_optimiser_from_attributes`](@ref) calls it to build the optimiser of a sub-problem from the Result of a fit. The Result holds no estimator, so the sub-problem resolves no slot again: the resolvers of both stages give a resolved value back.
+
+The function maps each field of the Result onto the slot of the same name, and five fields onto a slot with another name: `lcsr` onto `lcse`, `ctr` onto `cte`, `gcardr` onto `gcarde`, `sgcardr` onto `sgcarde` and `plr` onto `ple`. It derives the list from the fields of the Result, so it drops no field. A field with no slot raises a `MethodError` in the keyword constructor of the block. The prior `pr` and the rows `rd` have no slot, and the function leaves them out. A slot with no field, `tr` or `sets`, keeps its value in `cbe`.
+
+# Arguments
+
+  - `cbe`: The block of the optimiser that the sub-problem copies.
+  - `cbr`: The Result of the block.
+
+# Returns
+
+  - `cbe'::ConstraintBlock`: The block with the values of `cbr` in its slots.
+
+# Related
+
+  - [`ResolvedConstraintBlock`](@ref)
+  - [`jump_optimiser_from_attributes`](@ref)
+"""
+function constraint_block_from_resolved(cbe::ConstraintBlock,
+                                        cbr::ResolvedConstraintBlock)::ConstraintBlock
+    rename = (; lcsr = :lcse, ctr = :cte, gcardr = :gcarde, sgcardr = :sgcarde, plr = :ple)
+    rf = filter(f -> f !== :pr && f !== :rd, fieldnames(ResolvedConstraintBlock))
+    slots = NamedTuple{map(f -> get(rename, f, f), rf)}(map(f -> getfield(cbr, f), rf))
+    return rebuild_estimator(cbe, slots)
+end
+
+export ConstraintBlock, ResolvedConstraintBlock

@@ -458,7 +458,7 @@ pass `pr.X`, which is the documented `MatNum` arity.
     # constraints, and a solve would only add tolerance to the comparison.
     function build(r)
         mr = MeanRisk(; r = r, opt = JuMPOptimiser(; slv = slv))
-        attrs = PO.processed_jump_optimiser_attributes(mr.opt, rd; dims = 1)
+        attrs = PO.resolve_jump_optimiser(mr.opt, rd; dims = 1)
         model = PO.JuMP.Model()
         PO.JuMP.set_string_names_on_creation(model, false)
         PO.set_model_scales!(model, mr.opt.sc, mr.opt.so)

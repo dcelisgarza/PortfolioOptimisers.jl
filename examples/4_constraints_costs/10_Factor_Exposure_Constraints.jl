@@ -113,7 +113,7 @@ are the baseline that each mandate below changes.
 opt_base = JuMPOptimiser(; pe = FactorPrior(), slv = slv, sets = sets)
 res_base = optimise(MeanRisk(; obj = MinimumRisk(), opt = opt_base), rd)
 
-exposures(res) = transpose(res.pa.pr.rr.M) * res.w
+exposures(res) = transpose(res.jor.pr.rr.M) * res.w
 
 pretty_table(DataFrame("Factor" => rd.nf, "Baseline" => exposures(res_base));
              formatters = [resfmt], title = "Baseline factor exposures")
@@ -151,7 +151,7 @@ weights, and the result stores it in `pa.lcsr`, as it stores any linear constrai
 coefficients of the row.
 =#
 
-res_mtum.pa.lcsr.ineq.A
+res_mtum.jor.lcsr.ineq.A
 
 #=
 ## 5. Factor groups need no extra code
@@ -280,7 +280,7 @@ res_fit = optimise(MeanRisk(; obj = MinimumRisk(),
                             opt = JuMPOptimiser(; pe = EmpiricalPrior(), slv = slv,
                                                 sets = sets, lcse = re_fit)), rd_b)
 
-isnothing(res_fit.pa.pr.rr)
+isnothing(res_fit.jor.pr.rr)
 
 #=
 We fit the same regression on the second half, and print the momentum exposure of each portfolio

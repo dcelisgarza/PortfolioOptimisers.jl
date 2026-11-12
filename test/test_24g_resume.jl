@@ -125,7 +125,7 @@ assets is what keeps the JuMP families cheap.
         # resumed fold's turnover target is the old run's last weights.
         old = cross_val_predict(tn, rd_T, online_cv)
         new = cross_val_predict(Resume(old), rd, online_cv)
-        @test new.pred[1].res.jr.pa.tn.w == old.pred[end].res.w
+        @test new.pred[1].res.jr.jor.tn.w == old.pred[end].res.w
         # And the resumed arm announces nothing: a `Resume` is declared by name.
         @test_logs cross_val_predict(Resume(old), rd, online_cv)
     end
@@ -164,7 +164,7 @@ assets is what keeps the JuMP families cheap.
         same_weights(vcat(old, new), one, tn)
         @test all(isapprox(a.hw.w, b.hw.w; atol = 1e-5)
                   for (a, b) in zip(vcat(old, new).pred, one.pred))
-        @test new.pred[1].res.jr.pa.tn.w == old.pred[end].hw.w
+        @test new.pred[1].res.jr.jor.tn.w == old.pred[end].hw.w
     end
 
     @testset "A Result is a value: resumed twice, and a resume resumed" begin
@@ -230,9 +230,9 @@ assets is what keeps the JuMP families cheap.
         mid_failed = MultiPeriodPredictionResult(; pred = [failed], id = nothing,
                                                  opt = mid.opt)
         alone = cross_val_predict(Resume(mid_failed), rd, online_cv)
-        @test alone.pred[1].res.jr.pa.tn.w == fill(inv(N), N)
+        @test alone.pred[1].res.jr.jor.tn.w == fill(inv(N), N)
         stacked = cross_val_predict(Resume(vcat(old, mid_failed)), rd, online_cv)
-        @test stacked.pred[1].res.jr.pa.tn.w == old.pred[end].res.w
+        @test stacked.pred[1].res.jr.jor.tn.w == old.pred[end].res.w
     end
 
     @testset "A deployment step in the value form leaves the Result resumable" begin

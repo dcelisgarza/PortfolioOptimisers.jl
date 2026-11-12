@@ -3,15 +3,15 @@ $(DocStringExtensions.TYPEDEF)
 
 Abstract supertype of the values that [`set_risk_budgeting_constraints!`](@ref) returns.
 
-A [`RiskBudgetingResult`](@ref) holds one of them in its field `prb`, so a caller can read the budget that the model used.
+A [`RiskBudgetingResult`](@ref) holds one of them in its field `rbr`, so a caller can read the budget that the model used.
 
 # Related
 
-  - [`ProcessedAssetRiskBudgetingAttributes`](@ref)
-  - [`ProcessedFactorRiskBudgetingAttributes`](@ref)
+  - [`ResolvedAssetRiskBudgeting`](@ref)
+  - [`ResolvedFactorRiskBudgeting`](@ref)
   - [`RiskBudgetingResult`](@ref)
 """
-abstract type ProcessedRiskBudgetingAttributes <: ProcessedAttributes end
+abstract type AbstractResolvedRiskBudgeting <: AbstractResolved end
 """
 $(DocStringExtensions.TYPEDEF)
 
@@ -23,9 +23,9 @@ $(DocStringExtensions.FIELDS)
 
 # Constructors
 
-    ProcessedFactorRiskBudgetingAttributes(;
+    ResolvedFactorRiskBudgeting(;
         rkb::RiskBudget, b1::MatNum, rr::AbstractLoadingsRegressionResult
-    ) -> ProcessedFactorRiskBudgetingAttributes
+    ) -> ResolvedFactorRiskBudgeting
 
 Keywords correspond to the struct's fields.
 
@@ -35,7 +35,7 @@ Keywords correspond to the struct's fields.
   - [`FactorRiskBudgeting`](@ref)
   - [`set_factor_risk_contribution_constraints!`](@ref)
 """
-@concrete struct ProcessedFactorRiskBudgetingAttributes <: ProcessedRiskBudgetingAttributes
+@concrete struct ResolvedFactorRiskBudgeting <: AbstractResolvedRiskBudgeting
     """
     The [`RiskBudget`](@ref) of the factors, one entry for each column of `rr.L`.
     """
@@ -48,14 +48,14 @@ Keywords correspond to the struct's fields.
     The loadings regression that `b1` comes from. Its `L` is ``\\mathbf{B}``.
     """
     rr
-    function ProcessedFactorRiskBudgetingAttributes(rkb::RiskBudget, b1::MatNum,
-                                                    rr::AbstractLoadingsRegressionResult)
+    function ResolvedFactorRiskBudgeting(rkb::RiskBudget, b1::MatNum,
+                                         rr::AbstractLoadingsRegressionResult)
         return new{typeof(rkb), typeof(b1), typeof(rr)}(rkb, b1, rr)
     end
 end
-function ProcessedFactorRiskBudgetingAttributes(; rkb::RiskBudget, b1::MatNum,
-                                                rr::AbstractLoadingsRegressionResult)::ProcessedFactorRiskBudgetingAttributes
-    return ProcessedFactorRiskBudgetingAttributes(rkb, b1, rr)
+function ResolvedFactorRiskBudgeting(; rkb::RiskBudget, b1::MatNum,
+                                     rr::AbstractLoadingsRegressionResult)::ResolvedFactorRiskBudgeting
+    return ResolvedFactorRiskBudgeting(rkb, b1, rr)
 end
 """
 $(DocStringExtensions.TYPEDEF)
@@ -68,7 +68,7 @@ $(DocStringExtensions.FIELDS)
 
 # Constructors
 
-    ProcessedAssetRiskBudgetingAttributes(; rkb::RiskBudget) -> ProcessedAssetRiskBudgetingAttributes
+    ResolvedAssetRiskBudgeting(; rkb::RiskBudget) -> ResolvedAssetRiskBudgeting
 
 Keywords correspond to the struct's fields.
 
@@ -77,25 +77,24 @@ Keywords correspond to the struct's fields.
   - [`RiskBudgeting`](@ref)
   - [`AssetRiskBudgeting`](@ref)
 """
-@concrete struct ProcessedAssetRiskBudgetingAttributes <: ProcessedRiskBudgetingAttributes
+@concrete struct ResolvedAssetRiskBudgeting <: AbstractResolvedRiskBudgeting
     """
     The [`RiskBudget`](@ref) of the assets, one entry for each asset.
     """
     rkb
-    function ProcessedAssetRiskBudgetingAttributes(rkb::RiskBudget)
+    function ResolvedAssetRiskBudgeting(rkb::RiskBudget)
         return new{typeof(rkb)}(rkb)
     end
 end
-function ProcessedAssetRiskBudgetingAttributes(;
-                                               rkb::RiskBudget)::ProcessedAssetRiskBudgetingAttributes
-    return ProcessedAssetRiskBudgetingAttributes(rkb)
+function ResolvedAssetRiskBudgeting(; rkb::RiskBudget)::ResolvedAssetRiskBudgeting
+    return ResolvedAssetRiskBudgeting(rkb)
 end
 """
 $(DocStringExtensions.TYPEDEF)
 
 Holds the solution, the resolved risk measures, the budget and the fallback chain of a Risk Budgeting optimisation.
 
-[`optimise`](@ref) returns it for a [`RiskBudgeting`](@ref). A name that is not a field resolves through `prb` first, so `res.rkb` is the budget of the model. Every other name, and the property `w`, then resolves through `jr`, the [`JuMPOptimisationResult`](@ref) that the result holds.
+[`optimise`](@ref) returns it for a [`RiskBudgeting`](@ref). A name that is not a field resolves through `rbr` first, so `res.rkb` is the budget of the model. Every other name, and the property `w`, then resolves through `jr`, the [`JuMPOptimisationResult`](@ref) that the result holds.
 
 # Fields
 
@@ -106,7 +105,7 @@ $(DocStringExtensions.FIELDS)
     RiskBudgetingResult(;
         jr::JuMPOptimisationResult,
         r::BaseRM_VecBaseRM,
-        prb::ProcessedRiskBudgetingAttributes,
+        rbr::AbstractResolvedRiskBudgeting,
         fb::Option{<:OptE_Opt_FbChain}
     ) -> RiskBudgetingResult
 
@@ -129,30 +128,30 @@ Keywords correspond to the struct's fields.
     """
     r::BaseRM_VecBaseRM
     """
-    $(field_dict[:prb])
+    $(field_dict[:rbr])
     """
-    prb
+    rbr
     """
     $(field_dict[:fb_res])
     """
     fb
     function RiskBudgetingResult(jr::JuMPOptimisationResult, r::BaseRM_VecBaseRM,
-                                 prb::ProcessedRiskBudgetingAttributes,
+                                 rbr::AbstractResolvedRiskBudgeting,
                                  fb::Option{<:OptE_Opt_FbChain})
-        return new{typeof(jr), typeof(prb), typeof(fb)}(jr, r, prb, fb)
+        return new{typeof(jr), typeof(rbr), typeof(fb)}(jr, r, rbr, fb)
     end
 end
 function RiskBudgetingResult(; jr::JuMPOptimisationResult, r::BaseRM_VecBaseRM,
-                             prb::ProcessedRiskBudgetingAttributes,
+                             rbr::AbstractResolvedRiskBudgeting,
                              fb::Option{<:OptE_Opt_FbChain})::RiskBudgetingResult
-    return RiskBudgetingResult(jr, r, prb, fb)
+    return RiskBudgetingResult(jr, r, rbr, fb)
 end
 """
     set_retcode(res::RiskBudgetingResult, retcode::OptRetCode_VecOptRetCode)
 
 Rebuild a [`RiskBudgetingResult`](@ref) with a different return code.
 
-`retcode` is not a field of this result. It resolves through `jr`, the [`JuMPOptimisationResult`](@ref) that the result holds. So the method rebuilds `jr` with the new return code, and keeps `r`, `prb` and `fb` unchanged.
+`retcode` is not a field of this result. It resolves through `jr`, the [`JuMPOptimisationResult`](@ref) that the result holds. So the method rebuilds `jr` with the new return code, and keeps `r`, `rbr` and `fb` unchanged.
 
 # Arguments
 
@@ -170,12 +169,12 @@ Rebuild a [`RiskBudgetingResult`](@ref) with a different return code.
   - [`RiskBudgetingResult`](@ref)
 """
 function set_retcode(res::RiskBudgetingResult, retcode::OptRetCode_VecOptRetCode)
-    return RiskBudgetingResult(set_retcode(res.jr, retcode), res.r, res.prb, res.fb)
+    return RiskBudgetingResult(set_retcode(res.jr, retcode), res.r, res.rbr, res.fb)
 end
-# Unique field `prb` resolves directly; unknown properties forward into `prb` first, then
-# into the embedded [`JuMPOptimisationResult`](@ref) `jr` (the virtual `:w` and `pa` fall-through).
+# Unique field `rbr` resolves directly; unknown properties forward into `rbr` first, then
+# into the embedded [`JuMPOptimisationResult`](@ref) `jr` (the virtual `:w` and `jor` fall-through).
 @forward_properties RiskBudgetingResult begin
-    forward(prb)
+    forward(rbr)
     forward(jr)
 end
 """
@@ -1015,7 +1014,7 @@ Where:
 
 # Returns
 
-  - [`ProcessedAssetRiskBudgetingAttributes`](@ref) for [`AssetRiskBudgeting`](@ref), and [`ProcessedFactorRiskBudgetingAttributes`](@ref) for [`FactorRiskBudgeting`](@ref).
+  - [`ResolvedAssetRiskBudgeting`](@ref) for [`AssetRiskBudgeting`](@ref), and [`ResolvedFactorRiskBudgeting`](@ref) for [`FactorRiskBudgeting`](@ref).
 
 # Related
 
@@ -1034,7 +1033,7 @@ function set_risk_budgeting_constraints!(model::JuMP.Model,
     set_w!(model, pr.X, rb.wi)
     rkb = _set_risk_budgeting_constraints!(model, rb, get_w(model); strict = rb.opt.strict)
     set_weight_constraints!(model, wb, rb.opt, true)
-    return ProcessedAssetRiskBudgetingAttributes(; rkb = rkb)
+    return ResolvedAssetRiskBudgeting(; rkb = rkb)
 end
 function set_risk_budgeting_constraints!(model::JuMP.Model,
                                          rb::RiskBudgeting{<:Any, <:Any,
@@ -1052,7 +1051,7 @@ function set_risk_budgeting_constraints!(model::JuMP.Model,
     sc = get_constraint_scale(model)
     JuMP.@constraint(model, orthcrkb, sc * w >= 0)
     set_weight_constraints!(model, wb, rb.opt)
-    return ProcessedAssetRiskBudgetingAttributes(; rkb = rkb)
+    return ResolvedAssetRiskBudgeting(; rkb = rkb)
 end
 function set_risk_budgeting_constraints!(model::JuMP.Model,
                                          rb::RiskBudgeting{<:Any, <:Any,
@@ -1065,7 +1064,7 @@ function set_risk_budgeting_constraints!(model::JuMP.Model,
     rkb = _set_risk_budgeting_constraints!(model, rb, shared_get(model, :w1);
                                            strict = rb.opt.strict)
     set_weight_constraints!(model, wb, rb.opt)
-    return ProcessedFactorRiskBudgetingAttributes(; rkb = rkb, b1 = b1, rr = rr)
+    return ResolvedFactorRiskBudgeting(; rkb = rkb, b1 = b1, rr = rr)
 end
 """
     set_rb_mip_w!(model::JuMP.Model, X::MatNum)
@@ -1126,7 +1125,7 @@ function set_risk_budgeting_constraints!(model::JuMP.Model,
     rkb = _set_risk_budgeting_constraints!(model, rb, shared_get(model, :w_obj);
                                            strict = rb.opt.strict)
     set_weight_constraints!(model, wb, rb.opt)
-    return ProcessedAssetRiskBudgetingAttributes(; rkb = rkb)
+    return ResolvedAssetRiskBudgeting(; rkb = rkb)
 end
 """
     _optimise(rb::RiskBudgeting, rd::ReturnsResult = ReturnsResult(); str_names::Bool = false,
@@ -1139,14 +1138,14 @@ Build the model of a [`RiskBudgeting`](@ref), solve it, and return its result.
 # Algorithm
 
  1. Replace each schedule of `rb` with its static default through [`reset_time_dependent_estimator`](@ref).
- 2. Process the attributes of `rb.opt` against `rd` with [`processed_jump_optimiser_attributes`](@ref), giving `attrs`. It holds the prior, the weight bounds, the fees, the return terms and the Investable Mask.
+ 2. Process the attributes of `rb.opt` against `rd` with [`resolve_jump_optimiser`](@ref), giving `attrs`. It holds the prior, the weight bounds, the fees, the return terms and the Investable Mask.
  3. Take the view of `rb` and of `rd` at the investable assets with [`investable_view`](@ref). Both are unchanged when every asset is investable.
  4. Bind the benchmark of each [`DataBenchmarkTracking`](@ref) measure to `rd` with [`bind_data_benchmark`](@ref).
  5. Build a new model. Register the scales with [`set_model_scales!`](@ref) and the number of observations with [`set_model_observations!`](@ref).
- 6. Add the weights, the row of the logarithm and the weight constraints with [`set_risk_budgeting_constraints!`](@ref), giving `prb`.
+ 6. Add the weights, the row of the logarithm and the weight constraints with [`set_risk_budgeting_constraints!`](@ref), giving `rbr`.
  7. Add the constraints, the return terms and the risk measures with [`assemble_jump_model!`](@ref), under [`MinimumRisk`](@ref).
  8. Set the objective [`MinimumRisk`](@ref), and solve with [`optimise_JuMP_model!`](@ref), giving `retcode` and `sol`. [`process_model`](@ref) divides the unscaled weights by ``k``.
- 9. Build the result. It holds `attrs`, `retcode`, `sol`, the model when `save` is `true`, the risk measures resolved against the prior, and `prb`.
+ 9. Build the result. It holds `attrs`, `retcode`, `sol`, the model when `save` is `true`, the risk measures resolved against the prior, and `rbr`.
 
 # Arguments
 
@@ -1154,7 +1153,7 @@ Build the model of a [`RiskBudgeting`](@ref), solve it, and return its result.
   - $(arg_dict[:rd])
   - `str_names::Bool`: `true` gives each variable and each row of the model its string name.
   - `save::Bool`: `true` keeps the model in the result.
-  - `kwargs...`: Passed on to [`processed_jump_optimiser_attributes`](@ref).
+  - `kwargs...`: Passed on to [`resolve_jump_optimiser`](@ref).
 
 # Returns
 
@@ -1169,7 +1168,7 @@ Build the model of a [`RiskBudgeting`](@ref), solve it, and return its result.
 function _optimise(rb::RiskBudgeting, rd::ReturnsResult = ReturnsResult();
                    str_names::Bool = false, save::Bool = true, kwargs...)
     rb = reset_time_dependent_estimator(rb)
-    attrs = processed_jump_optimiser_attributes(rb.opt, rd; kwargs...)
+    attrs = resolve_jump_optimiser(rb.opt, rd; kwargs...)
     # The bundle reduced what it carries. The head carries the rest — an initial weight
     # vector, a risk measure holding per-asset data, tracking, a custom term — and hands
     # them to `assemble_jump_model!` itself, so it takes the same view of itself and of
@@ -1180,16 +1179,16 @@ function _optimise(rb::RiskBudgeting, rd::ReturnsResult = ReturnsResult();
     JuMP.set_string_names_on_creation(model, str_names)
     set_model_scales!(model, rb.opt.sc, rb.opt.so)
     set_model_observations!(model, size(attrs.pr.X, 1))
-    prb = set_risk_budgeting_constraints!(model, rb, attrs.pr, attrs.wb, rd)
+    rbr = set_risk_budgeting_constraints!(model, rb, attrs.pr, attrs.wb, rd)
     assemble_jump_model!(model, rb, rb.opt, attrs, rd, rb.r, MinimumRisk())
     set_portfolio_objective_function!(model, MinimumRisk(), rb, attrs)
     retcode, sol = optimise_JuMP_model!(model, rb, eltype(attrs.pr.X))
     return RiskBudgetingResult(;
-                               jr = JuMPOptimisationResult(; pa = attrs, retcode = retcode,
+                               jr = JuMPOptimisationResult(; jor = attrs, retcode = retcode,
                                                            sol = sol,
                                                            model = ifelse(save, model,
                                                                           nothing)),
-                               r = factory(rb.r, attrs.pr, rb.opt.slv), prb = prb,
+                               r = factory(rb.r, attrs.pr, rb.opt.slv), rbr = rbr,
                                fb = nothing)
 end
 """

@@ -121,7 +121,7 @@ The fixture is the online fold loop's, because the identities are structural.
             loop = po.fit_and_predict(opti, rd, cv)
             @test res.test_scores[:, i] == [-expected_risk(r, pr) for pr in loop.pred]
             # The loop threads fold `j - 1`'s held weights into fold `j`'s term.
-            @test all(j -> loop.pred[j].res.jr.pa.tn.w == loop.pred[j - 1].hw.w,
+            @test all(j -> loop.pred[j].res.jr.jor.tn.w == loop.pred[j - 1].hw.w,
                       2:length(loop.pred))
             hand = [-expected_risk(r,
                                    po.fit_and_predict(opti, rd;

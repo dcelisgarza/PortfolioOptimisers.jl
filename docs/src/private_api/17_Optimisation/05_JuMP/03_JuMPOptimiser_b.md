@@ -1,11 +1,11 @@
 ```@meta
-Description = "JuMP Optimiser (b), private API of PortfolioOptimisers.jl: processed_jump_optimiser_attributes, processed_jump_optimiser, assemble_jump_model!, …"
+Description = "JuMP Optimiser (b), private API of PortfolioOptimisers.jl: resolve_jump_optimiser, processed_jump_optimiser, assemble_jump_model!, set_risk_and_scalarise!, …"
 ```
 
 # [JuMP Optimiser (b): private API](@id private-api-jump-optimiser-b)
 
 ```@docs
-processed_jump_optimiser_attributes
+resolve_jump_optimiser
 processed_jump_optimiser
 assemble_jump_model!
 set_risk_and_scalarise!

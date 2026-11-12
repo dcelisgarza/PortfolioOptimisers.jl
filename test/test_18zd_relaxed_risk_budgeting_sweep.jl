@@ -131,7 +131,7 @@ end
         for alg in algs
             res = rrs_solve(alg; rba = rba, kw...)
             @test isa(res.retcode, OptimisationSuccess)
-            rkc = factor_risk_contribution(rv, res.w, RRS_PR.X; re = res.prb.rr)
+            rkc = factor_risk_contribution(rv, res.w, RRS_PR.X; re = res.rbr.rr)
             sigma2 = dot(res.w, RRS_PR.sigma, res.w)
             x = value.(res.model[:w1])
             zeta = value.(res.model[:zeta])

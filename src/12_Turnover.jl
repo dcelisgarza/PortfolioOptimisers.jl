@@ -508,7 +508,7 @@ const VecTn = AbstractVector{<:Turnover}
 """
     const Tn_VecTn = Union{Turnover, VecTn}
 
-One resolved turnover constraint, or a vector of them. [`ProcessedJuMPOptimiserAttributes`](@ref) holds this type after the resolution of the names, and [`set_turnover_constraints!`](@ref) reads it. A method that dispatches on it never receives a [`TurnoverEstimator`](@ref).
+One resolved turnover constraint, or a vector of them. [`ResolvedJuMPOptimiser`](@ref) holds this type after the resolution of the names, and [`set_turnover_constraints!`](@ref) reads it. A method that dispatches on it never receives a [`TurnoverEstimator`](@ref).
 
 # Related
 

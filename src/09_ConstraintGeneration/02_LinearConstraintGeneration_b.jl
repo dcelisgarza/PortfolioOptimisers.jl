@@ -1142,7 +1142,7 @@ Parse the equations a [`LinearConstraintEstimator`](@ref) carries, against the u
 
 The method reads `val` and `key` from the estimator and gives both to the equation method, so a single estimator and a vector of estimators have one interface. A vector gives a vector of the same length, one result per element.
 
-The method takes `rr`, so that a caller that holds loadings, such as [`processed_jump_optimiser_attributes`](@ref), can pass them to the value of `lcse` with no check of its type. A bare [`LinearConstraintEstimator`](@ref) ignores them. The asset frame is the absence of a re-basis, and an estimator that re-based itself because loadings were available makes the space depend on the prior and not on what the user wrote. Only a wrapper [`ExposureConstraintEstimator`](@ref) asks for a re-basis. The method takes `rd` for the same reason and ignores it for a stronger one. Only a constraint space can ask for a refit, and a bare estimator has no space.
+The method takes `rr`, so that a caller that holds loadings, such as [`resolve_jump_optimiser`](@ref), can pass them to the value of `lcse` with no check of its type. A bare [`LinearConstraintEstimator`](@ref) ignores them. The asset frame is the absence of a re-basis, and an estimator that re-based itself because loadings were available makes the space depend on the prior and not on what the user wrote. Only a wrapper [`ExposureConstraintEstimator`](@ref) asks for a re-basis. The method takes `rd` for the same reason and ignores it for a stronger one. Only a constraint space can ask for a refit, and a bare estimator has no space.
 
 # Algorithm
 

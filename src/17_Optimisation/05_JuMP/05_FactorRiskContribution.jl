@@ -86,7 +86,7 @@ function set_retcode(res::FactorRiskContributionResult, retcode::OptRetCode_VecO
                                         res.frc_plr, res.fb)
 end
 # Unique fields resolve directly; unknown properties forward into `rr` first, then into the
-# embedded [`JuMPOptimisationResult`](@ref) `jr` (the virtual `:w` and `pa` fall-through).
+# embedded [`JuMPOptimisationResult`](@ref) `jr` (the virtual `:w` and `jor` fall-through).
 @forward_properties FactorRiskContributionResult begin
     forward(rr)
     forward(jr)
@@ -507,7 +507,7 @@ Build the model of a [`FactorRiskContribution`](@ref), solve it, and return its 
 # Algorithm
 
  1. Replace each schedule of `frc` with its static default through [`reset_time_dependent_estimator`](@ref).
- 2. Process the attributes of `frc.opt` against `rd` with [`processed_jump_optimiser_attributes`](@ref), giving `attrs`.
+ 2. Process the attributes of `frc.opt` against `rd` with [`resolve_jump_optimiser`](@ref), giving `attrs`.
  3. Take the view of `frc` and of `rd` at the investable assets with [`investable_view`](@ref). Both are unchanged when every asset is investable.
  4. Bind the benchmark of each [`DataBenchmarkTracking`](@ref) measure to `rd` with [`bind_data_benchmark`](@ref).
  5. Build a new model. Register the scales with [`set_model_scales!`](@ref), the number of observations with [`set_model_observations!`](@ref), the homogenisation variables of a ratio with [`set_maximum_ratio_factor_variables!`](@ref) and the corner of a lifted variance with [`set_sdp_lift_corner!`](@ref).
@@ -524,7 +524,7 @@ Build the model of a [`FactorRiskContribution`](@ref), solve it, and return its 
   - $(arg_dict[:rd])
   - `str_names::Bool`: `true` gives each variable and each row of the model its string name.
   - `save::Bool`: `true` keeps the model in the result.
-  - `kwargs...`: Passed on to [`processed_jump_optimiser_attributes`](@ref).
+  - `kwargs...`: Passed on to [`resolve_jump_optimiser`](@ref).
 
 # Returns
 
@@ -539,7 +539,7 @@ Build the model of a [`FactorRiskContribution`](@ref), solve it, and return its 
 function _optimise(frc::FactorRiskContribution, rd::ReturnsResult = ReturnsResult();
                    str_names::Bool = false, save::Bool = true, kwargs...)
     frc = reset_time_dependent_estimator(frc)
-    attrs = processed_jump_optimiser_attributes(frc.opt, rd; kwargs...)
+    attrs = resolve_jump_optimiser(frc.opt, rd; kwargs...)
     # The bundle reduced what it carries. The head carries the rest — an initial weight
     # vector, a risk measure holding per-asset data, tracking, a custom term — and hands
     # them to `assemble_jump_model!` itself, so it takes the same view of itself and of
@@ -570,7 +570,7 @@ function _optimise(frc::FactorRiskContribution, rd::ReturnsResult = ReturnsResul
     set_portfolio_objective_function!(model, frc.obj, frc, attrs)
     retcode, sol = optimise_JuMP_model!(model, frc, eltype(attrs.pr.X))
     return FactorRiskContributionResult(;
-                                        jr = JuMPOptimisationResult(; pa = attrs,
+                                        jr = JuMPOptimisationResult(; jor = attrs,
                                                                     retcode = retcode,
                                                                     sol = sol,
                                                                     model = ifelse(save,

@@ -56,7 +56,8 @@ unique_key_dict!(arg_dict, :arg_dict,
                  :factor_fr => "`factor`: Multiplier applied to both ends of the sweep span after `bound` has transformed them. It carries a formulation's own correction factor, such as the `inv(1 / (T - ddof))` of a second-moment bound.",#
                  :bound_fr => "`bound`: [`FrontierBoundEstimator`](@ref) that converts a bound value into the units of the risk expression the bound is applied to. The sweep points are evenly spaced in **those** units, not in the units of the measure.",#
                  # Optimisation results.
-                 :pa => "`pa`: Processed optimisation attributes.",#
+                 :jor => "`jor`: The [`ResolvedJuMPOptimiser`](@ref) of the fit: its prior result, fees, return terms, scalariser, Investable Mask and the Resolved Constraint Block in `cbr`.",#
+                 :cbr => "`cbr`: The Resolved Constraint Block of the fit, a [`ResolvedConstraintBlock`](@ref), or a vector of them.",#
                  :retcode => "`retcode`: Optimisation return code.",#
                  :sol => "`sol`: Optimisation solution.",#
                  :imsk => "`imsk`: The Investable Mask the optimisation reduced on: `true` at every asset whose prior moments were finite. It is `nothing` when every asset was investable, and that sentinel is what skips both the reduction and the expansion. [`investable_mask`](@ref) derives it once from the full-universe prior result, and the result carries it, because the reduced prior can no longer yield it.",#
@@ -259,7 +260,7 @@ unique_key_dict!(arg_dict, :arg_dict,
                  :l_retcode => "`l_retcode`: Return code for the long allocation sub-problem.",#
                  :s_retcode => "`s_retcode`: Return code for the short allocation sub-problem.",#
                  # Risk budgeting.
-                 :prb => "`prb`: Processed risk budgeting configuration.",#
+                 :rbr => "`rbr`: The resolved risk budget of the model, an [`AbstractResolvedRiskBudgeting`](@ref).",#
                  :l_wass => "`l`: Weight of the tail term in the Esfahani-Kuhn loss. The mean term is not scaled by it.",#
                  :r_wass => "`r`: Radius of the type-1 Wasserstein ambiguity ball. It multiplies a decision variable, so it is not a constant offset.",#
                  :g_rm => "`g`: Risk aversion parameter.",#
