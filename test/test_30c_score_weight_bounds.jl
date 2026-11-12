@@ -66,10 +66,13 @@
         @test_throws PO.IsNothingError SubsetResampling(; wb = named, opt = EqualWeighted())
         @test_throws PO.IsNothingError BudgetedHindsightPath(; L = 0.1, p = 1, wb = named,
                                                              slv = slv)
-        # An Allocation Set of an online head resolves once for a block of rows, so a
-        # bound that reads the returns of the block would put a look-ahead in the pass.
+        # A bounded set resolves once for a block of rows, so a bound that reads the
+        # returns of the block would put a look-ahead in the pass. A programme set resolves
+        # such a bound at each step, on the rows of the step (#2059).
         @test_throws TypeError BoundedAllocationSet(; wb = swb, sets = sets)
-        @test_throws TypeError ProgrammeAllocationSet(; wb = swb, sets = sets, slv = slv)
+        @test ProgrammeAllocationSet(; wb = swb, sets = sets, slv = slv).wb === swb
+        @test PO.bounds_read_rows(swb) && !PO.bounds_read_rows(WeightBoundsEstimator())
+        @test !PO.bounds_read_rows(WeightBounds()) && !PO.bounds_read_rows(nothing)
     end
 
     @testset "score_cap and score_bounds" begin
@@ -243,5 +246,96 @@
         for (i, pred) in pairs(p.pred)
             @test pred.res.wb.ub ≈ min.(1.0, hand_cap(tr[i], 0.006))
         end
+    end
+
+    @testset "a programme set resolves the bound at each step (#2059)" begin
+        # The head's rows carry the masks of a panel and no Panel Field, so the score reads
+        # the returns. Each step scores the rows that the head holds, so the bound of step
+        # `t` is the bound of the rows `1:t`, and the Causal Pass over `1:t` equals the
+        # online fold after `t` rows.
+        T0 = 30
+        rdx = ReturnsResult(; nx = nx, X = X[1:T0, :])
+        sc = SCM()
+        rows(r, i) = PO.port_opt_view(r, i, :)
+        step_cap(r, t, v) = min.(1.0, v .* PO.asset_scores(sc, rows(r, 1:t)))
+        # The least sum of the scores over the steps sets `val`, so each step is feasible.
+        v = 1.3 / minimum(t -> sum(PO.asset_scores(sc, rows(rdx, 1:t))), 2:T0)
+        swb = ScoreWeightBounds(; score = sc, val = v)
+        sset = ProgrammeAllocationSet(; slv = slv, wb = swb)
+        @test isnothing(PO.rows_needed(sset))
+        @test PO.resolve_allocation_set(sset, N, false, Float64).wb === swb
+        held = (:warn, r"Held Step at 1")
+        opt = OnlinePortfolioSelection(; alg = PassiveAggressiveMeanReversion(), set = sset)
+        free = optimise(OnlinePortfolioSelection(; alg = PassiveAggressiveMeanReversion()),
+                        rdx).w
+        o = opt
+        binds = 0
+        for t in 1:T0
+            if t == 1
+                o = @test_logs held PO.partial_fit!(o, rows(rdx, t:t))
+                continue
+            end
+            o = @test_logs PO.partial_fit!(o, rows(rdx, t:t))
+            b = @test_logs held optimise(opt, rows(rdx, 1:t))
+            c = step_cap(rdx, t, v)
+            @test optimise(o).w == b.w
+            @test b.wb.ub ≈ c
+            # The solve meets the cap to 1.5e-7.
+            @test all(b.w .<= c .+ 1e-6)
+            binds += any(b.w .>= c .- 1e-6)
+        end
+        @test binds == T0 - 1
+        res = @test_logs held optimise(opt, rdx)
+        @test maximum(free) > maximum(step_cap(rdx, T0, v))
+        @test !isapprox(res.w, free; atol = 1e-2)
+        # The entropic geometry clips at the floor of the bound of the step, and the online
+        # fold still equals the Causal Pass.
+        eg = OnlinePortfolioSelection(; alg = ExponentiatedGradient(; eta = 5.0),
+                                      set = sset)
+        reg = @test_logs held optimise(eg, rdx)
+        o = eg
+        @test_logs held for t in 1:T0
+            o = PO.partial_fit!(o, rows(rdx, t:t))
+        end
+        @test optimise(o).w == reg.w
+        @test all(reg.w .<= step_cap(rdx, T0, v) .+ 1e-6)
+        @test !isapprox(reg.w,
+                        optimise(OnlinePortfolioSelection(;
+                                                          alg = ExponentiatedGradient(;
+                                                                                      eta = 5.0)),
+                                 rdx).w; atol = 1e-2)
+        # A negative floor of the bound of the step is refused under the entropic geometry.
+        neg = ProgrammeAllocationSet(; slv = slv,
+                                     wb = ScoreWeightBounds(; score = sc, val = v,
+                                                            wb = WeightBounds(-0.5, 1)))
+        @test_logs held @test_throws DomainError optimise(OnlinePortfolioSelection(;
+                                                                                   alg = ExponentiatedGradient(),
+                                                                                   set = neg),
+                                                          rdx)
+        # A leader on every row with the bound on the set equals the batch fit with the
+        # bound on the optimiser, because the leader's set scores the same rows.
+        logopt(; kw...) = MeanRisk(; obj = MaximumReturn(),
+                                   opt = JuMPOptimiser(; pe = EmpiricalPrior(), slv = slv,
+                                                       ret = LogarithmicReturn(), kw...))
+        lead = @test_logs held optimise(OnlinePortfolioSelection(;
+                                                                 alg = FollowTheLeader(;
+                                                                                       opt = logopt()),
+                                                                 set = sset), rdx)
+        @test isapprox(lead.w, optimise(logopt(; wb = swb), rdx).w; atol = 1e-6)
+        @test !isapprox(lead.w,
+                        optimise(OnlinePortfolioSelection(;
+                                                          alg = FollowTheLeader(;
+                                                                                opt = logopt())),
+                                 rdx).w; atol = 1e-2)
+        # The read-out scores the rows that the head holds at the assets active at the
+        # last row.
+        am = trues(T0, N)
+        am[26:end, 5] .= false
+        Xm = X[1:T0, :]
+        Xm[26:end, 5] .= NaN
+        rdm = ReturnsResult(; nx = nx, X = Xm, pnl = AssetPanel(; amsk = am, emsk = am))
+        rm = @test_logs held optimise(opt, rdm)
+        @test rm.imsk == [true, true, true, true, false] && iszero(rm.w[5])
+        @test rm.wb.ub ≈ min.(1.0, v .* PO.asset_scores(sc, PO.port_opt_view(rdm, :, 1:4)))
     end
 end

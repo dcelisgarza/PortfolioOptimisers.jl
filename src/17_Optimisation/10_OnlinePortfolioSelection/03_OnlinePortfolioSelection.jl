@@ -966,7 +966,7 @@ The Result expands ``\\bar{\\boldsymbol{w}}`` back over the pinned universe with
  2. View the head's set at `idx`, giving `set`, and slice the allocation to `w`.
  3. Resolve the head's fee against the full set, and view it at the Investable Mask through [`investable_fees_view`](@ref), giving `fees`.
  4. Sum `w` to `s`. When no asset is active, `s` is not positive, or an entry of `w` is not finite, return an [`OptimisationFailure`](@ref) with `NaN` weights and no bounds.
- 5. Resolve the weight bounds of `set` over the active assets, giving `wb`.
+ 5. Resolve the weight bounds of `set` over the active assets, giving `wb`. The resolution reads the rows that the head holds, viewed at the active assets, so a bound that reads the returns, such as a [`ScoreWeightBounds`](@ref), scores the rows of the last step.
  6. Return `w ./ s` with `wb`, `fees` and an [`OptimisationSuccess`](@ref) whose `res` is the hold record of the state.
 
 # Arguments
@@ -1005,7 +1005,9 @@ function online_selection_result(opt::OnlinePortfolioSelection,
                                        w = fill(convert(eltype(w), NaN), Nr), imsk = imsk,
                                        fb = nothing, fees = fees)
     end
-    wb = weight_bounds_constraints(set.wb, set.sets; N = Nr, strict = opt.strict,
+    # A head that keeps no rows has `nothing` here, and its view is `nothing`.
+    rows = port_opt_view(buffer_returns_result(state.X), idx)
+    wb = weight_bounds_constraints(set.wb, set.sets; rd = rows, N = Nr, strict = opt.strict,
                                    datatype = eltype(w))
     retcode, w = OptimisationSuccess(; res = state.hold), w ./ s
     return NaiveOptimisationResult(; pr = nothing, wb = wb, retcode = retcode, w = w,

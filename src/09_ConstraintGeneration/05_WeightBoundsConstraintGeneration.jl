@@ -363,13 +363,14 @@ const WbE_Wb = Union{AbstractWeightBoundsEstimator, WeightBounds}
 
 Alias for weight bounds that read no returns: a [`WeightBoundsEstimator`](@ref), which reads only the names of the universe, or a [`WeightBounds`](@ref).
 
-An Allocation Set of an [`OnlinePortfolioSelection`](@ref) takes this alias as the bound of its `wb` field, and refuses every other [`AbstractWeightBoundsEstimator`](@ref). The head resolves the set once for a block of rows. A bound that reads the returns of the block, such as a [`ScoreWeightBounds`](@ref), reads rows after each Online Update, and the Causal Pass then has a look-ahead.
+A [`BoundedAllocationSet`](@ref) takes this alias as the bound of its `wb` field, and refuses every other [`AbstractWeightBoundsEstimator`](@ref). The head resolves the set once for a block of rows, and its closed-form projections read the bounds as values. A bound that reads the returns of the block, such as a [`ScoreWeightBounds`](@ref), would read rows after each Online Update, and the Causal Pass would then have a look-ahead. A [`ProgrammeAllocationSet`](@ref) takes every bound. It resolves a bound that reads the returns at each step, on the head's rows of that step ([`bounds_read_rows`](@ref)).
 
 # Related
 
   - [`WbE_Wb`](@ref)
   - [`BoundedAllocationSet`](@ref)
   - [`ProgrammeAllocationSet`](@ref)
+  - [`bounds_read_rows`](@ref)
 """
 const NameWbE_Wb = Union{WeightBoundsEstimator, WeightBounds}
 """

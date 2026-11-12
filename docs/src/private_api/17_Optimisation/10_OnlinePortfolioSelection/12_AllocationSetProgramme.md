@@ -18,6 +18,7 @@ PortfolioOptimisers.set_distance_cone!
 PortfolioOptimisers.set_divergence_objective!
 PortfolioOptimisers.barrier_objective_entries
 PortfolioOptimisers.projection_solver
+PortfolioOptimisers.programme_answer
 PortfolioOptimisers.allocation_set_ready
 PortfolioOptimisers.projection_programme
 PortfolioOptimisers.programme_investable_reduction

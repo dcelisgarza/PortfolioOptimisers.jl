@@ -190,14 +190,15 @@ end
         sa = Accessors.set(s, Accessors.@optic(_.tn),
                            Turnover(; w = fill(1 / 3, 3), val = 0.2))
         @test sa.tn.val == 0.2 && sa.l2 === s.l2 && sa.ret === ret
-        # The block admits a bound that reads the returns and a schedule, and the set refuses
-        # both, as the bounds of its keywords did before.
+        # The block admits a bound that reads the returns and a schedule. The set takes the
+        # bound through both routes, and resolves it at each step (#2059). It refuses the
+        # schedule.
         sets = UniverseSets(; dict = Dict("nx" => ["A", "B", "C"]))
         swb = ScoreWeightBounds(; score = SCM())
-        @test_throws TypeError ProgrammeAllocationSet(; slv = slv, wb = swb, sets = sets)
-        @test_throws TypeError ProgrammeAllocationSet(; slv = slv,
-                                                      cbe = ConstraintBlock(; wb = swb,
-                                                                            sets = sets))
+        @test ProgrammeAllocationSet(; slv = slv, wb = swb, sets = sets).wb === swb
+        @test ProgrammeAllocationSet(; slv = slv,
+                                     cbe = ConstraintBlock(; wb = swb, sets = sets)).wb ===
+              swb
         err = try
             ProgrammeAllocationSet(; slv = slv, card = TimeDependent([2, 3]))
         catch e

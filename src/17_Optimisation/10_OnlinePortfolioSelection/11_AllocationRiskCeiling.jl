@@ -169,7 +169,7 @@ The set fits its `pe` on the rows that the head holds, the same way a batch head
 function allocation_set_prior(set::ProgrammeAllocationSet, X::Option{<:ReturnsResult})
     if isnothing(rows_needed(set))
         @argcheck(!isnothing(X),
-                  ArgumentError("a ProgrammeAllocationSet with a slot that reads the head's rows — a ceiling built on its prior, a tracking error, a centrality or phylogeny estimator, an exposure row, a return floor or a Calibration Rule — reads them inside an Online Update alone; `project` was called with none."))
+                  ArgumentError("a ProgrammeAllocationSet with a slot that reads the head's rows — weight bounds that read the returns, a ceiling built on its prior, a tracking error, a centrality or phylogeny estimator, an exposure row, a return floor or a Calibration Rule — reads them inside an Online Update alone; `project` was called with none."))
         return prior(set.pe, X)
     end
     return nothing

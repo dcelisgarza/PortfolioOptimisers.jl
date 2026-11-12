@@ -250,9 +250,14 @@ because RRB is `RelaxedRiskBudgeting`.
   not cut them: the reduction kept their width, and the model raised a bare `DimensionMismatch`.
   The set now declares the Non-Investable Axis on its `sets` in `programme_investable_reduction`,
   as `investable_reduction` does for a head. A test covers both arms.
-- **`ScoreWeightBounds` in a `ProgrammeAllocationSet`.** The set refuses it now. A stage 2 slot
-  reads `rd` at each step, so the set can take it after the resolver lands. Map #1213 records it
-  under *Not yet specified*.
+- **`ScoreWeightBounds` in a `ProgrammeAllocationSet` (#2059).** The set takes every bound. A
+  bound that reads only names resolves once for each fold, and `bounds_read_rows` keeps every
+  other bound for stage 2, which scores the head's rows at the Investable Mask of each step, as the
+  batch fit does. Every reader of the bound at a step reads that result: the bounds rows of both
+  arms, the floor and the clip of a barrier geometry in `projection_programme`, and the read-out
+  of the head, which scores the rows that the head holds. `set_allocation_set_constraints!`
+  returns the bounds of the step for the barrier geometry. A `BoundedAllocationSet` still refuses
+  such a bound, because its closed-form projections read the bound as a value.
 - **Other decision records.** The builder ticket amends ADR 0008: the middle of the assembly runs
   once for each block. The ticket of the leader re-solve amends or rewrites ADR 0164: the set no
   longer goes on `ccnt`. The closing ticket of map #1213 amends ADR 0159.

@@ -7,10 +7,14 @@ The set holds its constraint kinds and its direct objective penalties in a [`Con
 
 The projection is a bare JuMP model with the variables and rows of the Weight Finaliser, which are `w`, `k = 1`, `Σw = 1`, the constraint scale and the objective scale. [`set_allocation_set_constraints!`](@ref) adds the constraint kinds through the builders of the optimiser, in the order that [`assemble_jump_model!`](@ref) runs them. [`set_projection_objective!`](@ref) sets the objective, the divergence of the rule's Projection Geometry plus the set's penalties.
 
-The block resolves in the two stages of a JuMP head. Once per fold, [`resolve_allocation_set`](@ref) runs stage 1, [`resolve_constraint_block_names`](@ref), and resolves `wb`: the slots that hold a name over `sets` and whose value follows a view at the Investable Mask. These are `wb`, `lt`, `st`, `sgcarde`, `smtx`, `sgmtx`, `slt`, `sst`, `sglt`, `sgst` and `tn`. At every step, [`assemble_allocation_set!`](@ref) runs stage 2, [`resolve_constraint_block`](@ref), on the set viewed at the mask of the step and on the prior result of `pe` fitted on the head's rows. It gives the [`ResolvedConstraintBlock`](@ref) of the set, which the builders read. Stage 2 resolves these kinds:
+The block resolves in the two stages of a JuMP head. Once per fold, [`resolve_allocation_set`](@ref) runs stage 1, [`resolve_constraint_block_names`](@ref), and resolves `wb` when it reads no rows: the slots that hold a name over `sets` and whose value follows a view at the Investable Mask. These are `wb`, `lt`, `st`, `sgcarde`, `smtx`, `sgmtx`, `slt`, `sst`, `sglt`, `sgst` and `tn`. At every step, [`assemble_allocation_set!`](@ref) runs stage 2, [`resolve_constraint_block`](@ref), on the set viewed at the mask of the step and on the prior result of `pe` fitted on the head's rows. It gives the [`ResolvedConstraintBlock`](@ref) of the set, which the builders read. Stage 2 resolves these kinds:
+
+  - `wb`, when it reads the returns ([`bounds_read_rows`](@ref)), as a [`ScoreWeightBounds`](@ref) does. Each step scores the assets on the head's rows at the Investable Mask of the step, as the batch fit of a JuMP head on those rows does, so the bound reads no row after the step. The bounds rows, the floor of a barrier geometry and the read-out of the head all read this bound of the step.
 
   - `lcse` and `gcarde`, the linear rows. A linear constraint does not follow a view at the mask, so they resolve after it, over the `sets` that carry the Non-Investable Axis. An exposure row in `lcse` takes its loadings by the precedence of [`factor_space_regression`](@ref): the result that its `FactorSpace` states, else the loadings `rr` of the set's prior, else a fit of the regression of the space on the head's rows.
+
   - `cte`, the centrality rows, and `ple`, the integer and semidefinite phylogeny kinds.
+
   - A Calibration Rule in `l2c`, `lpc`, `linfc`, `l1`, `l2`, `lp` or `linf`, against the prior and the solver `slv`.
 
 The settings `sbgt`, `gbgt`, `xbgt`, `card`, `scard`, `ss`, `ccnt` and `cobj` need no resolution. Each kind goes to the builder that [`JuMPOptimiser`](@ref) gives it to. The fields of the set read the prior and the rows of its block Result at every step:
@@ -81,7 +85,6 @@ The positional constructor takes the fields in the order of the struct: `pe`, `s
 The constructor of [`ConstraintBlock`](@ref) checks each slot on its own: the values of `sbgt`, `gbgt`, `card`, `l2c`, `linfc`, `l1` and `linf`, an empty vector in a slot, the roles of `lp` and `lpc`, the shapes of the sub-group MIP slots, and `sets` beside a slot keyed by name ([`name_keyed`](@ref)). This constructor checks the fields of the set, and the rules that read the set and its block together.
 
   - If `slv` is a vector: `!isempty(slv)`. An `IsEmptyError` is thrown otherwise.
-  - `wb` is a [`NameWbE_Wb`](@ref). A bound that reads the returns, such as a [`ScoreWeightBounds`](@ref), would read rows after each Online Update, so the constructor refuses it with a `TypeError`.
   - No slot of `cbe` holds a [`TimeDependent`](@ref). No fold loop resolves a schedule inside an Allocation Set, so the constructor refuses it with an `ArgumentError`. Schedule the whole set instead, `OnlinePortfolioSelection(; set = TimeDependent([…]))`.
   - If `gbgt` is given: `sbgt` is not a number, because the budget of one and a number in `sbgt` already fix the gross exposure. If `wb` is a [`WeightBounds`](@ref), one of its bounds admits a short weight. If `gbgt` has an upper end, it is at least one, because the gross exposure is at least the budget of one ([`assert_gross_budget_admissible`](@ref)). An `ArgumentError` is thrown otherwise.
   - If `r` is given: the `settings.ub` of every measure is a finite non-negative number, the ceiling, and no measure holds a [`ReturnsTracking`](@ref), because the ceiling reads rows that change at every step ([`assert_risk_ceiling`](@ref)). An `ArgumentError` is thrown otherwise, and an `IsEmptyError` for an empty vector.
@@ -226,12 +229,8 @@ ProgrammeAllocationSet
             @argcheck(!isempty(slv), IsEmptyError("slv cannot be empty"))
         end
         # The constructor of the block checks each slot on its own. The checks below read a
-        # field of the set, or a rule that the set adds to the slots of the block. The type
-        # bounds of the block admit a bound that reads the returns and a schedule, and the
-        # bounds of the keywords of the set refused both before the set held a block.
-        if !isa(cbe.wb, Option{NameWbE_Wb})
-            throw(TypeError(:ProgrammeAllocationSet, "wb", Option{NameWbE_Wb}, cbe.wb))
-        end
+        # field of the set, or a rule that the set adds to the slots of the block. A bound
+        # that reads the returns resolves at stage 2, on the rows of each step (#2059).
         tdfs = typed_time_dependent_fields(cbe)
         @argcheck(isempty(tdfs),
                   ArgumentError("the slot `$(first(tdfs))` of a `ProgrammeAllocationSet` holds a `TimeDependent` schedule, and no fold loop resolves a schedule inside an Allocation Set: the online head resolves a schedule of the whole set. Schedule the set, `OnlinePortfolioSelection(; set = TimeDependent([...]))`, and give each entry a static slot."))
@@ -335,13 +334,13 @@ Resolves the slots of a [`ProgrammeAllocationSet`](@ref) that hold a name or an 
 
 This is stage 1 of the resolution of the set's block, [`resolve_constraint_block_names`](@ref), the stage that a [`JuMPOptimiser`](@ref) runs on its own block. The online head runs it once for each fold, before it knows the Investable Mask of a step. At every step, [`assemble_allocation_set!`](@ref) runs stage 2, [`resolve_constraint_block`](@ref), on the set viewed at the mask of the step. So the set orders the names and the reduction by the rule of a JuMP head.
 
-The weight bounds `wb` are a stage 2 slot of the block, because their resolver reads the rows. The set also resolves them here, over the `N` assets, because the type bound of the set admits no bound that reads the rows, and the closed-form projections and [`FollowTheLeader`](@ref) read `set.wb` as a [`WeightBounds`](@ref). Stage 2 then gives the resolved bounds back unchanged.
+The weight bounds `wb` are a stage 2 slot of the block, because their resolver can read the rows. A bound that reads only names, a [`WeightBounds`](@ref) or a [`WeightBoundsEstimator`](@ref), resolves here, over the `N` assets, once per fold. Stage 2 then gives the resolved bounds back unchanged. A bound that reads the rows, such as a [`ScoreWeightBounds`](@ref), stays in the set, and stage 2 resolves it at each step on the head's rows ([`bounds_read_rows`](@ref)).
 
 **Breaking change.** Before the block Result, this function also resolved `lcse` and `gcarde`, and `resolve_allocation_set_rows` resolved the slots that read the rows. A linear constraint does not follow a view at the mask, so `lcse` and `gcarde` now resolve at each step, after the reduction, over the `sets` that carry the Non-Investable Axis.
 
 # Algorithm
 
- 1. Resolve the weight bounds `wb` over the `N` assets with [`weight_bounds_constraints`](@ref).
+ 1. When `wb` reads no rows, resolve it over the `N` assets with [`weight_bounds_constraints`](@ref). Otherwise keep it.
  2. Resolve stage 1 of the block with [`resolve_constraint_block_names`](@ref): the thresholds, `sgcarde`, the sub-group matrices and thresholds, and the turnover ceilings `tn`.
  3. Return `set` rebuilt with [`rebuild_estimator`](@ref), with the resolved block in `cbe` and the resolved bounds in its slot `wb`. Every other field keeps its value.
 
@@ -365,8 +364,12 @@ The weight bounds `wb` are a stage 2 slot of the block, because their resolver r
 """
 function resolve_allocation_set(set::ProgrammeAllocationSet, N::Integer, strict::Bool,
                                 datatype::DataType)
-    wb = weight_bounds_constraints(set.wb, set.sets; N = N, strict = strict,
-                                   datatype = datatype)
+    wb = if bounds_read_rows(set.wb)
+        set.wb
+    else
+        weight_bounds_constraints(set.wb, set.sets; N = N, strict = strict,
+                                  datatype = datatype)
+    end
     cbe = resolve_constraint_block_names(set.cbe, strict, datatype)
     # The block and its slot `wb` go in one call, so the flat keyword replaces that slot of
     # the resolved block.
@@ -426,11 +429,39 @@ function fitted_on_rows(x::AbstractVector)
     return any(fitted_on_rows, x)
 end
 """
+    bounds_read_rows(wb)
+    bounds_read_rows(wb::AbstractWeightBoundsEstimator)
+    bounds_read_rows(wb::WeightBoundsEstimator)
+
+Tells whether the weight bounds of a programme set read the head's rows.
+
+A [`WeightBounds`](@ref), a [`WeightBoundsEstimator`](@ref) and `nothing` read no rows, so [`resolve_allocation_set`](@ref) resolves them once per fold. Every other [`AbstractWeightBoundsEstimator`](@ref), such as a [`ScoreWeightBounds`](@ref), can read the returns of the fit. Stage 2, [`resolve_constraint_block`](@ref), resolves it at each step on the head's rows, so it reads no row after the step.
+
+# Returns
+
+  - `::Bool`: `true` when the bounds read the rows.
+
+# Related
+
+  - [`rows_needed`](@ref)
+  - [`resolve_allocation_set`](@ref)
+  - [`ProgrammeAllocationSet`](@ref)
+"""
+function bounds_read_rows(::Any)
+    return false
+end
+function bounds_read_rows(::AbstractWeightBoundsEstimator)
+    return true
+end
+function bounds_read_rows(::WeightBoundsEstimator)
+    return false
+end
+"""
     rows_needed(set::ProgrammeAllocationSet)
 
 Returns the number of rows that a programme set reads at a step.
 
-The set reads every row that the head has folded when one of its slots reads the rows. These slots are a risk ceiling that reads them ([`risk_reads_rows`](@ref)), a tracking error, a centrality or phylogeny estimator ([`fitted_on_rows`](@ref)), an exposure row ([`exposure_keyed`](@ref)), a return floor, and a Calibration Rule in a norm ceiling or in a penalty ([`calibrated`](@ref)).
+The set reads every row that the head has folded when one of its slots reads the rows. These slots are weight bounds that read them ([`bounds_read_rows`](@ref)), a risk ceiling that reads them ([`risk_reads_rows`](@ref)), a tracking error, a centrality or phylogeny estimator ([`fitted_on_rows`](@ref)), an exposure row ([`exposure_keyed`](@ref)), a return floor, and a Calibration Rule in a norm ceiling or in a penalty ([`calibrated`](@ref)).
 
 # Returns
 
@@ -443,10 +474,10 @@ The set reads every row that the head has folded when one of its slots reads the
   - [`risk_reads_rows`](@ref)
 """
 function rows_needed(set::ProgrammeAllocationSet)
-    reads = risk_reads_rows(set.r) ||
+    reads = bounds_read_rows(set.wb) ||
+            risk_reads_rows(set.r) ||
             !isnothing(set.tr) ||
-            fitted_on_rows(set.cte) ||
-            fitted_on_rows(set.ple) ||
+            any(fitted_on_rows, (set.cte, set.ple)) ||
             exposure_keyed(set.lcse) ||
             !isnothing(set.ret) ||
             any(calibrated, (set.l2c, set.lpc, set.linfc, set.l1, set.l2, set.lp, set.linf))
@@ -865,11 +896,11 @@ end
 
 Refuses a negative lower bound under a geometry whose potential is undefined below zero.
 
-The head calls this function at its construction, with the geometry of its rule and its set. The entropic, Tsallis and log-barrier geometries refuse a negative bound. This function refuses a bound that is a value. The projection refuses a bound that an estimator resolves. The Euclidean, Gram and diagonal geometries admit a negative bound, so a long-short rule needs no other set.
+The head calls this function at its construction, with the geometry of its rule and its set. The entropic, Tsallis and log-barrier geometries refuse a negative bound. This function refuses a bound that is a value, through [`assert_geometry_admits_bounds`](@ref). The projection refuses a bound that an estimator resolves. The Euclidean, Gram and diagonal geometries admit a negative bound, so a long-short rule needs no other set.
 
 # Validation
 
-  - Under [`EntropicProjection`](@ref), [`TsallisProjection`](@ref) or [`LogBarrierProjection`](@ref) with a [`WeightBounds`](@ref) whose `lb` is a number or a vector: `all(>= 0, lb)`. A `DomainError` is thrown otherwise.
+  - With a [`WeightBounds`](@ref) in `set.wb`: the rules of [`assert_geometry_admits_bounds`](@ref).
 
 # Returns
 
@@ -878,20 +909,48 @@ The head calls this function at its construction, with the geometry of its rule 
 # Related
 
   - [`OnlinePortfolioSelection`](@ref)
+  - [`assert_geometry_admits_bounds`](@ref)
+  - [`project`](@ref)
+"""
+function assert_geometry_admits_set(proj::AbstractProjectionGeometry,
+                                    set::AbstractAllocationSet)::Nothing
+    wb = set.wb
+    if isa(wb, WeightBounds)
+        assert_geometry_admits_bounds(proj, wb)
+    end
+    return nothing
+end
+"""
+    assert_geometry_admits_bounds(proj::AbstractProjectionGeometry, wb::WeightBounds)
+
+Refuses a resolved bound with a negative floor under a geometry whose potential is undefined below zero.
+
+[`assert_geometry_admits_set`](@ref) calls it at the construction of the head, on a bound that is a value. [`projection_programme`](@ref) calls it at each step, on the bound that the step resolves, before the solve. The entropic, Tsallis and log-barrier geometries refuse a negative floor, and every other geometry admits it.
+
+# Validation
+
+  - Under [`EntropicProjection`](@ref), [`TsallisProjection`](@ref) or [`LogBarrierProjection`](@ref) with an `lb` that is a number or a vector: `all(>= 0, lb)`. A `DomainError` is thrown otherwise.
+
+# Returns
+
+  - `nothing`.
+
+# Related
+
+  - [`assert_geometry_admits_set`](@ref)
+  - [`projection_programme`](@ref)
   - [`EntropicProjection`](@ref)
   - [`TsallisProjection`](@ref)
   - [`LogBarrierProjection`](@ref)
-  - [`project`](@ref)
 """
-function assert_geometry_admits_set(::AbstractProjectionGeometry,
-                                    ::AbstractAllocationSet)::Nothing
+function assert_geometry_admits_bounds(::AbstractProjectionGeometry,
+                                       ::WeightBounds)::Nothing
     return nothing
 end
-function assert_geometry_admits_set(proj::Union{EntropicProjection, TsallisProjection,
-                                                LogBarrierProjection},
-                                    set::AbstractAllocationSet)::Nothing
-    wb = set.wb
-    if isa(wb, WeightBounds) && !isnothing(wb.lb)
+function assert_geometry_admits_bounds(proj::Union{EntropicProjection, TsallisProjection,
+                                                   LogBarrierProjection},
+                                       wb::WeightBounds)::Nothing
+    if !isnothing(wb.lb)
         @argcheck(all(x -> x >= zero(x), wb.lb),
                   DomainError(wb.lb,
                               "a `$(nameof(typeof(proj)))` admits no negative lower bound: its potential is undefined below zero. Use a Euclidean rule, or a non-negative bound."))
