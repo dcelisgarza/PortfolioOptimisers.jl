@@ -1,5 +1,5 @@
 """
-    set_return_bounds!(model, i, ret_expr, lb)
+    set_return_bounds!(model, i, ret_expr, lb; prefix = Symbol(""))
 
 Bound the expression of return term `i` from below.
 
@@ -39,6 +39,7 @@ Where:
   - `i`: Index of the return term.
   - `ret_expr`: The term's own JuMP return expression.
   - `lb`: Lower bound on the term (scalar, vector, or `Frontier`).
+  - $(arg_dict[:prefix_kw])
 
 # Returns
 
@@ -50,20 +51,23 @@ Where:
   - [`JuMPReturnsSettings`](@ref)
   - [`set_risk_upper_bound!`](@ref)
 """
-function set_return_bounds!(::JuMP.Model, ::Any, ::Any, ::Nothing)
+function set_return_bounds!(::JuMP.Model, ::Any, ::Any, ::Nothing;
+                            prefix::Symbol = Symbol(""))
     return nothing
 end
-function set_return_bounds!(model::JuMP.Model, i, ret_expr, lb::Number)
+function set_return_bounds!(model::JuMP.Model, i, ret_expr, lb::Number;
+                            prefix::Symbol = Symbol(""))
     sc = get_constraint_scale(model)
     k = get_k(model)
     m = bound_scale(lb)
-    state_set!(model, Symbol(""), :ret_lb_, i,
+    state_set!(model, prefix, :ret_lb_, i,
                JuMP.@constraint(model, sc * (ret_expr - lb * k) / m >= 0))
     return nothing
 end
-function set_return_bounds!(model::JuMP.Model, i, ret_expr, lb::Front_NumVec)
-    bound_key = state_key(Symbol(""), :ret_lb_, i)
-    bound_var_key = state_key(Symbol(""), :ret_lb_var_, i)
+function set_return_bounds!(model::JuMP.Model, i, ret_expr, lb::Front_NumVec;
+                            prefix::Symbol = Symbol(""))
+    bound_key = state_key(prefix, :ret_lb_, i)
+    bound_var_key = state_key(prefix, :ret_lb_var_, i)
     if !shared_has(model, :ret_frontier)
         JuMP.@expression(model, ret_frontier,
                          Pair{Tuple{Symbol, Symbol},
@@ -523,6 +527,7 @@ $(val_dict[:relax])
   - `obj::ObjectiveFunction`: Portfolio objective function.
   - `pr::AbstractPriorResult`: Prior result with asset moments.
   - `kwargs...`: Additional keyword arguments (e.g. `rd` for uncertainty sets).
+  - $(arg_dict[:prefix_kw]) A per-term builder takes it, and so does each builder that it calls. A programme Allocation Set passes the prefix of its block for its return floor.
 
 # Returns
 
@@ -581,22 +586,22 @@ function set_return_constraints!(model::JuMP.Model, pret::VecJRE, obj::Objective
 end
 function set_return_constraints!(model::JuMP.Model, i,
                                  pret::ArithmeticReturn{<:Any, Nothing, <:Any},
-                                 pr::AbstractPriorResult; kwargs...)
-    w = get_w(model)
+                                 pr::AbstractPriorResult; prefix::Symbol = Symbol(""),
+                                 kwargs...)
+    w = get_w(model, prefix)
     settings = pret.settings
     mu = ifelse(isnothing(pret.mu), pr.mu, pret.mu)
-    ret = state_set!(model, Symbol(""), :ret_, i,
-                     JuMP.@expression(model, dot_scalar(mu, w)))
+    ret = state_set!(model, prefix, :ret_, i, JuMP.@expression(model, dot_scalar(mu, w)))
     # A charge is not in the characteristic, so the ratio's test on it cannot see the charge.
     # The charged term takes the risk form, which has a solution for each charge (#1358).
     fee = add_fees_to_ret!(model, ret, settings.fee)
     mic = add_market_impact_cost!(model, ret, settings.mic)
-    set_return_bounds!(model, i, ret, settings.lb)
+    set_return_bounds!(model, i, ret, settings.lb; prefix = prefix)
     set_return_expression!(model, i, ret, settings.scale, settings.rte)
     return mu, fee || mic
 end
 """
-    set_ucs_return_constraints!(model, i, ucs::BoxUncertaintySet, mu, settings)
+    set_ucs_return_constraints!(model, i, ucs::BoxUncertaintySet, mu, settings; prefix = Symbol(""))
 
 Build one term's box-robust return expression.
 
@@ -659,6 +664,7 @@ $(val_dict[:relax])
   - `ucs`: The uncertainty set.
   - `mu`: Fallback characteristic vector, which the builder uses when the set carries no centre.
   - `settings::JuMPReturnsSettings`: The term's settings. The builder reads `fee` and `mic`.
+  - $(arg_dict[:prefix_kw]) The four other methods take it too.
 
 # Returns
 
@@ -671,17 +677,17 @@ $(val_dict[:relax])
 """
 function set_ucs_return_constraints!(model::JuMP.Model, i, ucs::BoxUncertaintySet,
                                      mu::Num_VecNum, settings::JuMPReturnsSettings,
-                                     ::Any = nothing)
+                                     ::Any = nothing; prefix::Symbol = Symbol(""))
     sc = get_constraint_scale(model)
-    w = get_w(model)
+    w = get_w(model, prefix)
     N = length(w)
     mu = something(ucs.val, mu)
     d_mu = (ucs.ub - ucs.lb) * 0.5
-    bucs_w = state_set!(model, Symbol(""), :bucs_w_, i, JuMP.@variable(model, [1:N]))
-    state_set!(model, Symbol(""), :bucs_ret_, i,
+    bucs_w = state_set!(model, prefix, :bucs_w_, i, JuMP.@variable(model, [1:N]))
+    state_set!(model, prefix, :bucs_ret_, i,
                JuMP.@constraint(model, [j = 1:N],
                                 [sc * bucs_w[j]; sc * w[j]] in JuMP.MOI.NormOneCone(2)))
-    ret = state_set!(model, Symbol(""), :ret_, i,
+    ret = state_set!(model, prefix, :ret_, i,
                      JuMP.@expression(model,
                                       dot_scalar(mu, w) - LinearAlgebra.dot(d_mu, bucs_w)))
     add_fees_to_ret!(model, ret, settings.fee)
@@ -751,18 +757,19 @@ $(val_dict[:relax])
 """
 function set_ucs_return_constraints!(model::JuMP.Model, i, ucs::EllipsoidalUncertaintySet,
                                      mu::Num_VecNum, settings::JuMPReturnsSettings,
-                                     mtx_sqrt::Option{<:AbstractMatrixSquareRootAlgorithm} = EigenFallbackSquareRoot())
+                                     mtx_sqrt::Option{<:AbstractMatrixSquareRootAlgorithm} = EigenFallbackSquareRoot();
+                                     prefix::Symbol = Symbol(""))
     sc = get_constraint_scale(model)
-    w = get_w(model)
+    w = get_w(model, prefix)
     mu = something(ucs.val, mu)
     G = transpose(matrix_square_root(mtx_sqrt, ucs.sigma))
     k = ucs.k
-    x_eucs_w = state_set!(model, Symbol(""), :x_eucs_w_, i, JuMP.@expression(model, G * w))
-    t_eucs_gw = state_set!(model, Symbol(""), :t_eucs_gw_, i, JuMP.@variable(model))
-    state_set!(model, Symbol(""), :eucs_ret_, i,
+    x_eucs_w = state_set!(model, prefix, :x_eucs_w_, i, JuMP.@expression(model, G * w))
+    t_eucs_gw = state_set!(model, prefix, :t_eucs_gw_, i, JuMP.@variable(model))
+    state_set!(model, prefix, :eucs_ret_, i,
                JuMP.@constraint(model,
                                 [sc * t_eucs_gw; sc * x_eucs_w] in JuMP.SecondOrderCone()))
-    ret = state_set!(model, Symbol(""), :ret_, i,
+    ret = state_set!(model, prefix, :ret_, i,
                      JuMP.@expression(model, dot_scalar(mu, w) - k * t_eucs_gw))
     add_fees_to_ret!(model, ret, settings.fee)
     add_market_impact_cost!(model, ret, settings.mic)
@@ -833,18 +840,18 @@ $(val_dict[:relax])
 """
 function set_ucs_return_constraints!(model::JuMP.Model, i, ucs::L1UncertaintySet,
                                      mu::Num_VecNum, settings::JuMPReturnsSettings,
-                                     ::Any = nothing)
+                                     ::Any = nothing; prefix::Symbol = Symbol(""))
     sc = get_constraint_scale(model)
-    w = get_w(model)
+    w = get_w(model, prefix)
     mu = something(ucs.mu, mu)
     sd = ucs.sd
     sw = isnothing(sd) ? w : sd .* w
-    t_l1ucs = state_set!(model, Symbol(""), :t_l1ucs_, i, JuMP.@variable(model))
-    state_set!(model, Symbol(""), :l1ucs_ret_, i,
+    t_l1ucs = state_set!(model, prefix, :t_l1ucs_, i, JuMP.@variable(model))
+    state_set!(model, prefix, :l1ucs_ret_, i,
                JuMP.@constraint(model,
                                 [sc * t_l1ucs;
                                  sc * sw] in JuMP.MOI.NormInfinityCone(1 + length(w))))
-    ret = state_set!(model, Symbol(""), :ret_, i,
+    ret = state_set!(model, prefix, :ret_, i,
                      JuMP.@expression(model, dot_scalar(mu, w) - ucs.eps * t_l1ucs))
     add_fees_to_ret!(model, ret, settings.fee)
     add_market_impact_cost!(model, ret, settings.mic)
@@ -919,21 +926,21 @@ $(val_dict[:relax])
 """
 function set_ucs_return_constraints!(model::JuMP.Model, i, ucs::SignedL1UncertaintySet,
                                      mu::Num_VecNum, settings::JuMPReturnsSettings,
-                                     ::Any = nothing)
+                                     ::Any = nothing; prefix::Symbol = Symbol(""))
     sc = get_constraint_scale(model)
-    w = get_w(model)
+    w = get_w(model, prefix)
     mu = something(ucs.mu, mu)
     sd = ucs.sd
     sw = isnothing(sd) ? w : sd .* w
-    t_sl1ucs_p = state_set!(model, Symbol(""), :t_sl1ucs_p_, i,
+    t_sl1ucs_p = state_set!(model, prefix, :t_sl1ucs_p_, i,
                             JuMP.@variable(model, lower_bound = 0))
-    t_sl1ucs_m = state_set!(model, Symbol(""), :t_sl1ucs_m_, i,
+    t_sl1ucs_m = state_set!(model, prefix, :t_sl1ucs_m_, i,
                             JuMP.@variable(model, lower_bound = 0))
-    state_set!(model, Symbol(""), :sl1ucs_ret_p_, i,
+    state_set!(model, prefix, :sl1ucs_ret_p_, i,
                JuMP.@constraint(model, sc * (-sw .- t_sl1ucs_p) <= 0))
-    state_set!(model, Symbol(""), :sl1ucs_ret_m_, i,
+    state_set!(model, prefix, :sl1ucs_ret_m_, i,
                JuMP.@constraint(model, sc * (sw .- t_sl1ucs_m) <= 0))
-    ret = state_set!(model, Symbol(""), :ret_, i,
+    ret = state_set!(model, prefix, :ret_, i,
                      JuMP.@expression(model,
                                       dot_scalar(mu, w) - ucs.ep * t_sl1ucs_p -
                                       ucs.en * t_sl1ucs_m))
@@ -1006,32 +1013,33 @@ function set_ucs_return_constraints!(model::JuMP.Model, i,
                                      ucs::NormBallUncertaintySet{<:Any, <:Any, <:Any,
                                                                  <:MuUncertaintySetClass},
                                      mu::Num_VecNum, settings::JuMPReturnsSettings,
-                                     ::Any = nothing)
-    w = get_w(model)
+                                     ::Any = nothing; prefix::Symbol = Symbol(""))
+    w = get_w(model, prefix)
     mu = something(ucs.val, mu)
     L = ucs.L
     # A map with no column spans nothing, so the worst case is the nominal return and no
     # cone is needed.
     robust = size(L, 2) > zero(Int)
     ret = if robust
-        x_nbucs_w = state_set!(model, Symbol(""), :x_nbucs_w_, i,
+        x_nbucs_w = state_set!(model, prefix, :x_nbucs_w_, i,
                                JuMP.@expression(model, transpose(L) * w))
         # The covariance builder registers its epigraph under the same prefix and index, so
         # this one tags the index.
-        t_nbucs = norm_ball_dual_norm_epigraph!(model, Symbol(""), Symbol(:w_, i),
-                                                x_nbucs_w, ucs.p)
+        t_nbucs = norm_ball_dual_norm_epigraph!(model, prefix, Symbol(:w_, i), x_nbucs_w,
+                                                ucs.p)
         JuMP.@expression(model, dot_scalar(mu, w) - ucs.kappa * t_nbucs)
     else
         JuMP.@expression(model, dot_scalar(mu, w))
     end
-    ret = state_set!(model, Symbol(""), :ret_, i, ret)
+    ret = state_set!(model, prefix, :ret_, i, ret)
     fee = add_fees_to_ret!(model, ret, settings.fee)
     mic = add_market_impact_cost!(model, ret, settings.mic)
     return ret, mu, robust || fee || mic
 end
 function set_return_constraints!(model::JuMP.Model, i,
                                  pret::ArithmeticReturn{<:Any, <:UcSE_UcS, <:Any},
-                                 pr::AbstractPriorResult; rd::ReturnsResult, kwargs...)
+                                 pr::AbstractPriorResult; rd::ReturnsResult,
+                                 prefix::Symbol = Symbol(""), kwargs...)
     settings = pret.settings
     # The set is a neighbourhood of the quantity it was calibrated on, so it names the
     # centre. The term's own field and then the prior are the fallbacks (ADR 0050).
@@ -1042,20 +1050,20 @@ function set_return_constraints!(model::JuMP.Model, i,
     # arguments takes no keyword.
     uc = mu_ucs(pret.ucs, rd, pr)
     ret, mu, forces_risk = set_ucs_return_constraints!(model, i, uc, fb, settings,
-                                                       pret.mtx_sqrt)
-    set_return_bounds!(model, i, ret, settings.lb)
+                                                       pret.mtx_sqrt; prefix = prefix)
+    set_return_bounds!(model, i, ret, settings.lb; prefix = prefix)
     set_return_expression!(model, i, ret, settings.scale, settings.rte)
     return mu, forces_risk
 end
 function set_return_constraints!(model::JuMP.Model, i, pret::LogarithmicReturn,
-                                 pr::AbstractPriorResult; kwargs...)
+                                 pr::AbstractPriorResult; prefix::Symbol = Symbol(""),
+                                 kwargs...)
     k = get_k(model)
     sc = get_constraint_scale(model)
     settings = pret.settings
-    X = set_portfolio_returns!(model, pr.X)
+    X = set_portfolio_returns!(model, pr.X; prefix = prefix)
     T = length(X)
-    t_elog_ret = state_set!(model, Symbol(""), :t_elog_ret_, i,
-                            JuMP.@variable(model, [1:T]))
+    t_elog_ret = state_set!(model, prefix, :t_elog_ret_, i, JuMP.@variable(model, [1:T]))
     # Both fields hold an `Option{<:ObsWeights}`, so the term's own weights and then the
     # prior's are the choice, as `fb` is in the arithmetic term.
     wi = get_observation_weights(ifelse(isnothing(pret.w), pr.w, pret.w), X)
@@ -1064,29 +1072,29 @@ function set_return_constraints!(model::JuMP.Model, i, pret::LogarithmicReturn,
     else
         JuMP.@expression(model, Statistics.mean(t_elog_ret, wi))
     end
-    state_set!(model, Symbol(""), :ret_, i, ret)
+    state_set!(model, prefix, :ret_, i, ret)
     fee = add_fees_to_ret!(model, ret, settings.fee)
     mic = add_market_impact_cost!(model, ret, settings.mic)
-    kret = state_set!(model, Symbol(""), :kret_, i, JuMP.@expression(model, k .+ X))
-    state_set!(model, Symbol(""), :elog_ret_ret_, i,
+    kret = state_set!(model, prefix, :kret_, i, JuMP.@expression(model, k .+ X))
+    state_set!(model, prefix, :elog_ret_ret_, i,
                JuMP.@constraint(model, [j = 1:T],
                                 [sc * t_elog_ret[j], sc * k, sc * kret[j]] in
                                 JuMP.MOI.ExponentialCone()))
-    set_return_bounds!(model, i, ret, settings.lb)
+    set_return_bounds!(model, i, ret, settings.lb; prefix = prefix)
     set_return_expression!(model, i, ret, settings.scale, settings.rte)
     # A logarithmic term holds no per-asset quantity, which forces the ratio's risk form. A
     # charge forces it too, when an arithmetic term supplies the characteristic (#1358).
     return nothing, fee || mic
 end
 function set_return_constraints!(model::JuMP.Model, i, pret::NoReturn,
-                                 ::AbstractPriorResult; kwargs...)
+                                 ::AbstractPriorResult; prefix::Symbol = Symbol(""),
+                                 kwargs...)
     settings = pret.settings
-    ret = state_set!(model, Symbol(""), :ret_, i,
-                     JuMP.@expression(model, zero(JuMP.AffExpr)))
+    ret = state_set!(model, prefix, :ret_, i, JuMP.@expression(model, zero(JuMP.AffExpr)))
     # No charge is applied here, and this is why `settings.fee` and `settings.mic` are inert:
     # the term's expression is identically zero by construction, every guard `NoReturn`
     # carries rests on that, and a fee subtracted here would make it non-zero.
-    set_return_bounds!(model, i, ret, settings.lb)
+    set_return_bounds!(model, i, ret, settings.lb; prefix = prefix)
     set_return_expression!(model, i, ret, settings.scale, settings.rte)
     # No per-asset quantity, and no robust cone.
     return nothing, false

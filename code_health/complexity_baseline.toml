@@ -5,7 +5,7 @@
 julia = "1.13.3"
 code_complexity = "0.2.0"
 julia_syntax = "1.0.2"
-commit = "f2b11c8207"
+commit = "dc3d282e50"
 
 [file]
 "ext/PortfolioOptimisersPlotsExt/01_CumulativeReturnsPlots.jl" = { cyc = 5, cog = 7, arg = 8, cyc_sum = 53, cog_sum = 57, arg_sum = 99, macros = [] }
@@ -345,21 +345,21 @@ commit = "f2b11c8207"
 "src/17_Optimisation/05_JuMP/01_Base_JuMPOptimisation/03_JuMPModelState.jl" = { cyc = 2, cog = 1, arg = 5, cyc_sum = 22, cog_sum = 2, arg_sum = 61, macros = [] }
 "src/17_Optimisation/05_JuMP/01_Base_JuMPOptimisation/04_FrontierSweep.jl" = { cyc = 4, cog = 5, arg = 5, cyc_sum = 24, cog_sum = 14, arg_sum = 33, macros = [] }
 "src/17_Optimisation/05_JuMP/01_Base_JuMPOptimisation/05_JuMPModelSetup.jl" = { cyc = 8, cog = 12, arg = 3, cyc_sum = 29, cog_sum = 24, arg_sum = 25, macros = [] }
-"src/17_Optimisation/05_JuMP/02_JuMPConstraints/01_MIPIndicators.jl" = { cyc = 22, cog = 13, arg = 15, cyc_sum = 89, cog_sum = 43, arg_sum = 132, macros = [] }
+"src/17_Optimisation/05_JuMP/02_JuMPConstraints/01_MIPIndicators.jl" = { cyc = 22, cog = 10, arg = 15, cyc_sum = 99, cog_sum = 44, arg_sum = 171, macros = [] }
 "src/17_Optimisation/05_JuMP/02_JuMPConstraints/02_Returns_and_ObjectiveFunctions/01_ReturnEstimators.jl" = { cyc = 5, cog = 4, arg = 6, cyc_sum = 36, cog_sum = 18, arg_sum = 76, macros = [] }
 "src/17_Optimisation/05_JuMP/02_JuMPConstraints/02_Returns_and_ObjectiveFunctions/02_ObjectiveFunctions.jl" = { cyc = 8, cog = 8, arg = 5, cyc_sum = 49, cog_sum = 40, arg_sum = 47, macros = [] }
-"src/17_Optimisation/05_JuMP/02_JuMPConstraints/02_Returns_and_ObjectiveFunctions/03_ReturnConstraints.jl" = { cyc = 5, cog = 7, arg = 6, cyc_sum = 47, cog_sum = 35, arg_sum = 96, macros = [] }
+"src/17_Optimisation/05_JuMP/02_JuMPConstraints/02_Returns_and_ObjectiveFunctions/03_ReturnConstraints.jl" = { cyc = 5, cog = 7, arg = 7, cyc_sum = 47, cog_sum = 35, arg_sum = 108, macros = [] }
 "src/17_Optimisation/05_JuMP/02_JuMPConstraints/03_BudgetConstraints.jl" = { cyc = 13, cog = 12, arg = 7, cyc_sum = 72, cog_sum = 54, arg_sum = 104, macros = ["@propagatable"] }
-"src/17_Optimisation/05_JuMP/02_JuMPConstraints/04_WeightConstraints.jl" = { cyc = 9, cog = 10, arg = 6, cyc_sum = 37, cog_sum = 28, arg_sum = 31, macros = [] }
+"src/17_Optimisation/05_JuMP/02_JuMPConstraints/04_WeightConstraints.jl" = { cyc = 9, cog = 10, arg = 6, cyc_sum = 37, cog_sum = 28, arg_sum = 33, macros = [] }
 "src/17_Optimisation/05_JuMP/02_JuMPConstraints/05_SDPConstraints.jl" = { cyc = 10, cog = 12, arg = 3, cyc_sum = 48, cog_sum = 43, arg_sum = 40, macros = [] }
-"src/17_Optimisation/05_JuMP/02_JuMPConstraints/06_IntegerPhylogenyConstraints.jl" = { cyc = 7, cog = 7, arg = 5, cyc_sum = 22, cog_sum = 16, arg_sum = 17, macros = [] }
-"src/17_Optimisation/05_JuMP/02_JuMPConstraints/07_CardinalityConstraints.jl" = { cyc = 15, cog = 19, arg = 11, cyc_sum = 64, cog_sum = 56, arg_sum = 78, macros = [] }
-"src/17_Optimisation/05_JuMP/02_JuMPConstraints/08_ThresholdConstraints.jl" = { cyc = 3, cog = 2, arg = 9, cyc_sum = 5, cog_sum = 3, arg_sum = 15, macros = [] }
-"src/17_Optimisation/05_JuMP/02_JuMPConstraints/09_TurnoverConstraints.jl" = { cyc = 2, cog = 1, arg = 3, cyc_sum = 4, cog_sum = 1, arg_sum = 6, macros = [] }
+"src/17_Optimisation/05_JuMP/02_JuMPConstraints/06_IntegerPhylogenyConstraints.jl" = { cyc = 7, cog = 7, arg = 5, cyc_sum = 22, cog_sum = 16, arg_sum = 19, macros = [] }
+"src/17_Optimisation/05_JuMP/02_JuMPConstraints/07_CardinalityConstraints.jl" = { cyc = 15, cog = 19, arg = 12, cyc_sum = 64, cog_sum = 56, arg_sum = 85, macros = [] }
+"src/17_Optimisation/05_JuMP/02_JuMPConstraints/08_ThresholdConstraints.jl" = { cyc = 3, cog = 2, arg = 9, cyc_sum = 6, cog_sum = 4, arg_sum = 21, macros = [] }
+"src/17_Optimisation/05_JuMP/02_JuMPConstraints/09_TurnoverConstraints.jl" = { cyc = 2, cog = 1, arg = 4, cyc_sum = 4, cog_sum = 1, arg_sum = 9, macros = [] }
 "src/17_Optimisation/05_JuMP/02_JuMPConstraints/10_FeesConstraints.jl" = { cyc = 3, cog = 2, arg = 7, cyc_sum = 30, cog_sum = 13, arg_sum = 63, macros = [] }
 "src/17_Optimisation/05_JuMP/02_JuMPConstraints/11_TrackingErrorConstraints.jl" = { cyc = 2, cog = 2, arg = 10, cyc_sum = 13, cog_sum = 2, arg_sum = 67, macros = [] }
-"src/17_Optimisation/05_JuMP/02_JuMPConstraints/12_RegularisationConstraints.jl" = { cyc = 2, cog = 1, arg = 5, cyc_sum = 44, cog_sum = 10, arg_sum = 88, macros = [] }
-"src/17_Optimisation/05_JuMP/02_JuMPConstraints/13_WeightNormConstraints.jl" = { cyc = 4, cog = 4, arg = 5, cyc_sum = 11, cog_sum = 5, arg_sum = 14, macros = [] }
+"src/17_Optimisation/05_JuMP/02_JuMPConstraints/12_RegularisationConstraints.jl" = { cyc = 2, cog = 1, arg = 6, cyc_sum = 45, cog_sum = 10, arg_sum = 103, macros = [] }
+"src/17_Optimisation/05_JuMP/02_JuMPConstraints/13_WeightNormConstraints.jl" = { cyc = 4, cog = 3, arg = 5, cyc_sum = 13, cog_sum = 5, arg_sum = 25, macros = [] }
 "src/17_Optimisation/05_JuMP/03_JuMPOptimiser_a.jl" = { cyc = 9, cog = 9, arg = 42, cyc_sum = 38, cog_sum = 29, arg_sum = 85, macros = ["@forward_properties"] }
 "src/17_Optimisation/05_JuMP/03_JuMPOptimiser_b.jl" = { cyc = 7, cog = 11, arg = 9, cyc_sum = 32, cog_sum = 29, arg_sum = 60, macros = [] }
 "src/17_Optimisation/05_JuMP/04_MeanRisk.jl" = { cyc = 5, cog = 5, arg = 7, cyc_sum = 42, cog_sum = 24, arg_sum = 85, macros = ["@pipe_delegates", "@pipe_route_sigma_ucs", "@propagatable"] }
@@ -410,7 +410,7 @@ commit = "f2b11c8207"
 "src/17_Optimisation/10_OnlinePortfolioSelection/09_AdaptiveOptimistic.jl" = { cyc = 5, cog = 4, arg = 9, cyc_sum = 60, cog_sum = 23, arg_sum = 131, macros = [] }
 "src/17_Optimisation/10_OnlinePortfolioSelection/10_MetaLearning.jl" = { cyc = 2, cog = 2, arg = 6, cyc_sum = 9, cog_sum = 5, arg_sum = 11, macros = [] }
 "src/17_Optimisation/10_OnlinePortfolioSelection/11_AllocationRiskCeiling.jl" = { cyc = 3, cog = 2, arg = 3, cyc_sum = 30, cog_sum = 8, arg_sum = 20, macros = [] }
-"src/17_Optimisation/10_OnlinePortfolioSelection/12_AllocationSetProgramme.jl" = { cyc = 4, cog = 5, arg = 7, cyc_sum = 91, cog_sum = 40, arg_sum = 108, macros = [] }
+"src/17_Optimisation/10_OnlinePortfolioSelection/12_AllocationSetProgramme.jl" = { cyc = 4, cog = 5, arg = 7, cyc_sum = 83, cog_sum = 33, arg_sum = 106, macros = [] }
 "src/17_Optimisation/10_OnlinePortfolioSelection/13_SparsePortfolioAlgorithms.jl" = { cyc = 3, cog = 3, arg = 5, cyc_sum = 17, cog_sum = 10, arg_sum = 26, macros = [] }
 "src/17_Optimisation/11_ProjectionWeightFinalisers.jl" = { cyc = 9, cog = 13, arg = 3, cyc_sum = 35, cog_sum = 34, arg_sum = 15, macros = [] }
 "src/18_ExpectedReturns/01_ExpectedReturns.jl" = { cyc = 3, cog = 4, arg = 9, cyc_sum = 55, cog_sum = 27, arg_sum = 175, macros = ["@propagatable"] }

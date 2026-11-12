@@ -23,6 +23,7 @@ unique_key_dict!(arg_dict, :arg_dict,
                  :seed => "`seed`: Optional seed. If set, the draws come from a copy of `rng` seeded with it, so `rng` does not advance and every call draws the same values. If `nothing`, the draws come from `rng` itself.",
                  # JuMP Optimisation
                  :model => "`model::JuMP.Model`: The JuMP optimisation model.",
+                 :prefix_kw => "`prefix::Symbol = Symbol(\"\")`: Model State namespace of the call. The builder reads the weights under it, and every entry that it registers takes it, so two calls under two prefixes add two sets of rows to one model. The empty default gives the bare names.",
                  :opt_rjumpe => "`opt::RiskConstraintOwner`: The owner of the risk constraint, a risk-based JuMP optimisation estimator or a programme Allocation Set.",
                  :ci => "`i`: Constraint index for unique variable and constraint naming.",
                  :wb_arg => "`wb::WeightBounds`: Weight bound specification containing lower and upper bounds.",

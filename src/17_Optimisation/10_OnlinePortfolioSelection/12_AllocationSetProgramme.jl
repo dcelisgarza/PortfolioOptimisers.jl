@@ -207,7 +207,7 @@ $(DocStringExtensions.TYPEDSIGNATURES)
 
 Adds every kind of a programme set other than the bounds and the budgets, in the order [`assemble_jump_model!`](@ref) runs them.
 
-Both arms call it after they add the bounds. The bare projection model passes the empty prefix `Symbol("")`. A leader's model passes `:aset_`. Then the builders that take an index use the first free index, and the head's `w` is registered under the prefix.
+Both arms call it after they add the bounds. The bare projection model passes the empty prefix `Symbol("")`. A leader's model passes `:aset_`. Then the head's `w` is registered under the prefix, and every builder writes its entries under it, so the set's rows sit beside the head's own. The MIP bits, the pin of the decomposition and the lifted matrix `W` belong to the weights, so the set reads the head's ([`set_mip_constraints!`](@ref)). The penalties add to the one Objective Penalty `op`.
 
 # Algorithm
 
@@ -216,7 +216,7 @@ Both arms call it after they add the bounds. The bare projection model passes th
  3. When `prefix` is not empty, register the model's `w` under it, with the owner `w_owner = Symbol("")`. Then [`weights_prefix`](@ref) keeps the lifted `W`, `variance_flag` and `rc_variance` in the bare namespace, because the weights are the leader's.
  4. Add the linear rows `lcsr`, then the centrality rows `ctr`.
  5. Add the MIP kinds, then the sub-group MIP kinds.
- 6. Add the turnover ceilings, each with its reference replaced by `w`, through [`set_allocation_turnover!`](@ref).
+ 6. Add the turnover ceilings, each with its reference replaced by `w`, through [`set_turnover_constraints!`](@ref).
  7. When the set has tracking errors, resolve each against `w`, so that a benchmark that is not fixed takes `w`. Cut each benchmark series to the row count of the prior with [`prefix_tracking_benchmark`](@ref). Bind each [`DataBenchmarkTracking`](@ref) to the benchmark of the rows `rd` with [`bind_data_benchmark`](@ref), and add the rows.
  8. Add the norm ceilings `l2c`, `lpc` and `linfc`.
  9. Add the penalties `l1`, `l2`, `lp` and `linf` to the Objective Penalty.
@@ -257,15 +257,13 @@ function assemble_allocation_set!(model::JuMP.Model, set::ProgrammeAllocationSet
         state_build!(() -> get_w(model), model, prefix, :w)
         state_build!(() -> Symbol(""), model, prefix, :w_owner)
     end
-    set_linear_weight_constraints!(model, lcsr, state_key(prefix, :lcs_ineq_),
-                                   state_key(prefix, :lcs_eq_))
-    set_linear_weight_constraints!(model, ctr, state_key(prefix, :cent_ineq_),
-                                   state_key(prefix, :cent_eq_))
+    set_linear_weight_constraints!(model, lcsr, :lcs_ineq_, :lcs_eq_; prefix = prefix)
+    set_linear_weight_constraints!(model, ctr, :cent_ineq_, :cent_eq_; prefix = prefix)
     set_mip_constraints!(model, set.wb, set.card, set.gcarde, plr, set.lt, set.st, nothing,
-                         set.ss, set.xbgt)
+                         set.ss, set.xbgt; prefix = prefix)
     set_smip_constraints!(model, set.wb, set.scard, set.sgcarde, set.smtx, set.sgmtx,
-                          set.slt, set.sst, set.sglt, set.sgst, set.ss)
-    set_allocation_turnover!(model, factory(set.tn, w), bare)
+                          set.slt, set.sst, set.sglt, set.sgst, set.ss; prefix = prefix)
+    set_turnover_constraints!(model, factory(set.tn, w); prefix = prefix)
     if !isnothing(set.tr)
         # The constructor refuses a data benchmark under a prior of the Excess Frame, so a
         # data benchmark binds to the raw rows that the set's prior reads.
@@ -273,17 +271,17 @@ function assemble_allocation_set!(model::JuMP.Model, set::ProgrammeAllocationSet
                                                            size(pr.X, 1)), rd)
         set_tracking_error_constraints!(model, pr, tr, set, plr, nothing; prefix = prefix)
     end
-    set_weight_norm_2_constraints!(model, l2c)
-    set_weight_norm_p_constraints!(model, lpc)
-    set_weight_norm_inf_constraints!(model, linfc)
-    set_l1_regularisation!(model, l1)
-    set_l2_regularisation!(model, l2)
-    set_lp_regularisation!(model, lp)
-    set_linf_regularisation!(model, linf)
+    set_weight_norm_2_constraints!(model, l2c; prefix = prefix)
+    set_weight_norm_p_constraints!(model, lpc; prefix = prefix)
+    set_weight_norm_inf_constraints!(model, linfc; prefix = prefix)
+    set_l1_regularisation!(model, l1; prefix = prefix)
+    set_l2_regularisation!(model, l2; prefix = prefix)
+    set_lp_regularisation!(model, lp; prefix = prefix)
+    set_linf_regularisation!(model, linf; prefix = prefix)
     set_allocation_risk_ceiling!(model, bind_data_benchmark(factory(set.r, w), rd), set, pr,
                                  plr; prefix = prefix)
-    set_allocation_return_floor!(model, ret, pr, bare; rd = rd)
-    set_iplg_constraints!(model, plr)
+    set_allocation_return_floor!(model, ret, pr; prefix = prefix, rd = rd)
+    set_iplg_constraints!(model, plr; prefix = prefix)
     set_sdp_phylogeny_constraints!(model, plr; prefix = prefix)
     add_custom_constraint!(model, set.ccnt, set, nothing)
     return nothing
@@ -326,61 +324,20 @@ function prefix_tracking_benchmark(trs::AbstractVector, T::Integer)
     return [prefix_tracking_benchmark(tr, T) for tr in trs]
 end
 """
-    set_allocation_turnover!(model::JuMP.Model, tn::Nothing, bare::Bool)
-    set_allocation_turnover!(model::JuMP.Model, tn::Turnover, bare::Bool)
-    set_allocation_turnover!(model::JuMP.Model, tns::VecTn, bare::Bool)
-
-Adds a programme set's turnover ceilings, whose reference is already the step's Price-Adjusted Allocation.
-
-On the bare projection model the ceilings take the indices one to the number of ceilings. In a leader's model each ceiling takes the first index that the model has not used, so the set's terms do not replace the head's own.
-
-# Arguments
-
-  - $(arg_dict[:model])
-  - `tn`: The turnover ceilings, one [`Turnover`](@ref), a vector of them, or `nothing`.
-  - `bare`: `true` on the bare projection model, `false` in a leader's model.
-
-# Returns
-
-  - `nothing`.
-
-# Related
-
-  - [`set_turnover_constraints!`](@ref)
-  - [`free_state_index`](@ref)
-"""
-function set_allocation_turnover!(::JuMP.Model, ::Nothing, ::Bool)::Nothing
-    return nothing
-end
-function set_allocation_turnover!(model::JuMP.Model, tn::Turnover, bare::Bool)::Nothing
-    set_allocation_turnover!(model, [tn], bare)
-    return nothing
-end
-function set_allocation_turnover!(model::JuMP.Model, tns::VecTn, bare::Bool)::Nothing
-    if bare
-        set_turnover_constraints!(model, tns)
-        return nothing
-    end
-    for tn in tns
-        _set_turnover_constraints!(model, tn, free_state_index(model, :t_tn_))
-    end
-    return nothing
-end
-"""
-    set_allocation_return_floor!(model::JuMP.Model, ret::Nothing, pr, bare::Bool; kwargs...)
-    set_allocation_return_floor!(model::JuMP.Model, ret::JuMPReturnsEstimator, pr::AbstractPriorResult, bare::Bool; kwargs...)
-    set_allocation_return_floor!(model::JuMP.Model, rets::VecJRE, pr::AbstractPriorResult, bare::Bool; kwargs...)
+    set_allocation_return_floor!(model::JuMP.Model, ret::Nothing, pr; prefix::Symbol = Symbol(""), kwargs...)
+    set_allocation_return_floor!(model::JuMP.Model, ret::JuMPReturnsEstimator, pr::AbstractPriorResult; prefix::Symbol = Symbol(""), kwargs...)
+    set_allocation_return_floor!(model::JuMP.Model, rets::VecJRE, pr::AbstractPriorResult; prefix::Symbol = Symbol(""), kwargs...)
 
 Adds a programme set's return floor.
 
-For each term, the per-index arm of [`set_return_constraints!`](@ref) writes the return expression on the prior's expected returns and the row of its `settings.lb`. The term's scale is set to one first. On the bare projection model the terms take the indices one to the number of terms. In a leader's model each term takes the first index the model has not used. The function does not use a term in the objective, as a scalarised return or the normalisation of a ratio, because the objective of the projection is the geometry's divergence.
+For each term, the per-index arm of [`set_return_constraints!`](@ref) writes the return expression on the prior's expected returns and the row of its `settings.lb`. The term's scale is set to one first. The terms take the indices one to the number of terms under `prefix`, so in a leader's model they do not replace the head's own. The function does not use a term in the objective, as a scalarised return or the normalisation of a ratio, because the objective of the projection is the geometry's divergence.
 
 # Arguments
 
   - $(arg_dict[:model])
   - `ret`: The return floor, one return estimator, a vector of them, or `nothing`.
   - `pr`: The set's prior result.
-  - `bare`: `true` on the bare projection model, `false` in a leader's model.
+  - $(arg_dict[:prefix_kw])
   - `kwargs...`: Forwarded to [`set_return_constraints!`](@ref). The rows that the head holds arrive as `rd`.
 
 # Returns
@@ -390,24 +347,24 @@ For each term, the per-index arm of [`set_return_constraints!`](@ref) writes the
 # Related
 
   - [`set_return_constraints!`](@ref)
-  - [`free_state_index`](@ref)
+  - [`assemble_allocation_set!`](@ref)
 """
-function set_allocation_return_floor!(::JuMP.Model, ::Nothing, ::Any, ::Bool;
-                                      kwargs...)::Nothing
+function set_allocation_return_floor!(::JuMP.Model, ::Nothing, ::Any;
+                                      prefix::Symbol = Symbol(""), kwargs...)::Nothing
     return nothing
 end
 function set_allocation_return_floor!(model::JuMP.Model, ret::JuMPReturnsEstimator,
-                                      pr::AbstractPriorResult, bare::Bool;
+                                      pr::AbstractPriorResult; prefix::Symbol = Symbol(""),
                                       kwargs...)::Nothing
-    set_allocation_return_floor!(model, [ret], pr, bare; kwargs...)
+    set_allocation_return_floor!(model, [ret], pr; prefix = prefix, kwargs...)
     return nothing
 end
 function set_allocation_return_floor!(model::JuMP.Model, rets::VecJRE,
-                                      pr::AbstractPriorResult, bare::Bool;
+                                      pr::AbstractPriorResult; prefix::Symbol = Symbol(""),
                                       kwargs...)::Nothing
     for (i, ret) in enumerate(rets)
-        j = bare ? i : free_state_index(model, :ret_)
-        set_return_constraints!(model, j, unit_scale_returns_estimator(ret), pr; kwargs...)
+        set_return_constraints!(model, i, unit_scale_returns_estimator(ret), pr;
+                                prefix = prefix, kwargs...)
     end
     return nothing
 end
@@ -561,29 +518,6 @@ function anonymous_budget_rows!(model::JuMP.Model, expr, bgt::BudgetRange)::Noth
         JuMP.@constraint(model, sc * (expr - k * bgt.ub) <= 0)
     end
     return nothing
-end
-"""
-$(DocStringExtensions.TYPEDSIGNATURES)
-
-Returns the first index `i`, counted from one, at which the Model State holds no entry `name`.
-
-A builder keyed by an index uses it to add the set's term next to the head's own terms, which hold the indices from one up.
-
-# Returns
-
-  - `i::Int`: The first free index.
-
-# Related
-
-  - [`add_allocation_set_constraints!`](@ref)
-  - [`state_set!`](@ref)
-"""
-function free_state_index(model::JuMP.Model, name::Symbol)
-    i = 1
-    while state_has(model, Symbol(""), name, i)
-        i += 1
-    end
-    return i
 end
 """
     set_allocation_set_bounds!(model::JuMP.Model, wb::WeightBounds, sbgt = nothing, gbgt = nothing)

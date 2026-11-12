@@ -1588,6 +1588,155 @@ end
             @test isa(nsres.retcode, OptimisationSuccess) && isnothing(nsres.retcode.res)
             @test sum(x -> max(-x, 0), nsres.w) ≈ 0.1 atol = 1e-5
         end
+        @testset "Two calls under two prefixes in one model (#2041)" begin
+            # A second call of a builder under its own prefix, on the weights that the head
+            # owns, adds its own rows beside the head's. The MIP bits belong to the weights,
+            # so the two calls share one bit for each asset.
+            function two_call_model(N; parts = false)
+                m = JuMP.Model()
+                po.set_model_scales!(m, 1, 1)
+                po.set_model_observations!(m, T)
+                JuMP.@expression(m, k, 1)
+                JuMP.@variable(m, w[1:N])
+                if parts
+                    # Long and short parts that bound the weights.
+                    po.set_weight_constraints!(m,
+                                               WeightBounds(; lb = fill(-1.0, N),
+                                                            ub = ones(N)), 1, 1)
+                end
+                po.state_set!(m, :b_, :w, po.get_w(m))
+                po.state_set!(m, :b_, :w_owner, Symbol(""))
+                return m
+            end
+            nbin(m) = count(JuMP.is_binary, JuMP.all_variables(m))
+            N = 3
+            rd3 = ReturnsResult(; nx = ["A", "B", "C"], X = R,
+                                ts = Date(2020, 1, 1) .+ Day.(0:(T - 1)))
+            wbh = WeightBounds(; lb = zeros(N), ub = ones(N))
+            wbb = WeightBounds(; lb = zeros(N), ub = fill(0.6, N))
+            # Two held calls: one vector of bits, and each call's gates, threshold,
+            # cardinality and integer phylogeny under its own prefix.
+            m = two_call_model(N)
+            iplg = po.IntegerPhylogeny(; A = [0 1 0; 1 0 1; 0 1 0], B = 1)
+            po.set_mip_constraints!(m, wbh, 2, nothing, iplg, Threshold(; val = 0.1),
+                                    nothing, nothing, nothing)
+            po.set_mip_constraints!(m, wbb, 1, nothing, iplg, Threshold(; val = 0.2),
+                                    nothing, nothing, nothing; prefix = :b_)
+            po.set_iplg_constraints!(m, iplg)
+            po.set_iplg_constraints!(m, iplg; prefix = :b_)
+            @test nbin(m) == N
+            @test haskey(m, :ib) && !haskey(m, :b_ib)
+            @test po.mip_indicators(m, :b_) === po.mip_indicators(m)
+            @test all(haskey(m, Symbol(p, k)) for p in ("", "b_")
+                      for k in (:card, :w_mip_ub, :w_mip_lt, :card_plg_1))
+            # The rows of both calls hold: the second call allows one asset, below its
+            # ceiling of 0.6, so a budget of 0.6 sits on one asset.
+            JuMP.@constraint(m, sum(po.get_w(m)) == 0.6)
+            JuMP.@objective(m, Max, po.get_w(m)[2])
+            JuMP.set_optimizer(m, mip.solver)
+            JuMP.optimize!(m)
+            wv = JuMP.value.(po.get_w(m))
+            @test isapprox(wv, [0, 0.6, 0]; atol = 1e-6)
+            # A long-short bundle of the weights serves a later held call, with its gates
+            # and its long threshold.
+            m = two_call_model(N; parts = true)
+            wbs = WeightBounds(; lb = fill(-1.0, N), ub = ones(N))
+            po.set_mip_constraints!(m, wbs, nothing, nothing, nothing, nothing,
+                                    Threshold(; val = 0.05), nothing, nothing)
+            po.set_mip_constraints!(m, wbs, 2, nothing, nothing, Threshold(; val = 0.1),
+                                    nothing, nothing, nothing; prefix = :b_)
+            @test nbin(m) == 2N
+            @test isa(po.mip_indicators(m, :b_), po.LongShortIndicators)
+            @test haskey(m, :b_w_mip_lt) && haskey(m, :b_card) && !haskey(m, :b_ib)
+            # A sign bundle has no held bit, so a later call with a cardinality declares its
+            # own bundle under its prefix. The pin of the decomposition is written once.
+            m = two_call_model(N; parts = true)
+            po.set_mip_constraints!(m, wbs, nothing, nothing, nothing, nothing, nothing,
+                                    nothing, nothing, true)
+            po.set_mip_constraints!(m, wbs, 2, nothing, nothing, nothing, nothing, nothing,
+                                    nothing, true; prefix = :b_)
+            @test isa(po.mip_indicators(m), po.SignIndicators)
+            @test isa(po.mip_indicators(m, :b_), po.LongShortIndicators)
+            @test nbin(m) == 3N
+            @test haskey(m, :xbgt_lw_ub) && !haskey(m, :b_xbgt_lw_ub)
+            @test haskey(m, :b_ilb) && haskey(m, :b_card)
+            @test isnothing(po.mip_indicators(two_call_model(N), :b_))
+            # The sub-group bits belong to the call.
+            m = two_call_model(N)
+            smtx = [1 1 0; 0 0 1]
+            po.set_smip_constraints!(m, wbh, 1, nothing, smtx, nothing, nothing, nothing,
+                                     nothing, nothing, nothing)
+            po.set_smip_constraints!(m, wbh, 1, nothing, smtx, nothing, nothing, nothing,
+                                     nothing, nothing, nothing; prefix = :b_)
+            @test haskey(m, :sib_1_) && haskey(m, :b_sib_1_)
+            ssp = po.SubsetMIPSpace(smtx, :s, 1, :b_)
+            @test po.mip_bit_space(ssp) === ssp
+            @test haskey(m, :scard_1_) && haskey(m, :b_scard_1_)
+            # The fixed names of the other builders.
+            m = two_call_model(N)
+            lc = po.LinearConstraint(;
+                                     ineq = po.PartialLinearConstraint(; A = [1.0 0 0],
+                                                                       B = [0.5]))
+            for (p, s) in ((Symbol(""), 1), (:b_, 2))
+                po.set_linear_weight_constraints!(m, lc, :lcs_ineq_, :lcs_eq_; prefix = p)
+                po.set_turnover_constraints!(m, Turnover(; w = fill(inv(N), N), val = 0.5);
+                                             prefix = p)
+                po.set_weight_norm_2_constraints!(m, 0.9; prefix = p)
+                po.set_weight_norm_p_constraints!(m, LpRegularisation(; p = 3, val = 0.9);
+                                                  prefix = p)
+                po.set_weight_norm_inf_constraints!(m, 0.8; prefix = p)
+                po.set_l1_regularisation!(m, 0.1s; prefix = p)
+                po.set_l2_regularisation!(m, L2Regularisation(; val = 0.1s); prefix = p)
+                po.set_lp_regularisation!(m, LpRegularisation(; p = 3, val = 0.1s);
+                                          prefix = p)
+                po.set_linf_regularisation!(m, 0.1s; prefix = p)
+            end
+            @test all(haskey(m, Symbol(p, k)) for p in ("", "b_")
+                      for k in
+                          (:lcs_ineq_1, :t_tn_1, :l2c, :cl2c, :t_lpc_1, :t_linfc, :clinfc,
+                           :t_l1, :l1, :t_l2_1, :t_lp_1, :t_linf, :linf))
+            # A second penalty adds its term to the one Objective Penalty.
+            op = po.shared_get(m, :op)
+            for (t, c) in ((:t_l1, 0.1), (:b_t_l1, 0.2), (:t_linf, 0.1), (:b_t_linf, 0.2),
+                           (:t_l2_1, 0.1), (:b_t_l2_1, 0.2), (:t_lp_1, 0.1), (:b_t_lp_1, 0.2))
+                @test JuMP.coefficient(op, m[t]) ≈ c
+            end
+            # The return floor of a term under a prefix.
+            pr = po.prior(EmpiricalPrior(), ReturnsResult(; nx = ["A", "B", "C"], X = R))
+            po.set_return_constraints!(m, 1,
+                                       ArithmeticReturn(;
+                                                        settings = JuMPReturnsSettings(;
+                                                                                       lb = 0.0)),
+                                       pr; prefix = :b_)
+            @test haskey(m, :b_ret_1) && haskey(m, :b_ret_lb_1) && !haskey(m, :ret_1)
+            # A leader whose head and set both state a penalty raised on the second name in
+            # v0.33. Both terms now enter the leader's model.
+            lres = optimise(OPS(;
+                                alg = FollowTheLeader(;
+                                                      opt = MeanRisk(;
+                                                                     obj = MaximumReturn(),
+                                                                     opt = JuMPOptimiser(;
+                                                                                         pe = EmpiricalPrior(),
+                                                                                         slv = slv,
+                                                                                         l1 = 0.01,
+                                                                                         linf = 0.01))),
+                                set = ProgrammeAllocationSet(; slv = slv, l1 = 0.01,
+                                                             linf = 0.01)), rd3)
+            @test isa(lres.retcode, OptimisationSuccess)
+            # A leader with a cardinality in the head and in the set holds both, on one
+            # vector of bits.
+            cres = optimise(OPS(;
+                                alg = FollowTheLeader(;
+                                                      opt = MeanRisk(;
+                                                                     obj = MaximumReturn(),
+                                                                     opt = JuMPOptimiser(;
+                                                                                         pe = EmpiricalPrior(),
+                                                                                         slv = mip,
+                                                                                         card = 2))),
+                                set = ProgrammeAllocationSet(; slv = mip, card = 1)), rd3)
+            @test isa(cres.retcode, OptimisationSuccess)
+            @test count(>(1e-6), abs.(cres.w)) <= 1
+        end
     end
     @testset "The set's view, the barrier roots and the mirror step's domain (#1192)" begin
         # The view of the set viewed every per-asset slot but the prior estimator, so a

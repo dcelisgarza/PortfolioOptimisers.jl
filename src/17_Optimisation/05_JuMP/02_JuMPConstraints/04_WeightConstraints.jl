@@ -329,6 +329,7 @@ Where:
     constraint entries.
   - `name_eq::Symbol`: Bare Model State entry name seeding the indexed equality constraint
     entries.
+  - $(arg_dict[:prefix_kw])
 
 # Returns
 
@@ -340,25 +341,26 @@ Where:
   - [`LinearConstraint`](@ref)
   - [`set_weight_constraints!`](@ref)
 """
-function set_linear_weight_constraints!(args...)
+function set_linear_weight_constraints!(args...; prefix::Symbol = Symbol(""))
     return nothing
 end
 function set_linear_weight_constraints!(model::JuMP.Model, lcms::Lc_VecLc,
-                                        name_ineq::Symbol, name_eq::Symbol)
-    w = get_w(model)
+                                        name_ineq::Symbol, name_eq::Symbol;
+                                        prefix::Symbol = Symbol(""))
+    w = get_w(model, prefix)
     k = get_k(model)
     sc = get_constraint_scale(model)
     for (i, lcm) in enumerate(lcms)
         if !isnothing(lcm.ineq)
             A = lcm.ineq.A
             B = lcm.ineq.B
-            state_set!(model, Symbol(""), name_ineq, i,
+            state_set!(model, prefix, name_ineq, i,
                        JuMP.@constraint(model, sc * (A * w - k * B) <= 0))
         end
         if !isnothing(lcm.eq)
             A = lcm.eq.A
             B = lcm.eq.B
-            state_set!(model, Symbol(""), name_eq, i,
+            state_set!(model, prefix, name_eq, i,
                        JuMP.@constraint(model, sc * (A * w - k * B) == 0))
         end
     end

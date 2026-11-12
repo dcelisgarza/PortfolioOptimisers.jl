@@ -9,6 +9,7 @@ The fall-through method does nothing. The concrete method iterates over the coll
 
   - $(arg_dict[:model])
   - `tns`: One or more [`Turnover`](@ref) constraint specifications.
+  - $(arg_dict[:prefix_kw])
 
 # Returns
 
@@ -20,7 +21,7 @@ The fall-through method does nothing. The concrete method iterates over the coll
   - [`Turnover`](@ref)
   - [`set_turnover_fees!`](@ref)
 """
-function set_turnover_constraints!(args...)
+function set_turnover_constraints!(args...; prefix::Symbol = Symbol(""))
     return nothing
 end
 """
@@ -52,6 +53,7 @@ Where:
   - $(arg_dict[:model])
   - `tn::Turnover`: Turnover constraint specification containing benchmark weights `w` and tolerance `val`.
   - `i::Integer = 1`: Index used to generate unique variable and constraint names.
+  - $(arg_dict[:prefix_kw])
 
 # Returns
 
@@ -62,15 +64,16 @@ Where:
   - [`set_turnover_constraints!`](@ref)
   - [`Turnover`](@ref)
 """
-function _set_turnover_constraints!(model::JuMP.Model, tn::Turnover, i::Integer = 1)
-    w = get_w(model)
+function _set_turnover_constraints!(model::JuMP.Model, tn::Turnover, i::Integer = 1;
+                                    prefix::Symbol = Symbol(""))
+    w = get_w(model, prefix)
     k = get_k(model)
     sc = get_constraint_scale(model)
     N = length(w)
     wb = tn.w
     val = tn.val
-    t_tn = state_set!(model, Symbol(""), :t_tn_, i, JuMP.@variable(model, [1:N]))
-    tn = state_set!(model, Symbol(""), :tn_, i, JuMP.@expression(model, w - wb * k))
+    t_tn = state_set!(model, prefix, :t_tn_, i, JuMP.@variable(model, [1:N]))
+    tn = state_set!(model, prefix, :tn_, i, JuMP.@expression(model, w - wb * k))
     ctn_noc, ctn = JuMP.@constraints(model,
                                      begin
                                          [i = 1:N],
@@ -78,13 +81,14 @@ function _set_turnover_constraints!(model::JuMP.Model, tn::Turnover, i::Integer 
                                           sc * tn[i]] in JuMP.MOI.NormOneCone(2)
                                          sc * (t_tn ⊖ val * k) <= 0
                                      end)
-    state_set!(model, Symbol(""), :ctn_noc_, i, ctn_noc)
-    state_set!(model, Symbol(""), :ctn_, i, ctn)
+    state_set!(model, prefix, :ctn_noc_, i, ctn_noc)
+    state_set!(model, prefix, :ctn_, i, ctn)
     return nothing
 end
-function set_turnover_constraints!(model::JuMP.Model, tns::Tn_VecTn)
+function set_turnover_constraints!(model::JuMP.Model, tns::Tn_VecTn;
+                                   prefix::Symbol = Symbol(""))
     for (i, tn) in enumerate(tns)
-        _set_turnover_constraints!(model, tn, i)
+        _set_turnover_constraints!(model, tn, i; prefix = prefix)
     end
     return nothing
 end

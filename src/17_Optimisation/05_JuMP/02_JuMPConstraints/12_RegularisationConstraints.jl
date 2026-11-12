@@ -1,6 +1,6 @@
 """
-    set_l1_regularisation!(model::JuMP.Model, l1_val::Number)
-    set_l1_regularisation!(args...)
+    set_l1_regularisation!(model::JuMP.Model, l1_val::Number; prefix::Symbol = Symbol(""))
+    set_l1_regularisation!(args...; prefix::Symbol = Symbol(""))
 
 Add an L1 penalty on the portfolio weights to the objective penalty.
 
@@ -45,6 +45,7 @@ Where:
 
   - $(arg_dict[:model])
   - `l1_val::Number`: L1 penalty coefficient.
+  - $(arg_dict[:prefix_kw])
 
 # Validation
 
@@ -61,12 +62,12 @@ Where:
   - [`set_linf_regularisation!`](@ref)
   - [`add_to_objective_penalty!`](@ref)
 """
-function set_l1_regularisation!(args...)
+function set_l1_regularisation!(args...; prefix::Symbol = Symbol(""))
     return nothing
 end
 """
-    set_l2_regularisation!(model::JuMP.Model, l2s::L2Reg_VecL2Reg)
-    set_l2_regularisation!(args...)
+    set_l2_regularisation!(model::JuMP.Model, l2s::L2Reg_VecL2Reg; prefix::Symbol = Symbol(""))
+    set_l2_regularisation!(args...; prefix::Symbol = Symbol(""))
 
 Add the penalty of each L2 term to the objective penalty.
 
@@ -97,6 +98,7 @@ Where:
 
   - $(arg_dict[:model])
   - `l2s::L2Reg_VecL2Reg`: One L2 term, or a vector of them.
+  - $(arg_dict[:prefix_kw])
 
 # Returns
 
@@ -110,12 +112,12 @@ Where:
   - [`set_l1_regularisation!`](@ref)
   - [`add_to_objective_penalty!`](@ref)
 """
-function set_l2_regularisation!(args...)
+function set_l2_regularisation!(args...; prefix::Symbol = Symbol(""))
     return nothing
 end
 """
-    set_lp_regularisation!(model::JuMP.Model, lps::LpReg_VecLpReg)
-    set_lp_regularisation!(args...)
+    set_lp_regularisation!(model::JuMP.Model, lps::LpReg_VecLpReg; prefix::Symbol = Symbol(""))
+    set_lp_regularisation!(args...; prefix::Symbol = Symbol(""))
 
 Add the penalty of each Lp term to the objective penalty.
 
@@ -174,6 +176,7 @@ Where:
 
   - $(arg_dict[:model])
   - `lps::LpReg_VecLpReg`: One Lp term, or a vector of them.
+  - $(arg_dict[:prefix_kw])
 
 # Returns
 
@@ -187,12 +190,12 @@ Where:
   - [`set_l1_regularisation!`](@ref)
   - [`add_to_objective_penalty!`](@ref)
 """
-function set_lp_regularisation!(args...)
+function set_lp_regularisation!(args...; prefix::Symbol = Symbol(""))
     return nothing
 end
 """
-    set_linf_regularisation!(model::JuMP.Model, linf::Number)
-    set_linf_regularisation!(args...)
+    set_linf_regularisation!(model::JuMP.Model, linf::Number; prefix::Symbol = Symbol(""))
+    set_linf_regularisation!(args...; prefix::Symbol = Symbol(""))
 
 Add an L∞ penalty on the portfolio weights to the objective penalty.
 
@@ -237,6 +240,7 @@ Where:
 
   - $(arg_dict[:model])
   - `linf::Number`: L∞ penalty coefficient.
+  - $(arg_dict[:prefix_kw])
 
 # Validation
 
@@ -254,17 +258,19 @@ Where:
   - [`set_weight_norm_inf_constraints!`](@ref)
   - [`add_to_objective_penalty!`](@ref)
 """
-function set_linf_regularisation!(args...)
+function set_linf_regularisation!(args...; prefix::Symbol = Symbol(""))
     return nothing
 end
-function set_l1_regularisation!(model::JuMP.Model, l1_val::Number)
+function set_l1_regularisation!(model::JuMP.Model, l1_val::Number;
+                                prefix::Symbol = Symbol(""))
     assert_nonempty_gt0_finite_val(l1_val, :l1)
-    w = get_w(model)
+    w = get_w(model, prefix)
     sc = get_constraint_scale(model)
-    JuMP.@variable(model, t_l1)
-    JuMP.@constraint(model, cl1_noc,
-                     [sc * t_l1; sc * w] in JuMP.MOI.NormOneCone(1 + length(w)))
-    JuMP.@expression(model, l1, l1_val * t_l1)
+    t_l1 = state_set!(model, prefix, :t_l1, JuMP.@variable(model))
+    state_set!(model, prefix, :cl1_noc,
+               JuMP.@constraint(model,
+                                [sc * t_l1; sc * w] in JuMP.MOI.NormOneCone(1 + length(w))))
+    l1 = state_set!(model, prefix, :l1, JuMP.@expression(model, l1_val * t_l1))
     add_to_objective_penalty!(model, l1)
     return nothing
 end
@@ -507,8 +513,8 @@ Matches either a single [`L2Regularisation`](@ref) or a vector of them ([`VecL2R
 """
 const L2Reg_VecL2Reg = Union{L2Regularisation, VecL2Reg}
 """
-    squared_norm_over_k!(model::JuMP.Model, i::Integer, x, k::Number, sc::Number)
-    squared_norm_over_k!(model::JuMP.Model, i::Integer, x, k, sc::Number)
+    squared_norm_over_k!(model::JuMP.Model, i::Integer, x, k::Number, sc::Number; prefix::Symbol = Symbol(""))
+    squared_norm_over_k!(model::JuMP.Model, i::Integer, x, k, sc::Number; prefix::Symbol = Symbol(""))
 
 Return a term equal to the squared 2-norm of `x` divided by the homogenisation variable `k`, for the squared L2 penalty at position `i`.
 
@@ -550,6 +556,7 @@ Where:
   - `x`: The vector, or the scalar, whose squared norm the term measures.
   - `k`: The homogenisation variable from [`effective_k`](@ref), or the number that stands for it.
   - `sc::Number`: Constraint scale. The number method registers no row and ignores it.
+  - $(arg_dict[:prefix_kw])
 
 # Returns
 
@@ -561,12 +568,14 @@ Where:
   - [`effective_k`](@ref)
   - [`MaximumRatio`](@ref)
 """
-function squared_norm_over_k!(::JuMP.Model, ::Integer, x, k::Number, ::Number)
+function squared_norm_over_k!(::JuMP.Model, ::Integer, x, k::Number, ::Number;
+                              prefix::Symbol = Symbol(""))
     return LinearAlgebra.dot(x, x) / k
 end
-function squared_norm_over_k!(model::JuMP.Model, i::Integer, x, k, sc::Number)
-    t_sq = state_set!(model, Symbol(""), :t_l2_sq_, i, JuMP.@variable(model))
-    state_set!(model, Symbol(""), :cl2_sq_rsoc_, i,
+function squared_norm_over_k!(model::JuMP.Model, i::Integer, x, k, sc::Number;
+                              prefix::Symbol = Symbol(""))
+    t_sq = state_set!(model, prefix, :t_l2_sq_, i, JuMP.@variable(model))
+    state_set!(model, prefix, :cl2_sq_rsoc_, i,
                JuMP.@constraint(model,
                                 [sc * t_sq; sc * k / 2; sc * x] in
                                 JuMP.RotatedSecondOrderCone()))
@@ -574,13 +583,13 @@ function squared_norm_over_k!(model::JuMP.Model, i::Integer, x, k, sc::Number)
 end
 """
     _set_l2_regularisation!(model::JuMP.Model, i::Integer, w::VecNum,
-                            l2::L2Regularisation{<:Any, <:SOCRiskExpr}, sc::Number)
+                            l2::L2Regularisation{<:Any, <:SOCRiskExpr}, sc::Number; prefix::Symbol = Symbol(""))
     _set_l2_regularisation!(model::JuMP.Model, i::Integer, w::VecNum,
-                            l2::L2Regularisation{<:Any, <:SquaredSOCRiskExpr}, sc::Number)
+                            l2::L2Regularisation{<:Any, <:SquaredSOCRiskExpr}, sc::Number; prefix::Symbol = Symbol(""))
     _set_l2_regularisation!(model::JuMP.Model, i::Integer, w::VecNum,
-                            l2::L2Regularisation{<:Any, <:QuadRiskExpr}, sc::Number)
+                            l2::L2Regularisation{<:Any, <:QuadRiskExpr}, sc::Number; prefix::Symbol = Symbol(""))
     _set_l2_regularisation!(model::JuMP.Model, i::Integer, w::VecNum,
-                            l2::L2Regularisation{<:Any, <:RSOCRiskExpr}, sc::Number)
+                            l2::L2Regularisation{<:Any, <:RSOCRiskExpr}, sc::Number; prefix::Symbol = Symbol(""))
 
 Add the penalty of the L2 term at position `i` to the objective penalty, in the formulation that `l2.alg` selects.
 
@@ -641,6 +650,7 @@ Where:
   - `w::VecNum`: The weights variable of the model.
   - `l2::L2Regularisation`: The L2 term.
   - `sc::Number`: Constraint scale. The [`QuadRiskExpr`](@ref) method uses it only when ``k`` is a variable.
+  - $(arg_dict[:prefix_kw])
 
 # Returns
 
@@ -654,53 +664,57 @@ Where:
   - [`add_to_objective_penalty!`](@ref)
 """
 function _set_l2_regularisation!(model::JuMP.Model, i::Integer, w::VecNum,
-                                 l2::L2Regularisation{<:Any, <:SOCRiskExpr}, sc::Number)
+                                 l2::L2Regularisation{<:Any, <:SOCRiskExpr}, sc::Number;
+                                 prefix::Symbol = Symbol(""))
     val = l2.val
-    t_l2 = state_set!(model, Symbol(""), :t_l2_, i, JuMP.@variable(model))
-    state_set!(model, Symbol(""), :cl2_soc_, i,
+    t_l2 = state_set!(model, prefix, :t_l2_, i, JuMP.@variable(model))
+    state_set!(model, prefix, :cl2_soc_, i,
                JuMP.@constraint(model, [sc * t_l2; sc * w] in JuMP.SecondOrderCone()))
-    l2 = state_set!(model, Symbol(""), :l2_, i, JuMP.@expression(model, val * t_l2))
+    l2 = state_set!(model, prefix, :l2_, i, JuMP.@expression(model, val * t_l2))
     add_to_objective_penalty!(model, l2)
     return nothing
 end
 function _set_l2_regularisation!(model::JuMP.Model, i::Integer, w::VecNum,
                                  l2::L2Regularisation{<:Any, <:SquaredSOCRiskExpr},
-                                 sc::Number)
+                                 sc::Number; prefix::Symbol = Symbol(""))
     val = l2.val
-    t_l2 = state_set!(model, Symbol(""), :t_l2_, i, JuMP.@variable(model))
-    state_set!(model, Symbol(""), :cl2_soc_, i,
+    t_l2 = state_set!(model, prefix, :t_l2_, i, JuMP.@variable(model))
+    state_set!(model, prefix, :cl2_soc_, i,
                JuMP.@constraint(model, [sc * t_l2; sc * w] in JuMP.SecondOrderCone()))
-    t_l2_sq = squared_norm_over_k!(model, i, t_l2, effective_k(model), sc)
-    l2 = state_set!(model, Symbol(""), :l2_, i, JuMP.@expression(model, val * t_l2_sq))
+    t_l2_sq = squared_norm_over_k!(model, i, t_l2, effective_k(model), sc; prefix = prefix)
+    l2 = state_set!(model, prefix, :l2_, i, JuMP.@expression(model, val * t_l2_sq))
     add_to_objective_penalty!(model, l2)
     return nothing
 end
 function _set_l2_regularisation!(model::JuMP.Model, i::Integer, w::VecNum,
-                                 l2::L2Regularisation{<:Any, <:QuadRiskExpr}, sc::Number)
+                                 l2::L2Regularisation{<:Any, <:QuadRiskExpr}, sc::Number;
+                                 prefix::Symbol = Symbol(""))
     val = l2.val
-    w_sq = squared_norm_over_k!(model, i, w, effective_k(model), sc)
-    l2 = state_set!(model, Symbol(""), :l2_, i, JuMP.@expression(model, val * w_sq))
+    w_sq = squared_norm_over_k!(model, i, w, effective_k(model), sc; prefix = prefix)
+    l2 = state_set!(model, prefix, :l2_, i, JuMP.@expression(model, val * w_sq))
     add_to_objective_penalty!(model, l2)
     return nothing
 end
 function _set_l2_regularisation!(model::JuMP.Model, i::Integer, w::VecNum,
-                                 l2::L2Regularisation{<:Any, <:RSOCRiskExpr}, sc::Number)
+                                 l2::L2Regularisation{<:Any, <:RSOCRiskExpr}, sc::Number;
+                                 prefix::Symbol = Symbol(""))
     val = l2.val
     k = effective_k(model)
-    t_l2 = state_set!(model, Symbol(""), :t_l2_, i, JuMP.@variable(model))
-    state_set!(model, Symbol(""), :cl2_rsoc_, i,
+    t_l2 = state_set!(model, prefix, :t_l2_, i, JuMP.@variable(model))
+    state_set!(model, prefix, :cl2_rsoc_, i,
                JuMP.@constraint(model,
                                 [sc * t_l2; sc * k / 2; sc * w] in
                                 JuMP.RotatedSecondOrderCone()))
-    l2 = state_set!(model, Symbol(""), :l2_, i, JuMP.@expression(model, val * t_l2))
+    l2 = state_set!(model, prefix, :l2_, i, JuMP.@expression(model, val * t_l2))
     add_to_objective_penalty!(model, l2)
     return nothing
 end
-function set_l2_regularisation!(model::JuMP.Model, l2s::L2Reg_VecL2Reg)
-    w = get_w(model)
+function set_l2_regularisation!(model::JuMP.Model, l2s::L2Reg_VecL2Reg;
+                                prefix::Symbol = Symbol(""))
+    w = get_w(model, prefix)
     sc = get_constraint_scale(model)
     for (i, l2) in enumerate(l2s)
-        _set_l2_regularisation!(model, i, w, l2, sc)
+        _set_l2_regularisation!(model, i, w, l2, sc; prefix = prefix)
     end
 end
 """
@@ -1016,8 +1030,9 @@ Matches either a single [`LpRegularisation`](@ref) or a vector of them ([`VecLpR
   - [`set_lp_regularisation!`](@ref)
 """
 const LpReg_VecLpReg = Union{LpRegularisation, VecLpReg}
-function set_lp_regularisation!(model::JuMP.Model, lps::LpReg_VecLpReg)
-    w = get_w(model)
+function set_lp_regularisation!(model::JuMP.Model, lps::LpReg_VecLpReg;
+                                prefix::Symbol = Symbol(""))
+    w = get_w(model, prefix)
     sc = get_constraint_scale(model)
     N = length(w)
     for (i, lp) in enumerate(lps)
@@ -1027,8 +1042,8 @@ function set_lp_regularisation!(model::JuMP.Model, lps::LpReg_VecLpReg)
                                          ()
                                          [1:N]
                                      end)
-        state_set!(model, Symbol(""), :t_lp_, i, t_lp)
-        state_set!(model, Symbol(""), :r_lp_, i, r_lp)
+        state_set!(model, prefix, :t_lp_, i, t_lp)
+        state_set!(model, prefix, :r_lp_, i, r_lp)
         clp, cslp = JuMP.@constraints(model,
                                       begin
                                           [i = 1:N],
@@ -1036,23 +1051,24 @@ function set_lp_regularisation!(model::JuMP.Model, lps::LpReg_VecLpReg)
                                           JuMP.MOI.PowerCone(p_inv)
                                           sc * (sum(r_lp) - t_lp) == 0
                                       end)
-        state_set!(model, Symbol(""), :clp_, i, clp)
-        state_set!(model, Symbol(""), :cslp_, i, cslp)
-        lp_expr = state_set!(model, Symbol(""), :lp_, i,
-                             JuMP.@expression(model, val * t_lp))
+        state_set!(model, prefix, :clp_, i, clp)
+        state_set!(model, prefix, :cslp_, i, cslp)
+        lp_expr = state_set!(model, prefix, :lp_, i, JuMP.@expression(model, val * t_lp))
         add_to_objective_penalty!(model, lp_expr)
     end
 end
-function set_linf_regularisation!(model::JuMP.Model, linf::Number)
+function set_linf_regularisation!(model::JuMP.Model, linf::Number;
+                                  prefix::Symbol = Symbol(""))
     assert_nonempty_gt0_finite_val(linf, :linf)
-    w = get_w(model)
+    w = get_w(model, prefix)
     sc = get_constraint_scale(model)
-    JuMP.@variable(model, t_linf)
-    JuMP.@constraint(model, clinf_nic,
-                     [sc * t_linf;
-                      sc * w] in JuMP.MOI.NormInfinityCone(1 + length(w)))
-    JuMP.@expression(model, linf, linf * t_linf)
-    add_to_objective_penalty!(model, linf)
+    t_linf = state_set!(model, prefix, :t_linf, JuMP.@variable(model))
+    state_set!(model, prefix, :clinf_nic,
+               JuMP.@constraint(model,
+                                [sc * t_linf;
+                                 sc * w] in JuMP.MOI.NormInfinityCone(1 + length(w))))
+    linf_expr = state_set!(model, prefix, :linf, JuMP.@expression(model, linf * t_linf))
+    add_to_objective_penalty!(model, linf_expr)
     return nothing
 end
 

@@ -1,6 +1,6 @@
 """
-    set_weight_norm_2_constraints!(model::JuMP.Model, val::Number)
-    set_weight_norm_2_constraints!(args...)
+    set_weight_norm_2_constraints!(model::JuMP.Model, val::Number; prefix::Symbol = Symbol(""))
+    set_weight_norm_2_constraints!(args...; prefix::Symbol = Symbol(""))
 
 Bound the 2-norm of the weights above by `val`, a ceiling that spreads the portfolio over more assets as it falls.
 
@@ -55,6 +55,7 @@ Where:
 
   - $(arg_dict[:model])
   - `val::Number`: Ceiling on the 2-norm of the weights.
+  - $(arg_dict[:prefix_kw])
 
 # Validation
 
@@ -77,24 +78,24 @@ Where:
 
   - $(ref_dict[:lobo1998]) Section 1.1.
 """
-function set_weight_norm_2_constraints!(args...)
+function set_weight_norm_2_constraints!(args...; prefix::Symbol = Symbol(""))
     return nothing
 end
-function set_weight_norm_2_constraints!(model::JuMP.Model, val::Number)
+function set_weight_norm_2_constraints!(model::JuMP.Model, val::Number;
+                                        prefix::Symbol = Symbol(""))
     assert_nonempty_gt0_finite_val(val, :l2c)
-    w = get_w(model)
+    w = get_w(model, prefix)
     k = get_k(model)
     sc = get_constraint_scale(model)
-    JuMP.@variable(model, l2c)
-    JuMP.@constraints(model, begin
-                          cl2c_soc, [sc * l2c; sc * w] in JuMP.SecondOrderCone()
-                          cl2c, sc * (l2c - val * k) <= 0
-                      end)
+    l2c = state_set!(model, prefix, :l2c, JuMP.@variable(model))
+    state_set!(model, prefix, :cl2c_soc,
+               JuMP.@constraint(model, [sc * l2c; sc * w] in JuMP.SecondOrderCone()))
+    state_set!(model, prefix, :cl2c, JuMP.@constraint(model, sc * (l2c - val * k) <= 0))
     return nothing
 end
 """
-    set_weight_norm_p_constraints!(model::JuMP.Model, lps::LpReg_VecLpReg)
-    set_weight_norm_p_constraints!(args...)
+    set_weight_norm_p_constraints!(model::JuMP.Model, lps::LpReg_VecLpReg; prefix::Symbol = Symbol(""))
+    set_weight_norm_p_constraints!(args...; prefix::Symbol = Symbol(""))
 
 Bound the ``p``-norm of the weights above, once for each term of `lps`.
 
@@ -153,6 +154,7 @@ Where:
 
   - $(arg_dict[:model])
   - `lps::LpReg_VecLpReg`: One or more ``p``-norm ceilings.
+  - $(arg_dict[:prefix_kw])
 
 # Returns
 
@@ -174,11 +176,12 @@ Where:
 
   - $(ref_dict[:chares2009]) Section 4.1.2, Equations 4.4 and 4.5.
 """
-function set_weight_norm_p_constraints!(args...)
+function set_weight_norm_p_constraints!(args...; prefix::Symbol = Symbol(""))
     return nothing
 end
-function set_weight_norm_p_constraints!(model::JuMP.Model, lps::LpReg_VecLpReg)
-    w = get_w(model)
+function set_weight_norm_p_constraints!(model::JuMP.Model, lps::LpReg_VecLpReg;
+                                        prefix::Symbol = Symbol(""))
+    w = get_w(model, prefix)
     k = get_k(model)
     sc = get_constraint_scale(model)
     N = length(w)
@@ -189,8 +192,8 @@ function set_weight_norm_p_constraints!(model::JuMP.Model, lps::LpReg_VecLpReg)
                                            ()
                                            [1:N]
                                        end)
-        state_set!(model, Symbol(""), :t_lpc_, i, t_lpc)
-        state_set!(model, Symbol(""), :r_lpc_, i, r_lpc)
+        state_set!(model, prefix, :t_lpc_, i, t_lpc)
+        state_set!(model, prefix, :r_lpc_, i, r_lpc)
         clpc, cslpc = JuMP.@constraints(model,
                                         begin
                                             [i = 1:N],
@@ -198,16 +201,16 @@ function set_weight_norm_p_constraints!(model::JuMP.Model, lps::LpReg_VecLpReg)
                                             JuMP.MOI.PowerCone(p_inv)
                                             sc * (sum(r_lpc) - t_lpc) == 0
                                         end)
-        state_set!(model, Symbol(""), :clpc_, i, clpc)
-        state_set!(model, Symbol(""), :cslpc_, i, cslpc)
-        state_set!(model, Symbol(""), :clpc_bnd_, i,
+        state_set!(model, prefix, :clpc_, i, clpc)
+        state_set!(model, prefix, :cslpc_, i, cslpc)
+        state_set!(model, prefix, :clpc_bnd_, i,
                    JuMP.@constraint(model, sc * (t_lpc - val * k) <= 0))
     end
     return nothing
 end
 """
-    set_weight_norm_inf_constraints!(model::JuMP.Model, val::Number)
-    set_weight_norm_inf_constraints!(args...)
+    set_weight_norm_inf_constraints!(model::JuMP.Model, val::Number; prefix::Symbol = Symbol(""))
+    set_weight_norm_inf_constraints!(args...; prefix::Symbol = Symbol(""))
 
 Bound the largest absolute weight above by `val`, the ∞-norm ceiling of the weights.
 
@@ -263,6 +266,7 @@ Where:
 
   - $(arg_dict[:model])
   - `val::Number`: Ceiling on the largest absolute weight.
+  - $(arg_dict[:prefix_kw])
 
 # Validation
 
@@ -281,19 +285,22 @@ Where:
   - [`set_linf_regularisation!`](@ref): the ∞-norm penalty on the weights.
   - [`JuMPOptimiser`](@ref)
 """
-function set_weight_norm_inf_constraints!(args...)
+function set_weight_norm_inf_constraints!(args...; prefix::Symbol = Symbol(""))
     return nothing
 end
-function set_weight_norm_inf_constraints!(model::JuMP.Model, val::Number)
+function set_weight_norm_inf_constraints!(model::JuMP.Model, val::Number;
+                                          prefix::Symbol = Symbol(""))
     assert_nonempty_gt0_finite_val(val, :linfc)
-    w = get_w(model)
+    w = get_w(model, prefix)
     k = get_k(model)
     sc = get_constraint_scale(model)
-    JuMP.@variable(model, t_linfc)
-    JuMP.@constraint(model, clinfc_nic,
-                     [sc * t_linfc;
-                      sc * w] in JuMP.MOI.NormInfinityCone(1 + length(w)))
-    JuMP.@constraint(model, clinfc, sc * (t_linfc - val * k) <= 0)
+    t_linfc = state_set!(model, prefix, :t_linfc, JuMP.@variable(model))
+    state_set!(model, prefix, :clinfc_nic,
+               JuMP.@constraint(model,
+                                [sc * t_linfc;
+                                 sc * w] in JuMP.MOI.NormInfinityCone(1 + length(w))))
+    state_set!(model, prefix, :clinfc,
+               JuMP.@constraint(model, sc * (t_linfc - val * k) <= 0))
     return nothing
 end
 """

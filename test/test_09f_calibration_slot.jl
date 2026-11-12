@@ -4750,8 +4750,9 @@ and ADR 0095 grants none.
     @test length(lpc_calls) == 2
     @test count(l -> occursin("factory(opt.lp,", l), lp_calls) == 1
     @test count(l -> occursin("norm_ceiling_factory(opt.lpc,", l), lpc_calls) == 1
-    @test count(==("set_lp_regularisation!(model, lp)"), lp_calls) == 1
-    @test count(==("set_weight_norm_p_constraints!(model, lpc)"), lpc_calls) == 1
+    @test count(==("set_lp_regularisation!(model, lp; prefix = prefix)"), lp_calls) == 1
+    @test count(==("set_weight_norm_p_constraints!(model, lpc; prefix = prefix)"),
+                lpc_calls) == 1
     @test length(calls("lp = factory(set.lp,")) == 1
     @test length(calls("lpc = norm_ceiling_factory(set.lpc,")) == 1
 
