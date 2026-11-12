@@ -954,6 +954,14 @@ The lifted matrix `W` and the variance marks belong to the weights, not to the b
 **Model Assembly**
 The fixed sequence in which the constraint and risk builders of an Optimisation Estimator run. They turn an empty model into a fully constrained one. It is not Model State, which is the data that those builders read and write.
 
+**Constraint Block**
+The part of a programme over the weights that a JuMP optimiser and a programme Allocation Set share. It is the feasible set of the weights and the terms that the programme adds to the Objective Penalty, and it never writes the objective. The budget, the fees and the return term belong to the owner, and so do the risk ceilings and the return floor of a programme set. One programme can hold more than one block, and each block reads its own prior and rows. Map #1213.
+*Avoid*: a linear constraint block, which is the rows of one linear constraint. And the Allocation Set, which is the whole set of an online head and holds a block. And Constraint Space, which is the basis in which the names of a constraint resolve.
+
+**Resolved Constraint Block**
+The data that a Constraint Block gives when it resolves against its own prior and rows. It holds the resolved constraints, the settings of the block that need no resolution, and that prior and those rows. A builder adds it to a programme, and no builder resolves the block again. Map #1213.
+*Avoid*: processed attributes, because in JuMP an attribute is a setting of the solver.
+
 **Objective Penalty**
 The accumulator through which every *soft* contribution reaches the objective: regularisation, soft Turnover and Tracking, and Custom Objective Terms. A contribution always worsens the objective, so a reward is a negative contribution.
 A programme Allocation Set's penalties and its semidefinite phylogeny's `p · tr(W)` reach a leader's objective through the same accumulator, from inside the Allocation Set Constraint. ADR 0164.
