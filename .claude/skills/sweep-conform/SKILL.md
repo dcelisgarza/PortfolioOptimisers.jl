@@ -111,10 +111,10 @@ The job runs on a red suite too (ADR 0082, amendment of 2026-10-30).
 
 ## Land the branch
 
-Sibling tickets land on `dev` while your gates run, and a rebase invalidates every gate that
-measured the old tree. A fast gate that goes red makes you edit `src/`, and an edit makes every
-slow run stale. So run the gates in order of cost, the fast ones first, and the slow ones once, on
-the tree you will push:
+Sibling tickets land on `dev` while your gates run. A rebase makes a gate or a test stale only
+when the commits that it brings in change a file that the gate or the test reads. A fast gate that
+goes red makes you edit `src/`, and an edit makes every slow run stale. So run the gates in order
+of cost, the fast ones first, and the slow ones once, on the tree you will push:
 
 1. Format the files you changed: `pre-commit run julia-formatter --files <changed .jl>`. A
    reformat moves the line counts that the size gate reads.
@@ -148,7 +148,14 @@ the tree you will push:
    `julia -t 1 --project=docs docs/doctest_files.jl --against origin/dev`.
 6. `git fetch origin dev`. If `git log --oneline HEAD..origin/dev` is not empty, rebase now, then
    run `bash code_health/gate_stamp.sh check`. It names the stamps that the rebase made stale.
-7. Run `test_26`. Then run the slow gates that `gate_stamp.sh reach` names, on the rebased tree:
+   **Rerun only a stale stamp that your change reaches, and no other test or gate.** Read what
+   the new commits change with `git diff --stat <old base>..origin/dev`. Commits that change only
+   docs (`.md` pages, ADRs, `GLOSSARY.md`, docstring prose outside a `jldoctest` block) make no
+   gate stale, so rerun nothing. Record the required stamps on the new base with
+   `gate_stamp.sh record <gate>...`, and paste the `drop` line for the test stamps. Do not rerun a
+   census file, a test file or a gate that already passed on the old base.
+7. Run `test_26` and the slow gates that `gate_stamp.sh reach` names, once, unless a stamp that
+   the rebase did not make stale records them. Run them on the rebased tree:
    the scoped doctests of step 5 for `doctest-files`, and JET on a changed file, scoped the same
    way, for `jet`. Run the full doctests (the `run-doctests` skill) when your change alters what a
    block of another file prints. A change to docstring prose reaches neither, and the push needs
