@@ -271,7 +271,7 @@ recommended package, and to the union split of a local that the dependency alway
 2026-11-05. The dismissals of `src/03_InputData/11_PricesToReturns.jl` take the extension to a \
 dependency: `DataFrames.DataFrame(::TimeArray)`, the documented conversion of a `TimeArray` to a \
 table, reaches `@sync` of Base, whose locals `c_ex` and `racy` JET reads as maybe undefined. The \
-dismissals of `src/05_Moments/32_CrossSectionalFactorModel/13_CrossSectionalLeverage.jl` cite \
+dismissals of `src/05_Moments/32_CrossSectionalFactorModel/13_CrossSectionalFactorisation.jl` cite \
 the documented forms of LinearAlgebra, `mul!`, `ldiv!` and the pivoted QR, with the `τ` of its \
 LAPACK wrapper. No dismissal cites the union split of a local now. Affirmed against Julia 1.13.3, \
 JET 0.13.1 and DataFrames 1.8.2."""
@@ -902,14 +902,14 @@ rationale = "a-signature-line-counter-on-a-method-whose-body-is-reached"
 # 2026-11-04 with Julia 1.13.3 and JET 0.13.1: the two reports are the only two of the file.
 
 [[dismissal]]
-file = "src/05_Moments/32_CrossSectionalFactorModel/13_CrossSectionalLeverage.jl"
+file = "src/05_Moments/32_CrossSectionalFactorModel/13_CrossSectionalFactorisation.jl"
 kind = "MethodErrorReport"
 message = "no matching method found `newindex(::LinearAlgebra.BandIndex, ::Tuple{Bool}, ::Tuple{Int64})`"
 count = 1
 rationale = "a-form-its-package-recommends"
 
 [[dismissal]]
-file = "src/05_Moments/32_CrossSectionalFactorModel/13_CrossSectionalLeverage.jl"
+file = "src/05_Moments/32_CrossSectionalFactorModel/13_CrossSectionalFactorisation.jl"
 kind = "BuiltinErrorReport"
 message = "BoundsError: attempt to access Tuple{Int64} at index [2]: getfield"
 count = 1
@@ -920,21 +920,21 @@ rationale = "a-form-its-package-recommends"
 # reports inside the machinery of those forms (`sizeof`, `getfield`, and a `τ` of the LAPACK
 # wrapper), and the probe of 211 fits gives the bits of the allocating forms.
 [[dismissal]]
-file = "src/05_Moments/32_CrossSectionalFactorModel/13_CrossSectionalLeverage.jl"
+file = "src/05_Moments/32_CrossSectionalFactorModel/13_CrossSectionalFactorisation.jl"
 kind = "BuiltinErrorReport"
 message = "invalid builtin function call: sizeof"
 count = 1
 rationale = "a-form-its-package-recommends"
 
 [[dismissal]]
-file = "src/05_Moments/32_CrossSectionalFactorModel/13_CrossSectionalLeverage.jl"
+file = "src/05_Moments/32_CrossSectionalFactorModel/13_CrossSectionalFactorisation.jl"
 kind = "BuiltinErrorReport"
 message = "invalid builtin function call: getfield"
 count = 2
 rationale = "a-form-its-package-recommends"
 
 [[dismissal]]
-file = "src/05_Moments/32_CrossSectionalFactorModel/13_CrossSectionalLeverage.jl"
+file = "src/05_Moments/32_CrossSectionalFactorModel/13_CrossSectionalFactorisation.jl"
 kind = "UndefVarErrorReport"
 message = "local variable `τ` may be undefined"
 count = 1

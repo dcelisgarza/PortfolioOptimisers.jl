@@ -181,7 +181,7 @@ commit = "391be5e"
 "src/05_Moments/32_CrossSectionalFactorModel/10_FactorModelSummary.jl" = { lines = 175, misses = 0 }
 "src/05_Moments/32_CrossSectionalFactorModel/11_CrossSectionalIdiosyncraticDiagnostics.jl" = { lines = 189, misses = 0 }
 "src/05_Moments/32_CrossSectionalFactorModel/12_CrossSectionalExposureIC.jl" = { lines = 148, misses = 0 }
-"src/05_Moments/32_CrossSectionalFactorModel/13_CrossSectionalLeverage.jl" = { lines = 98, misses = 0 }
+"src/05_Moments/32_CrossSectionalFactorModel/13_CrossSectionalFactorisation.jl" = { lines = 98, misses = 0 }
 "src/05_Moments/33_CoverageUniverse.jl" = { lines = 289, misses = 0 }
 "src/05_Moments/34_PriceLevelExpectedReturns.jl" = { lines = 218, misses = 1 }
 "src/05_Moments/35_CompositePriceLevelStatistics.jl" = { lines = 162, misses = 0 }

@@ -223,7 +223,7 @@ include("05_Moments/32_CrossSectionalFactorModel/09_CrossSectionalExposureDiagno
 include("05_Moments/32_CrossSectionalFactorModel/10_FactorModelSummary.jl")
 include("05_Moments/32_CrossSectionalFactorModel/11_CrossSectionalIdiosyncraticDiagnostics.jl")
 include("05_Moments/32_CrossSectionalFactorModel/12_CrossSectionalExposureIC.jl")
-include("05_Moments/32_CrossSectionalFactorModel/13_CrossSectionalLeverage.jl")
+include("05_Moments/32_CrossSectionalFactorModel/13_CrossSectionalFactorisation.jl")
 include("05_Moments/33_CoverageUniverse.jl")
 include("05_Moments/34_PriceLevelExpectedReturns.jl")
 include("05_Moments/35_CompositePriceLevelStatistics.jl")
