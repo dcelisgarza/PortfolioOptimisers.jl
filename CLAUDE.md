@@ -75,6 +75,13 @@ Rebase before you merge, so that you lower the number that is current.
   files with `--coverage=<absolute dir>`. Each `PATCH` line names an added line that CI reads as a
   miss, also in a method that no test calls. Test it, or exempt it (ADR 0082). The push guard asks
   for the `coverage` stamp that a clean run records (#1912).
+- **A coverage run stands for every line that a later edit does not reach.** After an edit that
+  follows a coverage run, such as the fix of a red file or a test for a `PATCH` line, rerun with
+  `--coverage` only the test files that the edit reaches, scoped to the directory of the edited
+  source file. Keep the verdicts of the earlier run for the other files. The driver records no
+  stamp for a run that measures part of the change, so when the two runs together leave no
+  `PATCH` miss, record it with `bash code_health/gate_stamp.sh waive coverage <reason>`, and
+  name both runs in the reason.
 - On a Revise world-age warning, **restart the session and cold-load**. If a session hangs, shut it
   down and start a new one. Do not try to recover it.
 

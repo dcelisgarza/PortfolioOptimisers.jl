@@ -613,7 +613,7 @@ $(DocStringExtensions.TYPEDEF)
 
 Holds the Resolved Constraint Block of the glossary: the data that a [`ConstraintBlock`](@ref) gives when it resolves against its own prior and rows.
 
-[`resolve_constraint_block`](@ref) makes it at stage 2 of the resolution, and a builder adds it to a programme. The JuMP head reads it in [`assemble_jump_model!`](@ref), and a [`ProgrammeAllocationSet`](@ref) reads it in [`assemble_allocation_set!`](@ref). So no builder resolves a slot again.
+[`resolve_constraint_block`](@ref) makes it at stage 2 of the resolution, and a builder adds it to a programme. The block builder [`set_block_constraints!`](@ref) reads it for both owners: a JuMP head in [`assemble_jump_model!`](@ref), and a [`ProgrammeAllocationSet`](@ref) in [`add_allocation_set_block!`](@ref). So no builder resolves a slot again.
 
 The Result holds three kinds of data:
 
@@ -987,7 +987,7 @@ end
 
 Resolves a [`ConstraintBlock`](@ref) against its own prior and rows, to its [`ResolvedConstraintBlock`](@ref). This is stage 2 of the resolution.
 
-Both owners of a block call it. [`resolve_jump_optimiser`](@ref) calls it once for each `optimise` call, and [`assemble_allocation_set!`](@ref) calls it at each step of an online head. The block must hold the result of stage 1, [`resolve_constraint_block_names`](@ref), viewed at the Investable Mask of `pr`. So `pr`, `rd` and the block are on the investable assets. A slot that still holds an estimator of stage 1 raises a `TypeError` in the constructor of the Result.
+Both owners of a block call it. [`resolve_jump_optimiser`](@ref) calls it once for each `optimise` call, and [`resolve_allocation_set_step`](@ref) calls it at each step of an online head. The block must hold the result of stage 1, [`resolve_constraint_block_names`](@ref), viewed at the Investable Mask of `pr`. So `pr`, `rd` and the block are on the investable assets. A slot that still holds an estimator of stage 1 raises a `TypeError` in the constructor of the Result.
 
 One rule orders the names and the reduction for every block. Stage 1 resolves before the reduction, and a view at the mask follows its values. This function resolves after the reduction, over the `sets` of the block, which carry the Non-Investable Axis. So a name that left the investable universe drops its row and is not refused, and a precomputed constraint keeps its width. [`assert_investable_constraint_width`](@ref) then refuses a precomputed `lcse` or `gcarde` whose width is not the number of assets of the block.
 
@@ -1028,7 +1028,7 @@ The method on a prior result runs these steps.
   - [`ResolvedConstraintBlock`](@ref)
   - [`resolve_constraint_block_names`](@ref)
   - [`resolve_jump_optimiser`](@ref)
-  - [`assemble_allocation_set!`](@ref)
+  - [`resolve_allocation_set_step`](@ref)
 """
 function resolve_constraint_block(cbe::ConstraintBlock, pr::AbstractPriorResult,
                                   rd::ReturnsResult; slv, strict::Bool = false,
@@ -1191,6 +1191,132 @@ function constraint_block_from_resolved(cbe::ConstraintBlock,
     rf = filter(f -> f !== :pr && f !== :rd, fieldnames(ResolvedConstraintBlock))
     slots = NamedTuple{map(f -> get(rename, f, f), rf)}(map(f -> getfield(cbr, f), rf))
     return rebuild_estimator(cbe, slots)
+end
+"""
+    set_block_constraints!(model::JuMP.Model, cbr::ResolvedConstraintBlock, owner, bgt, fees;
+                           tr = nothing, b1::Option{<:MatNum} = nothing,
+                           prefix::Symbol = Symbol(""), kwargs...) -> Nothing
+    set_block_post_risk_constraints!(model::JuMP.Model, cbr::ResolvedConstraintBlock, owner,
+                                     attrs; prefix::Symbol = Symbol("")) -> Nothing
+
+Add a [`ResolvedConstraintBlock`](@ref) to a model, in its own namespace and in two phases. This is the block builder.
+
+Every programme that holds a block adds it through these two functions: a JuMP head in [`assemble_jump_model!`](@ref), the projection of a [`ProgrammeAllocationSet`](@ref) in [`set_allocation_set_constraints!`](@ref), and the set in the model of a leader through [`add_allocation_set_constraints!`](@ref). So the order of the Model Assembly is written once. The owner of the model runs its own steps between the two phases: the fees, the risk step, the return terms and [`mark_risk_minimised!`](@ref).
+
+Phase 1, `set_block_constraints!`, adds the rows that come before the risk step of the owner. Phase 2, `set_block_post_risk_constraints!`, adds the rows that read the marks of the objective of the owner, `risk_minimised` and `variance_flag`: the semidefinite phylogeny reads them. The integer phylogeny and the custom constraints come after them too, as they did in each owner.
+
+The first block of a model takes the empty prefix and the names of today. Each block after the first takes a Model State namespace. Phase 1 registers the weights of the model under it, with the owner `w_owner = Symbol("")`, so [`weights_prefix`](@ref) keeps the lifted matrix and the marks with the weights. Every builder then registers its entries under the prefix. A kind on two blocks gives two sets of rows and no name collision. The MIP bits, the long and short parts of the weights and the pin of `xbgt` belong to the weights, so the blocks share them. The penalties of each block add to the one Objective Penalty.
+
+The block reads its own prior `cbr.pr` and its own phylogeny `cbr.plr`. The builder takes the values of the owner that the block cannot hold: the net budget `bgt`, for the long-short and gross budgets, the fees, for the MIP kinds and the tracking errors, the tracking errors `tr` that the owner bound to its rows, and the factor loadings `b1` of a factor head. The custom constraints get the owner and the bundle `attrs` that the owner gives them. A block of a set passes the set as the owner, `nothing` as the net budget and the fees, and `nothing` as `attrs`.
+
+**Breaking change.** These two functions replace the middle of `assemble_jump_model!` and the removed `assemble_allocation_set!`. A head no longer adds its weight bounds and its budgets before [`assemble_jump_model!`](@ref). Phase 1 adds them, with the net budget of the head.
+
+# Algorithm
+
+Phase 1:
+
+ 1. When `prefix` is not empty, register the weights of the model under it, with the owner `Symbol("")`.
+ 2. Add the weight bounds, the net budget `bgt`, and the short and gross budgets of the block with [`set_weight_constraints!`](@ref).
+ 3. Add the linear rows `lcsr`, then the centrality rows `ctr`, with [`set_linear_weight_constraints!`](@ref).
+ 4. Add the MIP kinds with [`set_mip_constraints!`](@ref), then the sub-group MIP kinds with [`set_smip_constraints!`](@ref).
+ 5. Add the turnover ceilings with [`set_turnover_constraints!`](@ref).
+ 6. Add the tracking errors `tr` with [`set_tracking_error_constraints!`](@ref), on the prior of the block.
+ 7. Add the norm ceilings `l2c`, `lpc` and `linfc`, then the penalties `l1`, `l2`, `lp` and `linf`.
+
+Phase 2:
+
+ 1. Add the integer phylogeny rows with [`set_iplg_constraints!`](@ref), then the semidefinite phylogeny rows with [`set_sdp_phylogeny_constraints!`](@ref).
+ 2. Add the custom constraints `ccnt` with [`add_custom_constraint!`](@ref).
+
+# Arguments
+
+  - $(arg_dict[:model])
+  - `cbr`: The Result of the block.
+  - `owner`: The owner of the block: a JuMP head, or a [`ProgrammeAllocationSet`](@ref). The tracking errors and the custom constraints dispatch on it.
+  - `bgt`: The net budget of the owner of the block, or `nothing`.
+  - `fees`: The fees of the owner of the block, or `nothing`.
+  - `tr`: The tracking errors of the owner, bound to its rows, or `nothing`.
+  - $(arg_dict[:b1_opt])
+  - `attrs`: The bundle that the custom constraints read, or `nothing`.
+  - $(arg_dict[:prefix_kw])
+  - `kwargs...`: Passed to [`set_tracking_error_constraints!`](@ref). A JuMP head passes its rows as `rd`.
+
+# Returns
+
+  - `nothing`.
+
+# Related
+
+  - [`ResolvedConstraintBlock`](@ref)
+  - [`assemble_jump_model!`](@ref)
+  - [`set_allocation_set_constraints!`](@ref)
+  - [`set_allocation_risk_return_bounds!`](@ref)
+  - [`weights_prefix`](@ref)
+"""
+function set_block_constraints!(model::JuMP.Model, cbr::ResolvedConstraintBlock, owner,
+                                bgt::Option{<:Num_BgtCE}, fees::Option{<:Fees};
+                                tr = nothing, b1::Option{<:MatNum} = nothing,
+                                prefix::Symbol = Symbol(""), kwargs...)::Nothing
+    if prefix != Symbol("")
+        state_build!(() -> get_w(model), model, prefix, :w)
+        state_build!(() -> Symbol(""), model, prefix, :w_owner)
+    end
+    (; wb, lt, st, lcsr, ctr, gcardr, sgcardr, smtx, sgmtx, slt, sst, sglt, sgst, plr, ss) = cbr
+    set_weight_constraints!(model, wb, bgt, cbr.sbgt; gbgt = cbr.gbgt, prefix = prefix)
+    set_linear_weight_constraints!(model, lcsr, :lcs_ineq_, :lcs_eq_; prefix = prefix)
+    set_linear_weight_constraints!(model, ctr, :cent_ineq_, :cent_eq_; prefix = prefix)
+    set_mip_constraints!(model, wb, cbr.card, gcardr, plr, lt, st, fees, ss, cbr.xbgt;
+                         prefix = prefix)
+    set_smip_constraints!(model, wb, cbr.scard, sgcardr, smtx, sgmtx, slt, sst, sglt, sgst,
+                          ss; prefix = prefix)
+    set_turnover_constraints!(model, cbr.tn; prefix = prefix)
+    set_tracking_error_constraints!(model, cbr.pr, tr, owner, plr, fees, b1;
+                                    prefix = prefix, kwargs...)
+    set_weight_norm_2_constraints!(model, cbr.l2c; prefix = prefix)
+    set_weight_norm_p_constraints!(model, cbr.lpc; prefix = prefix)
+    set_weight_norm_inf_constraints!(model, cbr.linfc; prefix = prefix)
+    set_l1_regularisation!(model, cbr.l1; prefix = prefix)
+    set_l2_regularisation!(model, cbr.l2; prefix = prefix)
+    set_lp_regularisation!(model, cbr.lp; prefix = prefix)
+    set_linf_regularisation!(model, cbr.linf; prefix = prefix)
+    return nothing
+end
+"""
+$(DocStringExtensions.TYPEDSIGNATURES)
+
+Add phase 2 of a [`ResolvedConstraintBlock`](@ref) to a model: the rows that come after the risk step and the marks of the owner.
+
+The owner calls it after [`mark_risk_minimised!`](@ref), because the semidefinite phylogeny reads the marks `risk_minimised` and `variance_flag` of the weights. [`set_block_constraints!`](@ref) states both phases, their order and their arguments.
+
+# Algorithm
+
+ 1. Add the integer phylogeny rows with [`set_iplg_constraints!`](@ref), then the semidefinite phylogeny rows with [`set_sdp_phylogeny_constraints!`](@ref), under `prefix`.
+ 2. Add the custom constraints `ccnt` with [`add_custom_constraint!`](@ref), with `owner` and `attrs`.
+
+# Arguments
+
+  - $(arg_dict[:model])
+  - `cbr`: The Result of the block.
+  - `owner`: The owner of the block.
+  - `attrs`: The bundle that the custom constraints read, or `nothing`.
+  - $(arg_dict[:prefix_kw])
+
+# Returns
+
+  - `nothing`.
+
+# Related
+
+  - [`set_block_constraints!`](@ref)
+  - [`assemble_jump_model!`](@ref)
+"""
+function set_block_post_risk_constraints!(model::JuMP.Model, cbr::ResolvedConstraintBlock,
+                                          owner, attrs;
+                                          prefix::Symbol = Symbol(""))::Nothing
+    set_iplg_constraints!(model, cbr.plr; prefix = prefix)
+    set_sdp_phylogeny_constraints!(model, cbr.plr; prefix = prefix)
+    add_custom_constraint!(model, cbr.ccnt, owner, attrs)
+    return nothing
 end
 
 export ConstraintBlock, ResolvedConstraintBlock

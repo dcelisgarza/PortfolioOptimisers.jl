@@ -826,7 +826,6 @@ end
         # `MaximumRatio` branch was never built and `gbgt` never reached the model.
         PO.set_maximum_ratio_factor_variables!(model, obj)
         PO.set_w!(model, attrs.pr.X, mr.wi)
-        PO.set_weight_constraints!(model, attrs.wb, mr.opt)
         PO.assemble_jump_model!(model, mr, mr.opt, attrs, rd, r, obj, b1)
         return Set(string.(keys(JuMP.object_dictionary(model))))
     end

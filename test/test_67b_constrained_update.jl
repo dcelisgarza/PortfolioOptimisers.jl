@@ -1999,6 +1999,158 @@ end
             end
         end
     end
+    @testset "One builder adds two blocks to one model (#2044)" begin
+        T3, N3 = 60, 3
+        R3 = 0.02 .* randn(StableRNG(11), T3, N3) .+ [0.002 0.001 0.0]
+        rd3 = ReturnsResult(; nx = ["A", "B", "C"], X = R3,
+                            ts = Date(2020, 1, 1) .+ Day.(0:(T3 - 1)))
+        pr3 = prior(EmpiricalPrior(), rd3)
+        sets3 = UniverseSets(; dict = Dict("nx" => ["A", "B", "C"]))
+        function cb(; kw...)
+            cbe = po.resolve_constraint_block_names(ConstraintBlock(; sets = sets3, kw...),
+                                                    false, Float64)
+            return po.resolve_constraint_block(cbe, pr3, rd3; slv = slv)
+        end
+        function base_model()
+            m = JuMP.Model()
+            po.set_model_scales!(m, 1, 1)
+            po.set_model_observations!(m, T3)
+            JuMP.@expression(m, k, 1)
+            po.state_set!(m, Symbol(""), :w, JuMP.@variable(m, [1:N3], base_name = "w"))
+            return m
+        end
+        lc(s) = LinearConstraintEstimator(; val = s)
+        a = cb(; wb = WeightBounds(; lb = zeros(N3), ub = fill(0.5, N3)),
+               lcse = lc(:(A <= 0.3)), l2c = 0.9, l1 = 0.01)
+        b = cb(; wb = WeightBounds(; lb = fill(0.05, N3), ub = fill(0.45, N3)),
+               lcse = lc(:(B >= 0.25)), l2c = 0.8, l1 = 0.02)
+        m = base_model()
+        po.set_block_constraints!(m, a, nothing, 1, nothing)
+        po.set_block_constraints!(m, b, nothing, nothing, nothing; prefix = :b_)
+        po.set_block_post_risk_constraints!(m, a, nothing, nothing)
+        po.set_block_post_risk_constraints!(m, b, nothing, nothing; prefix = :b_)
+        # A kind on both blocks gives two sets of rows under two names, and no collision.
+        @test all(haskey(m, Symbol(p, n)) for p in ("", "b_")
+                  for n in (:w_lb, :w_ub, :cl2c, :t_l1))
+        # The net budget is the owner's, so only the first block writes it, and the second
+        # block reads the weights of the model under its prefix.
+        @test haskey(m, :bgt) && !haskey(m, :b_bgt)
+        @test po.get_w(m, :b_) === po.get_w(m)
+        @test po.weights_prefix(m, :b_) == Symbol("")
+        # The penalties of both blocks add to the one Objective Penalty.
+        @test JuMP.coefficient(m[:op], m[:t_l1]) ≈ 0.01
+        @test JuMP.coefficient(m[:op], m[:b_t_l1]) ≈ 0.02
+        # The rows of both blocks hold. `A` takes the cap of the first block, `B` the floor
+        # of the second, and every weight the bounds and the norm ceilings of both.
+        wv = po.get_w(m)
+        JuMP.@objective(m, Max, wv[1] - wv[2])
+        JuMP.set_optimizer(m, Clarabel.Optimizer)
+        JuMP.set_silent(m)
+        JuMP.optimize!(m)
+        w = JuMP.value.(wv)
+        @test isapprox(sum(w), 1; atol = 1e-7)
+        @test isapprox(w[1], 0.3; atol = 1e-6) && isapprox(w[2], 0.25; atol = 1e-6)
+        @test all(x -> 0.05 - 1e-7 <= x <= 0.45 + 1e-7, w)
+        @test norm(w) <= 0.8 + 1e-7
+        # The first block alone lets `B` fall below the floor of the second.
+        m1 = base_model()
+        po.set_block_constraints!(m1, a, nothing, 1, nothing)
+        wv1 = po.get_w(m1)
+        JuMP.@objective(m1, Max, wv1[1] - wv1[2])
+        JuMP.set_optimizer(m1, Clarabel.Optimizer)
+        JuMP.set_silent(m1)
+        JuMP.optimize!(m1)
+        @test JuMP.value(wv1[2]) < 0.25 - 1e-3
+
+        # The long and short parts belong to the weights. Two blocks that admit a short
+        # position share them, and only the first ties them to the weights.
+        ls = WeightBounds(; lb = fill(-0.2, N3), ub = ones(N3))
+        m2 = base_model()
+        po.set_block_constraints!(m2, cb(; wb = ls, sbgt = 0.3), nothing, 1, nothing)
+        po.set_block_constraints!(m2, cb(; wb = ls, gbgt = 1.5), nothing, nothing, nothing;
+                                  prefix = :b_)
+        @test haskey(m2, :sw) && haskey(m2, :w_lw) && haskey(m2, :lbgt) && haskey(m2, :sbgt)
+        @test !haskey(m2, :b_sw) && !haskey(m2, :b_w_lw) && haskey(m2, :b_gbgt)
+        # A long-only block first gives the weights the long part `lw = w` and no short
+        # part. A later block with a short budget then makes parts of its own, and a block
+        # with no short or gross budget makes none.
+        lo = WeightBounds(; lb = zeros(N3), ub = ones(N3))
+        m3 = base_model()
+        po.set_block_constraints!(m3, cb(; wb = lo), nothing, 1, nothing)
+        po.set_block_constraints!(m3, cb(; wb = ls, sbgt = 0.1), nothing, nothing, nothing;
+                                  prefix = :b_)
+        po.set_block_constraints!(m3, cb(; wb = ls), nothing, nothing, nothing;
+                                  prefix = :c_)
+        @test haskey(m3, :lw) && !haskey(m3, :sw)
+        @test haskey(m3, :b_sw) && haskey(m3, :b_w_sw) && haskey(m3, :b_sbgt)
+        @test !haskey(m3, :c_sw)
+        # A net budget that pays costs registers shared entries, so it goes on the first
+        # block alone.
+        bc = BudgetCosts(; bgt = 1.0, w = fill(1 / N3, N3), vp = 0.01, vn = 0.01, up = 0.5,
+                         un = 0.5)
+        @test_throws ArgumentError po.set_budget_constraints!(base_model(), bc,
+                                                              po.get_w(base_model());
+                                                              prefix = :b_)
+
+        # A set with a ceiling and a floor beside the head's own ceiling and floor. The set
+        # enters the leader's model through its Allocation Set Constraint, in phase 2 of
+        # the head's block, under `:aset_`.
+        S3 = pr3.sigma
+        mu3 = pr3.mu
+        eq3 = fill(1 / N3, N3)
+        vcap(u) = Variance(; settings = RiskMeasureSettings(; ub = u))
+        rfloor(l) = ArithmeticReturn(; settings = JuMPReturnsSettings(; lb = l))
+        # The bounds come from the data, so each one admits weights and binds: the ceiling
+        # of the set lies above the least variance and below the head's, and the floor of
+        # the set lies between the return of the least-variance book and the largest return
+        # under that ceiling.
+        wmin = optimise(MeanRisk(; r = Variance(), opt = JuMPOptimiser(; slv = slv)), rd3).w
+        vmin = dot(wmin, S3, wmin)
+        vh, vs = 2 * vmin, 1.2 * vmin
+        wtop = optimise(MeanRisk(; obj = MaximumReturn(), r = vcap(vs),
+                                 opt = JuMPOptimiser(; slv = slv)), rd3).w
+        rs = (dot(mu3, wmin) + dot(mu3, wtop)) / 2
+        rh = dot(mu3, wmin) - 1e-3
+        aset = resolve(ProgrammeAllocationSet(; slv = slv, r = vcap(vs), ret = rfloor(rs)),
+                       N3)
+        function leader(obj)
+            ccnt = po.AllocationSetConstraint(aset, eq3, rd3)
+            mr = MeanRisk(; obj = obj, r = vcap(vh),
+                          opt = JuMPOptimiser(; slv = slv, ret = rfloor(rh), ccnt = ccnt))
+            return optimise(mr, rd3)
+        end
+        for obj in (MaximumReturn(), MinimumRisk())
+            res = leader(obj)
+            w = res.w
+            # Both ceilings and both floors hold.
+            @test dot(w, S3, w) <= min(vh, vs) * (1 + 1e-5)
+            @test dot(mu3, w) >= max(rh, rs) - 1e-8
+            # The head's risk and return expressions read only the head's own terms: the
+            # set's ceiling clears its `rke` and its floor clears its `rte`.
+            @test length(res.model[:risk_vec]) == 1
+            @test length(res.model[:ret_vec]) == 1
+            @test haskey(res.model, :aset_w) && haskey(res.model, :aset_bgt)
+        end
+        # The ceiling of the set binds when the head maximises the return, and the floor of
+        # the set binds when the head minimises the risk.
+        wr = leader(MaximumReturn()).w
+        @test isapprox(dot(wr, S3, wr), vs; rtol = 1e-4)
+        @test isapprox(dot(mu3, leader(MinimumRisk()).w), rs; atol = 1e-7)
+        # The floor copy of a term clears `rte` and keeps the bound and the scale.
+        t = ArithmeticReturn(; settings = JuMPReturnsSettings(; lb = 0.1, scale = 2))
+        f = po.no_return_expr_returns_estimator(t)
+        @test !f.settings.rte && f.settings.lb == 0.1 && f.settings.scale == 2
+        @test po.no_return_expr_returns_estimator(f) === f
+        # A value that is not a `WeightBounds` adds nothing, in the keyword form that the
+        # block builder uses.
+        mn = base_model()
+        @test isnothing(po.set_weight_constraints!(mn, nothing, nothing, nothing;
+                                                   prefix = :b_))
+        @test !haskey(mn, :b_w_lb)
+        # A long-only head refuses a negative bound where it builds its weights.
+        @test_throws ArgumentError po.assert_long_only_weight_bounds(ls)
+        @test isnothing(po.assert_long_only_weight_bounds(lo))
+    end
     @testset "Docs and the search seam" begin
         @test occursin("Held Step", string(@doc(po.HeldStep)))
         @test occursin("per-asset", string(@doc(ProgrammeAllocationSet)))

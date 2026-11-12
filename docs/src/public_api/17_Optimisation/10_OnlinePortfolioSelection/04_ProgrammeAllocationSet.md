@@ -1,5 +1,5 @@
 ```@meta
-Description = "Programme Allocation Set, public API of PortfolioOptimisers.jl: ProgrammeAllocationSet, TsallisProjection, LogBarrierProjection, mirror_step, rows_needed."
+Description = "Programme Allocation Set, public API of PortfolioOptimisers.jl: ProgrammeAllocationSet, TsallisProjection, LogBarrierProjection, mirror_step, rows_needed, …"
 ```
 
 # Programme Allocation Set
@@ -12,6 +12,7 @@ TsallisProjection
 LogBarrierProjection
 PortfolioOptimisers.mirror_step
 PortfolioOptimisers.rows_needed(set::ProgrammeAllocationSet)
+factory(set::ProgrammeAllocationSet, w::AbstractVector)
 ```
 
 ## References

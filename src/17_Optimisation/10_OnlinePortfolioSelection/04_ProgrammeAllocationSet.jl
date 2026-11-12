@@ -7,7 +7,7 @@ The set holds its constraint kinds and its direct objective penalties in a [`Con
 
 The projection is a bare JuMP model with the variables and rows of the Weight Finaliser, which are `w`, `k = 1`, `Σw = 1`, the constraint scale and the objective scale. [`set_allocation_set_constraints!`](@ref) adds the constraint kinds through the builders of the optimiser, in the order that [`assemble_jump_model!`](@ref) runs them. [`set_projection_objective!`](@ref) sets the objective, the divergence of the rule's Projection Geometry plus the set's penalties.
 
-The block resolves in the two stages of a JuMP head. Once per fold, [`resolve_allocation_set`](@ref) runs stage 1, [`resolve_constraint_block_names`](@ref), and resolves `wb` when it reads no rows: the slots that hold a name over `sets` and whose value follows a view at the Investable Mask. These are `wb`, `lt`, `st`, `sgcarde`, `smtx`, `sgmtx`, `slt`, `sst`, `sglt`, `sgst` and `tn`. At every step, [`assemble_allocation_set!`](@ref) runs stage 2, [`resolve_constraint_block`](@ref), on the set viewed at the mask of the step and on the prior result of `pe` fitted on the head's rows. It gives the [`ResolvedConstraintBlock`](@ref) of the set, which the builders read. Stage 2 resolves these kinds:
+The block resolves in the two stages of a JuMP head. Once per fold, [`resolve_allocation_set`](@ref) runs stage 1, [`resolve_constraint_block_names`](@ref), and resolves `wb` when it reads no rows: the slots that hold a name over `sets` and whose value follows a view at the Investable Mask. These are `wb`, `lt`, `st`, `sgcarde`, `smtx`, `sgmtx`, `slt`, `sst`, `sglt`, `sgst` and `tn`. At every step, [`resolve_allocation_set_step`](@ref) runs stage 2, [`resolve_constraint_block`](@ref), on the set viewed at the mask of the step and on the prior result of `pe` fitted on the head's rows. It gives the [`ResolvedConstraintBlock`](@ref) of the set, which the builders read. Stage 2 resolves these kinds:
 
   - `wb`, when it reads the returns ([`bounds_read_rows`](@ref)), as a [`ScoreWeightBounds`](@ref) does. Each step scores the assets on the head's rows at the Investable Mask of the step, as the batch fit of a JuMP head on those rows does, so the bound reads no row after the step. The bounds rows, the floor of a barrier geometry and the read-out of the head all read this bound of the step.
 
@@ -268,6 +268,30 @@ function port_opt_view(set::ProgrammeAllocationSet, i, args...)
                               r = port_opt_view(set.r, i, nothing),
                               ret = port_opt_view(set.ret, i)))
 end
+"""
+$(DocStringExtensions.TYPEDSIGNATURES)
+
+Returns a copy of `set` whose parts that read the previous weights hold the Price-Adjusted Allocation `w` of a step.
+
+The block takes `w` through `factory(cbe::ConstraintBlock, w)`: its turnover ceilings, its tracking errors, its custom constraints and its custom objective terms. The risk ceilings `r` take it through `factory(r, w)`, so a [`WeightsTracking`](@ref) benchmark or a [`TurnoverRiskMeasure`](@ref) reference that is not fixed reads the book of the step. A `fixed` object keeps the caller's reference. The return floor reads no weights. [`resolve_allocation_set_step`](@ref) calls it at each step, before stage 2 of the block.
+
+# Arguments
+
+  - `set`: The programme set.
+  - `w`: The Price-Adjusted Allocation of the step.
+
+# Returns
+
+  - `set'::ProgrammeAllocationSet`: The set with the parts rebuilt for `w`.
+
+# Related
+
+  - [`ProgrammeAllocationSet`](@ref)
+  - [`resolve_allocation_set_step`](@ref)
+"""
+function factory(set::ProgrammeAllocationSet, w::AbstractVector)::ProgrammeAllocationSet
+    return rebuild_estimator(set, (; cbe = factory(set.cbe, w), r = factory(set.r, w)))
+end
 # The set declares the Non-Investable Axis on its `sets` after the view at the mask of a step,
 # as a JuMP head does in `investable_reduction` (`programme_investable_reduction`).
 function non_investable_universe(set::ProgrammeAllocationSet,
@@ -332,7 +356,7 @@ $(DocStringExtensions.TYPEDSIGNATURES)
 
 Resolves the slots of a [`ProgrammeAllocationSet`](@ref) that hold a name or an estimator, once per fold.
 
-This is stage 1 of the resolution of the set's block, [`resolve_constraint_block_names`](@ref), the stage that a [`JuMPOptimiser`](@ref) runs on its own block. The online head runs it once for each fold, before it knows the Investable Mask of a step. At every step, [`assemble_allocation_set!`](@ref) runs stage 2, [`resolve_constraint_block`](@ref), on the set viewed at the mask of the step. So the set orders the names and the reduction by the rule of a JuMP head.
+This is stage 1 of the resolution of the set's block, [`resolve_constraint_block_names`](@ref), the stage that a [`JuMPOptimiser`](@ref) runs on its own block. The online head runs it once for each fold, before it knows the Investable Mask of a step. At every step, [`resolve_allocation_set_step`](@ref) runs stage 2, [`resolve_constraint_block`](@ref), on the set viewed at the mask of the step. So the set orders the names and the reduction by the rule of a JuMP head.
 
 The weight bounds `wb` are a stage 2 slot of the block, because their resolver can read the rows. A bound that reads only names, a [`WeightBounds`](@ref) or a [`WeightBoundsEstimator`](@ref), resolves here, over the `N` assets, once per fold. Stage 2 then gives the resolved bounds back unchanged. A bound that reads the rows, such as a [`ScoreWeightBounds`](@ref), stays in the set, and stage 2 resolves it at each step on the head's rows ([`bounds_read_rows`](@ref)).
 

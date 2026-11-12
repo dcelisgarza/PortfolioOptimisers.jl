@@ -481,6 +481,36 @@ function unit_scale_returns_estimator(r::JuMPReturnsEstimator)
     return rebuild_estimator(r, (; settings = s))
 end
 """
+$(DocStringExtensions.TYPEDSIGNATURES)
+
+Return a copy of return term `r` with `rte = false`, so its expression joins no return expression of an objective.
+
+This is the copy that a return floor takes when it only bounds the return, as a risk ceiling takes [`no_risk_expr_risk_measure`](@ref). The bound `lb` still binds on the term's own expression, and the term still charges the same fees. `scale` weighs the term only in the return expression, so the copy keeps it and it has no effect.
+
+# Arguments
+
+  - `r`: A [`JuMPReturnsEstimator`](@ref).
+
+# Returns
+
+  - The return term with `rte = false`, or `r` itself when `rte` is already `false`.
+
+# Related
+
+  - [`no_risk_expr_risk_measure`](@ref)
+  - [`unit_scale_returns_estimator`](@ref)
+  - [`set_allocation_return_floor!`](@ref)
+"""
+function no_return_expr_returns_estimator(r::JuMPReturnsEstimator)
+    settings = r.settings
+    if !settings.rte
+        return r
+    end
+    s = JuMPReturnsSettings(; scale = settings.scale, lb = settings.lb, rte = false,
+                            fee = settings.fee, mic = settings.mic)
+    return rebuild_estimator(r, (; settings = s))
+end
+"""
 $(DocStringExtensions.TYPEDEF)
 
 Computes the portfolio return as the mean logarithmic return, the Kelly criterion's objective.

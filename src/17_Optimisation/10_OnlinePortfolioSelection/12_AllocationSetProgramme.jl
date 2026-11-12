@@ -29,15 +29,15 @@ end
 
 Adds the constraints of a resolved Allocation Set to the bare projection model.
 
-The model must already hold `w`, `k`, the two scales and the observation count. On both kinds of set the function adds the weight bounds and the budget of one. On a [`ProgrammeAllocationSet`](@ref) it also adds every other kind of the set, through the builders a JuMP optimiser uses and in the order [`assemble_jump_model!`](@ref) runs them. [`assemble_allocation_set!`](@ref) lists that order.
+The model must already hold `w`, `k`, the two scales and the observation count. On both kinds of set the function adds the weight bounds and the budget of one. On a [`ProgrammeAllocationSet`](@ref) the projection is the owner of the model, and the set is the owner of its block. The projection writes the budget of one, and the block builder [`set_block_constraints!`](@ref) adds every kind of the block, which a JuMP optimiser adds through the same builder. The bounds builder [`set_allocation_risk_return_bounds!`](@ref) adds the risk ceilings and the return floor of the set between the two phases of the block.
 
-[`projection_programme`](@ref) calls the five-argument form with the prior it fitted and reduced to the Investable Mask. The four-argument form fits the prior on `X` itself. A JuMP head does not call this function. Its Allocation Set Constraint calls [`add_allocation_set_constraints!`](@ref), which runs the same builders under names that do not collide with the head's own. The prior must price every asset the model trades.
+[`projection_programme`](@ref) calls the five-argument form with the prior it fitted and reduced to the Investable Mask. The four-argument form fits the prior on `X` itself. A JuMP head does not call this function. Its Allocation Set Constraint calls [`add_allocation_set_constraints!`](@ref), which runs the same builders under the prefix `:aset_`. The prior must price every asset the model trades.
 
 # Algorithm
 
  1. In the four-argument form, fit the set's prior `pr` on `X` with [`allocation_set_prior`](@ref), and call the five-argument form.
- 2. On a bounded set, add the weight bounds and the budget of one with [`set_allocation_set_bounds!`](@ref), and return `set.wb`.
- 3. On a programme set, call [`assemble_allocation_set!`](@ref) under the empty prefix. It resolves the bounds of the step, adds them with the budgets, adds every other kind, and returns the bounds.
+ 2. On a bounded set, add the weight bounds and the budget of one with [`set_allocation_set_bounds!`](@ref), and return `set.wb` with no block Result.
+ 3. On a programme set, resolve the step with [`resolve_allocation_set_step`](@ref), which gives the set after `factory(set, w)` and the Result `cbr` of its block. Add the budget of one with [`set_budget_constraints!`](@ref). Add the block, the ceilings and the floor with [`add_allocation_set_block!`](@ref) under the empty prefix. Return the bounds of the step and `cbr`.
 
 # Arguments
 
@@ -54,9 +54,9 @@ The model must already hold `w`, `k`, the two scales and the observation count. 
 
 # Returns
 
-  - `wb::WeightBounds`: The weight bounds of the step that the model holds. [`projection_programme`](@ref) reads their floor under a barrier geometry.
+  - `(wb, cbr)::Tuple`: The weight bounds of the step that the model holds, and the [`ResolvedConstraintBlock`](@ref) of the set, or `nothing` for a bounded set. [`projection_programme`](@ref) reads the floor of `wb` under a barrier geometry, and gives `cbr` to the custom objective terms of the set.
 
-**Breaking change.** This function returned `nothing` before a programme set took a bound that reads the rows. It returns the bounds of the step, because such a bound resolves only at the step.
+**Breaking change.** This function returned `nothing` before a programme set took a bound that reads the rows, and then the bounds of the step alone. It returns the bounds and the block Result, because a custom objective term of the set reads the Result of its block. A programme set now gives its `ccnt` and its `cobj` the Price-Adjusted Allocation of the step through `factory(set, w)`, as it gave its turnover and its tracking errors before.
 
 # Related
 
@@ -67,20 +67,24 @@ The model must already hold `w`, `k`, the two scales and the observation count. 
   - [`set_allocation_risk_ceiling!`](@ref)
 """
 function set_allocation_set_constraints!(model::JuMP.Model, set::BoundedAllocationSet,
-                                         ::AbstractVector, ::Any,
-                                         ::Any = nothing)::WeightBounds
+                                         ::AbstractVector, ::Any, ::Any = nothing)::Tuple
     set_allocation_set_bounds!(model, set.wb)
-    return set.wb
+    return set.wb, nothing
 end
 function set_allocation_set_constraints!(model::JuMP.Model, set::ProgrammeAllocationSet,
                                          w::AbstractVector,
-                                         X::Option{<:ReturnsResult})::WeightBounds
+                                         X::Option{<:ReturnsResult})::Tuple
     return set_allocation_set_constraints!(model, set, w, X, allocation_set_prior(set, X))
 end
 function set_allocation_set_constraints!(model::JuMP.Model, set::ProgrammeAllocationSet,
                                          w::AbstractVector, X::Option{<:ReturnsResult},
-                                         pr::Option{<:AbstractPriorResult})::WeightBounds
-    return assemble_allocation_set!(model, set, w, X, pr, Symbol(""))
+                                         pr::Option{<:AbstractPriorResult})::Tuple
+    setw, cbr = resolve_allocation_set_step(set, w, X, pr)
+    # The bare projection owns the budget of one, so it writes the row itself and gives the
+    # block no net budget (ADR 0237).
+    set_budget_constraints!(model, 1, get_w(model))
+    add_allocation_set_block!(model, setw, cbr, Symbol(""))
+    return cbr.wb, cbr
 end
 """
     add_allocation_set_constraints!(model::JuMP.Model, set::BoundedAllocationSet, w::AbstractVector, X)
@@ -88,16 +92,16 @@ end
 
 Adds the constraints of a resolved Allocation Set to a JuMP head's model during its assembly.
 
-This is the arm of the Allocation Set Constraint that a [`FollowTheLeader`](@ref) rule appends to its held optimiser. The head's builders have already registered their named entries: the weight bounds, the budgets, and the turnover and tracking-error terms under their indices. So this function adds the set's rows under other names than the bare projection model uses. It adds the bounds, the budget of one, and the short and gross budgets as anonymous rows. It adds every other kind through the same builders as [`set_allocation_set_constraints!`](@ref), in the same order. A builder that takes a prefix gets `:aset_`. A builder that takes an index gets the first index the model has not used. The function registers the head's `w` under the prefix, so the entries of a set's risk ceiling never collide with the head's own risk measures.
+This is the arm of the Allocation Set Constraint that a [`FollowTheLeader`](@ref) rule appends to its held optimiser. The custom constraints run in phase 2 of the block of the leader, after [`mark_risk_minimised!`](@ref), so the set's block, its ceilings and its floor all come after the risk step of the leader. The block of the set takes the prefix `:aset_`: the block builder [`set_block_constraints!`](@ref) registers the head's `w` under it and adds every row of the set there, the bounds and the short and gross budgets among them. A kind on both the set and the held optimiser gives two sets of rows and no name collision. The MIP bits, the long and short parts and the lifted matrix belong to the weights, so the set reads the leader's.
 
 The set's penalties and the `p · tr(W)` term of its semidefinite phylogeny go into the Objective Penalty, which the head's objective builder adds to the head's objective. The tracking errors read the rows `X` that the head holds, and their row count. The set's prior is fitted on those rows, as the leader's prior is. The leader's model trades only the Investable Mask of its own prior, so [`assert_set_prior_priced`](@ref) refuses a set prior that prices fewer assets than the leader's.
 
-Some builders register their entries under one fixed name per model: a MIP kind, the exact long-short pin, a norm ceiling, a penalty and an integer phylogeny. State such a kind on the set or on the held optimiser, not on both. When it is on both, the second registration fails with an error that names the entry.
+The online head owns the budget of one, so this function writes `Σw = k` as the row `aset_bgt`. Every row of the set is registered in the model under `:aset_`, so a reader of the model can find it.
 
 # Algorithm
 
- 1. On a bounded set, add the bounds and the budget as anonymous rows with [`add_allocation_set_bounds!`](@ref).
- 2. On a programme set, fit the set's prior on `X` with [`allocation_set_prior`](@ref), and call [`assemble_allocation_set!`](@ref) under the prefix `:aset_`. It adds the bounds of the step and the budgets as anonymous rows, and then every other kind.
+ 1. On a bounded set, add the bounds and the budget under `:aset_` with [`add_allocation_set_bounds!`](@ref).
+ 2. On a programme set, fit the set's prior on `X` with [`allocation_set_prior`](@ref), and resolve the step with [`resolve_allocation_set_step`](@ref). Add `Σw = k` under `:aset_` with [`set_budget_constraints!`](@ref). Add the block, the ceilings and the floor with [`add_allocation_set_block!`](@ref) under the prefix `:aset_`.
 
 # Arguments
 
@@ -118,108 +122,128 @@ Some builders register their entries under one fixed name per model: a MIP kind,
 """
 function add_allocation_set_constraints!(model::JuMP.Model, set::BoundedAllocationSet,
                                          ::AbstractVector, ::Any)::Nothing
-    add_allocation_set_bounds!(model, set.wb, nothing, nothing)
+    add_allocation_set_bounds!(model, set.wb)
     return nothing
 end
 function add_allocation_set_constraints!(model::JuMP.Model, set::ProgrammeAllocationSet,
                                          w::AbstractVector,
                                          X::Option{<:ReturnsResult})::Nothing
-    assemble_allocation_set!(model, set, w, X, allocation_set_prior(set, X), :aset_)
+    setw, cbr = resolve_allocation_set_step(set, w, X, allocation_set_prior(set, X))
+    # The online head owns the budget of one (ADR 0159). Until the leader re-solve passes the
+    # set as a block of the entry (#2047), the set writes the row in the leader's model.
+    set_budget_constraints!(model, 1, get_w(model); prefix = :aset_)
+    add_allocation_set_block!(model, setw, cbr, :aset_)
     return nothing
 end
 """
 $(DocStringExtensions.TYPEDSIGNATURES)
 
-Adds every kind of a programme set, in the order [`assemble_jump_model!`](@ref) runs them, and returns the weight bounds of the step.
+Resolves a programme set for one step of an online head, to the set after `factory(set, w)` and the [`ResolvedConstraintBlock`](@ref) of its block.
 
-The bounds come first, from the block Result, because a bound that reads the rows resolves only at the step ([`bounds_read_rows`](@ref)). The bare projection model passes the empty prefix `Symbol("")`. A leader's model passes `:aset_`. Then the head's `w` is registered under the prefix, and every builder writes its entries under it, so the set's rows sit beside the head's own. The MIP bits, the pin of the decomposition and the lifted matrix `W` belong to the weights, so the set reads the head's ([`set_mip_constraints!`](@ref)). The penalties add to the one Objective Penalty `op`.
+Both arms of the set call it: the bare projection, [`set_allocation_set_constraints!`](@ref), and the model of a leader, [`add_allocation_set_constraints!`](@ref). Then [`add_allocation_set_block!`](@ref) adds the Result with the block builder.
 
 # Algorithm
 
  1. Check that the prior prices every asset in `X` with [`assert_set_prior_priced`](@ref).
- 2. Resolve stage 2 of the set's block against `pr` and `X` with [`resolve_constraint_block`](@ref), under the solver of the set and the `strict` flag of the current [`ProjectionStep`](@ref). This gives the block Result `cbr`. The builders below read its slots, its prior `cbr.pr` and its rows `cbr.rd`.
- 3. Add the bounds `cbr.wb`, the budget of one, and the short and gross budgets. The bare model takes them through [`set_allocation_set_bounds!`](@ref), and a leader's model takes them as anonymous rows through [`add_allocation_set_bounds!`](@ref).
- 4. When `prefix` is not empty, register the model's `w` under it, with the owner `w_owner = Symbol("")`. Then [`weights_prefix`](@ref) keeps the lifted `W`, `variance_flag` and `rc_variance` in the bare namespace, because the weights are the leader's.
- 5. Add the linear rows `lcsr`, then the centrality rows `ctr`.
- 6. Add the MIP kinds, then the sub-group MIP kinds.
- 7. Add the turnover ceilings, each with its reference replaced by `w`, through [`set_turnover_constraints!`](@ref).
- 8. When the set has tracking errors, resolve each against `w`, so that a benchmark that is not fixed takes `w`. Cut each benchmark series to the row count of the prior with [`prefix_tracking_benchmark`](@ref). Bind each [`DataBenchmarkTracking`](@ref) to the benchmark of the rows `cbr.rd` with [`bind_data_benchmark`](@ref), and add the rows.
- 9. Add the norm ceilings `l2c`, `lpc` and `linfc`.
-10. Add the penalties `l1`, `l2`, `lp` and `linf` to the Objective Penalty.
-11. Resolve the risk ceilings against `w` with [`factory`](@ref), so that a [`WeightsTracking`](@ref) benchmark or a [`TurnoverRiskMeasure`](@ref) reference that is not fixed takes `w`, as in steps 7 and 8. A measure that holds neither stays as it is. Bind each [`DataBenchmarkTracking`](@ref) of the ceilings to the benchmark of the rows `cbr.rd`, and add the ceilings with [`set_allocation_risk_ceiling!`](@ref).
-12. Resolve the return floor `ret` against the prior `cbr.pr` with [`factory`](@ref), and add it with [`set_allocation_return_floor!`](@ref), with the rows.
-13. Add the integer phylogeny rows and the semidefinite phylogeny rows of `plr`.
-14. Add the custom constraints.
-15. Return `cbr.wb`.
+ 2. Give the set the Price-Adjusted Allocation `w` with `factory(set, w)`, so a turnover ceiling, a tracking error, a risk ceiling, a custom constraint and a custom objective term that read the previous weights read the book of the step.
+ 3. Resolve stage 2 of the block of the set against `pr` and `X` with [`resolve_constraint_block`](@ref), under the solver of the set and the `strict` flag of the current [`ProjectionStep`](@ref).
+ 4. Check the bounds of the step against the budget of one with [`assert_feasible_bounds`](@ref). A bound that reads the rows resolves only here ([`bounds_read_rows`](@ref)).
 
 # Arguments
 
-  - $(arg_dict[:model])
   - `set`: The programme set, resolved once per fold.
   - `w`: The Price-Adjusted Allocation the step trades from.
   - `X`: The rows the head holds through the period, a [`ReturnsResult`](@ref), or `nothing`.
   - `pr`: The set's prior result on `X`, or `nothing` when the set reads no rows.
+
+# Validation
+
+  - The rules of [`assert_set_prior_priced`](@ref), [`resolve_constraint_block`](@ref) and [`assert_feasible_bounds`](@ref).
+
+# Returns
+
+  - `(set', cbr)::Tuple`: The set after `factory(set, w)`, and the Result of its block.
+
+# Related
+
+  - [`add_allocation_set_block!`](@ref)
+  - [`resolve_constraint_block`](@ref)
+"""
+function resolve_allocation_set_step(set::ProgrammeAllocationSet, w::AbstractVector,
+                                     X::Option{<:ReturnsResult},
+                                     pr::Option{<:AbstractPriorResult})::Tuple
+    assert_set_prior_priced(pr, X)
+    setw = factory(set, w)
+    cbr = resolve_constraint_block(setw.cbe, pr, X; slv = setw.slv,
+                                   strict = projection_step_strict())
+    assert_feasible_bounds(cbr.wb)
+    return setw, cbr
+end
+"""
+$(DocStringExtensions.TYPEDSIGNATURES)
+
+Adds the block of a programme set to a model with the block builder, and the set's risk ceilings and return floor with its bounds builder.
+
+The set is the owner of its block, so the builder gets no net budget and no fees, as the set had none before the block. The owner of the model writes the budget of one. The bare projection passes the empty prefix `Symbol("")`, and a leader's model passes `:aset_`, so the rows of the set sit beside the rows of the leader with no name collision.
+
+# Algorithm
+
+ 1. Add phase 1 of the block with [`set_block_constraints!`](@ref), with the set as the owner and its tracking errors from [`allocation_set_tracking`](@ref).
+ 2. Add the risk ceilings and the return floor with [`set_allocation_risk_return_bounds!`](@ref).
+ 3. Add phase 2 of the block with [`set_block_post_risk_constraints!`](@ref).
+
+# Arguments
+
+  - $(arg_dict[:model])
+  - `set`: The programme set, after `factory(set, w)`.
+  - `cbr`: The Result of its block, from [`resolve_allocation_set_step`](@ref).
   - `prefix`: `Symbol("")` on the bare projection model, `:aset_` in a leader's model.
 
 # Returns
 
-  - `wb::WeightBounds`: The weight bounds of the step, `cbr.wb`.
+  - `nothing`.
 
 # Related
 
-  - [`set_allocation_set_constraints!`](@ref)
-  - [`add_allocation_set_constraints!`](@ref)
-  - [`resolve_constraint_block`](@ref)
+  - [`resolve_allocation_set_step`](@ref)
+  - [`set_block_constraints!`](@ref)
+  - [`set_allocation_risk_return_bounds!`](@ref)
 """
-function assemble_allocation_set!(model::JuMP.Model, set::ProgrammeAllocationSet,
-                                  w::AbstractVector, X::Option{<:ReturnsResult},
-                                  pr::Option{<:AbstractPriorResult},
-                                  prefix::Symbol)::WeightBounds
-    bare = prefix == Symbol("")
-    assert_set_prior_priced(pr, X)
-    cbr = resolve_constraint_block(set.cbe, pr, X; slv = set.slv,
-                                   strict = projection_step_strict())
-    (; wb, lt, st, lcsr, ctr, gcardr, sgcardr, smtx, sgmtx, slt, sst, sglt, sgst, plr, ss, rd) = cbr
-    if bare
-        set_allocation_set_bounds!(model, wb, cbr.sbgt, cbr.gbgt)
-    else
-        add_allocation_set_bounds!(model, wb, cbr.sbgt, cbr.gbgt)
-    end
-    if !bare
-        state_build!(() -> get_w(model), model, prefix, :w)
-        state_build!(() -> Symbol(""), model, prefix, :w_owner)
-    end
-    set_linear_weight_constraints!(model, lcsr, :lcs_ineq_, :lcs_eq_; prefix = prefix)
-    set_linear_weight_constraints!(model, ctr, :cent_ineq_, :cent_eq_; prefix = prefix)
-    set_mip_constraints!(model, wb, cbr.card, gcardr, plr, lt, st, nothing, ss, cbr.xbgt;
-                         prefix = prefix)
-    set_smip_constraints!(model, wb, cbr.scard, sgcardr, smtx, sgmtx, slt, sst, sglt, sgst,
-                          ss; prefix = prefix)
-    set_turnover_constraints!(model, factory(cbr.tn, w); prefix = prefix)
-    if !isnothing(set.tr)
-        # The constructor refuses a data benchmark under a prior of the Excess Frame, so a
-        # data benchmark binds to the raw rows that the set's prior reads.
-        tr = bind_data_benchmark(prefix_tracking_benchmark(factory(set.tr, w),
-                                                           size(pr.X, 1)), rd)
-        set_tracking_error_constraints!(model, pr, tr, set, plr, nothing; prefix = prefix)
-    end
-    set_weight_norm_2_constraints!(model, cbr.l2c; prefix = prefix)
-    set_weight_norm_p_constraints!(model, cbr.lpc; prefix = prefix)
-    set_weight_norm_inf_constraints!(model, cbr.linfc; prefix = prefix)
-    set_l1_regularisation!(model, cbr.l1; prefix = prefix)
-    set_l2_regularisation!(model, cbr.l2; prefix = prefix)
-    set_lp_regularisation!(model, cbr.lp; prefix = prefix)
-    set_linf_regularisation!(model, cbr.linf; prefix = prefix)
-    # The risk ceilings and the return floor are fields of the set, and not slots of the
-    # block, so they read the prior and the rows of the block Result (ADR 0237).
-    set_allocation_risk_ceiling!(model, bind_data_benchmark(factory(set.r, w), rd), set,
-                                 cbr.pr, plr; prefix = prefix)
-    set_allocation_return_floor!(model, factory(set.ret, cbr.pr), cbr.pr; prefix = prefix,
-                                 rd = rd)
-    set_iplg_constraints!(model, plr; prefix = prefix)
-    set_sdp_phylogeny_constraints!(model, plr; prefix = prefix)
-    add_custom_constraint!(model, cbr.ccnt, set, nothing)
-    return wb
+function add_allocation_set_block!(model::JuMP.Model, set::ProgrammeAllocationSet,
+                                   cbr::ResolvedConstraintBlock, prefix::Symbol)::Nothing
+    set_block_constraints!(model, cbr, set, nothing, nothing;
+                           tr = allocation_set_tracking(set.tr, cbr), prefix = prefix)
+    set_allocation_risk_return_bounds!(model, set, cbr; prefix = prefix)
+    set_block_post_risk_constraints!(model, cbr, set, nothing; prefix = prefix)
+    return nothing
+end
+"""
+    allocation_set_tracking(tr::Nothing, cbr::ResolvedConstraintBlock)
+    allocation_set_tracking(tr, cbr::ResolvedConstraintBlock)
+
+Binds the tracking errors of a programme set to the rows of its block.
+
+The set comes after `factory(set, w)`, so a benchmark that is not fixed already holds the Price-Adjusted Allocation of the step. The function cuts each benchmark series to the row count of the prior of the block with [`prefix_tracking_benchmark`](@ref), and binds each [`DataBenchmarkTracking`](@ref) to the benchmark of the rows `cbr.rd` with [`bind_data_benchmark`](@ref). The constructor of the set refuses a data benchmark under a prior of the Excess Frame, so a data benchmark binds to the raw rows that the set's prior reads.
+
+# Arguments
+
+  - `tr`: The tracking errors of the set, or `nothing`.
+  - `cbr`: The Result of the block of the set.
+
+# Returns
+
+  - `tr'`: The bound tracking errors, or `nothing`.
+
+# Related
+
+  - [`add_allocation_set_block!`](@ref)
+  - [`prefix_tracking_benchmark`](@ref)
+"""
+function allocation_set_tracking(::Nothing, ::ResolvedConstraintBlock)::Nothing
+    return nothing
+end
+function allocation_set_tracking(tr, cbr::ResolvedConstraintBlock)
+    return bind_data_benchmark(prefix_tracking_benchmark(tr, size(cbr.pr.X, 1)), cbr.rd)
 end
 """
     prefix_tracking_benchmark(tr, T::Integer)
@@ -241,7 +265,7 @@ The head's rows are the first rows of the fold, up to the current period, so a b
 
 # Related
 
-  - [`assemble_allocation_set!`](@ref)
+  - [`allocation_set_tracking`](@ref)
   - [`set_tracking_error_constraints!`](@ref)
   - [`ReturnsTracking`](@ref)
 """
@@ -265,7 +289,9 @@ end
 
 Adds a programme set's return floor.
 
-For each term, the per-index arm of [`set_return_constraints!`](@ref) writes the return expression on the prior's expected returns and the row of its `settings.lb`. The term's scale is set to one first. The terms take the indices one to the number of terms under `prefix`, so in a leader's model they do not replace the head's own. The function does not use a term in the objective, as a scalarised return or the normalisation of a ratio, because the objective of the projection is the geometry's divergence.
+For each term, the per-index arm of [`set_return_constraints!`](@ref) writes the return expression on the prior's expected returns and the row of its `settings.lb`. The term clears its `rte` first with [`no_return_expr_returns_estimator`](@ref), as a risk ceiling clears its `rke`, so it adds nothing to `ret_vec`, the return expression of the objective of the owner. The terms take the indices one to the number of terms under `prefix`, so in a leader's model they do not replace the head's own. The function does not use a term in the objective, as a scalarised return or the normalisation of a ratio, because the objective of the projection is the geometry's divergence.
+
+**Breaking change.** The floor kept `rte`, so it pushed its expression into `ret_vec` of a leader's model. The leader had already collapsed `ret_vec` into its `ret`, so no number changed, but a later reader of `ret_vec` read the term of the set.
 
 # Arguments
 
@@ -282,7 +308,7 @@ For each term, the per-index arm of [`set_return_constraints!`](@ref) writes the
 # Related
 
   - [`set_return_constraints!`](@ref)
-  - [`assemble_allocation_set!`](@ref)
+  - [`set_allocation_risk_return_bounds!`](@ref)
 """
 function set_allocation_return_floor!(::JuMP.Model, ::Nothing, ::Any;
                                       prefix::Symbol = Symbol(""), kwargs...)::Nothing
@@ -298,7 +324,7 @@ function set_allocation_return_floor!(model::JuMP.Model, rets::VecJRE,
                                       pr::AbstractPriorResult; prefix::Symbol = Symbol(""),
                                       kwargs...)::Nothing
     for (i, ret) in enumerate(rets)
-        set_return_constraints!(model, i, unit_scale_returns_estimator(ret), pr;
+        set_return_constraints!(model, i, no_return_expr_returns_estimator(ret), pr;
                                 prefix = prefix, kwargs...)
     end
     return nothing
@@ -306,26 +332,23 @@ end
 """
 $(DocStringExtensions.TYPEDSIGNATURES)
 
-Adds an Allocation Set's weight bounds, its budget of one, and its short and gross budgets to a model that already names its own.
+Adds the weight bounds and the budget of one of a [`BoundedAllocationSet`](@ref) to a model that already names its own.
 
-The rows are the inequalities that [`set_allocation_set_bounds!`](@ref) writes, registered under no name. The short and gross budgets read the model's long and short parts when the model holds them. Otherwise the function makes two anonymous vectors of parts and bounds them by `w`.
+The rows are the inequalities that [`set_allocation_set_bounds!`](@ref) writes, registered under the prefix `:aset_` as `aset_w_lb`, `aset_w_ub` and `aset_bgt`. A [`ProgrammeAllocationSet`](@ref) does not come here: the block builder [`set_block_constraints!`](@ref) adds its bounds and its short and gross budgets under its own prefix.
+
+**Breaking change.** The rows were anonymous. They are registered now, so a reader of the model can find them.
 
 # JuMP formulation
 
 ## Variables
 
   - `w`, `k`: read from the model.
-  - `lw`, `sw`: long and short parts. They are read from the model when it holds them. Otherwise, when the set has a short or a gross budget, they are two anonymous vectors of ``N`` variables, each bounded below by zero.
 
 ## Constraints
 
-Every row is registered under no name.
-
-  - ``s_c (\\boldsymbol{w} - k \\boldsymbol{l}) \\geq 0``, when an entry of ``\\boldsymbol{l}`` is finite.
-  - ``s_c (\\boldsymbol{w} - k \\boldsymbol{u}) \\leq 0``, when an entry of ``\\boldsymbol{u}`` is finite.
-  - ``s_c \\left(\\sum_{i=1}^{N} w_i - k\\right) = 0``.
-  - ``s_c (\\boldsymbol{w} - \\boldsymbol{lw}) \\leq 0`` and ``s_c (\\boldsymbol{w} + \\boldsymbol{sw}) \\geq 0``, when the function makes the parts.
-  - The rows of [`anonymous_budget_rows!`](@ref) on ``\\sum_i sw_i`` for the short budget, and on ``\\sum_i (lw_i + sw_i)`` for the gross budget.
+  - `aset_w_lb`: ``s_c (\\boldsymbol{w} - k \\boldsymbol{l}) \\geq 0``, when an entry of ``\\boldsymbol{l}`` is finite.
+  - `aset_w_ub`: ``s_c (\\boldsymbol{w} - k \\boldsymbol{u}) \\leq 0``, when an entry of ``\\boldsymbol{u}`` is finite.
+  - `aset_bgt`: ``s_c \\left(\\sum_{i=1}^{N} w_i - k\\right) = 0``.
 
 Where:
 
@@ -334,14 +357,11 @@ Where:
   - $(math_dict[:w_port])
   - $(math_dict[:N])
   - ``\\boldsymbol{l}``, ``\\boldsymbol{u}``: Lower and upper weight bounds of the set, resolved.
-  - ``\\boldsymbol{lw}``, ``\\boldsymbol{sw}``: Long and short parts of ``\\boldsymbol{w}``, each ``N \\times 1`` and non-negative.
 
 # Arguments
 
   - $(arg_dict[:model])
   - `wb`: The set's resolved [`WeightBounds`](@ref).
-  - `sbgt`: The short budget, a number, a [`BudgetRange`](@ref), or `nothing`.
-  - `gbgt`: The gross budget, a number, a [`BudgetRange`](@ref), or `nothing`.
 
 # Validation
 
@@ -351,128 +371,31 @@ Where:
 
   - [`add_allocation_set_constraints!`](@ref)
   - [`set_allocation_set_bounds!`](@ref)
-  - [`anonymous_budget_rows!`](@ref)
 """
-function add_allocation_set_bounds!(model::JuMP.Model, wb::WeightBounds, sbgt,
-                                    gbgt)::Nothing
+function add_allocation_set_bounds!(model::JuMP.Model, wb::WeightBounds)::Nothing
     assert_feasible_bounds(wb)
-    w = get_w(model)
-    k = get_k(model)
-    sc = get_constraint_scale(model)
-    if w_finite_flag(wb.lb)
-        JuMP.@constraint(model, sc * (w ⊖ k * wb.lb) >= 0)
-    end
-    if w_finite_flag(wb.ub)
-        JuMP.@constraint(model, sc * (w ⊖ k * wb.ub) <= 0)
-    end
-    JuMP.@constraint(model, sc * (sum(w) - k) == 0)
-    return add_allocation_set_bounds!(model, w, sc, sbgt, gbgt)
-end
-# The short and the gross budgets read the long and the short parts of `w`. Without either
-# budget, no row reads them, so the parts are not built.
-function add_allocation_set_bounds!(::JuMP.Model, ::Any, ::Any, ::Nothing,
-                                    ::Nothing)::Nothing
-    return nothing
-end
-function add_allocation_set_bounds!(model::JuMP.Model, w, sc, sbgt, gbgt)::Nothing
-    lw, sw = if shared_has(model, :sw)
-        shared_get(model, :lw), shared_get(model, :sw)
-    else
-        N = length(w)
-        lw = JuMP.@variable(model, [1:N], lower_bound = 0)
-        sw = JuMP.@variable(model, [1:N], lower_bound = 0)
-        JuMP.@constraint(model, sc * (w - lw) <= 0)
-        JuMP.@constraint(model, sc * (w + sw) >= 0)
-        lw, sw
-    end
-    anonymous_budget_rows!(model, sum(sw), sbgt)
-    anonymous_budget_rows!(model, sum(lw) + sum(sw), gbgt)
+    state_build!(() -> get_w(model), model, :aset_, :w)
+    set_weight_constraints!(model, wb, nothing, nothing; prefix = :aset_)
+    set_budget_constraints!(model, 1, get_w(model); prefix = :aset_)
     return nothing
 end
 """
-    anonymous_budget_rows!(model::JuMP.Model, expr, bgt::Nothing)
-    anonymous_budget_rows!(model::JuMP.Model, expr, bgt::Number)
-    anonymous_budget_rows!(model::JuMP.Model, expr, bgt::BudgetRange)
+    set_allocation_set_bounds!(model::JuMP.Model, wb::WeightBounds)
 
-Adds one budget on an expression as rows under no name.
+Adds the weight bounds and the budget of one of a [`BoundedAllocationSet`](@ref) to the bare projection model.
 
-A number fixes the expression at `k · bgt`. A [`BudgetRange`](@ref) bounds it on each side that is set. `nothing` adds no row.
-
-# JuMP formulation
-
-## Variables
-
-  - `k`: read from the model.
-
-## Constraints
-
-Every row is registered under no name.
-
-  - ``s_c (e - k b) = 0``, when the budget is a number.
-  - ``s_c (e - k b_l) \\geq 0`` and ``s_c (e - k b_u) \\leq 0``, when the budget is a range, each row only when its bound is set.
-
-Where:
-
-  - $(math_dict[:sc_scale])
-  - $(math_dict[:k_budget])
-  - ``e``: The expression the budget bounds.
-  - ``b``: The budget, when it is a number.
-  - ``b_l``, ``b_u``: Lower and upper bounds of the range.
-
-# Arguments
-
-  - $(arg_dict[:model])
-  - `expr`: The expression the budget bounds.
-  - `bgt`: A number, a [`BudgetRange`](@ref), or `nothing`.
-
-# Returns
-
-  - `nothing`.
-
-# Related
-
-  - [`add_allocation_set_bounds!`](@ref)
-  - [`set_budget_constraints!`](@ref)
-"""
-function anonymous_budget_rows!(::JuMP.Model, ::Any, ::Nothing)::Nothing
-    return nothing
-end
-function anonymous_budget_rows!(model::JuMP.Model, expr, bgt::Number)::Nothing
-    k = get_k(model)
-    sc = get_constraint_scale(model)
-    JuMP.@constraint(model, sc * (expr - k * bgt) == 0)
-    return nothing
-end
-function anonymous_budget_rows!(model::JuMP.Model, expr, bgt::BudgetRange)::Nothing
-    k = get_k(model)
-    sc = get_constraint_scale(model)
-    if !isnothing(bgt.lb)
-        JuMP.@constraint(model, sc * (expr - k * bgt.lb) >= 0)
-    end
-    if !isnothing(bgt.ub)
-        JuMP.@constraint(model, sc * (expr - k * bgt.ub) <= 0)
-    end
-    return nothing
-end
-"""
-    set_allocation_set_bounds!(model::JuMP.Model, wb::WeightBounds, sbgt = nothing, gbgt = nothing)
-
-Adds an Allocation Set's weight bounds, its budget of one, and its short and gross budgets to the bare projection model.
-
-[`set_weight_constraints!`](@ref) writes the bounds, the short budget and the gross budget, with no net budget. A negative lower bound then builds the long and short parts of `w` and leaves the long part free. Under [`JuMPOptimiser`](@ref), a net budget with no short budget fixes the long part at the net budget, which forbids every short position. An Allocation Set lets the book hold short positions, so the function passes no net budget there. It adds `Σw = k` after that, through [`set_budget_constraints!`](@ref).
+[`set_weight_constraints!`](@ref) writes the bounds with no net budget, and the function adds `Σw = k` after that, through [`set_budget_constraints!`](@ref). A [`ProgrammeAllocationSet`](@ref) does not come here: the block builder [`set_block_constraints!`](@ref) adds its bounds and its short and gross budgets.
 
 # Algorithm
 
  1. Check the bounds against the budget with [`assert_feasible_bounds`](@ref).
- 2. Add the bounds, the short budget and the gross budget with [`set_weight_constraints!`](@ref), with no net budget.
+ 2. Add the bounds with [`set_weight_constraints!`](@ref), with no net budget.
  3. Add the budget `Σw = k` with [`set_budget_constraints!`](@ref).
 
 # Arguments
 
   - $(arg_dict[:model])
   - `wb`: The set's resolved [`WeightBounds`](@ref).
-  - `sbgt`: The short budget, a number, a [`BudgetRange`](@ref), or `nothing`.
-  - `gbgt`: The gross budget, a number, a [`BudgetRange`](@ref), or `nothing`.
 
 # Validation
 
@@ -482,12 +405,10 @@ Adds an Allocation Set's weight bounds, its budget of one, and its short and gro
 
   - [`set_allocation_set_constraints!`](@ref)
   - [`BoundedAllocationSet`](@ref)
-  - [`ProgrammeAllocationSet`](@ref)
 """
-function set_allocation_set_bounds!(model::JuMP.Model, wb::WeightBounds, sbgt = nothing,
-                                    gbgt = nothing)::Nothing
+function set_allocation_set_bounds!(model::JuMP.Model, wb::WeightBounds)::Nothing
     assert_feasible_bounds(wb)
-    set_weight_constraints!(model, wb, nothing, sbgt; gbgt = gbgt)
+    set_weight_constraints!(model, wb, nothing, nothing)
     set_budget_constraints!(model, 1, get_w(model))
     return nothing
 end
@@ -958,9 +879,9 @@ A distance reader of the set, its `ple` or its `cte`, can refuse an asset that t
 
  1. Reduce `set`, `X` and `pr` to `imsk` with [`programme_investable_reduction`](@ref). Reduce the geometry and `q` to the mask with [`investable_geometry_view`](@ref), and view `w` at the mask, which gives `wr`.
  2. Make a bare model with the set's two scales and the row count of `X`, zero when there are no rows. Register `k = 1`, and the vector `w` of weight variables.
- 3. Add the set's constraints with [`set_allocation_set_constraints!`](@ref) through [`distance_reader_call`](@ref), with `wr` as the reference. This gives the weight bounds `wb` of the step. When a distance reader refuses an asset, call this method again with the mask of [`distance_reader_refusal_mask`](@ref) under [`projection_step_strict`](@ref), and return its value.
+ 3. Add the set's constraints with [`set_allocation_set_constraints!`](@ref) through [`distance_reader_call`](@ref), with `wr` as the reference. This gives the weight bounds `wb` of the step and the Result `cbr` of the block of a programme set. When a distance reader refuses an asset, call this method again with the mask of [`distance_reader_refusal_mask`](@ref) under [`projection_step_strict`](@ref), and return its value.
  4. Refuse a floor of `wb` that the geometry does not admit, with [`assert_geometry_admits_bounds`](@ref).
- 5. Add the set's custom objective terms with [`add_custom_objective_term!`](@ref), with the geometry as the objective and the set as the owner.
+ 5. Add the set's custom objective terms with [`add_custom_objective_term!`](@ref), with the geometry as the objective, the set as the owner, and `cbr` as the bundle that the terms read.
  6. Set the objective with [`set_projection_objective!`](@ref).
  7. Solve on [`projection_solver`](@ref) with [`solve_projection_programme!`](@ref). When the solve gives an allocation, take its answer on the mask with [`programme_answer`](@ref), and return it with a zero at every asset outside the mask. Otherwise record the Held Step with the solver trials, and return a copy of `w`.
 
@@ -1019,15 +940,19 @@ function projection_programme(proj::AbstractProjectionGeometry, set::AbstractAll
     JuMP.@expression(model, k, 1)
     wv = state_set!(model, Symbol(""), :w,
                     JuMP.@variable(model, [1:length(qr)], base_name = "w"))
-    wb = distance_reader_call(set_allocation_set_constraints!, model, setr, wr, Xr, prr)
-    if wb isa DistanceReaderRefusalError
+    res = distance_reader_call(set_allocation_set_constraints!, model, setr, wr, Xr, prr)
+    if res isa DistanceReaderRefusalError
         # Only a set that reads rows calls a reader, so a refusal comes with rows.
         return projection_programme(proj, set, q, w, X, pr,
-                                    distance_reader_refusal_mask(wb, imsk, X::ReturnsResult,
+                                    distance_reader_refusal_mask(res, imsk,
+                                                                 X::ReturnsResult,
                                                                  projection_step_strict()))
     end
+    wb, cbr = res
     assert_geometry_admits_bounds(projr, wb)
-    add_custom_objective_term!(model, projr, allocation_set_cobj(setr), setr, nothing)
+    # A block's custom objective terms get the objective, the owner of the block and the
+    # Result of the block (ADR 0237).
+    add_custom_objective_term!(model, projr, allocation_set_cobj(cbr), setr, cbr)
     set_projection_objective!(model, projr, qr)
     res, wn = solve_projection_programme!(model, projr, qr, projection_solver(projr, setr))
     if !isnothing(wn)
@@ -1229,22 +1154,22 @@ function projection_scale(::BoundedAllocationSet, ::Symbol)
     return 1
 end
 """
-    allocation_set_cobj(set::ProgrammeAllocationSet)
-    allocation_set_cobj(set::BoundedAllocationSet)
+    allocation_set_cobj(cbr::ResolvedConstraintBlock)
+    allocation_set_cobj(cbr::Nothing)
 
 Returns the custom objective terms that a projection programme adds to its objective.
 
-A programme set gives its `cobj`. A bounded set carries no objective term, so it gives `nothing`.
+A programme set gives the `cobj` of its [`ResolvedConstraintBlock`](@ref), which holds the terms after `factory(set, w)`. A bounded set has no block Result and carries no objective term, so it gives `nothing`.
 
 # Related
 
   - [`projection_programme`](@ref)
   - [`add_custom_objective_term!`](@ref)
 """
-function allocation_set_cobj(set::ProgrammeAllocationSet)
-    return set.cobj
+function allocation_set_cobj(cbr::ResolvedConstraintBlock)
+    return cbr.cobj
 end
-function allocation_set_cobj(::BoundedAllocationSet)
+function allocation_set_cobj(::Nothing)
     return nothing
 end
 """

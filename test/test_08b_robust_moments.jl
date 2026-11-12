@@ -465,7 +465,6 @@ pass `pr.X`, which is the documented `MatNum` arity.
         PO.set_model_observations!(model, size(attrs.pr.X, 1))
         PO.set_maximum_ratio_factor_variables!(model, mr.obj)
         PO.set_w!(model, attrs.pr.X, mr.wi)
-        PO.set_weight_constraints!(model, attrs.wb, mr.opt)
         PO.assemble_jump_model!(model, mr, mr.opt, attrs, rd, mr.r, mr.obj)
         return sprint(print, model)
     end

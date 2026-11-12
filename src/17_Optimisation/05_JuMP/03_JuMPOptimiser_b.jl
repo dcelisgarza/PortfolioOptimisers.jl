@@ -271,22 +271,15 @@ $(DocStringExtensions.TYPEDSIGNATURES)
 
 Add weight bound and budget constraints to `model` from the optimiser's own budget group.
 
-Every JuMP optimiser head reaches [`set_weight_constraints!`](@ref) through this method, so
-the whole budget group (`bgt`, `sbgt`, `gbgt`) travels as one object. A budget field added
-to [`JuMPOptimiser`](@ref) is therefore read in one place rather than at every head, which
-is how the gross budget once reached [`MeanRisk`](@ref) alone and was silently dropped by
-the other four heads.
+[`UnconstrainedNearOptimalCentering`](@ref) reaches [`set_weight_constraints!`](@ref) through this method, because its centring solve adds the bounds of the block and no other row of it. Every other JuMP head adds its bounds and its budgets in phase 1 of its block, [`set_block_constraints!`](@ref), with the net budget of the head. Both routes pass the whole budget group (`bgt`, `sbgt`, `gbgt`) as one object, so a budget field cannot reach one head and miss the others.
 
-`long = true` forbids negative weight bounds, so the long/short decomposition is never
-built and `sbgt` and `gbgt` cannot apply; they are still forwarded, because the bound check
-is what rejects the combination.
+**Breaking change.** The positional `long::Bool` went, and the heads that forbade a negative bound with it call [`assert_long_only_weight_bounds`](@ref).
 
 # Arguments
 
   - $(arg_dict[:model])
   - $(arg_dict[:wb_arg])
   - `opt::JuMPOptimiser`: Optimiser supplying the budget group.
-  - `long::Bool = false`: When `true`, raises an error if any weight bound is negative.
 
 # Returns
 
@@ -298,9 +291,8 @@ is what rejects the combination.
   - [`set_budget_constraints!`](@ref)
   - [`set_gross_budget_constraints!`](@ref)
 """
-function set_weight_constraints!(model::JuMP.Model, wb::WeightBounds, opt::JuMPOptimiser,
-                                 long::Bool = false)
-    return set_weight_constraints!(model, wb, opt.bgt, opt.sbgt, long; gbgt = opt.gbgt)
+function set_weight_constraints!(model::JuMP.Model, wb::WeightBounds, opt::JuMPOptimiser)
+    return set_weight_constraints!(model, wb, opt.bgt, opt.sbgt; gbgt = opt.gbgt)
 end
 
 """
@@ -368,11 +360,23 @@ end
 
 Run the invariant model-assembly sequence shared by all single-JuMP-model optimisers.
 
-Executes the constraint-builder pipeline — from `set_linear_weight_constraints!` through
-`add_custom_constraint!` — that sits between the per-optimiser *head* (weight variables)
-and *tail* (objective + solve). The head must have populated Model State (`w`/`k` variables)
-before calling this function. See `Model Assembly` in `GLOSSARY.md` and
+Executes the constraint-builder pipeline that sits between the per-optimiser *head* (weight
+variables) and *tail* (objective + solve). The head must have populated Model State (`w`/`k`
+variables) before calling this function. See `Model Assembly` in `GLOSSARY.md` and
 `0008-jump-model-assembly.md`.
+
+The middle runs once for each block, through the block builder.
+Phase 1 of the block of the head, [`set_block_constraints!`](@ref), adds the weight bounds,
+the budgets with the net budget `opt.bgt`, and every row before the risk step. Then the head
+adds its fees, its risk measures and its return terms, and marks the objective with
+[`mark_risk_minimised!`](@ref). Phase 2, [`set_block_post_risk_constraints!`](@ref), adds the
+phylogeny rows and the custom constraints. The risk measures read the phylogeny `plr` of the
+block of the head.
+
+**Breaking change.** A head adds its weight bounds and its budgets here, in phase 1 of its
+block, and not before this function. A head of its own calls
+[`assert_long_only_weight_bounds`](@ref) where it builds its weights, when its formulation is
+long-only.
 
 The tail of the sequence is [`assert_frontier_sweep_cap`](@ref): both frontier registries are
 complete here and no sweep solve has started, so this is the one point at which the **total**
@@ -422,37 +426,20 @@ function assemble_jump_model!(model::JuMP.Model, optimiser::JuMPOptimisationEsti
                               obj::ObjectiveFunction = MinimumRisk(),
                               b1::Option{<:MatNum} = nothing)
     (; pr, fees, ret) = attrs
-    # The builder of a block after the first adds its rows (ADR 0237). Until it lands, the
+    # The heads that add each block of a list come with #2045 (ADR 0237). Until then, the
     # model holds the rows of the block of the owner, and the other blocks narrow the mask.
     cbr = owner_block(attrs.cbr)
-    (; wb, lt, st, lcsr, ctr, gcardr, sgcardr, smtx, sgmtx, slt, sst, sglt, sgst, tn, plr) = cbr
-    set_linear_weight_constraints!(model, lcsr, :lcs_ineq_, :lcs_eq_)
-    set_linear_weight_constraints!(model, ctr, :cent_ineq_, :cent_eq_)
-    set_mip_constraints!(model, wb, cbr.card, gcardr, plr, lt, st, fees, cbr.ss, cbr.xbgt)
-    set_smip_constraints!(model, wb, cbr.scard, sgcardr, smtx, sgmtx, slt, sst, sglt, sgst,
-                          cbr.ss)
-    set_turnover_constraints!(model, tn)
     # The head binds a data benchmark of its tracking errors to its rows, so `tr` is read
     # from the head and not from the block Result.
-    set_tracking_error_constraints!(model, pr, opt.tr, optimiser, plr, fees, b1; rd = rd)
-    # The norm ceilings and the penalties resolved their Calibration Rules at stage 2 of the
-    # block, `resolve_constraint_block`, which also checked the range of each number.
-    set_weight_norm_2_constraints!(model, cbr.l2c)
-    set_weight_norm_p_constraints!(model, cbr.lpc)
-    set_weight_norm_inf_constraints!(model, cbr.linfc)
-    set_l1_regularisation!(model, cbr.l1)
-    set_l2_regularisation!(model, cbr.l2)
-    set_lp_regularisation!(model, cbr.lp)
-    set_linf_regularisation!(model, cbr.linf)
+    set_block_constraints!(model, cbr, optimiser, opt.bgt, fees; tr = opt.tr, b1 = b1,
+                           rd = rd)
     set_non_fixed_fees!(model, fees)
-    set_risk_and_scalarise!(model, r, optimiser, opt, pr, plr, fees, b1; rd = rd)
+    set_risk_and_scalarise!(model, r, optimiser, opt, pr, cbr.plr, fees, b1; rd = rd)
     set_return_constraints!(model, ret, obj, pr; rd = rd)
     # After the return constraints, so a `MaximumRatio` has chosen its form, and before
     # every semidefinite phylogeny, including a programme set's in `add_custom_constraint!`.
     mark_risk_minimised!(model, obj)
-    set_iplg_constraints!(model, plr)
-    set_sdp_phylogeny_constraints!(model, plr)
-    add_custom_constraint!(model, cbr.ccnt, optimiser, attrs)
+    set_block_post_risk_constraints!(model, cbr, optimiser, attrs)
     assert_frontier_sweep_cap(model)
     assert_frontier_sweep_owner(model, optimiser)
     return nothing

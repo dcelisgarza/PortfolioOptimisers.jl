@@ -62,6 +62,10 @@ Add weight bound constraints to the JuMP optimisation model.
 
 The fall-through method does nothing. The concrete method adds lower-bound and upper-bound constraints on the portfolio weight vector `w`, handles long-short decomposition when negative bounds are present via `lw`/`sw` variables, and delegates budget constraints to [`set_budget_constraints!`](@ref).
 
+This is the first step of the block builder, [`set_block_constraints!`](@ref), so each [`ConstraintBlock`](@ref) of a model adds its own bounds. The rows go under `prefix`, the namespace of the block, and the builder reads the weights registered under it. The long and short parts belong to the weights. The first block that admits a short position makes them, with their rows `w_lw` and `w_sw`, and a later block reads them. A later block makes parts of its own under its prefix only when the weights already have a long part and no short part, because a block before it is long-only. Its short and gross budgets then read its own parts, as they read the anonymous parts of the set before this change.
+
+**Breaking change.** The positional `long::Bool` went. A long-only head checks its bounds with [`assert_long_only_weight_bounds`](@ref) where it built its weights, and the block builder adds the bounds.
+
 # Mathematical definition
 
 ```math
@@ -83,19 +87,15 @@ Where:
   - `bgt`: Optional total budget constraint. A number, a [`BudgetRange`](@ref), or a [`BudgetCostEstimator`](@ref), which is the whole of [`JuMPOptimiser`](@ref)'s own `bgt` bound.
   - `sbgt`: Optional short-side budget constraint. A [`BudgetCostEstimator`](@ref) `bgt` forbids one, so the pair never meets here.
   - `gbgt`: Optional gross (leverage) budget constraint, applied only when the weight bounds admit shorts. See [`set_gross_budget_constraints!`](@ref).
-  - `long::Bool = false`: When `true`, raises an error if any bound is negative.
+  - $(arg_dict[:prefix_kw])
 
 !!! note
 
-    Optimiser heads do not call this method directly. They pass their [`JuMPOptimiser`](@ref), whose method forwards the whole budget group (`bgt`, `sbgt`, `gbgt`) in one hand-off, so a budget field cannot reach one head and miss the others.
+    Optimiser heads do not call this method directly. The block builder [`set_block_constraints!`](@ref) calls it with the net budget of the owner of the block, and with the short and gross budgets of the block, so a budget field cannot reach one head and miss the others.
 
 !!! note
 
     The budgets set here **bound** the realised exposures rather than pinning them, because `lw` and `sw` are upper bounds on the parts of `w`. Pinning them is the `xbgt` option of [`short_mip_threshold_constraints`](@ref), applied later by [`set_mip_constraints!`](@ref).
-
-# Validation
-
-  - Raises an error when `long = true` and any bound is negative.
 
 # Returns
 
@@ -110,49 +110,184 @@ Where:
   - [`set_gross_budget_constraints!`](@ref)
   - [`JuMPOptimiser`](@ref)
 """
-function set_weight_constraints!(args...)
+function set_weight_constraints!(args...; kwargs...)
     return nothing
 end
 function set_weight_constraints!(model::JuMP.Model, wb::WeightBounds,
-                                 bgt::Option{<:Num_BgtCE}, sbgt::Option{<:Num_BgtRg},
-                                 long::Bool = false; gbgt::Option{<:Num_BgtRg} = nothing)
+                                 bgt::Option{<:Num_BgtCE}, sbgt::Option{<:Num_BgtRg};
+                                 gbgt::Option{<:Num_BgtRg} = nothing,
+                                 prefix::Symbol = Symbol(""))
     lb = wb.lb
     ub = wb.ub
     flag = w_neg_flag(lb) || w_neg_flag(ub)
-    @argcheck(!(long && flag), "Long-only strategy cannot have negative weight limits")
-    w = get_w(model)
+    w = get_w(model, prefix)
     N = length(w)
     k = get_k(model)
     sc = get_constraint_scale(model)
     if w_finite_flag(lb)
-        JuMP.@constraint(model, w_lb, sc * (w ⊖ k * lb) >= 0)
+        state_set!(model, prefix, :w_lb, JuMP.@constraint(model, sc * (w ⊖ k * lb) >= 0))
     end
     if w_finite_flag(ub)
-        JuMP.@constraint(model, w_ub, sc * (w ⊖ k * ub) <= 0)
+        state_set!(model, prefix, :w_ub, JuMP.@constraint(model, sc * (w ⊖ k * ub) <= 0))
     end
-    set_budget_constraints!(model, bgt, w)
+    set_budget_constraints!(model, bgt, w; prefix = prefix)
     set_gross_exposure_bound!(model, gross_exposure_bound(wb, bgt, sbgt, gbgt, N))
     if flag
-        lw, sw = if !shared_has(model, :sw)
-            JuMP.@variables(model, begin
-                                lw[1:N] >= 0
-                                sw[1:N] >= 0
-                            end)
-        else
-            shared_get(model, :lw), shared_get(model, :sw)
-        end
-        JuMP.@constraints(model, begin
-                              w_lw, sc * (w - lw) <= 0
-                              w_sw, sc * (w + sw) >= 0
-                          end)
-        # Only a declaration when no head made a stronger one: a head that derives `w` from the
-        # parts runs this too, and its identity survives these bounds.
-        set_decomposition_contract!(model, PartsBoundWeights())
-        set_long_short_budget_constraints!(model, bgt, sbgt)
-        set_gross_budget_constraints!(model, gbgt)
-    elseif !flag && !shared_has(model, :lw)
+        set_weight_parts!(model, w, prefix)
+        set_long_short_budget_constraints!(model, bgt, sbgt; prefix = prefix)
+        set_gross_budget_constraints!(model, gbgt; prefix = prefix)
+    elseif !shared_has(model, :lw)
         JuMP.@expression(model, lw, w)
     end
+    return nothing
+end
+"""
+$(DocStringExtensions.TYPEDSIGNATURES)
+
+Add the long and short parts of the weights, `lw` and `sw`, for a block whose bounds admit a short position.
+
+The parts belong to the weights, so they go in the shared Model State once. The first block that admits a short position makes them, or reads the parts that its head made, and adds the rows that tie them to `w`. A later block reads the same parts and adds no row. A head that derives `w` from the parts keeps its identity, because the rows here only bound the parts.
+
+A block before this one can be long-only. Then the weights already have the long part `lw = w` and no short part. This block cannot change that entry, because the rows of the earlier block read it. So the function adds nothing, and a budget of the block that reads the parts makes parts of its own under `prefix` through [`weight_parts!`](@ref). This is the case of a programme set that admits a short position in the model of a long-only leader.
+
+# JuMP formulation
+
+## Variables
+
+  - `lw`, `sw`: ``N \\times 1``, each bounded below by zero, shared.
+
+## Constraints
+
+  - `w_lw`: ``s_c (\\boldsymbol{w} - \\boldsymbol{lw}) \\leq 0``.
+  - `w_sw`: ``s_c (\\boldsymbol{w} + \\boldsymbol{sw}) \\geq 0``.
+
+Where:
+
+  - $(math_dict[:sc_scale])
+  - $(math_dict[:w_port])
+  - $(math_dict[:N])
+
+# Arguments
+
+  - $(arg_dict[:model])
+  - `w`: The weights registered under `prefix`.
+  - `prefix`: The Model State namespace of the block.
+
+# Returns
+
+  - `nothing`.
+
+# Related
+
+  - [`set_weight_constraints!`](@ref)
+  - [`weight_parts!`](@ref)
+  - [`set_decomposition_contract!`](@ref)
+"""
+function set_weight_parts!(model::JuMP.Model, w::AbstractVector, ::Symbol)::Nothing
+    if state_has(model, Symbol(""), :w_lw) ||
+       (shared_has(model, :lw) && !shared_has(model, :sw))
+        return nothing
+    end
+    N = length(w)
+    sc = get_constraint_scale(model)
+    lw, sw = if !shared_has(model, :sw)
+        JuMP.@variables(model, begin
+                            lw[1:N] >= 0
+                            sw[1:N] >= 0
+                        end)
+    else
+        shared_get(model, :lw), shared_get(model, :sw)
+    end
+    JuMP.@constraints(model, begin
+                          w_lw, sc * (w - lw) <= 0
+                          w_sw, sc * (w + sw) >= 0
+                      end)
+    # Only a declaration when no head made a stronger one: a head that derives `w` from the
+    # parts runs this too, and its identity survives these bounds.
+    set_decomposition_contract!(model, PartsBoundWeights())
+    return nothing
+end
+"""
+    weight_parts!(model::JuMP.Model, prefix::Symbol) -> Tuple
+
+Return the long and short parts of the weights that the budgets of a block read.
+
+A block reads the shared parts of the weights when they exist, see [`set_weight_parts!`](@ref). When a long-only block came first, the weights have the long part `lw = w` and no short part. Then the first budget of the block that reads the parts makes parts of its own under `prefix`, with their rows, and a later budget of the block reads them. So a block that states no short or gross budget makes no parts.
+
+# JuMP formulation
+
+## Variables
+
+  - `lw`, `sw`: ``N \\times 1``, each bounded below by zero, under `prefix`, when the function makes parts of the block.
+
+## Constraints
+
+  - `w_lw`: ``s_c (\\boldsymbol{w} - \\boldsymbol{lw}) \\leq 0``, under `prefix`.
+  - `w_sw`: ``s_c (\\boldsymbol{w} + \\boldsymbol{sw}) \\geq 0``, under `prefix`.
+
+Where:
+
+  - $(math_dict[:sc_scale])
+  - $(math_dict[:w_port]) It is the weights registered under `prefix`.
+  - $(math_dict[:N])
+
+# Arguments
+
+  - $(arg_dict[:model])
+  - `prefix`: The Model State namespace of the block.
+
+# Returns
+
+  - `(lw, sw)::Tuple`: The long and the short parts.
+
+# Related
+
+  - [`set_weight_parts!`](@ref)
+  - [`set_long_short_budget_constraints!`](@ref)
+  - [`set_gross_budget_constraints!`](@ref)
+"""
+function weight_parts!(model::JuMP.Model, prefix::Symbol)::Tuple
+    if shared_has(model, :sw)
+        return shared_get(model, :lw), shared_get(model, :sw)
+    end
+    if !state_has(model, prefix, :sw)
+        w = get_w(model, prefix)
+        N = length(w)
+        sc = get_constraint_scale(model)
+        lw = state_set!(model, prefix, :lw, JuMP.@variable(model, [1:N], lower_bound = 0))
+        sw = state_set!(model, prefix, :sw, JuMP.@variable(model, [1:N], lower_bound = 0))
+        state_set!(model, prefix, :w_lw, JuMP.@constraint(model, sc * (w - lw) <= 0))
+        state_set!(model, prefix, :w_sw, JuMP.@constraint(model, sc * (w + sw) >= 0))
+    end
+    return state_get(model, prefix, :lw), state_get(model, prefix, :sw)
+end
+"""
+$(DocStringExtensions.TYPEDSIGNATURES)
+
+Check that weight bounds admit no short position, for a head whose formulation is long-only.
+
+[`RiskBudgeting`](@ref) and [`RelaxedRiskBudgeting`](@ref) take the logarithm or the cone of the asset weights, which holds only for non-negative weights. The head calls this check where it builds its weights. The block builder [`set_block_constraints!`](@ref) then adds the bounds.
+
+# Arguments
+
+  - $(arg_dict[:wb_arg])
+
+# Validation
+
+  - No bound is negative. An `ArgumentError` is thrown otherwise.
+
+# Returns
+
+  - `nothing`.
+
+# Related
+
+  - [`w_neg_flag`](@ref)
+  - [`set_weight_constraints!`](@ref)
+"""
+function assert_long_only_weight_bounds(wb::WeightBounds)::Nothing
+    @argcheck(!(w_neg_flag(wb.lb) || w_neg_flag(wb.ub)),
+              "Long-only strategy cannot have negative weight limits")
     return nothing
 end
 """

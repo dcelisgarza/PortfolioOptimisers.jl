@@ -232,7 +232,7 @@ The projection programme reduces the model to the prior's Investable Mask before
 
 # Related
 
-  - [`assemble_allocation_set!`](@ref)
+  - [`resolve_allocation_set_step`](@ref)
   - [`add_allocation_set_constraints!`](@ref)
   - [`investable_mask`](@ref)
 """
@@ -483,7 +483,7 @@ Each ceiling goes through the measure's own JuMP builder, [`set_risk_constraints
 
 The source of the covariance matrix does not change the formulation. With a prior result, each measure is resolved against it first. Without one, every ceiling is a [`Variance`](@ref) or a [`StandardDeviation`](@ref) that holds its matrix, on a set that reads no rows, and the builder reads that matrix with `pr = nothing`.
 
-Under a `prefix`, the builders put their entries in that namespace. [`assemble_allocation_set!`](@ref) registers the head's `w` under the prefix before any builder runs. This keeps the ceiling's entries apart from the entries of the head's own measures. The lifted matrix ``\\mathbf{W}`` and the marks belong to the weights, [`weights_prefix`](@ref), so in a leader's model the ceiling, the set's phylogeny and the leader's measures read one ``\\mathbf{W}``.
+Under a `prefix`, the builders put their entries in that namespace. The block builder [`set_block_constraints!`](@ref) registers the head's `w` under the prefix before any builder runs. This keeps the ceiling's entries apart from the entries of the head's own measures. The lifted matrix ``\\mathbf{W}`` and the marks belong to the weights, [`weights_prefix`](@ref), so in a leader's model the ceiling, the set's phylogeny and the leader's measures read one ``\\mathbf{W}``.
 
 # Algorithm
 
@@ -547,6 +547,47 @@ function set_allocation_risk_ceiling!(model::JuMP.Model, rs::VecRM,
                                       pl; prefix::Symbol = Symbol(""))::Nothing
     ceilings = [no_risk_expr_risk_measure(factory(r, pr, set.slv)) for r in rs]
     set_risk_constraints!(model, ceilings, set, pr, pl, nothing; prefix = prefix)
+    return nothing
+end
+"""
+$(DocStringExtensions.TYPEDSIGNATURES)
+
+Adds the risk ceilings `r` and the return floor `ret` of a programme set to a model. This is the bounds builder of the set.
+
+`r` and `ret` are flat fields of the set and not slots of its [`ConstraintBlock`](@ref), because a [`JuMPOptimiser`](@ref) holds no bound that stands alone. So the block builder [`set_block_constraints!`](@ref) does not add them, and this builder reads them beside the [`ResolvedConstraintBlock`](@ref) of the set: its prior `cbr.pr`, its rows `cbr.rd` and its phylogeny `cbr.plr`. The set must come after `factory(set, w)`, so a [`WeightsTracking`](@ref) benchmark or a [`TurnoverRiskMeasure`](@ref) reference that is not fixed holds the Price-Adjusted Allocation of the step.
+
+The owner calls it after [`mark_risk_minimised!`](@ref), where the ceilings of the set ran through the custom constraints of a leader before. A ceiling clears its `rke` and a floor clears its `rte`, so neither joins the risk expression or the return expression of the objective of the owner. The set stays the [`RiskConstraintOwner`](@ref) of its ceilings. `nothing` in a field adds nothing.
+
+# Algorithm
+
+ 1. Bind each [`DataBenchmarkTracking`](@ref) of the ceilings to the benchmark of the rows `cbr.rd`, and add the ceilings with [`set_allocation_risk_ceiling!`](@ref).
+ 2. Resolve the floor against the prior `cbr.pr` with [`factory`](@ref), and add it with [`set_allocation_return_floor!`](@ref), with the rows.
+
+# Arguments
+
+  - $(arg_dict[:model])
+  - `set`: The programme set, after `factory(set, w)`.
+  - `cbr`: The Result of the block of the set.
+  - $(arg_dict[:prefix_kw])
+
+# Returns
+
+  - `nothing`.
+
+# Related
+
+  - [`set_allocation_risk_ceiling!`](@ref)
+  - [`set_allocation_return_floor!`](@ref)
+  - [`set_block_constraints!`](@ref)
+  - [`ProgrammeAllocationSet`](@ref)
+"""
+function set_allocation_risk_return_bounds!(model::JuMP.Model, set::ProgrammeAllocationSet,
+                                            cbr::ResolvedConstraintBlock;
+                                            prefix::Symbol = Symbol(""))::Nothing
+    set_allocation_risk_ceiling!(model, bind_data_benchmark(set.r, cbr.rd), set, cbr.pr,
+                                 cbr.plr; prefix = prefix)
+    set_allocation_return_floor!(model, factory(set.ret, cbr.pr), cbr.pr; prefix = prefix,
+                                 rd = cbr.rd)
     return nothing
 end
 """

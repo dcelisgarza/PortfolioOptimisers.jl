@@ -792,8 +792,8 @@ Build the model of a [`MeanRisk`](@ref), with every constraint, return term and 
 # Algorithm
 
  1. Make a new model. With `str_names`, give each variable and each row its string name.
- 2. Register the scales with [`set_model_scales!`](@ref), the number of observations with [`set_model_observations!`](@ref), the homogenisation variables of a ratio with [`set_maximum_ratio_factor_variables!`](@ref), the corner of a lifted variance with [`set_sdp_lift_corner!`](@ref), the weights with [`set_w!`](@ref) and the weight bounds with [`set_weight_constraints!`](@ref).
- 3. Add the constraints, the return terms and the risk measures with [`assemble_jump_model!`](@ref).
+ 2. Register the scales with [`set_model_scales!`](@ref), the number of observations with [`set_model_observations!`](@ref), the homogenisation variables of a ratio with [`set_maximum_ratio_factor_variables!`](@ref), the corner of a lifted variance with [`set_sdp_lift_corner!`](@ref), and the weights with [`set_w!`](@ref).
+ 3. Add the weight bounds, the budgets, the constraints, the return terms and the risk measures with [`assemble_jump_model!`](@ref).
 
 # Arguments
 
@@ -821,7 +821,6 @@ function build_mean_risk_model(mr::MeanRisk, attrs::ResolvedJuMPOptimiser,
     set_maximum_ratio_factor_variables!(model, mr.obj)
     set_sdp_lift_corner!(model, mr.obj, attrs.pr)
     set_w!(model, attrs.pr.X, mr.wi)
-    set_weight_constraints!(model, attrs.wb, mr.opt)
     assemble_jump_model!(model, mr, mr.opt, attrs, rd, mr.r, mr.obj)
     return model
 end

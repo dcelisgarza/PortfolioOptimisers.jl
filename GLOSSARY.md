@@ -959,7 +959,7 @@ The part of a programme over the weights that a JuMP optimiser and a programme A
 *Avoid*: a linear constraint block, which is the rows of one linear constraint. And the Allocation Set, which is the whole set of an online head and holds a block. And Constraint Space, which is the basis in which the names of a constraint resolve.
 
 **Resolved Constraint Block**
-The data that a Constraint Block gives when it resolves against its own prior and rows. It holds the resolved constraints, the settings of the block that need no resolution, and that prior and those rows. A builder adds it to a programme, and no builder resolves the block again. Map #1213.
+The data that a Constraint Block gives when it resolves against its own prior and rows. It holds the resolved constraints, the settings of the block that need no resolution, and that prior and those rows. The block builder adds it to a programme in two phases, around the risk step of the owner, and no builder resolves the block again. The first block of a model takes the bare names, and each block after the first takes a Model State namespace of its own. Map #1213.
 *Avoid*: processed attributes, because in JuMP an attribute is a setting of the solver.
 
 **Objective Penalty**

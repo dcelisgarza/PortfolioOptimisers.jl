@@ -132,9 +132,11 @@ Run the model-assembly middle of the Near Optimal Centering variant `alg`.
 
 The two variants share a head and a Result, and differ only in the middle and in the solve.
 This is the middle. [`ConstrainedNearOptimalCentering`](@ref) delegates to the shared
-[`assemble_jump_model!`](@ref). [`UnconstrainedNearOptimalCentering`](@ref) runs the four
-steps of that sequence it needs — non-fixed fees, risk, scalarisation, return — and then the
-same [`assert_frontier_sweep_cap`](@ref) tail.
+[`assemble_jump_model!`](@ref), whose block builder adds the weight bounds and the budgets.
+[`UnconstrainedNearOptimalCentering`](@ref) adds the weight bounds and the budgets of `opt`
+with [`set_weight_constraints!`](@ref), runs the four steps of that sequence it needs —
+non-fixed fees, risk, scalarisation, return — and then the same
+[`assert_frontier_sweep_cap`](@ref) tail.
 
 [`set_non_fixed_fees!`](@ref) runs before the risk build, as it does in
 [`assemble_jump_model!`](@ref). It is what makes the model's return expression net of fees,
@@ -178,6 +180,9 @@ function assemble_near_optimal_centering_model!(::UnconstrainedNearOptimalCenter
                                                 noc::NearOptimalCentering,
                                                 setup::NearOptimalSetup, rd::ReturnsResult)
     (; r, opt) = setup
+    # The centring solve keeps the bounds and the budgets of the block and no other row of
+    # it, so it adds them itself, outside the block builder.
+    set_weight_constraints!(model, opt.wb, opt)
     set_non_fixed_fees!(model, opt.fees)
     set_risk_and_scalarise!(model, r, noc, opt, opt.pe, nothing, opt.fees; rd = rd)
     set_return_constraints!(model, opt.ret, MinimumRisk(), opt.pe; rd = rd)
@@ -285,7 +290,6 @@ function _optimise(noc::NearOptimalCentering, rd::ReturnsResult = ReturnsResult(
     set_model_observations!(model, size(opt.pe.X, 1))
     set_maximum_ratio_factor_variables!(model, MinimumRisk())
     set_w!(model, opt.pe.X, w_opt)
-    set_weight_constraints!(model, opt.wb, opt)
     assemble_near_optimal_centering_model!(noc.alg, model, noc, setup, rd)
     noc_retcode, sol = solve_near_optimal_centering!(noc.alg, model, noc, setup)
     retcode = get_overall_retcode(w_min_retcode, w_opt_retcode, w_max_retcode, noc_retcode)

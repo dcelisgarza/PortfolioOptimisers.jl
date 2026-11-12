@@ -606,7 +606,6 @@ end
     PO.set_model_observations!(model, size(attrs.pr.X, 1))
     PO.set_maximum_ratio_factor_variables!(model, mr.obj)
     PO.set_w!(model, attrs.pr.X, mr.wi)
-    PO.set_weight_constraints!(model, attrs.wb, mr.opt)
     SLV_SEEN[] = nothing
     BUILT_ALPHA[] = nothing
     PO.assemble_jump_model!(model, mr, mr.opt, attrs, rd, mr.r, mr.obj)
@@ -627,7 +626,6 @@ end
     PO.set_model_observations!(modelv, size(attrsv.pr.X, 1))
     PO.set_maximum_ratio_factor_variables!(modelv, mrv.obj)
     PO.set_w!(modelv, attrsv.pr.X, mrv.wi)
-    PO.set_weight_constraints!(modelv, attrsv.wb, mrv.opt)
     SLV_SEEN[] = nothing
     PO.assemble_jump_model!(modelv, mrv, mrv.opt, attrsv, rd, mrv.r, mrv.obj)
     @test SLV_SEEN[].slv === slv
@@ -642,7 +640,6 @@ end
     PO.set_model_observations!(modelo, size(attrso.pr.X, 1))
     PO.set_maximum_ratio_factor_variables!(modelo, mro.obj)
     PO.set_w!(modelo, attrso.pr.X, mro.wi)
-    PO.set_weight_constraints!(modelo, attrso.wb, mro.opt)
     SLV_SEEN[] = nothing
     PO.assemble_jump_model!(modelo, mro, mro.opt, attrso, rd, mro.r, mro.obj)
     @test SLV_SEEN[].slv === own
@@ -3396,7 +3393,6 @@ end
     PO.set_model_observations!(model, size(attrs.pr.X, 1))
     PO.set_maximum_ratio_factor_variables!(model, mr.obj)
     PO.set_w!(model, attrs.pr.X, mr.wi)
-    PO.set_weight_constraints!(model, attrs.wb, mr.opt)
     PO.assemble_jump_model!(model, mr, mr.opt, attrs, rd, mr.r, mr.obj)
     @test JuMP.coefficient(model[:l1], model[:t_l1]) ≈ r_num
     @test JuMP.coefficient(model[:linf], model[:t_linf]) ≈ r_num
@@ -3411,7 +3407,6 @@ end
     PO.set_model_observations!(modeln, size(attrsn.pr.X, 1))
     PO.set_maximum_ratio_factor_variables!(modeln, mrn.obj)
     PO.set_w!(modeln, attrsn.pr.X, mrn.wi)
-    PO.set_weight_constraints!(modeln, attrsn.wb, mrn.opt)
     PO.assemble_jump_model!(modeln, mrn, mrn.opt, attrsn, rd, mrn.r, mrn.obj)
     @test JuMP.coefficient(modeln[:l1], modeln[:t_l1]) ≈ r_num
 
@@ -3705,7 +3700,6 @@ end
     PO.set_model_observations!(model, size(attrs.pr.X, 1))
     PO.set_maximum_ratio_factor_variables!(model, mr.obj)
     PO.set_w!(model, attrs.pr.X, mr.wi)
-    PO.set_weight_constraints!(model, attrs.wb, mr.opt)
     PO.assemble_jump_model!(model, mr, mr.opt, attrs, rd, mr.r, mr.obj)
 
     c_l1 = JuMP.coefficient(model[:l1], model[:t_l1])
@@ -4148,7 +4142,6 @@ the calibrated path alone: a stated number takes the fallback method and meets n
         PO.set_model_observations!(model, size(attrs.pr.X, 1))
         PO.set_maximum_ratio_factor_variables!(model, mr.obj)
         PO.set_w!(model, attrs.pr.X, mr.wi)
-        PO.set_weight_constraints!(model, attrs.wb, mr.opt)
         PO.assemble_jump_model!(model, mr, mr.opt, attrs, rd, mr.r, mr.obj)
         return model
     end
@@ -4605,7 +4598,6 @@ end
         PO.set_model_observations!(model, size(attrs.pr.X, 1))
         PO.set_maximum_ratio_factor_variables!(model, mr.obj)
         PO.set_w!(model, attrs.pr.X, mr.wi)
-        PO.set_weight_constraints!(model, attrs.wb, mr.opt)
         PO.assemble_jump_model!(model, mr, mr.opt, attrs, RD60, mr.r, mr.obj)
         return model
     end
@@ -4735,19 +4727,19 @@ and ADR 0095 grants none.
           [joinpath("src", "17_Optimisation", "05_JuMP", "02_JuMPConstraints",
                     "12_RegularisationConstraints.jl")]
 
-    # -- One resolution site, and no second path. Each builder is called from two sites, the
-    # optimiser's and the programme Allocation Set's (ADR 0159). Both read the term of the
-    # Resolved Constraint Block, and stage 2 of the block, `resolve_constraint_block`, is the
-    # one site that wraps the term in its route's verb (#2042). So no term reaches a builder
-    # unchecked. The `::Nothing` arm of stage 2 runs when no slot reads the rows, so the term
+    # -- One resolution site, and no second path. Each builder is called from one site, the
+    # block builder `set_block_constraints!`, which the optimiser and the programme
+    # Allocation Set both call (#2044). It reads the term of the Resolved Constraint Block,
+    # and stage 2 of the block, `resolve_constraint_block`, is the one site that wraps the
+    # term in its route's verb (#2042). So no term reaches a builder unchecked. The `::Nothing` arm of stage 2 runs when no slot reads the rows, so the term
     # it keeps is already a value. A definition line and a docstring signature both carry
     # `::`, so the filter keeps the calls alone.
     calls(tok) = [strip(l) for f in srcfiles
                   for l in eachline(f) if occursin(tok, l) && !occursin("::", l)]
     lp_calls = calls("set_lp_regularisation!(model")
     lpc_calls = calls("set_weight_norm_p_constraints!(model")
-    @test length(lp_calls) == 2
-    @test length(lpc_calls) == 2
+    @test length(lp_calls) == 1
+    @test length(lpc_calls) == 1
     @test all(l -> occursin("cbr.lp", l), lp_calls)
     @test all(l -> occursin("cbr.lpc", l), lpc_calls)
     @test length(calls("lp = factory(cbe.lp,")) == 1
@@ -4892,7 +4884,6 @@ path alone: a stated ceiling takes the fallback method and meets no check.
         PO.set_model_observations!(model, size(attrs.pr.X, 1))
         PO.set_maximum_ratio_factor_variables!(model, mr.obj)
         PO.set_w!(model, attrs.pr.X, mr.wi)
-        PO.set_weight_constraints!(model, attrs.wb, mr.opt)
         PO.assemble_jump_model!(model, mr, mr.opt, attrs, RD60, mr.r, mr.obj)
         return model
     end

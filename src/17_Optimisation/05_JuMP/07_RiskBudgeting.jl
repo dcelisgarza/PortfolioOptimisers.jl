@@ -971,9 +971,11 @@ end
     set_risk_budgeting_constraints!(model, rb, pr, wb, args...)
     set_risk_budgeting_constraints!(model, rb, pr, wb, rd::ReturnsResult)
 
-Add the weights, the row of the logarithm and the weight constraints of a [`RiskBudgeting`](@ref) to the model.
+Add the weights and the row of the logarithm of a [`RiskBudgeting`](@ref) to the model.
 
-The method dispatches on the formulation of `rb.rba`. Each method registers the weights, calls [`_set_risk_budgeting_constraints!`](@ref) with the vector that its formulation reads, and adds the weight bounds and the budgets with [`set_weight_constraints!`](@ref). The `# Mathematical definition` of [`RiskBudgeting`](@ref) states each programme.
+The method dispatches on the formulation of `rb.rba`. Each method registers the weights and calls [`_set_risk_budgeting_constraints!`](@ref) with the vector that its formulation reads. The weight bounds and the budgets come next, in phase 1 of the block of the head, [`set_block_constraints!`](@ref), which [`assemble_jump_model!`](@ref) runs. The `# Mathematical definition` of [`RiskBudgeting`](@ref) states each programme.
+
+**Breaking change.** The method added the weight bounds and the budgets itself, before [`assemble_jump_model!`](@ref).
 
 # JuMP formulation
 
@@ -987,7 +989,6 @@ The method dispatches on the formulation of `rb.rba`. Each method registers the 
 
   - The rows of [`_set_risk_budgeting_constraints!`](@ref), on ``\\boldsymbol{y}`` for [`LogRiskBudgeting`](@ref) with no orthant vector, on ``\\boldsymbol{z} \\odot \\boldsymbol{y}`` with an orthant vector, on ``\\boldsymbol{y}^{+} + \\boldsymbol{y}^{-}`` for [`MixedIntegerRiskBudgeting`](@ref), and on ``\\boldsymbol{y}_{f}`` for [`FactorRiskBudgeting`](@ref).
   - `orthcrkb`: ``\\boldsymbol{z} \\odot \\boldsymbol{y} \\geq \\boldsymbol{0}``, for [`LogRiskBudgeting`](@ref) with an orthant vector.
-  - The rows of [`set_weight_constraints!`](@ref). [`LogRiskBudgeting`](@ref) with no orthant vector calls it with `long = true`.
   - For [`MixedIntegerRiskBudgeting`](@ref), the binary variables and the rows ``\\boldsymbol{y}^{+} \\leq M \\boldsymbol{g}`` and ``\\boldsymbol{y}^{-} \\leq M (\\boldsymbol{1} - \\boldsymbol{g})`` come later, from [`set_mip_constraints!`](@ref), which reads the [`WeightsFromParts`](@ref) contract that [`set_rb_mip_w!`](@ref) records.
 
 Where:
@@ -1009,7 +1010,7 @@ Where:
 
 # Validation
 
-  - [`LogRiskBudgeting`](@ref) with no orthant vector: no weight bound is negative. Otherwise [`set_weight_constraints!`](@ref) throws an `ArgumentError`.
+  - [`LogRiskBudgeting`](@ref) with no orthant vector: no weight bound is negative. Otherwise [`assert_long_only_weight_bounds`](@ref) throws an `ArgumentError`. This is the one method that reads `wb`.
   - [`LogRiskBudgeting`](@ref) with an orthant vector: `z` has one entry for each asset. Otherwise a `DimensionMismatch` names both lengths.
 
 # Returns
@@ -1032,7 +1033,7 @@ function set_risk_budgeting_constraints!(model::JuMP.Model,
                                          wb::WeightBounds, args...)
     set_w!(model, pr.X, rb.wi)
     rkb = _set_risk_budgeting_constraints!(model, rb, get_w(model); strict = rb.opt.strict)
-    set_weight_constraints!(model, wb, rb.opt, true)
+    assert_long_only_weight_bounds(wb)
     return ResolvedAssetRiskBudgeting(; rkb = rkb)
 end
 function set_risk_budgeting_constraints!(model::JuMP.Model,
@@ -1050,7 +1051,6 @@ function set_risk_budgeting_constraints!(model::JuMP.Model,
     rkb = _set_risk_budgeting_constraints!(model, rb, w; strict = rb.opt.strict)
     sc = get_constraint_scale(model)
     JuMP.@constraint(model, orthcrkb, sc * w >= 0)
-    set_weight_constraints!(model, wb, rb.opt)
     return ResolvedAssetRiskBudgeting(; rkb = rkb)
 end
 function set_risk_budgeting_constraints!(model::JuMP.Model,
@@ -1063,7 +1063,6 @@ function set_risk_budgeting_constraints!(model::JuMP.Model,
                                                           hedge = rb.rba.hedge)
     rkb = _set_risk_budgeting_constraints!(model, rb, shared_get(model, :w1);
                                            strict = rb.opt.strict)
-    set_weight_constraints!(model, wb, rb.opt)
     return ResolvedFactorRiskBudgeting(; rkb = rkb, b1 = b1, rr = rr)
 end
 """
@@ -1124,7 +1123,6 @@ function set_risk_budgeting_constraints!(model::JuMP.Model,
     set_rb_mip_w!(model, pr.X)
     rkb = _set_risk_budgeting_constraints!(model, rb, shared_get(model, :w_obj);
                                            strict = rb.opt.strict)
-    set_weight_constraints!(model, wb, rb.opt)
     return ResolvedAssetRiskBudgeting(; rkb = rkb)
 end
 """

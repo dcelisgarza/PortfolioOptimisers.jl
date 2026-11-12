@@ -680,9 +680,11 @@ end
     set_relaxed_risk_budgeting_constraints!(model, rrb, pr, wb, args...)
     set_relaxed_risk_budgeting_constraints!(model, rrb, pr, wb, rd::ReturnsResult)
 
-Add the weights, the cones of the model and the weight constraints of a [`RelaxedRiskBudgeting`](@ref) to the model.
+Add the weights and the cones of the model of a [`RelaxedRiskBudgeting`](@ref) to the model.
 
-The method dispatches on `rrb.rba`. Each method registers the weights, calls [`_set_relaxed_risk_budgeting_constraints!`](@ref) with the vectors and the matrices that its budget reads, and adds the weight bounds and the budgets with [`set_weight_constraints!`](@ref). The table of [`_set_relaxed_risk_budgeting_constraints!`](@ref) states the values that each method passes.
+The method dispatches on `rrb.rba`. Each method registers the weights and calls [`_set_relaxed_risk_budgeting_constraints!`](@ref) with the vectors and the matrices that its budget reads. The weight bounds and the budgets come next, in phase 1 of the block of the head, [`set_block_constraints!`](@ref), which [`assemble_jump_model!`](@ref) runs. The table of [`_set_relaxed_risk_budgeting_constraints!`](@ref) states the values that each method passes.
+
+**Breaking change.** The method added the weight bounds and the budgets itself, before [`assemble_jump_model!`](@ref).
 
 # JuMP formulation
 
@@ -694,7 +696,6 @@ The method dispatches on `rrb.rba`. Each method registers the weights, calls [`_
 ## Constraints
 
   - The rows of [`_set_relaxed_risk_budgeting_constraints!`](@ref), with the budget on ``\\boldsymbol{w}`` for [`AssetRiskBudgeting`](@ref), and on ``\\boldsymbol{w}_{1}`` for [`FactorRiskBudgeting`](@ref).
-  - The rows of [`set_weight_constraints!`](@ref). [`AssetRiskBudgeting`](@ref) calls it with `long = true`.
 
 Where:
 
@@ -712,7 +713,7 @@ Where:
 
 # Validation
 
-  - [`AssetRiskBudgeting`](@ref): no weight bound is negative. Otherwise [`set_weight_constraints!`](@ref) throws an `ArgumentError`.
+  - [`AssetRiskBudgeting`](@ref): no weight bound is negative. Otherwise [`assert_long_only_weight_bounds`](@ref) throws an `ArgumentError`. This is the one method that reads `wb`.
 
 # Returns
 
@@ -750,7 +751,6 @@ function set_relaxed_risk_budgeting_constraints!(model::JuMP.Model,
                                                                                 pr.sigma *
                                                                                 P)))
     end
-    set_weight_constraints!(model, wb, rrb.opt)
     return ResolvedFactorRiskBudgeting(; rkb = rkb, b1 = b1, rr = rr)
 end
 function set_relaxed_risk_budgeting_constraints!(model::JuMP.Model,
@@ -760,7 +760,7 @@ function set_relaxed_risk_budgeting_constraints!(model::JuMP.Model,
                                                  pr::AbstractPriorResult, wb::WeightBounds,
                                                  args...)
     set_w!(model, pr.X, rrb.wi)
-    set_weight_constraints!(model, wb, rrb.opt, true)
+    assert_long_only_weight_bounds(wb)
     w = get_w(model)
     rkb = _set_relaxed_risk_budgeting_constraints!(model, rrb, w, pr.sigma, w, pr.sigma,
                                                    pr.chol)

@@ -512,11 +512,10 @@ Build the model of a [`FactorRiskContribution`](@ref), solve it, and return its 
  4. Bind the benchmark of each [`DataBenchmarkTracking`](@ref) measure to `rd` with [`bind_data_benchmark`](@ref).
  5. Build a new model. Register the scales with [`set_model_scales!`](@ref), the number of observations with [`set_model_observations!`](@ref), the homogenisation variables of a ratio with [`set_maximum_ratio_factor_variables!`](@ref) and the corner of a lifted variance with [`set_sdp_lift_corner!`](@ref).
  6. Create the factor weights and register `w` with [`set_factor_risk_contribution_constraints!`](@ref), giving `b1`, `b2` and `rr`. `b` is `b1`, or `[b1 b2]` when `flag = true`, the basis of the whole decision vector.
- 7. Add the weight bounds with [`set_weight_constraints!`](@ref).
- 8. Add the constraints, the return terms and the risk measures with [`assemble_jump_model!`](@ref), which reads `b`. The constructor refuses an asset phylogeny of the semidefinite kind, so the assembly adds the rows of an integer one alone.
- 9. Resolve `frc.frc_ple` on the factor returns with [`phylogeny_constraints`](@ref), giving `frc_plr`. Add its rows with [`set_sdp_frc_phylogeny_constraints!`](@ref) and [`set_frc_iplg_constraints!`](@ref).
-10. Set the objective with [`set_portfolio_objective_function!`](@ref), and solve with [`optimise_JuMP_model!`](@ref), giving `retcode` and `sol`.
-11. Build the result. It holds `attrs`, `retcode`, `sol`, the model when `save` is `true`, the risk measures resolved against the prior, `rr` and `frc_plr`.
+ 7. Add the weight bounds, the budgets, the constraints, the return terms and the risk measures with [`assemble_jump_model!`](@ref), which reads `b`. The constructor refuses an asset phylogeny of the semidefinite kind, so the assembly adds the rows of an integer one alone.
+ 8. Resolve `frc.frc_ple` on the factor returns with [`phylogeny_constraints`](@ref), giving `frc_plr`. Add its rows with [`set_sdp_frc_phylogeny_constraints!`](@ref) and [`set_frc_iplg_constraints!`](@ref).
+ 9. Set the objective with [`set_portfolio_objective_function!`](@ref), and solve with [`optimise_JuMP_model!`](@ref), giving `retcode` and `sol`.
+10. Build the result. It holds `attrs`, `retcode`, `sol`, the model when `save` is `true`, the risk measures resolved against the prior, `rr` and `frc_plr`.
 
 # Arguments
 
@@ -557,7 +556,6 @@ function _optimise(frc::FactorRiskContribution, rd::ReturnsResult = ReturnsResul
     # The risk builders read the basis of the whole decision vector, so a variance under
     # `flag = true` prices the off-factor weights too (#1350).
     b = isnothing(b2) ? b1 : hcat(b1, b2)
-    set_weight_constraints!(model, attrs.wb, frc.opt)
     assemble_jump_model!(model, frc, frc.opt, attrs, rd, frc.r, frc.obj, b)
     # After the model is assembled, so the factor phylogeny reads the marks that the
     # variance builders and `mark_risk_minimised!` write, as the asset phylogeny does.
