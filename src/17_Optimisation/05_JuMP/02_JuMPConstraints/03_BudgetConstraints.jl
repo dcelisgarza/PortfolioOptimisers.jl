@@ -32,6 +32,8 @@ $(DocStringExtensions.TYPEDEF)
 
 Abstract supertype for estimators that specify transaction cost budgets.
 
+Each member holds a reference portfolio `w` and a `fixed` flag. [`factory`](@ref factory(bgt::BudgetCosts, w::VecNum)) and [`needs_previous_weights`](@ref needs_previous_weights(bgt::BudgetCostEstimator)) read both.
+
 # Related
 
   - [`BudgetCosts`](@ref)
@@ -224,7 +226,7 @@ Where:
 
   - $(math_dict[:w_port])
   - $(math_dict[:k_budget])
-  - ``\\boldsymbol{w}_0``: Reference portfolio the trade starts from (`w`).
+  - ``\\boldsymbol{w}_0``: Reference portfolio the trade starts from (`w`). [`factory`](@ref factory(bgt::BudgetCosts, w::VecNum)) replaces it with the weights of the previous fold or step, unless `fixed` is `true`.
   - ``\\boldsymbol{w}_p``, ``\\boldsymbol{w}_n``: Positive and negative weight increments.
   - ``\\boldsymbol{v}_p``, ``\\boldsymbol{v}_n``: Cost coefficient vectors for positive and negative changes.
   - ``\\boldsymbol{u}_p``, ``\\boldsymbol{u}_n``: Upper limits on the positive and negative increments.
@@ -259,7 +261,8 @@ $(DocStringExtensions.FIELDS)
         vp::Num_VecNum = 1.0,
         vn::Num_VecNum = 1.0,
         up::Num_VecNum = 1.0,
-        un::Num_VecNum = 1.0
+        un::Num_VecNum = 1.0,
+        fixed::Bool = false
     ) -> BudgetCosts
 
 Keywords correspond to the struct's fields.
@@ -320,8 +323,12 @@ Keywords correspond to the struct's fields.
     $(field_dict[:un_cost])
     """
     @vprop un
+    """
+    $(field_dict[:fixed])
+    """
+    fixed
     function BudgetCosts(bgt::Num_BgtRg, w::VecNum, vp::Num_VecNum, vn::Num_VecNum,
-                         up::Num_VecNum, un::Num_VecNum)
+                         up::Num_VecNum, un::Num_VecNum, fixed::Bool)
         @argcheck(!isempty(w), IsEmptyError("w cannot be empty"))
         if isa(vp, VecNum)
             @argcheck(!isempty(vp), IsEmptyError("vp cannot be empty"))
@@ -351,17 +358,14 @@ Keywords correspond to the struct's fields.
         else
             @argcheck(un >= zero(un), DomainError(un, "un must be >= 0"))
         end
-        return new{typeof(bgt), typeof(w), typeof(vp), typeof(vn), typeof(up), typeof(un)}(bgt,
-                                                                                           w,
-                                                                                           vp,
-                                                                                           vn,
-                                                                                           up,
-                                                                                           un)
+        return new{typeof(bgt), typeof(w), typeof(vp), typeof(vn), typeof(up), typeof(un),
+                   typeof(fixed)}(bgt, w, vp, vn, up, un, fixed)
     end
 end
 function BudgetCosts(; bgt::Num_BgtRg = 1.0, w::VecNum, vp::Num_VecNum = 1.0,
-                     vn::Num_VecNum = 1.0, up::Num_VecNum = 1.0, un::Num_VecNum = 1.0)
-    return BudgetCosts(bgt, w, vp, vn, up, un)
+                     vn::Num_VecNum = 1.0, up::Num_VecNum = 1.0, un::Num_VecNum = 1.0,
+                     fixed::Bool = false)
+    return BudgetCosts(bgt, w, vp, vn, up, un, fixed)
 end
 """
 $(DocStringExtensions.TYPEDEF)
@@ -393,7 +397,7 @@ Where:
   - $(math_dict[:w_port])
   - $(math_dict[:k_budget])
   - $(math_dict[:N])
-  - ``\\boldsymbol{w}_0``: Reference portfolio the trade starts from (`w`).
+  - ``\\boldsymbol{w}_0``: Reference portfolio the trade starts from (`w`). [`factory`](@ref factory(bgt::BudgetCosts, w::VecNum)) replaces it with the weights of the previous fold or step, unless `fixed` is `true`.
   - ``\\boldsymbol{w}_p``, ``\\boldsymbol{w}_n``: Positive and negative weight increments.
   - ``\\boldsymbol{\\iota}_p``, ``\\boldsymbol{\\iota}_n``: Auxiliary variables the power cone bounds below by ``w_p^{1/\\beta}`` and ``w_n^{1/\\beta}``.
   - ``\\boldsymbol{v}_p``, ``\\boldsymbol{v}_n``: Market impact cost coefficients for positive and negative trades.
@@ -438,7 +442,8 @@ $(DocStringExtensions.FIELDS)
         vn::Num_VecNum = 1.0,
         up::Num_VecNum = 1.0,
         un::Num_VecNum = 1.0,
-        beta::Number = 2/3
+        beta::Number = 2/3,
+        fixed::Bool = false
     ) -> BudgetMarketImpact
 
 Keywords correspond to the struct's fields.
@@ -506,8 +511,12 @@ Keywords correspond to the struct's fields.
     $(field_dict[:beta_mic])
     """
     beta
+    """
+    $(field_dict[:fixed])
+    """
+    fixed
     function BudgetMarketImpact(bgt::Num_BgtRg, w::VecNum, vp::Num_VecNum, vn::Num_VecNum,
-                                up::Num_VecNum, un::Num_VecNum, beta::Number)
+                                up::Num_VecNum, un::Num_VecNum, beta::Number, fixed::Bool)
         @argcheck(!isempty(w), IsEmptyError("w cannot be empty"))
         if isa(vp, VecNum)
             @argcheck(!isempty(vp), IsEmptyError("vp cannot be empty"))
@@ -541,13 +550,115 @@ Keywords correspond to the struct's fields.
                   DomainError(beta,
                               "beta must satisfy 0 < beta < 1; the power cone is degenerate at both endpoints, and a solver reports SLOW_PROGRESS. The realised power law exponent is 1/beta, so beta = 2/3 charges the volume raised to 3/2"))
         return new{typeof(bgt), typeof(w), typeof(vp), typeof(vn), typeof(up), typeof(un),
-                   typeof(beta)}(bgt, w, vp, vn, up, un, beta)
+                   typeof(beta), typeof(fixed)}(bgt, w, vp, vn, up, un, beta, fixed)
     end
 end
 function BudgetMarketImpact(; bgt::Num_BgtRg = 1.0, w::VecNum, vp::Num_VecNum = 1.0,
                             vn::Num_VecNum = 1.0, up::Num_VecNum = 1.0,
-                            un::Num_VecNum = 1.0, beta::Number = 2 / 3)
-    return BudgetMarketImpact(bgt, w, vp, vn, up, un, beta)
+                            un::Num_VecNum = 1.0, beta::Number = 2 / 3, fixed::Bool = false)
+    return BudgetMarketImpact(bgt, w, vp, vn, up, un, beta, fixed)
+end
+"""
+    factory(bgt::BudgetCosts, w::VecNum)
+    factory(bgt::BudgetMarketImpact, w::VecNum)
+    factory(bgt::Number, w::VecNum)
+
+Replace the reference portfolio of a cost budget with the weights `w`, unless its `fixed` field is `true`.
+
+A [`BudgetCosts`](@ref) and a [`BudgetMarketImpact`](@ref) charge the cost of the move from their reference `w` against the budget. A fold of a walk-forward, or a step of an online rule, trades from the weights that it holds, and [`factory(opt::JuMPOptimiser, w::AbstractVector)`](@ref) passes these weights to the `bgt` of the optimiser. So the charged cost is the cost of the trade of the fold, as for a [`Turnover`](@ref) on `tn` or on `fees`. A `fixed` estimator keeps the reference that it was built with.
+
+A number holds no reference, so the method on a number returns it unchanged. A [`BudgetRange`](@ref) and `nothing` take the fallback method of [`factory`](@ref), which also returns them unchanged. A [`TimeDependent`](@ref) schedule applies `factory` to each entry.
+
+# Algorithm
+
+ 1. If `bgt` is a number, or if `bgt.fixed` is `true`, return `bgt` unchanged.
+ 2. Else rebuild `bgt` through its keyword constructor with `w` as the reference portfolio. Every other field keeps its value.
+
+# Arguments
+
+  - `bgt`: The net budget of a [`JuMPOptimiser`](@ref).
+  - `w`: The weights that the fold or the step trades from.
+
+# Validation
+
+  - Step 2 calls the keyword constructor, so it checks `w` as the constructor does.
+
+# Returns
+
+  - `bgt`: `bgt` unchanged in step 1. Else a new estimator of the same type with `w` as its reference.
+
+# Examples
+
+```jldoctest
+julia> bgt = BudgetCosts(; w = [0.2, 0.3, 0.5], vp = 0.01, vn = 0.01);
+
+julia> factory(bgt, [0.1, 0.4, 0.5]).w
+3-element Vector{Float64}:
+ 0.1
+ 0.4
+ 0.5
+
+julia> bgt = BudgetCosts(; w = [0.2, 0.3, 0.5], vp = 0.01, vn = 0.01, fixed = true);
+
+julia> factory(bgt, [0.1, 0.4, 0.5]).w
+3-element Vector{Float64}:
+ 0.2
+ 0.3
+ 0.5
+```
+
+# Related
+
+  - [`BudgetCosts`](@ref)
+  - [`BudgetMarketImpact`](@ref)
+  - [`needs_previous_weights(bgt::BudgetCostEstimator)`](@ref)
+  - [`factory(tn::TurnoverEstimator, w::VecNum)`](@ref): Reads the `fixed` flag in the same way.
+"""
+function factory(bgt::BudgetCosts, w::VecNum)::BudgetCosts
+    return bgt.fixed ? bgt : rebuild_estimator(bgt, (; w = w))
+end
+# `@propagatable` writes `factory(x::BudgetMarketImpact, args...)`, so this method names the
+# concrete type to be the more specific one.
+function factory(bgt::BudgetMarketImpact, w::VecNum)::BudgetMarketImpact
+    return bgt.fixed ? bgt : rebuild_estimator(bgt, (; w = w))
+end
+function factory(bgt::Number, ::VecNum)::Number
+    return bgt
+end
+"""
+    needs_previous_weights(bgt::BudgetCostEstimator) -> Bool
+    needs_previous_weights(bgt::Number) -> Bool
+
+Tell whether a net budget reads the weights of the previous fold or step.
+
+A cost budget that is not `fixed` measures its cost from the weights that [`factory`](@ref factory(bgt::BudgetCosts, w::VecNum)) gives it, so it needs them. A `fixed` cost budget and a number need none. So a walk-forward that holds a cost budget that is not `fixed` runs its folds in order, as one that holds a [`Turnover`](@ref) does.
+
+# Algorithm
+
+ 1. On a [`BudgetCostEstimator`](@ref), return `!bgt.fixed`.
+ 2. On a number, return `false`.
+
+# Arguments
+
+  - `bgt`: The net budget of a [`JuMPOptimiser`](@ref).
+
+# Returns
+
+  - `Bool`: `true` if `bgt` needs the previous weights, else `false`.
+
+# Related
+
+  - [`factory(bgt::BudgetCosts, w::VecNum)`](@ref)
+  - [`needs_previous_weights(tn::TnE_Tn)`](@ref): Reads the same `fixed` flag.
+"""
+function needs_previous_weights(bgt::BudgetCostEstimator)::Bool
+    return !bgt.fixed
+end
+function needs_previous_weights(::Number)::Bool
+    return false
+end
+function time_dependent_entry_needs_previous_weights(x::BudgetCostEstimator)::Bool
+    return needs_previous_weights(x)
 end
 function set_budget_constraints!(model::JuMP.Model, val::Number, w::VecNum)
     k = get_k(model)

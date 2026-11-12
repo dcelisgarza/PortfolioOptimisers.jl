@@ -349,7 +349,7 @@ commit = "dc3d282e50"
 "src/17_Optimisation/05_JuMP/02_JuMPConstraints/02_Returns_and_ObjectiveFunctions/01_ReturnEstimators.jl" = { cyc = 5, cog = 4, arg = 6, cyc_sum = 36, cog_sum = 18, arg_sum = 76, macros = [] }
 "src/17_Optimisation/05_JuMP/02_JuMPConstraints/02_Returns_and_ObjectiveFunctions/02_ObjectiveFunctions.jl" = { cyc = 8, cog = 8, arg = 5, cyc_sum = 49, cog_sum = 40, arg_sum = 47, macros = [] }
 "src/17_Optimisation/05_JuMP/02_JuMPConstraints/02_Returns_and_ObjectiveFunctions/03_ReturnConstraints.jl" = { cyc = 5, cog = 7, arg = 7, cyc_sum = 47, cog_sum = 35, arg_sum = 108, macros = [] }
-"src/17_Optimisation/05_JuMP/02_JuMPConstraints/03_BudgetConstraints.jl" = { cyc = 13, cog = 12, arg = 7, cyc_sum = 72, cog_sum = 54, arg_sum = 104, macros = ["@propagatable"] }
+"src/17_Optimisation/05_JuMP/02_JuMPConstraints/03_BudgetConstraints.jl" = { cyc = 13, cog = 12, arg = 8, cyc_sum = 94, cog_sum = 66, arg_sum = 119, macros = ["@propagatable"] }
 "src/17_Optimisation/05_JuMP/02_JuMPConstraints/04_WeightConstraints.jl" = { cyc = 9, cog = 10, arg = 6, cyc_sum = 37, cog_sum = 28, arg_sum = 33, macros = [] }
 "src/17_Optimisation/05_JuMP/02_JuMPConstraints/05_SDPConstraints.jl" = { cyc = 10, cog = 12, arg = 3, cyc_sum = 48, cog_sum = 43, arg_sum = 40, macros = [] }
 "src/17_Optimisation/05_JuMP/02_JuMPConstraints/06_IntegerPhylogenyConstraints.jl" = { cyc = 7, cog = 7, arg = 5, cyc_sum = 22, cog_sum = 16, arg_sum = 19, macros = [] }

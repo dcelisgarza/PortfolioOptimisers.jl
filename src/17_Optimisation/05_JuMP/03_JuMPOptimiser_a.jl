@@ -844,7 +844,8 @@ false
   - [`needs_previous_weights`](@ref)
 """
 function needs_previous_weights(opt::JuMPOptimiser)
-    return (needs_previous_weights(opt.tn) ||
+    return (needs_previous_weights(opt.bgt) ||
+            needs_previous_weights(opt.tn) ||
             needs_previous_weights(opt.fees) ||
             needs_previous_weights(opt.tr) ||
             needs_previous_weights(opt.ccnt) ||
@@ -859,7 +860,7 @@ $(DocStringExtensions.TYPEDSIGNATURES)
 
 Returns a copy of `opt` whose fields that read previous weights hold the weights `w`.
 
-The function calls `factory(x, w)` on `tn`, `fees`, `tr`, `ccnt` and `cobj`, and it keeps every other field. A [`TimeDependent`](@ref) in one of these fields applies `factory` to each of its entries. The keyword constructor of [`JuMPOptimiser`](@ref) checks the new fields.
+The function calls `factory(x, w)` on `bgt`, `tn`, `fees`, `tr`, `ccnt` and `cobj`, and it keeps every other field. So a cost budget on `bgt` measures its cost from `w`, unless it is `fixed`, see [`factory(bgt::BudgetCosts, w::VecNum)`](@ref). A [`TimeDependent`](@ref) in one of these fields applies `factory` to each of its entries. The keyword constructor of [`JuMPOptimiser`](@ref) checks the new fields.
 
 # Arguments
 
@@ -868,7 +869,7 @@ The function calls `factory(x, w)` on `tn`, `fees`, `tr`, `ccnt` and `cobj`, and
 
 # Returns
 
-  - `JuMPOptimiser`: The optimiser with the five fields rebuilt for `w`.
+  - `JuMPOptimiser`: The optimiser with the six fields rebuilt for `w`.
 
 # Examples
 
@@ -886,9 +887,9 @@ true
 """
 function factory(opt::JuMPOptimiser, w::AbstractVector)::JuMPOptimiser
     return rebuild_estimator(opt,
-                             (; tn = factory(opt.tn, w), fees = factory(opt.fees, w),
-                              tr = factory(opt.tr, w), ccnt = factory(opt.ccnt, w),
-                              cobj = factory(opt.cobj, w)))
+                             (; bgt = factory(opt.bgt, w), tn = factory(opt.tn, w),
+                              fees = factory(opt.fees, w), tr = factory(opt.tr, w),
+                              ccnt = factory(opt.ccnt, w), cobj = factory(opt.cobj, w)))
 end
 """
     obs_weights_view(opt::JuMPOptimiser, i) -> JuMPOptimiser

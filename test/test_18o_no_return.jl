@@ -1620,6 +1620,59 @@ end
                             sqrt(dot(rmi[1].w, pr.sigma, rmi[1].w)); rtol = 1e-5), rmi)
 end
 
+@testset "BudgetCosts and BudgetMarketImpact measure the cost from the previous weights (#2050)" begin
+    #=
+    `factory(opt::JuMPOptimiser, w)` did not reach `bgt`, and `needs_previous_weights` did
+    not read it. So every fold of a walk-forward charged the move from the caller's `w0`:
+    `sum(w) + cost(w, w0)` was one at all seven folds, and the identity against the weights
+    of the previous fold read 0.967 and 1.013. A cost budget now follows the book unless
+    `fixed` is `true`, as a `Turnover` does.
+    =#
+    PO = PortfolioOptimisers
+    w1 = [0.1, 0.3, 0.2, 0.25, 0.15]
+    bc = BudgetCosts(; bgt = 1.0, w = w0, vp = 0.05, vn = 0.05, up = 0.5, un = 0.5)
+    bcf = BudgetCosts(; bgt = 1.0, w = w0, vp = 0.05, vn = 0.05, up = 0.5, un = 0.5,
+                      fixed = true)
+    bmi = BudgetMarketImpact(; w = w0, vp = 0.01, vn = 0.01, beta = 0.5)
+    bmif = BudgetMarketImpact(; w = w0, vp = 0.01, vn = 0.01, beta = 0.5, fixed = true)
+    # `factory` replaces the reference unless `fixed`, and keeps every other field.
+    @test factory(bc, w1).w == w1
+    @test factory(bc, w1).vp == bc.vp && !factory(bc, w1).fixed
+    @test factory(bcf, w1) === bcf
+    @test factory(bmi, w1).w == w1 && factory(bmi, w1).beta == 0.5
+    @test factory(bmif, w1) === bmif
+    @test factory(1.0, w1) === 1.0
+    @test PO.needs_previous_weights(bc) && PO.needs_previous_weights(bmi)
+    @test !PO.needs_previous_weights(bcf) && !PO.needs_previous_weights(bmif)
+    # The optimiser passes the weights to `bgt`, and to each entry of a schedule.
+    opt(bgt) = JuMPOptimiser(; pe = pr, slv = slv, bgt = bgt)
+    @test factory(opt(bc), w1).bgt.w == w1
+    @test factory(opt(bcf), w1).bgt.w == w0
+    @test factory(opt(1.0), w1).bgt === 1.0
+    td = factory(opt(TimeDependent([1.0, bc])), w1).bgt
+    @test td.val[1] === 1.0 && td.val[2].w == w1
+    @test PO.needs_previous_weights(opt(bc))
+    @test !PO.needs_previous_weights(opt(bcf))
+    @test !PO.needs_previous_weights(opt(1.0))
+    @test !PO.needs_previous_weights(opt(BudgetRange(; lb = 0.9, ub = 1.0)))
+    @test PO.needs_previous_weights(opt(TimeDependent([1.0, bc])))
+    @test !PO.needs_previous_weights(opt(TimeDependent([1.0, bcf])))
+    # A walk-forward charges each fold the cost of its own trade. The first fold has no
+    # previous weights, so it trades from `w0`.
+    cost(w, wr) = 0.05 * sum(abs.(w .- wr))
+    function fold_weights(bgt)
+        mr = MeanRisk(; obj = MaximumReturn(), opt = JuMPOptimiser(; slv = slv, bgt = bgt))
+        return [p.res.w for p in cross_val_predict(mr, rd, IndexWalkForward(60, 20)).pred]
+    end
+    ws = fold_weights(bc)
+    @test isapprox(sum(ws[1]) + cost(ws[1], w0), 1.0; atol = 1e-6)
+    @test all(i -> isapprox(sum(ws[i]) + cost(ws[i], ws[i - 1]), 1.0; atol = 1e-6),
+              2:length(ws))
+    # A `fixed` cost budget keeps the caller's reference at every fold.
+    wf = fold_weights(bcf)
+    @test all(w -> isapprox(sum(w) + cost(w, w0), 1.0; atol = 1e-6), wf)
+end
+
 @testset "NoReturn: the contributions of an expected return beside any fee (#1912)" begin
     # `risk_contribution` divides a contribution by the degree of homogeneity of the measure.
     # A `NoReturn` term has degree one beside any fee, a `LogarithmicReturn` has none, and a

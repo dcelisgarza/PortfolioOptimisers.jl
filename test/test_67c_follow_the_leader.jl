@@ -345,7 +345,7 @@ using Test, PortfolioOptimisers, StableRNGs, LinearAlgebra, Statistics, Dates, C
         @test_throws DomainError ftl(; bgt = BudgetRange(; lb = 1.1, ub = 1.2))
         @test_throws DomainError ftl(; bgt = BudgetRange(; lb = nothing, ub = 0.9))
         # A cost estimator is refused in every form: with the head's row its cost is a band
-        # about its fixed reference, which the wealth recursion never pays.
+        # about its reference, which the wealth recursion never pays.
         @test_throws ArgumentError ftl(; bgt = BudgetCosts(; bgt = 1.0, w = w0))
         @test_throws "BudgetCostEstimator" ftl(;
                                                bgt = BudgetMarketImpact(;
