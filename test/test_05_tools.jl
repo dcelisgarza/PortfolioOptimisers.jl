@@ -1077,6 +1077,11 @@ end
         end
     end
     @test occursin("unknown option", rule_error(:(forward(pa; bogus))))
+    # An option on a rule that it does not apply to is refused, never ignored (#2037).
+    @test occursin("the option `broadcast` does not apply to `forward`, only to `compute` and `swap`",
+                   rule_error(:(forward(pa; broadcast))))
+    @test occursin("the option `settable` does not apply to `alias`, only to `forward`",
+                   rule_error(:(alias(zz, sol.z; settable))))
     @test occursin("`forward` needs a locator", rule_error(:(forward())))
     @test occursin("`forward` names must be bare identifiers",
                    rule_error(:(forward(pa, 1))))
@@ -1221,6 +1226,112 @@ using Accessors: Accessors
     s3 = Accessors.@set s.L = 1.5
     @test getfield(s3, :L) == 1.5
     @test s3 isa mk.KSwap{Float64}
+end
+@testset "@forward_properties: a settable `forward` rule passes its names to the keyword constructor (#2037)" begin
+    using PortfolioOptimisers, Test
+    PO = PortfolioOptimisers
+    #=
+    Item 4 of the ruling of Decision 3 of map #1213. A search sets a slot of a nested part,
+    such as `"opt.wb"`, through `Accessors.set`. A `forward` rule with the `settable` option
+    lets a patch name a slot that it forwards. The patch passes the slot to the keyword
+    constructor as a flat keyword, and the constructor replaces that slot of the part it is
+    given. `rebuild_estimator` calls the constructor in the same way.
+    =#
+    ms = Module(:ForwardSettableProbe)
+    Base.eval(ms, :(using PortfolioOptimisers: @forward_properties))
+    Base.eval(ms,
+              quote
+                  struct SInner
+                      w::Any
+                      z::Any
+                  end
+                  struct SNamed
+                      pa::SInner
+                      sol::SInner
+                      n::Int
+                  end
+                  # The default `nothing` of `w` keeps the slot of the given `pa`.
+                  function SNamed(; pa = SInner(1, 2), sol = SInner(3, 4), n = 0,
+                                  w = nothing)
+                      n >= 0 || throw(DomainError(n, "n must be non-negative"))
+                      return SNamed(isnothing(w) ? pa : SInner(w, pa.z), sol, n)
+                  end
+                  @forward_properties SNamed begin
+                      forward(pa, w; settable)
+                      forward(sol, z)
+                  end
+                  struct SAll
+                      pa::SInner
+                  end
+                  function SAll(; pa = SInner(1, 2), w = nothing, z = nothing)
+                      return SAll(SInner(isnothing(w) ? pa.w : w, isnothing(z) ? pa.z : z))
+                  end
+                  @forward_properties SAll begin
+                      forward(pa; settable)
+                  end
+                  struct SShadow
+                      pa::SInner
+                      sol::SInner
+                  end
+                  SShadow(; pa = SInner(1, 2), sol = SInner(3, 4), w = nothing) = SShadow(pa,
+                                                                                          sol)
+                  @forward_properties SShadow begin
+                      forward(sol, w)
+                      forward(pa, w; settable)
+                  end
+                  struct SHead
+                      opt::SNamed
+                      k::Int
+                  end
+              end)
+    function set_error(f)
+        return try
+            f()
+            ""
+        catch err
+            sprint(showerror, err)
+        end
+    end
+    o = ms.SNamed(; n = 3)
+    # The patch replaces the slot of the part, and every other value stays.
+    o2 = Accessors.@set o.w = 9
+    @test o2.w == 9
+    @test o2.pa.w == 9
+    @test o2.pa.z == 2
+    @test o2.sol === o.sol
+    @test o2.n == 3
+    # A patch can name a field and a settable name together.
+    o3 = Accessors.setproperties(o, (; n = 5, w = 7))
+    @test (o3.n, o3.w) == (5, 7)
+    # The keyword constructor runs, so its guard refuses a bad value.
+    @test_throws DomainError Accessors.setproperties(o, (; n = -1, w = 7))
+    # A name of a rule without the option keeps the refusal of today.
+    @test occursin("forwards from `sol.z`", set_error(() -> Accessors.@set o.z = 0))
+    # `rebuild_estimator` passes a name that is not a field to the same constructor.
+    @test PO.rebuild_estimator(o, (; w = 9)) === o2
+    #=
+    A lens path of two levels. `Accessors.set` builds the head again with its default
+    method, and it builds the decorated type again through the method of the macro.
+    =#
+    h = ms.SHead(o, 1)
+    h2 = Accessors.set(h, PO.parse_lens("opt.w"), 11)
+    @test h2.opt.w == 11
+    @test h2.opt.pa.z == 2
+    @test h2.k == 1
+    @test h2.opt === PO.rebuild_estimator(o, (; w = 11))
+    # The option on the form that forwards every property makes each of them settable.
+    a = ms.SAll()
+    a2 = Accessors.@set a.z = 5
+    @test (a2.w, a2.z) == (1, 5)
+    @test occursin("neither a field nor a property",
+                   set_error(() -> Accessors.setproperties(a, (; q = 1))))
+    #=
+    The rule that reads a name decides whether a patch can set it. `forward(sol, w)` reads
+    `w` first, so the settable rule after it never reads `w`, and the patch stays refused.
+    =#
+    s = ms.SShadow()
+    @test s.w == 3
+    @test occursin("forwards from `sol.w`", set_error(() -> Accessors.@set s.w = 0))
 end
 using Dates
 @testset "A carrier converts integer data once, and fits as its float copy does (#1972)" begin

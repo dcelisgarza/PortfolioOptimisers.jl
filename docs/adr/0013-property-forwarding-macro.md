@@ -213,3 +213,28 @@ runs on the new value. A patch that names a forwarded, aliased or computed prope
 because such a property is a view of a nested value with no storage of its own. The message names
 the path to set instead, where the property has one, and the fields otherwise. The keyword constructor of a decorated type must take every field by its
 field name.
+
+## Amendment (2026-11-12)
+
+**A `forward` rule can mark its names as settable.** The amendment of 2026-10-07 refuses a patch
+that names a forwarded property. Item 4 of the ruling of Decision 3 of map
+[#1213](https://github.com/dcelisgarza/PortfolioOptimisers.jl/issues/1213) needs an exception.
+A search sets a key such as `"opt.wb"` through `Accessors.set`, and `wb` is a slot of a nested
+part of `JuMPOptimiser`.
+[#2037](https://github.com/dcelisgarza/PortfolioOptimisers.jl/issues/2037) builds it.
+
+`forward(loc; settable)` and `forward(loc, names...; settable)` forward as before. The patch of
+the generated `ConstructionBase.setproperties` passes a name of such a rule to the keyword
+constructor as a flat keyword, beside the fields. The type that marks a name takes that name as a
+keyword. The keyword replaces that slot of the nested part that the constructor is given, and its
+default leaves the slot as it is. `rebuild_estimator` calls the constructor in the same way, so
+the two give the same value. A rule without the option keeps the refusal, so no type that the
+macro decorated before this amendment changes.
+
+The rule that reads a name decides whether a patch can set it. Each rule other than `swap` gives
+the pair of its path and its `settable` flag, in the order of the `getproperty` branches. A name
+that an earlier rule reads stays refused, even when a later `settable` rule forwards it.
+
+An option on a rule that it does not apply to is now refused. Before this amendment, the macro
+ignored `broadcast` on `forward` and `alias` with no error. `broadcast` applies to `compute` and
+`swap`, and `settable` applies to `forward`.
