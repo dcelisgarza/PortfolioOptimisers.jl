@@ -188,3 +188,24 @@ instead of dropping it.
   [ADR 0172](0172-a-folding-price-level-statistic-resets-an-asset-the-active-mask-turns-off-and-answers-nan-below-its-first-folded-level.md)
   settles it: [#1238](https://github.com/dcelisgarza/PortfolioOptimisers.jl/issues/1238).
 - Issue #1237.
+
+## Amendment (2026-11-13): the set enters the leader as a Constraint Block, and the entry intersects the masks
+
+[ADR 0237](0237-a-constraint-block-holds-the-feasible-set-of-a-programme-and-the-entry-of-a-head-takes-a-list-of-blocks.md)
+changed two parts of the Decision. The rest of the Decision holds.
+
+**The view of the set.** *The Allocation Set Constraint views with the optimiser* is superseded.
+The leader re-solve passes the set as a second block of the entry of the leader, and
+`AllocationSetConstraint` is gone (#2047, ADR 0164, amendment of 2026-11-13). The entry views the
+set at the Investable Mask of the step before it resolves the block of the set
+(`programme_investable_reduction`). So the reduction of the held estimator carries the set by
+construction, and no adapter needs a view.
+
+**A set prior narrower than the prior of the leader.** The Decision refused such a set prior by
+name, through `assert_set_prior_priced`. Now the entry intersects the Investable Masks of every
+block (#2043). So an asset that the prior of the set cannot price takes a zero weight with a
+warning that names it, and the `strict` flag of the head refuses it with an `IsNonFiniteError`.
+The projection programme reads the same rule, because the leader and the projection go through
+one shared entry, `resolve_block_entry` (#2046). `assert_set_prior_priced` now runs only in a direct
+call of `set_allocation_set_constraints!`, which resolves the step itself and cannot drop an
+asset.
