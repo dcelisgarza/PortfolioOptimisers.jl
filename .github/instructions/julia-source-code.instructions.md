@@ -593,7 +593,7 @@ and every addition:
    wrapper.
 5. **A self-forward that drops an ignored argument** becomes one method with an ignored or
    defaulted positional slot. A conversion to the canonical form is reason (a) on a public
-   verb, and it goes on a private function.
+   verb. On a private function, the conversion goes.
 6. **A rebuild by hand that copies every field but one** goes to
    `rebuild_estimator(x, (; f = v))`. A site stays by hand only on a measured loss of
    performance.
