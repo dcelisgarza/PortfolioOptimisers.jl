@@ -167,12 +167,15 @@ end
         @test preds[1].rd.X ≈ rd.X[61:80, :] * res.w
         @test preds[2].rd.X ≈ rd.X[81:100, :] * res.w
         # The result form of fit_and_predict predicts as predict does.
-        fap = PortfolioOptimisers.fit_and_predict(res, rd; test_idx = collect(61:100))
+        fap = PortfolioOptimisers.fit_and_predict(res, rd, nothing, collect(61:100))
         @test fap.rd.X ≈ pred.rd.X
-        fapv = PortfolioOptimisers.fit_and_predict(res, rd;
-                                                   test_idx = [collect(61:80),
-                                                               collect(81:100)])
+        fapv = PortfolioOptimisers.fit_and_predict(res, rd, nothing,
+                                                   [collect(61:80), collect(81:100)])
         @test fapv[2].rd.X ≈ preds[2].rd.X
+        # It passes every keyword to `predict`, which refuses a wrong one (#2066).
+        @test_throws MethodError PortfolioOptimisers.fit_and_predict(res, rd, nothing,
+                                                                     collect(61:100);
+                                                                     w_previous = nothing)
     end
 
     @testset "predict at price level, on several windows and from a result" begin
@@ -187,7 +190,7 @@ end
         @test length(preds) == 2
         @test preds[2].rd.X ≈ R[46:59, :] * res.w
         # The result form took returns data only, and a price window was a MethodError.
-        fap = PortfolioOptimisers.fit_and_predict(res, pr; test_idx = collect(46:60))
+        fap = PortfolioOptimisers.fit_and_predict(res, pr, nothing, collect(46:60))
         @test fap.rd.X ≈ preds[2].rd.X
         # A returns window after a price fit: the fitted PricesToReturns passes it unchanged.
         rw = ReturnsResult(; nx = string.("A", 1:5), X = R, ts = timestamp(X)[2:end])
@@ -202,8 +205,9 @@ end
         # A pipeline with no optimisation result has nothing to predict with.
         res0 = fit(Pipeline(; steps = (PricesToReturns(), EmpiricalPrior())), pr)
         @test_throws PortfolioOptimisers.IsNothingError PortfolioOptimisers.fit_and_predict(res0,
-                                                                                            pr;
-                                                                                            test_idx = collect(46:60))
+                                                                                            pr,
+                                                                                            nothing,
+                                                                                            collect(46:60))
     end
 
     @testset "predict guards" begin
@@ -693,15 +697,15 @@ end
 
     # The estimator method fits over the training rows and predicts over the test rows.
     ref = optimise(InverseVolatility(), PortfolioOptimisers.port_opt_view(rd, 1:4, :))
-    pred = PortfolioOptimisers.fit_and_predict(pipe, rd; train_idx = 1:4, test_idx = 5:6)
+    pred = PortfolioOptimisers.fit_and_predict(pipe, rd, 1:4, 5:6)
     @test pred.res.w ≈ ref.w
     @test pred.rd.X ≈ predict(ref, rd, 5:6).rd.X
 
     # The result method predicts over one window, or over each of a vector of windows.
     res = fit(pipe, rd)
-    @test PortfolioOptimisers.fit_and_predict(res, rd; test_idx = 5:6).rd.X ≈
+    @test PortfolioOptimisers.fit_and_predict(res, rd, nothing, 5:6).rd.X ≈
           predict(res.res, rd, 5:6).rd.X
-    preds = PortfolioOptimisers.fit_and_predict(res, rd; test_idx = [4:5, 5:6])
+    preds = PortfolioOptimisers.fit_and_predict(res, rd, nothing, [4:5, 5:6])
     @test length(preds) == 2
     @test preds[1].rd.X ≈ predict(res.res, rd, 4:5).rd.X
 
@@ -711,5 +715,5 @@ end
 
     # With no training rows the method reads the pipeline out with `fit(pipe)`, which only a
     # pipeline that holds a partial-fit state implements.
-    @test_throws MethodError PortfolioOptimisers.fit_and_predict(pipe, rd; test_idx = 5:6)
+    @test_throws MethodError PortfolioOptimisers.fit_and_predict(pipe, rd, nothing, 5:6)
 end

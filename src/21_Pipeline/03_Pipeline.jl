@@ -1154,7 +1154,7 @@ A vector of index vectors predicts on each window and returns one result per win
   - `data`: Price data or returns data that contains the window, a [`PricesResult`](@ref) or a [`ReturnsResult`](@ref).
   - `test_idx`: The rows of `data` in the window, as integer indices or `:` for all rows. Price data also takes a vector of timestamps.
   - `test_idxs`: Several such windows, as a vector of index vectors.
-  - `cols`: The columns of `data` in the window, as integer indices or `:` for all assets. The columns must give the training universe. So a subset of the columns needs a fit on the same subset, as `fit_and_predict(pipe, data; cols)` does.
+  - `cols`: The columns of `data` in the window, as integer indices or `:` for all assets. The columns must give the training universe. So a subset of the columns needs a fit on the same subset, as `fit_and_predict(pipe, data, train_idx, test_idx, cols)` does.
 
 # Keyword Arguments
 
@@ -1228,28 +1228,15 @@ function StatsAPI.predict(res::PipelineResult, data::AbstractReturnsResult,
     return [StatsAPI.predict(res, data, test_idx, cols; kwargs...)
             for test_idx in test_idxs]
 end
-function fit_and_predict(res::AbstractPipelineResult, data::Prices_RR;
-                         test_idx::VecInt_VecVecInt, cols = :,
-                         wd::Option{<:AbstractWeightDrift} = nothing,
-                         hwd::Option{<:AbstractWeightDrift} = wd,
-                         fa::Option{<:AbstractFeeAmortisation} = nothing,
-                         store_weight_path::Bool = false, strict::Bool = false,
-                         w_prev::Option{<:VecNum_VecVecNum} = nothing, kwargs...)
-    return StatsAPI.predict(res, data, test_idx, cols; wd = wd, hwd = hwd, fa = fa,
-                            store_weight_path = store_weight_path, strict = strict,
-                            w_prev = w_prev)
+function fit_and_predict(res::AbstractPipelineResult, data::Prices_RR, ::Option{<:VecInt},
+                         test_idx::VecInt_VecVecInt, cols = :; kwargs...)
+    return StatsAPI.predict(res, data, test_idx, cols; kwargs...)
 end
-function fit_and_predict(pipe::AbstractPipelineEstimator, data::Prices_RR;
-                         train_idx::Option{<:VecInt} = nothing, test_idx::VecInt_VecVecInt,
-                         cols = :, wd::Option{<:AbstractWeightDrift} = nothing,
-                         hwd::Option{<:AbstractWeightDrift} = wd,
-                         fa::Option{<:AbstractFeeAmortisation} = nothing,
-                         store_weight_path::Bool = false, strict::Bool = false,
-                         w_prev::Option{<:VecNum_VecVecNum} = nothing)
+function fit_and_predict(pipe::AbstractPipelineEstimator, data::Prices_RR,
+                         train_idx::Option{<:VecInt}, test_idx::VecInt_VecVecInt, cols = :;
+                         kwargs...)
     res = pipeline_fold_fit(pipe, data, train_idx, cols)
-    return StatsAPI.predict(res, data, test_idx, cols; wd = wd, hwd = hwd, fa = fa,
-                            store_weight_path = store_weight_path, strict = strict,
-                            w_prev = w_prev)
+    return StatsAPI.predict(res, data, test_idx, cols; kwargs...)
 end
 """
 $(DocStringExtensions.TYPEDSIGNATURES)

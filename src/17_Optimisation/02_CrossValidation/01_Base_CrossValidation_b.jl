@@ -172,10 +172,10 @@ end
 """
     fit_and_predict(opt, rd::ReturnsResult, cv::NonSeqCVER; cols, ex, id) -> MultiPeriodPredictionResult
     fit_and_predict(opt, rd::ReturnsResult, cv::CombCVER; cols, ex) -> PopulationPredictionResult
-    fit_and_predict(opt, rd::ReturnsResult; train_idx = nothing, test_idx, cols) -> PredictionResult
-    fit_and_predict(res::NonFiniteAllocationOptimisationResult, rd::ReturnsResult; test_idx, cols) -> PredictionResult
-    fit_and_predict(pipe::AbstractPipelineEstimator, data::Prices_RR; train_idx = nothing, test_idx, cols) -> PredictionResult
-    fit_and_predict(res::AbstractPipelineResult, data::Prices_RR; test_idx, cols) -> PredictionResult
+    fit_and_predict(opt, rd::ReturnsResult, train_idx, test_idx, cols = :; kwargs...) -> PredictionResult
+    fit_and_predict(res::NonFiniteAllocationOptimisationResult, rd::ReturnsResult, train_idx, test_idx, cols = :; kwargs...) -> PredictionResult
+    fit_and_predict(pipe::AbstractPipelineEstimator, data::Prices_RR, train_idx, test_idx, cols = :; kwargs...) -> PredictionResult
+    fit_and_predict(res::AbstractPipelineResult, data::Prices_RR, train_idx, test_idx, cols = :; kwargs...) -> PredictionResult
 
 Fit an optimisation estimator on training data and predict on test data using cross-validation.
 
@@ -183,9 +183,9 @@ The method over a scheme `cv` predicts over every fold of `cv`. The methods with
 
 A combinatorial `cv` takes its own method, because its folds recombine into several paths and not one. That method regroups the fold predictions by path, and returns one [`MultiPeriodPredictionResult`](@ref) per path in a [`PopulationPredictionResult`](@ref).
 
-The estimator form reads `train_idx = nothing` as *the estimator holds its window*. It reads the estimator out through `optimise(opt)` in place of a fit over `port_opt_view(rd, train_idx, cols)`, and predicts over `test_idx` as before. The online arm of [`fold_loop`](@ref) reads a fold out this way. It is also the public entry for an estimator stepped by hand, warmed up with [`update_online_estimator`](@ref) and folded with [`partial_fit!`](@ref). `fit_and_predict(opt, rd; test_idx)` on a stepped estimator equals `fit_and_predict(opt, rd; train_idx, test_idx)` on the cold one over the same rows. The two arms belong to [`fit_fold_result`](@ref), and the method is defined beside them.
+The estimator form reads a `train_idx` of `nothing` as *the estimator holds its window*. It reads the estimator out through `optimise(opt)` in place of a fit over `port_opt_view(rd, train_idx, cols)`, and predicts over `test_idx` as before. The online arm of [`fold_loop`](@ref) reads a fold out this way. It is also the public entry for an estimator stepped by hand, warmed up with [`update_online_estimator`](@ref) and folded with [`partial_fit!`](@ref). `fit_and_predict(opt, rd, nothing, test_idx)` on a stepped estimator equals `fit_and_predict(opt, rd, train_idx, test_idx)` on the cold one over the same rows. The two arms belong to [`fit_fold_result`](@ref), and the method is defined beside them.
 
-The result form is fitted already, so it ignores `train_idx` and every keyword that [`predict`](@ref) does not take. The fold loop passes the same keywords to an estimator and to a result.
+The result form is fitted already, so it ignores `train_idx`. The fold loop passes the same arguments to an estimator and to a result, and the type of the estimator of the fold selects the form. Each form over one split passes its keywords to [`predict`](@ref).
 
 The two pipeline methods take price data or returns data. They call only `fit` and `predict`, so they serve every [`AbstractPipelineEstimator`](@ref) and every [`AbstractPipelineResult`](@ref). The estimator method fits the pipeline over the rows `train_idx` and the columns `cols` with [`pipeline_fold_fit`](@ref), or reads a stepped pipeline out when `train_idx` is `nothing`. It then predicts over `test_idx` with [`predict(res::PipelineResult, data::AbstractPricesResult, window)`](@ref). The result method is fitted already, and predicts over `test_idx`.
 
@@ -205,15 +205,20 @@ For a scheme `cv` that is not combinatorial:
   - `rd::ReturnsResult`: Returns data.
   - `cv::NonSeqCVER`: Non-sequential cross-validation estimator or result, such as [`KFold`](@ref).
   - `cv::CombCVER`: Combinatorial cross-validation estimator or result ([`CombinatorialCrossValidation`](@ref)).
+  - `train_idx::Option{<:VecInt}`: Training indices of one split, or `nothing` to read a stepped estimator out.
+  - `test_idx::VecInt_VecVecInt`: Test indices of one split, one vector or one vector per window.
+  - `cols = :`: Column selector of one split.
 
 # Keyword Arguments
 
-  - `train_idx::Option{<:VecInt}`: Training indices, or `nothing` to read a stepped estimator out.
-  - `test_idx`: Test indices, one vector or one vector per fold.
-  - `cols = :`: Column selector.
+  - `cols = :`: Column selector of the forms over a scheme.
   - `ex::FLoops.Transducers.Executor = FLoops.ThreadedEx()`: Executor of the folds that run in parallel.
   - `id = nothing`: Identifier of the path.
-  - `wd`, `hwd`, `fa`, `store_weight_path`, `strict`, `w_prev`: The keywords of [`predict`](@ref), which the methods over one split pass on.
+  - `kwargs...`: The keywords of [`predict`](@ref), `wd`, `hwd`, `fa`, `store_weight_path`, `strict` and `w_prev`, which the forms over one split pass on.
+
+# Validation
+
+  - A form over one split raises the `MethodError` of [`predict`](@ref) for a keyword that `predict` does not take.
 
 # Returns
 
@@ -227,16 +232,10 @@ For a scheme `cv` that is not combinatorial:
   - [`KFold`](@ref)
   - [`CombinatorialCrossValidation`](@ref)
 """
-function fit_and_predict(res::NonFiniteAllocationOptimisationResult, rd::ReturnsResult;
-                         test_idx::VecInt_VecVecInt, cols = :,
-                         wd::Option{<:AbstractWeightDrift} = nothing,
-                         hwd::Option{<:AbstractWeightDrift} = wd,
-                         fa::Option{<:AbstractFeeAmortisation} = nothing,
-                         store_weight_path::Bool = false, strict::Bool = false,
-                         w_prev::Option{<:VecNum_VecVecNum} = nothing, kwargs...)
-    return StatsAPI.predict(res, rd, test_idx, cols; wd = wd, hwd = hwd, fa = fa,
-                            store_weight_path = store_weight_path, strict = strict,
-                            w_prev = w_prev)
+function fit_and_predict(res::NonFiniteAllocationOptimisationResult, rd::ReturnsResult,
+                         ::Option{<:VecInt}, test_idx::VecInt_VecVecInt, cols = :;
+                         kwargs...)
+    return StatsAPI.predict(res, rd, test_idx, cols; kwargs...)
 end
 """
     sort_predictions(res::VecVecInt, predictions::VecPredRes) -> VecPredRes
@@ -460,7 +459,7 @@ holds the weights that were threaded, a second time, so that a failed fold can h
 [`online_folds`](@ref), hands its callback a `Fold` of that shape. `est` has already folded
 every row of the training window through [`partial_fit!`](@ref), so a callback reads it out
 with `optimise(est)` and no returns, in place of a fit over rows the record does not carry.
-[`fit_and_predict`](@ref) takes `train_idx = nothing` for that case, so the callback of every
+[`fit_and_predict`](@ref) takes a `train_idx` of `nothing` for that case, so the callback of every
 entry point is the same under both arms.
 
 The type is immutable and every field is concretely typed at the construction site, so the
@@ -709,9 +708,8 @@ function fit_and_predict(opt::OptE_Opt_TD, rd::ReturnsResult, cv::NonSeqCVER; co
     hwd = held_weights_drift(wd, pws)
     predictions, _ = fold_loop(opt, length(train_idx), ex; rd = rd, train_idx = train_idx,
                                test_idx = test_idx, cv = cv, pws = pws) do fold
-        return fit_and_predict(fold.est, fold.rd; train_idx = fold.train,
-                               test_idx = fold.test, cols = cols, wd = wd, hwd = hwd,
-                               fa = fa, store_weight_path = store_weight_path,
+        return fit_and_predict(fold.est, fold.rd, fold.train, fold.test, cols; wd = wd,
+                               hwd = hwd, fa = fa, store_weight_path = store_weight_path,
                                strict = strict, w_prev = fold.w_prev)
     end
     return MultiPeriodPredictionResult(; pred = predictions, id = id)

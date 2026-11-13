@@ -6,9 +6,9 @@ Add tracking risk constraints to `model`.
 The `L1Norm` overload uses an L1-norm cone. The `L2Norm` / `SquaredL2Norm`
 overload uses an SOC. The `LpNorm` overload uses power cones parameterised by `r.alg.p`.
 The `LInfNorm` overload uses an infinity-norm cone. The independent-variable overload
-shifts the weight vector by a benchmark before delegating to [`set_risk_tracking_risk_constraints!`](@ref).
+shifts the weight vector by a benchmark before it builds the inner risk under a nested prefix.
 The dependent-variable overload computes a benchmark risk and adds an L1-norm cone on the
-risk difference via [`set_risk_tracking_risk_constraints!`](@ref).
+risk difference to the inner risk, which it builds under a nested prefix.
 
 # Mathematical definition
 
@@ -46,8 +46,7 @@ where ``\\boldsymbol{b}`` is the benchmark return series, ``k`` is the budget sc
 # Related
 
   - [`set_tracking_risk!`](@ref)
-  - [`set_risk_tr_constraints!`](@ref)
-  - [`set_risk_tracking_risk_constraints!`](@ref)
+  - [`nested_prefix`](@ref)
 """
 function set_risk_constraints!(model::JuMP.Model, i::Any,
                                r::TrackingRiskMeasure{<:Any, <:Any, <:L1Norm},
@@ -295,99 +294,23 @@ end
 """
 $(DocStringExtensions.TYPEDSIGNATURES)
 
-Dispatch to indexed [`set_risk_constraints!`](@ref) for a single measure or iterate over a
-vector of measures.
-
-The nested build's entries are separated from the enclosing build's by its `prefix` alone.
-The index seeds only the *measure* axis, exactly as it does at the outer level, because
-[`state_key`](@ref) resolves both axes. Seeding the index with the prefix as well — which
-this did in an earlier design — carried the same fact twice.
-
-# Arguments
-
-  - $(arg_dict[:model])
-  - `r`: A [`RiskMeasure`](@ref) or a vector of risk measures.
-  - $(arg_dict[:opt_rjumpe])
-  - $(arg_dict[:pr])
-  - $(arg_dict[:pl_opt])
-  - $(arg_dict[:fees_opt])
-
-# Returns
-
-  - `nothing`.
-
-# Related
-
-  - [`set_risk_constraints!`](@ref)
-  - [`set_risk_tracking_risk_constraints!`](@ref)
-  - [`state_key`](@ref)
-"""
-function set_risk_tr_constraints!(model::JuMP.Model, r::RiskMeasure,
-                                  opt::RiskConstraintOwner, pr::AbstractPriorResult,
-                                  pl::Option{<:PlC_VecPlC}, fees::Option{<:Fees}, args...;
-                                  kwargs...)
-    return set_risk_constraints!(model, 1, r, opt, pr, pl, fees, args...; kwargs...)
-end
-function set_risk_tr_constraints!(model::JuMP.Model, rs::VecRM, opt::RiskConstraintOwner,
-                                  pr::AbstractPriorResult, pl::Option{<:PlC_VecPlC},
-                                  fees::Option{<:Fees}, args...; kwargs...)
-    for (i, r) in enumerate(rs)
-        set_risk_constraints!(model, i, r, opt, pr, pl, fees, args...; kwargs...)
-    end
-    return nothing
-end
-"""
-$(DocStringExtensions.TYPEDSIGNATURES)
-
-Build the inner risk expression for risk tracking under a namespaced `tprefix`.
-
-The caller stores the tracking-difference weights under `tprefix`, so the inner
-[`set_risk_tr_constraints!`](@ref) build reads and writes its model-state keys
-(`:w`, `:net_X`, the per-measure scratch, …) under `tprefix` and cannot collide with the
-outer model's keys. The lifted matrix `:W` and the marks `:variance_flag` and
-`:rc_variance` belong to the namespace that owns the weights, [`weights_prefix`](@ref).
-That is `tprefix` for shifted weights, and the enclosing build's owner for the unshifted
-weights of a [`DependentVariableTracking`](@ref) build. This replaces the former
-save/unregister/restore swap: the prefix isolates the nested build structurally.
-Because tracking prefixes COMPOSE (`tprefix = nested_prefix(prefix, :tr_iv_, i)`),
-tracking-nested-in-tracking is collision-free.
-
-# Arguments
-
-  - $(arg_dict[:model])
-  - `r`: Inner risk measure (or vector of measures).
-  - $(arg_dict[:opt_rjumpe])
-  - $(arg_dict[:pr])
-  - $(arg_dict[:pl_opt])
-  - $(arg_dict[:fees_opt])
-  - `tprefix::Symbol`: Composed tracking prefix namespacing the nested build's keys.
-
-# Returns
-
-  - The inner risk JuMP expression.
-
-# Related
-
-  - [`set_risk_tr_constraints!`](@ref)
-"""
-function set_risk_tracking_risk_constraints!(model::JuMP.Model, r, opt::RiskConstraintOwner,
-                                             pr::AbstractPriorResult,
-                                             pl::Option{<:PlC_VecPlC}, fees::Option{<:Fees},
-                                             tprefix::Symbol, args...; kwargs...)
-    return set_risk_tr_constraints!(model, r, opt, pr, pl, fees, args...; prefix = tprefix,
-                                    kwargs...)
-end
-"""
-$(DocStringExtensions.TYPEDSIGNATURES)
-
 Add JuMP risk constraints for `RiskTrackingRiskMeasure` with `IndependentVariableTracking`
 to `model`.
 
 Stores the benchmark-shifted weights `w - wb*k` at `Symbol(tprefix, :w)` under the composed
-tracking prefix `tprefix = nested_prefix(prefix, :tr_iv_, i)`, delegates to
-[`set_risk_tracking_risk_constraints!`](@ref) to build the inner risk on those weights under
-`tprefix`, then applies risk bounds and expression registration. The prefix namespacing
-replaces the former save/restore swap and is re-entrant.
+tracking prefix `tprefix = nested_prefix(prefix, :tr_iv_, i)`, builds the inner risk on
+those weights with [`set_risk_constraints!`](@ref) at the index `1` under `tprefix`, then
+applies risk bounds and expression registration. The prefix namespacing replaces the former
+save/restore swap and is re-entrant.
+
+The inner build reads and writes its Model State keys (`:w`, `:net_X`, the scratch of each
+measure) under `tprefix`, so they cannot collide with the keys of the enclosing build. Its
+prefix alone separates them, so the index `1` seeds only the measure axis, as at the outer
+level, because [`state_key`](@ref) resolves both axes. The lifted matrix `:W` and the marks
+`:variance_flag` and `:rc_variance` belong to the namespace that owns the weights,
+[`weights_prefix`](@ref). For the shifted weights here, that is `tprefix`. The prefixes
+compose through [`nested_prefix`](@ref), so a tracking measure inside a tracking measure is
+free of collisions.
 
 # Arguments
 
@@ -408,7 +331,7 @@ replaces the former save/restore swap and is re-entrant.
 
   - [`RiskTrackingRiskMeasure`](@ref)
   - [`IndependentVariableTracking`](@ref)
-  - [`set_risk_tracking_risk_constraints!`](@ref)
+  - [`nested_prefix`](@ref)
   - [`set_risk_constraints!`](@ref)
 """
 function set_risk_constraints!(model::JuMP.Model, i::Any,
@@ -423,8 +346,8 @@ function set_risk_constraints!(model::JuMP.Model, i::Any,
     k = get_k(model)
     tprefix = nested_prefix(prefix, :tr_iv_, i)
     state_set!(model, tprefix, :w, JuMP.@expression(model, w - wb * k))
-    tracking_risk = set_risk_tracking_risk_constraints!(model, ri, opt, pr, pl, fees,
-                                                        tprefix, args...; kwargs...)
+    tracking_risk = set_risk_constraints!(model, 1, ri, opt, pr, pl, fees, args...;
+                                          prefix = tprefix, kwargs...)
     set_risk_bounds_and_expression!(model, opt, tracking_risk, r.settings, :tracking_risk_,
                                     i; prefix = prefix)
     return tracking_risk
@@ -437,9 +360,8 @@ to `model`.
 
 Computes the benchmark's expected risk value, stores the (unshifted) portfolio weights at
 `Symbol(tprefix, :w)` under the composed tracking prefix
-`tprefix = nested_prefix(prefix, :tr_dv_, i)`, delegates to
-[`set_risk_tracking_risk_constraints!`](@ref) to build the inner portfolio risk under
-`tprefix`, then adds an L1-norm cone constraint on the difference between the portfolio's
+`tprefix = nested_prefix(prefix, :tr_dv_, i)`, builds the inner portfolio risk with
+[`set_risk_constraints!`](@ref) at the index `1` under `tprefix`, then adds an L1-norm cone constraint on the difference between the portfolio's
 risk expression and the benchmark's expected risk scaled by the allocation variable `k`.
 The prefix namespacing replaces the former save/restore swap and is re-entrant.
 
@@ -509,7 +431,7 @@ Where:
 
   - [`RiskTrackingRiskMeasure`](@ref)
   - [`DependentVariableTracking`](@ref)
-  - [`set_risk_tracking_risk_constraints!`](@ref)
+  - [`weights_prefix`](@ref)
   - [`set_risk_constraints!`](@ref)
 """
 function set_risk_constraints!(model::JuMP.Model, i::Any,
@@ -531,8 +453,8 @@ function set_risk_constraints!(model::JuMP.Model, i::Any,
     tprefix = nested_prefix(prefix, :tr_dv_, i)
     state_set!(model, tprefix, :w, get_w(model, prefix))
     state_set!(model, tprefix, :w_owner, weights_prefix(model, prefix))
-    risk_expr = set_risk_tracking_risk_constraints!(model, ri, opt, pr, pl, fees, tprefix,
-                                                    args...; kwargs...)
+    risk_expr = set_risk_constraints!(model, 1, ri, opt, pr, pl, fees, args...;
+                                      prefix = tprefix, kwargs...)
     dr = state_set!(model, prefix, :r_dv_, i, JuMP.@expression(model, risk_expr - rb * k))
     state_set!(model, prefix, :crtr_noc_, i,
                JuMP.@constraint(model,

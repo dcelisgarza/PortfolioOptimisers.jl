@@ -107,7 +107,7 @@ what keeps the JuMP families cheap.
         end
         # The public door reads a hand-stepped pipeline out and predicts on a window.
         spipe = stepped(prices_pipe, pr, blocks)
-        pred = po.fit_and_predict(spipe, pr; test_idx = 84:100)
+        pred = po.fit_and_predict(spipe, pr, nothing, 84:100)
         @test isapprox(pred.res.w, fit(prices_pipe, rows(pr, 1:80)).w; atol = 1e-5)
         # The state and the Fold Context render only where set.
         @test !occursin("cache", sprint(show, MIME"text/plain"(), prices_pipe))
@@ -383,7 +383,7 @@ what keeps the JuMP families cheap.
             @test isnothing(fold.train)
             train = fit(pipes[1], rows(pr, cvr.train_idx[fold.i])).ctx.returns
             @test same_carrier(fit(fold.est).ctx.returns, train)
-            return po.fit_and_predict(fold.est, fold.rd; test_idx = fold.test)
+            return po.fit_and_predict(fold.est, fold.rd, nothing, fold.test)
         end
         @test seen == 1:n
         # The multiple-randomised form views the data and folds the pipeline afresh per

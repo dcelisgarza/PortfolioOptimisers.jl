@@ -28,7 +28,7 @@ A pipeline that folds observations one at a time also implements `fit(pipe::MyPi
 
 With `fit`, the subtype gets three methods that the library defines on `AbstractPipelineEstimator`:
 
-  - The method `fit_and_predict(pipe, data; train_idx, test_idx, cols)` fits the pipeline over the rows `train_idx` and predicts over `test_idx`. When `train_idx` is `nothing`, it calls `fit(pipe)` with no data.
+  - The method `fit_and_predict(pipe, data, train_idx, test_idx, cols)` fits the pipeline over the rows `train_idx` and predicts over `test_idx`. When `train_idx` is `nothing`, it calls `fit(pipe)` with no data.
   - The methods of `port_opt_view` and `optimise` raise an `ArgumentError`. A pipeline is a workflow, not an optimiser, so a meta-optimiser cannot hold one.
 
 The shape of [`Pipeline`](@ref) is a linear list of steps, not a graph of steps. A subtype can have a different shape, which the library does not define. These functions read the steps, the names or the `cache` of a `Pipeline`, so their methods stay on `Pipeline` alone:
@@ -69,7 +69,7 @@ julia> fit(pipe, rd).res.w
  0.44390013800777395
  0.2773847359664937
 
-julia> pred = PortfolioOptimisers.fit_and_predict(pipe, rd; train_idx = 1:4, test_idx = 5:6);
+julia> pred = PortfolioOptimisers.fit_and_predict(pipe, rd, 1:4, 5:6);
 
 julia> pred.res.w
 3-element Vector{Float64}:
@@ -119,7 +119,7 @@ To add a pipeline result, subtype `AbstractPipelineResult` and implement the fol
 
   - `pred::PredictionResult`: The prediction, or a vector of predictions for a vector of windows.
 
-With `predict`, the subtype gets the method `fit_and_predict(res, data; test_idx, cols)` that the library defines on `AbstractPipelineResult`. It calls `predict(res, data, test_idx, cols)` with the keywords above. [`PipelineResult`](@ref) keeps its two methods for a vector of windows, because a method on `AbstractPipelineResult` with that signature is ambiguous with the `predict` of `PipelineResult`.
+With `predict`, the subtype gets the method `fit_and_predict(res, data, train_idx, test_idx, cols)` that the library defines on `AbstractPipelineResult`. It ignores `train_idx`, and calls `predict(res, data, test_idx, cols)` with the keywords above. [`PipelineResult`](@ref) keeps its two methods for a vector of windows, because a method on `AbstractPipelineResult` with that signature is ambiguous with the `predict` of `PipelineResult`.
 
 ### Examples
 
@@ -151,7 +151,7 @@ julia> predict(res, rd, 5:6).rd.X
  0.008864698859563092
  0.010013303900592387
 
-julia> PortfolioOptimisers.fit_and_predict(res, rd; test_idx = 5:6).rd.X
+julia> PortfolioOptimisers.fit_and_predict(res, rd, nothing, 5:6).rd.X
 2-element Vector{Float64}:
  0.008864698859563092
  0.010013303900592387

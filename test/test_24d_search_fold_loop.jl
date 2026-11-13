@@ -94,9 +94,8 @@ The fixture is the online fold loop's, because the identities are structural.
             cvr = split(cv, rd)
             res = search_cross_validation(mr, gs(cv, jgrid; train_score = true), rd)
             for (i, val) in enumerate(jgrid[1][2]), j in eachindex(cvr.train_idx)
-                pred = po.fit_and_predict(Accessors.set(mr, l1, val), rd;
-                                          train_idx = cvr.train_idx[j],
-                                          test_idx = cvr.test_idx[j])
+                pred = po.fit_and_predict(Accessors.set(mr, l1, val), rd, cvr.train_idx[j],
+                                          cvr.test_idx[j])
                 @test res.test_scores[j, i] == -expected_risk(r, pred)
                 @test res.train_scores[j, i] == -expected_risk(r, pred.res)
             end
@@ -124,9 +123,8 @@ The fixture is the online fold loop's, because the identities are structural.
             @test all(j -> loop.pred[j].res.jr.jor.tn.w == loop.pred[j - 1].hw.w,
                       2:length(loop.pred))
             hand = [-expected_risk(r,
-                                   po.fit_and_predict(opti, rd;
-                                                      train_idx = cvr.train_idx[j],
-                                                      test_idx = cvr.test_idx[j],
+                                   po.fit_and_predict(opti, rd, cvr.train_idx[j],
+                                                      cvr.test_idx[j];
                                                       wd = SelfFinancingDrift(), hwd = hwd))
                     for j in eachindex(cvr.train_idx)]
             @test res.test_scores[1, i] == hand[1]
@@ -241,9 +239,8 @@ The fixture is the online fold loop's, because the identities are structural.
         # that fold's own asset subset, and each path is threaded within itself.
         l1 = po.parse_lens("opt.l1")
         for (i, val) in enumerate(jgrid[1][2]), j in eachindex(cvr.train_idx)
-            pred = po.fit_and_predict(Accessors.set(mr, l1, val), rdg;
-                                      train_idx = cvr.train_idx[j],
-                                      test_idx = cvr.test_idx[j], cols = cvr.asset_idx[j])
+            pred = po.fit_and_predict(Accessors.set(mr, l1, val), rdg, cvr.train_idx[j],
+                                      cvr.test_idx[j], cvr.asset_idx[j])
             @test b.test_scores[j, i] == -expected_risk(r, pred)
         end
         @test po.score_rows(cvr) == [findall(==(k), cvr.path_ids) for k in 1:2]
@@ -270,9 +267,8 @@ The fixture is the online fold loop's, because the identities are structural.
                                       rd)
         cvp = split(pinned, rd)
         for (i, val) in enumerate(jgrid[1][2]), j in eachindex(cvp.train_idx)
-            pred = po.fit_and_predict(Accessors.set(mr, l1, val), rd;
-                                      train_idx = cvp.train_idx[j],
-                                      test_idx = cvp.test_idx[j], cols = cvp.asset_idx[j])
+            pred = po.fit_and_predict(Accessors.set(mr, l1, val), rd, cvp.train_idx[j],
+                                      cvp.test_idx[j], cvp.asset_idx[j])
             @test res.test_scores[j, i] == -expected_risk(r, pred)
         end
     end
@@ -717,8 +713,8 @@ prior, and through a Pipeline.
     pe_vals = [EmpiricalPrior(), EmpiricalPrior(; ce = PortfolioOptimisersCovariance())]
     function scores_of(opt)
         return [-expected_risk(r,
-                               po.fit_and_predict(opt, rd; train_idx = cvr.train_idx[j],
-                                                  test_idx = cvr.test_idx[j]))
+                               po.fit_and_predict(opt, rd, cvr.train_idx[j],
+                                                  cvr.test_idx[j]))
                 for j in eachindex(cvr.train_idx)]
     end
     cases = (("pe.re", InverseVolatility(; pe = FactorPrior()), res_vals,

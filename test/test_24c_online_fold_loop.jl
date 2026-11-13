@@ -80,7 +80,7 @@ assets is what keeps the JuMP families cheap.
             @test isnothing(fold.train)
             @test fold.test == cvr.test_idx[fold.i]
             @test same_fields(po.returns_result(fold.est), rows(rdg, cvr.train_idx[fold.i]))
-            return po.fit_and_predict(fold.est, fold.rd; test_idx = fold.test)
+            return po.fit_and_predict(fold.est, fold.rd, nothing, fold.test)
         end
         @test seen == 1:n
     end
@@ -175,7 +175,7 @@ assets is what keeps the JuMP families cheap.
             # Fold `i` has folded `1 : test_start_i - p`, and nothing beyond.
             @test rdp.X == X[1:(first(cvr.test_idx[i]) - 1 - p), :]
             @test folded[i] == last(cvr.train_idx[i])
-            return po.fit_and_predict(fold.est, fold.rd; test_idx = fold.test)
+            return po.fit_and_predict(fold.est, fold.rd, nothing, fold.test)
         end
         # The purged rows of fold `i` are folded by fold `i + 1`.
         for i in 1:(n - 1)
@@ -391,7 +391,7 @@ assets is what keeps the JuMP families cheap.
                      test_idx = cvr.test_idx, cv = online_cv) do fold
             @test fold.est.opt.wb == wbs[fold.i]
             @test !isnothing(fold.est.opt.cache)
-            return po.fit_and_predict(fold.est, fold.rd; test_idx = fold.test)
+            return po.fit_and_predict(fold.est, fold.rd, nothing, fold.test)
         end
         # A schedule on an inner optimiser of a meta-optimiser carries no state either, so
         # the online arm takes it and resolves it per fold.
@@ -414,7 +414,7 @@ assets is what keeps the JuMP families cheap.
             @test isa(fold.est.opt.pe, EmpiricalPrior)
             @test isa(po.partial_fit_cache(fold.est.opt.pe), po.SampleBufferState)
             @test isnothing(po.online_entry_state(wrapped))
-            return po.fit_and_predict(fold.est, fold.rd; test_idx = fold.test)
+            return po.fit_and_predict(fold.est, fold.rd, nothing, fold.test)
         end
         # A wrapped prior refits from its buffer and reaches the expanding batch weights.
         @test isapprox(weights(cross_val_predict(wrapped, rd, online_cv)),
@@ -587,7 +587,7 @@ assets is what keeps the JuMP families cheap.
                          FLoops.SequentialEx(); rd = rd, train_idx = cvr.train_idx,
                          test_idx = cvr.test_idx, cv = online_cv) do fold
                 push!(seen, fold.i)
-                return po.fit_and_predict(fold.est, fold.rd; test_idx = fold.test)
+                return po.fit_and_predict(fold.est, fold.rd, nothing, fold.test)
             end
             nothing
         catch e
@@ -610,19 +610,23 @@ assets is what keeps the JuMP families cheap.
         for i in (1, 3)
             train, test = cvr.train_idx[i], cvr.test_idx[i]
             stepped = partial_fit!(po.update_online_estimator(mr), rows(rd, train))
-            cold = po.fit_and_predict(mr, rd; train_idx = train, test_idx = test)
-            warm = po.fit_and_predict(stepped, rd; test_idx = test)
+            cold = po.fit_and_predict(mr, rd, train, test)
+            warm = po.fit_and_predict(stepped, rd, nothing, test)
             @test isapprox(warm.res.w, cold.res.w; atol = 1e-5)
             @test isapprox(warm.rd.X, cold.rd.X; atol = 1e-5)
+            # The result form ignores the training window and predicts as `predict` does.
+            # It passes every keyword to `predict`, which refuses a wrong one (#2066).
+            @test po.fit_and_predict(cold.res, rd, train, test).rd.X == cold.rd.X
+            @test_throws MethodError po.fit_and_predict(cold.res, rd, train, test;
+                                                        w_previous = nothing)
             # And with an asset view: the stepped estimator is sliced as the cold one is.
-            cold = po.fit_and_predict(mr, rd; train_idx = train, test_idx = test,
-                                      cols = 2:6)
-            warm = po.fit_and_predict(stepped, rd; test_idx = test, cols = 2:6)
+            cold = po.fit_and_predict(mr, rd, train, test, 2:6)
+            warm = po.fit_and_predict(stepped, rd, nothing, test, 2:6)
             @test isapprox(warm.res.w, cold.res.w; atol = 1e-5)
             @test warm.rd.nx == cold.rd.nx == nx[2:6]
         end
         # A cold estimator with no window has nothing to read out.
-        @test_throws ArgumentError po.fit_and_predict(mr, rd; test_idx = cvr.test_idx[1])
+        @test_throws ArgumentError po.fit_and_predict(mr, rd, nothing, cvr.test_idx[1])
     end
 
     @testset "The context of a fold carries what the fold loop hands it (#1912)" begin

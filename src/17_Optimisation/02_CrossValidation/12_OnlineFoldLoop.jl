@@ -36,21 +36,15 @@ function fit_fold_result(opt::NonFiniteAllocationOptimisationEstimator, ::Return
                          ::Nothing, ::Any)
     return optimise(opt)
 end
-function fit_and_predict(opt::NonFiniteAllocationOptimisationEstimator, rd::ReturnsResult;
-                         train_idx::Option{<:VecInt} = nothing, test_idx::VecInt_VecVecInt,
-                         cols = :, wd::Option{<:AbstractWeightDrift} = nothing,
-                         hwd::Option{<:AbstractWeightDrift} = wd,
-                         fa::Option{<:AbstractFeeAmortisation} = nothing,
-                         store_weight_path::Bool = false, strict::Bool = false,
-                         w_prev::Option{<:VecNum_VecVecNum} = nothing)
+function fit_and_predict(opt::NonFiniteAllocationOptimisationEstimator, rd::ReturnsResult,
+                         train_idx::Option{<:VecInt}, test_idx::VecInt_VecVecInt, cols = :;
+                         kwargs...)
     if !isa(cols, Colon)
         opt = port_opt_view(opt, cols, rd.X)
     end
     #! Add ability to do callbacks
     res = fit_fold_result(opt, rd, train_idx, cols)
-    return StatsAPI.predict(res, rd, test_idx, cols; wd = wd, hwd = hwd, fa = fa,
-                            store_weight_path = store_weight_path, strict = strict,
-                            w_prev = w_prev)
+    return StatsAPI.predict(res, rd, test_idx, cols; kwargs...)
 end
 """
     online_step_fold(est, ctx::Option{<:TimeDependentContext}, rd::Prices_RR)

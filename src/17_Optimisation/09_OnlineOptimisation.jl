@@ -1032,7 +1032,7 @@ function assert_online_entry(est)
     assert_stateless_schedule(est)
     path = online_entry_state(est)
     @argcheck(isnothing(path),
-              ArgumentError("`$(typeof(est).name.name)` enters the online arm of the fold loop carrying a partial-fit state at `$(path)`, and the loop starts cold: its argument is the configuration alone, and the warm-up folds the first training window into an estimator that has folded nothing. Hand the loop the estimator with every `cache` at `nothing`, or read the stepped estimator out by hand with `fit_and_predict(opt, rd; test_idx)`."))
+              ArgumentError("`$(typeof(est).name.name)` enters the online arm of the fold loop carrying a partial-fit state at `$(path)`, and the loop starts cold: its argument is the configuration alone, and the warm-up folds the first training window into an estimator that has folded nothing. Hand the loop the estimator with every `cache` at `nothing`, or read the stepped estimator out by hand with `fit_and_predict(opt, rd, nothing, test_idx)`."))
     wpath = online_unreached_path(est)
     @argcheck(isnothing(wpath),
               ArgumentError("`$(typeof(est).name.name)` enters the online arm of the fold loop holding an `Online` at `$(wpath)`, where the warm-up does not resolve it. The online step forwards each observation to the prior of the optimiser alone, so a wrapper in any other field never gets a buffer, and the batch fit of `optimise(opt)` with no returns would refuse it. Move the wrapper to the prior of the optimiser, or set `$(wpath)` to the estimator it wraps, and `optimise(opt)` with no returns refits it from the folded rows."))

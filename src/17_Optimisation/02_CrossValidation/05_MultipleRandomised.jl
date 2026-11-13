@@ -763,10 +763,9 @@ function path_fit_and_predict(opt::OptE_TD, rd::ReturnsResult, train_idx, test_i
     predictions, est = fold_loop(opt, length(train_idx), ex; rd = rd, train_idx = train_idx,
                                  test_idx = test_idx, path_id = id, fold_view = asset_view,
                                  pws = pws, cv = cv) do fold
-        return fit_and_predict(fold.est, fold.rd; train_idx = fold.train,
-                               test_idx = fold.test, wd = wd, hwd = hwd, fa = fa,
-                               store_weight_path = store_weight_path, strict = strict,
-                               w_prev = fold.w_prev)
+        return fit_and_predict(fold.est, fold.rd, fold.train, fold.test; wd = wd, hwd = hwd,
+                               fa = fa, store_weight_path = store_weight_path,
+                               strict = strict, w_prev = fold.w_prev)
     end
     return MultiPeriodPredictionResult(; pred = sort_predictions(test_idx, predictions),
                                        id = id, opt = est)

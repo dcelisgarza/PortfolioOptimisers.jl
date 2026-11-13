@@ -397,7 +397,7 @@ Each refusal throws an `ArgumentError` that names the step.
 function assert_online_entry(p::Pipeline)
     path = online_entry_state(p)
     @argcheck(isnothing(path),
-              ArgumentError("`Pipeline` enters the online arm of the fold loop carrying a partial-fit state at `$(path)`, and the loop starts cold: its argument is the configuration alone, and the warm-up folds the first training window into a pipeline that has folded nothing. Hand the loop the pipeline with every `cache` at `nothing`, or read the stepped pipeline out by hand with `fit_and_predict(pipe, data; test_idx)`."))
+              ArgumentError("`Pipeline` enters the online arm of the fold loop carrying a partial-fit state at `$(path)`, and the loop starts cold: its argument is the configuration alone, and the warm-up folds the first training window into a pipeline that has folded nothing. Hand the loop the pipeline with every `cache` at `nothing`, or read the stepped pipeline out by hand with `fit_and_predict(pipe, data, nothing, test_idx)`."))
     k = pipeline_row_owner(p)
     @argcheck(k > 0,
               ArgumentError("a `Pipeline` with neither a prior step nor an optimisation step has no row owner, so the online step has nothing to fold the observations into. Add a prior or an optimiser, or refit every fold with `ff = nothing`."))

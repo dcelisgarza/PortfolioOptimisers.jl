@@ -94,15 +94,14 @@ assets is what keeps the JuMP families cheap.
         preds, est = po.fold_loop(mr, length(cvr.train_idx), FLoops.SequentialEx();
                                   rd = rd_T, train_idx = cvr.train_idx,
                                   test_idx = cvr.test_idx, cv = online_cv) do fold
-            return po.fit_and_predict(fold.est, fold.rd; test_idx = fold.test)
+            return po.fit_and_predict(fold.est, fold.rd, nothing, fold.test)
         end
         @test length(preds) == length(cvr.train_idx)
         @test isa(est, MeanRisk)
         preds, est = po.fold_loop(mr, length(cvr.train_idx), FLoops.SequentialEx();
                                   rd = rd_T, train_idx = cvr.train_idx,
                                   test_idx = cvr.test_idx, cv = batch_cv) do fold
-            return po.fit_and_predict(fold.est, fold.rd; train_idx = fold.train,
-                                      test_idx = fold.test)
+            return po.fit_and_predict(fold.est, fold.rd, fold.train, fold.test)
         end
         @test isnothing(est)
     end

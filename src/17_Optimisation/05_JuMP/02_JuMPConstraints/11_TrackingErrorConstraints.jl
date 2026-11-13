@@ -208,8 +208,8 @@ function set_tracking_error_constraints!(model::JuMP.Model, i::Integer,
     sc = get_constraint_scale(model)
     tprefix = nested_prefix(prefix, :tr_ir_, i)
     state_set!(model, tprefix, :w, JuMP.@expression(model, w - wb * k))
-    risk_expr = set_risk_tracking_risk_constraints!(model, r, opt, pr, pl, fees, tprefix,
-                                                    args...; kwargs...)
+    risk_expr = set_risk_constraints!(model, 1, r, opt, pr, pl, fees, args...;
+                                      prefix = tprefix, kwargs...)
     state_set!(model, prefix, :cter_, i,
                JuMP.@constraint(model, sc * (risk_expr - err * k) <= 0))
     return nothing
@@ -232,8 +232,8 @@ function set_tracking_error_constraints!(model::JuMP.Model, i::Integer,
     tprefix = nested_prefix(prefix, :tr_dr_, i)
     state_set!(model, tprefix, :w, get_w(model, prefix))
     state_set!(model, tprefix, :w_owner, weights_prefix(model, prefix))
-    risk_expr = set_risk_tracking_risk_constraints!(model, ri, opt, pr, pl, fees, tprefix,
-                                                    args...; kwargs...)
+    risk_expr = set_risk_constraints!(model, 1, ri, opt, pr, pl, fees, args...;
+                                      prefix = tprefix, kwargs...)
     # The risk difference is its own entry name. It was `Symbol(key, i)` — the *composed*
     # key with the index appended a second time — which put entry 1 at `:tr_dr_11`, the
     # key `tr_dr` itself takes at entry 11.
