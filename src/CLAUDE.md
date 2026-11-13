@@ -58,14 +58,19 @@ whole repository.
   processes a matrix that it assembles itself, as a prior or a higher-order moment does.
   [ADR 0222](../docs/adr/0222-a-type-is-kept-by-default-and-nothing-spells-a-skipped-procedure.md)
   states the rule.
-- **A keyword wrapper is for a call that a user writes.** A method that only moves a keyword into
-  a positional argument and forwards the call does no work. It gives one verb a second form.
-  Keep such a wrapper only on a keyword constructor, or on a verb of a workflow that a user calls
-  in a script, such as `optimise`, `prior` or `expected_risk`. Every other verb takes its slot as
-  a positional argument, and has no keyword wrapper. A public helper is such a verb, for example
-  `oriented_score(sca, r, p)` and `sort_by_measure(sca, ppred, r)`. The reason is the size of the
-  interface, not speed. #1997 measured a keyword form against a positional form, and the time,
-  the allocations and the runtime dispatches were equal. #2066 lists the wrappers that remain.
+- **A wrapper is for a call that a user writes, or for a dispatch problem.** A wrapper is a method
+  that only sends its arguments on to another function: it moves a keyword into a positional
+  slot, packs an argument into a tuple, reorders the arguments, or renames the call. It does no
+  work, and it gives one job a second name. Give each form of an input to the function that owns
+  the job, as a method of that function, and call that function. The keyword case: keep a keyword
+  wrapper only on a keyword constructor, or on a verb of a workflow that a user calls in a
+  script, such as `optimise`, `prior` or `expected_risk`. Every other verb takes its slot as a
+  positional argument, as `oriented_score(sca, r, p)` and `sort_by_measure(sca, ppred, r)` do.
+  The reason is the size of the interface, not speed: #1997 measured a keyword form against a
+  positional form, and the time, the allocations and the runtime dispatches were equal. #2071
+  lists the wrappers that remain. [`.github/instructions/julia-source-code.instructions.md`](../.github/instructions/julia-source-code.instructions.md)
+  § *A wrapper is for convenience or for a dispatch problem* owns the rule, and
+  `test/test_70_trivial_unit_census.jl` flags a one-method forward.
 - **Prefer a per-type method over a new dependency** for reflection-style work. Derive the field
   list, write the constructor name once per type, and use the ordinary keyword constructor.
 - Keep docstring field text in `field_dict` / `arg_dict` in

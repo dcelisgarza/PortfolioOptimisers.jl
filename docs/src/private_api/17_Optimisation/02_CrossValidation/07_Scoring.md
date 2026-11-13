@@ -1,5 +1,5 @@
 ```@meta
-Description = "Scoring, private API of PortfolioOptimisers.jl: AbstractCrossValidationScorer, PredictionScorer, PredictionCrossValScorer, oriented_score, …"
+Description = "Scoring, private API of PortfolioOptimisers.jl: AbstractCrossValidationScorer, PredictionScorer, PredictionCrossValScorer, oriented_score, oriented_value, …"
 ```
 
 # Scoring: private API
@@ -14,7 +14,8 @@ A scorer reads the oriented score of a path. The score orients each risk measure
 
 ```@docs
 PortfolioOptimisers.oriented_score
-PortfolioOptimisers.oriented_returns_score
+PortfolioOptimisers.oriented_value
+PortfolioOptimisers.reduce_member_scores
 PortfolioOptimisers.oriented_member_score
 PortfolioOptimisers.prediction_returns
 ```

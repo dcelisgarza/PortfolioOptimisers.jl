@@ -522,7 +522,11 @@ list can only shrink.
 
 Keep indirection to a minimum. Give each form of an input to the function that owns the job, as a
 method of that function, and call that function. A wrapper is a function whose methods only send
-their arguments on to another function, or hold a form that the other function could hold. It
+their arguments on to another function, or hold a form that the other function could hold. To
+pack an argument into a tuple, to move a keyword into a positional slot, or to reorder the
+arguments is still only to send them on, so the method is a wrapper. #1998 is the case: a
+one-method `oriented_returns_score(sca, rs, X)` that only called
+`reduce_member_scores(sca, rs, (X,))` went, and its callers call `reduce_member_scores`. A wrapper
 earns its place for two reasons only:
 
 - **A convenience for the user.** A keyword constructor, a preset such as `BookToPrice`, or a

@@ -46,8 +46,12 @@ const PredictionCrossValScorer = Union{PredictionScorer, Function}
 """
     oriented_score(sca::Option{<:Sca_VecToScaM}, r::BaseRM_VecBaseRM, p::PredRes_MultiPredRes;
                    kwargs...)
+    oriented_score(sca::Option{<:Sca_VecToScaM}, r::BaseRM_VecBaseRM, res::OptimisationResult,
+                   X::Option{<:MatNum} = nothing; kwargs...)
 
-Score a prediction under one risk measure or a vector of them, so that a higher score is always better.
+Score a prediction, or a fitted result over its own training sample, under one risk measure or a vector of them, so that a higher score is always better.
+
+The second form scores a fitted result. With `X = nothing` it scores the result through its prior result, as `expected_risk(r, res)` does. With a matrix `X` it scores the result over `X`, as `expected_risk(r, res, X)` does. A search calls it through [`candidate_train_score`](@ref) for its train scores.
 
 The function orients each measure before it reduces the vector. So a vector whose measures disagree on orientation gives a score with one orientation, and [`bigger_is_better`](@ref) of the vector is never read. Because the values are oriented, [`MaxScalariser`](@ref) and [`MaxValue`](@ref) give the score of the best measure, and [`MinScalariser`](@ref) and [`MinValue`](@ref) give the score of the worst. The function reads every reduction as "higher is better", so [`StdValue`](@ref) gives the highest score to the largest spread.
 
@@ -63,8 +67,8 @@ o_k &= \\begin{cases} 1 & \\mathcal{R}_k \\ \\mathrm{bigger\\ is\\ better} \\\\ 
 
 Where:
 
-  - ``\\mathcal{O}(P)``: Oriented score of the prediction ``P``. The first line is the case of one measure, and the second line the case of a vector.
-  - ``\\mathcal{R}(P)``, ``\\mathcal{R}_k(P)``: Expected risk of ``P`` under the measure, or under the ``k``-th measure of the vector.
+  - ``\\mathcal{O}(P)``: Oriented score of the prediction or the fitted result ``P``. The first line is the case of one measure, and the second line the case of a vector.
+  - ``\\mathcal{R}(P)``, ``\\mathcal{R}_k(P)``: Expected risk of ``P`` under the measure, or under the ``k``-th measure of the vector. For a fitted result, it is the risk over its training sample.
   - ``o``, ``o_k``: Orientation of the measure, from [`bigger_is_better`](@ref).
   - $(math_dict[:s_k_scale]) A negative scale is a negative weight, so that measure counts against the score.
   - ``S``: The reduction `sca`.
@@ -74,13 +78,16 @@ One measure ignores `sca` and its scale, as [`expected_risk`](@ref) does.
 
 # Algorithm
 
- 1. One measure: return ``o \\, \\mathcal{R}(P)``, with ``\\mathcal{R}(P)`` from [`expected_risk`](@ref) with `kwargs`.
- 2. A vector: read the return series of ``P`` once with [`prediction_returns`](@ref), and score that series with [`oriented_returns_score`](@ref) with `kwargs`. That function computes ``o_k s_k \\mathcal{R}_k(P)`` for each measure, and reduces the values by the type of `sca`.
+ 1. One measure: return ``o \\, \\mathcal{R}(P)``, with ``\\mathcal{R}(P)`` from [`expected_risk`](@ref) with `kwargs`, through [`oriented_value`](@ref).
+ 2. A vector of a prediction: read the return series of ``P`` once with [`prediction_returns`](@ref). A vector of a fitted result: take `res` and `X`.
+ 3. Score the sample of step 2 with [`reduce_member_scores`](@ref) with `kwargs`. That function computes ``o_k s_k \\mathcal{R}_k(P)`` for each measure, and reduces the values by the type of `sca`.
 
 # Arguments
 
   - `r`: One risk measure, or a vector of them.
   - `p`: A prediction of one fold, a [`PredictionResult`](@ref), or of one path, a [`MultiPeriodPredictionResult`](@ref).
+  - `res`: A fitted result.
+  - `X`: The training returns of `res`, or `nothing` to score `res` through its prior result.
   - `sca`: The reduction of a vector. A [`VectorToScalarMeasure`](@ref) or a function must take a vector of numbers.
   - `kwargs...`: Keyword arguments forwarded to [`expected_risk`](@ref).
 
@@ -93,14 +100,14 @@ One measure ignores `sca` and its scale, as [`expected_risk`](@ref) does.
   - [`Sca_VecToScaM`](@ref)
   - [`bigger_is_better`](@ref)
   - [`prediction_returns`](@ref)
-  - [`oriented_returns_score`](@ref)
+  - [`reduce_member_scores`](@ref)
   - [`sort_by_measure`](@ref): sorts the paths of a population by this score.
   - [`quantile_by_measure`](@ref): selects a path by the quantile of the negated score.
+  - [`candidate_train_score`](@ref): the train score of a search, through the form for a fitted result.
 """
 function oriented_score(::Option{<:Sca_VecToScaM}, r::AbstractBaseRiskMeasure,
                         p::PredRes_MultiPredRes; kwargs...)
-    x = expected_risk(r, p; kwargs...)
-    return bigger_is_better(r) ? x : -x
+    return oriented_value(r, expected_risk(r, p; kwargs...))
 end
 #=
 The orientation is a trait of the type, so the compiler drops each branch on it, and a
@@ -114,21 +121,57 @@ prediction, such as `ExpectedReturn`, still refuses it.
 =#
 function oriented_score(sca::Option{<:Sca_VecToScaM}, rs::VecBaseRM,
                         p::PredRes_MultiPredRes; kwargs...)
-    return oriented_returns_score(sca, rs, prediction_returns(p); kwargs...)
+    return reduce_member_scores(sca, rs, (prediction_returns(p),); kwargs...)
+end
+#=
+A fitted result is scored once per fold, for a train score, so the vector form passes the
+result to each member. Each member then resolves the result exactly as one measure does,
+through `expected_risk(r, res, X)`: the investable view, the prior result and a Deferred
+Quantity. The box of the result on each member call is paid by a vector alone.
+=#
+function oriented_score(::Option{<:Sca_VecToScaM}, r::AbstractBaseRiskMeasure,
+                        res::OptimisationResult, X::Option{<:MatNum} = nothing; kwargs...)
+    return oriented_value(r, expected_risk(r, res, X; kwargs...))
+end
+function oriented_score(sca::Option{<:Sca_VecToScaM}, rs::VecBaseRM,
+                        res::OptimisationResult, X::Option{<:MatNum} = nothing; kwargs...)
+    return reduce_member_scores(sca, rs, (res, X); kwargs...)
 end
 """
-    oriented_returns_score(sca::Scalariser, rs::VecBaseRM, X::VecNum; kwargs...)
-    oriented_returns_score(sca::Union{VectorToScalarMeasure, Function}, rs::VecBaseRM,
-                           X::VecNum; kwargs...)
-    oriented_returns_score(sca::Nothing, rs::VecBaseRM, X::VecNum; kwargs...)
+    oriented_value(r::AbstractBaseRiskMeasure, x)
 
-Score a return series under a vector of risk measures, so that a higher score is always better.
+Orient the value `x` of the risk measure `r`, so that a higher value is better.
 
-It is the score ``\\mathcal{O}`` of [`oriented_score`](@ref) for a vector, on a series and not on a prediction. [`oriented_score`](@ref) calls it on the series of a prediction. [`FoldRiskScorer`](@ref) calls it on the returns of one asset over one test window.
+# Arguments
+
+  - `r`: The risk measure of `x`.
+  - `x`: A value of `r`.
+
+# Returns
+
+  - `x`: `x` when [`bigger_is_better`](@ref) holds for `r`, and `-x` otherwise. The orientation is a trait of the type of `r`, so the compiler drops the branch.
+
+# Related
+
+  - [`oriented_score`](@ref)
+  - [`oriented_member_score`](@ref)
+"""
+function oriented_value(r::AbstractBaseRiskMeasure, x)
+    return bigger_is_better(r) ? x : -x
+end
+"""
+    reduce_member_scores(sca::Scalariser, rs::VecBaseRM, src::Tuple; kwargs...)
+    reduce_member_scores(sca::Union{VectorToScalarMeasure, Function}, rs::VecBaseRM,
+                         src::Tuple; kwargs...)
+    reduce_member_scores(sca::Nothing, rs::VecBaseRM, src::Tuple; kwargs...)
+
+Score each member of a vector of risk measures on one sample, so that a higher score is always better, and reduce the scores by the type of `sca`.
+
+It is the score ``\\mathcal{O}`` of [`oriented_score`](@ref) for a vector, on a sample and not on a prediction. `src` is the sample that each member reads, in the arguments of [`oriented_member_score`](@ref) after the measure. The vector methods of [`oriented_score`](@ref) call it on the return series of a prediction, `(X,)`, and on a fitted result and its training returns, `(res, X)`. [`FoldRiskScorer`](@ref) calls it on the returns of one asset over one test window.
 
 # Algorithm
 
- 1. Compute ``o_k s_k \\mathcal{R}_k`` for each measure on `X`, with [`oriented_member_score`](@ref) with `kwargs`.
+ 1. Compute ``o_k s_k \\mathcal{R}_k`` for each measure on `src`, with [`oriented_member_score`](@ref) with `kwargs`.
  2. Reduce the values of step 1 by the type of `sca`:
      1. A [`Scalariser`](@ref): through [`scalarise`](@ref).
      2. A [`VectorToScalarMeasure`](@ref) or a function: collect the values into a vector, and apply [`vec_to_real_measure`](@ref).
@@ -136,55 +179,63 @@ It is the score ``\\mathcal{O}`` of [`oriented_score`](@ref) for a vector, on a 
 
 # Arguments
 
-  - `sca`: The reduction of the vector. A [`VectorToScalarMeasure`](@ref) or a function must take a vector of numbers.
+  - `sca`: The reduction. A [`VectorToScalarMeasure`](@ref) or a function must take a vector of numbers.
   - `rs`: The vector of risk measures.
-  - `X`: The return series.
-  - `kwargs...`: Keyword arguments forwarded to [`expected_risk_from_returns`](@ref).
+  - `src`: The sample, a tuple.
+  - `kwargs...`: Keyword arguments forwarded to [`oriented_member_score`](@ref).
 
 # Returns
 
-  - `score::Number`: The oriented score. Under `sca = nothing`, `scores::Vector`, one oriented score for each measure.
+  - `score::Number`: The reduced score, through [`scalarise`](@ref) for a [`Scalariser`](@ref), and through [`vec_to_real_measure`](@ref) for a [`VectorToScalarMeasure`](@ref) or a function.
+  - `scores::AbstractVector`: Under `sca = nothing`, one score for each member.
 
 # Related
 
   - [`oriented_score`](@ref)
   - [`oriented_member_score`](@ref)
 """
-function oriented_returns_score(sca::Scalariser, rs::VecBaseRM, X::VecNum; kwargs...)
-    return scalarise(r -> oriented_member_score(r, X; kwargs...), sca, rs)
+function reduce_member_scores(sca::Scalariser, rs::VecBaseRM, src::Tuple; kwargs...)
+    return scalarise(r -> oriented_member_score(r, src...; kwargs...), sca, rs)
 end
-function oriented_returns_score(sca::Union{VectorToScalarMeasure, Function}, rs::VecBaseRM,
-                                X::VecNum; kwargs...)
-    return vec_to_real_measure(sca, oriented_returns_score(nothing, rs, X; kwargs...))
+function reduce_member_scores(sca::Union{VectorToScalarMeasure, Function}, rs::VecBaseRM,
+                              src::Tuple; kwargs...)
+    return vec_to_real_measure(sca, reduce_member_scores(nothing, rs, src; kwargs...))
 end
-function oriented_returns_score(::Nothing, rs::VecBaseRM, X::VecNum; kwargs...)
-    return map(r -> oriented_member_score(r, X; kwargs...), rs)
+function reduce_member_scores(::Nothing, rs::VecBaseRM, src::Tuple; kwargs...)
+    return map(r -> oriented_member_score(r, src...; kwargs...), rs)
 end
 """
     oriented_member_score(r::AbstractBaseRiskMeasure, X::VecNum; kwargs...)
+    oriented_member_score(r::AbstractBaseRiskMeasure, res::OptimisationResult,
+                          X::Option{<:MatNum}; kwargs...)
 
-Score one member of a vector of risk measures on a return series, oriented so that a higher value is better and multiplied by its scale.
+Score one member of a vector of risk measures on a return series, or a fitted result over its training sample, oriented so that a higher value is better and multiplied by its scale.
 
-It is the value ``o_k s_k \\mathcal{R}_k(P)`` of [`oriented_score`](@ref), which reduces these values of a vector. [`oriented_returns_score`](@ref) calls this function once for each member, on one return series.
+It is the value ``o_k s_k \\mathcal{R}_k(P)`` of [`oriented_score`](@ref), which reduces these values of a vector. [`reduce_member_scores`](@ref) calls this function once for each member, on one sample.
 
 # Arguments
 
   - `r`: One member of the vector.
-  - `X`: The return series of the prediction.
-  - `kwargs...`: Keyword arguments forwarded to [`expected_risk_from_returns`](@ref).
+  - `X`: The return series of the prediction. In the second form, the training returns of `res`, or `nothing` to score `res` through its prior result.
+  - `res`: A fitted result.
+  - `kwargs...`: Keyword arguments forwarded to [`expected_risk_from_returns`](@ref), or to [`expected_risk`](@ref) for a fitted result.
 
 # Returns
 
-  - `score::Number`: The value of `r` on `X`, multiplied by `-1` when [`bigger_is_better`](@ref) does not hold for `r`, and by `r.settings.scale`.
+  - `score::Number`: The value of `r`, multiplied by `-1` when [`bigger_is_better`](@ref) does not hold for `r`, and by `r.settings.scale`.
 
 # Related
 
   - [`oriented_score`](@ref)
+  - [`oriented_value`](@ref)
   - [`prediction_returns`](@ref)
 """
 function oriented_member_score(r::AbstractBaseRiskMeasure, X::VecNum; kwargs...)
-    x = expected_risk_from_returns(r, X; kwargs...)
-    return (bigger_is_better(r) ? x : -x) * r.settings.scale
+    return oriented_value(r, expected_risk_from_returns(r, X; kwargs...)) * r.settings.scale
+end
+function oriented_member_score(r::AbstractBaseRiskMeasure, res::OptimisationResult,
+                               X::Option{<:MatNum}; kwargs...)
+    return oriented_value(r, expected_risk(r, res, X; kwargs...)) * r.settings.scale
 end
 """
     prediction_returns(p::PredictionResult)

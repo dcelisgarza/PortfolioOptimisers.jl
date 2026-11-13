@@ -687,6 +687,95 @@ The fixture is the online fold loop's, because the identities are structural.
         full = optimise(mr, rows(rd, cvr.train_idx[1]))
         @test expected_risk(r, full) == expected_risk(r, full.w, full.pr)
     end
+
+    @testset "13. A vector of risk measures reduces in each fold through `r_sca` (#1998)" begin
+        # Each score orients each measure before `r_sca` reduces the vector, so a vector
+        # whose measures disagree on orientation has one score, and a higher score is
+        # better. The hand formula negates the measure of which a smaller value is better.
+        rv = [ConditionalValueatRisk(), MeanReturn()]
+        oriented(f, x) = f([-expected_risk(rv[1], x), expected_risk(rv[2], x)])
+        l1 = po.parse_lens("opt.l1")
+        kcv = KFold(; n = 4)
+        kcvr = split(kcv, rd)
+        for (sca, f) in
+            ((SumScalariser(), sum), (MaxScalariser(), maximum), (MedianValue(), median),
+             (minimum, minimum))
+            res = search_cross_validation(mr,
+                                          gs(kcv, jgrid; r = rv, r_sca = sca,
+                                             train_score = true), rd)
+            for (i, val) in enumerate(jgrid[1][2]), j in eachindex(kcvr.train_idx)
+                pred = po.fit_and_predict(Accessors.set(mr, l1, val), rd, kcvr.train_idx[j],
+                                          kcvr.test_idx[j])
+                @test res.test_scores[j, i] == oriented(f, pred)
+                @test res.train_scores[j, i] == oriented(f, pred.res)
+            end
+        end
+        # The combinatorial form writes one score per path, and one train score per fold
+        # of each path.
+        ccv = CombinatorialCrossValidation(; n_folds = 4, n_test_folds = 2)
+        res = search_cross_validation(mr,
+                                      gs(ccv, jgrid; r = rv, r_sca = MaxScalariser(),
+                                         train_score = true, ex = FLoops.SequentialEx()),
+                                      rd)
+        for (i, val) in enumerate(jgrid[1][2])
+            pp = po.fit_and_predict(Accessors.set(mr, l1, val), rd, ccv)
+            @test res.test_scores[:, i] == [oriented(maximum, path) for path in pp.pred]
+            for (q, path) in enumerate(pp.pred)
+                @test res.train_scores[q][:, i] ==
+                      [oriented(maximum, fp.res) for fp in path.pred]
+            end
+        end
+        # For one measure the slot is inert: no number moves, batch or combinatorial.
+        for cv in (kcv, ccv)
+            a = search_cross_validation(mr, gs(cv, jgrid; train_score = true), rd)
+            b = search_cross_validation(mr,
+                                        gs(cv, jgrid; r_sca = MaxScalariser(),
+                                           train_score = true), rd)
+            @test a.test_scores == b.test_scores
+            @test a.train_scores == b.train_scores
+            @test a.idx == b.idx
+        end
+        # The randomised search forwards `r_sca` to the grid search of its trials.
+        rgrid = ["opt.l1" => [0.0002, 0.0005, 0.002, 0.005]]
+        rr = search_cross_validation(mr,
+                                     RandomisedSearchCrossValidation(rgrid; cv = kcv,
+                                                                     r = rv,
+                                                                     r_sca = MaxScalariser(),
+                                                                     n_iter = 2, seed = 3),
+                                     rd)
+        rg = search_cross_validation(mr,
+                                     gs(kcv, [["opt.l1" => [v[1]]] for v in rr.val_grid];
+                                        r = rv, r_sca = MaxScalariser()), rd)
+        @test rr.test_scores == rg.test_scores
+        # The reduction is the field `r_sca`, so both constructors refuse it in `kwargs`.
+        for err in (try
+                        GridSearchCrossValidation(jgrid; kwargs = (; sca = MaxScalariser()))
+                        nothing
+                    catch e
+                        e
+                    end,
+                    try
+                        RandomisedSearchCrossValidation(rgrid; kwargs = (; sca = MaxScalariser()))
+                        nothing
+                    catch e
+                        e
+                    end)
+            @test isa(err, ConflictingArgumentError)
+            @test occursin("r_sca", sprint(showerror, err))
+        end
+        # The form of `oriented_score` for a fitted result: through its prior result, or
+        # over a matrix of training returns, for one measure and for a vector.
+        fit = optimise(mr, rows(rd, kcvr.train_idx[1]))
+        Xt = view(rd.X, kcvr.train_idx[1], :)
+        @test po.oriented_score(nothing, r, fit) == -expected_risk(r, fit)
+        @test po.oriented_score(SumScalariser(), r, fit, Xt) == -expected_risk(r, fit, Xt)
+        @test po.oriented_score(MaxScalariser(), rv, fit) ==
+              max(-expected_risk(rv[1], fit), expected_risk(rv[2], fit))
+        @test po.oriented_score(MedianValue(), rv, fit, Xt) ==
+              median([-expected_risk(rv[1], fit, Xt), expected_risk(rv[2], fit, Xt)])
+        @test po.oriented_score(SumScalariser(), rv, fit, Xt) ==
+              -expected_risk(rv[1], fit, Xt) + expected_risk(rv[2], fit, Xt)
+    end
 end
 #=
 A search tunes a field of a prior with forwarded properties, issue #1497.

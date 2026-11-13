@@ -85,7 +85,12 @@ Four facts bore on the answer.
   one measure is the `sgn` that the search applied before.
 - **A call that uses no new capability costs what it cost before.** The type of `r_sca` decides
   the shape, so the compiler picks the method of the allocator and of the writer, and a search of
-  one measure keeps one matrix.
+  one measure keeps one matrix. #1998 measured the old and the new bodies of the writer, the
+  allocator and the vector score in one slotted process, for `ConditionalValueatRisk` and
+  `MeanReturn`, with and without train scores, batch and combinatorial, at 160 × 8 and
+  2000 × 50. The allocations were equal or lower in every case. The times were equal within
+  noise: the three cases whose first sample was slower gave the same minimum over five
+  alternated rounds.
 
 This ADR changes the form of the score in ADR 0231: the keyword form of `oriented_score` is
 removed.

@@ -250,8 +250,7 @@ unique_key_dict!(math_dict, :math_dict,
                  :S_C_search => "``\\mathbf{S}_{:,\\,\\mathcal{C}}``: Finite columns, the columns of ``\\mathbf{S}`` at the finite candidates, in grid order.",#
                  :c_j_search => "``c_j``: Finite candidate ``j``, the ``j``-th smallest entry of ``\\mathcal{C}``.",#
                  :theta_i_cand => "``\\theta_i``: Candidate ``i``, the estimator with each tuned parameter set to its value at grid point ``i``. Column ``i`` of every score matrix belongs to it.",#
-                 :s_orient_search => "``s \\in \\{1, -1\\}``: Orientation of the score, ``1`` when [`bigger_is_better`](@ref) holds for `r` and ``-1`` otherwise, so a higher score is always better.",#
-                 :R_search => "``\\mathcal{R}``: Expected risk under `r`, as [`expected_risk`](@ref) computes it with the keyword arguments `kwargs`.",#
+                 :O_search => "``\\mathcal{O}``: Oriented score under `r`, from [`oriented_score`](@ref) with the reduction `r_sca` and the keyword arguments `kwargs`. Each measure is oriented so that a higher score is always better, and `r_sca` reduces a vector of measures to one score. For one measure, ``\\mathcal{O}`` is its expected risk, negated when a smaller value is better.",#
                  :C_finite_cand => "``\\mathcal{C}``: Finite candidates, the candidates whose every score is finite. A failed fold scores `NaN`, so a candidate that failed one is not in ``\\mathcal{C}``.",#
                  :sigma_scorer => "``\\sigma``: Search scorer `scorer`, a map from a score matrix to the position of its best column. The default [`HighestMeanScore`](@ref) takes the column of greatest mean.",#
                  :v_cand_scores => "``v``: Value per candidate of the scorer, [`candidate_scores`](@ref), one entry per column of the matrix that it receives, bigger is better.",#

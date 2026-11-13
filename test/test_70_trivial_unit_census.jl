@@ -187,7 +187,8 @@ end
                                 # Private names that are simple and convenient.
                                 :cv_sequential_info => "the one message of the sequential fold loop, named beside the rule that sends a run there",
                                 :_expr_to_lens => "the base case of the lens-building recursion of `expr_to_lens_chain`",
-                                :attribution_no_errors => "the empty answer of an attribution, named where the Result reads three fields from it")
+                                :attribution_no_errors => "the empty answer of an attribution, named where the Result reads three fields from it",
+                                :no_head_block => "the resolver of the block of a bare head, passed as a function value to `resolve_block_entry`, which takes `f` and its arguments and not a closure, so that no variable of the entry is boxed")
 
     # ------------------------------------------------------------- the type census
 

@@ -106,7 +106,7 @@ Each candidate runs through [`fit_and_predict`](@ref), the fold loop of every cr
 
 ```math
 \\begin{align}
-S_{fi} &= s \\, \\mathcal{R}\\left(\\hat{P}_{f}(\\theta_i)\\right)\\,, \\quad f = 1, \\ldots, F\\,, \\quad \\theta_i \\in \\Theta\\,, \\\\
+S_{fi} &= \\mathcal{O}\\left(\\hat{P}_{f}(\\theta_i)\\right)\\,, \\quad f = 1, \\ldots, F\\,, \\quad \\theta_i \\in \\Theta\\,, \\\\
 \\mathcal{C} &= \\left\\{ i : S_{fi} \\text{ is finite for every } f \\right\\}\\,, \\\\
 i^{\\star} &= c_{\\sigma\\left(\\mathbf{S}_{:,\\,\\mathcal{C}}\\right)}\\,.
 \\end{align}
@@ -119,8 +119,7 @@ Where:
   - $(math_dict[:F_folds_search])
   - $(math_dict[:theta_i_cand])
   - $(math_dict[:Theta_grid])
-  - $(math_dict[:s_orient_search])
-  - $(math_dict[:R_search])
+  - $(math_dict[:O_search])
   - $(math_dict[:C_finite_cand])
   - $(math_dict[:S_C_search])
   - $(math_dict[:c_j_search])
@@ -137,19 +136,18 @@ A candidate that failed one fold is never selected, whatever the scorer computes
  4. Fix the folds through [`pin_draw`](@ref), giving `scheme`. A scheme whose `split` draws at random then scores every candidate on the same folds.
  5. Split `rd` by `scheme`, giving `cv`.
  6. Read the rows of the folds through [`score_rows`](@ref), giving `rows`.
- 7. Set `sgn` to ``s``.
- 8. Allocate `test_scores`, of size `M × N` for `M` folds and `N` candidates, with the element type of `rd.X`. When `gscv.train_score` is `true`, allocate `train_scores` of the same size.
- 9. When `gscv.train_score` is `true`, view the training returns of each fold through [`fold_train_returns`](@ref), giving `train_X`.
-10. For each candidate `i`, in parallel over `gscv.ex`, do steps 11 to 13.
-11. Build `opti` through [`search_candidate`](@ref).
-12. Fit and predict `opti` over `scheme` through [`fit_and_predict`](@ref), with the folds in sequence, giving `predictions`.
-13. Write column `i` of `test_scores` and `train_scores` through [`write_candidate_scores!`](@ref).
-14. Order the finite candidates, keep the best `gscv.n_best`, build each from `opt`, and return the [`SearchCrossValidationResult`](@ref) through [`search_result`](@ref). The path of each row is [`score_path_ids`](@ref) of `cv`.
+ 7. Allocate `test_scores`, of size `M × N` for `M` folds and `N` candidates, with the element type of `rd.X`, through [`allocate_search_scores`](@ref). When `gscv.train_score` is `true`, it allocates `train_scores` of the same size.
+ 8. When `gscv.train_score` is `true`, view the training returns of each fold through [`fold_train_returns`](@ref), giving `train_X`.
+ 9. For each candidate `i`, in parallel over `gscv.ex`, do steps 10 to 12.
+10. Build `opti` through [`search_candidate`](@ref).
+11. Fit and predict `opti` over `scheme` through [`fit_and_predict`](@ref), with the folds in sequence, giving `predictions`.
+12. Write ``\\mathcal{O}`` of each fold into column `i` of `test_scores` and `train_scores` through [`write_candidate_scores!`](@ref).
+13. Order the finite candidates, keep the best `gscv.n_best`, build each from `opt`, and return the [`SearchCrossValidationResult`](@ref) through [`search_result`](@ref). The path of each row is [`score_path_ids`](@ref) of `cv`.
 
 # Arguments
 
   - `opt`: The estimator to tune. The search reads it as configuration alone.
-  - `gscv`: The grid search. It gives the grid `p`, the scheme `cv`, the risk measure `r`, the `scorer`, the executor `ex`, the `train_score` flag and the keyword arguments `kwargs` of [`expected_risk`](@ref).
+  - `gscv`: The grid search. It gives the grid `p`, the scheme `cv`, the risk measures `r` and their reduction `r_sca`, the `scorer`, the executor `ex`, the `train_score` flag and the keyword arguments `kwargs` of [`oriented_score`](@ref).
   - $(arg_dict[:rd])
 
 # Validation
@@ -161,7 +159,7 @@ A candidate that failed one fold is never selected, whatever the scorer computes
 
 # Returns
 
-  - `res::SearchCrossValidationResult`: The field `test_scores` is ``\\mathbf{S}``. It is the raw matrix, with `NaN` at a failed fold, so its columns agree with the grid and a reader sees which fold failed. Row ``f`` is fold ``f`` in the order of `split`. Under a [`MultipleRandomised`](@ref), [`score_rows`](@ref) puts the scores of each path back onto the rows of the split. The field `train_scores` holds ``s \\, \\mathcal{R}`` of each fitted result over its own training window, in a matrix of the same size, or `nothing` when `gscv.train_score` is `false`. The field `opt` is candidate ``i^{\\star}``, and `idx` is ``i^{\\star}``.
+  - `res::SearchCrossValidationResult`: The field `test_scores` is ``\\mathbf{S}``. It is the raw matrix, with `NaN` at a failed fold, so its columns agree with the grid and a reader sees which fold failed. Row ``f`` is fold ``f`` in the order of `split`. Under a [`MultipleRandomised`](@ref), [`score_rows`](@ref) puts the scores of each path back onto the rows of the split. The field `train_scores` holds ``\\mathcal{O}`` of each fitted result over its own training window, in a matrix of the same size, or `nothing` when `gscv.train_score` is `false`. The field `opt` is candidate ``i^{\\star}``, and `idx` is ``i^{\\star}``.
 
 # Related
 
@@ -187,14 +185,7 @@ function search_cross_validation(opt::NonFiniteAllocationOptimisationEstimator,
     rows = score_rows(cv)
     N = length(val_grid)
     M = length(cv.train_idx)
-    r = gscv.r
-    sgn = ifelse(bigger_is_better(r), 1, -1)
-    test_scores = Matrix{eltype(rd.X)}(undef, M, N)
-    train_scores = if gscv.train_score
-        Matrix{eltype(rd.X)}(undef, M, N)
-    else
-        nothing
-    end
+    test_scores, train_scores = allocate_search_scores(gscv, eltype(rd.X), M, M, N)
     # One view per fold, built once for the whole search rather than per candidate. It is
     # read only for a result that holds no prior result of its own; see
     # [`candidate_train_score`](@ref).
@@ -212,7 +203,7 @@ function search_cross_validation(opt::NonFiniteAllocationOptimisationEstimator,
             local predictions = fit_and_predict(opti, rd, scheme;
                                                 ex = FLoops.SequentialEx())
             write_candidate_scores!(test_scores, train_scores, i, predictions, rows,
-                                    train_X, r, sgn, gscv.kwargs)
+                                    train_X, gscv.r_sca, gscv.r, gscv.kwargs)
         end
     end
     return search_result(opt, gscv, test_scores, train_scores, lens_grid, val_grid,
@@ -225,13 +216,13 @@ end
 
 Tune `opt` over the grid of `gscv` under a [`CombinatorialCrossValidation`](@ref), with one score per candidate and backtest path.
 
-A combinatorial scheme recombines its disjoint test groups into full backtest paths, and a split scored alone mixes the groups of different paths. So this method scores each path. For each candidate, the scheme runs through [`fit_and_predict`](@ref), [`sort_predictions`](@ref) recombines the groups into a [`PopulationPredictionResult`](@ref), and [`expected_risk`](@ref) gives one score per path. The candidates run in sequence, and the fold loop of each candidate runs with the executor `gscv.ex`.
+A combinatorial scheme recombines its disjoint test groups into full backtest paths, and a split scored alone mixes the groups of different paths. So this method scores each path. For each candidate, the scheme runs through [`fit_and_predict`](@ref), [`sort_predictions`](@ref) recombines the groups into a [`PopulationPredictionResult`](@ref), and [`oriented_score`](@ref) gives one score per path. The candidates run in sequence, and the fold loop of each candidate runs with the executor `gscv.ex`.
 
 # Mathematical definition
 
 ```math
 \\begin{align}
-S_{pi} &= s \\, \\mathcal{R}\\left(\\hat{P}_{p}(\\theta_i)\\right)\\,, \\quad p = 1, \\ldots, n_{p}\\,, \\quad \\theta_i \\in \\Theta\\,, \\\\
+S_{pi} &= \\mathcal{O}\\left(\\hat{P}_{p}(\\theta_i)\\right)\\,, \\quad p = 1, \\ldots, n_{p}\\,, \\quad \\theta_i \\in \\Theta\\,, \\\\
 \\mathcal{C} &= \\left\\{ i : S_{pi} \\text{ is finite for every } p \\right\\}\\,, \\\\
 i^{\\star} &= c_{\\sigma\\left(\\mathbf{S}_{:,\\,\\mathcal{C}}\\right)}\\,.
 \\end{align}
@@ -244,8 +235,7 @@ Where:
   - $(math_dict[:n_p_search])
   - $(math_dict[:theta_i_cand])
   - $(math_dict[:Theta_grid])
-  - $(math_dict[:s_orient_search])
-  - $(math_dict[:R_search])
+  - $(math_dict[:O_search])
   - $(math_dict[:C_finite_cand])
   - $(math_dict[:S_C_search])
   - $(math_dict[:c_j_search])
@@ -261,20 +251,18 @@ A candidate that failed one path is never selected, whatever the scorer computes
  3. Run the entry checks of [`cross_val_predict`](@ref) on every candidate through [`assert_search_candidates`](@ref), before any candidate is scored.
  4. Split `rd` by `gscv.cv`, giving `cv`.
  5. Set `M`, the count of the paths, to the greatest entry of `cv.path_ids`.
- 6. Set `sgn` to ``s``.
- 7. Allocate `test_scores`, of size `M × N` for `N` candidates, with the element type of `rd.X`. When `gscv.train_score` is `true`, allocate `train_scores`, one matrix per path, with one row per fold of the path and one column per candidate.
- 8. View the training returns of each fold of each path through [`fold_train_returns`](@ref), giving `path_X`. The entries of a path in `cv.path_ids` are read in column order, and the column is the fold, which is the order of the folds in the path that [`sort_predictions`](@ref) gives.
- 9. For each candidate `i`, in sequence, do steps 10 to 13.
-10. Build `opti` through [`search_candidate`](@ref).
-11. Fit and predict `opti` over `gscv.cv` through [`fit_and_predict`](@ref), with the executor `gscv.ex`, giving `predictions`, one path per member.
-12. Write ``s \\, \\mathcal{R}`` of each path of `predictions` into column `i` of `test_scores`.
-13. When `gscv.train_score` is `true`, write the train score of each fold of each path into column `i` of the matrix of that path, through [`candidate_train_score`](@ref) with the view of `path_X`.
-14. Order the finite candidates, keep the best `gscv.n_best`, build each from `opt`, and return the [`SearchCrossValidationResult`](@ref) through [`search_result`](@ref). Row `p` is path `p`, so the path of each row is `1:M`.
+ 6. Allocate `test_scores`, of size `M × N` for `N` candidates, with the element type of `rd.X`, through [`allocate_search_scores`](@ref). When `gscv.train_score` is `true`, it allocates `train_scores`, one matrix per path, with one row per fold of the path and one column per candidate.
+ 7. View the training returns of each fold of each path through [`fold_train_returns`](@ref), giving `path_X`. The entries of a path in `cv.path_ids` are read in column order, and the column is the fold, which is the order of the folds in the path that [`sort_predictions`](@ref) gives.
+ 8. For each candidate `i`, in sequence, do steps 9 to 11.
+ 9. Build `opti` through [`search_candidate`](@ref).
+10. Fit and predict `opti` over `gscv.cv` through [`fit_and_predict`](@ref), with the executor `gscv.ex`, giving `predictions`, one path per member.
+11. Write column `i` through [`write_candidate_scores!`](@ref), with row `p` for path `p`. The test score of each path is ``\\mathcal{O}`` of the path. When `gscv.train_score` is `true`, the train score of each fold of each path goes into column `i` of the matrix of that path, through [`candidate_train_score`](@ref) with the view of `path_X`.
+12. Order the finite candidates, keep the best `gscv.n_best`, build each from `opt`, and return the [`SearchCrossValidationResult`](@ref) through [`search_result`](@ref). Row `p` is path `p`, so the path of each row is `1:M`.
 
 # Arguments
 
   - `opt`: The estimator to tune. The search reads it as configuration alone.
-  - `gscv`: The grid search over a [`CombinatorialCrossValidation`](@ref). It gives the grid `p`, the scheme `cv`, the risk measure `r`, the `scorer`, the executor `ex`, the `train_score` flag and the keyword arguments `kwargs` of [`expected_risk`](@ref).
+  - `gscv`: The grid search over a [`CombinatorialCrossValidation`](@ref). It gives the grid `p`, the scheme `cv`, the risk measures `r` and their reduction `r_sca`, the `scorer`, the executor `ex`, the `train_score` flag and the keyword arguments `kwargs` of [`oriented_score`](@ref).
   - $(arg_dict[:rd])
 
 # Validation
@@ -310,17 +298,12 @@ function search_cross_validation(opt::NonFiniteAllocationOptimisationEstimator,
     cv = split(gscv.cv, rd)
     N = length(val_grid)
     M = maximum(cv.path_ids)          # one score per recombined backtest path
-    r = gscv.r
-    sgn = ifelse(bigger_is_better(r), 1, -1)
-    test_scores = Matrix{eltype(rd.X)}(undef, M, N)
     # Train scores are per fold, and each path holds a different number of folds, so they
     # are kept as one `folds × candidates` matrix per path (a Vector of matrices) rather
     # than collapsed. Test scores stay one per path.
-    train_scores = if gscv.train_score
-        [Matrix{eltype(rd.X)}(undef, count(==(p), cv.path_ids), N) for p in 1:M]
-    else
-        nothing
-    end
+    test_scores, train_scores = allocate_search_scores(gscv, eltype(rd.X), M,
+                                                       [count(==(p), cv.path_ids)
+                                                        for p in 1:M], N)
     # One training view per fold of each path. A combinatorial `path_ids` is a matrix, one
     # row per test block of a fold, so a path's entries are Cartesian and the fold is the
     # **column**. The folds of a path arrive in that order, measured against `res.pr.X` of
@@ -334,16 +317,9 @@ function search_cross_validation(opt::NonFiniteAllocationOptimisationEstimator,
         # Fold-level parallelism happens inside fit_and_predict; the candidate loop is
         # sequential to avoid nested threading.
         predictions = fit_and_predict(opti, rd, gscv.cv; ex = gscv.ex)
-        test_scores[:, i] = sgn * expected_risk(r, predictions; gscv.kwargs...)
-        if gscv.train_score
-            for (p, path) in enumerate(predictions.pred)
-                # A two-argument `map`, not a comprehension that destructures a pair: over
-                # the method's declared signature JET cannot see through that destructuring.
-                train_scores[p][:, i] = map(path.pred, path_X[p]) do fp, X
-                    return sgn * candidate_train_score(r, fp.res, X, gscv.kwargs)
-                end
-            end
-        end
+        # Row `p` is path `p`, so each path writes one test score at its own row.
+        write_candidate_scores!(test_scores, train_scores, i, predictions, 1:M, path_X,
+                                gscv.r_sca, gscv.r, gscv.kwargs)
     end
     return search_result(opt, gscv, test_scores, train_scores, lens_grid, val_grid, 1:M)
 end

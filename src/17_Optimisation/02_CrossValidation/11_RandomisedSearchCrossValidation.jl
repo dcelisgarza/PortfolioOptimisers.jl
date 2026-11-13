@@ -250,7 +250,7 @@ The search draws the trials through [`make_p_grid`](@ref), and runs the search o
 
 ```math
 \\begin{align}
-S_{fi} &= s \\, \\mathcal{R}\\left(\\hat{P}_{f}(\\theta_i)\\right)\\,, \\quad f = 1, \\ldots, F\\,, \\quad \\theta_i \\in \\Theta\\,, \\\\
+S_{fi} &= \\mathcal{O}\\left(\\hat{P}_{f}(\\theta_i)\\right)\\,, \\quad f = 1, \\ldots, F\\,, \\quad \\theta_i \\in \\Theta\\,, \\\\
 \\mathcal{C} &= \\left\\{ i : S_{fi} \\text{ is finite for every } f \\right\\}\\,, \\\\
 i^{\\star} &= c_{\\sigma\\left(\\mathbf{S}_{:,\\,\\mathcal{C}}\\right)}\\,.
 \\end{align}
@@ -263,8 +263,7 @@ Where:
   - $(math_dict[:F_folds_search])
   - $(math_dict[:theta_i_cand])
   - $(math_dict[:Theta_trials])
-  - $(math_dict[:s_orient_search])
-  - $(math_dict[:R_search])
+  - $(math_dict[:O_search])
   - $(math_dict[:C_finite_cand])
   - $(math_dict[:S_C_search])
   - $(math_dict[:c_j_search])
@@ -281,7 +280,7 @@ Where:
 # Arguments
 
   - `opt`: The estimator to tune. The search reads it as configuration alone.
-  - `rscv`: The randomised search. It gives the space `p`, the trial count `n_iter`, the generator `rng` and `seed`, and the fields of a grid search: the scheme `cv`, the risk measure `r`, the `scorer`, the executor `ex`, the `train_score` flag and the keyword arguments `kwargs` of [`expected_risk`](@ref).
+  - `rscv`: The randomised search. It gives the space `p`, the trial count `n_iter`, the generator `rng` and `seed`, and the fields of a grid search: the scheme `cv`, the risk measures `r` and their reduction `r_sca`, the `scorer`, the executor `ex`, the `train_score` flag and the keyword arguments `kwargs` of [`oriented_score`](@ref).
   - $(arg_dict[:rd])
 
 # Validation
@@ -313,6 +312,7 @@ function search_cross_validation(opt::NonFiniteAllocationOptimisationEstimator,
                                    GridSearchCrossValidation(make_p_grid(rscv.p,
                                                                          rscv.n_iter, rng);
                                                              cv = rscv.cv, r = rscv.r,
+                                                             r_sca = rscv.r_sca,
                                                              scorer = rscv.scorer,
                                                              n_best = rscv.n_best,
                                                              ex = rscv.ex,

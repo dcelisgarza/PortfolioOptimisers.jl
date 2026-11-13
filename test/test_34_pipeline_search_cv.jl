@@ -491,6 +491,39 @@
         end
         @test cres.idx == argmax(vec(mean(cres.test_scores; dims = 1)))
         @test cres.opt.steps[2] === cands[cres.idx]
+        # Issue #1998: a vector of risk measures. Each measure is oriented, and `r_sca`
+        # reduces the vector in each fold and in each path.
+        rv = [ConditionalValueatRisk(), MeanReturn()]
+        oriented(x) = max(-expected_risk(rv[1], x), expected_risk(rv[2], x))
+        vres = search_cross_validation(ppipe,
+                                       GridSearchCrossValidation(["opt" => cands]; cv = cv,
+                                                                 r = rv,
+                                                                 r_sca = MaxScalariser(),
+                                                                 train_score = true), pr)
+        vcres = search_cross_validation(pipe,
+                                        GridSearchCrossValidation(["opt" => cands];
+                                                                  cv = ccv, r = rv,
+                                                                  r_sca = MaxScalariser(),
+                                                                  train_score = true), rd)
+        for (i, c) in enumerate(cands)
+            loop = cross_val_predict(Accessors.set(ppipe, pl, c), pr, cv)
+            @test vres.test_scores[:, i] == [oriented(p) for p in loop.pred]
+            @test vres.train_scores[:, i] == [oriented(p.res) for p in loop.pred]
+            preds = cross_val_predict(Accessors.set(pipe, l, c), rd, ccv)
+            @test vcres.test_scores[:, i] == [oriented(path) for path in preds.pred]
+            for (p, path) in enumerate(preds.pred)
+                @test vcres.train_scores[p][:, i] == [oriented(fp.res) for fp in path.pred]
+            end
+        end
+        # The randomised search of a Pipeline forwards `r_sca`.
+        rres = search_cross_validation(ppipe,
+                                       RandomisedSearchCrossValidation(["opt" => cands];
+                                                                       cv = cv, r = rv,
+                                                                       r_sca = MaxScalariser(),
+                                                                       n_iter = 2,
+                                                                       seed = 1), pr)
+        @test sort(vec(mean(rres.test_scores; dims = 1))) ==
+              sort(vec(mean(vres.test_scores; dims = 1)))
     end
 
     # Issue #1937: a Pipeline search keeps its n best candidates by the rule of the optimiser

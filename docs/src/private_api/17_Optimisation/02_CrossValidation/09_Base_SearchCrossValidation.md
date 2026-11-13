@@ -8,6 +8,7 @@ Description = "Base search cross validation, private API of PortfolioOptimisers.
 AbstractSearchCrossValidationEstimator
 CrossValSearchScorer
 assert_search_n_best
+assert_search_reduction
 finite_candidate_order
 search_result
 assert_search_entry
@@ -19,6 +20,8 @@ score_path_ids
 fold_train_returns
 candidate_train_score
 write_candidate_scores!
+allocate_search_scores
+search_score_array
 parse_lens
 assert_search_grid_cap
 _expr_to_lens

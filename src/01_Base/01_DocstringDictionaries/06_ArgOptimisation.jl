@@ -174,6 +174,7 @@ unique_key_dict!(arg_dict, :arg_dict,
                  :q_scorer => "`q`: Quantile level of the population's risks that the selected path is nearest to.",#
                  :r_kwargs => "`r_kwargs`: Keyword arguments forwarded to [`oriented_score`](@ref). It must not contain `sca`, because the reduction of a vector of risk measures is `sca` itself.",#
                  :sca_path => "`sca`: Reduction of the oriented scores of a vector of risk measures in `r` to one score for each path, a [`Sca_VecToScaM`](@ref). Inert when `r` holds one measure, where `nothing` is also admitted. A vector refuses `nothing`, because a path needs one score.",#
+                 :r_sca => "`r_sca`: Reduction of the oriented scores of a vector of risk measures in `r` to one score in each fold or path, a [`Sca_VecToScaM`](@ref), or `nothing` for the sum that [`SumScalariser`](@ref) gives. Inert when `r` holds one measure.",#
                  :q_kwargs => "`q_kwargs`: Keyword arguments forwarded to `Statistics.quantile`, such as its `alpha` and `beta`.",#
                  :p_cv => "`p`: Hyperparameter search grid.",#
                  :wd => "`wd`: Weight drift the fold's return series is read under, or `nothing` to read it at the target weights of the fold.",#

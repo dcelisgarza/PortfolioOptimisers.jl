@@ -610,7 +610,7 @@ end
 
 Refuse a reduction of `nothing` for a vector of risk measures in a [`FoldRiskScorer`](@ref).
 
-Under `nothing`, [`oriented_returns_score`](@ref) of a vector gives one value for each measure. A selector reads one score for each asset, so the scorer refuses it. For one measure the reduction is inert, and `nothing` is admitted. The types of the arguments select the method, so the check makes no test at run time.
+Under `nothing`, [`reduce_member_scores`](@ref) of a vector gives one value for each measure. A selector reads one score for each asset, so the scorer refuses it. For one measure the reduction is inert, and `nothing` is admitted. The types of the arguments select the method, so the check makes no test at run time.
 
 # Arguments
 
@@ -670,7 +670,7 @@ end
 
 Evaluate the risk measure of a [`FoldRiskScorer`](@ref) on each column of one test window.
 
-The method on one measure returns the raw value of each column through [`asset_scores`](@ref), and ignores `sca`. The method on a vector returns the [`oriented_returns_score`](@ref) of each column under `sca`, so a bigger value is better. The constructor of the scorer refuses `nothing` with a vector, so no method takes that pair.
+The method on one measure returns the raw value of each column through [`asset_scores`](@ref), and ignores `sca`. The method on a vector returns the oriented score of each column under `sca`, through [`reduce_member_scores`](@ref), so a bigger value is better. The constructor of the scorer refuses `nothing` with a vector, so no method takes that pair.
 
 # Arguments
 
@@ -690,13 +690,13 @@ The method on one measure returns the raw value of each column through [`asset_s
 
   - [`FoldRiskScorer`](@ref)
   - [`window_bigger_is_better`](@ref)
-  - [`oriented_returns_score`](@ref)
+  - [`reduce_member_scores`](@ref)
 """
 function window_values(::Option{<:Sca_VecToScaM}, r::AbstractBaseRiskMeasure, X::MatNum)
     return asset_scores(r, X)
 end
 function window_values(sca::Sca_VecToScaM, rs::VecBaseRM, X::MatNum)
-    v = [oriented_returns_score(sca, rs, view(X, :, j)) for j in axes(X, 2)]
+    v = [reduce_member_scores(sca, rs, (view(X, :, j),)) for j in axes(X, 2)]
     bad = findall(!isfinite, v)
     @argcheck(isempty(bad),
               DomainError(v,
