@@ -568,9 +568,10 @@ function near_optimal_centering_risks(::Any, r::RiskMeasure, pr::AbstractPriorRe
     risk_max = expected_risk(r, w_max, X, fees)
     return risk_min, risk_opt, risk_max
 end
-function near_optimal_centering_risks(sca::Scalariser, rs::VecRM, pr::AbstractPriorResult,
-                                      fees::Option{<:Fees}, slv::Option{<:Slv_VecSlv},
-                                      w_min::VecNum, w_opt::VecNum_VecVecNum, w_max::VecNum)
+function near_optimal_centering_risks(sca::Option{<:Scalariser}, rs::VecRM,
+                                      pr::AbstractPriorResult, fees::Option{<:Fees},
+                                      slv::Option{<:Slv_VecSlv}, w_min::VecNum,
+                                      w_opt::VecNum_VecVecNum, w_max::VecNum)
     X = pr.X
     rs = factory(rs, pr, slv)
     return scalarise(sca, rs) do r

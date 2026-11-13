@@ -977,7 +977,7 @@ $(DocStringExtensions.FIELDS)
     RiskLoss(;
         r::BaseRM_VecBaseRM = Variance(),
         window::Integer = 20,
-        sca::Scalariser = SumScalariser(),
+        sca::Option{<:Scalariser} = nothing,
         pe::AbstractPriorEstimator = EmpiricalPrior()
     ) -> RiskLoss
 
@@ -1007,7 +1007,7 @@ RiskLoss
          │   ratio_alg ┼ SquareRootRatio()
          │      corner ┴ nothing
   window ┼ Int64: 20
-     sca ┼ SumScalariser()
+     sca ┼ nothing
       pe ┼ EmpiricalPrior
          │           ce ┼ PortfolioOptimisersCovariance
          │              │   ce ┼ Covariance
@@ -1060,7 +1060,8 @@ RiskLoss
     pe
     function RiskLoss(r::T1, window::T2, sca::T3,
                       pe::T4) where {T1 <: BaseRM_VecBaseRM, T2 <: Integer,
-                                     T3 <: Scalariser, T4 <: AbstractPriorEstimator}
+                                     T3 <: Option{<:Scalariser},
+                                     T4 <: AbstractPriorEstimator}
         @argcheck(window >= 2, DomainError(window, "window must be at least 2"))
         path = returns_tracking_path(r)
         @argcheck(isnothing(path),
@@ -1070,7 +1071,7 @@ RiskLoss
     end
 end
 function RiskLoss(; r::BaseRM_VecBaseRM = Variance(), window::Integer = 20,
-                  sca::Scalariser = SumScalariser(),
+                  sca::Option{<:Scalariser} = nothing,
                   pe::AbstractPriorEstimator = EmpiricalPrior())::RiskLoss
     return RiskLoss(r, window, sca, pe)
 end

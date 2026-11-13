@@ -14,7 +14,7 @@ function PortfolioOptimisers.plot_portfolio_dashboard(res::OptimisationResult, r
                                                       percentage::Bool = true,
                                                       alpha::Number = 0.05,
                                                       kappa::Number = 0.3, rw = nothing,
-                                                      sca::Scalariser = SumScalariser(),
+                                                      sca::Option{<:Scalariser} = nothing,
                                                       kwargs...)
     _, w, rd, fees, nx = result_investable_view(res, rd, nothing, nx)
     if isa(rd, ReturnsResult)

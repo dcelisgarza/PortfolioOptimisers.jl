@@ -279,7 +279,7 @@ function plot_stacked_area_composition end
         percentage::Bool = true,
         erc::Bool = true,
         N::Option{<:Number} = nothing,
-        sca::Scalariser = SumScalariser(),
+        sca::Option{<:Scalariser} = nothing,
         kwargs...
     ) -> Plot
     plot_risk_contribution(r, w::VecNum, rd::ReturnsResult, fees = nothing; delta, marginal, percentage, erc, N, sca, kwargs...) -> Plot
@@ -365,7 +365,7 @@ function plot_risk_contribution end
         N::Option{<:Number} = nothing,
         percentage::Bool = true,
         erc::Bool = true,
-        sca::Scalariser = SumScalariser(),
+        sca::Option{<:Scalariser} = nothing,
         kwargs...
     ) -> Plot
     plot_factor_risk_contribution(r, res::OptimisationResult, rd::ReturnsResult; re, delta, N, percentage, erc, sca, kwargs...) -> Plot
@@ -1140,7 +1140,7 @@ function plot_eigenspectrum end
         fees::Option{<:Fees} = nothing;
         ts::AbstractVector = 1:size(X, 1),
         rolling::Integer = 0,
-        sca::Scalariser = SumScalariser(),
+        sca::Option{<:Scalariser} = nothing,
         kwargs...
     ) -> Plot
     plot_rolling_measure(r, w, rd::ReturnsResult, fees = nothing; rolling, sca, kwargs...) -> Plot
@@ -1261,13 +1261,13 @@ function plot_weight_stability end
     plot_cv_scores(
         r::BaseRM_VecBaseRM,
         mpred::MultiPeriodPredictionResult;
-        sca::Scalariser = SumScalariser(),
+        sca::Option{<:Scalariser} = nothing,
         kwargs...
     ) -> Plot
     plot_cv_scores(
         r::BaseRM_VecBaseRM,
         ppred::PopulationPredictionResult;
-        sca::Scalariser = SumScalariser(),
+        sca::Option{<:Scalariser} = nothing,
         kwargs...
     ) -> Plot
 
@@ -1630,7 +1630,7 @@ function plot_cokurtosis end
         alpha::Number = 0.05,
         kappa::Number = 0.3,
         rw = nothing,
-        sca::Scalariser = SumScalariser(),
+        sca::Option{<:Scalariser} = nothing,
         kwargs...
     ) -> Plot
 

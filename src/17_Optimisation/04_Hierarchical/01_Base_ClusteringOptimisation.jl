@@ -288,7 +288,7 @@ $(DocStringExtensions.FIELDS)
     HierarchicalRiskParityResult(;
         hr::HierarchicalResult,
         r::BaseRM_VecBaseRM,
-        sca::Scalariser,
+        sca::Option{<:Scalariser},
         fb::Option{<:OptE_Opt_FbChain}
     ) -> HierarchicalRiskParityResult
 
@@ -313,18 +313,19 @@ Keywords correspond to the struct's fields.
     """
     $(field_dict[:sca_res])
     """
-    sca::Scalariser
+    sca::Option{<:Scalariser}
     """
     $(field_dict[:fb_res])
     """
     fb
     function HierarchicalRiskParityResult(hr::HierarchicalResult, r::BaseRM_VecBaseRM,
-                                          sca::Scalariser, fb::Option{<:OptE_Opt_FbChain})
+                                          sca::Option{<:Scalariser},
+                                          fb::Option{<:OptE_Opt_FbChain})
         return new{typeof(hr), typeof(fb)}(hr, r, sca, fb)
     end
 end
 function HierarchicalRiskParityResult(; hr::HierarchicalResult, r::BaseRM_VecBaseRM,
-                                      sca::Scalariser,
+                                      sca::Option{<:Scalariser},
                                       fb::Option{<:OptE_Opt_FbChain})::HierarchicalRiskParityResult
     return HierarchicalRiskParityResult(hr, r, sca, fb)
 end
@@ -354,8 +355,8 @@ $(DocStringExtensions.FIELDS)
         hr::HierarchicalResult,
         ri::BaseRM_VecBaseRM,
         ro::BaseRM_VecBaseRM,
-        scai::Scalariser,
-        scao::Scalariser,
+        scai::Option{<:Scalariser},
+        scao::Option{<:Scalariser},
         fb::Option{<:OptE_Opt_FbChain}
     ) -> HierarchicalEqualRiskContributionResult
 
@@ -384,26 +385,28 @@ Keywords correspond to the struct's fields.
     """
     $(field_dict[:scai])
     """
-    scai::Scalariser
+    scai::Option{<:Scalariser}
     """
     $(field_dict[:scao])
     """
-    scao::Scalariser
+    scao::Option{<:Scalariser}
     """
     $(field_dict[:fb_res])
     """
     fb
     function HierarchicalEqualRiskContributionResult(hr::HierarchicalResult,
                                                      ri::BaseRM_VecBaseRM,
-                                                     ro::BaseRM_VecBaseRM, scai::Scalariser,
-                                                     scao::Scalariser,
+                                                     ro::BaseRM_VecBaseRM,
+                                                     scai::Option{<:Scalariser},
+                                                     scao::Option{<:Scalariser},
                                                      fb::Option{<:OptE_Opt_FbChain})
         return new{typeof(hr), typeof(fb)}(hr, ri, ro, scai, scao, fb)
     end
 end
 function HierarchicalEqualRiskContributionResult(; hr::HierarchicalResult,
                                                  ri::BaseRM_VecBaseRM, ro::BaseRM_VecBaseRM,
-                                                 scai::Scalariser, scao::Scalariser,
+                                                 scai::Option{<:Scalariser},
+                                                 scao::Option{<:Scalariser},
                                                  fb::Option{<:OptE_Opt_FbChain})::HierarchicalEqualRiskContributionResult
     return HierarchicalEqualRiskContributionResult(hr, ri, ro, scai, scao, fb)
 end

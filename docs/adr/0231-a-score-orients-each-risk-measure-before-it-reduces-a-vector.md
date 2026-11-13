@@ -33,13 +33,13 @@ The readers of a risk do not change.**
 
 | Item | Rule |
 | --- | --- |
-| The readers of a risk | `expected_risk`, its value siblings, the derivative readers and the optimisers keep `sca::Scalariser`. `JuMPOptimiser.sca` keeps `NonHierarchicalScalariser`. `nothing` is not a value of their `sca`. |
+| The readers of a risk | `expected_risk`, its value siblings, the derivative readers and the optimisers keep the family `Scalariser`. `JuMPOptimiser.sca` keeps `NonHierarchicalScalariser`. ADR 0238 lets each of them take `nothing`, which gives the sum. |
 | The score | `oriented_score(sca, r, p; kwargs...)`, internal, in `07_Scoring.jl`. The caller holds the reduction and passes it first. ADR 0232 removes the keyword form `oriented_score(r, p; sca, kwargs...)`, which takes `sca` out of `kwargs`. Build ticket #1997 removes it, and until then the code holds both forms. For member `k` it reads `o_k * expected_risk(r_k, p; kwargs...) * r_k.settings.scale`, with `o_k = 1` when `bigger_is_better(r_k)` holds and `-1` otherwise. |
-| The bound | `const Sca_VecToScaM = Union{Scalariser, VectorToScalarMeasure, Function}`, after the precedent `Num_VecToScaM`. A slot that admits `nothing` binds `Option{<:Sca_VecToScaM}`. The `r_sca` of a search also takes `PerCandidate(sca)` (ADR 0234). A `Number` is not a member, because it gives one score to every candidate. |
+| The bound | `const Sca_VecToScaM = Union{Scalariser, VectorToScalarMeasure, Function}`, after the precedent `Num_VecToScaM`. Every slot binds `Option{<:Sca_VecToScaM}`, with the default `nothing` (ADR 0238). The `r_sca` and `s_sca` of a search also take the per-value singleton of #2001, and `r_sca` takes `PerCandidate(sca)` (ADR 0234). A `Number` is not a member, because it gives one score to every candidate. |
 | The seams | Neither seam changes. A `Scalariser` reduces the values through `scalarise` (ADR 0024). A `VectorToScalarMeasure` or a function reduces the vector of values through `vec_to_real_measure`. |
 | The orientation | Every value is "higher is better" before the reduction. So a vector of mixed orientation has one score, and no outer sign exists. `MaxScalariser` and `MaxValue` give the best member, and `MinScalariser` and `MinValue` the worst. The score reads every reduction as "higher is better", so `StdValue` gives the highest score to the largest spread. |
 | A negative scale | Used as given. It is a negative weight, so that member counts against the score. |
-| `nothing` | Returns the vector of oriented values, so each member keeps its own score. |
+| `nothing` | Gives the sum of the oriented values, as `SumScalariser` does (ADR 0238). The per-value form, which keeps one score for each member, is a singleton of the search (#2001). |
 | One measure | The slot and the scale are inert, as in `expected_risk`. The score is `o * expected_risk(r, p)`. |
 
 The scorers of paths take the score now:
@@ -54,7 +54,7 @@ The scorers of paths take the score now:
 The two searches and `FoldRiskScorer` take the same score in the build tickets of map #1980,
 ticket #1998 for the searches and ticket #1999 for `FoldRiskScorer`. ADR 0232 (#1983) decides
 where a search holds the reduction of its risk measures, its default, and the shape of the scores
-under `nothing`. ADR 0233 (#1984) decides the same for the search scorers, and ADR 0234 (#1985)
+under the per-value form. ADR 0233 (#1984) decides the same for the search scorers, and ADR 0234 (#1985)
 decides the selection when a candidate has more than one value.
 
 ## Considered options

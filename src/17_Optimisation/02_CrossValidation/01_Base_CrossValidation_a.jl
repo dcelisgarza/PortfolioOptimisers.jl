@@ -848,8 +848,8 @@ Represents the outer collection of cross-validation paths, where each inner vect
   - [`CombinatorialCrossValidation`](@ref)
 """
 const VecVecPredRes = AbstractVector{<:VecPredRes}
-function expected_risk(sca::Scalariser, r::BaseRM_VecBaseRM, pred::PredictionResult;
-                       kwargs...)
+function expected_risk(sca::Option{<:Scalariser}, r::BaseRM_VecBaseRM,
+                       pred::PredictionResult; kwargs...)
     return expected_risk_from_returns(sca, r, pred.rd.X; kwargs...)
 end
 """
@@ -1250,7 +1250,7 @@ const VecMPredRes = AbstractVector{<:MultiPeriodPredictionResult}
     compute(res, pred.res; broadcast)
     compute(rd, pred.rd; broadcast)
 end
-function expected_risk(sca::Scalariser, r::BaseRM_VecBaseRM,
+function expected_risk(sca::Option{<:Scalariser}, r::BaseRM_VecBaseRM,
                        mpred::MultiPeriodPredictionResult; kwargs...)
     X = mpred.mrd.X
     return expected_risk_from_returns(sca, r, X; kwargs...)
@@ -1355,10 +1355,11 @@ function PopulationPredictionResult(;
                                                                                                  0))::PopulationPredictionResult
     return PopulationPredictionResult(pred)
 end
-function expected_risk(sca::Scalariser, r::BaseRM_VecBaseRM, preds::VecMPredRes; kwargs...)
+function expected_risk(sca::Option{<:Scalariser}, r::BaseRM_VecBaseRM, preds::VecMPredRes;
+                       kwargs...)
     return [expected_risk(sca, r, pred; kwargs...) for pred in preds]
 end
-function expected_risk(sca::Scalariser, r::BaseRM_VecBaseRM,
+function expected_risk(sca::Option{<:Scalariser}, r::BaseRM_VecBaseRM,
                        ppred::PopulationPredictionResult; kwargs...)
     return [expected_risk(sca, r, p; kwargs...) for p in ppred.pred]
 end
@@ -1367,7 +1368,7 @@ end
 # does. The methods of a `PrRM`, which refuse a prediction, are positional too, so both forms
 # reach them.
 function expected_risk(r::BaseRM_VecBaseRM, p::Union{AbstractPredictionResult, VecMPredRes};
-                       sca::Scalariser = SumScalariser(), kwargs...)
+                       sca::Option{<:Scalariser} = nothing, kwargs...)
     return expected_risk(sca, r, p; kwargs...)
 end
 """
@@ -1442,7 +1443,7 @@ path and [`MaxScalariser`](@ref) by the best.
 
 # Algorithm
 
- 1. Check `sca` and `kwargs` with [`assert_path_reduction`](@ref).
+ 1. Check `kwargs` with [`assert_path_reduction`](@ref).
  2. Keep the successful members of `ppred` with [`successful_members`](@ref).
  3. Compute the oriented score of each member under `r` and `sca` with [`oriented_score`](@ref), giving `rks`.
  4. Sort the members whose `rks` is finite by `rks`, in descending order.
@@ -1457,7 +1458,7 @@ path and [`MaxScalariser`](@ref) by the best.
 
 # Validation
 
-  - `kwargs` must not contain `sca`, and `sca` must not be `nothing` when `r` is a vector, through [`assert_path_reduction`](@ref).
+  - `kwargs` must not contain `sca`, through [`assert_path_reduction`](@ref).
 
 # Returns
 
@@ -1471,7 +1472,7 @@ path and [`MaxScalariser`](@ref) by the best.
 """
 function sort_by_measure(sca::Option{<:Sca_VecToScaM}, ppred::PopulationPredictionResult,
                          r::BaseRM_VecBaseRM; kwargs...)
-    assert_path_reduction(sca, r, kwargs, "kwargs")
+    assert_path_reduction(kwargs, "kwargs")
     pred = successful_members(ppred)
     rks = [oriented_score(sca, r, x; kwargs...) for x in pred]
     fin = isfinite.(rks)
@@ -1491,7 +1492,7 @@ A path whose measure is not finite takes no part. It is dropped before the quant
 
 # Algorithm
 
- 1. Check `sca` and `r_kwargs` with [`assert_path_reduction`](@ref).
+ 1. Check `r_kwargs` with [`assert_path_reduction`](@ref).
  2. Keep the successful members of `ppred` with [`successful_members`](@ref).
  3. Compute the negated oriented score of each member under `r` and `sca` with [`oriented_score`](@ref), giving `rks`.
  4. Drop the members whose `rks` is not finite.
@@ -1509,7 +1510,7 @@ A path whose measure is not finite takes no part. It is dropped before the quant
 
 # Validation
 
-  - `r_kwargs` must not contain `sca`, and `sca` must not be `nothing` when `r` is a vector, through [`assert_path_reduction`](@ref).
+  - `r_kwargs` must not contain `sca`, through [`assert_path_reduction`](@ref).
   - At least one successful member must have a finite measure. With none, `Statistics.quantile` receives an empty vector and throws.
 
 # Returns
@@ -1526,7 +1527,7 @@ function quantile_by_measure(sca::Option{<:Sca_VecToScaM},
                              ppred::PopulationPredictionResult, r::BaseRM_VecBaseRM,
                              q::Real; r_kwargs::NamedTuple = (;),
                              q_kwargs::NamedTuple = (;))
-    assert_path_reduction(sca, r, r_kwargs, "r_kwargs")
+    assert_path_reduction(r_kwargs, "r_kwargs")
     pred = successful_members(ppred)
     rks = [-oriented_score(sca, r, p; r_kwargs...) for p in pred]
     fin = findall(isfinite, rks)

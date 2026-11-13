@@ -258,7 +258,7 @@ end
 function PortfolioOptimisers.plot_rolling_measure(r::PortfolioOptimisers.BaseRM_VecBaseRM,
                                                   ret::VecNum; ts::AbstractVector,
                                                   rolling::Integer = 0,
-                                                  sca::Scalariser = SumScalariser(),
+                                                  sca::Option{<:Scalariser} = nothing,
                                                   kwargs...)
     if !(rolling >= 0)
         throw(DomainError(rolling, "rolling must be >= 0"))

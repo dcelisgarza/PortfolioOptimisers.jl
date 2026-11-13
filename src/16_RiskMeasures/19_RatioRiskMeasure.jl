@@ -134,9 +134,9 @@ $(DocStringExtensions.FIELDS)
     NonOptimisationRiskRatio(;
         settings::HierarchicalRiskMeasureSettings = HierarchicalRiskMeasureSettings(),
         r1::BaseRM_VecBaseRM = Variance(),
-        sca1::Scalariser = SumScalariser(),
+        sca1::Option{<:Scalariser} = nothing,
         r2::BaseRM_VecBaseRM = ConditionalValueatRisk(),
-        sca2::Scalariser = SumScalariser()
+        sca2::Option{<:Scalariser} = nothing
     ) -> NonOptimisationRiskRatio
 
 Keywords correspond to the struct's fields.
@@ -178,7 +178,7 @@ NonOptimisationRiskRatio
            │    mtx_sqrt ┼ EigenFallbackSquareRoot()
            │   ratio_alg ┼ SquareRootRatio()
            │      corner ┴ nothing
-      sca1 ┼ SumScalariser()
+      sca1 ┼ nothing
         r2 ┼ ConditionalValueatRisk
            │   settings ┼ RiskMeasureSettings
            │            │   scale ┼ Float64: 1.0
@@ -186,7 +186,7 @@ NonOptimisationRiskRatio
            │            │     rke ┴ Bool: true
            │      alpha ┼ Float64: 0.05
            │          w ┴ nothing
-      sca2 ┴ SumScalariser()
+      sca2 ┴ nothing
 ```
 
 # Related
@@ -217,8 +217,8 @@ NonOptimisationRiskRatio
     """
     sca2
     function NonOptimisationRiskRatio(settings::HierarchicalRiskMeasureSettings,
-                                      r1::BaseRM_VecBaseRM, sca1::Scalariser,
-                                      r2::BaseRM_VecBaseRM, sca2::Scalariser)
+                                      r1::BaseRM_VecBaseRM, sca1::Option{<:Scalariser},
+                                      r2::BaseRM_VecBaseRM, sca2::Option{<:Scalariser})
         if isa(r1, VecBaseRM)
             @argcheck(!isempty(r1), IsEmptyError("r1 cannot be empty"))
         end
@@ -235,9 +235,9 @@ end
 function NonOptimisationRiskRatio(;
                                   settings::HierarchicalRiskMeasureSettings = HierarchicalRiskMeasureSettings(),
                                   r1::BaseRM_VecBaseRM = Variance(),
-                                  sca1::Scalariser = SumScalariser(),
+                                  sca1::Option{<:Scalariser} = nothing,
                                   r2::BaseRM_VecBaseRM = ConditionalValueatRisk(),
-                                  sca2::Scalariser = SumScalariser())::NonOptimisationRiskRatio
+                                  sca2::Option{<:Scalariser} = nothing)::NonOptimisationRiskRatio
     return NonOptimisationRiskRatio(settings, r1, sca1, r2, sca2)
 end
 # Deferrable slots — see `deferred_slots`. Each side is one measure or a vector of them, and

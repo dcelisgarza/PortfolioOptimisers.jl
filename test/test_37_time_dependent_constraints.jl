@@ -791,7 +791,8 @@ end
             r0 = PortfolioOptimisers.reset_time_dependent_estimator(opt)
             @test r0.pe == EmpiricalPrior()
             @test r0.ret == ArithmeticReturn()
-            @test r0.sca == SumScalariser()
+            # The static default of a scalariser is `nothing`, which gives the sum (#2069).
+            @test isnothing(r0.sca)
             @test isnothing(r0.sets)
             # Per fold: the schedule's entry is swapped in.
             ctx2 = TimeDependentContext(; i = 2, n = 2, rd = rd, train_idx = 1:150,
@@ -805,7 +806,8 @@ end
             # value, so `nothing` stays inadmissible.
             @test_throws TypeError JuMPOptimiser(; slv = slv, pe = nothing)
             @test_throws TypeError JuMPOptimiser(; slv = slv, ret = nothing)
-            @test_throws TypeError JuMPOptimiser(; slv = slv, sca = nothing)
+            # `sca` is `TD_Option`: `nothing` is its default and gives the sum (#2069).
+            @test isnothing(JuMPOptimiser(; slv = slv).sca)
             @test_throws TypeError HierarchicalOptimiser(; cle = nothing)
             @test_throws TypeError HierarchicalOptimiser(; wf = nothing)
             # The constructor test-substitutes each entry, so a wrongly-typed one throws
@@ -1068,7 +1070,7 @@ end
             @test PortfolioOptimisers.time_dependent_fields(hrp) == (:r, :sca)
             hrp0 = PortfolioOptimisers.reset_time_dependent_estimator(hrp)
             @test hrp0.r == Variance()
-            @test hrp0.sca == SumScalariser()
+            @test isnothing(hrp0.sca)
             hrp2 = PortfolioOptimisers.update_time_dependent_estimator(hrp, ctx2)
             @test isa(hrp2.r, ConditionalValueatRisk)
             @test isa(hrp2.sca, MaxScalariser)
@@ -1094,8 +1096,8 @@ end
             herc0 = PortfolioOptimisers.reset_time_dependent_estimator(herc)
             @test herc0.ri == Variance()
             @test herc0.ro == Variance()
-            @test herc0.scai == SumScalariser()
-            @test herc0.scao == SumScalariser()
+            @test isnothing(herc0.scai)
+            @test isnothing(herc0.scao)
             herc2 = PortfolioOptimisers.update_time_dependent_estimator(herc, ctx2)
             @test isa(herc2.ri, ConditionalValueatRisk)
             @test isa(herc2.ro, StandardDeviation)

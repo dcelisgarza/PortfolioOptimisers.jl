@@ -70,7 +70,7 @@ unique_key_dict!(arg_dict, :arg_dict,
                  :r_res => "`r`: The risk measure the optimisation ran under, or a vector of them, stored resolved. Every Deferred Quantity in it is fitted, and every unstated slot holds the prior's field. A resolved measure is fitted state, not configuration, so it belongs on the Result. Pass it back as `expected_risk(res.r, res.w, res.pr; sca = res.sca)`. The type of `r` is not a type parameter of the Result, so the Results of two risk measures have one type, and a verb that reads them compiles one time.",#
                  :obj => "`obj`: Portfolio objective function.",#
                  :wi => "`wi`: Initial portfolio weights for warm-starting the solver.",#
-                 :sca => "`sca`: Scalariser for combining multiple risk measures.",#
+                 :sca => "`sca`: Scalariser for combining multiple risk measures. `nothing` gives the sum of [`SumScalariser`](@ref).",#
                  :sca_res => "`sca`: The scalariser the optimisation ran under, taken from `opt.sca`. Pass it back as `expected_risk(res.r, res.w, res.pr; sca = res.sca)` so the reported figure matches the optimised one. The type of `sca` is not a type parameter, so the Results of two scalarisers have one type, and a verb that reads them compiles one time.",#
                  :wb_jmp => "`wb`: Weight bounds estimator or weight bounds.",#
                  :bgt => "`bgt`: Net budget, `1ᵀw`. A number pins it, a [`BudgetRange`](@ref) bounds it. By default a budget *bounds* the realised exposure and does not pin it, see `xbgt`. With `sbgt`, it fixes the net and gross exposures only together. To constrain the gross exposure alone, see `gbgt`.",#
@@ -173,7 +173,7 @@ unique_key_dict!(arg_dict, :arg_dict,
                  :asset_idx => "`asset_idx`: Asset column indices per fold.",#
                  :q_scorer => "`q`: Quantile level of the population's risks that the selected path is nearest to.",#
                  :r_kwargs => "`r_kwargs`: Keyword arguments forwarded to [`oriented_score`](@ref). It must not contain `sca`, because the reduction of a vector of risk measures is `sca` itself.",#
-                 :sca_path => "`sca`: Reduction of the oriented scores of a vector of risk measures in `r` to one score for each path, a [`Sca_VecToScaM`](@ref). Inert when `r` holds one measure, where `nothing` is also admitted. A vector refuses `nothing`, because a path needs one score.",#
+                 :sca_path => "`sca`: Reduction of the oriented scores of a vector of risk measures in `r` to one score for each path, a [`Sca_VecToScaM`](@ref), or `nothing`, which gives the sum of [`SumScalariser`](@ref). Inert when `r` holds one measure.",#
                  :r_sca => "`r_sca`: Reduction of the oriented scores of a vector of risk measures in `r` to one score in each fold or path, a [`Sca_VecToScaM`](@ref), or `nothing` for the sum that [`SumScalariser`](@ref) gives. Inert when `r` holds one measure.",#
                  :q_kwargs => "`q_kwargs`: Keyword arguments forwarded to `Statistics.quantile`, such as its `alpha` and `beta`.",#
                  :p_cv => "`p`: Hyperparameter search grid.",#
@@ -219,8 +219,8 @@ unique_key_dict!(arg_dict, :arg_dict,
                  :ro_res => "`ro`: The inter-cluster risk measure the optimisation ran under, or a vector of them, stored resolved.",#
                  :hr_core => "`hr`: The [`HierarchicalResult`](@ref) that holds the fields every hierarchical result shares. Each of its properties reads through this result.",#
                  :ro => "`ro`: Outer risk measure.",#
-                 :scai => "`scai`: Inner scalariser.",#
-                 :scao => "`scao`: Outer scalariser.",#
+                 :scai => "`scai`: Inner scalariser. `nothing` gives the sum of [`SumScalariser`](@ref).",#
+                 :scao => "`scao`: Outer scalariser. `nothing` gives the sum of [`SumScalariser`](@ref).",#
                  :params => "`params`: Schur complement bundle, or a vector of bundles whose portfolios the allocation blends.",#
                  :gamma_schur => "`gamma`: Schur complement parameter, in `[0, 1]`. At `0` the recursion augments no block, and with a [`Variance`](@ref) measure the allocation equals that of [`HierarchicalRiskParity`](@ref) under a [`Variance`](@ref) measure. A larger value subtracts more of the cross-cluster block from the covariance block of each half, which moves the allocation towards the minimum variance portfolio. Under [`MonotonicSchurComplement`](@ref) it is the upper end of the searched range, not the value that the allocation runs at.",#
                  :gamma_schur_res => "`gamma`: The Schur complement parameter that the allocation ran at. It holds one value for one bundle, and one value per bundle for a vector of bundles. Under [`MonotonicSchurComplement`](@ref) it is the value that the search chose, which is at most the `gamma` of the bundle.",#

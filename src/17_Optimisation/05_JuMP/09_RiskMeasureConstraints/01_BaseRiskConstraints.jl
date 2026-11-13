@@ -137,7 +137,7 @@ $(val_dict[:relax])
 # Arguments
 
   - $(arg_dict[:model])
-  - `sca`: The scalariser, a [`SumScalariser`](@ref), a [`LogSumExpScalariser`](@ref) or a [`MaxScalariser`](@ref).
+  - `sca`: The scalariser, a [`SumScalariser`](@ref), a [`LogSumExpScalariser`](@ref) or a [`MaxScalariser`](@ref). `nothing` takes the sum method.
 
 # Returns
 
@@ -150,7 +150,7 @@ $(val_dict[:relax])
   - [`MaxScalariser`](@ref)
   - [`set_risk_expression!`](@ref)
 """
-function scalarise_risk_expression!(model::JuMP.Model, ::SumScalariser)
+function scalarise_risk_expression!(model::JuMP.Model, ::Option{<:SumScalariser})
     if !shared_has(model, :risk_vec)
         return nothing
     end

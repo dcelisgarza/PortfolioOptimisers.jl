@@ -804,7 +804,7 @@ function owa_weights(w::OWA_Func_VecNum, T::Integer, sym::Symbol = :w)
     return ow
 end
 """
-    scalarised_degree(r::BaseRM_VecBaseRM, sca::Scalariser, fees::Option{<:Fees} = nothing,
+    scalarised_degree(r::BaseRM_VecBaseRM, sca::Option{<:Scalariser}, fees::Option{<:Fees} = nothing,
                       T::Option{<:Integer} = nothing) -> Option{<:Integer}
 
 Return the degree of homogeneity of one side of a ratio, which is one measure or a vector of measures that `sca` combines, under the fees `fees` on `T` observations.
@@ -814,7 +814,7 @@ A single measure ignores `sca`. A vector has the common degree of its elements u
 # Arguments
 
   - $(arg_dict[:r])
-  - `sca::Scalariser`: Scalariser of the side.
+  - `sca::Option{<:Scalariser}`: Scalariser of the side.
   - `fees`: The fees that the risk pays, or `nothing`.
   - `T`: The number of observations of the net returns, or `nothing` when it is not known.
 
@@ -827,7 +827,7 @@ A single measure ignores `sca`. A vector has the common degree of its elements u
   - [`homogeneity_degree`](@ref)
   - [`degree_difference`](@ref)
 """
-function scalarised_degree(r::AbstractBaseRiskMeasure, ::Scalariser,
+function scalarised_degree(r::AbstractBaseRiskMeasure, ::Option{<:Scalariser},
                            fees::Option{<:Fees} = nothing, T::Option{<:Integer} = nothing)
     return homogeneity_degree(r, fees, T)
 end
@@ -835,8 +835,8 @@ function scalarised_degree(::VecBaseRM, ::LogSumExpScalariser, ::Option{<:Fees} 
                            ::Option{<:Integer} = nothing)
     return nothing
 end
-function scalarised_degree(rs::VecBaseRM, ::Scalariser, fees::Option{<:Fees} = nothing,
-                           T::Option{<:Integer} = nothing)
+function scalarised_degree(rs::VecBaseRM, ::Option{<:Scalariser},
+                           fees::Option{<:Fees} = nothing, T::Option{<:Integer} = nothing)
     d = homogeneity_degree(first(rs), fees, T)
     return all(r -> homogeneity_degree(r, fees, T) == d, rs) ? d : nothing
 end

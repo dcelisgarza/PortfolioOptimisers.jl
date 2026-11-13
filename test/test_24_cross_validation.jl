@@ -1201,9 +1201,9 @@
               ppred.pred[sortperm(middle.(-c1, -c2); rev = true)]
         #=
         Issue #1997: the reduction is the argument or the field `sca`. A `sca` in the keywords
-        that reach a reader of a risk would be ignored for one measure, so it is refused. A
-        vector under `nothing` gives one score per measure, and a path needs one, so it is
-        refused too. For one measure `nothing` is inert.
+        that reach a reader of a risk would be ignored for one measure, so it is refused.
+        Issue #2069: `nothing` is the default of every scalariser slot, and it gives the sum of
+        `SumScalariser` for a vector. For one measure it is inert.
         =#
         @test_throws ConflictingArgumentError NearestQuantilePrediction(; r = rv,
                                                                         r_kwargs = (sca = MaxScalariser(),))
@@ -1214,19 +1214,26 @@
                                                                                       r_kwargs = (sca = MaxScalariser(),))
         @test_throws ConflictingArgumentError sort_by_measure(SumScalariser(), ppred, rv;
                                                               sca = MaxScalariser())
-        @test_throws IsNothingError NearestQuantilePrediction(; r = rv, sca = nothing)
-        @test_throws IsNothingError PortfolioOptimisers.quantile_by_measure(nothing, ppred,
-                                                                            rv, 0.5)
-        @test_throws IsNothingError sort_by_measure(nothing, ppred, rv)
+        @test NearestQuantilePrediction(; r = rv).sca === nothing
+        for q in (0.0, 0.5, 1.0)
+            @test NearestQuantilePrediction(; r = rv, q = q)(ppred) ===
+                  NearestQuantilePrediction(; r = rv, sca = SumScalariser(), q = q)(ppred)
+        end
+        @test PortfolioOptimisers.quantile_by_measure(nothing, ppred, rv, 0.5) ===
+              PortfolioOptimisers.quantile_by_measure(SumScalariser(), ppred, rv, 0.5)
+        @test sort_by_measure(nothing, ppred, rv) ==
+              sort_by_measure(SumScalariser(), ppred, rv)
         @test NearestQuantilePrediction(; r = r, sca = nothing, q = 0.0)(ppred) ===
               ppred.pred[argmin(rks)]
         @test NearestQuantilePrediction(; r = r, sca = nothing).sca === nothing
-        # the scores themselves: one measure ignores the reduction, nothing keeps each score
+        # the scores themselves: one measure ignores the reduction, nothing gives the sum
         p1 = ppred.pred[1]
         os = PortfolioOptimisers.oriented_score
         @test os(nothing, mr, p1) == expected_risk(mr, p1)
         @test os(MaxScalariser(), rv[1], p1) == -c1[1]
-        @test os(nothing, rw, p1) == [-2 * c1[1], c2[1]]
+        @test os(nothing, rw, p1) == -2 * c1[1] + c2[1]
+        @test os(nothing, rw, p1) == os(SumScalariser(), rw, p1)
+        @test os(MaxValue(), rw, p1) == max(-2 * c1[1], c2[1])
         @test os(SumScalariser(), mixed, p1) == mrs[1] - mdd[1]
         @test os(MinValue(), mixed, p1) == min(mrs[1], -mdd[1])
         # a failed fold takes its path out, and no solved path leaves nothing to rank
@@ -1270,7 +1277,7 @@
         @test os(SumScalariser(), rv, f1) ==
               -(expected_risk(rv[1], f1) + expected_risk(rv[2], f1))
         @test os(nothing, mixed, f1) ==
-              [expected_risk(mixed[1], f1), -expected_risk(mixed[2], f1)]
+              expected_risk(mixed[1], f1) - expected_risk(mixed[2], f1)
     end
     @testset "A clustering optimiser in the fold loop refuses a precomputed prior (#1277)" begin
         # A precomputed prior is the full sample's, so every fold would read its test rows.

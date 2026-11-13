@@ -121,7 +121,7 @@ function PortfolioOptimisers.plot_risk_contribution(r::PortfolioOptimisers.BaseR
                                                     marginal::Bool = false,
                                                     percentage::Bool = true,
                                                     N::Option{<:Number} = nothing,
-                                                    sca::Scalariser = SumScalariser(),
+                                                    sca::Option{<:Scalariser} = nothing,
                                                     kwargs...)
     nx = isnothing(rd.nx) ? (1:size(rd.X, 2)) : rd.nx
     return PortfolioOptimisers.plot_risk_contribution(r, w, rd.X, fees; nx = nx,
@@ -135,7 +135,7 @@ function PortfolioOptimisers.plot_risk_contribution(r::PortfolioOptimisers.BaseR
                                                     marginal::Bool = false,
                                                     percentage::Bool = true,
                                                     N::Option{<:Number} = nothing,
-                                                    sca::Scalariser = SumScalariser(),
+                                                    sca::Option{<:Scalariser} = nothing,
                                                     kwargs...)
     _, w, rd, fees = result_investable_view(res, rd)
     return PortfolioOptimisers.plot_risk_contribution(r, w, rd, fees; delta = delta,
@@ -151,7 +151,7 @@ function PortfolioOptimisers.plot_risk_contribution(r::PortfolioOptimisers.BaseR
                                                     marginal::Bool = false,
                                                     percentage::Bool = true,
                                                     N::Option{<:Number} = nothing,
-                                                    sca::Scalariser = SumScalariser(),
+                                                    sca::Option{<:Scalariser} = nothing,
                                                     kwargs...)
     _, w, pr, fees, nx = result_investable_view(res, pr, nothing, nx)
     return PortfolioOptimisers.plot_risk_contribution(r, w, pr.X, fees; nx = nx,
@@ -188,7 +188,7 @@ function PortfolioOptimisers.plot_factor_risk_contribution(r::PortfolioOptimiser
                                                            re::RegE_Reg = StepwiseRegression(),
                                                            delta::Number = 1e-6,
                                                            N::Option{<:Number} = nothing,
-                                                           sca::Scalariser = SumScalariser(),
+                                                           sca::Option{<:Scalariser} = nothing,
                                                            kwargs...)
     _, w, rd, fees = result_investable_view(res, rd)
     return PortfolioOptimisers.plot_factor_risk_contribution(r, w, rd.X, fees; re = re,
@@ -234,7 +234,7 @@ function PortfolioOptimisers.plot_risk_contribution(r::PortfolioOptimisers.BaseR
                                                     percentage::Bool = true,
                                                     erc::Bool = true,
                                                     N::Option{<:Number} = nothing,
-                                                    sca::Scalariser = SumScalariser(),
+                                                    sca::Option{<:Scalariser} = nothing,
                                                     kwargs...)
     if !(delta > zero(delta))
         throw(DomainError(delta, "delta must be > 0"))
@@ -267,7 +267,7 @@ function PortfolioOptimisers.plot_factor_risk_contribution(r::PortfolioOptimiser
                                                            N::Option{<:Number} = nothing,
                                                            percentage::Bool = true,
                                                            erc::Bool = true,
-                                                           sca::Scalariser = SumScalariser(),
+                                                           sca::Option{<:Scalariser} = nothing,
                                                            kwargs...)
     if !(delta > zero(delta))
         throw(DomainError(delta, "delta must be > 0"))

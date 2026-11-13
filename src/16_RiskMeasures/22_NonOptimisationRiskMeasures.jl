@@ -162,7 +162,7 @@ $(DocStringExtensions.FIELDS)
         settings::HierarchicalRiskMeasureSettings = HierarchicalRiskMeasureSettings(),
         rt::MeanReturn = MeanReturn(),
         rk::BaseRM_VecBaseRM = ConditionalValueatRisk(),
-        sca::Scalariser = SumScalariser(),
+        sca::Option{<:Scalariser} = nothing,
         rf::Number = 0.0
     ) -> MeanReturnRiskRatio
 
@@ -203,7 +203,7 @@ MeanReturnRiskRatio
            │            │     rke ┴ Bool: true
            │      alpha ┼ Float64: 0.05
            │          w ┴ nothing
-       sca ┼ SumScalariser()
+       sca ┼ nothing
         rf ┴ Float64: 0.0
 ```
 
@@ -241,7 +241,8 @@ MeanReturnRiskRatio
     """
     rf
     function MeanReturnRiskRatio(settings::HierarchicalRiskMeasureSettings, rt::MeanReturn,
-                                 rk::BaseRM_VecBaseRM, sca::Scalariser, rf::Number)
+                                 rk::BaseRM_VecBaseRM, sca::Option{<:Scalariser},
+                                 rf::Number)
         if isa(rk, VecBaseRM)
             @argcheck(!isempty(rk), IsEmptyError("rk cannot be empty"))
         end
@@ -257,7 +258,7 @@ function MeanReturnRiskRatio(;
                              settings::HierarchicalRiskMeasureSettings = HierarchicalRiskMeasureSettings(),
                              rt::MeanReturn = MeanReturn(),
                              rk::BaseRM_VecBaseRM = ConditionalValueatRisk(),
-                             sca::Scalariser = SumScalariser(),
+                             sca::Option{<:Scalariser} = nothing,
                              rf::Number = 0.0)::MeanReturnRiskRatio
     return MeanReturnRiskRatio(settings, rt, rk, sca, rf)
 end

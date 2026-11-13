@@ -210,7 +210,7 @@ end
 """
     expected_ratio(r::BaseRM_VecBaseRM, ret::JRE_VecJRE, w::VecNum,
                    pr::AbstractPriorResult, fees::Option{<:Fees} = nothing;
-                   rf::Number = 0, sca::Scalariser = SumScalariser(),
+                   rf::Number = 0, sca::Option{<:Scalariser} = nothing,
                    strict::Bool = false, kwargs...)
 
 Compute the ratio of the expected return of a portfolio to its expected risk.
@@ -277,7 +277,7 @@ Both axes receive `pr` itself, so both apply the same precedence rule. A stated 
 """
 function expected_ratio(r::BaseRM_VecBaseRM, ret::JRE_VecJRE, w::VecNum,
                         pr::AbstractPriorResult, fees::Option{<:Fees} = nothing;
-                        rf::Number = 0, sca::Scalariser = SumScalariser(),
+                        rf::Number = 0, sca::Option{<:Scalariser} = nothing,
                         strict::Bool = false, kwargs...)
     # Reduce to the Investable Mask here, at the outermost entry the caller reached, so a
     # held non-investable asset is named once. Both children reduce again on the reduced
@@ -295,7 +295,7 @@ end
 """
     expected_risk_ret_ratio(r::BaseRM_VecBaseRM, ret::JRE_VecJRE, w::VecNum,
                             pr::AbstractPriorResult, fees::Option{<:Fees} = nothing;
-                            rf::Number = 0, sca::Scalariser = SumScalariser(),
+                            rf::Number = 0, sca::Option{<:Scalariser} = nothing,
                             strict::Bool = false, kwargs...)
 
 Compute the expected risk, the expected return and the risk-adjusted return ratio of a portfolio.
@@ -372,7 +372,7 @@ A [`NonRiskJuMPOptimisationResult`](@ref) has no `r`, because its solve resolved
 """
 function expected_risk_ret_ratio(r::BaseRM_VecBaseRM, ret::JRE_VecJRE, w::VecNum,
                                  pr::AbstractPriorResult, fees::Option{<:Fees} = nothing;
-                                 rf::Number = 0, sca::Scalariser = SumScalariser(),
+                                 rf::Number = 0, sca::Option{<:Scalariser} = nothing,
                                  strict::Bool = false, kwargs...)
     # Reduce to the Investable Mask once here — see the note in `expected_ratio`.
     _, pr, w, fees = investable_reduction(pr, w, fees, strict)
@@ -429,7 +429,7 @@ end
 """
     expected_sric(r::BaseRM_VecBaseRM, ret::JRE_VecJRE, w::VecNum,
                   pr::AbstractPriorResult, fees::Option{<:Fees} = nothing;
-                  rf::Number = 0, sca::Scalariser = SumScalariser(),
+                  rf::Number = 0, sca::Option{<:Scalariser} = nothing,
                   strict::Bool = false, kwargs...)
 
 Compute the Sharpe ratio information criterion (SRIC) of a portfolio.
@@ -485,7 +485,7 @@ The function penalises the ratio of [`expected_ratio`](@ref), so the rule is the
 """
 function expected_sric(r::BaseRM_VecBaseRM, ret::JRE_VecJRE, w::VecNum,
                        pr::AbstractPriorResult, fees::Option{<:Fees} = nothing;
-                       rf::Number = 0, sca::Scalariser = SumScalariser(),
+                       rf::Number = 0, sca::Option{<:Scalariser} = nothing,
                        strict::Bool = false, kwargs...)
     # Reduce to the Investable Mask once here, so the penalty's asset count is the count
     # of assets the prior could estimate — see the note in `expected_ratio`.
@@ -496,7 +496,7 @@ end
 """
     expected_risk_ret_sric(r::BaseRM_VecBaseRM, ret::JRE_VecJRE, w::VecNum,
                            pr::AbstractPriorResult, fees::Option{<:Fees} = nothing;
-                           rf::Number = 0, sca::Scalariser = SumScalariser(),
+                           rf::Number = 0, sca::Option{<:Scalariser} = nothing,
                            strict::Bool = false, kwargs...)
 
 Compute the expected risk, the expected return and the SRIC of a portfolio.
@@ -554,7 +554,7 @@ The tuple is the tuple of [`expected_risk_ret_ratio`](@ref), with the penalty su
 """
 function expected_risk_ret_sric(r::BaseRM_VecBaseRM, ret::JRE_VecJRE, w::VecNum,
                                 pr::AbstractPriorResult, fees::Option{<:Fees} = nothing;
-                                rf::Number = 0, sca::Scalariser = SumScalariser(),
+                                rf::Number = 0, sca::Option{<:Scalariser} = nothing,
                                 strict::Bool = false, kwargs...)
     # Reduce to the Investable Mask once here — see the note in `expected_sric`.
     _, pr, w, fees = investable_reduction(pr, w, fees, strict)
@@ -744,7 +744,7 @@ $(DocStringExtensions.FIELDS)
         settings::HierarchicalRiskMeasureSettings = HierarchicalRiskMeasureSettings(),
         rt::JRE_VecJRE = ArithmeticReturn(),
         rk::BaseRM_VecBaseRM = Variance(),
-        sca::Scalariser = SumScalariser(),
+        sca::Option{<:Scalariser} = nothing,
         rf::Number = 0.0,
     ) -> ExpectedReturnRiskRatio
 
@@ -798,7 +798,7 @@ ExpectedReturnRiskRatio
            │    mtx_sqrt ┼ EigenFallbackSquareRoot()
            │   ratio_alg ┼ SquareRootRatio()
            │      corner ┴ nothing
-       sca ┼ SumScalariser()
+       sca ┼ nothing
         rf ┴ Float64: 0.0
 ```
 
@@ -832,8 +832,8 @@ ExpectedReturnRiskRatio
     """
     rf
     function ExpectedReturnRiskRatio(settings::HierarchicalRiskMeasureSettings,
-                                     rt::JRE_VecJRE, rk::BaseRM_VecBaseRM, sca::Scalariser,
-                                     rf::Number)
+                                     rt::JRE_VecJRE, rk::BaseRM_VecBaseRM,
+                                     sca::Option{<:Scalariser}, rf::Number)
         if isa(rt, VecJRE)
             @argcheck(!isempty(rt), IsEmptyError("rt cannot be empty"))
         end
@@ -852,7 +852,7 @@ function ExpectedReturnRiskRatio(;
                                  settings::HierarchicalRiskMeasureSettings = HierarchicalRiskMeasureSettings(),
                                  rt::JRE_VecJRE = ArithmeticReturn(),
                                  rk::BaseRM_VecBaseRM = Variance(),
-                                 sca::Scalariser = SumScalariser(),
+                                 sca::Option{<:Scalariser} = nothing,
                                  rf::Number = 0.0)::ExpectedReturnRiskRatio
     return ExpectedReturnRiskRatio(settings, rt, rk, sca, rf)
 end
@@ -1145,16 +1145,16 @@ function prrm_prediction_message(r::PrRM, pred)
     return msg
 end
 """
-    expected_risk(::Scalariser, r::PrRM,
+    expected_risk(::Option{<:Scalariser}, r::PrRM,
                   pred::PredictionResult{<:Any,
                                          <:PredictionReturnsResult{<:Any, <:VecNum}};
                   kwargs...)
-    expected_risk(::Scalariser, r::PrRM,
+    expected_risk(::Option{<:Scalariser}, r::PrRM,
                   pred::PredictionResult{<:Any,
                                          <:PredictionReturnsResult{<:Any, <:VecVecNum}};
                   kwargs...)
-    expected_risk(::Scalariser, r::PrRM, pred::MultiPeriodPredictionResult; kwargs...)
-    expected_risk(::Scalariser, r::PrRM, pred::PopulationPredictionResult; kwargs...)
+    expected_risk(::Option{<:Scalariser}, r::PrRM, pred::MultiPeriodPredictionResult; kwargs...)
+    expected_risk(::Option{<:Scalariser}, r::PrRM, pred::PopulationPredictionResult; kwargs...)
 
 Refuse to compute a risk measure that reads a prior on a prediction result.
 
@@ -1169,7 +1169,7 @@ The caller has two routes:
 
 # Arguments
 
-  - `::Scalariser`: The scalariser of the call, which none of the four methods reads.
+  - `::Option{<:Scalariser}`: The scalariser of the call, which none of the four methods reads.
   - `r`: [`ExpectedReturn`](@ref) or [`ExpectedReturnRiskRatio`](@ref).
   - `pred`: The prediction result that the caller gave.
   - `kwargs...`: Keyword arguments that none of the four methods reads.
@@ -1188,22 +1188,24 @@ The caller has two routes:
   - [`MultiPeriodPredictionResult`](@ref)
   - [`PopulationPredictionResult`](@ref)
 """
-function expected_risk(::Scalariser, r::PrRM,
+function expected_risk(::Option{<:Scalariser}, r::PrRM,
                        pred::PredictionResult{<:Any,
                                               <:PredictionReturnsResult{<:Any, <:VecNum}};
                        kwargs...)
     return throw(ArgumentError(prrm_prediction_message(r, pred)))
 end
-function expected_risk(::Scalariser, r::PrRM,
+function expected_risk(::Option{<:Scalariser}, r::PrRM,
                        pred::PredictionResult{<:Any,
                                               <:PredictionReturnsResult{<:Any, <:VecVecNum}};
                        kwargs...)
     return throw(ArgumentError(prrm_prediction_message(r, pred)))
 end
-function expected_risk(::Scalariser, r::PrRM, pred::MultiPeriodPredictionResult; kwargs...)
+function expected_risk(::Option{<:Scalariser}, r::PrRM, pred::MultiPeriodPredictionResult;
+                       kwargs...)
     return throw(ArgumentError(prrm_prediction_message(r, pred)))
 end
-function expected_risk(::Scalariser, r::PrRM, pred::PopulationPredictionResult; kwargs...)
+function expected_risk(::Option{<:Scalariser}, r::PrRM, pred::PopulationPredictionResult;
+                       kwargs...)
     return throw(ArgumentError(prrm_prediction_message(r, pred)))
 end
 

@@ -12,7 +12,7 @@ The constructor's substitution check and [`time_dependent_field_defaults`](@ref)
   - [`assert_time_dependent_substitution`](@ref)
 """
 function hierarchical_risk_parity_td_defaults()::NamedTuple
-    return (; r = Variance(), sca = SumScalariser())
+    return (; r = Variance(), sca = nothing)
 end
 """
 $(DocStringExtensions.TYPEDEF)
@@ -59,7 +59,7 @@ $(DocStringExtensions.FIELDS)
     HierarchicalRiskParity(;
         opt::HierarchicalOptimiser = HierarchicalOptimiser(),
         r::TD{<:OptRM_VecOptRM} = Variance(),
-        sca::TD{<:Scalariser} = SumScalariser(),
+        sca::TD_Option{<:Scalariser} = nothing,
         fb::TDO_Option{<:OptE_Opt} = nothing
     ) -> HierarchicalRiskParity
 
@@ -173,7 +173,7 @@ HierarchicalRiskParity
       │    mtx_sqrt ┼ EigenFallbackSquareRoot()
       │   ratio_alg ┼ SquareRootRatio()
       │      corner ┴ nothing
-  sca ┼ SumScalariser()
+  sca ┼ nothing
    fb ┴ nothing
 ```
 
@@ -213,7 +213,8 @@ HierarchicalRiskParity
     """
     @fprop fb
     function HierarchicalRiskParity(opt::HierarchicalOptimiser, r::TD{<:OptRM_VecOptRM},
-                                    sca::TD{<:Scalariser}, fb::TDO_Option{<:OptE_Opt})
+                                    sca::TD_Option{<:Scalariser},
+                                    fb::TDO_Option{<:OptE_Opt})
         assert_no_nearest_bind_optimiser_schedule(fb, :fb, :HierarchicalRiskParity)
         if isa(r, AbstractVector)
             @argcheck(!isempty(r), IsEmptyError("r cannot be empty"))
@@ -229,7 +230,7 @@ HierarchicalRiskParity
 end
 function HierarchicalRiskParity(; opt::HierarchicalOptimiser = HierarchicalOptimiser(),
                                 r::TD{<:OptRM_VecOptRM} = Variance(),
-                                sca::TD{<:Scalariser} = SumScalariser(),
+                                sca::TD_Option{<:Scalariser} = nothing,
                                 fb::TDO_Option{<:OptE_Opt} = nothing)::HierarchicalRiskParity
     return HierarchicalRiskParity(opt, r, sca, fb)
 end
@@ -490,7 +491,7 @@ function _optimise(hrp::HierarchicalRiskParity{<:Any, <:OptimisationRiskMeasure}
                                         sca = hrp.sca, fb = nothing)
 end
 """
-    hrp_scalarised_risk(sca::Scalariser, wu::MatNum, rkus::VecVecNum, lc::VecNum,
+    hrp_scalarised_risk(sca::Option{<:Scalariser}, wu::MatNum, rkus::VecVecNum, lc::VecNum,
                         rc::VecNum, rs::VecOptRM, X::MatNum,
                         fees::Option{<:Fees}) -> Tuple
 
@@ -547,8 +548,9 @@ The four cases are [`SumScalariser`](@ref), [`MaxScalariser`](@ref), [`MinScalar
   - [`unitary_expected_risks`](@ref)
   - [`herc_intra_cluster_weights`](@ref)
 """
-function hrp_scalarised_risk(sca::Scalariser, wu::MatNum, rkus::VecVecNum, lc::VecNum,
-                             rc::VecNum, rs::VecOptRM, X::MatNum, fees::Option{<:Fees})
+function hrp_scalarised_risk(sca::Option{<:Scalariser}, wu::MatNum, rkus::VecVecNum,
+                             lc::VecNum, rc::VecNum, rs::VecOptRM, X::MatNum,
+                             fees::Option{<:Fees})
     return scalarise(sca, zip(rs, rkus); by = sum) do (r, rku)
         fill!(wu, zero(eltype(wu)))
         wu[lc, 1] .= inv.(view(rku, lc))

@@ -617,7 +617,9 @@ using Test, PortfolioOptimisers, StableRNGs, LinearAlgebra, Statistics, Dates, C
         # The one deliberate widening of `obj`: every earlier fixture in this file runs on
         # `LogWealth()`, so their agreement above is the proof it left them unchanged.
         rl = RiskLoss()
-        @test isa(rl.r, Variance) && rl.window == 20 && isa(rl.sca, SumScalariser)
+        # The default scalariser is `nothing`, which gives the sum (#2069). The checks of
+        # the constructor run under it, which the two refusals below prove.
+        @test isa(rl.r, Variance) && rl.window == 20 && isnothing(rl.sca)
         @test isa(rl.pe, EmpiricalPrior)
         @test isa(rl, po.AbstractOnlineObjective) &&
               isa(LogWealth(), po.AbstractOnlineObjective)

@@ -152,11 +152,13 @@ struct NoOrientationScorer <: PortfolioOptimisers.AbstractAssetScorer end
     @testset "FoldRiskScorer validation" begin
         @test_throws ArgumentError FoldRiskScorer(; r = Variance())
         @test_throws DomainError FoldRiskScorer(; r = SCM(), min_folds = 0)
-        # A vector checks each member, and refuses `nothing`: a selector reads one score
-        # for each asset (#1999). For one measure `nothing` is inert.
+        # A vector checks each member (#1999). `nothing` is the default, and it gives the
+        # sum of `SumScalariser` for a vector (#2069). For one measure it is inert.
         @test_throws ArgumentError FoldRiskScorer(; r = [SCM(), Variance()])
-        @test_throws PO.IsNothingError FoldRiskScorer(; r = [SCM(), MeanReturn()],
-                                                      sca = nothing)
+        @test isnothing(FoldRiskScorer(; r = [SCM(), MeanReturn()]).sca)
+        @test PO.asset_scores(FoldRiskScorer(; r = [SCM(), MeanReturn()]), rd) ==
+              PO.asset_scores(FoldRiskScorer(; r = [SCM(), MeanReturn()],
+                                             sca = SumScalariser()), rd)
         @test isnothing(FoldRiskScorer(; r = SCM(), sca = nothing).sca)
     end
 

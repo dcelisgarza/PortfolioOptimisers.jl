@@ -75,7 +75,7 @@ Argument bound for every value-level reader of a risk measure: one measure or se
 
 Mirrors [`JRE_VecJRE`](@ref) on the return side. A method bounded here serves a measure and a vector of them with one body, so the value-level surface needs one method per arity rather than two.
 
-A vector is scalarised into **one** number by the `sca` keyword, which defaults to [`SumScalariser`](@ref) and is silently inert on a single measure.
+A vector is scalarised into **one** number by the `sca` keyword, which defaults to `nothing`, gives the sum of [`SumScalariser`](@ref), and is silently inert on a single measure.
 
 # Related
 
@@ -1342,7 +1342,7 @@ $(DocStringExtensions.TYPEDEF)
 
 Adds the scaled risk measures together.
 
-This is the default everywhere a `sca` keyword appears, and the only strategy whose model form is an expression rather than a variable with constraints: [`scalarise_risk_expression!`](@ref) sums `risk_vec` into one affine or quadratic expression, so it is also the only one that takes a quadratic risk expression without a reformulation.
+Every `sca` field and keyword defaults to `nothing`, and `nothing` gives this sum. It is the only strategy whose model form is an expression rather than a variable with constraints: [`scalarise_risk_expression!`](@ref) sums `risk_vec` into one affine or quadratic expression, so it is also the only one that takes a quadratic risk expression without a reformulation.
 
 # Mathematical definition
 
@@ -1614,7 +1614,7 @@ function scalarise_logsumexp(vs::AbstractVector{<:Tuple})
     return ntuple(k -> scalarise_logsumexp([v[k] for v in vs]), Val(length(first(vs))))
 end
 """
-    scalarise(f, sca::Scalariser, itr; by = nothing)
+    scalarise(f, sca::Option{<:Scalariser}, itr; by = nothing)
 
 Reduce per-risk-measure values into a single scalarised value.
 
@@ -1622,7 +1622,7 @@ Applies `f` to every element of `itr`, a vector of risk measures or the `pairs` 
 
 The combining rules are:
 
-  - [`SumScalariser`](@ref): slot-wise sum of all values. `f` is expected to include the measure's `settings.scale` weight in its result.
+  - [`SumScalariser`](@ref) and `nothing`: slot-wise sum of all values. `f` is expected to include the measure's `settings.scale` weight in its result. `nothing` is the default of every `sca` field and keyword, and it gives the sum.
 
   - [`MaxScalariser`](@ref)/[`MinScalariser`](@ref):
 
@@ -1644,7 +1644,7 @@ The combining rules are:
 # Arguments
 
   - `f`: Per-element evaluation closure, applied to each element of `itr`.
-  - `sca`: Scalarisation strategy.
+  - `sca`: Scalarisation strategy. `nothing` gives the rule of [`SumScalariser`](@ref).
   - `itr`: Iterable of risk measures (or `pairs` of them, when `f` needs the index).
   - `by`: Optional selection key for `MaxScalariser`/`MinScalariser`; ignored by the other scalarisers.
 
@@ -1659,7 +1659,7 @@ The combining rules are:
   - [`scalarise_map`](@ref)
   - [`scalarise_logsumexp`](@ref)
 """
-function scalarise(f, ::SumScalariser, itr; by = nothing)
+function scalarise(f, ::Option{<:SumScalariser}, itr; by = nothing)
     acc = nothing
     for el in itr
         v = f(el)
@@ -1706,7 +1706,7 @@ end
 
 Union of the reductions that a score of a vector of risk measures accepts: a [`Scalariser`](@ref), a [`VectorToScalarMeasure`](@ref) or a plain function from a vector to a number.
 
-A score reduces numbers that are already computed, so it needs no convex form and no derivative. So it admits the two families and a function, as [`Num_VecToScaM`](@ref) admits a reduction or a function. The readers of a risk, such as [`expected_risk`](@ref), keep the bound [`Scalariser`](@ref).
+A score reduces numbers that are already computed, so it needs no convex form and no derivative. So it admits the two families and a function, as [`Num_VecToScaM`](@ref) admits a reduction or a function. The readers of a risk, such as [`expected_risk`](@ref), keep the bound [`Scalariser`](@ref). Each slot takes `Option` of its bound, and `nothing` gives the rule of [`SumScalariser`](@ref).
 
 # Related
 
@@ -2592,7 +2592,7 @@ _ctx(a::Slv_VecSlv, args...) = a
 _ctx(::Any, args...) = _ctx(args...)
 """
     expected_risk(r, args...; kwargs...)
-    expected_risk(sca::Scalariser, r, args...; kwargs...)
+    expected_risk(sca::Option{<:Scalariser}, r, args...; kwargs...)
 
 Compute the expected value of a risk measure.
 
@@ -2608,7 +2608,7 @@ A vector of measures takes a [`Scalariser`](@ref) `sca`. The keyword form takes 
 function expected_risk end
 """
     expected_risk_from_returns(r, X; kwargs...)
-    expected_risk_from_returns(sca::Scalariser, r, X; kwargs...)
+    expected_risk_from_returns(sca::Option{<:Scalariser}, r, X; kwargs...)
 
 Compute the expected risk of a measure from a precomputed net-return series.
 

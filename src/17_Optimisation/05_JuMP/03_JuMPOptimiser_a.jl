@@ -18,7 +18,7 @@ $(DocStringExtensions.FIELDS)
 # Constructors
 
     ResolvedJuMPOptimiser(;
-        pr::AbstractPriorResult, fees::Option{<:Fees}, ret::JRE_VecJRE, sca::Scalariser,
+        pr::AbstractPriorResult, fees::Option{<:Fees}, ret::JRE_VecJRE, sca::Option{<:Scalariser},
         imsk::Option{<:BitVector} = nothing, cbr::Rcb_VecRcb
     ) -> ResolvedJuMPOptimiser
 
@@ -37,7 +37,7 @@ julia> cbr = PortfolioOptimisers.resolve_constraint_block(ConstraintBlock(), pr,
                                                                         X = pr.X); slv = nothing);
 
 julia> jor = ResolvedJuMPOptimiser(; pr = pr, fees = nothing, ret = ArithmeticReturn(),
-                                   sca = SumScalariser(), cbr = cbr);
+                                   sca = nothing, cbr = cbr);
 
 julia> jor.wb === jor.cbr.wb
 true
@@ -67,7 +67,7 @@ true
     """
     $(field_dict[:sca_res])
     """
-    sca::Scalariser
+    sca::Option{<:Scalariser}
     """
     $(field_dict[:imsk])
     """
@@ -77,14 +77,14 @@ true
     """
     cbr
     function ResolvedJuMPOptimiser(pr::AbstractPriorResult, fees::Option{<:Fees},
-                                   ret::JRE_VecJRE, sca::Scalariser,
+                                   ret::JRE_VecJRE, sca::Option{<:Scalariser},
                                    imsk::Option{<:BitVector}, cbr::Rcb_VecRcb)
         return new{typeof(pr), typeof(fees), typeof(imsk), typeof(cbr)}(pr, fees, ret, sca,
                                                                         imsk, cbr)
     end
 end
 function ResolvedJuMPOptimiser(; pr::AbstractPriorResult, fees::Option{<:Fees},
-                               ret::JRE_VecJRE, sca::Scalariser,
+                               ret::JRE_VecJRE, sca::Option{<:Scalariser},
                                imsk::Option{<:BitVector} = nothing,
                                cbr::Rcb_VecRcb)::ResolvedJuMPOptimiser
     return ResolvedJuMPOptimiser(pr, fees, ret, sca, imsk, cbr)
@@ -308,7 +308,7 @@ The constructor reads them when it checks each entry of a schedule, and [`time_d
 """
 function jump_optimiser_td_defaults()::NamedTuple
     return merge((; pe = EmpiricalPrior(), bgt = 1.0, ret = ArithmeticReturn(),
-                  sca = SumScalariser()), constraint_block_td_defaults())
+                  sca = nothing), constraint_block_td_defaults())
 end
 """
 $(DocStringExtensions.TYPEDEF)
@@ -332,7 +332,7 @@ $(DocStringExtensions.FIELDS)
         bgt::TD_Option{<:Num_BgtCE} = 1.0,
         fees::TD_Option{<:FeesE_Fees} = nothing,
         ret::TD{<:JRE_VecJRE} = ArithmeticReturn(),
-        sca::TD{<:NonHierarchicalScalariser} = SumScalariser(),
+        sca::TD_Option{<:NonHierarchicalScalariser} = nothing,
         sc::Number = 1,
         so::Number = 1,
         strict::Bool = false,
@@ -423,9 +423,9 @@ A value outside its bound raises an `IsEmptyError`, an `IsNonFiniteError`, a `Do
     cache
     function JuMPOptimiser(pe::Onl{<:TD{<:PrE_Pr}}, slv::Slv_VecSlv, cbe::ConstraintBlock,
                            bgt::TD_Option{<:Num_BgtCE}, fees::TD_Option{<:FeesE_Fees},
-                           ret::TD{<:JRE_VecJRE}, sca::TD{<:NonHierarchicalScalariser},
-                           sc::Number, so::Number, strict::Bool,
-                           cache::Option{<:ReturnsBufferState})
+                           ret::TD{<:JRE_VecJRE},
+                           sca::TD_Option{<:NonHierarchicalScalariser}, sc::Number,
+                           so::Number, strict::Bool, cache::Option{<:ReturnsBufferState})
         if isa(slv, VecSlv)
             @argcheck(!isempty(slv), IsEmptyError("slv cannot be empty"))
         end
@@ -458,7 +458,7 @@ function JuMPOptimiser(; pe::Onl{<:TD{<:PrE_Pr}} = EmpiricalPrior(), slv::Slv_Ve
                        bgt::TD_Option{<:Num_BgtCE} = 1.0,
                        fees::TD_Option{<:FeesE_Fees} = nothing,
                        ret::TD{<:JRE_VecJRE} = ArithmeticReturn(),
-                       sca::TD{<:NonHierarchicalScalariser} = SumScalariser(),
+                       sca::TD_Option{<:NonHierarchicalScalariser} = nothing,
                        sc::Number = 1, so::Number = 1, strict::Bool = false,
                        cache::Option{<:ReturnsBufferState} = nothing,
                        slots...)::JuMPOptimiser

@@ -12,8 +12,7 @@ The constructor's substitution check and [`time_dependent_field_defaults`](@ref)
   - [`assert_time_dependent_substitution`](@ref)
 """
 function herc_td_defaults()::NamedTuple
-    return (; ri = Variance(), ro = Variance(), scai = SumScalariser(),
-            scao = SumScalariser())
+    return (; ri = Variance(), ro = Variance(), scai = nothing, scao = nothing)
 end
 """
 $(DocStringExtensions.TYPEDEF)
@@ -67,8 +66,8 @@ $(DocStringExtensions.FIELDS)
         opt::HierarchicalOptimiser = HierarchicalOptimiser(),
         ri::TD{<:OptRM_VecOptRM} = Variance(),
         ro::TD{<:OptRM_VecOptRM} = ri,
-        scai::TD{<:Scalariser} = SumScalariser(),
-        scao::TD{<:Scalariser} = scai,
+        scai::TD_Option{<:Scalariser} = nothing,
+        scao::TD_Option{<:Scalariser} = scai,
         ex::FLoops.Transducers.Executor = FLoops.ThreadedEx(),
         fb::TDO_Option{<:OptE_Opt} = nothing
     ) -> HierarchicalEqualRiskContribution
@@ -198,8 +197,8 @@ HierarchicalEqualRiskContribution
        │    mtx_sqrt ┼ EigenFallbackSquareRoot()
        │   ratio_alg ┼ SquareRootRatio()
        │      corner ┴ nothing
-  scai ┼ SumScalariser()
-  scao ┼ SumScalariser()
+  scai ┼ nothing
+  scao ┼ nothing
     ex ┼ Transducers.ThreadedEx{@NamedTuple{}}: Transducers.ThreadedEx()
     fb ┴ nothing
 ```
@@ -256,8 +255,8 @@ HierarchicalEqualRiskContribution
     function HierarchicalEqualRiskContribution(opt::HierarchicalOptimiser,
                                                ri::TD{<:OptRM_VecOptRM},
                                                ro::TD{<:OptRM_VecOptRM},
-                                               scai::TD{<:Scalariser},
-                                               scao::TD{<:Scalariser},
+                                               scai::TD_Option{<:Scalariser},
+                                               scao::TD_Option{<:Scalariser},
                                                ex::FLoops.Transducers.Executor,
                                                fb::TDO_Option{<:OptE_Opt})
         assert_no_nearest_bind_optimiser_schedule(fb, :fb,
@@ -287,8 +286,8 @@ function HierarchicalEqualRiskContribution(;
                                            opt::HierarchicalOptimiser = HierarchicalOptimiser(),
                                            ri::TD{<:OptRM_VecOptRM} = Variance(),
                                            ro::TD{<:OptRM_VecOptRM} = ri,
-                                           scai::TD{<:Scalariser} = SumScalariser(),
-                                           scao::TD{<:Scalariser} = scai,
+                                           scai::TD_Option{<:Scalariser} = nothing,
+                                           scao::TD_Option{<:Scalariser} = scai,
                                            ex::FLoops.Transducers.Executor = FLoops.ThreadedEx(),
                                            fb::TDO_Option{<:OptE_Opt} = nothing)::HierarchicalEqualRiskContribution
     return HierarchicalEqualRiskContribution(opt, ri, ro, scai, scao, ex, fb)
@@ -408,9 +407,9 @@ function herc_unitary_risks(rs::VecOptRM, X::MatNum, fees::Option{<:Fees})
     return [unitary_expected_risks(r, X, fees) for r in rs]
 end
 """
-    herc_intra_cluster_weights(sca::Scalariser, r::OptimisationRiskMeasure, rku::VecNum,
+    herc_intra_cluster_weights(sca::Option{<:Scalariser}, r::OptimisationRiskMeasure, rku::VecNum,
                                cl::VecInt) -> VecNum
-    herc_intra_cluster_weights(sca::Scalariser, rs::VecOptRM, rkus::VecVecNum,
+    herc_intra_cluster_weights(sca::Option{<:Scalariser}, rs::VecOptRM, rkus::VecVecNum,
                                cl::VecInt) -> VecNum
 
 Return the shares that divide the weight of cluster `cl` between its assets.
@@ -443,7 +442,7 @@ Where:
   - ``u_i``: The combined weight of asset ``i`` before the normalisation.
   - ``v_i``: Share of asset ``i`` in the weight of ``C``.
 
-The four cases are [`SumScalariser`](@ref), [`MaxScalariser`](@ref), [`MinScalariser`](@ref) and [`LogSumExpScalariser`](@ref). Under a sum, ``\\boldsymbol{v}`` is the average of the ``\\boldsymbol{v}^{(k)}`` weighted by ``s_k``. A maximum or a minimum selects one measure by its total scaled unitary risk over ``C``, and ``\\boldsymbol{v}`` is that measure's ``\\boldsymbol{v}^{(k)}``. The shares sum to one under every scalariser, so the cluster keeps the weight that the split factors give it.
+The four cases are [`SumScalariser`](@ref), [`MaxScalariser`](@ref), [`MinScalariser`](@ref) and [`LogSumExpScalariser`](@ref). `nothing` takes the sum. Under a sum, ``\\boldsymbol{v}`` is the average of the ``\\boldsymbol{v}^{(k)}`` weighted by ``s_k``. A maximum or a minimum selects one measure by its total scaled unitary risk over ``C``, and ``\\boldsymbol{v}`` is that measure's ``\\boldsymbol{v}^{(k)}``. The shares sum to one under every scalariser, so the cluster keeps the weight that the split factors give it.
 
 # Arguments
 
@@ -463,12 +462,12 @@ The four cases are [`SumScalariser`](@ref), [`MaxScalariser`](@ref), [`MinScalar
   - [`herc_unitary_risks`](@ref)
   - [`scalarise`](@ref)
 """
-function herc_intra_cluster_weights(::Scalariser, ::OptimisationRiskMeasure, rku::VecNum,
-                                    cl::VecInt)
+function herc_intra_cluster_weights(::Option{<:Scalariser}, ::OptimisationRiskMeasure,
+                                    rku::VecNum, cl::VecInt)
     v = inv.(view(rku, cl))
     return v ./= sum(v)
 end
-function herc_intra_cluster_weights(sca::Union{SumScalariser, LogSumExpScalariser},
+function herc_intra_cluster_weights(sca::Union{Nothing, SumScalariser, LogSumExpScalariser},
                                     rs::VecOptRM, rkus::VecVecNum, cl::VecInt)
     u = scalarise(sca, pairs(rs)) do (k, r)
         return r.settings.scale * herc_intra_cluster_weights(sca, r, rkus[k], cl)
@@ -483,9 +482,9 @@ function herc_intra_cluster_weights(sca::Union{MaxScalariser, MinScalariser}, rs
     return herc_intra_cluster_weights(sca, rs[k], rkus[k], cl)
 end
 """
-    herc_cluster_risk(sca::Scalariser, r::OptimisationRiskMeasure, rku::VecNum,
+    herc_cluster_risk(sca::Option{<:Scalariser}, r::OptimisationRiskMeasure, rku::VecNum,
                       cl::VecInt, X::MatNum, fees::Option{<:Fees}) -> Number
-    herc_cluster_risk(sca::Scalariser, rs::VecOptRM, rkus::VecVecNum, cl::VecInt,
+    herc_cluster_risk(sca::Option{<:Scalariser}, rs::VecOptRM, rkus::VecVecNum, cl::VecInt,
                       X::MatNum, fees::Option{<:Fees}) -> Number
 
 Return the risk of the naive risk parity sub-portfolio of cluster `cl`, the risk from which HERC forms its split factors.
@@ -540,14 +539,14 @@ The risk of one measure carries no scale. Every cluster would carry the same sca
   - [`herc_unitary_risks`](@ref)
   - [`scalarise`](@ref)
 """
-function herc_cluster_risk(sca::Scalariser, r::OptimisationRiskMeasure, rku::VecNum,
-                           cl::VecInt, X::MatNum, fees::Option{<:Fees})
+function herc_cluster_risk(sca::Option{<:Scalariser}, r::OptimisationRiskMeasure,
+                           rku::VecNum, cl::VecInt, X::MatNum, fees::Option{<:Fees})
     w = zeros(eltype(X), size(X, 2))
     w[cl] = herc_intra_cluster_weights(sca, r, rku, cl)
     return expected_risk(r, w, X, fees)
 end
-function herc_cluster_risk(sca::Scalariser, rs::VecOptRM, rkus::VecVecNum, cl::VecInt,
-                           X::MatNum, fees::Option{<:Fees})
+function herc_cluster_risk(sca::Option{<:Scalariser}, rs::VecOptRM, rkus::VecVecNum,
+                           cl::VecInt, X::MatNum, fees::Option{<:Fees})
     return scalarise(sca, pairs(rs)) do (k, r)
         return r.settings.scale * herc_cluster_risk(sca, r, rkus[k], cl, X, fees)
     end

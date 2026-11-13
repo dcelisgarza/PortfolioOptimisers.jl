@@ -50,9 +50,9 @@ tune. An argument of `select_assets` has no such path.
 
 ### `FoldRiskScorer` aggregates a Fold Statistic over the distinct test windows
 
-`FoldRiskScorer(; r, sca = SumScalariser(), cv = KFold(), agg = MeanFoldScore(), min_folds = 1)`
+`FoldRiskScorer(; r, sca = nothing, cv = KFold(), agg = MeanFoldScore(), min_folds = 1)`
 evaluates `r` on each distinct test window of `split(cv, rd)`. `r` is one risk measure or a
-vector of them, and `sca` reduces a vector as ADR 0231 and ADR 0232 state. A `CombinatorialCrossValidation` split holds each test
+vector of them, and `sca` reduces a vector as ADR 0231, ADR 0232 and ADR 0238 state. A `CombinatorialCrossValidation` split holds each test
 block in many splits, so the scorer counts each block once. A `MultipleRandomised` split draws
 asset subsets, and the scorer ignores them, because the score of an asset reads its own column.
 

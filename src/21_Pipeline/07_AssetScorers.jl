@@ -462,7 +462,7 @@ Scores each asset with a risk measure, or with a vector of them, on each test wi
 
 One window of bad luck then does not decide the rank of an asset. The score of an asset reads its own column alone, so the training rows do not change it. The scheme gives the windows only. `agg` sets the rule of the aggregation, and its `alg` sets whether it reduces the raw values with [`Value`](@ref) or the ranks with [`Rank`](@ref).
 
-One measure gives its raw value, with the orientation of the measure. A vector gives the [`oriented_score`](@ref) of the returns of the asset: each member is oriented so that a bigger value is better, multiplied by its scale, and then reduced through `sca`. So a vector whose members disagree on orientation gives one value, and a bigger value is better. For one measure `sca` is inert.
+One measure gives its raw value, with the orientation of the measure. A vector gives the [`oriented_score`](@ref) of the returns of the asset: each member is oriented so that a bigger value is better, multiplied by its scale, and then reduced through `sca`. The default `nothing` gives the sum of [`SumScalariser`](@ref). So a vector whose members disagree on orientation gives one value, and a bigger value is better. For one measure `sca` is inert.
 
 # Mathematical definition
 
@@ -512,7 +512,7 @@ $(DocStringExtensions.FIELDS)
 
     FoldRiskScorer(;
         r::BaseRM_VecBaseRM,
-        sca::Option{<:Sca_VecToScaM} = SumScalariser(),
+        sca::Option{<:Sca_VecToScaM} = nothing,
         cv::CVE_Onl = KFold(),
         agg::AbstractFoldAggregation = MeanFoldScore(),
         min_folds::Integer = 1,
@@ -523,7 +523,6 @@ Keywords correspond to the struct's fields.
 ## Validation
 
   - `supports_precomputed_returns` of `r`, or of each member of a vector, through [`assert_scoreable`](@ref).
-  - `sca` is not `nothing` when `r` is a vector, through [`assert_one_score_per_asset`](@ref). A selector reads one score for each asset, and `nothing` keeps one score for each measure. The error is an [`IsNothingError`](@ref).
   - `min_folds >= 1`.
 
 # Examples
@@ -568,7 +567,7 @@ The vector orients `SCM()`, so the value of asset A is the negated variance plus
     """
     r
     """
-    The reduction of the oriented values of a vector of risk measures in `r` to one value for each asset on each window, a [`Sca_VecToScaM`](@ref). It is inert when `r` holds one measure, where `nothing` is also admitted. A vector refuses `nothing`, because a selector reads one score for each asset. `PerCandidate` is not a member, because the scorer has no stage of search scorers.
+    The reduction of the oriented values of a vector of risk measures in `r` to one value for each asset on each window, a [`Sca_VecToScaM`](@ref), or `nothing`, which gives the sum of [`SumScalariser`](@ref). It is inert when `r` holds one measure. `PerCandidate` is not a member, because the scorer has no stage of search scorers.
     """
     sca
     """
@@ -586,7 +585,6 @@ The vector orients `SCM()`, so the value of asset A is the negated variance plus
     function FoldRiskScorer(r::BaseRM_VecBaseRM, sca::Option{<:Sca_VecToScaM}, cv::CVE_Onl,
                             agg::AbstractFoldAggregation, min_folds::Integer)
         assert_scoreable(r)
-        assert_one_score_per_asset(sca, r)
         @argcheck(min_folds >= 1,
                   DomainError(min_folds,
                               "min_folds must be at least one, got min_folds = $min_folds"))
@@ -597,44 +595,11 @@ The vector orients `SCM()`, so the value of asset A is the negated variance plus
                                                                                        min_folds)
     end
 end
-function FoldRiskScorer(; r::BaseRM_VecBaseRM,
-                        sca::Option{<:Sca_VecToScaM} = SumScalariser(),
+function FoldRiskScorer(; r::BaseRM_VecBaseRM, sca::Option{<:Sca_VecToScaM} = nothing,
                         cv::CVE_Onl = KFold(),
                         agg::AbstractFoldAggregation = MeanFoldScore(),
                         min_folds::Integer = 1)::FoldRiskScorer
     return FoldRiskScorer(r, sca, cv, agg, min_folds)
-end
-"""
-    assert_one_score_per_asset(sca::Option{<:Sca_VecToScaM}, r::BaseRM_VecBaseRM)
-    assert_one_score_per_asset(sca::Nothing, r::VecBaseRM)
-
-Refuse a reduction of `nothing` for a vector of risk measures in a [`FoldRiskScorer`](@ref).
-
-Under `nothing`, [`reduce_member_scores`](@ref) of a vector gives one value for each measure. A selector reads one score for each asset, so the scorer refuses it. For one measure the reduction is inert, and `nothing` is admitted. The types of the arguments select the method, so the check makes no test at run time.
-
-# Arguments
-
-  - `sca`: The reduction of the vector, the field `sca` of the scorer.
-  - `r`: One risk measure, or a vector of them.
-
-# Validation
-
-  - `sca` must not be `nothing` when `r` is a vector. The error is an [`IsNothingError`](@ref).
-
-# Returns
-
-  - `nothing`.
-
-# Related
-
-  - [`FoldRiskScorer`](@ref)
-  - [`assert_one_score_per_path`](@ref)
-"""
-function assert_one_score_per_asset(::Option{<:Sca_VecToScaM}, ::BaseRM_VecBaseRM)
-    return nothing
-end
-function assert_one_score_per_asset(::Nothing, ::VecBaseRM)
-    return throw(IsNothingError("`sca` must not be `nothing` when `r` is a vector of risk measures: a selector reads one score for each asset, and `nothing` keeps one score for each measure. Pass a reduction such as `SumScalariser()` or `MaxScalariser()`."))
 end
 """
     window_bigger_is_better(r::AbstractBaseRiskMeasure) -> Bool
@@ -666,15 +631,15 @@ end
 """
     window_values(sca::Option{<:Sca_VecToScaM}, r::AbstractBaseRiskMeasure, X::MatNum)
         -> VecNum
-    window_values(sca::Sca_VecToScaM, r::VecBaseRM, X::MatNum) -> VecNum
+    window_values(sca::Option{<:Sca_VecToScaM}, r::VecBaseRM, X::MatNum) -> VecNum
 
 Evaluate the risk measure of a [`FoldRiskScorer`](@ref) on each column of one test window.
 
-The method on one measure returns the raw value of each column through [`asset_scores`](@ref), and ignores `sca`. The method on a vector returns the oriented score of each column under `sca`, through [`reduce_member_scores`](@ref), so a bigger value is better. The constructor of the scorer refuses `nothing` with a vector, so no method takes that pair.
+The method on one measure returns the raw value of each column through [`asset_scores`](@ref), and ignores `sca`. The method on a vector returns the oriented score of each column under `sca`, through [`reduce_member_scores`](@ref), so a bigger value is better.
 
 # Arguments
 
-  - `sca`: The reduction of a vector, the field `sca` of the scorer.
+  - `sca`: The reduction of a vector, the field `sca` of the scorer. `nothing` gives the sum.
   - `r`: One risk measure, or a vector of them.
   - `X`: The returns of the covered assets at the rows of the window, `observations × assets`. Every column is in the Coverage Universe of the window.
 
@@ -695,7 +660,7 @@ The method on one measure returns the raw value of each column through [`asset_s
 function window_values(::Option{<:Sca_VecToScaM}, r::AbstractBaseRiskMeasure, X::MatNum)
     return asset_scores(r, X)
 end
-function window_values(sca::Sca_VecToScaM, rs::VecBaseRM, X::MatNum)
+function window_values(sca::Option{<:Sca_VecToScaM}, rs::VecBaseRM, X::MatNum)
     v = [reduce_member_scores(sca, rs, (view(X, :, j),)) for j in axes(X, 2)]
     bad = findall(!isfinite, v)
     @argcheck(isempty(bad),

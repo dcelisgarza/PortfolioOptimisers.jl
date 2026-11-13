@@ -7,8 +7,10 @@ status: accepted
 ## Context
 
 Map #1980 lets a search score with a vector of risk measures and a vector of search scorers. ADR
-0232 keeps one score matrix per measure under `r_sca = nothing`, and ADR 0233 keeps one entry of
-`rank_scores` per scorer under `s_sca = nothing`. Both ADRs left the selection open: what `opt`,
+0232 keeps one score matrix per measure under the per-value form of `r_sca`, and ADR 0233 keeps one
+entry of `rank_scores` per scorer under the per-value form of `s_sca`. The per-value form is a
+singleton type that #2001 names. #1985 spelled it `nothing`, and #2069 (ADR 0238) made `nothing`
+give the sum on every scalariser slot. Both ADRs left the selection open: what `opt`,
 `idx`, `ranked` and `rank_idx` hold when a candidate has more than one value. The direction of the
 maintainer on the map is that the search does not refuse this case. It gives a ranking and an
 `opt` for each value per candidate. Issue #1985 asked for the shape of the Result, the shape in
@@ -40,9 +42,9 @@ folds.**
 
 | `r_sca` | What it combines | `test_scores` |
 | --- | --- | --- |
-| `sca`, a `Sca_VecToScaM` | The `K` measures of one row: one fold, or one path in the combinatorial form. Then the scorer reduces the rows. ADR 0232. | One matrix. |
+| `sca`, a `Sca_VecToScaM`, or `nothing`, which gives the sum | The `K` measures of one row: one fold, or one path in the combinatorial form. Then the scorer reduces the rows. ADR 0232. | One matrix. |
 | `PerCandidate(sca)` | The `K` values of one candidate. Each value is what the scorer gives for one matrix over all its rows. | `K` matrices. |
-| `nothing` | Nothing. Each measure keeps its own ranking. | `K` matrices. |
+| The per-value singleton (#2001) | Nothing. Each measure keeps its own ranking. | `K` matrices. |
 
 For one candidate, two measures, three folds, `MaxScalariser` and `HighestMeanScore`:
 
@@ -74,10 +76,10 @@ at run time (ADR 0227).
 
 | `r_sca` | `s_sca` | Values per candidate | Container of each field |
 | --- | --- | --- | --- |
-| `sca`, `PerCandidate`, or one measure | `sca`, or one scorer | `1` | Today's fields. |
-| `sca`, `PerCandidate`, or one measure | `nothing` | `L` | A vector, in the order of `scorer`. |
-| `nothing` | `sca`, or one scorer | `K` | A vector, in the order of `r`. |
-| `nothing` | `nothing` | `K × L` | A `K × L` matrix. Row `k` is measure `k`, column `l` is scorer `l`. |
+| `sca`, `nothing`, `PerCandidate`, or one measure | `sca`, `nothing`, or one scorer | `1` | Today's fields. |
+| `sca`, `nothing`, `PerCandidate`, or one measure | per-value | `L` | A vector, in the order of `scorer`. |
+| per-value | `sca`, `nothing`, or one scorer | `K` | A vector, in the order of `r`. |
+| per-value | per-value | `K × L` | A `K × L` matrix. Row `k` is measure `k`, column `l` is scorer `l`. |
 
 So `res.opt[k, l]` is the winner of measure `k` under scorer `l`, and `res.opt[:, l]` holds the
 winners of every measure under scorer `l`. The constructor checks `opt[v] == ranked[v][1]` and
@@ -88,9 +90,9 @@ winners of every measure under scorer `l`. The constructor checks `opt[v] == ran
 | Item | Rule |
 | --- | --- |
 | `n_best` | Each ranking keeps `min(n_best, finite count)` candidates, so the rankings can differ in length. An index-only scorer keeps one candidate (ADR 0233). |
-| ADR 0120 under `nothing` | Holds for each matrix apart (ADR 0232). A candidate can enter the ranking of one measure and stay out of the ranking of another. |
+| ADR 0120 under the per-value form | Holds for each matrix apart (ADR 0232). A candidate can enter the ranking of one measure and stay out of the ranking of another. |
 | ADR 0120 under `PerCandidate` | A candidate enters only when it is finite in every matrix, because a value of fewer than `K` measures does not compare with a value of `K`. |
-| An empty entry | Under `r_sca = nothing`, a matrix with no finite column gives an empty entry: `opt[v]` and `idx[v]` are `nothing`, `ranked[v]` and `rank_idx[v]` are empty, and `rank_scores[v]` is an empty vector, or `nothing` for an index-only scorer. Only `r_sca = nothing` can give one empty entry beside entries that are not empty. |
+| An empty entry | Under the per-value form of `r_sca`, a matrix with no finite column gives an empty entry: `opt[v]` and `idx[v]` are `nothing`, `ranked[v]` and `rank_idx[v]` are empty, and `rank_scores[v]` is an empty vector, or `nothing` for an index-only scorer. Only the per-value form of `r_sca` can give one empty entry beside entries that are not empty. |
 | Every entry empty | The search throws the `IsNonFiniteError` of `finite_candidate_order`, as for one value. The constructor checks that at least one entry holds a candidate. No search of one value changes. |
 
 ### No refit
@@ -104,11 +106,11 @@ of the search states this as the form of the `refit` of sklearn.
 - **A vector of Results, one per value.** Each Result keeps today's field types. Rejected: ADR 0232
   and ADR 0233 already keep the per-value data in one Result, and each Result would repeat the
   shared `test_scores`, `lens_grid` and `val_grid`.
-- **A third field for the combination after the folds.** Rejected: it acts only when `r_sca` is
-  `nothing`, so a configuration could set a field that has no effect, and the constructor would
+- **A third field for the combination after the folds.** Rejected: it acts only when `r_sca` holds
+  the per-value form, so a configuration could set a field that has no effect, and the constructor would
   need a conflict check.
 - **No combination after the folds.** Rejected: it drops the reason that the map gives for
-  `nothing` on `r`.
+  the per-value form on `r`.
 - **The scorers before the measures after the folds.** Rejected: the measures combine before the
   scorers in the stage of each fold, and the order of the two stages then differs.
 - **The names `PerPath` and `AfterFolds`.** Rejected. `PerPath` names the stage of each row in the
@@ -128,11 +130,11 @@ of the search states this as the form of the `refit` of sklearn.
 ## Consequences
 
 - **The build tickets of map #1980.** The code holds none of this decision until they land.
-  Ticket #2001 builds the shape of the Result under `r_sca = nothing` or `s_sca = nothing`, the
-  empty entry and its checks. Ticket #2002 builds `PerCandidate`. Ticket #2003 shows a search
+  Ticket #2001 builds the per-value singleton, the shape of the Result under it on `r_sca` or
+  `s_sca`, the empty entry and its checks. Ticket #2002 builds `PerCandidate`. Ticket #2003 shows a search
   with a vector of risk measures and a vector of search scorers in the tuning example and the
   user guide.
-- **A breaking change, for the build.** Under `r_sca = nothing` or `s_sca = nothing` with a vector,
+- **A breaking change, for the build.** Under the per-value form of `r_sca` or `s_sca` with a vector,
   `opt`, `idx`, `ranked`, `rank_idx` and `rank_scores` change type. These are new configurations,
   so they reach no released caller. The bound of `r_sca` widens to take `PerCandidate`.
 - **A call that uses no new capability costs what it cost before.** The types of the four fields

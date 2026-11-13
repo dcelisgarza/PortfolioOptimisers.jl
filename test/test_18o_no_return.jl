@@ -752,8 +752,9 @@ end
     end
 
     @testset "the result carries the measure and the scalariser it ran under" begin
-        # A resolved measure is fitted state, so it belongs on the Result.
-        @test isa(res.sca, PortfolioOptimisers.Scalariser)
+        # A resolved measure is fitted state, so it belongs on the Result. The scalariser is
+        # the default, `nothing`, which gives the sum (#2069).
+        @test isnothing(res.sca)
         @test !isnothing(res.r)
         # Stored resolved: reporting against it reproduces the optimised figure without a
         # refit, and it passes `assert_resolved_slots`.
@@ -1011,14 +1012,15 @@ end
     end
 
     @testset "each leaf carries its own estimator's arity" begin
-        # HRP: one measure, one scalariser.
+        # HRP: one measure, one scalariser. Each scalariser is the default, `nothing`,
+        # which gives the sum (#2069).
         @test !isnothing(hrp.r)
-        @test isa(hrp.sca, PortfolioOptimisers.Scalariser)
+        @test hasproperty(hrp, :sca) && isnothing(hrp.sca)
         # HERC: two measures, two scalarisers.
         @test !isnothing(herc.ri)
         @test !isnothing(herc.ro)
-        @test isa(herc.scai, PortfolioOptimisers.Scalariser)
-        @test isa(herc.scao, PortfolioOptimisers.Scalariser)
+        @test hasproperty(herc, :scai) && isnothing(herc.scai)
+        @test hasproperty(herc, :scao) && isnothing(herc.scao)
     end
 
     @testset "the measure on the result reproduces a reported figure" begin

@@ -31,21 +31,21 @@ Both members hold their two risks in the fields `r1` and `r2`, so one method of 
 const RkRatioRM = Union{RiskRatio, NonOptimisationRiskRatio}
 """
     expected_risk(r::AbstractBaseRiskMeasure, w::VecNum, args...; kwargs...)
-    expected_risk(rs::VecBaseRM, w::VecNum_MatNum, args...; sca = SumScalariser(), kwargs...)
-    expected_risk(sca::Scalariser, r::BaseRM_VecBaseRM, w::VecNum_MatNum, args...; kwargs...)
+    expected_risk(rs::VecBaseRM, w::VecNum_MatNum, args...; sca = nothing, kwargs...)
+    expected_risk(sca::Option{<:Scalariser}, r::BaseRM_VecBaseRM, w::VecNum_MatNum, args...; kwargs...)
     expected_risk(kind::RiskInputKind, r, w::VecNum, args...; kwargs...)
     expected_risk(r::RiskRatio, w::VecNum, X::MatNum, fees = nothing; kwargs...)
     expected_risk(r::NonOptimisationRiskRatio, w::VecNum, X::MatNum, fees = nothing; kwargs...)
     expected_risk(r::MeanReturnRiskRatio, w::VecNum, X::MatNum, fees = nothing; kwargs...)
     expected_risk(r::AbstractBaseRiskMeasure, w::VecNum, pr::Pr_RR, fees = nothing; strict = false, kwargs...)
-    expected_risk(sca::Scalariser, rs::VecBaseRM, w::VecNum_MatNum, pr::Pr_RR, fees = nothing; strict = false, kwargs...)
-    expected_risk(r::BaseRM_VecBaseRM, w::VecVecNum, args...; sca = SumScalariser(), kwargs...)
-    expected_risk(sca::Scalariser, r::BaseRM_VecBaseRM, w::VecVecNum, args...; kwargs...)
-    expected_risk(sca::Scalariser, r::BaseRM_VecBaseRM, w::VecVecNum, pr::Pr_RR, fees = nothing; strict = false, kwargs...)
+    expected_risk(sca::Option{<:Scalariser}, rs::VecBaseRM, w::VecNum_MatNum, pr::Pr_RR, fees = nothing; strict = false, kwargs...)
+    expected_risk(r::BaseRM_VecBaseRM, w::VecVecNum, args...; sca = nothing, kwargs...)
+    expected_risk(sca::Option{<:Scalariser}, r::BaseRM_VecBaseRM, w::VecVecNum, args...; kwargs...)
+    expected_risk(sca::Option{<:Scalariser}, r::BaseRM_VecBaseRM, w::VecVecNum, pr::Pr_RR, fees = nothing; strict = false, kwargs...)
 
 Compute the risk of a portfolio under one risk measure, or under a vector of them.
 
-Each method that can take a vector of measures has two forms. The keyword form takes the [`Scalariser`](@ref) `sca` as a keyword, with the default [`SumScalariser`](@ref), and calls the positional form. The positional form takes `sca` as its first argument, as [`oriented_score`](@ref) does, and every internal caller calls it. A single measure ignores `sca` in both forms.
+Each method that can take a vector of measures has two forms. The keyword form takes the [`Scalariser`](@ref) `sca` as a keyword, with the default `nothing`, which gives the sum of [`SumScalariser`](@ref), and calls the positional form. The positional form takes `sca` as its first argument, as [`oriented_score`](@ref) does, and every internal caller calls it. A single measure ignores `sca` in both forms.
 
 A risk measure declares the input that it reads through [`risk_input_kind`](@ref), and the generic entry dispatches on the returned [`RiskInputKind`](@ref):
 
@@ -79,7 +79,7 @@ The prior route, `expected_risk(r, w, pr, fees)`:
 
 # Arguments
 
-  - `sca::Scalariser`: Scalariser that combines a vector of measures, in the positional form. A single measure ignores it.
+  - `sca::Option{<:Scalariser}`: Scalariser that combines a vector of measures, in the positional form. A single measure ignores it.
   - $(arg_dict[:r])
   - `w`: Portfolio weights vector `assets × 1`, or a vector of them.
   - `X::MatNum`: Returns matrix `observations × assets`.
@@ -88,7 +88,7 @@ The prior route, `expected_risk(r, w, pr, fees)`:
 
 # Keyword Arguments
 
-  - `sca::Scalariser = SumScalariser()`: Scalariser that combines a vector of measures, in the keyword form. A single measure ignores it.
+  - `sca::Option{<:Scalariser} = nothing`: Scalariser that combines a vector of measures, in the keyword form. A single measure ignores it.
   - `strict::Bool = false`: Whether a held non-investable asset raises an error. When it is `false`, the asset warns and its weight is dropped. Only the methods that take a prior read it.
 
 # Validation
@@ -146,10 +146,10 @@ function missing_returns_data_message(r::AbstractBaseRiskMeasure)
     return "`$(nameof(typeof(r)))` is evaluated on a return series, and no returns data was given. Either the call named none, or the result it was taken from carries none of its own. Pass one: `expected_risk(r, w, X)` or `expected_risk(r, res, X)` for a returns matrix, `expected_risk(r, w, pr)` or `expected_risk(r, res, pr)` for a prior result."
 end
 """
-    expected_risk(rs::VecBaseRM, w::VecNum_MatNum, args...; sca::Scalariser = SumScalariser(),
+    expected_risk(rs::VecBaseRM, w::VecNum_MatNum, args...; sca::Option{<:Scalariser} = nothing,
                   kwargs...)
-    expected_risk(sca::Scalariser, rs::VecBaseRM, w::VecNum_MatNum, args...; kwargs...)
-    expected_risk(sca::Scalariser, r::AbstractBaseRiskMeasure, w::VecNum_MatNum, args...;
+    expected_risk(sca::Option{<:Scalariser}, rs::VecBaseRM, w::VecNum_MatNum, args...; kwargs...)
+    expected_risk(sca::Option{<:Scalariser}, r::AbstractBaseRiskMeasure, w::VecNum_MatNum, args...;
                   kwargs...)
 
 Combine the risks of several risk measures into one number.
@@ -166,7 +166,7 @@ The vector follows three rules.
 
     Because of the last rule, a figure over the `opt.r` of an optimiser can include a measure that the objective did not read. Filter the vector first to get the aggregate of the objective.
 
-    The figure matches the optimisation only when the caller names the same measures and the same scalariser. `sca` defaults to `SumScalariser()`, which is also the default of [`JuMPOptimiser`](@ref), so a caller who names no scalariser gets a matched figure. The same holds for `fees` and `rf`.
+    The figure matches the optimisation only when the caller names the same measures and the same scalariser. `sca` defaults to `nothing`, which gives the sum and is also the default of [`JuMPOptimiser`](@ref), so a caller who names no scalariser gets a matched figure. The same holds for `fees` and `rf`.
 
 # Mathematical definition
 
@@ -186,14 +186,14 @@ Where:
 
 # Arguments
 
-  - `sca::Scalariser`: Scalariser that combines the scaled risks, in the positional form.
+  - `sca::Option{<:Scalariser}`: Scalariser that combines the scaled risks, in the positional form.
   - `rs::VecBaseRM`: Vector of risk measures.
   - `w::VecNum_MatNum`: Portfolio weights vector `assets × 1`, or a weight path `observations × assets`.
   - `args...`: The returns data and the fees, forwarded to each element.
 
 # Keyword Arguments
 
-  - `sca::Scalariser = SumScalariser()`: Scalariser that combines the scaled risks, in the keyword form.
+  - `sca::Option{<:Scalariser} = nothing`: Scalariser that combines the scaled risks, in the keyword form.
 
 # Returns
 
@@ -209,16 +209,17 @@ Where:
   - [`expected_risk`](@ref)
 """
 function expected_risk(rs::VecBaseRM, w::VecNum_MatNum, args...;
-                       sca::Scalariser = SumScalariser(), kwargs...)
+                       sca::Option{<:Scalariser} = nothing, kwargs...)
     return expected_risk(sca, rs, w, args...; kwargs...)
 end
-function expected_risk(sca::Scalariser, rs::VecBaseRM, w::VecNum_MatNum, args...; kwargs...)
+function expected_risk(sca::Option{<:Scalariser}, rs::VecBaseRM, w::VecNum_MatNum, args...;
+                       kwargs...)
     return scalarise(sca, rs) do r
         return expected_risk(r, w, args...; kwargs...) * r.settings.scale
     end
 end
-function expected_risk(::Scalariser, r::AbstractBaseRiskMeasure, w::VecNum_MatNum, args...;
-                       kwargs...)
+function expected_risk(::Option{<:Scalariser}, r::AbstractBaseRiskMeasure, w::VecNum_MatNum,
+                       args...; kwargs...)
     return expected_risk(r, w, args...; kwargs...)
 end
 function expected_risk(::NetReturnsInput, r::AbstractBaseRiskMeasure, w::VecNum, X::MatNum,
@@ -585,8 +586,9 @@ end
 # would resolve the prior inside the scalarise loop. It reduces once too, so the vector warns
 # once and not once per element. On a path, the mask selects the columns of the path and every
 # row keeps its own observation.
-function expected_risk(sca::Scalariser, rs::VecBaseRM, w::VecNum_MatNum, pr::Pr_RR,
-                       fees::Option{<:Fees} = nothing; strict::Bool = false, kwargs...)
+function expected_risk(sca::Option{<:Scalariser}, rs::VecBaseRM, w::VecNum_MatNum,
+                       pr::Pr_RR, fees::Option{<:Fees} = nothing; strict::Bool = false,
+                       kwargs...)
     _, pr, w, fees = investable_reduction(pr, w, fees, strict)
     rs, X = resolve_risk_inputs(rs, pr)
     return expected_risk(sca, rs, w, X, fees; kwargs...)
@@ -702,17 +704,18 @@ function expected_risk(r::AbstractBaseRiskMeasure, w::MatNum, pr::Pr_RR,
     return expected_risk(r, w, X, fees; kwargs...)
 end
 function expected_risk(r::BaseRM_VecBaseRM, w::VecVecNum, args...;
-                       sca::Scalariser = SumScalariser(), kwargs...)
+                       sca::Option{<:Scalariser} = nothing, kwargs...)
     return expected_risk(sca, r, w, args...; kwargs...)
 end
-function expected_risk(sca::Scalariser, r::BaseRM_VecBaseRM, w::VecVecNum, args...;
-                       kwargs...)
+function expected_risk(sca::Option{<:Scalariser}, r::BaseRM_VecBaseRM, w::VecVecNum,
+                       args...; kwargs...)
     return [expected_risk(sca, r, wi, args...; kwargs...) for wi in w]
 end
 # A population reduces once, on the mask a member holds an asset under. Reducing inside the
 # comprehension would warn once per member of a population that all hold the same dead asset.
-function expected_risk(sca::Scalariser, r::BaseRM_VecBaseRM, w::VecVecNum, pr::Pr_RR,
-                       fees::Option{<:Fees} = nothing; strict::Bool = false, kwargs...)
+function expected_risk(sca::Option{<:Scalariser}, r::BaseRM_VecBaseRM, w::VecVecNum,
+                       pr::Pr_RR, fees::Option{<:Fees} = nothing; strict::Bool = false,
+                       kwargs...)
     _, pr, w, fees = investable_reduction(pr, w, fees, strict)
     r, X = resolve_risk_inputs(r, pr)
     return [expected_risk(sca, r, wi, X, fees; kwargs...) for wi in w]
@@ -820,14 +823,14 @@ end
 # as its `expected_risk` method does. A side that can hold a vector takes the scalariser of the
 # composite as its first argument, as `expected_risk(sca, rs, ...)` does. A vector side
 # scalarises its scaled measures, and a single measure ignores the scalariser.
-function difference_risk(sca::Scalariser, rs::VecBaseRM, wd::VecNum, w::VecNum, X::MatNum,
-                         fees::Fees)
+function difference_risk(sca::Option{<:Scalariser}, rs::VecBaseRM, wd::VecNum, w::VecNum,
+                         X::MatNum, fees::Fees)
     return scalarise(sca, rs) do r
         return difference_risk(r, wd, w, X, fees) * r.settings.scale
     end
 end
-function difference_risk(::Scalariser, r::AbstractBaseRiskMeasure, wd::VecNum, w::VecNum,
-                         X::MatNum, fees::Fees)
+function difference_risk(::Option{<:Scalariser}, r::AbstractBaseRiskMeasure, wd::VecNum,
+                         w::VecNum, X::MatNum, fees::Fees)
     return difference_risk(r, wd, w, X, fees)
 end
 function difference_risk(r::RiskRatio, wd::VecNum, w::VecNum, X::MatNum, fees::Fees;
@@ -883,10 +886,10 @@ function expected_risk_from_returns(r::AbstractBaseRiskMeasure, X::VecNum; kwarg
     return r(X)
 end
 """
-    expected_risk_from_returns(rs::VecBaseRM, X::VecNum; sca::Scalariser = SumScalariser(),
+    expected_risk_from_returns(rs::VecBaseRM, X::VecNum; sca::Option{<:Scalariser} = nothing,
                                kwargs...)
-    expected_risk_from_returns(sca::Scalariser, rs::VecBaseRM, X::VecNum; kwargs...)
-    expected_risk_from_returns(sca::Scalariser, r::AbstractBaseRiskMeasure, X::VecNum;
+    expected_risk_from_returns(sca::Option{<:Scalariser}, rs::VecBaseRM, X::VecNum; kwargs...)
+    expected_risk_from_returns(sca::Option{<:Scalariser}, r::AbstractBaseRiskMeasure, X::VecNum;
                                kwargs...)
 
 Combine the risks of several risk measures on one net return series that the caller already formed.
@@ -901,22 +904,23 @@ The method follows the three rules of [`expected_risk`](@ref) on a vector. `scal
   - [`Scalariser`](@ref)
 """
 function expected_risk_from_returns(rs::VecBaseRM, X::VecNum;
-                                    sca::Scalariser = SumScalariser(), kwargs...)
+                                    sca::Option{<:Scalariser} = nothing, kwargs...)
     return expected_risk_from_returns(sca, rs, X; kwargs...)
 end
-function expected_risk_from_returns(sca::Scalariser, rs::VecBaseRM, X::VecNum; kwargs...)
+function expected_risk_from_returns(sca::Option{<:Scalariser}, rs::VecBaseRM, X::VecNum;
+                                    kwargs...)
     return scalarise(sca, rs) do r
         return expected_risk_from_returns(r, X; kwargs...) * r.settings.scale
     end
 end
-function expected_risk_from_returns(::Scalariser, r::AbstractBaseRiskMeasure, X::VecNum;
-                                    kwargs...)
+function expected_risk_from_returns(::Option{<:Scalariser}, r::AbstractBaseRiskMeasure,
+                                    X::VecNum; kwargs...)
     return expected_risk_from_returns(r, X; kwargs...)
 end
 """
     expected_risk_from_returns(r::BaseRM_VecBaseRM, X::VecVecNum;
-                               sca::Scalariser = SumScalariser(), kwargs...)
-    expected_risk_from_returns(sca::Scalariser, r::BaseRM_VecBaseRM, X::VecVecNum; kwargs...)
+                               sca::Option{<:Scalariser} = nothing, kwargs...)
+    expected_risk_from_returns(sca::Option{<:Scalariser}, r::BaseRM_VecBaseRM, X::VecVecNum; kwargs...)
 
 Evaluate a risk measure on each series of a vector of net return series.
 
@@ -928,11 +932,11 @@ The method calls [`expected_risk_from_returns`](@ref) on each `Xi` in `X`, and r
   - [`supports_precomputed_returns`](@ref)
 """
 function expected_risk_from_returns(r::BaseRM_VecBaseRM, X::VecVecNum;
-                                    sca::Scalariser = SumScalariser(), kwargs...)
+                                    sca::Option{<:Scalariser} = nothing, kwargs...)
     return expected_risk_from_returns(sca, r, X; kwargs...)
 end
-function expected_risk_from_returns(sca::Scalariser, r::BaseRM_VecBaseRM, X::VecVecNum;
-                                    kwargs...)
+function expected_risk_from_returns(sca::Option{<:Scalariser}, r::BaseRM_VecBaseRM,
+                                    X::VecVecNum; kwargs...)
     return [expected_risk_from_returns(sca, r, Xi; kwargs...) for Xi in X]
 end
 """
@@ -1072,7 +1076,7 @@ end
         fees::Option{<:Fees} = nothing;
         delta::Number = 1e-6,
         marginal::Bool = false,
-        sca::Scalariser = SumScalariser(),
+        sca::Option{<:Scalariser} = nothing,
         strict::Bool = false,
         kwargs...
     ) -> Vector
@@ -1127,7 +1131,7 @@ Where:
 
   - `delta::Number = 1e-6`: Step of the finite difference.
   - `marginal::Bool = false`: Whether to return the marginal risks, without the factor ``w_i``.
-  - `sca::Scalariser = SumScalariser()`: Scalariser that combines a vector of measures. A single measure ignores it.
+  - `sca::Option{<:Scalariser} = nothing`: Scalariser that combines a vector of measures. A single measure ignores it.
   - `strict::Bool = false`: Whether a held non-investable asset raises an error. Only a prior result reads it.
 
 # Validation
@@ -1149,7 +1153,7 @@ Where:
 """
 function risk_contribution(r::BaseRM_VecBaseRM, w::VecNum, X::MatNum_Pr,
                            fees::Option{<:Fees} = nothing; delta::Number = 1e-6,
-                           marginal::Bool = false, sca::Scalariser = SumScalariser(),
+                           marginal::Bool = false, sca::Option{<:Scalariser} = nothing,
                            strict::Bool = false, kwargs...)
     # The function reduces once, before the finite difference, so no perturbed
     # weight ever meets a `NaN` moment. The per asset answer expands back into a zero
@@ -1235,7 +1239,7 @@ end
         X::MatNum_Pr,
         fees::Option{<:Fees} = nothing;
         delta::Number = 1e-6,
-        sca::Scalariser = SumScalariser(),
+        sca::Option{<:Scalariser} = nothing,
         strict::Bool = false,
         kwargs...
     ) -> Vector
@@ -1296,7 +1300,7 @@ The prior route reduces the prior, the weights and the fees to the Investable Ma
 # Keyword Arguments
 
   - `delta::Number = 1e-6`: Step of the finite difference.
-  - `sca::Scalariser = SumScalariser()`: Scalariser that combines a vector of measures. A single measure ignores it.
+  - `sca::Option{<:Scalariser} = nothing`: Scalariser that combines a vector of measures. A single measure ignores it.
   - `strict::Bool = false`: Whether a held non-investable asset raises an error. Only a prior result reads it.
 
 # Validation
@@ -1333,7 +1337,7 @@ function risk_gradient(r::AbstractBaseRiskMeasure, w::VecNum, X::MatNum,
     return measure_gradient(r, w, X, fees; delta = delta, kwargs...)
 end
 function risk_gradient(rs::VecBaseRM, w::VecNum, X::MatNum, fees::Option{<:Fees} = nothing;
-                       delta::Number = 1e-6, sca::Scalariser = SumScalariser(), kwargs...)
+                       delta::Number = 1e-6, sca::Option{<:Scalariser} = nothing, kwargs...)
     ps = scalariser_element_weights(sca, rs, w, X, fees; kwargs...)
     # The gradient of each measure widens the type of the weights, as the step of
     # `finite_difference_gradient` does, so the sum takes the promoted type.
@@ -1412,14 +1416,14 @@ function measure_gradient(r::MeanReturn, w::VecNum, X::MatNum, ::Nothing; kwargs
     return transpose(X) * omega
 end
 """
-    scalariser_gradient_weights(sca::SumScalariser, vals::VecNum)
+    scalariser_gradient_weights(sca::Option{<:SumScalariser}, vals::VecNum)
     scalariser_gradient_weights(sca::MaxScalariser, vals::VecNum)
     scalariser_gradient_weights(sca::MinScalariser, vals::VecNum)
     scalariser_gradient_weights(sca::LogSumExpScalariser, vals::VecNum)
 
 Compute the chain-rule weight of each element in the gradient of a scalarised aggregate, from the scaled risks of the elements.
 
-The weight of an element is the partial derivative of the scalariser with respect to that element. [`SumScalariser`](@ref) gives a weight of one to every element. [`MaxScalariser`](@ref) and [`MinScalariser`](@ref) give a weight of one to the earliest maximum or minimum, and zero to every other element. [`LogSumExpScalariser`](@ref) gives the softmax of ``\\gamma v_k``, which the method computes after it subtracts the maximum of `vals`, so that the exponentials do not overflow.
+The weight of an element is the partial derivative of the scalariser with respect to that element. [`SumScalariser`](@ref) and `nothing` give a weight of one to every element. [`MaxScalariser`](@ref) and [`MinScalariser`](@ref) give a weight of one to the earliest maximum or minimum, and zero to every other element. [`LogSumExpScalariser`](@ref) gives the softmax of ``\\gamma v_k``, which the method computes after it subtracts the maximum of `vals`, so that the exponentials do not overflow.
 
 # Mathematical definition
 
@@ -1453,7 +1457,7 @@ Where:
   - [`risk_gradient`](@ref)
   - [`Scalariser`](@ref)
 """
-function scalariser_gradient_weights(::SumScalariser, vals::VecNum)
+function scalariser_gradient_weights(::Option{<:SumScalariser}, vals::VecNum)
     return ones(eltype(vals), length(vals))
 end
 function scalariser_gradient_weights(::MaxScalariser, vals::VecNum)
@@ -1471,8 +1475,8 @@ function scalariser_gradient_weights(sca::LogSumExpScalariser, vals::VecNum)
     return p ./ sum(p)
 end
 """
-    scalariser_element_weights(sca::Scalariser, r::AbstractBaseRiskMeasure, args...; kwargs...)
-    scalariser_element_weights(sca::Scalariser, rs::VecBaseRM, w::VecNum, X::MatNum,
+    scalariser_element_weights(sca::Option{<:Scalariser}, r::AbstractBaseRiskMeasure, args...; kwargs...)
+    scalariser_element_weights(sca::Option{<:Scalariser}, rs::VecBaseRM, w::VecNum, X::MatNum,
                                fees::Option{<:Fees}; kwargs...)
 
 Return the chain-rule weight of each element of a vector of risk measures at `w`, or `nothing` for a single measure.
@@ -1496,12 +1500,12 @@ The weights are [`scalariser_gradient_weights`](@ref) of the scaled values ``s_k
   - [`scalariser_gradient_weights`](@ref)
   - [`adjusted_risk`](@ref)
 """
-function scalariser_element_weights(::Scalariser, ::AbstractBaseRiskMeasure, args...;
-                                    kwargs...)
+function scalariser_element_weights(::Option{<:Scalariser}, ::AbstractBaseRiskMeasure,
+                                    args...; kwargs...)
     return nothing
 end
-function scalariser_element_weights(sca::Scalariser, rs::VecBaseRM, w::VecNum, X::MatNum,
-                                    fees::Option{<:Fees}; kwargs...)
+function scalariser_element_weights(sca::Option{<:Scalariser}, rs::VecBaseRM, w::VecNum,
+                                    X::MatNum, fees::Option{<:Fees}; kwargs...)
     vals = map(r -> expected_risk(r, w, X, fees; kwargs...) * r.settings.scale, rs)
     return scalariser_gradient_weights(sca, vals)
 end
@@ -1579,7 +1583,7 @@ Where:
   - `re::RegE_Reg = StepwiseRegression()`: Regression estimator or result for the factor loadings.
   - `rd::ReturnsResult = ReturnsResult()`: Returns result that carries the factor returns `F`, which a regression estimator reads.
   - `delta::Number = 1e-6`: Step of the finite difference.
-  - `sca::Scalariser = SumScalariser()`: Scalariser that combines a vector of measures. A single measure ignores it.
+  - `sca::Option{<:Scalariser} = nothing`: Scalariser that combines a vector of measures. A single measure ignores it.
   - `strict::Bool = false`: Whether a held non-investable asset raises an error. Only a prior result reads it.
 
 # Validation
@@ -1609,7 +1613,7 @@ function factor_risk_contribution(r::BaseRM_VecBaseRM, w::VecNum, X::MatNum_Pr,
                                   fees::Option{<:Fees} = nothing;
                                   re::RegE_Reg = StepwiseRegression(),
                                   rd::ReturnsResult = ReturnsResult(), delta::Number = 1e-6,
-                                  sca::Scalariser = SumScalariser(), strict::Bool = false,
+                                  sca::Option{<:Scalariser} = nothing, strict::Bool = false,
                                   kwargs...)
     # The function reduces once, and the loadings come from the reduced prior or
     # from the reduced data, so the regression is fitted over the live assets alone. The
@@ -1663,7 +1667,7 @@ Where:
 
 # Keyword Arguments
 
-  - `sca::Scalariser = SumScalariser()`: Scalariser combining a vector `r`. Inert on a single measure.
+  - `sca::Option{<:Scalariser} = nothing`: Scalariser combining a vector `r`. Inert on a single measure.
 
 # Validation
 
@@ -1682,7 +1686,7 @@ The function checks the window itself. Without the check, a window that is not p
 """
 function rolling_window_measure(r::BaseRM_VecBaseRM, w::VecNum, X::MatNum,
                                 fees::Option{<:Fees}, window::Integer;
-                                sca::Scalariser = SumScalariser(), kwargs...)
+                                sca::Option{<:Scalariser} = nothing, kwargs...)
     T = size(X, 1)
     @argcheck(1 <= window <= T,
               DomainError(window,
@@ -1727,7 +1731,7 @@ Where:
 
 # Keyword Arguments
 
-  - `sca::Scalariser = SumScalariser()`: Scalariser combining a vector `r`. Inert on a single measure.
+  - `sca::Option{<:Scalariser} = nothing`: Scalariser combining a vector `r`. Inert on a single measure.
 
 # Validation
 
@@ -1747,7 +1751,7 @@ Where:
 """
 function rolling_window_measure(r::BaseRM_VecBaseRM, w::MatNum, X::MatNum,
                                 fees::Option{<:Fees}, window::Integer;
-                                sca::Scalariser = SumScalariser(), kwargs...)
+                                sca::Option{<:Scalariser} = nothing, kwargs...)
     T = size(X, 1)
     @argcheck(1 <= window <= T,
               DomainError(window,
@@ -1787,7 +1791,7 @@ Where:
 
 # Keyword Arguments
 
-  - `sca::Scalariser = SumScalariser()`: Scalariser combining a vector `r`. Inert on a single measure.
+  - `sca::Option{<:Scalariser} = nothing`: Scalariser combining a vector `r`. Inert on a single measure.
 
 # Validation
 
@@ -1807,7 +1811,7 @@ The function checks the window for the reason that the constant-weight method st
   - [`plot_rolling_measure`](@ref)
 """
 function rolling_window_measure(r::BaseRM_VecBaseRM, ret::VecNum, window::Integer;
-                                sca::Scalariser = SumScalariser(), kwargs...)
+                                sca::Option{<:Scalariser} = nothing, kwargs...)
     T = length(ret)
     @argcheck(1 <= window <= T,
               DomainError(window,

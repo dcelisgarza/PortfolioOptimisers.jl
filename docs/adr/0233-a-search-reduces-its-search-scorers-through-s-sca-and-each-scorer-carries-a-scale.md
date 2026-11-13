@@ -10,7 +10,9 @@ Map #1980 lets `GridSearchCrossValidation` and `RandomisedSearchCrossValidation`
 candidates with a vector of search scorers in `scorer`. ADR 0232 named the slot that reduces the
 vector, `s_sca`, beside `r_sca`. Issue #1984 asked how the search combines the values of the
 scorers for each candidate, what a function scorer in the vector does, and what `rank_scores`
-holds when the reduction is `nothing`.
+holds under the per-value form. #1984 spelled that form `nothing`. #2069 (ADR 0238) made `nothing`
+give the sum on every scalariser slot, so the form takes its own singleton type, which #2001
+names. This ADR calls it "the per-value form".
 
 Five facts bore on the answer.
 
@@ -27,7 +29,7 @@ Five facts bore on the answer.
 4. **A risk measure carries a weight, and a search scorer carries none.** `oriented_member_score`
    multiplies the oriented value of each member by `r.settings.scale`. `HighestMeanScore` has no
    fields, so `SumScalariser` would add the values of the scorers with equal weights.
-5. **Under `nothing`, each scorer orders its candidates apart.** The direction of the maintainer
+5. **Under the per-value form, each scorer orders its candidates apart.** The direction of the maintainer
    on map #1980 is that the search gives a ranking for each value per candidate. So two scorers
    keep different candidates, in different orders.
 
@@ -35,22 +37,22 @@ Five facts bore on the answer.
 
 **A search reduces the values of its search scorers per candidate through `s_sca`, after it
 multiplies each value by the scale of its scorer. A function scorer gives what a scorer gives.
-Under `s_sca = nothing`, `rank_scores` holds one entry for each scorer.**
+Under the per-value form, `rank_scores` holds one entry for each scorer.**
 
 | Item | Rule |
 | --- | --- |
-| The field | `s_sca::Option{<:Sca_VecToScaM}` on `GridSearchCrossValidation` and `RandomisedSearchCrossValidation`, with the default `SumScalariser()`, as `r_sca` (ADR 0232). No wrapper type holds the vector. |
+| The field | `s_sca::Option{<:Sca_VecToScaM}` on `GridSearchCrossValidation` and `RandomisedSearchCrossValidation`, with the default `nothing`, which gives the sum, as `r_sca` (ADR 0232, ADR 0238). The bound also takes the per-value singleton of #2001. No wrapper type holds the vector. |
 | `scorer` | One search scorer, or an `AbstractVector` of them. A literal vector of a type and a function, such as `[HighestMeanScore(), f]`, has the element type `Any`, so the constructor checks each member and does not bind the element type. A wrong member is a fault of the configuration, so the constructor refuses it. |
 | The orientation | Every value is bigger-is-better before the reduction (ADR 0226, ADR 0231). `MaxScalariser` and `MaxValue` give the best scorer of each candidate, and `MinScalariser` and `MinValue` the worst. `StdValue` gives the highest value to the largest spread. |
 | The seam | A `Scalariser` reduces through `scalarise`, elementwise over the vectors of the scorers. A `VectorToScalarMeasure` or a function reduces the vector of `L` values of each candidate through `vec_to_real_measure`. |
 | The scale | Each built-in search scorer holds `scale::Number = 1.0`, the same word and mechanism as `settings.scale` of a risk measure. The constructor refuses a non-finite scale, as `HierarchicalRiskMeasureSettings` does. The reduction multiplies the value of each member by its scale. A negative scale is a negative weight (ADR 0231). A user subtype with no `scale` field, and a function, read a scale of one through a fallback accessor. A caller who wants a scaled function writes the scale into the function. |
 | A function scorer | It gives what a search scorer gives, in the same form: one value per column of the score matrix, bigger is better, or the index of one winner. So a raw function can do the job of any built-in scorer, for example `X -> vec(mean(X; dims = 1))` for `HighestMeanScore()`. The search reads the form from the type of the return of its one call. A vector is the new form, and an integer takes the path that a function took before. |
-| An index-only member | A function that returns an index, and a subtype that defines only the index form, stay. Alone, each keeps one candidate, as before. In a vector under a reduction, the search refuses it when it runs, because an index has no value to combine. In a vector under `nothing`, it keeps its one index with `n_best = 1`, and its entry of `rank_scores` is `nothing`. |
+| An index-only member | A function that returns an index, and a subtype that defines only the index form, stay. Alone, each keeps one candidate, as before. In a vector under a reduction, the search refuses it when it runs, because an index has no value to combine. In a vector under the per-value form, it keeps its one index with `n_best = 1`, and its entry of `rank_scores` is `nothing`. |
 | The `n_best` check | The refusal of a function with `n_best > 1` moves from the constructor to the run, because only the return of the function shows its form. It applies only to a return that is an index. The constructor keeps `n_best > 0`. |
 | One scorer | When `scorer` holds one scorer, not a vector, `s_sca` and the scale are inert, as for one risk measure. No search of one scorer changes. |
-| The shape with `nothing` | `rank_scores` is a vector of `L` entries in the order of `scorer`. Entry `l` is what scorer `l` alone gives: the values of the candidates that it keeps, in its own order, as `Option{<:VecNum}`. The shape follows the types of `scorer` and `s_sca`, never the count at run time (ADR 0227), so a vector of one scorer under `nothing` gives a vector of one entry. Each value keeps its scale, so a negative scale reverses the order of that scorer alone. |
+| The shape under the per-value form | `rank_scores` is a vector of `L` entries in the order of `scorer`. Entry `l` is what scorer `l` alone gives: the values of the candidates that it keeps, in its own order, as `Option{<:VecNum}`. The shape follows the types of `scorer` and `s_sca`, never the count at run time (ADR 0227), so a vector of one scorer under the per-value form gives a vector of one entry. Each value keeps its scale, so a negative scale reverses the order of that scorer alone. |
 | ADR 0120 | Unchanged. Every scorer reads the same finite columns, and a candidate with a non-finite entry enters no order. |
-| The selection with `nothing` | ADR 0234. `opt`, `idx`, `ranked` and `rank_idx` hold one entry per scorer, and a `K × L` matrix when `r_sca` and `s_sca` are both `nothing`. |
+| The selection under the per-value form | ADR 0234. `opt`, `idx`, `ranked` and `rank_idx` hold one entry per scorer, and a `K × L` matrix when `r_sca` and `s_sca` both hold the per-value form. |
 
 ## Considered options
 
@@ -72,8 +74,8 @@ Under `s_sca = nothing`, `rank_scores` holds one entry for each scorer.**
   type. Rejected by the maintainer: a scorer takes the same word and mechanism as a risk measure.
 - **A weight vector `s_w` on the search.** Rejected: a second place for a weight that a member
   of the vector already states, and a length check against `scorer`.
-- **A `candidates × L` matrix under `nothing`.** Rejected: the rows need one order that the `L`
-  scorers share, and `nothing` gives none. A matrix also cannot hold the `nothing` entry of an
+- **A `candidates × L` matrix under the per-value form.** Rejected: the rows need one order that
+  the `L` scorers share, and the per-value form gives none. A matrix also cannot hold the `nothing` entry of an
   index-only member.
 
 ## Consequences
@@ -81,7 +83,7 @@ Under `s_sca = nothing`, `rank_scores` holds one entry for each scorer.**
 - **The build tickets of map #1980.** The code holds none of this decision until they land.
   Ticket #2000 gives the searches a vector of search scorers, `s_sca`, the scale of each scorer,
   the two forms of a function scorer, and the `n_best` refusal at the run. Ticket #2001 builds
-  `rank_scores` under `s_sca = nothing` and its selection (ADR 0234).
+  the per-value singleton, `rank_scores` under it, and its selection (ADR 0234).
 - **A breaking change, for the build.** The released docstring of `CrossValSearchScorer` says
   that a function returns an integer. The build widens it to the two forms. A released index
   function keeps its meaning. A released call of `HighestMeanScore()` keeps its meaning, because

@@ -310,9 +310,9 @@ end
                     fees::Option{<:Fees}; kwargs...)
     linearised_risk(q, r::AbstractBaseRiskMeasure, w::VecNum, X::MatNum,
                     fees::Option{<:Fees}; kwargs...)
-    linearised_risk(sca::Scalariser, qs::AbstractVector, rs::VecBaseRM, w::VecNum, X::MatNum,
+    linearised_risk(sca::Option{<:Scalariser}, qs::AbstractVector, rs::VecBaseRM, w::VecNum, X::MatNum,
                     fees::Option{<:Fees}; kwargs...)
-    linearised_risk(sca::Scalariser, q, r::AbstractBaseRiskMeasure, w::VecNum, X::MatNum,
+    linearised_risk(sca::Option{<:Scalariser}, q, r::AbstractBaseRiskMeasure, w::VecNum, X::MatNum,
                     fees::Option{<:Fees}; kwargs...)
 
 Evaluate the risk of `r` at `w`, or its expected loss under the fixed Worst-Case Distribution `q`, for a finite difference.
@@ -398,14 +398,14 @@ end
 function worst_case_distribution(rs::VecBaseRM, w::VecNum, X::MatNum, fees::Option{<:Fees})
     return map(r -> worst_case_distribution(r, w, X, fees), rs)
 end
-function linearised_risk(sca::Scalariser, qs::AbstractVector, rs::VecBaseRM, w::VecNum,
-                         X::MatNum, fees::Option{<:Fees}; kwargs...)
+function linearised_risk(sca::Option{<:Scalariser}, qs::AbstractVector, rs::VecBaseRM,
+                         w::VecNum, X::MatNum, fees::Option{<:Fees}; kwargs...)
     return scalarise(sca, zip(qs, rs)) do (q, r)
         return linearised_risk(q, r, w, X, fees; kwargs...) * r.settings.scale
     end
 end
-function linearised_risk(::Scalariser, q, r::AbstractBaseRiskMeasure, w::VecNum, X::MatNum,
-                         fees::Option{<:Fees}; kwargs...)
+function linearised_risk(::Option{<:Scalariser}, q, r::AbstractBaseRiskMeasure, w::VecNum,
+                         X::MatNum, fees::Option{<:Fees}; kwargs...)
     return linearised_risk(q, r, w, X, fees; kwargs...)
 end
 function worst_case_distribution(r::RkRatioRM, w::VecNum, X::MatNum, fees::Option{<:Fees})
@@ -610,14 +610,15 @@ end
 function difference_worst_case(rs::VecBaseRM, wd::VecNum, w::VecNum, X::MatNum, fees::Fees)
     return map(r -> difference_worst_case(r, wd, w, X, fees), rs)
 end
-function difference_linearised_risk(sca::Scalariser, qs::AbstractVector, rs::VecBaseRM,
-                                    wd::VecNum, w::VecNum, X::MatNum, fees::Fees)
+function difference_linearised_risk(sca::Option{<:Scalariser}, qs::AbstractVector,
+                                    rs::VecBaseRM, wd::VecNum, w::VecNum, X::MatNum,
+                                    fees::Fees)
     return scalarise(sca, zip(qs, rs)) do (q, r)
         return difference_linearised_risk(q, r, wd, w, X, fees) * r.settings.scale
     end
 end
-function difference_linearised_risk(::Scalariser, q, r::AbstractBaseRiskMeasure, wd::VecNum,
-                                    w::VecNum, X::MatNum, fees::Fees)
+function difference_linearised_risk(::Option{<:Scalariser}, q, r::AbstractBaseRiskMeasure,
+                                    wd::VecNum, w::VecNum, X::MatNum, fees::Fees)
     return difference_linearised_risk(q, r, wd, w, X, fees)
 end
 function difference_worst_case(r::RkRatioRM, wd::VecNum, w::VecNum, X::MatNum, fees::Fees)

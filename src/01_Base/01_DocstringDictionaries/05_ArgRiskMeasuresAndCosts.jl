@@ -127,9 +127,9 @@ unique_key_dict!(arg_dict, :arg_dict,
                  :r2 => "`r2`: Second risk measure.",#
                  :r1_vec => "`r1`: First risk measure, or a vector of them scalarised by `sca1`.",#
                  :r2_vec => "`r2`: Second risk measure, or a vector of them scalarised by `sca2`.",#
-                 :sca_rk => "`sca`: Scalariser combining the risk measures in `rk` into one number. Inert when `rk` holds a single measure. The field beats a `sca` keyword supplied at the call site.",#
-                 :sca_r1 => "`sca1`: Scalariser combining the risk measures in `r1` into one number. Inert when `r1` holds a single measure.",#
-                 :sca_r2 => "`sca2`: Scalariser combining the risk measures in `r2` into one number. Inert when `r2` holds a single measure.",#
+                 :sca_rk => "`sca`: Scalariser combining the risk measures in `rk` into one number. `nothing` gives the sum of [`SumScalariser`](@ref). Inert when `rk` holds a single measure. The field beats a `sca` keyword supplied at the call site.",#
+                 :sca_r1 => "`sca1`: Scalariser combining the risk measures in `r1` into one number. `nothing` gives the sum of [`SumScalariser`](@ref). Inert when `r1` holds a single measure.",#
+                 :sca_r2 => "`sca2`: Scalariser combining the risk measures in `r2` into one number. `nothing` gives the sum of [`SumScalariser`](@ref). Inert when `r2` holds a single measure.",#
                  # Risk measure.
                  :r => "`r`: Risk measure or vector of risk measures.",#
                  # Tracking.
