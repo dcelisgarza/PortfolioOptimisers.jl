@@ -1209,8 +1209,6 @@ The first block of a model takes the empty prefix and the names of today. Each b
 
 The block reads its own prior `cbr.pr` and its own phylogeny `cbr.plr`. The builder takes the values of the owner that the block cannot hold: the net budget `bgt`, for the long-short and gross budgets, the fees, for the MIP kinds and the tracking errors, the tracking errors `tr` that the owner bound to its rows, and the factor loadings `b1` of a factor head. The custom constraints get the owner and the bundle `attrs` that the owner gives them. A block of a set passes the set as the owner, `nothing` as the net budget and the fees, and `nothing` as `attrs`.
 
-**Breaking change.** These two functions replace the middle of `assemble_jump_model!` and the removed `assemble_allocation_set!`. A head no longer adds its weight bounds and its budgets before [`assemble_jump_model!`](@ref). Phase 1 adds them, with the net budget of the head.
-
 # Algorithm
 
 Phase 1:

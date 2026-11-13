@@ -429,8 +429,6 @@ A term that is not homogeneous of degree one in `w` multiplies each constant by 
 
 [`assemble_jump_model!`](@ref) calls the verb once for each model, while it builds the model. A [`Frontier`](@ref) sweep of [`MeanRisk`](@ref) solves its end points as [`MinimumRisk`](@ref) and [`MaximumReturn`](@ref) on the same model, and the term is in each of these objectives once, with the `obj` of the model.
 
-**Breaking change.** The objective builder called the verb once for each objective that the model got, with that objective as `obj`. A point of a sweep then counted the term once for each end point and once more for itself, and the term got [`MinimumRisk`](@ref) or [`MaximumReturn`](@ref) at an end point. A method that dispatches on `obj` now gets the declared objective at every end point.
-
 # Arguments
 
   - `model::JuMP.Model`: The JuMP model while it is built.

@@ -857,8 +857,6 @@ The function dispatches on the objective, builds its expression, and adds the [O
 
 The function adds nothing to the Objective Penalty, so a model can take one objective after another, as the corners of a [`Frontier`](@ref) sweep do, and each objective holds each contribution once. [`assemble_jump_model!`](@ref) adds the custom objective terms. [`add_penalty_to_objective!`](@ref) applies the sign that matches the sense of the objective, so a contribution always worsens the objective, whichever objective the method builds.
 
-**Breaking change.** The function took the arguments `optimiser` and `attrs`, and it added the custom objective terms of `optimiser.opt.cobj` to the penalty on each call. A sweep point then counted each term once for each corner and once more for itself.
-
 The return term is not an argument. Under [`MaximumRatio`](@ref) the method reads the form from the model instead. A registered `:sr_risk` means the risk form, and no `:sr_risk` means the return form.
 
 # Algorithm

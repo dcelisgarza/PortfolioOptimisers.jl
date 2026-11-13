@@ -64,8 +64,6 @@ The fall-through method does nothing. The concrete method adds lower-bound and u
 
 This is the first step of the block builder, [`set_block_constraints!`](@ref), so each [`ConstraintBlock`](@ref) of a model adds its own bounds. The rows go under `prefix`, the namespace of the block, and the builder reads the weights registered under it. The long and short parts belong to the weights. The first block that admits a short position makes them, with their rows `w_lw` and `w_sw`, and a later block reads them. A later block makes parts of its own under its prefix only when the weights already have a long part and no short part, because a block before it is long-only. Its short and gross budgets then read its own parts, as they read the anonymous parts of the set before this change.
 
-**Breaking change.** The positional `long::Bool` went. A long-only head checks its bounds with [`assert_long_only_weight_bounds`](@ref) where it built its weights, and the block builder adds the bounds.
-
 # Mathematical definition
 
 ```math

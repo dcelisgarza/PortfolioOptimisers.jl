@@ -8,9 +8,10 @@ whole repository.
   and the precedents of the library state, and change with it every site that the same mechanism
   reaches. A breaking change to an interface, a public verb among them, is the cost of that form.
   It is not a reason to take a weaker design, and it is not by itself the maintainer's decision.
-  Name the break in the commit, and in the docstring of each changed verb that a method of a user
-  implements. A released number that moves is the same cost. An ADR binds by the reason that it
-  states, so when that reason is a definition and not mathematics, correct the ADR in the fix.
+  Name the break in the commit and in `docs/src/migration.md`, where a user reads it. A docstring
+  states the current behaviour alone. A released number that moves is the same cost. An ADR
+  binds by the reason that it states, so when that reason is a definition and not mathematics,
+  correct the ADR in the fix.
   #1908 is the case: `RateRadius` and `RateSignificance` read the count of their siblings, against
   an amendment of ADR 0138. Ask the maintainer only when the mathematics and the precedents leave
   two designs open. #1900 is the case: both cross-sectional solve verbs return the residual count

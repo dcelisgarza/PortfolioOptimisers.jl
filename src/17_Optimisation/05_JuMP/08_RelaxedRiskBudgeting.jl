@@ -673,8 +673,6 @@ Add the weights and the cones of the model of a [`RelaxedRiskBudgeting`](@ref) t
 
 The method dispatches on `rrb.rba`. Each method registers the weights and calls [`_set_relaxed_risk_budgeting_constraints!`](@ref) with the vectors and the matrices that its budget reads. The weight bounds and the budgets come next, in phase 1 of the block of the head, [`set_block_constraints!`](@ref), which [`assemble_jump_model!`](@ref) runs. The table of [`_set_relaxed_risk_budgeting_constraints!`](@ref) states the values that each method passes.
 
-**Breaking change.** The method added the weight bounds and the budgets itself, before [`assemble_jump_model!`](@ref).
-
 # JuMP formulation
 
 ## Variables

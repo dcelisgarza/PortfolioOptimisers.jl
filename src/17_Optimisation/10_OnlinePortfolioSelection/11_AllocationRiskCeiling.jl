@@ -288,8 +288,6 @@ Intersects the Investable Mask of a JuMP head with the assets that the prior of 
 
 The prior of a set reads the rows of the online head, and the prior of the head reads its own rows. A young asset that the head keeps can then have no price in the prior of the set, when the `pe` of the set is plain and the prior of the head is mask-aware. A ceiling, a floor or a tracking error of the set would read `NaN` at that asset. So the asset departs from every block, as an asset that a distance reader refuses departs, see [`distance_reader_refusal_mask`](@ref). The function warns once, and it names the assets and the remedies. Under `strict` it refuses them. An asset that the head already left out raises no warning.
 
-**Breaking change.** Before the entry took a list of blocks, the leader re-solve of [`FollowTheLeader`](@ref) refused such a set prior with the `ArgumentError` of [`assert_set_prior_priced`](@ref).
-
 # Algorithm
 
  1. When `pmsk` is `nothing`, the prior of the set prices every asset. Return `imsk`.

@@ -60,8 +60,6 @@ The model must already hold `w`, `k`, the two scales and the observation count. 
 
   - `(wb, cbr)::Tuple`: The weight bounds of the step that the model holds, and the [`ResolvedConstraintBlock`](@ref) of the set, or `nothing` for a bounded set. [`projection_programme`](@ref) reads the floor of `wb` under a barrier geometry.
 
-**Breaking change.** This function returned `nothing` before a programme set took a bound that reads the rows, and then the bounds of the step alone. It returns the bounds and the block Result, because a custom objective term of the set reads the Result of its block. A programme set now gives its `ccnt` and its `cobj` the Price-Adjusted Allocation of the step through `factory(set, w)`, as it gave its turnover and its tracking errors before. The three-argument form is new: the projection programme resolves the block through the shared entry, and adds it with this form.
-
 # Related
 
   - [`ProgrammeAllocationSet`](@ref)
@@ -254,8 +252,6 @@ end
 Adds a programme set's return floor.
 
 For each term, the per-index arm of [`set_return_constraints!`](@ref) writes the return expression on the prior's expected returns and the row of its `settings.lb`. The term clears its `rte` first with [`no_return_expr_returns_estimator`](@ref), as a risk ceiling clears its `rke`, so it adds nothing to `ret_vec`, the return expression of the objective of the owner. The terms take the indices one to the number of terms under `prefix`, so in a leader's model they do not replace the head's own. The function does not use a term in the objective, as a scalarised return or the normalisation of a ratio, because the objective of the projection is the geometry's divergence.
-
-**Breaking change.** The floor kept `rte`, so it pushed its expression into `ret_vec` of a leader's model. The leader had already collapsed `ret_vec` into its `ret`, so no number changed, but a later reader of `ret_vec` read the term of the set.
 
 # Arguments
 
@@ -713,8 +709,6 @@ A set that reads the rows fits its prior on the rows of the step, as a batch hea
 
 The programme is a bare head of the shared entry [`resolve_block_entry`](@ref): it holds no block of its own, and it passes the block of its set. So the mask of the step follows the rules of the entry of a JuMP head. An asset that a [`FeatureDistance`](@ref) of a reader of the set cannot read, an asset with a gap in the rows that a plain graph reader of the set reads, and an asset that a distance reader of the set refuses each take a zero weight at the step, with a warning. Under the `strict` flag of the step, the programme refuses them.
 
-**Breaking change.** The programme fitted again without an asset that a distance reader refused, in its seven-argument method. It did not drop an asset that a reader cannot read or that a plain graph reader reads with a gap. The shared entry holds the one refusal branch now, and it drops those assets as the entry of a JuMP head does.
-
 # Mathematical definition
 
 ```math
@@ -791,8 +785,6 @@ end
 Builds and solves the projection programme of one step at the Investable Mask `imsk`, from the entry `e = (imsk, set, cbr)` that the shared entry resolved for the step.
 
 [`resolve_projection_entry`](@ref) gives the entry. The method takes the three values as one `Tuple`, so a bounded set always comes with no block Result and a programme set with its own block Result. The entry already dropped every asset that a distance reader of the set refuses, so the model is built once, at the final mask. The refused asset takes a zero weight at the step, as an asset that the prior cannot price does. The Investable Mask of the Recursion Result does not change, because it is the active mask of the last row.
-
-**Breaking change.** This method had seven arguments. It took the prior result `pr`, the mask and the set before the reduction, and it caught the refusal of a distance reader around [`set_allocation_set_constraints!`](@ref) to build the model again. It takes the entry of the step now, with the set viewed at the mask and the Result `cbr` of its block, because the shared entry [`resolve_block_entry`](@ref) holds the one refusal branch.
 
 # Algorithm
 

@@ -360,8 +360,6 @@ This is stage 1 of the resolution of the set's block, [`resolve_constraint_block
 
 The weight bounds `wb` are a stage 2 slot of the block, because their resolver can read the rows. A bound that reads only names, a [`WeightBounds`](@ref) or a [`WeightBoundsEstimator`](@ref), resolves here, over the `N` assets, once per fold. Stage 2 then gives the resolved bounds back unchanged. A bound that reads the rows, such as a [`ScoreWeightBounds`](@ref), stays in the set, and stage 2 resolves it at each step on the head's rows ([`bounds_read_rows`](@ref)).
 
-**Breaking change.** Before the block Result, this function also resolved `lcse` and `gcarde`, and `resolve_allocation_set_rows` resolved the slots that read the rows. A linear constraint does not follow a view at the mask, so `lcse` and `gcarde` now resolve at each step, after the reduction, over the `sets` that carry the Non-Investable Axis.
-
 # Algorithm
 
  1. When `wb` reads no rows, resolve it over the `N` assets with [`weight_bounds_constraints`](@ref). Otherwise keep it.

@@ -14,8 +14,6 @@ The entry takes a list of blocks. The block of `opt` is the first, and the keywo
 
 A distance reader of a block, its `cte` or its `ple`, can refuse an asset that its prior keeps, see [`DistanceReaderRefusalError`](@ref). The shared entry [`resolve_block_entry`](@ref) holds one refusal branch for every reader of every block. The projection programme of a [`ProgrammeAllocationSet`](@ref) uses the same entry as a bare head. On a refusal, the entry fits again from the same prior results, without that asset. The readers of `opt` refuse under `opt.strict`, and the readers of a set refuse under the `strict` flag of the online head that holds the set, [`projection_step_strict`](@ref).
 
-**Breaking change.** The verb was `processed_jump_optimiser_attributes`, and it returned `ProcessedJuMPOptimiserAttributes`, which held one field for each resolved constraint. The constraints are now in the block Result in `cbr`. The calibrated slots `l2c`, `lpc`, `linfc`, `l1`, `l2`, `lp` and `linf` resolve at stage 2, and not in [`assemble_jump_model!`](@ref). A method of a custom constraint that reads `attrs.cbr` reads a vector when the head has more than one block, and [`owner_block`](@ref) gives the block of `opt`. The keyword `rmsk` went, because the shared entry holds the fit again.
-
 # Algorithm
 
  1. Fit the prior `pr` of `opt.pe` on `rd`. Fit the prior of each entry of `blocks` on its rows with [`fit_allocation_set_block`](@ref).
@@ -324,8 +322,6 @@ Add weight bound and budget constraints to `model` from the optimiser's own budg
 
 [`UnconstrainedNearOptimalCentering`](@ref) reaches [`set_weight_constraints!`](@ref) through this method, because its centring solve adds the bounds of the block and no other row of it. Every other JuMP head adds its bounds and its budgets in phase 1 of its block, [`set_block_constraints!`](@ref), with the net budget of the head. Both routes pass the whole budget group (`bgt`, `sbgt`, `gbgt`) as one object, so a budget field cannot reach one head and miss the others.
 
-**Breaking change.** The positional `long::Bool` went, and the heads that forbade a negative bound with it call [`assert_long_only_weight_bounds`](@ref).
-
 # Arguments
 
   - $(arg_dict[:model])
@@ -438,18 +434,6 @@ owner is its [`ProgrammeAllocationSet`](@ref), see [`later_constraint_blocks`](@
 
 A frontier corner solves this model again with another objective. Every custom objective term
 keeps the `obj` of the assembly, as the penalties do, and counts once in each solve.
-
-**Breaking change.** The objective builder [`set_portfolio_objective_function!`](@ref) added
-the custom objective terms of the head, once for each objective that the model got. A
-[`Frontier`](@ref) sweep of [`MeanRisk`](@ref) sets the objective of its corners first, so a
-sweep point counted each term once for each corner and once more for itself, and a term got
-the objective of the corner. Now the assembly adds each term once, with `obj`.
-
-**Breaking change.** A head adds its weight bounds and its budgets here, in phase 1 of its
-block, and not before this function. A head of its own calls
-[`assert_long_only_weight_bounds`](@ref) where it builds its weights, when its formulation is
-long-only. A head that gets more than one block adds the rows of every block, where it added
-the rows of its own block alone and the other blocks only narrowed its Investable Mask.
 
 The tail of the sequence is [`assert_frontier_sweep_cap`](@ref): both frontier registries are
 complete here and no sweep solve has started, so this is the one point at which the **total**

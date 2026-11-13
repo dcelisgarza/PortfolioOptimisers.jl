@@ -972,8 +972,6 @@ Add the weights and the row of the logarithm of a [`RiskBudgeting`](@ref) to the
 
 The method dispatches on the formulation of `rb.rba`. Each method registers the weights and calls [`_set_risk_budgeting_constraints!`](@ref) with the vector that its formulation reads. The weight bounds and the budgets come next, in phase 1 of the block of the head, [`set_block_constraints!`](@ref), which [`assemble_jump_model!`](@ref) runs. The `# Mathematical definition` of [`RiskBudgeting`](@ref) states each programme.
 
-**Breaking change.** The method added the weight bounds and the budgets itself, before [`assemble_jump_model!`](@ref).
-
 # JuMP formulation
 
 ## Variables
