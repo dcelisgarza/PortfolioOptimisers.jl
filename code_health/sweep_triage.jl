@@ -322,8 +322,10 @@ function body_of(c::Candidate, commit::AbstractString)
     println(io, "4. Its prose passes `/unslop`.")
     println(io, "5. Its code carries no performance trap: `code_health/perf.jl scan ",
             c.path, "` lists no Finding that a Dismissal does not cover.")
-    println(io, "6. Its methods meet the wrapper standard: `code_health/forward_survey.jl ",
-            c.path, "` reports no candidate without a ruling.\n")
+    println(io,
+            "6. Its methods meet the wrapper standard and the rule for a returned named ",
+            "tuple: ", "`code_health/forward_survey.jl ", c.path,
+            "` reports no candidate without a ruling.\n")
     println(io, "Take the numbers from `code_health/sweep_manifest.toml` and ",
             "`code_health/coverage_baseline.toml`, not from this table.\n")
     println(io, "## Notes\n")

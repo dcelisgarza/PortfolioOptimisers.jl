@@ -673,6 +673,26 @@ its callers call the positional form.
 A wrapper that one of the two reasons keeps names that reason in the allow-list of
 `test/test_70_trivial_unit_census.jl`.
 
+### A function returns a defined type or a plain tuple, not a named tuple
+
+A function that gives back more than one value returns a defined type or a plain tuple of the
+values. It does not return a named tuple. The maintainer ruled this on 2026-11-13 (#2113).
+
+- **A defined type** names the values once, in one place that a docstring, a `show` method and a
+  test can reach. A public result is a `…Result <: AbstractResult`, as `ForecastSummaryResult`
+  and `PerformanceSummaryResult` are, and `GLOSSARY.md` names it.
+- **A plain tuple** suits values that the caller takes apart by position at once, as
+  `a, b = f(x)` does.
+- **A named tuple stays only where #2113 rules it the true answer**, for example a bundle of
+  keywords that a caller splats or merges by field name. #2113 rules each group, and its ruling
+  goes into this section.
+
+`code_health/forward_survey.jl <file>` reports each method that returns a named tuple literal, at a
+`return` or at the tail of its body, as a `review` finding of the shape `named tuple`. This is part
+of the sixth condition of #404. A `named tuple` finding that your change adds asks for a defined
+type or a plain tuple. A finding that you did not add belongs to the build ticket of its directory
+under map #2072.
+
 ## The simple form wins
 
 Write the simplest code that does the work. A layer, a closure, a type, a macro or a generated

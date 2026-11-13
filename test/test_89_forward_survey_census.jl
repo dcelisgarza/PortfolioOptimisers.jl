@@ -193,6 +193,24 @@ using Test
              # keyword form of a public verb
              kwv(x::A; s = 1) = kwv_worker(x, s)
              kwv_worker(x, s) = x + s
+
+             # named tuple (#2113)
+             nt_short(x::A) = (; x, y = 1)
+             function nt_long(x::B)
+                 if x === 1
+                     return (a = 1, b = 2)
+                 end
+                 return (1, 2)
+             end
+             nt_empty(x::A) = (;)
+             nt_plain(x::A) = (x, 1)
+             function nt_inner(x::A)
+                 g = y -> (; y)
+                 h(z) = (; z)
+                 return g(h(x))
+             end
+             nt_arg(x::A) = nt_take((; a = x))
+             Mod.nt_q(x::A) = (; x.a)
              """
     census = """
              kept = Dict{Symbol, String}(:mk => "public preset")
@@ -345,6 +363,27 @@ using Test
                               ("interface", :T2, "keep (interface)")]
         # A public verb that passes a keyword as a slot is a keyword form, not a worker.
         @test of(:kwv) == [("keyword form", :kwv_worker, "keep (a)")]
+    end
+
+    @testset "named tuple (#2113)" begin
+        nt(name) = [x.verdict for x in found if x.name === name && x.shape == "named tuple"]
+        nt_of(name) = only(x for x in found if x.name === name && x.shape == "named tuple")
+        @test nt(:nt_short) == ["review"]
+        @test occursin("`(; x, y)`", nt_of(:nt_short).why)
+        @test FS.is_candidate(nt_of(:nt_short))
+        # A `return` inside an `if` counts, and the plain tuple of the tail does not.
+        @test nt(:nt_long) == ["review"]
+        @test occursin("`(; a, b)`", nt_of(:nt_long).why)
+        @test !occursin("1, 2", nt_of(:nt_long).why)
+        @test nt(:nt_empty) == ["review"]
+        @test isempty(nt(:nt_plain))
+        # An inner function gives its value back to its own caller.
+        @test isempty(nt(:nt_inner))
+        # A named tuple that the method passes to a call is no return.
+        @test isempty(nt(:nt_arg))
+        # A qualified method, as an extension writes one, is read too.
+        @test nt(:nt_q) == ["review"]
+        @test occursin("`(; a)`", nt_of(:nt_q).why)
     end
 
     @testset "the rulings of the census" begin

@@ -50,6 +50,13 @@
 #   keyword form         a public method that passes its keywords as positional arguments.
 #                        `src/CLAUDE.md` keeps a keyword wrapper on a verb of a workflow that a
 #                        user calls. Reason (a).
+#   named tuple          a method that returns a named tuple literal, `(; a, b)` or `(a = x,)`,
+#                        at a `return` or at the tail of its body (#2113). A function returns a
+#                        defined type or a plain tuple of values. Until #2113 rules the groups
+#                        that keep the named tuple, each finding is `review`. This detector reads
+#                        every method, also one that another detector reports. It does not read a
+#                        functor method, a named tuple that a variable carries to the `return`, a
+#                        `NamedTuple{…}(…)` call or a `merge`.
 #
 # THE VERDICTS. `go`: the rulings remove the method. `keep (a)` and `keep (b)`: the two reasons of
 # the standard. `keep (interface)`: the method is not a wrapper, by rule 3 or rule 4.
@@ -1211,6 +1218,108 @@ function default_findings!(out, t::Tree, rulings)
     return out
 end
 
+# --- named tuple (#2113) ---------------------------------------------------------
+
+# Whether `e` is a named tuple literal: `(; a, b)`, `(;)` or `(a = x, b = y)`.
+function is_named_tuple(e)
+    if !(e isa Expr && e.head === :tuple && !isempty(e.args))
+        return false
+    end
+    a = e.args[1]
+    return (a isa Expr && a.head === :parameters) ||
+           all(x -> x isa Expr && x.head === :(=), e.args)
+end
+
+# The field of one entry of a named tuple literal: `a` of `a`, of `a = x` and of `x.a`.
+nt_field(a::Symbol) = string(a)
+function nt_field(a::Expr)
+    if a.head === :kw || a.head === :(=)
+        return string(a.args[1])
+    elseif a.head === :. && a.args[end] isa QuoteNode
+        return string(a.args[end].value)
+    end
+    return string(a)
+end
+nt_field(a) = string(a)
+
+# The fields of a named tuple literal, as the source spells the shape: `(; a, b)`.
+function nt_fields(e)
+    entries = e.args[1] isa Expr && e.args[1].head === :parameters ? e.args[1].args : e.args
+    return "(; " * join((nt_field(a) for a in entries), ", ") * ")"
+end
+
+# The values that `e` gives back when it is the tail of a body: through a `begin` block, an `if`,
+# a `let`, a `return` and a macro call, the last expression of each branch.
+function tail_values!(out, e)
+    if e isa Expr
+        if e.head === :block || e.head === :macrocall
+            stmts = filter(a -> !(a isa LineNumberNode),
+                           e.head === :block ? e.args : e.args[2:end])
+            if !(isempty(stmts))
+                tail_values!(out, stmts[end])
+            end
+            return out
+        elseif e.head === :if || e.head === :elseif
+            foreach(a -> tail_values!(out, a), e.args[2:end])
+            return out
+        elseif e.head === :let
+            return tail_values!(out, e.args[2])
+        elseif e.head === :return
+            if !(isempty(e.args))
+                tail_values!(out, e.args[1])
+            end
+            return out
+        end
+    end
+    push!(out, e)
+    return out
+end
+
+# Whether `e` defines a function inside a body: a closure, or a long or short form. Its `return`
+# gives back to its own caller.
+function is_inner_function(e)
+    if e.head === :function || e.head === :(->)
+        return true
+    end
+    sig = e.head === :(=) ? CH.call_signature(e.args[1]) : nothing
+    return sig isa Expr && sig.head === :call
+end
+
+# The values of each `return` in `e`, outside an inner function.
+function returned_values!(out, e)
+    if !(e isa Expr) || is_inner_function(e)
+        return out
+    end
+    if e.head === :return
+        return tail_values!(out, e)
+    end
+    foreach(a -> returned_values!(out, a), e.args)
+    return out
+end
+
+"""
+    named_tuple_findings!(out, t::Tree) -> out
+
+One `review` finding for each method that returns a named tuple literal, at a `return` or at the
+tail of its body (#2113). The reason names the shape of each named tuple that the method returns.
+"""
+function named_tuple_findings!(out, t::Tree)
+    for d in t.defs
+        values = returned_values!(tail_values!(Any[], d.body), d.body)
+        shapes = unique!([nt_fields(v) for v in values if is_named_tuple(v)])
+        if isempty(shapes)
+            continue
+        end
+        why = "returns the named tuple " *
+              join(("`$s`" for s in shapes), ", ") *
+              ": a function returns a defined type or a plain tuple of values. Rule it on #2113, which rules the groups that keep the named tuple"
+        push!(out,
+              SurveyFinding(d.file, d.line, "named tuple", d.name, nothing, "review", why,
+                            ""))
+    end
+    return out
+end
+
 # --- the survey ------------------------------------------------------------------
 
 """
@@ -1218,7 +1327,9 @@ end
 
 Every finding in `files`, relative to `root`, sorted by file and line. `census` is the file whose
 lists rule a finding, and a census that does not exist rules nothing. A method that one detector
-reports, no later detector reports, in the order rebuild, self-forward, forward, default.
+reports, no later detector reports, in the order rebuild, self-forward, forward, default. The
+named tuple detector reads the returns of every method, so it reports a method that another
+detector reports too.
 """
 function survey(; root = CH.REPO_ROOT, files = CH.source_files(; root),
                 census = joinpath(root, CENSUS))
@@ -1230,6 +1341,7 @@ function survey(; root = CH.REPO_ROOT, files = CH.source_files(; root),
     self_findings!(out, t, rulings, done())
     forward_findings!(out, t, rulings, done())
     default_findings!(out, t, rulings)
+    named_tuple_findings!(out, t)
     return sort!(out; by = f -> (f.file, f.line, string(f.name), string(f.callee)))
 end
 

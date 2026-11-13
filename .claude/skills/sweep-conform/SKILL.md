@@ -130,6 +130,8 @@ of cost, the fast ones first, and the slow ones once, on the tree you will push:
    of #2072. A `go` finding that your change adds is a wrapper: give the form to its owner. A
    `review` finding that your change adds needs a decision of the maintainer: ask before you
    push. A finding that `test_70` lists as ruled, or that a `keep` verdict covers, needs no work.
+   A `named tuple` finding that your change adds is a function that returns a named tuple:
+   return a defined type or a plain tuple of the values (#2113).
    This is the sixth condition of #404. A finding that you did not add belongs to the build
    ticket of its directory under #2072, and you leave it.
    **A gate that trips on your own row asks for a decision, not a smaller number.** Lower the
@@ -212,7 +214,7 @@ The check is a convenience, never an Authority. Another file owns each rule that
 | the reopened map and the sub-issue | ADR 0084 | `.github/workflows/Sweep.yml` |
 | a row in each gate baseline | ADR 0074 | `code_health/<gate>.jl check` |
 | the size ceiling | ADR 0101 | `code_health/size.jl check` |
-| the wrapper standard, the sixth condition | `.github/instructions/julia-source-code.instructions.md` § *A wrapper is for convenience or for a dispatch problem* | `test/test_70_trivial_unit_census.jl`, and `code_health/forward_survey.jl <file>` |
+| the wrapper standard and the return of many values, the sixth condition | `.github/instructions/julia-source-code.instructions.md` § *A wrapper is for convenience or for a dispatch problem* and § *A function returns a defined type or a plain tuple, not a named tuple* | `test/test_70_trivial_unit_census.jl`, and `code_health/forward_survey.jl <file>` |
 | a gate measured the pushed tree | `code_health/gate_stamp.sh` | the `gate-stamps` pre-push hook |
 
 `CODING_STANDARDS.md` routes any subject the table does not carry.
