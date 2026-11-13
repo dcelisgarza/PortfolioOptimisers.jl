@@ -1414,7 +1414,8 @@ function rolling_window_measure(r::BaseRM_VecBaseRM, ppred::PopulationPrediction
     return [rolling_window_measure(r, p, window; kwargs...) for p in ppred.pred]
 end
 """
-    sort_by_measure(ppred::PopulationPredictionResult, r::BaseRM_VecBaseRM; kwargs...)
+    sort_by_measure(sca::Option{<:Sca_VecToScaM}, ppred::PopulationPredictionResult,
+                    r::BaseRM_VecBaseRM; kwargs...)
 
 Sort the successful paths in a [`PopulationPredictionResult`](@ref) from the best to the worst
 under `r`. A path in which any fold returned a failure code is left out.
@@ -1430,16 +1431,22 @@ path and [`MaxScalariser`](@ref) by the best.
 
 # Algorithm
 
- 1. Keep the successful members of `ppred` with [`successful_members`](@ref).
- 2. Compute the oriented score of each member under `r` with [`oriented_score`](@ref), giving `rks`.
- 3. Sort the members whose `rks` is finite by `rks`, in descending order.
- 4. Append the members whose `rks` is not finite, in their own order.
+ 1. Check `sca` and `kwargs` with [`assert_path_reduction`](@ref).
+ 2. Keep the successful members of `ppred` with [`successful_members`](@ref).
+ 3. Compute the oriented score of each member under `r` and `sca` with [`oriented_score`](@ref), giving `rks`.
+ 4. Sort the members whose `rks` is finite by `rks`, in descending order.
+ 5. Append the members whose `rks` is not finite, in their own order.
 
 # Arguments
 
+  - $(arg_dict[:sca_path])
   - `ppred::PopulationPredictionResult`: Population prediction to sort.
-  - `r::BaseRM_VecBaseRM`: Risk measure used for ranking, or a vector of them. A vector is reduced by `kwargs.sca`, a [`Sca_VecToScaM`](@ref) that defaults to [`SumScalariser`](@ref).
+  - `r::BaseRM_VecBaseRM`: Risk measure used for ranking, or a vector of them.
   - `kwargs...`: Keyword arguments forwarded to [`oriented_score`](@ref).
+
+# Validation
+
+  - `kwargs` must not contain `sca`, and `sca` must not be `nothing` when `r` is a vector, through [`assert_path_reduction`](@ref).
 
 # Returns
 
@@ -1451,16 +1458,19 @@ path and [`MaxScalariser`](@ref) by the best.
   - [`oriented_score`](@ref)
   - [`PopulationPredictionResult`](@ref)
 """
-function sort_by_measure(ppred::PopulationPredictionResult, r::BaseRM_VecBaseRM; kwargs...)
+function sort_by_measure(sca::Option{<:Sca_VecToScaM}, ppred::PopulationPredictionResult,
+                         r::BaseRM_VecBaseRM; kwargs...)
+    assert_path_reduction(sca, r, kwargs, "kwargs")
     pred = successful_members(ppred)
-    rks = [oriented_score(r, x; kwargs...) for x in pred]
+    rks = [oriented_score(sca, r, x; kwargs...) for x in pred]
     fin = isfinite.(rks)
     idx = findall(fin)
     return [pred[idx[sortperm(rks[idx]; rev = true)]]; pred[findall(!, fin)]]
 end
 """
-    quantile_by_measure(ppred::PopulationPredictionResult, r::BaseRM_VecBaseRM, q::Real;
-                        r_kwargs::NamedTuple = (;), q_kwargs::NamedTuple = (;))
+    quantile_by_measure(sca::Option{<:Sca_VecToScaM}, ppred::PopulationPredictionResult,
+                        r::BaseRM_VecBaseRM, q::Real; r_kwargs::NamedTuple = (;),
+                        q_kwargs::NamedTuple = (;))
 
 Select the successful path in `ppred` whose risk under `r` is closest to the `q`-th quantile of the risks across all successful paths.
 
@@ -1470,22 +1480,25 @@ A path whose measure is not finite takes no part. It is dropped before the quant
 
 # Algorithm
 
- 1. Keep the successful members of `ppred` with [`successful_members`](@ref).
- 2. Compute the negated oriented score of each member under `r` with [`oriented_score`](@ref), giving `rks`.
- 3. Drop the members whose `rks` is not finite.
- 4. Compute the `q`-th quantile of `rks` with `Statistics.quantile`, giving `rkq`.
- 5. Return the first member whose `abs(rks[i] - rkq)` is the smallest.
+ 1. Check `sca` and `r_kwargs` with [`assert_path_reduction`](@ref).
+ 2. Keep the successful members of `ppred` with [`successful_members`](@ref).
+ 3. Compute the negated oriented score of each member under `r` and `sca` with [`oriented_score`](@ref), giving `rks`.
+ 4. Drop the members whose `rks` is not finite.
+ 5. Compute the `q`-th quantile of `rks` with `Statistics.quantile`, giving `rkq`.
+ 6. Return the first member whose `abs(rks[i] - rkq)` is the smallest.
 
 # Arguments
 
+  - $(arg_dict[:sca_path])
   - `ppred::PopulationPredictionResult`: Population prediction result.
-  - `r::BaseRM_VecBaseRM`: Risk measure for computing path risks, or a vector of them. A vector is reduced by `r_kwargs.sca`, a [`Sca_VecToScaM`](@ref) that defaults to [`SumScalariser`](@ref).
+  - `r::BaseRM_VecBaseRM`: Risk measure for computing path risks, or a vector of them.
   - `q::Real`: Quantile level in `[0, 1]`.
-  - `r_kwargs::NamedTuple = (;)`: Keyword arguments forwarded to [`oriented_score`](@ref).
+  - `r_kwargs::NamedTuple = (;)`: Keyword arguments forwarded to [`oriented_score`](@ref). It must not contain `sca`.
   - `q_kwargs::NamedTuple = (;)`: Keyword arguments forwarded to `Statistics.quantile`.
 
 # Validation
 
+  - `r_kwargs` must not contain `sca`, and `sca` must not be `nothing` when `r` is a vector, through [`assert_path_reduction`](@ref).
   - At least one successful member must have a finite measure. With none, `Statistics.quantile` receives an empty vector and throws.
 
 # Returns
@@ -1498,11 +1511,13 @@ A path whose measure is not finite takes no part. It is dropped before the quant
   - [`oriented_score`](@ref)
   - [`PopulationPredictionResult`](@ref)
 """
-function quantile_by_measure(ppred::PopulationPredictionResult, r::BaseRM_VecBaseRM,
+function quantile_by_measure(sca::Option{<:Sca_VecToScaM},
+                             ppred::PopulationPredictionResult, r::BaseRM_VecBaseRM,
                              q::Real; r_kwargs::NamedTuple = (;),
                              q_kwargs::NamedTuple = (;))
+    assert_path_reduction(sca, r, r_kwargs, "r_kwargs")
     pred = successful_members(ppred)
-    rks = [-oriented_score(r, p; r_kwargs...) for p in pred]
+    rks = [-oriented_score(sca, r, p; r_kwargs...) for p in pred]
     fin = findall(isfinite, rks)
     rks = rks[fin]
     pred = pred[fin]

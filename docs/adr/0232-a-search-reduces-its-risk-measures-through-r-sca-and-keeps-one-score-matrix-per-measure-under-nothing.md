@@ -43,7 +43,8 @@ Four facts bore on the answer.
 | ADR 0120 | Holds for each matrix apart. Each matrix goes through `finite_candidate_order` unchanged. |
 | The selection with `nothing` | ADR 0234. `opt`, `idx`, `ranked`, `rank_idx` and `rank_scores` hold one entry per measure. |
 | The six methods | One writer and one allocator. The combinatorial score becomes a method of `write_candidate_scores!`, and one helper allocates a matrix or a vector of `K` matrices. The two randomised forms forward `r_sca`. |
-| The keyword form of the score | `oriented_score(r, p; sca, kwargs...)` is removed. Every caller holds its reduction and calls `oriented_score(sca, r, p; kwargs...)`. `sort_by_measure` and `quantile_by_measure` take a keyword `sca = SumScalariser()`, as `expected_risk` does. `quantile_by_measure` and `NearestQuantilePrediction` refuse a `sca` in `r_kwargs`, because a reader of a risk would ignore it for one measure. |
+| The keyword form of the score | `oriented_score(r, p; sca, kwargs...)` is removed. Every caller holds its reduction and calls `oriented_score(sca, r, p; kwargs...)`. `sort_by_measure(sca, ppred, r; kwargs...)` and `quantile_by_measure(sca, ppred, r, q; r_kwargs, q_kwargs)` take the reduction as their first argument in the same way, and they have no keyword form. #1997 measured the keyword form against the positional form: the time, the allocations and the count of runtime dispatches were equal in each case. So the form follows the rule for keyword wrappers in `src/CLAUDE.md`. `quantile_by_measure` and `NearestQuantilePrediction` refuse a `sca` in `r_kwargs`, and `sort_by_measure` refuses a `sca` in its `kwargs`, because a reader of a risk would ignore it for one measure. |
+| `nothing` with a vector | `NearestQuantilePrediction`, `sort_by_measure` and `quantile_by_measure` refuse `sca = nothing` when `r` is a vector, with an `IsNothingError`. A sort and a quantile need one score for each path, and `nothing` keeps one score for each measure. For one measure `nothing` is inert. The types of `sca` and `r` select the refusal, so a call that is admitted pays nothing for it. |
 
 ## Considered options
 
@@ -72,10 +73,10 @@ Four facts bore on the answer.
 - **A breaking change, for the build.** The released `quantile_by_measure` and
   `NearestQuantilePrediction` pass `r_kwargs` to `expected_risk`, so a released caller can write
   `r_kwargs = (sca = MaxScalariser(),)`. That spelling is now refused, and the error names the
-  keyword `sca` of `quantile_by_measure` and the field `sca` of `NearestQuantilePrediction`. The
+  argument `sca` of `quantile_by_measure` and the field `sca` of `NearestQuantilePrediction`. The
   build names the break in the migration guide, beside the `sign` that ADR 0231 removed. A
-  released call `sort_by_measure(ppred, r; sca = …)` keeps its meaning, because the new keyword
-  has the same spelling. The Result of a search holds a vector of matrices in `test_scores` and
+  released call `sort_by_measure(ppred, r; …)` or `quantile_by_measure(ppred, r, q; …)` raises a
+  `MethodError`, because the reduction is now the first argument. The Result of a search holds a vector of matrices in `test_scores` and
   `train_scores` under `r_sca = nothing`, a new configuration that reaches no released caller.
 - **No search of one measure changes.** The slot is inert for one measure, and the orientation of
   one measure is the `sgn` that the search applied before.

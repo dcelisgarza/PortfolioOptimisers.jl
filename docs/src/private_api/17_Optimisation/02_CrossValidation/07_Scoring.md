@@ -18,6 +18,13 @@ PortfolioOptimisers.oriented_member_score
 PortfolioOptimisers.prediction_returns
 ```
 
+A reader of a population needs one score for each path. So it refuses a reduction of `nothing` for a vector of measures, and a `sca` in the keywords that it forwards to the score.
+
+```@docs
+PortfolioOptimisers.assert_path_reduction
+PortfolioOptimisers.assert_one_score_per_path
+```
+
 A scorer ranks only the members of a population whose every fold solved.
 
 ```@docs

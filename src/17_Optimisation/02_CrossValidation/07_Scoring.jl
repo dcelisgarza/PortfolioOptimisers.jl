@@ -44,8 +44,6 @@ The union exists so that a caller can select a path with a function and write no
 """
 const PredictionCrossValScorer = Union{PredictionScorer, Function}
 """
-    oriented_score(r::BaseRM_VecBaseRM, p::PredRes_MultiPredRes;
-                   sca::Option{<:Sca_VecToScaM} = SumScalariser(), kwargs...)
     oriented_score(sca::Option{<:Sca_VecToScaM}, r::BaseRM_VecBaseRM, p::PredRes_MultiPredRes;
                    kwargs...)
 
@@ -76,10 +74,9 @@ One measure ignores `sca` and its scale, as [`expected_risk`](@ref) does.
 
 # Algorithm
 
- 1. With the keyword form, take `sca` out of `kwargs` and call the positional form.
- 2. One measure: return ``o \\, \\mathcal{R}(P)``, with ``\\mathcal{R}(P)`` from [`expected_risk`](@ref) with `kwargs`.
- 3. A vector: read the return series of ``P`` once with [`prediction_returns`](@ref), and compute ``o_k s_k \\mathcal{R}_k(P)`` for each measure on that series, with [`oriented_member_score`](@ref) with `kwargs`.
- 4. Reduce the values of step 3 by the type of `sca`:
+ 1. One measure: return ``o \\, \\mathcal{R}(P)``, with ``\\mathcal{R}(P)`` from [`expected_risk`](@ref) with `kwargs`.
+ 2. A vector: read the return series of ``P`` once with [`prediction_returns`](@ref), and compute ``o_k s_k \\mathcal{R}_k(P)`` for each measure on that series, with [`oriented_member_score`](@ref) with `kwargs`.
+ 3. Reduce the values of step 2 by the type of `sca`:
      1. A [`Scalariser`](@ref): through [`scalarise`](@ref).
      2. A [`VectorToScalarMeasure`](@ref) or a function: collect the values into a vector, and apply [`vec_to_real_measure`](@ref).
      3. `nothing`: return the vector of the values, so each measure keeps its own score.
@@ -103,9 +100,10 @@ One measure ignores `sca` and its scale, as [`expected_risk`](@ref) does.
   - [`sort_by_measure`](@ref): sorts the paths of a population by this score.
   - [`quantile_by_measure`](@ref): selects a path by the quantile of the negated score.
 """
-function oriented_score(r::BaseRM_VecBaseRM, p::PredRes_MultiPredRes;
-                        sca::Option{<:Sca_VecToScaM} = SumScalariser(), kwargs...)
-    return oriented_score(sca, r, p; kwargs...)
+function oriented_score(::Option{<:Sca_VecToScaM}, r::AbstractBaseRiskMeasure,
+                        p::PredRes_MultiPredRes; kwargs...)
+    x = expected_risk(r, p; kwargs...)
+    return bigger_is_better(r) ? x : -x
 end
 #=
 The orientation is a trait of the type, so the compiler drops each branch on it, and a
@@ -117,11 +115,6 @@ arithmetic is on concrete types. A call that passed the prediction would box it 
 member. One measure reads `expected_risk` on the prediction, so that a measure that refuses a
 prediction, such as `ExpectedReturn`, still refuses it.
 =#
-function oriented_score(::Option{<:Sca_VecToScaM}, r::AbstractBaseRiskMeasure,
-                        p::PredRes_MultiPredRes; kwargs...)
-    x = expected_risk(r, p; kwargs...)
-    return bigger_is_better(r) ? x : -x
-end
 function oriented_score(sca::Scalariser, rs::VecBaseRM, p::PredRes_MultiPredRes; kwargs...)
     X = prediction_returns(p)
     return scalarise(r -> oriented_member_score(r, X; kwargs...), sca, rs)
@@ -188,6 +181,73 @@ function prediction_returns(p::MultiPeriodPredictionResult)
     return p.mrd.X
 end
 """
+    assert_path_reduction(sca::Option{<:Sca_VecToScaM}, r::BaseRM_VecBaseRM, kwargs,
+                          name::AbstractString)
+
+Check the reduction of a reader that gives one score for each path of a population.
+
+[`NearestQuantilePrediction`](@ref), [`sort_by_measure`](@ref) and [`quantile_by_measure`](@ref) call it before they score a path. The reduction is the argument `sca`, so a `sca` in the keyword arguments that the reader forwards to [`oriented_score`](@ref) is refused. A reader of a risk takes every keyword that it does not declare, so it would ignore that `sca` without an error. The keys of a `NamedTuple` are part of its type, so the check costs nothing at run time.
+
+# Arguments
+
+  - $(arg_dict[:sca_path])
+  - `r`: One risk measure, or a vector of them.
+  - `kwargs`: The keyword arguments that the reader forwards to [`oriented_score`](@ref).
+  - `name`: The name of `kwargs` in the call of the caller, for the error message.
+
+# Validation
+
+  - `kwargs` must not contain `sca`. The error is a [`ConflictingArgumentError`](@ref).
+  - [`assert_one_score_per_path`](@ref) checks `sca` against `r`.
+
+# Returns
+
+  - `nothing`.
+
+# Related
+
+  - [`assert_one_score_per_path`](@ref)
+  - [`oriented_score`](@ref)
+"""
+function assert_path_reduction(sca::Option{<:Sca_VecToScaM}, r::BaseRM_VecBaseRM, kwargs,
+                               name::AbstractString)
+    @argcheck(!haskey(kwargs, :sca),
+              ConflictingArgumentError("`$name` must not contain `sca`: the reduction of a vector of risk measures is the argument `sca`, or the field `sca` of a `NearestQuantilePrediction`. A reader of a risk ignores a `sca` in `$name`. Got\n$name.sca => $(get(kwargs, :sca, nothing))"))
+    return assert_one_score_per_path(sca, r)
+end
+"""
+    assert_one_score_per_path(sca::Option{<:Sca_VecToScaM}, r::BaseRM_VecBaseRM)
+    assert_one_score_per_path(sca::Nothing, r::VecBaseRM)
+
+Refuse a reduction of `nothing` for a vector of risk measures, where a reader needs one score for each path.
+
+Under `nothing`, [`oriented_score`](@ref) of a vector gives one score for each measure. A sort and a quantile need one number for each path, so the readers of a population refuse it. For one measure the reduction is inert, and `nothing` is admitted. The types of the arguments select the method, so the check makes no test at run time.
+
+# Arguments
+
+  - $(arg_dict[:sca_path])
+  - `r`: One risk measure, or a vector of them.
+
+# Validation
+
+  - `sca` must not be `nothing` when `r` is a vector. The error is an [`IsNothingError`](@ref).
+
+# Returns
+
+  - `nothing`.
+
+# Related
+
+  - [`assert_path_reduction`](@ref)
+  - [`NearestQuantilePrediction`](@ref)
+"""
+function assert_one_score_per_path(::Option{<:Sca_VecToScaM}, ::BaseRM_VecBaseRM)
+    return nothing
+end
+function assert_one_score_per_path(::Nothing, ::VecBaseRM)
+    return throw(IsNothingError("`sca` must not be `nothing` when `r` is a vector of risk measures: a path needs one score to be sorted or to take part in a quantile, and `nothing` keeps one score for each measure. Pass a reduction such as `SumScalariser()` or `MaxScalariser()`."))
+end
+"""
 $(DocStringExtensions.TYPEDEF)
 
 Selects the path of a population whose risk is nearest to a target quantile of the population's risks.
@@ -207,7 +267,7 @@ Where:
 
   - ``P_i``: Path ``i`` of the population.
   - ``\\mathcal{S}``: Set of the paths whose every fold solved and whose ``\\rho_i`` is finite.
-  - ``\\mathcal{O}(P_i)``: Oriented score of path ``i`` under `r`, from [`oriented_score`](@ref), so a higher score is better. The reduction `r_kwargs.sca` reduces a vector of risk measures to one value, and the default is [`SumScalariser`](@ref).
+  - ``\\mathcal{O}(P_i)``: Oriented score of path ``i`` under `r`, from [`oriented_score`](@ref), so a higher score is better. The field `sca` reduces a vector of risk measures to one value, and the default is [`SumScalariser`](@ref).
   - ``\\rho_i``: Risk of path ``i`` on a scale where a larger value is worse.
   - ``Q_q``: ``q``-th quantile of a set of values, as `Statistics.quantile` computes it with `q_kwargs`.
   - ``i^{\\star}``: Selected path.
@@ -217,7 +277,7 @@ Where:
 # Algorithm
 
  1. Keep the members of `ppred` whose every fold solved, through [`successful_members`](@ref), giving `pred`.
- 2. Compute `rks`, the vector of ``-\\mathcal{O}(P_i)`` over `pred`, through [`oriented_score`](@ref) with `r_kwargs`.
+ 2. Compute `rks`, the vector of ``-\\mathcal{O}(P_i)`` over `pred`, through [`oriented_score`](@ref) with `sca` and `r_kwargs`.
  3. Drop every entry of `rks` that is not finite, and the member of `pred` at its position.
  4. Compute `rkq`, the `q`-th quantile of `rks`, through `Statistics.quantile` with `q_kwargs`.
  5. Scan `rks` in population order for the entry nearest to `rkq`, giving `idx`. A tie goes to the first entry.
@@ -231,6 +291,7 @@ $(DocStringExtensions.FIELDS)
 
     NearestQuantilePrediction(;
         r::BaseRM_VecBaseRM = ConditionalValueatRisk(),
+        sca::Option{<:Sca_VecToScaM} = SumScalariser(),
         q::Real = 0.5,
         r_kwargs::NamedTuple = (;),
         q_kwargs::NamedTuple = (;)
@@ -238,13 +299,15 @@ $(DocStringExtensions.FIELDS)
 
 ## Multiplicity
 
-`r` takes one risk measure or a vector of them, and the type has no reduction field. [`oriented_score`](@ref) reads the reduction from `r_kwargs`, so a caller writes `r_kwargs = (sca = MinScalariser(),)` or `r_kwargs = (sca = MedianValue(),)`. The reduction reads oriented scores, so [`MinScalariser`](@ref) selects by the worst measure of each path and [`MaxScalariser`](@ref) by the best.
+`r` takes one risk measure or a vector of them, and the field `sca` reduces a vector, as in `sca = MinScalariser()` or `sca = MedianValue()`. The reduction reads oriented scores, so [`MinScalariser`](@ref) selects by the worst measure of each path and [`MaxScalariser`](@ref) by the best. For one measure `sca` is inert.
 
 The scorer admits a vector whose members disagree on orientation, because [`oriented_score`](@ref) orients each member before the reduction.
 
 ## Validation
 
   - $(val_dict[:q_scorer])
+  - `r_kwargs` must not contain `sca`, through [`assert_path_reduction`](@ref). The reduction is the field `sca`.
+  - `sca` must not be `nothing` when `r` is a vector, through [`assert_one_score_per_path`](@ref). A quantile needs one score for each path.
 
 # Functor
 
@@ -267,6 +330,10 @@ When the population is empty, or every member has a failed fold or a risk that i
     """
     r
     """
+    $(field_dict[:sca_path])
+    """
+    sca
+    """
     $(field_dict[:q_scorer])
     """
     q
@@ -278,20 +345,25 @@ When the population is empty, or every member has a failed fold or a risk that i
     $(field_dict[:q_kwargs])
     """
     q_kwargs
-    function NearestQuantilePrediction(r::BaseRM_VecBaseRM, q::Real, r_kwargs::NamedTuple,
-                                       q_kwargs::NamedTuple)
+    function NearestQuantilePrediction(r::BaseRM_VecBaseRM, sca::Option{<:Sca_VecToScaM},
+                                       q::Real, r_kwargs::NamedTuple, q_kwargs::NamedTuple)
         @argcheck(zero(q) <= q <= one(q), DomainError(q, "`q` must be in [0, 1]"))
-        return new{typeof(r), typeof(q), typeof(r_kwargs), typeof(q_kwargs)}(r, q, r_kwargs,
-                                                                             q_kwargs)
+        assert_path_reduction(sca, r, r_kwargs, "r_kwargs")
+        return new{typeof(r), typeof(sca), typeof(q), typeof(r_kwargs), typeof(q_kwargs)}(r,
+                                                                                          sca,
+                                                                                          q,
+                                                                                          r_kwargs,
+                                                                                          q_kwargs)
     end
 end
 function NearestQuantilePrediction(; r::BaseRM_VecBaseRM = ConditionalValueatRisk(),
+                                   sca::Option{<:Sca_VecToScaM} = SumScalariser(),
                                    q::Real = 0.5, r_kwargs::NamedTuple = (;),
                                    q_kwargs::NamedTuple = (;))::NearestQuantilePrediction
-    return NearestQuantilePrediction(r, q, r_kwargs, q_kwargs)
+    return NearestQuantilePrediction(r, sca, q, r_kwargs, q_kwargs)
 end
 function (s::NearestQuantilePrediction)(ppred::PopulationPredictionResult)
-    return quantile_by_measure(ppred, s.r, s.q; r_kwargs = s.r_kwargs,
+    return quantile_by_measure(s.sca, ppred, s.r, s.q; r_kwargs = s.r_kwargs,
                                q_kwargs = s.q_kwargs)
 end
 

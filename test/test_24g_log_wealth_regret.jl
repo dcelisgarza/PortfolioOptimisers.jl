@@ -1151,12 +1151,13 @@ end
         pop = PopulationPredictionResult(; pred = [high, low])
         @test pop.pred[1] === high
         r = ConditionalValueatRisk()
-        sorted = sort_by_measure(pop, r)
+        sca = SumScalariser()
+        sorted = sort_by_measure(sca, pop, r)
         @test all(x -> isa(x, PredictionResult), sorted)
         @test sorted[1] === low
         @test sorted[2] === high
-        @test PortfolioOptimisers.quantile_by_measure(pop, r, 1.0) === high
-        @test PortfolioOptimisers.quantile_by_measure(pop, r, 0.0) === low
+        @test PortfolioOptimisers.quantile_by_measure(sca, pop, r, 1.0) === high
+        @test PortfolioOptimisers.quantile_by_measure(sca, pop, r, 0.0) === low
     end
     @testset "A failed member keeps its weights with no previous weights" begin
         s = OptimisationSuccess()

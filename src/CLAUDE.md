@@ -58,6 +58,14 @@ whole repository.
   processes a matrix that it assembles itself, as a prior or a higher-order moment does.
   [ADR 0222](../docs/adr/0222-a-type-is-kept-by-default-and-nothing-spells-a-skipped-procedure.md)
   states the rule.
+- **A keyword wrapper is for a call that a user writes.** A method that only moves a keyword into
+  a positional argument and forwards the call does no work. It gives one verb a second form.
+  Keep such a wrapper only on a keyword constructor, or on a verb of a workflow that a user calls
+  in a script, such as `optimise`, `prior` or `expected_risk`. Every other verb takes its slot as
+  a positional argument, and has no keyword wrapper. A public helper is such a verb, for example
+  `oriented_score(sca, r, p)` and `sort_by_measure(sca, ppred, r)`. The reason is the size of the
+  interface, not speed. #1997 measured a keyword form against a positional form, and the time,
+  the allocations and the runtime dispatches were equal. #2066 lists the wrappers that remain.
 - **Prefer a per-type method over a new dependency** for reflection-style work. Derive the field
   list, write the constructor name once per type, and use the ordinary keyword constructor.
 - Keep docstring field text in `field_dict` / `arg_dict` in
