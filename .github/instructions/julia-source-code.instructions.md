@@ -499,16 +499,18 @@ and a body that only constructs the geometry token that the caller could constru
 A unit wider than that stays, because it reduces the complexity of its caller, keeps the inferred
 type of the caller concrete, or names a rule that the caller would otherwise restate:
 
-- **Two methods are dispatch.** A `Nothing`/value pair and a two-family pair save the caller an
-  `isa` branch. The census never flags them. A set of methods that only sends each form of an
-  input on to another function is a wrapper all the same, and § *A wrapper is for convenience or
-  for a dispatch problem* below governs it.
+- **Two methods are dispatch when each arm does work.** A `Nothing`/value pair and a two-family
+  pair save the caller an `isa` branch. A pair whose value arm only forwards to another function
+  is a wrapper: the `Nothing` method belongs on that function, and the callers call it. A set of
+  methods that only sends each form of an input on to another function is a wrapper all the
+  same. § *A wrapper is for convenience or for a dispatch problem* below governs both.
 - **A decision, an operator, an index, a nested call, a comprehension or a string template is
   logic the unit owns.** A ternary that picks a formulation, a message template, an accessor
   that slices, and a helper that names one rule all stay.
 - **A public forward is public API.** The call of a user is a use that the census cannot see. So
   the census flags a public forward, an allow-list entry keeps it, and the list shows every public
-  forward of the library.
+  forward of the library. The entry names one of the two reasons of § *A wrapper is for
+  convenience or for a dispatch problem*. That the name is public is not a reason by itself.
 
 The type-level case is an abstract type with one concrete subtype that nothing codes against: no
 dispatch on it, no field bound, no union alias. It stays when it has a realistic future
@@ -525,9 +527,9 @@ method of that function, and call that function. A wrapper is a function whose m
 their arguments on to another function, or hold a form that the other function could hold. To
 pack an argument into a tuple, to move a keyword into a positional slot, or to reorder the
 arguments is still only to send them on, so the method is a wrapper. #1998 is the case: a
-one-method `oriented_returns_score(sca, rs, X)` that only called
-`reduce_member_scores(sca, rs, (X,))` went, and its callers call `reduce_member_scores`. A wrapper
-earns its place for two reasons only:
+one-method form of a score on a return series only packed the series into a tuple for
+`reduce_member_scores`. It went, and its callers call `reduce_member_scores`. A wrapper earns its
+place for two reasons only:
 
 - **A convenience for the user.** A keyword constructor, a preset such as `BookToPrice`, or a
   short name for a call that users write often.
@@ -540,6 +542,38 @@ front of them. #2005 is the case. A reader of the inputs of a scorer sent two of
 to `descriptor_field_values` and held the other two, and its check did the same for
 `assert_panel_terms`. Both wrappers went, and the generic functions took their methods. The census flags a
 one-method forward only, so a wrapper of more than one method holds by review.
+
+The two reasons are the whole list. Each of these is a description of a wrapper, not a reason to
+keep it:
+
+- **The name is public, or a hub that callers reach through one name.** Give the hub the
+  methods: each form of the input is a method of the public function. When the wrapper itself
+  is the public name, remove it all the same. The break is the cost of the better form, and
+  `docs/src/migration.md` names it (`src/CLAUDE.md`, the first rule). A released spelling is
+  never a reason by itself.
+- **The target takes the slot as a keyword, by the precedent of its family.** Give the target a
+  method for the form, and keep the keyword in that method.
+- **Another arm of the function holds logic, or owns a fallback.** The arm that only forwards
+  still moves. A `Nothing` arm moves with it, to the function that takes the value.
+- **The function only inserts a field to dispatch on it, or picks an arity by type.** The
+  callers pass the field, or the owner takes the method for the type.
+- **Several methods share one body.** Write one method on the abstract type, or on the `Union`
+  of a mixed family.
+
+**One owner, one name, even at the cost of a second copy.** A helper that holds part of the job
+of a function for several forms of input is a second name for that job. Give each form to the
+owning function as a method, even when a short rule is then written once per form, such as the
+reduction of a vector by the type of a scalariser. The `# Algorithm` section of the owner states
+that the copies agree, and a test holds each copy. #2071 is the case: `reduce_member_scores`
+holds the reduction of `oriented_score` for a series and for a fitted result, and #2071 moves
+it into the methods of `oriented_score`, one set for each sample.
+
+**A user verb is declared.** A keyword verb that is kept as a convenience for the user is
+exported or `public`. A verb that is neither is internal, and an internal keyword wrapper goes:
+its callers call the positional form.
+
+A wrapper that one of the two reasons keeps names that reason in the allow-list of
+`test/test_70_trivial_unit_census.jl`.
 
 ## The simple form wins
 
@@ -691,12 +725,12 @@ macro that `state_set!` registers cost the same.
 | An expression built in a loop | `JuMP.add_to_expression!`, or a generator inside the macro. Never `+=` | 26.8 KiB and 28.4 KiB against 718 KiB on N terms |
 | A dot product | `LinearAlgebra.dot(c, w)` or `transpose(c) * w`. Never `sum(c .* w)` | 13.2 KiB against 62.5 KiB |
 | A shared expression | Register it once, and let each row read the entry | Five rows that read the entry: 116 KiB. The same rows with the expression inlined: 149 KiB |
-| A vector of rows | One vector-valued row, with the comparison unbroadcast, for every model and every solver. Keep a container `[i = 1:N]` for a cone of each index | The form does not depend on the solver: JuMP converts each form to the other when a solver needs it. The probe added the JuMP build and the copy to Clarabel, SCS and HiGHS over T = 1000 rows. The vector row was cheaper at every size from 3 to 102 terms in each entry (31.8 ms against 35.5 ms at 3 terms, 347 ms against 361 ms at 102 terms). The JuMP build alone favours the vector row up to about 12 terms, and costs up to 25 % more for a dense row (47 ms against 35 ms at 102 terms). Clarabel and SCS copy the vector row 25 to 30 % faster, and HiGHS copies scalar rows faster. The rows of the discrete allocator hold 2 or 3 terms, and their vector form builds 13 % faster and copies faster or equal on all three solvers |
-| A bound on one variable | A variable bound, `lower_bound = 0`. A bound that scales with `k`, such as `w ⊖ k * lb`, stays a row | 1000 bounds: 179 KiB, against 767 KiB for one vector row and 963 KiB for 1000 rows. The solve is the same |
+| A vector of rows | One vector-valued row, with the comparison unbroadcast, for every model and every solver. Keep a container `[i = 1:N]` for a cone of each index | The form does not depend on the solver: JuMP converts each form to the other when a solver needs it. The probe added the JuMP build and the copy to Clarabel, SCS and HiGHS over a thousand rows. The vector row was cheaper at every size from 3 to 102 terms in each entry (31.8 ms against 35.5 ms at 3 terms, 347 ms against 361 ms at 102 terms). The JuMP build alone favours the vector row up to about 12 terms, and costs up to 25 % more for a dense row (47 ms against 35 ms at 102 terms). Clarabel and SCS copy the vector row 25 to 30 % faster, and HiGHS copies scalar rows faster. The rows of the discrete allocator hold 2 or 3 terms, and their vector form builds 13 % faster and copies faster or equal on all three solvers |
+| A bound on one variable | A variable bound, `lower_bound = 0`. A bound that scales with `k`, such as `w ⊖ k * lb`, stays a row | A thousand bounds: 179 KiB, against 767 KiB for one vector row and 963 KiB for a thousand rows. The solve is the same |
 | The sense of a row | `expr >= 0` and `expr in MOI.GreaterThan(0)` are equal. Use the set when the caller passes it | The same row and the same bytes |
 | The circled operators | Keep `⊖`, `⊕` and `⊙` on a rate that can be a scalar or a vector, because they keep the number types open | The same bytes as the plain operators, except `scalar ⊙ w`, which costs 49 KiB more on N terms, below the stop rule |
-| String names | Keep `JuMP.set_string_names_on_creation(model, str_names)`, with `str_names = false` by default | A named `@variable` of 1000 entries with names is 2.6 times slower |
-| The model | `JuMP.Model()`, with `JuMP.set_optimizer` at the solve | The only form that serves a list of solvers. `direct_model` binds the model to one solver, so the next solver of the list cannot take it, and a solver that takes no change after the first copy refuses it (Clarabel refused the first variable). `add_bridges = false` refuses each row that the solver does not take in its own form (Clarabel refused the scalar equality rows). The build costs the same in `Model()` and in `Model(optimizer)` |
+| String names | Keep `JuMP.set_string_names_on_creation(model, str_names)`, with `str_names = false` by default | A named `@variable` of a thousand entries with names is 2.6 times slower |
+| The model | `JuMP.Model()`, with `JuMP.set_optimizer` at the solve | The only form that serves a list of solvers. A direct model of JuMP binds the model to one solver, so the next solver of the list cannot take it, and a solver that takes no change after the first copy refuses it (Clarabel refused the first variable). `add_bridges = false` refuses each row that the solver does not take in its own form (Clarabel refused the scalar equality rows). The build costs the same in `Model()` and in `Model(optimizer)` |
 | Plural macros | One singular `@variable`, `@constraint` or `@expression` for each entry. Never `@variables`, `@constraints` or `@expressions` | A plural block builds the same model, with the same bytes and time, and the formatter aligns its lines far to the right |
 
 `test/test_88_jump_build_form_census.jl` gates the plural macros, the sums over an axis, the `+=`

@@ -8,6 +8,9 @@ whole repository.
   and the precedents of the library state, and change with it every site that the same mechanism
   reaches. A breaking change to an interface, a public verb among them, is the cost of that form.
   It is not a reason to take a weaker design, and it is not by itself the maintainer's decision.
+  Legacy and inertia are never a reason: a released spelling, a public name, the count of the
+  callers or the size of the break does not keep a design that a better one replaces. Make the
+  change, and name the break.
   Name the break in the commit and in `docs/src/migration.md`, where a user reads it. A docstring
   states the current behaviour alone. A released number that moves is the same cost. An ADR
   binds by the reason that it states, so when that reason is a definition and not mathematics,
@@ -62,7 +65,9 @@ whole repository.
   that only sends its arguments on to another function: it moves a keyword into a positional
   slot, packs an argument into a tuple, reorders the arguments, or renames the call. It does no
   work, and it gives one job a second name. Give each form of an input to the function that owns
-  the job, as a method of that function, and call that function. The keyword case: keep a keyword
+  the job, as a method of that function, and call that function, even when a short rule is then
+  written once per form. The two reasons are the whole list: a public name, a hub, a keyword
+  precedent of the target, or a sibling arm with logic is not a reason. The keyword case: keep a keyword
   wrapper only on a keyword constructor, or on a verb of a workflow that a user calls in a
   script, such as `optimise`, `prior` or `expected_risk`. Every other verb takes its slot as a
   positional argument, as `oriented_score(sca, r, p)` and `sort_by_measure(sca, ppred, r)` do.
