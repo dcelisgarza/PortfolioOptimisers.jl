@@ -1,4 +1,4 @@
-using Clarabel
+using Clarabel, JuMP
 const PO = PortfolioOptimisers
 
 # The sweep of `src/17_Optimisation/05_JuMP/04_MeanRisk.jl`. Each objective of `MeanRisk` is
@@ -26,6 +26,23 @@ function mrs_free(; kwargs...)
     return mrs_opt(; wb = WeightBounds(; lb = -Inf, ub = Inf), sbgt = 1000.0, kwargs...)
 end
 mrs_floor(lb) = ArithmeticReturn(; settings = JuMPReturnsSettings(; lb = lb))
+# A cost on the first asset, `c * w[1]`, and a term that records the objective it gets.
+struct MrsFirstCost <: PO.CustomJuMPObjective
+    c::Float64
+end
+function PO.add_custom_objective_term!(model::JuMP.Model, ::Any, t::MrsFirstCost, ::Any,
+                                       ::Any)
+    w = PO.get_w(model)
+    PO.add_to_objective_penalty!(model, JuMP.@expression(model, t.c * w[1]))
+    return nothing
+end
+struct MrsObjectiveSpy <: PO.CustomJuMPObjective
+    log::Vector{PO.ObjectiveFunction}
+end
+function PO.add_custom_objective_term!(::JuMP.Model, obj, t::MrsObjectiveSpy, ::Any, ::Any)
+    push!(t.log, obj)
+    return nothing
+end
 
 @testset "MeanRisk sweep: each objective agrees with its closed form" begin
     mu, S = MRS_PR.mu, MRS_PR.sigma
@@ -96,6 +113,56 @@ end
         wb = optimise(MeanRisk(; opt = mrs_opt(; ret = mrs_floor(mu' * w)))).w
         @test isapprox(sd(wb), sd(w); rtol = 1e-6)
     end
+end
+
+@testset "MeanRisk sweep: a custom objective term counts once in each solve (#2065)" begin
+    # The corners and the sweep set the objective of one model. The Objective Penalty keeps
+    # every term that it gets, so a term added for each objective counted three times at the
+    # sweep. The penalty `l1` went in once, in the assembly, and the term goes in there too.
+    rf = Variance(; settings = RiskMeasureSettings(; ub = Frontier(; N = 3)))
+    res = optimise(MeanRisk(; r = rf, obj = MaximumReturn(),
+                            opt = mrs_opt(; cobj = MrsFirstCost(1.0), l1 = 0.5)))
+    m = res.model
+    @test JuMP.coefficient(m[:op], PO.get_w(m)[1]) == 1.0
+    @test JuMP.coefficient(m[:op], m[:t_l1]) == 0.5
+    # The hook runs once, with the declared objective, and not with the objective of a corner.
+    log = PO.ObjectiveFunction[]
+    optimise(MeanRisk(; r = rf, obj = MaximumReturn(),
+                      opt = mrs_opt(; cobj = MrsObjectiveSpy(log))))
+    @test length(log) == 1 && only(log) isa MaximumReturn
+    # A sweep on both axes calls the hook once too.
+    empty!(log)
+    optimise(MeanRisk(;
+                      r = Variance(;
+                                   settings = RiskMeasureSettings(; ub = Frontier(; N = 2))),
+                      opt = mrs_opt(; ret = mrs_floor(Frontier(; N = 2)),
+                                    cobj = MrsObjectiveSpy(log))))
+    @test length(log) == 1 && only(log) isa MinimumRisk
+    # Each corner and each point of a return sweep counts the term once. So the floors run
+    # from the return of the minimum-risk solve with the term to the return of the
+    # maximum-return solve with the term, and each point equals a plain solve with the term at
+    # its floor. The minimum-variance book holds none of the first asset, so a cost on it moves
+    # nothing. A reward of the order of the variance moves the weights, so a term that counts
+    # three times gives other weights.
+    mu = MRS_PR.mu
+    t = MrsFirstCost(-1e-4)
+    res = optimise(MeanRisk(;
+                            opt = mrs_opt(; ret = mrs_floor(Frontier(; N = 3)), cobj = t)))
+    @test all(c -> isa(c, PO.OptimisationSuccess), res.retcode)
+    wmin = optimise(MeanRisk(; opt = mrs_opt(; cobj = t))).w
+    wmax = optimise(MeanRisk(; opt = mrs_opt(; cobj = t), obj = MaximumReturn())).w
+    levels = range(mu' * wmin, mu' * wmax; length = 3)
+    @test isapprox([mu' * w for w in res.w], levels; atol = 1e-7)
+    for (w, e) in zip(res.w, levels)
+        wi = optimise(MeanRisk(; opt = mrs_opt(; ret = mrs_floor(e), cobj = t))).w
+        @test isapprox(w, wi; atol = 5e-5)
+    end
+    e = levels[2]
+    w1 = optimise(MeanRisk(; opt = mrs_opt(; ret = mrs_floor(e), cobj = t))).w
+    w3 = optimise(MeanRisk(;
+                           opt = mrs_opt(; ret = mrs_floor(e), cobj = MrsFirstCost(-3e-4)))).w
+    w0 = optimise(MeanRisk(; opt = mrs_opt(; ret = mrs_floor(e)))).w
+    @test !isapprox(w1, w3; atol = 1e-3) && !isapprox(w1, w0; atol = 1e-3)
 end
 
 @testset "MeanRisk sweep: a Frontier under MaximumRatio spans the corners of the plain weights" begin

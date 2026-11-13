@@ -469,7 +469,7 @@ The first `Val` is `true` when the model holds a `:ret_frontier` registry, and t
 function solve_mean_risk!(model::JuMP.Model, mr::MeanRisk, pr::AbstractPriorResult,
                           ::Val{false}, ::Val{false}, ::Option{<:Fees},
                           attrs::ResolvedJuMPOptimiser)
-    set_portfolio_objective_function!(model, mr.obj, mr, attrs)
+    set_portfolio_objective_function!(model, mr.obj)
     return optimise_JuMP_model!(model, mr, eltype(pr.X))
 end
 """
@@ -551,14 +551,14 @@ function compute_ret_lbs(model::JuMP.Model, mr::MeanRisk, pr::AbstractPriorResul
     end
     X = pr.X
     ret_frontier = copy(ret_frontier)
-    set_portfolio_objective_function!(model, MinimumRisk(), mr, attrs)
+    set_portfolio_objective_function!(model, MinimumRisk())
     retcode, sol_min = optimise_JuMP_model!(model, mr, eltype(X))
     @argcheck(isa(retcode, OptimisationSuccess),
               ArgumentError("minimum-risk solve failed with retcode $retcode"))
     JuMP.unregister(model, :obj_expr)
     for j in idx
         expr, front, i = ret_frontier[j].second
-        set_portfolio_objective_function!(model, MaximumElementReturn(i), mr, attrs)
+        set_portfolio_objective_function!(model, MaximumElementReturn(i))
         retcode, sol_max = optimise_JuMP_model!(model, mr, eltype(X))
         @argcheck(isa(retcode, OptimisationSuccess),
                   ArgumentError("maximum-return solve for return term $i failed with retcode $retcode"))
@@ -576,7 +576,7 @@ function solve_mean_risk!(model::JuMP.Model, mr::MeanRisk, pr::AbstractPriorResu
                           attrs::ResolvedJuMPOptimiser)
     ret_frontier = compute_ret_lbs(model, mr, pr, fees, attrs)
     ret_axis = set_ret_frontier_parameters!(model, ret_frontier)
-    set_portfolio_objective_function!(model, mr.obj, mr, attrs)
+    set_portfolio_objective_function!(model, mr.obj)
     return frontier_sweep!(model, mr, eltype(pr.X), frontier_sweep_axes(ret_axis, nothing))
 end
 """
@@ -673,12 +673,12 @@ function rebuild_risk_frontier(model::JuMP.Model, mr::MeanRisk, pr::AbstractPrio
                                attrs::ResolvedJuMPOptimiser)
     X = pr.X
     risk_frontier = copy(risk_frontier)
-    set_portfolio_objective_function!(model, MinimumRisk(), mr, attrs)
+    set_portfolio_objective_function!(model, MinimumRisk())
     retcode, sol_min = optimise_JuMP_model!(model, mr, eltype(X))
     @argcheck(isa(retcode, OptimisationSuccess),
               ArgumentError("minimum-risk solve failed with retcode $retcode"))
     JuMP.unregister(model, :obj_expr)
-    set_portfolio_objective_function!(model, MaximumReturn(), mr, attrs)
+    set_portfolio_objective_function!(model, MaximumReturn())
     retcode, sol_max = optimise_JuMP_model!(model, mr, eltype(X))
     @argcheck(isa(retcode, OptimisationSuccess),
               ArgumentError("maximum-return solve failed with retcode $retcode"))
@@ -767,7 +767,7 @@ function solve_mean_risk!(model::JuMP.Model, mr::MeanRisk, pr::AbstractPriorResu
                           attrs::ResolvedJuMPOptimiser)
     risk_frontier = compute_risk_ubs(model, mr, pr, fees, attrs)
     risk_axis = set_risk_frontier_parameters!(model, risk_frontier)
-    set_portfolio_objective_function!(model, mr.obj, mr, attrs)
+    set_portfolio_objective_function!(model, mr.obj)
     return frontier_sweep!(model, mr, eltype(pr.X), frontier_sweep_axes(nothing, risk_axis))
 end
 function solve_mean_risk!(model::JuMP.Model, mr::MeanRisk, pr::AbstractPriorResult,
@@ -777,7 +777,7 @@ function solve_mean_risk!(model::JuMP.Model, mr::MeanRisk, pr::AbstractPriorResu
     risk_frontier = compute_risk_ubs(model, mr, pr, fees, attrs)
     risk_axis = set_risk_frontier_parameters!(model, risk_frontier)
     ret_axis = set_ret_frontier_parameters!(model, ret_frontier)
-    set_portfolio_objective_function!(model, mr.obj, mr, attrs)
+    set_portfolio_objective_function!(model, mr.obj)
     return frontier_sweep!(model, mr, eltype(pr.X),
                            frontier_sweep_axes(ret_axis, risk_axis))
 end

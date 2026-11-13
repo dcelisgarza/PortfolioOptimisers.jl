@@ -432,12 +432,18 @@ owner is its [`ProgrammeAllocationSet`](@ref), see [`later_constraint_blocks`](@
  3. The bounds builder [`set_allocation_risk_return_bounds!`](@ref) adds the risk ceilings
     `r` and the return floor `ret` of each set.
  4. Phase 2 of each block, [`set_block_post_risk_constraints!`](@ref), adds the phylogeny
-    rows and the custom constraints. A block of a set then adds its custom objective terms
-    with [`add_custom_objective_term!`](@ref), with `obj`, the set and the Result of its
-    block. The objective builder of the head adds the terms of the block of the head.
+    rows and the custom constraints. Each block then adds its custom objective terms with
+    [`add_custom_objective_term!`](@ref), with `obj`. The block of the head gives the head
+    and `attrs`, and a block of a set gives the set and the Result of its block.
 
-A frontier corner solves this model again with another objective, and the terms of a block of
-a set keep the `obj` of the assembly, as its penalties do.
+A frontier corner solves this model again with another objective. Every custom objective term
+keeps the `obj` of the assembly, as the penalties do, and counts once in each solve.
+
+**Breaking change.** The objective builder [`set_portfolio_objective_function!`](@ref) added
+the custom objective terms of the head, once for each objective that the model got. A
+[`Frontier`](@ref) sweep of [`MeanRisk`](@ref) sets the objective of its corners first, so a
+sweep point counted each term once for each corner and once more for itself, and a term got
+the objective of the corner. Now the assembly adds each term once, with `obj`.
 
 **Breaking change.** A head adds its weight bounds and its budgets here, in phase 1 of its
 block, and not before this function. A head of its own calls
@@ -455,7 +461,7 @@ when the optimiser solves its model once.
 
   - $(arg_dict[:model])
   - `optimiser::JuMPOptimisationEstimator`: Dispatch object for risk, tracking, and custom
-    constraint builders.
+    constraint builders, and the owner that the custom objective terms of the head get.
   - `opt::JuMPOptimiser`: Supplies the tracking errors `tr`, which the head binds to its
     rows, and the scalariser `sca` of the risk step.
   - `attrs::ResolvedJuMPOptimiser`: The resolved bundle of [`resolve_jump_optimiser`](@ref).
@@ -467,7 +473,7 @@ when the optimiser solves its model once.
   - `r::Option{<:RM_VecRM} = nothing`: Risk measure(s), or `nothing` to skip risk
     constraints and scalarisation (the [`RelaxedRiskBudgeting`](@ref) path).
   - `obj::ObjectiveFunction = MinimumRisk()`: Objective used by the return constraints, and
-    by the custom objective terms of a block of a set.
+    by the custom objective terms of every block.
   - $(arg_dict[:b1_opt])
   - `blocks`: The blocks after the block of the head, the keyword `blocks` of
     [`resolve_jump_optimiser`](@ref) that gave `attrs`. The empty `Tuple` gives one block.
@@ -520,9 +526,11 @@ function assemble_jump_model!(model::JuMP.Model, optimiser::JuMPOptimisationEsti
         set_allocation_risk_return_bounds!(model, set, cbri; prefix = prefix)
     end
     set_block_post_risk_constraints!(model, cbr, optimiser, attrs)
-    # The objective builder of the head adds the custom objective terms of its own block. A
-    # later block adds its terms here, once, with the objective of the model, as its
-    # penalties go into the Objective Penalty in phase 1.
+    # Every block adds its custom objective terms here, once, with the objective of the
+    # assembly, as its penalties go into the Objective Penalty in phase 1. The objective
+    # builder runs once for each corner of a frontier, and the Objective Penalty keeps every
+    # term it gets, so a term added there counts once for each corner (#2065).
+    add_custom_objective_term!(model, obj, cbr.cobj, optimiser, attrs)
     for (set, cbri, prefix) in later
         set_block_post_risk_constraints!(model, cbri, set, nothing; prefix = prefix)
         add_custom_objective_term!(model, obj, cbri.cobj, set, cbri)

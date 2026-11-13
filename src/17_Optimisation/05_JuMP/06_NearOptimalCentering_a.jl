@@ -1027,16 +1027,16 @@ end
 
 Set the Near Optimal Centering objective function in the JuMP model.
 
-The objective minimises ``s_{o}`` times the barrier of [`set_near_optimal_centering_constraints!`](@ref). For [`ConstrainedNearOptimalCentering`](@ref), it also holds the Custom Objective Terms of `opt.cobj` and the [Objective Penalty](@ref add_to_objective_penalty!).
+The objective minimises ``s_{o}`` times the barrier of [`set_near_optimal_centering_constraints!`](@ref). For [`ConstrainedNearOptimalCentering`](@ref), it also holds the [Objective Penalty](@ref add_to_objective_penalty!), which holds the Custom Objective Terms of `opt.cobj`.
 
-The centring solve minimises the barrier, so the objective that it gives to a Custom Objective Term is [`MinimumRisk`](@ref), not `noc.obj`. `noc.obj` is the objective of the anchor sub-problem.
+The middle of the constrained variant, [`assemble_jump_model!`](@ref), adds the Custom Objective Terms to the Objective Penalty, with the objective [`MinimumRisk`](@ref) of the assembly, and not `noc.obj`. The centring solve minimises the barrier, and `noc.obj` is the objective of the anchor sub-problem.
 
-[`UnconstrainedNearOptimalCentering`](@ref) calls neither [`add_custom_objective_term!`](@ref) nor [`add_penalty_to_objective!`](@ref), so `opt.cobj` prices the anchor sub-problems and not the centring solve. No builder of that variant adds to the Objective Penalty, so the penalty is empty, and its omission changes no number.
+The middle of [`UnconstrainedNearOptimalCentering`](@ref) calls no [`add_custom_objective_term!`](@ref), and its objective calls no [`add_penalty_to_objective!`](@ref), so `opt.cobj` prices the anchor sub-problems and not the centring solve. No builder of that variant adds to the Objective Penalty, so the penalty is empty, and its omission changes no number.
 
 # Algorithm
 
  1. Add the barrier with [`set_near_optimal_centering_constraints!`](@ref).
- 2. For [`ConstrainedNearOptimalCentering`](@ref), add the Custom Objective Terms with [`add_custom_objective_term!`](@ref), and add the Objective Penalty with [`add_penalty_to_objective!`](@ref).
+ 2. For [`ConstrainedNearOptimalCentering`](@ref), add the Objective Penalty with [`add_penalty_to_objective!`](@ref).
  3. Set the objective to minimise ``s_{o}`` times that expression, where ``s_{o}`` is the objective scale `so`.
 
 # JuMP formulation
@@ -1049,7 +1049,7 @@ The centring solve minimises the barrier, so the objective that it gives to a Cu
 
   - `alg`: [`UnconstrainedNearOptimalCentering`](@ref) or [`ConstrainedNearOptimalCentering`](@ref).
   - $(arg_dict[:model])
-  - `noc::NearOptimalCentering`: The estimator, which the Custom Objective Terms receive.
+  - `noc::NearOptimalCentering`: The estimator. The method reads no field of it.
   - `attrs::ResolvedJuMPOptimiser`: The processed attributes of the optimiser.
   - `m_rk::Number`, `m_rt::Number`: The scales of the anchor cones of [`set_near_optimal_centering_constraints!`](@ref).
 
@@ -1073,12 +1073,11 @@ function set_near_optimal_objective_function!(::UnconstrainedNearOptimalCenterin
     return nothing
 end
 function set_near_optimal_objective_function!(::ConstrainedNearOptimalCentering,
-                                              model::JuMP.Model, noc::NearOptimalCentering,
+                                              model::JuMP.Model, ::NearOptimalCentering,
                                               attrs::ResolvedJuMPOptimiser, m_rk::Number,
                                               m_rt::Number)
     so = get_objective_scale(model)
     obj_expr = set_near_optimal_centering_constraints!(model, attrs.wb, m_rk, m_rt)
-    add_custom_objective_term!(model, MinimumRisk(), noc.opt.cobj, noc, attrs)
     obj_expr = add_penalty_to_objective!(model, 1, obj_expr)
     JuMP.@objective(model, Min, so * obj_expr)
     return nothing

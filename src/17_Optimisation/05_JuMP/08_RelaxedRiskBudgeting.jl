@@ -813,7 +813,7 @@ function _optimise(rrb::RelaxedRiskBudgeting, rd::ReturnsResult = ReturnsResult(
     set_maximum_ratio_factor_variables!(model, MinimumRisk())
     rbr = set_relaxed_risk_budgeting_constraints!(model, rrb, attrs.pr, attrs.wb, rd)
     assemble_jump_model!(model, rrb, rrb.opt, attrs, rd; blocks = blocks)
-    set_portfolio_objective_function!(model, MinimumRisk(), rrb, attrs)
+    set_portfolio_objective_function!(model, MinimumRisk())
     retcode, sol = optimise_JuMP_model!(model, rrb, eltype(attrs.pr.X))
     jr = JuMPOptimisationResult(; jor = attrs, retcode = retcode, sol = sol,
                                 model = ifelse(save, model, nothing))

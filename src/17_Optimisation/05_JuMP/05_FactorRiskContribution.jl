@@ -566,7 +566,7 @@ function _optimise(frc::FactorRiskContribution, rd::ReturnsResult = ReturnsResul
     frc_plr = phylogeny_constraints(frc_ple, rdf.F)
     set_sdp_frc_phylogeny_constraints!(model, frc_plr)
     set_frc_iplg_constraints!(model, frc_plr, attrs.wb, transpose(rr.L), frc.opt.ss)
-    set_portfolio_objective_function!(model, frc.obj, frc, attrs)
+    set_portfolio_objective_function!(model, frc.obj)
     retcode, sol = optimise_JuMP_model!(model, frc, eltype(attrs.pr.X))
     return FactorRiskContributionResult(;
                                         jr = JuMPOptimisationResult(; jor = attrs,

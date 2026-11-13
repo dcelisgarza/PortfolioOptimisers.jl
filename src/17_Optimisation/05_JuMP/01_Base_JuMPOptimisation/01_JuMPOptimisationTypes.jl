@@ -339,7 +339,7 @@ To add a penalty or a reward, subtype `CustomJuMPObjective` with the parameters 
 ### Arguments
 
   - `model`: The JuMP model while it is built. Read the weights with [`get_w`](@ref).
-  - `obj`: The objective that the model builds. Inside a [`Frontier`](@ref) sweep it is not the objective that the user declared.
+  - `obj`: The objective of the optimiser that builds the model, see [`add_custom_objective_term!`](@ref). The corners of a [`Frontier`](@ref) sweep solve the same model under other objectives, and the term keeps this `obj` and counts once in each solve.
   - `cobj`: The instance of the subtype.
   - `optimiser`: The outer optimiser, for example the [`MeanRisk`](@ref).
   - `attrs`: The processed problem data. `attrs.pr` is the prior and `attrs.wb` the weight bounds.
@@ -427,10 +427,14 @@ A term that is not homogeneous of degree one in `w` multiplies each constant by 
 
 `nothing`, the value when no custom term is configured, is the only no-op.
 
+[`assemble_jump_model!`](@ref) calls the verb once for each model, while it builds the model. A [`Frontier`](@ref) sweep of [`MeanRisk`](@ref) solves its end points as [`MinimumRisk`](@ref) and [`MaximumReturn`](@ref) on the same model, and the term is in each of these objectives once, with the `obj` of the model.
+
+**Breaking change.** The objective builder called the verb once for each objective that the model got, with that objective as `obj`. A point of a sweep then counted the term once for each end point and once more for itself, and the term got [`MinimumRisk`](@ref) or [`MaximumReturn`](@ref) at an end point. A method that dispatches on `obj` now gets the declared objective at every end point.
+
 # Arguments
 
   - `model::JuMP.Model`: The JuMP model while it is built.
-  - `obj`: The [`ObjectiveFunction`](@ref) that the model builds. Inside a [`Frontier`](@ref) sweep it is not the objective that the user declared, because the sweep builds the sub-problems of its end points as [`MinimumRisk`](@ref) and [`MaximumReturn`](@ref).
+  - `obj`: The objective of the optimiser that builds the model. It is the `obj` of a [`MeanRisk`](@ref) or a [`FactorRiskContribution`](@ref), and [`MinimumRisk`](@ref) for [`RiskBudgeting`](@ref), [`RelaxedRiskBudgeting`](@ref) and the centring solve of [`NearOptimalCentering`](@ref). The end points of a frontier of a [`MaximumRatio`](@ref) solve a copy of the head with [`MinimumRisk`](@ref), so a term there gets [`MinimumRisk`](@ref). The projection programme of a [`ProgrammeAllocationSet`](@ref) gives its Projection Geometry.
   - `cobj`: The custom term, the argument to dispatch on.
   - `optimiser`: The outer optimiser, for example the [`MeanRisk`](@ref). Its `opt` field is the [`JuMPOptimiser`](@ref).
   - `attrs::ResolvedJuMPOptimiser`: The processed problem data: the prior `attrs.pr`, the returns estimator `attrs.ret`, the weight bounds `attrs.wb` and the rest.

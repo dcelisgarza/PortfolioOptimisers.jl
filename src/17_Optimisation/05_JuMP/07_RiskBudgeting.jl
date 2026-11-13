@@ -1174,7 +1174,7 @@ function _optimise(rb::RiskBudgeting, rd::ReturnsResult = ReturnsResult();
     set_model_observations!(model, size(attrs.pr.X, 1))
     rbr = set_risk_budgeting_constraints!(model, rb, attrs.pr, attrs.wb, rd)
     assemble_jump_model!(model, rb, rb.opt, attrs, rd, rb.r, MinimumRisk(); blocks = blocks)
-    set_portfolio_objective_function!(model, MinimumRisk(), rb, attrs)
+    set_portfolio_objective_function!(model, MinimumRisk())
     retcode, sol = optimise_JuMP_model!(model, rb, eltype(attrs.pr.X))
     return RiskBudgetingResult(;
                                jr = JuMPOptimisationResult(; jor = attrs, retcode = retcode,
