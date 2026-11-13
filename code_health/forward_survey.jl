@@ -33,7 +33,11 @@
 #                        goes to its owner, and an identity in front of a constructor stays as
 #                        (b). `RULED_DEFAULTS` holds the verdicts that the parse cannot read.
 #   rebuild              a constructor call that passes `x.f` for every field but one or two
-#                        (#2082, rule 6). It goes to `rebuild_struct`.
+#                        (#2082, rule 6). It goes to `rebuild_struct`, by the rulings of #2110
+#                        that `rebuild_verdict` states: a root of another type is no rebuild, a
+#                        Partial Fit State keeps the positional constructor as (b), and a type
+#                        with no keyword constructor takes one first. `RULED_REBUILDS` holds the
+#                        verdicts that the parse cannot read.
 #   self-forward         a method that calls its own function with fewer arguments, or with
 #                        converted ones (#2081, rule 5).
 #   worker               a method of a public verb that sends one form to a private function
@@ -149,13 +153,15 @@ end
     Tree
 
 What the survey reads from the parse of the source files: every method, the fields of every
-struct, the public names (an `export` or a `public` line), the names that an `# Interfaces`
-section names, and the forward methods of the census.
+struct, the supertype of every struct and abstract type, the public names (an `export` or a
+`public` line), the names that an `# Interfaces` section names, and the forward methods of the
+census.
 """
 struct Tree
     defs::Vector{CH.MethodDef}
     by_name::Dict{Symbol, Vector{CH.MethodDef}}
     fields::Dict{Symbol, Vector{Symbol}}
+    supers::Dict{Symbol, Symbol}
     public::Set{Symbol}
     hooks::Set{Symbol}
     forwards::Dict{Tuple{Symbol, Symbol}, Vector{Tuple{String, Int}}}
@@ -198,6 +204,18 @@ function struct_fields!(out, e)
     return nothing
 end
 
+# The supertype of a struct or an abstract type, from its header `T{…} <: S{…}`.
+function supertype!(out, header)
+    if header isa Expr && header.head === :(<:) && length(header.args) == 2
+        name = CH.defname(header.args[1])
+        super = type_head(header.args[2])
+        if !isempty(name) && super isa Symbol
+            out[Symbol(name)] = super
+        end
+    end
+    return nothing
+end
+
 # Every name in an expression, a field name too. A use that this misses would turn a shared
 # callee into a callee with one caller, so the count errs on the side of a use, as
 # `CodeHealth.reference_counts` does.
@@ -221,6 +239,7 @@ Parse each of `files`, relative to `root`, and read the [`Tree`](@ref).
 function read_tree(files; root = CH.REPO_ROOT)
     defs = CH.MethodDef[]
     fields = Dict{Symbol, Vector{Symbol}}()
+    supers = Dict{Symbol, Symbol}()
     public = Set{Symbol}()
     hooks = Set{Symbol}()
     for f in files
@@ -228,7 +247,11 @@ function read_tree(files; root = CH.REPO_ROOT)
         append!(defs, CH.method_defs(f, tree))
         struct_fields!(fields, tree)
         CH.walk_ast(tree) do x
-            if x.head === :export || x.head === :public
+            if x.head === :struct
+                supertype!(supers, x.args[2])
+            elseif x.head === :abstract
+                supertype!(supers, x.args[1])
+            elseif x.head === :export || x.head === :public
                 foreach(a -> a isa Symbol && push!(public, a), x.args)
                 return CH.PRUNE
             elseif CH.isdocstring(x)
@@ -253,7 +276,7 @@ function read_tree(files; root = CH.REPO_ROOT)
     for d in defs, n in names_in(d.body)
         n === d.name || push!(get!(callers, n, Set{Symbol}()), d.name)
     end
-    return Tree(defs, by_name, fields, public, hooks, forwards, callers)
+    return Tree(defs, by_name, fields, supers, public, hooks, forwards, callers)
 end
 
 # --- the findings -------------------------------------------------------------
@@ -423,9 +446,104 @@ function has_keyword_constructor(t::Tree, T)
     return any(d -> CH.keywords_alone(d.sig), get(t.by_name, T, CH.MethodDef[]))
 end
 
-function rebuild_findings!(out, t::Tree, rulings)
+"""
+    is_partial_fit_state(t::Tree, T) -> Bool
+
+Whether the struct `T` is a subtype of `AbstractPartialFitState`, through the supertypes that the
+tree declares. A rebuild of such a state keeps the positional constructor, called by name, as the
+fold exception of `.github/instructions/julia-source-code.instructions.md` § *Immutability* states
+(#1807, #2110).
+"""
+function is_partial_fit_state(t::Tree, T)
+    seen = Set{Symbol}()
+    S = get(t.supers, T, nothing)
+    while S isa Symbol && !(S in seen)
+        if S === :AbstractPartialFitState
+            return true
+        end
+        push!(seen, S)
+        S = get(t.supers, S, nothing)
+    end
+    return false
+end
+
+"""
+The verdict "no rebuild" of [`RULED_REBUILDS`](@ref): the call builds the struct from another type,
+so the survey reports nothing.
+"""
+const NO_REBUILD = "no rebuild"
+
+"""
+The verdicts of #2110 that the parse cannot read, keyed by the method name and the struct it
+builds. Each root is a local, whose type the parse does not know. An entry is a verdict and its
+reason. The verdict [`NO_REBUILD`](@ref) reports nothing. An entry whose pair is no longer a
+rebuild shape is stale, and `test/test_89_forward_survey_census.jl` fails on it, so a build ticket
+that moves the site to `rebuild_struct` deletes the entry.
+"""
+const RULED_REBUILDS = Dict{Tuple{Symbol, Symbol}, Tuple{String, String}}(#
+                                                                          (:fit,
+                                                                           :ElasticNetFit) =>
+                                                                              (NO_REBUILD,
+                                                                               "`cnt` is the `NamedTuple` of `elastic_net_counts` (#2110)"),
+                                                                          (:exposure_ic_summary,
+                                                                           :ExposureICSummaryResult) =>
+                                                                              (NO_REBUILD,
+                                                                               "`s` is the `NamedTuple` of the matrix method (#2110)"),
+                                                                          (:cross_sectional_factor_sets,
+                                                                           :UniverseSets) =>
+                                                                              ("go",
+                                                                               "`us` is a `UniverseSets`, and the call changes `dict`: `rebuild_struct(us, (; dict = dict))` (rule 6, #2110)"),
+                                                                          (:cross_sectional_benchmark_returns,
+                                                                           :AssetPanel) =>
+                                                                              ("go",
+                                                                               "`pnl` is the `AssetPanel` of `rd`, and the call changes `pf`: `rebuild_struct(pnl, (; pf = pf))` (rule 6, #2110)"),
+                                                                          (:unit_scale_risk_measure,
+                                                                           :MaxRiskMeasureSettings) =>
+                                                                              ("go",
+                                                                               "`settings` is the `MaxRiskMeasureSettings` of `r`: `rebuild_struct(settings, (; scale = one(scale)))`, and `r` takes `rebuild_struct` too (rule 6, #2110)"),
+                                                                          (:unit_scale_risk_measure,
+                                                                           :RiskMeasureSettings) =>
+                                                                              ("go",
+                                                                               "`settings` is the `RiskMeasureSettings` of `r`: `rebuild_struct(settings, (; scale = one(scale)))` (rule 6, #2110)"),
+                                                                          (:no_risk_expr_risk_measure,
+                                                                           :RiskMeasureSettings) =>
+                                                                              ("go",
+                                                                               "`settings` is the `RiskMeasureSettings` of `r`: `rebuild_struct(settings, (; rke = false))` (rule 6, #2110)"),
+                                                                          (:bounds_risk_measure,
+                                                                           :RiskMeasureSettings) =>
+                                                                              ("go",
+                                                                               "`settings` is the `RiskMeasureSettings` of `r`: `rebuild_struct(settings, (; ub = ub))` (rule 6, #2110)"),
+                                                                          (:unit_scale_returns_estimator,
+                                                                           :JuMPReturnsSettings) =>
+                                                                              ("go",
+                                                                               "`settings` is the `JuMPReturnsSettings` of `r`: `rebuild_struct(settings, (; scale = one(scale)))` (rule 6, #2110)"),
+                                                                          (:no_return_expr_returns_estimator,
+                                                                           :JuMPReturnsSettings) =>
+                                                                              ("go",
+                                                                               "`settings` is the `JuMPReturnsSettings` of `r`: `rebuild_struct(settings, (; rte = false))` (rule 6, #2110)"),
+                                                                          (:forecast_evaluation_align,
+                                                                           :ForecastEvaluationResult) =>
+                                                                              ("go",
+                                                                               "each `fe` is a `ForecastEvaluationResult`, which has no keyword constructor: add the outer keyword constructor of § *Constructor Pattern*, then `rebuild_struct(fe, (; dates = dates))` (rule 6, #2110)"),
+                                                                          (:fit_data_step_from_state,
+                                                                           :PriceGapFillResult) =>
+                                                                              ("go",
+                                                                               "`res` is the `PriceGapFillResult` of `fit_preprocessing`, which has no keyword constructor: add the outer keyword constructor of § *Constructor Pattern*, then `rebuild_struct(res, (; nx = res.nx[keep], v = res.v[keep]))` (rule 6, #2110)"),
+                                                                          (:schedule_update!,
+                                                                           :WindowedBestRateState) =>
+                                                                              ("keep (b)",
+                                                                               "the schedule state that the fold of a `MirrorDescentState` steps: the fold exception keeps the positional constructor (#1807, #2110)"))
+
+"""
+    rebuild_sites(t::Tree) -> Vector
+
+Every call in a method of the tree that builds a struct `T` from the fields of one value `root`,
+with one or two fields changed, as `(d, T, root, copied, changed, nfields)`. A method keeps only
+the first call of each `T`. A constructor method of `T` owns the build of `T`, so it is skipped.
+"""
+function rebuild_sites(t::Tree)
+    out = []
     for d in t.defs
-        # A constructor method of the type owns the build of the type.
         if is_struct(t, d.name)
             continue
         end
@@ -454,25 +572,63 @@ function rebuild_findings!(out, t::Tree, rulings)
                 return nothing
             end
             push!(seen, T)
-            root, copied, changed = shape
-            args = positional_arguments(d.sig)
-            i = findfirst(a -> a[1] === root, args)
-            same = i !== nothing && type_head(args[i][2]) === T
-            verdict, why = if same && has_keyword_constructor(t, T)
-                ("go",
-                 "copies $copied of the $(length(fs)) fields of `$root::$T` and changes $changed: `rebuild_struct($root, (; …))` (rule 6). A measured loss keeps it by hand as (b)")
-            elseif same
-                ("review",
-                 "copies $copied of the $(length(fs)) fields of `$root::$T` and changes $changed, but `$T` has no keyword constructor for `rebuild_struct` to call (rule 6)")
-            else
-                ("review",
-                 "copies $copied of the $(length(fs)) fields of `$root` into a `$T` and changes $changed. It is a rebuild when `$root` is a `$T`, and then it goes to `rebuild_struct` (rule 6)")
-            end
-            push!(out,
-                  SurveyFinding(d.file, d.line, "rebuild", d.name, T, verdict, why,
-                                ruling_of(rulings, d.name, T)))
+            push!(out, (d, T, shape..., length(fs)))
             return nothing
         end
+    end
+    return out
+end
+
+"""
+    rebuild_verdict(t::Tree, d, T, root, copied, changed, n) -> Option{Tuple{String, String}}
+
+The verdict and the reason for a call of method `d` that copies `copied` of the `n` fields of
+`root` into a `T` and changes `changed`, by the rulings of #2082 and #2110. `nothing` when the
+call is no rebuild.
+
+ 1. A pair of [`RULED_REBUILDS`](@ref): its verdict.
+ 2. A root whose declared type is another struct of the tree, or a `NamedTuple`: the call builds
+    `T` from another type, so it is no rebuild.
+ 3. A Partial Fit State keeps the positional constructor by the fold exception: `keep (b)`.
+ 4. A root of type `T` goes to `rebuild_struct`. A `T` with no keyword constructor first takes
+    the outer keyword constructor of § *Constructor Pattern*.
+ 5. Any other root needs a review: the parse does not know its type.
+"""
+function rebuild_verdict(t::Tree, d, T, root, copied, changed, n)
+    if haskey(RULED_REBUILDS, (d.name, T))
+        verdict, why = RULED_REBUILDS[(d.name, T)]
+        return verdict == NO_REBUILD ? nothing : (verdict, why)
+    end
+    args = positional_arguments(d.sig)
+    i = findfirst(a -> a[1] === root, args)
+    head = i === nothing ? nothing : type_head(args[i][2])
+    if head !== T && (head === :NamedTuple || (head isa Symbol && is_struct(t, head)))
+        return nothing
+    end
+    if is_partial_fit_state(t, T)
+        return ("keep (b)",
+                "rebuilds the Partial Fit State `$T`: the fold exception keeps the positional constructor, called by name (#1807, #2110)")
+    end
+    if head === T && has_keyword_constructor(t, T)
+        return ("go",
+                "copies $copied of the $n fields of `$root::$T` and changes $changed: `rebuild_struct($root, (; …))` (rule 6). A measured loss keeps it by hand as (b)")
+    elseif head === T
+        return ("go",
+                "copies $copied of the $n fields of `$root::$T` and changes $changed. `$T` has no keyword constructor: add the outer keyword constructor of § *Constructor Pattern*, then `rebuild_struct($root, (; …))` (rule 6, #2110)")
+    end
+    return ("review",
+            "copies $copied of the $n fields of `$root` into a `$T` and changes $changed. It is a rebuild when `$root` is a `$T`, and then it goes to `rebuild_struct` (rule 6). Rule it, and add it to `RULED_REBUILDS` (#2110)")
+end
+
+function rebuild_findings!(out, t::Tree, rulings)
+    for (d, T, root, copied, changed, n) in rebuild_sites(t)
+        v = rebuild_verdict(t, d, T, root, copied, changed, n)
+        if v === nothing
+            continue
+        end
+        push!(out,
+              SurveyFinding(d.file, d.line, "rebuild", d.name, T, v[1], v[2],
+                            ruling_of(rulings, d.name, T)))
     end
     return out
 end

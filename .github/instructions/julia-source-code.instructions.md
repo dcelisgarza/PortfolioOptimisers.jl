@@ -353,9 +353,13 @@ An **alias** is the case to check first. Its docstring carries a different set o
   of a search names the field at run time, `parse_lens` turns the key into a lens, and
   `Accessors.set(opt, lens, val)` applies it. A lens whose field a type parameter names,
   `PropertyLens{target}()` in the pipe routing, is the same case.
-- The fold of a Partial Fit State is the one exception. It builds the new state through the
-  positional constructor of the state, called by name, as `merge_states` and the seed functions
-  do. The fold runs on every step, and the keyword constructor costs it three things (#1807):
+- A Partial Fit State is the one exception. Every rebuild of a state, a subtype of
+  `AbstractPartialFitState`, calls the positional constructor of the state by name, as the fold,
+  `merge_states`, the seed functions and `copy` do. The exception holds for the type, not for a
+  list of verbs, because the costs below are costs of the type (#2110). A state that the fold of
+  a Partial Fit State steps, such as the `WindowedBestRateState` of a schedule, takes the same
+  exception. The fold runs on every step, and the keyword constructor costs it three things
+  (#1807):
   - It checks values that a fold writes by design. A fold under no Coverage Policy writes `NaN`
     into the cell of an inactive asset, and `assert_partial_fit_state` refuses it.
   - It reads every entry of the state. For a covariance state of 100 assets, it added 64 % to the
@@ -634,7 +638,15 @@ and every addition:
    verb. On a private function, the conversion goes.
 6. **A rebuild by hand that copies every field but one** goes to
    `rebuild_struct(x, (; f = v))`. A site stays by hand only on a measured loss of
-   performance.
+   performance. #2110 rules the edges of the rule:
+   - **A build from another type is no rebuild.** A call that copies fields of an estimator, a
+     model or a `NamedTuple` into a struct of another type is a conversion, as
+     `SmythBrobyKernel(ce.alg, mu, sd, ce.c1, …)` is.
+   - **A type with no keyword constructor takes one.** Add the outer keyword constructor of
+     § *Constructor Pattern*, as `AssetPanel(; pf, amsk, emsk)` has, and the site goes to
+     `rebuild_struct`. Do not keep the site by hand for want of the constructor.
+   - **A Partial Fit State keeps the positional constructor**, by the exception of
+     § *Immutability and `Accessors.jl`*.
 
 **A user verb is declared.** A keyword verb that is kept as a convenience for the user is
 exported or `public`. A verb that is neither is internal, and an internal keyword wrapper goes:

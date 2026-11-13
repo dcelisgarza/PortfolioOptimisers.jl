@@ -44,6 +44,19 @@ using Test
                  a
                  b
              end
+             abstract type AbstractPartialFitState end
+             abstract type AbstractMomentState <: AbstractPartialFitState end
+             struct PS <: AbstractMomentState
+                 a
+                 b
+                 c
+             end
+             PS(; a, b, c) = PS(a, b, c)
+             struct M
+                 a
+                 b
+                 c
+             end
 
              # interface: `helper` is shared by `f` and `k`.
              helper(x) = x + 1
@@ -117,6 +130,21 @@ using Test
              set_s(s::S, v) = S(s.a, s.b, v)
              set_u(r, v) = R(r.a, r.b, v)
              two(x::T3, v) = T3(x.a, v)
+             from_m(m::M, v) = R(m.a, m.b, v)
+             from_nt(nt::NamedTuple, v) = R(nt.a, nt.b, v)
+             from_abstract(r::AbstractR, v) = R(r.a, r.b, v)
+             fold_ps(s::PS, v) = PS(s.a, s.b, v)
+             fold_local(x, v) = PS(x.a, x.b, v)
+             from_m_ps(m::M, v) = PS(m.a, m.b, v)
+             function fit(x, v)
+                 cnt = x
+                 return ElasticNetFit(cnt.a, cnt.b, v)
+             end
+             struct ElasticNetFit
+                 a
+                 b
+                 c
+             end
 
              # self-forward
              sf(x::A) = 1
@@ -234,12 +262,31 @@ using Test
 
     @testset "rebuild (#2082, rule 6)" begin
         @test of(:set_c) == [("rebuild", :R, "go")]
-        # No keyword constructor for `rebuild_struct` to call.
-        @test of(:set_s) == [("rebuild", :S, "review")]
+        # No keyword constructor: the type takes one, then `rebuild_struct` (#2110).
+        @test of(:set_s) == [("rebuild", :S, "go")]
+        @test occursin("add the outer keyword constructor", first_of(:set_s).why)
         # The root has no declared type, so it can be another type.
         @test of(:set_u) == [("rebuild", :R, "review")]
+        @test occursin("RULED_REBUILDS", first_of(:set_u).why)
         # One copy is no rebuild.
         @test all(x -> x[1] != "rebuild", of(:two))
+    end
+
+    @testset "rebuild: the rulings of #2110" begin
+        # A root of another struct, or a `NamedTuple`, is a conversion and no rebuild.
+        @test all(x -> x[1] != "rebuild", of(:from_m))
+        @test all(x -> x[1] != "rebuild", of(:from_nt))
+        @test all(x -> x[1] != "rebuild", of(:from_m_ps))
+        # An abstract root can hold the struct: a person rules it.
+        @test of(:from_abstract) == [("rebuild", :R, "review")]
+        # A Partial Fit State, through two supertypes, keeps the positional constructor, with a
+        # typed root and with a local root alike.
+        @test of(:fold_ps) == [("rebuild", :PS, "keep (b)")]
+        @test of(:fold_local) == [("rebuild", :PS, "keep (b)")]
+        @test occursin("fold exception", first_of(:fold_ps).why)
+        @test !FS.is_candidate(first_of(:fold_ps))
+        # A pair of `RULED_REBUILDS` takes its verdict: `fit` builds from a `NamedTuple`.
+        @test all(x -> x[1] != "rebuild", of(:fit))
     end
 
     @testset "self-forward (#2081, rule 5)" begin
@@ -311,5 +358,12 @@ using Test
         @test ("stale entries of RULED_DEFAULTS",
                sort!([n for n in keys(FS.RULED_DEFAULTS) if !(n in defaults)])) ==
               ("stale entries of RULED_DEFAULTS", Symbol[])
+        # An entry of `RULED_REBUILDS` whose pair is no longer a rebuild shape is stale: the build
+        # ticket that moved the site to `rebuild_struct` deletes it (#2110).
+        shapes = Set((s[1].name, s[2])
+                     for s in FS.rebuild_sites(FS.read_tree(FS.CH.source_files())))
+        @test ("stale entries of RULED_REBUILDS",
+               sort!([p for p in keys(FS.RULED_REBUILDS) if !(p in shapes)])) ==
+              ("stale entries of RULED_REBUILDS", Tuple{Symbol, Symbol}[])
     end
 end
