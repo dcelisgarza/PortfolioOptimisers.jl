@@ -14,6 +14,18 @@ leader the solver-free fixed point stops short of at its default budget.
 =#
 using Test, PortfolioOptimisers, StableRNGs, LinearAlgebra, Statistics, Dates, Clarabel,
       HiGHS, Pajarito, JuMP
+# A custom objective term that costs the weight of the first asset. On a set it tests the
+# leader re-solve of the set's `cobj` (#2032).
+struct FirstCosts <: PortfolioOptimisers.CustomJuMPObjective
+    c::Float64
+end
+function PortfolioOptimisers.add_custom_objective_term!(model::JuMP.Model, ::Any,
+                                                        t::FirstCosts, ::Any, ::Any)
+    w = PortfolioOptimisers.get_w(model)
+    PortfolioOptimisers.add_to_objective_penalty!(model,
+                                                  JuMP.@expression(model, t.c * w[1]))
+    return nothing
+end
 @testset "Online portfolio selection: the third set" begin
     po = PortfolioOptimisers
     OPS = po.OnlinePortfolioSelection
@@ -472,6 +484,40 @@ using Test, PortfolioOptimisers, StableRNGs, LinearAlgebra, Statistics, Dates, C
         @test isapprox(sum(fb), 1; atol = 1e-8)
         # A member that cannot take the set raises at construction.
         @test_throws ArgumentError FollowTheLeader(; opt = lead(bad; fb = EqualWeighted()))
+    end
+
+    @testset "The set's custom objective term enters the re-solve (#2032)" begin
+        # The reproduction of #2032. The first asset has the highest drift, so the leader
+        # alone holds it. A cost of 10 on its weight moves the leader to another asset. At
+        # `dc3d282e50` the cost on the set changed no weight, and the cost on the held
+        # optimiser did.
+        R2 = 0.02 .* randn(StableRNG(23), 40, 3) .+ [0.01 0.0 0.0]
+        rd2 = ReturnsResult(; nx = ["A", "B", "C"], X = R2)
+        ftlw(; okw = (;), skw = (;)) = optimise(OPS(;
+                                                    alg = FollowTheLeader(;
+                                                                          opt = logopt(;
+                                                                                       okw...)),
+                                                    set = ProgrammeAllocationSet(;
+                                                                                 slv = slv,
+                                                                                 skw...)),
+                                                rd2).w
+        base = ftlw()
+        onset = ftlw(; skw = (; cobj = FirstCosts(10.0)))
+        onopt = ftlw(; okw = (; cobj = FirstCosts(10.0)))
+        @test base[1] > 0.99
+        @test onopt[1] < 1e-6
+        @test isapprox(onset, onopt; atol = 1e-6)
+        # The set's term goes in once. A cost of 0.0041 splits the leader between the first
+        # two assets. A term that went in twice would give the weights of twice the cost. Half
+        # of the cost on the set and half on the held optimiser add up to the whole cost.
+        c = 0.0041
+        cost(x) = (; cobj = FirstCosts(x))
+        wopt = ftlw(; okw = cost(c))
+        @test 0.3 < wopt[1] < 0.5
+        @test isapprox(ftlw(; skw = cost(c)), wopt; atol = 1e-6)
+        @test isapprox(ftlw(; okw = cost(c / 2), skw = cost(c / 2)), wopt; atol = 1e-6)
+        @test ftlw(; okw = cost(2 * c))[1] < 1e-6
+        @test ftlw(; okw = cost(c / 2))[1] > 0.99
     end
 
     @testset "A schedule in a leader resolves at each fold (#2049)" begin
