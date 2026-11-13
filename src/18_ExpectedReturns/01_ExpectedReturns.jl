@@ -288,7 +288,7 @@ function expected_ratio(r::BaseRM_VecBaseRM, ret::JRE_VecJRE, w::VecNum,
     # `resolve_risk_inputs` exactly once. Unwrapping the matrix here dropped the prior
     # fallback for an unstated slot and refused a Deferred Quantity that this argument list
     # was already holding the prior for.
-    rk = expected_risk(r, w, pr, fees; sca = sca, kwargs...)
+    rk = expected_risk(sca, r, w, pr, fees; kwargs...)
     rt = expected_return(ret, w, pr, fees; kwargs...)
     return (rt - rf) / rk
 end
@@ -377,7 +377,7 @@ function expected_risk_ret_ratio(r::BaseRM_VecBaseRM, ret::JRE_VecJRE, w::VecNum
     # Reduce to the Investable Mask once here — see the note in `expected_ratio`.
     _, pr, w, fees = investable_reduction(pr, w, fees, strict)
     # The prior, not `pr.X` — see the note in `expected_ratio`.
-    rk = expected_risk(r, w, pr, fees; sca = sca, kwargs...)
+    rk = expected_risk(sca, r, w, pr, fees; kwargs...)
     rt = expected_return(ret, w, pr, fees; kwargs...)
     return rk, rt, (rt - rf) / rk
 end
@@ -932,7 +932,7 @@ end
 function expected_risk(r::ExpectedReturnRiskRatio, w::VecNum, X::MatNum,
                        fees::Option{<:Fees} = nothing; kwargs...)
     return (resolved_expected_return(r.rt, w, w, X, fees) - r.rf) /
-           expected_risk(r.rk, w, X, fees; kwargs..., sca = r.sca)
+           expected_risk(r.sca, r.rk, w, X, fees; kwargs...)
 end
 function expected_risk(r::ExpectedReturnRiskRatio, w::MatNum, ::MatNum,
                        ::Option{<:Fees} = nothing; kwargs...)
@@ -946,14 +946,14 @@ end
 function linearised_risk(q::Tuple, r::ExpectedReturnRiskRatio, w::VecNum, X::MatNum,
                          fees::Option{<:Fees}; kwargs...)
     return (resolved_expected_return(r.rt, w, w, X, fees) - r.rf) /
-           linearised_risk(q[1], r.rk, w, X, fees; kwargs..., sca = r.sca)
+           linearised_risk(r.sca, q[1], r.rk, w, X, fees; kwargs...)
 end
 # The active weights of an independent tracking measure read the expected return of `wd` minus
 # the fee of `w`, as `difference_risk` of `ExpectedReturn` does.
 function difference_risk(r::ExpectedReturnRiskRatio, wd::VecNum, w::VecNum, X::MatNum,
                          fees::Fees; kwargs...)
     return (resolved_expected_return(r.rt, wd, w, X, fees) - r.rf) /
-           difference_risk(r.rk, wd, w, X, fees; kwargs..., sca = r.sca)
+           difference_risk(r.sca, r.rk, wd, w, X, fees)
 end
 function difference_worst_case(r::ExpectedReturnRiskRatio, wd::VecNum, w::VecNum, X::MatNum,
                                fees::Fees)
@@ -962,7 +962,7 @@ end
 function difference_linearised_risk(q::Tuple, r::ExpectedReturnRiskRatio, wd::VecNum,
                                     w::VecNum, X::MatNum, fees::Fees; kwargs...)
     return (resolved_expected_return(r.rt, wd, w, X, fees) - r.rf) /
-           difference_linearised_risk(q[1], r.rk, wd, w, X, fees; kwargs..., sca = r.sca)
+           difference_linearised_risk(r.sca, q[1], r.rk, wd, w, X, fees)
 end
 function needs_previous_weights(r::ExpectedReturnRiskRatio)
     return needs_previous_weights(r.rk)
@@ -1145,20 +1145,22 @@ function prrm_prediction_message(r::PrRM, pred)
     return msg
 end
 """
-    expected_risk(r::PrRM,
+    expected_risk(::Scalariser, r::PrRM,
                   pred::PredictionResult{<:Any,
                                          <:PredictionReturnsResult{<:Any, <:VecNum}};
                   kwargs...)
-    expected_risk(r::PrRM,
+    expected_risk(::Scalariser, r::PrRM,
                   pred::PredictionResult{<:Any,
                                          <:PredictionReturnsResult{<:Any, <:VecVecNum}};
                   kwargs...)
-    expected_risk(r::PrRM, pred::MultiPeriodPredictionResult; kwargs...)
-    expected_risk(r::PrRM, pred::PopulationPredictionResult; kwargs...)
+    expected_risk(::Scalariser, r::PrRM, pred::MultiPeriodPredictionResult; kwargs...)
+    expected_risk(::Scalariser, r::PrRM, pred::PopulationPredictionResult; kwargs...)
 
 Refuse to compute a risk measure that reads a prior on a prediction result.
 
 A [`PrRM`](@ref) reads a **prior** result. It multiplies the expected returns of the prior by the weights. A prediction result holds a **realised** return series and no expected returns, so the two measures have nothing to read. Each of the four methods raises an error, and none gives a figure from the wrong input.
+
+The four methods are positional forms, which take the scalariser first and ignore it. The keyword form `expected_risk(r, pred; kwargs...)` of a prediction calls them, so both forms raise the error.
 
 The caller has two routes:
 
@@ -1167,6 +1169,7 @@ The caller has two routes:
 
 # Arguments
 
+  - `::Scalariser`: The scalariser of the call, which none of the four methods reads.
   - `r`: [`ExpectedReturn`](@ref) or [`ExpectedReturnRiskRatio`](@ref).
   - `pred`: The prediction result that the caller gave.
   - `kwargs...`: Keyword arguments that none of the four methods reads.
@@ -1185,22 +1188,22 @@ The caller has two routes:
   - [`MultiPeriodPredictionResult`](@ref)
   - [`PopulationPredictionResult`](@ref)
 """
-function expected_risk(r::PrRM,
+function expected_risk(::Scalariser, r::PrRM,
                        pred::PredictionResult{<:Any,
                                               <:PredictionReturnsResult{<:Any, <:VecNum}};
                        kwargs...)
     return throw(ArgumentError(prrm_prediction_message(r, pred)))
 end
-function expected_risk(r::PrRM,
+function expected_risk(::Scalariser, r::PrRM,
                        pred::PredictionResult{<:Any,
                                               <:PredictionReturnsResult{<:Any, <:VecVecNum}};
                        kwargs...)
     return throw(ArgumentError(prrm_prediction_message(r, pred)))
 end
-function expected_risk(r::PrRM, pred::MultiPeriodPredictionResult; kwargs...)
+function expected_risk(::Scalariser, r::PrRM, pred::MultiPeriodPredictionResult; kwargs...)
     return throw(ArgumentError(prrm_prediction_message(r, pred)))
 end
-function expected_risk(r::PrRM, pred::PopulationPredictionResult; kwargs...)
+function expected_risk(::Scalariser, r::PrRM, pred::PopulationPredictionResult; kwargs...)
     return throw(ArgumentError(prrm_prediction_message(r, pred)))
 end
 

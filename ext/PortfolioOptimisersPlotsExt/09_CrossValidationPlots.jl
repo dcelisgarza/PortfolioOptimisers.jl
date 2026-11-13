@@ -2,13 +2,13 @@
 function PortfolioOptimisers.plot_cv_scores(r::PortfolioOptimisers.BaseRM_VecBaseRM,
                                             mpred::MultiPeriodPredictionResult;
                                             sca::Scalariser = SumScalariser(), kwargs...)
-    scores = [expected_risk(r, p; sca = sca) for p in mpred.pred]
+    scores = [expected_risk(sca, r, p) for p in mpred.pred]
     return PortfolioOptimisers.plot_cv_scores(scores, 1:length(scores); kwargs...)
 end
 function PortfolioOptimisers.plot_cv_scores(r::PortfolioOptimisers.BaseRM_VecBaseRM,
                                             ppred::PopulationPredictionResult;
                                             sca::Scalariser = SumScalariser(), kwargs...)
-    scores = [expected_risk(r, m; sca = sca) for m in ppred.pred]
+    scores = [expected_risk(sca, r, m) for m in ppred.pred]
     return PortfolioOptimisers.plot_cv_scores(scores, 1:length(scores); kwargs...)
 end
 ## plot_turnover

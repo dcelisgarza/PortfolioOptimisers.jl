@@ -848,8 +848,9 @@ Represents the outer collection of cross-validation paths, where each inner vect
   - [`CombinatorialCrossValidation`](@ref)
 """
 const VecVecPredRes = AbstractVector{<:VecPredRes}
-function expected_risk(r::BaseRM_VecBaseRM, pred::PredictionResult; kwargs...)
-    return expected_risk_from_returns(r, pred.rd.X; kwargs...)
+function expected_risk(sca::Scalariser, r::BaseRM_VecBaseRM, pred::PredictionResult;
+                       kwargs...)
+    return expected_risk_from_returns(sca, r, pred.rd.X; kwargs...)
 end
 """
 $(DocStringExtensions.TYPEDSIGNATURES)
@@ -1249,9 +1250,10 @@ const VecMPredRes = AbstractVector{<:MultiPeriodPredictionResult}
     compute(res, pred.res; broadcast)
     compute(rd, pred.rd; broadcast)
 end
-function expected_risk(r::BaseRM_VecBaseRM, mpred::MultiPeriodPredictionResult; kwargs...)
+function expected_risk(sca::Scalariser, r::BaseRM_VecBaseRM,
+                       mpred::MultiPeriodPredictionResult; kwargs...)
     X = mpred.mrd.X
-    return expected_risk_from_returns(r, X; kwargs...)
+    return expected_risk_from_returns(sca, r, X; kwargs...)
 end
 """
 $(DocStringExtensions.TYPEDSIGNATURES)
@@ -1353,11 +1355,20 @@ function PopulationPredictionResult(;
                                                                                                  0))::PopulationPredictionResult
     return PopulationPredictionResult(pred)
 end
-function expected_risk(r::BaseRM_VecBaseRM, preds::VecMPredRes; kwargs...)
-    return [expected_risk(r, pred; kwargs...) for pred in preds]
+function expected_risk(sca::Scalariser, r::BaseRM_VecBaseRM, preds::VecMPredRes; kwargs...)
+    return [expected_risk(sca, r, pred; kwargs...) for pred in preds]
 end
-function expected_risk(r::BaseRM_VecBaseRM, ppred::PopulationPredictionResult; kwargs...)
-    return [expected_risk(r, p; kwargs...) for p in ppred.pred]
+function expected_risk(sca::Scalariser, r::BaseRM_VecBaseRM,
+                       ppred::PopulationPredictionResult; kwargs...)
+    return [expected_risk(sca, r, p; kwargs...) for p in ppred.pred]
+end
+# The keyword form of every prediction method above. It takes `sca` out of the keywords and
+# calls the positional form, which every internal caller calls, as `expected_risk` on weights
+# does. The methods of a `PrRM`, which refuse a prediction, are positional too, so both forms
+# reach them.
+function expected_risk(r::BaseRM_VecBaseRM, p::Union{AbstractPredictionResult, VecMPredRes};
+                       sca::Scalariser = SumScalariser(), kwargs...)
+    return expected_risk(sca, r, p; kwargs...)
 end
 """
 $(DocStringExtensions.TYPEDSIGNATURES)

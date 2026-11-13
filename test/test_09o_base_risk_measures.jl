@@ -213,4 +213,97 @@ end
         @test PO._ctx(1, :a, _slv596) === _slv596
         @test isnothing(PO._ctx(1, :a))
     end
+
+    @testset "The positional form takes the scalariser first, and a field still wins" begin
+        # #2067. Two measures that read the net returns, so a weight path reaches them too.
+        X = _X596
+        rn = [ConditionalValueatRisk(; settings = RiskMeasureSettings(; scale = 1.5)),
+              MaximumDrawdown(; settings = RiskMeasureSettings(; scale = 0.5))]
+        w = [0.1, 0.2, 0.3, 0.25, 0.15]
+        w2 = fill(0.2, 5)
+        W = repeat(transpose(w), size(X, 1))
+        x = X * w
+        s = [expected_risk(r, w, X) * r.settings.scale for r in rn]
+        for (sca, v) in ((SumScalariser(), sum(s)), (MaxScalariser(), maximum(s)),
+                         (MinScalariser(), minimum(s)))
+            @test expected_risk(sca, rn, w, X) ≈ v
+            @test expected_risk(rn, w, X; sca = sca) ≈ v
+            @test expected_risk(sca, rn, W, X) ≈ v
+            @test expected_risk(sca, rn, w, _pr596) ≈
+                  expected_risk(rn, w, _pr596; sca = sca)
+            @test expected_risk(sca, rn, W, _pr596) ≈
+                  expected_risk(rn, W, _pr596; sca = sca)
+            @test expected_risk(sca, rn, [w, w2], X) ≈
+                  [v, expected_risk(rn, w2, X; sca = sca)]
+            @test expected_risk(sca, rn, [w, w2], _pr596) ≈
+                  expected_risk(rn, [w, w2], _pr596; sca = sca)
+            @test expected_risk_from_returns(sca, rn, x) ≈ v
+            @test expected_risk_from_returns(rn, x; sca = sca) ≈ v
+            @test expected_risk_from_returns(sca, rn, [x, x]) ≈ [v, v]
+            @test expected_risk_from_returns(rn, [x, x]; sca = sca) ≈ [v, v]
+        end
+        # A single measure ignores the scalariser in both forms.
+        r = rn[1]
+        @test expected_risk(MaxScalariser(), r, w, X) == expected_risk(r, w, X)
+        @test expected_risk(MaxScalariser(), r, [w, w2], _pr596) ==
+              expected_risk(r, [w, w2], _pr596)
+        @test expected_risk_from_returns(MaxScalariser(), r, x) ==
+              expected_risk_from_returns(r, x)
+        @test expected_risk_from_returns(MaxScalariser(), r, [x, x]) ==
+              expected_risk_from_returns(r, [x, x])
+        # A ratio passes its own field as the positional scalariser, so a scalariser of the
+        # call site does not beat the field.
+        nr = NonOptimisationRiskRatio(; r1 = rn, sca1 = MaxScalariser(), r2 = rn,
+                                      sca2 = MinScalariser())
+        val = maximum(s) / minimum(s)
+        @test expected_risk(nr, w, X) ≈ val
+        @test expected_risk(nr, w, X; sca = SumScalariser()) ≈ val
+        @test expected_risk(SumScalariser(), nr, w, X) ≈ val
+        @test expected_risk(nr, W, X; sca = SumScalariser()) ≈ val
+        @test nr(x) ≈ val
+        mr = MeanReturnRiskRatio(; rk = rn, sca = MaxScalariser())
+        @test expected_risk(mr, w, X; sca = SumScalariser()) ≈ mean(x) / maximum(s)
+        @test expected_risk(mr, W, X) ≈ mean(x) / maximum(s)
+        @test mr(x) ≈ mean(x) / maximum(s)
+        # The internal verbs that a ratio calls take the scalariser first, and no keyword.
+        fees = Fees(; l = 0.001)
+        wd = w .- w2
+        d = [PO.difference_risk(r, wd, w, X, fees) * r.settings.scale for r in rn]
+        @test PO.difference_risk(MaxScalariser(), rn, wd, w, X, fees) ≈ maximum(d)
+        @test PO.difference_risk(MaxScalariser(), r, wd, w, X, fees) ==
+              PO.difference_risk(r, wd, w, X, fees)
+        @test PO.difference_linearised_risk(MinScalariser(), [nothing, nothing], rn, wd, w,
+                                            X, fees) ≈ minimum(d)
+        @test PO.difference_linearised_risk(MinScalariser(), nothing, r, wd, w, X, fees) ==
+              PO.difference_risk(r, wd, w, X, fees)
+        @test PO.linearised_risk(MaxScalariser(), [nothing, nothing], rn, w, X, nothing) ≈
+              maximum(s)
+        @test PO.linearised_risk(MaxScalariser(), nothing, r, w, X, nothing) ==
+              expected_risk(r, w, X)
+        # A result and a prediction take both forms, and a `PrRM` refuses a prediction in
+        # both.
+        rd = ReturnsResult(; nx = ["a$i" for i in 1:5], X = X)
+        res = optimise(EqualWeighted(), rd)
+        pred = predict(res, rd)
+        mp = MultiPeriodPredictionResult(; pred = [pred, pred])
+        pp = PopulationPredictionResult(; pred = [mp, mp])
+        sca = MaxScalariser()
+        @test expected_risk(sca, rn, res, X) ≈ expected_risk(sca, rn, res.w, X)
+        @test expected_risk(rn, res, X; sca = sca) ≈ expected_risk(sca, rn, res.w, X)
+        @test expected_risk(sca, rn, res, _pr596) ≈
+              expected_risk(rn, res, _pr596; sca = sca)
+        @test expected_risk(sca, rn, pred) ≈ expected_risk(rn, pred; sca = sca)
+        @test expected_risk(sca, rn, mp) ≈ expected_risk(rn, mp; sca = sca)
+        @test expected_risk(sca, rn, [mp, mp]) ≈ expected_risk(rn, [mp, mp]; sca = sca)
+        @test expected_risk(sca, rn, pp) ≈ expected_risk(rn, pp; sca = sca)
+        for p in (pred, mp, pp)
+            @test_throws ArgumentError expected_risk(ExpectedReturn(), p)
+            @test_throws ArgumentError expected_risk(sca, ExpectedReturnRiskRatio(), p)
+        end
+        # No method of the five verbs is ambiguous with another.
+        verbs = (:expected_risk, :expected_risk_from_returns, :difference_risk,
+                 :linearised_risk, :difference_linearised_risk)
+        @test !any(p -> p[1].name in verbs || p[2].name in verbs,
+                   Test.detect_ambiguities(PortfolioOptimisers))
+    end
 end

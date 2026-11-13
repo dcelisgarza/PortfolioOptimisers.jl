@@ -2592,27 +2592,33 @@ _ctx(a::Slv_VecSlv, args...) = a
 _ctx(::Any, args...) = _ctx(args...)
 """
     expected_risk(r, args...; kwargs...)
+    expected_risk(sca::Scalariser, r, args...; kwargs...)
 
 Compute the expected value of a risk measure.
 
 Generic function extended by concrete risk measure types. Each method computes the risk value associated with its risk measure type, given a portfolio (or its return distribution).
 
+A vector of measures takes a [`Scalariser`](@ref) `sca`. The keyword form takes it as a keyword and calls the positional form, which takes it first. A single measure ignores it.
+
 # Related
 
   - [`AbstractBaseRiskMeasure`](@ref)
+  - [`Scalariser`](@ref)
 """
 function expected_risk end
 """
     expected_risk_from_returns(r, X; kwargs...)
+    expected_risk_from_returns(sca::Scalariser, r, X; kwargs...)
 
 Compute the expected risk of a measure from a precomputed net-return series.
 
-Generic function extended by concrete risk measure types that support the precomputed-returns contract. Only a measure with `supports_precomputed_returns(r) == true` implements a method.
+Generic function extended by concrete risk measure types that support the precomputed-returns contract. Only a measure with `supports_precomputed_returns(r) == true` implements a method. A vector of measures takes a [`Scalariser`](@ref) `sca`, as [`expected_risk`](@ref) does.
 
 # Related
 
   - [`AbstractBaseRiskMeasure`](@ref)
   - [`supports_precomputed_returns`](@ref)
+  - [`Scalariser`](@ref)
 """
 function expected_risk_from_returns end
 """

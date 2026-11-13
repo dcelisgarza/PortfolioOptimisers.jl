@@ -9,7 +9,7 @@ ExpectedReturn
 ExpectedReturnRiskRatio
 expected_risk(r::ExpectedReturn, w::VecNum, pr::AbstractPriorResult, fees::Option{<:Fees} = nothing; kwargs...)
 expected_risk(r::ExpectedReturnRiskRatio, w::VecNum, pr::AbstractPriorResult, fees::Option{<:Fees} = nothing; kwargs...)
-expected_risk(r::PrRM, pred::PredictionResult{<:Any, <:PredictionReturnsResult{<:Any, <:VecNum}}; kwargs...)
+expected_risk(::Scalariser, r::PrRM, pred::PredictionResult{<:Any, <:PredictionReturnsResult{<:Any, <:VecNum}}; kwargs...)
 expected_return
 expected_ratio
 expected_risk_ret_ratio
