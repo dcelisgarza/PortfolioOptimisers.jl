@@ -1566,6 +1566,11 @@
         @test bars_sw(plot_cv_scores(rs_sw, mpred_sw; sca = MaxScalariser())) ≈ max_sw
         @test bars_sw(plot_cv_scores(rs_sw, mpred_sw)) ≈ sum_sw
         @test !(max_sw ≈ sum_sw)
+        # A population draws one bar for each path, scored under the same `sca`.
+        ppred_sw = PopulationPredictionResult(; pred = [mpred_sw, mpred_sw])
+        pmax_sw = expected_risk(rs_sw, mpred_sw; sca = MaxScalariser())
+        @test bars_sw(plot_cv_scores(rs_sw, ppred_sw; sca = MaxScalariser())) ≈
+              [pmax_sw, pmax_sw]
         # A path scores to one number, which the scatter raised on. `plt` is drawn into.
         base_sw = plot(; title = "base")
         @test plot_measures(mpred_sw; plt = base_sw) === base_sw
