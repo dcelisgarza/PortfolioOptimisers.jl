@@ -209,7 +209,7 @@ end
 
 Refuses a programme set prior that cannot price an asset the model trades, and names the asset.
 
-The projection programme reduces the model to the prior's Investable Mask before it builds, so its prior always passes. A leader's model trades the Investable Mask of the leader's own prior, and the set fits its prior on the same rows. When both priors are plain, the two masks agree and the check passes. When the set's `pe` is plain and the leader's prior is mask-aware, a young asset that the leader trades can have no price in the set's prior. Its ceiling would then carry `NaN`, so the check refuses it here, before the model reaches the solver.
+A model of a fixed width calls it: the direct call of [`set_allocation_set_constraints!`](@ref), and a leader's model. The projection programme does not call it, because its shared entry builds the model at the prior's Investable Mask, [`resolve_projection_entry`](@ref). A leader's model trades the Investable Mask of the leader's own prior, and the set fits its prior on the same rows. When both priors are plain, the two masks agree and the check passes. When the set's `pe` is plain and the leader's prior is mask-aware, a young asset that the leader trades can have no price in the set's prior. Its ceiling would then carry `NaN`, so the check refuses it here, before the model reaches the solver.
 
 # Algorithm
 
@@ -255,7 +255,7 @@ end
 
 Fits the prior of an entry of the keyword `blocks` of [`resolve_jump_optimiser`](@ref), and gives the entry with its prior.
 
-An entry is the block of a [`ProgrammeAllocationSet`](@ref) beside the block of a JuMP head. It is the set after stage 1, [`resolve_allocation_set`](@ref), and after `factory(set, w)`, with the rows `X` that the online head holds. The set reads its risk ceilings `r`, its return floor `ret` and the slots of its block against its own prior on `X`, so the entry carries the rows and no Result of a step lives in an estimator. An entry with a third value carries the prior result of the set already. The entry of a fit again after a refusal has one, and so has an entry for a sub-problem, from [`allocation_set_block_step`](@ref). The function fits nothing for such an entry.
+An entry is the block of a [`ProgrammeAllocationSet`](@ref) beside the block of a JuMP head, or the one block of the bare head of [`projection_programme`](@ref). It is the set after stage 1, [`resolve_allocation_set`](@ref), and after `factory(set, w)`, with the rows `X` that the online head holds. The set reads its risk ceilings `r`, its return floor `ret` and the slots of its block against its own prior on `X`, so the entry carries the rows and no Result of a step lives in an estimator. An entry with a third value carries the prior result of the set already. The entry of a fit again after a refusal has one, and so has an entry for a sub-problem, from [`allocation_set_block_step`](@ref). The function fits nothing for such an entry.
 
 # Arguments
 
@@ -348,7 +348,7 @@ end
 
 Intersects the Investable Mask of a JuMP head with the mask of a block of a set, at the entry of the head.
 
-[`resolve_jump_optimiser`](@ref) folds the function over the entries of its keyword `blocks`, after it composes the mask of its own block with [`distance_reader_entry_mask`](@ref). The mask of the block of a set follows the same rules as the mask of the head, on the prior and the rows of the set. So an asset that one block cannot read departs from every block. A set that reads no rows fits no prior and has no distance reader, so its block keeps the mask.
+The shared entry [`resolve_block_entry`](@ref) folds the function over the entries of its blocks. A JuMP head first composes the mask of its own block with [`distance_reader_entry_mask`](@ref), in [`resolve_jump_optimiser`](@ref). The bare head of [`projection_programme`](@ref) starts from the mask of the prior of its set, so the set prices every asset that the bare head keeps, and no asset raises the warning of [`allocation_set_priced_mask`](@ref). The mask of the block of a set follows the same rules as the mask of the head, on the prior and the rows of the set. So an asset that one block cannot read departs from every block. A set that reads no rows fits no prior and has no distance reader, so its block keeps the mask.
 
 # Algorithm
 
@@ -396,9 +396,9 @@ end
 """
 $(DocStringExtensions.TYPEDSIGNATURES)
 
-Resolves the block of a set at the Investable Mask of a JuMP head, to its [`ResolvedConstraintBlock`](@ref), or to the refusal of one of its distance readers.
+Resolves the block of a set at the Investable Mask of a head, to its [`ResolvedConstraintBlock`](@ref), or to the refusal of one of its distance readers.
 
-[`resolve_jump_optimiser`](@ref) calls it for each entry of its keyword `blocks`, after the mask holds the masks of every block. The block resolves against the prior of the set on the rows of the set, and not against the prior of the head. A distance reader of the set can still refuse an asset that the prior of the set keeps. The function then returns the [`DistanceReaderRefusalError`](@ref), and the one refusal branch of the entry fits again without the asset.
+The shared entry [`resolve_block_entry`](@ref) calls it for each entry of its blocks, after the mask holds the masks of every block. The head is a JuMP head, [`resolve_jump_optimiser`](@ref), or the bare head of [`projection_programme`](@ref). The block resolves against the prior of the set on the rows of the set, and not against the prior of the head. A distance reader of the set can still refuse an asset that the prior of the set keeps. The function then returns the [`DistanceReaderRefusalError`](@ref), and the one refusal branch of the entry fits again without the asset.
 
 # Algorithm
 
@@ -433,6 +433,83 @@ function resolve_allocation_set_block(b::Tuple{<:ProgrammeAllocationSet, <:Retur
     setr, Xr, prr = programme_investable_reduction(imsk, set, X, pr)
     return distance_reader_call(resolve_constraint_block, setr.cbe, prr, Xr; slv = set.slv,
                                 strict = projection_step_strict())
+end
+"""
+    resolve_block_entry(f, args::Tuple, imsk::Option{BitVector}, blocks::Tuple,
+                        rd::ReturnsResult, strict::Bool;
+                        rmsk::Option{BitVector} = nothing) -> Tuple
+
+Resolves every block of a head at its entry, with one refusal branch for the readers of every block. This is the shared entry for a list of blocks.
+
+Two heads call it. [`resolve_jump_optimiser`](@ref) passes the block of a JuMP head as the first block, and the blocks of the sets after it. [`projection_programme`](@ref) is a bare head: it holds no block of its own, and it passes the block of its set alone, on the rows of the step. The function `f` resolves the block of the head at a mask. It takes the mask and `args...`, and it returns the values of the head and a `Tuple` of the Results of its blocks, one Result or none. [`no_head_block`](@ref) is the `f` of a bare head. The function takes `f` and its arguments, not a closure, as [`distance_reader_call`](@ref) does, so a variable of the entry that it reads is not boxed.
+
+A distance reader of a block, its `cte` or its `ple`, can refuse an asset that its prior keeps, see [`DistanceReaderRefusalError`](@ref). The function then fits again without that asset, with the mask of [`distance_reader_refusal_mask`](@ref) in `rmsk`, from the same prior results. That mask already holds the masks of every block, so no mask warns a second time. Two readers can refuse different assets, and the fit again meets the refusal of the other one. The first refusal in the order of the blocks wins.
+
+# Algorithm
+
+ 1. On the first fit, intersect `imsk` with the mask of each entry of `blocks`, [`allocation_set_entry_mask`](@ref). On a fit again, take `rmsk`.
+ 2. Resolve the block of the head with `f(imsk, args...)`. Resolve each entry of `blocks` at the mask with [`resolve_allocation_set_block`](@ref).
+ 3. If a block gives a [`DistanceReaderRefusalError`](@ref), take the `strict` flag of its owner: `strict` for the block of the head, and [`projection_step_strict`](@ref) for the block of a set. Fit again from step 1 with the mask of [`distance_reader_refusal_mask`](@ref), and return its value.
+ 4. Return the mask, the values of the head and the Results of every block.
+
+# Arguments
+
+  - `f`: The resolver of the block of the head, `f(imsk, args...) -> (head, cbrs::Tuple)`.
+  - `args`: The arguments of `f` after the mask.
+  - `imsk`: The Investable Mask of the head, or `nothing` when every asset is investable.
+  - `blocks`: The fitted entries `(set, X, pr)` of the sets, from [`fit_allocation_set_block`](@ref).
+  - `rd`: The rows of the head on its full universe, read for the asset names of a refusal.
+  - `strict`: The `strict` flag of the readers of the block of the head.
+  - `rmsk`: The mask of a fit again after a refusal, or `nothing` on the first fit.
+
+# Validation
+
+  - The rules of [`allocation_set_entry_mask`](@ref) and [`distance_reader_refusal_mask`](@ref).
+
+# Returns
+
+  - `(imsk, head, cbrs)::Tuple`: The Investable Mask of the entry, the values that `f` gave for the head, and the `Tuple` of the block Results, the block of the head first.
+
+# Related
+
+  - [`resolve_jump_optimiser`](@ref)
+  - [`projection_programme`](@ref)
+  - [`resolve_allocation_set_block`](@ref)
+  - [`distance_reader_refusal_mask`](@ref)
+"""
+function resolve_block_entry(f::F, args::Tuple, imsk::Option{BitVector}, blocks::Tuple,
+                             rd::ReturnsResult, strict::Bool;
+                             rmsk::Option{BitVector} = nothing) where {F}
+    imsk = isnothing(rmsk) ? foldl(allocation_set_entry_mask, blocks; init = imsk) : rmsk
+    head, hcbrs = f(imsk, args...)
+    cbrs = (hcbrs..., map(b -> resolve_allocation_set_block(b, imsk), blocks)...)
+    i = findfirst(x -> x isa DistanceReaderRefusalError, cbrs)
+    if isnothing(i)
+        return imsk, head, cbrs
+    end
+    # A distance reader that refuses an asset the prior kept raises before it builds its
+    # graph. The block of the head refuses under the flag of the head, and the block of a
+    # set under the flag of the online head that holds the set.
+    s = i <= length(hcbrs) ? strict : projection_step_strict()
+    return resolve_block_entry(f, args, imsk, blocks, rd, strict;
+                               rmsk = distance_reader_refusal_mask(cbrs[i], imsk, rd, s))
+end
+"""
+    no_head_block(imsk::Option{BitVector}) -> Tuple
+
+The resolver of the block of a bare head, for [`resolve_block_entry`](@ref). A bare head holds no block of its own, so the function gives no values of the head and no block Result.
+
+# Returns
+
+  - `(nothing, ())::Tuple`.
+
+# Related
+
+  - [`resolve_block_entry`](@ref)
+  - [`projection_programme`](@ref)
+"""
+function no_head_block(::Option{BitVector})::Tuple
+    return nothing, ()
 end
 """
 $(DocStringExtensions.TYPEDSIGNATURES)

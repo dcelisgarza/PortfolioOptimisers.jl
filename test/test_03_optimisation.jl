@@ -2345,10 +2345,16 @@ end
         setn = PO.resolve_allocation_set(ProgrammeAllocationSet(; slv = csl, sets,
                                                                 lcse = lce), N, true,
                                          Float64)
-        wn = @test_logs min_level = Base.CoreLogging.Warn PO.projection_programme(EuclideanProjection(),
-                                                                                  setn, q,
-                                                                                  wq, rd,
-                                                                                  pr, imsk)
+        # The projection at the mask `imsk` goes through the shared entry of a bare head,
+        # which starts from that mask and resolves the block of the set at it.
+        function proj_at(set)
+            imskr, _, cbrs = PO.resolve_block_entry(PO.no_head_block, (), imsk,
+                                                    ((set, rd, pr),), rd, false)
+            setr, _, _ = PO.programme_investable_reduction(imskr, set, rd, nothing)
+            return PO.projection_programme(EuclideanProjection(), (imskr, setr, only(cbrs)),
+                                           q, wq, rd)
+        end
+        wn = @test_logs min_level = Base.CoreLogging.Warn proj_at(setn)
         @test iszero(wn[k]) && isapprox(sum(wn), 1; atol = 1e-6)
         @test wn[1] + wn[2] <= 0.3 + 1e-6
         for (kw, name) in (((; lcse = lcp), "lcse"), ((; gcarde = gcp), "gcarde"))
@@ -2356,7 +2362,7 @@ end
                                                                     kw...), N, false,
                                              Float64)
             err = try
-                PO.projection_programme(EuclideanProjection(), setp, q, wq, rd, pr, imsk)
+                proj_at(setp)
             catch e
                 e
             end

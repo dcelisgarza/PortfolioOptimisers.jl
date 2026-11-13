@@ -1,4 +1,5 @@
 using Clarabel, Statistics
+using JuMP: JuMP
 using InteractiveUtils: subtypes
 
 #=
@@ -1206,6 +1207,77 @@ end
         end
         @test optimise(o).w == r.w
     end
+end
+
+@testset "The projection resolves its set through the entry of a bare head (#2046)" begin
+    # The data of #2028. The prior of the set fills the gap of `e`, and a plain graph
+    # reader of the set reads that gap. The entry drops `e` before the reader runs, as the
+    # entry of a batch head does. The old projection raised the reader's IsNonFiniteError.
+    rng8 = StableRNG(424242)
+    T8, N8 = 120, 8
+    F8 = randn(rng8, T8, 2)
+    X8 = (F8 * randn(rng8, 2, N8) .+ randn(rng8, T8, N8)) ./ 100 .+ 0.0005
+    X8[1:60, 5] .= NaN
+    amsk8 = trues(T8, N8)
+    amsk8[1:60, 5] .= false
+    rd8 = ReturnsResult(; nx = string.('a':'h'), X = X8,
+                        pnl = AssetPanel(; pf = nothing, amsk = amsk8, emsk = amsk8))
+    pe8 = EmpiricalPrior(; me = ExpWeightedExpectedReturns(; decay = 0.9, min_obs = 2),
+                         ce = ExpWeightedCovariance(; decay = 0.9, min_obs = 2,
+                                                    centring = PreCentred()),
+                         fill_limit = 1)
+    mk(; kw...) = ProgrammeAllocationSet(; slv = slv, pe = pe8,
+                                         wb = WeightBounds(; ub = 0.5),
+                                         ple = SemiDefinitePhylogenyEstimator(;
+                                                                              pl = NetworkEstimator()),
+                                         kw...)
+    ops(set; strict = false) = OnlinePortfolioSelection(; alg = ExponentiatedGradient(),
+                                                        set = set, strict = strict)
+    gap = (:warn,
+           r"a graph reader of this optimiser reads the returns data with a plain moment estimator, and the rows that it reads hold a gap for 1 asset\(s\) that the prior kept: \[\"e\"\]")
+    r = @test_logs gap match_mode = :any optimise(ops(mk()), rd8)
+    @test iszero(r.w[5])
+    @test isapprox(sum(r.w), 1)
+    @test_throws IsNonFiniteError optimise(ops(mk(); strict = true), rd8)
+    # The fold step by step gives the batch weights.
+    o = ops(mk())
+    @test_logs gap match_mode = :any for t in 1:T8
+        o = PO.partial_fit!(o, PO.port_opt_view(rd8, t:t, :))
+    end
+    @test optimise(o).w == r.w
+    # At one step, the entry gives the mask, the set viewed at it and the block Result. The
+    # three-argument form adds the block, and a set with `r = nothing` and `ret = nothing`
+    # adds no ceiling and no floor.
+    Xt = PO.port_opt_view(rd8, 1:100, :)
+    function step_keys(set0)
+        set = PO.resolve_allocation_set(set0, N8, false, Float64)
+        val, _ = PO.with_projection_step(Xt, 1) do
+            imsk, setr, cbr = @test_logs gap match_mode = :any PO.resolve_projection_entry(set,
+                                                                                           fill(1 /
+                                                                                                N8,
+                                                                                                N8),
+                                                                                           Xt)
+            @test imsk == BitVector([1, 1, 1, 1, 0, 1, 1, 1])
+            @test length(setr.wb.ub) == 7 && size(cbr.pr.X, 2) == 7
+            m = JuMP.Model()
+            PO.set_model_scales!(m, 1, 1)
+            PO.set_model_observations!(m, size(Xt.X, 1))
+            JuMP.@expression(m, k, 1)
+            PO.state_set!(m, Symbol(""), :w, JuMP.@variable(m, [1:count(imsk)]))
+            wb, c = PO.set_allocation_set_constraints!(m, setr, cbr)
+            @test c === cbr && wb === cbr.wb
+            return String.(collect(keys(JuMP.object_dictionary(m))))
+        end
+        return val
+    end
+    @test !any(k -> occursin("risk", k) || occursin("ret", k), step_keys(mk()))
+    @test "variance_risk_1_ub" in
+          step_keys(mk(; r = Variance(; settings = RiskMeasureSettings(; ub = 1.0))))
+    # A bounded set holds no block, and resolves to itself with no mask.
+    bset = BoundedAllocationSet()
+    @test PO.resolve_projection_entry(bset, fill(1 / N8, N8), Xt) ===
+          (nothing, bset, nothing)
+    @test isnothing(PO.set_block_objective_terms!(JuMP.Model(), nothing, nothing, bset))
 end
 
 @testset "The entry of a JuMP head drops the assets that the readers of each block refuse (#2043)" begin

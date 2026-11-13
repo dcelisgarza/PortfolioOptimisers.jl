@@ -24,4 +24,5 @@ constraint_block_from_resolved
 set_block_constraints!
 set_block_weight_constraints!
 set_block_post_risk_constraints!
+set_block_objective_terms!
 ```

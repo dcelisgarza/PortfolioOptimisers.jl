@@ -1250,6 +1250,7 @@ Phase 2:
   - [`assemble_jump_model!`](@ref)
   - [`set_allocation_set_constraints!`](@ref)
   - [`set_allocation_risk_return_bounds!`](@ref)
+  - [`set_block_objective_terms!`](@ref)
   - [`weights_prefix`](@ref)
 """
 function set_block_constraints!(model::JuMP.Model, cbr::ResolvedConstraintBlock, owner,
@@ -1349,6 +1350,39 @@ function set_block_post_risk_constraints!(model::JuMP.Model, cbr::ResolvedConstr
     set_iplg_constraints!(model, cbr.plr; prefix = prefix)
     set_sdp_phylogeny_constraints!(model, cbr.plr; prefix = prefix)
     add_custom_constraint!(model, cbr.ccnt, owner, attrs)
+    return nothing
+end
+"""
+    set_block_objective_terms!(model::JuMP.Model, cbr::Nothing, obj, owner) -> Nothing
+    set_block_objective_terms!(model::JuMP.Model, cbr::ResolvedConstraintBlock, obj, owner) -> Nothing
+
+Add the custom objective terms `cobj` of a [`ResolvedConstraintBlock`](@ref) to the Objective Penalty of a model. This is the step of the block builder for the objective.
+
+A term of a block gets the objective `obj` of the model, the owner of its block and the Result of its block, through [`add_custom_objective_term!`](@ref). The term adds to the Objective Penalty, and the objective builder of the owner adds the penalty to its objective. So the owner calls this function after the two phases of the block, [`set_block_constraints!`](@ref) and [`set_block_post_risk_constraints!`](@ref), and before it sets the objective. The projection programme of a [`ProgrammeAllocationSet`](@ref) calls it with its Projection Geometry as `obj`. A `nothing` block, the block of a [`BoundedAllocationSet`](@ref), adds no term.
+
+# Arguments
+
+  - $(arg_dict[:model])
+  - `cbr`: The Result of the block, or `nothing` when the owner holds no block.
+  - `obj`: The objective of the model, such as a Projection Geometry.
+  - `owner`: The owner of the block.
+
+# Returns
+
+  - `nothing`.
+
+# Related
+
+  - [`add_custom_objective_term!`](@ref)
+  - [`set_block_constraints!`](@ref)
+  - [`projection_programme`](@ref)
+"""
+function set_block_objective_terms!(::JuMP.Model, ::Nothing, ::Any, ::Any)::Nothing
+    return nothing
+end
+function set_block_objective_terms!(model::JuMP.Model, cbr::ResolvedConstraintBlock, obj,
+                                    owner)::Nothing
+    add_custom_objective_term!(model, obj, cbr.cobj, owner, cbr)
     return nothing
 end
 

@@ -22,10 +22,10 @@ PortfolioOptimisers.projection_solver
 PortfolioOptimisers.programme_answer
 PortfolioOptimisers.allocation_set_ready
 PortfolioOptimisers.projection_programme
+PortfolioOptimisers.resolve_projection_entry
 PortfolioOptimisers.programme_investable_reduction
 PortfolioOptimisers.investable_geometry_view
 PortfolioOptimisers.solve_projection_programme!
 PortfolioOptimisers.projection_scale
-PortfolioOptimisers.allocation_set_cobj
 PortfolioOptimisers.blend_projection
 ```
