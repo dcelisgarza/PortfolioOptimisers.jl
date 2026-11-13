@@ -1,7 +1,7 @@
 #=
 The third algorithm set of the online portfolio selection family (issue #1178 on map #1148):
-`FollowTheLeader` over a Sample Selector, the seven selectors, the Allocation Set Constraint
-through which a re-solve honours the head's set (ADR 0164), `FollowTheLeadingHistory`,
+`FollowTheLeader` over a Sample Selector, the seven selectors, the block of the head's set that
+a re-solve and each member of its fallback chain take (ADR 0164), `FollowTheLeadingHistory`,
 `RankOneCovariance` with the `ShortTermLossControlPortfolio` constructor, and the
 pattern-matching and risk-aversion aggregations as configurations.
 
@@ -442,6 +442,36 @@ using Test, PortfolioOptimisers, StableRNGs, LinearAlgebra, Statistics, Dates, C
         @test !haskey(res.model, :blk_2_bgt) && !haskey(res.model, :aset_bgt)
         @test maximum(res.w) <= 0.4 + 1e-8 && isapprox(sum(res.w), 1; atol = 1e-8)
         @test maximum(optimise(lead(; bgt = nothing), rdv).w) > 0.4 + 1e-3
+    end
+
+    @testset "A fallback leader solves on the head's set (#2035)" begin
+        # The held optimiser stops at `max_iter = 0`, so its fallback is the leader. At
+        # `dc3d282e50` the fallback solved without the set, and the leader put the budget on
+        # one asset, 0.9999999937 against the cap of 0.2. The set now reaches each member of
+        # the chain as a block of the entry (#2045, #2047).
+        rngf = StableRNG(424242)
+        Tf, Nf = 80, 8
+        Ff = randn(rngf, Tf, 2)
+        Rf = (Ff * randn(rngf, 2, Nf) .+ randn(rngf, Tf, Nf)) ./ 100 .+ 0.0005
+        rdf = ReturnsResult(; nx = string.('a':'h'), X = Rf)
+        bad = Solver(; name = :bad, solver = Clarabel.Optimizer,
+                     settings = Dict("verbose" => false, "max_iter" => 0))
+        cap = ProgrammeAllocationSet(; slv = slv, wb = WeightBounds(; lb = 0.0, ub = 0.2))
+        lead(s; fb = nothing) = MeanRisk(; obj = MaximumReturn(),
+                                         opt = JuMPOptimiser(; slv = s), fb = fb)
+        free = optimise(OPS(; alg = FollowTheLeader(; opt = lead(slv))), rdf).w
+        ok = optimise(OPS(; alg = FollowTheLeader(; opt = lead(slv)), set = cap), rdf).w
+        fb = optimise(OPS(; alg = FollowTheLeader(; opt = lead(bad; fb = lead(slv))),
+                          set = cap), rdf).w
+        # The leader leaves the cap without the set, so the cap binds.
+        @test maximum(free) > 0.2 + 1e-3
+        @test maximum(ok) <= 0.2 + 1e-8
+        # The fallback leader keeps the cap, and it is the leader of the held solver.
+        @test maximum(fb) <= 0.2 + 1e-8
+        @test isapprox(fb, ok; atol = 1e-8)
+        @test isapprox(sum(fb), 1; atol = 1e-8)
+        # A member that cannot take the set raises at construction.
+        @test_throws ArgumentError FollowTheLeader(; opt = lead(bad; fb = EqualWeighted()))
     end
 
     @testset "A schedule in a leader resolves at each fold (#2049)" begin
