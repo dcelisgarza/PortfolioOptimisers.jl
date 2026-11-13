@@ -1399,6 +1399,65 @@ end
     @test jor.cbr[1].pr === res.jor.pr && jor.cbr[2] === cbr[2]
 end
 
+@testset "A leader re-solve drops an asset that a reader of its programme set refuses (#2030)" begin
+    # The data of #2028. The held optimiser takes the prior of the set, so its prior keeps
+    # `e`, and the reader of the set asks for 60 %. The old leader raised the reader's
+    # DistanceReaderRefusalError, because the set entered the model of the head after the
+    # entry of the head had fixed its mask.
+    rng8 = StableRNG(424242)
+    T8, N8 = 120, 8
+    F8 = randn(rng8, T8, 2)
+    X8 = (F8 * randn(rng8, 2, N8) .+ randn(rng8, T8, N8)) ./ 100 .+ 0.0005
+    X8[1:60, 5] .= NaN
+    amsk8 = trues(T8, N8)
+    amsk8[1:60, 5] .= false
+    rd8 = ReturnsResult(; nx = string.('a':'h'), X = X8,
+                        pnl = AssetPanel(; pf = nothing, amsk = amsk8, emsk = amsk8))
+    pe8 = EmpiricalPrior(; me = ExpWeightedExpectedReturns(; decay = 0.9, min_obs = 2),
+                         ce = ExpWeightedCovariance(; decay = 0.9, min_obs = 2,
+                                                    centring = PreCentred()),
+                         fill_limit = 1)
+    cvg(c) = PortfolioOptimisersCovariance(;
+                                           ce = Covariance(;
+                                                           cvg = CoveragePolicy(;
+                                                                                min_coverage = c)))
+    plc(c) = SemiDefinitePhylogenyEstimator(; pl = NetworkEstimator(; ce = cvg(c)))
+    set8 = ProgrammeAllocationSet(; slv = slv, pe = pe8, ple = plc(0.6))
+    jopt(; kw...) = JuMPOptimiser(; pe = pe8, slv = slv, kw...)
+    ops(opt; strict = false) = OnlinePortfolioSelection(;
+                                                        alg = FollowTheLeader(; opt = opt),
+                                                        set = set8, strict = strict)
+    refused(a) = (:warn,
+                  Regex("distance reader of this optimiser cannot estimate the correlation of 1 asset\\(s\\) that the prior kept: \\[\"$a\"\\]"))
+    for opt in (MeanRisk(; opt = jopt()), RiskBudgeting(; opt = jopt()))
+        r = @test_logs refused("e") match_mode = :any optimise(ops(opt), rd8)
+        @test iszero(r.w[5])
+        @test isapprox(sum(r.w), 1)
+        # Under the strict flag of the step, the leader refuses the asset.
+        @test_throws IsNonFiniteError optimise(ops(opt; strict = true), rd8)
+        # The fold step by step gives the batch weights.
+        o = ops(opt)
+        @test_logs refused("e") match_mode = :any for t in 1:T8
+            o = PO.partial_fit!(o, PO.port_opt_view(rd8, t:t, :))
+        end
+        @test optimise(o).w == r.w
+    end
+    # The asset `d` is constant, so the reader of the head refuses it for its zero variance.
+    # That reader asks for 10 %, so it keeps `e` at every step after row 66. The reader of the
+    # set refuses `e` at those steps, and a warning that names `e` alone is the set's. Both
+    # assets depart.
+    X9 = copy(X8)
+    X9[:, 4] .= 0.0005
+    rd9 = ReturnsResult(; nx = string.('a':'h'), X = X9,
+                        pnl = AssetPanel(; pf = nothing, amsk = amsk8, emsk = amsk8))
+    r9 = @test_logs refused("d") refused("e") match_mode = :any optimise(ops(MeanRisk(;
+                                                                                      opt = jopt(;
+                                                                                                 ple = plc(0.1)))),
+                                                                         rd9)
+    @test iszero(r9.w[4]) && iszero(r9.w[5])
+    @test isapprox(sum(r9.w), 1)
+end
+
 # The panel for a window of `t` observations over `N2` assets, so an expanding walk-forward can
 # be driven a fold at a time without the cross-validation machinery in the way: a fold's fit is
 # exactly this call.
