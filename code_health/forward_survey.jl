@@ -29,8 +29,9 @@
 #   default              an untyped or `::Any` fallback that returns its input, `false` or
 #                        `nothing`, and a step function that copies one in front of an owner
 #                        (#2074, rule 2). A fallback with no owner takes the verdict of #2108,
-#                        which `fallback_verdict` states: an `args...` fallback goes, a check
-#                        and a query keep theirs, and a contract verb takes a `::Nothing`
+#                        which `fallback_verdict` states: an `args...` fallback goes, a query
+#                        and a refusal check keep theirs, a value check takes a no-op method on
+#                        the set that reaches it, and a contract verb takes a `::Nothing`
 #                        method. A step function in front of an owner takes the verdict of
 #                        #2109, which `step_verdict` states: a walk keeps its leaf, `nothing`
 #                        goes to its owner, and an identity in front of a constructor stays as
@@ -1011,17 +1012,45 @@ function single_statement(body)
     return s
 end
 
+# The verdict of a refusal check, which refuses `what` and permits every other type (#2108).
+function refusal_check(what)
+    return ("keep (default)",
+            "a refusal check: it refuses $what, and it permits every other type, so its open method is a true answer (#2108, amended)")
+end
+
 """
 The verdicts of #2074, #2108 and #2109 that the parse cannot read. With no owner, an identity on
 two or more slots is a traversal step or a pass-through that stays, or a fallback that only a
 closed set reaches (#2108). In front of an owner, a step function that returns its input goes
 when the owner is a traversal or a repair, and stays as (b) when it holds a policy of a container
-(#2074, #2109). Each entry is a name, with its verdict and its reason. An entry whose name is no
-longer a `default`
-finding is stale, and `test/test_89_forward_survey_census.jl` fails on it, so a build ticket that
-types or removes the fallback deletes the entry.
+(#2074, #2109). A check is a value check unless this list names it: a refusal check names the
+types or the pairs that it refuses, and the parse cannot tell it from a value check (#2108,
+amended). A query whose only reader is a value check takes the set that reaches it, as a value
+check does. Each entry is a name, with its verdict and its reason. An entry whose name is no
+longer a `default` finding is stale, and `test/test_89_forward_survey_census.jl` fails on it, so
+a build ticket that types or removes the fallback deletes the entry.
 """
 const RULED_DEFAULTS = Dict{Symbol, Tuple{String, String}}(#
+                                                           :assert_rc_variance =>
+                                                               refusal_check("a `LinearConstraint` risk contribution on a `Variance` in a nested optimiser"),
+                                                           :assert_rc_pl =>
+                                                               refusal_check("a precomputed phylogeny result in a nested `FactorRiskContribution`"),
+                                                           :assert_stateless_prior =>
+                                                               refusal_check("a `TimeDependent` prior on the online arm"),
+                                                           :assert_online_fee_source =>
+                                                               refusal_check("an `OnlinePortfolioSelection` whose turnover fees have no Previous-Weights Source"),
+                                                           :rethrow_parse_error =>
+                                                               refusal_check("`nothing` and an incomplete `Expr`"),
+                                                           :assert_ambiguity_radius_formulation =>
+                                                               refusal_check("an ambiguity-radius rule with a squared-norm formulation"),
+                                                           :assert_penalty_coefficient_role =>
+                                                               refusal_check("a norm ceiling or a count of effective assets in a penalty slot"),
+                                                           :assert_norm_ceiling_role =>
+                                                               refusal_check("an ambiguity radius in a norm-ceiling slot"),
+                                                           :net_budget_floor => ("go",
+                                                                                 "a query whose only reader is a value check: only `nothing`, a `BudgetCostEstimator` and a `TimeDependent` reach it, so it takes `Option{<:UnresolvedValue}` (#2108, amended)"),
+                                                           :gross_budget_ceiling => ("go",
+                                                                                     "a query whose only reader is a value check: only `nothing`, a `BudgetCostEstimator` and a `TimeDependent` reach it, so it takes `Option{<:UnresolvedValue}` (#2108, amended)"),
                                                            :_wprop => ("keep (default)",
                                                                        "one step of the `factory` traversal: a field that no threaded argument replaces keeps its value (#2108)"),
                                                            :bind_data_benchmark =>
@@ -1044,7 +1073,7 @@ const RULED_DEFAULTS = Dict{Symbol, Tuple{String, String}}(#
                                                                               "`factory` is a traversal and owns the identity on every leaf, as `adapt_structure(to, x) = x` does in Adapt.jl: `factory(a, args...; kwargs...) = a` on `::Any` replaces this function (#2109)"),
                                                            :maybe_count_or_fraction =>
                                                                ("go",
-                                                                "`count_or_fraction` is a repair at a constructor, and a repair owns the identity on a value that needs none: `count_or_fraction(x) = x` on `::Any` replaces this function (#2109)"),
+                                                                "`count_or_fraction` is a repair at a constructor, and a repair owns the identity on a value that needs none: `count_or_fraction(x::Option{<:UnresolvedValue}) = x` replaces this function (#2109, #2108 amended)"),
                                                            :update_online_member => ("go",
                                                                                      "`update_online_estimator` owns the identity on a leaf (#2074), so it replaces this function (#2109)"),
                                                            :update_online_step => ("go",
@@ -1082,8 +1111,11 @@ input on two or more slots, by the rulings of #2108:
 
  1. A name of [`RULED_DEFAULTS`](@ref): its verdict.
  2. An `args...` fallback goes: it takes every arity. A contract verb takes a `::Nothing` method
-    on the empty slot, and a check takes one open method with the typed arity.
- 3. A check keeps its open method: it owns "no violation" for a type that it has no rule for.
+    on the empty slot, and a value check takes a no-op method on the set that reaches it.
+ 3. A check that [`RULED_DEFAULTS`](@ref) does not name is a value check, and its open method
+    goes. Its no-op method takes the set that reaches it: `Option{<:UnresolvedValue}` for a check
+    that many slots share, or the bound of its slots. A refusal check keeps its open method, and
+    `RULED_DEFAULTS` names it, because the parse cannot tell the two apart.
  4. One slot: a query keeps `nothing`, the answer "none". A verb whose name ends in `!` does a
     job, so it owns no default and takes a `::Nothing` method.
  5. Two or more slots that return `nothing`: a typed method on the set that reaches it.
@@ -1099,12 +1131,12 @@ function fallback_verdict(t::Tree, d, kind, args)
     end
     if has_splat(d.sig)
         return ("go",
-                "an `args...` fallback takes every arity: a contract verb takes a `::Nothing` method on the empty slot, and a check takes one open method with the typed arity (#2108)")
+                "an `args...` fallback takes every arity: a contract verb takes a `::Nothing` method on the empty slot, and a value check takes a no-op method on the set that reaches it (#2108)")
     end
     if occursin(r"assert|validate", string(d.name)) ||
        (length(args) > 1 && throws_elsewhere(t, d))
-        return ("keep (default)",
-                "a check owns \"no violation\" for a type that it has no rule for, and the field bound is the gate of the type (#2108)")
+        return ("go",
+                "a value check owns no open default: its no-op method takes the set that reaches it, `Option{<:UnresolvedValue}` or the bound of its slots, and any other type is a `MethodError`. A refusal check keeps its open method: add it to `RULED_DEFAULTS` (#2108, amended)")
     end
     if length(args) == 1
         return if endswith(string(d.name), "!")
@@ -1136,7 +1168,8 @@ forward method to `owner`, by the rulings of #2074 and #2109:
  2. `false`: a query trait owns `false`, so the owner takes the fallback.
  3. A walk, a function that another of its methods calls: it owns its leaf answer, the identity,
     `nothing` for "not found" or `nothing` for "pass". The owner is a callee.
- 4. `nothing`: a query or a check owns `nothing`, so the owner takes the fallback. An owner whose
+ 4. `nothing`: a query or a refusal check owns `nothing`, and a value check owns it on the set
+    that reaches it, so the owner takes the fallback. An owner whose
     name ends in `!` does a job and owns no default, so a person rules it.
  5. The input in front of a constructor: a constructor owns no default. The method on the wrapper
     type is an interface method (rule 3), and the bare form is a choice of the container (b).
@@ -1161,7 +1194,7 @@ function step_verdict(t::Tree, d, kind, owner)
              "a step function returns `nothing` in front of `$owner`, a verb that does a job and owns no default. Rule it, and add it to `RULED_DEFAULTS` (#2109)")
         else
             ("go",
-             "a step function returns `nothing` in front of `$owner`: a query or a check owns `nothing`, so `$owner` takes the fallback (#2109)")
+             "a step function returns `nothing` in front of `$owner`: a query or a refusal check owns `nothing`, and a value check owns it on the set that reaches it, so `$owner` takes the fallback (#2109)")
         end
     end
     if is_struct(t, owner)

@@ -132,6 +132,10 @@ using Test
              assert_role(x::A) = throw(ArgumentError("a role"))
              refuse(::Any, ::Any) = nothing
              refuse(x::A, y::B) = throw(ArgumentError("refused"))
+             assert_rc_pl(::Any) = nothing
+             assert_rc_pl(x::A) = throw(ArgumentError("refused"))
+             net_budget_floor(::Any) = nothing
+             net_budget_floor(x::A) = 1
              fill_slot!(::Any) = nothing
              fill_slot!(x::A) = 1
              pair_op(::Any, ::Any) = nothing
@@ -294,10 +298,19 @@ using Test
         @test of(:setter!) == [("default", nothing, "go")]
         @test of(:assert_pos) == [("default", nothing, "go")]
         @test occursin("every arity", first_of(:assert_pos).why)
-        # A check keeps its open method: by its name, or because another method throws.
-        @test of(:assert_role) == [("default", nothing, "keep (default)")]
-        @test of(:refuse) == [("default", nothing, "keep (default)")]
-        @test occursin("no violation", first_of(:refuse).why)
+        # A check, by its name or because another method throws, is a value check: its open
+        # method goes, and its no-op method takes the set that reaches it (#2108, amended).
+        @test of(:assert_role) == [("default", nothing, "go")]
+        @test occursin("UnresolvedValue", first_of(:assert_role).why)
+        @test of(:refuse) == [("default", nothing, "go")]
+        @test occursin("value check", first_of(:refuse).why)
+        # A refusal check that `RULED_DEFAULTS` names keeps its open method.
+        @test of(:assert_rc_pl) == [("default", nothing, "keep (default)")]
+        @test first_of(:assert_rc_pl).why == FS.RULED_DEFAULTS[:assert_rc_pl][2]
+        @test occursin("refusal check", first_of(:assert_rc_pl).why)
+        # A query whose only reader is a value check takes the set that reaches it.
+        @test of(:net_budget_floor) == [("default", nothing, "go")]
+        @test first_of(:net_budget_floor).why == FS.RULED_DEFAULTS[:net_budget_floor][2]
         # A verb that does a job owns no default.
         @test of(:fill_slot!) == [("default", nothing, "go")]
         # Two slots that return `nothing`: a typed method on the set that reaches it.

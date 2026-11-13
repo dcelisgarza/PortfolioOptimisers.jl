@@ -588,16 +588,29 @@ and every addition:
    identity on a leaf, as `copy_states(x) = x` and `factory(a, args...; kwargs...) = a` do,
    which is the idiom of `fmap` in Functors.jl and of Adapt.jl. A contract verb, which each type
    implements, owns no default, so a missing method stays a `MethodError`. A conversion such as
-   `count_or_fraction` is a repair at a constructor, and it owns the identity on a value that
-   needs no repair, as `float_if_integer` does. A choice that belongs to a container, such as
+   `count_or_fraction` is a repair at a constructor, and it owns the identity on the forms that
+   need no repair, which it names: `float_if_integer` names `AbstractArray`, `TimeArray` and
+   `Nothing`, and `count_or_fraction` names `Option{<:UnresolvedValue}`. A repair takes no
+   method on `::Any`. A choice that belongs to a container, such as
    which steps of a pipeline take the weights, stays in a function of the container, and that
    function is kept by reason (b). #2108 rules the untyped fallback that returns `nothing`:
    - **A contract verb takes a `::Nothing` method on the empty slot**, with the arity of its
      typed methods, as `set_turnover_fees!(::JuMP.Model, ::Nothing) = nothing`. A fallback on
      `args...` goes, because it takes every type and every arity.
-   - **A check owns "no violation" for a type that it has no rule for.** Its open method
-     stays, with the typed arity: `assert_unit_interval(::Any, ::Sym_Str = :val)`. The field
-     bound is the gate of the type, and the check is the gate of the value.
+   - **A value check takes a no-op method on the set that reaches it, never on `::Any`.** A
+     value check tests a number, a container or a length against a rule. A slot that holds no
+     value yet holds an **Unresolved Value**: an Estimator, an Algorithm or a function that
+     computes the value, which `UnresolvedValue` names. A check that many slots share takes
+     `assert_unit_interval(::Option{<:UnresolvedValue}, ::Sym_Str = :val) = nothing`. A check of
+     one or two slots takes the bound of its slots, as
+     `validate_bounds(::Option{<:Num_VecNum}, ::Option{<:Num_VecNum}) = nothing` does, beside
+     the method that holds the rule. Any other type is a `MethodError`, as an unknown index is
+     in `Base.checkindex`. So a form that a widened bound admits, and that has no rule, fails at
+     construction and does not pass with no check. A query whose only reader is a value check,
+     such as `net_budget_floor`, takes the same set.
+   - **A refusal check keeps its open method.** It names the types or the pairs that it
+     refuses, as `assert_rc_pl` and `assert_penalty_coefficient_role` do, and it permits every
+     other type. So "no violation" is a true answer for every type that it does not name.
    - **A query owns `nothing`, the answer "none"**, as `returns_source(::Any) = nothing` does.
      A pass-through to a gate keeps the identity: `timestamp_positions(::Any, i) = i` sends
      every other index to `view`.
@@ -610,9 +623,11 @@ and every addition:
      (`seed_window_path(::Any) = nothing`) or for "pass"
      (`assert_stateless_schedule(::Any) = nothing`). A function that the walk calls is not its
      owner.
-   - **The step function goes when its owner owns the default.** A query or a check takes
-     `nothing`, as `coverage_policy(::Any) = nothing` does. A traversal or a repair takes the
-     identity, as `factory` and `count_or_fraction` do, and the callers call the owner.
+   - **The step function goes when its owner owns the default.** A query or a refusal check
+     takes `nothing`, as `coverage_policy(::Any) = nothing` does, and a value check takes it on
+     the set that reaches it. A traversal takes the identity, as `factory` does, and a repair
+     takes it on the forms that need no repair, as `count_or_fraction` does. The callers call
+     the owner.
    - **The step function stays as (b) in front of a constructor**, which owns no default, as
      `rewrap_step` does in front of `PipelineStep`, and when it holds a policy of a container,
      as `pipeline_step_factory` does.

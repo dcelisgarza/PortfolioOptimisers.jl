@@ -84,6 +84,10 @@ The mechanism that propagates runtime-computed values down a composed struct tre
 **Deferred Quantity**
 A moment Estimator in the place of a value derived from the prior. So the slot takes either the value or the method that computes it. Factory resolves it against the Prior of the optimisation.
 
+**Unresolved Value**
+The form of a value slot that holds no value yet: an Estimator, an Algorithm or a function that computes the value. The alias `UnresolvedValue` names it, and `Option{<:UnresolvedValue}` adds the empty slot. A value check has no number to test in it, so its no-op method takes this set, and any other form with no rule is a `MethodError` (#2108). A Deferred Quantity, a Calibration Rule, a `CountOf` or a `FractionOf`, a `TimeDependent` schedule and a `DynamicAbstractWeights` are Unresolved Values.
+*Avoid*: a check that passes every type it has no rule for, which lets a form that a widened bound admits skip the check.
+
 **View**
 An index selection propagated down a composed struct tree. It restricts an Estimator, Algorithm or Result to a subset of assets or observations.
 The View of a Result restricts what the Result states and never fits it again. For example, the View of an Uncertainty Set is the projection of the set, which is the worst case of a portfolio that holds nothing outside the selection. An Estimator that crosses the selection fits the selected data instead.
