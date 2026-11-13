@@ -422,7 +422,7 @@ function return_forecast_step(rfe::FixedWeightedReturnForecast, P::NamedTuple,
     den = zeros(Tf, size(Sb, 3), size(Sb, 1))
     signed_composite_accumulate!(num, den, Sb, wv)
     composite_finalise!(num, den, rfe.min_coverage)
-    Z = K > 1 ? exposure_transform(ds.scoring, num, P.w, P.g) : num
+    Z = K > 1 ? cross_sectional_transform(ds.scoring, num; w = P.w, groups = P.g) : num
     return (; hist = forecast_return_units(rfe.unit, rfe.scale * Z, csfm.vs), fs = nothing)
 end
 """

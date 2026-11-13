@@ -13,7 +13,7 @@ Six settings apply to the whole package. Each is in a [`ScopedConfig`](@ref), wh
 - [`RESOURCE_LIMITS`](@ref) sets the largest draw counts, subset counts and grids that the sampling and sweep estimators accept.
 - [`LOG_LIMITS`](@ref) sets how many times one log site repeats one message, for each log level.
 
-A `set_*!` function replaces the global default in one atomic step. A `with_*` function changes the setting for the duration of one call, and restores it after. The tasks that the call starts see the change too. You can also set the defaults of a project at load time through Preferences.jl.
+The `set_*!` and `with_*` functions that change these settings are public, see [Scoped config](@ref "Scoped config"). You can also set the defaults of a project at load time through Preferences.jl.
 
 ```@docs
 RESOURCE_LIMITS
@@ -28,21 +28,9 @@ StringDistanceConfig
 EquationLimits
 set_default!
 with_config
-set_resource_limits!
-with_resource_limits
-set_compact_show!
-with_compact_show
 compact_show_budget
-set_show_nothing_fields!
-with_show_nothing_fields
-set_string_distance!
-with_string_distance
-set_equation_limits!
-with_equation_limits
 LOG_LIMITS
 LogLimits
-set_log_limits!
-with_log_limits
 log_limit
 @log_id
 ```

@@ -72,10 +72,13 @@ whole repository.
   script, such as `optimise`, `prior` or `expected_risk`. Every other verb takes its slot as a
   positional argument, as `oriented_score(sca, r, p)` and `sort_by_measure(sca, ppred, r)` do.
   The reason is the size of the interface, not speed: #1997 measured a keyword form against a
-  positional form, and the time, the allocations and the runtime dispatches were equal. #2071
+  positional form, and the time, the allocations and the runtime dispatches were equal. #2072
   lists the wrappers that remain. [`.github/instructions/julia-source-code.instructions.md`](../.github/instructions/julia-source-code.instructions.md)
   § *A wrapper is for convenience or for a dispatch problem* owns the rule, and
-  `test/test_70_trivial_unit_census.jl` flags a one-method forward.
+  `test/test_70_trivial_unit_census.jl` flags each method that only forwards. The same section
+  holds the rulings of #2072: the standing test of every change (architecture, maintenance,
+  ergonomics and Julia idiom, with no loss of performance), which verb owns a default, the
+  interface method, the template hook, the self-forward and the rebuild by hand.
 - **Prefer a per-type method over a new dependency** for reflection-style work. Derive the field
   list, write the constructor name once per type, and use the ordinary keyword constructor.
 - Keep docstring field text in `field_dict` / `arg_dict` in

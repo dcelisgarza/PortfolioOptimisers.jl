@@ -342,7 +342,7 @@ Run one path of [`MultipleRandomised`](@ref) over a [`Pipeline`](@ref) on price-
 # Algorithm
 
  1. Read the training rows `train_idx` and the test rows `test_idx` of each fold from `folds`. `folds` holds one `(train, test, asset)` tuple for each fold of the path, in the order of the split.
- 2. For fold `i`, view `data` on the asset subset of the fold with [`pipeline_asset_view`](@ref), which indexes the assets the same way at both levels. The pipeline fits again on each subset, so it never selects from a fitted universe.
+ 2. For fold `i`, view `data` on the asset subset of the fold with `port_opt_view(data, :, cols)`, which takes the assets third at both levels. The pipeline fits again on each subset, so it never selects from a fitted universe.
  3. Through [`fold_loop`](@ref), fit the pipeline on the training rows of each fold with [`pipeline_fold_fit`](@ref), and predict its test rows. The loop resolves each schedule for the fold, and the context holds `path_id`. When the folds of `cv` are a timeline and the pipeline [`needs_previous_weights`](@ref), the loop runs the folds of the path in sequence and gives each fold the weights of the previous fold. This gives the predictions and `est`, the estimator that the online arm threaded.
  4. Sort the predictions by their test rows with [`sort_predictions`](@ref).
 
@@ -366,7 +366,7 @@ function pipeline_path_fit_and_predict(pipe::Pipeline_OnlPipe, data::Prices_RR, 
                                        strict::Bool = false, cv = nothing)
     train_idx = map(x -> x[1], folds)
     test_idx = map(x -> x[2], folds)
-    asset_view(i) = (pipe, pipeline_asset_view(data, folds[i][3]))
+    asset_view(i) = (pipe, port_opt_view(data, :, folds[i][3]))
     predictions, est = fold_loop(pipe, length(folds), ex; rd = data, train_idx = train_idx,
                                  test_idx = test_idx, path_id = path_id,
                                  fold_view = asset_view, pws = pws, cv = cv) do fold
@@ -383,7 +383,7 @@ end
 
 Run asset-resampling cross-validation, [`MultipleRandomised`](@ref), over a [`Pipeline`](@ref) on price-level or returns-level data.
 
-Each path is an inner walk-forward over a random subset of the assets. The subset applies to the input data as a view through [`pipeline_asset_view`](@ref), and the pipeline fits again on the subset. So the pipeline never selects from its fitted universe. The scheme draws assets and not rows, so each window of observations stays contiguous. Unlike combinatorial cross-validation, the method adds no approximation on price-level data.
+Each path is an inner walk-forward over a random subset of the assets. The subset applies to the input data as a view through [`port_opt_view`](@ref), and the pipeline fits again on the subset. So the pipeline never selects from its fitted universe. The scheme draws assets and not rows, so each window of observations stays contiguous. Unlike combinatorial cross-validation, the method adds no approximation on price-level data.
 
 `cv` is the scheme or its split, a [`MultipleRandomisedResult`](@ref) from `split(cv, data)`. A split result runs the paths and the asset subsets it holds, and evaluates them with the defaults of [`fold_evaluation`](@ref), as the direct route does.
 
@@ -397,7 +397,7 @@ Each path is an inner walk-forward over a random subset of the assets. The subse
 
   - [`MultipleRandomised`](@ref)
   - [`pipeline_path_fit_and_predict`](@ref)
-  - [`pipeline_asset_view`](@ref)
+  - [`port_opt_view`](@ref)
   - [`cross_val_predict(pipe::Pipeline, data::Prices_RR, cv::CVER)`](@ref)
 """
 function cross_val_predict(pipe::Pipeline, data::Prices_RR, cv::MRCVR;

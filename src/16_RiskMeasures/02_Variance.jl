@@ -1150,7 +1150,7 @@ function ucs_variance(ucs::NormBallUncertaintySet{<:Any, <:Any, <:Any,
     return LinearAlgebra.dot(w, sigma, w) + ucs.kappa * penalty
 end
 """
-    _no_bounds_risk_measure(r, flag)
+    no_bounds_risk_measure(r::UncertaintySetVariance, flag = nothing)
 
 Return a copy of an [`UncertaintySetVariance`](@ref) without the bound in `settings.ub`, for the sub-problems of [`NearOptimalCentering`](@ref) that solve without bounds.
 
@@ -1170,29 +1170,26 @@ Return a copy of an [`UncertaintySetVariance`](@ref) without the bound in `setti
 # Related
 
   - [`no_bounds_risk_measure`](@ref)
-  - [`_no_bounds_no_risk_expr_risk_measure`](@ref)
+  - [`no_bounds_no_risk_expr_risk_measure`](@ref)
   - [`UncertaintySetVariance`](@ref)
 """
-function _no_bounds_risk_measure(r::UncertaintySetVariance, ::Union{Val{true}, Nothing})
+function no_bounds_risk_measure(r::UncertaintySetVariance,
+                                ::Union{Val{true}, Nothing} = nothing)
     return UncertaintySetVariance(;
                                   settings = RiskMeasureSettings(; rke = r.settings.rke,
                                                                  scale = r.settings.scale),
                                   r.ucs, sigma = r.sigma, mtx_sqrt = r.mtx_sqrt,
                                   ratio_alg = r.ratio_alg, corner = r.corner)
 end
-function _no_bounds_risk_measure(r::UncertaintySetVariance, ::Val{false})
+function no_bounds_risk_measure(r::UncertaintySetVariance, ::Val{false})
     return Variance(;
                     settings = RiskMeasureSettings(; rke = r.settings.rke,
                                                    scale = r.settings.scale),
                     sigma = r.sigma, mtx_sqrt = r.mtx_sqrt, ratio_alg = r.ratio_alg,
                     corner = r.corner)
 end
-function no_bounds_risk_measure(r::UncertaintySetVariance,
-                                flag::Union{Val{false}, Val{true}, Nothing} = nothing)
-    return _no_bounds_risk_measure(r, flag)
-end
 """
-    _no_bounds_no_risk_expr_risk_measure(r, flag)
+    no_bounds_no_risk_expr_risk_measure(r::UncertaintySetVariance, flag = nothing)
 
 Return a copy of an [`UncertaintySetVariance`](@ref) without the bound in `settings.ub` and outside the risk of the objective.
 
@@ -1212,27 +1209,23 @@ A measure that only measures a distance, such as the tracked measure of a [`Risk
 # Related
 
   - [`no_bounds_no_risk_expr_risk_measure`](@ref)
-  - [`_no_bounds_risk_measure`](@ref)
+  - [`no_bounds_risk_measure`](@ref)
   - [`UncertaintySetVariance`](@ref)
 """
-function _no_bounds_no_risk_expr_risk_measure(r::UncertaintySetVariance,
-                                              ::Union{Val{true}, Nothing})
+function no_bounds_no_risk_expr_risk_measure(r::UncertaintySetVariance,
+                                             ::Union{Val{true}, Nothing} = nothing)
     return UncertaintySetVariance(;
                                   settings = RiskMeasureSettings(; rke = false,
                                                                  scale = one(r.settings.scale)),
                                   r.ucs, sigma = r.sigma, mtx_sqrt = r.mtx_sqrt,
                                   ratio_alg = r.ratio_alg, corner = r.corner)
 end
-function _no_bounds_no_risk_expr_risk_measure(r::UncertaintySetVariance, ::Val{false})
+function no_bounds_no_risk_expr_risk_measure(r::UncertaintySetVariance, ::Val{false})
     return Variance(;
                     settings = RiskMeasureSettings(; rke = false,
                                                    scale = one(r.settings.scale)),
                     rc = nothing, sigma = r.sigma, mtx_sqrt = r.mtx_sqrt,
                     ratio_alg = r.ratio_alg, corner = r.corner)
-end
-function no_bounds_no_risk_expr_risk_measure(r::UncertaintySetVariance,
-                                             flag::Union{Val{false}, Val{true}, Nothing} = nothing)
-    return _no_bounds_no_risk_expr_risk_measure(r, flag)
 end
 """
     factory(r::UncertaintySetVariance, pr::AbstractPriorResult, ::Any,

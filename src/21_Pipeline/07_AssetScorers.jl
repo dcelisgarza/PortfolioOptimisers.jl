@@ -635,7 +635,7 @@ end
 
 Evaluate the risk measure of a [`FoldRiskScorer`](@ref) on each column of one test window.
 
-The method on one measure returns the raw value of each column through [`asset_scores`](@ref), and ignores `sca`. The method on a vector returns the oriented score of each column under `sca`, through [`reduce_member_scores`](@ref), so a bigger value is better.
+The method on one measure returns the raw value of each column through [`asset_scores`](@ref), and ignores `sca`. The method on a vector returns the oriented score of each column under `sca`, through [`oriented_score`](@ref) on the series of the column, so a bigger value is better.
 
 # Arguments
 
@@ -655,13 +655,13 @@ The method on one measure returns the raw value of each column through [`asset_s
 
   - [`FoldRiskScorer`](@ref)
   - [`window_bigger_is_better`](@ref)
-  - [`reduce_member_scores`](@ref)
+  - [`oriented_score`](@ref)
 """
 function window_values(::Option{<:Sca_VecToScaM}, r::AbstractBaseRiskMeasure, X::MatNum)
     return asset_scores(r, X)
 end
 function window_values(sca::Option{<:Sca_VecToScaM}, rs::VecBaseRM, X::MatNum)
-    v = [reduce_member_scores(sca, rs, (view(X, :, j),)) for j in axes(X, 2)]
+    v = [oriented_score(sca, rs, view(X, :, j)) for j in axes(X, 2)]
     bad = findall(!isfinite, v)
     @argcheck(isempty(bad),
               DomainError(v,

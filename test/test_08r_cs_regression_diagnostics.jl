@@ -1505,7 +1505,7 @@ end
     end
     @testset "A nothing transform slot is the identity" begin
         X = [1.0 2.0; 3.0 4.0]
-        @test PortfolioOptimisers.exposure_transform(nothing, X, nothing, nothing) === X
+        @test cross_sectional_transform(nothing, X) === X
     end
     @testset "The active fill covers both ranks, and checks the shape" begin
         L2 = [1.0 2.0; 3.0 4.0]

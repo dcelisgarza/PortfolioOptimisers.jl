@@ -34,7 +34,6 @@ windowed_parse_field
 windowed_parse_forward
 windowed_relation_check
 windowed_estimator_check_key
-windowed_estimator_suggest
 windowed_estimator_error
 windowed_type_doc
 windowed_method_ref

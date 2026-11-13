@@ -153,67 +153,6 @@ function show_fields(ve::SimpleVariance)
     return isnothing(ve.cvg) ? (:me, :w, :corrected) : (:me, :w, :corrected, :cvg)
 end
 """
-$(DocStringExtensions.TYPEDSIGNATURES)
-
-Computes the dispersion for the [`SimpleVariance`](@ref) methods of `Statistics.std` and `Statistics.var`.
-
-# Algorithm
-
-The matrix method:
-
- 1. Check that `dims` is `1` or `2`.
- 2. Get the centring vector `mu` from `me` and `ve.w` with [`weighted_centre`](@ref). It uses `mean` if the caller gave one.
- 3. Get the observation weights `w` from `ve.w` and `X` with [`get_observation_weights`](@ref).
- 4. When `w` is `nothing`, call `f(X; dims = dims, corrected = ve.corrected, mean = mu)`.
- 5. Otherwise call `Statistics.var(X, w, dims; corrected = ve.corrected, mean = mu)`. Write `NaN` in each entry when the divisor of `w` is not positive, with [`weighted_moment_guard`](@ref). Then change the variance to the result of `f` with [`coverage_moment_map`](@ref).
-
-The vector method:
-
- 1. Get the observation weights `w` from `ve.w` and `X`.
- 2. When `w` is `nothing`, call `f(X; corrected = ve.corrected, mean = mean)`.
- 3. Otherwise call `Statistics.var(X, w; corrected = ve.corrected, mean = mean)`. Return `NaN` when the divisor of `w` is not positive, with [`weighted_moment_guard`](@ref). Then change the variance to the result of `f` with [`coverage_moment_map`](@ref).
-
-A corrected fit on one observation of positive weight has a divisor of zero. Its result is then `NaN`, as the unweighted fit on one observation is, and not the `Inf` that the rounding of the weighted mean gives. The guard reads the variance before the square root, because a divisor below zero gives a variance below zero. `StatsBase` takes the weighted standard deviation as the square root of the weighted variance, so a valid result does not change.
-
-The two methods get one centre by two routes. The matrix method gets a centre before it calls `f`. [`weighted_centre`](@ref) takes that centre from `me` after [`factory`](@ref) writes `ve.w` into `me`. The vector method passes `mean` to `f` without change, so a `mean` of `nothing` lets `f` centre on the weighted mean of `X`.
-
-One `SimpleVariance` gives the same number for a one-column matrix and for the matching vector. `ve.w` replaces the weights that `me` holds, as [`factory`](@ref) does on all other paths. Pass `mean` for any other centre.
-
-[`weighted_centre`](@ref) calls [`factory`](@ref) only when `ve.w` is not `nothing`. That test is for performance and is not a second contract. `ve.w` is a field, so its type decides the branch. The test stops a windowed loop from a rebuild of the estimator tree of `me` in each window.
-
-# Arguments
-
-  - `f`: The dispersion function, `Statistics.std` or `Statistics.var`.
-  - `ve::SimpleVariance`: The variance estimator. It gives the observation weights and the `corrected` flag.
-  - `me::AbstractExpectedReturnsEstimator`: The expected returns estimator for the centre when the caller gives no `mean`. Only the matrix method takes it.
-  - `X::VecNum_MatNum`: The data matrix or vector.
-  - `dims::Int = 1`: The dimension along which the computation runs. Only the matrix method takes it.
-  - `mean = nothing`: The precomputed mean.
-  - `kwargs...`: More keyword arguments for the centre and for the observation weights. Only the matrix method takes them.
-
-# Validation
-
-  - $(val_dict[:dims]) Only the matrix method checks it.
-
-# Returns
-
-  - `sigma::Union{Number, ArrNum}`: The dispersion of `X` that `f` computes.
-
-# Related
-
-  - [`SimpleVariance`](@ref)
-  - [`weighted_centre`](@ref)
-  - [`get_observation_weights`](@ref)
-"""
-function simple_variance_kernel(f::F, ve::SimpleVariance,
-                                me::AbstractExpectedReturnsEstimator, X::MatNum;
-                                dims::Int = 1, mean = nothing,
-                                active_mask::Option{<:AbstractMatrix{<:Bool}} = nothing,
-                                kwargs...) where {F}
-    return coverage_variance(f, ve, ve.cvg, me, X; dims = dims, mean = mean,
-                             active_mask = active_mask, kwargs...)
-end
-"""
     coverage_variance(f, ve, cvg, me, X; dims::Int = 1, mean = nothing,
                       active_mask = nothing, kwargs...) -> ArrNum
     coverage_variance(f, ve, cvg, X::VecNum; mean = nothing) -> Number
@@ -249,12 +188,38 @@ function coverage_variance end
 """
 $(DocStringExtensions.TYPEDSIGNATURES)
 
-The `Nothing` method of [`coverage_variance`](@ref) is the Coverage Universe arm. It is the body that [`simple_variance_kernel`](@ref) had before the `cvg` field existed. It refuses a gapped sample with [`assert_finite_sample`](@ref). A cell is a gap when its return is not finite or when `active_mask` is `false` at that cell, so the arm refuses an inactive cell too.
+The `Nothing` method of [`coverage_variance`](@ref) is the Coverage Universe arm, which the [`SimpleVariance`](@ref) methods of `Statistics.std` and `Statistics.var` reach when `ve.cvg` is `nothing`. A cell is a gap when its return is not finite or when `active_mask` is `false` at that cell, so the arm refuses an inactive cell too.
+
+# Algorithm
+
+The matrix method, this one:
+
+ 1. Check that `dims` is `1` or `2`. Refuse a gapped sample with [`assert_finite_sample`](@ref).
+ 2. Get the centring vector `mu` from `me` and `ve.w` with [`weighted_centre`](@ref). It uses `mean` if the caller gave one.
+ 3. Get the observation weights `w` from `ve.w` and `X` with [`get_observation_weights`](@ref).
+ 4. When `w` is `nothing`, call `f(X; dims = dims, corrected = ve.corrected, mean = mu)`.
+ 5. Otherwise call `Statistics.var(X, w, dims; corrected = ve.corrected, mean = mu)`. Write `NaN` in each entry when the divisor of `w` is not positive, with [`weighted_moment_guard`](@ref). Then change the variance to the result of `f` with [`coverage_moment_map`](@ref).
+
+The vector method, the `Nothing` method of the vector arm:
+
+ 1. Refuse a gapped series with [`assert_finite_sample`](@ref). Get the observation weights `w` from `ve.w` and `X`.
+ 2. When `w` is `nothing`, call `f(X; corrected = ve.corrected, mean = mean)`.
+ 3. Otherwise call `Statistics.var(X, w; corrected = ve.corrected, mean = mean)`. Return `NaN` when the divisor of `w` is not positive, with [`weighted_moment_guard`](@ref). Then change the variance to the result of `f` with [`coverage_moment_map`](@ref).
+
+A corrected fit on one observation of positive weight has a divisor of zero. Its result is then `NaN`, as the unweighted fit on one observation is, and not the `Inf` that the rounding of the weighted mean gives. The guard reads the variance before the square root, because a divisor below zero gives a variance below zero. `StatsBase` takes the weighted standard deviation as the square root of the weighted variance, so a valid result does not change.
+
+The two methods get one centre by two routes. The matrix method gets a centre before it calls `f`. [`weighted_centre`](@ref) takes that centre from `me` after [`factory`](@ref) writes `ve.w` into `me`. The vector method passes `mean` to `f` without change, so a `mean` of `nothing` lets `f` centre on the weighted mean of `X`.
+
+One `SimpleVariance` gives the same number for a one-column matrix and for the matching vector. `ve.w` replaces the weights that `me` holds, as [`factory`](@ref) does on all other paths. Pass `mean` for any other centre.
+
+[`weighted_centre`](@ref) calls [`factory`](@ref) only when `ve.w` is not `nothing`. That test is for performance and is not a second contract. `ve.w` is a field, so its type decides the branch. The test stops a windowed loop from a rebuild of the estimator tree of `me` in each window.
 
 # Related
 
   - [`coverage_variance`](@ref)
-  - [`simple_variance_kernel`](@ref)
+  - [`SimpleVariance`](@ref)
+  - [`weighted_centre`](@ref)
+  - [`get_observation_weights`](@ref)
 """
 function coverage_variance(f::F, ve::SimpleVariance, ::Nothing,
                            me::AbstractExpectedReturnsEstimator, X::MatNum; dims::Int = 1,
@@ -336,19 +301,14 @@ end
 function coverage_moment_map(::typeof(Statistics.std), v::Num_ArrNum)
     return sqrt.(v)
 end
-function simple_variance_kernel(f::F, ve::SimpleVariance, X::VecNum;
-                                mean = nothing) where {F}
-    return coverage_variance(f, ve, ve.cvg, X; mean = mean)
-end
 """
 $(DocStringExtensions.TYPEDSIGNATURES)
 
-The `Nothing` method of the vector arm of [`coverage_variance`](@ref) is the Coverage Universe arm over the series of one asset. It refuses a gapped series with [`assert_finite_sample`](@ref).
+The `Nothing` method of the vector arm of [`coverage_variance`](@ref) is the Coverage Universe arm over the series of one asset. It refuses a gapped series with [`assert_finite_sample`](@ref). The matrix method of this arm states the algorithm of both.
 
 # Related
 
   - [`coverage_variance`](@ref)
-  - [`simple_variance_kernel`](@ref)
 """
 function coverage_variance(f::F, ve::SimpleVariance, ::Nothing, X::VecNum;
                            mean = nothing) where {F}
@@ -470,8 +430,8 @@ julia> std(sv, Xmat; dims = 1)
 """
 function Statistics.std(ve::SimpleVariance, X::MatNum; dims::Int = 1, mean = nothing,
                         kwargs...)
-    return simple_variance_kernel(Statistics.std, ve, ve.me, X; dims = dims, mean = mean,
-                                  kwargs...)
+    return coverage_variance(Statistics.std, ve, ve.cvg, ve.me, X; dims = dims, mean = mean,
+                             kwargs...)
 end
 """
 $(DocStringExtensions.TYPEDSIGNATURES)
@@ -480,8 +440,8 @@ This is the `SimpleVariance{Nothing}` method of [`std(ve::SimpleVariance, X::Mat
 """
 function Statistics.std(ve::SimpleVariance{Nothing}, X::MatNum; dims::Int = 1,
                         mean = nothing, kwargs...)
-    return simple_variance_kernel(Statistics.std, ve, SimpleExpectedReturns(), X;
-                                  dims = dims, mean = mean, kwargs...)
+    return coverage_variance(Statistics.std, ve, ve.cvg, SimpleExpectedReturns(), X;
+                             dims = dims, mean = mean, kwargs...)
 end
 """
     Statistics.std(
@@ -555,7 +515,7 @@ julia> std(svw, X)
   - [`var(ve::SimpleVariance, X::VecNum; mean = nothing)`](@ref)
 """
 function Statistics.std(ve::SimpleVariance, X::VecNum; mean = nothing)
-    return simple_variance_kernel(Statistics.std, ve, X; mean = mean)
+    return coverage_variance(Statistics.std, ve, ve.cvg, X; mean = mean)
 end
 """
     Statistics.var(
@@ -659,8 +619,8 @@ julia> var(sv, Xmat; dims = 1)
 """
 function Statistics.var(ve::SimpleVariance, X::MatNum; dims::Int = 1, mean = nothing,
                         kwargs...)
-    return simple_variance_kernel(Statistics.var, ve, ve.me, X; dims = dims, mean = mean,
-                                  kwargs...)
+    return coverage_variance(Statistics.var, ve, ve.cvg, ve.me, X; dims = dims, mean = mean,
+                             kwargs...)
 end
 """
 $(DocStringExtensions.TYPEDSIGNATURES)
@@ -669,8 +629,8 @@ This is the `SimpleVariance{Nothing}` method of [`var(ve::SimpleVariance, X::Mat
 """
 function Statistics.var(ve::SimpleVariance{Nothing}, X::MatNum; dims::Int = 1,
                         mean = nothing, kwargs...)
-    return simple_variance_kernel(Statistics.var, ve, SimpleExpectedReturns(), X;
-                                  dims = dims, mean = mean, kwargs...)
+    return coverage_variance(Statistics.var, ve, ve.cvg, SimpleExpectedReturns(), X;
+                             dims = dims, mean = mean, kwargs...)
 end
 """
     Statistics.var(
@@ -744,7 +704,7 @@ julia> var(svw, X)
   - [`var(ve::SimpleVariance, X::MatNum; dims::Int = 1, mean = nothing, kwargs...)`](@ref)
 """
 function Statistics.var(ve::SimpleVariance, X::VecNum; mean = nothing)
-    return simple_variance_kernel(Statistics.var, ve, X; mean = mean)
+    return coverage_variance(Statistics.var, ve, ve.cvg, X; mean = mean)
 end
 """
 $(DocStringExtensions.TYPEDEF)

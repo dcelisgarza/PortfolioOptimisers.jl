@@ -49,7 +49,7 @@ what keeps the JuMP families cheap.
     w, t, p = 60, 20, 3
     batch_cv = IndexWalkForward(w, t; purged_size = p, expand_train = true)
     online_cv = OnlineIndexWalkForward(w, t; purged_size = p)
-    rows(d, i) = po.pipeline_data_view(d, i)
+    rows(d, i) = po.port_opt_view(d, i, :)
     weight_tol(pipe) = isa(pipe.steps[end], po.JuMPOptimisationEstimator) ? 1e-5 : 1e-10
     same_carrier(a, b) = isequal(a.nx, b.nx) &&
                          isequal(a.ts, b.ts) &&

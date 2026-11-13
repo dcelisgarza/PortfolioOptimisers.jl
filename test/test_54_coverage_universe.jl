@@ -106,7 +106,7 @@ end
     @test PO.expand_moment(sigma, nothing, Val(:kt)) === sigma
     @test PO.expand_columns(sigma, nothing) === sigma
     @test PO.expand_rows(sigma, nothing) === sigma
-    @test PO.expand_vector([1.0, 2.0], nothing) == [1.0, 2.0]
+    @test PO.expand_moment([1.0, 2.0], nothing) == [1.0, 2.0]
 
     # A covariance-like matrix.
     blk = reshape(collect(1.0:9.0), 3, 3)
@@ -138,10 +138,10 @@ end
     @test PO.coverage_reduced_pair(A, A, cmsk) == (A[:, 1:3], A[:, 1:3])
 
     # An idiosyncratic covariance expands in either of the two shapes it takes.
-    @test isnothing(PO.expand_idiosyncratic_covariance(nothing, cmsk))
-    ev = PO.expand_idiosyncratic_covariance([1.0, 2.0, 3.0], cmsk)
+    @test isnothing(PO.expand_moment(nothing, cmsk))
+    ev = PO.expand_moment([1.0, 2.0, 3.0], cmsk)
     @test ev[1:3] == [1.0, 2.0, 3.0]
-    em = PO.expand_idiosyncratic_covariance(blk, cmsk)
+    em = PO.expand_moment(blk, cmsk)
     @test em[1:3, 1:3] == blk
 
     # The pair index of a co-moment tensor, `a` outermost.

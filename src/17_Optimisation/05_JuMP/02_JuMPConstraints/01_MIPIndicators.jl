@@ -431,32 +431,6 @@ function serves_mip_kind(::LongShortIndicators, ::Type{<:AbstractMIPIndicators})
     return true
 end
 """
-    declare_mip_indicators!(model::JuMP.Model, sp::AbstractMIPSpace, kind::Type{<:AbstractMIPIndicators}, wb::WeightBounds, wx::VecNum, ss::Option{<:Number})
-
-Declare a new indicator bundle of type `kind` in the space `sp`.
-
-Each method calls the declaration of its kind: [`declare_held_indicators!`](@ref), [`declare_long_short_indicators!`](@ref) or [`declare_sign_indicators!`](@ref).
-
-# Related
-
-  - [`mip_indicators!`](@ref)
-"""
-function declare_mip_indicators!(model::JuMP.Model, sp::AbstractMIPSpace,
-                                 ::Type{HeldIndicators}, wb::WeightBounds, wx::VecNum,
-                                 ss::Option{<:Number})
-    return declare_held_indicators!(model, sp, wb, wx, ss)
-end
-function declare_mip_indicators!(model::JuMP.Model, sp::AbstractMIPSpace,
-                                 ::Type{LongShortIndicators}, wb::WeightBounds, wx::VecNum,
-                                 ss::Option{<:Number})
-    return declare_long_short_indicators!(model, sp, wb, wx, ss)
-end
-function declare_mip_indicators!(model::JuMP.Model, sp::AbstractMIPSpace,
-                                 ::Type{SignIndicators}, wb::WeightBounds, wx::VecNum,
-                                 ss::Option{<:Number})
-    return declare_sign_indicators!(model, sp, wb, wx, ss)
-end
-"""
     mip_indicators!(model::JuMP.Model, sp::AbstractMIPSpace, kind::Type{<:AbstractMIPIndicators}, wb::WeightBounds, wx::VecNum, ss::Option{<:Number})
     mip_indicators!(model::JuMP.Model, sp::AssetMIPSpace, kind::Type{<:AbstractMIPIndicators}, wb::WeightBounds, wx::VecNum, ss::Option{<:Number})
 
@@ -714,11 +688,11 @@ business of their own emitters, which take the returned bundle.
 # Related
 
   - [`HeldIndicators`](@ref)
-  - [`declare_long_short_indicators!`](@ref)
-  - [`declare_sign_indicators!`](@ref)
+  - [`mip_indicators!`](@ref)
 """
-function declare_held_indicators!(model::JuMP.Model, sp::AbstractMIPSpace, wb::WeightBounds,
-                                  wx::VecNum, ss::Option{<:Number})
+function declare_mip_indicators!(model::JuMP.Model, sp::AbstractMIPSpace,
+                                 ::Type{HeldIndicators}, wb::WeightBounds, wx::VecNum,
+                                 ss::Option{<:Number})
     k = get_k(model)
     sc = get_constraint_scale(model)
     N = length(wx)
@@ -746,7 +720,7 @@ Creates a long and a short binary per asset, forces them mutually exclusive (`il
 so an asset is long, short, or inactive), and builds the continuous relaxations `ilf`/`isf` with
 their big-M linking constraints when the budget is free. Each call that reads the bundle applies its own [`mip_wb`](@ref).
 
-Emits no feature constraints; see [`declare_held_indicators!`](@ref).
+Emits no feature constraints; see the [`HeldIndicators`](@ref) method.
 
 # Arguments
 
@@ -763,10 +737,11 @@ Emits no feature constraints; see [`declare_held_indicators!`](@ref).
 # Related
 
   - [`LongShortIndicators`](@ref)
-  - [`declare_held_indicators!`](@ref)
+  - [`mip_indicators!`](@ref)
 """
-function declare_long_short_indicators!(model::JuMP.Model, sp::AbstractMIPSpace,
-                                        wb::WeightBounds, wx::VecNum, ss::Option{<:Number})
+function declare_mip_indicators!(model::JuMP.Model, sp::AbstractMIPSpace,
+                                 ::Type{LongShortIndicators}, wb::WeightBounds, wx::VecNum,
+                                 ss::Option{<:Number})
     k = get_k(model)
     sc = get_constraint_scale(model)
     ss = set_mip_ss_expr!(model, ss, wb)
@@ -820,10 +795,11 @@ only chosen when nothing in the model consumes a held indicator.
 # Related
 
   - [`SignIndicators`](@ref)
-  - [`declare_long_short_indicators!`](@ref)
+  - [`mip_indicators!`](@ref)
 """
-function declare_sign_indicators!(model::JuMP.Model, sp::AbstractMIPSpace, wb::WeightBounds,
-                                  wx::VecNum, ss::Option{<:Number})
+function declare_mip_indicators!(model::JuMP.Model, sp::AbstractMIPSpace,
+                                 ::Type{SignIndicators}, wb::WeightBounds, wx::VecNum,
+                                 ss::Option{<:Number})
     set_mip_ss_expr!(model, ss, wb)
     N = length(wx)
     xb = model[mip_key(sp, :xbgt_ib)] = JuMP.@variable(model, [1:N], binary = true)

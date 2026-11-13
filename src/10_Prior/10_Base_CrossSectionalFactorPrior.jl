@@ -1521,7 +1521,7 @@ The fit of observation `t` regresses the returns of `t` on the exposures of `t -
 
 # Validation
 
-  - The rules of [`expand_factor_returns`](@ref), [`expand_factor_mu`](@ref) and [`expand_factor_covariance`](@ref).
+  - The rules of [`expand_factor_returns`](@ref) and [`expand_factor_covariance`](@ref).
 
 # Returns
 
@@ -1533,7 +1533,7 @@ The fit of observation `t` regresses the returns of `t` on the exposures of `t -
 
   - [`cross_sectional_basis_now`](@ref)
   - [`expand_factor_returns`](@ref)
-  - [`expand_factor_mu`](@ref)
+  - [`expand_factor_returns`](@ref)
   - [`expand_factor_covariance`](@ref)
   - [`CrossSectionalFactorModel`](@ref)
 """
@@ -1548,7 +1548,8 @@ function cross_sectional_expand(::Nothing, r, mu::VecNum, sigma::MatNum)
 end
 function cross_sectional_expand(fcb::FactorFamilyBasis, r, mu::VecNum, sigma::MatNum)
     now = factor_basis_slice(fcb, r)
-    return (; mu = expand_factor_mu(now, mu), sigma = expand_factor_covariance(now, sigma))
+    return (; mu = expand_factor_returns(now, mu),
+            sigma = expand_factor_covariance(now, sigma))
 end
 """
     cross_sectional_residual_block(esigma::VecNum, idx, mtx_sqrt = EigenFallbackSquareRoot()) -> NamedTuple

@@ -1107,3 +1107,7 @@ macro log_id(parts...)
     site = Symbol(__module__, ".", something(__source__.file, :none), ":", __source__.line)
     return :(hash(($(QuoteNode(site)), $(map(esc, parts)...))))
 end
+public set_resource_limits!, with_resource_limits, set_compact_show!, with_compact_show,
+       set_show_nothing_fields!, with_show_nothing_fields, set_string_distance!,
+       with_string_distance, set_equation_limits!, with_equation_limits, set_log_limits!,
+       with_log_limits

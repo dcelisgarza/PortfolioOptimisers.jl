@@ -1110,8 +1110,7 @@ function fold_train_returns(cv::MultipleRandomisedResult, rd::ReturnsResult, k::
     return view(rd.X, cv.train_idx[k], cv.asset_idx[k])
 end
 """
-    candidate_train_score(r_sca, r, res::OptimisationResult, X::MatNum, kwargs)
-    candidate_train_score(r_sca, r, res::OptimisationResult, X::Nothing, kwargs)
+    candidate_train_score(r_sca, r, res::OptimisationResult, X::Option{<:MatNum}, kwargs)
 
 Score a fold's fitted result over its own training sample, oriented so that a higher score is better.
 
@@ -1144,15 +1143,10 @@ A result that exposes no `pr` property at all keeps the refusal [`extract_pr`](@
   - [`write_candidate_scores!`](@ref)
   - [`extract_pr`](@ref)
 """
-function candidate_train_score(r_sca, r, res::OptimisationResult, X::MatNum, kwargs)
-    return if hasproperty(res, :pr) && isnothing(res.pr)
-        oriented_score(r_sca, r, res, X; kwargs...)
-    else
-        oriented_score(r_sca, r, res; kwargs...)
-    end
-end
-function candidate_train_score(r_sca, r, res::OptimisationResult, ::Nothing, kwargs)
-    return oriented_score(r_sca, r, res; kwargs...)
+function candidate_train_score(r_sca, r, res::OptimisationResult, X::Option{<:MatNum},
+                               kwargs)
+    Xs = !isnothing(X) && hasproperty(res, :pr) && isnothing(res.pr) ? X : nothing
+    return oriented_score(r_sca, r, res, Xs; kwargs...)
 end
 """
     write_candidate_scores!(test_scores::MatNum, train_scores::Option{<:MatNum}, i::Integer,

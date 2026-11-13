@@ -197,11 +197,11 @@ end
 
     @testset "The factor mean round trips" begin
         mu = randn(rng, Kr)
-        raw = PO.expand_factor_mu(fcb, mu)
+        raw = PO.expand_factor_returns(fcb, mu)
         @test length(raw) == K
         @test raw ≈ dense_basis(fcb, T) * mu
         @test PO.reduce_factor_mu(fcb, raw) ≈ mu
-        @test PO.expand_factor_mu(fcb, mu, 2) ≈ dense_basis(fcb, 2) * mu
+        @test PO.expand_factor_returns(fcb, mu, 2) ≈ dense_basis(fcb, 2) * mu
     end
 
     @testset "The factor covariance round trips and is singular" begin
@@ -259,7 +259,7 @@ end
         W = PO.dropped_factor_weights(fcb, T)
         @test size(W) == (1, Kr)
         mu = randn(rng, Kr)
-        @test (W * mu)[1] ≈ PO.expand_factor_mu(fcb, mu)[fcb.fi[1][fcb.di[1]]]
+        @test (W * mu)[1] ≈ PO.expand_factor_returns(fcb, mu)[fcb.fi[1][fcb.di[1]]]
     end
 
     @testset "A stack is the loop of the single form over the observations" begin
@@ -286,20 +286,20 @@ end
             @test W[:, :, t] == PO.dropped_factor_weights(fcb, t)
         end
         mu = randn(rng, T, Kr)
-        raw = PO.expand_factor_mu(fcb, mu)
+        raw = PO.expand_factor_returns(fcb, mu)
         @test size(raw) == (T, K)
         for t in 1:T
-            @test raw[t, :] == PO.expand_factor_mu(fcb, mu[t, :], t)
+            @test raw[t, :] == PO.expand_factor_returns(fcb, mu[t, :], t)
         end
-        L = PO.reduce_loadings(fcb, Ms)
+        L = PO.reduce_exposures(fcb, Ms)
         @test L == PO.reduce_exposures(fcb, Ms)
         for t in 1:T
             @test L[:, :, t] == PO.reduce_loadings(fcb, Ms[:, :, t], t)
         end
         # A stack whose observation axis is not the basis's is refused, as a history is.
         @test_throws DimensionMismatch PO.expand_factor_covariance(fcb, V[:, :, 1:(T - 1)])
-        @test_throws DimensionMismatch PO.expand_factor_mu(fcb, mu[1:(T - 1), :])
-        @test_throws DimensionMismatch PO.reduce_loadings(fcb, Ms[:, :, 1:(T - 1)])
+        @test_throws DimensionMismatch PO.expand_factor_returns(fcb, mu[1:(T - 1), :])
+        @test_throws DimensionMismatch PO.reduce_exposures(fcb, Ms[:, :, 1:(T - 1)])
         @test_throws DimensionMismatch PO.expand_factor_covariance(fcb,
                                                                    randn(rng, Kr + 1,
                                                                          Kr + 1, T))
@@ -320,7 +320,7 @@ end
                                                                    randn(rng, K + 1, K + 1))
         @test_throws DimensionMismatch PO.expand_factor_returns(fcb, randn(rng, T, Kr + 1))
         @test_throws DimensionMismatch PO.expand_factor_returns(fcb, randn(rng, T + 1, Kr))
-        @test_throws DimensionMismatch PO.expand_factor_mu(fcb, randn(rng, Kr + 1))
+        @test_throws DimensionMismatch PO.expand_factor_returns(fcb, randn(rng, Kr + 1))
         @test_throws DimensionMismatch PO.expand_factor_covariance(fcb,
                                                                    randn(rng, Kr + 1,
                                                                          Kr + 1))
@@ -338,7 +338,7 @@ end
         catch e
             sprint(showerror, e)
         end
-        @test occursin("g carries a factor axis", msg)
+        @test occursin("mu carries a factor axis", msg)
     end
 end
 
@@ -379,7 +379,7 @@ end
                          rtol = 1e-14, scale = :array, name = "stack reduced").ok
     @test parity_compare(PO.dropped_factor_weights(fcb), oracle("Weights", 2); rtol = 1e-14,
                          name = "stack weights").ok
-    @test parity_compare(PO.expand_factor_mu(fcb, M),
+    @test parity_compare(PO.expand_factor_returns(fcb, M),
                          parity_load("FactorFamilyBasis", "Stack", "Mu"); rtol = 1e-14,
                          name = "stack mu").ok
 end
@@ -473,8 +473,8 @@ end
     @testset "The factor mean expands through R" begin
         m = Rational{Int}.(rand(rng, -3:3, Kr))
         for t in 1:T
-            @test PO.expand_factor_mu(fcb, m, t) == R(t) * m
-            @test PO.reduce_factor_mu(fcb, PO.expand_factor_mu(fcb, m, t)) == m
+            @test PO.expand_factor_returns(fcb, m, t) == R(t) * m
+            @test PO.reduce_factor_mu(fcb, PO.expand_factor_returns(fcb, m, t)) == m
         end
         raw = Rational{Int}.(rand(rng, 1:3, K))
         @test PO.reduce_factor_mu(fcb, raw) == transpose(S) * raw
@@ -523,7 +523,7 @@ end
         @test eltype(PO.reduce_loadings(f32, B32[:, :, 1])) == Float32
         @test eltype(PO.expand_factor_returns(f32, ones(Float32, T, Kr))) == Float32
         @test eltype(PO.expand_factor_returns(f32, ones(Float32, Kr))) == Float32
-        @test eltype(PO.expand_factor_mu(f32, ones(Float32, Kr))) == Float32
+        @test eltype(PO.expand_factor_returns(f32, ones(Float32, Kr))) == Float32
         @test eltype(PO.expand_factor_covariance(f32,
                                                  Matrix{Float32}(LinearAlgebra.I, Kr, Kr))) ==
               Float32

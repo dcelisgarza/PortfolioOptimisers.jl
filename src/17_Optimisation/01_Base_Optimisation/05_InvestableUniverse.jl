@@ -283,7 +283,9 @@ The optimiser solves over the assets that the Investable Mask keeps, so its weig
 
 A failed solve carries `NaN` at every solved position. The expansion keeps two cases apart: `NaN` where the optimiser tried and failed, and zero where it could not try. It does not flatten both to zero.
 
-The `nothing` mask returns the weights unchanged, so nothing is copied when every asset is investable. A `nothing` weight vector stays `nothing`, which is what a naive head records when its finaliser gave up. The vector-of-vectors method serves the efficient-frontier route, which records one weight vector per sweep point. [`JuMPOptimisationSolution`](@ref) carries its own methods beside the JuMP prelude, and they delegate to the plain weight vector here, so one length check and one message serve every family.
+The `nothing` mask returns the weights unchanged, so nothing is copied when every asset is investable. A `nothing` weight vector stays `nothing`, which is what a naive head records when its finaliser gave up. The vector-of-vectors method serves the efficient-frontier route, which records one weight vector per sweep point.
+
+A matrix is a per-asset history over the investable assets, `observations × investable assets`: the weight path or the asset returns of a [`HeldWeightsResult`](@ref), which [`expand_held_weights`](@ref) expands on the way out of a fold. The column of a non-investable asset is zero, which is what [`filter_held_gaps`](@ref) writes over its whole `NaN` column anyway. A drift over a zero column at a zero weight moves no wealth, so the expanded history rebuilds the same weight path that the reduced one did. A vector of matrices is the population of the efficient-frontier route, and each member expands as one matrix. [`JuMPOptimisationSolution`](@ref) carries its own methods beside the JuMP prelude, and they delegate to the plain weight vector here, so one length check and one message serve every family.
 
 The **keyword** constructor of each optimisation result is the caller, and every family builds its result through it. The positional constructor never expands, because every rebuild of a return code goes through it, and a second pass would expand twice.
 
@@ -312,21 +314,22 @@ The expansion keeps the sum of the weights, ``\\sum_{i=1}^{N} \\tilde{w}_{i} = \
 # Arguments
 
   - $(arg_dict[:imsk])
-  - `w`: The weights the optimisation solved over the investable universe: one weight vector, or a vector of them on the efficient-frontier route.
+  - `w`: The weights the optimisation solved over the investable universe: one weight vector, or a vector of them on the efficient-frontier route. Or a history over the investable assets, `observations × investable assets`, or a vector of them.
 
 # Validation
 
-  - The solved weight vector must hold one weight per investable asset.
+  - The solved weight vector must hold one weight per investable asset, and a history one column per investable asset.
 
 # Returns
 
-  - `w`: The weights, or the vector of them, on the full asset universe.
+  - `w`: The weights, the history, or the vector of them, on the full asset universe.
 
 # Related
 
   - [`investable_mask`](@ref)
   - [`investable_reduction`](@ref)
   - [`set_retcode`](@ref)
+  - [`expand_held_weights`](@ref)
 """
 function expand_investable_weights(::Nothing, w::Option{<:VecNum_VecVecNum})
     return w
@@ -343,6 +346,16 @@ function expand_investable_weights(imsk::BitVector, w::VecNum)
 end
 function expand_investable_weights(imsk::BitVector, w::VecVecNum)
     return [expand_investable_weights(imsk, wi) for wi in w]
+end
+function expand_investable_weights(imsk::BitVector, A::MatNum)
+    @argcheck(count(imsk) == size(A, 2),
+              DimensionMismatch("the investable mask keeps $(count(imsk)) of $(length(imsk)) assets, but the history holds $(size(A, 2)) columns; the mask and the history must come from the same reduction"))
+    out = zeros(eltype(A), size(A, 1), length(imsk))
+    out[:, imsk] = A
+    return out
+end
+function expand_investable_weights(imsk::BitVector, A::VecMatNum)
+    return [expand_investable_weights(imsk, Ai) for Ai in A]
 end
 """
     optimise(opt::OptimisationEstimator, args...; kwargs...) -> OptimisationResult

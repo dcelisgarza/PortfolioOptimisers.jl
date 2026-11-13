@@ -9,7 +9,7 @@ module TrivialUnitCensusHealth
 include(joinpath(@__DIR__, "..", "code_health", "CodeHealth.jl"))
 end
 
-@testset "Trivial unit census: a pure forward with one caller is inlined, and a kept one is an allow-list entry (ADR 0168)" begin
+@testset "Trivial unit census: a pure forward with one caller is inlined, a forward method of any shape is a wrapper, and a kept one is an allow-list entry (ADR 0168, #2071)" begin
     using PortfolioOptimisers, Test
 
     #=
@@ -190,6 +190,566 @@ end
                                 :attribution_no_errors => "the empty answer of an attribution, named where the Result reads three fields from it",
                                 :no_head_block => "the resolver of the block of a bare head, passed as a function value to `resolve_block_entry`, which takes `f` and its arguments and not a closure, so that no variable of the entry is boxed")
 
+    # ------------------------------------------------------------- the forward census
+
+    #=
+    Issue #2071. The function census above flags one shape alone: one method, one reference.
+    A wrapper has more shapes: a function whose methods all forward to one owner, a per-form
+    forward that sends each form to a different function, a forward with two references, a
+    public verb that renames a private helper, a keyword constructor under a name that is not
+    its type, and a tuple pack inside a function whose other methods hold logic. So this
+    census reads each METHOD, whatever the count of its methods and of its references.
+
+    A method is a forward when its body is one call, at depth one, to a function or a type
+    that the package defines, with arguments that are leaves (a name, a literal, a field
+    chain, a splat, a keyword forward or a tuple of them), and at least one argument is an
+    argument of the method or a field of one. A call that passes none of them returns a
+    constant, a trait such as `WeightsInput()`, and sends nothing on. These are exempt:
+
+    1. a constructor method named after its type, the keyword-constructor idiom, and a
+       method with keywords alone that calls a positional method of its own name, as
+       `DenoiseCovariance(; ce, dn, pdm) = DenoiseCovariance(ce, dn, pdm)` does;
+    2. a method of a function of another module, an interface by definition;
+    3. a method with a positional argument of type `Nothing`, the `Nothing` arm of a
+       `Nothing`/value pair. Its value arm is still a method of its own, so a pair whose value
+       arm only forwards is flagged on that arm;
+    4. a method with positional arguments that are all untyped, the `Any` fallback of a
+       family. A method with keywords alone is not a fallback, so it is read;
+    5. a self-call that passes a field of an argument, a recursion on a field.
+
+    The census keys a forward by the pair `(name, callee)`, because one name can hold a kept
+    method and a wrapper: `expected_risk`, `factory` and `observed_weights` do. A flagged pair
+    is kept only by a name in `kept` or in `interface_functions`, or by a pair in
+    `kept_forwards` or in `pending_forwards`. `kept_forwards` names reason (a) or (b) of
+    § *A wrapper is for convenience or for a dispatch problem*. `interface_functions` names
+    the functions whose methods are interface methods by that section, a method whose callee
+    two or more methods share, or the constructor of a type. `pending_forwards` is the debt
+    that #2072 removes. An entry whose pair or name is no longer flagged is stale and fails,
+    so the debt can only shrink, and a new wrapper of any shape fails the build.
+    =#
+    fwd_leaf(e) = is_leaf(e)
+    fwd_root(e) =
+        if e isa Symbol
+            e
+        elseif e isa Expr && e.head === :.
+            fwd_root(e.args[1])
+        elseif e isa Expr && e.head in (:(...), :kw)
+            fwd_root(e.args[end])
+        else
+            nothing
+        end
+    function fwd_passes(e, names)
+        if e isa Expr && e.head in (:parameters, :tuple)
+            return any(a -> fwd_passes(a, names), e.args)
+        end
+        r = fwd_root(e)
+        return r !== nothing && r in names
+    end
+    fwd_has_field(e) = e isa Expr &&
+                       (e.head === :. || (e.head in (:(...), :kw, :parameters, :tuple) &&
+                                          any(fwd_has_field, e.args)))
+    # The one call of a body, or `nothing`.
+    function fwd_call(body)
+        stmts = body isa Expr && body.head === :block ? strip_lnn(body.args) : Any[body]
+        length(stmts) == 1 || return nothing
+        s = stmts[1]
+        if s isa Expr && s.head === :return
+            isempty(s.args) && return nothing
+            s = s.args[1]
+        end
+        s isa Expr && s.head === :call || return nothing
+        f = s.args[1]
+        (f isa Symbol && !is_operator_name(f)) || return nothing
+        all(fwd_leaf, s.args[2:end]) || return nothing
+        return s
+    end
+    # The names a signature binds, whether a positional argument is typed, and whether one is
+    # typed `Nothing`.
+    function fwd_signature(sig)
+        # Unwrap `where` and a return type, `f(x)::T where {T}`.
+        while sig isa Expr && (sig.head === :where || (sig.head === :(::) &&
+                                                       sig.args[1] isa Expr &&
+                                                       sig.args[1].head in (:call, :where)))
+            sig = sig.args[1]
+        end
+        names = Set{Symbol}()
+        typed = false
+        nothing_arm = false
+        sig isa Expr && sig.head === :call || return names, typed, nothing_arm
+        function bind!(a, positional)
+            if a isa Symbol
+                push!(names, a)
+            elseif a isa Expr && a.head === :parameters
+                foreach(x -> bind!(x, false), a.args)
+            elseif a isa Expr && a.head in (:kw, :(...))
+                bind!(a.args[1], positional)
+            elseif a isa Expr && a.head === :(::)
+                length(a.args) == 2 && a.args[1] isa Symbol && push!(names, a.args[1])
+                if positional
+                    a.args[end] === :Any || (typed = true)
+                    a.args[end] === :Nothing && (nothing_arm = true)
+                end
+            end
+            return nothing
+        end
+        foreach(a -> bind!(a, true), sig.args[2:end])
+        # A method with keywords alone, `f(; a, b)`, is no `Any` fallback.
+        positional = filter(a -> !(a isa Expr && a.head === :parameters), sig.args[2:end])
+        isempty(positional) && (typed = true)
+        return names, typed, nothing_arm
+    end
+    # Whether a method takes keywords alone, `f(; a, b)`.
+    function fwd_keywords_alone(sig)
+        while sig isa Expr && (sig.head === :where || (sig.head === :(::) &&
+                                                       sig.args[1] isa Expr &&
+                                                       sig.args[1].head in (:call, :where)))
+            sig = sig.args[1]
+        end
+        sig isa Expr && sig.head === :call || return false
+        return all(a -> a isa Expr && a.head === :parameters, sig.args[2:end])
+    end
+    owned = Set(n for (n, ds) in defs if !all(d -> d[4], ds))
+    # (name, callee) => [(file, line)] of every forward method.
+    forwards = Dict{Tuple{Symbol, Symbol}, Vector{Tuple{String, Int}}}()
+    function record_forward!(e, file, line)
+        if CH.isdocstring(e)
+            e.args[2] isa LineNumberNode && (line = e.args[2].line)
+            e = CH.unwrap(e)
+        end
+        e isa Expr || return nothing
+        if e.head === :function || (e.head === :(=) && CH.is_signature(e.args[1]))
+            length(e.args) >= 2 || return nothing
+            name, qual = CH.signature_name(e.args[1])
+            (name === nothing || qual || name in structs || extends_other(name)) &&
+                return nothing
+            call = fwd_call(e.args[2])
+            call === nothing && return nothing
+            callee = call.args[1]
+            (callee in owned || callee in structs) || return nothing
+            names, typed, nothing_arm = fwd_signature(e.args[1])
+            (typed && !nothing_arm) || return nothing
+            any(a -> fwd_passes(a, names), call.args[2:end]) || return nothing
+            callee === name && any(fwd_has_field, call.args[2:end]) && return nothing
+            callee === name && fwd_keywords_alone(e.args[1]) && return nothing
+            push!(get!(forwards, (name, callee), Tuple{String, Int}[]),
+                  (relpath(file, root), line))
+        elseif e.head === :macrocall
+            l = e.args[2] isa LineNumberNode ? e.args[2].line : line
+            record_forward!(e.args[end], file, l)
+        elseif e.head === :module || e.head === :block || e.head === :toplevel
+            for a in (e.head === :module ? e.args[end].args : e.args)
+                a isa LineNumberNode && (line = a.line; continue)
+                record_forward!(a, file, line)
+            end
+        end
+        return nothing
+    end
+    for f in files
+        record_forward!(trees[f], f, 0)
+    end
+    flagged_forwards = sort!(collect(keys(forwards)))
+
+    #=
+    The forwards kept after a check, with the reason. `kept` above holds the public presets,
+    and the forward census reads it too.
+    =#
+    kept_forwards = Dict{Tuple{Symbol, Symbol}, String}(#
+                                                        (:performance_summary, :summarise_input) => "public: (a) the keyword form of an exported workflow verb; the positional form is internal and does work (#2071)",
+                                                        (:performance_summary, :candidate_summary) => "public: (a) the keyword form of an exported workflow verb; the positional form is internal and does work (#2071)",
+                                                        (:set_compact_show!, :set_default!) => "public: (a) a configuration verb that a user calls (#2071)",
+                                                        (:with_compact_show, :with_config) => "public: (a) a configuration verb that a user calls (#2071)",
+                                                        (:mip_indicators!, :declare_mip_indicators!) => "(b) its kind methods on `mip_indicators!` would be ambiguous with the `AssetMIPSpace` arm, so the generic arm calls `declare_mip_indicators!` (#2071)",
+                                                        (:cs_weights_initial, :cross_sectional_cap_weights) => "public: the verb that a weight policy implements; the two capitalisation policies share `cross_sectional_cap_weights`, which the benchmark weights also read with another power (#2071)")
+    # The functions whose forward methods are interface methods, with the check that shows
+    # it. #2072 adds a name after a check of each one.
+    interface_functions = Dict{Symbol, String}()
+    # The debt that #2072 removes. Do not add a pair: fix the wrapper.
+    pending_forwards = Set{Tuple{Symbol, Symbol}}([(:active_weights,
+                                                    :nothing_scalar_array_getindex),
+                                                   (:adopt_pinned_choice,
+                                                    :rebuild_estimator),
+                                                   (:apply_fitted_step,
+                                                    :apply_fitted_steps),
+                                                   (:apply_fitted_step,
+                                                    :apply_preprocessing),
+                                                   (:apply_preprocessing,
+                                                    :prices_to_returns),
+                                                   (:assert_online_owner,
+                                                    :assert_online_entry),
+                                                   (:assert_scenario_refit,
+                                                    :assert_scenario_model),
+                                                   (:assert_stateless_schedule,
+                                                    :assert_stateless_prior),
+                                                   (:assert_stepwise_regression,
+                                                    :assert_stepwise_regression_fields),
+                                                   (:asset_panel_view, :port_opt_view),
+                                                   (:attach_universe_masks,
+                                                    :attach_universe_masks),
+                                                   (:attribution_active_mask,
+                                                    :panel_active_cells),
+                                                   (:attribution_expand_errors,
+                                                    :expand_factor_covariance),
+                                                   (:attribution_finite_rows,
+                                                    :attribution_finite),
+                                                   (:attribution_fold_weights,
+                                                    :weight_path),
+                                                   (:attribution_idiosyncratic_covariance,
+                                                    :assert_attribution_field),
+                                                   (:attribution_lag, :cs_regression_lag),
+                                                   (:attribution_standalone,
+                                                    :attribution_finite),
+                                                   (:attribution_unknown_block,
+                                                    :attribution_unknown_rows),
+                                                   (:attribution_window_basis,
+                                                    :factor_basis_slice),
+                                                   (:blend_projection, :project),
+                                                   (:bl_posteriors, :vanilla_posteriors),
+                                                   (:buffer_asset_panel,
+                                                    :sample_buffer_panel),
+                                                   (:buffer_column_view, :sample_buffer),
+                                                   (:calc_distance_weighted_graph,
+                                                    :calc_weighted_adjacency_graph),
+                                                   (:calibration_series_matrix,
+                                                    :absolute_drawdown_arr),
+                                                   (:calibration_series_matrix,
+                                                    :relative_drawdown_arr),
+                                                   (:calibration_series_vec,
+                                                    :absolute_drawdown_vec),
+                                                   (:calibration_series_vec,
+                                                    :relative_drawdown_vec),
+                                                   (:carry_lookback, :lookback_max),
+                                                   (:centrality_graph,
+                                                    :calc_distance_weighted_graph),
+                                                   (:centrality_graph,
+                                                    :calc_weighted_adjacency_graph),
+                                                   (:cokurtosis, :coverage_cokurtosis),
+                                                   (:collapse_rows, :last_active_rows),
+                                                   (:comovement_finalise,
+                                                    :comovement_ratio),
+                                                   (:copy_step_states, :copy_states),
+                                                   (:coskewness, :coverage_coskewness),
+                                                   (:coskewness, :coverage_panel_moment),
+                                                   (:count_or_fraction, :CountOf),
+                                                   (:coverage_fittable_estimator,
+                                                    :coverage_inner_corrected),
+                                                   (:coverage_inner_corrected,
+                                                    :partial_fit_corrected),
+                                                   (:coverage_mask_source, :dims_oriented),
+                                                   (:coverage_sentinel, :coverage_sentinel),
+                                                   (:cross_sectional_basis_now,
+                                                    :factor_basis_slice),
+                                                   (:cross_sectional_block_regression,
+                                                    :cross_sectional_regression),
+                                                   (:cross_sectional_full_solve,
+                                                    :cross_sectional_full_solve),
+                                                   (:cross_sectional_gram_factor,
+                                                    :cross_sectional_gram_factor),
+                                                   (:cross_sectional_local_returns,
+                                                    :descriptor_field_values),
+                                                   (:cross_sectional_move_basis,
+                                                    :cross_sectional_rebase),
+                                                   (:cross_sectional_neutralise!,
+                                                    :neutralise_exposures!),
+                                                   (:cross_sectional_prior_option,
+                                                    :cross_sectional_prior_pairs),
+                                                   (:cross_sectional_reduced_history,
+                                                    :reduce_exposures),
+                                                   (:cross_sectional_regression,
+                                                    :cross_sectional_block_regression),
+                                                   (:cross_sectional_shared_qr,
+                                                    :cross_sectional_qr),
+                                                   (:cross_sectional_solve,
+                                                    :cross_sectional_solve),
+                                                   (:cross_val_predict, :fit_and_predict),
+                                                   (:cross_val_predict,
+                                                    :pipeline_cross_val_predict),
+                                                   (:cs_diagnostic_factor_names,
+                                                    :cs_design_labels),
+                                                   (:cs_diagnostic_factor_names,
+                                                    :reduce_factor_names),
+                                                   (:cs_diagnostic_weights,
+                                                    :cs_diagnostic_weight_history),
+                                                   (:descriptor_field_values, :descriptor),
+                                                   (:difference_linearised_risk,
+                                                    :difference_linearised_risk),
+                                                   (:difference_risk, :difference_risk),
+                                                   (:difference_risk,
+                                                    :resolved_expected_return),
+                                                   (:dup_elim_sum_view,
+                                                    :dup_elim_sum_matrices),
+                                                   (:effective_observation_count,
+                                                    :gerber_iq_observation_count),
+                                                   (:effective_observation_count,
+                                                    :observation_count),
+                                                   (:ew_state_buffer,
+                                                    :rolling_state_buffer),
+                                                   (:ew_volatility_state,
+                                                    :EWVolatilityState),
+                                                   (:expected_risk, :expected_ratio),
+                                                   (:expected_risk, :expected_return),
+                                                   (:expected_risk, :expected_risk),
+                                                   (:expected_risk,
+                                                    :expected_risk_from_returns),
+                                                   (:expected_risk_from_returns,
+                                                    :expected_risk_from_returns),
+                                                   (:expert_allocation_set,
+                                                    :resolve_allocation_set),
+                                                   (:exposure_active_fill!,
+                                                    :descriptor_active_fill!),
+                                                   (:exposure_coverage_weights,
+                                                    :cs_diagnostic_weights),
+                                                   (:exposure_group_labels,
+                                                    :cross_sectional_groups),
+                                                   (:factor_attribution,
+                                                    :attribution_realised_entry),
+                                                   (:factor_attribution,
+                                                    :attribution_returns_entry),
+                                                   (:factor_attribution,
+                                                    :attribution_rolling_entry),
+                                                   (:factor_attribution,
+                                                    :factor_attribution),
+                                                   (:factor_axis_positions,
+                                                    :label_positions),
+                                                   (:factory, :BudgetedHindsightPathResult),
+                                                   (:factory_child, :factory),
+                                                   (:factory, :ElasticNet),
+                                                   (:factory, :factory),
+                                                   (:factory, :GeneralisedLinearModel),
+                                                   (:factory, :resolve_deferred_quantities),
+                                                   (:factory, :SubsetResamplingResult),
+                                                   (:first_error_line, :solve_status_msg),
+                                                   (:fit_preprocessing, :rebuild_estimator),
+                                                   (:fit_preprocessing, :train_test_split),
+                                                   (:fitted_step_keeps_observations,
+                                                    :keeps_observations),
+                                                   (:fold_context, :TimeDependentContext),
+                                                   (:fold_factor_returns,
+                                                    :investable_returns_view),
+                                                   (:fold_optimiser, :partial_fit!),
+                                                   (:folds_forecast_rows,
+                                                    :target_forecast_folds),
+                                                   (:forecast_coverage_policy,
+                                                    :coverage_policy),
+                                                   (:forecast_location,
+                                                    :forecast_state_location),
+                                                   (:forecast_target_history,
+                                                    :forecast_idiosyncratic_returns),
+                                                   (:forget_row_positions, :set_row_key),
+                                                   (:gap_fill_seed, :vec_to_real_measure),
+                                                   (:gram_geometry, :GramProjection),
+                                                   (:group_frames, :pipeline_frames),
+                                                   (:group_returns_view,
+                                                    :shared_series_fit),
+                                                   (:held_timestamps, :context_timestamps),
+                                                   (:held_timestamps,
+                                                    :pipeline_held_timestamps),
+                                                   (:herc_unitary_risks,
+                                                    :unitary_expected_risks),
+                                                   (:idio_vol_ic, :idio_vol_dependence),
+                                                   (:idio_vol_residual_dependence,
+                                                    :idio_vol_dependence),
+                                                   (:input_entries, :population_entries),
+                                                   (:input_entries, :prediction_entries),
+                                                   (:is_time_dependent,
+                                                    :pipeline_step_is_time_dependent),
+                                                   (:leverage_one_residuals,
+                                                    :leverage_one_nan),
+                                                   (:library_covariance_estimator,
+                                                    :GeneralCovariance),
+                                                   (:lift_fee_rate,
+                                                    :expand_investable_weights),
+                                                   (:linearised_risk, :linearised_risk),
+                                                   (:lookback, :lookback_max),
+                                                   (:mahalanobis_level_bias,
+                                                    :mahalanobis_level_bias),
+                                                   (:matrix_processing_step!, :detone!),
+                                                   (:matrix_processing_step!,
+                                                    :matrix_processing_algorithm!),
+                                                   (:matrix_processing_step!, :posdef!),
+                                                   (:maybe_count_or_fraction,
+                                                    :count_or_fraction),
+                                                   (:maybe_inject_step, :inject_context),
+                                                   (:mean_test_rng, :resolve_rng),
+                                                   (:member_regret, :series_regret),
+                                                   (:merge_column, :merge_states),
+                                                   (:merge_held_data, :partial_fit!),
+                                                   (:mip_bit_space, :AssetMIPSpace),
+                                                   (:mip_key, :state_key),
+                                                   (:mip_wx!, :get_w),
+                                                   (:mip_wx!, :shared_get),
+                                                   (:no_bounds_returns_settings,
+                                                    :JuMPReturnsSettings),
+                                                   (:n_splits, :n_splits),
+                                                   (:observed_long_run_form,
+                                                    :long_run_quadratic_form),
+                                                   (:observed_weights,
+                                                    :get_observation_weights),
+                                                   (:observed_weights, :observed_weights),
+                                                   (:obs_weights_index, :observed_weights),
+                                                   (:obs_weights_view, :obs_weights_fields),
+                                                   (:online_entry_state, :element_path),
+                                                   (:online_state_seed,
+                                                    :PipelineBufferState),
+                                                   (:online_state_seed,
+                                                    :ReturnsBufferState),
+                                                   (:online_state_seed, :SampleBufferState),
+                                                   (:online_step_fold, :partial_fit!),
+                                                   (:online_update!, :online_update!),
+                                                   (:opinion_pooling_inner, :forward_prior),
+                                                   (:opinion_pooling_kept, :forward_prior),
+                                                   (:optimise, :_optimise),
+                                                   (:optional_gap_cells, :clock_gap_cells),
+                                                   (:orthogonal_forecast_result,
+                                                    :return_forecast),
+                                                   (:orthogonal_forecast_step,
+                                                    :return_forecast_step),
+                                                   (:orthogonality_weights,
+                                                    :latest_orthogonality_weights),
+                                                   (:override_fee_amortisation, :Fees),
+                                                   (:owa_l_moment_crm, :ncrra_weights),
+                                                   (:panel_field_placeholder,
+                                                    :CategoricalPanelField),
+                                                   (:panel_field_placeholder,
+                                                    :NumericPanelField),
+                                                   (:panel_field_placeholder,
+                                                    :TensorPanelField),
+                                                   (:panel_fill, :panel_fill),
+                                                   (:panel_info, :panel_info),
+                                                   (:panel_mask_lift,
+                                                    :RepeatedObservations),
+                                                   (:panel_placeholder, :panel_placeholder),
+                                                   (:panel_resolve, :panel_resolve),
+                                                   (:partial_fit!, :fold_pipeline),
+                                                   (:partial_fit, :partial_fit!),
+                                                   (:pipeline_lens, :parse_lens),
+                                                   (:pipeline_step_factory, :factory),
+                                                   (:pipeline_step_is_time_dependent,
+                                                    :is_time_dependent),
+                                                   (:port_opt_view,
+                                                    :nothing_scalar_array_view),
+                                                   (:port_opt_view, :port_opt_view),
+                                                   (:predictor_state_seed,
+                                                    :forecaster_seed),
+                                                   (:predictor_state_view, :port_opt_view),
+                                                   (:price_level_statistic, :fold_levels),
+                                                   (:price_level_statistic,
+                                                    :spatial_median),
+                                                   (:prior_investable_mask,
+                                                    :investable_mask),
+                                                   (:prior_probability_factory, :factory),
+                                                   (:project, :projection_programme),
+                                                   (:readable_window_rows, :collapse_rows),
+                                                   (:readable_window_rows,
+                                                    :last_active_rows),
+                                                   (:reader_frames, :field_frames),
+                                                   (:reader_frames, :source_frames),
+                                                   (:rebase_linear_constraints,
+                                                    :project_linear_constraint),
+                                                   (:regime_bias_table, :regime_bias_table),
+                                                   (:regression_factor_names,
+                                                    :cs_diagnostic_factor_names),
+                                                   (:report_risk_contribution,
+                                                    :risk_contribution_figure),
+                                                   (:reprojection, :project),
+                                                   (:reset_time_dependent_estimator,
+                                                    :reset_time_dependent_fields),
+                                                   (:reset_time_dependent_step,
+                                                    :reset_time_dependent_estimator),
+                                                   (:resolve_calibration_slot,
+                                                    :calibrated_part),
+                                                   (:resolved_constraint_block,
+                                                    :ResolvedConstraintBlock),
+                                                   (:resolve_deferred_child,
+                                                    :resolve_deferred_quantities),
+                                                   (:return_forecast_step,
+                                                    :return_forecast_step),
+                                                   (:rewrap_step, :PipelineStep),
+                                                   (:risk_measure_nothing_scalar_array_view,
+                                                    :nothing_scalar_array_view),
+                                                   (:rule_state_seed, :forecaster_seed),
+                                                   (:rule_state_seed, :rule_state_seed),
+                                                   (:rule_state_view, :port_opt_view),
+                                                   (:run_step, :run_constraint_step),
+                                                   (:run_step, :run_step),
+                                                   (:run_step, :run_uncertainty_step),
+                                                   (:sample_matrix_processing!,
+                                                    :matrix_processing!),
+                                                   (:scalarised_degree,
+                                                    :homogeneity_degree),
+                                                   (:scale_rows, :window_rows),
+                                                   (:scenario_factory, :factory),
+                                                   (:seed_window_path, :element_path),
+                                                   (:sel, :solver_selector),
+                                                   (:sel, :ucs_selector),
+                                                   (:separation_graph,
+                                                    :calc_distance_weighted_graph),
+                                                   (:set_allocation_set_constraints!,
+                                                    :set_allocation_set_constraints!),
+                                                   (:set_retcode, :JuMPOptimisationResult),
+                                                   (:set_retcode, :NestedClusteredResult),
+                                                   (:set_retcode, :StackingResult),
+                                                   (:set_retcode, :SubsetResamplingResult),
+                                                   (:set_risk_constraints!,
+                                                    :set_range_risk_constraints!),
+                                                   (:set_variance_risk!,
+                                                    :set_sdp_variance_risk!),
+                                                   (:set_variance_risk!,
+                                                    :set_variance_risk!),
+                                                   (:sparse_portfolio_iterate,
+                                                    :largest_forecast_split),
+                                                   (:step_fallback, :partial_fit!),
+                                                   (:step_online_member,
+                                                    :pipeline_online_member),
+                                                   (:summarise_entries, :summarise_returns),
+                                                   (:supports_partial_fit, :folds),
+                                                   (:supports_precomputed_returns,
+                                                    :weight_independent_target),
+                                                   (:systematic_processing!,
+                                                    :sample_matrix_processing!),
+                                                   (:tail_worst_case_risk,
+                                                    :worst_case_risk),
+                                                   (:target_forecast_variances,
+                                                    :forecast_idiosyncratic_variances),
+                                                   (:target_forecast_warmup,
+                                                    :target_forecast_insample),
+                                                   (:tracking_benchmark, :calc_net_returns),
+                                                   (:ucs_prior, :prior),
+                                                   (:universe_axis_visit!,
+                                                    :universe_axis_children!),
+                                                   (:update_online_member,
+                                                    :update_online_estimator),
+                                                   (:update_online_step,
+                                                    :update_online_estimator),
+                                                   (:update_time_dependent_estimator,
+                                                    :update_time_dependent_fields),
+                                                   (:update_time_dependent_step,
+                                                    :update_time_dependent_estimator),
+                                                   (:variance_count,
+                                                    :exp_weighted_variance_count),
+                                                   (:variance_risk_bounds_val, :Frontier),
+                                                   (:variance_series,
+                                                    :coverage_variance_series),
+                                                   (:variance_series,
+                                                    :windowed_variance_series),
+                                                   (:weighted_comoment_guard,
+                                                    :weighted_moment_guard),
+                                                   (:weight_mass_grid,
+                                                    :pipeline_lens_val_grid),
+                                                   (:weight_path, :rebuild_weight_path),
+                                                   (:window_bigger_is_better,
+                                                    :bigger_is_better),
+                                                   (:windowed_inner, :factory),
+                                                   (:windowed_panel, :asset_panel_view),
+                                                   (:window_values, :asset_scores),
+                                                   (:with_position_id,
+                                                    :MultiPeriodPredictionResult),
+                                                   (:worst_case_distribution,
+                                                    :ERM_worst_case),
+                                                   (:worst_case_distribution,
+                                                    :PRM_worst_case),
+                                                   (:worst_case_distribution,
+                                                    :RRM_worst_case)])
+
     # ------------------------------------------------------------- the type census
 
     # An abstract type the package declares with exactly one concrete subtype and no
@@ -272,6 +832,51 @@ end
         if startswith(why, "public")
             @test (n, Base.ispublic(PO, n)) == (n, true)
         end
+    end
+
+    # The forward census (#2071). The floor guards the parser: measured 2026-11-13, 375
+    # forward methods of 229 names.
+    @test sum(length, values(forwards)) > 200
+    forward_kept(pair) = haskey(kept, pair[1]) ||
+                         haskey(interface_functions, pair[1]) ||
+                         haskey(kept_forwards, pair) ||
+                         pair in pending_forwards
+    unkept_forwards = [(pair, forwards[pair])
+                       for pair in flagged_forwards if !forward_kept(pair)]
+    @test ("forwards outside the allow-lists: give each form to the owner",
+           unkept_forwards) ==
+          ("forwards outside the allow-lists: give each form to the owner",
+           Tuple{Tuple{Symbol, Symbol}, Vector{Tuple{String, Int}}}[])
+    stale_forwards = sort!([pair
+                            for pair in union(keys(kept_forwards), pending_forwards)
+                            if !haskey(forwards, pair)])
+    @test ("forward entries no longer flagged: delete the entry", stale_forwards) ==
+          ("forward entries no longer flagged: delete the entry", Tuple{Symbol, Symbol}[])
+    flagged_names = Set(first.(flagged_forwards))
+    stale_interfaces = sort!([n for n in keys(interface_functions) if !(n in flagged_names)])
+    @test ("interface functions no longer flagged: delete the entry", stale_interfaces) ==
+          ("interface functions no longer flagged: delete the entry", Symbol[])
+    @test isempty(intersect(keys(kept_forwards), pending_forwards))
+    for (pair, why) in kept_forwards
+        @test !isempty(why)
+        if startswith(why, "public")
+            @test (pair, Base.ispublic(PO, pair[1])) == (pair, true)
+        end
+    end
+    for (n, why) in interface_functions
+        @test !isempty(why)
+    end
+    # Pinned on the wrappers that #2071 removed.
+    for n in
+        (:pipeline_data_view, :pipeline_asset_view, :windowed_estimator_suggest, :_Frontier,
+         :declare_held_indicators!, :declare_long_short_indicators!,
+         :declare_sign_indicators!, :_no_bounds_risk_measure,
+         :_no_bounds_no_risk_expr_risk_measure, :exposure_transform,
+         :expand_idiosyncratic_covariance, :expand_vector, :simple_variance_kernel,
+         :expand_held_member, :expand_investable_columns, :reduce_member_scores,
+         :weighted_coverage_covariance, :coverage_keyword_mask, :expand_factor_mu,
+         :time_dependent_entry_needs_previous_weights)
+        @test (n, isdefined(PO, n)) == (n, false)
     end
 
     # Pinned on the three units ADR 0168 named and the one dead-end the build removed.

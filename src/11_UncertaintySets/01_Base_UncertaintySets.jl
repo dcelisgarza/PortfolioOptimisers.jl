@@ -1115,7 +1115,7 @@ The expansion is the inverse of [`port_opt_view`](@ref). The view slices the two
 
 # Algorithm
 
- 1. Write `set.lb` and `set.ub` at the rows that the mask keeps into two `NaN` frames of `length(imsk)` entries, with [`expand_vector`](@ref).
+ 1. Write `set.lb` and `set.ub` at the rows that the mask keeps into two `NaN` frames of `length(imsk)` entries, with [`expand_moment`](@ref).
  2. Build a [`BoxUncertaintySet`](@ref) from the two frames, with `pr.mu` as `val`.
 
 # Arguments
@@ -1131,14 +1131,14 @@ The expansion is the inverse of [`port_opt_view`](@ref). The view slices the two
 # Related
 
   - [`BoxUncertaintySet`](@ref)
-  - [`expand_vector`](@ref)
+  - [`expand_moment`](@ref)
   - [`investable_ucs_reduction`](@ref)
   - [`port_opt_view`](@ref)
 """
 function expand_investable_ucs(set::BoxUncertaintySet{<:VecNum, <:VecNum}, imsk::BitVector,
                                pr::AbstractPriorResult)::BoxUncertaintySet
-    return BoxUncertaintySet(; lb = expand_vector(set.lb, imsk),
-                             ub = expand_vector(set.ub, imsk), val = pr.mu)
+    return BoxUncertaintySet(; lb = expand_moment(set.lb, imsk),
+                             ub = expand_moment(set.ub, imsk), val = pr.mu)
 end
 """
 $(DocStringExtensions.TYPEDSIGNATURES)

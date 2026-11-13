@@ -157,7 +157,7 @@ julia> factor_exposure(xe, rd, [1.0 2.0; 3.0 4.0])
 
   - [`DerivedExposure`](@ref)
   - [`AbstractExposureEstimator`](@ref)
-  - [`exposure_transform`](@ref)
+  - [`cross_sectional_transform`](@ref)
   - [`CompositeExposure`](@ref)
 """
 function factor_exposure(xe::DerivedExposure, ::ReturnsResult)
@@ -173,8 +173,9 @@ function factor_exposure(xe::DerivedExposure, rd::ReturnsResult, xs::MatNum;
     @argcheck(size(D0) == size(xs),
               DimensionMismatch("f maps one Factor Exposure to another, so it must return a matrix of the size it was given, got $(size(D0)) from size(xs) = $(size(xs))"))
     Tf = promote_type(eltype(D0), eltype(xs))
-    D = exposure_transform(xe.outlier, convert(Matrix{Tf}, D0), w, groups)
-    D = exposure_transform(xe.scoring, D, w, groups)
+    D = cross_sectional_transform(xe.outlier, convert(Matrix{Tf}, D0); w = w,
+                                  groups = groups)
+    D = cross_sectional_transform(xe.scoring, D; w = w, groups = groups)
     exposure_active_fill!(D, rd.pnl)
     return D
 end

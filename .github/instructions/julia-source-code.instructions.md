@@ -527,9 +527,9 @@ method of that function, and call that function. A wrapper is a function whose m
 their arguments on to another function, or hold a form that the other function could hold. To
 pack an argument into a tuple, to move a keyword into a positional slot, or to reorder the
 arguments is still only to send them on, so the method is a wrapper. #1998 is the case: a
-one-method form of a score on a return series only packed the series into a tuple for
-`reduce_member_scores`. It went, and its callers call `reduce_member_scores`. A wrapper earns its
-place for two reasons only:
+one-method form of a score on a return series only packed the series into a tuple for a helper
+of `oriented_score`. It went, and #2071 gave the series to `oriented_score` as a method. A
+wrapper earns its place for two reasons only:
 
 - **A convenience for the user.** A keyword constructor, a preset such as `BookToPrice`, or a
   short name for a call that users write often.
@@ -540,8 +540,10 @@ place for two reasons only:
 A new form of an input is a new method of its reader and of its check, not a new function in
 front of them. #2005 is the case. A reader of the inputs of a scorer sent two of its four forms
 to `descriptor_field_values` and held the other two, and its check did the same for
-`assert_panel_terms`. Both wrappers went, and the generic functions took their methods. The census flags a
-one-method forward only, so a wrapper of more than one method holds by review.
+`assert_panel_terms`. Both wrappers went, and the generic functions took their methods.
+`test/test_70_trivial_unit_census.jl` reads each method: a method whose body only forwards fails
+the build unless its name is on an allow-list with reason (a) or (b). A helper that holds a part
+of a job for several forms, and a `Nothing` arm, still hold by review.
 
 The two reasons are the whole list. Each of these is a description of a wrapper, not a reason to
 keep it:
@@ -565,8 +567,36 @@ of a function for several forms of input is a second name for that job. Give eac
 owning function as a method, even when a short rule is then written once per form, such as the
 reduction of a vector by the type of a scalariser. The `# Algorithm` section of the owner states
 that the copies agree, and a test holds each copy. #2071 is the case: `reduce_member_scores`
-holds the reduction of `oriented_score` for a series and for a fitted result, and #2071 moves
-it into the methods of `oriented_score`, one set for each sample.
+held the reduction of `oriented_score` for a series and for a fitted result. It went, and
+`oriented_score` holds the reduction in its methods, one set for each sample.
+
+**The rulings of #2072.** The maintainer ruled these on 2026-11-13. They hold for every change
+and every addition:
+
+1. **The standing test.** Pick the form that improves the code most by architecture,
+   maintenance, ergonomics and Julia idiom, with no loss of performance. When the effect is not
+   clear, a measurement decides. A break is not a cost.
+2. **A verb owns a default only when the default is a true answer for every caller.** A query
+   trait owns `false`, as `needs_previous_weights` does. A structural traversal owns the
+   identity on a leaf, as `copy_states(x) = x` does, which is the idiom of `fmap` in Functors.jl
+   and of Adapt.jl. A contract verb such as `factory` owns no default, so a missing method
+   stays a `MethodError`. A choice that belongs to a container, such as which steps of a
+   pipeline take the weights, stays in a function of the container, and that function is kept
+   by reason (b).
+3. **An interface method is not a wrapper** when two or more methods share its callee, or when
+   its callee is the constructor of a type. `reader_frames(x::T, path, ::Bool) =
+   source_frames(x.x_src, path, true)` is the case. When the method is the only caller of its
+   callee, the body of the callee moves into the method.
+4. **A template hook is not a second name.** A hook that the `# Interfaces` section names, and
+   that does one step of a driver, is part of the driver: `_optimise` under `optimise`, as
+   `__solve` under `solve` in SciML. A method of the verb that goes around the driver is a
+   wrapper.
+5. **A self-forward that drops an ignored argument** becomes one method with an ignored or
+   defaulted positional slot. A conversion to the canonical form is reason (a) on a public
+   verb, and it goes on a private function.
+6. **A rebuild by hand that copies every field but one** goes to
+   `rebuild_estimator(x, (; f = v))`. A site stays by hand only on a measured loss of
+   performance.
 
 **A user verb is declared.** A keyword verb that is kept as a convenience for the user is
 exported or `public`. A verb that is neither is internal, and an internal keyword wrapper goes:

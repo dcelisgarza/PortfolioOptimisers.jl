@@ -83,10 +83,10 @@ function target_forecast_design(rfe::TargetReturnForecast, P::NamedTuple,
         al.S
     end
     fwd = forward_mean_returns(al.eps, rfe.horizon, rfe.lag)
-    y = exposure_transform(rfe.target_scoring,
-                           exposure_transform(rfe.target_outlier,
-                                              forecast_unit_target(rfe.unit, fwd, al.vs),
-                                              al.w, al.groups), al.w, al.groups)
+    yo = cross_sectional_transform(rfe.target_outlier,
+                                   forecast_unit_target(rfe.unit, fwd, al.vs); w = al.w,
+                                   groups = al.groups)
+    y = cross_sectional_transform(rfe.target_scoring, yo; w = al.w, groups = al.groups)
     return (; Sa = Sa, fwd = fwd, y = y, vs = al.vs, w = al.w,
             off = rfe.whole_history ? first(rows) - 1 : 0)
 end

@@ -335,7 +335,7 @@ end
 """
 $(DocStringExtensions.TYPEDSIGNATURES)
 
-Computes the weighted available-case covariance of a [`Covariance`](@ref) with observation weights and a [`CoveragePolicy`](@ref). The two weighted methods of [`coverage_covariance`](@ref) call it.
+The weighted [`FullMoment`](@ref) and [`SemiMoment`](@ref) method of the available-case arm of [`coverage_covariance`](@ref). It computes the weighted available-case covariance of a [`Covariance`](@ref) with observation weights and a [`CoveragePolicy`](@ref). The unweighted methods take `nothing` in the slot of the weights, so the two arms do not overlap.
 
 Each pair reads the observations that its two assets share, with their weights, through [`weighted_pair_covariance`](@ref). The arm reads the valid entries, the admission and the peel of the unweighted arms, so the two arms read one universe. The counts of the admission are counts of observations, and the weights do not change them. A pair whose weighted sample gives no covariance is `NaN`, also when it shares observations: every shared observation can have a weight of zero, or the divisor of the weights can be not positive. The peel counts no observation for such a pair, so the pair is undetermined, and the peel removes an asset of it or refuses it under `strict`, as it does for a pair with no shared observation.
 
@@ -358,6 +358,7 @@ Each pair reads the observations that its two assets share, with their weights, 
   - `mean`: Must be `nothing`.
   - `active_mask`: The active mask of the Asset Panel, or `nothing`.
   - `strict`: Whether a peel refuses rather than warns.
+  - `kwargs...`: Ignored. The unweighted arms take them too.
 
 # Returns
 
@@ -369,10 +370,12 @@ Each pair reads the observations that its two assets share, with their weights, 
   - [`weighted_pair_covariance`](@ref)
   - [`coverage_peel`](@ref)
 """
-function weighted_coverage_covariance(f::F, ce::Covariance, cvg::CoveragePolicy, X::MatNum;
-                                      dims::Int = 1, mean = nothing,
-                                      active_mask::Option{<:AbstractMatrix{<:Bool}} = nothing,
-                                      strict::Bool = false) where {F}
+function coverage_covariance(f::F,
+                             ce::Covariance{<:Any, <:Any, <:Union{FullMoment, SemiMoment},
+                                            <:ObsWeights}, cvg::CoveragePolicy, X::MatNum;
+                             dims::Int = 1, mean = nothing,
+                             active_mask::Option{<:AbstractMatrix{<:Bool}} = nothing,
+                             strict::Bool = false, kwargs...) where {F}
     assert_dims(dims)
     @argcheck(isnothing(mean),
               ArgumentError("an available-case covariance centres each asset on that asset's own observations, so it cannot take a centre fitted over the whole window. Pass `mean = nothing`, or clear `cvg`."))
@@ -394,30 +397,6 @@ function weighted_coverage_covariance(f::F, ce::Covariance, cvg::CoveragePolicy,
                          coverage_admission(cvg, CoverageCounts(nu, nothing, active, stale),
                                             size(Xo, 1)), nd, corrected, strict)
     return coverage_correlation(f, coverage_frame(sigma, nu, cmsk))
-end
-"""
-$(DocStringExtensions.TYPEDSIGNATURES)
-
-The weighted [`FullMoment`](@ref) and [`SemiMoment`](@ref) methods of the available-case arm of [`coverage_covariance`](@ref). Both call [`weighted_coverage_covariance`](@ref).
-
-# Related
-
-  - [`coverage_covariance`](@ref)
-  - [`weighted_coverage_covariance`](@ref)
-"""
-function coverage_covariance(f::F, ce::Covariance{<:Any, <:Any, <:FullMoment, <:ObsWeights},
-                             cvg::CoveragePolicy, X::MatNum; dims::Int = 1, mean = nothing,
-                             active_mask::Option{<:AbstractMatrix{<:Bool}} = nothing,
-                             strict::Bool = false, kwargs...) where {F}
-    return weighted_coverage_covariance(f, ce, cvg, X; dims = dims, mean = mean,
-                                        active_mask = active_mask, strict = strict)
-end
-function coverage_covariance(f::F, ce::Covariance{<:Any, <:Any, <:SemiMoment, <:ObsWeights},
-                             cvg::CoveragePolicy, X::MatNum; dims::Int = 1, mean = nothing,
-                             active_mask::Option{<:AbstractMatrix{<:Bool}} = nothing,
-                             strict::Bool = false, kwargs...) where {F}
-    return weighted_coverage_covariance(f, ce, cvg, X; dims = dims, mean = mean,
-                                        active_mask = active_mask, strict = strict)
 end
 """
 $(DocStringExtensions.TYPEDSIGNATURES)

@@ -30,11 +30,9 @@ PortfolioOptimisers.coverage_pair_index
 PortfolioOptimisers.expand_columns
 PortfolioOptimisers.reduce_columns
 PortfolioOptimisers.expand_rows
-PortfolioOptimisers.expand_vector
 PortfolioOptimisers.expand_moment
 PortfolioOptimisers.expand_count
 PortfolioOptimisers.expand_regression
-PortfolioOptimisers.expand_idiosyncratic_covariance
 ```
 
 ## The check for missing returns
@@ -68,6 +66,5 @@ PortfolioOptimisers.variance_series(ce::Covariance, X::MatNum, pnl::Option{<:Ass
 PortfolioOptimisers.variance_series(ve::SimpleVariance, X::MatNum, pnl::Option{<:AssetPanel}; dims::Int = 1, kwargs...)
 PortfolioOptimisers.coverage_floor
 PortfolioOptimisers.coverage_keyword_reduction
-PortfolioOptimisers.coverage_keyword_mask
 PortfolioOptimisers.coverage_columns
 ```

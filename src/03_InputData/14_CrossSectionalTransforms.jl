@@ -1150,8 +1150,11 @@ end
     cross_sectional_transform(ct::CrossSectionalStandardiser, X::MatNum; w::Option{<:MatNum} = nothing, groups::Option{<:AbstractMatrix{<:Integer}} = nothing)
     cross_sectional_transform(ct::CrossSectionalGaussianRank, X::MatNum; w::Option{<:MatNum} = nothing, groups::Option{<:AbstractMatrix{<:Integer}} = nothing)
     cross_sectional_transform(ct::CrossSectionalPercentileRank, X::MatNum; w::Option{<:MatNum} = nothing, groups::Option{<:AbstractMatrix{<:Integer}} = nothing)
+    cross_sectional_transform(::Nothing, X::MatNum; w::Option{<:MatNum} = nothing, groups::Option{<:AbstractMatrix{<:Integer}} = nothing)
 
 Transform each observation of a matrix against the other assets of that same observation.
+
+An Exposure Estimator holds its outlier slot and its scoring slot as `Option{<:AbstractCrossSectionalTransform}`, where `nothing` skips the step. The method on `Nothing` returns `X` unchanged, without a check, so a member calls this function on each slot and never writes the two branches.
 
 The benchmark weights and the group labels are arguments and never fields, because one transform runs against a different benchmark and a different classification at every call site, while the transform itself is one configuration.
 
@@ -1170,7 +1173,7 @@ Four rules are shared by every member:
 
 # Arguments
 
-  - `ct`: Cross-sectional transform.
+  - `ct`: Cross-sectional transform, or `nothing` to skip the step.
   - `X::MatNum`: Data matrix `observations × assets`, where a `NaN` marks a missing cell.
   - `w`: Benchmark weight matrix `observations × assets`, or `nothing`.
   - `groups`: Group label matrix `observations × assets`, or `nothing`. [`CS_MISSING_GROUP`](@ref) labels an asset that carries no group.
@@ -1183,7 +1186,7 @@ Four rules are shared by every member:
 
 # Returns
 
-  - `Y::Matrix{<:AbstractFloat}`: Transformed matrix `observations × assets`, carrying a missing marker wherever `X` did.
+  - `Y::Matrix{<:AbstractFloat}`: Transformed matrix `observations × assets`, carrying a missing marker wherever `X` did. `X` itself when `ct` is `nothing`.
 
 # Examples
 
@@ -1310,6 +1313,10 @@ function cross_sectional_transform(ct::CrossSectionalPercentileRank, X::MatNum;
     fin = isfinite.(A)
     est = cross_sectional_estimation_mask(fin, w)
     return cross_sectional_percentile_ranks(A, fin, est, groups, ct.min_group_size)
+end
+function cross_sectional_transform(::Nothing, X::MatNum; w::Option{<:MatNum} = nothing,
+                                   groups::Option{<:AbstractMatrix{<:Integer}} = nothing)
+    return X
 end
 """
     cross_sectional_standardise!(Y::AbstractMatrix, A::AbstractMatrix, fin::AbstractMatrix{Bool}, est::AbstractMatrix{Bool}, w::Option{<:MatNum}, groups::Nothing, mgs::Integer, atol::Real) -> nothing

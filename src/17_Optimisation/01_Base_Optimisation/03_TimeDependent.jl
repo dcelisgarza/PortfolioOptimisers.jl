@@ -558,7 +558,7 @@ A bare function gives `false`, because no code can find out what it reads.
 
  1. When `td.val` is a [`PreviousWeightsFunction`](@ref), return `true`.
  2. When `td.val` is a [`TimeDependentCallable`](@ref), return its own `needs_previous_weights`.
- 3. When `td.val` is a vector, return `true` if any entry needs the previous weights, by [`time_dependent_entry_needs_previous_weights`](@ref).
+ 3. When `td.val` is a vector, return `true` if any entry needs the previous weights, by the method of [`needs_previous_weights`](@ref) for the type of the entry.
  4. Else return `false`.
 
 # Related
@@ -573,37 +573,28 @@ function needs_previous_weights(td::TimeDependent)::Bool
     elseif isa(v, TimeDependentCallable)
         return needs_previous_weights(v)
     elseif isa(v, AbstractVector)
-        return any(time_dependent_entry_needs_previous_weights, v)
+        return any(needs_previous_weights, v)
     end
     return false
 end
 """
-    time_dependent_entry_needs_previous_weights(x)
+    needs_previous_weights(x::Any) -> Bool
+    needs_previous_weights(x::AbstractVector) -> Bool
 
-Returns `true` if an entry of a [`TimeDependent`](@ref) vector reads the weights of the previous fold.
+Return `true` if an entry of a [`TimeDependent`](@ref) vector reads the weights of the previous fold.
 
-A turnover, a fee, a tracking input, a risk measure, an optimisation estimator or result, and a nested schedule each give their own [`needs_previous_weights`](@ref). A vector entry gives `true` if any of its elements does. Every other value gives `false`.
+A turnover, a fee, a tracking input, a risk measure, a budget cost, an optimisation estimator or result, a constraint and a nested schedule each give their own method. A vector gives `true` if any of its elements does. Every other value, such as a number or a bare function, gives `false`, because no code can find out what a bare function reads.
 
 # Related
 
   - [`TimeDependent`](@ref)
   - [`needs_previous_weights`](@ref)
 """
-function time_dependent_entry_needs_previous_weights(::Any)::Bool
+function needs_previous_weights(::Any)::Bool
     return false
 end
-function time_dependent_entry_needs_previous_weights(x::Union{TnE_Tn, FeesE_Fees, Tr_VecTr,
-                                                              AbstractBaseRiskMeasure})::Bool
-    return needs_previous_weights(x)
-end
-function time_dependent_entry_needs_previous_weights(x::AbstractVector)::Bool
-    return any(time_dependent_entry_needs_previous_weights, x)
-end
-function time_dependent_entry_needs_previous_weights(x::OptE_Opt)::Bool
-    return needs_previous_weights(x)
-end
-function time_dependent_entry_needs_previous_weights(x::TimeDependent)::Bool
-    return needs_previous_weights(x)
+function needs_previous_weights(x::AbstractVector)::Bool
+    return any(needs_previous_weights, x)
 end
 """
     schedule_reads_previous_weights(x)

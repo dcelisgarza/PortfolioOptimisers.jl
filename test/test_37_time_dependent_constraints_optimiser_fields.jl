@@ -551,8 +551,7 @@ end
             @test isa(f, TimeDependent)
             @test f.bind === :nearest
             # A schedule inside a field-level entry vector counts toward the trait...
-            @test PortfolioOptimisers.time_dependent_entry_needs_previous_weights(TimeDependent([mrtn,
-                                                                                                 ew]))
+            @test PortfolioOptimisers.needs_previous_weights(TimeDependent([mrtn, ew]))
             @test PortfolioOptimisers.needs_previous_weights(TimeDependent([[mrtn, ew],
                                                                             [ew, ew]]))
             # ...and so does an element schedule of a Stacking, driving sequential outer

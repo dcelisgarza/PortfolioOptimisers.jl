@@ -1253,7 +1253,7 @@ Check that `key` names an entry of `dict`. When it does not, raise an error that
 
 # Validation
 
-  - `haskey(dict, key)`. For a key that names no entry, the function raises through [`windowed_estimator_error`](@ref), and the message ends with the suffix from [`windowed_estimator_suggest`](@ref).
+  - `haskey(dict, key)`. For a key that names no entry, the function raises through [`windowed_estimator_error`](@ref), and the message ends with the suffix from [`suggest_declared_key`](@ref).
 
 # Returns
 
@@ -1267,40 +1267,10 @@ Check that `key` names an entry of `dict`. When it does not, raise an error that
 function windowed_estimator_check_key(key::Symbol, dict::AbstractDict, what::AbstractString)
     if !haskey(dict, key)
         windowed_estimator_error("`$(key)` is not a `$(what)` key" *
-                                 windowed_estimator_suggest(key, keys(dict)) *
+                                 suggest_declared_key(key, keys(dict)) *
                                  ".")
     end
     return key
-end
-"""
-$(DocStringExtensions.TYPEDSIGNATURES)
-
-Suggest the nearest `candidates` entry to a mistyped [`@windowed_estimator`](@ref) key.
-
-The function calls [`suggest_declared_key`](@ref), which every suggestion for a declaration key
-uses. That function scores the candidates with the Damerau-Levenshtein distance at
-`min_score = 0.5`, which accepts more matches than the global default. This is safe here,
-because the candidates are constants of the source code: the block keys and the keys of
-`field_dict` and `ret_dict`. A suggestion cannot show the name of a real asset to a caller who
-guesses.
-
-# Arguments
-
-  - `key`: The mistyped key.
-  - `candidates`: The keys that the declaration accepts.
-
-# Returns
-
-  - `msg::String`: The suffix of the suggestion, to put at the end of a message. It is empty when no candidate gets a score that is high enough.
-
-# Related
-
-  - [`@windowed_estimator`](@ref)
-  - [`suggest_declared_key`](@ref)
-  - [`did_you_mean`](@ref)
-"""
-function windowed_estimator_suggest(key, candidates)
-    return suggest_declared_key(key, candidates)
 end
 """
 $(DocStringExtensions.TYPEDSIGNATURES)
@@ -1820,7 +1790,7 @@ unknown key of `field_dict` or `ret_dict`. The error for an unknown key ends wit
   - The header reads `Name <: Super`, and `Name` is a `Symbol`.
   - The declaration body is a `begin ... end` block, and every line of it is an assignment.
   - At most one `field::Type = default` line appears.
-  - Every other key names an entry of [`WINDOWED_ESTIMATOR_KEYS`](@ref). An unknown key raises with a [`windowed_estimator_suggest`](@ref) suffix.
+  - Every other key names an entry of [`WINDOWED_ESTIMATOR_KEYS`](@ref). An unknown key raises with a [`suggest_declared_key`](@ref) suffix.
   - All four of `field::Type = default`, `noun`, `forward` and `doctest` are present.
   - `noun` and `doctest` are string literals.
   - `forward` is a vector, and it declares at least one generic.
@@ -1889,8 +1859,7 @@ macro windowed_estimator(head, body)
             doctest = stmt.args[2]
         else
             windowed_estimator_error("`$(lhs)` is not a recognised key" *
-                                     windowed_estimator_suggest(lhs,
-                                                                WINDOWED_ESTIMATOR_KEYS) *
+                                     suggest_declared_key(lhs, WINDOWED_ESTIMATOR_KEYS) *
                                      ".")
         end
     end

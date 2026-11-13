@@ -106,11 +106,10 @@ function reduce_exposures(fcb::FactorFamilyBasis, Ms::Arr3Num)
 end
 """
     reduce_loadings(fcb::FactorFamilyBasis, M::MatNum, t::Integer = size(fcb.ratios, 1))
-    reduce_loadings(fcb::FactorFamilyBasis, M::Arr3Num)
 
 Map a point-in-time loading matrix onto the reduced factor axis.
 
-This is [`reduce_exposures`](@ref) at one observation. It applies the ratios of observation `t` to a matrix of assets by raw factors. A stack of loading matrices, one slice per observation of the basis, is an exposure history, and the function reduces it with [`reduce_exposures`](@ref).
+This is [`reduce_exposures`](@ref) at one observation. It applies the ratios of observation `t` to a matrix of assets by raw factors. A stack of loading matrices, one slice per observation of the basis, is an exposure history, and [`reduce_exposures`](@ref) reduces it. Each of the two functions takes one rank of array, so a caller whose argument has no inferred type reaches one method.
 
 # Mathematical definition
 
@@ -131,16 +130,16 @@ Where:
 # Arguments
 
   - `fcb`: A Factor Family Basis.
-  - `M::MatNum_Arr3Num`: Loading matrix on the raw axis, `assets × factors`, or a stack of them, `assets × factors × observations`.
+  - `M::MatNum`: Loading matrix on the raw axis, `assets × factors`.
   - `t::Integer`: Observation whose ratios the function applies to a matrix. It defaults to the last observation of the basis.
 
 # Validation
 
-  - The factor axis of `M` is `fcb.K`, `t` indexes the observation axis of the basis, and a stack matches that axis.
+  - The factor axis of `M` is `fcb.K`, and `t` indexes the observation axis of the basis.
 
 # Returns
 
-  - `L::Array{<:Real}`: The loading matrix on the reduced axis, `assets × reduced factors`, or the stack of them.
+  - `L::Matrix{<:Real}`: The loading matrix on the reduced axis, `assets × reduced factors`.
 
 # Related
 
@@ -166,9 +165,6 @@ function reduce_loadings(fcb::FactorFamilyBasis, M::MatNum,
         end
     end
     return L
-end
-function reduce_loadings(fcb::FactorFamilyBasis, M::Arr3Num)
-    return reduce_exposures(fcb, M)
 end
 """
 $(DocStringExtensions.TYPEDSIGNATURES)
@@ -258,7 +254,7 @@ end
 
 Drop the redundant entries of a factor mean, giving the reduced-axis mean.
 
-The reduction applies no ratio. It undoes [`expand_factor_mu`](@ref), and the converse holds only for a raw mean that satisfies the zero-sum condition of every constrained Factor Family.
+The reduction applies no ratio. It undoes [`expand_factor_returns`](@ref), and the converse holds only for a raw mean that satisfies the zero-sum condition of every constrained Factor Family.
 
 # Mathematical definition
 
@@ -296,7 +292,7 @@ Where:
 # Related
 
   - [`FactorFamilyBasis`](@ref)
-  - [`expand_factor_mu`](@ref)
+  - [`expand_factor_returns`](@ref)
 """
 function reduce_factor_mu(fcb::FactorFamilyBasis, mu::VecNum)
     assert_factor_axis_length(length(mu), fcb.K, :mu)
@@ -426,9 +422,11 @@ function dropped_factor_weights(fcb::FactorFamilyBasis)
 end
 """
     expand_factor_returns(fcb::FactorFamilyBasis, g::MatNum)
-    expand_factor_returns(fcb::FactorFamilyBasis, g::VecNum)
+    expand_factor_returns(fcb::FactorFamilyBasis, mu::VecNum, t::Integer = size(fcb.ratios, 1))
 
-Reconstruct the raw-axis factor returns from the reduced-axis ones.
+Reconstruct the raw-axis factor returns, or a raw-axis factor mean, from the reduced-axis ones.
+
+A vector is the returns of one observation, or a factor mean. The function expands it with the ratios of observation `t`, and [`reduce_factor_mu`](@ref) undoes it for a mean.
 
 The retained returns pass through, and the zero-sum condition of each family gives the return of the factor it drops.
 
@@ -454,11 +452,13 @@ Where:
 # Arguments
 
   - `fcb`: A Factor Family Basis.
-  - `g::VecNum_MatNum`: Factor returns on the reduced axis, either one observation per row or one observation alone. The function expands each row of a matrix with the ratios of that row, and a vector with the ratios of the last observation.
+  - `g::MatNum`: Factor returns on the reduced axis, one observation per row, or one mean per observation. The function expands each row with the ratios of that row.
+  - `mu::VecNum`: Factor returns of one observation, or a factor mean, on the reduced axis.
+  - `t::Integer`: Observation whose ratios the function applies to a vector. It defaults to the last observation of the basis.
 
 # Validation
 
-  - The factor axis of `g` is the reduced factor count, and a matrix matches the observation axis of the basis.
+  - The factor axis of `g` or `mu` is the reduced factor count, `t` indexes the observation axis of the basis, and a matrix matches that axis.
 
 # Returns
 
@@ -468,6 +468,7 @@ Where:
 
   - [`FactorFamilyBasis`](@ref)
   - [`reduce_factor_returns`](@ref)
+  - [`reduce_factor_mu`](@ref)
 """
 function expand_factor_returns(fcb::FactorFamilyBasis, g::MatNum)
     assert_factor_axis_length(size(g, 2), reduced_factor_count(fcb), :g)
@@ -492,55 +493,8 @@ function expand_factor_returns(fcb::FactorFamilyBasis, g::MatNum)
     end
     return f
 end
-function expand_factor_returns(fcb::FactorFamilyBasis, g::VecNum)
-    assert_factor_axis_length(length(g), reduced_factor_count(fcb), :g)
-    return expand_factor_mu(fcb, g, size(fcb.ratios, 1))
-end
-"""
-    expand_factor_mu(fcb::FactorFamilyBasis, mu::VecNum, t::Integer = size(fcb.ratios, 1))
-    expand_factor_mu(fcb::FactorFamilyBasis, mu::MatNum)
-
-Reconstruct the raw-axis factor mean from the reduced-axis one.
-
-The retained entries pass through, and the zero-sum condition of each family at observation `t` gives the entry of the factor it drops. [`reduce_factor_mu`](@ref) undoes it. A matrix holds one mean per observation of the basis, one per row, and the function expands each row with the ratios of that row, as [`expand_factor_returns`](@ref) does.
-
-# Mathematical definition
-
-```math
-\\begin{align}
-\\boldsymbol{\\mu}^{\\mathrm{raw}} &= \\mathbf{R}_{t} \\boldsymbol{\\mu}^{\\mathrm{red}}\\,.
-\\end{align}
-```
-
-Where:
-
-  - $(math_dict[:mu_fcb])
-  - $(math_dict[:R_t_fcb])
-  - $(math_dict[:r_tj_fcb])
-  - $(math_dict[:K_r_fcb])
-
-# Arguments
-
-  - `fcb`: A Factor Family Basis.
-  - `mu::VecNum_MatNum`: Factor mean on the reduced axis, or one mean per observation, `observations × reduced factors`.
-  - `t::Integer`: Observation whose ratios the function applies to a vector. It defaults to the last observation of the basis.
-
-# Validation
-
-  - The factor axis of `mu` is the reduced factor count, `t` indexes the observation axis of the basis, and a matrix matches that axis.
-
-# Returns
-
-  - `mu::Array{<:Real}`: The factor mean on the raw axis, of the same number of dimensions as the input.
-
-# Related
-
-  - [`FactorFamilyBasis`](@ref)
-  - [`reduce_factor_mu`](@ref)
-  - [`expand_factor_returns`](@ref)
-"""
-function expand_factor_mu(fcb::FactorFamilyBasis, mu::VecNum,
-                          t::Integer = size(fcb.ratios, 1))
+function expand_factor_returns(fcb::FactorFamilyBasis, mu::VecNum,
+                               t::Integer = size(fcb.ratios, 1))
     assert_factor_axis_length(length(mu), reduced_factor_count(fcb), :mu)
     assert_factor_basis_index(t, fcb)
     Tf = promote_type(real(eltype(mu)), real(eltype(fcb.ratios)))
@@ -559,9 +513,6 @@ function expand_factor_mu(fcb::FactorFamilyBasis, mu::VecNum,
         f[d] = -s
     end
     return f
-end
-function expand_factor_mu(fcb::FactorFamilyBasis, mu::MatNum)
-    return expand_factor_returns(fcb, mu)
 end
 """
     expand_factor_covariance(fcb::FactorFamilyBasis, sigma::MatNum,
@@ -1103,5 +1054,5 @@ end
 
 public reduce_factor_names, reduce_exposures, reduce_loadings, reduce_factor_returns,
        reduce_factor_mu, reduce_factor_covariance, dropped_factor_weights,
-       expand_factor_returns, expand_factor_mu, expand_factor_covariance,
-       project_factor_coordinates, unseen_member_design
+       expand_factor_returns, expand_factor_covariance, project_factor_coordinates,
+       unseen_member_design

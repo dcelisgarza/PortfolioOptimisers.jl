@@ -24,7 +24,7 @@ time_dependent_candidate_fields
 time_dependent_slot
 time_dependent_fields
 time_dependent_entries
-time_dependent_entry_needs_previous_weights
+needs_previous_weights(::Any)
 schedule_reads_previous_weights
 schedule_tree_fields
 assert_time_dependent_substitution

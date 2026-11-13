@@ -383,10 +383,8 @@ function cross_sectional_cap_weights(p::Real, mcap::Option{<:MatNum},
     return W0
 end
 """
-    cs_weights_initial(alg::MarketCapWeights, mcap::Option{<:MatNum},
-                       mask::AbstractMatrix{Bool}) -> Matrix{<:Number}
-    cs_weights_initial(alg::BlendedInverseVarianceWeights, mcap::Option{<:MatNum},
-                       mask::AbstractMatrix{Bool}) -> Matrix{<:Number}
+    cs_weights_initial(alg::Union{MarketCapWeights, BlendedInverseVarianceWeights},
+                       mcap::Option{<:MatNum}, mask::AbstractMatrix{Bool}) -> Matrix{<:Number}
 
 Return the first-pass cross-sectional regression weights of a weight policy.
 
@@ -423,12 +421,8 @@ julia> PortfolioOptimisers.cs_weights_initial(MarketCapWeights(; p = 1.0), [2.0 
   - [`cross_sectional_cap_weights`](@ref)
   - [`cs_weights_refine`](@ref)
 """
-function cs_weights_initial(alg::MarketCapWeights, mcap::Option{<:MatNum},
-                            mask::AbstractMatrix{Bool})::MatNum
-    return cross_sectional_cap_weights(alg.p, mcap, mask)
-end
-function cs_weights_initial(alg::BlendedInverseVarianceWeights, mcap::Option{<:MatNum},
-                            mask::AbstractMatrix{Bool})::MatNum
+function cs_weights_initial(alg::Union{MarketCapWeights, BlendedInverseVarianceWeights},
+                            mcap::Option{<:MatNum}, mask::AbstractMatrix{Bool})::MatNum
     return cross_sectional_cap_weights(alg.p, mcap, mask)
 end
 """

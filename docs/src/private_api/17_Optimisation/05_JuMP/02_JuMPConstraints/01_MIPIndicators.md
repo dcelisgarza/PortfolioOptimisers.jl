@@ -33,9 +33,6 @@ short_gate
 long_bin
 short_bin
 mip_wb
-declare_held_indicators!
-declare_long_short_indicators!
-declare_sign_indicators!
 short_mip_threshold_constraints
 mip_constraints
 sign_mip_constraints

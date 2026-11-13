@@ -947,13 +947,9 @@ $(DocStringExtensions.FIELDS)
 
 Creates a `Frontier` with `N` points, a scaling factor of `1`, and the specified `bound` strategy. Used to set appropriate frontier bounds in [`variance_risk_bounds_val`](@ref) and [`second_moment_bound_val`](@ref).
 
-    PortfolioOptimisers._Frontier(;
-        N::Integer = 20,
-        factor::Number,
-        bound::FrontierBoundEstimator
-    ) -> Frontier
+    Frontier(N::Integer, factor::Number = 1, bound::FrontierBoundEstimator = LinearBound()) -> Frontier
 
-Internal constructor. Keywords correspond to the struct's fields.
+Creates a `Frontier` whose `factor` and `bound` a formulation chose. The keyword form pins `factor` to `1`, because a caller states a bound in the units of the measure and knows nothing of the internal scaling of the model. A formulation does know: it reads the `Frontier` of the caller, keeps its `N`, and rebuilds it with the conversion that its own risk expression needs, as [`variance_risk_bounds_val`](@ref) and [`second_moment_bound_val`](@ref) do. The sweep values come later, in [`rebuild_risk_frontier`](@ref), once the two corner portfolios are known: `bound` transforms each end of the span, `factor` multiplies both, and `range` divides the result into `N` levels.
 
 ## Validation
 
@@ -1011,37 +1007,6 @@ end
 function Frontier(; N::Integer = 20,
                   bound::FrontierBoundEstimator = LinearBound())::Frontier
     return Frontier(N, 1, bound)
-end
-"""
-    _Frontier(; N = 20, factor, bound)
-
-Build a [`Frontier`](@ref) whose `factor` and `bound` a formulation chose, rather than the caller.
-
-The keyword constructor `Frontier(; N, bound)` pins `factor` to `1`, because a caller states a bound in the units of the measure and knows nothing of the model's internal scaling. A formulation does know: it reads the caller's `Frontier`, keeps its `N`, and rebuilds it with the conversion its own risk expression needs. That is what [`variance_risk_bounds_val`](@ref) and [`second_moment_bound_val`](@ref) do.
-
-This builds a `Frontier`, not the sweep values. The values are built later, in [`rebuild_risk_frontier`](@ref), once the two corner portfolios are known: `bound` transforms each end of the span, `factor` multiplies both, and `range` divides the result into `N` levels.
-
-# Arguments
-
-  - `N`: Number of sweep points (default 20).
-  - `factor`: Multiplier applied to both ends of the span, after `bound` has transformed them.
-  - `bound`: [`FrontierBoundEstimator`](@ref) converting the span into the units of the risk expression.
-
-# Returns
-
-  - `Frontier`: The rebuilt sweep specification.
-
-# Related
-
-  - [`Frontier`](@ref)
-  - [`variance_risk_bounds_val`](@ref)
-  - [`second_moment_bound_val`](@ref)
-  - [`rebuild_risk_frontier`](@ref)
-  - [`MeanRisk`](@ref)
-  - [`NearOptimalCentering`](@ref)
-"""
-function _Frontier(; N::Integer = 20, factor::Number, bound::FrontierBoundEstimator)
-    return Frontier(N, factor, bound)
 end
 """
     const RkRtBounds = Union{Num_VecNum, Frontier}

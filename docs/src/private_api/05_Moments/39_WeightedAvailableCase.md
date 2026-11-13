@@ -17,7 +17,6 @@ PortfolioOptimisers.coverage_inner_corrected
 PortfolioOptimisers.coverage_fittable_estimator
 PortfolioOptimisers.weighted_pair_sample
 PortfolioOptimisers.weighted_pair_covariance
-PortfolioOptimisers.weighted_coverage_covariance
 PortfolioOptimisers.coverage_covariance(f, ce::Covariance{<:Any, <:Any, <:FullMoment, <:PortfolioOptimisers.ObsWeights}, cvg::CoveragePolicy, X::PortfolioOptimisers.MatNum)
 PortfolioOptimisers.weighted_comoment_cell
 PortfolioOptimisers.weighted_comoment

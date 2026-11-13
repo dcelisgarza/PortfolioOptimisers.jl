@@ -2855,13 +2855,13 @@ end
         # library default a short key like `noun` never matches, so the suggestion would
         # be dead code (ADR 0026 keeps the strict default for asset-name probes).
         @test occursin("did you mean `noun`?",
-                       PortfolioOptimisers.windowed_estimator_suggest(:nuon,
-                                                                      PortfolioOptimisers.WINDOWED_ESTIMATOR_KEYS))
+                       PortfolioOptimisers.suggest_declared_key(:nuon,
+                                                                PortfolioOptimisers.WINDOWED_ESTIMATOR_KEYS))
         @test isempty(PortfolioOptimisers.did_you_mean("nuon",
                                                        ["noun", "forward", "doctest"]))
         # A key too far from any candidate suggests nothing rather than guessing.
-        @test isempty(PortfolioOptimisers.windowed_estimator_suggest(:zzzzzzz,
-                                                                     PortfolioOptimisers.WINDOWED_ESTIMATOR_KEYS))
+        @test isempty(PortfolioOptimisers.suggest_declared_key(:zzzzzzz,
+                                                               PortfolioOptimisers.WINDOWED_ESTIMATOR_KEYS))
     end
 
     @testset "Generated docstrings and method bodies" begin

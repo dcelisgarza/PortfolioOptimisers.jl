@@ -62,5 +62,4 @@ weight_independent_target(::Nothing)
 weight_independent_target(::Number)
 weight_independent_target(::Any)
 moment_target_fees
-_Frontier
 ```

@@ -160,7 +160,7 @@ $(DocStringExtensions.TYPEDSIGNATURES)
 
 Add the integer phylogeny rows on the factor weights of a [`FactorRiskContribution`](@ref) model.
 
-The asset builder [`set_iplg_constraints!`](@ref) reads the held binary of the asset bundle. This builder declares a held binary of its own, one bit for each factor, through [`declare_held_indicators!`](@ref) in the [`FactorMIPSpace`](@ref). The gate rows of [`mip_wb`](@ref) on those bits force the weight of a factor to zero when its bit is zero. Each [`IntegerPhylogeny`](@ref) entry of `plgs` then adds its rows on the factor bits. A factor weight is free in sign, so its gate needs a bound on each side, and [`factor_weight_bounds`](@ref) derives both from the asset weight bounds.
+The asset builder [`set_iplg_constraints!`](@ref) reads the held binary of the asset bundle. This builder declares a held binary of its own, one bit for each factor, through the [`HeldIndicators`](@ref) method of [`declare_mip_indicators!`](@ref) in the [`FactorMIPSpace`](@ref). The gate rows of [`mip_wb`](@ref) on those bits force the weight of a factor to zero when its bit is zero. Each [`IntegerPhylogeny`](@ref) entry of `plgs` then adds its rows on the factor bits. A factor weight is free in sign, so its gate needs a bound on each side, and [`factor_weight_bounds`](@ref) derives both from the asset weight bounds.
 
 The builder adds nothing when `plgs` holds no [`IntegerPhylogeny`](@ref). The head calls it after [`assemble_jump_model!`](@ref), beside [`set_sdp_frc_phylogeny_constraints!`](@ref). When the budget ``k`` is a variable, the gate reads the big-M constant `ss`. An asset MIP builder registered it if one ran. If none ran, this builder registers it from the asset weight bounds, as the asset builder does.
 
@@ -234,7 +234,7 @@ The rows `frc_card_plg_<i>` read the bits ``\\boldsymbol{b}`` and never the gate
   - [`set_iplg_constraints!`](@ref): Adds the same rows on the asset weights.
   - [`set_sdp_frc_phylogeny_constraints!`](@ref)
   - [`factor_weight_bounds`](@ref)
-  - [`declare_held_indicators!`](@ref)
+  - [`declare_mip_indicators!`](@ref)
   - [`FactorMIPSpace`](@ref)
   - [`IntegerPhylogeny`](@ref)
 """
@@ -252,7 +252,7 @@ function set_frc_iplg_constraints!(model::JuMP.Model, plgs::Option{<:PlC_VecPlC}
     end
     sp = FactorMIPSpace()
     w1 = mip_wx!(model, sp)
-    ind = declare_held_indicators!(model, sp, fwb, w1, ss)
+    ind = declare_mip_indicators!(model, sp, HeldIndicators, fwb, w1, ss)
     mip_wb(model, sp, fwb, w1, ind)
     ib = held_bin(ind)
     sc = get_constraint_scale(model)

@@ -27,9 +27,7 @@ investable_returns_view
 held_gap_pairs
 filter_held_gaps
 held_gap_msg
-expand_investable_columns
 expand_held_weights
-expand_held_member
 charge_fees
 charge_asset_fees
 charges_nothing

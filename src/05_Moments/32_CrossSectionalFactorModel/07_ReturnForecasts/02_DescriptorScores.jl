@@ -400,7 +400,8 @@ function neutralise_scores!(S::AbstractArray{<:Real, 3},
         y = permutedims(view(S, :, k, rows))
         W = neutralisation_weights(y, X, w)
         csr = cross_sectional_regression(cre, X, y, W)
-        S[:, k, rows] = transpose(exposure_transform(scoring, csr.eps, w, gb))
+        S[:, k, rows] = transpose(cross_sectional_transform(scoring, csr.eps; w = w,
+                                                            groups = gb))
     end
     S[:, :, 1:(first(rows) - 1)] .= Tf(NaN)
     return nothing

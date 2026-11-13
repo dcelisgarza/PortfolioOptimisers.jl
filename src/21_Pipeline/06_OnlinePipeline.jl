@@ -108,7 +108,7 @@ function partial_fit!(state::PipelineBufferState, data::Prices_RR)
     held = isnothing(state.data) ? data : vcat_observations(state.data, data)
     n = data_row_count(held)
     if !isnothing(state.max_history) && n > state.max_history
-        held = pipeline_data_view(held, (n - state.max_history + 1):n)
+        held = port_opt_view(held, (n - state.max_history + 1):n, :)
     end
     return PipelineBufferState(; data = held, max_history = state.max_history)
 end
@@ -149,7 +149,7 @@ function Base.copy(x::PipelineBufferState)
     return PipelineBufferState(x.data, x.max_history)
 end
 function port_opt_view(x::PipelineBufferState, i, args...)
-    data = isnothing(x.data) ? nothing : pipeline_asset_view(x.data, i)
+    data = isnothing(x.data) ? nothing : port_opt_view(x.data, :, i)
     return PipelineBufferState(; data = data, max_history = x.max_history)
 end
 function online_state_seed(::Pipeline, max_history::Option{<:Integer})
@@ -1115,7 +1115,7 @@ This is the pipeline form of [`fit_fold_result`](@ref). A window fits the workfl
 """
 function pipeline_fold_fit(pipe::AbstractPipelineEstimator, data::Prices_RR,
                            train_idx::VecInt, cols = :)
-    return StatsAPI.fit(pipe, pipeline_data_view(data, train_idx, cols))
+    return StatsAPI.fit(pipe, port_opt_view(data, train_idx, cols))
 end
 function pipeline_fold_fit(pipe::AbstractPipelineEstimator, ::Prices_RR, ::Nothing,
                            ::Any = :)

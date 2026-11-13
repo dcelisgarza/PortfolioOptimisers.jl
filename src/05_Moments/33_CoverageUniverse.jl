@@ -113,8 +113,13 @@ end
     coverage_mask(X::MatNum, iv::MatNum,
                   pnl::Union{Nothing, AssetPanel, AbstractMatrix{<:Bool}};
                   dims::Int = 1) -> Option{BitVector}
+    coverage_mask(X::MatNum, iv::Nothing,
+                  pnl::Union{Nothing, AssetPanel, AbstractMatrix{<:Bool}};
+                  dims::Int = 1) -> Option{BitVector}
 
 Derive the Coverage Universe of one [`ImpliedVolatility`](@ref) fit, which reads an implied volatility surface beside its returns.
+
+A fit that reads no surface passes `iv = nothing`, and the method on `Nothing` derives the Coverage Universe from the returns and `pnl` alone, as the two-argument form does. So [`coverage_keyword_reduction`](@ref) makes one call whether the fit reads a surface or not.
 
 The estimator fits on the assets whose returns pass [`coverage_mask`](@ref), and whose implied volatilities are finite at every row of the window. An implied volatility series holds `NaN` where it has no quote, as a return series does. So one rule names an asset that the estimator cannot price and an asset that it cannot estimate, and the reduce-and-expand writes a `NaN` row and column for both.
 
@@ -191,6 +196,11 @@ function coverage_mask(X::MatNum, iv::MatNum,
     end
     return coverage_sentinel(imsk,
                              "no asset is in the Coverage Universe of this window: every asset carries a non-finite return, an inactive row of the Asset Panel, or a non-finite implied volatility, at some observation. Check that the window holds at least one asset that is listed and quoted throughout it, and whose implied volatility series is complete over it.")
+end
+function coverage_mask(X::MatNum, ::Nothing,
+                       pnl::Union{Nothing, AssetPanel, AbstractMatrix{<:Bool}};
+                       dims::Int = 1)::Option{BitVector}
+    return coverage_mask(X, pnl; dims = dims)
 end
 """
     coverage_mask_source(pnl::Option{<:AssetPanel}, active_mask::Nothing, dims::Int)
@@ -445,7 +455,7 @@ function coverage_keyword_reduction(est, X::MatNum, pnl::Option{<:AssetPanel}, d
                                     kwargs...)
     src = coverage_mask_source(pnl, active_mask, dims)
     iv = reads_implied_volatility(est) ? get(kwargs, :iv, nothing) : nothing
-    cmsk = coverage_keyword_mask(X, iv, src, dims)
+    cmsk = coverage_mask(X, iv, src; dims = dims)
     kw = values(kwargs)
     if haskey(kw, :iv)
         kw = merge(kw, (; iv = coverage_columns(kw.iv, cmsk, dims)))
@@ -454,23 +464,6 @@ function coverage_keyword_reduction(est, X::MatNum, pnl::Option{<:AssetPanel}, d
         kw = merge(kw, (; ivpa = coverage_reduced_ivpa(kw.ivpa, cmsk)))
     end
     return cmsk, coverage_columns(X, cmsk, dims), kw
-end
-"""
-    coverage_keyword_mask(X::MatNum, iv::Nothing, src, dims::Int) -> Option{BitVector}
-    coverage_keyword_mask(X::MatNum, iv::MatNum, src, dims::Int) -> Option{BitVector}
-
-Derive the Coverage Universe of [`coverage_keyword_reduction`](@ref) from `X`, and from `iv` when the fit reads it.
-
-# Related
-
-  - [`coverage_mask`](@ref)
-  - [`coverage_keyword_reduction`](@ref)
-"""
-function coverage_keyword_mask(X::MatNum, ::Nothing, src, dims::Int)
-    return coverage_mask(X, src; dims = dims)
-end
-function coverage_keyword_mask(X::MatNum, iv::MatNum, src, dims::Int)
-    return coverage_mask(X, iv, src; dims = dims)
 end
 """
     coverage_columns(A::Nothing, cmsk, dims::Int) -> Nothing
@@ -588,7 +581,7 @@ end
 
 Write a block whose columns are the asset axis back into a `NaN` frame of the full width.
 
-The expansion has three basic functions, this one, [`expand_rows`](@ref) and [`expand_vector`](@ref). The moment verbs call them through [`expand_moment`](@ref), and a prior that carries a block of its own calls them directly. A reconstructed returns matrix is `observations × assets` and a Cholesky factor is `factors × assets`, so both expand along their columns.
+The expansion of a block has two basic functions, this one and [`expand_rows`](@ref). The moment verbs call them through [`expand_moment`](@ref), and a prior that carries a block of its own calls them directly. A per-asset vector is a method of [`expand_moment`](@ref). A reconstructed returns matrix is `observations × assets` and a Cholesky factor is `factors × assets`, so both expand along their columns.
 
 # Arguments
 
@@ -678,37 +671,6 @@ function expand_rows(A::MatNum, cmsk::BitVector)
     return frame
 end
 """
-    expand_vector(v::VecNum, cmsk::Nothing) -> v
-    expand_vector(v::VecNum, cmsk::BitVector) -> VecNum
-
-Write a per-asset vector back into a `NaN` frame of the full width.
-
-This is [`expand_columns`](@ref) over one axis alone. A mean vector, an intercept vector and a per-asset idiosyncratic variance all take it.
-
-# Arguments
-
-  - `v`: The per-asset vector that the reduced fit produced.
-  - `cmsk`: The Coverage Universe, or `nothing`.
-
-# Returns
-
-  - The vector on the full asset universe, carrying `NaN` outside the Coverage Universe.
-
-# Related
-
-  - [`expand_columns`](@ref)
-  - [`expand_moment`](@ref)
-  - [`expand_idiosyncratic_covariance`](@ref)
-"""
-function expand_vector(v::VecNum, ::Nothing)
-    return v
-end
-function expand_vector(v::VecNum, cmsk::BitVector)
-    frame = coverage_nan_frame(v, (length(cmsk),))
-    frame[cmsk] = v
-    return frame
-end
-"""
     expand_count(x::Nothing, cmsk::BitVector) -> nothing
     expand_count(x::VecNum, cmsk::BitVector) -> VecNum
 
@@ -728,7 +690,7 @@ A count differs from a moment at an absent asset. No observation of an asset out
 # Related
 
   - [`expand_regression`](@ref)
-  - [`expand_vector`](@ref)
+  - [`expand_moment`](@ref)
   - [`Regression`](@ref)
 """
 function expand_count(::Nothing, ::BitVector)::Nothing
@@ -775,58 +737,27 @@ function expand_regression(re::Regression, cmsk::BitVector)
     b = getfield(re, :b)
     return Regression(; M = expand_rows(re.M, cmsk),
                       L = isnothing(L) ? nothing : expand_rows(L, cmsk),
-                      b = isnothing(b) ? nothing : expand_vector(b, cmsk),
-                      esigma = expand_idiosyncratic_covariance(re.esigma, cmsk),
+                      b = isnothing(b) ? nothing : expand_moment(b, cmsk),
+                      esigma = expand_moment(re.esigma, cmsk),
                       edof = expand_count(re.edof, cmsk),
                       ediv = expand_count(re.ediv, cmsk), idx = re.idx, ts = re.ts)
-end
-"""
-    expand_idiosyncratic_covariance(esigma::Nothing, cmsk) -> nothing
-    expand_idiosyncratic_covariance(esigma::VecNum, cmsk::BitVector) -> VecNum
-    expand_idiosyncratic_covariance(esigma::MatNum, cmsk::BitVector) -> MatNum
-
-Expand the idiosyncratic covariance a regression result carries, in either of the two shapes it takes.
-
-The block is a per-asset variance vector when the regression takes the residuals as uncorrelated, and an `assets × assets` matrix when it does not. [`idiosyncratic_covariance_view`](@ref) slices the same two shapes, and this function expands them.
-
-# Arguments
-
-  - `esigma`: The idiosyncratic covariance, or `nothing`.
-  - `cmsk`: The Coverage Universe.
-
-# Returns
-
-  - `esigma`: The idiosyncratic covariance on the full asset universe.
-
-# Related
-
-  - [`expand_regression`](@ref)
-  - [`idiosyncratic_covariance_view`](@ref)
-"""
-function expand_idiosyncratic_covariance(::Nothing, ::BitVector)
-    return nothing
-end
-function expand_idiosyncratic_covariance(esigma::VecNum, cmsk::BitVector)
-    return expand_vector(esigma, cmsk)
-end
-function expand_idiosyncratic_covariance(esigma::MatNum, cmsk::BitVector)
-    return expand_moment(esigma, cmsk)
 end
 """
     expand_moment(m, cmsk::Nothing) -> m
     expand_moment(m, cmsk::Nothing, dims::Int) -> m
     expand_moment(m, cmsk::Nothing, ::Val{:kt}) -> m
+    expand_moment(m::Nothing, cmsk::BitVector) -> nothing
     expand_moment(sigma::MatNum, cmsk::BitVector) -> MatNum
-    expand_moment(mu::VecNum, cmsk::BitVector, dims::Int) -> VecNum
+    expand_moment(v::VecNum, cmsk::BitVector, dims::Int = 1) -> VecNum
     expand_moment(mu::MatNum, cmsk::BitVector, dims::Int) -> MatNum
     expand_moment(skV::Tuple{MatNum, MatNum}, cmsk::BitVector) -> Tuple{MatNum, MatNum}
     expand_moment(kt::MatNum, cmsk::BitVector, ::Val{:kt}) -> MatNum
 
 Write a moment estimated on the Coverage Universe back into a `NaN` frame of the full width.
 
-A Prior Result is on the full asset universe, and an asset that the prior cannot estimate carries `NaN`. So the prior expands every block of a reduced fit before it stores the block. [`coverage_reduction`](@ref) is the first half of the reduce-and-expand, and this function is the second half. The `nothing` sentinel returns the argument unchanged.
+A Prior Result is on the full asset universe, and an asset that the prior cannot estimate carries `NaN`. So the prior expands every block of a reduced fit before it stores the block. [`coverage_reduction`](@ref) is the first half of the reduce-and-expand, and this function is the second half. The `nothing` sentinel returns the argument unchanged, and a moment that is `nothing` stays `nothing`.
 
-The four shapes need four methods, and their types do not tell them apart. A covariance matrix and a cokurtosis matrix are both square, and a mean and a coskewness tensor are both rectangular. The number of arguments and the `Val` marker tell them apart.
+The four shapes need four methods, and their types do not tell them apart. A per-asset vector, such as a mean, an intercept or the variances of an idiosyncratic covariance, is the fifth shape, and its type tells it apart. The idiosyncratic covariance of a regression is a vector or an `assets × assets` matrix, and each takes its own method. A covariance matrix and a cokurtosis matrix are both square, and a mean and a coskewness tensor are both rectangular. The number of arguments and the `Val` marker tell them apart.
 
 # Mathematical definition
 
@@ -858,17 +789,17 @@ Where:
 
 Dispatch selects one step of this list for each call.
 
- 1. Return the moment unchanged when the mask is `nothing`, at every arity.
+ 1. Return the moment unchanged when the mask is `nothing`, at every arity, and return `nothing` for a moment that is `nothing`.
  2. Write a covariance-like matrix, `assets × assets`, into `frame`, a `NaN` frame of `N × N`, at `(cmsk, cmsk)`.
- 3. Write a marginal into `frame` along its asset axis. A matrix marginal is `1 × assets` under `dims = 1` and `assets × 1` under `dims = 2`, and a vector marginal goes to [`expand_vector`](@ref).
+ 3. Write a marginal into `frame` along its asset axis. A matrix marginal is `1 × assets` under `dims = 1` and `assets × 1` under `dims = 2`, and write a vector into a `NaN` frame of `N` entries at `cmsk`, with or without `dims`.
  4. Write the coskewness tensor of a pair into `frame`, a `NaN` frame of `N × N²`, at the rows `cmsk` and the columns of [`coverage_pair_index`](@ref). Expand the negative spectral skewness matrix of the pair as in step 2.
  5. Write a cokurtosis matrix into `frame`, a `NaN` frame of `N² × N²`, at the pair index on both axes.
 
 # Arguments
 
-  - `m`, `sigma`, `mu`, `skV`, `kt`: The moment that the reduced fit produced.
+  - `m`, `sigma`, `v`, `mu`, `skV`, `kt`: The moment that the reduced fit produced.
   - `cmsk`: The Coverage Universe, or `nothing`.
-  - `dims`: The dimension that the marginal was computed along.
+  - `dims`: The dimension that the marginal was computed along. A vector reads no dimension.
   - `::Val{:kt}`: The marker that names a cokurtosis matrix, which a covariance matrix cannot be told from by type.
 
 # Validation
@@ -901,8 +832,13 @@ function expand_moment(sigma::MatNum, cmsk::BitVector)
     frame[cmsk, cmsk] = sigma
     return frame
 end
-function expand_moment(mu::VecNum, cmsk::BitVector, ::Int)
-    return expand_vector(mu, cmsk)
+function expand_moment(::Nothing, ::BitVector)
+    return nothing
+end
+function expand_moment(v::VecNum, cmsk::BitVector, ::Int = 1)
+    frame = coverage_nan_frame(v, (length(cmsk),))
+    frame[cmsk] = v
+    return frame
 end
 function expand_moment(mu::MatNum, cmsk::BitVector, dims::Int)
     N = length(cmsk)

@@ -235,7 +235,7 @@ end
     @test v_lo < v_hi
     for (bound, g) in
         ((LinearBound(), identity), (SquareRootBound(), sqrt), (SquaredBound(), x -> x^2))
-        front = PO._Frontier(; N = 4, factor = 2, bound = bound)
+        front = Frontier(4, 2, bound)
         registry = [(:a_ub_var, :a_ub) => (:EXPR, front, true, rs)]
         entry = PO._rebuild_risk_frontier(pr, nothing, rs, registry, w_lo, w_hi, 1)
         @test collect(entry.second[2]) ≈ range(2 * g(v_lo), 2 * g(v_hi); length = 4)
@@ -246,6 +246,14 @@ end
         @test collect(swapped.second[2]) == collect(entry.second[2])
         @test issorted(swapped.second[2])
     end
+    # A second moment rebuilds the `Frontier` of the caller with the positional constructor
+    # (#2071): it keeps `N`, takes the inverse of its factor, and names the bound of its
+    # formulation, the square root unless the expression is a second-order cone.
+    front = Frontier(; N = 5)
+    soc = PO.second_moment_bound_val(SOCRiskExpr(), front, 4)
+    sq = PO.second_moment_bound_val(QuadRiskExpr(), front, 4)
+    @test (soc.N, soc.factor, soc.bound) == (5, 0.25, LinearBound())
+    @test (sq.N, sq.factor, sq.bound) == (5, 0.25, SquareRootBound())
 end
 
 # The variance and the fourth moment of `VarianceSkewKurtosis` at `w`, read off the matrices

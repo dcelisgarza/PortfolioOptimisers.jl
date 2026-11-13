@@ -2337,35 +2337,6 @@ function drift_observations(ts, ::Any)
     return ts
 end
 """
-    expand_investable_columns(imsk::BitVector, A::MatNum)
-
-Expand a per asset history of the investable universe back onto the full asset universe.
-
-The column of a non-investable asset is filled with zero, which is what [`filter_held_gaps`](@ref) writes over its whole `NaN` column anyway. A drift over a zero column at a zero weight moves no wealth, so the expanded history rebuilds the same weight path the reduced one did.
-
-# Arguments
-
-  - `imsk`: The Investable Mask, `true` at every asset whose prior moments were finite.
-  - `A`: A history over the investable assets, `observations × investable assets`.
-
-# Returns
-
-  - `A::MatNum`: The history over the full asset universe.
-
-# Related
-
-  - [`expand_held_weights`](@ref)
-  - [`expand_investable_weights`](@ref)
-  - [`filter_held_gaps`](@ref)
-"""
-function expand_investable_columns(imsk::BitVector, A::MatNum)
-    @argcheck(count(imsk) == size(A, 2),
-              DimensionMismatch("the investable mask keeps $(count(imsk)) of $(length(imsk)) assets, but the history holds $(size(A, 2)) columns; the mask and the history must come from the same reduction"))
-    out = zeros(eltype(A), size(A, 1), length(imsk))
-    out[:, imsk] = A
-    return out
-end
-"""
     expand_held_weights(imsk::Nothing, hw)
     expand_held_weights(imsk::BitVector, hw::Nothing)
     expand_held_weights(imsk::BitVector, hw::HeldWeightsResult)
@@ -2392,8 +2363,7 @@ A fold reduces its test window to the Investable Mask before it reads it, so the
 # Related
 
   - [`HeldWeightsResult`](@ref)
-  - [`expand_investable_columns`](@ref)
-  - [`expand_held_member`](@ref)
+  - [`expand_investable_weights`](@ref)
   - [`held_weights_result`](@ref)
 """
 function expand_held_weights(::Nothing, hw)
@@ -2403,51 +2373,10 @@ function expand_held_weights(::BitVector, ::Nothing)
     return nothing
 end
 function expand_held_weights(imsk::BitVector, hw::HeldWeightsResult)
-    return HeldWeightsResult(; X = expand_investable_columns(imsk, hw.X),
-                             U = expand_held_member(imsk, hw.U),
-                             w0 = expand_held_member(imsk, hw.w0),
-                             w = expand_held_member(imsk, hw.w), wd = hw.wd)
-end
-"""
-    expand_held_member(imsk::BitVector, x::Nothing)
-    expand_held_member(imsk::BitVector, x::VecNum)
-    expand_held_member(imsk::BitVector, x::MatNum)
-    expand_held_member(imsk::BitVector, x::VecVecNum)
-    expand_held_member(imsk::BitVector, x::VecMatNum)
-
-Expand one member of a Held Weights record back onto the full asset universe.
-
-The member's type is the picker, so [`expand_held_weights`](@ref) states no branch of its own. A weight vector expands through [`expand_investable_weights`](@ref) and a weight path through [`expand_investable_columns`](@ref); a population expands member by member; an absent path stays absent.
-
-# Arguments
-
-  - `imsk`: The Investable Mask, `true` at every asset whose prior moments were finite.
-  - `x`: Held weights, a weight path, a population of either, or `nothing`.
-
-# Returns
-
-  - The member over the full asset universe.
-
-# Related
-
-  - [`expand_held_weights`](@ref)
-  - [`expand_investable_columns`](@ref)
-  - [`expand_investable_weights`](@ref)
-"""
-function expand_held_member(::BitVector, ::Nothing)
-    return nothing
-end
-function expand_held_member(imsk::BitVector, x::VecNum)
-    return expand_investable_weights(imsk, x)
-end
-function expand_held_member(imsk::BitVector, x::MatNum)
-    return expand_investable_columns(imsk, x)
-end
-function expand_held_member(imsk::BitVector, x::VecVecNum)
-    return [expand_investable_weights(imsk, xi) for xi in x]
-end
-function expand_held_member(imsk::BitVector, x::VecMatNum)
-    return [expand_investable_columns(imsk, xi) for xi in x]
+    return HeldWeightsResult(; X = expand_investable_weights(imsk, hw.X),
+                             U = expand_investable_weights(imsk, hw.U),
+                             w0 = expand_investable_weights(imsk, hw.w0),
+                             w = expand_investable_weights(imsk, hw.w), wd = hw.wd)
 end
 export calc_net_returns, calc_net_asset_returns, calc_turnover, cumulative_returns,
        drawdowns, SelfFinancingDrift, DriftedWeights, TargetWeights, HeldWeightsResult

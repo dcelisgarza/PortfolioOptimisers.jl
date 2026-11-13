@@ -391,7 +391,7 @@ $(val_dict[:relax])
 function set_variance_risk!(model::JuMP.Model, i::Any, r::Variance,
                             pr::Option{<:AbstractPriorResult}, ::LinearBound;
                             prefix::Symbol = Symbol(""))
-    return set_sdp_variance_risk!(model, i, r, pr; prefix = prefix)
+    return set_sdp_variance_risk!(model, i, r, pr, r.ratio_alg; prefix = prefix)
 end
 function set_variance_risk!(model::JuMP.Model, i::Any, r::Variance,
                             pr::Option{<:AbstractPriorResult}, ::SquareRootBound;
@@ -403,7 +403,7 @@ $(DocStringExtensions.TYPEDSIGNATURES)
 
 Build the semidefinite variance expression, the trace of the covariance matrix times the lifted weight matrix.
 
-The trace on the lift of [`set_sdp_constraints!`](@ref) has degree one in the weights and ``k``, where the second-order cone expressions have degree two. So when [`sdp_objective_lift_flag`](@ref) is `true`, under [`MaximumRatio`](@ref) with [`SquareRootRatio`](@ref), the objective term reads the lift with a constant corner of [`set_sdp_objective_lift!`](@ref), which has degree two, and the model maximises the Sharpe ratio. The bound then reads the trace on the first lift, and the method builds that trace only when `settings.ub` holds a bound. Otherwise the term and the bound read one trace. The method dispatches on `r.ratio_alg`: under [`LinearRatio`](@ref) the term never reads the lift with a constant corner, so that method builds the one trace. The `# Mathematical definition` of [`MaximumRatio`](@ref) states the rule. The bound acts on the trace in the units of a variance.
+The trace on the lift of [`set_sdp_constraints!`](@ref) has degree one in the weights and ``k``, where the second-order cone expressions have degree two. So when [`sdp_objective_lift_flag`](@ref) is `true`, under [`MaximumRatio`](@ref) with [`SquareRootRatio`](@ref), the objective term reads the lift with a constant corner of [`set_sdp_objective_lift!`](@ref), which has degree two, and the model maximises the Sharpe ratio. The bound then reads the trace on the first lift, and the method builds that trace only when `settings.ub` holds a bound. Otherwise the term and the bound read one trace. The caller passes `r.ratio_alg`, and the method dispatches on it: under [`LinearRatio`](@ref) the term never reads the lift with a constant corner, so that method builds the one trace. The `# Mathematical definition` of [`MaximumRatio`](@ref) states the rule. The bound acts on the trace in the units of a variance.
 
 # JuMP formulation
 
@@ -441,6 +441,7 @@ $(val_dict[:relax])
   - $(arg_dict[:ci])
   - `r::Variance`: The measure.
   - $(arg_dict[:pr_sigma])
+  - `ratio_alg`: The [`RatioFormulation`](@ref) of the measure, `r.ratio_alg`.
 
 # Keyword arguments
 
@@ -456,11 +457,6 @@ $(val_dict[:relax])
   - [`set_sdp_constraints!`](@ref)
   - [`rc_variance_constraints!`](@ref)
 """
-function set_sdp_variance_risk!(model::JuMP.Model, i::Any, r::Variance,
-                                pr::Option{<:AbstractPriorResult};
-                                prefix::Symbol = Symbol(""))
-    return set_sdp_variance_risk!(model, i, r, pr, r.ratio_alg; prefix = prefix)
-end
 function set_sdp_variance_risk!(model::JuMP.Model, i::Any, r::Variance,
                                 pr::Option{<:AbstractPriorResult}, ::LinearRatio;
                                 prefix::Symbol = Symbol(""))
@@ -582,10 +578,10 @@ A [`Frontier`](@ref) keeps its `N`, and takes `bound` as its [`FrontierBoundEsti
   - [`SquareRootBound`](@ref)
   - [`SquaredBound`](@ref)
   - [`variance_risk_bounds_expr`](@ref)
-  - [`_Frontier`](@ref)
+  - [`Frontier`](@ref)
 """
 function variance_risk_bounds_val(bound::FrontierBoundEstimator, ub::Frontier)
-    return _Frontier(; N = ub.N, factor = 1, bound = bound)
+    return Frontier(ub.N, 1, bound)
 end
 function variance_risk_bounds_val(::LinearBound, ub::Num_VecNum)
     return ub

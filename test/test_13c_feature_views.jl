@@ -351,7 +351,7 @@ end
         @test rc.seen[1] == Zsqp[keep, keep]
 
         # Search cross-validation at price level draws assets *and* windows rows, through
-        # `pipeline_asset_view`/`pipeline_data_view` rather than the returns-level arities.
+        # `port_opt_view(data, :, cols)` and `port_opt_view(data, rows, :)`, which take the assets third at both levels.
         prs = PricesResult(; X = TimeArray(tsp, Pv, nx), pnl = sqpanel(nx, Zsqp))
         rg = RecordingDistance(FeatureDistance())
         mrs = MultipleRandomised(IndexWalkForward(60, 20); subset_size = 3, n_subsets = 2,

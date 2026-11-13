@@ -302,10 +302,10 @@ square-root transformation to convert from variance to standard-deviation units.
   - [`set_second_moment_risk!`](@ref)
 """
 function second_moment_bound_val(::SecondMomentFormulation, ub::Frontier, factor::Number)
-    return _Frontier(; N = ub.N, factor = inv(factor), bound = SquareRootBound())
+    return Frontier(ub.N, inv(factor), SquareRootBound())
 end
 function second_moment_bound_val(::SOCRiskExpr, ub::Frontier, factor::Number)
-    return _Frontier(; N = ub.N, factor = inv(factor), bound = LinearBound())
+    return Frontier(ub.N, inv(factor), LinearBound())
 end
 function second_moment_bound_val(::SecondMomentFormulation, ub::VecNum, factor::Number)
     return inv(factor) * sqrt.(ub)

@@ -435,13 +435,12 @@
     @testset "the views and the score type of a Pipeline search" begin
         pr = PricesResult(; X = make_prices())
         rd = make_returns()
-        @test values(PortfolioOptimisers.pipeline_asset_view(pr, [2, 4]).X) ==
+        @test values(PortfolioOptimisers.port_opt_view(pr, :, [2, 4]).X) ==
               values(pr.X)[:, [2, 4]]
-        @test PortfolioOptimisers.pipeline_asset_view(rd, [2, 4]).X == rd.X[:, [2, 4]]
-        @test values(PortfolioOptimisers.pipeline_data_view(pr, 11:20).X) ==
+        @test PortfolioOptimisers.port_opt_view(rd, :, [2, 4]).X == rd.X[:, [2, 4]]
+        @test values(PortfolioOptimisers.port_opt_view(pr, 11:20, :).X) ==
               values(pr.X)[11:20, :]
-        @test PortfolioOptimisers.pipeline_data_view(rd, 11:20, [1, 3]).X ==
-              rd.X[11:20, [1, 3]]
+        @test PortfolioOptimisers.port_opt_view(rd, 11:20, [1, 3]).X == rd.X[11:20, [1, 3]]
         @test PortfolioOptimisers.cv_data_eltype(rd) === Float64
         @test PortfolioOptimisers.cv_data_eltype(ReturnsResult(; nx = rd.nx,
                                                                X = Float32.(rd.X))) ===

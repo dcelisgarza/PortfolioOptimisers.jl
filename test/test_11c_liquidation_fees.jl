@@ -311,7 +311,7 @@
         # The split is **one** matrix on the caller's universe, and the Investable Mask is
         # what says which columns each axis owns: the five per asset fields were sliced to
         # `imsk` at the door and the two carriers to its complement. Here asset 4 is the one
-        # that left, so its column of `X4` is zero, as `expand_investable_columns` leaves it.
+        # that left, so its column of `X4` is zero, as `expand_investable_weights` leaves it.
         X3 = [0.010 -0.020 0.030
               -0.015 0.025 0.012
               0.020 0.010 -0.008

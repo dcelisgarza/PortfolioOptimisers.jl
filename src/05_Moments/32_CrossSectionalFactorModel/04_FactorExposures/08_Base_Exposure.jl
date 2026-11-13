@@ -228,43 +228,6 @@ function exposure_group_labels(rd::ReturnsResult, group::AbstractString)::Matrix
     return cross_sectional_groups(rd.pnl, group)
 end
 """
-    exposure_transform(ct::Nothing, X::MatNum, w::Option{<:MatNum},
-                       groups::Option{<:AbstractMatrix{<:Integer}}) -> MatNum
-    exposure_transform(ct::AbstractCrossSectionalTransform, X::MatNum, w::Option{<:MatNum},
-                       groups::Option{<:AbstractMatrix{<:Integer}}) -> Matrix{<:Real}
-
-Apply one optional cross-sectional transform slot of an Exposure Estimator.
-
-An exposure holds its outlier slot and its scoring slot as `Option{<:AbstractCrossSectionalTransform}`, where `nothing` says that the step is skipped. This is the one place that reading is written, so a member states its two slots and never its two branches.
-
-# Arguments
-
-  - `ct`: The cross-sectional transform, or `nothing`.
-  - `X`: Data matrix `observations × assets`.
-  - `w`: Benchmark weight matrix `observations × assets`, or `nothing`.
-  - `groups`: Group label matrix `observations × assets`, or `nothing`.
-
-# Returns
-
-  - `Y::MatNum`: `X` itself when `ct` is `nothing`, the transformed matrix otherwise.
-
-# Related
-
-  - [`CompositeExposure`](@ref)
-  - [`DerivedExposure`](@ref)
-  - [`cross_sectional_transform`](@ref)
-  - [`AbstractCrossSectionalTransform`](@ref)
-"""
-function exposure_transform(::Nothing, X::MatNum, ::Option{<:MatNum},
-                            ::Option{<:AbstractMatrix{<:Integer}})::MatNum
-    return X
-end
-function exposure_transform(ct::AbstractCrossSectionalTransform, X::MatNum,
-                            w::Option{<:MatNum},
-                            groups::Option{<:AbstractMatrix{<:Integer}})::MatNum
-    return cross_sectional_transform(ct, X; w = w, groups = groups)
-end
-"""
     exposure_active_fill!(L::AbstractMatrix{<:Number}, pnl::AssetPanel) -> nothing
     exposure_active_fill!(L::AbstractArray{<:Number, 3}, pnl::AssetPanel) -> nothing
 

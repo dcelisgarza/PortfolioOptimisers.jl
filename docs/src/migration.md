@@ -606,6 +606,8 @@ v0.33 also brings the cross-sectional factor prior to parity with the oracle, an
 ### [Names that were removed](@id migration-0-34-removed)
 
 - **`AllocationSetConstraint`.** The re-solve of a `FollowTheLeader` rule with a JuMP leader passes the allocation set of the head, the set in which every allocation of the head lies, as a second block of the entry of the leader, and the type is gone. A custom constraint of yours that wrapped a set for a JuMP head of your own passes the set to the entry instead: `optimise(opt, rd; blocks = ((factory(set, w), X),))`, with the rows `X` that the set reads. `append_custom_constraint`, the prefix `:aset_` and the rule "state a kind on the set or on the held optimiser, not on both" go with it. A kind on both now gives two constraints.
+- **`reduce_loadings` of a stack.** Write `reduce_exposures(fcb, Ms)` for a stack of loading matrices, `assets × factors × observations`. `reduce_loadings(fcb, M, t)` takes one loading matrix alone, and a stack raises a `MethodError`. The numbers do not move.
+- **`expand_factor_mu`.** Write `expand_factor_returns(fcb, mu, t)` for a factor mean at observation `t`, and `expand_factor_returns(fcb, mu)` for one mean per observation. `expand_factor_returns` takes both forms, and the numbers do not move. A call of `expand_factor_mu` raises an `UndefVarError`.
 
 ### [Renamed keywords and changed defaults](@id migration-0-34-renames)
 
@@ -693,7 +695,7 @@ Every array of rank three that the library takes or gives holds its observations
 
 | Where | v0.33 | v0.34 |
 | --- | --- | --- |
-| `Z` of `cross_sectional_regression`, `predict`, `cross_sectional_r2` and `mean_cross_sectional_r2`; the field `Ms` of `CrossSectionalFactorModel`; `Ms` of `factor_family_basis` and `reduce_exposures`, and the result of `reduce_exposures`; a stack given to `reduce_loadings`; `B` of `factor_attribution`, `forecast_factor_correlation`, `plot_forecast_factor_correlation`, `exposure_ic`, the `exposure_*` diagnostics and the `cs_regression_*` diagnostics | `observations × assets × factors` | `assets × factors × observations` |
+| `Z` of `cross_sectional_regression`, `predict`, `cross_sectional_r2` and `mean_cross_sectional_r2`; the field `Ms` of `CrossSectionalFactorModel`; `Ms` of `factor_family_basis` and `reduce_exposures`, and the result of `reduce_exposures`; `B` of `factor_attribution`, `forecast_factor_correlation`, `plot_forecast_factor_correlation`, `exposure_ic`, the `exposure_*` diagnostics and the `cs_regression_*` diagnostics | `observations × assets × factors` | `assets × factors × observations` |
 | `factor_exposure` of `OneHotExposure` and `CurrencyExposure`, and `B` of `cross_sectional_groups` | `observations × assets × levels` | `assets × levels × observations` |
 | `cs_gram`, and a stack given to `expand_factor_covariance` or `reduce_factor_covariance` | `observations × factors × factors` | `factors × factors × observations` |
 | `dropped_factor_weights(fcb)` with no observation index | `observations × constrained families × reduced factors` | `constrained families × reduced factors × observations` |

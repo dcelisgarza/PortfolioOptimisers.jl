@@ -664,9 +664,6 @@ end
 function needs_previous_weights(::Number)::Bool
     return false
 end
-function time_dependent_entry_needs_previous_weights(x::BudgetCostEstimator)::Bool
-    return needs_previous_weights(x)
-end
 function set_budget_constraints!(model::JuMP.Model, val::Number, w::VecNum;
                                  prefix::Symbol = Symbol(""))
     budget_row!(model, prefix, :bgt, val, ==, w)

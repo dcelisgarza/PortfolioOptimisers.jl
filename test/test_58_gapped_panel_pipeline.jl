@@ -131,9 +131,8 @@ cv58 = split(iwf58, rd58)
     for (est, rtol) in ((mr58, 1e-5), (hrp58, 1e-8))
         @test isapprox(optimise(est, rd58).w, optimise(est, rd_hand).w; rtol = rtol)
         for tr in cv58.train_idx
-            @test isapprox(optimise(est, PortfolioOptimisers.pipeline_data_view(rd58, tr)).w,
-                           optimise(est,
-                                    PortfolioOptimisers.pipeline_data_view(rd_hand, tr)).w;
+            @test isapprox(optimise(est, PortfolioOptimisers.port_opt_view(rd58, tr, :)).w,
+                           optimise(est, PortfolioOptimisers.port_opt_view(rd_hand, tr, :)).w;
                            rtol = rtol)
         end
     end
@@ -183,7 +182,7 @@ end
                                                                                      tr,
                                                                                      1:N58))
             @test cm == covered[k]
-            w = optimise(mr58, PortfolioOptimisers.pipeline_data_view(rd58, tr)).w
+            w = optimise(mr58, PortfolioOptimisers.port_opt_view(rd58, tr, :)).w
             # Outside the Coverage Universe the weight is exactly zero, and inside it is not.
             @test all(iszero, view(w, .!cm))
             @test all(!iszero, view(w, cm))
@@ -194,7 +193,7 @@ end
         # Fold 2 trains on 21:80, where d is live, and tests on 81:100, where d delists at
         # observation 91. The fold holds d and d has no return, so the pair is a Held Gap.
         tr, te = cv58.train_idx[2], cv58.test_idx[2]
-        res = optimise(mr58, PortfolioOptimisers.pipeline_data_view(rd58, tr))
+        res = optimise(mr58, PortfolioOptimisers.port_opt_view(rd58, tr, :))
         @test !iszero(res.w[4])
         @test @test_logs (:warn,) match_mode=:any predict(res, rd58, te) isa Any
         # The pair contributes zero rather than poisoning the series.
@@ -209,7 +208,7 @@ end
         # silent: fold 1 holds no e, and fold 3 holds no d.
         for k in (1, 3)
             trk, tek = cv58.train_idx[k], cv58.test_idx[k]
-            resk = optimise(mr58, PortfolioOptimisers.pipeline_data_view(rd58, trk))
+            resk = optimise(mr58, PortfolioOptimisers.port_opt_view(rd58, trk, :))
             @test predict(resk, rd58, tek; strict = true) isa Any
         end
     end
@@ -219,11 +218,12 @@ end
         # training universe is every name and the test window's is the same. The check the
         # fit/apply contract exists for has nothing to catch here.
         for (tr, te) in zip(cv58.train_idx, cv58.test_idx)
-            res = fit(pipe_jump58, PortfolioOptimisers.pipeline_data_view(rd58, tr))
+            res = fit(pipe_jump58, PortfolioOptimisers.port_opt_view(rd58, tr, :))
             @test res.ctx.returns.nx == nx58
             @test PortfolioOptimisers.assert_universe_aligned(res,
-                                                              PortfolioOptimisers.pipeline_data_view(rd58,
-                                                                                                     te)) ===
+                                                              PortfolioOptimisers.port_opt_view(rd58,
+                                                                                                te,
+                                                                                                :)) ===
                   nothing
         end
     end
@@ -256,7 +256,7 @@ end
         apw, epw = amsk58[tr, :], emsk58[tr, :]
         aw = span_amsk58(Xtr)
         ew = aw .& isfinite.(Xtr)
-        rd_pw = PortfolioOptimisers.pipeline_data_view(rd58, tr)
+        rd_pw = PortfolioOptimisers.port_opt_view(rd58, tr, :)
         rd_win = ReturnsResult(; nx = nx58, X = Xtr, pnl = panel58(aw, ew))
         # Fold 1's window ends inside e's suspension, so the two masks genuinely disagree
         # there: panel-wide says e is still listed, per-window reads a delisting.

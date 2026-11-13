@@ -745,11 +745,10 @@ function factor_summary_stability(Ms::Arr3Num, csfm::CrossSectionalFactorModel;
     return Tf[con[k] ? one(Tf) : Tf(factor_summary_column_median(S, k)) for k in 1:K]
 end
 """
-    factor_summary_exposure(csfm::CrossSectionalFactorModel; step, weighting,
-                            coverage_weighting)
-    factor_summary_exposure(Ms::Nothing, csfm::CrossSectionalFactorModel; kwargs...)
-    factor_summary_exposure(Ms::Arr3Num, csfm::CrossSectionalFactorModel; step, weighting,
-                            coverage_weighting)
+    factor_summary_exposure(Ms::Nothing, csfm::CrossSectionalFactorModel, step::Integer,
+                            weighting, coverage_weighting)
+    factor_summary_exposure(Ms::Arr3Num, csfm::CrossSectionalFactorModel, step::Integer,
+                            weighting, coverage_weighting)
 
 Return the two exposure columns of a factor model summary, on the raw factor axis.
 
@@ -776,18 +775,12 @@ The two columns read different weight histories. The stability reads the history
   - [`exposure_coverage`](@ref)
   - [`factor_summary_stability`](@ref)
 """
-function factor_summary_exposure(csfm::CrossSectionalFactorModel; step::Integer = 21,
-                                 weighting = BenchmarkWeightMetric(),
-                                 coverage_weighting = RegressionWeightMetric())
-    return factor_summary_exposure(csfm.Ms, csfm; step = step, weighting = weighting,
-                                   coverage_weighting = coverage_weighting)
-end
-function factor_summary_exposure(::Nothing, ::CrossSectionalFactorModel; kwargs...)
+function factor_summary_exposure(::Nothing, ::CrossSectionalFactorModel, ::Integer, ::Any,
+                                 ::Any)
     return nothing, nothing
 end
-function factor_summary_exposure(Ms::Arr3Num, csfm::CrossSectionalFactorModel;
-                                 step::Integer = 21, weighting = BenchmarkWeightMetric(),
-                                 coverage_weighting = RegressionWeightMetric())
+function factor_summary_exposure(Ms::Arr3Num, csfm::CrossSectionalFactorModel,
+                                 step::Integer, weighting, coverage_weighting)
     stability = factor_summary_stability(Ms, csfm; step = step, weighting = weighting)
     coverage = exposure_coverage(csfm; weighting = coverage_weighting).X
     return stability, coverage
@@ -968,8 +961,8 @@ function factor_model_summary(csfm::CrossSectionalFactorModel; ppy::Number = 1,
                                              factor_summary_return_stats(f, ppy))
     autocorr = factor_summary_mapped(factor_summary_autocorrelation(f), pos)
     mean_abs_t, t_rate, mean_vif = factor_summary_gram(csfm, threshold)
-    stability, coverage = factor_summary_exposure(csfm; step = step, weighting = weighting,
-                                                  coverage_weighting = coverage_weighting)
+    stability, coverage = factor_summary_exposure(csfm.Ms, csfm, step, weighting,
+                                                  coverage_weighting)
     return FactorSummaryResult(ann_return, ann_volatility, sharpe, autocorr, mean_abs_t,
                                t_rate, mean_vif, stability, coverage, ppy, csfm.nf,
                                csfm.fam)

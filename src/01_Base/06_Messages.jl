@@ -59,7 +59,7 @@ The function passes [`did_you_mean`](@ref) a configuration that admits more matc
 
   - [`did_you_mean`](@ref)
   - [`StringDistanceConfig`](@ref)
-  - [`windowed_estimator_suggest`](@ref)
+  - [`@windowed_estimator`](@ref)
   - [`check_propagatable_contracts`](@ref)
 """
 function suggest_declared_key(key, candidates)

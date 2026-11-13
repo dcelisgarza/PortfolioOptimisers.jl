@@ -15,7 +15,6 @@ A scorer reads the oriented score of a path. The score orients each risk measure
 ```@docs
 PortfolioOptimisers.oriented_score
 PortfolioOptimisers.oriented_value
-PortfolioOptimisers.reduce_member_scores
 PortfolioOptimisers.oriented_member_score
 PortfolioOptimisers.prediction_returns
 ```

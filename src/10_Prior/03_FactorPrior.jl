@@ -658,7 +658,7 @@ function prior(pe::FactorPrior, X::MatNum, F::MatNum, pnl::Option{<:AssetPanel} 
     # — a weighting with no provenance cannot be interrogated (ADR 0046) — and so does `eoc`,
     # the count of the moments that sizes every uncertainty set built on this result.
     return LowOrderPrior(; X = expand_columns(scenario_window(n, posterior_X), cmsk),
-                         o_X = scenario_window(n, X), mu = expand_vector(mu, cmsk),
+                         o_X = scenario_window(n, X), mu = expand_moment(mu, cmsk),
                          sigma = expand_moment(sigma, cmsk),
                          chol = expand_columns(chol, cmsk), w = f_prior.w,
                          ens = f_prior.ens, eoc = f_prior.eoc, kld = f_prior.kld,

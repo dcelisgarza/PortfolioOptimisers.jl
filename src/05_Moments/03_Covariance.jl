@@ -1068,7 +1068,7 @@ The centre of a pair is the mean of that pair, which a pairwise Welford recursio
   - [`coverage_correlation`](@ref)
   - [`partial_fit!`](@ref)
 """
-function coverage_covariance(f::F, ce::Covariance{<:Any, <:Any, <:FullMoment},
+function coverage_covariance(f::F, ce::Covariance{<:Any, <:Any, <:FullMoment, Nothing},
                              cvg::CoveragePolicy, X::MatNum; dims::Int = 1, mean = nothing,
                              active_mask::Option{<:AbstractMatrix{<:Bool}} = nothing,
                              strict::Bool = false, kwargs...) where {F}
@@ -1156,7 +1156,7 @@ The centre is the available-case mean of each asset, over only the finite and ac
   - [`coverage_valid_block`](@ref)
   - [`coverage_divide`](@ref)
 """
-function coverage_covariance(f::F, ce::Covariance{<:Any, <:Any, <:SemiMoment},
+function coverage_covariance(f::F, ce::Covariance{<:Any, <:Any, <:SemiMoment, Nothing},
                              cvg::CoveragePolicy, X::MatNum; dims::Int = 1, mean = nothing,
                              active_mask::Option{<:AbstractMatrix{<:Bool}} = nothing,
                              strict::Bool = false, kwargs...) where {F}

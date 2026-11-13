@@ -179,6 +179,7 @@ Under a threshold `th` above zero, the idiosyncratic correlation reads the rows 
 
   - `pe`: Cross-Sectional Factor Prior estimator.
   - `st`: The state after the fit of the step.
+  - `csr`: The cross-sectional regression result of the state, `st.csr`, which gives the residuals.
   - `stepped`: `true` when the step fitted the new observations alone, `false` when it fitted every observation.
 
 # Returns
@@ -194,10 +195,6 @@ Under a threshold `th` above zero, the idiosyncratic correlation reads the rows 
   - [`cross_sectional_carry_fold`](@ref)
   - [`cross_sectional_assemble`](@ref)
 """
-function cross_sectional_carry_standardised(pe::CrossSectionalFactorPrior,
-                                            st::CrossSectionalCarryState, stepped::Bool)
-    return cross_sectional_carry_standardised(pe, st, st.csr, stepped)
-end
 function cross_sectional_carry_standardised(pe::CrossSectionalFactorPrior,
                                             st::CrossSectionalCarryState, csr,
                                             stepped::Bool)
@@ -711,7 +708,7 @@ function cross_sectional_carry_outputs(pe::CrossSectionalFactorPrior,
                                        st::CrossSectionalCarryState, stepped::Bool)
     st = cross_sectional_carry_forecast(pe, st, stepped)
     st = cross_sectional_carry_history(pe, st, stepped)
-    return cross_sectional_carry_standardised(pe, st, stepped)
+    return cross_sectional_carry_standardised(pe, st, st.csr, stepped)
 end
 """
 $(DocStringExtensions.TYPEDSIGNATURES)
