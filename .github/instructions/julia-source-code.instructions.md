@@ -581,11 +581,13 @@ and every addition:
    clear, a measurement decides. A break is not a cost.
 2. **A verb owns a default only when the default is a true answer for every caller.** A query
    trait owns `false`, as `needs_previous_weights` does. A structural traversal owns the
-   identity on a leaf, as `copy_states(x) = x` does, which is the idiom of `fmap` in Functors.jl
-   and of Adapt.jl. A contract verb such as `factory` owns no default, so a missing method
-   stays a `MethodError`. A choice that belongs to a container, such as which steps of a
-   pipeline take the weights, stays in a function of the container, and that function is kept
-   by reason (b). #2108 rules the untyped fallback that returns `nothing`:
+   identity on a leaf, as `copy_states(x) = x` and `factory(a, args...; kwargs...) = a` do,
+   which is the idiom of `fmap` in Functors.jl and of Adapt.jl. A contract verb, which each type
+   implements, owns no default, so a missing method stays a `MethodError`. A conversion such as
+   `count_or_fraction` is a repair at a constructor, and it owns the identity on a value that
+   needs no repair, as `float_if_integer` does. A choice that belongs to a container, such as
+   which steps of a pipeline take the weights, stays in a function of the container, and that
+   function is kept by reason (b). #2108 rules the untyped fallback that returns `nothing`:
    - **A contract verb takes a `::Nothing` method on the empty slot**, with the arity of its
      typed methods, as `set_turnover_fees!(::JuMP.Model, ::Nothing) = nothing`. A fallback on
      `args...` goes, because it takes every type and every arity.
@@ -597,6 +599,19 @@ and every addition:
      every other index to `view`.
    - **Methods that share one body that answers every type become one untyped method**, as
      `online_unreached_path(opt)` does.
+
+   #2109 rules the step function that returns a default in front of an owner:
+   - **A walk owns its leaf answer.** A function that another of its methods calls walks a
+     tree, and its fallback is the leaf: the identity, or `nothing` for "not found"
+     (`seed_window_path(::Any) = nothing`) or for "pass"
+     (`assert_stateless_schedule(::Any) = nothing`). A function that the walk calls is not its
+     owner.
+   - **The step function goes when its owner owns the default.** A query or a check takes
+     `nothing`, as `coverage_policy(::Any) = nothing` does. A traversal or a repair takes the
+     identity, as `factory` and `count_or_fraction` do, and the callers call the owner.
+   - **The step function stays as (b) in front of a constructor**, which owns no default, as
+     `rewrap_step` does in front of `PipelineStep`, and when it holds a policy of a container,
+     as `pipeline_step_factory` does.
 
    `code_health/forward_survey.jl` gives each of these its verdict, and its `RULED_DEFAULTS`
    holds the verdicts that the parse cannot read.

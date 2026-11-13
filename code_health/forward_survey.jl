@@ -26,7 +26,10 @@
 #                        (#2074, rule 2). A fallback with no owner takes the verdict of #2108,
 #                        which `fallback_verdict` states: an `args...` fallback goes, a check
 #                        and a query keep theirs, and a contract verb takes a `::Nothing`
-#                        method. `RULED_DEFAULTS` holds the verdicts that the parse cannot read.
+#                        method. A step function in front of an owner takes the verdict of
+#                        #2109, which `step_verdict` states: a walk keeps its leaf, `nothing`
+#                        goes to its owner, and an identity in front of a constructor stays as
+#                        (b). `RULED_DEFAULTS` holds the verdicts that the parse cannot read.
 #   rebuild              a constructor call that passes `x.f` for every field but one or two
 #                        (#2082, rule 6). It goes to `rebuild_struct`.
 #   self-forward         a method that calls its own function with fewer arguments, or with
@@ -701,9 +704,12 @@ function single_statement(body)
 end
 
 """
-The verdicts of #2108 that the parse cannot read: an identity on two or more slots is a
-traversal step or a pass-through that stays, or a fallback that only a closed set reaches. Each
-entry is a name, with its verdict and its reason. An entry whose name is no longer a `default`
+The verdicts of #2074, #2108 and #2109 that the parse cannot read. With no owner, an identity on
+two or more slots is a traversal step or a pass-through that stays, or a fallback that only a
+closed set reaches (#2108). In front of an owner, a step function that returns its input goes
+when the owner is a traversal or a repair, and stays as (b) when it holds a policy of a container
+(#2074, #2109). Each entry is a name, with its verdict and its reason. An entry whose name is no
+longer a `default`
 finding is stale, and `test/test_89_forward_survey_census.jl` fails on it, so a build ticket that
 types or removes the fallback deletes the entry.
 """
@@ -722,7 +728,27 @@ const RULED_DEFAULTS = Dict{Symbol, Tuple{String, String}}(#
                                                                 "only the tests reach the fallback, and the method on `AbstractPriorResult` holds the identity on a leaf (#2108)"),
                                                            :timestamp_positions =>
                                                                ("keep (default)",
-                                                                "an index that is not a timestamp or a name passes to `view`, which is the gate of the index (#2108)"))
+                                                                "an index that is not a timestamp or a name passes to `view`, which is the gate of the index (#2108)"),
+                                                           :regression_factor_names =>
+                                                               ("keep (default)",
+                                                                "a query of the names of the loadings axis owns `nothing`, the answer \"none\". Its callee reads fields of the input, so it owns no default for the input (#2109)"),
+                                                           :factory_child => ("go",
+                                                                              "`factory` is a traversal and owns the identity on every leaf, as `adapt_structure(to, x) = x` does in Adapt.jl: `factory(a, args...; kwargs...) = a` on `::Any` replaces this function (#2109)"),
+                                                           :maybe_count_or_fraction =>
+                                                               ("go",
+                                                                "`count_or_fraction` is a repair at a constructor, and a repair owns the identity on a value that needs none: `count_or_fraction(x) = x` on `::Any` replaces this function (#2109)"),
+                                                           :update_online_member => ("go",
+                                                                                     "`update_online_estimator` owns the identity on a leaf (#2074), so it replaces this function (#2109)"),
+                                                           :update_online_step => ("go",
+                                                                                   "`update_online_estimator` takes the identity and a `PipelineStep` method (#2074)"),
+                                                           :copy_step_states => ("go",
+                                                                                 "`copy_states(x) = x` owns the identity, so only a `PipelineStep` method moves (#2074)"),
+                                                           :pipeline_step_factory =>
+                                                               ("keep (b)",
+                                                                "a policy of the pipeline: only the optimiser and a nested pipeline take the weights (#2074)"),
+                                                           :reset_time_dependent_step =>
+                                                               ("keep (b)",
+                                                                "its `TimeDependent` arm throws for a fit with no folds, a job that differs from the method of the owner (#2074)"))
 
 # Whether a positional argument of the signature is a splat, `args...`.
 function has_splat(sig)
@@ -785,6 +811,59 @@ function fallback_verdict(t::Tree, d, kind, args)
             "a fallback of $(length(args)) slots returns `nothing`: a typed method on the set that reaches it (#2108)")
 end
 
+# Whether another method of the function of `d` names the function: the function is a walk, and
+# `d` is its leaf.
+function is_walk(t::Tree, d)
+    return any(m -> m !== d && d.name in names_in(m.body),
+               get(t.by_name, d.name, CH.MethodDef[]))
+end
+
+"""
+    step_verdict(t::Tree, d, kind, owner) -> Tuple{String, String}
+
+The verdict and the reason for an untyped fallback that returns `kind` in a function with a
+forward method to `owner`, by the rulings of #2074 and #2109:
+
+ 1. A name of [`RULED_DEFAULTS`](@ref): its verdict.
+ 2. `false`: a query trait owns `false`, so the owner takes the fallback.
+ 3. A walk, a function that another of its methods calls: it owns its leaf answer, the identity,
+    `nothing` for "not found" or `nothing` for "pass". The owner is a callee.
+ 4. `nothing`: a query or a check owns `nothing`, so the owner takes the fallback. An owner whose
+    name ends in `!` does a job and owns no default, so a person rules it.
+ 5. The input in front of a constructor: a constructor owns no default. The method on the wrapper
+    type is an interface method (rule 3), and the bare form is a choice of the container (b).
+ 6. The input in front of a function: a traversal or a repair owns the identity, a contract verb
+    owns none, and a policy of a container stays as (b). A person rules it.
+"""
+function step_verdict(t::Tree, d, kind, owner)
+    if haskey(RULED_DEFAULTS, d.name)
+        return RULED_DEFAULTS[d.name]
+    end
+    if kind == "`false`"
+        return ("go",
+                "a step function returns `false` in front of `$owner`: a query trait owns `false`, so `$owner` takes the fallback (rule 2)")
+    end
+    if is_walk(t, d)
+        return ("keep (default)",
+                "a walk owns its leaf answer: the identity, or `nothing` for \"not found\" or \"pass\". `$owner` is a callee of the walk, not its owner (#2109)")
+    end
+    if kind == "`nothing`"
+        return if endswith(string(owner), "!")
+            ("review",
+             "a step function returns `nothing` in front of `$owner`, a verb that does a job and owns no default. Rule it, and add it to `RULED_DEFAULTS` (#2109)")
+        else
+            ("go",
+             "a step function returns `nothing` in front of `$owner`: a query or a check owns `nothing`, so `$owner` takes the fallback (#2109)")
+        end
+    end
+    if is_struct(t, owner)
+        return ("keep (b)",
+                "a step function returns its input in front of the constructor `$owner`, which owns no default: its method on `$owner` is an interface method (rule 3), and the bare form is a choice of the container (#2109)")
+    end
+    return ("review",
+            "a step function returns its input in front of `$owner`. A traversal or a repair owns the identity, and then `$owner` takes the fallback. A contract verb owns none, and a policy of a container stays as (b). Rule it, and add it to `RULED_DEFAULTS` (#2109)")
+end
+
 function default_findings!(out, t::Tree, rulings)
     for d in t.defs
         if (d.qualified || is_struct(t, d.name))
@@ -811,13 +890,7 @@ function default_findings!(out, t::Tree, rulings)
         owners = unique(c for (n, c) in keys(t.forwards) if n === d.name && c !== d.name)
         if !isempty(owners)
             owner = sort!(owners)[1]
-            verdict, why = if kind == "`false`"
-                ("go",
-                 "a step function returns `false` in front of `$owner`: a query trait owns `false`, so `$owner` takes the fallback (rule 2)")
-            else
-                ("review",
-                 "a step function returns $kind in front of `$owner`. A traversal owns the identity, and then `$owner` takes the fallback. A contract verb owns none, and a choice of a container stays as (b) (rule 2)")
-            end
+            verdict, why = step_verdict(t, d, kind, owner)
             push!(out,
                   SurveyFinding(d.file, d.line, "default", d.name, owner, verdict, why,
                                 ruling_of(rulings, d.name, owner)))

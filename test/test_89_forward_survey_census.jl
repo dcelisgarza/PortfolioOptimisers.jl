@@ -74,6 +74,26 @@ using Test
              step_td(x::A) = owner_td(x)
              owner_td(x::A) = true
 
+             # step functions in front of an owner (#2109)
+             walk_path(x::A) = walk_path(x.a)
+             walk_path(v::B) = elem_path(walk_path, v)
+             walk_path(::Any) = nothing
+             elem_path(f, v::B) = 1
+             step_q(x::A) = owner_q(x)
+             step_q(::Any) = nothing
+             owner_q(x::A) = 1
+             step_j(x::A) = owner_j!(x)
+             step_j(::Any) = nothing
+             owner_j!(x::A) = 1
+             rewrap(w::T3, e) = T3(e, w.b)
+             rewrap(::Any, e) = e
+             step_i(x::A) = owner_i(x)
+             step_i(x) = x
+             owner_i(x::A) = 1
+             factory_child(v::A) = factory(v)
+             factory_child(v) = v
+             factory(v::A) = 1
+
              # untyped fallbacks with no owner (#2108)
              setter!(args...) = nothing
              setter!(m::A, x::B) = 1
@@ -166,6 +186,25 @@ using Test
         @test of(:noop) == [("default", nothing, "keep (default)")]
         # A step function in front of an owner: the owner takes `false`.
         @test ("default", :owner_td, "go") in of(:step_td)
+    end
+
+    @testset "step functions in front of an owner (#2109)" begin
+        # A walk owns its leaf answer: its callee is not its owner.
+        @test ("default", :elem_path, "keep (default)") in of(:walk_path)
+        @test occursin("a walk owns its leaf",
+                       only(x
+                            for x in found if x.name === :walk_path && x.shape == "default").why)
+        # `nothing` in front of an owner: a query or a check owns it, so the owner takes it.
+        @test ("default", :owner_q, "go") in of(:step_q)
+        # An owner that does a job owns no default: a person rules it.
+        @test ("default", :owner_j!, "review") in of(:step_j)
+        # The input in front of a constructor stays as (b): the constructor owns no default.
+        @test ("default", :T3, "keep (b)") in of(:rewrap)
+        # The input in front of a function: a person rules it, and `RULED_DEFAULTS` holds it.
+        @test ("default", :owner_i, "review") in of(:step_i)
+        @test ("default", :factory, "go") in of(:factory_child)
+        @test only(x for x in found if x.name === :factory_child && x.shape == "default").why ==
+              FS.RULED_DEFAULTS[:factory_child][2]
     end
 
     @testset "untyped fallbacks with no owner (#2108)" begin
