@@ -670,6 +670,310 @@ function definition_name(e0)
     return ""
 end
 
+# --- the forward reader ------------------------------------------------------
+#
+# **This is the one reader of a forward.** The forward census of
+# `test/test_70_trivial_unit_census.jl` keys a forward method with it, and
+# `code_health/forward_survey.jl` gives each forward a verdict with it. So the census and the
+# survey cannot disagree about which method only forwards. Issues #2071 and #2086. The comment
+# of the forward census in `test_70` states the rule and its five exemptions.
+
+"""
+    MethodDef
+
+One method definition, as [`method_defs`](@ref) reads it: the name, the file and line of the
+definition (of its docstring, when it has one), the signature, the body, and whether the name is
+module-qualified (`Base.show`). A qualified name extends the function of another module, or of the
+package from an extension.
+"""
+struct MethodDef
+    name::Symbol
+    file::String
+    line::Int
+    sig::Any
+    body::Any
+    qualified::Bool
+end
+
+"""
+    method_defs(file, tree) -> Vector{MethodDef}
+
+Every named method that `tree`, the parse of `file`, defines at its top level, inside a `module`
+or a `begin` block, or under a macro such as `@inline`. A method inside a `struct` body, an inner
+constructor, is not read, and nor is a functor method `(r::T)(x)`, which has no name.
+"""
+function method_defs(file::AbstractString, tree)
+    out = MethodDef[]
+    collect_methods!(out, tree, String(file), 0)
+    return out
+end
+
+function collect_methods!(out, e, file, line)
+    if isdocstring(e)
+        if e.args[2] isa LineNumberNode
+            (line = e.args[2].line)
+        end
+        e = unwrap(e)
+    end
+    if !(e isa Expr)
+        return nothing
+    end
+    if e.head === :function || (e.head === :(=) && is_signature(e.args[1]))
+        if !(length(e.args) >= 2)
+            return nothing
+        end
+        name, qual = signature_name(e.args[1])
+        if name === nothing
+            return nothing
+        end
+        push!(out, MethodDef(name, file, line, e.args[1], e.args[2], qual))
+    elseif e.head === :macrocall
+        l = e.args[2] isa LineNumberNode ? e.args[2].line : line
+        collect_methods!(out, e.args[end], file, l)
+    elseif e.head === :module || e.head === :block || e.head === :toplevel
+        for a in (e.head === :module ? e.args[end].args : e.args)
+            if a isa LineNumberNode
+                (line = a.line; continue)
+            end
+            collect_methods!(out, a, file, line)
+        end
+    end
+    return nothing
+end
+
+"""
+    forward_leaf(e) -> Bool
+
+Whether a forward may pass `e` on: a name, a literal, `nothing`, a field chain on a name, a splat
+of one, a keyword forward, or a tuple of these.
+"""
+function forward_leaf(e)
+    if e isa Symbol
+        return true
+    end
+    if !(e isa Expr)
+        return true
+    end
+    if e.head === :. && length(e.args) == 2 && e.args[2] isa QuoteNode
+        return forward_leaf(e.args[1])
+    elseif e.head === :(...) || e.head === :kw
+        return forward_leaf(e.args[end])
+    elseif e.head === :parameters || e.head === :tuple
+        return all(forward_leaf, e.args)
+    end
+    return false
+end
+
+"""
+    is_operator_name(f) -> Bool
+
+Whether `f` is the name of an operator, such as `+` or `=>`. A call of an operator is logic that
+the method owns, never a forward.
+"""
+is_operator_name(f) = f isa Symbol && Base.isoperator(f)
+
+"""
+    single_call(body) -> Union{Nothing, Expr}
+
+The call of a body that is one call to a function named by a `Symbol`, with or without `return`,
+or `nothing`. The arguments of the call can be any expression.
+"""
+function single_call(body)
+    stmts = if body isa Expr && body.head === :block
+        filter(a -> !(a isa LineNumberNode), body.args)
+    else
+        Any[body]
+    end
+    if !(length(stmts) == 1)
+        return nothing
+    end
+    s = stmts[1]
+    if s isa Expr && s.head === :return
+        if isempty(s.args)
+            return nothing
+        end
+        s = s.args[1]
+    end
+    if !(s isa Expr && s.head === :call)
+        return nothing
+    end
+    f = s.args[1]
+    if !(f isa Symbol && !is_operator_name(f))
+        return nothing
+    end
+    return s
+end
+
+"""
+    forward_call(body) -> Union{Nothing, Expr}
+
+The call of a body that is one depth-one forward: a [`single_call`](@ref) whose arguments are each
+a [`forward_leaf`](@ref). `nothing` for any other body.
+"""
+function forward_call(body)
+    s = single_call(body)
+    if s === nothing
+        return nothing
+    end
+    if !(all(forward_leaf, s.args[2:end]))
+        return nothing
+    end
+    return s
+end
+
+"""
+    call_signature(sig) -> Any
+
+The `f(args...)` call of a signature, with `where` clauses and a return type removed.
+"""
+function call_signature(sig)
+    while sig isa Expr && (sig.head === :where || (sig.head === :(::) &&
+                                                   sig.args[1] isa Expr &&
+                                                   sig.args[1].head in (:call, :where)))
+        sig = sig.args[1]
+    end
+    return sig
+end
+
+"""
+    forward_signature(sig) -> Tuple{Set{Symbol}, Bool, Bool}
+
+The names that a signature binds, whether a positional argument is typed, and whether one is typed
+`Nothing`. A positional argument typed `Any` is untyped. A method with keywords alone, `f(; a, b)`,
+counts as typed, because it is no `Any` fallback.
+"""
+function forward_signature(sig)
+    sig = call_signature(sig)
+    names = Set{Symbol}()
+    typed = false
+    nothing_arm = false
+    if !(sig isa Expr && sig.head === :call)
+        return names, typed, nothing_arm
+    end
+    function bind!(a, positional)
+        if a isa Symbol
+            push!(names, a)
+        elseif a isa Expr && a.head === :parameters
+            foreach(x -> bind!(x, false), a.args)
+        elseif a isa Expr && a.head in (:kw, :(...))
+            bind!(a.args[1], positional)
+        elseif a isa Expr && a.head === :(::)
+            if length(a.args) == 2 && a.args[1] isa Symbol
+                push!(names, a.args[1])
+            end
+            if positional
+                if !(a.args[end] === :Any)
+                    (typed = true)
+                end
+                a.args[end] === :Nothing && (nothing_arm = true)
+            end
+        end
+        return nothing
+    end
+    foreach(a -> bind!(a, true), sig.args[2:end])
+    positional = filter(a -> !(a isa Expr && a.head === :parameters), sig.args[2:end])
+    if isempty(positional)
+        (typed = true)
+    end
+    return names, typed, nothing_arm
+end
+
+"""
+    keywords_alone(sig) -> Bool
+
+Whether a method takes keywords alone, `f(; a, b)`.
+"""
+function keywords_alone(sig)
+    sig = call_signature(sig)
+    if !(sig isa Expr && sig.head === :call)
+        return false
+    end
+    return all(a -> a isa Expr && a.head === :parameters, sig.args[2:end])
+end
+
+# The name at the root of a leaf: `x` of `x.a.b`, of `x...` and of `k = x`.
+function forward_root(e)
+    if e isa Symbol
+        return e
+    elseif e isa Expr && e.head === :.
+        return forward_root(e.args[1])
+    elseif e isa Expr && e.head in (:(...), :kw)
+        return forward_root(e.args[end])
+    end
+    return nothing
+end
+
+"""
+    forward_passes(e, names) -> Bool
+
+Whether the leaf `e` passes one of `names`, or a field of one.
+"""
+function forward_passes(e, names)
+    if e isa Expr && e.head in (:parameters, :tuple)
+        return any(a -> forward_passes(a, names), e.args)
+    end
+    r = forward_root(e)
+    return r !== nothing && r in names
+end
+
+"""
+    forward_has_field(e) -> Bool
+
+Whether the leaf `e` passes a field of a name.
+"""
+function forward_has_field(e)
+    return e isa Expr && (e.head === :. ||
+                          (e.head in (:(...), :kw, :parameters, :tuple) && any(forward_has_field, e.args)))
+end
+
+"""
+    forward_methods(defs; owned, structs, foreign = _ -> false)
+        -> Dict{Tuple{Symbol, Symbol}, Vector{Tuple{String, Int}}}
+
+Every forward method of `defs`, keyed by `(name, callee)`, with the file and line of each. A
+method is a forward when its body is a [`forward_call`](@ref) to a name in `owned` (a function
+that the package defines) or in `structs` (a type that it declares), and the call passes an
+argument of the method or a field of one. The five exemptions of the forward census apply: a
+method named after a type, a qualified method or a name for which `foreign` is true, a method with
+a positional argument typed `Nothing`, a method whose positional arguments are all untyped, and a
+self-call that passes a field or that a method with keywords alone makes.
+
+`foreign` is the one input that can need the loaded module. `test_70` passes the check against the
+loaded package. The survey passes the default: the package extends a function of another module
+only by a qualified name, and the qualified methods are exempt already.
+"""
+function forward_methods(defs; owned, structs, foreign = _ -> false)
+    out = Dict{Tuple{Symbol, Symbol}, Vector{Tuple{String, Int}}}()
+    for d in defs
+        if (d.qualified || d.name in structs || foreign(d.name))
+            continue
+        end
+        call = forward_call(d.body)
+        if call === nothing
+            continue
+        end
+        callee = call.args[1]
+        if !(callee in owned || callee in structs)
+            continue
+        end
+        names, typed, nothing_arm = forward_signature(d.sig)
+        if !(typed && !nothing_arm)
+            continue
+        end
+        if !(any(a -> forward_passes(a, names), call.args[2:end]))
+            continue
+        end
+        if callee === d.name && any(forward_has_field, call.args[2:end])
+            continue
+        end
+        if callee === d.name && keywords_alone(d.sig)
+            continue
+        end
+        push!(get!(out, (d.name, callee), Tuple{String, Int}[]), (d.file, d.line))
+    end
+    return out
+end
+
 # --- Declaration Macros ----------------------------------------------------
 #
 # Found by parsing alone, so `complexity.jl` stays a pure parser and loads no package.

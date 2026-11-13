@@ -1153,6 +1153,9 @@ end
             @test !occursin("This file is swept.", body)
             @test occursin(open ? "after that map was charted" : "after that map closed",
                            body)
+            # The sixth condition of #404 names the survey of the file (#2086).
+            @test occursin("6. Its methods meet the wrapper standard: " *
+                           "`code_health/forward_survey.jl src/a.jl`", body)
         end
     end
     @testset "a sweep title that names no current path is reported and refused" begin

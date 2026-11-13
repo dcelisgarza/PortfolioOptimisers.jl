@@ -232,7 +232,13 @@
                           "refit_last" =>
                               "a keyword of the oracle's online runner, cited by " *
                               "`GLOSSARY.md` § Resume as the exit the library does not " *
-                              "port")
+                              "port",
+                          "fmap" =>
+                              "the traversal of Functors.jl, cited by rule 2 of the " *
+                              "rulings of #2072 as the precedent of an identity default",
+                          "__solve" =>
+                              "the hook of `solve` in SciML, cited by rule 4 of the " *
+                              "rulings of #2072 as the precedent of a template hook")
 
     #=
     A path that names an artefact the docs build writes and git ignores, so no tracked file

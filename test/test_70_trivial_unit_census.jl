@@ -62,29 +62,18 @@ end
 
     strip_lnn(args) = filter(a -> !(a isa LineNumberNode), args)
 
-    # A leaf a forward may pass on: a name, a literal, `nothing`, a field chain on a name,
-    # a splat of one, a keyword forward or a tuple of leaves.
-    function is_leaf(e)
-        e isa Symbol && return true
-        e isa Expr || return true
-        if e.head === :. && length(e.args) == 2 && e.args[2] isa QuoteNode
-            return is_leaf(e.args[1])
-        elseif e.head === :(...) || e.head === :kw
-            return is_leaf(e.args[end])
-        elseif e.head === :parameters || e.head === :tuple
-            return all(is_leaf, e.args)
-        end
-        return false
-    end
-    is_operator_name(f) = f isa Symbol && Base.isoperator(f)
-    # One depth-one forward, as rule 2 states it.
+    # A leaf, `CH.forward_leaf`, is what a forward may pass on: a name, a literal, `nothing`, a
+    # field chain on a name, a splat of one, a keyword forward or a tuple of leaves. One
+    # depth-one forward, as rule 2 states it:
     function is_forward(e)
-        is_leaf(e) && return true
+        CH.forward_leaf(e) && return true
         e isa Expr && e.head === :call || return false
         f = e.args[1]
-        callee_ok = (f isa Symbol && !is_operator_name(f)) ||
-                    (f isa Expr && f.head === :. && f.args[end] isa QuoteNode && is_leaf(f))
-        return callee_ok && all(is_leaf, e.args[2:end])
+        callee_ok = (f isa Symbol && !CH.is_operator_name(f)) || (f isa Expr &&
+                                                                  f.head === :. &&
+                                                                  f.args[end] isa QuoteNode &&
+                                                                  CH.forward_leaf(f))
+        return callee_ok && all(CH.forward_leaf, e.args[2:end])
     end
     function body_trivial(body)
         stmts = body isa Expr && body.head === :block ? strip_lnn(body.args) : Any[body]
@@ -226,127 +215,16 @@ end
     two or more methods share, or the constructor of a type. `pending_forwards` is the debt
     that #2072 removes. An entry whose pair or name is no longer flagged is stale and fails,
     so the debt can only shrink, and a new wrapper of any shape fails the build.
+
+    `CH.forward_methods` is the one reader of this rule. `code_health/forward_survey.jl` reads
+    the source with it too and gives each forward a verdict, so the census and the survey agree
+    on which method only forwards (#2086). The census passes the check of the loaded module
+    for exemption 2.
     =#
-    fwd_leaf(e) = is_leaf(e)
-    fwd_root(e) =
-        if e isa Symbol
-            e
-        elseif e isa Expr && e.head === :.
-            fwd_root(e.args[1])
-        elseif e isa Expr && e.head in (:(...), :kw)
-            fwd_root(e.args[end])
-        else
-            nothing
-        end
-    function fwd_passes(e, names)
-        if e isa Expr && e.head in (:parameters, :tuple)
-            return any(a -> fwd_passes(a, names), e.args)
-        end
-        r = fwd_root(e)
-        return r !== nothing && r in names
-    end
-    fwd_has_field(e) = e isa Expr &&
-                       (e.head === :. || (e.head in (:(...), :kw, :parameters, :tuple) &&
-                                          any(fwd_has_field, e.args)))
-    # The one call of a body, or `nothing`.
-    function fwd_call(body)
-        stmts = body isa Expr && body.head === :block ? strip_lnn(body.args) : Any[body]
-        length(stmts) == 1 || return nothing
-        s = stmts[1]
-        if s isa Expr && s.head === :return
-            isempty(s.args) && return nothing
-            s = s.args[1]
-        end
-        s isa Expr && s.head === :call || return nothing
-        f = s.args[1]
-        (f isa Symbol && !is_operator_name(f)) || return nothing
-        all(fwd_leaf, s.args[2:end]) || return nothing
-        return s
-    end
-    # The names a signature binds, whether a positional argument is typed, and whether one is
-    # typed `Nothing`.
-    function fwd_signature(sig)
-        # Unwrap `where` and a return type, `f(x)::T where {T}`.
-        while sig isa Expr && (sig.head === :where || (sig.head === :(::) &&
-                                                       sig.args[1] isa Expr &&
-                                                       sig.args[1].head in (:call, :where)))
-            sig = sig.args[1]
-        end
-        names = Set{Symbol}()
-        typed = false
-        nothing_arm = false
-        sig isa Expr && sig.head === :call || return names, typed, nothing_arm
-        function bind!(a, positional)
-            if a isa Symbol
-                push!(names, a)
-            elseif a isa Expr && a.head === :parameters
-                foreach(x -> bind!(x, false), a.args)
-            elseif a isa Expr && a.head in (:kw, :(...))
-                bind!(a.args[1], positional)
-            elseif a isa Expr && a.head === :(::)
-                length(a.args) == 2 && a.args[1] isa Symbol && push!(names, a.args[1])
-                if positional
-                    a.args[end] === :Any || (typed = true)
-                    a.args[end] === :Nothing && (nothing_arm = true)
-                end
-            end
-            return nothing
-        end
-        foreach(a -> bind!(a, true), sig.args[2:end])
-        # A method with keywords alone, `f(; a, b)`, is no `Any` fallback.
-        positional = filter(a -> !(a isa Expr && a.head === :parameters), sig.args[2:end])
-        isempty(positional) && (typed = true)
-        return names, typed, nothing_arm
-    end
-    # Whether a method takes keywords alone, `f(; a, b)`.
-    function fwd_keywords_alone(sig)
-        while sig isa Expr && (sig.head === :where || (sig.head === :(::) &&
-                                                       sig.args[1] isa Expr &&
-                                                       sig.args[1].head in (:call, :where)))
-            sig = sig.args[1]
-        end
-        sig isa Expr && sig.head === :call || return false
-        return all(a -> a isa Expr && a.head === :parameters, sig.args[2:end])
-    end
     owned = Set(n for (n, ds) in defs if !all(d -> d[4], ds))
+    methods = reduce(vcat, (CH.method_defs(relpath(f, root), trees[f]) for f in files))
     # (name, callee) => [(file, line)] of every forward method.
-    forwards = Dict{Tuple{Symbol, Symbol}, Vector{Tuple{String, Int}}}()
-    function record_forward!(e, file, line)
-        if CH.isdocstring(e)
-            e.args[2] isa LineNumberNode && (line = e.args[2].line)
-            e = CH.unwrap(e)
-        end
-        e isa Expr || return nothing
-        if e.head === :function || (e.head === :(=) && CH.is_signature(e.args[1]))
-            length(e.args) >= 2 || return nothing
-            name, qual = CH.signature_name(e.args[1])
-            (name === nothing || qual || name in structs || extends_other(name)) &&
-                return nothing
-            call = fwd_call(e.args[2])
-            call === nothing && return nothing
-            callee = call.args[1]
-            (callee in owned || callee in structs) || return nothing
-            names, typed, nothing_arm = fwd_signature(e.args[1])
-            (typed && !nothing_arm) || return nothing
-            any(a -> fwd_passes(a, names), call.args[2:end]) || return nothing
-            callee === name && any(fwd_has_field, call.args[2:end]) && return nothing
-            callee === name && fwd_keywords_alone(e.args[1]) && return nothing
-            push!(get!(forwards, (name, callee), Tuple{String, Int}[]),
-                  (relpath(file, root), line))
-        elseif e.head === :macrocall
-            l = e.args[2] isa LineNumberNode ? e.args[2].line : line
-            record_forward!(e.args[end], file, l)
-        elseif e.head === :module || e.head === :block || e.head === :toplevel
-            for a in (e.head === :module ? e.args[end].args : e.args)
-                a isa LineNumberNode && (line = a.line; continue)
-                record_forward!(a, file, line)
-            end
-        end
-        return nothing
-    end
-    for f in files
-        record_forward!(trees[f], f, 0)
-    end
+    forwards = CH.forward_methods(methods; owned, structs, foreign = extends_other)
     flagged_forwards = sort!(collect(keys(forwards)))
 
     #=

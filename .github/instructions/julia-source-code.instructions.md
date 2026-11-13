@@ -544,6 +544,9 @@ to `descriptor_field_values` and held the other two, and its check did the same 
 `test/test_70_trivial_unit_census.jl` reads each method: a method whose body only forwards fails
 the build unless its name is on an allow-list with reason (a) or (b). A helper that holds a part
 of a job for several forms, and a `Nothing` arm, still hold by review.
+`code_health/forward_survey.jl <file>` reads the shapes of the rulings below, and gives each
+finding the verdict of its ruling. A swept file has no candidate without a ruling, the sixth
+condition of #404.
 
 The two reasons are the whole list. Each of these is a description of a wrapper, not a reason to
 keep it:

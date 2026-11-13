@@ -100,7 +100,9 @@ test also holds the row's `algorithm` count as a floor. Raise
 that count in the same commit when the new unit carries the section. The check measures the count
 with `CodeHealth.algorithm_sections`, the function the test calls, and every row it prints carries
 the measured count. Paste that row. Do not count the sections by hand.
-A swept file also carries no performance trap, the fifth condition of #404 (ADR 0175).
+A swept file also carries no performance trap, the fifth condition of #404 (ADR 0175). Its
+methods meet the wrapper standard, the sixth condition (#2086): the survey of step 2 of *Land the
+branch* reports no candidate without a ruling for the file.
 
 **A new file has no coverage row yet.** The gate ratchets `misses` per file, and a new file enters
 at zero misses. Write the tests, or write the Coverage Exemption with its rationale. Then add the
@@ -122,6 +124,14 @@ of cost, the fast ones first, and the slow ones once, on the tree you will push:
    gate: `julia --project=code_health code_health/<gate>.jl check --against origin/dev` for size,
    complexity, perf and expansion. A scoped run names the foreign rows and does not fail on them.
    A foreign row that is red on `dev` is a defect. File it once.
+   Run the forward survey on each `src/` or `ext/` file that you changed, in one call:
+   `julia --project=code_health code_health/forward_survey.jl <file> <file> …`. It parses the
+   tree in about ten seconds and loads no package. Each finding carries the verdict of a ruling
+   of #2072. A `go` finding that your change adds is a wrapper: give the form to its owner. A
+   `review` finding that your change adds needs a decision of the maintainer: ask before you
+   push. A finding that `test_70` lists as ruled, or that a `keep` verdict covers, needs no work.
+   This is the sixth condition of #404. A finding that you did not add belongs to the build
+   ticket of its directory under #2072, and you leave it.
    **A gate that trips on your own row asks for a decision, not a smaller number.** Lower the
    number only when the lower form is also the better design. When the correct form gives the
    higher number, record the rise with `refresh --accept-rise --files <path>`. The correct form
@@ -202,6 +212,7 @@ The check is a convenience, never an Authority. Another file owns each rule that
 | the reopened map and the sub-issue | ADR 0084 | `.github/workflows/Sweep.yml` |
 | a row in each gate baseline | ADR 0074 | `code_health/<gate>.jl check` |
 | the size ceiling | ADR 0101 | `code_health/size.jl check` |
+| the wrapper standard, the sixth condition | `.github/instructions/julia-source-code.instructions.md` § *A wrapper is for convenience or for a dispatch problem* | `test/test_70_trivial_unit_census.jl`, and `code_health/forward_survey.jl <file>` |
 | a gate measured the pushed tree | `code_health/gate_stamp.sh` | the `gate-stamps` pre-push hook |
 
 `CODING_STANDARDS.md` routes any subject the table does not carry.

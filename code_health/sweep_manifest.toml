@@ -9,7 +9,9 @@
 #          lines are covered or exempted. The fourth condition, that its prose passes `/unslop`,
 #          is carried by the file's sweep ticket and moves this flag neither way. The flag arms
 #          the gates of the docstring standard, so a swept file keeps it while its prose is
-#          re-read.
+#          re-read. The fifth condition, no performance trap, and the sixth, that
+#          `code_health/forward_survey.jl <file>` reports no candidate without a ruling (#2086),
+#          are carried the same way. No closed sweep ticket reopens for either.
 #
 # A row whose `swept` is true carries two more keys:
 #
