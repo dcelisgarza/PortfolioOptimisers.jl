@@ -3,7 +3,7 @@
 
 Register the constraint scale `sc` and the objective scale `so` in the JuMP model.
 
-The constraint scale comes first, in the order in which every head passes `opt.sc, opt.so` from its [`JuMPOptimiser`](@ref). JuMP stores a number given to `@expressions` as the number itself, so `model[:sc]` and `model[:so]` hold `sc` and `so` with their own types.
+The constraint scale comes first, in the order in which every head passes `opt.sc, opt.so` from its [`JuMPOptimiser`](@ref). JuMP stores a number given to `@expression` as the number itself, so `model[:sc]` and `model[:so]` hold `sc` and `so` with their own types.
 
 # JuMP formulation
 
@@ -34,10 +34,8 @@ Where:
   - [`get_objective_scale`](@ref)
 """
 function set_model_scales!(model::JuMP.Model, sc::Number, so::Number)
-    JuMP.@expressions(model, begin
-                          so, so
-                          sc, sc
-                      end)
+    JuMP.@expression(model, so, so)
+    JuMP.@expression(model, sc, sc)
     return nothing
 end
 """

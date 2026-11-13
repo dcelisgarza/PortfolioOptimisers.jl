@@ -202,20 +202,12 @@ function set_relativistic_risk_constraints!(model::JuMP.Model, i::Any, r::RiskMe
     wi = checked_observation_weights(wi, pr.X)
     rows = positive_weight_rows(wi, T)
     N = length(rows)
-    t, z, omega, psi, theta, epsilon = JuMP.@variables(model, begin
-                                                           ()
-                                                           (), (lower_bound = 0)
-                                                           [1:N]
-                                                           [1:N]
-                                                           [1:N]
-                                                           [1:N]
-                                                       end)
-    state_set!(model, prefix, keys.t, i, t)
-    state_set!(model, prefix, keys.z, i, z)
-    state_set!(model, prefix, keys.omega, i, omega)
-    state_set!(model, prefix, keys.psi, i, psi)
-    state_set!(model, prefix, keys.theta, i, theta)
-    state_set!(model, prefix, keys.epsilon, i, epsilon)
+    t = state_set!(model, prefix, keys.t, i, JuMP.@variable(model))
+    z = state_set!(model, prefix, keys.z, i, JuMP.@variable(model, lower_bound = 0))
+    omega = state_set!(model, prefix, keys.omega, i, JuMP.@variable(model, [1:N]))
+    psi = state_set!(model, prefix, keys.psi, i, JuMP.@variable(model, [1:N]))
+    theta = state_set!(model, prefix, keys.theta, i, JuMP.@variable(model, [1:N]))
+    epsilon = state_set!(model, prefix, keys.epsilon, i, JuMP.@variable(model, [1:N]))
     lnk = kappa_log(inv(alpha * T), kappa)
     risk = if isnothing(wi)
         JuMP.@expression(model, t + lnk * z + sum(psi + theta))
@@ -225,24 +217,16 @@ function set_relativistic_risk_constraints!(model::JuMP.Model, i::Any, r::RiskMe
     end
     state_set!(model, prefix, keys.risk, i, risk)
     sr = view(series, rows)
-    pcone_a, pcone_b, exceedance = JuMP.@constraints(model,
-                                                     begin
-                                                         [k = 1:N],
-                                                         [sc * z * opk * ik2,
-                                                          sc * psi[k] * opk * ik,
-                                                          sc * epsilon[k]] in
-                                                         JuMP.MOI.PowerCone(iopk)
-                                                         [k = 1:N],
-                                                         [sc * omega[k] * iomk,
-                                                          sc * theta[k] * ik,
-                                                          -sc * z * ik2] in
-                                                         JuMP.MOI.PowerCone(omk)
-                                                         sc *
-                                                         ((epsilon + omega - sr) .- t) <= 0
-                                                     end)
-    state_set!(model, prefix, keys.pcone_a, i, pcone_a)
-    state_set!(model, prefix, keys.pcone_b, i, pcone_b)
-    state_set!(model, prefix, keys.exceedance, i, exceedance)
+    state_set!(model, prefix, keys.pcone_a, i,
+               JuMP.@constraint(model, [k = 1:N],
+                                [sc * z * opk * ik2, sc * psi[k] * opk * ik,
+                                 sc * epsilon[k]] in JuMP.MOI.PowerCone(iopk)))
+    state_set!(model, prefix, keys.pcone_b, i,
+               JuMP.@constraint(model, [k = 1:N],
+                                [sc * omega[k] * iomk, sc * theta[k] * ik, -sc * z * ik2] in
+                                JuMP.MOI.PowerCone(omk)))
+    state_set!(model, prefix, keys.exceedance, i,
+               JuMP.@constraint(model, sc * ((epsilon + omega - sr) .- t) <= 0))
     set_risk_bounds_and_expression!(model, opt, risk, r.settings, keys.risk, i;
                                     prefix = prefix)
     return risk

@@ -856,18 +856,14 @@ function owa_model_setup(method::OWAJuMP, weights::MatNum)
     model = JuMP.Model()
     max_phi = method.max_phi
     sc = owa_constraint_scale(method.sc, method.alg)
-    JuMP.@variables(model, begin
-                        theta[1:T]
-                        phi[1:N]
-                    end)
-    JuMP.@constraints(model, begin
-                          sc * phi >= 0
-                          sc * (phi .- max_phi) <= 0
-                          sc * (sum(phi) - 1) == 0
-                          sc * (theta - weights * phi) == 0
-                          sc * (phi[2:end] - phi[1:(end - 1)]) <= 0
-                          sc * (theta[2:end] - theta[1:(end - 1)]) >= 0
-                      end)
+    JuMP.@variable(model, theta[1:T])
+    JuMP.@variable(model, phi[1:N])
+    JuMP.@constraint(model, sc * phi >= 0)
+    JuMP.@constraint(model, sc * (phi .- max_phi) <= 0)
+    JuMP.@constraint(model, sc * (sum(phi) - 1) == 0)
+    JuMP.@constraint(model, sc * (theta - weights * phi) == 0)
+    JuMP.@constraint(model, sc * (phi[2:end] - phi[1:(end - 1)]) <= 0)
+    JuMP.@constraint(model, sc * (theta[2:end] - theta[1:(end - 1)]) >= 0)
     return model
 end
 """

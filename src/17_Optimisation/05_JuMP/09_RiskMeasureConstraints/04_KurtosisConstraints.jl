@@ -149,10 +149,8 @@ Return the spectrum of the prior's cokurtosis matrix, and register it in the mod
 function get_kt_Akt_pm(model::JuMP.Model, pr::HighOrderPrior)
     if !shared_has(model, :vecs_Akt)
         vals_A, vecs_A = cokurtosis_spectrum(pr.kt, length(pr.mu))
-        JuMP.@expressions(model, begin
-                              vecs_Akt, vecs_A
-                              vals_Akt, vals_A
-                          end)
+        JuMP.@expression(model, vecs_Akt, vecs_A)
+        JuMP.@expression(model, vals_Akt, vals_A)
     end
     return shared_get(model, :vals_Akt), shared_get(model, :vecs_Akt)
 end
@@ -394,12 +392,9 @@ function set_risk_constraints!(model::JuMP.Model, i::Any,
     N = size(W, 1)
     f = clamp(r.N, 1, N)
     Nf = f * N
-    sqrt_kurtosis_risk, x_kurt = JuMP.@variables(model, begin
-                                                     ()
-                                                     [1:Nf]
-                                                 end)
-    state_set!(model, prefix, :kurtosis_risk_, i, sqrt_kurtosis_risk)
-    state_set!(model, prefix, :x_kurt_, i, x_kurt)
+    sqrt_kurtosis_risk = state_set!(model, prefix, :kurtosis_risk_, i,
+                                    JuMP.@variable(model))
+    x_kurt = state_set!(model, prefix, :x_kurt_, i, JuMP.@variable(model, [1:Nf]))
     vals_A, vecs_A = if isnothing(r.kt)
         get_kt_Akt_pm(model, pr)
     else
@@ -409,18 +404,14 @@ function set_risk_constraints!(model::JuMP.Model, i::Any,
     N_eig = length(vals_A)
     Bi = [reshape(sqrt(vals_A[N_eig - j]) * view(vecs_A, :, N_eig - j), N, N)
           for j in 0:(Nf - 1)]
-    capprox_kurt_soc, capprox_kurt = JuMP.@constraints(model,
-                                                       begin
-                                                           [sc * sqrt_kurtosis_risk
-                                                            sc * x_kurt] in
-                                                           JuMP.SecondOrderCone()
-                                                           [j = 1:Nf],
-                                                           sc * (x_kurt[j] -
-                                                                 LinearAlgebra.dot(transpose(Bi[j]),
-                                                                                   W)) == 0
-                                                       end)
-    state_set!(model, prefix, :capprox_kurt_soc_, i, capprox_kurt_soc)
-    state_set!(model, prefix, :capprox_kurt_, i, capprox_kurt)
+    state_set!(model, prefix, :capprox_kurt_soc_, i,
+               JuMP.@constraint(model,
+                                [sc * sqrt_kurtosis_risk; sc * x_kurt] in
+                                JuMP.SecondOrderCone()))
+    state_set!(model, prefix, :capprox_kurt_, i,
+               JuMP.@constraint(model, [j = 1:Nf],
+                                sc * (x_kurt[j] - LinearAlgebra.dot(transpose(Bi[j]), W)) ==
+                                0))
     return set_kurtosis_risk!(model, r, opt, sqrt_kurtosis_risk, x_kurt, i; prefix = prefix)
 end
 """

@@ -126,7 +126,7 @@ Add budget constraints to the JuMP optimisation model.
 
 The fall-through method does nothing. The concrete methods add the appropriate portfolio budget constraint based on the type of budget specification provided.
 
-A number and a [`BudgetRange`](@ref) register their rows under `prefix`, the namespace of the block whose owner states the budget. A budget that pays costs registers its trade variables and its cost expression in the shared Model State, because they measure the trade of the one weight vector. So it goes on the first block of a model, the block of its owner, and refuses a non-empty `prefix`.
+A number and a [`BudgetRange`](@ref) register their rows under `prefix`, the namespace of the block whose owner states the budget. A budget that pays costs registers its trade variables, its cost expression and its rows in the shared Model State, because they measure the trade of the one weight vector. The rows are `wp_ub` and `wn_ub`, the bounds of the trades, `cost_bgt_trade`, the trade of the weights from the reference, and for [`BudgetMarketImpact`](@ref) the power cones `wip_pcone` and `win_pcone`. So it goes on the first block of a model, the block of its owner, and refuses a non-empty `prefix`.
 
 # Mathematical definition
 
@@ -1136,15 +1136,11 @@ function set_budget_constraints!(model::JuMP.Model, bgt::BudgetCosts, w::VecNum;
     k = get_k(model)
     sc = get_constraint_scale(model)
     N = length(w)
-    JuMP.@variables(model, begin
-                        wp[1:N], (lower_bound = 0)
-                        wn[1:N], (lower_bound = 0)
-                    end)
-    JuMP.@constraints(model, begin
-                          sc * (wp ⊖ up * k) <= 0
-                          sc * (wn ⊖ un * k) <= 0
-                          sc * (w - wb * k - wp + wn) == 0
-                      end)
+    JuMP.@variable(model, wp[1:N], lower_bound = 0)
+    JuMP.@variable(model, wn[1:N], lower_bound = 0)
+    JuMP.@constraint(model, wp_ub, sc * (wp ⊖ up * k) <= 0)
+    JuMP.@constraint(model, wn_ub, sc * (wn ⊖ un * k) <= 0)
+    JuMP.@constraint(model, cost_bgt_trade, sc * (w - wb * k - wp + wn) == 0)
     set_cost_budget_constraints!(model, bgt.vp, bgt.vn, bgt.bgt, w, wp, wn)
     return nothing
 end
@@ -1158,22 +1154,17 @@ function set_budget_constraints!(model::JuMP.Model, bgt::BudgetMarketImpact, w::
     beta = bgt.beta
     sc = get_constraint_scale(model)
     N = length(w)
-    JuMP.@variables(model, begin
-                        wp[1:N], (lower_bound = 0)
-                        wn[1:N], (lower_bound = 0)
-                        wip[1:N]
-                        win[1:N]
-                    end)
-    JuMP.@constraints(model,
-                      begin
-                          sc * (wp ⊖ up * k) <= 0
-                          sc * (wn ⊖ un * k) <= 0
-                          sc * (w - wb * k - wp + wn) == 0
-                          [i = 1:N],
-                          [sc * wip[i], sc * k, sc * wp[i]] in JuMP.MOI.PowerCone(beta)
-                          [i = 1:N],
-                          [sc * win[i], sc * k, sc * wn[i]] in JuMP.MOI.PowerCone(beta)
-                      end)
+    JuMP.@variable(model, wp[1:N], lower_bound = 0)
+    JuMP.@variable(model, wn[1:N], lower_bound = 0)
+    JuMP.@variable(model, wip[1:N])
+    JuMP.@variable(model, win[1:N])
+    JuMP.@constraint(model, wp_ub, sc * (wp ⊖ up * k) <= 0)
+    JuMP.@constraint(model, wn_ub, sc * (wn ⊖ un * k) <= 0)
+    JuMP.@constraint(model, cost_bgt_trade, sc * (w - wb * k - wp + wn) == 0)
+    JuMP.@constraint(model, wip_pcone[i = 1:N],
+                     [sc * wip[i], sc * k, sc * wp[i]] in JuMP.MOI.PowerCone(beta))
+    JuMP.@constraint(model, win_pcone[i = 1:N],
+                     [sc * win[i], sc * k, sc * wn[i]] in JuMP.MOI.PowerCone(beta))
     set_cost_budget_constraints!(model, bgt.vp, bgt.vn, bgt.bgt, w, wip, win)
     return nothing
 end

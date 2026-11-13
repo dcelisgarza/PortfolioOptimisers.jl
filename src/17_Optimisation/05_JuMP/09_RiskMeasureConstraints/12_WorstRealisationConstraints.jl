@@ -41,12 +41,15 @@ function set_wr_risk_expression!(model::JuMP.Model, X::MatNum; loss::Bool = true
     return state_build!(model, prefix, key1) do
         sc = get_constraint_scale(model)
         net_X = set_net_portfolio_returns!(model, X; prefix = prefix)
-        if !loss
-            net_X = -net_X
-        end
         wr_risk = JuMP.@variable(model)
-        state_set!(model, prefix, key2,
-                   JuMP.@constraint(model, sc * (wr_risk .+ net_X) >= 0))
+        # The gain tail subtracts `net_X` inside the macro, which builds the row on one copy
+        # of the series. A negated copy made before the macro costs a second copy (#2062).
+        cwr = if loss
+            JuMP.@constraint(model, sc * (wr_risk .+ net_X) >= 0)
+        else
+            JuMP.@constraint(model, sc * (wr_risk .- net_X) >= 0)
+        end
+        state_set!(model, prefix, key2, cwr)
         return wr_risk
     end
 end

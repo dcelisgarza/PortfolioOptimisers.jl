@@ -540,13 +540,10 @@ function set_relaxed_risk_budgeting_alg_constraints!(::RegularisedRelaxedRiskBud
     sc = get_constraint_scale(model)
     psi = shared_get(model, :psi)
     JuMP.@variable(model, rho >= 0)
-    JuMP.@constraints(model,
-                      begin
-                          creg_rrp_soc_1,
-                          [sc * psi; sc * Gw; sc * rho] in JuMP.SecondOrderCone()
-                          creg_rrp_soc_2,
-                          [sc * rho; sc * sqrt(n) * Gw] in JuMP.SecondOrderCone()
-                      end)
+    JuMP.@constraint(model, creg_rrp_soc_1,
+                     [sc * psi; sc * Gw; sc * rho] in JuMP.SecondOrderCone())
+    JuMP.@constraint(model, creg_rrp_soc_2,
+                     [sc * rho; sc * sqrt(n) * Gw] in JuMP.SecondOrderCone())
     return nothing
 end
 function set_relaxed_risk_budgeting_alg_constraints!(alg::RegularisedPenalisedRelaxedRiskBudgeting,
@@ -557,13 +554,10 @@ function set_relaxed_risk_budgeting_alg_constraints!(alg::RegularisedPenalisedRe
     psi = shared_get(model, :psi)
     theta = sqrt.(n * alg.p * LinearAlgebra.diag(sigma_z))
     JuMP.@variable(model, rho >= 0)
-    JuMP.@constraints(model,
-                      begin
-                          creg_pen_rrp_soc_1,
-                          [sc * psi; sc * Gw; sc * rho] in JuMP.SecondOrderCone()
-                          creg_pen_rrp_soc_2,
-                          [sc * rho; sc * (theta .* z)] in JuMP.SecondOrderCone()
-                      end)
+    JuMP.@constraint(model, creg_pen_rrp_soc_1,
+                     [sc * psi; sc * Gw; sc * rho] in JuMP.SecondOrderCone())
+    JuMP.@constraint(model, creg_pen_rrp_soc_2,
+                     [sc * rho; sc * (theta .* z)] in JuMP.SecondOrderCone())
     return nothing
 end
 """
@@ -657,21 +651,16 @@ function _set_relaxed_risk_budgeting_constraints!(model::JuMP.Model,
     rb = rkb.val / sum(rkb.val)
     @argcheck(length(rb) == N, DimensionMismatch("rb ($(length(rb))) must match N ($N)"))
     sc = get_constraint_scale(model)
-    JuMP.@variables(model, begin
-                        psi >= 0
-                        gamma >= 0
-                        zeta[1:N] >= 0
-                    end)
+    JuMP.@variable(model, psi >= 0)
+    JuMP.@variable(model, gamma >= 0)
+    JuMP.@variable(model, zeta[1:N] >= 0)
     JuMP.@expression(model, risk, psi - gamma)
     # RRB constraints.
-    JuMP.@constraints(model,
-                      begin
-                          crrp, sc * (zeta - A * w) == 0
-                          crrp_soc[i = 1:N],
-                          [sc * (x[i] + zeta[i])
-                           sc * (2 * gamma * sqrt(rb[i]))
-                           sc * (x[i] - zeta[i])] in JuMP.SecondOrderCone()
-                      end)
+    JuMP.@constraint(model, crrp, sc * (zeta - A * w) == 0)
+    JuMP.@constraint(model, crrp_soc[i = 1:N],
+                     [sc * (x[i] + zeta[i])
+                      sc * (2 * gamma * sqrt(rb[i]))
+                      sc * (x[i] - zeta[i])] in JuMP.SecondOrderCone())
     G = isnothing(chol) ? transpose(matrix_square_root(rrb.mtx_sqrt, sigma)) : chol
     set_relaxed_risk_budgeting_alg_constraints!(rrb.alg, model, N, G * w, z, sigma_z)
     return rkb

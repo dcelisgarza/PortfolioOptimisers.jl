@@ -191,17 +191,14 @@ function set_weight_parts!(model::JuMP.Model, w::AbstractVector, ::Symbol)::Noth
     N = length(w)
     sc = get_constraint_scale(model)
     lw, sw = if !shared_has(model, :sw)
-        JuMP.@variables(model, begin
-                            lw[1:N] >= 0
-                            sw[1:N] >= 0
-                        end)
+        JuMP.@variable(model, lw[1:N] >= 0)
+        JuMP.@variable(model, sw[1:N] >= 0)
+        lw, sw
     else
         shared_get(model, :lw), shared_get(model, :sw)
     end
-    JuMP.@constraints(model, begin
-                          w_lw, sc * (w - lw) <= 0
-                          w_sw, sc * (w + sw) >= 0
-                      end)
+    JuMP.@constraint(model, w_lw, sc * (w - lw) <= 0)
+    JuMP.@constraint(model, w_sw, sc * (w + sw) >= 0)
     # Only a declaration when no head made a stronger one: a head that derives `w` from the
     # parts runs this too, and its identity survives these bounds.
     set_decomposition_contract!(model, PartsBoundWeights())

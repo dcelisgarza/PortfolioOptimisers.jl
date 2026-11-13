@@ -117,16 +117,11 @@ function set_power_norm_risk_constraints!(model::JuMP.Model, i::Any, r::RiskMeas
     wi = checked_observation_weights(wi, pr.X)
     rows = positive_weight_rows(wi, T)
     N = length(rows)
-    eta, t, slack, v = JuMP.@variables(model, begin
-                                           ()
-                                           ()
-                                           [1:N], (lower_bound = 0)
-                                           [1:N]
-                                       end)
-    state_set!(model, prefix, keys.eta, i, eta)
-    state_set!(model, prefix, keys.t, i, t)
-    state_set!(model, prefix, keys.slack, i, slack)
-    state_set!(model, prefix, keys.v, i, v)
+    eta = state_set!(model, prefix, keys.eta, i, JuMP.@variable(model))
+    t = state_set!(model, prefix, keys.t, i, JuMP.@variable(model))
+    slack = state_set!(model, prefix, keys.slack, i,
+                       JuMP.@variable(model, [1:N], lower_bound = 0))
+    v = state_set!(model, prefix, keys.v, i, JuMP.@variable(model, [1:N]))
     iaT = if isnothing(wi)
         state_set!(model, prefix, keys.budget, i,
                    JuMP.@constraint(model, sc * (sum(v) - t) <= 0))
@@ -137,15 +132,12 @@ function set_power_norm_risk_constraints!(model::JuMP.Model, i::Any, r::RiskMeas
                                     sc * (LinearAlgebra.dot(view(wi, rows), v) - t) <= 0))
         inv(r.alpha * sum(wi)^ip)
     end
-    exceedance, pcone = JuMP.@constraints(model,
-                                          begin
-                                              sc * ((series[rows] + slack) .+ eta) >= 0
-                                              [k = 1:N],
-                                              [sc * v[k], sc * t, sc * slack[k]] in
-                                              JuMP.MOI.PowerCone(ip)
-                                          end)
-    state_set!(model, prefix, keys.exceedance, i, exceedance)
-    state_set!(model, prefix, keys.pcone, i, pcone)
+    state_set!(model, prefix, keys.exceedance, i,
+               JuMP.@constraint(model, sc * ((series[rows] + slack) .+ eta) >= 0))
+    state_set!(model, prefix, keys.pcone, i,
+               JuMP.@constraint(model, [k = 1:N],
+                                [sc * v[k], sc * t, sc * slack[k]] in
+                                JuMP.MOI.PowerCone(ip)))
     risk = state_set!(model, prefix, keys.risk, i, JuMP.@expression(model, eta + iaT * t))
     set_risk_bounds_and_expression!(model, opt, risk, r.settings, keys.risk, i;
                                     prefix = prefix)

@@ -5,7 +5,7 @@
 julia = "1.13.3"
 code_complexity = "0.2.0"
 julia_syntax = "1.0.2"
-commit = "19ed69fece"
+commit = "00744f4fcc"
 
 [file]
 "ext/PortfolioOptimisersPlotsExt/01_CumulativeReturnsPlots.jl" = { cyc = 5, cog = 7, arg = 8, cyc_sum = 53, cog_sum = 57, arg_sum = 99, macros = [] }
@@ -384,7 +384,7 @@ commit = "19ed69fece"
 "src/17_Optimisation/05_JuMP/09_RiskMeasureConstraints/09_UlcerIndexConstraints.jl" = { cyc = 2, cog = 2, arg = 8, cyc_sum = 2, cog_sum = 2, arg_sum = 8, macros = [] }
 "src/17_Optimisation/05_JuMP/09_RiskMeasureConstraints/10_MaximumDrawdownConstraints.jl" = { cyc = 1, cog = 0, arg = 8, cyc_sum = 1, cog_sum = 0, arg_sum = 8, macros = [] }
 "src/17_Optimisation/05_JuMP/09_RiskMeasureConstraints/11_BrownianDistanceVarianceConstraints.jl" = { cyc = 1, cog = 0, arg = 8, cyc_sum = 5, cog_sum = 0, arg_sum = 28, macros = [] }
-"src/17_Optimisation/05_JuMP/09_RiskMeasureConstraints/12_WorstRealisationConstraints.jl" = { cyc = 2, cog = 2, arg = 9, cyc_sum = 3, cog_sum = 2, arg_sum = 13, macros = [] }
+"src/17_Optimisation/05_JuMP/09_RiskMeasureConstraints/12_WorstRealisationConstraints.jl" = { cyc = 2, cog = 3, arg = 9, cyc_sum = 3, cog_sum = 3, arg_sum = 13, macros = [] }
 "src/17_Optimisation/05_JuMP/09_RiskMeasureConstraints/13_NoRiskConstraints.jl" = { cyc = 1, cog = 0, arg = 9, cyc_sum = 1, cog_sum = 0, arg_sum = 9, macros = [] }
 "src/17_Optimisation/05_JuMP/09_RiskMeasureConstraints/14_RangeConstraints.jl" = { cyc = 1, cog = 0, arg = 8, cyc_sum = 1, cog_sum = 0, arg_sum = 8, macros = [] }
 "src/17_Optimisation/05_JuMP/09_RiskMeasureConstraints/15_TurnoverRiskMeasureConstraints.jl" = { cyc = 1, cog = 0, arg = 8, cyc_sum = 1, cog_sum = 0, arg_sum = 8, macros = [] }

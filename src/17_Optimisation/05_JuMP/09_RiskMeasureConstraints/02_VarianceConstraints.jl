@@ -1031,14 +1031,11 @@ function set_ucs_variance_risk!(model::JuMP.Model, i::Any, ucs::EllipsoidalUncer
     k = ucs.k
     G = transpose(matrix_square_root(mtx_sqrt, ucs.sigma))
     t_eucs = state_set!(model, prefix, :t_eucs, i, JuMP.@variable(model))
-    x_eucs, ucs_variance_risk = JuMP.@expressions(model,
-                                                  begin
-                                                      G * vec(WpE)
-                                                      LinearAlgebra.dot(transpose(sigma),
-                                                                        WpE) + k * t_eucs
-                                                  end)
-    state_set!(model, prefix, :x_eucs, i, x_eucs)
-    state_set!(model, prefix, :eucs_variance_risk_, i, ucs_variance_risk)
+    x_eucs = state_set!(model, prefix, :x_eucs, i, JuMP.@expression(model, G * vec(WpE)))
+    ucs_variance_risk = state_set!(model, prefix, :eucs_variance_risk_, i,
+                                   JuMP.@expression(model,
+                                                    LinearAlgebra.dot(transpose(sigma),
+                                                                      WpE) + k * t_eucs))
     state_set!(model, prefix, :ge_soc, i,
                JuMP.@constraint(model,
                                 [sc * t_eucs; sc * x_eucs] in JuMP.SecondOrderCone()))

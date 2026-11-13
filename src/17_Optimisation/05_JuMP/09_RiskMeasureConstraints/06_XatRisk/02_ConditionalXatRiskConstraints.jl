@@ -176,12 +176,8 @@ function set_conditional_risk_constraints!(model::JuMP.Model, i::Any, r::RiskMea
                                             bound = keys.exceedance); prefix = prefix)
     end
     sc = get_constraint_scale(model)
-    var, z = JuMP.@variables(model, begin
-                                 ()
-                                 [1:T], (lower_bound = 0)
-                             end)
-    state_set!(model, prefix, keys.var, i, var)
-    state_set!(model, prefix, keys.z, i, z)
+    var = state_set!(model, prefix, keys.var, i, JuMP.@variable(model))
+    z = state_set!(model, prefix, keys.z, i, JuMP.@variable(model, [1:T], lower_bound = 0))
     risk = if isnothing(wi)
         iat = inv(r.alpha * T)
         JuMP.@expression(model, var + sum(z) * iat)
@@ -349,24 +345,19 @@ function set_dr_conditional_risk_constraints!(model::JuMP.Model, i::Any, r::Risk
     a1 = -one(alpha)
     a2 = -one(alpha) - b1 * inv(alpha)
     b2 = b1 * (one(alpha) - inv(alpha))
-    lb, tau, s, tu, tv, u, v = JuMP.@variables(model, begin
-                                                   ()
-                                                   ()
-                                                   [1:T]
-                                                   [1:T]
-                                                   [1:T]
-                                                   [1:T, 1:N], (lower_bound = 0)
-                                                   [1:T, 1:N], (lower_bound = 0)
-                                               end)
-    state_set!(model, prefix, keys.lb, i, lb)
-    state_set!(model, prefix, keys.tau, i, tau)
-    state_set!(model, prefix, keys.s, i, s)
-    state_set!(model, prefix, keys.tu, i, tu)
-    state_set!(model, prefix, keys.tv, i, tv)
-    state_set!(model, prefix, keys.u, i, u)
-    state_set!(model, prefix, keys.v, i, v)
-    u_cost = vec(sum(u .* ambiguity; dims = 2))
-    v_cost = vec(sum(v .* ambiguity; dims = 2))
+    lb = state_set!(model, prefix, keys.lb, i, JuMP.@variable(model))
+    tau = state_set!(model, prefix, keys.tau, i, JuMP.@variable(model))
+    s = state_set!(model, prefix, keys.s, i, JuMP.@variable(model, [1:T]))
+    tu = state_set!(model, prefix, keys.tu, i, JuMP.@variable(model, [1:T]))
+    tv = state_set!(model, prefix, keys.tv, i, JuMP.@variable(model, [1:T]))
+    u = state_set!(model, prefix, keys.u, i,
+                   JuMP.@variable(model, [1:T, 1:N], lower_bound = 0))
+    v = state_set!(model, prefix, keys.v, i,
+                   JuMP.@variable(model, [1:T, 1:N], lower_bound = 0))
+    # One `dot` for each row. `sum(u .* ambiguity; dims = 2)` reduces with a plain `+` and
+    # copies each partial sum, which cost 781 MiB for each row on 1000 × 100 (#2062).
+    u_cost = [LinearAlgebra.dot(view(ambiguity, t, :), view(u, t, :)) for t in 1:T]
+    v_cost = [LinearAlgebra.dot(view(ambiguity, t, :), view(v, t, :)) for t in 1:T]
     state_set!(model, prefix, keys.cu, i,
                JuMP.@constraint(model, sc * (b1 * tau .+ (a1 * series + u_cost - s)) <= 0))
     state_set!(model, prefix, keys.cv, i,

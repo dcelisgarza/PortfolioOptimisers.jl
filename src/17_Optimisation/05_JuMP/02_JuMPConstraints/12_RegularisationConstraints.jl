@@ -1029,21 +1029,14 @@ function set_lp_regularisation!(model::JuMP.Model, lps::LpReg_VecLpReg;
     for (i, lp) in enumerate(lps)
         val = lp.val
         p_inv = inv(lp.p)
-        t_lp, r_lp = JuMP.@variables(model, begin
-                                         ()
-                                         [1:N]
-                                     end)
-        state_set!(model, prefix, :t_lp_, i, t_lp)
-        state_set!(model, prefix, :r_lp_, i, r_lp)
-        clp, cslp = JuMP.@constraints(model,
-                                      begin
-                                          [i = 1:N],
-                                          [sc * r_lp[i], sc * t_lp, sc * w[i]] in
-                                          JuMP.MOI.PowerCone(p_inv)
-                                          sc * (sum(r_lp) - t_lp) == 0
-                                      end)
-        state_set!(model, prefix, :clp_, i, clp)
-        state_set!(model, prefix, :cslp_, i, cslp)
+        t_lp = state_set!(model, prefix, :t_lp_, i, JuMP.@variable(model))
+        r_lp = state_set!(model, prefix, :r_lp_, i, JuMP.@variable(model, [1:N]))
+        state_set!(model, prefix, :clp_, i,
+                   JuMP.@constraint(model, [i = 1:N],
+                                    [sc * r_lp[i], sc * t_lp, sc * w[i]] in
+                                    JuMP.MOI.PowerCone(p_inv)))
+        state_set!(model, prefix, :cslp_, i,
+                   JuMP.@constraint(model, sc * (sum(r_lp) - t_lp) == 0))
         lp_expr = state_set!(model, prefix, :lp_, i, JuMP.@expression(model, val * t_lp))
         add_to_objective_penalty!(model, lp_expr)
     end

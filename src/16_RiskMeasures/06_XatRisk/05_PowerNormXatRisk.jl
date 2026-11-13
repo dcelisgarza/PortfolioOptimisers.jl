@@ -253,12 +253,10 @@ function PRM_model(x::VecNum, slv::Slv_VecSlv, alpha::Number, p::Number,
     ip = inv(p)
     model = JuMP.Model()
     JuMP.set_string_names_on_creation(model, false)
-    JuMP.@variables(model, begin
-                        pvar_eta
-                        pvar_t
-                        pvar_w[1:N] >= 0
-                        pvar_v[1:N]
-                    end)
+    JuMP.@variable(model, pvar_eta)
+    JuMP.@variable(model, pvar_t)
+    JuMP.@variable(model, pvar_w[1:N] >= 0)
+    JuMP.@variable(model, pvar_v[1:N])
     iaT = if isnothing(w)
         JuMP.@constraint(model, sum(pvar_v) - pvar_t <= 0)
         inv(alpha * T^ip)
@@ -266,12 +264,9 @@ function PRM_model(x::VecNum, slv::Slv_VecSlv, alpha::Number, p::Number,
         JuMP.@constraint(model, LinearAlgebra.dot(view(w, rows), pvar_v) - pvar_t <= 0)
         inv(alpha * sum(w)^ip)
     end
-    JuMP.@constraints(model,
-                      begin
-                          prm_loss, (xr + pvar_w) .+ pvar_eta >= 0
-                          [k = 1:N],
-                          [pvar_v[k], pvar_t, pvar_w[k]] in JuMP.MOI.PowerCone(ip)
-                      end)
+    JuMP.@constraint(model, prm_loss, (xr + pvar_w) .+ pvar_eta >= 0)
+    JuMP.@constraint(model, [k = 1:N],
+                     [pvar_v[k], pvar_t, pvar_w[k]] in JuMP.MOI.PowerCone(ip))
     JuMP.@objective(model, Min, pvar_eta + iaT * pvar_t)
     return if optimise_JuMP_model!(model, slv).success
         model

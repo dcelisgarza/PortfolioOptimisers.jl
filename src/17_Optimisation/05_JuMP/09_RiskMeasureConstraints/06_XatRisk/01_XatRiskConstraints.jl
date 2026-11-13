@@ -125,12 +125,8 @@ function set_mip_quantile_risk_constraints!(model::JuMP.Model, i::Any, r::RiskMe
                                             b::Number, s::Number, keys::NamedTuple;
                                             prefix::Symbol = Symbol(""))
     sc = get_constraint_scale(model)
-    risk, z = JuMP.@variables(model, begin
-                                  ()
-                                  [1:T], (binary = true)
-                              end)
-    state_set!(model, prefix, keys.risk, i, risk)
-    state_set!(model, prefix, keys.z, i, z)
+    risk = state_set!(model, prefix, keys.risk, i, JuMP.@variable(model))
+    z = state_set!(model, prefix, keys.z, i, JuMP.@variable(model, [1:T], binary = true))
     alpha = r.alpha
     wi = nothing_scalar_array_selector(r.w, pr.w)
     wi = checked_observation_weights(wi, pr.X)
@@ -382,12 +378,10 @@ function set_risk_constraints!(model::JuMP.Model, i::Any,
                                        :g_var_range_, :cvar_range_soc_; prefix = prefix)
     var_range_mu = state_set!(model, prefix, :var_range_mu_, i,
                               JuMP.@expression(model, LinearAlgebra.dot(mu, w)))
-    var_risk_l, var_risk_h = JuMP.@expressions(model, begin
-                                                   -var_range_mu + z_l * g_var
-                                                   -var_range_mu + z_h * g_var
-                                               end)
-    state_set!(model, prefix, :var_risk_l_, i, var_risk_l)
-    state_set!(model, prefix, :var_risk_h_, i, var_risk_h)
+    var_risk_l = state_set!(model, prefix, :var_risk_l_, i,
+                            JuMP.@expression(model, -var_range_mu + z_l * g_var))
+    var_risk_h = state_set!(model, prefix, :var_risk_h_, i,
+                            JuMP.@expression(model, -var_range_mu + z_h * g_var))
     var_range_risk = state_set!(model, prefix, :var_range_risk_, i,
                                 JuMP.@expression(model, var_risk_l - var_risk_h))
     set_risk_bounds_and_expression!(model, opt, var_range_risk, r.settings,

@@ -74,15 +74,11 @@ function _set_turnover_constraints!(model::JuMP.Model, tn::Turnover, i::Integer 
     val = tn.val
     t_tn = state_set!(model, prefix, :t_tn_, i, JuMP.@variable(model, [1:N]))
     tn = state_set!(model, prefix, :tn_, i, JuMP.@expression(model, w - wb * k))
-    ctn_noc, ctn = JuMP.@constraints(model,
-                                     begin
-                                         [i = 1:N],
-                                         [sc * t_tn[i]
-                                          sc * tn[i]] in JuMP.MOI.NormOneCone(2)
-                                         sc * (t_tn ⊖ val * k) <= 0
-                                     end)
-    state_set!(model, prefix, :ctn_noc_, i, ctn_noc)
-    state_set!(model, prefix, :ctn_, i, ctn)
+    state_set!(model, prefix, :ctn_noc_, i,
+               JuMP.@constraint(model, [i = 1:N],
+                                [sc * t_tn[i]
+                                 sc * tn[i]] in JuMP.MOI.NormOneCone(2)))
+    state_set!(model, prefix, :ctn_, i, JuMP.@constraint(model, sc * (t_tn ⊖ val * k) <= 0))
     return nothing
 end
 function set_turnover_constraints!(model::JuMP.Model, tns::Tn_VecTn;

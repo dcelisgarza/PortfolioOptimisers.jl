@@ -223,14 +223,12 @@ function RRM_model(x::VecNum, slv::Slv_VecSlv, alpha::Number, kappa::Number,
     xr = view(x, rows)
     model = JuMP.Model()
     JuMP.set_string_names_on_creation(model, false)
-    JuMP.@variables(model, begin
-                        t
-                        z >= 0
-                        omega[1:N]
-                        psi[1:N]
-                        theta[1:N]
-                        epsilon[1:N]
-                    end)
+    JuMP.@variable(model, t)
+    JuMP.@variable(model, z >= 0)
+    JuMP.@variable(model, omega[1:N])
+    JuMP.@variable(model, psi[1:N])
+    JuMP.@variable(model, theta[1:N])
+    JuMP.@variable(model, epsilon[1:N])
     ln_k = kappa_log(inv(alpha * T), kappa)
     if isnothing(w)
         JuMP.@expression(model, risk, t + ln_k * z + sum(psi + theta))
@@ -238,46 +236,32 @@ function RRM_model(x::VecNum, slv::Slv_VecSlv, alpha::Number, kappa::Number,
         wi = view(w / sum(w), rows)
         JuMP.@expression(model, risk, t + ln_k * z + T * LinearAlgebra.dot(wi, psi + theta))
     end
-    JuMP.@constraints(model,
-                      begin
-                          [k = 1:N],
-                          [z * opk * ik2, psi[k] * opk * ik, epsilon[k]] in
-                          JuMP.MOI.PowerCone(iopk)
-                          [k = 1:N],
-                          [omega[k] * iomk, theta[k] * ik, -z * ik2] in
-                          JuMP.MOI.PowerCone(omk)
-                          rrm_loss, (epsilon + omega - xr) .- t <= 0
-                      end)
+    JuMP.@constraint(model, [k = 1:N],
+                     [z * opk * ik2, psi[k] * opk * ik, epsilon[k]] in
+                     JuMP.MOI.PowerCone(iopk))
+    JuMP.@constraint(model, [k = 1:N],
+                     [omega[k] * iomk, theta[k] * ik, -z * ik2] in JuMP.MOI.PowerCone(omk))
+    JuMP.@constraint(model, rrm_loss, (epsilon + omega - xr) .- t <= 0)
     JuMP.@objective(model, Min, risk)
     return if optimise_JuMP_model!(model, slv).success
         (; model = model, primal = true)
     else
         model = JuMP.Model()
         JuMP.set_string_names_on_creation(model, false)
-        JuMP.@variables(model, begin
-                            z[1:N]
-                            nu[1:N]
-                            tau[1:N]
-                        end)
-        JuMP.@constraints(model, begin
-                              sum(z) - 1 == 0
-                              sum(nu - tau) * ik2 - ln_k <= 0
-                          end)
+        JuMP.@variable(model, z[1:N])
+        JuMP.@variable(model, nu[1:N])
+        JuMP.@variable(model, tau[1:N])
+        JuMP.@constraint(model, sum(z) - 1 == 0)
+        JuMP.@constraint(model, sum(nu - tau) * ik2 - ln_k <= 0)
         JuMP.@expression(model, risk, -LinearAlgebra.dot(z, xr))
         if isnothing(w)
-            JuMP.@constraints(model,
-                              begin
-                                  [k = 1:N], [nu[k], 1, z[k]] in JuMP.MOI.PowerCone(iopk)
-                                  [k = 1:N], [z[k], 1, tau[k]] in JuMP.MOI.PowerCone(omk)
-                              end)
+            JuMP.@constraint(model, [k = 1:N], [nu[k], 1, z[k]] in JuMP.MOI.PowerCone(iopk))
+            JuMP.@constraint(model, [k = 1:N], [z[k], 1, tau[k]] in JuMP.MOI.PowerCone(omk))
         else
-            JuMP.@constraints(model,
-                              begin
-                                  [k = 1:N],
-                                  [nu[k], wi[k] * T, z[k]] in JuMP.MOI.PowerCone(iopk)
-                                  [k = 1:N],
-                                  [z[k], wi[k] * T, tau[k]] in JuMP.MOI.PowerCone(omk)
-                              end)
+            JuMP.@constraint(model, [k = 1:N],
+                             [nu[k], wi[k] * T, z[k]] in JuMP.MOI.PowerCone(iopk))
+            JuMP.@constraint(model, [k = 1:N],
+                             [z[k], wi[k] * T, tau[k]] in JuMP.MOI.PowerCone(omk))
         end
         JuMP.@objective(model, Max, risk)
         if optimise_JuMP_model!(model, slv).success

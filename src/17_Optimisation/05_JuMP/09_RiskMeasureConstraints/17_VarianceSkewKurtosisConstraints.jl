@@ -158,20 +158,15 @@ function set_risk_constraints!(model::JuMP.Model, i::Any, r::VarianceSkewKurtosi
     end
     W2 = state_get(model, prefix, :W2_vr_sk_kt)
     W3 = state_get(model, prefix, :W3_vr_sk_kt)
-    vr_risk, sk_risk, kt_risk = JuMP.@expressions(model,
-                                                  begin
-                                                      LinearAlgebra.dot(transpose(sigma),
-                                                                        W1)
-                                                      LinearAlgebra.dot(transpose(sk * D2),
-                                                                        W2)
-                                                      LinearAlgebra.dot(transpose(S2 *
-                                                                                  kt *
-                                                                                  transpose(S2)),
-                                                                        W3)
-                                                  end)
-    state_set!(model, prefix, :vr_risk_, i, vr_risk)
-    state_set!(model, prefix, :sk_risk_, i, sk_risk)
-    state_set!(model, prefix, :kt_risk_, i, kt_risk)
+    vr_risk = state_set!(model, prefix, :vr_risk_, i,
+                         JuMP.@expression(model, LinearAlgebra.dot(transpose(sigma), W1)))
+    sk_risk = state_set!(model, prefix, :sk_risk_, i,
+                         JuMP.@expression(model, LinearAlgebra.dot(transpose(sk * D2), W2)))
+    kt_risk = state_set!(model, prefix, :kt_risk_, i,
+                         JuMP.@expression(model,
+                                          LinearAlgebra.dot(transpose(S2 *
+                                                                      kt *
+                                                                      transpose(S2)), W3)))
     vr_bound = variance_risk_bounds_val(LinearBound(), r.vr.settings.ub)
     sk_bound = variance_risk_bounds_val(LinearBound(), r.sk.settings.lb)
     kt_bound = variance_risk_bounds_val(ifelse(isa(r.kt.alg, QuadSecondMomentFormulations),

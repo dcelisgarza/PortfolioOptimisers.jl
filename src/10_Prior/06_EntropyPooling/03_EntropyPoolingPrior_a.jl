@@ -1434,10 +1434,8 @@ function ep_tail_dual_block!(model::JuMP.Model, pw,
     alpha = tv.alpha
     T = length(x)
     nu = JuMP.@variable(model, [1:T], lower_bound = 0)
-    JuMP.@constraints(model, begin
-                          [j = 1:T], sc1 * (nu[j] - pw[j] / alpha) <= 0
-                          sc1 * (sum(nu) - one(alpha)) == 0
-                      end)
+    JuMP.@constraint(model, [j = 1:T], sc1 * (nu[j] - pw[j] / alpha) <= 0)
+    JuMP.@constraint(model, sc1 * (sum(nu) - one(alpha)) == 0)
     return LinearAlgebra.dot(nu, x)
 end
 function ep_tail_dual_block!(model::JuMP.Model, pw,
@@ -1447,12 +1445,10 @@ function ep_tail_dual_block!(model::JuMP.Model, pw,
     alpha = tv.alpha
     T = length(x)
     nu = JuMP.@variable(model, [1:T], lower_bound = 0, upper_bound = 1)
-    JuMP.@constraints(model,
-                      begin
-                          sc1 * (sum(nu) - one(alpha)) == 0
-                          [sc1 * log(inv(alpha)); sc1 * pw; sc1 * nu] in
-                          JuMP.MOI.RelativeEntropyCone(2 * T + 1)
-                      end)
+    JuMP.@constraint(model, sc1 * (sum(nu) - one(alpha)) == 0)
+    JuMP.@constraint(model,
+                     [sc1 * log(inv(alpha)); sc1 * pw; sc1 * nu] in
+                     JuMP.MOI.RelativeEntropyCone(2 * T + 1))
     return LinearAlgebra.dot(nu, x)
 end
 function ep_tail_dual_block!(model::JuMP.Model, pw,
@@ -1472,17 +1468,14 @@ function ep_tail_dual_block!(model::JuMP.Model, pw,
     # into an `OPTIMAL` one.
     tau = JuMP.@variable(model, [1:T], lower_bound = 0)
     varsigma = JuMP.@variable(model, [1:T], lower_bound = 0)
-    JuMP.@constraints(model,
-                      begin
-                          sc1 * (sum(nu) - one(alpha)) == 0
-                          sc1 * (sum(tau - varsigma) * ik2 - lnk) <= 0
-                          [j = 1:T],
-                          [sc1 * tau[j], sc1 * T * pw[j], sc1 * nu[j]] in
-                          JuMP.MOI.PowerCone(inv(opk))
-                          [j = 1:T],
-                          [sc1 * nu[j], sc1 * T * pw[j], sc1 * varsigma[j]] in
-                          JuMP.MOI.PowerCone(omk)
-                      end)
+    JuMP.@constraint(model, sc1 * (sum(nu) - one(alpha)) == 0)
+    JuMP.@constraint(model, sc1 * (sum(tau - varsigma) * ik2 - lnk) <= 0)
+    JuMP.@constraint(model, [j = 1:T],
+                     [sc1 * tau[j], sc1 * T * pw[j], sc1 * nu[j]] in
+                     JuMP.MOI.PowerCone(inv(opk)))
+    JuMP.@constraint(model, [j = 1:T],
+                     [sc1 * nu[j], sc1 * T * pw[j], sc1 * varsigma[j]] in
+                     JuMP.MOI.PowerCone(omk))
     return LinearAlgebra.dot(nu, x)
 end
 """
@@ -1936,15 +1929,12 @@ function add_ep_tail_view!(model::JuMP.Model, pw,
         sb = length(ordi)
         y = JuMP.@variable(model, [1:sb], binary = true)
         q = JuMP.@variable(model, [1:sb], lower_bound = 0)
-        JuMP.@constraints(model,
-                          begin
-                              [j = 1:sb], sc1 * (q[j] - y[j]) <= 0
-                              [j = 1:sb], sc1 * (q[j] - pw[ordi[j]]) <= 0
-                              [j = 2:sb],
-                              sc1 * (pw[ordi[j]] - (one(alpha) - y[j - 1]) - q[j]) <= 0
-                              [j = 1:(sb - 1)], sc1 * (y[j] - y[j + 1]) <= 0
-                              sc1 * (sum(q) - alpha) == 0
-                          end)
+        JuMP.@constraint(model, [j = 1:sb], sc1 * (q[j] - y[j]) <= 0)
+        JuMP.@constraint(model, [j = 1:sb], sc1 * (q[j] - pw[ordi[j]]) <= 0)
+        JuMP.@constraint(model, [j = 2:sb],
+                         sc1 * (pw[ordi[j]] - (one(alpha) - y[j - 1]) - q[j]) <= 0)
+        JuMP.@constraint(model, [j = 1:(sb - 1)], sc1 * (y[j] - y[j + 1]) <= 0)
+        JuMP.@constraint(model, sc1 * (sum(q) - alpha) == 0)
         JuMP.add_to_expression!(expr, ci / alpha, LinearAlgebra.dot(q, xi))
     end
     if op == :eq

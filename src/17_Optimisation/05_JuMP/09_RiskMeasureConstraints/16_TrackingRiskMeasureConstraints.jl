@@ -218,12 +218,8 @@ function set_risk_constraints!(model::JuMP.Model, i::Any,
     X = pr.X
     net_X = set_net_portfolio_returns!(model, X; prefix = prefix)
     T = length(net_X)
-    t_tracking_risk, r_tr = JuMP.@variables(model, begin
-                                                ()
-                                                [1:T]
-                                            end)
-    state_set!(model, prefix, :t_tracking_risk_, i, t_tracking_risk)
-    state_set!(model, prefix, :r_tracking_risk_, i, r_tr)
+    t_tracking_risk = state_set!(model, prefix, :t_tracking_risk_, i, JuMP.@variable(model))
+    r_tr = state_set!(model, prefix, :r_tracking_risk_, i, JuMP.@variable(model, [1:T]))
     p_inv = inv(r.alg.p)
     scale = norm_factor(r.alg, T)
     tracking_risk = state_set!(model, prefix, :tracking_risk_, i,
@@ -234,19 +230,12 @@ function set_risk_constraints!(model::JuMP.Model, i::Any,
                                              net_X -
                                              tracking_benchmark_expression(model, benchmark,
                                                                            prefix)))
-    ctracking_r_pnorm, ctracking_r_pnorm_eq = JuMP.@constraints(model,
-                                                                begin
-                                                                    [i = 1:T],
-                                                                    [sc * r_tr[i],
-                                                                     sc * t_tracking_risk,
-                                                                     sc * tracking_r[i]] in
-                                                                    JuMP.MOI.PowerCone(p_inv)
-                                                                    sc * (sum(r_tr) -
-                                                                          t_tracking_risk) ==
-                                                                    0
-                                                                end)
-    state_set!(model, prefix, :ctracking_r_pnorm_, i, ctracking_r_pnorm)
-    state_set!(model, prefix, :ctracking_r_pnorm_eq_, i, ctracking_r_pnorm_eq)
+    state_set!(model, prefix, :ctracking_r_pnorm_, i,
+               JuMP.@constraint(model, [i = 1:T],
+                                [sc * r_tr[i], sc * t_tracking_risk, sc * tracking_r[i]] in
+                                JuMP.MOI.PowerCone(p_inv)))
+    state_set!(model, prefix, :ctracking_r_pnorm_eq_, i,
+               JuMP.@constraint(model, sc * (sum(r_tr) - t_tracking_risk) == 0))
     set_risk_bounds_and_expression!(model, opt, tracking_risk, r.settings, :tracking_risk_,
                                     i; prefix = prefix)
     return tracking_risk

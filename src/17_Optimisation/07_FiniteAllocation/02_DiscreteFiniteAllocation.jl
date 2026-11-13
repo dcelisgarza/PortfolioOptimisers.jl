@@ -490,10 +490,8 @@ function set_allocation_fees!(model::JuMP.Model, p::VecNum, lu::Num_VecNum, cash
         # Per period: the turnover. An absolute value needs an epigraph.
         prev_money = sf.prev_money
         JuMP.@variable(model, t_ftn[1:N] >= 0)
-        JuMP.@constraints(model, begin
-                              cftn_ub, sc * (money .- prev_money .- t_ftn) .<= 0
-                              cftn_lb, sc * (prev_money .- money .- t_ftn) .<= 0
-                          end)
+        JuMP.@constraint(model, cftn_ub, sc * (money - prev_money - t_ftn) <= 0)
+        JuMP.@constraint(model, cftn_lb, sc * (prev_money - money - t_ftn) <= 0)
         JuMP.@expression(model, fee_tn, dot_scalar(tn_val, t_ftn))
         JuMP.add_to_expression!(fee, T, fee_tn)
     end
@@ -511,10 +509,8 @@ function set_allocation_fees!(model::JuMP.Model, p::VecNum, lu::Num_VecNum, cash
                               "a fixed fee needs `1 + horizon * s > 0` on every asset of the short side: the credit of a negative short rate `s` over the horizon must not pay for the whole position, or the cash bounds no share count"))
         ub = floor.(cash ./ (p .* cf .* lu))
         JuMP.@variable(model, b[1:N], Bin)
-        JuMP.@constraints(model, begin
-                              cb_ub, sc * (z .- ub .* b) .<= 0
-                              cb_lb, sc * (b .- z) .<= 0
-                          end)
+        JuMP.@constraint(model, cb_ub, sc * (z .- ub .* b) <= 0)
+        JuMP.@constraint(model, cb_lb, sc * (b - z) <= 0)
         JuMP.@expression(model, fee_fixed, dot_scalar(fixed, b))
         JuMP.add_to_expression!(fee, fee_fixed)
     end
@@ -627,10 +623,8 @@ function finite_sub_allocation(w::VecNum, p::VecNum, lu::Num_VecNum, cash::Numbe
     JuMP.@expression(model, so, da.so)
     N = length(w)
     # z: the lot counts. u: the bound on the allocation error.
-    JuMP.@variables(model, begin
-                        z[1:N] >= 0, Int
-                        u
-                    end)
+    JuMP.@variable(model, z[1:N] >= 0, Int)
+    JuMP.@variable(model, u)
     # x: the share counts, whole lots of the lot unit of each asset.
     JuMP.@expression(model, x, lu .* z)
     # r: the cash left before the fee.

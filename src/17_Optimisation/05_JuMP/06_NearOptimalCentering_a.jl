@@ -989,27 +989,22 @@ function set_near_optimal_centering_constraints!(model::JuMP.Model, wb::WeightBo
     rk = shared_get(model, :noc_rk)
     rt = shared_get(model, :noc_rt)
     il, iu = barrier_weight_bounds(w_lb, w_ub)
-    JuMP.@variables(model, begin
-                        log_ret
-                        log_risk
-                        log_w[il]
-                        log_delta_w[iu]
-                    end)
-    JuMP.@constraints(model,
-                      begin
-                          clog_risk,
-                          [sc * log_risk, sc, sc * (rk - risk) / m_rk] in
-                          JuMP.MOI.ExponentialCone()
-                          clog_ret,
-                          [sc * log_ret, sc, sc * (ret - rt) / m_rt] in
-                          JuMP.MOI.ExponentialCone()
-                          clog_w[i = il],
-                          [sc * log_w[i], sc, sc * (w[i] - w_lb[i])] in
-                          JuMP.MOI.ExponentialCone()
-                          clog_delta_w[i = iu],
-                          [sc * log_delta_w[i], sc, sc * (w_ub[i] - w[i])] in
-                          JuMP.MOI.ExponentialCone()
-                      end)
+    JuMP.@variable(model, log_ret)
+    JuMP.@variable(model, log_risk)
+    JuMP.@variable(model, log_w[il])
+    JuMP.@variable(model, log_delta_w[iu])
+    JuMP.@constraint(model, clog_risk,
+                     [sc * log_risk, sc, sc * (rk - risk) / m_rk] in
+                     JuMP.MOI.ExponentialCone())
+    JuMP.@constraint(model, clog_ret,
+                     [sc * log_ret, sc, sc * (ret - rt) / m_rt] in
+                     JuMP.MOI.ExponentialCone())
+    JuMP.@constraint(model, clog_w[i = il],
+                     [sc * log_w[i], sc, sc * (w[i] - w_lb[i])] in
+                     JuMP.MOI.ExponentialCone())
+    JuMP.@constraint(model, clog_delta_w[i = iu],
+                     [sc * log_delta_w[i], sc, sc * (w_ub[i] - w[i])] in
+                     JuMP.MOI.ExponentialCone())
     JuMP.@expression(model, obj_expr,
                      -(log_ret +
                        log_risk +

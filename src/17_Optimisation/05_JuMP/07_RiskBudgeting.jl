@@ -950,12 +950,9 @@ function _set_risk_budgeting_constraints!(model::JuMP.Model, rb::RiskBudgeting,
     # both routes.
     JuMP.@variable(model, k >= risk_budgeting_scale_floor(rb))
     JuMP.@variable(model, log_w[1:N])
-    JuMP.@constraints(model,
-                      begin
-                          clog_w[i = 1:N],
-                          [sc * log_w[i], sc, sc * w[i]] in JuMP.MOI.ExponentialCone()
-                          crkb, sc * LinearAlgebra.dot(b, log_w) >= 0
-                      end)
+    JuMP.@constraint(model, clog_w[i = 1:N],
+                     [sc * log_w[i], sc, sc * w[i]] in JuMP.MOI.ExponentialCone())
+    JuMP.@constraint(model, crkb, sc * LinearAlgebra.dot(b, log_w) >= 0)
     # The log-barrier normalisation above pins the scale, so downstream builders may use 1
     # in place of the variable `k`.
     set_unit_budget!(model)
@@ -1102,14 +1099,10 @@ The weights are an expression of the parts, so the function records the [`Weight
 """
 function set_rb_mip_w!(model::JuMP.Model, X::MatNum)
     N = size(X, 2)
-    JuMP.@variables(model, begin
-                        lw[1:N] >= 0
-                        sw[1:N] >= 0
-                    end)
-    JuMP.@expressions(model, begin
-                          w, lw - sw
-                          w_obj, lw + sw
-                      end)
+    JuMP.@variable(model, lw[1:N] >= 0)
+    JuMP.@variable(model, sw[1:N] >= 0)
+    JuMP.@expression(model, w, lw - sw)
+    JuMP.@expression(model, w_obj, lw + sw)
     set_decomposition_contract!(model, WeightsFromParts())
     return nothing
 end

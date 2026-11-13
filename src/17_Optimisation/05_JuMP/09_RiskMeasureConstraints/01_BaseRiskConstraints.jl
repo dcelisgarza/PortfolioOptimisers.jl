@@ -173,10 +173,8 @@ function scalarise_risk_expression!(model::JuMP.Model, sca::LogSumExpScalariser)
     sc = get_constraint_scale(model)
     N = length(risk_vec)
     gamma = sca.gamma
-    JuMP.@variables(model, begin
-                        risk
-                        u_risk[1:N]
-                    end)
+    JuMP.@variable(model, risk)
+    JuMP.@variable(model, u_risk[1:N])
     # An exponential cone takes no quadratic entry. The cone is monotone in its first entry, so
     # an epigraph variable at or above each quadratic entry gives the same scalarised risk.
     quad = findall(x -> isa(x, JuMP.QuadExpr), risk_vec)
@@ -188,13 +186,10 @@ function scalarise_risk_expression!(model::JuMP.Model, sca::LogSumExpScalariser)
     lse_vec = Vector{JuMP.AffExpr}(undef, N)
     lse_vec[aff] .= risk_vec[aff]
     lse_vec[quad] .= t_risk_lse
-    JuMP.@constraints(model,
-                      begin
-                          u_risk_lse, sc * (sum(u_risk) - 1) <= 0
-                          risk_lse[i = 1:N],
-                          [sc * gamma * (lse_vec[i] - risk), sc, sc * u_risk[i]] in
-                          JuMP.MOI.ExponentialCone()
-                      end)
+    JuMP.@constraint(model, u_risk_lse, sc * (sum(u_risk) - 1) <= 0)
+    JuMP.@constraint(model, risk_lse[i = 1:N],
+                     [sc * gamma * (lse_vec[i] - risk), sc, sc * u_risk[i]] in
+                     JuMP.MOI.ExponentialCone())
     return nothing
 end
 function scalarise_risk_expression!(model::JuMP.Model, ::MaxScalariser)
@@ -1030,11 +1025,19 @@ Where:
   - $(math_dict[:s_t_series])
   - $(math_dict[:rhat_t_net])
 
+The gain tail reads one registered copy of the negated series for each `prefix`. Every gain tail of the model reads that entry, so the negation is built once and a user can read it. A negation made before a macro and held by no entry cost each gain tail a copy of the ``T \\times N`` terms.
+
+# JuMP formulation
+
+## Expressions
+
+  - `gain_net_X` under `prefix`: ``-\\hat{r}_t``, ``t = 1, \\ldots, T``, the series of the gain tail. Only `loss = false` builds it, the first time.
+
 # Algorithm
 
  1. Read `net_X`, the net portfolio returns, with [`set_net_portfolio_returns!`](@ref).
- 2. Negate `net_X` when `loss` is `false`.
- 3. Return `net_X` and its length.
+ 2. When `loss` is `false`, build `-net_X` in a registered `JuMP.@expression` under `gain_net_X` with [`state_build!`](@ref), or read it when the model holds it.
+ 3. Return the series and its length.
 
 # Arguments
 
@@ -1062,10 +1065,14 @@ Where:
 function risk_series(model::JuMP.Model, ::NetReturnsRiskSeries, pr::AbstractPriorResult;
                      loss::Bool = true, prefix::Symbol = Symbol(""))
     net_X = set_net_portfolio_returns!(model, pr.X; prefix = prefix)
-    if !loss
-        net_X = -net_X
+    series = if loss
+        net_X
+    else
+        state_build!(model, prefix, :gain_net_X) do
+            return JuMP.@expression(model, -net_X)
+        end
     end
-    return net_X, length(net_X)
+    return series, length(series)
 end
 """
 $(DocStringExtensions.TYPEDSIGNATURES)
@@ -1090,11 +1097,20 @@ Where:
   - $(math_dict[:dd_t_model])
   - $(math_dict[:T])
 
+Every drawdown measure under one `prefix` reads one registered copy of the negated path, so the negation is built once and a user can read it.
+
+# JuMP formulation
+
+## Expressions
+
+  - `neg_dd` under `prefix`: ``-dd_t``, ``t = 1, \\ldots, T``, the negated drawdown path.
+
 # Algorithm
 
  1. Build `dd` with [`set_drawdown_constraints!`](@ref), or read it when the model holds it.
  2. Set `T = length(dd) - 1`.
- 3. Return `-dd[2:T+1]` and `T`.
+ 3. Build `-dd[2:T+1]` in a registered `JuMP.@expression` under `neg_dd` with [`state_build!`](@ref), or read it when the model holds it.
+ 4. Return the series and `T`.
 
 # Arguments
 
@@ -1121,6 +1137,9 @@ function risk_series(model::JuMP.Model, ::DrawdownRiskSeries, pr::AbstractPriorR
                      prefix::Symbol = Symbol(""))
     dd = set_drawdown_constraints!(model, pr.X; prefix = prefix)
     T = length(dd) - 1
-    return -view(dd, 2:(T + 1)), T
+    series = state_build!(model, prefix, :neg_dd) do
+        return JuMP.@expression(model, -view(dd, 2:(T + 1)))
+    end
+    return series, T
 end
 public set_risk_constraints!, set_risk_bounds_and_expression!

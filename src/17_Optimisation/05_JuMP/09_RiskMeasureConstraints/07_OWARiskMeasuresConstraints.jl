@@ -112,12 +112,8 @@ function set_risk_constraints!(model::JuMP.Model, i::Any,
     T = get_T(model)
     owa = set_owa_constraints!(model, X; prefix = prefix)
     ovec = range(one(eltype(X)), one(eltype(X)); length = T)
-    owa_a, owa_b = JuMP.@variables(model, begin
-                                       [1:T]
-                                       [1:T]
-                                   end)
-    state_set!(model, prefix, :owa_a_, i, owa_a)
-    state_set!(model, prefix, :owa_b_, i, owa_b)
+    owa_a = state_set!(model, prefix, :owa_a_, i, JuMP.@variable(model, [1:T]))
+    owa_b = state_set!(model, prefix, :owa_b_, i, JuMP.@variable(model, [1:T]))
     owa_risk = state_set!(model, prefix, :owa_risk_, i,
                           JuMP.@expression(model, sum(owa_a + owa_b)))
     owa_w = owa_weights(r.w, T, :w)
@@ -202,12 +198,8 @@ function set_risk_constraints!(model::JuMP.Model, i::Any,
     T = get_T(model)
     owa = set_owa_constraints!(model, X; prefix = prefix)
     ovec = range(one(eltype(X)), one(eltype(X)); length = T)
-    owa_a, owa_b = JuMP.@variables(model, begin
-                                       [1:T]
-                                       [1:T]
-                                   end)
-    state_set!(model, prefix, :owa_range_a_, i, owa_a)
-    state_set!(model, prefix, :owa_range_b_, i, owa_b)
+    owa_a = state_set!(model, prefix, :owa_range_a_, i, JuMP.@variable(model, [1:T]))
+    owa_b = state_set!(model, prefix, :owa_range_b_, i, JuMP.@variable(model, [1:T]))
     owa_range_risk = state_set!(model, prefix, :owa_range_risk_, i,
                                 JuMP.@expression(model, sum(owa_a + owa_b)))
     owa_w1 = owa_weights(r.w1, T, :w1)
@@ -358,9 +350,6 @@ function set_risk_constraints!(model::JuMP.Model, i::Any,
     X = pr.X
     T = get_T(model)
     net_X = set_net_portfolio_returns!(model, X; prefix = prefix)
-    if !loss
-        net_X = -net_X
-    end
     owa_w = -owa_weights(r.w, T, :w)
     owa_s = sum(owa_w)
     owa_l, owa_h = extrema(owa_w)
@@ -369,65 +358,49 @@ function set_risk_constraints!(model::JuMP.Model, i::Any,
     # at the apex of every cone, where the interior point solver can stall (#1895).
     owa_p = count(x -> owa_l < x < owa_h, owa_w) <= 1 ? empty(r.alg.p) : r.alg.p
     M = length(owa_p)
-    owa_t, owa_nu, owa_eta, owa_epsilon, owa_psi, owa_z, owa_y = JuMP.@variables(model,
-                                                                                 begin
-                                                                                     ()
-                                                                                     [1:T],
-                                                                                     (lower_bound = 0)
-                                                                                     [1:T],
-                                                                                     (lower_bound = 0)
-                                                                                     [1:T,
-                                                                                      1:M]
-                                                                                     [1:T,
-                                                                                      1:M]
-                                                                                     [1:M]
-                                                                                     [1:M],
-                                                                                     (lower_bound = 0)
-                                                                                 end)
-    state_set!(model, prefix, :owa_t_, i, owa_t)
-    state_set!(model, prefix, :owa_nu_, i, owa_nu)
-    state_set!(model, prefix, :owa_eta_, i, owa_eta)
-    state_set!(model, prefix, :owa_epsilon_, i, owa_epsilon)
-    state_set!(model, prefix, :owa_psi_, i, owa_psi)
-    state_set!(model, prefix, :owa_z_, i, owa_z)
-    state_set!(model, prefix, :owa_y_, i, owa_y)
+    owa_t = state_set!(model, prefix, :owa_t_, i, JuMP.@variable(model))
+    owa_nu = state_set!(model, prefix, :owa_nu_, i,
+                        JuMP.@variable(model, [1:T], lower_bound = 0))
+    owa_eta = state_set!(model, prefix, :owa_eta_, i,
+                         JuMP.@variable(model, [1:T], lower_bound = 0))
+    owa_epsilon = state_set!(model, prefix, :owa_epsilon_, i,
+                             JuMP.@variable(model, [1:T, 1:M]))
+    owa_psi = state_set!(model, prefix, :owa_psi_, i, JuMP.@variable(model, [1:T, 1:M]))
+    owa_z = state_set!(model, prefix, :owa_z_, i, JuMP.@variable(model, [1:M]))
+    owa_y = state_set!(model, prefix, :owa_y_, i,
+                       JuMP.@variable(model, [1:M], lower_bound = 0))
     owa_d = [LinearAlgebra.norm(owa_w, p) for p in owa_p]
-    aowa_risk, neg_owa_z_owa_p, owa_p_o_owa_pm1 = JuMP.@expressions(model,
-                                                                    begin
-                                                                        owa_s * owa_t -
-                                                                        owa_l *
-                                                                        sum(owa_nu) +
-                                                                        owa_h *
-                                                                        sum(owa_eta) +
-                                                                        LinearAlgebra.dot(owa_d,
-                                                                                          owa_y)
-                                                                        -owa_z .* owa_p
-                                                                        owa_p ./ (owa_p .-
-                                                                                  one(eltype(owa_p)))
-                                                                    end)
-    state_set!(model, prefix, :aowa_risk_, i, aowa_risk)
-    state_set!(model, prefix, :neg_owa_z_owa_p_, i, neg_owa_z_owa_p)
-    state_set!(model, prefix, :owa_p_o_owa_pm1_, i, owa_p_o_owa_pm1)
-    ca1_owa, ca2_owa, ca_owa_pcone = JuMP.@constraints(model,
-                                                       begin
-                                                           sc *
-                                                           ((net_X - owa_nu + owa_eta -
-                                                             vec(sum(owa_epsilon; dims = 2))) .+
-                                                            owa_t) == 0
-                                                           sc * (owa_z + owa_y -
-                                                                 vec(sum(owa_psi; dims = 1))) ==
-                                                           0
-                                                           [i = 1:M, j = 1:T],
-                                                           [sc * neg_owa_z_owa_p[i],
-                                                            sc *
-                                                            owa_psi[j, i] *
-                                                            owa_p_o_owa_pm1[i],
-                                                            sc * owa_epsilon[j, i]] in
-                                                           JuMP.MOI.PowerCone(inv(owa_p[i]))
-                                                       end)
+    aowa_risk = state_set!(model, prefix, :aowa_risk_, i,
+                           JuMP.@expression(model,
+                                            owa_s * owa_t - owa_l * sum(owa_nu) +
+                                            owa_h * sum(owa_eta) +
+                                            LinearAlgebra.dot(owa_d, owa_y)))
+    neg_owa_z_owa_p = state_set!(model, prefix, :neg_owa_z_owa_p_, i,
+                                 JuMP.@expression(model, -owa_z .* owa_p))
+    owa_p_o_owa_pm1 = state_set!(model, prefix, :owa_p_o_owa_pm1_, i,
+                                 JuMP.@expression(model,
+                                                  owa_p ./ (owa_p .- one(eltype(owa_p)))))
+    # A sum over one axis of a JuMP array is one `sum(view(…))` for each row or column.
+    # `sum(owa_psi; dims = 1)` reduces with a plain `+` and copies each partial sum, which
+    # cost 144 MiB on 1000 × 3 (#2062).
+    eps_sum = [sum(view(owa_epsilon, t, :)) for t in 1:T]
+    psi_sum = [sum(view(owa_psi, :, j)) for j in 1:M]
+    # The gain tail negates `net_X` inside the macro, which builds the row on one copy of the
+    # series. A negated copy made before the macro costs a second copy (#2062).
+    ca1_owa = if loss
+        JuMP.@constraint(model, sc * ((net_X - owa_nu + owa_eta - eps_sum) .+ owa_t) == 0)
+    else
+        JuMP.@constraint(model, sc * ((-net_X - owa_nu + owa_eta - eps_sum) .+ owa_t) == 0)
+    end
     state_set!(model, prefix, :ca1_owa_, i, ca1_owa)
-    state_set!(model, prefix, :ca2_owa_, i, ca2_owa)
-    state_set!(model, prefix, :ca_owa_pcone_, i, ca_owa_pcone)
+    state_set!(model, prefix, :ca2_owa_, i,
+               JuMP.@constraint(model, sc * (owa_z + owa_y - psi_sum) == 0))
+    state_set!(model, prefix, :ca_owa_pcone_, i,
+               JuMP.@constraint(model, [i = 1:M, j = 1:T],
+                                [sc * neg_owa_z_owa_p[i],
+                                 sc * owa_psi[j, i] * owa_p_o_owa_pm1[i],
+                                 sc * owa_epsilon[j, i]] in
+                                JuMP.MOI.PowerCone(inv(owa_p[i]))))
     set_risk_bounds_and_expression!(model, opt, aowa_risk, r.settings, :aowa_risk_, i;
                                     prefix = prefix)
     return aowa_risk
@@ -549,11 +522,9 @@ function set_sorting_network_owa!(model::JuMP.Model, alg::SortingNetworkOrderedW
     end
     l = (T + 1):2:(T + 2 * K)
     h = (T + 2):2:(T + 2 * K)
-    c_eq, c_a, c_b = JuMP.@constraints(model, begin
-                                           sc * (x[l] + x[h] - x[a] - x[b]) == 0
-                                           sc * (x[h] - x[a]) in JuMP.Nonnegatives()
-                                           sc * (x[h] - x[b]) in JuMP.Nonnegatives()
-                                       end)
+    c_eq = JuMP.@constraint(model, sc * (x[l] + x[h] - x[a] - x[b]) == 0)
+    c_a = JuMP.@constraint(model, sc * (x[h] - x[a]) in JuMP.Nonnegatives())
+    c_b = JuMP.@constraint(model, sc * (x[h] - x[b]) in JuMP.Nonnegatives())
     risk = JuMP.@expression(model, s * LinearAlgebra.dot(owa_w, x[wire]))
     return (; z, c_eq, c_a, c_b, risk)
 end

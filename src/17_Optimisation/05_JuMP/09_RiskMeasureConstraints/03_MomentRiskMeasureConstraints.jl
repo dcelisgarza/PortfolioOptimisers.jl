@@ -473,16 +473,12 @@ function set_risk_constraints!(model::JuMP.Model, i::Any,
     # can stop the solver far from the optimum, as in the EVaR and power-norm programmes.
     rows = positive_weight_rows(wi, T)
     N = length(rows)
-    even_moment_u, even_moment_t, even_moment_risk = JuMP.@variables(model,
-                                                                     begin
-                                                                         [1:N]
-                                                                         [1:N]
-                                                                         (),
-                                                                         (lower_bound = 0)
-                                                                     end)
-    state_set!(model, prefix, :even_moment_u_, i, even_moment_u)
-    state_set!(model, prefix, :even_moment_t_, i, even_moment_t)
-    state_set!(model, prefix, :even_moment_risk_, i, even_moment_risk)
+    even_moment_u = state_set!(model, prefix, :even_moment_u_, i,
+                               JuMP.@variable(model, [1:N]))
+    even_moment_t = state_set!(model, prefix, :even_moment_t_, i,
+                               JuMP.@variable(model, [1:N]))
+    even_moment_risk = state_set!(model, prefix, :even_moment_risk_, i,
+                                  JuMP.@variable(model, lower_bound = 0))
     even_moment = state_set!(model, prefix, :even_moment_, i,
                              JuMP.@expression(model, net_X .- tgt))
     state_set!(model, prefix, :ceven_moment_s_, i,

@@ -183,10 +183,8 @@ function set_turnover_fees!(model::JuMP.Model, tn::Turnover)
     wt = tn.w
     val = tn.val
     JuMP.@variable(model, t_ftn[1:N])
-    JuMP.@expressions(model, begin
-                          x_ftn, w - wt * k
-                          ftn, dot_scalar(val, t_ftn)
-                      end)
+    JuMP.@expression(model, x_ftn, w - wt * k)
+    JuMP.@expression(model, ftn, dot_scalar(val, t_ftn))
     JuMP.@constraint(model, cftn[i = 1:N],
                      [sc * t_ftn[i]; sc * x_ftn[i]] in JuMP.MOI.NormOneCone(2))
     add_to_fees!(model, ftn)
@@ -630,10 +628,8 @@ function set_proportional_fees!(model::JuMP.Model, fl::Num_VecNum, fs::Num_VecNu
     sc = get_constraint_scale(model)
     N = length(w)
     JuMP.@variable(model, t_fp[1:N])
-    JuMP.@constraints(model, begin
-                          cfp_l, sc * (fl ⊙ w - t_fp) <= 0
-                          cfp_s, sc * (fs ⊙ w + t_fp) >= 0
-                      end)
+    JuMP.@constraint(model, cfp_l, sc * (fl ⊙ w - t_fp) <= 0)
+    JuMP.@constraint(model, cfp_s, sc * (fs ⊙ w + t_fp) >= 0)
     JuMP.@expression(model, fp, sum(t_fp))
     add_to_fees!(model, fp)
     return nothing

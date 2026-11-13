@@ -479,10 +479,8 @@ function set_factor_risk_contribution_constraints!(model::JuMP.Model, re::RegE_R
         b2 = LinearAlgebra.pinv(transpose(LinearAlgebra.nullspace(Bt)))
         # The null space has `N - rank(B)` columns, which is more than `N - Nf` when the
         # loadings have a lower rank, so `w2` takes its size from `b2`.
-        JuMP.@variables(model, begin
-                            w1[1:Nf]
-                            w2[1:size(b2, 2)]
-                        end)
+        JuMP.@variable(model, w1[1:Nf])
+        JuMP.@variable(model, w2[1:size(b2, 2)])
         JuMP.@expression(model, w, b1 * w1 + b2 * w2)
         if hedge
             sc = get_constraint_scale(model)

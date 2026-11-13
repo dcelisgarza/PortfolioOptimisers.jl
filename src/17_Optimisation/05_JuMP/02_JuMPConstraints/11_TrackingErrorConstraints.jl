@@ -79,14 +79,9 @@ function set_tracking_error_constraints!(model::JuMP.Model, i::Integer,
                     JuMP.@expression(model,
                                      net_X -
                                      tracking_benchmark_expression(model, wb, prefix)))
-    ctr_noc, ctr = JuMP.@constraints(model,
-                                     begin
-                                         [sc * t_tr;
-                                          sc * tr] in JuMP.MOI.NormOneCone(1 + T)
-                                         sc * (t_tr - f * k) <= 0
-                                     end)
-    state_set!(model, prefix, :ctr_noc_, i, ctr_noc)
-    state_set!(model, prefix, :ctr_, i, ctr)
+    state_set!(model, prefix, :ctr_noc_, i,
+               JuMP.@constraint(model, [sc * t_tr; sc * tr] in JuMP.MOI.NormOneCone(1 + T)))
+    state_set!(model, prefix, :ctr_, i, JuMP.@constraint(model, sc * (t_tr - f * k) <= 0))
     return nothing
 end
 """
@@ -137,14 +132,9 @@ function set_tracking_error_constraints!(model::JuMP.Model, i::Integer,
                     JuMP.@expression(model,
                                      net_X -
                                      tracking_benchmark_expression(model, wb, prefix)))
-    ctr_soc, ctr = JuMP.@constraints(model,
-                                     begin
-                                         [sc * t_tr;
-                                          sc * tr] in JuMP.SecondOrderCone()
-                                         sc * (t_tr - f * k) <= 0
-                                     end)
-    state_set!(model, prefix, :ctr_soc_, i, ctr_soc)
-    state_set!(model, prefix, :ctr_, i, ctr)
+    state_set!(model, prefix, :ctr_soc_, i,
+               JuMP.@constraint(model, [sc * t_tr; sc * tr] in JuMP.SecondOrderCone()))
+    state_set!(model, prefix, :ctr_, i, JuMP.@constraint(model, sc * (t_tr - f * k) <= 0))
     return nothing
 end
 function set_tracking_error_constraints!(model::JuMP.Model, i::Integer,
@@ -163,27 +153,19 @@ function set_tracking_error_constraints!(model::JuMP.Model, i::Integer,
     err = tr.err
     p_inv = inv(tr.alg.p)
     f = err * norm_factor(tr.alg, T)
-    t_tr, r_tr = JuMP.@variables(model, begin
-                                     ()
-                                     [1:T]
-                                 end)
-    state_set!(model, prefix, :t_tr_, i, t_tr)
-    state_set!(model, prefix, :r_tr_, i, r_tr)
+    t_tr = state_set!(model, prefix, :t_tr_, i, JuMP.@variable(model))
+    r_tr = state_set!(model, prefix, :r_tr_, i, JuMP.@variable(model, [1:T]))
     tr = state_set!(model, prefix, :tr_, i,
                     JuMP.@expression(model,
                                      net_X -
                                      tracking_benchmark_expression(model, wb, prefix)))
-    ctr_pnorm, cstr, ctr = JuMP.@constraints(model,
-                                             begin
-                                                 [i = 1:T],
-                                                 [sc * r_tr[i], sc * t_tr, sc * tr[i]] in
-                                                 JuMP.MOI.PowerCone(p_inv)
-                                                 sc * (sum(r_tr) - t_tr) == 0
-                                                 sc * (t_tr - f * k) <= 0
-                                             end)
-    state_set!(model, prefix, :ctr_pnorm_, i, ctr_pnorm)
-    state_set!(model, prefix, :cstr_, i, cstr)
-    state_set!(model, prefix, :ctr_, i, ctr)
+    state_set!(model, prefix, :ctr_pnorm_, i,
+               JuMP.@constraint(model, [i = 1:T],
+                                [sc * r_tr[i], sc * t_tr, sc * tr[i]] in
+                                JuMP.MOI.PowerCone(p_inv)))
+    state_set!(model, prefix, :cstr_, i,
+               JuMP.@constraint(model, sc * (sum(r_tr) - t_tr) == 0))
+    state_set!(model, prefix, :ctr_, i, JuMP.@constraint(model, sc * (t_tr - f * k) <= 0))
     return nothing
 end
 function set_tracking_error_constraints!(model::JuMP.Model, i::Integer,
@@ -203,14 +185,11 @@ function set_tracking_error_constraints!(model::JuMP.Model, i::Integer,
                     JuMP.@expression(model,
                                      net_X -
                                      tracking_benchmark_expression(model, wb, prefix)))
-    ctr_infnorm, ctr = JuMP.@constraints(model,
-                                         begin
-                                             [sc * t_tr
-                                              sc * tr] in JuMP.MOI.NormInfinityCone(1 + T)
-                                             sc * (t_tr - f * k) <= 0
-                                         end)
-    state_set!(model, prefix, :ctr_infnorm_, i, ctr_infnorm)
-    state_set!(model, prefix, :ctr_, i, ctr)
+    state_set!(model, prefix, :ctr_infnorm_, i,
+               JuMP.@constraint(model,
+                                [sc * t_tr
+                                 sc * tr] in JuMP.MOI.NormInfinityCone(1 + T)))
+    state_set!(model, prefix, :ctr_, i, JuMP.@constraint(model, sc * (t_tr - f * k) <= 0))
     return nothing
 end
 function set_tracking_error_constraints!(model::JuMP.Model, i::Integer,
@@ -260,14 +239,11 @@ function set_tracking_error_constraints!(model::JuMP.Model, i::Integer,
     # key `tr_dr` itself takes at entry 11.
     dr = state_set!(model, prefix, :tr_dr_diff_, i,
                     JuMP.@expression(model, risk_expr - rb * k))
-    cter_noc, cter = JuMP.@constraints(model,
-                                       begin
-                                           [sc * tr_dr
-                                            sc * dr] in JuMP.MOI.NormOneCone(2)
-                                           sc * (tr_dr - err * k) <= 0
-                                       end)
-    state_set!(model, prefix, :cter_noc_, i, cter_noc)
-    state_set!(model, prefix, :cter_, i, cter)
+    state_set!(model, prefix, :cter_noc_, i,
+               JuMP.@constraint(model, [sc * tr_dr
+                                        sc * dr] in JuMP.MOI.NormOneCone(2)))
+    state_set!(model, prefix, :cter_, i,
+               JuMP.@constraint(model, sc * (tr_dr - err * k) <= 0))
     return nothing
 end
 """

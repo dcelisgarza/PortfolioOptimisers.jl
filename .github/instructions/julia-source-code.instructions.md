@@ -660,6 +660,45 @@ is the workflow that applies them.
   process order, single-threaded, as the median of five fits after a warm-up. A comparison with
   another library times that library in that same run.
 
+## A JuMP model is built in the measured forms
+
+Issue #2062 measured each choice that a builder of a JuMP model makes. The probes ran in a bare
+process that loads JuMP, Clarabel and HiGHS only, on N = 100 assets and T = 1000 observations, as
+the minimum of many builds after a warm-up. Each pair of forms gave the same row to MOI, unless the
+rule says otherwise. These rules bind every builder under `src/` and `ext/`.
+
+A change to an existing site passes a stop rule. It saves at least 1 % of the build time or of the
+bytes of the typical model that reaches the site, or it moves the solve time by at least 5 %. The
+typical model is a `MeanRisk` on the same N and T. Its build costs 1.8 MiB for a variance, 44 MiB
+for a conditional value at risk, and 309 MiB for an approximate ordered weights array before #2062.
+
+**Every expression and every row stays registered.** A builder registers each entry with
+`state_set!` under its prefix, or with a named macro. A user introspects the model, and a
+report reads it, so no speed gain trades a registration away. A model that the library does not
+return can hold anonymous entries: the model of a risk value, of a weight finaliser, of a
+projection, of an entropy pooling posterior or of a path score. A named macro and an anonymous
+macro that `state_set!` registers cost the same.
+
+| Choice | Rule | Measurement |
+| --- | --- | --- |
+| Where the arithmetic is done | Do the arithmetic on JuMP expressions inside the macro of the row, or inside a registered `JuMP.@expression` | A vector on T built in a local before the macro: 35.1 MiB against 23.7 MiB in the macro. A scalar on N: 108 KiB against 92.5 KiB, below the stop rule, so both forms are correct for a scalar |
+| A negated series | Write the minus inside the macro of the row, `-net_X - …` or `wr .- net_X`. When many builders read the negated series, build it once in a registered `JuMP.@expression` that each of them reads, as `risk_series` does for the gain tail (`gain_net_X`) and for the drawdown path (`neg_dd`) | A negated copy before the macro: 31.1 MiB against 24.7 MiB. A sign variable, `sg * net_X`, gains nothing, because the macro copies the product again |
+| A sum over one axis | Write one `sum(view(A, :, j))`, or one `LinearAlgebra.dot(view(c, t, :), view(A, t, :))`, for each row or column. Never `sum(A; dims = d)` or `mean(A; dims = d)` on a JuMP array | Base reduces over an axis with a plain `+`, which copies each partial sum. The robust conditional value at risk: 781 MiB against 107 MiB for each row, so its model built in 664 ms and 861 MiB, against 1954 ms and 2210 MiB. The column sums of the ordered weights array: 144 MiB against 1 MiB, so its approximate model built in 70 ms and 70 MiB, against 129 ms and 308 MiB |
+| An expression built in a loop | `JuMP.add_to_expression!`, or a generator inside the macro. Never `+=` | 26.8 KiB and 28.4 KiB against 718 KiB on N terms |
+| A dot product | `LinearAlgebra.dot(c, w)` or `transpose(c) * w`. Never `sum(c .* w)` | 13.2 KiB against 62.5 KiB |
+| A shared expression | Register it once, and let each row read the entry | Five rows that read the entry: 116 KiB. The same rows with the expression inlined: 149 KiB |
+| A vector of rows | One vector-valued row, with the comparison unbroadcast, for every model and every solver. Keep a container `[i = 1:N]` for a cone of each index | The form does not depend on the solver: JuMP converts each form to the other when a solver needs it. The probe added the JuMP build and the copy to Clarabel, SCS and HiGHS over T = 1000 rows. The vector row was cheaper at every size from 3 to 102 terms in each entry (31.8 ms against 35.5 ms at 3 terms, 347 ms against 361 ms at 102 terms). The JuMP build alone favours the vector row up to about 12 terms, and costs up to 25 % more for a dense row (47 ms against 35 ms at 102 terms). Clarabel and SCS copy the vector row 25 to 30 % faster, and HiGHS copies scalar rows faster. The rows of the discrete allocator hold 2 or 3 terms, and their vector form builds 13 % faster and copies faster or equal on all three solvers |
+| A bound on one variable | A variable bound, `lower_bound = 0`. A bound that scales with `k`, such as `w ⊖ k * lb`, stays a row | 1000 bounds: 179 KiB, against 767 KiB for one vector row and 963 KiB for 1000 rows. The solve is the same |
+| The sense of a row | `expr >= 0` and `expr in MOI.GreaterThan(0)` are equal. Use the set when the caller passes it | The same row and the same bytes |
+| The circled operators | Keep `⊖`, `⊕` and `⊙` on a rate that can be a scalar or a vector, because they keep the number types open | The same bytes as the plain operators, except `scalar ⊙ w`, which costs 49 KiB more on N terms, below the stop rule |
+| String names | Keep `JuMP.set_string_names_on_creation(model, str_names)`, with `str_names = false` by default | A named `@variable` of 1000 entries with names is 2.6 times slower |
+| The model | `JuMP.Model()`, with `JuMP.set_optimizer` at the solve | The only form that serves a list of solvers. `direct_model` binds the model to one solver, so the next solver of the list cannot take it, and a solver that takes no change after the first copy refuses it (Clarabel refused the first variable). `add_bridges = false` refuses each row that the solver does not take in its own form (Clarabel refused the scalar equality rows). The build costs the same in `Model()` and in `Model(optimizer)` |
+| Plural macros | One singular `@variable`, `@constraint` or `@expression` for each entry. Never `@variables`, `@constraints` or `@expressions` | A plural block builds the same model, with the same bytes and time, and the formatter aligns its lines far to the right |
+
+`test/test_88_jump_build_form_census.jl` gates the plural macros, the sums over an axis, the `+=`
+and the `sum(c .* w)`. The other rules have no static form that a census can read, so a review
+reads them.
+
 ## Return Type Annotations
 
 - `.github/instructions/julia-return-types.instructions.md` holds the full guidelines.

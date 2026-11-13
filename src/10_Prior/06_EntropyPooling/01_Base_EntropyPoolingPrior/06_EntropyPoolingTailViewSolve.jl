@@ -367,10 +367,8 @@ function ep_diagnose_views(slv::Slv_VecSlv, w::VecNum, epc::AbstractDict, tvs::V
     q = collect(w)
     Z = findall(iszero, q)
     model = JuMP.Model()
-    JuMP.@variables(model, begin
-                        t
-                        p[1:T] >= 0
-                    end)
+    JuMP.@variable(model, t)
+    JuMP.@variable(model, p[1:T] >= 0)
     JuMP.fix.(p[Z], zero(eltype(w)); force = true)
     JuMP.@constraint(model, csum, sum(p) - one(eltype(w)) == 0)
     JuMP.@constraint(model, cmargin, t * q - p <= 0)
@@ -509,17 +507,13 @@ function ep_jump_entropy_pooling(w::VecNum, epc::AbstractDict, tvs::VecEPTV,
     q = collect(w)
     sup = q .> zero(eltype(q))
     model = JuMP.Model()
-    JuMP.@variables(model, begin
-                        t
-                        x[1:T] >= 0
-                    end)
+    JuMP.@variable(model, t)
+    JuMP.@variable(model, x[1:T] >= 0)
     JuMP.fix.(x[.!sup], zero(eltype(q)); force = true)
-    JuMP.@constraints(model,
-                      begin
-                          sc1 * (sum(x) - one(eltype(w))) == 0
-                          [sc1 * t; sc1 * q[sup]; sc1 * x[sup]] in
-                          JuMP.MOI.RelativeEntropyCone(2 * count(sup) + 1)
-                      end)
+    JuMP.@constraint(model, sc1 * (sum(x) - one(eltype(w))) == 0)
+    JuMP.@constraint(model,
+                     [sc1 * t; sc1 * q[sup]; sc1 * x[sup]] in
+                     JuMP.MOI.RelativeEntropyCone(2 * count(sup) + 1))
     JuMP.@expression(model, obj_expr, so * t)
     ep_jump_views!(model, x, obj_expr, epc, tvs, sc1, sc2, so)
     JuMP.@objective(model, Min, obj_expr)
@@ -543,18 +537,14 @@ function ep_jump_entropy_pooling(w::VecNum, epc::AbstractDict, tvs::VecEPTV,
     q = collect(w)
     sup = q .> zero(eltype(q))
     log_p = log.(q[sup])
-    JuMP.@variables(model, begin
-                        x[1:T]
-                        t
-                    end)
+    JuMP.@variable(model, x[1:T])
+    JuMP.@variable(model, t)
     JuMP.fix.(x[.!sup], zero(eltype(q)); force = true)
     JuMP.@expression(model, obj_expr, so * t)
-    JuMP.@constraints(model,
-                      begin
-                          sc1 * (sum(x) - one(eltype(w))) == 0
-                          [sc1 * t; fill(sc1, count(sup)); sc1 * x[sup]] in
-                          JuMP.MOI.RelativeEntropyCone(2 * count(sup) + 1)
-                      end)
+    JuMP.@constraint(model, sc1 * (sum(x) - one(eltype(w))) == 0)
+    JuMP.@constraint(model,
+                     [sc1 * t; fill(sc1, count(sup)); sc1 * x[sup]] in
+                     JuMP.MOI.RelativeEntropyCone(2 * count(sup) + 1))
     ep_jump_views!(model, x, obj_expr, epc, tvs, sc1, sc2, so)
     JuMP.@objective(model, Min, obj_expr - so * LinearAlgebra.dot(x[sup], log_p))
     @argcheck(optimise_JuMP_model!(model, slv).success,
@@ -660,14 +650,10 @@ function ep_jump_views!(model::JuMP.Model, x, obj_expr, epc::AbstractDict, tvs::
     if haskey(epc, :feq)
         A, B = epc[:feq]
         N = length(B)
-        JuMP.@variables(model, begin
-                            tc
-                            c[1:N]
-                        end)
-        JuMP.@constraints(model, begin
-                              cfeq, sc1 * (A * x ⊖ B ⊖ c) == 0
-                              [sc1 * tc; sc1 * c] in JuMP.MOI.NormOneCone(N + 1)
-                          end)
+        JuMP.@variable(model, tc)
+        JuMP.@variable(model, c[1:N])
+        JuMP.@constraint(model, cfeq, sc1 * (A * x ⊖ B ⊖ c) == 0)
+        JuMP.@constraint(model, [sc1 * tc; sc1 * c] in JuMP.MOI.NormOneCone(N + 1))
         JuMP.add_to_expression!(obj_expr, so * sc2 * tc)
     end
     for tv in tvs

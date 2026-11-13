@@ -198,11 +198,9 @@ function ERM_model(x::VecNum, slv::Slv_VecSlv, alpha::Number, w::Option{<:VecNum
     rows = positive_weight_rows(w, T)
     N = length(rows)
     xr = view(x, rows)
-    JuMP.@variables(model, begin
-                        t
-                        z >= 0
-                        u[1:T]
-                    end)
+    JuMP.@variable(model, t)
+    JuMP.@variable(model, z >= 0)
+    JuMP.@variable(model, u[1:T])
     aT = if isnothing(w)
         JuMP.@constraint(model, sum(u) - z <= 0)
         alpha * T

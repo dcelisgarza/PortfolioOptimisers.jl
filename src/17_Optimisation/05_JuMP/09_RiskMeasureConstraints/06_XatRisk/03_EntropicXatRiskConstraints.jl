@@ -115,14 +115,9 @@ function set_entropic_risk_constraints!(model::JuMP.Model, i::Any, r::RiskMeasur
     sc = get_constraint_scale(model)
     rows = positive_weight_rows(wi, T)
     N = length(rows)
-    t, z, u = JuMP.@variables(model, begin
-                                  ()
-                                  (), (lower_bound = 0)
-                                  [1:N]
-                              end)
-    state_set!(model, prefix, keys.t, i, t)
-    state_set!(model, prefix, keys.z, i, z)
-    state_set!(model, prefix, keys.u, i, u)
+    t = state_set!(model, prefix, keys.t, i, JuMP.@variable(model))
+    z = state_set!(model, prefix, keys.z, i, JuMP.@variable(model, lower_bound = 0))
+    u = state_set!(model, prefix, keys.u, i, JuMP.@variable(model, [1:N]))
     at = if isnothing(wi)
         state_set!(model, prefix, keys.budget, i,
                    JuMP.@constraint(model, sc * (sum(u) - z) <= 0))
