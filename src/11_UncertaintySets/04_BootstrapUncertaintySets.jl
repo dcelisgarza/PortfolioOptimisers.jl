@@ -933,7 +933,7 @@ Where:
  1. Reduce the Prior Result to the Investable Mask with [`investable_ucs_reduction`](@ref). Inside an optimiser, the result is already reduced, and the step changes nothing. Outside an optimiser, on a prior fitted on a point-in-time Asset Panel, the step makes the reduction that an optimiser makes.
  2. Take `X` from the reduced Prior Result. The method resamples this `X`, so under a Scenario Cap it resamples only the rows that the prior keeps.
  3. Draw the resampled statistics with [`bootstrap_generator`](@ref) to get `mus` and `sigmas` from one index stream.
- 4. Subtract the `mu` of the reduced Prior Result from each column of `mus` to get `X_mu`. Subtract its vectorised `sigma` from each slice of `sigmas` to get `X_sigma`. Transpose both, so that each row is one simulation.
+ 4. Subtract the `mu` of the reduced Prior Result from each column of `mus` to get `X_mu`. Subtract its vectorised `sigma` from each slice of `sigmas` to get `X_sigma`. Transpose both, so that each row is one simulation. The subtraction writes into `mus` and `sigmas`, so the method holds no second copy of the resamples.
  5. Fit `ue.ce` on `X_mu` to get the shape matrix `sigma_mu`. This is the only fit of `ue.ce` on the mean axis. The shape is empirical, and no asymptotic formula enters.
  6. Fit `ue.ce` on `X_sigma` to get the shape matrix `sigma_sigma`. This is the second fit of `ue.ce` on the covariance axis.
  7. Build both sets with [`bootstrap_ellipsoidal_set`](@ref). It fits each radius `k` at the level `ue.q`, with the degrees of freedom capped at `ue.n_sim - 1`.
@@ -967,14 +967,12 @@ function ucs(ue::ARCHUncertaintySet{Nothing, <:Any, <:Any,
     X = prr.X
     N = size(X, 2)
     mus, sigmas = bootstrap_generator(ue, X; kwargs...)
-    X_mu = Matrix{eltype(X)}(undef, N, ue.n_sim)
-    X_sigma = Matrix{eltype(X)}(undef, N^2, ue.n_sim)
-    for i in axes(X_mu, 2)
-        X_mu[:, i] = vec(@view(mus[:, i]) - prr.mu)
-        X_sigma[:, i] = vec(@view(sigmas[:, :, i]) - prr.sigma)
-    end
-    X_mu = transpose(X_mu)
-    X_sigma = transpose(X_sigma)
+    # In place: the deviations reuse the memory of the resamples. The reshape shares that
+    # memory, and it keeps the column-major order of `vec`.
+    mus .-= prr.mu
+    sigmas .-= prr.sigma
+    X_mu = transpose(mus)
+    X_sigma = transpose(reshape(sigmas, N^2, :))
     sigma_mu = Statistics.cov(ue.ce, X_mu)
     sigma_sigma = Statistics.cov(ue.ce, X_sigma)
     mu_set, sigma_set = bootstrap_ellipsoidal_set(ue, X_mu, sigma_mu,
@@ -1015,7 +1013,7 @@ Where:
  1. Reduce the Prior Result to the Investable Mask with [`investable_ucs_reduction`](@ref). Inside an optimiser, the result is already reduced, and the step changes nothing. Outside an optimiser, on a prior fitted on a point-in-time Asset Panel, the step makes the reduction that an optimiser makes.
  2. Take `X` from the reduced Prior Result. The method resamples this `X`, so under a Scenario Cap it resamples only the rows that the prior keeps.
  3. Draw the resampled means with [`mu_bootstrap_generator`](@ref) to get `mus`.
- 4. Subtract the `mu` of the reduced Prior Result from each column of `mus` to get the deviation matrix `X_mu`. Transpose it, so that each row is one simulation.
+ 4. Subtract the `mu` of the reduced Prior Result from each column of `mus` to get the deviation matrix `X_mu`. Transpose it, so that each row is one simulation. The subtraction writes into `mus`, so the method holds no second copy of the resamples.
  5. Fit `ue.ce` on `X_mu` to get the shape matrix `sigma_mu`. The shape is empirical, and no asymptotic formula enters.
  6. Build the set with [`bootstrap_ellipsoidal_set`](@ref). It fits the radius `k` at the level `ue.q`, with the degrees of freedom capped at `ue.n_sim - 1`.
  7. Write the set back onto the full universe with [`expand_investable_ucs`](@ref), and return it. A set fitted outside an optimiser then covers the same assets as the prior. A view of the set at the mask gives the reduced fit again.
@@ -1045,13 +1043,10 @@ function mu_ucs(ue::ARCHUncertaintySet{Nothing, <:Any, <:Any,
                 rd = nothing, kwargs...)
     imsk, prr, _ = investable_ucs_reduction(pr, rd)
     X = prr.X
-    N = size(X, 2)
     mus = mu_bootstrap_generator(ue, X; kwargs...)
-    X_mu = Matrix{eltype(X)}(undef, N, ue.n_sim)
-    for i in axes(X_mu, 2)
-        X_mu[:, i] = vec(@view(mus[:, i]) - prr.mu)
-    end
-    X_mu = transpose(X_mu)
+    # In place: the deviations reuse the memory of the resamples.
+    mus .-= prr.mu
+    X_mu = transpose(mus)
     sigma_mu = Statistics.cov(ue.ce, X_mu)
     set = bootstrap_ellipsoidal_set(ue, X_mu, sigma_mu, MuUncertaintySetClass(), prr.mu)
     return expand_investable_ucs(set, imsk, pr)
@@ -1087,7 +1082,7 @@ Where:
  1. Reduce the Prior Result to the Investable Mask with [`investable_ucs_reduction`](@ref). Inside an optimiser, the result is already reduced, and the step changes nothing. Outside an optimiser, on a prior fitted on a point-in-time Asset Panel, the step makes the reduction that an optimiser makes.
  2. Take `X` from the reduced Prior Result. The method resamples this `X`, so under a Scenario Cap it resamples only the rows that the prior keeps.
  3. Draw the resampled covariances with [`sigma_bootstrap_generator`](@ref) to get `sigmas`. This is the first fit of `ue.ce`.
- 4. Subtract the vectorised `sigma` of the reduced Prior Result from each slice of `sigmas` to get the deviation matrix `X_sigma`. Transpose it, so that each row is one simulation.
+ 4. Subtract the vectorised `sigma` of the reduced Prior Result from each slice of `sigmas` to get the deviation matrix `X_sigma`. Transpose it, so that each row is one simulation. The subtraction writes into `sigmas`, so the method holds no second copy of the resamples.
  5. Fit `ue.ce` on `X_sigma` to get the shape matrix `sigma_sigma`. This is the second fit of `ue.ce`. The shape is empirical, and no asymptotic formula enters.
  6. Build the set with [`bootstrap_ellipsoidal_set`](@ref). It fits the radius `k` at the level `ue.q`, with the degrees of freedom capped at `ue.n_sim - 1`.
  7. Write the set back onto the full universe with [`expand_investable_ucs`](@ref), and return it. A set fitted outside an optimiser then covers the same assets as the prior. A view of the set at the mask gives the reduced fit again.
@@ -1119,11 +1114,10 @@ function sigma_ucs(ue::ARCHUncertaintySet{Nothing, <:Any, <:Any,
     X = prr.X
     N = size(X, 2)
     sigmas = sigma_bootstrap_generator(ue, X; kwargs...)
-    X_sigma = Matrix{eltype(X)}(undef, N^2, ue.n_sim)
-    for i in axes(X_sigma, 2)
-        X_sigma[:, i] = vec(@view(sigmas[:, :, i]) - prr.sigma)
-    end
-    X_sigma = transpose(X_sigma)
+    # In place: the deviations reuse the memory of the resamples. The reshape shares that
+    # memory, and it keeps the column-major order of `vec`.
+    sigmas .-= prr.sigma
+    X_sigma = transpose(reshape(sigmas, N^2, :))
     sigma_sigma = Statistics.cov(ue.ce, X_sigma)
     set = bootstrap_ellipsoidal_set(ue, X_sigma, sigma_sigma, SigmaUncertaintySetClass(),
                                     prr.sigma)
@@ -1162,7 +1156,7 @@ Where:
  1. Reduce the Prior Result to the Investable Mask with [`investable_ucs_reduction`](@ref). Inside an optimiser, the result is already reduced, and the step changes nothing. Outside an optimiser, on a prior fitted on a point-in-time Asset Panel, the step makes the reduction that an optimiser makes.
  2. Take `X` and `N = size(X, 2)` from the reduced Prior Result. The method resamples this `X`.
  3. Refit both statistics on every resample with [`bootstrap_generator`](@ref) to get `mus` and `sigmas` from one index stream.
- 4. Subtract the `mu` of the reduced Prior Result from every resampled mean to get `X_mu`. Subtract its `sigma` from every resampled covariance to get `X_sigma`. Each column holds one deviation.
+ 4. Subtract the `mu` of the reduced Prior Result from every resampled mean to get `X_mu`. Subtract its `sigma` from every resampled covariance to get `X_sigma`. Each column holds one deviation. The subtraction writes into the resampled statistics, so the method holds no second copy of the resamples.
  5. Build the two sets with [`norm_ball_deviation_set`](@ref) on the transposed deviations.
  6. Write both sets back onto the full universe with [`expand_investable_ucs`](@ref). Return them as a tuple, with the mean set first. A set fitted outside an optimiser then covers the same assets as the prior. A view of the set at the mask gives the reduced fit again.
 
@@ -1204,13 +1198,12 @@ function ucs(ue::ARCHUncertaintySet{Nothing, <:Any, <:Any,
     X = prr.X
     N = size(X, 2)
     mus, sigmas = bootstrap_generator(ue, X; kwargs...)
-    X_mu = Matrix{eltype(X)}(undef, N, ue.n_sim)
-    X_sigma = Matrix{eltype(X)}(undef, N^2, ue.n_sim)
-    for i in axes(X_mu, 2)
-        X_mu[:, i] = vec(@view(mus[:, i]) - prr.mu)
-        X_sigma[:, i] = vec(@view(sigmas[:, :, i]) - prr.sigma)
-    end
-    mu_set, sigma_set = norm_ball_deviation_set(ue.alg, ue.q, transpose(X_mu),
+    # In place: the deviations reuse the memory of the resamples. The reshape shares that
+    # memory, and it keeps the column-major order of `vec`.
+    mus .-= prr.mu
+    sigmas .-= prr.sigma
+    X_sigma = reshape(sigmas, N^2, :)
+    mu_set, sigma_set = norm_ball_deviation_set(ue.alg, ue.q, transpose(mus),
                                                 MuUncertaintySetClass(), prr.mu),
                         norm_ball_deviation_set(ue.alg, ue.q, transpose(X_sigma),
                                                 SigmaUncertaintySetClass(), prr.sigma)
@@ -1232,7 +1225,7 @@ This route builds no shape matrix, because the scaled bootstrap deviations are t
  1. Reduce the Prior Result to the Investable Mask with [`investable_ucs_reduction`](@ref). Inside an optimiser, the result is already reduced, and the step changes nothing. Outside an optimiser, on a prior fitted on a point-in-time Asset Panel, the step makes the reduction that an optimiser makes.
  2. Take `X` and `N = size(X, 2)` from the reduced Prior Result. The method resamples this `X`.
  3. Refit the mean on every resample with [`mu_bootstrap_generator`](@ref) to get `mus`.
- 4. Subtract the `mu` of the reduced Prior Result from every resampled mean to get `X_mu`. Each column holds one deviation.
+ 4. Subtract the `mu` of the reduced Prior Result from every resampled mean to get `X_mu`. Each column holds one deviation. The subtraction writes into the resampled means, so the method holds no second copy of the resamples.
  5. Build the set with [`norm_ball_deviation_set`](@ref) on the transposed deviations, with the `mu` of the reduced Prior Result as the centre.
  6. Write the set back onto the full universe with [`expand_investable_ucs`](@ref), and return it. A set fitted outside an optimiser then covers the same assets as the prior. A view of the set at the mask gives the reduced fit again.
 
@@ -1270,13 +1263,10 @@ function mu_ucs(ue::ARCHUncertaintySet{Nothing, <:Any, <:Any,
                 rd = nothing, kwargs...)
     imsk, prr, _ = investable_ucs_reduction(pr, rd)
     X = prr.X
-    N = size(X, 2)
     mus = mu_bootstrap_generator(ue, X; kwargs...)
-    X_mu = Matrix{eltype(X)}(undef, N, ue.n_sim)
-    for i in axes(X_mu, 2)
-        X_mu[:, i] = vec(@view(mus[:, i]) - prr.mu)
-    end
-    set = norm_ball_deviation_set(ue.alg, ue.q, transpose(X_mu), MuUncertaintySetClass(),
+    # In place: the deviations reuse the memory of the resamples.
+    mus .-= prr.mu
+    set = norm_ball_deviation_set(ue.alg, ue.q, transpose(mus), MuUncertaintySetClass(),
                                   prr.mu)
     return expand_investable_ucs(set, imsk, pr)
 end
@@ -1297,7 +1287,7 @@ The map that [`norm_ball_deviation_factor`](@ref) builds is the scaled deviation
  1. Reduce the Prior Result to the Investable Mask with [`investable_ucs_reduction`](@ref). Inside an optimiser, the result is already reduced, and the step changes nothing. Outside an optimiser, on a prior fitted on a point-in-time Asset Panel, the step makes the reduction that an optimiser makes.
  2. Take `X` and `N = size(X, 2)` from the reduced Prior Result. The method resamples this `X`.
  3. Refit the covariance on every resample with [`sigma_bootstrap_generator`](@ref) to get `sigmas`.
- 4. Subtract the `sigma` of the reduced Prior Result from every resampled covariance, and vectorise the difference, to get `X_sigma`. Each column holds one deviation.
+ 4. Subtract the `sigma` of the reduced Prior Result from every resampled covariance, and vectorise the difference, to get `X_sigma`. Each column holds one deviation. The subtraction writes into the resampled covariances, so the method holds no second copy of the resamples.
  5. Build the set with [`norm_ball_deviation_set`](@ref) on the transposed deviations, with the `sigma` of the reduced Prior Result as the centre.
  6. Write the set back onto the full universe with [`expand_investable_ucs`](@ref), and return it. A set fitted outside an optimiser then covers the same assets as the prior. A view of the set at the mask gives the reduced fit again.
 
@@ -1337,11 +1327,10 @@ function sigma_ucs(ue::ARCHUncertaintySet{Nothing, <:Any, <:Any,
     X = prr.X
     N = size(X, 2)
     sigmas = sigma_bootstrap_generator(ue, X; kwargs...)
-    X_sigma = Matrix{eltype(X)}(undef, N^2, ue.n_sim)
-    for i in axes(X_sigma, 2)
-        X_sigma[:, i] = vec(@view(sigmas[:, :, i]) - prr.sigma)
-    end
-    set = norm_ball_deviation_set(ue.alg, ue.q, transpose(X_sigma),
+    # In place: the deviations reuse the memory of the resamples. The reshape shares that
+    # memory, and it keeps the column-major order of `vec`.
+    sigmas .-= prr.sigma
+    set = norm_ball_deviation_set(ue.alg, ue.q, transpose(reshape(sigmas, N^2, :)),
                                   SigmaUncertaintySetClass(), prr.sigma)
     return expand_investable_ucs(set, imsk, pr)
 end

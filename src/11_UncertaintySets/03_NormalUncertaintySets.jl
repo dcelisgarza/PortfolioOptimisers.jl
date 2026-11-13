@@ -806,7 +806,10 @@ Each row of the sample is an estimation error, a draw minus `mu`. The draws come
 """
 function normal_mu_error_sample(ue::NormalUncertaintySet, rng::Random.AbstractRNG,
                                 mu::VecNum, sigma_mu::MatNum)
-    return transpose(rand(rng, Distributions.MvNormal(mu, sigma_mu), ue.n_sim) .- mu)
+    X_mu = rand(rng, Distributions.MvNormal(mu, sigma_mu), ue.n_sim)
+    # In place: the estimation errors reuse the memory of the draws.
+    X_mu .-= mu
+    return transpose(X_mu)
 end
 """
     normal_sigma_error_sample(ue::NormalUncertaintySet, rng::Random.AbstractRNG,
@@ -818,8 +821,8 @@ Each row of the sample is an estimation error, a draw minus `sigma`. The varianc
 
 # Algorithm
 
- 1. Draw `ue.n_sim` matrices from `Distributions.Wishart(T, sigma_mu)` to get `sigmas`.
- 2. Subtract `sigma` from each draw into an `N` by `N` by `ue.n_sim` array.
+ 1. Draw `ue.n_sim` matrices from `Distributions.Wishart(T, sigma_mu)`, one at a time into one buffer.
+ 2. Subtract `sigma` from each draw into an `N` by `N` by `ue.n_sim` array. The function holds only this array and the buffer, and not all the draws.
  3. Reshape the array to `N^2` rows, with one column for each draw. Transpose it, so that each row holds one vectorised estimation error.
 
 # Arguments
@@ -845,10 +848,16 @@ Each row of the sample is an estimation error, a draw minus `sigma`. The varianc
 """
 function normal_sigma_error_sample(ue::NormalUncertaintySet, rng::Random.AbstractRNG,
                                    sigma::MatNum, sigma_mu::MatNum, T::Number, N::Integer)
-    sigmas = rand(rng, Distributions.Wishart(T, sigma_mu), ue.n_sim)
+    W = Distributions.Wishart(T, sigma_mu)
     X_sigma = Array{eltype(sigma)}(undef, N, N, ue.n_sim)
-    for i in axes(sigmas, 1)
-        X_sigma[:, :, i] = sigmas[i] - sigma
+    # One draw at a time into one buffer. `rand(rng, W, n)` fills its `n` matrices in this
+    # order with `rand!`, so the stream and the draws are the same. The first `rand` gives
+    # the buffer the element type that `Distributions` draws in.
+    draw = rand(rng, W)
+    X_sigma[:, :, 1] .= draw .- sigma
+    for i in 2:(ue.n_sim)
+        Distributions.rand!(rng, W, draw)
+        X_sigma[:, :, i] .= draw .- sigma
     end
     return transpose(reshape(X_sigma, N^2, :))
 end
