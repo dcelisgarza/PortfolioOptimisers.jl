@@ -618,7 +618,13 @@ and every addition:
 3. **An interface method is not a wrapper** when two or more methods share its callee, or when
    its callee is the constructor of a type. `reader_frames(x::T, path, ::Bool) =
    source_frames(x.x_src, path, true)` is the case. When the method is the only caller of its
-   callee, the body of the callee moves into the method.
+   callee, the body of the callee moves into the method. A private function with one method that
+   only builds a type is not an interface method. It is a second name for the constructor, and
+   it holds a form that the constructor can hold. The form goes to the constructor as a method,
+   and the function goes. #2112 is the case: `resolved_constraint_block(cbe, pr, rd, vals)` read
+   the slots of a block that stage 2 does not resolve. It became
+   `ResolvedConstraintBlock(cbe::ConstraintBlock; pr, rd, …)`, with a required keyword for each
+   resolved value, as `FiniteAllocationInput(res; prices, …)` takes the fields of a result.
 4. **A template hook is not a second name.** A hook that the `# Interfaces` section names, and
    that does one step of a driver, is part of the driver: `_optimise` under `optimise`, as
    `__solve` under `solve` in SciML. A method of the verb that goes around the driver is a

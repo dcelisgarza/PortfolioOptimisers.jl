@@ -141,6 +141,11 @@ using Test
              # preset
              mk(x::A) = T2(x)
 
+             # in front of a constructor: one private method, and two (#2112, rule 3)
+             mk_priv(x::T3, v) = T3(; a = x.a, b = v)
+             mk_two(x::A) = T2(x)
+             mk_two(x::B) = T2(x)
+
              # keyword form of a public verb
              kwv(x::A; s = 1) = kwv_worker(x, s)
              kwv_worker(x, s) = x + s
@@ -253,6 +258,13 @@ using Test
         @test of(:verb2) == [("worker", :hook_fn, "go")]
         @test occursin("around the driver", first_of(:verb2).why)
         @test of(:mk) == [("preset", :T2, "keep (a)")]
+        # One private method that builds a type is a second name for the constructor: its
+        # form goes to the constructor as a method (#2112).
+        @test of(:mk_priv) == [("interface", :T3, "go")]
+        @test occursin("#2112", first_of(:mk_priv).why)
+        # Two methods that share the constructor are interface methods (rule 3).
+        @test of(:mk_two) == [("interface", :T2, "keep (interface)"),
+                              ("interface", :T2, "keep (interface)")]
         # A public verb that passes a keyword as a slot is a keyword form, not a worker.
         @test of(:kwv) == [("keyword form", :kwv_worker, "keep (a)")]
     end

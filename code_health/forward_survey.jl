@@ -19,6 +19,8 @@
 #   interface, per-form  a method that only forwards, and the count of callers of its callee
 #                        (#2078, rule 3). A shared callee, a public callee, a hook or a type
 #                        keeps it. A callee with this method as its only caller moves its body in.
+#                        One private method in front of a type goes to the constructor of the
+#                        type as a method (#2112).
 #   nothing pair         the value arm of a `Nothing`/value pair, and whether the callee has a
 #                        `::Nothing` method (#2077). Case 1 goes. Cases 2 and 3 need a review.
 #   default              an untyped or `::Any` fallback that returns its input, `false` or
@@ -624,8 +626,9 @@ function forward_verdict(t::Tree, name, callee, d)
             return ("interface", "keep (interface)",
                     "the callee is the constructor of a type (rule 3)")
         end
-        return ("interface", "review",
-                "one private method that builds a `$callee`: a second name for the constructor, or a preset")
+        # One private method holds a form that the constructor can hold (#2112).
+        return ("interface", "go",
+                "one private method that builds a `$callee`: a second name for the constructor. Its form goes to `$callee` as a method, and its callers call `$callee` (#2112)")
     elseif name in t.public && callee in t.hooks && has_driver(t, name)
         return ("worker", "go",
                 "goes around the driver of `$name` to the hook `$callee`, and the driver gives the same answer. A measured loss keeps it as (b) (rule 4)")
