@@ -44,7 +44,7 @@ Four facts bore on the answer.
 | The selection with `nothing` | ADR 0234. `opt`, `idx`, `ranked`, `rank_idx` and `rank_scores` hold one entry per measure. |
 | The six methods | One writer and one allocator. The combinatorial score becomes a method of `write_candidate_scores!`, and one helper allocates a matrix or a vector of `K` matrices. The two randomised forms forward `r_sca`. |
 | The keyword form of the score | `oriented_score(r, p; sca, kwargs...)` is removed. Every caller holds its reduction and calls `oriented_score(sca, r, p; kwargs...)`. `sort_by_measure(sca, ppred, r; kwargs...)` and `quantile_by_measure(sca, ppred, r, q; r_kwargs, q_kwargs)` take the reduction as their first argument in the same way, and they have no keyword form. #1997 measured the keyword form against the positional form: the time, the allocations and the count of runtime dispatches were equal in each case. So the form follows the rule for keyword wrappers in `src/CLAUDE.md`. `quantile_by_measure` and `NearestQuantilePrediction` refuse a `sca` in `r_kwargs`, and `sort_by_measure` refuses a `sca` in its `kwargs`, because a reader of a risk would ignore it for one measure. |
-| `nothing` with a vector | `NearestQuantilePrediction`, `sort_by_measure` and `quantile_by_measure` refuse `sca = nothing` when `r` is a vector, with an `IsNothingError`. A sort and a quantile need one score for each path, and `nothing` keeps one score for each measure. For one measure `nothing` is inert. The types of `sca` and `r` select the refusal, so a call that is admitted pays nothing for it. |
+| `nothing` with a vector | `NearestQuantilePrediction`, `sort_by_measure` and `quantile_by_measure` refuse `sca = nothing` when `r` is a vector, with an `IsNothingError`. A sort and a quantile need one score for each path, and `nothing` keeps one score for each measure. For one measure `nothing` is inert. The types of `sca` and `r` select the refusal, so a call that is admitted pays nothing for it. The constructor of `FoldRiskScorer` refuses `sca = nothing` with a vector in the same way, because a selector reads one score for each asset. |
 
 ## Considered options
 
@@ -68,7 +68,10 @@ Four facts bore on the answer.
   Ticket #1997 gives `NearestQuantilePrediction` its field `sca`, gives `sort_by_measure` and
   `quantile_by_measure` their keyword `sca`, and removes the keyword form of `oriented_score`.
   Ticket #1998 gives the two searches `r_sca`, the one writer and the one allocator.
-  Ticket #1999 gives `FoldRiskScorer` its field `sca`. Ticket #2001 builds the shape under
+  Ticket #1999 gives `FoldRiskScorer` its field `sca`, with the default `SumScalariser()`. A
+  vector gives each asset its oriented score on each window, so `bigger_is_better` of the scorer
+  reads `true` as the orientation of the values. One measure keeps its raw value and its own
+  orientation, so no number of one measure moves. Ticket #2001 builds the shape under
   `nothing` and its selection (ADR 0234).
 - **A breaking change, for the build.** The released `quantile_by_measure` and
   `NearestQuantilePrediction` pass `r_kwargs` to `expected_risk`, so a released caller can write

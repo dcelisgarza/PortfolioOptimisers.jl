@@ -17,7 +17,7 @@ To add a statistic, subtype `AbstractFoldStatistic`, put every parameter of the 
 
   - `alg`: The concrete statistic.
   - `v`: The values of the risk measure on one test window, one entry for each asset that the window covers.
-  - `bib`: The [`bigger_is_better`](@ref) flag of the risk measure.
+  - $(arg_dict[:fold_bib])
 
 ### Returns
 
@@ -30,7 +30,7 @@ To add a statistic, subtype `AbstractFoldStatistic`, put every parameter of the 
 ### Arguments
 
   - `alg`: The concrete statistic.
-  - `bib`: The [`bigger_is_better`](@ref) flag of the risk measure.
+  - $(arg_dict[:fold_bib])
 
 ### Returns
 
@@ -138,7 +138,7 @@ The [`Rank`](@ref) method runs these steps:
 
   - `alg`: The statistic.
   - `v`: The values of the risk measure on one test window, one entry for each covered asset.
-  - `bib`: The [`bigger_is_better`](@ref) flag of the risk measure.
+  - $(arg_dict[:fold_bib])
 
 # Returns
 
@@ -169,7 +169,7 @@ The [`Value`](@ref) method returns `bib`, because the raw value has the orientat
 # Arguments
 
   - `alg`: The statistic.
-  - `bib`: The [`bigger_is_better`](@ref) flag of the risk measure.
+  - $(arg_dict[:fold_bib])
 
 # Returns
 
@@ -458,23 +458,30 @@ end
 """
 $(DocStringExtensions.TYPEDEF)
 
-Scores each asset with a risk measure on each test window of a cross-validation scheme, and aggregates the values over the windows.
+Scores each asset with a risk measure, or with a vector of them, on each test window of a cross-validation scheme, and aggregates the values over the windows.
 
 One window of bad luck then does not decide the rank of an asset. The score of an asset reads its own column alone, so the training rows do not change it. The scheme gives the windows only. `agg` sets the rule of the aggregation, and its `alg` sets whether it reduces the raw values with [`Value`](@ref) or the ranks with [`Rank`](@ref).
+
+One measure gives its raw value, with the orientation of the measure. A vector gives the [`oriented_score`](@ref) of the returns of the asset: each member is oriented so that a bigger value is better, multiplied by its scale, and then reduced through `sca`. So a vector whose members disagree on orientation gives one value, and a bigger value is better. For one measure `sca` is inert.
 
 # Mathematical definition
 
 ```math
 \\begin{align}
 v_{i k} &= r\\left(\\boldsymbol{x}_{T_{k},\\, i}\\right)\\,, \\\\
+v_{i k} &= S\\left(o_1 s_1 r_1\\left(\\boldsymbol{x}_{T_{k},\\, i}\\right), \\, \\ldots, \\, o_n s_n r_n\\left(\\boldsymbol{x}_{T_{k},\\, i}\\right)\\right)\\,, \\\\
 s_{i} &= A\\left(\\left\\{ g_{i k} : k \\in \\mathcal{F}_{i} \\right\\}\\right)\\,.
 \\end{align}
 ```
 
 Where:
 
-  - ``v_{i k}``: The value of the risk measure on the returns of asset ``i`` over the test window ``T_{k}``.
-  - ``r``: The risk measure `r`.
+  - ``v_{i k}``: The value of asset ``i`` on the test window ``T_{k}``. The first line is the case of one measure, and the second line the case of a vector.
+  - ``r``, ``r_j``: The risk measure `r`, or the ``j``-th measure of the vector `r`.
+  - ``o_j``: The orientation of ``r_j``: ``1`` when [`bigger_is_better`](@ref) holds for it, and ``-1`` otherwise.
+  - ``s_j``: `scale` of ``r_j``, its weight in the reduction.
+  - ``S``: The reduction `sca`.
+  - $(math_dict[:n_rm_vec])
   - ``\\boldsymbol{x}_{T_{k},\\, i}``: The returns of asset ``i`` at the rows of the test window ``T_{k}``.
   - ``T_{k}``: The ``k``-th distinct test window of `split(cv, rd)`.
   - ``g_{i k}``: The statistic of asset ``i`` on window ``T_{k}``. It is ``v_{i k}`` under [`Value`](@ref), and the rank of ``v_{i k}`` among the covered assets of the window under [`Rank`](@ref).
@@ -490,10 +497,10 @@ An asset that fewer than `min_folds` windows cover has the score `NaN`. Every se
 
 # Algorithm
 
- 1. Read the orientation `bib` of `r` with [`bigger_is_better`](@ref).
+ 1. Read the orientation `bib` of the values with [`window_bigger_is_better`](@ref): the [`bigger_is_better`](@ref) flag of one measure, and `true` for a vector.
  2. Take the distinct test windows of `split(cv, rd)` with [`distinct_test_windows`](@ref).
  3. For each window, find the positions `live` of the covered assets with [`cv_live_assets`](@ref).
- 4. Evaluate `r` on the covered columns of the window with [`asset_scores`](@ref), and turn the values into statistics with [`fold_statistic`](@ref).
+ 4. Evaluate `r` on the covered columns of the window with [`window_values`](@ref), and turn the values into statistics with [`fold_statistic`](@ref).
  5. Collect the statistics of each asset over the windows that cover it into `stats`.
  6. Reduce the statistics of each asset that at least `min_folds` windows cover with [`fold_aggregate`](@ref), under the orientation from [`statistic_bigger_is_better`](@ref). Write `NaN` at every other asset. [`min_folds_scores`](@ref) does this step.
 
@@ -504,7 +511,8 @@ $(DocStringExtensions.FIELDS)
 # Constructors
 
     FoldRiskScorer(;
-        r::AbstractBaseRiskMeasure,
+        r::BaseRM_VecBaseRM,
+        sca::Option{<:Sca_VecToScaM} = SumScalariser(),
         cv::CVE_Onl = KFold(),
         agg::AbstractFoldAggregation = MeanFoldScore(),
         min_folds::Integer = 1,
@@ -514,7 +522,8 @@ Keywords correspond to the struct's fields.
 
 ## Validation
 
-  - `supports_precomputed_returns(r)`, through [`assert_scoreable`](@ref).
+  - `supports_precomputed_returns` of `r`, or of each member of a vector, through [`assert_scoreable`](@ref).
+  - `sca` is not `nothing` when `r` is a vector, through [`assert_one_score_per_asset`](@ref). A selector reads one score for each asset, and `nothing` keeps one score for each measure. The error is an [`IsNothingError`](@ref).
   - `min_folds >= 1`.
 
 # Examples
@@ -530,7 +539,20 @@ julia> round.(PortfolioOptimisers.asset_scores(s, rd); digits = 4)
  0.02
  0.005
  0.085
+
+julia> sv = FoldRiskScorer(; r = [SCM(), MeanReturn()], cv = KFold(; n = 2));
+
+julia> round.(PortfolioOptimisers.asset_scores(sv, rd); digits = 4)
+3-element Vector{Float64}:
+  0.03
+ -0.005
+ -0.035
+
+julia> PortfolioOptimisers.bigger_is_better(sv)
+true
 ```
+
+The vector orients `SCM()`, so the value of asset A is the negated variance plus the mean return, `-0.02 + 0.05`.
 
 # Related
 
@@ -542,9 +564,13 @@ julia> round.(PortfolioOptimisers.asset_scores(s, rd); digits = 4)
 """
 @concrete struct FoldRiskScorer <: AbstractAssetScorer
     """
-    The [`AbstractBaseRiskMeasure`](@ref) that scores the returns of each asset on each test window.
+    The [`AbstractBaseRiskMeasure`](@ref), or the vector of them, that scores the returns of each asset on each test window.
     """
     r
+    """
+    The reduction of the oriented values of a vector of risk measures in `r` to one value for each asset on each window, a [`Sca_VecToScaM`](@ref). It is inert when `r` holds one measure, where `nothing` is also admitted. A vector refuses `nothing`, because a selector reads one score for each asset. `PerCandidate` is not a member, because the scorer has no stage of search scorers.
+    """
+    sca
     """
     $(field_dict[:cv])
     """
@@ -557,20 +583,125 @@ julia> round.(PortfolioOptimisers.asset_scores(s, rd); digits = 4)
     The smallest number of test windows that must cover an asset. An asset that fewer windows cover has the score `NaN`.
     """
     min_folds
-    function FoldRiskScorer(r::AbstractBaseRiskMeasure, cv::CVE_Onl,
+    function FoldRiskScorer(r::BaseRM_VecBaseRM, sca::Option{<:Sca_VecToScaM}, cv::CVE_Onl,
                             agg::AbstractFoldAggregation, min_folds::Integer)
         assert_scoreable(r)
+        assert_one_score_per_asset(sca, r)
         @argcheck(min_folds >= 1,
                   DomainError(min_folds,
                               "min_folds must be at least one, got min_folds = $min_folds"))
-        return new{typeof(r), typeof(cv), typeof(agg), typeof(min_folds)}(r, cv, agg,
-                                                                          min_folds)
+        return new{typeof(r), typeof(sca), typeof(cv), typeof(agg), typeof(min_folds)}(r,
+                                                                                       sca,
+                                                                                       cv,
+                                                                                       agg,
+                                                                                       min_folds)
     end
 end
-function FoldRiskScorer(; r::AbstractBaseRiskMeasure, cv::CVE_Onl = KFold(),
+function FoldRiskScorer(; r::BaseRM_VecBaseRM,
+                        sca::Option{<:Sca_VecToScaM} = SumScalariser(),
+                        cv::CVE_Onl = KFold(),
                         agg::AbstractFoldAggregation = MeanFoldScore(),
                         min_folds::Integer = 1)::FoldRiskScorer
-    return FoldRiskScorer(r, cv, agg, min_folds)
+    return FoldRiskScorer(r, sca, cv, agg, min_folds)
+end
+"""
+    assert_one_score_per_asset(sca::Option{<:Sca_VecToScaM}, r::BaseRM_VecBaseRM)
+    assert_one_score_per_asset(sca::Nothing, r::VecBaseRM)
+
+Refuse a reduction of `nothing` for a vector of risk measures in a [`FoldRiskScorer`](@ref).
+
+Under `nothing`, [`oriented_returns_score`](@ref) of a vector gives one value for each measure. A selector reads one score for each asset, so the scorer refuses it. For one measure the reduction is inert, and `nothing` is admitted. The types of the arguments select the method, so the check makes no test at run time.
+
+# Arguments
+
+  - `sca`: The reduction of the vector, the field `sca` of the scorer.
+  - `r`: One risk measure, or a vector of them.
+
+# Validation
+
+  - `sca` must not be `nothing` when `r` is a vector. The error is an [`IsNothingError`](@ref).
+
+# Returns
+
+  - `nothing`.
+
+# Related
+
+  - [`FoldRiskScorer`](@ref)
+  - [`assert_one_score_per_path`](@ref)
+"""
+function assert_one_score_per_asset(::Option{<:Sca_VecToScaM}, ::BaseRM_VecBaseRM)
+    return nothing
+end
+function assert_one_score_per_asset(::Nothing, ::VecBaseRM)
+    return throw(IsNothingError("`sca` must not be `nothing` when `r` is a vector of risk measures: a selector reads one score for each asset, and `nothing` keeps one score for each measure. Pass a reduction such as `SumScalariser()` or `MaxScalariser()`."))
+end
+"""
+    window_bigger_is_better(r::AbstractBaseRiskMeasure) -> Bool
+    window_bigger_is_better(r::VecBaseRM) -> Bool
+
+State whether a bigger value of a [`FoldRiskScorer`](@ref) on a test window is better.
+
+One measure keeps its raw value, so the method returns its [`bigger_is_better`](@ref) flag. A vector gives an oriented value, in which a bigger value is better, so the method returns `true`. It never reads [`bigger_is_better`](@ref) of the vector, which throws when the members disagree on orientation.
+
+# Arguments
+
+  - `r`: One risk measure, or a vector of them.
+
+# Returns
+
+  - `bib::Bool`: `true` when a bigger value is better.
+
+# Related
+
+  - [`FoldRiskScorer`](@ref)
+  - [`window_values`](@ref)
+"""
+function window_bigger_is_better(r::AbstractBaseRiskMeasure)::Bool
+    return bigger_is_better(r)
+end
+function window_bigger_is_better(::VecBaseRM)::Bool
+    return true
+end
+"""
+    window_values(sca::Option{<:Sca_VecToScaM}, r::AbstractBaseRiskMeasure, X::MatNum)
+        -> VecNum
+    window_values(sca::Sca_VecToScaM, r::VecBaseRM, X::MatNum) -> VecNum
+
+Evaluate the risk measure of a [`FoldRiskScorer`](@ref) on each column of one test window.
+
+The method on one measure returns the raw value of each column through [`asset_scores`](@ref), and ignores `sca`. The method on a vector returns the [`oriented_returns_score`](@ref) of each column under `sca`, so a bigger value is better. The constructor of the scorer refuses `nothing` with a vector, so no method takes that pair.
+
+# Arguments
+
+  - `sca`: The reduction of a vector, the field `sca` of the scorer.
+  - `r`: One risk measure, or a vector of them.
+  - `X`: The returns of the covered assets at the rows of the window, `observations × assets`. Every column is in the Coverage Universe of the window.
+
+# Validation
+
+  - Every value is finite. Otherwise the function throws a `DomainError` that names the columns with a non-finite value, as [`asset_scores`](@ref) does for one measure.
+
+# Returns
+
+  - `v::VecNum`: One value for each column of `X`.
+
+# Related
+
+  - [`FoldRiskScorer`](@ref)
+  - [`window_bigger_is_better`](@ref)
+  - [`oriented_returns_score`](@ref)
+"""
+function window_values(::Option{<:Sca_VecToScaM}, r::AbstractBaseRiskMeasure, X::MatNum)
+    return asset_scores(r, X)
+end
+function window_values(sca::Sca_VecToScaM, rs::VecBaseRM, X::MatNum)
+    v = [oriented_returns_score(sca, rs, view(X, :, j)) for j in axes(X, 2)]
+    bad = findall(!isfinite, v)
+    @argcheck(isempty(bad),
+              DomainError(v,
+                          "scoring the asset columns with a vector of risk measures $(typeof(rs)) produced non-finite values at columns $bad"))
+    return v
 end
 """
 $(DocStringExtensions.TYPEDSIGNATURES)
@@ -580,7 +711,7 @@ Return the statistic of each covered asset on one test window, with the position
 # Algorithm
 
  1. Find the positions `live` of the assets in the Coverage Universe of the rows `T` with [`cv_live_assets`](@ref).
- 2. Evaluate the risk measure of `s` on the covered columns of the window with [`asset_scores`](@ref).
+ 2. Evaluate the risk measure of `s` on the covered columns of the window with [`window_values`](@ref).
  3. Turn the values into statistics with [`fold_statistic`](@ref).
  4. Write the position of each covered asset in the statistics into `pos`, and zero at each other asset.
 
@@ -589,7 +720,7 @@ Return the statistic of each covered asset on one test window, with the position
   - `s`: The fold risk scorer.
   - $(arg_dict[:rd])
   - `T`: The rows of the test window.
-  - `bib`: The [`bigger_is_better`](@ref) flag of the risk measure of `s`.
+  - $(arg_dict[:fold_bib])
 
 # Returns
 
@@ -602,13 +733,13 @@ Return the statistic of each covered asset on one test window, with the position
 function window_statistic(s::FoldRiskScorer, rd::AbstractReturnsResult, T::VecInt,
                           bib::Bool)
     live = cv_live_assets(port_opt_view(rd, T, :))
-    v = fold_statistic(s.agg.alg, asset_scores(s.r, view(rd.X, T, live)), bib)
+    v = fold_statistic(s.agg.alg, window_values(s.sca, s.r, view(rd.X, T, live)), bib)
     pos = zeros(Int, size(rd.X, 2))
     pos[live] = eachindex(live)
     return (; pos = pos, v = v)
 end
 function asset_scores(s::FoldRiskScorer, rd::AbstractReturnsResult)
-    bib = bigger_is_better(s.r)
+    bib = window_bigger_is_better(s.r)
     wins = [window_statistic(s, rd, T, bib)
             for T in distinct_test_windows(split(s.cv, rd).test_idx)]
     stats = [[w.v[w.pos[i]] for w in wins if !iszero(w.pos[i])] for i in axes(rd.X, 2)]
@@ -617,7 +748,7 @@ function asset_scores(s::FoldRiskScorer, rd::AbstractReturnsResult)
                             s.min_folds, eltype(rd.X))
 end
 function bigger_is_better(s::FoldRiskScorer)::Bool
-    return statistic_bigger_is_better(s.agg.alg, bigger_is_better(s.r))
+    return statistic_bigger_is_better(s.agg.alg, window_bigger_is_better(s.r))
 end
 """
 $(DocStringExtensions.TYPEDEF)

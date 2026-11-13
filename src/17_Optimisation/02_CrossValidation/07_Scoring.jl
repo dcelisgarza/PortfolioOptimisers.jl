@@ -75,11 +75,7 @@ One measure ignores `sca` and its scale, as [`expected_risk`](@ref) does.
 # Algorithm
 
  1. One measure: return ``o \\, \\mathcal{R}(P)``, with ``\\mathcal{R}(P)`` from [`expected_risk`](@ref) with `kwargs`.
- 2. A vector: read the return series of ``P`` once with [`prediction_returns`](@ref), and compute ``o_k s_k \\mathcal{R}_k(P)`` for each measure on that series, with [`oriented_member_score`](@ref) with `kwargs`.
- 3. Reduce the values of step 2 by the type of `sca`:
-     1. A [`Scalariser`](@ref): through [`scalarise`](@ref).
-     2. A [`VectorToScalarMeasure`](@ref) or a function: collect the values into a vector, and apply [`vec_to_real_measure`](@ref).
-     3. `nothing`: return the vector of the values, so each measure keeps its own score.
+ 2. A vector: read the return series of ``P`` once with [`prediction_returns`](@ref), and score that series with [`oriented_returns_score`](@ref) with `kwargs`. That function computes ``o_k s_k \\mathcal{R}_k(P)`` for each measure, and reduces the values by the type of `sca`.
 
 # Arguments
 
@@ -97,6 +93,7 @@ One measure ignores `sca` and its scale, as [`expected_risk`](@ref) does.
   - [`Sca_VecToScaM`](@ref)
   - [`bigger_is_better`](@ref)
   - [`prediction_returns`](@ref)
+  - [`oriented_returns_score`](@ref)
   - [`sort_by_measure`](@ref): sorts the paths of a population by this score.
   - [`quantile_by_measure`](@ref): selects a path by the quantile of the negated score.
 """
@@ -115,16 +112,52 @@ arithmetic is on concrete types. A call that passed the prediction would box it 
 member. One measure reads `expected_risk` on the prediction, so that a measure that refuses a
 prediction, such as `ExpectedReturn`, still refuses it.
 =#
-function oriented_score(sca::Scalariser, rs::VecBaseRM, p::PredRes_MultiPredRes; kwargs...)
-    X = prediction_returns(p)
+function oriented_score(sca::Option{<:Sca_VecToScaM}, rs::VecBaseRM,
+                        p::PredRes_MultiPredRes; kwargs...)
+    return oriented_returns_score(sca, rs, prediction_returns(p); kwargs...)
+end
+"""
+    oriented_returns_score(sca::Scalariser, rs::VecBaseRM, X::VecNum; kwargs...)
+    oriented_returns_score(sca::Union{VectorToScalarMeasure, Function}, rs::VecBaseRM,
+                           X::VecNum; kwargs...)
+    oriented_returns_score(sca::Nothing, rs::VecBaseRM, X::VecNum; kwargs...)
+
+Score a return series under a vector of risk measures, so that a higher score is always better.
+
+It is the score ``\\mathcal{O}`` of [`oriented_score`](@ref) for a vector, on a series and not on a prediction. [`oriented_score`](@ref) calls it on the series of a prediction. [`FoldRiskScorer`](@ref) calls it on the returns of one asset over one test window.
+
+# Algorithm
+
+ 1. Compute ``o_k s_k \\mathcal{R}_k`` for each measure on `X`, with [`oriented_member_score`](@ref) with `kwargs`.
+ 2. Reduce the values of step 1 by the type of `sca`:
+     1. A [`Scalariser`](@ref): through [`scalarise`](@ref).
+     2. A [`VectorToScalarMeasure`](@ref) or a function: collect the values into a vector, and apply [`vec_to_real_measure`](@ref).
+     3. `nothing`: return the vector of the values, so each measure keeps its own score.
+
+# Arguments
+
+  - `sca`: The reduction of the vector. A [`VectorToScalarMeasure`](@ref) or a function must take a vector of numbers.
+  - `rs`: The vector of risk measures.
+  - `X`: The return series.
+  - `kwargs...`: Keyword arguments forwarded to [`expected_risk_from_returns`](@ref).
+
+# Returns
+
+  - `score::Number`: The oriented score. Under `sca = nothing`, `scores::Vector`, one oriented score for each measure.
+
+# Related
+
+  - [`oriented_score`](@ref)
+  - [`oriented_member_score`](@ref)
+"""
+function oriented_returns_score(sca::Scalariser, rs::VecBaseRM, X::VecNum; kwargs...)
     return scalarise(r -> oriented_member_score(r, X; kwargs...), sca, rs)
 end
-function oriented_score(sca::Union{VectorToScalarMeasure, Function}, rs::VecBaseRM,
-                        p::PredRes_MultiPredRes; kwargs...)
-    return vec_to_real_measure(sca, oriented_score(nothing, rs, p; kwargs...))
+function oriented_returns_score(sca::Union{VectorToScalarMeasure, Function}, rs::VecBaseRM,
+                                X::VecNum; kwargs...)
+    return vec_to_real_measure(sca, oriented_returns_score(nothing, rs, X; kwargs...))
 end
-function oriented_score(::Nothing, rs::VecBaseRM, p::PredRes_MultiPredRes; kwargs...)
-    X = prediction_returns(p)
+function oriented_returns_score(::Nothing, rs::VecBaseRM, X::VecNum; kwargs...)
     return map(r -> oriented_member_score(r, X; kwargs...), rs)
 end
 """
@@ -132,7 +165,7 @@ end
 
 Score one member of a vector of risk measures on a return series, oriented so that a higher value is better and multiplied by its scale.
 
-It is the value ``o_k s_k \\mathcal{R}_k(P)`` of [`oriented_score`](@ref), which reduces these values of a vector. The vector methods of [`oriented_score`](@ref) read the series of the prediction once with [`prediction_returns`](@ref), and call this function once for each member.
+It is the value ``o_k s_k \\mathcal{R}_k(P)`` of [`oriented_score`](@ref), which reduces these values of a vector. [`oriented_returns_score`](@ref) calls this function once for each member, on one return series.
 
 # Arguments
 

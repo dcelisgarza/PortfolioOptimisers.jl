@@ -1,17 +1,20 @@
 ```@meta
-Description = "Asset scorers, private API of PortfolioOptimisers.jl: distinct_test_windows, window_statistic, min_folds_scores, weight_mass_grid, weight_mass_candidates, …"
+Description = "Asset scorers, private API of PortfolioOptimisers.jl: distinct_test_windows, window_statistic, min_folds_scores, assert_one_score_per_asset, …"
 ```
 
 # Asset scorers: private API
 
 ## The test windows of a fold risk scorer
 
-A [`FoldRiskScorer`](@ref) reads each distinct test window once. In each window it scores only the assets that the window covers, the assets whose return is finite and active at every row of the window. An asset that too few windows cover has no score, and its entry is `NaN`.
+A [`FoldRiskScorer`](@ref) reads each distinct test window once. In each window it scores only the assets that the window covers, the assets whose return is finite and active at every row of the window. An asset that too few windows cover has no score, and its entry is `NaN`. A vector of risk measures gives each asset one oriented value on each window, so its constructor refuses a reduction of `nothing`.
 
 ```@docs
 PortfolioOptimisers.distinct_test_windows
 PortfolioOptimisers.window_statistic
 PortfolioOptimisers.min_folds_scores
+PortfolioOptimisers.assert_one_score_per_asset
+PortfolioOptimisers.window_bigger_is_better
+PortfolioOptimisers.window_values
 ```
 
 ## The splits of a weight mass scorer

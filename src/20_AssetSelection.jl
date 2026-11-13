@@ -502,11 +502,11 @@ Check that `score` can take the return series of one asset.
 
 The score of asset `i` is `score(X[:, i])`. This is the route of a precomputed return vector, and [`supports_precomputed_returns`](@ref) controls it. A [`WeightsInput`](@ref) measure, such as [`Variance`](@ref) or [`StandardDeviation`](@ref), takes portfolio weights in place of a return vector. It cannot score an asset.
 
-The method on an [`AbstractAssetScorer`](@ref) checks nothing and returns `nothing`. A scorer that holds a risk measure checks that measure in its own constructor.
+The method on an [`AbstractAssetScorer`](@ref) checks nothing and returns `nothing`. A scorer that holds a risk measure checks that measure in its own constructor. The method on a vector of risk measures checks each member, for a [`FoldRiskScorer`](@ref) that holds a vector.
 
 # Arguments
 
-  - `score`: The risk measure or the Asset Scorer that a selector uses to score its assets.
+  - `score`: The risk measure, the vector of risk measures, or the Asset Scorer that a selector uses to score its assets.
 
 # Validation
 
@@ -534,6 +534,10 @@ function assert_scoreable(score::AbstractBaseRiskMeasure)::Nothing
         end
         throw(ArgumentError("`$(Base.typename(typeof(score)).wrapper)` cannot score a single asset's return series: its `supports_precomputed_returns` is false, so its functor consumes portfolio weights rather than a precomputed return vector.$hint"))
     end
+    return nothing
+end
+function assert_scoreable(rs::VecBaseRM)::Nothing
+    foreach(assert_scoreable, rs)
     return nothing
 end
 assert_scoreable(::AbstractAssetScorer)::Nothing = nothing

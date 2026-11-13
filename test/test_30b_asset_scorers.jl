@@ -152,6 +152,62 @@ struct NoOrientationScorer <: PortfolioOptimisers.AbstractAssetScorer end
     @testset "FoldRiskScorer validation" begin
         @test_throws ArgumentError FoldRiskScorer(; r = Variance())
         @test_throws DomainError FoldRiskScorer(; r = SCM(), min_folds = 0)
+        # A vector checks each member, and refuses `nothing`: a selector reads one score
+        # for each asset (#1999). For one measure `nothing` is inert.
+        @test_throws ArgumentError FoldRiskScorer(; r = [SCM(), Variance()])
+        @test_throws PO.IsNothingError FoldRiskScorer(; r = [SCM(), MeanReturn()],
+                                                      sca = nothing)
+        @test isnothing(FoldRiskScorer(; r = SCM(), sca = nothing).sca)
+    end
+
+    @testset "FoldRiskScorer scores a vector of risk measures (#1999)" begin
+        cv = KFold(; n = 3)
+        wins = PO.distinct_test_windows(split(cv, rd).test_idx)
+        # The oriented value of each member on each window, one matrix for each member.
+        oriented(r) = (PO.bigger_is_better(r) ? 1 : -1) * r.settings.scale .*
+                      window_values(r, cv, rd)
+        rs = [SCM(), MeanReturn()]
+        O = oriented.(rs)
+        cases = ((SumScalariser(), O[1] + O[2]), (MaxScalariser(), max.(O[1], O[2])),
+                 (MinValue(), min.(O[1], O[2])), (x -> x[1] - x[2], O[1] - O[2]))
+        for (sca, V) in cases
+            s = FoldRiskScorer(; r = rs, sca = sca, cv = cv)
+            # The members disagree on orientation, and the value is oriented: bigger is better.
+            @test PO.bigger_is_better(s)
+            @test PO.asset_scores(s, rd) ≈ vec(mean(V; dims = 2))
+            sr = FoldRiskScorer(; r = rs, sca = sca, cv = cv,
+                                agg = MeanFoldScore(; alg = Rank()))
+            R = reduce(hcat, [hand_rank(c, true) for c in eachcol(V)])
+            @test !PO.bigger_is_better(sr)
+            @test PO.asset_scores(sr, rd) ≈ vec(mean(R; dims = 2))
+        end
+        # The scale of a member is its weight in the reduction.
+        r2 = SCM(; settings = RiskMeasureSettings(; scale = 3.0))
+        s2 = FoldRiskScorer(; r = [r2, MeanReturn()], cv = cv)
+        @test PO.asset_scores(s2, rd) ≈ vec(mean(3 * O[1] + O[2]; dims = 2))
+        # A vector of one risk is oriented, so its score is the negated score of the measure.
+        # One measure keeps its raw value and its orientation, and ignores `sca`.
+        one = FoldRiskScorer(; r = SCM(), cv = cv)
+        vone = FoldRiskScorer(; r = [SCM()], cv = cv)
+        @test PO.asset_scores(vone, rd) ≈ -PO.asset_scores(one, rd)
+        @test PO.bigger_is_better(vone)
+        @test !PO.bigger_is_better(one)
+        @test PO.asset_scores(FoldRiskScorer(; r = SCM(), sca = MaxScalariser(), cv = cv),
+                              rd) == PO.asset_scores(one, rd)
+        # A selector keeps the assets with the best oriented scores.
+        sv = FoldRiskScorer(; r = rs, cv = cv)
+        keep = PO.select_assets(ScoreSelector(; score = sv, rule = RankRule(; best = 2)),
+                                rd)
+        @test findall(keep) ==
+              sort(partialsortperm(PO.asset_scores(sv, rd), 1:2; rev = true))
+        # A member that gives a non-finite value on a covered column is a defect, and the
+        # scorer throws, as one measure does. A constant series has a zero standard deviation.
+        Xc = copy(X)
+        Xc[:, 3] .= 0.01
+        rdc = ReturnsResult(; nx = nx, X = Xc)
+        tcm = ThirdCentralMoment(; ve = SimpleVariance())
+        @test_throws DomainError PO.asset_scores(FoldRiskScorer(; r = [SCM(), tcm],
+                                                                cv = cv), rdc)
     end
 
     @testset "WeightMassScorer equals the mean weight over the folds" begin
