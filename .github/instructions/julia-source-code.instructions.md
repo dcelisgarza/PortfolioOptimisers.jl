@@ -585,7 +585,21 @@ and every addition:
    and of Adapt.jl. A contract verb such as `factory` owns no default, so a missing method
    stays a `MethodError`. A choice that belongs to a container, such as which steps of a
    pipeline take the weights, stays in a function of the container, and that function is kept
-   by reason (b).
+   by reason (b). #2108 rules the untyped fallback that returns `nothing`:
+   - **A contract verb takes a `::Nothing` method on the empty slot**, with the arity of its
+     typed methods, as `set_turnover_fees!(::JuMP.Model, ::Nothing) = nothing`. A fallback on
+     `args...` goes, because it takes every type and every arity.
+   - **A check owns "no violation" for a type that it has no rule for.** Its open method
+     stays, with the typed arity: `assert_unit_interval(::Any, ::Sym_Str = :val)`. The field
+     bound is the gate of the type, and the check is the gate of the value.
+   - **A query owns `nothing`, the answer "none"**, as `returns_source(::Any) = nothing` does.
+     A pass-through to a gate keeps the identity: `timestamp_positions(::Any, i) = i` sends
+     every other index to `view`.
+   - **Methods that share one body that answers every type become one untyped method**, as
+     `online_unreached_path(opt)` does.
+
+   `code_health/forward_survey.jl` gives each of these its verdict, and its `RULED_DEFAULTS`
+   holds the verdicts that the parse cannot read.
 3. **An interface method is not a wrapper** when two or more methods share its callee, or when
    its callee is the constructor of a type. `reader_frames(x::T, path, ::Bool) =
    source_frames(x.x_src, path, true)` is the case. When the method is the only caller of its

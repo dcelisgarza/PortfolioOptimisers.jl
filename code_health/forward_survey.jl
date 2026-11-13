@@ -23,7 +23,10 @@
 #                        `::Nothing` method (#2077). Case 1 goes. Cases 2 and 3 need a review.
 #   default              an untyped or `::Any` fallback that returns its input, `false` or
 #                        `nothing`, and a step function that copies one in front of an owner
-#                        (#2074, rule 2).
+#                        (#2074, rule 2). A fallback with no owner takes the verdict of #2108,
+#                        which `fallback_verdict` states: an `args...` fallback goes, a check
+#                        and a query keep theirs, and a contract verb takes a `::Nothing`
+#                        method. `RULED_DEFAULTS` holds the verdicts that the parse cannot read.
 #   rebuild              a constructor call that passes `x.f` for every field but one or two
 #                        (#2082, rule 6). It goes to `rebuild_struct`.
 #   self-forward         a method that calls its own function with fewer arguments, or with
@@ -697,6 +700,91 @@ function single_statement(body)
     return s
 end
 
+"""
+The verdicts of #2108 that the parse cannot read: an identity on two or more slots is a
+traversal step or a pass-through that stays, or a fallback that only a closed set reaches. Each
+entry is a name, with its verdict and its reason. An entry whose name is no longer a `default`
+finding is stale, and `test/test_89_forward_survey_census.jl` fails on it, so a build ticket that
+types or removes the fallback deletes the entry.
+"""
+const RULED_DEFAULTS = Dict{Symbol, Tuple{String, String}}(#
+                                                           :_wprop => ("keep (default)",
+                                                                       "one step of the `factory` traversal: a field that no threaded argument replaces keeps its value (#2108)"),
+                                                           :bind_data_benchmark =>
+                                                               ("keep (default)",
+                                                                "a traversal owns the identity on a leaf and ignores its context slot, as `adapt(to, x) = x` does in Adapt.jl (#2108)"),
+                                                           :drift_observations => ("go",
+                                                                                   "only a `VecDate` reaches the fallback, so the slot takes that type (#2108)"),
+                                                           :online_unreached_path => ("go",
+                                                                                      "the typed methods share one body that answers every estimator: one untyped method replaces them and the fallback (#2108)"),
+                                                           :resolve_deferred_quantities =>
+                                                               ("go",
+                                                                "only the tests reach the fallback, and the method on `AbstractPriorResult` holds the identity on a leaf (#2108)"),
+                                                           :timestamp_positions =>
+                                                               ("keep (default)",
+                                                                "an index that is not a timestamp or a name passes to `view`, which is the gate of the index (#2108)"))
+
+# Whether a positional argument of the signature is a splat, `args...`.
+function has_splat(sig)
+    sig = CH.call_signature(sig)
+    if !(sig isa Expr && sig.head === :call)
+        return false
+    end
+    return any(a -> a isa Expr && a.head === :(...), sig.args[2:end])
+end
+
+# Whether another method of the function of `d` throws: the function is a check.
+function throws_elsewhere(t::Tree, d)
+    return any(m -> m !== d &&
+                    !isempty(intersect(names_in(m.body), (:throw, Symbol("@argcheck")))),
+               get(t.by_name, d.name, CH.MethodDef[]))
+end
+
+"""
+    fallback_verdict(t::Tree, d, kind, args) -> Tuple{String, String}
+
+The verdict and the reason for an untyped fallback with no owner that returns `nothing`, or its
+input on two or more slots, by the rulings of #2108:
+
+ 1. A name of [`RULED_DEFAULTS`](@ref): its verdict.
+ 2. An `args...` fallback goes: it takes every arity. A contract verb takes a `::Nothing` method
+    on the empty slot, and a check takes one open method with the typed arity.
+ 3. A check keeps its open method: it owns "no violation" for a type that it has no rule for.
+ 4. One slot: a query keeps `nothing`, the answer "none". A verb whose name ends in `!` does a
+    job, so it owns no default and takes a `::Nothing` method.
+ 5. Two or more slots that return `nothing`: a typed method on the set that reaches it.
+ 6. An identity on two or more slots that the list does not hold: a person rules it.
+"""
+function fallback_verdict(t::Tree, d, kind, args)
+    if haskey(RULED_DEFAULTS, d.name)
+        return RULED_DEFAULTS[d.name]
+    end
+    if kind == "its input"
+        return ("review",
+                "a fallback returns its input on $(length(args)) slots. A traversal step or a pass-through to a gate keeps it, and a fallback that a closed set reaches takes a typed method. Rule it, and add it to `RULED_DEFAULTS` (#2108)")
+    end
+    if has_splat(d.sig)
+        return ("go",
+                "an `args...` fallback takes every arity: a contract verb takes a `::Nothing` method on the empty slot, and a check takes one open method with the typed arity (#2108)")
+    end
+    if occursin(r"assert|validate", string(d.name)) ||
+       (length(args) > 1 && throws_elsewhere(t, d))
+        return ("keep (default)",
+                "a check owns \"no violation\" for a type that it has no rule for, and the field bound is the gate of the type (#2108)")
+    end
+    if length(args) == 1
+        return if endswith(string(d.name), "!")
+            ("go",
+             "a verb that does a job owns no default: a `::Nothing` method on the empty slot (#2108)")
+        else
+            ("keep (default)",
+             "a query owns `nothing`, the answer \"none\" for every type (#2108)")
+        end
+    end
+    return ("go",
+            "a fallback of $(length(args)) slots returns `nothing`: a typed method on the set that reaches it (#2108)")
+end
+
 function default_findings!(out, t::Tree, rulings)
     for d in t.defs
         if (d.qualified || is_struct(t, d.name))
@@ -740,8 +828,7 @@ function default_findings!(out, t::Tree, rulings)
         elseif kind == "its input" && length(args) == 1
             ("keep (default)", "a traversal owns the identity on a leaf (rule 2)")
         else
-            ("review",
-             "a fallback returns $kind: a verb owns a default only when the default is a true answer for every caller (rule 2)")
+            fallback_verdict(t, d, kind, args)
         end
         push!(out,
               SurveyFinding(d.file, d.line, "default", d.name, nothing, verdict, why,

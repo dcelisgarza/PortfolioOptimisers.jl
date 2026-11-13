@@ -74,6 +74,24 @@ using Test
              step_td(x::A) = owner_td(x)
              owner_td(x::A) = true
 
+             # untyped fallbacks with no owner (#2108)
+             setter!(args...) = nothing
+             setter!(m::A, x::B) = 1
+             assert_pos(args...) = nothing
+             assert_pos(x::A, s::Symbol = :x) = 1
+             assert_role(::Any) = nothing
+             assert_role(x::A) = throw(ArgumentError("a role"))
+             refuse(::Any, ::Any) = nothing
+             refuse(x::A, y::B) = throw(ArgumentError("refused"))
+             fill_slot!(::Any) = nothing
+             fill_slot!(x::A) = 1
+             pair_op(::Any, ::Any) = nothing
+             pair_op(x::A, y::A) = 1
+             leaf_pass(x, ::Any) = x
+             leaf_pass(x::A, y::B) = 1
+             timestamp_positions(::Any, i) = i
+             timestamp_positions(::Any, i::A) = 1
+
              # rebuild
              set_c(r::R, v) = R(r.a, r.b, v)
              set_s(s::S, v) = S(s.a, s.b, v)
@@ -144,9 +162,30 @@ using Test
     @testset "default (#2074, rule 2)" begin
         @test of(:trait) == [("default", nothing, "keep (default)")]
         @test of(:ident) == [("default", nothing, "keep (default)")]
-        @test of(:noop) == [("default", nothing, "review")]
+        # One slot, and no `!`: a query owns `nothing`, the answer "none" (#2108).
+        @test of(:noop) == [("default", nothing, "keep (default)")]
         # A step function in front of an owner: the owner takes `false`.
         @test ("default", :owner_td, "go") in of(:step_td)
+    end
+
+    @testset "untyped fallbacks with no owner (#2108)" begin
+        # An `args...` fallback goes, for a contract verb and for a check alike.
+        @test of(:setter!) == [("default", nothing, "go")]
+        @test of(:assert_pos) == [("default", nothing, "go")]
+        @test occursin("every arity", first_of(:assert_pos).why)
+        # A check keeps its open method: by its name, or because another method throws.
+        @test of(:assert_role) == [("default", nothing, "keep (default)")]
+        @test of(:refuse) == [("default", nothing, "keep (default)")]
+        @test occursin("no violation", first_of(:refuse).why)
+        # A verb that does a job owns no default.
+        @test of(:fill_slot!) == [("default", nothing, "go")]
+        # Two slots that return `nothing`: a typed method on the set that reaches it.
+        @test of(:pair_op) == [("default", nothing, "go")]
+        # An identity on two slots: a person rules it, and `RULED_DEFAULTS` holds the ruling.
+        @test of(:leaf_pass) == [("default", nothing, "review")]
+        @test of(:timestamp_positions) == [("default", nothing, "keep (default)")]
+        @test first_of(:timestamp_positions).why ==
+              FS.RULED_DEFAULTS[:timestamp_positions][2]
     end
 
     @testset "rebuild (#2082, rule 6)" begin
@@ -189,7 +228,8 @@ using Test
         @test FS.is_candidate(pending)
         @test startswith(first_of(:mk).ruling, "ruled by `kept`")
         @test !FS.is_candidate(first_of(:trait))
-        @test FS.is_candidate(first_of(:noop))
+        @test !FS.is_candidate(first_of(:noop))
+        @test FS.is_candidate(first_of(:leaf_pass))
     end
 
     @testset "the command line" begin
@@ -210,8 +250,15 @@ using Test
         @test !isempty(r.kept_forwards)
         # Every pair that the census holds is a finding of the survey: the two read forwards
         # with the one reader, `CodeHealth.forward_methods`.
-        real = Set((x.name, x.callee) for x in FS.survey())
+        found_real = FS.survey()
+        real = Set((x.name, x.callee) for x in found_real)
         @test [p for p in union(r.pending, keys(r.kept_forwards)) if !(p in real)] ==
               Tuple{Symbol, Symbol}[]
+        # An entry of `RULED_DEFAULTS` whose name is no longer a `default` finding is stale:
+        # the build ticket that typed or removed the fallback deletes it (#2108).
+        defaults = Set(x.name for x in found_real if x.shape == "default")
+        @test ("stale entries of RULED_DEFAULTS",
+               sort!([n for n in keys(FS.RULED_DEFAULTS) if !(n in defaults)])) ==
+              ("stale entries of RULED_DEFAULTS", Symbol[])
     end
 end
