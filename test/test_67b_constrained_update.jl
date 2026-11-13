@@ -23,6 +23,22 @@ function PortfolioOptimisers.add_custom_constraint!(model::JuMP.Model, c::FirstA
     JuMP.@constraint(model, sc * (w[1] - c.ub * k) <= 0)
     return nothing
 end
+# A custom constraint with one cap for each asset. The reduction to the Investable Mask cuts
+# it, and a cap of the wrong width fails in the model build (#2045).
+struct AssetCaps <: PortfolioOptimisers.CustomJuMPConstraint
+    ub::Vector{Float64}
+end
+function PortfolioOptimisers.port_opt_view(c::AssetCaps, i, args...)
+    return AssetCaps(c.ub[i])
+end
+function PortfolioOptimisers.add_custom_constraint!(model::JuMP.Model, c::AssetCaps, ::Any,
+                                                    ::Any)
+    w = PortfolioOptimisers.get_w(model)
+    k = PortfolioOptimisers.get_k(model)
+    sc = PortfolioOptimisers.get_constraint_scale(model)
+    JuMP.@constraint(model, asset_caps, sc * (w - c.ub * k) <= 0)
+    return nothing
+end
 # An allocation set of a user, which only the general method of `projection_solver` reaches.
 struct ProbeAllocationSet <: PortfolioOptimisers.AbstractAllocationSet end
 struct FirstCosts <: PortfolioOptimisers.CustomJuMPObjective
@@ -2150,6 +2166,132 @@ end
         # A long-only head refuses a negative bound where it builds its weights.
         @test_throws ArgumentError po.assert_long_only_weight_bounds(ls)
         @test isnothing(po.assert_long_only_weight_bounds(lo))
+    end
+    @testset "Every JuMP head adds every block that it gets (#2045)" begin
+        rng4 = StableRNG(2045)
+        T4, N4 = 80, 5
+        F4 = randn(rng4, T4, 2)
+        R4 = (F4 * randn(rng4, 2, N4) .+ randn(rng4, T4, N4)) ./ 100 .+
+             [0.002 0.0015 0.001 0.0005 0.0]
+        rd4 = ReturnsResult(; nx = string.('A':'E'), X = R4, nf = ["f1", "f2"], F = F4)
+        cset(cap; kw...) = resolve(ProgrammeAllocationSet(; slv = slv,
+                                                          wb = WeightBounds(; lb = 0.0,
+                                                                            ub = cap),
+                                                          kw...), N4)
+        # The head floors every weight, and the set caps every weight. The cap lies between
+        # the equal weight and the largest weight of the head alone, so it binds and admits
+        # weights.
+        hopt = JuMPOptimiser(; slv = slv, wb = WeightBounds(; lb = 0.05, ub = 1.0))
+        heads = (MeanRisk(; obj = MaximumReturn(), opt = hopt), RiskBudgeting(; opt = hopt),
+                 RelaxedRiskBudgeting(; opt = hopt), FactorRiskContribution(; opt = hopt),
+                 NearOptimalCentering(; obj = MaximumReturn(), opt = hopt),
+                 NearOptimalCentering(; obj = MaximumReturn(), opt = hopt,
+                                      alg = ConstrainedNearOptimalCentering()))
+        for h in heads
+            w0 = optimise(h, rd4).w
+            cap = (maximum(w0) + 1 / N4) / 2
+            @test maximum(w0) > cap + 1e-4
+            res = optimise(h, rd4; blocks = ((cset(cap), rd4),))
+            @test isa(res.retcode, OptimisationSuccess)
+            # The weights lie in the feasible set of both blocks.
+            @test maximum(res.w) <= cap + 1e-6
+            @test minimum(res.w) >= 0.05 - 1e-6
+            @test isapprox(sum(res.w), 1; atol = 1e-6)
+            # The second block registers its rows under its own namespace.
+            @test haskey(res.model, :blk_2_w_ub) && haskey(res.model, :w_ub)
+        end
+
+        # A set with a risk ceiling, a return floor, a custom constraint and a custom
+        # objective term beside a head with its own. The bounds come from the data, as in the
+        # test of #2044, so each one binds.
+        pr4 = prior(EmpiricalPrior(), rd4)
+        S4, mu4 = pr4.sigma, pr4.mu
+        vcap(u) = Variance(; settings = RiskMeasureSettings(; ub = u))
+        rfloor(l) = ArithmeticReturn(; settings = JuMPReturnsSettings(; lb = l))
+        mr(obj; kw...) = MeanRisk(; obj = obj, opt = JuMPOptimiser(; slv = slv, kw...))
+        wmin = optimise(MeanRisk(; r = Variance(), opt = JuMPOptimiser(; slv = slv)), rd4).w
+        vs = 1.2 * dot(wmin, S4, wmin)
+        wtop = optimise(MeanRisk(; obj = MaximumReturn(), r = vcap(vs),
+                                 opt = JuMPOptimiser(; slv = slv)), rd4).w
+        rs = (dot(mu4, wmin) + dot(mu4, wtop)) / 2
+        bset = cset(1.0; r = vcap(vs), ret = rfloor(rs))
+        # The ceiling of the set binds when the head maximises the return, and the floor of
+        # the set binds when the head minimises the risk.
+        wr = optimise(mr(MaximumReturn()), rd4; blocks = ((bset, rd4),)).w
+        @test isapprox(dot(wr, S4, wr), vs; rtol = 1e-4)
+        wv = optimise(MeanRisk(; r = Variance(), opt = JuMPOptimiser(; slv = slv)), rd4;
+                      blocks = ((bset, rd4),)).w
+        @test isapprox(dot(mu4, wv), rs; atol = 1e-7)
+        # The custom constraint of the set holds, and its custom objective term moves the
+        # weights as the same term on the head does. The head alone holds `B`, and the term
+        # rewards `A`.
+        wc = optimise(mr(MaximumReturn()), rd4;
+                      blocks = ((cset(1.0; ccnt = FirstAtMost(0.1)), rd4),)).w
+        @test wc[1] <= 0.1 + 1e-7
+        won = optimise(mr(MaximumReturn(); cobj = FirstCosts(-10.0)), rd4).w
+        wset = optimise(mr(MaximumReturn()), rd4;
+                        blocks = ((cset(1.0; cobj = FirstCosts(-10.0)), rd4),)).w
+        wbase = optimise(mr(MaximumReturn()), rd4).w
+        @test isapprox(wset, won; atol = 1e-6) && !isapprox(wset, wbase; atol = 1e-3)
+        # A frontier of a ratio solves its corners on the model of every block, so its span
+        # runs between the corners of the head with the cap of the set. The rows of the sweep
+        # need a parametric solver (#1842), so the test reads the span from the model, as
+        # `test_18zb` does.
+        b03 = ((cset(0.3), rd4),)
+        sd4(w) = sqrt(dot(w, S4, w))
+        cmin = optimise(MeanRisk(; opt = JuMPOptimiser(; slv = slv)), rd4; blocks = b03).w
+        cmax = optimise(mr(MaximumReturn()), rd4; blocks = b03).w
+        @test sd4(cmax) < sd4(wbase) - 1e-4
+        fr = optimise(MeanRisk(; obj = MaximumRatio(),
+                               r = Variance(;
+                                            settings = RiskMeasureSettings(;
+                                                                           ub = Frontier(;
+                                                                                         N = 3))),
+                               opt = JuMPOptimiser(; slv = slv)), rd4; blocks = b03)
+        @test isapprox(collect(only(fr.model[:risk_frontier]).second[2]),
+                       range(sd4(cmin), sd4(cmax); length = 3); rtol = 1e-5)
+
+        # A fallback member gets the block (#2035). The first solver stops at once, so the
+        # chain runs the fallback, and the fallback keeps the cap of the set.
+        bad = Solver(; name = :bad, solver = Clarabel.Optimizer,
+                     settings = Dict("verbose" => false, "max_iter" => 0))
+        lead(s; fb = nothing) = MeanRisk(; obj = MaximumReturn(),
+                                         opt = JuMPOptimiser(; slv = s), fb = fb)
+        rfb = optimise(lead(bad; fb = lead(slv)), rd4; blocks = ((cset(0.3), rd4),))
+        @test !isnothing(rfb.fb) && isa(rfb.retcode, OptimisationSuccess)
+        @test maximum(rfb.w) <= 0.3 + 1e-6
+        @test maximum(optimise(lead(bad; fb = lead(slv)), rd4).w) > 0.3 + 1e-3
+
+        # The anchors of `NearOptimalCentering` keep the ceiling and the floor of the set, as
+        # they keep its bounds (the amendment of Decision 1 of #1213, consequence 6).
+        for alg in (UnconstrainedNearOptimalCentering(), ConstrainedNearOptimalCentering())
+            noc = NearOptimalCentering(; r = Variance(), obj = MaximumReturn(), alg = alg,
+                                       opt = JuMPOptimiser(; slv = slv))
+            setup = po.near_optimal_centering_setup(noc, rd4; blocks = ((bset, rd4),))
+            @test dot(setup.w_max, S4, setup.w_max) <= vs * (1 + 1e-5)
+            @test dot(setup.w_opt, S4, setup.w_opt) <= vs * (1 + 1e-5)
+            @test dot(mu4, setup.w_min) >= rs - 1e-7
+        end
+        # The suspicion of the proposal on #1213: a `NearOptimalCentering` sub-problem copies
+        # the `ccnt` of the head. The copy is cut to the Investable Mask, because the setup
+        # views the head before it repackages the optimiser. A cap of the wrong width would
+        # fail in the model build of each anchor.
+        X5 = copy(R4)
+        X5[:, 5] .= NaN
+        rd5 = ReturnsResult(; nx = string.('A':'E'), X = X5)
+        caps = AssetCaps(fill(0.4, N4))
+        for alg in (UnconstrainedNearOptimalCentering(), ConstrainedNearOptimalCentering())
+            noc = NearOptimalCentering(; obj = MaximumReturn(), alg = alg,
+                                       opt = JuMPOptimiser(; slv = slv, ccnt = caps))
+            setup = po.near_optimal_centering_setup(noc, rd5)
+            @test setup.attrs.imsk == BitVector([1, 1, 1, 1, 0])
+            @test length(setup.opt.ccnt.ub) == 4
+            @test maximum(setup.w_max) <= 0.4 + 1e-6
+            res = optimise(noc, rd5)
+            @test isa(res.retcode, OptimisationSuccess) && iszero(res.w[5])
+        end
+        # A head with no later block gives no later block.
+        @test po.later_constraint_blocks((), optimise(mr(MaximumReturn()), rd4).jor) === ()
     end
     @testset "Docs and the search seam" begin
         @test occursin("Held Step", string(@doc(po.HeldStep)))

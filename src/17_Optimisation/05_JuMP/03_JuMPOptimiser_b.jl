@@ -232,6 +232,37 @@ function constraint_block_steps(blocks::Tuple, attrs::ResolvedJuMPOptimiser)
                   length(blocks))
 end
 """
+    later_constraint_blocks(blocks::Tuple{}, attrs::ResolvedJuMPOptimiser) -> Tuple{}
+    later_constraint_blocks(blocks::Tuple, attrs::ResolvedJuMPOptimiser) -> Tuple
+
+Gives each block after the first of a resolved bundle, with the set that owns it and the namespace of the block in the model of the head.
+
+A JuMP head adds every block of its bundle to its model, in [`assemble_jump_model!`](@ref). The block of the head is the first, and it takes the empty prefix. Block `i` after it takes the Model State namespace `blk_i_`, from [`nested_prefix`](@ref), so the second block registers its rows under `blk_2_`. The owner of a later block is its [`ProgrammeAllocationSet`](@ref), viewed at the Investable Mask of the bundle with [`constraint_block_steps`](@ref). The set holds the risk ceilings `r` and the return floor `ret` that the bounds builder adds, the tracking errors of the block, and the owner that its custom constraints and its custom objective terms get.
+
+# Arguments
+
+  - `blocks`: The entries that the bundle resolved, in the keyword `blocks` of [`resolve_jump_optimiser`](@ref).
+  - `attrs`: The bundle. Its `cbr` holds the block Result of each entry after the block of the owner.
+
+# Returns
+
+  - `later::Tuple`: One entry `(set, cbr, prefix)` for each entry of `blocks`, or the empty `Tuple`.
+
+# Related
+
+  - [`assemble_jump_model!`](@ref)
+  - [`constraint_block_steps`](@ref)
+  - [`set_block_constraints!`](@ref)
+"""
+function later_constraint_blocks(::Tuple{}, ::ResolvedJuMPOptimiser)
+    return ()
+end
+function later_constraint_blocks(blocks::Tuple, attrs::ResolvedJuMPOptimiser)
+    steps = constraint_block_steps(blocks, attrs)
+    return ntuple(i -> (first(steps[i]), attrs.cbr[i + 1],
+                        nested_prefix(Symbol(""), :blk_, i + 1)), length(blocks))
+end
+"""
     processed_jump_optimiser(
         opt::JuMPOptimiser,
         rd::ReturnsResult;
@@ -355,7 +386,8 @@ end
         rd::ReturnsResult,
         r::Option{<:RM_VecRM} = nothing,
         obj::ObjectiveFunction = MinimumRisk(),
-        b1::Option{<:MatNum} = nothing
+        b1::Option{<:MatNum} = nothing;
+        blocks::Tuple = ()
     ) -> Nothing
 
 Run the invariant model-assembly sequence shared by all single-JuMP-model optimisers.
@@ -365,18 +397,33 @@ variables) and *tail* (objective + solve). The head must have populated Model St
 variables) before calling this function. See `Model Assembly` in `GLOSSARY.md` and
 `0008-jump-model-assembly.md`.
 
-The middle runs once for each block, through the block builder.
-Phase 1 of the block of the head, [`set_block_constraints!`](@ref), adds the weight bounds,
-the budgets with the net budget `opt.bgt`, and every row before the risk step. Then the head
-adds its fees, its risk measures and its return terms, and marks the objective with
-[`mark_risk_minimised!`](@ref). Phase 2, [`set_block_post_risk_constraints!`](@ref), adds the
-phylogeny rows and the custom constraints. The risk measures read the phylogeny `plr` of the
-block of the head.
+The middle runs once for each block, through the block builder. The block of the head is the
+first, and the keyword `blocks` gives the others, as the head gave them to
+[`resolve_jump_optimiser`](@ref). Each block after the first takes its own namespace, and its
+owner is its [`ProgrammeAllocationSet`](@ref), see [`later_constraint_blocks`](@ref).
+
+ 1. Phase 1 of each block, [`set_block_constraints!`](@ref), adds the weight bounds, the
+    budgets and every row before the risk step. The block of the head takes the net budget
+    `opt.bgt`, the fees and the tracking errors of the head. A block of a set takes no net
+    budget and no fees, and its own tracking errors.
+ 2. The head adds its fees, its risk measures and its return terms, and marks the objective
+    with [`mark_risk_minimised!`](@ref). The risk measures read the phylogeny `plr` of the
+    block of the head.
+ 3. The bounds builder [`set_allocation_risk_return_bounds!`](@ref) adds the risk ceilings
+    `r` and the return floor `ret` of each set.
+ 4. Phase 2 of each block, [`set_block_post_risk_constraints!`](@ref), adds the phylogeny
+    rows and the custom constraints. A block of a set then adds its custom objective terms
+    with [`add_custom_objective_term!`](@ref), with `obj`, the set and the Result of its
+    block. The objective builder of the head adds the terms of the block of the head.
+
+A frontier corner solves this model again with another objective, and the terms of a block of
+a set keep the `obj` of the assembly, as its penalties do.
 
 **Breaking change.** A head adds its weight bounds and its budgets here, in phase 1 of its
 block, and not before this function. A head of its own calls
 [`assert_long_only_weight_bounds`](@ref) where it builds its weights, when its formulation is
-long-only.
+long-only. A head that gets more than one block adds the rows of every block, where it added
+the rows of its own block alone and the other blocks only narrowed its Investable Mask.
 
 The tail of the sequence is [`assert_frontier_sweep_cap`](@ref): both frontier registries are
 complete here and no sweep solve has started, so this is the one point at which the **total**
@@ -399,8 +446,11 @@ when the optimiser solves its model once.
   - $(arg_dict[:rd])
   - `r::Option{<:RM_VecRM} = nothing`: Risk measure(s), or `nothing` to skip risk
     constraints and scalarisation (the [`RelaxedRiskBudgeting`](@ref) path).
-  - `obj::ObjectiveFunction = MinimumRisk()`: Objective used by the return constraints.
+  - `obj::ObjectiveFunction = MinimumRisk()`: Objective used by the return constraints, and
+    by the custom objective terms of a block of a set.
   - $(arg_dict[:b1_opt])
+  - `blocks`: The blocks after the block of the head, the keyword `blocks` of
+    [`resolve_jump_optimiser`](@ref) that gave `attrs`. The empty `Tuple` gives one block.
 
 # Returns
 
@@ -410,6 +460,7 @@ when the optimiser solves its model once.
 
   - [`ResolvedJuMPOptimiser`](@ref)
   - [`resolve_jump_optimiser`](@ref)
+  - [`later_constraint_blocks`](@ref)
   - [`set_risk_and_scalarise!`](@ref)
   - [`assert_frontier_sweep_cap`](@ref)
   - [`assert_frontier_sweep_owner`](@ref)
@@ -424,22 +475,38 @@ function assemble_jump_model!(model::JuMP.Model, optimiser::JuMPOptimisationEsti
                               opt::JuMPOptimiser, attrs::ResolvedJuMPOptimiser,
                               rd::ReturnsResult, r::Option{<:RM_VecRM} = nothing,
                               obj::ObjectiveFunction = MinimumRisk(),
-                              b1::Option{<:MatNum} = nothing)
+                              b1::Option{<:MatNum} = nothing; blocks::Tuple = ())
     (; pr, fees, ret) = attrs
-    # The heads that add each block of a list come with #2045 (ADR 0237). Until then, the
-    # model holds the rows of the block of the owner, and the other blocks narrow the mask.
     cbr = owner_block(attrs.cbr)
+    # Each block after the first comes with the set that owns it and its own namespace
+    # (ADR 0237).
+    later = later_constraint_blocks(blocks, attrs)
     # The head binds a data benchmark of its tracking errors to its rows, so `tr` is read
     # from the head and not from the block Result.
     set_block_constraints!(model, cbr, optimiser, opt.bgt, fees; tr = opt.tr, b1 = b1,
                            rd = rd)
+    # The head owns the net budget and the fees, so a block of a set takes neither.
+    for (set, cbri, prefix) in later
+        set_block_constraints!(model, cbri, set, nothing, nothing;
+                               tr = allocation_set_tracking(set.tr, cbri), prefix = prefix)
+    end
     set_non_fixed_fees!(model, fees)
     set_risk_and_scalarise!(model, r, optimiser, opt, pr, cbr.plr, fees, b1; rd = rd)
     set_return_constraints!(model, ret, obj, pr; rd = rd)
     # After the return constraints, so a `MaximumRatio` has chosen its form, and before
     # every semidefinite phylogeny, including a programme set's in `add_custom_constraint!`.
     mark_risk_minimised!(model, obj)
+    for (set, cbri, prefix) in later
+        set_allocation_risk_return_bounds!(model, set, cbri; prefix = prefix)
+    end
     set_block_post_risk_constraints!(model, cbr, optimiser, attrs)
+    # The objective builder of the head adds the custom objective terms of its own block. A
+    # later block adds its terms here, once, with the objective of the model, as its
+    # penalties go into the Objective Penalty in phase 1.
+    for (set, cbri, prefix) in later
+        set_block_post_risk_constraints!(model, cbri, set, nothing; prefix = prefix)
+        add_custom_objective_term!(model, obj, cbri.cobj, set, cbri)
+    end
     assert_frontier_sweep_cap(model)
     assert_frontier_sweep_owner(model, optimiser)
     return nothing

@@ -63,6 +63,16 @@ each position held, so it needs the binary variables of `set_mip_constraints!`.
 [`set_near_optimal_objective_function!`](@ref) adds no Objective Penalty to the barrier, so a
 Custom Objective Term prices the anchor sub-problems and not the centring solve.
 
+# A block after the first
+
+A block that reaches the head through the keyword `blocks` of its entry follows the same rule.
+The centring model holds the weight bounds `wb` and the short and gross budgets `sbgt` and
+`gbgt` of the block, as rows under the namespace of the block, and no other row. The barrier
+holds a term for each bound of `opt.wb` alone. The risk ceilings `r` and the return floor
+`ret` of the set do not reach the centring model, as the bounds of the risk measures and of
+the return terms of the head do not. Every anchor sub-problem holds every row of every block,
+the ceilings and the floor of the set among them.
+
 # Related
 
   - [`NearOptimalCenteringAlgorithm`](@ref)

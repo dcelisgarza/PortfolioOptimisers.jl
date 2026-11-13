@@ -1205,7 +1205,7 @@ Every programme that holds a block adds it through these two functions: a JuMP h
 
 Phase 1, `set_block_constraints!`, adds the rows that come before the risk step of the owner. Phase 2, `set_block_post_risk_constraints!`, adds the rows that read the marks of the objective of the owner, `risk_minimised` and `variance_flag`: the semidefinite phylogeny reads them. The integer phylogeny and the custom constraints come after them too, as they did in each owner.
 
-The first block of a model takes the empty prefix and the names of today. Each block after the first takes a Model State namespace. Phase 1 registers the weights of the model under it, with the owner `w_owner = Symbol("")`, so [`weights_prefix`](@ref) keeps the lifted matrix and the marks with the weights. Every builder then registers its entries under the prefix. A kind on two blocks gives two sets of rows and no name collision. The MIP bits, the long and short parts of the weights and the pin of `xbgt` belong to the weights, so the blocks share them. The penalties of each block add to the one Objective Penalty.
+The first block of a model takes the empty prefix and the names of today. Each block after the first takes a Model State namespace. In the model of a JuMP head, block `i` takes `blk_i_`, see [`later_constraint_blocks`](@ref). Phase 1 registers the weights of the model under it, with the owner `w_owner = Symbol("")`, so [`weights_prefix`](@ref) keeps the lifted matrix and the marks with the weights. Every builder then registers its entries under the prefix. A kind on two blocks gives two sets of rows and no name collision. The MIP bits, the long and short parts of the weights and the pin of `xbgt` belong to the weights, so the blocks share them. The penalties of each block add to the one Objective Penalty.
 
 The block reads its own prior `cbr.pr` and its own phylogeny `cbr.plr`. The builder takes the values of the owner that the block cannot hold: the net budget `bgt`, for the long-short and gross budgets, the fees, for the MIP kinds and the tracking errors, the tracking errors `tr` that the owner bound to its rows, and the factor loadings `b1` of a factor head. The custom constraints get the owner and the bundle `attrs` that the owner gives them. A block of a set passes the set as the owner, `nothing` as the net budget and the fees, and `nothing` as `attrs`.
 
@@ -1215,13 +1215,12 @@ The block reads its own prior `cbr.pr` and its own phylogeny `cbr.plr`. The buil
 
 Phase 1:
 
- 1. When `prefix` is not empty, register the weights of the model under it, with the owner `Symbol("")`.
- 2. Add the weight bounds, the net budget `bgt`, and the short and gross budgets of the block with [`set_weight_constraints!`](@ref).
- 3. Add the linear rows `lcsr`, then the centrality rows `ctr`, with [`set_linear_weight_constraints!`](@ref).
- 4. Add the MIP kinds with [`set_mip_constraints!`](@ref), then the sub-group MIP kinds with [`set_smip_constraints!`](@ref).
- 5. Add the turnover ceilings with [`set_turnover_constraints!`](@ref).
- 6. Add the tracking errors `tr` with [`set_tracking_error_constraints!`](@ref), on the prior of the block.
- 7. Add the norm ceilings `l2c`, `lpc` and `linfc`, then the penalties `l1`, `l2`, `lp` and `linf`.
+ 1. When `prefix` is not empty, register the weights of the model under it, with the owner `Symbol("")`. Add the weight bounds, the net budget `bgt`, and the short and gross budgets of the block. [`set_block_weight_constraints!`](@ref) does both.
+ 2. Add the linear rows `lcsr`, then the centrality rows `ctr`, with [`set_linear_weight_constraints!`](@ref).
+ 3. Add the MIP kinds with [`set_mip_constraints!`](@ref), then the sub-group MIP kinds with [`set_smip_constraints!`](@ref).
+ 4. Add the turnover ceilings with [`set_turnover_constraints!`](@ref).
+ 5. Add the tracking errors `tr` with [`set_tracking_error_constraints!`](@ref), on the prior of the block.
+ 6. Add the norm ceilings `l2c`, `lpc` and `linfc`, then the penalties `l1`, `l2`, `lp` and `linf`.
 
 Phase 2:
 
@@ -1257,12 +1256,8 @@ function set_block_constraints!(model::JuMP.Model, cbr::ResolvedConstraintBlock,
                                 bgt::Option{<:Num_BgtCE}, fees::Option{<:Fees};
                                 tr = nothing, b1::Option{<:MatNum} = nothing,
                                 prefix::Symbol = Symbol(""), kwargs...)::Nothing
-    if prefix != Symbol("")
-        state_build!(() -> get_w(model), model, prefix, :w)
-        state_build!(() -> Symbol(""), model, prefix, :w_owner)
-    end
     (; wb, lt, st, lcsr, ctr, gcardr, sgcardr, smtx, sgmtx, slt, sst, sglt, sgst, plr, ss) = cbr
-    set_weight_constraints!(model, wb, bgt, cbr.sbgt; gbgt = cbr.gbgt, prefix = prefix)
+    set_block_weight_constraints!(model, cbr, bgt; prefix = prefix)
     set_linear_weight_constraints!(model, lcsr, :lcs_ineq_, :lcs_eq_; prefix = prefix)
     set_linear_weight_constraints!(model, ctr, :cent_ineq_, :cent_eq_; prefix = prefix)
     set_mip_constraints!(model, wb, cbr.card, gcardr, plr, lt, st, fees, ss, cbr.xbgt;
@@ -1279,6 +1274,44 @@ function set_block_constraints!(model::JuMP.Model, cbr::ResolvedConstraintBlock,
     set_l2_regularisation!(model, cbr.l2; prefix = prefix)
     set_lp_regularisation!(model, cbr.lp; prefix = prefix)
     set_linf_regularisation!(model, cbr.linf; prefix = prefix)
+    return nothing
+end
+"""
+$(DocStringExtensions.TYPEDSIGNATURES)
+
+Add the weight bounds and the budgets of a [`ResolvedConstraintBlock`](@ref) to a model, under the namespace of the block.
+
+This is the first step of the block builder, [`set_block_constraints!`](@ref). The centring solve of [`UnconstrainedNearOptimalCentering`](@ref) also calls it for each block after the first, because that solve keeps the bounds and the budgets of every block and no other row of a block.
+
+# Algorithm
+
+ 1. When `prefix` is not empty, register the weights of the model under it, with the owner `Symbol("")`, so [`weights_prefix`](@ref) keeps the parts and the marks with the weights.
+ 2. Add the weight bounds `cbr.wb`, the net budget `bgt`, and the short and gross budgets `cbr.sbgt` and `cbr.gbgt` with [`set_weight_constraints!`](@ref).
+
+# Arguments
+
+  - $(arg_dict[:model])
+  - `cbr`: The Result of the block.
+  - `bgt`: The net budget of the owner of the block, or `nothing`.
+  - $(arg_dict[:prefix_kw])
+
+# Returns
+
+  - `nothing`.
+
+# Related
+
+  - [`set_block_constraints!`](@ref)
+  - [`set_weight_constraints!`](@ref)
+"""
+function set_block_weight_constraints!(model::JuMP.Model, cbr::ResolvedConstraintBlock,
+                                       bgt::Option{<:Num_BgtCE};
+                                       prefix::Symbol = Symbol(""))::Nothing
+    if prefix != Symbol("")
+        state_build!(() -> get_w(model), model, prefix, :w)
+        state_build!(() -> Symbol(""), model, prefix, :w_owner)
+    end
+    set_weight_constraints!(model, cbr.wb, bgt, cbr.sbgt; gbgt = cbr.gbgt, prefix = prefix)
     return nothing
 end
 """

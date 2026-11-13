@@ -1120,7 +1120,7 @@ function set_risk_budgeting_constraints!(model::JuMP.Model,
 end
 """
     _optimise(rb::RiskBudgeting, rd::ReturnsResult = ReturnsResult(); str_names::Bool = false,
-              save::Bool = true, kwargs...) -> RiskBudgetingResult
+              save::Bool = true, blocks::Tuple = (), kwargs...) -> RiskBudgetingResult
 
 Build the model of a [`RiskBudgeting`](@ref), solve it, and return its result.
 
@@ -1129,12 +1129,12 @@ Build the model of a [`RiskBudgeting`](@ref), solve it, and return its result.
 # Algorithm
 
  1. Replace each schedule of `rb` with its static default through [`reset_time_dependent_estimator`](@ref).
- 2. Process the attributes of `rb.opt` against `rd` with [`resolve_jump_optimiser`](@ref), giving `attrs`. It holds the prior, the weight bounds, the fees, the return terms and the Investable Mask.
+ 2. Process the attributes of `rb.opt` against `rd` with [`resolve_jump_optimiser`](@ref), with the blocks of `blocks`, giving `attrs`. It holds the prior, the block Results, the fees, the return terms and the Investable Mask.
  3. Take the view of `rb` and of `rd` at the investable assets with [`investable_view`](@ref). Both are unchanged when every asset is investable.
  4. Bind the benchmark of each [`DataBenchmarkTracking`](@ref) measure to `rd` with [`bind_data_benchmark`](@ref).
  5. Build a new model. Register the scales with [`set_model_scales!`](@ref) and the number of observations with [`set_model_observations!`](@ref).
  6. Add the weights, the row of the logarithm and the weight constraints with [`set_risk_budgeting_constraints!`](@ref), giving `rbr`.
- 7. Add the constraints, the return terms and the risk measures with [`assemble_jump_model!`](@ref), under [`MinimumRisk`](@ref).
+ 7. Add the constraints of every block, the return terms and the risk measures with [`assemble_jump_model!`](@ref), under [`MinimumRisk`](@ref).
  8. Set the objective [`MinimumRisk`](@ref), and solve with [`optimise_JuMP_model!`](@ref), giving `retcode` and `sol`. [`process_model`](@ref) divides the unscaled weights by ``k``.
  9. Build the result. It holds `attrs`, `retcode`, `sol`, the model when `save` is `true`, the risk measures resolved against the prior, and `rbr`.
 
@@ -1144,6 +1144,7 @@ Build the model of a [`RiskBudgeting`](@ref), solve it, and return its result.
   - $(arg_dict[:rd])
   - `str_names::Bool`: `true` gives each variable and each row of the model its string name.
   - `save::Bool`: `true` keeps the model in the result.
+  - $(arg_dict[:blocks_head])
   - `kwargs...`: Passed on to [`resolve_jump_optimiser`](@ref).
 
 # Returns
@@ -1157,9 +1158,10 @@ Build the model of a [`RiskBudgeting`](@ref), solve it, and return its result.
   - [`RiskBudgetingResult`](@ref)
 """
 function _optimise(rb::RiskBudgeting, rd::ReturnsResult = ReturnsResult();
-                   str_names::Bool = false, save::Bool = true, kwargs...)
+                   str_names::Bool = false, save::Bool = true, blocks::Tuple = (),
+                   kwargs...)
     rb = reset_time_dependent_estimator(rb)
-    attrs = resolve_jump_optimiser(rb.opt, rd; kwargs...)
+    attrs = resolve_jump_optimiser(rb.opt, rd; blocks = blocks, kwargs...)
     # The bundle reduced what it carries. The head carries the rest — an initial weight
     # vector, a risk measure holding per-asset data, tracking, a custom term — and hands
     # them to `assemble_jump_model!` itself, so it takes the same view of itself and of
@@ -1171,7 +1173,7 @@ function _optimise(rb::RiskBudgeting, rd::ReturnsResult = ReturnsResult();
     set_model_scales!(model, rb.opt.sc, rb.opt.so)
     set_model_observations!(model, size(attrs.pr.X, 1))
     rbr = set_risk_budgeting_constraints!(model, rb, attrs.pr, attrs.wb, rd)
-    assemble_jump_model!(model, rb, rb.opt, attrs, rd, rb.r, MinimumRisk())
+    assemble_jump_model!(model, rb, rb.opt, attrs, rd, rb.r, MinimumRisk(); blocks = blocks)
     set_portfolio_objective_function!(model, MinimumRisk(), rb, attrs)
     retcode, sol = optimise_JuMP_model!(model, rb, eltype(attrs.pr.X))
     return RiskBudgetingResult(;

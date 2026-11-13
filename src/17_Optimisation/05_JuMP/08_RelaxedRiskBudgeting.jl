@@ -757,7 +757,8 @@ function set_relaxed_risk_budgeting_constraints!(model::JuMP.Model,
 end
 """
     _optimise(rrb::RelaxedRiskBudgeting, rd::ReturnsResult = ReturnsResult();
-              str_names::Bool = false, save::Bool = true, kwargs...) -> RelaxedRiskBudgetingResult
+              str_names::Bool = false, save::Bool = true, blocks::Tuple = (),
+              kwargs...) -> RelaxedRiskBudgetingResult
 
 Build the model of a [`RelaxedRiskBudgeting`](@ref), solve it, and return its result.
 
@@ -766,12 +767,12 @@ Build the model of a [`RelaxedRiskBudgeting`](@ref), solve it, and return its re
 # Algorithm
 
  1. Replace each schedule of `rrb` with its static default through [`reset_time_dependent_estimator`](@ref).
- 2. Process the attributes of `rrb.opt` against `rd` with [`resolve_jump_optimiser`](@ref), giving `attrs`. It holds the prior, the weight bounds, the fees, the return terms and the Investable Mask.
+ 2. Process the attributes of `rrb.opt` against `rd` with [`resolve_jump_optimiser`](@ref), with the blocks of `blocks`, giving `attrs`. It holds the prior, the block Results, the fees, the return terms and the Investable Mask.
  3. Take the view of `rrb` and of `rd` at the investable assets with [`investable_view`](@ref). Both are unchanged when every asset is investable.
  4. Bind the benchmark of each [`DataBenchmarkTracking`](@ref) term to `rd` with [`bind_data_benchmark`](@ref).
  5. Build a new model. Register the scales with [`set_model_scales!`](@ref), the number of observations with [`set_model_observations!`](@ref), and the expression `k = 1` with [`set_maximum_ratio_factor_variables!`](@ref), because [`MinimumRisk`](@ref) does not scale the weights.
  6. Add the weights, the cones and the weight constraints with [`set_relaxed_risk_budgeting_constraints!`](@ref), giving `rbr`.
- 7. Add the constraints and the return terms of `rrb.opt` with [`assemble_jump_model!`](@ref).
+ 7. Add the constraints of every block and the return terms of `rrb.opt` with [`assemble_jump_model!`](@ref).
  8. Set the objective [`MinimumRisk`](@ref), which minimises `risk`, and solve with [`optimise_JuMP_model!`](@ref), giving `retcode` and `sol`.
  9. Build the result. It holds `attrs`, `retcode`, `sol`, the model when `save` is `true`, and `rbr`.
 
@@ -781,6 +782,7 @@ Build the model of a [`RelaxedRiskBudgeting`](@ref), solve it, and return its re
   - $(arg_dict[:rd])
   - `str_names::Bool`: `true` gives each variable and each row of the model its string name.
   - `save::Bool`: `true` keeps the model in the result.
+  - $(arg_dict[:blocks_head])
   - `kwargs...`: Passed on to [`resolve_jump_optimiser`](@ref).
 
 # Returns
@@ -794,9 +796,10 @@ Build the model of a [`RelaxedRiskBudgeting`](@ref), solve it, and return its re
   - [`RelaxedRiskBudgetingResult`](@ref)
 """
 function _optimise(rrb::RelaxedRiskBudgeting, rd::ReturnsResult = ReturnsResult();
-                   str_names::Bool = false, save::Bool = true, kwargs...)
+                   str_names::Bool = false, save::Bool = true, blocks::Tuple = (),
+                   kwargs...)
     rrb = reset_time_dependent_estimator(rrb)
-    attrs = resolve_jump_optimiser(rrb.opt, rd; kwargs...)
+    attrs = resolve_jump_optimiser(rrb.opt, rd; blocks = blocks, kwargs...)
     # The bundle reduced what it carries. The head carries the rest — an initial weight
     # vector, a risk measure holding per-asset data, tracking, a custom term — and hands
     # them to `assemble_jump_model!` itself, so it takes the same view of itself and of
@@ -809,7 +812,7 @@ function _optimise(rrb::RelaxedRiskBudgeting, rd::ReturnsResult = ReturnsResult(
     set_model_observations!(model, size(attrs.pr.X, 1))
     set_maximum_ratio_factor_variables!(model, MinimumRisk())
     rbr = set_relaxed_risk_budgeting_constraints!(model, rrb, attrs.pr, attrs.wb, rd)
-    assemble_jump_model!(model, rrb, rrb.opt, attrs, rd)
+    assemble_jump_model!(model, rrb, rrb.opt, attrs, rd; blocks = blocks)
     set_portfolio_objective_function!(model, MinimumRisk(), rrb, attrs)
     retcode, sol = optimise_JuMP_model!(model, rrb, eltype(attrs.pr.X))
     jr = JuMPOptimisationResult(; jor = attrs, retcode = retcode, sol = sol,

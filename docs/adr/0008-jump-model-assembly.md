@@ -464,3 +464,31 @@ clears its `rte`, so neither joins the risk or the return expression of the obje
 The heads add the block of the owner alone. The heads that add every block of a list come in #2045.
 Verified in `test/test_67b_constrained_update.jl`, "One builder adds two blocks to one model
 (#2044)", and by the head tests, whose reference values do not move.
+
+## Amendment 8 (2026-11-13)
+
+Every JuMP head adds every block that its entry gets (ADR 0237, #2045). `MeanRisk`,
+`RiskBudgeting`, `RelaxedRiskBudgeting`, `FactorRiskContribution` and both `NearOptimalCentering`
+heads take the keyword `blocks` of `_optimise` by name, and give it to `resolve_jump_optimiser` and
+to `assemble_jump_model!`. The fallback chain of `optimise` passes the keyword to each member, so a
+fallback solves on the same blocks.
+
+The middle of a head with more than one block runs in this order:
+
+1. Phase 1 of the block of the head, with the net budget, the fees and the tracking errors of the
+   head. Then phase 1 of each later block, with no net budget and no fees, and the set as the
+   owner.
+2. The fees, the risk measures, the return terms and `mark_risk_minimised!` of the head.
+3. The bounds builder `set_allocation_risk_return_bounds!` of each set, after the marks.
+4. Phase 2 of the block of the head, then phase 2 of each later block. A later block then adds
+   its custom objective terms with the `obj` of the assembly, the set and its block Result. The
+   objective builder of the head adds the terms of the block of the head alone.
+
+Block `i` after the first takes the prefix `blk_i_` (`later_constraint_blocks`). The set that owns
+it is viewed at the Investable Mask of the bundle. The frontier model of a `MaximumRatio` under a
+`Frontier` adds the same blocks. **Decision 6 changes again**: the unconstrained
+`NearOptimalCentering` adds the bounds and the budgets of every block, and no other row of a
+block. Its barrier keeps a term for the bounds of the head alone.
+
+Verified in `test/test_67b_constrained_update.jl`, "Every JuMP head adds every block that it gets
+(#2045)". A head with one block builds the model of Amendment 7.

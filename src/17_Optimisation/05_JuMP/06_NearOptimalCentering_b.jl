@@ -126,15 +126,18 @@ function get_overall_retcode(w_min_retcode, w_opt_retcode, w_max_retcode, noc_re
     end
 end
 """
-    assemble_near_optimal_centering_model!(alg, model, noc, setup, rd)
+    assemble_near_optimal_centering_model!(alg, model, noc, setup, rd; blocks = ())
 
 Run the model-assembly middle of the Near Optimal Centering variant `alg`.
 
 The two variants share a head and a Result, and differ only in the middle and in the solve.
 This is the middle. [`ConstrainedNearOptimalCentering`](@ref) delegates to the shared
-[`assemble_jump_model!`](@ref), whose block builder adds the weight bounds and the budgets.
+[`assemble_jump_model!`](@ref), whose block builder adds every block, the weight bounds and the
+budgets among them.
 [`UnconstrainedNearOptimalCentering`](@ref) adds the weight bounds and the budgets of `opt`
-with [`set_weight_constraints!`](@ref), runs the four steps of that sequence it needs —
+with [`set_weight_constraints!`](@ref), and the weight bounds and the budgets of each block
+after the first with [`set_block_weight_constraints!`](@ref). It adds no other row of a block.
+It then runs the four steps of that sequence it needs —
 non-fixed fees, risk, scalarisation, return — and then the same
 [`assert_frontier_sweep_cap`](@ref) tail.
 
@@ -162,6 +165,7 @@ phylogeny argument is `nothing` because the variant applies no phylogeny constra
   - `noc::NearOptimalCentering`: Dispatch object for the risk and custom constraint builders.
   - `setup::NearOptimalSetup`: Setup bundle from [`near_optimal_centering_setup`](@ref).
   - $(arg_dict[:rd])
+  - `blocks`: The blocks after the block of `noc.opt`, as [`assemble_jump_model!`](@ref) takes them.
 
 # Returns
 
@@ -178,11 +182,16 @@ phylogeny argument is `nothing` because the variant applies no phylogeny constra
 function assemble_near_optimal_centering_model!(::UnconstrainedNearOptimalCentering,
                                                 model::JuMP.Model,
                                                 noc::NearOptimalCentering,
-                                                setup::NearOptimalSetup, rd::ReturnsResult)
-    (; r, opt) = setup
-    # The centring solve keeps the bounds and the budgets of the block and no other row of
-    # it, so it adds them itself, outside the block builder.
+                                                setup::NearOptimalSetup, rd::ReturnsResult;
+                                                blocks::Tuple = ())
+    (; r, opt, attrs) = setup
+    # The centring solve keeps the bounds and the budgets of each block and no other row of
+    # a block, so it adds them itself, outside the block builder. A later block takes no net
+    # budget, because the head owns it.
     set_weight_constraints!(model, opt.wb, opt)
+    for (_, cbri, prefix) in later_constraint_blocks(blocks, attrs)
+        set_block_weight_constraints!(model, cbri, nothing; prefix = prefix)
+    end
     set_non_fixed_fees!(model, opt.fees)
     set_risk_and_scalarise!(model, r, noc, opt, opt.pe, nothing, opt.fees; rd = rd)
     set_return_constraints!(model, opt.ret, MinimumRisk(), opt.pe; rd = rd)
@@ -192,9 +201,10 @@ end
 function assemble_near_optimal_centering_model!(::ConstrainedNearOptimalCentering,
                                                 model::JuMP.Model,
                                                 noc::NearOptimalCentering,
-                                                setup::NearOptimalSetup, rd::ReturnsResult)
+                                                setup::NearOptimalSetup, rd::ReturnsResult;
+                                                blocks::Tuple = ())
     (; r, opt, attrs) = setup
-    assemble_jump_model!(model, noc, opt, attrs, rd, r)
+    assemble_jump_model!(model, noc, opt, attrs, rd, r; blocks = blocks)
     return nothing
 end
 """
@@ -275,9 +285,10 @@ function solve_near_optimal_centering!(::ConstrainedNearOptimalCentering, model:
                       Val(shared_has(model, :risk_frontier)))
 end
 function _optimise(noc::NearOptimalCentering, rd::ReturnsResult = ReturnsResult();
-                   str_names::Bool = false, save::Bool = true, kwargs...)
+                   str_names::Bool = false, save::Bool = true, blocks::Tuple = (),
+                   kwargs...)
     noc = reset_time_dependent_estimator(noc)
-    setup = near_optimal_centering_setup(noc, rd; kwargs...)
+    setup = near_optimal_centering_setup(noc, rd; blocks = blocks, kwargs...)
     (; w_opt, r, opt, attrs, w_min_retcode, w_opt_retcode, w_max_retcode) = setup
     # The setup reduced its own locals. These are this method's, and they reach
     # `assemble_near_optimal_centering_model!` directly.
@@ -290,7 +301,7 @@ function _optimise(noc::NearOptimalCentering, rd::ReturnsResult = ReturnsResult(
     set_model_observations!(model, size(opt.pe.X, 1))
     set_maximum_ratio_factor_variables!(model, MinimumRisk())
     set_w!(model, opt.pe.X, w_opt)
-    assemble_near_optimal_centering_model!(noc.alg, model, noc, setup, rd)
+    assemble_near_optimal_centering_model!(noc.alg, model, noc, setup, rd; blocks = blocks)
     noc_retcode, sol = solve_near_optimal_centering!(noc.alg, model, noc, setup)
     retcode = get_overall_retcode(w_min_retcode, w_opt_retcode, w_max_retcode, noc_retcode)
     return NearOptimalCenteringResult(;
