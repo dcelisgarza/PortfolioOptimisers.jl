@@ -209,7 +209,7 @@ end
 
 Refuses a programme set prior that cannot price an asset the model trades, and names the asset.
 
-A model of a fixed width calls it: the direct call of [`set_allocation_set_constraints!`](@ref), and a leader's model. The projection programme does not call it, because its shared entry builds the model at the prior's Investable Mask, [`resolve_projection_entry`](@ref). A leader's model trades the Investable Mask of the leader's own prior, and the set fits its prior on the same rows. When both priors are plain, the two masks agree and the check passes. When the set's `pe` is plain and the leader's prior is mask-aware, a young asset that the leader trades can have no price in the set's prior. Its ceiling would then carry `NaN`, so the check refuses it here, before the model reaches the solver.
+The direct call of [`set_allocation_set_constraints!`](@ref) calls it, because its model has a fixed width. A young asset that the model trades can have no price in the set's prior, when the set's `pe` is plain. Its ceiling would then carry `NaN`, so the check refuses it here, before the model reaches the solver. The projection programme and the leader re-solve of [`FollowTheLeader`](@ref) do not call it. Each one resolves the set through the shared entry, which drops such an asset with the warning of [`allocation_set_priced_mask`](@ref).
 
 # Algorithm
 
@@ -233,7 +233,7 @@ A model of a fixed width calls it: the direct call of [`set_allocation_set_const
 # Related
 
   - [`resolve_allocation_set_step`](@ref)
-  - [`add_allocation_set_constraints!`](@ref)
+  - [`allocation_set_priced_mask`](@ref)
   - [`investable_mask`](@ref)
 """
 function assert_set_prior_priced(::Nothing, ::Any)::Nothing

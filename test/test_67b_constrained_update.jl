@@ -1521,8 +1521,9 @@ end
             @test haskey(m4, :rc_variance) && haskey(m4, :variance_risk_2_ub)
             @test !haskey(m4, :dev_2)
             # In a leader's model both routes build the ceiling on the leader's `W`; only the
-            # set's rows take the prefix. The ceiling marks no flag, so the set's phylogeny
-            # keeps its penalty, unless the leader minimises a variance on the same `W`.
+            # set's rows take the namespace of its block, `blk_2_`, as `assemble_jump_model!`
+            # gives a later block. The ceiling marks no flag, so the set's phylogeny keeps its
+            # penalty, unless the leader minimises a variance on the same `W`.
             for r in (ceil3(; sigma = S3), ceil3()), leader_minimises in (false, true)
                 ml = JuMP.Model()
                 po.set_model_scales!(ml, 1, 1)
@@ -1533,13 +1534,19 @@ end
                     po.mark_risk_minimised!(ml, MinimumRisk())
                     po.mark_objective_variance!(ml, Symbol(""), po.RiskMeasureSettings())
                 end
-                inside(() -> po.add_allocation_set_constraints!(ml, mk3(r, pair), w3, rdR))
-                @test haskey(ml, :W) && !haskey(ml, :aset_W)
+                sl = mk3(r, pair)
+                inside() do
+                    setw, cbr = po.resolve_allocation_set_step(sl, w3, rdR,
+                                                               po.allocation_set_prior(sl,
+                                                                                       rdR))
+                    return po.add_allocation_set_block!(ml, setw, cbr, :blk_2_)
+                end
+                @test haskey(ml, :W) && !haskey(ml, :blk_2_W)
                 @test haskey(ml, :variance_flag) == leader_minimises
-                @test !haskey(ml, :aset_variance_flag)
-                @test haskey(ml, :aset_variance_risk_1_ub) && haskey(ml, :aset_sdp_plg_1)
-                @test haskey(ml, :aset_sdp_plg_p_1) == !leader_minimises
-                @test po.weights_prefix(ml, :aset_) === Symbol("")
+                @test !haskey(ml, :blk_2_variance_flag)
+                @test haskey(ml, :blk_2_variance_risk_1_ub) && haskey(ml, :blk_2_sdp_plg_1)
+                @test haskey(ml, :blk_2_sdp_plg_p_1) == !leader_minimises
+                @test po.weights_prefix(ml, :blk_2_) === Symbol("")
             end
             # A prefix without a recorded owner owns itself, even when it holds the model's
             # own `w`. The owner a build records is the owner `weights_prefix` returns.
@@ -1600,8 +1607,8 @@ end
             vidx(v::JuMP.VariableRef) = JuMP.index(v).value
             vidx(v::AbstractArray) = vidx(first(v))
             @test vidx(m[:t_tn_1]) < vidx(m[:t_tr_1]) < vidx(m[:t_l1]) < vidx(m[:var_1])
-            # The leader's arm writes the same kinds beside the head's own, under the
-            # `:aset_` prefix where a builder takes one and at free indices otherwise.
+            # The leader's arm writes the same kinds beside the head's own, in the namespace
+            # of the block of the set, `blk_2_`.
             rd = ReturnsResult(; nx = ["A", "B", "C"], X = R,
                                ts = Date(2020, 1, 1) .+ Day.(0:(T - 1)))
             lead = FollowTheLeader(;
@@ -2109,8 +2116,8 @@ end
                                                               prefix = :b_)
 
         # A set with a ceiling and a floor beside the head's own ceiling and floor. The set
-        # enters the leader's model through its Allocation Set Constraint, in phase 2 of
-        # the head's block, under `:aset_`.
+        # enters the leader's model as the second block of the entry, under `blk_2_`, and the
+        # bounds builder adds its ceiling and its floor after the risk step of the head.
         S3 = pr3.sigma
         mu3 = pr3.mu
         eq3 = fill(1 / N3, N3)
@@ -2130,10 +2137,9 @@ end
         aset = resolve(ProgrammeAllocationSet(; slv = slv, r = vcap(vs), ret = rfloor(rs)),
                        N3)
         function leader(obj)
-            ccnt = po.AllocationSetConstraint(aset, eq3, rd3)
             mr = MeanRisk(; obj = obj, r = vcap(vh),
-                          opt = JuMPOptimiser(; slv = slv, ret = rfloor(rh), ccnt = ccnt))
-            return optimise(mr, rd3)
+                          opt = JuMPOptimiser(; slv = slv, ret = rfloor(rh)))
+            return optimise(mr, rd3; blocks = ((po.factory(aset, eq3), rd3),))
         end
         for obj in (MaximumReturn(), MinimumRisk())
             res = leader(obj)
@@ -2145,7 +2151,7 @@ end
             # set's ceiling clears its `rke` and its floor clears its `rte`.
             @test length(res.model[:risk_vec]) == 1
             @test length(res.model[:ret_vec]) == 1
-            @test haskey(res.model, :aset_w) && haskey(res.model, :aset_bgt)
+            @test haskey(res.model, :blk_2_w) && !haskey(res.model, :blk_2_bgt)
         end
         # The ceiling of the set binds when the head maximises the return, and the floor of
         # the set binds when the head minimises the risk.
@@ -2595,9 +2601,4 @@ end
     # again and keeps no forecaster state.
     fp = OPS(; alg = ForecastReversion(; me = PriorExpectedReturns()))
     @test isnothing(partial_fit!(fp, vw(1, 10)).cache.st)
-    # Custom constraints append as one, two or many.
-    c1, c2 = FirstAtMost(0.5), FirstAtMost(0.4)
-    @test po.append_custom_constraint(nothing, c1) === c1
-    @test po.append_custom_constraint(c1, c2) == [c1, c2]
-    @test po.append_custom_constraint([c1, c2], c1) == [c1, c2, c1]
 end

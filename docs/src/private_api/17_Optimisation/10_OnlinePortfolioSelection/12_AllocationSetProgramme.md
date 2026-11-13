@@ -1,18 +1,16 @@
 ```@meta
-Description = "Allocation Set programme, private API of PortfolioOptimisers.jl: calibrated, add_allocation_set_constraints!, resolve_allocation_set_step, …"
+Description = "Allocation Set programme, private API of PortfolioOptimisers.jl: calibrated, resolve_allocation_set_step, add_allocation_set_block!, …"
 ```
 
 # Allocation Set programme: private API
 
 ```@docs
 PortfolioOptimisers.calibrated
-PortfolioOptimisers.add_allocation_set_constraints!
 PortfolioOptimisers.resolve_allocation_set_step
 PortfolioOptimisers.add_allocation_set_block!
 PortfolioOptimisers.allocation_set_tracking
 PortfolioOptimisers.prefix_tracking_benchmark
 PortfolioOptimisers.set_allocation_return_floor!
-PortfolioOptimisers.add_allocation_set_bounds!
 PortfolioOptimisers.set_allocation_set_bounds!
 PortfolioOptimisers.set_projection_objective!
 PortfolioOptimisers.set_distance_cone!

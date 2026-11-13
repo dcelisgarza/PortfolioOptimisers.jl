@@ -1201,7 +1201,7 @@ end
 
 Add a [`ResolvedConstraintBlock`](@ref) to a model, in its own namespace and in two phases. This is the block builder.
 
-Every programme that holds a block adds it through these two functions: a JuMP head in [`assemble_jump_model!`](@ref), the projection of a [`ProgrammeAllocationSet`](@ref) in [`set_allocation_set_constraints!`](@ref), and the set in the model of a leader through [`add_allocation_set_constraints!`](@ref). So the order of the Model Assembly is written once. The owner of the model runs its own steps between the two phases: the fees, the risk step, the return terms and [`mark_risk_minimised!`](@ref).
+Every programme that holds a block adds it through these two functions: a JuMP head in [`assemble_jump_model!`](@ref) for its own block and for each later block, such as the set in the model of a leader, and the projection of a [`ProgrammeAllocationSet`](@ref) in [`set_allocation_set_constraints!`](@ref). So the order of the Model Assembly is written once. The owner of the model runs its own steps between the two phases: the fees, the risk step, the return terms and [`mark_risk_minimised!`](@ref).
 
 Phase 1, `set_block_constraints!`, adds the rows that come before the risk step of the owner. Phase 2, `set_block_post_risk_constraints!`, adds the rows that read the marks of the objective of the owner, `risk_minimised` and `variance_flag`: the semidefinite phylogeny reads them. The integer phylogeny and the custom constraints come after them too, as they did in each owner.
 

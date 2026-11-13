@@ -335,8 +335,9 @@ using Test, PortfolioOptimisers, StableRNGs, LinearAlgebra, Statistics, Dates, C
     end
 
     @testset "The held budgets meet the head's budget of one (#2034)" begin
-        # The leader's model holds the head's row `sum(w) == k` beside the held optimiser's
-        # rows. A held budget that excludes one held every step at `dc3d282e50`.
+        # The re-solve sets the held budget to one, so the leader's model holds the head's row
+        # `sum(w) == k` (#2047). A held budget that excludes one held every step at
+        # `dc3d282e50`, when the row stood beside the held optimiser's rows.
         ftl(; kw...) = FollowTheLeader(; opt = logopt(; kw...))
         ls = WeightBounds(; lb = -1.0, ub = 1.0)
         w0 = fill(1 / N, N)
@@ -384,6 +385,63 @@ using Test, PortfolioOptimisers, StableRNGs, LinearAlgebra, Statistics, Dates, C
             @test isapprox(sum(r.w), 1; atol = 1e-8)
             @test isapprox(r.w, r1.w; atol = 1e-6)
         end
+    end
+
+    @testset "The re-solve passes the set as a second block (#2047)" begin
+        lead(; fb = nothing, kw...) = MeanRisk(; obj = MaximumReturn(),
+                                               opt = JuMPOptimiser(; pe = EmpiricalPrior(),
+                                                                   slv = slv,
+                                                                   ret = LogarithmicReturn(),
+                                                                   kw...), fb = fb)
+        bcrp = BestConstantRebalancedPortfolio
+        w0 = fill(1 / N, N)
+        rdv = rows(rd, 1:10)
+        # Each member of the fallback chain has the kind of the held estimator, and a JuMP
+        # member meets the budget rules of the held estimator.
+        @test isa(FollowTheLeader(; opt = lead(; fb = lead(; bgt = nothing))),
+                  FollowTheLeader)
+        @test isa(FollowTheLeader(; opt = bcrp(; fb = bcrp())), FollowTheLeader)
+        @test_throws ArgumentError FollowTheLeader(; opt = lead(; fb = EqualWeighted()))
+        @test_throws "a `BestConstantRebalancedPortfolio` after a `MeanRisk`" FollowTheLeader(;
+                                                                                              opt = lead(;
+                                                                                                         fb = bcrp()))
+        @test_throws ArgumentError FollowTheLeader(; opt = bcrp(; fb = lead()))
+        @test_throws "precomputed result" FollowTheLeader(;
+                                                          opt = lead(;
+                                                                     fb = optimise(lead(),
+                                                                                   rdv)))
+        @test_throws DomainError FollowTheLeader(; opt = lead(; fb = lead(; bgt = 0.5)))
+        @test_throws DomainError FollowTheLeader(;
+                                                 opt = lead(;
+                                                            fb = lead(;
+                                                                      fb = lead(;
+                                                                                bgt = BudgetRange(;
+                                                                                                  lb = 1.1,
+                                                                                                  ub = 1.2)))))
+        # The chain takes the budget of one on each JuMP member, and the bounds of a bounded
+        # set on each solver-free member.
+        bset = resolve(BoundedAllocationSet(; wb = WeightBounds(0, 0.4)), N)
+        ch = po.leader_chain(lead(; bgt = nothing, fb = lead(; bgt = nothing)), bset, 1.0)
+        @test ch.opt.bgt == 1 && ch.fb.opt.bgt == 1 && isnothing(ch.fb.fb)
+        bc = po.leader_chain(bcrp(; fb = bcrp()), bset, 1.0)
+        @test bc.wb.ub == bset.wb.ub && bc.fb.wb.ub == bset.wb.ub && isnothing(bc.fb.fb)
+        # The entry of a bounded set is a programme set whose block holds its bounds alone,
+        # so it fits no prior. A programme set takes the book of the step through `factory`.
+        e = po.leader_block(bset, lead(), w0, rdv)
+        @test isa(e[1], ProgrammeAllocationSet) && e[1].wb.ub == bset.wb.ub && e[2] === rdv
+        @test isnothing(po.allocation_set_prior(e[1], rdv))
+        tset = resolve(ProgrammeAllocationSet(; slv = slv,
+                                              tn = Turnover(; w = zeros(N), val = 0.2)), N)
+        ep = po.leader_block(tset, lead(), w0, rdv)
+        @test ep[1].tn.w == w0 && ep[2] === rdv
+        # The leader's model holds the block of the set under `blk_2_` and the budget of one
+        # in the row of the leader. The block of the set carries no budget row.
+        res = optimise(po.leader_chain(lead(; bgt = nothing), bset, 1.0), rdv;
+                       blocks = (e,))
+        @test haskey(res.model, :blk_2_w_ub) && haskey(res.model, :bgt)
+        @test !haskey(res.model, :blk_2_bgt) && !haskey(res.model, :aset_bgt)
+        @test maximum(res.w) <= 0.4 + 1e-8 && isapprox(sum(res.w), 1; atol = 1e-8)
+        @test maximum(optimise(lead(; bgt = nothing), rdv).w) > 0.4 + 1e-3
     end
 
     @testset "A schedule in a leader resolves at each fold (#2049)" begin
@@ -633,13 +691,6 @@ using Test, PortfolioOptimisers, StableRNGs, LinearAlgebra, Statistics, Dates, C
                                                                       rowsT, bset), rowsT,
                                               1)
         @test isapprox(wb5, 0.5 .* wb0 .+ 0.5 .* wt; atol = 1e-10)
-        # The adapter views with the held optimiser, so a leader whose prior reduces to
-        # its Investable Mask keeps the set: the set, the reference and the carrier are
-        # each sliced (ADR 0170).
-        cn = po.port_opt_view(po.AllocationSetConstraint(tset, wt, nothing), [1, 2])
-        @test isnothing(cn.X) && cn.w == wt[1:2] && length(cn.set.wb.lb) == 2
-        cr = po.port_opt_view(po.AllocationSetConstraint(tset, wt, rowsT), [1, 2])
-        @test cr.X.nx == ["C", "A"] && size(cr.X.X, 2) == 2 && cr.w == wt[1:2]
         # 4. Under card = 2 the leader holds two names and the mix of it with a
         #    two-name book is projected back to two. A MIP kind on the set needs a
         #    MIP-capable solver on the held optimiser, whose model it enters.
@@ -1078,8 +1129,8 @@ using Test, PortfolioOptimisers, StableRNGs, LinearAlgebra, Statistics, Dates, C
                 string(@doc(KernelMatch)), string(@doc(NearestNeighbourMatch)),
                 string(@doc(CorrelationMatch)), string(@doc(ClusterMatch)),
                 string(@doc(RankOneCovariance)),
-                string(@doc(ShortTermLossControlPortfolio)),
-                string(@doc(po.AllocationSetConstraint)),
+                string(@doc(ShortTermLossControlPortfolio)), string(@doc(po.leader_block)),
+                string(@doc(po.leader_chain)), string(@doc(po.assert_leader_chain)),
                 string(@doc(po.AbstractSampleSelector)), string(@doc(matrix_square_root))]
         @test all(d -> !occursin("No documentation found", d), docs)
         @test occursin("follow-the-leader rule", docs[1])

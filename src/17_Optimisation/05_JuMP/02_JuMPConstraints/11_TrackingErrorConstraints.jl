@@ -44,7 +44,7 @@ Where:
   - `opt`: The [`RiskConstraintOwner`](@ref) whose programme the constraint joins, read by the risk-based variants for the solver a Deferred Quantity is resolved against ([`risk_constraint_solver`](@ref)).
   - $(arg_dict[:pl_opt])
   - $(arg_dict[:fees_opt])
-  - `prefix::Symbol`: The Model State namespace the entries are registered under, `Symbol("")` for a head's own, so a programme Allocation Set's tracking error joins a leader's model beside the head's own under `:aset_`. The net returns `X w` are formed under the same prefix, over the rows of `pr` and their count.
+  - `prefix::Symbol`: The Model State namespace the entries are registered under, `Symbol("")` for a head's own, so a programme Allocation Set's tracking error joins a leader's model beside the head's own under the namespace of its block, `blk_2_`. The net returns `X w` are formed under the same prefix, over the rows of `pr` and their count.
 
 # Returns
 

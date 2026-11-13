@@ -33,7 +33,7 @@ Adds the constraints of a resolved Allocation Set to the bare projection model.
 
 The model must already hold `w`, `k`, the two scales and the observation count. On both kinds of set the function adds the weight bounds and the budget of one. On a [`ProgrammeAllocationSet`](@ref) the projection is the owner of the model, and the set is the owner of its block. The projection writes the budget of one, and the block builder [`set_block_constraints!`](@ref) adds every kind of the block, which a JuMP optimiser adds through the same builder. The bounds builder [`set_allocation_risk_return_bounds!`](@ref) adds the risk ceilings and the return floor of the set between the two phases of the block.
 
-[`projection_programme`](@ref) calls the three-argument form. It resolves the block of the set through the shared entry of a bare head, [`resolve_projection_entry`](@ref), and gives the set viewed at the Investable Mask and the Result of its block. The four-argument and the five-argument forms are the direct call. They resolve the step themselves, on a model that already holds the width of `w`, so they cannot drop an asset. A direct call refuses an asset that the prior cannot price, with [`assert_set_prior_priced`](@ref), and a distance reader of the set that refuses an asset raises its [`DistanceReaderRefusalError`](@ref). A JuMP head does not call this function. Its Allocation Set Constraint calls [`add_allocation_set_constraints!`](@ref), which runs the same builders under the prefix `:aset_`.
+[`projection_programme`](@ref) calls the three-argument form. It resolves the block of the set through the shared entry of a bare head, [`resolve_projection_entry`](@ref), and gives the set viewed at the Investable Mask and the Result of its block. The four-argument and the five-argument forms are the direct call. They resolve the step themselves, on a model that already holds the width of `w`, so they cannot drop an asset. A direct call refuses an asset that the prior cannot price, with [`assert_set_prior_priced`](@ref), and a distance reader of the set that refuses an asset raises its [`DistanceReaderRefusalError`](@ref). A JuMP head does not call this function. The leader re-solve of [`FollowTheLeader`](@ref) passes the set as a second block of the entry of the head, and [`assemble_jump_model!`](@ref) adds the block with the same builders under the namespace `blk_2_`.
 
 # Algorithm
 
@@ -67,7 +67,7 @@ The model must already hold `w`, `k`, the two scales and the observation count. 
   - [`ProgrammeAllocationSet`](@ref)
   - [`BoundedAllocationSet`](@ref)
   - [`resolve_projection_entry`](@ref)
-  - [`add_allocation_set_constraints!`](@ref)
+  - [`leader_block`](@ref)
   - [`assemble_jump_model!`](@ref)
   - [`set_allocation_risk_ceiling!`](@ref)
 """
@@ -100,60 +100,11 @@ function set_allocation_set_constraints!(model::JuMP.Model, set::ProgrammeAlloca
     return cbr.wb, cbr
 end
 """
-    add_allocation_set_constraints!(model::JuMP.Model, set::BoundedAllocationSet, w::AbstractVector, X)
-    add_allocation_set_constraints!(model::JuMP.Model, set::ProgrammeAllocationSet, w::AbstractVector, X)
-
-Adds the constraints of a resolved Allocation Set to a JuMP head's model during its assembly.
-
-This is the arm of the Allocation Set Constraint that a [`FollowTheLeader`](@ref) rule appends to its held optimiser. The custom constraints run in phase 2 of the block of the leader, after [`mark_risk_minimised!`](@ref), so the set's block, its ceilings and its floor all come after the risk step of the leader. The block of the set takes the prefix `:aset_`: the block builder [`set_block_constraints!`](@ref) registers the head's `w` under it and adds every row of the set there, the bounds and the short and gross budgets among them. A kind on both the set and the held optimiser gives two sets of rows and no name collision. The MIP bits, the long and short parts and the lifted matrix belong to the weights, so the set reads the leader's.
-
-The set's penalties and the `p · tr(W)` term of its semidefinite phylogeny go into the Objective Penalty, which the head's objective builder adds to the head's objective. The tracking errors read the rows `X` that the head holds, and their row count. The set's prior is fitted on those rows, as the leader's prior is. The leader's model trades only the Investable Mask of its own prior, so [`assert_set_prior_priced`](@ref) refuses a set prior that prices fewer assets than the leader's.
-
-The online head owns the budget of one, so this function writes `Σw = k` as the row `aset_bgt`. Every row of the set is registered in the model under `:aset_`, so a reader of the model can find it.
-
-# Algorithm
-
- 1. On a bounded set, add the bounds and the budget under `:aset_` with [`add_allocation_set_bounds!`](@ref).
- 2. On a programme set, fit the set's prior on `X` with [`allocation_set_prior`](@ref), and resolve the step with [`resolve_allocation_set_step`](@ref). Add `Σw = k` under `:aset_` with [`set_budget_constraints!`](@ref). Add the block, the ceilings and the floor with [`add_allocation_set_block!`](@ref) under the prefix `:aset_`.
-
-# Arguments
-
-  - $(arg_dict[:model])
-  - `set`: The Allocation Set, resolved once per fold.
-  - `w`: The Price-Adjusted Allocation the step trades from.
-  - `X`: The rows the head holds through the period, a [`ReturnsResult`](@ref), or `nothing`.
-
-# Returns
-
-  - `nothing`.
-
-# Related
-
-  - [`set_allocation_set_constraints!`](@ref)
-  - [`AllocationSetConstraint`](@ref)
-  - [`FollowTheLeader`](@ref)
-"""
-function add_allocation_set_constraints!(model::JuMP.Model, set::BoundedAllocationSet,
-                                         ::AbstractVector, ::Any)::Nothing
-    add_allocation_set_bounds!(model, set.wb)
-    return nothing
-end
-function add_allocation_set_constraints!(model::JuMP.Model, set::ProgrammeAllocationSet,
-                                         w::AbstractVector,
-                                         X::Option{<:ReturnsResult})::Nothing
-    setw, cbr = resolve_allocation_set_step(set, w, X, allocation_set_prior(set, X))
-    # The online head owns the budget of one (ADR 0159). Until the leader re-solve passes the
-    # set as a block of the entry (#2047), the set writes the row in the leader's model.
-    set_budget_constraints!(model, 1, get_w(model); prefix = :aset_)
-    add_allocation_set_block!(model, setw, cbr, :aset_)
-    return nothing
-end
-"""
 $(DocStringExtensions.TYPEDSIGNATURES)
 
 Resolves a programme set for one step of an online head, to the set after `factory(set, w)` and the [`ResolvedConstraintBlock`](@ref) of its block.
 
-Two callers have a model of a fixed width, so they resolve the step here and do not drop an asset: the direct call of [`set_allocation_set_constraints!`](@ref), and the model of a leader, [`add_allocation_set_constraints!`](@ref). Then [`add_allocation_set_block!`](@ref) adds the Result with the block builder. [`projection_programme`](@ref) does not call it. It resolves the block through the shared entry of a bare head, [`resolve_projection_entry`](@ref), which drops an asset that the prior cannot price or that a reader refuses.
+The direct call of [`set_allocation_set_constraints!`](@ref) has a model of a fixed width, so it resolves the step here and does not drop an asset. Then [`add_allocation_set_block!`](@ref) adds the Result with the block builder. [`projection_programme`](@ref) does not call it. It resolves the block through the shared entry of a bare head, [`resolve_projection_entry`](@ref), which drops an asset that the prior cannot price or that a reader refuses.
 
 # Algorithm
 
@@ -197,7 +148,7 @@ $(DocStringExtensions.TYPEDSIGNATURES)
 
 Adds the block of a programme set to a model with the block builder, and the set's risk ceilings and return floor with its bounds builder.
 
-The set is the owner of its block, so the builder gets no net budget and no fees, as the set had none before the block. The owner of the model writes the budget of one. The bare projection passes the empty prefix `Symbol("")`, and a leader's model passes `:aset_`, so the rows of the set sit beside the rows of the leader with no name collision.
+The set is the owner of its block, so the builder gets no net budget and no fees, as the set had none before the block. The owner of the model writes the budget of one. The bare projection passes the empty prefix `Symbol("")`. Another prefix puts the rows of the set in that namespace, beside the rows of the owner of the model, as [`assemble_jump_model!`](@ref) puts a later block under `blk_i_`.
 
 # Algorithm
 
@@ -210,7 +161,7 @@ The set is the owner of its block, so the builder gets no net budget and no fees
   - $(arg_dict[:model])
   - `set`: The programme set, after `factory(set, w)`.
   - `cbr`: The Result of its block, from [`resolve_allocation_set_step`](@ref).
-  - `prefix`: `Symbol("")` on the bare projection model, `:aset_` in a leader's model.
+  - `prefix`: The Model State namespace of the block, `Symbol("")` on the bare projection model.
 
 # Returns
 
@@ -340,56 +291,6 @@ function set_allocation_return_floor!(model::JuMP.Model, rets::VecJRE,
         set_return_constraints!(model, i, no_return_expr_returns_estimator(ret), pr;
                                 prefix = prefix, kwargs...)
     end
-    return nothing
-end
-"""
-$(DocStringExtensions.TYPEDSIGNATURES)
-
-Adds the weight bounds and the budget of one of a [`BoundedAllocationSet`](@ref) to a model that already names its own.
-
-The rows are the inequalities that [`set_allocation_set_bounds!`](@ref) writes, registered under the prefix `:aset_` as `aset_w_lb`, `aset_w_ub` and `aset_bgt`. A [`ProgrammeAllocationSet`](@ref) does not come here: the block builder [`set_block_constraints!`](@ref) adds its bounds and its short and gross budgets under its own prefix.
-
-**Breaking change.** The rows were anonymous. They are registered now, so a reader of the model can find them.
-
-# JuMP formulation
-
-## Variables
-
-  - `w`, `k`: read from the model.
-
-## Constraints
-
-  - `aset_w_lb`: ``s_c (\\boldsymbol{w} - k \\boldsymbol{l}) \\geq 0``, when an entry of ``\\boldsymbol{l}`` is finite.
-  - `aset_w_ub`: ``s_c (\\boldsymbol{w} - k \\boldsymbol{u}) \\leq 0``, when an entry of ``\\boldsymbol{u}`` is finite.
-  - `aset_bgt`: ``s_c \\left(\\sum_{i=1}^{N} w_i - k\\right) = 0``.
-
-Where:
-
-  - $(math_dict[:sc_scale])
-  - $(math_dict[:k_budget])
-  - $(math_dict[:w_port])
-  - $(math_dict[:N])
-  - ``\\boldsymbol{l}``, ``\\boldsymbol{u}``: Lower and upper weight bounds of the set, resolved.
-
-# Arguments
-
-  - $(arg_dict[:model])
-  - `wb`: The set's resolved [`WeightBounds`](@ref).
-
-# Validation
-
-  - `Σ lb ≤ 1 ≤ Σ ub` over the resolved bounds, through [`assert_feasible_bounds`](@ref).
-
-# Related
-
-  - [`add_allocation_set_constraints!`](@ref)
-  - [`set_allocation_set_bounds!`](@ref)
-"""
-function add_allocation_set_bounds!(model::JuMP.Model, wb::WeightBounds)::Nothing
-    assert_feasible_bounds(wb)
-    state_build!(() -> get_w(model), model, :aset_, :w)
-    set_weight_constraints!(model, wb, nothing, nothing; prefix = :aset_)
-    set_budget_constraints!(model, 1, get_w(model); prefix = :aset_)
     return nothing
 end
 """
