@@ -1673,7 +1673,7 @@ function ep_refine_tail_view(tv::AbstractSequentialTailViewConstraint, w::VecNum
         scale = max(scale, maximum(abs, x))
     end
     gap = abs((LinearAlgebra.dot(cn, wi) + bn) - (LinearAlgebra.dot(c, wi) + b))
-    return rebuild_estimator(tv, (; c = cn, b = bn)), gap <= tol * scale
+    return rebuild_struct(tv, (; c = cn, b = bn)), gap <= tol * scale
 end
 """
     ep_sequential_start(tv::AbstractSequentialTailViewConstraint, w::VecNum)

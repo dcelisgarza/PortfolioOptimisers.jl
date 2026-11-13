@@ -919,7 +919,7 @@ Return the centrality constraint with the observation weights of its centrality 
   - [`shared_series_estimator`](@ref)
 """
 function obs_weights_view(cc::CentralityConstraint, i)::CentralityConstraint
-    return rebuild_estimator(cc, (; A = obs_weights_view(cc.A, i)))
+    return rebuild_struct(cc, (; A = obs_weights_view(cc.A, i)))
 end
 """
     const VecCC = AbstractVector{<:CentralityConstraint}

@@ -245,7 +245,7 @@ The function takes no fold context, unlike [`update_time_dependent_estimator`](@
  1. For an [`Online`](@ref), rebuild the wrapped estimator with `cache` set to the state of [`online_state_seed`](@ref), and continue with that estimator.
  2. Find the fields of the estimator that hold a wrapper, with [`online_fields`](@ref). Return the estimator when there is none.
  3. Resolve the value of each of these fields with this function.
- 4. Rebuild the estimator with the resolved values through [`rebuild_estimator`](@ref).
+ 4. Rebuild the estimator with the resolved values through [`rebuild_struct`](@ref).
 
 # Arguments
 
@@ -260,7 +260,7 @@ The function takes no fold context, unlike [`update_time_dependent_estimator`](@
   - [`Online`](@ref)
   - [`SampleBufferState`](@ref)
   - [`online_fields`](@ref)
-  - [`rebuild_estimator`](@ref)
+  - [`rebuild_struct`](@ref)
 """
 function update_online_estimator(est::Union{AbstractEstimator,
                                             StatsBase.CovarianceEstimator})
@@ -269,7 +269,7 @@ function update_online_estimator(est::Union{AbstractEstimator,
         return est
     end
     repl = NamedTuple{fns}(map(f -> update_online_estimator(getfield(est, f)), fns))
-    return rebuild_estimator(est, repl)
+    return rebuild_struct(est, repl)
 end
 function update_online_estimator(::Nothing)
     return nothing
@@ -734,7 +734,7 @@ function online_state_seed(::Union{AbstractEstimator, StatsBase.CovarianceEstima
     return SampleBufferState(; max_history = max_history)
 end
 function update_online_estimator(o::Online)
-    est = rebuild_estimator(o.est, (; cache = online_state_seed(o.est, o.max_history)))
+    est = rebuild_struct(o.est, (; cache = online_state_seed(o.est, o.max_history)))
     return update_online_estimator(est)
 end
 function update_online_estimator(::Online{<:CrossValidationEstimator})

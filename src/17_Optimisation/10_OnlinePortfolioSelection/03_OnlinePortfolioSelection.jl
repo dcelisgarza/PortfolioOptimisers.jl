@@ -284,7 +284,7 @@ The update of the head:
  1. Return `opt` unchanged when [`is_time_dependent`](@ref) is `false` for it.
  2. Replace each scheduled field of `opt` with its value at the fold, through [`update_time_dependent_fields`](@ref), giving the new `opt`.
  3. Resolve the fallback `opt.fb` and the rule `opt.alg` of the new `opt` at the same `ctx`.
- 4. Rebuild `opt` with the two resolved values through [`rebuild_estimator`](@ref).
+ 4. Rebuild `opt` with the two resolved values through [`rebuild_struct`](@ref).
 
 # Arguments
 
@@ -322,11 +322,9 @@ function update_time_dependent_estimator(opt::OnlinePortfolioSelection,
         return opt
     end
     opt = update_time_dependent_fields(opt, ctx, all_binds)
-    return rebuild_estimator(opt,
-                             (;
-                              fb = update_time_dependent_estimator(opt.fb, ctx, all_binds),
-                              alg = update_time_dependent_estimator(opt.alg, ctx,
-                                                                    all_binds)))
+    return rebuild_struct(opt,
+                          (; fb = update_time_dependent_estimator(opt.fb, ctx, all_binds),
+                           alg = update_time_dependent_estimator(opt.alg, ctx, all_binds)))
 end
 """
 $(DocStringExtensions.TYPEDSIGNATURES)
@@ -896,9 +894,9 @@ function partial_fit!(opt::OnlinePortfolioSelection{<:Any, <:Any, <:Any, <:Any, 
                                                     <:Any, <:Any,
                                                     <:Option{<:OnlinePortfolioSelectionState}},
                       rd::ReturnsResult)
-    return rebuild_estimator(opt,
-                             (; cache = fold_online_selection(opt, opt.cache, rd),
-                              fb = step_fallback(opt.fb, rd)))
+    return rebuild_struct(opt,
+                          (; cache = fold_online_selection(opt, opt.cache, rd),
+                           fb = step_fallback(opt.fb, rd)))
 end
 """
     online_step_fold(opt::OnlinePortfolioSelection, ctx::TimeDependentContext, rd::ReturnsResult)
@@ -931,10 +929,10 @@ function online_step_fold(opt::OnlinePortfolioSelection{<:Any, <:Any, <:Any, <:A
     set = opt.set
     set = isa(set, TimeDependent) ? time_dependent_value(set, ctx) : set
     alg = update_time_dependent_estimator(opt.alg, ctx)
-    step = alg === opt.alg ? opt : rebuild_estimator(opt, (; alg = alg))
-    return rebuild_estimator(opt,
-                             (; cache = fold_online_selection(step, opt.cache, rd, set),
-                              fb = step_fallback(opt.fb, rd)))
+    step = alg === opt.alg ? opt : rebuild_struct(opt, (; alg = alg))
+    return rebuild_struct(opt,
+                          (; cache = fold_online_selection(step, opt.cache, rd, set),
+                           fb = step_fallback(opt.fb, rd)))
 end
 """
 $(DocStringExtensions.TYPEDSIGNATURES)
@@ -1157,7 +1155,7 @@ function update_online_estimator(opt::Union{OnlinePortfolioSelection{<:Any, <:An
                                                                      <:OptimisationEstimator},
                                             PreviousWeights{<:Any, <:Any,
                                                             <:OptimisationEstimator}})
-    return rebuild_estimator(opt, (; fb = update_online_estimator(opt.fb)))
+    return rebuild_struct(opt, (; fb = update_online_estimator(opt.fb)))
 end
 """
     online_unreached_path(opt::Union{OnlinePortfolioSelection, PreviousWeights})

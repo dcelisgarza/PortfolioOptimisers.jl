@@ -72,10 +72,10 @@ function resolve_jump_optimiser(opt::JuMPOptimiser, rd::ReturnsResult; blocks::T
     # reduction views its values. An online head runs the same stage once for each fold,
     # before it knows the mask of a step, so both owners order the names and the reduction
     # by one rule (ADR 0237).
-    opt1 = rebuild_estimator(opt,
-                             (;
-                              cbe = resolve_constraint_block_names(opt.cbe, opt.strict,
-                                                                   datatype)))
+    opt1 = rebuild_struct(opt,
+                          (;
+                           cbe = resolve_constraint_block_names(opt.cbe, opt.strict,
+                                                                datatype)))
     # The shared entry holds the one refusal branch for the readers of every block.
     imsk, (fees, prr, optr), cbrs = resolve_block_entry(resolve_jump_head_block,
                                                         (opt1, pr, rd, feesu, kwargs), imsk,
@@ -216,7 +216,7 @@ function jump_optimiser_from_attributes(opt::JuMPOptimiser, attrs::ResolvedJuMPO
             getfield(attrs, f)
         end
     end
-    return rebuild_estimator(opt, NamedTuple{map(f -> get(rename, f, f), af)}(vals))
+    return rebuild_struct(opt, NamedTuple{map(f -> get(rename, f, f), af)}(vals))
 end
 """
     constraint_block_steps(blocks::Tuple{}, attrs::ResolvedJuMPOptimiser) -> Tuple{}
@@ -546,7 +546,7 @@ function pipe_route(cfg::JuMPOptimiser, ::Val{:mu_ucs}, v)
                             else
                                 "cannot route a mean uncertainty set into a $(Base.typename(typeof(cfg.ret)).wrapper); expected returns uncertainty requires an ArithmeticReturn return estimator"
                             end))
-    return rebuild_estimator(cfg, (; ret = rebuild_estimator(cfg.ret, (; ucs = v))))
+    return rebuild_struct(cfg, (; ret = rebuild_struct(cfg.ret, (; ucs = v))))
 end
 pipe_accepts(::JuMPOptimiser, ::Val{:mu_ucs})::Bool = true
 # A routing target that is a slot of the Constraint Block, such as `:wb` or `:ple`, goes into
@@ -606,7 +606,7 @@ Each rebuilds through its keyword constructor only when a field changes, so a he
  1. A [`JuMPOptimiser`](@ref) binds `opt.tr` to `rd` with [`bind_data_benchmark`](@ref), giving `tr`.
  2. A head binds its `est.opt` with step 1, giving `opt`. A [`RiskJuMPOptimisationEstimator`](@ref) also binds `est.r`, giving `r`.
  3. Return the object itself when every bound field is the field it replaces, by `===`.
- 4. Otherwise rebuild the object with the bound fields through its keyword constructor, with [`rebuild_estimator`](@ref).
+ 4. Otherwise rebuild the object with the bound fields through its keyword constructor, with [`rebuild_struct`](@ref).
 
 # Arguments
 
@@ -625,11 +625,11 @@ Each rebuilds through its keyword constructor only when a field changes, so a he
 """
 function bind_data_benchmark(opt::JuMPOptimiser, rd::ReturnsResult)
     tr = bind_data_benchmark(opt.tr, rd)
-    return tr === opt.tr ? opt : rebuild_estimator(opt, (; tr = tr))
+    return tr === opt.tr ? opt : rebuild_struct(opt, (; tr = tr))
 end
 function bind_data_benchmark(est::JuMPOptimisationEstimator, rd::ReturnsResult)
     opt = bind_data_benchmark(est.opt, rd)
-    return opt === est.opt ? est : rebuild_estimator(est, (; opt = opt))
+    return opt === est.opt ? est : rebuild_struct(est, (; opt = opt))
 end
 function bind_data_benchmark(est::RiskJuMPOptimisationEstimator, rd::ReturnsResult)
     opt = bind_data_benchmark(est.opt, rd)
@@ -637,6 +637,6 @@ function bind_data_benchmark(est::RiskJuMPOptimisationEstimator, rd::ReturnsResu
     return if opt === est.opt && r === est.r
         est
     else
-        rebuild_estimator(est, (; opt = opt, r = r))
+        rebuild_struct(est, (; opt = opt, r = r))
     end
 end

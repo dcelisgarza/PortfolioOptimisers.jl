@@ -616,7 +616,7 @@ function partial_fit!(ce::ExpWeightedVariance{<:Any, <:Any, <:Any,
                       X::MatNum; dims::Int = 1,
                       active_mask::Option{<:AbstractMatrix{<:Bool}} = nothing, kwargs...)
     cache = exp_weighted_pass!(ce, X, dims, active_mask, ce.cache)
-    return cache === ce.cache ? ce : rebuild_estimator(ce, (; cache = cache))
+    return cache === ce.cache ? ce : rebuild_struct(ce, (; cache = cache))
 end
 """
     partial_fit!(

@@ -250,8 +250,8 @@ function assert_set_prior_priced(pr::AbstractPriorResult, X::ReturnsResult)::Not
     return throw(ArgumentError("the Allocation Set's prior cannot price $(non_investable_names(X.nx, imsk)), which the programme trades: an asset outside the set prior's Coverage Universe over the rows it was fitted on has no covariance, no mean and no loadings for a ceiling, a floor or a tracking error to read. Give the set a `pe` whose universe covers the programme's — a mask-aware one under a `CoveragePolicy`, or the held estimator's own — or shorten the window the set reads."))
 end
 """
-    fit_allocation_set_block(b::Tuple{<:ProgrammeAllocationSet, <:ReturnsResult})
-    fit_allocation_set_block(b::Tuple{<:ProgrammeAllocationSet, <:ReturnsResult, <:Option{<:AbstractPriorResult}})
+    fit_allocation_set_block(b::Tuple{ProgrammeAllocationSet, ReturnsResult})
+    fit_allocation_set_block(b::Tuple{ProgrammeAllocationSet, ReturnsResult, Option{<:AbstractPriorResult}})
 
 Fits the prior of an entry of the keyword `blocks` of [`resolve_jump_optimiser`](@ref), and gives the entry with its prior.
 
@@ -272,12 +272,12 @@ An entry is the block of a [`ProgrammeAllocationSet`](@ref) beside the block of 
   - [`allocation_set_entry_mask`](@ref)
   - [`resolve_allocation_set_block`](@ref)
 """
-function fit_allocation_set_block(b::Tuple{<:ProgrammeAllocationSet, <:ReturnsResult})
+function fit_allocation_set_block(b::Tuple{ProgrammeAllocationSet, ReturnsResult})
     set, X = b
     return (set, X, allocation_set_prior(set, X))
 end
-function fit_allocation_set_block(b::Tuple{<:ProgrammeAllocationSet, <:ReturnsResult,
-                                           <:Option{<:AbstractPriorResult}})
+function fit_allocation_set_block(b::Tuple{ProgrammeAllocationSet, ReturnsResult,
+                                           Option{<:AbstractPriorResult}})
     return b
 end
 """
@@ -341,8 +341,8 @@ function allocation_set_priced_mask(imsk::Option{BitVector}, pmsk::BitVector,
     return keep
 end
 """
-    allocation_set_entry_mask(imsk::Option{BitVector}, b::Tuple{<:ProgrammeAllocationSet, <:ReturnsResult, Nothing})
-    allocation_set_entry_mask(imsk::Option{BitVector}, b::Tuple{<:ProgrammeAllocationSet, <:ReturnsResult, <:AbstractPriorResult})
+    allocation_set_entry_mask(imsk::Option{BitVector}, b::Tuple{ProgrammeAllocationSet, ReturnsResult, Nothing})
+    allocation_set_entry_mask(imsk::Option{BitVector}, b::Tuple{ProgrammeAllocationSet, ReturnsResult, AbstractPriorResult})
 
 Intersects the Investable Mask of a JuMP head with the mask of a block of a set, at the entry of the head.
 
@@ -377,13 +377,12 @@ The shared entry [`resolve_block_entry`](@ref) folds the function over the entri
   - [`resolve_allocation_set_block`](@ref)
 """
 function allocation_set_entry_mask(imsk::Option{BitVector},
-                                   ::Tuple{<:ProgrammeAllocationSet, <:ReturnsResult,
-                                           Nothing})
+                                   ::Tuple{ProgrammeAllocationSet, ReturnsResult, Nothing})
     return imsk
 end
 function allocation_set_entry_mask(imsk::Option{BitVector},
-                                   b::Tuple{<:ProgrammeAllocationSet, <:ReturnsResult,
-                                            <:AbstractPriorResult})
+                                   b::Tuple{ProgrammeAllocationSet, ReturnsResult,
+                                            AbstractPriorResult})
     set, X, pr = b
     strict = projection_step_strict()
     readers = (set.ple, set.cte)
@@ -424,8 +423,8 @@ The shared entry [`resolve_block_entry`](@ref) calls it for each entry of its bl
   - [`distance_reader_call`](@ref)
   - [`allocation_set_entry_mask`](@ref)
 """
-function resolve_allocation_set_block(b::Tuple{<:ProgrammeAllocationSet, <:ReturnsResult,
-                                               <:Option{<:AbstractPriorResult}},
+function resolve_allocation_set_block(b::Tuple{ProgrammeAllocationSet, ReturnsResult,
+                                               Option{<:AbstractPriorResult}},
                                       imsk::Option{BitVector})
     set, X, pr = b
     setr, Xr, prr = programme_investable_reduction(imsk, set, X, pr)
@@ -538,13 +537,11 @@ Gives an entry of the keyword `blocks` for a sub-problem on the reduced universe
   - [`fit_allocation_set_block`](@ref)
   - [`jump_optimiser_from_attributes`](@ref)
 """
-function allocation_set_block_step(b::Tuple{<:ProgrammeAllocationSet, <:ReturnsResult,
-                                            Vararg}, cbr::ResolvedConstraintBlock,
-                                   imsk::Option{BitVector})
+function allocation_set_block_step(b::Tuple{ProgrammeAllocationSet, ReturnsResult, Vararg},
+                                   cbr::ResolvedConstraintBlock, imsk::Option{BitVector})
     setr, Xr, _ = programme_investable_reduction(imsk, b[1], b[2], nothing)
-    return (rebuild_estimator(setr,
-                              (; cbe = constraint_block_from_resolved(setr.cbe, cbr))), Xr,
-            cbr.pr)
+    return (rebuild_struct(setr, (; cbe = constraint_block_from_resolved(setr.cbe, cbr))),
+            Xr, cbr.pr)
 end
 """
     set_allocation_risk_ceiling!(model::JuMP.Model, r::Nothing, set::ProgrammeAllocationSet, pr, pl; prefix::Symbol = Symbol(""))

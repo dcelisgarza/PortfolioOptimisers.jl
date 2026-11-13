@@ -1258,15 +1258,15 @@ function leader_chain(::Nothing, ::AbstractAllocationSet, ::Number)::Nothing
     return nothing
 end
 function leader_chain(opt::JuMPOptimisationEstimator, set::AbstractAllocationSet, k::Number)
-    return rebuild_estimator(opt,
-                             (; opt = rebuild_estimator(opt.opt, (; bgt = k)),
-                              fb = leader_chain(opt.fb, set, k)))
+    return rebuild_struct(opt,
+                          (; opt = rebuild_struct(opt.opt, (; bgt = k)),
+                           fb = leader_chain(opt.fb, set, k)))
 end
 function leader_chain(opt::BestConstantRebalancedPortfolio, set::BoundedAllocationSet,
                       k::Number)
-    return rebuild_estimator(opt,
-                             (; wb = set.wb, sets = set.sets,
-                              fb = leader_chain(opt.fb, set, k)))
+    return rebuild_struct(opt,
+                          (; wb = set.wb, sets = set.sets,
+                           fb = leader_chain(opt.fb, set, k)))
 end
 """
     leader_block(set::ProgrammeAllocationSet, opt::JuMPOptimisationEstimator, w::AbstractVector, X::ReturnsResult)

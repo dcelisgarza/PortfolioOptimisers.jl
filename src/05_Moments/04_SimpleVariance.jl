@@ -1102,14 +1102,14 @@ The [`SimpleVariance`](@ref) method of [`partial_fit!`](@ref) folds one observat
  1. Refuse a configuration that no incremental fit can reproduce, with [`assert_partial_fittable`](@ref).
  2. Seed a [`SimpleVarianceState`](@ref) of zeros over `length(x)` assets when `ve.cache` holds `nothing`, with [`variance_state_seed`](@ref).
  3. Fold `x` into the state, with the policy `ve.cvg` and the active mask.
- 4. Rebuild the estimator with the new state in `cache` through [`rebuild_estimator`](@ref), and return it.
+ 4. Rebuild the estimator with the new state in `cache` through [`rebuild_struct`](@ref), and return it.
 """
 function partial_fit!(ve::SimpleVariance{<:Any, <:Any, <:Any, <:Any,
                                          <:Option{<:SimpleVarianceState}}, x::VecNum;
                       active_mask::Option{<:AbstractVector{<:Bool}} = nothing)
     assert_partial_fittable(ve.me, ve.w, "SimpleVariance")
     state = variance_state_seed(ve.cache, x, ve.cvg)
-    return rebuild_estimator(ve, (; cache = partial_fit!(state, x, ve.cvg, active_mask)))
+    return rebuild_struct(ve, (; cache = partial_fit!(state, x, ve.cvg, active_mask)))
 end
 """
     variance_state_seed(cache::Nothing, x::VecNum,

@@ -553,9 +553,8 @@ function partial_fit_transform(ptr::PricesToReturns, pr::PricesResult)
                            state.anchor
                        end, P)
     end
-    return rebuild_estimator(ptr,
-                             (;
-                              cache = PricesToReturnsState(; tail = tail, anchor = anchor))),
+    return rebuild_struct(ptr,
+                          (; cache = PricesToReturnsState(; tail = tail, anchor = anchor))),
            rd
 end
 """
@@ -656,7 +655,7 @@ The conversion keeps no fitted value. So its fitted object is the estimator with
   - [`fit_preprocessing`](@ref)
 """
 function fit_preprocessing(ptr::PricesToReturns)
-    return rebuild_estimator(ptr, (; cache = nothing))
+    return rebuild_struct(ptr, (; cache = nothing))
 end
 function supports_partial_fit(ptr::PricesToReturns)
     return isnothing(ptr.gap_return_alg) || isa(ptr.gap_return_alg, CatchUpGapReturn)
@@ -804,7 +803,7 @@ function partial_fit_transform(est::PriceGapFill, pr::PricesResult)
     out = PricesResult(; X = X, F = pr.F, B = pr.B, E = pr.E, iv = pr.iv, ivpa = pr.ivpa,
                        pnl = pr.pnl, span = pr.span)
     cache = PriceGapFillState(; nx = names, v = vnew, held = hnew, te = last(ts))
-    return rebuild_estimator(est, (; cache = cache)), out
+    return rebuild_struct(est, (; cache = cache)), out
 end
 """
     fit_preprocessing(est::PriceGapFill)
@@ -946,7 +945,7 @@ function partial_fit_transform(mdf::MissingDataFilter, pr::PricesResult)
         MissingDataFilterState(; nx = names, miss = state.miss .+ miss,
                                n = state.n + size(cells, 1))
     end
-    return rebuild_estimator(mdf, (; cache = state)), pr
+    return rebuild_struct(mdf, (; cache = state)), pr
 end
 """
     fit_preprocessing(mdf::MissingDataFilter)

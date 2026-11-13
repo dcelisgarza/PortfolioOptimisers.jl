@@ -1755,7 +1755,7 @@ A buffer carries the per-observation masks beside the observations. So a [`Cover
 
  1. Read the buffer out of the `cache` field with [`assert_sample_buffer`](@ref), which refuses an estimator that was never wrapped in [`Online`](@ref).
  2. Fold a matrix, its masks and its implied volatilities through the block arm of [`partial_fit!`](@ref), and a vector, its masks and its implied volatilities through the single-observation arm.
- 3. Rebuild the estimator with the new buffer in `cache` through [`rebuild_estimator`](@ref), and return it.
+ 3. Rebuild the estimator with the new buffer in `cache` through [`rebuild_struct`](@ref), and return it.
 
 # Arguments
 
@@ -1798,5 +1798,5 @@ function partial_fit!(est::Union{AbstractEstimator, StatsBase.CovarianceEstimato
         partial_fit!(state, X; active_mask = active_mask, estimation_mask = estimation_mask,
                      iv = iv, ivpa = ivpa)
     end
-    return state === est.cache ? est : rebuild_estimator(est, (; cache = state))
+    return state === est.cache ? est : rebuild_struct(est, (; cache = state))
 end

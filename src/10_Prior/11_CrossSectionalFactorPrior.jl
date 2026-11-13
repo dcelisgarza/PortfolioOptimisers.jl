@@ -1068,7 +1068,7 @@ Where:
 # Algorithm
 
  1. Take `b = c * sp.ap`, or the zero `b` of `csfm` when the prior states no Return Forecast Estimator.
- 2. Rebuild the block with `b`, with `sp.rf` in its field `rf`, and with `lambda` and `c` in its fields of the same names, through [`rebuild_estimator`](@ref). It reads every field with `getfield`. The property `L` of [`CrossSectionalFactorModel`](@ref) gives `M` when `L` is unset, and the rebuilt block would then hold `M` as a set `L`. Every other field passes through, so the refit of an entropy pooling prior keeps the cache of the block.
+ 2. Rebuild the block with `b`, with `sp.rf` in its field `rf`, and with `lambda` and `c` in its fields of the same names, through [`rebuild_struct`](@ref). It reads every field with `getfield`. The property `L` of [`CrossSectionalFactorModel`](@ref) gives `M` when `L` is unset, and the rebuilt block would then hold `M` as a set `L`. Every other field passes through, so the refit of an entropy pooling prior keeps the cache of the block.
 
 # Arguments
 
@@ -1094,7 +1094,7 @@ Where:
 function cross_sectional_forecast_block(csfm::CrossSectionalFactorModel, sp::NamedTuple,
                                         lambda::Number, c::Number)
     b = isnothing(sp.ap) ? csfm.b : c * sp.ap
-    return rebuild_estimator(csfm, (; b = b, rf = sp.rf, lambda = lambda, c = c))
+    return rebuild_struct(csfm, (; b = b, rf = sp.rf, lambda = lambda, c = c))
 end
 """
 $(DocStringExtensions.TYPEDSIGNATURES)
@@ -1543,7 +1543,7 @@ function cross_sectional_pin_choice(::BatchChoice, pe::CrossSectionalFactorPrior
 end
 function cross_sectional_pin_choice(::PinnedChoice, pe::CrossSectionalFactorPrior)
     families = cross_sectional_pinned_families(pe)
-    return isnothing(families) ? pe : rebuild_estimator(pe, (; families = families))
+    return isnothing(families) ? pe : rebuild_struct(pe, (; families = families))
 end
 """
 $(DocStringExtensions.TYPEDSIGNATURES)
@@ -1832,7 +1832,7 @@ function cross_sectional_live_regression(cre::AbstractCrossSectionalRegressionEs
                                          lv::AbstractVector{Bool}, t0::Integer = 0)
     if all(lv)
         csr = cross_sectional_block_regression(cre, Z, X, W, t0)
-        return (; csr = rebuild_estimator(csr, (; lv = lv)), lv = lv)
+        return (; csr = rebuild_struct(csr, (; lv = lv)), lv = lv)
     end
     csl = cross_sectional_block_regression(cre, Z[:, lv, :], X, W, t0)
     f = zeros(eltype(csl.f), size(csl.f, 1), size(Z, 2))

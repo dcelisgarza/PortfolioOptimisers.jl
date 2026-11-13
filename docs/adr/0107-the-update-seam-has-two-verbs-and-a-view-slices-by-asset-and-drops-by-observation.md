@@ -181,7 +181,7 @@ observation channel on `@fprop` for every type at once, not a `cache` rule per t
 The Decision says that `partial_fit!` rebinds the scalar fields of a state with `Accessors.@reset`.
 Since `cf52bf7c92` (#1807), no fold uses `Accessors.jl`. The fold of a state builds the new state
 through the positional constructor of the state, called by name, as `merge_states` and the seed
-functions do. The estimator that holds the state is rebuilt through `rebuild_estimator`, which
+functions do. The estimator that holds the state is rebuilt through `rebuild_struct`, which
 calls the keyword constructor of its type. § *Immutability and `Accessors.jl`* of
 `.github/instructions/julia-source-code.instructions.md` states the rule and the reasons for the
 positional route.

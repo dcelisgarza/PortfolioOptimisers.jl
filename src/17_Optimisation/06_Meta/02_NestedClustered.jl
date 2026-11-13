@@ -828,7 +828,7 @@ Resolve the [`TimeDependent`](@ref) schedules of `opt` for the fold that `ctx` d
  2. Resolve the schedules in the fields of `opt` with [`update_time_dependent_fields`](@ref), giving `opt`. A schedule in `opti` that binds `:nearest` stays, because the inner fold loop reads `opti`.
  3. Resolve the schedules inside `opti` with `all_binds = false`, so that a schedule that binds `:nearest` stays for the inner fold loop.
  4. Resolve the schedules inside `opto` and `fb` with `all_binds`.
- 5. Rebuild `opt` with the three resolved values through [`rebuild_estimator`](@ref), which runs the checks of the constructor again.
+ 5. Rebuild `opt` with the three resolved values through [`rebuild_struct`](@ref), which runs the checks of the constructor again.
 """
 function update_time_dependent_estimator(opt::NestedClustered, ctx::TimeDependentContext,
                                          all_binds::Bool = true)
@@ -836,12 +836,10 @@ function update_time_dependent_estimator(opt::NestedClustered, ctx::TimeDependen
         return opt
     end
     opt = update_time_dependent_fields(opt, ctx, all_binds)
-    return rebuild_estimator(opt,
-                             (;
-                              opti = update_time_dependent_estimator(opt.opti, ctx, false),
-                              opto = update_time_dependent_estimator(opt.opto, ctx,
-                                                                     all_binds),
-                              fb = update_time_dependent_estimator(opt.fb, ctx, all_binds)))
+    return rebuild_struct(opt,
+                          (; opti = update_time_dependent_estimator(opt.opti, ctx, false),
+                           opto = update_time_dependent_estimator(opt.opto, ctx, all_binds),
+                           fb = update_time_dependent_estimator(opt.fb, ctx, all_binds)))
 end
 """
 $(DocStringExtensions.TYPEDSIGNATURES)
@@ -875,7 +873,7 @@ function port_opt_view(nco::NestedClustered, i, X::MatNum, args...)
                            cache = port_opt_view(nco.cache, i))
 end
 function non_investable_universe(nco::NestedClustered, ni::VecStr)::NestedClustered
-    return rebuild_estimator(nco, (; sets = non_investable_sets(nco.sets, ni)))
+    return rebuild_struct(nco, (; sets = non_investable_sets(nco.sets, ni)))
 end
 """
 $(DocStringExtensions.TYPEDSIGNATURES)
@@ -914,16 +912,16 @@ function _update_asset_sets(nco::NestedClustered, rdo::ReturnsResult)
                get(nco.opto.opt.sets.dict, nco.opto.opt.sets.xkey, nothing) !== rdo.nx)
         ndict = copy(nco.opto.opt.sets.dict)
         ndict[nco.opto.opt.sets.xkey] = rdo.nx
-        sets = rebuild_estimator(nco.opto.opt.sets, (; dict = ndict))
-        opt = rebuild_estimator(nco.opto.opt, (; sets = sets))
-        rebuild_estimator(nco, (; opto = rebuild_estimator(nco.opto, (; opt = opt))))
+        sets = rebuild_struct(nco.opto.opt.sets, (; dict = ndict))
+        opt = rebuild_struct(nco.opto.opt, (; sets = sets))
+        rebuild_struct(nco, (; opto = rebuild_struct(nco.opto, (; opt = opt))))
     elseif (hasproperty(nco.opto, :sets) &&
             !isnothing(nco.opto.sets) &&
             get(nco.opto.sets.dict, nco.opto.sets.xkey, nothing) !== rdo.nx)
         ndict = copy(nco.opto.sets.dict)
         ndict[nco.opto.sets.xkey] = rdo.nx
-        sets = rebuild_estimator(nco.opto.sets, (; dict = ndict))
-        rebuild_estimator(nco, (; opto = rebuild_estimator(nco.opto, (; sets = sets))))
+        sets = rebuild_struct(nco.opto.sets, (; dict = ndict))
+        rebuild_struct(nco, (; opto = rebuild_struct(nco.opto, (; sets = sets))))
     else
         nco
     end
@@ -966,8 +964,8 @@ function _optimise(nco::NestedClustered, rd::ReturnsResult; branchorder::Symbol 
     clr = distance_reader_call(clusterise, nco.cle, pr; rd = rdr, iv = rdr.iv,
                                ivpa = rdr.ivpa, branchorder = branchorder)
     if clr isa DistanceReaderRefusalError
-        return _optimise(rebuild_estimator(nco0, (; pe = pr0)), rd;
-                         branchorder = branchorder, str_names = str_names, save = save,
+        return _optimise(rebuild_struct(nco0, (; pe = pr0)), rd; branchorder = branchorder,
+                         str_names = str_names, save = save,
                          rmsk = distance_reader_refusal_mask(clr, imsk, rd, nco0.strict),
                          kwargs...)
     end

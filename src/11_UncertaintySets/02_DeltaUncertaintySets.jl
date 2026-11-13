@@ -298,7 +298,7 @@ The returns-data method does step 1 and forwards the call. The prior-result meth
 function ucs(ue::DeltaUncertaintySet, X::MatNum, F::Option{<:MatNum} = nothing;
              dims::Int = 1, kwargs...)
     pr = ucs_prior(ue.pe, X, F; dims = dims, kwargs...)
-    return ucs(rebuild_estimator(ue, (; pe = nothing)), pr)
+    return ucs(rebuild_struct(ue, (; pe = nothing)), pr)
 end
 function ucs(ue::DeltaUncertaintySet{Nothing}, pr::AbstractPriorResult; rd = nothing,
              kwargs...)
@@ -365,7 +365,7 @@ Where:
 function mu_ucs(ue::DeltaUncertaintySet, X::MatNum, F::Option{<:MatNum} = nothing;
                 dims::Int = 1, kwargs...)
     pr = ucs_prior(ue.pe, X, F; dims = dims, kwargs...)
-    return mu_ucs(rebuild_estimator(ue, (; pe = nothing)), pr)
+    return mu_ucs(rebuild_struct(ue, (; pe = nothing)), pr)
 end
 function mu_ucs(ue::DeltaUncertaintySet{Nothing}, pr::AbstractPriorResult; rd = nothing,
                 kwargs...)
@@ -431,7 +431,7 @@ Where:
 function sigma_ucs(ue::DeltaUncertaintySet, X::MatNum, F::Option{<:MatNum} = nothing;
                    dims::Int = 1, kwargs...)
     pr = ucs_prior(ue.pe, X, F; dims = dims, kwargs...)
-    return sigma_ucs(rebuild_estimator(ue, (; pe = nothing)), pr)
+    return sigma_ucs(rebuild_struct(ue, (; pe = nothing)), pr)
 end
 function sigma_ucs(ue::DeltaUncertaintySet{Nothing}, pr::AbstractPriorResult; rd = nothing,
                    kwargs...)

@@ -80,7 +80,7 @@ The fallback is resolved after the optimiser's own fields, so a fallback that a 
  1. Return `opt` unchanged when [`is_time_dependent`](@ref) is `false`.
  2. Replace each scheduled field of `opt` with its value at the fold, through [`update_time_dependent_fields`](@ref). This gives the new `opt`.
  3. Resolve the inner optimiser `opt.opt` and the fallback `opt.fb` of the new `opt` with the same `ctx` and `all_binds`.
- 4. Rebuild `opt` with the two resolved estimators, through [`rebuild_estimator`](@ref).
+ 4. Rebuild `opt` with the two resolved estimators, through [`rebuild_struct`](@ref).
 
 # Arguments
 
@@ -104,11 +104,9 @@ function update_time_dependent_estimator(opt::ClusteringOptimisationEstimator,
         return opt
     end
     opt = update_time_dependent_fields(opt, ctx, all_binds)
-    return rebuild_estimator(opt,
-                             (;
-                              opt = update_time_dependent_estimator(opt.opt, ctx,
-                                                                    all_binds),
-                              fb = update_time_dependent_estimator(opt.fb, ctx, all_binds)))
+    return rebuild_struct(opt,
+                          (; opt = update_time_dependent_estimator(opt.opt, ctx, all_binds),
+                           fb = update_time_dependent_estimator(opt.fb, ctx, all_binds)))
 end
 """
 $(DocStringExtensions.TYPEDSIGNATURES)
@@ -122,7 +120,7 @@ A fold-less [`optimise`](@ref) calls it first, so the optimiser runs with each s
  1. Return `opt` unchanged when [`is_time_dependent`](@ref) is `false`.
  2. Replace each scheduled field of `opt` with its static default, through [`reset_time_dependent_fields`](@ref). This gives the new `opt`.
  3. Reset the inner optimiser `opt.opt` and the fallback `opt.fb` of the new `opt`.
- 4. Rebuild `opt` with the two reset estimators, through [`rebuild_estimator`](@ref).
+ 4. Rebuild `opt` with the two reset estimators, through [`rebuild_struct`](@ref).
 
 # Arguments
 
@@ -143,9 +141,9 @@ function reset_time_dependent_estimator(opt::ClusteringOptimisationEstimator)
         return opt
     end
     opt = reset_time_dependent_fields(opt)
-    return rebuild_estimator(opt,
-                             (; opt = reset_time_dependent_estimator(opt.opt),
-                              fb = reset_time_dependent_estimator(opt.fb)))
+    return rebuild_struct(opt,
+                          (; opt = reset_time_dependent_estimator(opt.opt),
+                           fb = reset_time_dependent_estimator(opt.fb)))
 end
 """
 $(DocStringExtensions.TYPEDEF)
@@ -652,7 +650,7 @@ function HierarchicalOptimiser(; pe::Onl{<:TD{<:PrE_Pr}} = EmpiricalPrior(),
     return HierarchicalOptimiser(pe, cle, slv, wb, fees, sets, wf, strict, cache)
 end
 function non_investable_universe(opt::HierarchicalOptimiser, ni::VecStr)
-    return rebuild_estimator(opt, (; sets = non_investable_sets(opt.sets, ni)))
+    return rebuild_struct(opt, (; sets = non_investable_sets(opt.sets, ni)))
 end
 """
     reader_frames(opt::HierarchicalOptimiser, path::AbstractString, refit::Bool) -> ReturnsFrames

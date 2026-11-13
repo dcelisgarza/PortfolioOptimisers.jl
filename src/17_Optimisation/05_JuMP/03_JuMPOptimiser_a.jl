@@ -551,9 +551,9 @@ true
   - [`factory`](@ref)
 """
 function factory(opt::JuMPOptimiser, w::AbstractVector)::JuMPOptimiser
-    return rebuild_estimator(opt,
-                             (; bgt = factory(opt.bgt, w), fees = factory(opt.fees, w),
-                              cbe = factory(opt.cbe, w)))
+    return rebuild_struct(opt,
+                          (; bgt = factory(opt.bgt, w), fees = factory(opt.fees, w),
+                           cbe = factory(opt.cbe, w)))
 end
 """
     obs_weights_view(opt::JuMPOptimiser, i) -> JuMPOptimiser
@@ -636,16 +636,16 @@ function port_opt_view(opt::JuMPOptimiser, i, X::MatNum, args...)::JuMPOptimiser
     # liquidation charges are on the other assets. Its view finds the other assets from the
     # width of the unreduced `X`, so it needs the matrix, as the tracking errors of the
     # block do.
-    return rebuild_estimator(opt,
-                             (; pe = port_opt_view(opt.pe, i),
-                              cbe = port_opt_view(opt.cbe, i, X),
-                              bgt = port_opt_view(opt.bgt, i),
-                              fees = port_opt_view(opt.fees, i, X),
-                              ret = port_opt_view(opt.ret, i),
-                              cache = port_opt_view(opt.cache, i)))
+    return rebuild_struct(opt,
+                          (; pe = port_opt_view(opt.pe, i),
+                           cbe = port_opt_view(opt.cbe, i, X),
+                           bgt = port_opt_view(opt.bgt, i),
+                           fees = port_opt_view(opt.fees, i, X),
+                           ret = port_opt_view(opt.ret, i),
+                           cache = port_opt_view(opt.cache, i)))
 end
 function non_investable_universe(opt::JuMPOptimiser, ni::VecStr)::JuMPOptimiser
-    return rebuild_estimator(opt, (; sets = non_investable_sets(opt.sets, ni)))
+    return rebuild_struct(opt, (; sets = non_investable_sets(opt.sets, ni)))
 end
 
 export ResolvedJuMPOptimiser, JuMPOptimiser

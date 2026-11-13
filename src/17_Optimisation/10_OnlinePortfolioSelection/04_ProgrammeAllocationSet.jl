@@ -262,11 +262,11 @@ end
             l2, lp, linf, xbgt; settable)
 end
 function port_opt_view(set::ProgrammeAllocationSet, i, args...)
-    return rebuild_estimator(set,
-                             (; pe = port_opt_view(set.pe, i),
-                              cbe = port_opt_view(set.cbe, i, args...),
-                              r = port_opt_view(set.r, i, nothing),
-                              ret = port_opt_view(set.ret, i)))
+    return rebuild_struct(set,
+                          (; pe = port_opt_view(set.pe, i),
+                           cbe = port_opt_view(set.cbe, i, args...),
+                           r = port_opt_view(set.r, i, nothing),
+                           ret = port_opt_view(set.ret, i)))
 end
 """
 $(DocStringExtensions.TYPEDSIGNATURES)
@@ -290,13 +290,13 @@ The block takes `w` through `factory(cbe::ConstraintBlock, w)`: its turnover cei
   - [`resolve_allocation_set_step`](@ref)
 """
 function factory(set::ProgrammeAllocationSet, w::AbstractVector)::ProgrammeAllocationSet
-    return rebuild_estimator(set, (; cbe = factory(set.cbe, w), r = factory(set.r, w)))
+    return rebuild_struct(set, (; cbe = factory(set.cbe, w), r = factory(set.r, w)))
 end
 # The set declares the Non-Investable Axis on its `sets` after the view at the mask of a step,
 # as a JuMP head does in `investable_reduction` (`programme_investable_reduction`).
 function non_investable_universe(set::ProgrammeAllocationSet,
                                  ni::VecStr)::ProgrammeAllocationSet
-    return rebuild_estimator(set, (; sets = non_investable_sets(set.sets, ni)))
+    return rebuild_struct(set, (; sets = non_investable_sets(set.sets, ni)))
 end
 """
     reader_frames(set::ProgrammeAllocationSet, path::AbstractString, refit::Bool) -> ReturnsFrames
@@ -364,7 +364,7 @@ The weight bounds `wb` are a stage 2 slot of the block, because their resolver c
 
  1. When `wb` reads no rows, resolve it over the `N` assets with [`weight_bounds_constraints`](@ref). Otherwise keep it.
  2. Resolve stage 1 of the block with [`resolve_constraint_block_names`](@ref): the thresholds, `sgcarde`, the sub-group matrices and thresholds, and the turnover ceilings `tn`.
- 3. Return `set` rebuilt with [`rebuild_estimator`](@ref), with the resolved block in `cbe` and the resolved bounds in its slot `wb`. Every other field keeps its value.
+ 3. Return `set` rebuilt with [`rebuild_struct`](@ref), with the resolved block in `cbe` and the resolved bounds in its slot `wb`. Every other field keeps its value.
 
 # Arguments
 
@@ -395,7 +395,7 @@ function resolve_allocation_set(set::ProgrammeAllocationSet, N::Integer, strict:
     cbe = resolve_constraint_block_names(set.cbe, strict, datatype)
     # The block and its slot `wb` go in one call, so the flat keyword replaces that slot of
     # the resolved block.
-    return rebuild_estimator(set, (; cbe = cbe, wb = wb))
+    return rebuild_struct(set, (; cbe = cbe, wb = wb))
 end
 """
     exposure_keyed(x)

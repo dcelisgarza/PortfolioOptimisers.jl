@@ -366,8 +366,7 @@ end
     # The debt that #2072 removes. Do not add a pair: fix the wrapper.
     pending_forwards = Set{Tuple{Symbol, Symbol}}([(:active_weights,
                                                     :nothing_scalar_array_getindex),
-                                                   (:adopt_pinned_choice,
-                                                    :rebuild_estimator),
+                                                   (:adopt_pinned_choice, :rebuild_struct),
                                                    (:apply_fitted_step,
                                                     :apply_fitted_steps),
                                                    (:apply_fitted_step,
@@ -518,7 +517,7 @@ end
                                                    (:factory, :resolve_deferred_quantities),
                                                    (:factory, :SubsetResamplingResult),
                                                    (:first_error_line, :solve_status_msg),
-                                                   (:fit_preprocessing, :rebuild_estimator),
+                                                   (:fit_preprocessing, :rebuild_struct),
                                                    (:fit_preprocessing, :train_test_split),
                                                    (:fitted_step_keeps_observations,
                                                     :keeps_observations),

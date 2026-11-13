@@ -355,8 +355,7 @@ end
     end
     # A fold rebuilds the head with the value of a function schedule, so the rebuild refuses.
     f = frc(TimeDependent(; val = _ -> sdp, default = nothing))
-    @test_throws msg PO.rebuild_estimator(f,
-                                          (; opt = JuMPOptimiser(; slv = slv, ple = sdp)))
+    @test_throws msg PO.rebuild_struct(f, (; opt = JuMPOptimiser(; slv = slv, ple = sdp)))
     # An integer phylogeny applies through the shared assembly, and a factor phylogeny goes
     # in `frc_ple`.
     @test frc(ipl) isa FactorRiskContribution

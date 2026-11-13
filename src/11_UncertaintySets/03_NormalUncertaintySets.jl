@@ -915,17 +915,17 @@ So a set with a prior of its own fits on that prior alone, and the prior fits on
 function ucs(ue::NormalUncertaintySet, X::MatNum, F::Option{<:MatNum} = nothing;
              dims::Int = 1, kwargs...)
     pr = ucs_prior(ue.pe, X, F; dims = dims, kwargs...)
-    return ucs(rebuild_estimator(ue, (; pe = nothing)), pr)
+    return ucs(rebuild_struct(ue, (; pe = nothing)), pr)
 end
 function mu_ucs(ue::NormalUncertaintySet, X::MatNum, F::Option{<:MatNum} = nothing;
                 dims::Int = 1, kwargs...)
     pr = ucs_prior(ue.pe, X, F; dims = dims, kwargs...)
-    return mu_ucs(rebuild_estimator(ue, (; pe = nothing)), pr)
+    return mu_ucs(rebuild_struct(ue, (; pe = nothing)), pr)
 end
 function sigma_ucs(ue::NormalUncertaintySet, X::MatNum, F::Option{<:MatNum} = nothing;
                    dims::Int = 1, kwargs...)
     pr = ucs_prior(ue.pe, X, F; dims = dims, kwargs...)
-    return sigma_ucs(rebuild_estimator(ue, (; pe = nothing)), pr)
+    return sigma_ucs(rebuild_struct(ue, (; pe = nothing)), pr)
 end
 """
     ucs(ue::NormalUncertaintySet{Nothing, <:BoxUncertaintySetAlgorithm, <:Any, <:Any, <:Any},

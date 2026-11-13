@@ -1318,8 +1318,7 @@ end
                                                                                        rows4(1:(n - 1)))
                 x = [1 .+ R4[n, 1:3]; 1]
                 whn = o.cache.w .* x ./ dot(o.cache.w, x)
-                step_w(set) = po.partial_fit!(po.rebuild_estimator(deepcopy(o),
-                                                                   (; set = set)),
+                step_w(set) = po.partial_fit!(po.rebuild_struct(deepcopy(o), (; set = set)),
                                               rows4(n:n)).cache.w
                 wb = po.partial_fit!(deepcopy(o), rows4(n:n)).cache.w
                 @test iszero(wb[4])

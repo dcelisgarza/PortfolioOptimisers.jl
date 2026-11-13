@@ -541,7 +541,7 @@ The method of [`prior`](@ref) on a carrying prior reads `pe.me` and `pe.ce`, and
 
  1. Drop the marked observations from the buffer with [`shared_series_buffer`](@ref).
  2. Return `pe` with the buffer when the buffer marks no observation of its valid region, see [`buffer_gap_marks`](@ref).
- 3. Otherwise rebuild `pe` with `me` and `ce` from [`buffer_refit_member`](@ref), through `rebuild_estimator`.
+ 3. Otherwise rebuild `pe` with `me` and `ce` from [`buffer_refit_member`](@ref), through `rebuild_struct`.
 
 # Arguments
 
@@ -563,9 +563,9 @@ function buffer_refit_members(pe::EmpiricalPrior, state::SampleBufferState)
     if !any(buffer_gap_marks(state))
         return pe, buf
     end
-    return rebuild_estimator(pe,
-                             (; me = buffer_refit_member(pe.me, state),
-                              ce = buffer_refit_member(pe.ce, state))), buf
+    return rebuild_struct(pe,
+                          (; me = buffer_refit_member(pe.me, state),
+                           ce = buffer_refit_member(pe.ce, state))), buf
 end
 
 export EmpiricalPrior

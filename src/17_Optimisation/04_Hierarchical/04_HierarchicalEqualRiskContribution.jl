@@ -355,7 +355,7 @@ The optimiser calls it after [`investable_reduction`](@ref), so the benchmark ha
  1. Bind the inner measures `hec.ri` to `rd` with [`bind_data_benchmark`](@ref), giving `ri`.
  2. Bind the outer measures `hec.ro` the same way, giving `ro`.
  3. Return `hec` itself when `ri === hec.ri` and `ro === hec.ro`.
- 4. Otherwise rebuild `hec` with `ri` and `ro` through its keyword constructor, with [`rebuild_estimator`](@ref).
+ 4. Otherwise rebuild `hec` with `ri` and `ro` through its keyword constructor, with [`rebuild_struct`](@ref).
 
 # Related
 
@@ -369,11 +369,11 @@ function bind_data_benchmark(hec::HierarchicalEqualRiskContribution, rd::Returns
     return if ri === hec.ri && ro === hec.ro
         hec
     else
-        rebuild_estimator(hec, (; ri = ri, ro = ro))
+        rebuild_struct(hec, (; ri = ri, ro = ro))
     end
 end
 function non_investable_universe(hec::HierarchicalEqualRiskContribution, ni::VecStr)
-    return rebuild_estimator(hec, (; opt = non_investable_universe(hec.opt, ni)))
+    return rebuild_struct(hec, (; opt = non_investable_universe(hec.opt, ni)))
 end
 """
     herc_unitary_risks(r::OptimisationRiskMeasure, X::MatNum, fees::Option{<:Fees}) -> VecNum
@@ -668,9 +668,8 @@ function _optimise(hec::HierarchicalEqualRiskContribution,
     clr = distance_reader_call(clusterise, hec.opt.cle, pr; rd = rd, iv = rd.iv,
                                ivpa = rd.ivpa, branchorder = branchorder)
     if clr isa DistanceReaderRefusalError
-        return _optimise(rebuild_estimator(hec0,
-                                           (;
-                                            opt = rebuild_estimator(hec0.opt, (; pe = pr0)))),
+        return _optimise(rebuild_struct(hec0,
+                                        (; opt = rebuild_struct(hec0.opt, (; pe = pr0)))),
                          rd0; branchorder = branchorder,
                          rmsk = distance_reader_refusal_mask(clr, imsk, rd0,
                                                              hec0.opt.strict), kwargs...)

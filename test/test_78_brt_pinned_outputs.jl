@@ -102,17 +102,17 @@ Pipeline), which the decision tickets of the map can change.
         return all(map(===, u, v)) ? v : u
     end
     function excess_reader(pe::po.AbstractPriorEstimator, ::Any, ::Any)
-        return po.rebuild_estimator(pe, (; x_src = ExcessSource()))
+        return po.rebuild_struct(pe, (; x_src = ExcessSource()))
     end
     function excess_reader(x::Union{<:ClustersEstimator, <:NetworkEstimator,
                                     <:SemiDefinitePhylogenyEstimator,
                                     <:IntegerPhylogenyEstimator, <:CentralityConstraint}, g,
                            ::Any)
-        return po.rebuild_estimator(x, (; x_src = g))
+        return po.rebuild_struct(x, (; x_src = g))
     end
     function excess_reader(re::Union{<:StepwiseRegression, <:DimensionReductionRegression},
                            ::Any, rg)
-        return po.rebuild_estimator(re, (; x_src = rg))
+        return po.rebuild_struct(re, (; x_src = rg))
     end
     # The graph readers and the exposure rows of a head sit in the slots of its Constraint
     # Block since #2039 and #2040, so the walk enters the block as it enters a field.
@@ -127,10 +127,10 @@ Pipeline), which the decision tickets of the map can change.
         vals = map(f -> excess_reader(getfield(x, f), g, rg), fns)
         moved = Tuple(f for (f, v) in zip(fns, vals) if v !== getfield(x, f))
         isempty(moved) && return x
-        return po.rebuild_estimator(x,
-                                    NamedTuple{moved}(Tuple(getindex(vals,
-                                                                     findfirst(==(f), fns))
-                                                            for f in moved)))
+        return po.rebuild_struct(x,
+                                 NamedTuple{moved}(Tuple(getindex(vals,
+                                                                  findfirst(==(f), fns))
+                                                         for f in moved)))
     end
     function excess_head(x, xs::Symbol = :data)
         rg = po.refits_regression(x.pe) ? ExcessSource() : nothing

@@ -614,17 +614,17 @@ The method resamples the `X` of that Prior Result. So a set with a prior of its 
 function ucs(ue::ARCHUncertaintySet, X::MatNum, F::Option{<:MatNum} = nothing;
              dims::Int = 1, kwargs...)
     pr = ucs_prior(ue.pe, X, F; dims = dims, kwargs...)
-    return ucs(rebuild_estimator(ue, (; pe = nothing)), pr; kwargs...)
+    return ucs(rebuild_struct(ue, (; pe = nothing)), pr; kwargs...)
 end
 function mu_ucs(ue::ARCHUncertaintySet, X::MatNum, F::Option{<:MatNum} = nothing;
                 dims::Int = 1, kwargs...)
     pr = ucs_prior(ue.pe, X, F; dims = dims, kwargs...)
-    return mu_ucs(rebuild_estimator(ue, (; pe = nothing)), pr; kwargs...)
+    return mu_ucs(rebuild_struct(ue, (; pe = nothing)), pr; kwargs...)
 end
 function sigma_ucs(ue::ARCHUncertaintySet, X::MatNum, F::Option{<:MatNum} = nothing;
                    dims::Int = 1, kwargs...)
     pr = ucs_prior(ue.pe, X, F; dims = dims, kwargs...)
-    return sigma_ucs(rebuild_estimator(ue, (; pe = nothing)), pr; kwargs...)
+    return sigma_ucs(rebuild_struct(ue, (; pe = nothing)), pr; kwargs...)
 end
 """
     ucs(ue::ARCHUncertaintySet{Nothing, <:Any, <:Any, <:BoxUncertaintySetAlgorithm, <:Any, <:Any,

@@ -36,7 +36,7 @@ assert_time_dependent_fold_count(::OptE_Opt, ::Integer, ::Bool = true)
 assert_time_dependent_fold_count(td::TDO_OptE_Opt, n::Integer, all_binds::Bool = true)
 assert_time_dependent_fold_count(opt::VecOptE_Opt_TD, n::Integer, all_binds::Bool = true)
 assert_time_dependent_fields_fold_count
-rebuild_estimator
+rebuild_struct
 is_time_dependent(::OptE_Opt)
 is_time_dependent(opt::VecOptE_Opt)
 is_time_dependent(opt::BaseOptimisationEstimator)

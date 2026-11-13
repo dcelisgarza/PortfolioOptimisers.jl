@@ -952,7 +952,7 @@ The Descriptor of an observation equals the one of the batch call [`descriptor`]
 """
 function descriptor_step(de::Union{EWMean, EWVolumeRatio, DaysToCover}, rd::ReturnsResult)
     (; st, D) = ew_mean_fold(de, rd, de.cache)
-    return (; de = rebuild_estimator(de, (; cache = st)), D = D)
+    return (; de = rebuild_struct(de, (; cache = st)), D = D)
 end
 """
     partial_fit!(de::Union{EWMean, EWVolumeRatio, DaysToCover}, rd::ReturnsResult)

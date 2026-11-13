@@ -1756,14 +1756,13 @@ The [`GeneralCovariance`](@ref) method of [`partial_fit!`](@ref) folds one obser
  1. Refuse an estimator that an incremental fit cannot reproduce, with [`partial_fit_corrected`](@ref).
  2. Seed a [`CovarianceState`](@ref) of zeros over `length(x)` assets when `ce.cache` holds `nothing`, with [`covariance_state_seed`](@ref).
  3. Fold `x` into the state.
- 4. Rebuild the estimator with the new state in `cache` through [`rebuild_estimator`](@ref), and return it.
+ 4. Rebuild the estimator with the new state in `cache` through [`rebuild_struct`](@ref), and return it.
 """
 function partial_fit!(ce::GeneralCovariance{<:Any, <:Any, <:Option{<:CovarianceState}},
                       x::VecNum)
     partial_fit_corrected(ce)
-    return rebuild_estimator(ce,
-                             (;
-                              cache = partial_fit!(covariance_state_seed(ce.cache, x), x)))
+    return rebuild_struct(ce,
+                          (; cache = partial_fit!(covariance_state_seed(ce.cache, x), x)))
 end
 """
 $(DocStringExtensions.TYPEDSIGNATURES)
@@ -1823,14 +1822,14 @@ The `Covariance{<:Any, <:Any, <:FullMoment}` method of [`partial_fit!`](@ref) fo
  1. Refuse an estimator that an incremental fit cannot reproduce, with [`partial_fit_corrected`](@ref).
  2. Seed a [`CovarianceState`](@ref) of zeros over `length(x)` assets when `ce.cache` holds `nothing`, with [`covariance_state_seed`](@ref).
  3. Fold `x` into the state, with the policy `ce.cvg` and the active mask.
- 4. Rebuild the estimator with the new state in `cache` through [`rebuild_estimator`](@ref), and return it.
+ 4. Rebuild the estimator with the new state in `cache` through [`rebuild_struct`](@ref), and return it.
 """
 function partial_fit!(ce::Covariance{<:Any, <:Any, <:FullMoment, <:Any, <:Any,
                                      <:Option{<:CovarianceState}}, x::VecNum;
                       active_mask::Option{<:AbstractVector{<:Bool}} = nothing)
     partial_fit_corrected(ce)
     state = covariance_state_seed(ce.cache, x, ce.cvg)
-    return rebuild_estimator(ce, (; cache = partial_fit!(state, x, ce.cvg, active_mask)))
+    return rebuild_struct(ce, (; cache = partial_fit!(state, x, ce.cvg, active_mask)))
 end
 """
 $(DocStringExtensions.TYPEDSIGNATURES)

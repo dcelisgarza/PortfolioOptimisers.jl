@@ -2,7 +2,7 @@
     using Test, PortfolioOptimisers, StatsBase, Logging
 
     #=
-    `rebuild_estimator` rebuilds an estimator through its keyword constructor (#1806), and the
+    `rebuild_struct` rebuilds a struct through its keyword constructor (#1806), and the
     online fold calls it on every step (#1807). A keyword argument whose type annotation holds a
     `Union` with a bounded member, such as `Union{<:Real, <:AbstractLearningRateSchedule}`, or a
     `Tuple` with a bounded parameter, such as `Option{<:Tuple{<:Number, <:Number}}`, makes Julia
@@ -164,7 +164,7 @@
     # Each call is measured through a function, so the call itself is what is counted. The
     # function names the module by its global name: `PO` is a local of the test set, and a call
     # through it resolves the field at run time and allocates by itself.
-    keyword_rebuild(x) = PortfolioOptimisers.rebuild_estimator(x, (;))
+    keyword_rebuild(x) = PortfolioOptimisers.rebuild_struct(x, (;))
     function positional_call(x)
         T = typeof(x)
         return T.name.wrapper(ntuple(i -> getfield(x, i), Val(fieldcount(T)))...)
@@ -174,7 +174,7 @@
     #=
     A positional call that fails, for a type whose inner constructor does not take every field,
     counts as zero bytes, so the keyword rebuild of that type must allocate nothing. A type that
-    `rebuild_estimator` cannot rebuild at all is skipped: `Frontier` and `LogRegimeAdjusted`
+    `rebuild_struct` cannot rebuild at all is skipped: `Frontier` and `LogRegimeAdjusted`
     derive a field that their keyword constructor does not take, and no step reaches them.
     =#
     measured = DataType[]

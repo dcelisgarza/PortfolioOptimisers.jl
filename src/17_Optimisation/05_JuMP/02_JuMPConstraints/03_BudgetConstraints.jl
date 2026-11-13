@@ -622,12 +622,12 @@ julia> factory(bgt, [0.1, 0.4, 0.5]).w
   - [`factory(tn::TurnoverEstimator, w::VecNum)`](@ref): Reads the `fixed` flag in the same way.
 """
 function factory(bgt::BudgetCosts, w::VecNum)::BudgetCosts
-    return bgt.fixed ? bgt : rebuild_estimator(bgt, (; w = w))
+    return bgt.fixed ? bgt : rebuild_struct(bgt, (; w = w))
 end
 # `@propagatable` writes `factory(x::BudgetMarketImpact, args...)`, so this method names the
 # concrete type to be the more specific one.
 function factory(bgt::BudgetMarketImpact, w::VecNum)::BudgetMarketImpact
-    return bgt.fixed ? bgt : rebuild_estimator(bgt, (; w = w))
+    return bgt.fixed ? bgt : rebuild_struct(bgt, (; w = w))
 end
 function factory(bgt::Number, ::VecNum)::Number
     return bgt

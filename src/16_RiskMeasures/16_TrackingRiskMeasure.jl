@@ -736,7 +736,7 @@ A [`TrackingRiskMeasure`](@ref) binds its `tr` field. A [`RiskTrackingError`](@r
 
  1. Bind the field that can hold a data benchmark with [`bind_data_benchmark`](@ref): `tr` of a [`TrackingRiskMeasure`](@ref), giving `tr`, or the tracked measure `r` of the two risk trackers, giving `inner`.
  2. Return `r` itself when the bound field is the field it replaces, by `===`.
- 3. Otherwise rebuild `r` with the bound field through its keyword constructor, with [`rebuild_estimator`](@ref).
+ 3. Otherwise rebuild `r` with the bound field through its keyword constructor, with [`rebuild_struct`](@ref).
 
 # Related
 
@@ -746,11 +746,11 @@ A [`TrackingRiskMeasure`](@ref) binds its `tr` field. A [`RiskTrackingError`](@r
 """
 function bind_data_benchmark(r::TrackingRiskMeasure, rd)
     tr = bind_data_benchmark(r.tr, rd)
-    return tr === r.tr ? r : rebuild_estimator(r, (; tr = tr))
+    return tr === r.tr ? r : rebuild_struct(r, (; tr = tr))
 end
 function bind_data_benchmark(r::Union{RiskTrackingError, RiskTrackingRiskMeasure}, rd)
     inner = bind_data_benchmark(r.r, rd)
-    return inner === r.r ? r : rebuild_estimator(r, (; r = inner))
+    return inner === r.r ? r : rebuild_struct(r, (; r = inner))
 end
 """
     reader_frames(r::Union{RiskTrackingError, RiskTrackingRiskMeasure},

@@ -287,7 +287,7 @@ The optimiser calls it after [`investable_reduction`](@ref), so the benchmark ha
 
  1. Bind the measures `hrp.r` to `rd` with [`bind_data_benchmark`](@ref), giving `r`.
  2. Return `hrp` itself when `r === hrp.r`.
- 3. Otherwise rebuild `hrp` with `r` through its keyword constructor, with [`rebuild_estimator`](@ref).
+ 3. Otherwise rebuild `hrp` with `r` through its keyword constructor, with [`rebuild_struct`](@ref).
 
 # Related
 
@@ -297,11 +297,11 @@ The optimiser calls it after [`investable_reduction`](@ref), so the benchmark ha
 """
 function bind_data_benchmark(hrp::HierarchicalRiskParity, rd::ReturnsResult)
     r = bind_data_benchmark(hrp.r, rd)
-    return r === hrp.r ? hrp : rebuild_estimator(hrp, (; r = r))
+    return r === hrp.r ? hrp : rebuild_struct(hrp, (; r = r))
 end
 function non_investable_universe(hrp::HierarchicalRiskParity,
                                  ni::VecStr)::HierarchicalRiskParity
-    return rebuild_estimator(hrp, (; opt = non_investable_universe(hrp.opt, ni)))
+    return rebuild_struct(hrp, (; opt = non_investable_universe(hrp.opt, ni)))
 end
 """
     split_factor_weight_constraints(alpha::Number, wb::WeightBounds, w::VecNum,
@@ -445,9 +445,8 @@ function _optimise(hrp::HierarchicalRiskParity{<:Any, <:OptimisationRiskMeasure}
     clr = distance_reader_call(clusterise, hrp.opt.cle, pr; rd = rd, iv = rd.iv,
                                ivpa = rd.ivpa)
     if clr isa DistanceReaderRefusalError
-        return _optimise(rebuild_estimator(hrp0,
-                                           (;
-                                            opt = rebuild_estimator(hrp0.opt, (; pe = pr0)))),
+        return _optimise(rebuild_struct(hrp0,
+                                        (; opt = rebuild_struct(hrp0.opt, (; pe = pr0)))),
                          rd0;
                          rmsk = distance_reader_refusal_mask(clr, imsk, rd0,
                                                              hrp0.opt.strict), kwargs...)
@@ -625,9 +624,8 @@ function _optimise(hrp::HierarchicalRiskParity{<:Any, <:VecOptRM},
     clr = distance_reader_call(clusterise, hrp.opt.cle, pr; rd = rd, iv = rd.iv,
                                ivpa = rd.ivpa)
     if clr isa DistanceReaderRefusalError
-        return _optimise(rebuild_estimator(hrp0,
-                                           (;
-                                            opt = rebuild_estimator(hrp0.opt, (; pe = pr0)))),
+        return _optimise(rebuild_struct(hrp0,
+                                        (; opt = rebuild_struct(hrp0.opt, (; pe = pr0)))),
                          rd0;
                          rmsk = distance_reader_refusal_mask(clr, imsk, rd0,
                                                              hrp0.opt.strict), kwargs...)

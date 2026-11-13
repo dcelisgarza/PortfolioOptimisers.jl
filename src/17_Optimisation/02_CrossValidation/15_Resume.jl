@@ -14,7 +14,7 @@ Two callers use it. [`Resume`](@ref) calls it once at entry, so the Result it ho
  2. Call `copy_states` on every estimator-valued field of `est` ([`estimator_fields`](@ref)), giving `repl`.
  3. Set `moved` when an entry of `repl` is not the object (`!==`) that `est` holds in that field.
  4. Return `est` when `cache` is `nothing` and `moved` is false.
- 5. Otherwise rebuild `est` through [`rebuild_estimator`](@ref) from `repl`, and from `cache` too when it is not `nothing`.
+ 5. Otherwise rebuild `est` through [`rebuild_struct`](@ref) from `repl`, and from `cache` too when it is not `nothing`.
 
 # Arguments
 
@@ -30,7 +30,7 @@ Two callers use it. [`Resume`](@ref) calls it once at entry, so the Result it ho
   - [`partial_fit`](@ref)
   - [`online_entry_state`](@ref)
   - [`estimator_fields`](@ref)
-  - [`rebuild_estimator`](@ref)
+  - [`rebuild_struct`](@ref)
   - [`AbstractPartialFitState`](@ref)
 """
 function copy_states(est::Union{AbstractEstimator, StatsBase.CovarianceEstimator})
@@ -45,7 +45,7 @@ function copy_states(est::Union{AbstractEstimator, StatsBase.CovarianceEstimator
     if isnothing(cache) && !moved
         return est
     end
-    return rebuild_estimator(est, isnothing(cache) ? repl : merge(repl, (; cache = cache)))
+    return rebuild_struct(est, isnothing(cache) ? repl : merge(repl, (; cache = cache)))
 end
 function copy_states(td::TimeDependent)
     return td

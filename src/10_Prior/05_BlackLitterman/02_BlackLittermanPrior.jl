@@ -1076,7 +1076,7 @@ This is the forwarding form of [`fold_prior_step`](@ref), the fold that [`partia
 """
 function fold_prior_step(pe::BlackLittermanPrior, rd::ReturnsResult,
                          gaps::Option{<:AbstractVector{Bool}})
-    return rebuild_estimator(pe, (; pe = fold_prior_step(pe.pe, rd, gaps)))
+    return rebuild_struct(pe, (; pe = fold_prior_step(pe.pe, rd, gaps)))
 end
 
 export BlackLittermanPrior

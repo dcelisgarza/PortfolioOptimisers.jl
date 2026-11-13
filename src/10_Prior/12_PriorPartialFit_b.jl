@@ -152,7 +152,7 @@ The estimator keeps no buffer, for the reason that [`HighOrderPriorEstimator`](@
 """
 function partial_fit!(pe::BlackLittermanPrior, X::VecNum_MatNum,
                       F::Option{<:VecNum_MatNum} = nothing; kwargs...)
-    return rebuild_estimator(pe, (; pe = partial_fit!(pe.pe, X, F; kwargs...)))
+    return rebuild_struct(pe, (; pe = partial_fit!(pe.pe, X, F; kwargs...)))
 end
 """
     prior(pe::BlackLittermanPrior; strict::Bool = false, kwargs...)
@@ -237,5 +237,5 @@ The generic method scans the fields of the wrapping prior alone, and a wrapping 
 function update_online_estimator(pe::Union{HighOrderPriorEstimator, BlackLittermanPrior})
     fns = online_fields(pe)
     repl = NamedTuple{fns}(map(f -> update_online_estimator(getfield(pe, f)), fns))
-    return rebuild_estimator(pe, merge(repl, (; pe = update_online_estimator(pe.pe))))
+    return rebuild_struct(pe, merge(repl, (; pe = update_online_estimator(pe.pe))))
 end

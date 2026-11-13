@@ -228,7 +228,7 @@ end
         p = CrossSectionalFactorPrior(; lambda = 1, factors = f, families = fam)
         @test p.factors === f
         @test p.families === fam
-        r = PO.rebuild_estimator(p, (; cache = nothing))
+        r = PO.rebuild_struct(p, (; cache = nothing))
         @test r.factors === f
         @test r.families === fam
         # A dictionary, and a key that is not a String, are still collected.
@@ -236,7 +236,7 @@ end
         q = CrossSectionalFactorPrior(; lambda = 1, factors = f, families = d)
         @test q.families == ["industry" => nothing]
         @test q.families !== d
-        @test PO.rebuild_estimator(q, (; cache = nothing)).families === q.families
+        @test PO.rebuild_struct(q, (; cache = nothing)).families === q.families
         @test PO.string_key_pairs([:a => 1]) == ["a" => 1]
     end
     @testset "A pin has nothing to read from a buffer that fits nothing or holds no panel (#1912)" begin
@@ -2445,8 +2445,8 @@ refit reads it from the result of that fit, so it runs no regression (#1751, ADR
     q = PO.prior_probability_factory(pe, w0, rd.X, nothing, rd.pnl; kw...)
     n = size(PO.cross_sectional_factor_scenarios(pe, rd.X, nothing, rd.pnl; kw...).f, 1)
     @test n == T
-    ref = PO.rebuild_estimator(PO.factory(pe, PO.scenario_weights(w0, n)),
-                               (; pe = PO.factory(pe.pe, PO.scenario_weights(w0, n))))
+    ref = PO.rebuild_struct(PO.factory(pe, PO.scenario_weights(w0, n)),
+                            (; pe = PO.factory(pe.pe, PO.scenario_weights(w0, n))))
     @test isequal(prior(q, rd).mu, prior(ref, rd).mu)
     stage() = PO.cross_sectional_regression_stage(pe, rd.X, nothing, rd.pnl; kw...)
     ppf() = PO.prior_probability_factory(pe, w0, rd.X, nothing, rd.pnl; kw...)

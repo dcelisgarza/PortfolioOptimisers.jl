@@ -877,7 +877,7 @@ function partial_fit!(pe::AbstractPriorEstimator, X::VecNum_MatNum,
         partial_fit!(state, X, F; active_mask = active_mask,
                      estimation_mask = estimation_mask)
     end
-    return pin_buffer_choice(rebuild_estimator(pe, (; cache = state)))
+    return pin_buffer_choice(rebuild_struct(pe, (; cache = state)))
 end
 """
     partial_fit!(pe::AbstractPriorEstimator, rd::ReturnsResult)
@@ -1110,14 +1110,14 @@ function pin_prior_choice(pe::Union{FactorPrior, FactorBlackLittermanPrior,
     # scenarios alone, and the rows that the cap removed take a zero weight, as the batch
     # fit gives them through `prior_probability_factory` (ADR 0209).
     re = pin_regression_choice(pe.re, X, F, scenario_weights(w, size(F, 1)))
-    return re === pe.re ? pe : rebuild_estimator(pe, (; re = re))
+    return re === pe.re ? pe : rebuild_struct(pe, (; re = re))
 end
 function pin_prior_choice(pe::Union{HighOrderPriorEstimator, HighOrderFactorPriorEstimator,
                                     BlackLittermanPrior, BayesianBlackLittermanPrior,
                                     EntropyPoolingPrior, MeucciEntropyPoolingPrior}, X, F,
                           w = nothing, pnl = nothing; kwargs...)
     inner = pin_prior_choice(pe.pe, X, F, embedded_pin_weights(pe, w), pnl; kwargs...)
-    return inner === pe.pe ? pe : rebuild_estimator(pe, (; pe = inner))
+    return inner === pe.pe ? pe : rebuild_struct(pe, (; pe = inner))
 end
 function pin_prior_choice(pe::OpinionPoolingPrior, X::MatNum, F::MatNum,
                           w::Option{<:ObsWeights} = nothing,
@@ -1125,21 +1125,20 @@ function pin_prior_choice(pe::OpinionPoolingPrior, X::MatNum, F::MatNum,
     if size(F, 1) < 2 || !pending_choice(pe)
         return pe
     end
-    pe = rebuild_estimator(pe, (; pe1 = pin_prior_choice(pe.pe1, X, F, w, pnl; kwargs...)))
+    pe = rebuild_struct(pe, (; pe1 = pin_prior_choice(pe.pe1, X, F, w, pnl; kwargs...)))
     if !any(pending_choice, pe.pes) && !pending_choice(pe.pe2)
         return pe
     end
     pool = isnothing(w) ? pe : factory(pe, w)
     X1 = isnothing(pool.pe1) ? X : prior(pool.pe1, X, F, pnl; kwargs...).X
     pes = [pin_prior_choice(p, X1, F, w, pnl; kwargs...) for p in pe.pes]
-    pe = rebuild_estimator(pe, (; pes = pes))
+    pe = rebuild_struct(pe, (; pes = pes))
     if !pending_choice(pe.pe2)
         return pe
     end
     pool = isnothing(w) ? pe : factory(pe, w)
     wp = first(opinion_pooling_weights(pool, X1, F, pnl; kwargs...))
-    return rebuild_estimator(pe,
-                             (; pe2 = pin_prior_choice(pe.pe2, X1, F, wp, pnl; kwargs...)))
+    return rebuild_struct(pe, (; pe2 = pin_prior_choice(pe.pe2, X1, F, wp, pnl; kwargs...)))
 end
 """
     pending_choice(est::Union{Nothing, AbstractEstimator})
@@ -1248,20 +1247,20 @@ end
 function adopt_pinned_choice(pe::Union{FactorPrior, FactorBlackLittermanPrior,
                                        AugmentedBlackLittermanPrior}, pinned)
     re = adopt_pinned_choice(pe.re, pinned.re)
-    return re === pe.re ? pe : rebuild_estimator(pe, (; re = re))
+    return re === pe.re ? pe : rebuild_struct(pe, (; re = re))
 end
 function adopt_pinned_choice(pe::Union{HighOrderPriorEstimator,
                                        HighOrderFactorPriorEstimator, BlackLittermanPrior,
                                        BayesianBlackLittermanPrior, EntropyPoolingPrior,
                                        MeucciEntropyPoolingPrior}, pinned)
     inner = adopt_pinned_choice(pe.pe, pinned.pe)
-    return inner === pe.pe ? pe : rebuild_estimator(pe, (; pe = inner))
+    return inner === pe.pe ? pe : rebuild_struct(pe, (; pe = inner))
 end
 function adopt_pinned_choice(pe::OpinionPoolingPrior, pinned::OpinionPoolingPrior)
     pes = [adopt_pinned_choice(p, q) for (p, q) in zip(pe.pes, pinned.pes)]
-    return rebuild_estimator(pe,
-                             (; pe1 = adopt_pinned_choice(pe.pe1, pinned.pe1), pes = pes,
-                              pe2 = adopt_pinned_choice(pe.pe2, pinned.pe2)))
+    return rebuild_struct(pe,
+                          (; pe1 = adopt_pinned_choice(pe.pe1, pinned.pe1), pes = pes,
+                           pe2 = adopt_pinned_choice(pe.pe2, pinned.pe2)))
 end
 """
 $(DocStringExtensions.TYPEDSIGNATURES)
@@ -1310,7 +1309,7 @@ function refit_prior_fold(pe::AbstractPriorEstimator, rd::ReturnsResult,
     state = partial_fit!(assert_sample_buffer(pe), rd.X, F;
                          refit_step_kwargs(pe, rd.pnl)..., exogenous_step_kwargs(pe, rd)...,
                          iv = rd.iv, ivpa = rd.ivpa, gaps = gaps)
-    return rebuild_estimator(pe, (; cache = state))
+    return rebuild_struct(pe, (; cache = state))
 end
 """
 $(DocStringExtensions.TYPEDSIGNATURES)
@@ -1578,8 +1577,8 @@ Each step of the carry folds `pe.me` and `pe.ce` on the same observations, so th
 """
 function fold_carry_members(pe::EmpiricalPrior, X::VecNum_MatNum; kwargs...)
     assert_cold_carry_entry(pe, pe.cache, "EmpiricalPrior")
-    pe = rebuild_estimator(pe, (; me = fold_member(pe.me, X; kwargs...)))
-    return rebuild_estimator(pe, (; ce = fold_member(pe.ce, X; kwargs...)))
+    pe = rebuild_struct(pe, (; me = fold_member(pe.me, X; kwargs...)))
+    return rebuild_struct(pe, (; ce = fold_member(pe.ce, X; kwargs...)))
 end
 """
 $(DocStringExtensions.TYPEDSIGNATURES)
@@ -1682,7 +1681,7 @@ function partial_fit!(pe::EmpiricalPrior{<:Any, <:Any, Nothing, <:Any, <:Any,
                       ivpa::Option{<:Num_VecNum} = nothing, kwargs...)
     pe = fold_carry_members(pe, x; kwargs...)
     cache = fold_carry(pe.cache, x; iv = iv, ivpa = ivpa, kwargs...)
-    return rebuild_estimator(pe, (; cache = cache))
+    return rebuild_struct(pe, (; cache = cache))
 end
 function partial_fit!(pe::EmpiricalPrior{<:Any, <:Any, Nothing, <:Any, <:Any,
                                          <:Option{<:PriorCarryState}}, X::MatNum,
@@ -1693,7 +1692,7 @@ function partial_fit!(pe::EmpiricalPrior{<:Any, <:Any, Nothing, <:Any, <:Any,
     Xm, kw = shared_series_member_rows(X, gaps; kwargs...)
     pe = fold_carry_members(pe, Xm; dims = 1, kw...)
     cache = fold_carry(pe.cache, X; dims = 1, iv = iv, ivpa = ivpa, gaps = gaps, kwargs...)
-    return rebuild_estimator(pe, (; cache = cache))
+    return rebuild_struct(pe, (; cache = cache))
 end
 function partial_fit!(pe::EmpiricalPrior{<:Any, <:Any, <:Number, <:Any, <:Any,
                                          <:Option{<:PriorCarryState}}, x::VecNum,
@@ -1701,7 +1700,7 @@ function partial_fit!(pe::EmpiricalPrior{<:Any, <:Any, <:Number, <:Any, <:Any,
                       ivpa::Option{<:Num_VecNum} = nothing, kwargs...)
     pe = fold_carry_members(pe, log1p.(x); kwargs...)
     cache = fold_carry(pe.cache, x; iv = iv, ivpa = ivpa, kwargs...)
-    return rebuild_estimator(pe, (; cache = cache))
+    return rebuild_struct(pe, (; cache = cache))
 end
 function partial_fit!(pe::EmpiricalPrior{<:Any, <:Any, <:Number, <:Any, <:Any,
                                          <:Option{<:PriorCarryState}}, X::MatNum,
@@ -1712,7 +1711,7 @@ function partial_fit!(pe::EmpiricalPrior{<:Any, <:Any, <:Number, <:Any, <:Any,
     Xm, kw = shared_series_member_rows(X, gaps; kwargs...)
     pe = fold_carry_members(pe, log1p.(Xm); dims = 1, kw...)
     cache = fold_carry(pe.cache, X; dims = 1, iv = iv, ivpa = ivpa, gaps = gaps, kwargs...)
-    return rebuild_estimator(pe, (; cache = cache))
+    return rebuild_struct(pe, (; cache = cache))
 end
 """
     fold_prior_step(pe::EmpiricalPrior{<:Any, <:Any, <:Any, <:Any, <:Any,

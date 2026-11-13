@@ -564,7 +564,7 @@ Resolve every [`TimeDependent`](@ref) schedule of `opt` for the fold that `ctx` 
 
  1. Return `opt` unchanged when [`is_time_dependent`](@ref) is `false` for it.
  2. Resolve the fields of `opt` itself with [`update_time_dependent_fields`](@ref), giving a new `opt`.
- 3. Resolve `opt.opt` and `opt.fb` with this function, and rebuild `opt` with them through [`rebuild_estimator`](@ref).
+ 3. Resolve `opt.opt` and `opt.fb` with this function, and rebuild `opt` with them through [`rebuild_struct`](@ref).
 
 # Related
 
@@ -578,11 +578,9 @@ function update_time_dependent_estimator(opt::SubsetResampling, ctx::TimeDepende
         return opt
     end
     opt = update_time_dependent_fields(opt, ctx, all_binds)
-    return rebuild_estimator(opt,
-                             (;
-                              opt = update_time_dependent_estimator(opt.opt, ctx,
-                                                                    all_binds),
-                              fb = update_time_dependent_estimator(opt.fb, ctx, all_binds)))
+    return rebuild_struct(opt,
+                          (; opt = update_time_dependent_estimator(opt.opt, ctx, all_binds),
+                           fb = update_time_dependent_estimator(opt.fb, ctx, all_binds)))
 end
 """
 $(DocStringExtensions.TYPEDSIGNATURES)
@@ -625,7 +623,7 @@ function port_opt_view(sr::SubsetResampling, i, X::MatNum, args...)::SubsetResam
                             strict = sr.strict, cache = port_opt_view(sr.cache, i))
 end
 function non_investable_universe(sr::SubsetResampling, ni::VecStr)::SubsetResampling
-    return rebuild_estimator(sr, (; sets = non_investable_sets(sr.sets, ni)))
+    return rebuild_struct(sr, (; sets = non_investable_sets(sr.sets, ni)))
 end
 """
     subset_resampling_retcode(ress::VecOpt, retcode::OptimisationReturnCode)

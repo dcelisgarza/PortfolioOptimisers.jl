@@ -9,7 +9,7 @@ comment is the specification these tests read.
 
 Two probe types stand in for the members the layers above will be. They are the shape those
 members have: a `cache` field and a keyword constructor, which is all the seam and
-`rebuild_estimator` read.
+`rebuild_struct` read.
 
 Issue #997 then made the eleven shipped families subjects of their own. Each narrows the
 `cache` type parameter of its own `partial_fit!` methods to the state its exact fold reads,

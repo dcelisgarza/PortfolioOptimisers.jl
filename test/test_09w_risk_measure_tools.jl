@@ -58,16 +58,16 @@ function _bounded610(r)
     end
     s = r.settings
     if s isa RiskMeasureSettings
-        return PO.rebuild_estimator(r,
-                                    (;
-                                     settings = RiskMeasureSettings(; rke = true, ub = 0.7,
-                                                                    scale = 2.5)))
+        return PO.rebuild_struct(r,
+                                 (;
+                                  settings = RiskMeasureSettings(; rke = true, ub = 0.7,
+                                                                 scale = 2.5)))
     elseif s isa PO.MaxRiskMeasureSettings
-        return PO.rebuild_estimator(r,
-                                    (;
-                                     settings = PO.MaxRiskMeasureSettings(; rke = true,
-                                                                          lb = 0.7,
-                                                                          scale = 2.5)))
+        return PO.rebuild_struct(r,
+                                 (;
+                                  settings = PO.MaxRiskMeasureSettings(; rke = true,
+                                                                       lb = 0.7,
+                                                                       scale = 2.5)))
     end
     return r
 end

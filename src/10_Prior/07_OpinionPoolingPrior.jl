@@ -857,11 +857,11 @@ function prior_probability_factory(pe::OpinionPoolingPrior, w, X::MatNum,
                                    kwargs...)
     pool = factory(pe, w)
     pe1 = prior_probability_factory(pe.pe1, w, X, F, pnl; kwargs...)
-    return rebuild_estimator(pool, (; pe1 = pe1))
+    return rebuild_struct(pool, (; pe1 = pe1))
 end
 function prior_probability_factory(pe::OpinionPoolingPrior, w, n::Integer)
     pool = factory(pe, w)
-    return rebuild_estimator(pool, (; pe1 = prior_probability_factory(pe.pe1, w, n)))
+    return rebuild_struct(pool, (; pe1 = prior_probability_factory(pe.pe1, w, n)))
 end
 # A pool with no first prior has nothing below it to reweight.
 function prior_probability_factory(pe::OpinionPoolingPrior{<:Any, Nothing}, w, ::MatNum,

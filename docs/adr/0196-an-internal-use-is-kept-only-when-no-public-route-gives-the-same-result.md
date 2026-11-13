@@ -112,13 +112,17 @@ constructor, so that every rule of construction runs again. The default
 constructor. On that route, a check or a derivation that only the keyword constructor runs does not
 run. #1806 is the later decision, and it rests on those checks.
 
+The verb that § *Considered options* names `rebuild_estimator` is now `rebuild_struct`
+([#2087](https://github.com/dcelisgarza/PortfolioOptimisers.jl/issues/2087)). It rebuilds a result
+as much as an estimator, so the name states the scope of the verb.
+
 **The rebuild rule now reads: a generic rebuild of a field that the code names calls the keyword
-constructor, through `rebuild_estimator(x, (; f = new))`.** `Accessors.set` and
+constructor, through `rebuild_struct(x, (; f = new))`.** `Accessors.set` and
 `Accessors.setproperties` stay the route where the code cannot know the field in advance: the lens
 of a tuning search, and the `PropertyLens{target}()` of the pipe routing. § *Immutability and
 `Accessors.jl`* of `.github/instructions/julia-source-code.instructions.md` states the same rule.
 
-**The read of `.name.wrapper` in `rebuild_estimator`
+**The read of `.name.wrapper` in `rebuild_struct`
 (`src/17_Optimisation/01_Base_Optimisation/03_TimeDependent.jl:967`) is a Keep, with the reason
 "no public route" and the Upstream mark (Julia).** #1500 gave it a Replace. The facts, measured on
 Julia 1.13.1:
@@ -135,12 +139,12 @@ Julia 1.13.1:
   `AbstractResult`, the two routes give the same type, at the same cost and with the same inferred
   return type.
 
-Two types raise a `MethodError` from `rebuild_estimator`, because their keyword constructor does not
+Two types raise a `MethodError` from `rebuild_struct`, because their keyword constructor does not
 take every field: `Frontier` (the keyword constructor pins `factor`) and `LogRegimeAdjusted` (it
 derives `kappa`). No call in `src/` reaches either. A rebuild of one of them calls its own
 constructor by name.
 
-**The positional rebuilds stay Replace, and their route becomes `rebuild_estimator`.** Each of these
+**The positional rebuilds stay Replace, and their route becomes `rebuild_struct`.** Each of these
 sites names the field that it replaces, so the rule above reaches it:
 
 | Site | Function | The field it names |
@@ -157,8 +161,8 @@ sites of `set_result_prior` joined `src/` after #1500. The hand-off of
 [#1502](https://github.com/dcelisgarza/PortfolioOptimisers.jl/issues/1502) takes all six, and it
 measures the cost of each change on the online fold before it lands.
 
-The census of #1501 lists the Keep of `rebuild_estimator`. The draft request for a public route is
+The census of #1501 lists the Keep of `rebuild_struct`. The draft request for a public route is
 on [#1504](https://github.com/dcelisgarza/PortfolioOptimisers.jl/issues/1504), as a comment on
 Julia issue 35543 ("Stable API to strip type parameters from type"). On that issue, Julia triage
 agreed on the name `basetype`, and no pull request exists. When a supported Julia gives
-`basetype`, `rebuild_estimator` calls `basetype(T)`, and the census drops the entry.
+`basetype`, `rebuild_struct` calls `basetype(T)`, and the census drops the entry.

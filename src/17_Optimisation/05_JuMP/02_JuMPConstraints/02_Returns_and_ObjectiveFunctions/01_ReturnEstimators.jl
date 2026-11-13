@@ -478,7 +478,7 @@ function unit_scale_returns_estimator(r::JuMPReturnsEstimator)
     end
     s = JuMPReturnsSettings(; scale = one(scale), lb = settings.lb, rte = settings.rte,
                             fee = settings.fee, mic = settings.mic)
-    return rebuild_estimator(r, (; settings = s))
+    return rebuild_struct(r, (; settings = s))
 end
 """
 $(DocStringExtensions.TYPEDSIGNATURES)
@@ -508,7 +508,7 @@ function no_return_expr_returns_estimator(r::JuMPReturnsEstimator)
     end
     s = JuMPReturnsSettings(; scale = settings.scale, lb = settings.lb, rte = false,
                             fee = settings.fee, mic = settings.mic)
-    return rebuild_estimator(r, (; settings = s))
+    return rebuild_struct(r, (; settings = s))
 end
 """
 $(DocStringExtensions.TYPEDEF)
@@ -805,7 +805,7 @@ function bounds_returns_estimator(r::JuMPReturnsEstimator, lb::Option{<:RkRtBoun
     return if lb === settings.lb
         r
     else
-        rebuild_estimator(r, (; settings = rebuild_estimator(settings, (; lb = lb))))
+        rebuild_struct(r, (; settings = rebuild_struct(settings, (; lb = lb))))
     end
 end
 function bounds_returns_estimator(r::VecJRE, lb::Nothing)

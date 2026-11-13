@@ -339,11 +339,11 @@ An **alias** is the case to check first. Its docstring carries a different set o
 
 - The library **never uses mutable structs**. All types are immutable.
 - To replace a field that the code names, call the keyword constructor, so every rule of
-  construction runs again. `rebuild_estimator` calls it for any type. Guard the call with `===`, so
+  construction runs again. `rebuild_struct` calls it for any type. Guard the call with `===`, so
   that the function returns the object itself when nothing changed:
 
   ```julia
-  new_obj = new_value === obj.field ? obj : rebuild_estimator(obj, (; field = new_value))
+  new_obj = new_value === obj.field ? obj : rebuild_struct(obj, (; field = new_value))
   ```
 
   A small type can call its own keyword constructor instead. The rule covers every form of
@@ -361,11 +361,11 @@ An **alias** is the case to check first. Its docstring carries a different set o
   - It reads every entry of the state. For a covariance state of 100 assets, it added 64 % to the
     cost of one step.
   - A field with a declared `Union` type, such as the gap marks of a `SampleBufferState`, puts a
-    `Union` value into the `NamedTuple` of `rebuild_estimator`. The type of that `NamedTuple` is
+    `Union` value into the `NamedTuple` of `rebuild_struct`. The type of that `NamedTuple` is
     then abstract, and the step dispatches at run time. A positional call splits the `Union` at
     the call site, so it stays concrete.
 
-  The estimator that holds the state still takes `rebuild_estimator`.
+  The estimator that holds the state still takes `rebuild_struct`.
 
 - Functions must be as pure as possible. Avoid side effects and global state.
 
@@ -595,7 +595,7 @@ and every addition:
    defaulted positional slot. A conversion to the canonical form is reason (a) on a public
    verb. On a private function, the conversion goes.
 6. **A rebuild by hand that copies every field but one** goes to
-   `rebuild_estimator(x, (; f = v))`. A site stays by hand only on a measured loss of
+   `rebuild_struct(x, (; f = v))`. A site stays by hand only on a measured loss of
    performance.
 
 **A user verb is declared.** A keyword verb that is kept as a convenience for the user is

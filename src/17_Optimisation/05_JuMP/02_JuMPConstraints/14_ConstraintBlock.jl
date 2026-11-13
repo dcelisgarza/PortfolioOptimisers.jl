@@ -360,13 +360,13 @@ end
 
 Returns the [`ConstraintBlock`](@ref) that the keyword constructor of an owner holds, from the block that the caller gives and the slots that the caller names as flat keywords.
 
-The keyword constructors of [`JuMPOptimiser`](@ref) and [`ProgrammeAllocationSet`](@ref) call it. A flat keyword replaces that slot of a given block, and a slot that the caller does not name keeps its value. So the default of a flat keyword never overwrites a slot of a given block. [`rebuild_estimator`](@ref) and `Accessors.set` pass the block and a new slot in one call, and they rely on this rule.
+The keyword constructors of [`JuMPOptimiser`](@ref) and [`ProgrammeAllocationSet`](@ref) call it. A flat keyword replaces that slot of a given block, and a slot that the caller does not name keeps its value. So the default of a flat keyword never overwrites a slot of a given block. [`rebuild_struct`](@ref) and `Accessors.set` pass the block and a new slot in one call, and they rely on this rule.
 
 # Algorithm
 
  1. `cbe` is `nothing`: build the block from `slots` with the keyword constructor of [`ConstraintBlock`](@ref). A slot that `slots` does not name takes its default.
  2. `slots` is empty: return `cbe`.
- 3. Otherwise rebuild `cbe` with the slots in `slots` replaced, with [`rebuild_estimator`](@ref).
+ 3. Otherwise rebuild `cbe` with the slots in `slots` replaced, with [`rebuild_struct`](@ref).
 
 # Arguments
 
@@ -385,13 +385,13 @@ The keyword constructors of [`JuMPOptimiser`](@ref) and [`ProgrammeAllocationSet
 
   - [`ConstraintBlock`](@ref)
   - [`JuMPOptimiser`](@ref)
-  - [`rebuild_estimator`](@ref)
+  - [`rebuild_struct`](@ref)
 """
 function constraint_block(::Nothing; slots...)::ConstraintBlock
     return ConstraintBlock(; slots...)
 end
 function constraint_block(cbe::ConstraintBlock; slots...)::ConstraintBlock
-    return isempty(slots) ? cbe : rebuild_estimator(cbe, values(slots))
+    return isempty(slots) ? cbe : rebuild_struct(cbe, values(slots))
 end
 """
 $(DocStringExtensions.TYPEDSIGNATURES)
@@ -466,9 +466,9 @@ The function calls `factory(x, w)` on `tn`, `tr`, `ccnt` and `cobj`, and it keep
   - [`factory`](@ref)
 """
 function factory(cbe::ConstraintBlock, w::AbstractVector)::ConstraintBlock
-    return rebuild_estimator(cbe,
-                             (; tn = factory(cbe.tn, w), tr = factory(cbe.tr, w),
-                              ccnt = factory(cbe.ccnt, w), cobj = factory(cbe.cobj, w)))
+    return rebuild_struct(cbe,
+                          (; tn = factory(cbe.tn, w), tr = factory(cbe.tr, w),
+                           ccnt = factory(cbe.ccnt, w), cobj = factory(cbe.cobj, w)))
 end
 """
     obs_weights_view(cbe::ConstraintBlock, i) -> ConstraintBlock
@@ -531,15 +531,14 @@ function port_opt_view(cbe::ConstraintBlock, i, args...)::ConstraintBlock
     smtx, sgmtx = shared_pair_view(cbe.smtx, cbe.sgmtx, i)
     slt, sglt = shared_pair_view(cbe.slt, cbe.sglt, i)
     sst, sgst = shared_pair_view(cbe.sst, cbe.sgst, i)
-    return rebuild_estimator(cbe,
-                             (; wb = port_opt_view(cbe.wb, i),
-                              lt = port_opt_view(cbe.lt, i), st = port_opt_view(cbe.st, i),
-                              lcse = port_opt_view(cbe.lcse, i), smtx, sgmtx, slt, sst,
-                              sglt, sgst, tn = port_opt_view(cbe.tn, i),
-                              sets = port_opt_view(cbe.sets, i),
-                              tr = port_opt_view(cbe.tr, i, args...),
-                              ccnt = port_opt_view(cbe.ccnt, i),
-                              cobj = port_opt_view(cbe.cobj, i)))
+    return rebuild_struct(cbe,
+                          (; wb = port_opt_view(cbe.wb, i), lt = port_opt_view(cbe.lt, i),
+                           st = port_opt_view(cbe.st, i), lcse = port_opt_view(cbe.lcse, i),
+                           smtx, sgmtx, slt, sst, sglt, sgst, tn = port_opt_view(cbe.tn, i),
+                           sets = port_opt_view(cbe.sets, i),
+                           tr = port_opt_view(cbe.tr, i, args...),
+                           ccnt = port_opt_view(cbe.ccnt, i),
+                           cobj = port_opt_view(cbe.cobj, i)))
 end
 """
 $(DocStringExtensions.TYPEDSIGNATURES)
@@ -914,7 +913,7 @@ A slot is a stage 1 slot when its value follows a view at the mask, so the two o
  2. Resolve the sub-grouped cardinality constraint `sgcarde` with [`linear_constraints`](@ref), with integer values. Its columns are the sub-groups and not the assets, so a view does not change it.
  3. Resolve the sub-group matrices `smtx` and `sgmtx` with [`asset_sets_matrix`](@ref), and the sub-group thresholds `slt`, `sst`, `sglt` and `sgst` with [`threshold_constraints`](@ref). When the two slots of a pair hold one object, resolve it once with [`shared_pair_resolution`](@ref).
  4. Resolve the turnover constraints `tn` with [`turnover_constraints`](@ref).
- 5. Return `cbe` rebuilt with the resolved slots, with [`rebuild_estimator`](@ref).
+ 5. Return `cbe` rebuilt with the resolved slots, with [`rebuild_struct`](@ref).
 
 # Arguments
 
@@ -941,13 +940,13 @@ function resolve_constraint_block_names(cbe::ConstraintBlock, strict::Bool,
                                          cbe.sgmtx)
     slt, sglt = shared_pair_resolution(thr, cbe.slt, cbe.sglt)
     sst, sgst = shared_pair_resolution(thr, cbe.sst, cbe.sgst)
-    return rebuild_estimator(cbe,
-                             (; lt = thr(cbe.lt), st = thr(cbe.st),
-                              sgcarde = linear_constraints(cbe.sgcarde, sets;
-                                                           datatype = Int, strict = strict),
-                              smtx, sgmtx, slt, sst, sglt, sgst,
-                              tn = turnover_constraints(cbe.tn, sets; datatype = datatype,
-                                                        strict = strict)))
+    return rebuild_struct(cbe,
+                          (; lt = thr(cbe.lt), st = thr(cbe.st),
+                           sgcarde = linear_constraints(cbe.sgcarde, sets; datatype = Int,
+                                                        strict = strict), smtx, sgmtx, slt,
+                           sst, sglt, sgst,
+                           tn = turnover_constraints(cbe.tn, sets; datatype = datatype,
+                                                     strict = strict)))
 end
 """
 $(DocStringExtensions.TYPEDSIGNATURES)
@@ -1190,7 +1189,7 @@ function constraint_block_from_resolved(cbe::ConstraintBlock,
     rename = (; lcsr = :lcse, ctr = :cte, gcardr = :gcarde, sgcardr = :sgcarde, plr = :ple)
     rf = filter(f -> f !== :pr && f !== :rd, fieldnames(ResolvedConstraintBlock))
     slots = NamedTuple{map(f -> get(rename, f, f), rf)}(map(f -> getfield(cbr, f), rf))
-    return rebuild_estimator(cbe, slots)
+    return rebuild_struct(cbe, slots)
 end
 """
     set_block_constraints!(model::JuMP.Model, cbr::ResolvedConstraintBlock, owner, bgt, fees;

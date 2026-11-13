@@ -227,7 +227,7 @@ part of `JuMPOptimiser`.
 the generated `ConstructionBase.setproperties` passes a name of such a rule to the keyword
 constructor as a flat keyword, beside the fields. The type that marks a name takes that name as a
 keyword. The keyword replaces that slot of the nested part that the constructor is given, and its
-default leaves the slot as it is. `rebuild_estimator` calls the constructor in the same way, so
+default leaves the slot as it is. `rebuild_struct` calls the constructor in the same way, so
 the two give the same value. A rule without the option keeps the refusal, so no type that the
 macro decorated before this amendment changes.
 

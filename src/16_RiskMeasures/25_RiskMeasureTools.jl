@@ -1,17 +1,17 @@
 function no_bounds_risk_measure(r::RiskMeasure, ::Any = nothing)
     settings = r.settings
     s = RiskMeasureSettings(; rke = settings.rke, scale = settings.scale)
-    return s === settings ? r : rebuild_estimator(r, (; settings = s))
+    return s === settings ? r : rebuild_struct(r, (; settings = s))
 end
 function no_bounds_no_risk_expr_risk_measure(r::RiskMeasure, ::Any = nothing)
     settings = r.settings
     s = RiskMeasureSettings(; rke = false, scale = one(settings.scale))
-    return s === settings ? r : rebuild_estimator(r, (; settings = s))
+    return s === settings ? r : rebuild_struct(r, (; settings = s))
 end
 function no_risk_expr_risk_measure(r::RiskMeasure)
     settings = r.settings
     s = RiskMeasureSettings(; rke = false, ub = settings.ub, scale = settings.scale)
-    return s === settings ? r : rebuild_estimator(r, (; settings = s))
+    return s === settings ? r : rebuild_struct(r, (; settings = s))
 end
 function unit_scale_risk_measure(r::RiskMeasure)
     settings = r.settings
@@ -20,12 +20,12 @@ function unit_scale_risk_measure(r::RiskMeasure)
         return r
     end
     s = RiskMeasureSettings(; scale = one(scale), ub = settings.ub, rke = settings.rke)
-    return rebuild_estimator(r, (; settings = s))
+    return rebuild_struct(r, (; settings = s))
 end
 function bounds_risk_measure(r::RiskMeasure, ub::Number)
     settings = r.settings
     s = RiskMeasureSettings(; ub = ub, rke = settings.rke, scale = settings.scale)
-    return s === settings ? r : rebuild_estimator(r, (; settings = s))
+    return s === settings ? r : rebuild_struct(r, (; settings = s))
 end
 function no_bounds_risk_measure(r::Union{HierarchicalRiskMeasure,
                                          NonOptimisationRiskMeasure}, ::Any = nothing)

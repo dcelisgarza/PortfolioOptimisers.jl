@@ -647,12 +647,10 @@ function update_time_dependent_estimator(opt::Stacking, ctx::TimeDependentContex
         return opt
     end
     opt = update_time_dependent_fields(opt, ctx, all_binds)
-    return rebuild_estimator(opt,
-                             (;
-                              opti = update_time_dependent_estimator(opt.opti, ctx, false),
-                              opto = update_time_dependent_estimator(opt.opto, ctx,
-                                                                     all_binds),
-                              fb = update_time_dependent_estimator(opt.fb, ctx, all_binds)))
+    return rebuild_struct(opt,
+                          (; opti = update_time_dependent_estimator(opt.opti, ctx, false),
+                           opto = update_time_dependent_estimator(opt.opto, ctx, all_binds),
+                           fb = update_time_dependent_estimator(opt.fb, ctx, all_binds)))
 end
 """
 $(DocStringExtensions.TYPEDSIGNATURES)
@@ -704,7 +702,7 @@ function port_opt_view(st::Stacking, i, X::MatNum, args...)::Stacking
                     pcol = st.pcol, cache = port_opt_view(st.cache, i))
 end
 function non_investable_universe(st::Stacking, ni::VecStr)::Stacking
-    return rebuild_estimator(st, (; sets = non_investable_sets(st.sets, ni)))
+    return rebuild_struct(st, (; sets = non_investable_sets(st.sets, ni)))
 end
 """
 $(DocStringExtensions.TYPEDSIGNATURES)

@@ -772,7 +772,7 @@ function port_opt_view(sh::SchurComplementHierarchicalRiskParity, i, X::MatNum,
                                                  fb = view_child(sh.fb, i, X))
 end
 function non_investable_universe(sh::SchurComplementHierarchicalRiskParity, ni::VecStr)
-    return rebuild_estimator(sh, (; opt = non_investable_universe(sh.opt, ni)))
+    return rebuild_struct(sh, (; opt = non_investable_universe(sh.opt, ni)))
 end
 """
     symmetric_step_up_matrix(n1::Integer, n2::Integer) -> AbstractMatrix
@@ -1297,9 +1297,8 @@ function _optimise(sh::SchurComplementHierarchicalRiskParity{<:Any, <:Any},
     clr = distance_reader_call(clusterise, sh.opt.cle, pr; rd = rd, iv = rd.iv,
                                ivpa = rd.ivpa)
     if clr isa DistanceReaderRefusalError
-        return _optimise(rebuild_estimator(sh0,
-                                           (;
-                                            opt = rebuild_estimator(sh0.opt, (; pe = pr0)))),
+        return _optimise(rebuild_struct(sh0,
+                                        (; opt = rebuild_struct(sh0.opt, (; pe = pr0)))),
                          rd0;
                          rmsk = distance_reader_refusal_mask(clr, imsk, rd0,
                                                              sh0.opt.strict), kwargs...)
@@ -1381,9 +1380,8 @@ function _optimise(sh::SchurComplementHierarchicalRiskParity{<:Any, <:AbstractVe
     clr = distance_reader_call(clusterise, sh.opt.cle, pr; rd = rd, iv = rd.iv,
                                ivpa = rd.ivpa)
     if clr isa DistanceReaderRefusalError
-        return _optimise(rebuild_estimator(sh0,
-                                           (;
-                                            opt = rebuild_estimator(sh0.opt, (; pe = pr0)))),
+        return _optimise(rebuild_struct(sh0,
+                                        (; opt = rebuild_struct(sh0.opt, (; pe = pr0)))),
                          rd0;
                          rmsk = distance_reader_refusal_mask(clr, imsk, rd0,
                                                              sh0.opt.strict), kwargs...)

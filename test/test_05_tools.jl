@@ -1235,7 +1235,7 @@ end
     such as `"opt.wb"`, through `Accessors.set`. A `forward` rule with the `settable` option
     lets a patch name a slot that it forwards. The patch passes the slot to the keyword
     constructor as a flat keyword, and the constructor replaces that slot of the part it is
-    given. `rebuild_estimator` calls the constructor in the same way.
+    given. `rebuild_struct` calls the constructor in the same way.
     =#
     ms = Module(:ForwardSettableProbe)
     Base.eval(ms, :(using PortfolioOptimisers: @forward_properties))
@@ -1307,8 +1307,8 @@ end
     @test_throws DomainError Accessors.setproperties(o, (; n = -1, w = 7))
     # A name of a rule without the option keeps the refusal of today.
     @test occursin("forwards from `sol.z`", set_error(() -> Accessors.@set o.z = 0))
-    # `rebuild_estimator` passes a name that is not a field to the same constructor.
-    @test PO.rebuild_estimator(o, (; w = 9)) === o2
+    # `rebuild_struct` passes a name that is not a field to the same constructor.
+    @test PO.rebuild_struct(o, (; w = 9)) === o2
     #=
     A lens path of two levels. `Accessors.set` builds the head again with its default
     method, and it builds the decorated type again through the method of the macro.
@@ -1318,7 +1318,7 @@ end
     @test h2.opt.w == 11
     @test h2.opt.pa.z == 2
     @test h2.k == 1
-    @test h2.opt === PO.rebuild_estimator(o, (; w = 11))
+    @test h2.opt === PO.rebuild_struct(o, (; w = 11))
     # The option on the form that forwards every property makes each of them settable.
     a = ms.SAll()
     a2 = Accessors.@set a.z = 5

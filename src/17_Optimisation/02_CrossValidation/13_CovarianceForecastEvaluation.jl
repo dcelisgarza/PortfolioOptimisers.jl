@@ -328,7 +328,7 @@ function forecast_location(ce::Union{ExpWeightedCovariance,
                            dims::Int = 1,
                            active_mask::Option{<:AbstractMatrix{<:Bool}} = nothing,
                            kwargs...)
-    ce = rebuild_estimator(ce, (; cache = nothing))
+    ce = rebuild_struct(ce, (; cache = nothing))
     return forecast_location(partial_fit!(ce, X; dims = dims, active_mask = active_mask,
                                           kwargs...))
 end

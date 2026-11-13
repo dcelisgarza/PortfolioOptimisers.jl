@@ -959,10 +959,10 @@ function _set_risk_budgeting_constraints!(model::JuMP.Model, rb::RiskBudgeting,
     return rkb
 end
 function non_investable_universe(rba::AssetRiskBudgeting, ni::VecStr)::AssetRiskBudgeting
-    return rebuild_estimator(rba, (; sets = non_investable_sets(rba.sets, ni)))
+    return rebuild_struct(rba, (; sets = non_investable_sets(rba.sets, ni)))
 end
 function non_investable_universe(rb::RiskBudgeting, ni::VecStr)::RiskBudgeting
-    return rebuild_estimator(rb, (; rba = non_investable_universe(rb.rba, ni)))
+    return rebuild_struct(rb, (; rba = non_investable_universe(rb.rba, ni)))
 end
 """
     set_risk_budgeting_constraints!(model, rb, pr, wb, args...)

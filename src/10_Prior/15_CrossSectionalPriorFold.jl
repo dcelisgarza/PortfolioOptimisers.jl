@@ -1307,7 +1307,7 @@ function fold_prior_step(pe::CrossSectionalFactorPrior{<:Any, <:Any, <:Any, <:An
     end
     st = cross_sectional_carry_fold(pe, st, rd, gaps)
     st.tip[] = st.buf.n
-    return rebuild_estimator(pe, (; cache = st))
+    return rebuild_struct(pe, (; cache = st))
 end
 """
 $(DocStringExtensions.TYPEDSIGNATURES)

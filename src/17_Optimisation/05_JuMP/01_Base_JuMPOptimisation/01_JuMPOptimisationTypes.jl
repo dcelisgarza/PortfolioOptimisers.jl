@@ -68,11 +68,9 @@ function update_time_dependent_estimator(opt::JuMPOptimisationEstimator,
         return opt
     end
     opt = update_time_dependent_fields(opt, ctx, all_binds)
-    return rebuild_estimator(opt,
-                             (;
-                              opt = update_time_dependent_estimator(opt.opt, ctx,
-                                                                    all_binds),
-                              fb = update_time_dependent_estimator(opt.fb, ctx, all_binds)))
+    return rebuild_struct(opt,
+                          (; opt = update_time_dependent_estimator(opt.opt, ctx, all_binds),
+                           fb = update_time_dependent_estimator(opt.fb, ctx, all_binds)))
 end
 """
 $(DocStringExtensions.TYPEDSIGNATURES)
@@ -91,9 +89,9 @@ function reset_time_dependent_estimator(opt::JuMPOptimisationEstimator)
         return opt
     end
     opt = reset_time_dependent_fields(opt)
-    return rebuild_estimator(opt,
-                             (; opt = reset_time_dependent_estimator(opt.opt),
-                              fb = reset_time_dependent_estimator(opt.fb)))
+    return rebuild_struct(opt,
+                          (; opt = reset_time_dependent_estimator(opt.opt),
+                           fb = reset_time_dependent_estimator(opt.fb)))
 end
 """
 $(DocStringExtensions.TYPEDEF)

@@ -729,14 +729,14 @@ The [`SimpleExpectedReturns`](@ref) method of [`partial_fit!`](@ref) folds one o
  1. Refuse a configuration that no incremental fit can reproduce, with [`assert_partial_fittable`](@ref).
  2. Seed a [`SimpleExpectedReturnsState`](@ref) of zeros over `length(x)` assets when `me.cache` holds `nothing`, with [`expected_returns_state_seed`](@ref).
  3. Fold `x` into the state, with the policy `me.cvg` and the active mask.
- 4. Rebuild the estimator with the new state in `cache` through [`rebuild_estimator`](@ref), and return it.
+ 4. Rebuild the estimator with the new state in `cache` through [`rebuild_struct`](@ref), and return it.
 """
 function partial_fit!(me::SimpleExpectedReturns{<:Any, <:Any,
                                                 <:Option{<:SimpleExpectedReturnsState}},
                       x::VecNum; active_mask::Option{<:AbstractVector{<:Bool}} = nothing)
     assert_partial_fittable(me, me.w, "SimpleExpectedReturns")
     state = expected_returns_state_seed(me.cache, x, me.cvg)
-    return rebuild_estimator(me, (; cache = partial_fit!(state, x, me.cvg, active_mask)))
+    return rebuild_struct(me, (; cache = partial_fit!(state, x, me.cvg, active_mask)))
 end
 """
     expected_returns_state_seed(cache::Nothing, x::VecNum,

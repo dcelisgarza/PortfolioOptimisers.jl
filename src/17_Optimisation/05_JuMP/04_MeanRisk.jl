@@ -924,7 +924,7 @@ function resolve_ratio_frontier!(model::JuMP.Model,
     if isempty(names)
         return nothing
     end
-    cmr = rebuild_estimator(mr, (; obj = MinimumRisk()))
+    cmr = rebuild_struct(mr, (; obj = MinimumRisk()))
     cmodel = build_mean_risk_model(cmr, attrs, rd, false; blocks = blocks)
     pr, fees = attrs.pr, attrs.fees
     if :ret_frontier in names

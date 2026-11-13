@@ -2171,12 +2171,12 @@ end
                                                                                        N)),
                                                             cbe = ConstraintBlock(;
                                                                                   sbgt = 0.2))
-        # `Accessors.set`, `rebuild_estimator` and a search key replace one slot.
+        # `Accessors.set`, `rebuild_struct` and a search key replace one slot.
         # The function form: a macro of a package that the testset loads cannot expand.
         o2 = Accessors.set(o, PO.parse_lens("wb"), WeightBounds(; lb = 0.0, ub = 0.5))
         @test (o2.wb.ub, o2.card, o2.l1) == (0.5, 3, 0.1)
-        @test PO.rebuild_estimator(o, (; card = 2)).cbe ==
-              PO.rebuild_estimator(o.cbe, (; card = 2))
+        @test PO.rebuild_struct(o, (; card = 2)).cbe ==
+              PO.rebuild_struct(o.cbe, (; card = 2))
         mr = MeanRisk(; opt = JuMPOptimiser(; slv = csl, wb = wb3))
         for (key, v) in (("opt.wb", WeightBounds(; lb = 0.0, ub = 0.25)), ("opt.l1", 0.01),
                          ("opt.l2", L2Regularisation(; val = 0.01)))

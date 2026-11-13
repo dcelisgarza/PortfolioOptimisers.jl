@@ -1187,7 +1187,7 @@ The estimator always passes the fold to `pe.pe`, because that member holds the r
  1. At the first step, when `pe.pe` holds no state, refuse a member that holds one, with [`assert_cold_carry_entry`](@ref).
  2. Fold the observations and `F` into `pe.pe` with [`partial_fit!`](@ref).
  3. Fold the observations into `pe.kte` and `pe.ske` with [`fold_member`](@ref).
- 4. Rebuild the estimator with the three folded members through [`rebuild_estimator`](@ref), and return it.
+ 4. Rebuild the estimator with the three folded members through [`rebuild_struct`](@ref), and return it.
 
 # Arguments
 
@@ -1216,10 +1216,10 @@ The estimator always passes the fold to `pe.pe`, because that member holds the r
 function partial_fit!(pe::HighOrderPriorEstimator, X::VecNum_MatNum,
                       F::Option{<:VecNum_MatNum} = nothing; kwargs...)
     assert_cold_carry_entry(pe, online_entry_state(pe.pe), "HighOrderPriorEstimator")
-    return rebuild_estimator(pe,
-                             (; pe = partial_fit!(pe.pe, X, F; kwargs...),
-                              kte = fold_member(pe.kte, X; kwargs...),
-                              ske = fold_member(pe.ske, X; kwargs...)))
+    return rebuild_struct(pe,
+                          (; pe = partial_fit!(pe.pe, X, F; kwargs...),
+                           kte = fold_member(pe.kte, X; kwargs...),
+                           ske = fold_member(pe.ske, X; kwargs...)))
 end
 """
     fold_prior_step(pe::HighOrderPriorEstimator, rd::ReturnsResult,
@@ -1234,7 +1234,7 @@ This is the method of [`fold_prior_step`](@ref) for an estimator that passes the
  1. At the first step, when `pe.pe` holds no state, refuse a member that holds one, with [`assert_cold_carry_entry`](@ref).
  2. Fold `rd` and `gaps` into `pe.pe` with [`fold_prior_step`](@ref).
  3. Take the rows of `rd.X` that `gaps` does not mark, and the same rows of the active mask of `rd.pnl`, with [`shared_series_member_rows`](@ref). Fold them into `pe.kte` and `pe.ske` with [`fold_member`](@ref).
- 4. Rebuild the estimator with its folded members, with `rebuild_estimator`, and return it.
+ 4. Rebuild the estimator with its folded members, with `rebuild_struct`, and return it.
 
 # Arguments
 
@@ -1262,10 +1262,10 @@ function fold_prior_step(pe::HighOrderPriorEstimator, rd::ReturnsResult,
                          gaps::Option{<:AbstractVector{Bool}})
     assert_cold_carry_entry(pe, online_entry_state(pe.pe), "HighOrderPriorEstimator")
     X, kw = shared_series_member_rows(rd.X, gaps; step_active_kwargs(rd.pnl)...)
-    return rebuild_estimator(pe,
-                             (; pe = fold_prior_step(pe.pe, rd, gaps),
-                              kte = fold_member(pe.kte, X; kw...),
-                              ske = fold_member(pe.ske, X; kw...)))
+    return rebuild_struct(pe,
+                          (; pe = fold_prior_step(pe.pe, rd, gaps),
+                           kte = fold_member(pe.kte, X; kw...),
+                           ske = fold_member(pe.ske, X; kw...)))
 end
 """
     prior(pe::HighOrderPriorEstimator; kwargs...)

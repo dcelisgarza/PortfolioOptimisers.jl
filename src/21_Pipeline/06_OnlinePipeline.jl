@@ -156,7 +156,7 @@ function online_state_seed(::Pipeline, max_history::Option{<:Integer})
     return PipelineBufferState(; max_history = max_history)
 end
 """
-    rebuild_estimator(p::Pipeline, repl::NamedTuple)
+    rebuild_struct(p::Pipeline, repl::NamedTuple)
 
 Rebuilds a [`Pipeline`](@ref) with the fields in `repl` replaced, through the positional constructor.
 
@@ -164,10 +164,10 @@ The keyword constructor derives the names from the steps. A rebuild that seeds a
 
 # Related
 
-  - [`rebuild_estimator`](@ref)
+  - [`rebuild_struct`](@ref)
   - [`Online`](@ref)
 """
-function rebuild_estimator(p::Pipeline, repl::NamedTuple)
+function rebuild_struct(p::Pipeline, repl::NamedTuple)
     return Pipeline(get(repl, :names, p.names), get(repl, :steps, p.steps),
                     get(repl, :cache, p.cache))
 end

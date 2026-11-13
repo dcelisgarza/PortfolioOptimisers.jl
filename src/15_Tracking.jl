@@ -1110,7 +1110,7 @@ true
   - [`TrackingError`](@ref)
   - [`tracking_benchmark`](@ref)
   - [`ReturnsResult`](@ref)
-  - [`rebuild_estimator`](@ref)
+  - [`rebuild_struct`](@ref)
 """
 function bind_data_benchmark(x::Any, ::Any)
     return x
@@ -1122,7 +1122,7 @@ function bind_data_benchmark(::DataBenchmarkTracking, rd::ReturnsResult)
 end
 function bind_data_benchmark(tr::TrackingError, rd)
     bound = bind_data_benchmark(tr.tr, rd)
-    return bound === tr.tr ? tr : rebuild_estimator(tr, (; tr = bound))
+    return bound === tr.tr ? tr : rebuild_struct(tr, (; tr = bound))
 end
 function bind_data_benchmark(v::AbstractVector, rd)
     bound = [bind_data_benchmark(x, rd) for x in v]

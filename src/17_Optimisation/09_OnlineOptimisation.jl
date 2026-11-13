@@ -252,7 +252,7 @@ function fold_returns(opt, rd::ReturnsResult,
     own_returns = !isa(returns_source(opt.pe), Option{<:DataSource})
     cache = fold_context(opt.cache, rd, rows.max_history, own_returns, own_factors,
                          !reads_exogenous_series(pe))
-    return rebuild_estimator(opt, (; pe = pe, cache = cache))
+    return rebuild_struct(opt, (; pe = pe, cache = cache))
 end
 """
 $(DocStringExtensions.TYPEDSIGNATURES)
@@ -398,7 +398,7 @@ function fold_optimiser(opt::Union{JuMPOptimisationEstimator, HierarchicalRiskPa
                                    SchurComplementHierarchicalRiskParity},
                         rd::ReturnsResult, gsrc::Option{<:AbstractReturnsSource})
     assert_step_tracks_no_series(opt)
-    return rebuild_estimator(opt, (; opt = fold_returns(opt.opt, rd, gsrc)))
+    return rebuild_struct(opt, (; opt = fold_returns(opt.opt, rd, gsrc)))
 end
 function fold_optimiser(opt::Union{JuMPOptimiser, BaseClusteringOptimisationEstimator,
                                    InverseVolatility, NestedClustered,
@@ -662,13 +662,13 @@ function partial_fit!(opt::Union{EqualWeighted, RandomWeighted,
                                  BestConstantRebalancedPortfolio}, rd::ReturnsResult)
     @argcheck(!isnothing(rd.X), IsNothingError("rd.X cannot be nothing"))
     max_history = isnothing(opt.cache) ? nothing : opt.cache.max_history
-    return rebuild_estimator(opt,
-                             (;
-                              cache = fold_context(opt.cache, rd, max_history, true, true,
-                                                   true)))
+    return rebuild_struct(opt,
+                          (;
+                           cache = fold_context(opt.cache, rd, max_history, true, true,
+                                                true)))
 end
 function partial_fit!(opt::PreviousWeights, rd::ReturnsResult)
-    return rebuild_estimator(opt, (; fb = step_fallback(opt.fb, rd)))
+    return rebuild_struct(opt, (; fb = step_fallback(opt.fb, rd)))
 end
 """
     step_fallback(fb::OptimisationEstimator, rd::ReturnsResult)
@@ -841,19 +841,19 @@ The JuMP and hierarchical heads resolve the bundle they hold, and the bundle, th
   - [`partial_fit!`](@ref)
 """
 function update_online_estimator(opt::JuMPOptimisationEstimator)
-    return rebuild_estimator(opt, (; opt = update_online_estimator(opt.opt)))
+    return rebuild_struct(opt, (; opt = update_online_estimator(opt.opt)))
 end
 function update_online_estimator(opt::Union{HierarchicalRiskParity,
                                             HierarchicalEqualRiskContribution,
                                             SchurComplementHierarchicalRiskParity})
-    return rebuild_estimator(opt, (; opt = update_online_estimator(opt.opt)))
+    return rebuild_struct(opt, (; opt = update_online_estimator(opt.opt)))
 end
 function update_online_estimator(opt::Union{JuMPOptimiser,
                                             BaseClusteringOptimisationEstimator,
                                             InverseVolatility, NestedClustered,
                                             BaseStackingOptimisationEstimator,
                                             BaseSubsetResamplingOptimisationEstimator})
-    return rebuild_estimator(opt, (; pe = update_online_member(opt.pe)))
+    return rebuild_struct(opt, (; pe = update_online_member(opt.pe)))
 end
 """
     online_unreached_path(opt::Union{JuMPOptimisationEstimator, HierarchicalRiskParity, HierarchicalEqualRiskContribution, SchurComplementHierarchicalRiskParity, JuMPOptimiser, BaseClusteringOptimisationEstimator, InverseVolatility, NestedClustered, BaseStackingOptimisationEstimator, BaseSubsetResamplingOptimisationEstimator})
@@ -1193,21 +1193,21 @@ function batch_from_state(opt, ::Nothing, pe)
 end
 function batch_from_state(opt, ::AbstractPartialFitState, ::Nothing)
     rd = returns_result(opt)
-    return rebuild_estimator(opt, (; cache = nothing)), rd
+    return rebuild_struct(opt, (; cache = nothing)), rd
 end
 function batch_from_state(opt, ::AbstractPartialFitState, pe)
     rd = returns_result(opt)
-    return rebuild_estimator(opt, (; pe = prior(pe), cache = nothing)), rd
+    return rebuild_struct(opt, (; pe = prior(pe), cache = nothing)), rd
 end
 function batch_from_state(opt::JuMPOptimisationEstimator)
     inner, rd = batch_from_state(opt.opt)
-    return rebuild_estimator(opt, (; opt = inner)), rd
+    return rebuild_struct(opt, (; opt = inner)), rd
 end
 function batch_from_state(opt::Union{HierarchicalRiskParity,
                                      HierarchicalEqualRiskContribution,
                                      SchurComplementHierarchicalRiskParity})
     inner, rd = batch_from_state(opt.opt)
-    return rebuild_estimator(opt, (; opt = inner)), rd
+    return rebuild_struct(opt, (; opt = inner)), rd
 end
 """
     batch_without_state(opt, pe::AbstractPriorResult)

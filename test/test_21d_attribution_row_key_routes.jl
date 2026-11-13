@@ -383,10 +383,10 @@ end
         b = [mean(filter(isfinite, r)) for r in eachrow(rd.X)]
         pe = CrossSectionalFactorPrior(; lambda = 1, factors = factors,
                                        x_src = ExcessSource())
-        ref = prior(pe, PO.rebuild_estimator(rd, (; B = b))).rr.idx
+        ref = prior(pe, PO.rebuild_struct(rd, (; B = b))).rr.idx
         @test 50 in ref
         b[50] = NaN
-        rdb = PO.rebuild_estimator(rd, (; B = b))
+        rdb = PO.rebuild_struct(rd, (; B = b))
         @test prior(pe, rdb).rr.idx == filter(!=(50), ref)
         @test stepped(PO.update_online_estimator(Online(pe)), rdb).rr.idx ==
               filter(!=(50), ref)

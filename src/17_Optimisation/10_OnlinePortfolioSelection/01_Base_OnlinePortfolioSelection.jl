@@ -1288,7 +1288,7 @@ The update of a rule:
  1. Return `alg` unchanged when [`is_time_dependent`](@ref) is `false` for it.
  2. Read the names `fns` of the fields of the rule tree with [`rule_tree_fields`](@ref).
  3. Resolve the value of each field in `fns` at `ctx` with [`update_time_dependent_estimator`](@ref).
- 4. Rebuild `alg` with the resolved values through [`rebuild_estimator`](@ref).
+ 4. Rebuild `alg` with the resolved values through [`rebuild_struct`](@ref).
 
 The update of a vector of rules returns `v` unchanged when no rule in it holds a schedule. Otherwise it maps the update of a rule over `v`.
 
@@ -1350,7 +1350,7 @@ function update_time_dependent_estimator(alg::AbstractOnlinePortfolioSelectionAl
     end
     fns = rule_tree_fields(alg)
     resolve(f) = update_time_dependent_estimator(getfield(alg, f), ctx, all_binds)
-    return rebuild_estimator(alg, NamedTuple{fns}(map(resolve, fns)))
+    return rebuild_struct(alg, NamedTuple{fns}(map(resolve, fns)))
 end
 function update_time_dependent_estimator(v::AbstractVector{<:AbstractOnlinePortfolioSelectionAlgorithm},
                                          ctx::TimeDependentContext, all_binds::Bool = true)

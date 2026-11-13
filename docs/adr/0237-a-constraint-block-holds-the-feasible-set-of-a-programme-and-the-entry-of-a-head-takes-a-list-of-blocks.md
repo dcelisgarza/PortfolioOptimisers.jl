@@ -156,8 +156,8 @@ The batch entry runs the two stages one after the other. A slot whose resolver r
    becomes a property of the owner only through an edit of the list. The `r` and the `ret` of the
    set are fields, so they need no forward rule.
 3. **The keyword constructor also takes the block by its field name**, because
-   `forward_setproperties` and `rebuild_estimator` call the constructor with every field by name.
-4. **A flat keyword replaces that slot of a given block.** `rebuild_estimator` passes on each name
+   `forward_setproperties` and `rebuild_struct` call the constructor with every field by name.
+4. **A flat keyword replaces that slot of a given block.** `rebuild_struct` passes on each name
    of `repl` that is not a field. So a rebuild that names `wb` calls the constructor with the old
    block and the new `wb`. The flat default of a keyword must not overwrite a slot of a given
    block. The schedules of #1243 rebuild through this path at each fold.
@@ -231,7 +231,7 @@ because RRB is `RelaxedRiskBudgeting`.
   `ArgumentError`. Each break takes a row in `docs/src/migration.md`.
 - **`resolve_allocation_set_rows` and `assemble_allocation_set!` go.** The projection programme
   uses the shared entry, and the refusal rebuild of #2028 in its method of seven arguments goes.
-- **`port_opt_view`, `factory`, `rebuild_estimator`, `needs_previous_weights` and the
+- **`port_opt_view`, `factory`, `rebuild_struct`, `needs_previous_weights` and the
   schedules of issue #1243 move to the block.** A field of the set keeps the schedule that #1243 gives it.
 - **The bounds builder of the set clears `rte` for a floor, as a ceiling clears `rke`.** Before,
   the floor of the set kept `rte`. The set stays the Risk Constraint Owner of its ceilings.

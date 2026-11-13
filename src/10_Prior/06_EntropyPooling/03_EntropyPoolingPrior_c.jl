@@ -1163,13 +1163,12 @@ function scenario_factory(pe::Union{FactorPrior, FactorBlackLittermanPrior}, w,
                           ::Option{<:AssetPanel}; strict::Bool = false, kwargs...)
     inner = scenario_factory(pe.pe, w, scenario_factor_result(pr), F, nothing, nothing;
                              strict = strict)
-    return rebuild_estimator(pe, (; pe = inner))
+    return rebuild_struct(pe, (; pe = inner))
 end
 function scenario_factory(pe::Union{BlackLittermanPrior, BayesianBlackLittermanPrior}, w,
                           pr::Option{<:AbstractPriorResult}, X::MatNum, F::Option{<:MatNum},
                           pnl::Option{<:AssetPanel}; kwargs...)
-    return rebuild_estimator(pe,
-                             (; pe = scenario_factory(pe.pe, w, pr, X, F, pnl; kwargs...)))
+    return rebuild_struct(pe, (; pe = scenario_factory(pe.pe, w, pr, X, F, pnl; kwargs...)))
 end
 function scenario_factory(pe::AugmentedBlackLittermanPrior, w,
                           pr::Option{<:AbstractPriorResult}, X::MatNum, F::MatNum,
@@ -1177,7 +1176,7 @@ function scenario_factory(pe::AugmentedBlackLittermanPrior, w,
     a_pe = scenario_factory(pe.a_pe, w, pr, X, nothing, pnl; strict = strict, kwargs...)
     f_pe = scenario_factory(pe.f_pe, w, scenario_factor_result(pr), F, nothing, nothing;
                             strict = strict)
-    return rebuild_estimator(pe, (; a_pe = a_pe, f_pe = f_pe))
+    return rebuild_struct(pe, (; a_pe = a_pe, f_pe = f_pe))
 end
 function scenario_factory(pe::Union{EntropyPoolingPrior, MeucciEntropyPoolingPrior}, w,
                           pr::Option{<:AbstractPriorResult}, X::MatNum, F::Option{<:MatNum},
@@ -1391,7 +1390,7 @@ end
 function prior_probability_factory(pe::Union{FactorPrior, FactorBlackLittermanPrior}, w,
                                    ::MatNum, F::MatNum, ::Option{<:AssetPanel}; kwargs...)
     inner = prior_probability_factory(pe.pe, w, size(F, 1))
-    return rebuild_estimator(factory(pe, scenario_weights(w, size(F, 1))), (; pe = inner))
+    return rebuild_struct(factory(pe, scenario_weights(w, size(F, 1))), (; pe = inner))
 end
 function prior_probability_factory(pe::Union{BlackLittermanPrior,
                                              BayesianBlackLittermanPrior,
@@ -1400,21 +1399,20 @@ function prior_probability_factory(pe::Union{BlackLittermanPrior,
                                    F::Option{<:MatNum}, pnl::Option{<:AssetPanel};
                                    kwargs...)
     inner = prior_probability_factory(pe.pe, w, X, F, pnl; kwargs...)
-    return rebuild_estimator(factory(pe, w), (; pe = inner))
+    return rebuild_struct(factory(pe, w), (; pe = inner))
 end
 function prior_probability_factory(pe::Union{BlackLittermanPrior,
                                              BayesianBlackLittermanPrior,
                                              EntropyPoolingPrior,
                                              MeucciEntropyPoolingPrior}, w, n::Integer)
-    return rebuild_estimator(factory(pe, w),
-                             (; pe = prior_probability_factory(pe.pe, w, n)))
+    return rebuild_struct(factory(pe, w), (; pe = prior_probability_factory(pe.pe, w, n)))
 end
 function prior_probability_factory(pe::AugmentedBlackLittermanPrior, w, X::MatNum,
                                    F::MatNum, pnl::Option{<:AssetPanel}; kwargs...)
     a_pe = prior_probability_factory(pe.a_pe, w, X, nothing, pnl; kwargs...)
     f_pe = prior_probability_factory(pe.f_pe, w, size(F, 1))
-    return rebuild_estimator(factory(pe, scenario_weights(w, size(X, 1))),
-                             (; a_pe = a_pe, f_pe = f_pe))
+    return rebuild_struct(factory(pe, scenario_weights(w, size(X, 1))),
+                          (; a_pe = a_pe, f_pe = f_pe))
 end
 """
     assert_scenario_model(pe::AbstractPriorEstimator)

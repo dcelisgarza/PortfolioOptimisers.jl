@@ -736,7 +736,7 @@ end
 
 Returns the names under which `opt` can hold a [`TimeDependent`](@ref).
 
-[`time_dependent_fields`](@ref) reads the values of these names only. The fallback returns the fields of [`typed_time_dependent_fields`](@ref). An owner of a [`ConstraintBlock`](@ref), such as [`JuMPOptimiser`](@ref), also returns the slots of its block that can hold a schedule, under their flat names. [`time_dependent_slot`](@ref) reads such a name, and [`rebuild_estimator`](@ref) passes it to the keyword constructor of the owner, which replaces that slot of the block.
+[`time_dependent_fields`](@ref) reads the values of these names only. The fallback returns the fields of [`typed_time_dependent_fields`](@ref). An owner of a [`ConstraintBlock`](@ref), such as [`JuMPOptimiser`](@ref), also returns the slots of its block that can hold a schedule, under their flat names. [`time_dependent_slot`](@ref) reads such a name, and [`rebuild_struct`](@ref) passes it to the keyword constructor of the owner, which replaces that slot of the block.
 
 For a `JuMPOptimiser` that holds no schedule, the tuple is empty at compile time, so `split` and `_optimise` read none of its fields.
 
@@ -1028,7 +1028,7 @@ end
 """
 $(DocStringExtensions.TYPEDSIGNATURES)
 
-Rebuilds an estimator with its keyword constructor, with the fields in `repl` replaced.
+Rebuilds a struct with its keyword constructor, with the fields in `repl` replaced. The struct can be an estimator, a result, or any other type whose keyword constructor takes every field by its name.
 
 The other fields keep their values. The keyword constructor checks every rule of construction again.
 
@@ -1045,7 +1045,7 @@ The function reads each field in one tuple expression, and it does not `merge` t
   - [`update_time_dependent_fields`](@ref)
   - [`reset_time_dependent_fields`](@ref)
 """
-function rebuild_estimator(x, repl::NamedTuple)
+function rebuild_struct(x, repl::NamedTuple)
     T = typeof(x)
     fns = fieldnames(T)
     vals = ntuple(i -> haskey(repl, fns[i]) ? getfield(repl, fns[i]) : getfield(x, i),
@@ -1121,7 +1121,7 @@ The methods of [`update_time_dependent_estimator`](@ref) for the optimisers call
 
  1. Collect the names `tdfs` of the fields that the current fold loop resolves, with [`time_dependent_fields`](@ref). Return `opt` unchanged when there is none.
  2. Resolve each of them with [`time_dependent_value`](@ref), giving `repl`.
- 3. Rebuild `opt` with [`rebuild_estimator`](@ref).
+ 3. Rebuild `opt` with [`rebuild_struct`](@ref).
 
 # Related
 
@@ -1137,7 +1137,7 @@ function update_time_dependent_fields(opt, ctx::TimeDependentContext,
     end
     repl = NamedTuple{tdfs}(map(f -> time_dependent_value(time_dependent_slot(opt, f), ctx),
                                 tdfs))
-    return rebuild_estimator(opt, repl)
+    return rebuild_struct(opt, repl)
 end
 """
     time_dependent_field_defaults(opt)
@@ -1223,7 +1223,7 @@ The methods of [`reset_time_dependent_estimator`](@ref) for the optimisers call 
  1. Collect the names `tdfs` of the scheduled fields with [`time_dependent_fields`](@ref), which leaves out the schedules with `:nearest` in the fields of [`inner_fold_fields`](@ref). Return `opt` unchanged when there is none.
  2. Read the static defaults of `opt` with [`time_dependent_field_defaults`](@ref).
  3. Find the value of each field in `tdfs` with [`time_dependent_reset_value`](@ref), giving `repl`.
- 4. Rebuild `opt` with [`rebuild_estimator`](@ref).
+ 4. Rebuild `opt` with [`rebuild_struct`](@ref).
 
 # Related
 
@@ -1240,7 +1240,7 @@ function reset_time_dependent_fields(opt)
     defaults = time_dependent_field_defaults(opt)
     repl = NamedTuple{tdfs}(map(f -> time_dependent_reset_value(time_dependent_slot(opt, f),
                                                                 defaults, f, opt), tdfs))
-    return rebuild_estimator(opt, repl)
+    return rebuild_struct(opt, repl)
 end
 #! End: Overload these for all estimators which can use time-dependent constraints.
 #! Begin: TimeDependent as an optimiser in its own right.

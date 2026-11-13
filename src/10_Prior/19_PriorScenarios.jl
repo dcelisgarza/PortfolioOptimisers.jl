@@ -1254,7 +1254,7 @@ Store the cache that the refit of an entropy pooling prior reads on the block of
 """
 function cross_sectional_stored_cache(csfm::CrossSectionalFactorModel, cache_reg::Bool,
                                       amr::AbstractMatrix{Bool}, hist::Option{<:MatNum})
-    return cache_reg ? rebuild_estimator(csfm, (; amr = amr, hist = hist)) : csfm
+    return cache_reg ? rebuild_struct(csfm, (; amr = amr, hist = hist)) : csfm
 end
 """
     cross_sectional_kept_cache(f_pr::NamedTuple, pf::Option{<:AbstractPriorResult}) -> NamedTuple
@@ -1295,10 +1295,10 @@ function scenario_factory(pe::CrossSectionalFactorPrior, w,
     else
         cross_sectional_cached_scenarios(rr).f
     end
-    return rebuild_estimator(pe,
-                             (;
-                              pe = scenario_factory(pe.pe, w, scenario_factor_result(pr), f,
-                                                    nothing, nothing; strict = strict)))
+    return rebuild_struct(pe,
+                          (;
+                           pe = scenario_factory(pe.pe, w, scenario_factor_result(pr), f,
+                                                 nothing, nothing; strict = strict)))
 end
 # The refit of an entropy pooling prior fits the factor prior of `scenario_factory` on the
 # factor returns of the regression. A fit that stores the cache gives the regression, the
@@ -1347,7 +1347,7 @@ function prior_probability_factory(pe::CrossSectionalFactorPrior, w, X::MatNum,
     assert_cross_sectional_lag_rows(length(rw), pe.lag)
     n = length(rw) - pe.lag
     inner = prior_probability_factory(pe.pe, w, n)
-    return rebuild_estimator(factory(pe, scenario_weights(w, n)), (; pe = inner))
+    return rebuild_struct(factory(pe, scenario_weights(w, n)), (; pe = inner))
 end
 # The regression answers one factor return for each row after the Descriptor warm-up and the
 # exposure lag, so the count runs the exposure stage alone. The factor prior then counts its

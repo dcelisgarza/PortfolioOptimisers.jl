@@ -108,9 +108,8 @@ function update_time_dependent_estimator(opt::NaiveOptimisationEstimator,
         return opt
     end
     opt = update_time_dependent_fields(opt, ctx, all_binds)
-    return rebuild_estimator(opt,
-                             (;
-                              fb = update_time_dependent_estimator(opt.fb, ctx, all_binds)))
+    return rebuild_struct(opt,
+                          (; fb = update_time_dependent_estimator(opt.fb, ctx, all_binds)))
 end
 function time_dependent_field_defaults(::NaiveOptimisationEstimator)::NamedTuple
     return naive_optimiser_td_defaults()
@@ -155,7 +154,7 @@ function reset_time_dependent_estimator(opt::NaiveOptimisationEstimator)
         return opt
     end
     opt = reset_time_dependent_fields(opt)
-    return rebuild_estimator(opt, (; fb = reset_time_dependent_estimator(opt.fb)))
+    return rebuild_struct(opt, (; fb = reset_time_dependent_estimator(opt.fb)))
 end
 """
 $(DocStringExtensions.TYPEDEF)
@@ -484,7 +483,7 @@ function group_frames(iv::InverseVolatility)
     return field_frames(iv, "", refits_regression(iv.pe))
 end
 function non_investable_universe(iv::InverseVolatility, ni::VecStr)::InverseVolatility
-    return rebuild_estimator(iv, (; sets = non_investable_sets(iv.sets, ni)))
+    return rebuild_struct(iv, (; sets = non_investable_sets(iv.sets, ni)))
 end
 function time_dependent_field_defaults(::InverseVolatility)::NamedTuple
     return merge(naive_optimiser_td_defaults(), (; pe = EmpiricalPrior()))
@@ -732,7 +731,7 @@ function EqualWeighted(; wb::TD_Option{<:WbE_Wb} = WeightBounds(),
     return EqualWeighted(wb, fees, sets, wf, fb, strict, cache)
 end
 function non_investable_universe(ew::EqualWeighted, ni::VecStr)::EqualWeighted
-    return rebuild_estimator(ew, (; sets = non_investable_sets(ew.sets, ni)))
+    return rebuild_struct(ew, (; sets = non_investable_sets(ew.sets, ni)))
 end
 """
 $(DocStringExtensions.TYPEDSIGNATURES)
@@ -989,7 +988,7 @@ function RandomWeighted(; alpha::Num_VecNum = 1,
     return RandomWeighted(alpha, rng, seed, wb, fees, sets, wf, fb, strict, cache)
 end
 function non_investable_universe(rw::RandomWeighted, ni::VecStr)::RandomWeighted
-    return rebuild_estimator(rw, (; sets = non_investable_sets(rw.sets, ni)))
+    return rebuild_struct(rw, (; sets = non_investable_sets(rw.sets, ni)))
 end
 function time_dependent_field_defaults(::RandomWeighted)::NamedTuple
     return (; wf = IterativeWeightFinaliser())
@@ -1276,7 +1275,7 @@ function BestConstantRebalancedPortfolio(; wb::TD_Option{<:WbE_Wb} = WeightBound
 end
 function non_investable_universe(bcrp::BestConstantRebalancedPortfolio,
                                  ni::VecStr)::BestConstantRebalancedPortfolio
-    return rebuild_estimator(bcrp, (; sets = non_investable_sets(bcrp.sets, ni)))
+    return rebuild_struct(bcrp, (; sets = non_investable_sets(bcrp.sets, ni)))
 end
 """
     cover_fixed_point(X::MatNum, iters::Integer, tol::Number) -> NamedTuple

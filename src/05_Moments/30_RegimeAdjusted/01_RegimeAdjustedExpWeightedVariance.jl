@@ -706,7 +706,7 @@ julia> ce.min_obs
 end
 # `Tuple` is covariant, so `Tuple{Number, Number}` admits every pair of numbers. A form with a
 # `<:` bound on each parameter makes each keyword call build its type again, and an online step
-# rebuilds the estimator through this constructor (`rebuild_estimator`).
+# rebuilds the estimator through this constructor (`rebuild_struct`).
 function RegimeAdjustedExpWeightedVariance(; decay::Number = exp2(-inv(40.0)),
                                            min_obs::Integer = round(Int,
                                                                     max(1,
@@ -1933,7 +1933,7 @@ function partial_fit!(ce::RegimeAdjustedExpWeightedVariance{<:Any, <:Any, <:Any,
                       active_mask::Option{<:AbstractMatrix{<:Bool}} = nothing, kwargs...)
     cache = regime_adjusted_variance_pass!(ce, X, dims, estimation_mask, active_mask,
                                            ce.cache)
-    return cache === ce.cache ? ce : rebuild_estimator(ce, (; cache = cache))
+    return cache === ce.cache ? ce : rebuild_struct(ce, (; cache = cache))
 end
 """
     partial_fit!(
