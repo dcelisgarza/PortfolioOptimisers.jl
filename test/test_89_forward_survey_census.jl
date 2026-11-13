@@ -79,6 +79,22 @@ using Test
              p2(x::A) = q2(x)
              q2(x::A) = x + 1
 
+             # nothing pairs that the parse rules (#2111)
+             pu(::Nothing) = nothing
+             pu(x::A) = qu(x)
+             qu(x::Union{Nothing, A}) = x
+             po(::Nothing) = nothing
+             po(x::A) = qo(x)
+             qo(x::Option{<:A}) = x
+             pc(::Nothing, b) = nothing
+             pc(x::A, b) = T3(x, b)
+             pt(::Nothing) = throw(ArgumentError("no prior"))
+             pt(x::A) = qt(x)
+             qt(x::A) = x + 1
+             coverage_mask_source(p, ::Nothing) = p
+             coverage_mask_source(p, m::A) = dims_oriented(m)
+             dims_oriented(m::Option{<:A}) = m
+
              # default
              trait(x) = false
              ident(x) = x
@@ -210,6 +226,21 @@ using Test
     @testset "nothing pair (#2077)" begin
         @test of(:p) == [("nothing pair", :q, "go")]
         @test of(:p2) == [("nothing pair", :q2, "review")]
+    end
+
+    @testset "nothing pairs that the parse rules (#2111)" begin
+        # A callee that takes `nothing` through a `Union` or an `Option` is case 1.
+        @test of(:pu) == [("nothing pair", :qu, "go")]
+        @test of(:po) == [("nothing pair", :qo, "go")]
+        # A constructor owns no default, so the pair stays in front of it (#2109).
+        @test of(:pc) == [("nothing pair", :T3, "keep (b)")]
+        # A `Nothing` arm that throws refuses in the context of its own callers.
+        @test of(:pt) == [("nothing pair", :qt, "keep (b)")]
+        @test occursin("throws", first_of(:pt).why)
+        # A ruling comes before case 1: the callee takes `nothing` with another answer.
+        @test of(:coverage_mask_source) == [("nothing pair", :dims_oriented, "keep (b)")]
+        @test first_of(:coverage_mask_source).why ==
+              FS.RULED_NOTHING_PAIRS[(:coverage_mask_source, :dims_oriented)][2]
     end
 
     @testset "default (#2074, rule 2)" begin
@@ -358,6 +389,12 @@ using Test
         @test ("stale entries of RULED_DEFAULTS",
                sort!([n for n in keys(FS.RULED_DEFAULTS) if !(n in defaults)])) ==
               ("stale entries of RULED_DEFAULTS", Symbol[])
+        # An entry of `RULED_NOTHING_PAIRS` whose pair is no longer a `nothing pair` finding is
+        # stale: the build ticket that removed the pair deletes it (#2111).
+        pairs = Set((x.name, x.callee) for x in found_real if x.shape == "nothing pair")
+        @test ("stale entries of RULED_NOTHING_PAIRS",
+               sort!([p for p in keys(FS.RULED_NOTHING_PAIRS) if !(p in pairs)])) ==
+              ("stale entries of RULED_NOTHING_PAIRS", Tuple{Symbol, Symbol}[])
         # An entry of `RULED_REBUILDS` whose pair is no longer a rebuild shape is stale: the build
         # ticket that moved the site to `rebuild_struct` deletes it (#2110).
         shapes = Set((s[1].name, s[2])

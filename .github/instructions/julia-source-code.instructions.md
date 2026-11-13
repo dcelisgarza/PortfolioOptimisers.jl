@@ -617,8 +617,26 @@ and every addition:
      `rewrap_step` does in front of `PipelineStep`, and when it holds a policy of a container,
      as `pipeline_step_factory` does.
 
-   `code_health/forward_survey.jl` gives each of these its verdict, and its `RULED_DEFAULTS`
-   holds the verdicts that the parse cannot read.
+   #2111 rules the `Nothing`/value pair whose callee takes no `nothing`:
+   - **The callee takes a `::Nothing` method when no other caller of the callee must reject
+     `nothing`**, with the leaf answer of its kind (case 2 of #2077). A caller that a static
+     type stops before the call does not reject `nothing`, and a `MethodError` that no caller
+     meets guards nothing. `reduce_exposures(::Nothing, Ms) = Ms` follows
+     `cross_sectional_transform`, and `window_rows(::Nothing) = 0` follows `rows_needed`, which
+     gives `0` for no row and `nothing` for every row.
+   - **The callee takes the slot when the answer of the `Nothing` arm needs only arguments that
+     the callee can take.** A callee whose only caller is the pair takes a new argument, as
+     `clock_gap_cells` takes `n`. A callee that answers the question of both arms takes the slot
+     that the pair dispatches on, as `coverage_inner_corrected(w, ce)` does.
+   - **The pair stays as (b) when its `Nothing` arm holds a policy that the callee cannot
+     own:** the arm throws in the context of its callers, its answer is an argument that the
+     callee does not take, or it selects among sources. The pair also stays when a caller of
+     the callee must reject `nothing` (case 3). `worst_case_risk` reads the series alone, so
+     `linearised_risk` sends `nothing` to `expected_risk`, and `tail_worst_case_risk` stays. A
+     pair in front of a constructor stays too, because a constructor owns no default (#2109).
+
+   `code_health/forward_survey.jl` gives each of these its verdict, and its `RULED_DEFAULTS` and
+   `RULED_NOTHING_PAIRS` hold the verdicts that the parse cannot read.
 3. **An interface method is not a wrapper** when two or more methods share its callee, or when
    its callee is the constructor of a type. `reader_frames(x::T, path, ::Bool) =
    source_frames(x.x_src, path, true)` is the case. When the method is the only caller of its

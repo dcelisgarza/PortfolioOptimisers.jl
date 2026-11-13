@@ -21,8 +21,11 @@
 #                        keeps it. A callee with this method as its only caller moves its body in.
 #                        One private method in front of a type goes to the constructor of the
 #                        type as a method (#2112).
-#   nothing pair         the value arm of a `Nothing`/value pair, and whether the callee has a
-#                        `::Nothing` method (#2077). Case 1 goes. Cases 2 and 3 need a review.
+#   nothing pair         the value arm of a `Nothing`/value pair, and whether the callee takes
+#                        `nothing` (#2077). Case 1 goes. A constructor as the callee, and a
+#                        `Nothing` arm that throws, keep the pair as (b). `RULED_NOTHING_PAIRS`
+#                        holds the verdicts of #2111 that the parse cannot read, and a person
+#                        rules every other pair: case 2 or case 3.
 #   default              an untyped or `::Any` fallback that returns its input, `false` or
 #                        `nothing`, and a step function that copies one in front of an owner
 #                        (#2074, rule 2). A fallback with no owner takes the verdict of #2108,
@@ -331,6 +334,31 @@ end
 method_count(t::Tree, name) = length(get(t.by_name, name, CH.MethodDef[]))
 function has_nothing_arm(t::Tree, name)
     return any(d -> CH.forward_signature(d.sig)[3], get(t.by_name, name, CH.MethodDef[]))
+end
+# Whether a type in a signature admits `nothing`: `Nothing`, a `Union` that names it, or an
+# `Option{…}`, the alias of the library for `Union{Nothing, …}`.
+admits_nothing(T) = T === :Nothing || T === :Option
+function admits_nothing(T::Expr)
+    return T.head === :curly && (T.args[1] === :Option ||
+                                 (T.args[1] === :Union && any(admits_nothing, T.args[2:end])))
+end
+"""
+    takes_nothing(t::Tree, name) -> Bool
+
+Whether a method of `name` takes `nothing` in a positional slot: a slot typed `Nothing`, a `Union`
+that names `Nothing`, or an `Option{…}`. The callee of a `Nothing`/value pair is case 1 when it
+does (#2077), as `nothing_scalar_array_getindex` takes `nothing` through a `Union` (#2111).
+"""
+function takes_nothing(t::Tree, name)
+    return any(d -> any(a -> admits_nothing(a[2]), positional_arguments(d.sig)),
+               get(t.by_name, name, CH.MethodDef[]))
+end
+# Whether one of the `Nothing` arms of `name` throws: it refuses in the context of its own
+# callers, a policy that its callee cannot own (#2111).
+function nothing_arm_throws(t::Tree, name)
+    return any(d -> CH.forward_signature(d.sig)[3] &&
+                    !isempty(intersect(names_in(d.body), (:throw, Symbol("@argcheck")))),
+               get(t.by_name, name, CH.MethodDef[]))
 end
 is_struct(t::Tree, name) = haskey(t.fields, name)
 
@@ -760,6 +788,126 @@ function value_arm_count(t::Tree, name)
     return count(d -> !CH.forward_signature(d.sig)[3], get(t.by_name, name, CH.MethodDef[]))
 end
 
+const CASE_2 = "case 2: no other caller of the callee can pass `nothing`, so none must reject it, and the callee takes a `::Nothing` method with the leaf answer of its kind (#2077, #2111)"
+const SLOT_TAKEN = "the callee takes the slot: the answer of the `Nothing` arm needs only arguments that the callee can take (#2111)"
+const POLICY = "the `Nothing` arm holds a policy that the callee cannot own (#2111)"
+
+"""
+The verdicts of #2111 for the `Nothing`/value pairs that the parse cannot read, keyed by
+`(name, callee)`. The parse reads three shapes alone: a constructor as the callee keeps the pair
+as (b) (#2109), a `Nothing` arm that throws keeps it as (b), and a callee that takes `nothing`
+makes it case 1. A ruling here comes first, because a callee can take `nothing` with another
+answer: `dims_oriented(dims, nothing)` is `nothing`, and the `Nothing` arm of
+`coverage_mask_source` returns the panel. An entry whose pair is no longer a `nothing pair`
+finding is stale, and `test/test_89_forward_survey_census.jl` fails on it, so the build ticket that
+removes the pair deletes the entry.
+"""
+const RULED_NOTHING_PAIRS = Dict{Tuple{Symbol, Symbol}, Tuple{String, String}}(#
+                                                                               (:optional_gap_cells,
+                                                                                :clock_gap_cells) =>
+                                                                                   ("go",
+                                                                                    "$SLOT_TAKEN: the pair is the only caller of `clock_gap_cells`, so it takes `n` and a `::Nothing` method"),
+                                                                               (:coverage_fittable_estimator,
+                                                                                :coverage_inner_corrected) =>
+                                                                                   ("go",
+                                                                                    "$SLOT_TAKEN: `coverage_inner_corrected(w, ce)` answers both arms, and both of its callers can pass `w`"),
+                                                                               (:expert_allocation_set,
+                                                                                :resolve_allocation_set) =>
+                                                                                   ("go",
+                                                                                    "$CASE_2. A contract verb takes a `::Nothing` method on the empty slot (#2108): no set is the bare simplex, and the callers pass `strict = false`"),
+                                                                               (:cross_sectional_neutralise!,
+                                                                                :neutralise_exposures!) =>
+                                                                                   ("go",
+                                                                                    CASE_2),
+                                                                               (:cross_sectional_basis_now,
+                                                                                :factor_basis_slice) =>
+                                                                                   ("go",
+                                                                                    CASE_2),
+                                                                               (:attribution_window_basis,
+                                                                                :factor_basis_slice) =>
+                                                                                   ("go",
+                                                                                    CASE_2),
+                                                                               (:cross_sectional_reduced_history,
+                                                                                :reduce_exposures) =>
+                                                                                   ("go",
+                                                                                    CASE_2),
+                                                                               (:attribution_expand_errors,
+                                                                                :expand_factor_covariance) =>
+                                                                                   ("go",
+                                                                                    CASE_2),
+                                                                               (:attribution_finite_rows,
+                                                                                :attribution_finite) =>
+                                                                                   ("go",
+                                                                                    CASE_2),
+                                                                               (:prior_investable_mask,
+                                                                                :investable_mask) =>
+                                                                                   ("go",
+                                                                                    CASE_2),
+                                                                               (:attribution_active_mask,
+                                                                                :panel_active_cells) =>
+                                                                                   ("go",
+                                                                                    CASE_2),
+                                                                               (:cross_sectional_prior_option,
+                                                                                :cross_sectional_prior_pairs) =>
+                                                                                   ("go",
+                                                                                    "$CASE_2. The keyword `factors::Dict_VecPair` refuses `nothing` before the call"),
+                                                                               (:exposure_group_labels,
+                                                                                :cross_sectional_groups) =>
+                                                                                   ("go",
+                                                                                    "$CASE_2. The callers pass `rd.pnl`"),
+                                                                               (:scale_rows,
+                                                                                :window_rows) =>
+                                                                                   ("go",
+                                                                                    "$CASE_2: `window_rows(::Nothing) = 0`, as `rows_needed` gives 0 for no row and `nothing` for every row"),
+                                                                               (:bl_posteriors,
+                                                                                :vanilla_posteriors) =>
+                                                                                   ("keep (b)",
+                                                                                    "$POLICY: the callers hold an `Option` of the view system, and the callee takes its fields"),
+                                                                               (:windowed_inner,
+                                                                                :factory) =>
+                                                                                   ("keep (b)",
+                                                                                    "$POLICY: the weights come from three sources, and `factory(est, nothing)` rebuilds the estimator"),
+                                                                               (:coverage_mask_source,
+                                                                                :dims_oriented) =>
+                                                                                   ("keep (b)",
+                                                                                    "$POLICY: its answer is the panel, and `dims_oriented(dims, nothing)` is `nothing`"),
+                                                                               (:tail_worst_case_risk,
+                                                                                :worst_case_risk) =>
+                                                                                   ("keep (b)",
+                                                                                    "case 3: `linearised_risk` and `difference_linearised_risk` reject `nothing`, because `worst_case_risk` reads the series alone and a measure of kind `WeightsInput` reads the weights (#2077, #2111)"),
+                                                                               (:systematic_processing!,
+                                                                                :sample_matrix_processing!) =>
+                                                                                   ("keep (interface)",
+                                                                                    "a public contract verb: its `::Nothing` arm on the empty slot has a body of its own (#2108, rule 3)"))
+
+"""
+    nothing_pair_verdict(t::Tree, name, callee) -> Tuple{String, String}
+
+The verdict and the reason for the value arm of a `Nothing`/value pair, by the rulings of #2077
+and #2111:
+
+ 1. A pair of [`RULED_NOTHING_PAIRS`](@ref): its verdict.
+ 2. A constructor as the callee keeps the pair as (b): a constructor owns no default (#2109).
+ 3. A `Nothing` arm that throws keeps the pair as (b): it refuses in the context of its callers.
+ 4. A callee that takes `nothing` makes the pair case 1, and the pair goes.
+ 5. Any other pair is case 2 or case 3, and a person rules it.
+"""
+function nothing_pair_verdict(t::Tree, name, callee)
+    if haskey(RULED_NOTHING_PAIRS, (name, callee))
+        return RULED_NOTHING_PAIRS[(name, callee)]
+    elseif is_struct(t, callee)
+        return ("keep (b)",
+                "`$callee` is a constructor, which owns no default, so the `Nothing` arm stays in front of it (#2109)")
+    elseif nothing_arm_throws(t, name)
+        return ("keep (b)",
+                "a `Nothing` arm of `$name` throws: it refuses in the context of its own callers, a policy that `$callee` cannot own (#2111)")
+    elseif takes_nothing(t, callee)
+        return ("go", "case 1: `$callee` takes `nothing`, so the pair goes (#2077)")
+    end
+    return ("review",
+            "case 2 or 3: `$callee` takes no `nothing`. Its `::Nothing` method is right when no other caller of `$callee` must reject `nothing`, and otherwise the pair is (b). When the answer needs an argument that `$callee` does not take, `$callee` takes the slot, or the pair holds a policy and stays as (b). Rule it, and add it to `RULED_NOTHING_PAIRS` (#2077, #2111)")
+end
+
 function forward_verdict(t::Tree, name, callee, d)
     others = setdiff(get(t.callers, callee, Set{Symbol}()), (name,))
     n_values = value_arm_count(t, name)
@@ -768,13 +916,7 @@ function forward_verdict(t::Tree, name, callee, d)
         return ("keyword form", "keep (a)",
                 "the keyword form of a public verb passes its keywords as slots")
     elseif has_nothing_arm(t, name) && n_values == 1
-        return if has_nothing_arm(t, callee)
-            ("nothing pair", "go",
-             "case 1: `$callee` has a `::Nothing` method, so the pair goes (#2077)")
-        else
-            ("nothing pair", "review",
-             "case 2 or 3: `$callee` has no `::Nothing` method. Its `::Nothing` method is right when `nothing` is a true answer for every caller of `$callee`, and otherwise the pair is (b) (#2077)")
-        end
+        return ("nothing pair", nothing_pair_verdict(t, name, callee)...)
     elseif is_struct(t, callee)
         if name in t.public
             return ("preset", "keep (a)", "a public preset or keyword constructor (#2079)")
