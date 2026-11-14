@@ -290,7 +290,9 @@ end
     investable_reduction(X::MatNum, w, fees::Option{<:Fees}, strict::Bool)
     investable_reduction(rd::AbstractReturnsResult, w, fees::Option{<:Fees}, strict::Bool)
     investable_reduction(pr::AbstractPriorResult, w, fees::Option{<:Fees}, strict::Bool,
-                         imsk::Option{BitVector} = investable_mask(pr))
+                         imsk::Nothing)
+    investable_reduction(pr::AbstractPriorResult, w, fees::Option{<:Fees}, strict::Bool,
+                         imsk::BitVector = investable_mask(pr))
 
 Reduce a prior result, the weights scored against it and the fees charged on them to the Investable Mask.
 
@@ -308,7 +310,7 @@ A bare returns matrix and a [`ReturnsResult`](@ref) carry no moments, so no mask
 
  1. Return `nothing`, `pr` and the weights unchanged, and the fee through [`investable_fees_view`](@ref) under a `nothing` mask, when `pr` is a matrix or a returns result.
  2. Take the Investable Mask `imsk`. By default, [`investable_mask`](@ref) derives it once from the prior.
- 3. Return the same when the mask is `nothing`, which means that every asset is investable.
+ 3. Return the same when the mask is `nothing`, which means that every asset is investable. The method on a `Nothing` mask takes this case.
  4. Otherwise report the held non-investable assets through [`strict_diagnostic`](@ref).
  5. Return the mask, a [`port_opt_view`](@ref) of the prior at `findall(imsk)`, the view of the weights at the mask, and the fee through [`investable_fees_view`](@ref) at the mask and the prior's unreduced `pr.X`.
 
@@ -348,11 +350,12 @@ function investable_reduction(rd::AbstractReturnsResult,
     return nothing, rd, w, investable_fees_view(fees, nothing, rd.X)
 end
 function investable_reduction(pr::AbstractPriorResult, w::Union{VecNum, VecVecNum, MatNum},
+                              fees::Option{<:Fees}, ::Bool, ::Nothing)
+    return nothing, pr, w, investable_fees_view(fees, nothing, pr.X)
+end
+function investable_reduction(pr::AbstractPriorResult, w::Union{VecNum, VecVecNum, MatNum},
                               fees::Option{<:Fees}, strict::Bool,
-                              imsk::Option{BitVector} = investable_mask(pr))
-    if isnothing(imsk)
-        return nothing, pr, w, investable_fees_view(fees, nothing, pr.X)
-    end
+                              imsk::BitVector = investable_mask(pr))
     held = held_non_investable(imsk, w)
     if !isempty(held)
         strict_diagnostic("a value-level verb cannot score a holding the prior could not estimate. Assets $(held) are not investable, and the weights hold them. Their weights are dropped, so the figure describes the portfolio without them. Pass `strict = true` to refuse instead, reduce the weights to the investable universe, or refit the prior over a history that covers these assets.",

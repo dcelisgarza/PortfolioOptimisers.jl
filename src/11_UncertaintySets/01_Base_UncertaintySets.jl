@@ -459,8 +459,9 @@ function port_opt_view(risk_ucs::Option{<:AbstractUncertaintySetEstimator}, ::An
     return risk_ucs
 end
 """
+    investable_ucs_reduction(pr::AbstractPriorResult, rd, imsk::Nothing) -> (nothing, pr, rd)
     investable_ucs_reduction(pr::AbstractPriorResult, rd,
-                             imsk::Option{BitVector} = investable_mask(pr)) -> (imsk, pr, rd)
+                             imsk::BitVector = investable_mask(pr)) -> (imsk, pr, rd)
 
 Reduces a Prior Result, and the returns data beside it, to the Investable Mask before an estimator fits a set on them outside an optimiser.
 
@@ -468,7 +469,7 @@ A Prior Result covers the full asset universe. An asset outside its Investable M
 
 [`expand_investable_ucs`](@ref) writes the fitted set back onto the full universe. Every Prior Result follows the same pattern of reduction and expansion.
 
-The mask is the last positional slot, and its default reads it from the Prior Result. A mask of `nothing` is the path where all assets are investable, and the function then returns its arguments unchanged.
+The mask is the last positional slot, and its default reads it from the Prior Result. A mask of `nothing` is the path where all assets are investable, and the method on `Nothing` then returns its arguments unchanged.
 
 # Algorithm
 
@@ -492,11 +493,11 @@ The mask is the last positional slot, and its default reads it from the Prior Re
   - [`investable_mask`](@ref)
   - [`port_opt_view`](@ref)
 """
+function investable_ucs_reduction(pr::AbstractPriorResult, rd, ::Nothing)
+    return nothing, pr, rd
+end
 function investable_ucs_reduction(pr::AbstractPriorResult, rd,
-                                  imsk::Option{BitVector} = investable_mask(pr))
-    if isnothing(imsk)
-        return nothing, pr, rd
-    end
+                                  imsk::BitVector = investable_mask(pr))
     idx = findall(imsk)
     return imsk, port_opt_view(pr, idx), isnothing(rd) ? nothing : port_opt_view(rd, idx)
 end
