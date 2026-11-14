@@ -384,7 +384,7 @@ This is the [`port_opt_view`](@ref) method for [`ReturnsResult`](@ref). It restr
  3. View the asset returns as `view(rd.X, :, i)`. Axis 2 is the assets, and every observation is kept.
  4. When `B` is a matrix, it holds one column per asset, so view `nb` at `i` and view `B` as `view(rd.B, :, i)`. When `B` is a vector or `nothing`, `nb` and `B` pass through unchanged.
  5. View the implied volatilities as `view(rd.iv, :, i)`, and the adjustment `ivpa` at `i`.
- 6. View the [`AssetPanel`](@ref) `pnl` with [`asset_panel_view`](@ref) at `i` on the asset axis, and give it the asset names `rd.nx`. The observation index is a `Colon`, so a time-varying panel keeps every observation. The view slices the values of every Panel Field and both universe masks on the asset axis. It also slices the label axis of a tensor Panel Field whose labels are the asset names, see [`features_are_assets`](@ref). The label axis of every other field holds features, and an asset view does not change it.
+ 6. View the [`AssetPanel`](@ref) `pnl` with [`port_opt_view`](@ref) at `i` on the asset axis, and give it the asset names `rd.nx`. The observation index is a `Colon`, so a time-varying panel keeps every observation. The view slices the values of every Panel Field and both universe masks on the asset axis. It also slices the label axis of a tensor Panel Field whose labels are the asset names, see [`features_are_assets`](@ref). The label axis of every other field holds features, and an asset view does not change it.
  7. Rebuild the [`ReturnsResult`](@ref). The factor names `nf`, the factor returns `F`, the Exogenous Series `ne` and `E`, and the timestamps `ts` pass through unchanged, because none of them has an asset axis.
 
 Each field that is `nothing` stays `nothing`. No step copies data.
@@ -476,7 +476,7 @@ Return a view of the `ReturnsResult` object for assets at indices `j`, observati
  4. View the factor names `nf` at `k`. When `k` is a `Colon`, `nf` passes through. View the factor returns as `view(rd.F, i, k)`.
  5. When `B` is a matrix, it holds one column per asset, so view `nb` at `j` and view `B` as `view(rd.B, i, j)`. When `B` is a vector, every asset shares it, so view it as `view(rd.B, i)` and pass `nb` through.
  6. View the Exogenous Series as `view(rd.E, i, :)`, and pass its names `ne` through. View the timestamps `ts` at `i`, the implied volatilities as `view(rd.iv, i, j)`, and the adjustment `ivpa` at `j`.
- 7. View the [`AssetPanel`](@ref) `pnl` with [`asset_panel_view`](@ref) at the observations `i` and the assets `j`, and give it the asset names `rd.nx`. The view slices both axes of every Panel Field and of both universe masks. It also slices the label axis of a tensor Panel Field whose labels are the asset names, see [`features_are_assets`](@ref). A static panel has no observation axis and ignores `i`, as a scalar `ivpa` ignores `j`.
+ 7. View the [`AssetPanel`](@ref) `pnl` with [`port_opt_view`](@ref) at the observations `i` and the assets `j`, and give it the asset names `rd.nx`. The view slices both axes of every Panel Field and of both universe masks. It also slices the label axis of a tensor Panel Field whose labels are the asset names, see [`features_are_assets`](@ref). A static panel has no observation axis and ignores `i`, as a scalar `ivpa` ignores `j`.
  8. Rebuild the [`ReturnsResult`](@ref).
 
 Each field that is `nothing` stays `nothing`. No step copies data.
@@ -606,7 +606,7 @@ function port_opt_view(rd::ReturnsResult, i)
     B = !isa(rd.B, MatNum) ? rd.B : view(rd.B, :, i)
     iv = isnothing(rd.iv) ? nothing : view(rd.iv, :, i)
     ivpa = nothing_scalar_array_view(rd.ivpa, i)
-    pnl = asset_panel_view(rd.pnl, :, i, rd.nx)
+    pnl = port_opt_view(rd.pnl, :, i, rd.nx)
     return ReturnsResult(; nx = nx, X = X, nf = rd.nf, F = rd.F, nb = nb, B = B, ne = rd.ne,
                          E = rd.E, ts = rd.ts, iv = iv, ivpa = ivpa, pnl = pnl)
 end
@@ -630,7 +630,7 @@ function port_opt_view(rd::ReturnsResult, i, j, k = :)
     ts = isnothing(rd.ts) ? rd.ts : view(rd.ts, i)
     iv = isnothing(rd.iv) ? rd.iv : view(rd.iv, i, j)
     ivpa = nothing_scalar_array_view(rd.ivpa, j)
-    pnl = asset_panel_view(rd.pnl, i, j, rd.nx)
+    pnl = port_opt_view(rd.pnl, i, j, rd.nx)
     return ReturnsResult(; nx = nx, X = X, nf = nf, F = F, nb = nb, B = B, ne = rd.ne,
                          E = E, ts = ts, iv = iv, ivpa = ivpa, pnl = pnl)
 end
@@ -1203,10 +1203,9 @@ function benchmark_estimation_mask(rd::ReturnsResult, B::MatNum,
     if all(isfinite, B)
         return rd
     end
-    pnl = AssetPanel(; pf = pnl.pf, amsk = pnl.amsk, emsk = pnl.emsk .& isfinite.(B))
-    return ReturnsResult(; nx = rd.nx, X = rd.X, nf = rd.nf, F = rd.F, nb = rd.nb, B = B,
-                         ne = rd.ne, E = rd.E, ts = rd.ts, iv = rd.iv, ivpa = rd.ivpa,
-                         pnl = pnl)
+    return rebuild_struct(rd,
+                          (;
+                           pnl = rebuild_struct(pnl, (; emsk = pnl.emsk .& isfinite.(B)))))
 end
 """
     asset_panel(ape::Nothing, pr, rd::ReturnsResult, X) -> AssetPanel

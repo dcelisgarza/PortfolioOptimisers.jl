@@ -39,7 +39,7 @@ end
     X, amsk, pnl = windowed_panel_fixture()
     T = size(X, 1)
     win = (T - 39):T
-    pw = PortfolioOptimisers.asset_panel_view(pnl, win, :, nothing)
+    pw = PortfolioOptimisers.port_opt_view(pnl, win, :, nothing)
     me = ExpWeightedExpectedReturns(; decay = WM_DECAY, min_obs = 1)
     ve = ExpWeightedVariance(; decay = WM_DECAY, min_obs = 1)
     ce = ExpWeightedCovariance(; decay = WM_DECAY, min_obs = 1)
@@ -77,7 +77,7 @@ end
     idx = collect(60:3:120)
     @test isequal(cov(WindowedCovariance(; ce = ce, window = idx), X, pnl),
                   cov(ce, X[idx, :],
-                      PortfolioOptimisers.asset_panel_view(pnl, idx, :, nothing)))
+                      PortfolioOptimisers.port_opt_view(pnl, idx, :, nothing)))
     @test isequal(cov(WindowedCovariance(; ce = ce), X, pnl), cov(ce, X, pnl))
     @test isequal(cov(WindowedCovariance(; ce = ce, window = 40), X, nothing),
                   cov(ce, X[win, :], nothing))

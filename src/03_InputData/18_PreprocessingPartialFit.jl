@@ -162,9 +162,7 @@ function returns_with_universe(rd::ReturnsResult)::ReturnsResult
     if !isnothing(rd.pnl) || isnothing(rd.X)
         return rd
     end
-    return ReturnsResult(; nx = rd.nx, X = rd.X, nf = rd.nf, F = rd.F, nb = rd.nb, B = rd.B,
-                         ne = rd.ne, E = rd.E, ts = rd.ts, iv = rd.iv, ivpa = rd.ivpa,
-                         pnl = finite_universe_panel(rd.X))
+    return rebuild_struct(rd, (; pnl = finite_universe_panel(rd.X)))
 end
 """
 $(DocStringExtensions.TYPEDSIGNATURES)
@@ -799,9 +797,8 @@ function partial_fit_transform(est::PriceGapFill, pr::PricesResult)
             hnew[j] = gap_fill_open(raw, j, t)
         end
     end
-    X = TimeSeries.TimeArray(ts, vals, TimeSeries.colnames(pr.X))
-    out = PricesResult(; X = X, F = pr.F, B = pr.B, E = pr.E, iv = pr.iv, ivpa = pr.ivpa,
-                       pnl = pr.pnl, span = pr.span)
+    out = rebuild_struct(pr,
+                         (; X = TimeSeries.TimeArray(ts, vals, TimeSeries.colnames(pr.X))))
     cache = PriceGapFillState(; nx = names, v = vnew, held = hnew, te = last(ts))
     return rebuild_struct(est, (; cache = cache)), out
 end

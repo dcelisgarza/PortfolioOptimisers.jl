@@ -974,7 +974,7 @@ A prior result gives `w` on the rows of its own `X`, and it can hold fewer rows 
  1. When `w` is `nothing`, return `X` and `pnl` with no change.
  2. Otherwise take `t = size(X, 1)` and `s = length(w)`, and refuse `s > t`.
  3. When `s == t`, return `X` and `pnl` with no change.
- 4. Otherwise take the rows `(t - s + 1):t`. Return the view of `X` over them, and the view of `pnl` over them from [`asset_panel_view`](@ref).
+ 4. Otherwise take the rows `(t - s + 1):t`. Return the view of `X` over them, and the view of `pnl` over them from [`port_opt_view`](@ref).
 
 # Arguments
 
@@ -995,7 +995,7 @@ A prior result gives `w` on the rows of its own `X`, and it can hold fewer rows 
 
   - [`HighOrderPriorEstimator`](@ref)
   - [`HighOrderFactorPriorEstimator`](@ref)
-  - [`asset_panel_view`](@ref)
+  - [`port_opt_view`](@ref)
   - [`read_comoment`](@ref)
 """
 function scenario_rows(::Nothing, X::MatNum, pnl::Option{<:AssetPanel})
@@ -1010,7 +1010,7 @@ function scenario_rows(w::ObsWeights, X::MatNum, pnl::Option{<:AssetPanel})
         return X, pnl
     end
     idx = (t - s + 1):t
-    return view(X, idx, :), asset_panel_view(pnl, idx, :, nothing)
+    return view(X, idx, :), port_opt_view(pnl, idx, :, nothing)
 end
 """
     read_comoment(f, est, w::Nothing, X::MatNum, pnl::Option{<:AssetPanel}; kwargs...)

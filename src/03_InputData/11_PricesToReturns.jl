@@ -524,11 +524,13 @@ function prices_to_returns(pr::PricesResult; ret_method::Symbol = :simple,
     end
     #! The span is on the price clock and the masks are on the returns clock, and
     #! `universe_masks` does the crossing. Both padding conventions reach it, and it reads
-    #! which from the two row counts.
+    #! which from the two row counts. The splat passes the two masks as one pair, both
+    #! `nothing` or both matrices, and inference keeps the pair (#2090).
     RX = Matrix(X[!, nx])
-    amsk, emsk = returns_universe_masks(listing_span_view(pr.span, asset_ts, asset_ts,
-                                                          acols), RX)
-    pnl = attach_universe_masks(pnl, amsk, emsk)
+    pnl = attach_universe_masks(pnl,
+                                returns_universe_masks(listing_span_view(pr.span, asset_ts,
+                                                                         asset_ts, acols),
+                                                       RX)...)
     F = isempty(nf) ? nothing : Matrix(X[!, nf])
     B = if isempty(nb)
         nothing

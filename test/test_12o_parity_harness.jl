@@ -354,7 +354,7 @@ end
                            for n in num]; amsk = A[rows, cols], emsk = pnl.emsk[rows, cols])
         @test all(panel_field(sub, n).vals == panel_field(v, n).vals for n in num)
         @test PO.feature_row_indices(pnl, [3, 7, 20], collect(1:80)) == [3, 7, 20]
-        @test PO.asset_panel_view(nothing, rows, cols, nothing) === nothing
+        @test PO.port_opt_view(nothing, rows, cols, nothing) === nothing
     end
 
     @testset "The carriers keep the panel" begin

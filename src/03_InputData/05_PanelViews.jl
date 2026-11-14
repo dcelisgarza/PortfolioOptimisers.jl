@@ -138,46 +138,6 @@ function panel_feature_names(pnl::AssetPanel)
     return nz
 end
 """
-    asset_panel_view(pnl::Nothing, i, j, nx) -> nothing
-    asset_panel_view(pnl::AssetPanel, i, j, nx) -> AssetPanel
-
-View the [`AssetPanel`](@ref) of a `PricesResult` or a `ReturnsResult`, or return `nothing` when the input data holds none.
-
-[`port_opt_view`](@ref) of a [`PricesResult`](@ref) or of a [`ReturnsResult`](@ref) calls it, and [`MissingDataFilter`](@ref) reaches it through that view. So the `nothing` case has one method, and no call site needs a branch for it.
-
-# Algorithm
-
-The method that Julia selects is the algorithm.
-
- 1. `pnl` is `nothing`: return `nothing`.
- 2. `pnl` is an [`AssetPanel`](@ref): return [`port_opt_view`](@ref) of it.
-
-# Arguments
-
-  - `pnl`: The Asset Panel, or `nothing`.
-  - `i`: Observation index. A static panel has no observation axis and ignores it.
-  - `j`: Asset index.
-  - `nx`: The asset names, or `nothing`. [`port_opt_view`](@ref) uses them to cut a tensor Panel Field whose labels are the asset names on its label axis too. With `nothing`, every label axis stays whole.
-
-# Returns
-
-  - `pnl′::Option{<:AssetPanel}`: The Asset Panel over the selected observations and assets, or `nothing`.
-
-# Related
-
-  - [`AssetPanel`](@ref)
-  - [`port_opt_view`](@ref)
-  - [`ReturnsResult`](@ref)
-  - [`PricesResult`](@ref)
-  - [`MissingDataFilter`](@ref)
-"""
-function asset_panel_view(::Nothing, ::Any, ::Any, ::Any)
-    return nothing
-end
-function asset_panel_view(pnl::AssetPanel, i, j, nx::Option{<:VecStr})
-    return port_opt_view(pnl, i, j, nx)
-end
-"""
     label_positions(names, sel, what::AbstractString) -> typeof(sel)
     label_positions(names, sel::VecDate, what::AbstractString) -> Union{}
     label_positions(names::Nothing, sel::VecStr, what::AbstractString) -> Union{}

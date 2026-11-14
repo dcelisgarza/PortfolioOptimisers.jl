@@ -485,29 +485,34 @@ end
     @test_throws DomainError BackwardPanelFill(; lim = -1)
 
     v = [missing, 1.0, missing, missing, 2.0, missing]
-    @test PortfolioOptimisers.panel_fill(ConstantPanelFill(; val = -1.0), v, "f") ==
-          [-1.0, 1.0, -1.0, -1.0, 2.0, -1.0]
+    @test PortfolioOptimisers.panel_fill(ConstantPanelFill(; val = -1.0), v, nothing,
+                                         "f") == [-1.0, 1.0, -1.0, -1.0, 2.0, -1.0]
     # A forward fill carries the last observed value, and a leading blank falls to `val`.
-    @test PortfolioOptimisers.panel_fill(ForwardPanelFill(; val = 0.0), v, "f") ==
+    @test PortfolioOptimisers.panel_fill(ForwardPanelFill(; val = 0.0), v, nothing, "f") ==
           [0.0, 1.0, 1.0, 1.0, 2.0, 2.0]
     # The limit stops the carry after that many consecutive blanks.
-    @test PortfolioOptimisers.panel_fill(ForwardPanelFill(; val = 0.0, lim = 1), v, "f") ==
-          [0.0, 1.0, 1.0, 0.0, 2.0, 2.0]
+    @test PortfolioOptimisers.panel_fill(ForwardPanelFill(; val = 0.0, lim = 1), v, nothing,
+                                         "f") == [0.0, 1.0, 1.0, 0.0, 2.0, 2.0]
     # A backward fill looks the other way, and its trailing blank falls to `val`.
-    @test PortfolioOptimisers.panel_fill(BackwardPanelFill(; val = 0.0), v, "f") ==
+    @test PortfolioOptimisers.panel_fill(BackwardPanelFill(; val = 0.0), v, nothing, "f") ==
           [1.0, 1.0, 2.0, 2.0, 2.0, 0.0]
 
     # The default `nothing` refuses a blank and passes a complete column through.
     @test isnothing(NumericPanelInput(; name = "f", vals = [1.0, 2.0]).alg)
     @test_throws "its fill policy is nothing, which refuses one" PortfolioOptimisers.panel_fill(nothing,
                                                                                                 v,
+                                                                                                nothing,
                                                                                                 "f")
-    @test PortfolioOptimisers.panel_fill(nothing, [1.0, 2.0], "f") == [1.0, 2.0]
+    @test PortfolioOptimisers.panel_fill(nothing, [1.0, 2.0], nothing, "f") == [1.0, 2.0]
     @test PortfolioOptimisers.panel_fill(nothing, [1.0, 2.0], trues(2), "f") == [1.0, 2.0]
-    @test PortfolioOptimisers.panel_placeholder(nothing, v) == falses(length(v))
+    @test PortfolioOptimisers.panel_placeholder(nothing, v, nothing) == falses(length(v))
+    # A policy takes the mask slot in its own method; the fallbacks that dropped it are gone
+    # (#2090), so a policy that knows no mask takes the slot and ignores it.
+    @test !hasmethod(PortfolioOptimisers.panel_fill,
+                     Tuple{ConstantPanelFill, Vector{Float64}, String})
 end
-# A test-local input and a test-local policy that define only the methods an extension written
-# before #1413 defines: the builder reaches them through the fallbacks that drop the active mask.
+# A test-local input and a test-local policy of an extension that reads no active mask. Each
+# takes the mask slot and ignores it (#2090).
 struct Test06bPanelInput <: PortfolioOptimisers.AbstractPanelFieldInput
     name::String
     vals::Matrix{Float64}
@@ -517,16 +522,16 @@ function test06b_numeric(inp::Test06bPanelInput)
     return NumericPanelInput(; name = inp.name, vals = inp.vals, alg = inp.alg)
 end
 PortfolioOptimisers.panel_input_is_static(::Test06bPanelInput) = false
-function PortfolioOptimisers.panel_resolve(inp::Test06bPanelInput)
+function PortfolioOptimisers.panel_resolve(inp::Test06bPanelInput, ::Any = nothing)
     return PortfolioOptimisers.panel_resolve(test06b_numeric(inp))
 end
 function PortfolioOptimisers.panel_input_field(inp::Test06bPanelInput, vals, obs)
     return PortfolioOptimisers.panel_input_field(test06b_numeric(inp), vals, obs)
 end
 struct Test06bPanelFill <: PortfolioOptimisers.AbstractPanelFillAlgorithm end
-function PortfolioOptimisers.panel_fill(::Test06bPanelFill, v::AbstractVector,
+function PortfolioOptimisers.panel_fill(::Test06bPanelFill, v::AbstractVector, ::Any,
                                         ::AbstractString)
-    return PortfolioOptimisers.panel_fill(ForwardPanelFill(), v, "f")
+    return PortfolioOptimisers.panel_fill(ForwardPanelFill(), v, nothing, "f")
 end
 @testset "A policy of the user needs no val" begin
     # The check of the type of val reads only the policies of the library, so a categorical
@@ -580,7 +585,7 @@ end
     @test tf.vals[1, 1, 5:8] == fill(-1.0, 4)
     @test tf.vals[1, 2, 5:8] == fill(-1.0, 4)
     @test tf.vals[2, :, :] == t[2, :, :]
-    # The one-argument resolution reads no mask, so the column is one stretch.
+    # The resolution with no mask, its default, makes the column one stretch.
     inp = NumericPanelInput(; name = "x", vals = x, alg = ForwardPanelFill(; val = -1.0))
     @test PortfolioOptimisers.panel_resolve(inp)[1][8, 1] == 4.0
     @test PortfolioOptimisers.panel_resolve(inp, amsk)[1][8, 1] == -1.0
@@ -588,7 +593,7 @@ end
     @test_throws DimensionMismatch PortfolioOptimisers.panel_resolve(inp, trues(11, 2))
     @test_throws DimensionMismatch asset_panel([inp]; amsk = trues(12, 3),
                                                emsk = trues(12, 3))
-    # An extension's input and policy that know no mask keep working through the fallbacks.
+    # An extension's input and policy that ignore the mask slot read no mask.
     ext = Test06bPanelInput("x", x, ForwardPanelFill(; val = -1.0))
     @test panel_field(asset_panel([ext]; amsk = amsk, emsk = amsk), "x").vals[8, 1] == 4.0
     own = NumericPanelInput(; name = "x", vals = x, alg = Test06bPanelFill())
@@ -1442,6 +1447,8 @@ end
     nx = ["A", "B", "C"]
     @test PortfolioOptimisers.panel_frame_assets(nx, nothing) == [1, 2, 3]
     @test PortfolioOptimisers.panel_frame_assets(nx, "B") == [2]
+    # The method of one string refuses an unknown name as the method of a collection does.
+    @test_throws KeyError PortfolioOptimisers.panel_frame_assets(nx, "D")
     @test PortfolioOptimisers.panel_frame_assets(nx, ["C", "A"]) == [3, 1]
     @test_throws KeyError PortfolioOptimisers.panel_frame_assets(nx, ["D"])
     @test_throws ArgumentError PortfolioOptimisers.panel_frame_assets(nx, ["A", "A"])
@@ -2068,16 +2075,15 @@ end
     @test v.emsk == v.amsk
     # The alignment to `book` moves the start of asset 1 to observation 2, so observation 1
     # holds no active asset.
-    res = panel_align_active(pnl, "book")
-    @test res.n == 1
-    @test res.pnl.amsk == Bool[0 0; 1 1; 0 1]
-    @test !any(res.pnl.amsk[1, :])
+    al, n = panel_align_active(pnl, "book")
+    @test n == 1
+    @test al.amsk == Bool[0 0; 1 1; 0 1]
+    @test !any(al.amsk[1, :])
     # The long table keeps no cell of that observation, and the manifest restores it.
-    @test panel_1399_equal(res.pnl, panel_1399_trip(res.pnl; layout = :long);
-                           active_only = true)
+    @test panel_1399_equal(al, panel_1399_trip(al; layout = :long); active_only = true)
     # The count of active assets of each observation is 0, 2 and 1.
-    c = PortfolioOptimisers.panel_mask_coverage(res.pnl.amsk)
-    @test c.per_observation == (; min = 0, median = 1.0, max = 2)
+    c = PortfolioOptimisers.panel_mask_coverage(al.amsk)
+    @test c.per_observation == PortfolioOptimisers.CountSpread(0, 1.0, 2)
 end
 @testset "asset_panel(df, mf): masks alone, a lifted field and the parity fixture" begin
     # A panel with no Panel Field, and one with no observation.

@@ -231,7 +231,7 @@ The panel method of a windowed estimator cuts the returns to the window. It give
 The method that Julia selects is the algorithm.
 
  1. `win` is a `Colon`: return `pnl` unchanged.
- 2. `win` is an index vector: return the view of `pnl` over the rows in `win` and every asset, with [`asset_panel_view`](@ref). A `nothing` panel stays `nothing`.
+ 2. `win` is an index vector: return the view of `pnl` over the rows in `win` and every asset, with [`port_opt_view`](@ref). A `nothing` panel stays `nothing`.
 
 # Arguments
 
@@ -244,7 +244,7 @@ The method that Julia selects is the algorithm.
 
 # Related
 
-  - [`asset_panel_view`](@ref)
+  - [`port_opt_view`](@ref)
   - [`windowed_preamble`](@ref)
   - [`AssetPanel`](@ref)
 """
@@ -252,7 +252,7 @@ function windowed_panel(pnl::Option{<:AssetPanel}, ::Colon)
     return pnl
 end
 function windowed_panel(pnl::Option{<:AssetPanel}, win::VecInt)
-    return asset_panel_view(pnl, win, :, nothing)
+    return port_opt_view(pnl, win, :, nothing)
 end
 """
     windowed_series_rows(window::Nothing, t::Integer) -> UnitRange

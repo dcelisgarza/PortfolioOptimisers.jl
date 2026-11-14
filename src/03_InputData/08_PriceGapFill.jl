@@ -584,12 +584,13 @@ function apply_preprocessing(res::PriceGapFillResult, pr::PricesResult)::PricesR
         end
         gap_fill_column!(res.fill, vals, span, j, v, t0)
     end
-    X = TimeSeries.TimeArray(TimeSeries.timestamp(pr.X), vals, names)
     #! A fill states a price, not a listing, so the span passes through untouched: it is
     #! what bounded the fill, and the Span Rule reads the same listing off the filled
     #! panel as off the raw one.
-    return PricesResult(; X = X, F = pr.F, B = pr.B, E = pr.E, iv = pr.iv, ivpa = pr.ivpa,
-                        pnl = pr.pnl, span = pr.span)
+    return rebuild_struct(pr,
+                          (;
+                           X = TimeSeries.TimeArray(TimeSeries.timestamp(pr.X), vals,
+                                                    names)))
 end
 
 export CarriedPrice, PriceGapFill, PriceGapFillResult

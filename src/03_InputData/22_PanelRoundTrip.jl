@@ -696,7 +696,37 @@ function panel_code_reader(s::NamedTuple, ::Type{T}) where {T <: Integer}
     end
 end
 """
-    panel_manifest_axes(mf::DataFrames.DataFrame) -> NamedTuple
+$(DocStringExtensions.TYPEDEF)
+
+Holds the shape, the observation labels and the asset names of a manifest that [`panel_manifest`](@ref) wrote.
+
+This type is an implementation detail and is not intended for direct use. [`panel_manifest_axes`](@ref) makes it, and [`asset_panel`](@ref), [`panel_table_cells`](@ref) and [`panel_long_cells`](@ref) read it.
+
+# Fields
+
+$(DocStringExtensions.FIELDS)
+
+# Related
+
+  - [`panel_manifest_axes`](@ref)
+  - [`asset_panel`](@ref)
+"""
+@concrete struct PanelManifestAxes
+    """
+    `static`: Whether the panel is static.
+    """
+    static
+    """
+    `ts`: The observation labels, as text. Empty for a static panel.
+    """
+    ts
+    """
+    `nx`: The asset names, as text.
+    """
+    nx
+end
+"""
+    panel_manifest_axes(mf::DataFrames.DataFrame) -> PanelManifestAxes
 
 Read the shape, the observation labels and the asset names from a manifest that [`panel_manifest`](@ref) wrote.
 
@@ -718,10 +748,11 @@ Read the shape, the observation labels and the asset names from a manifest that 
 
 # Returns
 
-  - `(; static, ts, nx)`: Whether the panel is static, the observation labels and the asset names, as text.
+  - `ax::PanelManifestAxes`: Whether the panel is static, the observation labels and the asset names, as text.
 
 # Related
 
+  - [`PanelManifestAxes`](@ref)
   - [`asset_panel`](@ref)
   - [`panel_manifest`](@ref)
   - [`panel_text`](@ref)
@@ -739,7 +770,7 @@ function panel_manifest_axes(mf::DataFrames.DataFrame)
               ArgumentError("the manifest states a static panel and holds $(length(ts)) \"observation\" row(s), but a static panel has no observation axis"))
     @argcheck(allunique(nx),
               ArgumentError("the manifest names an asset twice, so a table column or a table row cannot name one asset. Got\nnx => $(nx)"))
-    return (; static = static, ts = ts, nx = nx)
+    return PanelManifestAxes(static, ts, nx)
 end
 """
     panel_manifest_fields(mf::DataFrames.DataFrame) -> Vector{<:NamedTuple}
@@ -883,7 +914,7 @@ function panel_manifest_attach!(specs::AbstractVector{<:NamedTuple}, r::Integer,
     return nothing
 end
 """
-    panel_long_cells(df::DataFrames.DataFrame, ax::NamedTuple) -> Vector{Int}
+    panel_long_cells(df::DataFrames.DataFrame, ax::PanelManifestAxes) -> Vector{Int}
 
 Find the cell of the panel that each row of a long table holds.
 
@@ -918,7 +949,7 @@ A long table from [`panel_dataframe`](@ref) holds one row per asset of a static 
   - [`panel_table_read!`](@ref)
   - [`panel_text`](@ref)
 """
-function panel_long_cells(df::DataFrames.DataFrame, ax::NamedTuple)
+function panel_long_cells(df::DataFrames.DataFrame, ax::PanelManifestAxes)
     kpos = Dict(a => k for (k, a) in pairs(ax.nx))
     #! A table column states no element type that inference can read, so a comprehension over
     #! it reaches every method that a package adds to `Base.collect_to_with_first!`, and JET
@@ -1078,7 +1109,7 @@ function asset_panel(df::DataFrames.DataFrame, mf::DataFrames.DataFrame; fields 
                       emsk = panel_table_mask(lin, tab, "emsk", sz))
 end
 """
-    panel_table_cells(df::DataFrames.DataFrame, ax::NamedTuple) -> Option{Vector{Int}}
+    panel_table_cells(df::DataFrames.DataFrame, ax::PanelManifestAxes) -> Option{Vector{Int}}
 
 Tell the layout of a table from [`panel_dataframe`](@ref), and find where its rows go in the panel.
 
@@ -1110,7 +1141,7 @@ Only the long layout holds an `"asset"` column. The wide layout names a column `
   - [`panel_long_cells`](@ref)
   - [`Option`](@ref)
 """
-function panel_table_cells(df::DataFrames.DataFrame, ax::NamedTuple)
+function panel_table_cells(df::DataFrames.DataFrame, ax::PanelManifestAxes)
     if !iszero(DataFrames.columnindex(df, "asset"))
         return panel_long_cells(df, ax)
     end
@@ -1201,7 +1232,7 @@ function panel_manifest_select(specs::AbstractVector{<:NamedTuple}, ::Nothing)
     return specs
 end
 function panel_manifest_select(specs::AbstractVector{<:NamedTuple}, fields::AbstractString)
-    return panel_manifest_select(specs, [fields])
+    return [panel_manifest_entry(specs, fields)]
 end
 function panel_manifest_select(specs::AbstractVector{<:NamedTuple}, fields)
     return [panel_manifest_entry(specs, String(name)) for name in fields]

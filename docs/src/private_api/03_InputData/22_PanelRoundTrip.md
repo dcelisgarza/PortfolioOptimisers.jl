@@ -1,8 +1,14 @@
 ```@meta
-Description = "Panel round trip, private API of PortfolioOptimisers.jl: panel_frame_axes, panel_manifest_row!, panel_manifest_rows!, panel_text, panel_table_column, …"
+Description = "Panel round trip, private API of PortfolioOptimisers.jl: PanelManifestAxes, panel_frame_axes, panel_manifest_row!, panel_manifest_rows!, panel_text, …"
 ```
 
 # Panel round trip: private API
+
+## Types
+
+```@docs
+PortfolioOptimisers.PanelManifestAxes
+```
 
 ## Functions
 

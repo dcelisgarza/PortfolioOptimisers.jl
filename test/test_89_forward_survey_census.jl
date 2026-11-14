@@ -25,7 +25,7 @@ using Test
     nt_hook_doc = join([q3, "    nt_hook(x)", "", "A hook.", "", "# Interfaces", "",
                         "## `nt_hook`", "", "A subtype implements it.", q3], '\n')
     source = """
-             export verb, verb2, pubf, pubk, mk, kwv, nt_pub
+             export verb, verb2, pubf, pubk, mk, kwv, nt_pub, pubfill
              struct A end
              struct B end
              struct R
@@ -175,6 +175,11 @@ using Test
              privf(x::A, y::B) = privf(x, string(y))
              pubk(x::A; s = 1) = pubk(s, x)
              fill1(x::A) = fill1(x, 1)
+             # a slot before a passed argument: no default holds it (#2090)
+             pubfill(x::A) = pubfill(1, x)
+             privfill(x::A) = privfill(1, x)
+             # a trait before a passed argument keeps the old verdict
+             traitfill(x::A) = traitfill(kind(x), x)
              walk(x::A) = walk(x.child)
 
              # worker: a private worker with one caller, and a method around a driver.
@@ -378,6 +383,12 @@ using Test
         @test of(:pubk) == [("self-forward", :pubk, "keep (a)")]
         @test of(:fill1) == [("self-forward", :fill1, "go")]
         @test occursin("defaulted positional", first_of(:fill1).why)
+        # A filled slot before a passed argument converts the call: a public verb keeps it as
+        # reason (a), and a private function lets the caller pass the canonical form (#2090).
+        @test of(:pubfill) == [("self-forward", :pubfill, "keep (a)")]
+        @test of(:privfill) == [("self-forward", :privfill, "go")]
+        @test occursin("converts its arguments", first_of(:privfill).why)
+        @test occursin("defaulted positional", first_of(:traitfill).why)
         # A recursion on a field is a traversal.
         @test isempty(of(:walk))
     end

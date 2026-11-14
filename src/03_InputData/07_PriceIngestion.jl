@@ -168,14 +168,13 @@ function assert_no_infinite_price(v::AbstractArray, names, ts)::Nothing
                              "an infinite value is neither a price nor the marker of an absence, and the ingestion layer spells an absent price `NaN`; got $(v[k]) in column `$(names[col])` at $(ts[idx[1]]). Spell the absence `NaN` or `missing`, or correct the price, before the call."))
 end
 """
-    unify_gaps(A::TimeSeries.TimeArray) -> TimeSeries.TimeArray
-    unify_gaps(A::TimeSeries.TimeArray, ::Type{T}) -> TimeSeries.TimeArray
+    unify_gaps(A::TimeSeries.TimeArray, ::Type{T} = absence_type(series_value_type(A))) -> TimeSeries.TimeArray
 
 Spell every absent price of one series the one way the ingestion layer carries, in the value type `T`.
 
 A source spells an absent price one of two ways. An outer join of ragged per-asset histories pads with `NaN`, and a wide table built from a tidy one leaves `missing`. The layer unifies both as `NaN`, which no deletion step reads. This defines a gap for every later piece, so it runs before the Span Rule and before the join.
 
-The caller does not name the target type. The one-argument form derives it from the series alone with [`absence_type`](@ref), and the conversion uses this form for a `PricesResult` built by hand. [`price_ingestion`](@ref) first promotes the asset, factor and benchmark series to one type, because the join lays them in one table, and passes that type to the two-argument form.
+The caller does not name the target type. The default of `T` derives it from the series alone with [`absence_type`](@ref), and the conversion uses this default for a `PricesResult` built by hand. [`price_ingestion`](@ref) first promotes the asset, factor and benchmark series to one type, because the join lays them in one table, and passes that type as `T`.
 
 # Algorithm
 
@@ -193,7 +192,7 @@ The caller does not name the target type. The one-argument form derives it from 
 
   - Every value is `missing`, `NaN`, or finite. An infinity raises a `DomainError` naming the column and the observation.
   - `T` carries an absence when a value is `missing`. Raises a `DomainError` naming `T`, from [`absent_value`](@ref).
-  - The one-argument form: the element type of the series is not `Missing` alone. Raises a `DomainError`, from [`absence_type`](@ref).
+  - With the default `T`: the element type of the series is not `Missing` alone. Raises a `DomainError`, from [`absence_type`](@ref).
 
 # Returns
 
@@ -209,10 +208,8 @@ The caller does not name the target type. The one-argument form derives it from 
   - [`assert_no_infinite_price`](@ref)
   - [`listing_span`](@ref)
 """
-function unify_gaps(A::TimeSeries.TimeArray)
-    return unify_gaps(A, absence_type(series_value_type(A)))
-end
-function unify_gaps(A::TimeSeries.TimeArray, ::Type{T}) where {T}
+function unify_gaps(A::TimeSeries.TimeArray,
+                    ::Type{T} = absence_type(series_value_type(A))) where {T}
     v = values(A)
     assert_no_infinite_price(v, TimeSeries.colnames(A), TimeSeries.timestamp(A))
     if eltype(v) === T
@@ -651,13 +648,13 @@ function price_ingestion(est::PriceIngestion, X::TimeSeries.TimeArray;
         nothing
     else
         push!(lines, padding_report_line("iv", iv, ts))
-        align_series(unify_gaps(iv, absence_type(series_value_type(iv))), ts)
+        align_series(unify_gaps(iv), ts)
     end
     Ea = if isnothing(E)
         nothing
     else
         push!(lines, padding_report_line("E", E, ts))
-        align_series(unify_gaps(E, absence_type(series_value_type(E))), ts)
+        align_series(unify_gaps(E), ts)
     end
     assert_join_padding(lines, est.strict)
     #! The collapse is the one step here that renumbers an observation, and a Panel Field is
@@ -675,9 +672,7 @@ function price_ingestion(est::PriceIngestion, pr::PricesResult)::PricesResult
     #! only where neither states one. A declared span is on the clock the caller handed
     #! in, so after a collapse that moves the clock, the PricesResult constructor refuses
     #! it by its shape.
-    span = isnothing(est.span) ? pr.span : est.span
-    est = PriceIngestion(; join_method = est.join_method, collapse_args = est.collapse_args,
-                         span = span, strict = est.strict)
+    est = rebuild_struct(est, (; span = isnothing(est.span) ? pr.span : est.span))
     return price_ingestion(est, pr.X; F = pr.F, B = pr.B, E = pr.E, iv = pr.iv,
                            ivpa = pr.ivpa, pnl = pr.pnl)
 end
@@ -1083,10 +1078,9 @@ function returns_universe_masks(span::AbstractMatrix{Bool}, R::AbstractMatrix)
 end
 """
     attach_universe_masks(pnl, amsk::Nothing, emsk::Nothing)
-    attach_universe_masks(pnl::Nothing, amsk::AllTrueMask, emsk::AllTrueMask) -> nothing
-    attach_universe_masks(pnl::Nothing, amsk::AbstractMatrix{Bool}, emsk::AbstractMatrix{Bool}) -> AssetPanel
-    attach_universe_masks(pnl::AssetPanel{Nothing}, amsk::AbstractMatrix{Bool}, emsk::AbstractMatrix{Bool}) -> Option{<:AssetPanel}
-    attach_universe_masks(pnl::AssetPanel, amsk::AbstractMatrix{Bool}, emsk::AbstractMatrix{Bool}) -> AssetPanel
+    attach_universe_masks(pnl::Option{<:AssetPanel{Nothing}}, amsk::AllTrueMask, emsk::AllTrueMask) -> nothing
+    attach_universe_masks(pnl::Option{<:AssetPanel{Nothing}}, amsk::AbstractMatrix{Bool}, emsk::AbstractMatrix{Bool}) -> AssetPanel
+    attach_universe_masks(pnl::AssetPanel{<:AbstractVector}, amsk::AbstractMatrix{Bool}, emsk::AbstractMatrix{Bool}) -> AssetPanel
 
 Put the two universe masks onto the [`AssetPanel`](@ref) that the `ReturnsResult` holds.
 
@@ -1126,18 +1120,16 @@ The method that Julia selects is the algorithm.
 function attach_universe_masks(pnl, ::Nothing, ::Nothing)
     return pnl
 end
-function attach_universe_masks(::Nothing, ::AllTrueMask, ::AllTrueMask)
+function attach_universe_masks(::Option{<:AssetPanel{Nothing}}, ::AllTrueMask,
+                               ::AllTrueMask)
     return nothing
 end
-function attach_universe_masks(::Nothing, amsk::AbstractMatrix{Bool},
+function attach_universe_masks(::Option{<:AssetPanel{Nothing}}, amsk::AbstractMatrix{Bool},
                                emsk::AbstractMatrix{Bool})::AssetPanel
     return AssetPanel(; amsk = amsk, emsk = emsk)
 end
-function attach_universe_masks(::AssetPanel{Nothing}, amsk::AbstractMatrix{Bool},
-                               emsk::AbstractMatrix{Bool})
-    return attach_universe_masks(nothing, amsk, emsk)
-end
-function attach_universe_masks(pnl::AssetPanel, amsk::AbstractMatrix{Bool},
+function attach_universe_masks(pnl::AssetPanel{<:AbstractVector},
+                               amsk::AbstractMatrix{Bool},
                                emsk::AbstractMatrix{Bool})::AssetPanel
     pf = if panel_is_static(pnl)
         [panel_field_lift(f, size(amsk, 1)) for f in pnl.pf]

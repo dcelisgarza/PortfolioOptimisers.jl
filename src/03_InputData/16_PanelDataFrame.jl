@@ -98,7 +98,7 @@ The panel holds no asset names. Its Panel Fields share an asset axis, and the `P
 The method that Julia selects is the algorithm.
 
  1. `assets` is `nothing`: return every position, in axis order.
- 2. `assets` is one string: return the position of that label, as a one-entry vector.
+ 2. `assets` is one string: return the position of that label, as a one-entry vector. The method finds and refuses the label as step 3 does for each entry, and the two copies of the rule agree.
  3. Otherwise: find the first position of each label in `nx`, in the order of `assets`, and check that no position repeats.
 
 # Arguments
@@ -125,7 +125,10 @@ function panel_frame_assets(nx::VecStr, ::Nothing)
     return collect(1:length(nx))
 end
 function panel_frame_assets(nx::VecStr, assets::AbstractString)
-    return panel_frame_assets(nx, [assets])
+    k = findfirst(==(assets), nx)
+    @argcheck(!isnothing(k),
+              KeyError("the panel's universe holds no asset named `$assets`$(did_you_mean(assets, nx)). It holds $(length(nx)): $(join(nx, ", "))"))
+    return [something(k)]
 end
 function panel_frame_assets(nx::VecStr, assets)
     j = Int[]

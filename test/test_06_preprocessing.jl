@@ -1384,25 +1384,25 @@ include(joinpath(@__DIR__, "asset_panel_fixture.jl"))
         @test PortfolioOptimisers.panel_feature_names(pnl) == panel_feature_matrix(pnl)[1]
 
         # The view cuts the label axis of a square tensor field only when it has the names.
-        @test isnothing(PortfolioOptimisers.asset_panel_view(nothing, 1:2, 1:2, nothing))
+        @test isnothing(PortfolioOptimisers.port_opt_view(nothing, 1:2, 1:2, nothing))
         sq = AssetPanel(;
                         pf = [TensorPanelField(; name = "prox", axis = "asset",
                                                labels = ["A", "B", "C"],
                                                vals = [1.0 2.0 3.0; 4.0 5.0 6.0;
                                                        7.0 8.0 9.0])])
-        @test panel_feature_matrix(PortfolioOptimisers.asset_panel_view(sq, :, [2, 3],
-                                                                        ["A", "B", "C"])) ==
+        @test panel_feature_matrix(PortfolioOptimisers.port_opt_view(sq, :, [2, 3],
+                                                                     ["A", "B", "C"])) ==
               (["prox=B", "prox=C"], [5.0 6.0; 8.0 9.0])
-        @test panel_feature_matrix(PortfolioOptimisers.asset_panel_view(sq, :, [2, 3],
-                                                                        nothing)) ==
+        @test panel_feature_matrix(PortfolioOptimisers.port_opt_view(sq, :, [2, 3],
+                                                                     nothing)) ==
               (["prox=A", "prox=B", "prox=C"], [4.0 5.0 6.0; 7.0 8.0 9.0])
         # A time-varying panel is cut on both axes, and a static one ignores the rows.
         Z3 = permutedims(reshape(Float64.(1:36), 6, 3, 2), (2, 3, 1))
-        tv = PortfolioOptimisers.asset_panel_view(matrix_panel(["f1", "f2"], Z3), [2, 5],
-                                                  [1, 3], nothing)
+        tv = PortfolioOptimisers.port_opt_view(matrix_panel(["f1", "f2"], Z3), [2, 5],
+                                               [1, 3], nothing)
         @test panel_feature_matrix(tv)[2] == Z3[[1, 3], :, [2, 5]]
-        st = PortfolioOptimisers.asset_panel_view(matrix_panel(["f1", "f2"], Z3[:, :, 1]),
-                                                  [2, 5], [1, 3], nothing)
+        st = PortfolioOptimisers.port_opt_view(matrix_panel(["f1", "f2"], Z3[:, :, 1]),
+                                               [2, 5], [1, 3], nothing)
         @test panel_feature_matrix(st)[2] == Z3[[1, 3], :, 1]
     end
     @testset "the preprocessing family: its levels, its missing values and its stubs" begin
@@ -3406,8 +3406,8 @@ end
     # oracle prints 2.
     amsk = Bool[1 0 0 0; 1 1 0 0; 1 1 1 0; 1 1 1 1]
     c = PO.panel_mask_coverage(amsk)
-    @test c.per_observation == (; min = 1, median = 2.5, max = 4)
-    @test c.durations == (; min = 1, median = 2.5, max = 4)
+    @test c.per_observation == PO.CountSpread(1, 2.5, 4)
+    @test c.durations == PO.CountSpread(1, 2.5, 4)
     s = sprint(panel_info, AssetPanel(; amsk = amsk, emsk = amsk))
     @test occursin("assets per obs.  : min 1, median 2.5, max 4", s)
     @test occursin("duration (obs.)  : min 1, median 2.5, max 4", s)
@@ -3415,33 +3415,33 @@ end
 
 @testset "panel_align_active moves the start of each asset to its first observed cell" begin
     pnl = summary_small_panel()
-    res = panel_align_active(pnl, "mcap")
+    al, n = panel_align_active(pnl, "mcap")
     # Asset 1 starts at 2; asset 2 is observed at its first cell; asset 3 is never observed
     # while active, so it leaves the universe.
-    @test res.n == 1 + 2
-    @test res.pnl.amsk == Bool[0 1 0; 1 1 0; 1 1 0]
-    @test res.pnl.emsk == res.pnl.emsk .& res.pnl.amsk
-    @test res.pnl.emsk == Bool[0 0 0; 1 1 0; 1 1 0]
-    @test res.pnl.pf === pnl.pf
+    @test n == 1 + 2
+    @test al.amsk == Bool[0 1 0; 1 1 0; 1 1 0]
+    @test al.emsk == al.emsk .& al.amsk
+    @test al.emsk == Bool[0 0 0; 1 1 0; 1 1 0]
+    @test al.pf === pnl.pf
     # The tensor field is observed at a pair when each label is. Its gap at (3, 3) follows
     # the first active cell of asset 3, which is observed, so it stays.
-    res = panel_align_active(pnl, ["beta"])
-    @test res.n == 1
-    @test res.pnl.amsk == Bool[0 1 0; 1 1 1; 1 1 1]
+    al, n = panel_align_active(pnl, ["beta"])
+    @test n == 1
+    @test al.amsk == Bool[0 1 0; 1 1 1; 1 1 1]
     # The order of the fields does not change the result, and a second call removes nothing.
-    a = panel_align_active(pnl, ["mcap", "beta", "sector"])
-    b = panel_align_active(pnl, ["sector", "beta", "mcap"])
-    @test a.pnl.amsk == b.pnl.amsk
-    @test a.n == b.n
-    @test panel_align_active(a.pnl, ["mcap", "beta", "sector"]).n == 0
+    a, na = panel_align_active(pnl, ["mcap", "beta", "sector"])
+    b, nb = panel_align_active(pnl, ["sector", "beta", "mcap"])
+    @test a.amsk == b.amsk
+    @test na == nb
+    @test panel_align_active(a, ["mcap", "beta", "sector"])[2] == 0
     # No field, or a field that cannot blank, removes nothing.
-    @test panel_align_active(pnl, String[]).n == 0
+    @test panel_align_active(pnl, String[])[2] == 0
     lifted = AssetPanel(;
                         pf = [NumericPanelField(; name = "x",
                                                 vals = PO.RepeatedObservations([1.0, 2.0,
                                                                                 3.0], 3))],
                         amsk = pnl.amsk, emsk = pnl.emsk)
-    @test panel_align_active(lifted, "x").n == 0
+    @test panel_align_active(lifted, "x")[2] == 0
     @test_throws KeyError panel_align_active(pnl, "nope")
     static = AssetPanel(; pf = [NumericPanelField(; name = "mcap", vals = [1.0, 2.0])])
     @test_throws ArgumentError panel_align_active(static, "mcap")
@@ -3496,33 +3496,33 @@ end
 @testset "panel_align_active equals the oracle on the parity fixture" begin
     pnl = summary_parity_panel()
     for (case, fs) in SUMMARY_ALIGN_CASES
-        res = panel_align_active(pnl, fs)
+        al, nal = panel_align_active(pnl, fs)
         n = Int.(vec(parity_load("AssetPanelSummary", "Align$case", "N")))
         # The oracle's second call; one call of ours gives it.
         amsk = parity_load("AssetPanelSummary", "Align$case", "ActiveMask2")
-        @test res.pnl.amsk == (amsk .== 1)
-        @test res.n == sum(n)
-        @test res.pnl.emsk ==
+        @test al.amsk == (amsk .== 1)
+        @test nal == sum(n)
+        @test al.emsk ==
               (parity_load("AssetPanelSummary", "Align$case", "EstimationMask") .== 1) .&
-              res.pnl.amsk
+              al.amsk
         first = parity_load("AssetPanelSummary", "Align$case", "ActiveMask") .== 1
         if case == "SalesBook"
             # Better: the oracle's first call walks the fields in turn, so it stops at
             # observation 5 on asset 7, where `sales_ttm` is not observed, and its second
             # call moves on to observation 10. The rule of the library is its fixed point.
             @test findfirst(first[:, 7]) == 5
-            @test findfirst(res.pnl.amsk[:, 7]) == 10
+            @test findfirst(al.amsk[:, 7]) == 10
             @test n[2] > 0
         else
             # The oracle's second call aligns nothing more, so its first call is the result.
             @test n[2] == 0
-            @test first == res.pnl.amsk
+            @test first == al.amsk
         end
     end
     # Better: the oracle refuses a tensor field; the library aligns asset 3 past the three
     # observations where the label "value" is not observed. The gap of asset 8 is not a
     # leading one, so it stays.
-    res = panel_align_active(pnl, "exposure")
-    @test res.n == 3
-    @test findfirst(res.pnl.amsk[:, 3]) == 4
+    al, n = panel_align_active(pnl, "exposure")
+    @test n == 3
+    @test findfirst(al.amsk[:, 3]) == 4
 end

@@ -139,7 +139,45 @@ function panel_active_cells(pnl::AssetPanel)
     return panel_is_static(pnl) ? trues(panel_axes(pnl)) : pnl.amsk
 end
 """
-    panel_field_coverage(f::AbstractPanelField, act::AbstractArray{Bool}) -> NamedTuple
+$(DocStringExtensions.TYPEDEF)
+
+Holds the counts of the cells and of the missing cells of one Panel Field, over all cells and over the active cells.
+
+This type is an implementation detail and is not intended for direct use. [`panel_field_coverage`](@ref) makes it, and [`DataFrames.describe(pnl::AssetPanel)`](@ref) and [`panel_info`](@ref) read it.
+
+# Fields
+
+$(DocStringExtensions.FIELDS)
+
+# Related
+
+  - [`panel_field_coverage`](@ref)
+  - [`panel_info_fields`](@ref)
+"""
+@concrete struct PanelFieldCoverage
+    """
+    `cells`: The count of cells.
+    """
+    cells
+    """
+    `missing`: The count of missing cells.
+    """
+    missing
+    """
+    `active`: The count of active cells.
+    """
+    active
+    """
+    `active_missing`: The count of missing active cells.
+    """
+    active_missing
+    """
+    `assets_missing`: The count of assets whose active cells are all missing.
+    """
+    assets_missing
+end
+"""
+    panel_field_coverage(f::AbstractPanelField, act::AbstractArray{Bool}) -> PanelFieldCoverage
 
 Count the cells and the missing cells of a Panel Field, over all cells and over the active cells.
 
@@ -156,10 +194,11 @@ Count the cells and the missing cells of a Panel Field, over all cells and over 
 
 # Returns
 
-  - `cov::NamedTuple`: `cells`, the count of cells; `missing`, the count of missing cells; `active`, the count of active cells; `active_missing`, the count of missing active cells; `assets_missing`, the count of assets whose active cells are all missing.
+  - `cov::PanelFieldCoverage`: The five counts.
 
 # Related
 
+  - [`PanelFieldCoverage`](@ref)
   - [`panel_field_missing`](@ref)
   - [`panel_active_cells`](@ref)
   - [`DataFrames.describe(pnl::AssetPanel)`](@ref)
@@ -172,9 +211,9 @@ function panel_field_coverage(f::AbstractPanelField, act::AbstractArray{Bool})
     A = reshape(act, :, N)
     assets_missing = count(j -> any(view(A, :, j)) &&
                                 all(t -> !A[t, j] || M[t, j] == K, axes(A, 1)), 1:N)
-    return (; cells = length(miss) * K, missing = sum(miss), active = count(act) * K,
-            active_missing = sum(m * a for (m, a) in zip(miss, act); init = 0),
-            assets_missing)
+    return PanelFieldCoverage(length(miss) * K, sum(miss), count(act) * K,
+                              sum(m * a for (m, a) in zip(miss, act); init = 0),
+                              assets_missing)
 end
 """
     DataFrames.describe(pnl::AssetPanel; by::Option{<:AbstractString} = nothing)
@@ -343,7 +382,37 @@ function panel_level_cells(g::CategoricalPanelField, k::Integer, act::AbstractAr
     return member
 end
 """
-    panel_spread(v::AbstractVector{<:Real}) -> Option{NamedTuple}
+$(DocStringExtensions.TYPEDEF)
+
+Holds the minimum, the median and the maximum of a vector of counts.
+
+This type is an implementation detail and is not intended for direct use. [`panel_spread`](@ref) makes it, and [`panel_info_mask`](@ref) prints it.
+
+# Fields
+
+$(DocStringExtensions.FIELDS)
+
+# Related
+
+  - [`panel_spread`](@ref)
+  - [`PanelMaskCoverage`](@ref)
+"""
+@concrete struct CountSpread
+    """
+    `min`: The smallest count.
+    """
+    min
+    """
+    `median`: The median of the counts.
+    """
+    median
+    """
+    `max`: The largest count.
+    """
+    max
+end
+"""
+    panel_spread(v::AbstractVector{<:Real}) -> Option{CountSpread}
 
 Return the minimum, the median and the maximum of a vector of counts, or `nothing` when it is empty.
 
@@ -358,10 +427,11 @@ Return the minimum, the median and the maximum of a vector of counts, or `nothin
 
 # Returns
 
-  - `s::Option{NamedTuple}`: `min`, `median` and `max`, or `nothing`.
+  - `s::Option{CountSpread}`: The spread, or `nothing`.
 
 # Related
 
+  - [`CountSpread`](@ref)
   - [`panel_mask_coverage`](@ref)
   - [`Option`](@ref)
 """
@@ -369,10 +439,52 @@ function panel_spread(v::AbstractVector{<:Real})
     if isempty(v)
         return nothing
     end
-    return (; min = minimum(v), median = Statistics.median(v), max = maximum(v))
+    return CountSpread(minimum(v), Statistics.median(v), maximum(v))
 end
 """
-    panel_mask_coverage(msk::AbstractMatrix{Bool}) -> NamedTuple
+$(DocStringExtensions.TYPEDEF)
+
+Holds the counts of the cells of one universe mask, and the spread of its assets for each observation and of its observations for each asset.
+
+This type is an implementation detail and is not intended for direct use. [`panel_mask_coverage`](@ref) makes it, and [`panel_info_mask`](@ref) prints it.
+
+# Fields
+
+$(DocStringExtensions.FIELDS)
+
+# Related
+
+  - [`panel_mask_coverage`](@ref)
+  - [`CountSpread`](@ref)
+"""
+@concrete struct PanelMaskCoverage
+    """
+    `cells`: The count of cells.
+    """
+    cells
+    """
+    `in_mask`: The count of true cells.
+    """
+    in_mask
+    """
+    `per_observation`: The spread of the count of assets for each observation, or `nothing` when the mask has no observation.
+    """
+    per_observation
+    """
+    `assets`: The count of assets with one true cell or more.
+    """
+    assets
+    """
+    `N`: The count of assets.
+    """
+    N
+    """
+    `durations`: The spread of the count of observations for each asset with one true cell or more, or `nothing` when no asset has one.
+    """
+    durations
+end
+"""
+    panel_mask_coverage(msk::AbstractMatrix{Bool}) -> PanelMaskCoverage
 
 Count the cells of a universe mask, and the spread of its assets for each observation and of its observations for each asset.
 
@@ -388,20 +500,19 @@ Count the cells of a universe mask, and the spread of its assets for each observ
 
 # Returns
 
-  - `cov::NamedTuple`: `cells`, the count of cells; `in_mask`, the count of true cells; `per_observation`, the spread of the count of assets for each observation; `assets`, the count of assets with one true cell or more; `N`, the count of assets; `durations`, the spread of the count of observations for each of those assets.
+  - `cov::PanelMaskCoverage`: The counts and the two spreads.
 
 # Related
 
+  - [`PanelMaskCoverage`](@ref)
   - [`panel_spread`](@ref)
   - [`panel_info`](@ref)
 """
 function panel_mask_coverage(msk::AbstractMatrix{Bool})
     per_asset = vec(sum(msk; dims = 1))
     durations = filter(>(0), per_asset)
-    return (; cells = length(msk), in_mask = count(msk),
-            per_observation = panel_spread(vec(sum(msk; dims = 2))),
-            assets = length(durations), N = size(msk, 2),
-            durations = panel_spread(durations))
+    return PanelMaskCoverage(length(msk), count(msk), panel_spread(vec(sum(msk; dims = 2))),
+                             length(durations), size(msk, 2), panel_spread(durations))
 end
 """
     panel_percent(x::Real) -> Real
@@ -755,7 +866,7 @@ function panel_observed_cells(f::AbstractPanelField)
     return isnothing(f.omsk) ? nothing : iszero.(panel_field_missing(f))
 end
 """
-    panel_align_active(pnl::AssetPanel, fields) -> NamedTuple
+    panel_align_active(pnl::AssetPanel, fields) -> Tuple{AssetPanel, Int}
 
 Remove the leading active cells of each asset of an [`AssetPanel`](@ref) until each named Panel Field holds an observed value.
 
@@ -783,7 +894,10 @@ A tensor Panel Field is observed at a pair of observation and asset when each of
 
 # Returns
 
-  - `res::NamedTuple`: `pnl`, the aligned Asset Panel; `n`, the count of cells removed from the active mask.
+  - `pnl′::AssetPanel`: The aligned Asset Panel.
+  - `n::Int`: The count of cells removed from the active mask.
+
+The two values are a plain tuple, as `findmax` returns: `pnl′, n = panel_align_active(pnl, fields)`.
 
 # Examples
 
@@ -794,12 +908,12 @@ julia> pnl = AssetPanel(;
                                                 omsk = Bool[0 1; 0 0; 1 1; 1 0])],
                         amsk = trues(4, 2), emsk = trues(4, 2));
 
-julia> res = panel_align_active(pnl, \"book\");
+julia> aligned, n = panel_align_active(pnl, \"book\");
 
-julia> res.n
+julia> n
 2
 
-julia> res.pnl.amsk
+julia> aligned.amsk
 4×2 BitMatrix:
  0  1
  0  1
@@ -830,7 +944,7 @@ function panel_align_active(pnl::AssetPanel, fields)
             amsk[t, j] = false
         end
     end
-    return (; pnl = AssetPanel(; pf = pnl.pf, amsk = amsk, emsk = pnl.emsk .& amsk), n)
+    return AssetPanel(; pf = pnl.pf, amsk = amsk, emsk = pnl.emsk .& amsk), n
 end
 
 export panel_info, panel_align_active

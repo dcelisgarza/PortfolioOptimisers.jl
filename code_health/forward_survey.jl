@@ -712,7 +712,8 @@ function self_verdict(t::Tree, d, call)
             ("go",
              "a private function moves a keyword to a slot: the callers pass the slot")
         end
-    elseif positional_count(call) > length(positional_arguments(d.sig))
+    elseif positional_count(call) > length(positional_arguments(d.sig)) &&
+           fills_trailing(call, names)
         return ("go",
                 "fills a slot: one method takes it as a defaulted positional argument (rule 5)")
     elseif converted
@@ -739,6 +740,21 @@ end
 
 function positional_count(call)
     return count(a -> !(a isa Expr && a.head in (:parameters, :kw)), call.args[2:end])
+end
+
+# Whether `call` fills a slot that a default can hold. Only a trailing slot can be a default. A
+# literal or a global before a passed argument, as `show(x) = show(stdout, x)` fills, converts
+# the call to the canonical form (#2090). A computed slot before it, as a trait that
+# `f(r) = f(kind(r), r)` inserts, keeps the old verdict.
+function fills_trailing(call, names)
+    pos = [a for a in call.args[2:end] if !(a isa Expr && a.head in (:parameters, :kw))]
+    passed(a) = CH.forward_leaf(a) && CH.forward_root(a) in names
+    last_passed = findlast(passed, pos)
+    if isnothing(last_passed)
+        return true
+    end
+    inner = [a for a in pos[1:last_passed] if !passed(a)]
+    return isempty(inner) || !all(CH.forward_leaf, inner)
 end
 
 # The names of the keyword arguments of a signature.
@@ -816,10 +832,6 @@ finding is stale, and `test/test_89_forward_survey_census.jl` fails on it, so th
 removes the pair deletes the entry.
 """
 const RULED_NOTHING_PAIRS = Dict{Tuple{Symbol, Symbol}, Tuple{String, String}}(#
-                                                                               (:optional_gap_cells,
-                                                                                :clock_gap_cells) =>
-                                                                                   ("go",
-                                                                                    "$SLOT_TAKEN: the pair is the only caller of `clock_gap_cells`, so it takes `n` and a `::Nothing` method"),
                                                                                (:coverage_fittable_estimator,
                                                                                 :coverage_inner_corrected) =>
                                                                                    ("go",
@@ -880,6 +892,10 @@ const RULED_NOTHING_PAIRS = Dict{Tuple{Symbol, Symbol}, Tuple{String, String}}(#
                                                                                 :factory) =>
                                                                                    ("keep (b)",
                                                                                     "$POLICY: the weights come from three sources, and `factory(est, nothing)` rebuilds the estimator"),
+                                                                               (:panel_field_placeholder,
+                                                                                :rebuild_struct) =>
+                                                                                   ("keep (b)",
+                                                                                    "$POLICY: `nothing` means that the fill wrote no placeholder, so the arm keeps the Panel Field as it was built, and `rebuild_struct(f, (; pmsk = nothing))` would replace its mask (#2090)"),
                                                                                (:coverage_mask_source,
                                                                                 :dims_oriented) =>
                                                                                    ("keep (b)",
@@ -1459,9 +1475,6 @@ const RULED_NAMED_TUPLES = Dict{Symbol, Tuple{String, String}}(#
                                                                :attribution_array_keywords =>
                                                                    ("go",
                                                                     "two keyword bundles of one type: a private defined type, because a positional swap is silent (#2113)"),
-                                                               :panel_align_active =>
-                                                                   ("go",
-                                                                    "a transform and a count: the plain tuple `(pnl, n)`, as `findmax` (#2113)"),
                                                                :prior_field_values =>
                                                                    ("keep (keys)",
                                                                     "the keys are the field names of the prior (#2113)"),
@@ -1599,11 +1612,6 @@ const RULED_NAMED_TUPLES = Dict{Symbol, Tuple{String, String}}(#
                                                                :opinion_pooling_scenarios =>
                                                                    ("go",
                                                                     "every caller takes it apart at once: a plain tuple, unless two values have one type, which takes a private type (#2113)"),
-                                                               :panel_manifest_axes =>
-                                                                   ("go",
-                                                                    "the value travels: `ax` goes to `panel_table_cells`: a private defined type (#2113)"),
-                                                               :panel_spread => ("go",
-                                                                                 "the value travels: a keyword of a call: a private defined type (#2113)"),
                                                                :regression_polarity =>
                                                                    ("go",
                                                                     "`best` and `worst` are numbers of one type, so a positional swap is silent: a private defined type (#2113)"),

@@ -154,7 +154,6 @@ const CENSUS_EXEMPT = Dict{Symbol, String}(
                                            # Transport: a cut, a view or a move keeps each inactive cell as it was, and the consumer
                                            # that reads the result is the one a case runs.
                                            :port_opt_view => "a view",
-                                           :asset_panel_view => "a view",
                                            :fold_asset_panel => "a cut to the rows of a fold",
                                            :windowed_panel => "a cut to the rows of a window",
                                            :feature_row_indices => "reads the clock",
@@ -418,9 +417,9 @@ function census_cases(rd::ReturnsResult)
                 # The summary of a panel. The share of all cells counts every cell by design,
                 # so the case of describe reads its active columns and its levels.
                 ((:panel_align_active,), "the alignment",
-                 r -> (a = panel_align_active(r.pnl,
-                                              ["book_equity", "industry", "loadings"]);
-                       (a.pnl.amsk, a.pnl.emsk, a.n))),
+                 r -> ((a, n) = panel_align_active(r.pnl,
+                                                   ["book_equity", "industry", "loadings"]);
+                       (a.amsk, a.emsk, n))),
                 ((:describe, :panel_active_cells), "the active columns and the levels",
                  r -> (d = describe(r.pnl);
                        (d.active_cells, d.active_missing, d.assets_missing,
