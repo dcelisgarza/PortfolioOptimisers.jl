@@ -241,10 +241,16 @@ end
                                                         (:port_opt_view, :port_opt_view) => "public: (a) the one-index form `port_opt_view(pnl, i)` of the public verb selects the assets, and converts the call to the canonical form `(observations, assets, nx)`; the filled slot `:` comes before `i`, so no trailing default holds it (rule 5, #2090)",
                                                         (:panel_info, :panel_info) => "public: (a) the IO-first idiom of `show`: `panel_info(pnl)` writes to `stdout`, so the filled slot `io` comes first and no trailing default holds it (rule 5, #2090)",
                                                         (:panel_mask_lift, :RepeatedObservations) => "(b) a constructor owns no default, so the `Nothing` arm stays in front of `RepeatedObservations` (#2109, #2111)",
-                                                        (:panel_field_placeholder, :rebuild_struct) => "(b) the `Nothing` arm holds a policy: `nothing` means that the fill wrote no placeholder, so the arm keeps the Panel Field as it was built, and `rebuild_struct(f, (; pmsk = nothing))` would replace its mask (#2090, #2111)")
+                                                        (:panel_field_placeholder, :rebuild_struct) => "(b) the `Nothing` arm holds a policy: `nothing` means that the fill wrote no placeholder, so the arm keeps the Panel Field as it was built, and `rebuild_struct(f, (; pmsk = nothing))` would replace its mask (#2090, #2111)",
+                                                        (:obs_weights_view, :obs_weights_fields) => "(default) a walk owns its leaf answer, the identity: `obs_weights_fields` is a callee of the walk, not its owner (#2109, #2089)")
     # The functions whose forward methods are interface methods, with the check that shows
     # it. #2072 adds a name after a check of each one.
     interface_functions = Dict{Symbol, String}(#
+                                               # src/02_Tools (#2089).
+                                               :port_opt_view => "the leaf of the view traversal: 12 functions share its callee `nothing_scalar_array_view` (rule 3, #2089)",
+                                               :obs_weights_index => "its mask method shares the callee `observed_weights` with `observed_sample` (rule 3, #2089)",
+                                               :observed_long_run_form => "one method for each long-run form: 3 functions share its callee `long_run_quadratic_form` (rule 3, #2089)",
+                                               :mean_test_rng => "the method of the bootstrap test of an interface verb that `# Interfaces` names: `resolve_rng` is a public verb that many functions share, and the default `nothing` drives no hook (rule 3, #2089)",
                                                # src/03_InputData (#2090).
                                                :gap_fill_seed => "rule 3: its callee `vec_to_real_measure` is a shared public verb",
                                                :apply_preprocessing => "rule 3: its callee `prices_to_returns` is a shared public verb",
@@ -392,7 +398,6 @@ end
                                                    (:factor_axis_positions,
                                                     :label_positions),
                                                    (:factory, :BudgetedHindsightPathResult),
-                                                   (:factory_child, :factory),
                                                    (:factory, :ElasticNet),
                                                    (:factory, :factory),
                                                    (:factory, :GeneralisedLinearModel),
@@ -447,7 +452,6 @@ end
                                                    (:maybe_count_or_fraction,
                                                     :count_or_fraction),
                                                    (:maybe_inject_step, :inject_context),
-                                                   (:mean_test_rng, :resolve_rng),
                                                    (:member_regret, :series_regret),
                                                    (:merge_held_data, :partial_fit!),
                                                    (:mip_bit_space, :AssetMIPSpace),
@@ -457,13 +461,9 @@ end
                                                    (:no_bounds_returns_settings,
                                                     :JuMPReturnsSettings),
                                                    (:n_splits, :n_splits),
-                                                   (:observed_long_run_form,
-                                                    :long_run_quadratic_form),
                                                    (:observed_weights,
                                                     :get_observation_weights),
                                                    (:observed_weights, :observed_weights),
-                                                   (:obs_weights_index, :observed_weights),
-                                                   (:obs_weights_view, :obs_weights_fields),
                                                    (:online_entry_state, :element_path),
                                                    (:online_state_seed,
                                                     :PipelineBufferState),
@@ -489,8 +489,6 @@ end
                                                    (:pipeline_step_factory, :factory),
                                                    (:pipeline_step_is_time_dependent,
                                                     :is_time_dependent),
-                                                   (:port_opt_view,
-                                                    :nothing_scalar_array_view),
                                                    (:predictor_state_seed,
                                                     :forecaster_seed),
                                                    (:predictor_state_view, :port_opt_view),

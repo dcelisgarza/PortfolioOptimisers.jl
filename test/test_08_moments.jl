@@ -2763,9 +2763,8 @@ using Statistics, StatsBase, PortfolioOptimisers
 using PortfolioOptimisers: MatNum, VecNum, Option, Int_VecInt, ObsWeights,
                            AbstractVarianceEstimator, AbstractWindowRule,
                            AbstractPartialFitState, arg_dict, field_dict, ret_dict,
-                           val_dict, assert_nonempty_nonneg_finite_val, factory_child,
-                           windowed_preamble, _wprop, @concrete, @propagatable,
-                           @windowed_estimator
+                           val_dict, assert_nonempty_nonneg_finite_val, windowed_preamble,
+                           _wprop, @concrete, @propagatable, @windowed_estimator
 import PortfolioOptimisers: factory, port_opt_view
 const DocStringExtensions = PortfolioOptimisers.DocStringExtensions
 @windowed_estimator ProbeWindowedVariance <: AbstractVarianceEstimator begin

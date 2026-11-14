@@ -25,37 +25,6 @@ function port_opt_view(ce::StatsBase.CovarianceEstimator, ::Any,
     return ce
 end
 """
-    factory(
-        ce::StatsBase.CovarianceEstimator,
-        args...;
-        kwargs...
-    ) -> StatsBase.CovarianceEstimator
-
-Returns a covariance estimator unchanged when a factory call gives it new observation weights.
-
-This is the fallback of [`factory`](@ref) for a covariance estimator that defines no method of its own. A covariance estimator of `StatsBase` holds no observation weights, so a factory call has nothing to replace.
-
-# Arguments
-
-  - $(arg_dict[:ce])
-  - `args...`: More arguments. The method ignores them.
-  - `kwargs...`: More keyword arguments. The method ignores them.
-
-# Returns
-
-  - `ce::StatsBase.CovarianceEstimator`: The original covariance estimator.
-
-# Related
-
-  - [`factory`](@ref)
-  - [`AbstractCovarianceEstimator`](@ref)
-  - [`StatsBase.CovarianceEstimator`](https://juliastats.org/StatsBase.jl/stable/cov/)
-"""
-function factory(ce::StatsBase.CovarianceEstimator, args...;
-                 kwargs...)::StatsBase.CovarianceEstimator
-    return ce
-end
-"""
 $(DocStringExtensions.TYPEDEF)
 
 Abstract supertype for all covariance estimator types.
@@ -342,12 +311,6 @@ function assert_covariance_estimator(ce::AbstractVarianceEstimator, name::Symbol
     return throw(ArgumentError("`$(name)` needs a covariance estimator, and `$(nameof(typeof(ce)))` is a variance estimator. A variance estimator computes one marginal variance for each asset and no relation between two assets, so it has no `cov` or `cor`. Use a covariance estimator, for example `Covariance()`."))
 end
 @define_pretty_show(AbstractCovarianceEstimator)
-function factory_child(v::AbstractCovarianceEstimator, args...; kwargs...)
-    return factory(v, args...; kwargs...)
-end
-function factory_child(v::AbstractArray{<:AbstractCovarianceEstimator}, args...; kwargs...)
-    return [factory_child(vi, args...; kwargs...) for vi in v]
-end
 """
 $(DocStringExtensions.TYPEDSIGNATURES)
 

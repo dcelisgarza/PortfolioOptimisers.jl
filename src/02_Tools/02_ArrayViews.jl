@@ -214,7 +214,7 @@ end
 
 View of one field. The [`port_opt_view`](@ref) methods that [`@propagatable`](@ref) makes call it, and so does the hand-written view of every optimiser that holds a fallback `fb`.
 
-It is the view twin of [`factory_child`](@ref). It views a child at the asset index, but it keeps a precomputed optimisation result with no change. A result is in a field as a fallback `fb`. The fallback loop of [`optimise`](@ref) returns that result without a solve, on the universe of its own solve. A function such as [`investable_reduction`](@ref) views an optimiser and never reads its fallback. A refusal of the result there refuses a fallback that nothing reads.
+It is the view twin of the leaf of [`factory`](@ref). It views a child at the asset index, but it keeps a precomputed optimisation result with no change. A result is in a field as a fallback `fb`. The fallback loop of [`optimise`](@ref) returns that result without a solve, on the universe of its own solve. A function such as [`investable_reduction`](@ref) views an optimiser and never reads its fallback. A refusal of the result there refuses a fallback that nothing reads.
 
 A [`TimeDependent`](@ref) schedule is not a result, so `view_child` sends it to [`port_opt_view`](@ref). A schedule that holds a result still refuses a view of an asset subset.
 
@@ -238,7 +238,7 @@ The method that Julia selects is the algorithm.
 # Related
 
   - [`port_opt_view`](@ref)
-  - [`factory_child`](@ref)
+  - [`factory`](@ref)
   - [`@vprop`](@ref)
 """
 function view_child(v, i, args...)

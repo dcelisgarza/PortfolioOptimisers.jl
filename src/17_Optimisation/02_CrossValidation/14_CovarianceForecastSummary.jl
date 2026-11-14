@@ -791,7 +791,7 @@ function covariance_forecast_compare(a::CovarianceForecastEvaluationResult,
 end
 """
     loss_difference_test(mt::AbstractMeanTestEstimator, d::VecNum, k::AbstractVector{Bool}, rng)
-        -> NamedTuple
+        -> MeanTestResult
 
 Return the Mean Test of a loss difference against zero, over the entries that both sides scored.
 
@@ -808,7 +808,7 @@ One entry is one step of a walk-forward, or one row of a return series, and two 
 
 # Returns
 
-  - `res::NamedTuple`: `(; t_stat, p_value, mean_ci_lower, mean_ci_upper)`, as [`mean_test`](@ref) returns it.
+  - `res::MeanTestResult`: The answer of the Mean Test, as [`mean_test`](@ref) returns it, see [`MeanTestResult`](@ref).
 
 # Related
 
@@ -821,7 +821,7 @@ function loss_difference_test(mt::AbstractMeanTestEstimator, d::VecNum,
     Tm = real(eltype(d))
     if any(t -> k[t] && !isfinite(d[t]), eachindex(d, k))
         nan = typeof(sqrt(one(Tm)))(NaN)
-        return (; t_stat = nan, p_value = nan, mean_ci_lower = nan, mean_ci_upper = nan)
+        return MeanTestResult(nan, nan, nan, nan)
     end
     return mean_test(mt, ifelse.(k, d, Tm(NaN)), 1, rng)
 end

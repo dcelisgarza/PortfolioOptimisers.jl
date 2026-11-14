@@ -615,7 +615,7 @@ Return a new [`ElasticNet`](@ref) whose fit leaves the column of ones that an es
 
   - [`ElasticNet`](@ref)
   - [`InterceptColumn`](@ref)
-  - [`factory(::AbstractRegressionTarget, ::InterceptColumn)`](@ref)
+  - [`factory`](@ref)
 """
 function factory(tgt::ElasticNet, ic::InterceptColumn)::ElasticNet
     return ElasticNet(; theta = tgt.theta, strength = tgt.strength, sdiv = tgt.sdiv,

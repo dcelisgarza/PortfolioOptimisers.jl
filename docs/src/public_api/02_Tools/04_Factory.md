@@ -1,5 +1,5 @@
 ```@meta
-Description = "Factory, public API of PortfolioOptimisers.jl: factory, factory_child."
+Description = "Factory, public API of PortfolioOptimisers.jl: factory."
 ```
 
 # Factory
@@ -7,6 +7,5 @@ Description = "Factory, public API of PortfolioOptimisers.jl: factory, factory_c
 ## Utility functions
 
 ```@docs
-factory(a::Union{Nothing, AbstractEstimator, AbstractAlgorithm, AbstractResult}, args...; kwargs...)
-factory_child
+factory(a, args...; kwargs...)
 ```

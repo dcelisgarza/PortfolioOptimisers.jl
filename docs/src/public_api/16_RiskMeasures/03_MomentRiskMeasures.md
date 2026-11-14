@@ -13,7 +13,6 @@ LowOrderMoment
 ThirdLowerMoment
 FourthMoment
 HighOrderMoment
-factory(alg::MomentMeasureAlgorithm, args...; kwargs...)
 factory(r::LowOrderMoment, pr::AbstractPriorResult, args...; kwargs...)
 port_opt_view(r::LowOrderMoment, i, args...)
 factory(r::HighOrderMoment, pr::AbstractPriorResult, args...; kwargs...)

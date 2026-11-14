@@ -241,7 +241,7 @@ end
     @test prior_pair.args[2] == :($(PO).sel(xr.a, getproperty(pr, :a)))
     # The factory channel does not know `@pprop`, so the same field recurses there instead.
     factory_pair = only(PO.prop_channel_pairs(:factory, both, [:a], :x, PO, ()))
-    @test factory_pair.args[2] == :($(PO).factory_child(x.a, args...; kwargs...))
+    @test factory_pair.args[2] == :($(PO).factory(x.a, args...; kwargs...))
     #=
     A tag means what its CHANNEL says it means. `@wprop` names the same field in the factory
     channel and in the observation channel, and the two transforms differ: `factory`
@@ -754,19 +754,36 @@ end
     @test PO.float_if_integer(BigFloat) === BigFloat
     @test PO.float_if_integer(Rational{Int}) === Rational{Int}
     @test PO.float_if_integer(Complex{Int}) === Complex{Int}
-    # --- factory and factory_child over a vector ---
+    # --- factory over an array: the traversal owns the identity on every leaf (#2109) ---
     @test factory([MeanValue(), nothing]) == [MeanValue(), nothing]
-    fc = PO.factory_child([MeanValue(), MedianValue()], aw)
+    fc = factory([MeanValue(), MedianValue()], aw)
     @test length(fc) == 2
     @test fc[1].w === aw
     @test fc[2].w === aw
-    # factory_child recurses into estimators only. A `nothing` and a weights value come back
-    # with no change, because only `_wprop` replaces weights (#440).
-    @test PO.factory_child(nothing, aw) === nothing
-    @test PO.factory_child([1.0, 2.0], aw) == [1.0, 2.0]
-    # --- resolve_deferred_quantities: the universal fallback returns its argument ---
-    @test PO.resolve_deferred_quantities(7, nothing) === 7
-    @test PO.resolve_deferred_quantities(MinValue(), nothing) == MinValue()
+    # An array of any shape keeps its shape, and a `nothing` element comes back.
+    fm = factory(Union{Nothing, MeanValue}[MeanValue() nothing; nothing MeanValue()], aw)
+    @test size(fm) == (2, 2)
+    @test fm[1, 1].w === aw && fm[2, 2].w === aw
+    @test isnothing(fm[1, 2]) && isnothing(fm[2, 1])
+    # A leaf comes back with no change: `nothing`, a scalar, and a weights value, because only
+    # `_wprop` replaces weights (#440). An array of data is a leaf, so no copy is made.
+    @test factory(nothing, aw) === nothing
+    @test factory(7, aw) === 7
+    @test factory(aw, aw) === aw
+    xd = [1.0, 2.0]
+    @test factory(xd, aw) === xd
+    # A covariance estimator of `StatsBase` holds no weights, so it is a leaf too. An array of
+    # covariance estimators takes the weights element by element.
+    sc = StatsBase.SimpleCovariance()
+    @test factory(sc, aw) === sc
+    @test factory([sc, sc], aw) == [sc, sc]
+    fcv = factory([Covariance(), Covariance()], aw)
+    @test fcv isa Vector{<:Covariance}
+    @test all(c -> c.w === aw, fcv)
+    @test !isdefined(PO, :factory_child)
+    # --- resolve_deferred_quantities takes a prior result, and owns no fallback (#2108) ---
+    @test_throws MethodError PO.resolve_deferred_quantities(7, nothing)
+    @test_throws MethodError PO.resolve_deferred_quantities(MinValue(), nothing)
     # --- the two examples that the /unslop pass of #440 wrote into the measure docstrings ---
     # An exact zero deviation takes the guard `sqrt(eps)`.
     @test PO.vec_to_real_measure(StandardisedValue(), [2.0, 2.0, 2.0]) ==

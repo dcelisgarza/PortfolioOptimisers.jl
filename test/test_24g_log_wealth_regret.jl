@@ -42,7 +42,7 @@ form compares a prediction result against the benchmark of its own rows (#1664).
         @test reg.regret ≈ log(reg.wealth_b) - log(reg.wealth_a)
         # The test is the Mean Test of the difference at a window of one row (#1787).
         @test test_fields(reg) ==
-              values(po.mean_test(mt, reg.difference, 1, po.mean_test_rng(mt)))
+              test_fields(po.mean_test(mt, reg.difference, 1, po.mean_test_rng(mt)))
         @test reg.mean_ci_lower < reg.regret_per_period < reg.mean_ci_upper
         # The rule of zero lags of Diebold and Mariano: the mean over its standard error,
         # against a Student law.

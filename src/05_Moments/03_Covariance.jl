@@ -829,7 +829,7 @@ The four methods of `Statistics.cov` and `Statistics.cor` that take a [`Covarian
 
  1. Get the centre `mu` from `ce.me` and `ce.w` with [`weighted_centre`](@ref). It uses `mean` if the caller gave one. `ce.w` gets to `ce.me` through [`factory`](@ref), so the centre has the weights of the deviations.
  2. If `ce.w` is `nothing`, take `ce.ce` without change.
- 3. If `ce.w` is not `nothing`, send `ce.ce` through [`factory_child`](@ref) with `ce.w`. An estimator of the library takes the weights. A `StatsBase.CovarianceEstimator` that the library does not own does not change, because no verb of the library reads its weights.
+ 3. If `ce.w` is not `nothing`, send `ce.ce` through [`factory`](@ref) with `ce.w`. An estimator of the library takes the weights. A `StatsBase.CovarianceEstimator` that the library does not own does not change, because no verb of the library reads its weights.
  4. Send the estimator of step 2 or 3 through [`library_covariance_estimator`](@ref). It wraps an estimator that the library does not own in a [`GeneralCovariance`](@ref), so that the keywords of the caller, such as `iv` and `ivpa`, do not get to a `StatsBase` method that refuses them.
 
 Step 2 is for performance and is not a second contract. `ce.w` is a field, so its type decides the branch. The step stops a windowed loop from a rebuild of the estimator tree of `ce` in each window. A `ce.ce` with its own weights keeps them when `ce.w` is `nothing`, and `ce.w` replaces them when it is not. [`factory`](@ref) does the same on all other paths.
@@ -852,7 +852,6 @@ Step 2 is for performance and is not a second contract. `ce.w` is a field, so it
   - [`Covariance`](@ref)
   - [`weighted_centre`](@ref)
   - [`factory`](@ref)
-  - [`factory_child`](@ref)
 """
 function covariance_centre_and_estimator(ce::Covariance, X::MatNum; dims::Int = 1,
                                          mean = nothing, kwargs...)
@@ -872,19 +871,19 @@ This is steps 2 to 4 of [`covariance_centre_and_estimator`](@ref). [`variance_co
 
 # Returns
 
-  - `cel::AbstractCovarianceEstimator`: `ce.ce` without change when `ce.w` is `nothing`, and `ce.ce` through [`factory_child`](@ref) with `ce.w` otherwise, through [`library_covariance_estimator`](@ref).
+  - `cel::AbstractCovarianceEstimator`: `ce.ce` without change when `ce.w` is `nothing`, and `ce.ce` through [`factory`](@ref) with `ce.w` otherwise, through [`library_covariance_estimator`](@ref).
 
 # Related
 
   - [`covariance_centre_and_estimator`](@ref)
   - [`library_covariance_estimator`](@ref)
-  - [`factory_child`](@ref)
+  - [`factory`](@ref)
 """
 function covariance_inner_estimator(ce::Covariance)
     return library_covariance_estimator(if isnothing(ce.w)
                                             ce.ce
                                         else
-                                            factory_child(ce.ce, ce.w)
+                                            factory(ce.ce, ce.w)
                                         end)
 end
 # `ce.w` replaces the weights of `ce.ce` when it is set, as `covariance_centre_and_estimator`

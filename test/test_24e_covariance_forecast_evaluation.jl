@@ -15,6 +15,8 @@ with one cell missing; the summary literals by its summary verbs on a run of sev
 steps. Both sides read the same formula-built inputs, so no random stream is shared.
 =#
 include(joinpath(@__DIR__, "parity_harness.jl"))
+# The four fields of a `MeanTestResult`, in their order, for a test that reads them all.
+mean_test_values(r) = (r.t_stat, r.p_value, r.mean_ci_lower, r.mean_ci_upper)
 # A caller's covariance estimator with no location of its own, for the fallback. A struct is
 # declared at the top level because a testset body is a local scope.
 struct NoLocationCovariance <: PortfolioOptimisers.AbstractCovarianceEstimator end
@@ -693,7 +695,7 @@ end
         rng = po.mean_test_rng(mt)
         for (i, d) in enumerate(ds)
             @test (cmp.t_stat[i], cmp.p_value[i], cmp.mean_ci_lower[i],
-                   cmp.mean_ci_upper[i]) == values(po.mean_test(mt, d, 1, rng))
+                   cmp.mean_ci_upper[i]) == mean_test_values(po.mean_test(mt, d, 1, rng))
         end
         @test covariance_forecast_compare(a, b; mt = mt).p_value == cmp.p_value
         # The rule of zero lags of Diebold and Mariano: the mean over its standard error.
@@ -803,8 +805,8 @@ end
         @test po.loss_difference_test(mt, d, k, po.mean_test_rng(mt)) !=
               po.mean_test(mt, d[k], 1, po.mean_test_rng(mt))
         @test all(isnan,
-                  values(po.loss_difference_test(mt, [0.1, Inf, 0.2], trues(3),
-                                                 po.mean_test_rng(mt))))
+                  mean_test_values(po.loss_difference_test(mt, [0.1, Inf, 0.2], trues(3),
+                                                           po.mean_test_rng(mt))))
         # The number type of the losses is kept, on the answer and on the `NaN` path.
         d32 = Float32[0.3, -0.1, 0.2, 0.5, -0.4]
         @test po.loss_difference_test(OverlapMeanTest(), d32, trues(5), nothing).t_stat isa

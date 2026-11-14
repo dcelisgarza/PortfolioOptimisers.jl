@@ -53,36 +53,6 @@ const PlE_Pl = Union{AbstractPhylogenyEstimator, AbstractPhylogenyResult}
 """
 $(DocStringExtensions.TYPEDSIGNATURES)
 
-Return the phylogeny estimator or result `pl` unchanged.
-
-A caller that rebuilds an estimator with [`factory`](@ref) reaches this method for a phylogeny estimator or a precomputed result. A phylogeny estimator has no field that depends on a prior, so the method keeps every field and replaces none.
-
-# Algorithm
-
- 1. Return `pl` itself. The method rebuilds no field of it, and it discards `args` and `kwargs`.
-
-# Arguments
-
-  - `pl`: Phylogeny estimator or phylogeny result.
-  - `args...`: Optional arguments. The method does not read them.
-  - `kwargs...`: Optional keyword arguments. The method does not read them.
-
-# Returns
-
-  - `pl::PlE_Pl`: The original phylogeny estimator or result.
-
-# Related
-
-  - [`AbstractPhylogenyEstimator`](@ref)
-  - [`AbstractPhylogenyResult`](@ref)
-  - [`factory`](@ref)
-"""
-function factory(pl::PlE_Pl, args...; kwargs...)::PlE_Pl
-    return pl
-end
-"""
-$(DocStringExtensions.TYPEDSIGNATURES)
-
 Return the phylogeny algorithm `alg` unchanged.
 
 A caller that rebuilds an estimator with [`factory`](@ref) reaches this method for a phylogeny algorithm that has no nearer method. A phylogeny algorithm has no field that depends on a prior, so the method keeps every field and replaces none.

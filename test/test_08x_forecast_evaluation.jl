@@ -114,6 +114,8 @@ ELEVEN CONVENTIONS SHAPE THE PROBES.
 include(joinpath(@__DIR__, "parity_harness.jl"))
 include(joinpath(@__DIR__, "test06c_setup.jl"))
 include(joinpath(@__DIR__, "forecast_evaluation_fixture.jl"))
+# The four fields of a `MeanTestResult`, in their order, for a test that reads them all.
+mean_test_values(r) = (r.t_stat, r.p_value, r.mean_ci_lower, r.mean_ci_upper)
 
 @testset "The forward target family reads the history each member names" begin
     PO = PortfolioOptimisers
@@ -843,7 +845,8 @@ end
         # A span that the band covers has no statistic: every pair is in the band.
         @test PO.overlap_student_law(NullMomentLaw(), trues(4), 5, 4, Float64) == (0, 0)
         @test all(isnan,
-                  values(PO.mean_test(OverlapMeanTest(), [0.1, 0.3, -0.2, 0.4], 5, nothing)))
+                  mean_test_values(PO.mean_test(OverlapMeanTest(), [0.1, 0.3, -0.2, 0.4], 5,
+                                                nothing)))
         @test all(>(0), PO.overlap_student_law(NullMomentLaw(), trues(6), 5, 6, Float64))
         # The law reads the type of the data and of the window.
         x32 = Float32.(randn(StableRNG(3), 40))
@@ -1215,7 +1218,8 @@ end
                   QuadratureSumDraws(; form = ExactLongRunForm()))
             mt = WildBootstrapMeanTest(; kernel = QuadraticSpectralKernel(), alg = a,
                                        n_sim = 19)
-            @test all(isnan, values(PO.mean_test(mt, fill(0.03, 40), 1, StableRNG(1))))
+            @test all(isnan,
+                      mean_test_values(PO.mean_test(mt, fill(0.03, 40), 1, StableRNG(1))))
         end
     end
 
@@ -1257,6 +1261,43 @@ end
               PO.mean_test(mt, v, 1, PO.mean_test_rng(mt))
         @test_throws DomainError PO.mean_test(mt, v, 0, PO.mean_test_rng(mt))
         @test_throws DomainError PO.mean_test(OverlapMeanTest(), v, 0, nothing)
+    end
+
+    @testset "A Mean Test answers a MeanTestResult that checks its values (#2089)" begin
+        v = randn(StableRNG(5), 40)
+        mt = WildBootstrapMeanTest(; n_sim = 19, seed = 1)
+        for t in (mt, OverlapMeanTest())
+            r = PO.mean_test(t, v, 1, PO.mean_test_rng(t))
+            @test r isa PO.MeanTestResult
+            @test 0 <= r.p_value <= 1
+            @test r.mean_ci_lower <= r.mean_ci_upper
+            (; t_stat, p_value) = r
+            @test (t_stat, p_value) == (r.t_stat, r.p_value)
+        end
+        # A test that cannot answer gives `NaN` in each field, and the type stays the same.
+        @test PO.mean_test(mt, [NaN, NaN], 1, PO.mean_test_rng(mt)) isa PO.MeanTestResult
+        # A loss difference with a scored entry that is not finite answers the same type.
+        k = trues(length(v))
+        dn = copy(v)
+        dn[3] = Inf
+        rn = PO.loss_difference_test(mt, dn, k, PO.mean_test_rng(mt))
+        @test rn isa PO.MeanTestResult
+        @test all(isnan, mean_test_values(rn))
+        @test PO.loss_difference_test(mt, v, k, PO.mean_test_rng(mt)) isa PO.MeanTestResult
+        # The keyword constructor takes each field by name, and both constructors check.
+        r = PO.MeanTestResult(; t_stat = 2.5, p_value = 0.04, mean_ci_lower = 0.01,
+                              mean_ci_upper = 0.09)
+        @test mean_test_values(r) == (2.5, 0.04, 0.01, 0.09)
+        @test r isa PO.AbstractResult
+        @test all(isnan, mean_test_values(PO.MeanTestResult(NaN, NaN, NaN, NaN)))
+        @test PO.MeanTestResult(1.0, 0.0, 0.1, 0.1).p_value == 0.0
+        @test_throws DomainError PO.MeanTestResult(2.5, 1.5, 0.01, 0.09)
+        @test_throws DomainError PO.MeanTestResult(2.5, -0.1, 0.01, 0.09)
+        @test_throws DomainError PO.MeanTestResult(; t_stat = 2.5, p_value = 0.04,
+                                                   mean_ci_lower = 0.09,
+                                                   mean_ci_upper = 0.01)
+        # A `NaN` bound passes the order check.
+        @test isnan(PO.MeanTestResult(1.0, 0.5, NaN, 0.1).mean_ci_lower)
     end
 
     @testset "The bootstrap is the draw-by-draw computation, on both paths" begin
@@ -1301,7 +1342,7 @@ end
         @test r1.mean_ci_lower ≈ r0.mean_ci_lower && r1.mean_ci_upper ≈ r0.mean_ci_upper
         # A divisor of zero or less has no statistic.
         m9 = WildBootstrapMeanTest(; n_sim = 19, ddof = 50)
-        @test all(isnan, values(PO.mean_test(m9, v, 1, PO.mean_test_rng(m9))))
+        @test all(isnan, mean_test_values(PO.mean_test(m9, v, 1, PO.mean_test_rng(m9))))
         # One resolved generator per summary: two equal series take different draws.
         s = exposure_ic_summary(hcat(v, v); mt = mt)
         @test s.t_stat[1] == s.t_stat[2]
@@ -1341,7 +1382,7 @@ end
         for v in ([NaN, NaN], [0.2, NaN], fill(0.3, 6), Float64[])
             for t in (mt, OverlapMeanTest())
                 r = PO.mean_test(t, v, 1, PO.mean_test_rng(t))
-                @test all(isnan, values(r))
+                @test all(isnan, mean_test_values(r))
             end
         end
         # A constant series whose sum over its count misses its value by round-off: the
@@ -1350,7 +1391,7 @@ end
         g = fill(0.03, 100)
         g[[1, 40, 41, 100]] .= NaN
         for v in (fill(0.03, 100), g), t in (mt, OverlapMeanTest())
-            @test all(isnan, values(PO.mean_test(t, v, 1, PO.mean_test_rng(t))))
+            @test all(isnan, mean_test_values(PO.mean_test(t, v, 1, PO.mean_test_rng(t))))
         end
         # A series whose entries are one ulp apart is constant to round-off, in every float
         # type. A spread forty times the round-off of the mean is not, and an exact type reads
@@ -1362,7 +1403,7 @@ end
         for v in (u, u32, ub),
             t in (mt, OverlapMeanTest(), OverlapMeanTest(; law = BandCountLaw()))
 
-            @test all(isnan, values(PO.mean_test(t, v, 1, PO.mean_test_rng(t))))
+            @test all(isnan, mean_test_values(PO.mean_test(t, v, 1, PO.mean_test_rng(t))))
         end
         a = 0.3 .+ repeat([0.0, 1e-13], 20)
         for t in (mt, OverlapMeanTest())
@@ -1371,7 +1412,8 @@ end
         r = repeat([3 // 10, 3 // 10 + 1 // 1000], 20)
         @test isfinite(PO.mean_test(OverlapMeanTest(), r, 1, nothing).t_stat)
         @test all(isnan,
-                  values(PO.mean_test(OverlapMeanTest(), fill(3 // 10, 40), 1, nothing)))
+                  mean_test_values(PO.mean_test(OverlapMeanTest(), fill(3 // 10, 40), 1,
+                                                nothing)))
         # An alternating series sums the untapered long-run variance below zero, and the
         # Bartlett one stays positive, so only the overlap test answers NaN.
         v = [0.5, -0.4, 0.5, -0.4, 0.5, -0.4, 0.5, -0.4]
@@ -1386,7 +1428,7 @@ end
         end
         for t in (WildBootstrapMeanTest(; n_sim = 19, min_obs = 28),
                   OverlapMeanTest(; min_obs = 28))
-            @test all(isnan, values(PO.mean_test(t, w, 1, PO.mean_test_rng(t))))
+            @test all(isnan, mean_test_values(PO.mean_test(t, w, 1, PO.mean_test_rng(t))))
         end
         # Thirty entries hold ten windows of three and seven and a half windows of four. A
         # window of `5 // 2` entries is a horizon of five at a stride of two: twelve periods,

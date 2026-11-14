@@ -1,46 +1,55 @@
 """
-    factory(a::Union{Nothing, AbstractEstimator, AbstractAlgorithm,
-                     AbstractResult}, args...; kwargs...) -> a
-    factory(a::AbstractVector{<:Union{Nothing, AbstractEstimator, AbstractAlgorithm,
-                                      AbstractResult}}, args...; kwargs...) -> Vector
+    factory(a, args...; kwargs...) -> a
+    factory(a::AbstractArray{<:Union{Nothing, AbstractEstimator, AbstractAlgorithm,
+                                     AbstractResult, StatsBase.CovarianceEstimator}},
+            args...; kwargs...) -> AbstractArray
 
-Rebuild an estimator, an algorithm or a result with runtime values. These two methods are the fallbacks of the verb.
+Rebuild an estimator, an algorithm or a result with runtime values. These two methods are the leaf and the array step of the traversal.
 
 `factory` and [`port_opt_view`](@ref) are the two propagation mechanisms of this library.
 `factory` passes **runtime values**, such as prior moments, observation weights and
 previous portfolio weights, down a tree of composed structs. `port_opt_view` passes an
 **index selection**, a subset of the assets, down the same tree.
 
-The vector method is the **one forwarding contract** for every propagation field that holds a vector. It applies `factory` to each element, and it forwards `args...` and `kwargs...` with no change. A family that accepts a vector of estimators, algorithms or results needs no method of its own. A family that needs more than the forward defines its own, more specific method. A concrete element type, through [`concrete_typed_array_if_abstract`](@ref), is an example.
+`factory` is a traversal, so it owns the identity on every leaf, as `fmap` in Functors.jl and `adapt_structure` in Adapt.jl do. A value that has no method of its own comes back with no change: a data field, a scalar, `nothing`, a set of observation weights and a covariance estimator of `StatsBase`. So a [`@propagatable`](@ref) struct sends each `@fprop` field to `factory` directly, whatever the field holds.
+
+The array method is the **one forwarding contract** for every propagation field that holds an array of estimators, algorithms, results or covariance estimators. It applies `factory` to each element, and it forwards `args...` and `kwargs...` with no change. A family that accepts an array of them needs no method of its own. A family that needs more than the forward defines its own, more specific method. A concrete element type, through [`concrete_typed_array_if_abstract`](@ref), is an example. An array of data, such as a vector of numbers, is a leaf, and it comes back with no change and with no copy.
 
 # Algorithm
 
-The scalar method:
+The leaf method:
 
  1. Return `a` with no change, and drop `args...` and `kwargs...`. This method is the leaf of the recursion. Because of it, a call of the verb on a type with no tags returns the value and raises no error.
 
-The vector method:
+The array method:
 
  1. For each element `ai` of `a`, call `factory` on `ai`, and forward `args...` and `kwargs...` with no change.
- 2. Collect the results into a new vector, in the order of `a`, and return it.
+ 2. Collect the results into a new array of the shape of `a`, in the order of `a`, and return it.
 
-A [`@propagatable`](@ref) struct always has a generated method that is more specific than the scalar method. If the struct has at least one `@fprop` or `@wprop` field, that method builds the struct again with its keyword constructor. It sends each `@fprop` field through [`factory_child`](@ref) and each `@wprop` field through [`_wprop`](@ref). If the struct has no such field, that method returns `x`.
+A [`@propagatable`](@ref) struct always has a generated method that is more specific than the leaf method. If the struct has at least one `@fprop` or `@wprop` field, that method builds the struct again with its keyword constructor. It sends each `@fprop` field through `factory` and each `@wprop` field through [`_wprop`](@ref). If the struct has no such field, that method returns `x`.
+
+The leaf method does **not** fill a `nothing` field. A weights field that must take the incoming weights when it holds `nothing` carries `@wprop`, and it goes to [`_wprop`](@ref).
 
 # Arguments
 
-  - `a`: An estimator, an algorithm, a result or `nothing`, which the scalar method returns with no change. For the vector method, a vector of them, which it rebuilds one element at a time.
-  - `args...`: Positional arguments. The scalar method ignores them, and the vector method forwards them.
-  - `kwargs...`: Keyword arguments. The scalar method ignores them, and the vector method forwards them.
+  - `a`: Any value, which the leaf method returns with no change. For the array method, an array of estimators, algorithms, results, covariance estimators or `nothing`, which it rebuilds one element at a time.
+  - `args...`: Positional arguments. The leaf method ignores them, and the array method forwards them.
+  - `kwargs...`: Keyword arguments. The leaf method ignores them, and the array method forwards them.
 
 # Returns
 
-  - `a`: The input with no change, for the scalar method.
-  - `v::Vector`: The rebuilt elements, for the vector method.
+  - `a`: The input with no change, for the leaf method.
+  - `v::AbstractArray`: The rebuilt elements, in an array of the shape of `a`, for the array method.
 
 # Examples
 
 ```jldoctest
 julia> factory(nothing, 1, 2; x = 3)
+
+julia> factory([1.0, 2.0], 1, 2; x = 3)
+2-element Vector{Float64}:
+ 1.0
+ 2.0
 
 julia> factory(MeanValue())
 MeanValue
@@ -50,49 +59,19 @@ MeanValue
 # Related
 
   - [`port_opt_view`](@ref)
+  - [`@propagatable`](@ref)
+  - [`_wprop`](@ref)
   - [`AbstractEstimator`](@ref)
   - [`AbstractAlgorithm`](@ref)
   - [`AbstractResult`](@ref)
 """
-function factory(a::Union{Nothing, AbstractEstimator, AbstractAlgorithm, AbstractResult},
-                 args...; kwargs...)
+function factory(a, args...; kwargs...)
     return a
 end
-function factory(a::AbstractVector{<:Union{Nothing, AbstractEstimator, AbstractAlgorithm,
-                                           AbstractResult}}, args...; kwargs...)
+function factory(a::AbstractArray{<:Union{Nothing, AbstractEstimator, AbstractAlgorithm,
+                                          AbstractResult, StatsBase.CovarianceEstimator}},
+                 args...; kwargs...)
     return [factory(ai, args...; kwargs...) for ai in a]
-end
-
-"""
-$(DocStringExtensions.TYPEDSIGNATURES)
-
-Recursion into one field. The [`factory`](@ref) methods that [`@propagatable`](@ref) makes call it for each `@fprop` field.
-
-It dispatches on the type of the field value. An estimator, an algorithm or a result recurses through [`factory`](@ref). Every other value comes back with no change, and this includes `nothing` and a set of observation weights. Only [`_wprop`](@ref) replaces observation weights with an incoming [`ObsWeights`](@ref).
-
-# Algorithm
-
-The method that Julia selects is the algorithm.
-
- 1. `v` is an estimator, an algorithm or a result: return [`factory`](@ref) of `v`, and forward `args...` and `kwargs...`. The recursion goes down one level of the struct tree.
- 2. `v` is an array of them: apply step 1 to each element, and collect the results into a new array of the same shape.
- 3. `v` is any other value: return `v` with no change. A data field, a scalar and a `nothing` all take this branch.
-
-Because of step 3, this verb does **not** fill a `nothing` field. A weights field that must take the incoming weights when it holds `nothing` carries `@wprop`, and it goes to [`_wprop`](@ref).
-
-# Related
-
-  - [`@propagatable`](@ref)
-  - [`factory`](@ref)
-"""
-factory_child(v, args...; kwargs...) = v
-function factory_child(v::Union{AbstractEstimator, AbstractAlgorithm, AbstractResult},
-                       args...; kwargs...)
-    return factory(v, args...; kwargs...)
-end
-function factory_child(v::AbstractArray{<:Union{AbstractEstimator, AbstractAlgorithm,
-                                                AbstractResult}}, args...; kwargs...)
-    return [factory_child(vi, args...; kwargs...) for vi in v]
 end
 """
 $(DocStringExtensions.TYPEDSIGNATURES)
@@ -101,7 +80,7 @@ New value of an observation-weights field with a [`@wprop`](@ref) tag, in a call
 [`factory`](@ref).
 
 When `factory` passes an [`ObsWeights`](@ref) argument, those weights **replace** the
-field. Otherwise, the field keeps its value. [`factory_child`](@ref), which
+field. Otherwise, the field keeps its value. [`factory`](@ref), which
 [`@fprop`](@ref) uses, is different. It recurses into sub-estimators, and it returns
 `nothing` and every value that is not an estimator with no change. A weights field that
 holds `nothing` and an optional sub-estimator that is `nothing` need different rules, so
@@ -120,12 +99,12 @@ The value of the field never selects the branch. An incoming [`ObsWeights`](@ref
 
   - [`@wprop`](@ref)
   - [`@propagatable`](@ref)
-  - [`factory_child`](@ref)
+  - [`factory`](@ref)
 """
 _wprop(field, args...; kwargs...) = field
 _wprop(::Any, w::ObsWeights, args...; kwargs...) = w
 """
-$(DocStringExtensions.TYPEDSIGNATURES)
+    resolve_deferred_quantities(x, pr::AbstractPriorResult, slv = nothing)
 
 Resolve every **Deferred Quantity** that `x` holds against a prior result. The result is
 a struct of the same type whose deferred slots hold plain values.
@@ -148,9 +127,7 @@ The third argument, `slv`, is the effective solver, and a **Calibration Rule** i
 
 # Algorithm
 
- 1. Return `x` with no change. This method takes a second argument that is **not** a prior result. Without a prior, the function cannot fit anything, so the deferred state stays as it is.
-
-On a prior result, a more specific method takes the call. It is the method that [`deferred_slots`](@ref) derives for a container, or the hand-written method of a type that resolves a quantity of its own.
+The method that Julia selects is the algorithm. It is the method that [`deferred_slots`](@ref) derives for a container, or the hand-written method of a type that resolves a quantity of its own. Each method takes a prior result as its second argument. A second argument that is not a prior result raises a `MethodError`, because without a prior the function cannot fit anything, and no caller asks it to.
 
 # Related
 
@@ -160,7 +137,6 @@ On a prior result, a more specific method takes the call. It is the method that 
   - [`factory`](@ref)
   - [`set_risk_constraints!`](@ref)
 """
-resolve_deferred_quantities(x, ::Any, ::Any = nothing) = x
+function resolve_deferred_quantities end
 
 export factory
-public factory_child

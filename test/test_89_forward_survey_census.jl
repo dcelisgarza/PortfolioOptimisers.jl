@@ -25,7 +25,7 @@ using Test
     nt_hook_doc = join([q3, "    nt_hook(x)", "", "A hook.", "", "# Interfaces", "",
                         "## `nt_hook`", "", "A subtype implements it.", q3], '\n')
     source = """
-             export verb, verb2, pubf, pubk, mk, kwv, nt_pub, pubfill
+             export verb, verb2, verb3, pubf, pubk, mk, kwv, nt_pub, pubfill
              struct A end
              struct B end
              struct R
@@ -121,8 +121,8 @@ using Test
              step_i(x::A) = owner_i(x)
              step_i(x) = x
              owner_i(x::A) = 1
-             factory_child(v::A) = factory(v)
-             factory_child(v) = v
+             pipeline_step_factory(v::A) = factory(v)
+             pipeline_step_factory(v) = v
              factory(v::A) = 1
 
              # untyped fallbacks with no owner (#2108)
@@ -192,6 +192,10 @@ using Test
                  return y + 1
              end
              verb2(x::A) = hook_fn(x)
+             # A default that answers alone drives no hook, so a method that calls the hook
+             # is an interface method, as `mean_test_rng` is (#2089).
+             verb3(x::B) = 0
+             verb3(x::A) = hook_fn(x)
 
              # preset
              mk(x::A) = T2(x)
@@ -313,9 +317,11 @@ using Test
         @test ("default", :T3, "keep (b)") in of(:rewrap)
         # The input in front of a function: a person rules it, and `RULED_DEFAULTS` holds it.
         @test ("default", :owner_i, "review") in of(:step_i)
-        @test ("default", :factory, "go") in of(:factory_child)
-        @test only(x for x in found if x.name === :factory_child && x.shape == "default").why ==
-              FS.RULED_DEFAULTS[:factory_child][2]
+        @test ("default", :factory, "keep (b)") in of(:pipeline_step_factory)
+        @test only(x
+                   for x in found
+                   if x.name === :pipeline_step_factory && x.shape == "default").why ==
+              FS.RULED_DEFAULTS[:pipeline_step_factory][2]
     end
 
     @testset "untyped fallbacks with no owner (#2108)" begin
@@ -397,6 +403,8 @@ using Test
         @test of(:verb) == [("worker", :verb_worker, "go")]
         @test of(:verb2) == [("worker", :hook_fn, "go")]
         @test occursin("around the driver", first_of(:verb2).why)
+        # A method of the verb that does not call the hook is no driver of it (#2089).
+        @test of(:verb3) == [("interface", :hook_fn, "keep (interface)")]
         @test of(:mk) == [("preset", :T2, "keep (a)")]
         # One private method that builds a type is a second name for the constructor: its
         # form goes to the constructor as a method (#2112).

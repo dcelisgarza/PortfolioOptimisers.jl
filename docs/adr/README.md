@@ -22,7 +22,7 @@ decision that changed many times, so read the amendments as well as the body.
 | # | Decision | Am. | What it settles |
 | ---- | -------- | --- | --------------- |
 | 0001 | [Generalise the pure-propagation `factory` methods](0001-generalise-factory-methods.md) | | One generic `factory` recurses into the fields of an eligible struct. The leaf injectors and the methods that carry logic stay explicit. The `@propagatable` macro is the mechanism. |
-| 0002 | [`@propagatable` macro design](0002-propagatable-macro-design.md) | 1 · 2026-08-17 | A field joins propagation only if a tag marks it. Runtime type dispatch alone is not enough. |
+| 0002 | [`@propagatable` macro design](0002-propagatable-macro-design.md) | 2 · 2026-11-14 | A field joins propagation only if a tag marks it. Runtime type dispatch alone is not enough. Amended (#2089): an `@fprop` field expands to `factory`, which owns the identity on every leaf. |
 | 0003 | [Parallelise the test suite with ParallelTestRunner.jl](0003-parallelise-test-suite.md) | 1 · 2026-08-17 | The runner finds every `test/*.jl` file itself and runs each file in an isolated worker module. |
 | 0004 | [Give the JuMP model a typed state interface](0004-typed-jump-model-state.md) | | Code reaches Category A state through a named and checked accessor interface. Category B keeps the `(expr, key)` convention. |
 | 0005 | [Namespace nested risk state by key prefix](0005-prefix-namespaced-risk-state.md) | 2 · 2026-11-13 | The builder puts a nested risk expression under a key prefix. It saves, unregisters and restores nothing. Amended (#2048): the `:aset_` prefix is gone. A later Constraint Block takes `blk_i_` and registers the weights with `w_owner = Symbol("")`. |

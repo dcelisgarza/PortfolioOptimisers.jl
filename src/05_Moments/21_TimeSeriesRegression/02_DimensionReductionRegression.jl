@@ -16,33 +16,6 @@ A subtype sets the method that reduces the factors of a [`DimensionReductionRegr
 """
 abstract type DimensionReductionTarget <: AbstractRegressionAlgorithm end
 """
-    factory(drtgt::DimensionReductionTarget, args...; kwargs...) -> DimensionReductionTarget
-
-Returns a [`DimensionReductionTarget`](@ref) unchanged.
-
-A dimension reduction target, for example [`PCA`](@ref) or [`PPCA`](@ref), does not read observation weights. So this method returns `drtgt` unchanged, and generic code can call `factory` on a target with no special case. The weights reach the reduction through the `ve` field of [`DimensionReductionRegression`](@ref), which standardises the factors before the target sees them.
-
-# Arguments
-
-  - `drtgt`: Dimension reduction target.
-  - $(arg_dict[:ignargs])
-  - $(arg_dict[:ignkwargs])
-
-# Returns
-
-  - `drtgt`: The input dimension reduction target, unchanged.
-
-# Related
-
-  - [`DimensionReductionTarget`](@ref)
-  - [`PCA`](@ref)
-  - [`PPCA`](@ref)
-  - [`factory`](@ref)
-"""
-function factory(drtgt::DimensionReductionTarget, args...; kwargs...)
-    return drtgt
-end
-"""
 $(DocStringExtensions.TYPEDEF)
 
 Replaces the factors with the principal components of their standardised covariance.

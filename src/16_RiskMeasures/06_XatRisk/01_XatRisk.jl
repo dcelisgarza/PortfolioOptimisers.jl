@@ -17,21 +17,6 @@ All concrete subtypes should subtype `ValueatRiskFormulation`.
 """
 abstract type ValueatRiskFormulation <: AbstractAlgorithm end
 """
-$(DocStringExtensions.TYPEDSIGNATURES)
-
-Return the Value-at-Risk formulation `alg` unchanged.
-
-A formulation that reads nothing from the prior has nothing to fill. [`DistributionValueatRisk`](@ref) reads the prior's moments, and it has its own method.
-
-# Related
-
-  - [`ValueatRiskFormulation`](@ref)
-  - [`factory`](@ref)
-"""
-function factory(alg::ValueatRiskFormulation, args...; kwargs...)::ValueatRiskFormulation
-    return alg
-end
-"""
     port_opt_view(r::ValueatRiskFormulation, i, args...) -> ValueatRiskFormulation
 
 Return the Value-at-Risk formulation `r` unchanged for the asset selection `i`.

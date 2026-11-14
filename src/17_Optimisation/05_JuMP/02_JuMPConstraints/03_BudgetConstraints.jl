@@ -568,17 +568,16 @@ end
 """
     factory(bgt::BudgetCosts, w::VecNum)
     factory(bgt::BudgetMarketImpact, w::VecNum)
-    factory(bgt::Number, w::VecNum)
 
 Replace the reference portfolio of a cost budget with the weights `w`, unless its `fixed` field is `true`.
 
 A [`BudgetCosts`](@ref) and a [`BudgetMarketImpact`](@ref) charge the cost of the move from their reference `w` against the budget. A fold of a walk-forward, or a step of an online rule, trades from the weights that it holds, and [`factory(opt::JuMPOptimiser, w::AbstractVector)`](@ref) passes these weights to the `bgt` of the optimiser. So the charged cost is the cost of the trade of the fold, as for a [`Turnover`](@ref) on `tn` or on `fees`. A `fixed` estimator keeps the reference that it was built with.
 
-A number holds no reference, so the method on a number returns it unchanged. A [`BudgetRange`](@ref) and `nothing` take the fallback method of [`factory`](@ref), which also returns them unchanged. A [`TimeDependent`](@ref) schedule applies `factory` to each entry.
+A number, a [`BudgetRange`](@ref) and `nothing` hold no reference, so they take the leaf method of [`factory`](@ref), which returns them unchanged. A [`TimeDependent`](@ref) schedule applies `factory` to each entry.
 
 # Algorithm
 
- 1. If `bgt` is a number, or if `bgt.fixed` is `true`, return `bgt` unchanged.
+ 1. If `bgt.fixed` is `true`, return `bgt` unchanged.
  2. Else rebuild `bgt` through its keyword constructor with `w` as the reference portfolio. Every other field keeps its value.
 
 # Arguments
@@ -628,9 +627,6 @@ end
 # concrete type to be the more specific one.
 function factory(bgt::BudgetMarketImpact, w::VecNum)::BudgetMarketImpact
     return bgt.fixed ? bgt : rebuild_struct(bgt, (; w = w))
-end
-function factory(bgt::Number, ::VecNum)::Number
-    return bgt
 end
 """
     needs_previous_weights(bgt::BudgetCostEstimator) -> Bool

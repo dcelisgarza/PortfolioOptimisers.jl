@@ -806,9 +806,11 @@ end
 
 # --- the forward methods (#2077, #2078, #2079, #2080) ---------------------------
 
-# Whether a method of `name` holds logic of its own, so that it can be a driver.
-function has_driver(t::Tree, name)
-    return any(m -> CH.forward_call(m.body) === nothing,
+# Whether a method of `name` holds logic of its own and calls the hook `callee`, so that it is a
+# driver of the hook. A default that answers alone, such as `mean_test_rng(::Any) = nothing`,
+# drives nothing: a method that goes around it does not get the same answer from it (#2089).
+function has_driver(t::Tree, name, callee)
+    return any(m -> CH.forward_call(m.body) === nothing && callee in names_in(m.body),
                get(t.by_name, name, CH.MethodDef[]))
 end
 
@@ -956,7 +958,7 @@ function forward_verdict(t::Tree, name, callee, d)
         # One private method holds a form that the constructor can hold (#2112).
         return ("interface", "go",
                 "one private method that builds a `$callee`: a second name for the constructor. Its form goes to `$callee` as a method, and its callers call `$callee` (#2112)")
-    elseif name in t.public && callee in t.hooks && has_driver(t, name)
+    elseif name in t.public && callee in t.hooks && has_driver(t, name, callee)
         return ("worker", "go",
                 "goes around the driver of `$name` to the hook `$callee`, and the driver gives the same answer. A measured loss keeps it as (b) (rule 4)")
     elseif name in t.public &&
@@ -1081,17 +1083,12 @@ const RULED_DEFAULTS = Dict{Symbol, Tuple{String, String}}(#
                                                                                    "only a `VecDate` reaches the fallback, so the slot takes that type (#2108)"),
                                                            :online_unreached_path => ("go",
                                                                                       "the typed methods share one body that answers every estimator: one untyped method replaces them and the fallback (#2108)"),
-                                                           :resolve_deferred_quantities =>
-                                                               ("go",
-                                                                "only the tests reach the fallback, and the method on `AbstractPriorResult` holds the identity on a leaf (#2108)"),
                                                            :timestamp_positions =>
                                                                ("keep (default)",
                                                                 "an index that is not a timestamp or a name passes to `view`, which is the gate of the index (#2108)"),
                                                            :regression_factor_names =>
                                                                ("keep (default)",
                                                                 "a query of the names of the loadings axis owns `nothing`, the answer \"none\". Its callee reads fields of the input, so it owns no default for the input (#2109)"),
-                                                           :factory_child => ("go",
-                                                                              "`factory` is a traversal and owns the identity on every leaf, as `adapt_structure(to, x) = x` does in Adapt.jl: `factory(a, args...; kwargs...) = a` on `::Any` replaces this function (#2109)"),
                                                            :maybe_count_or_fraction =>
                                                                ("go",
                                                                 "`count_or_fraction` is a repair at a constructor, and a repair owns the identity on a value that needs none: `count_or_fraction(x::Option{<:UnresolvedValue}) = x` replaces this function (#2109, #2108 amended)"),

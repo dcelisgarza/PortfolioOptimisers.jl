@@ -1579,7 +1579,7 @@ end
     # `covariance_centre_and_estimator` reads the same verb, so `Covariance` centres where
     # its three siblings do. It also answers the inner estimator, which is the half no
     # sibling has: `ce.ce` passes through untouched when `ce.w` is `nothing`, and takes the
-    # weights through `factory_child` when it is not.
+    # weights through `factory` when it is not.
     ce0 = Covariance()
     mu0, cel0 = PortfolioOptimisers.covariance_centre_and_estimator(ce0, X; dims = 1)
     @test mu0 ≈ Statistics.mean(me, X; dims = 1)
@@ -1678,15 +1678,15 @@ end
 @testset "the no-op seams of the moment layer" begin
     rng = StableRNG(20260824)
     w = StatsBase.eweights(1:40, 0.3)
-    # `factory_child` maps over an array of covariance estimators, one call per element.
+    # `factory` maps over an array of covariance estimators, one call per element.
     ces = [Covariance(), PortfolioOptimisersCovariance()]
-    out = PortfolioOptimisers.factory_child(ces, w)
+    out = factory(ces, w)
     @test out isa Vector
     @test length(out) == 2
     @test out[1].ce.w === w
     @test out[2].ce.ce.w === w
     # A single estimator takes the other method and answers a single estimator.
-    @test PortfolioOptimisers.factory_child(ces[1], w) isa Covariance
+    @test factory(ces[1], w) isa Covariance
     # An expected returns algorithm carries no asset axis, so its view is itself.
     for alg in (GrandMean(), VolatilityWeighted(), MeanSquaredError())
         @test PortfolioOptimisers.port_opt_view(alg, nothing) === alg

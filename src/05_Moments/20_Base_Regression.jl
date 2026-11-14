@@ -443,7 +443,7 @@ The cross-sectional regression fits every observation under its cross-sectional 
 
   - `factory(tgt::MyRegressionTarget, ic::InterceptColumn) -> MyRegressionTarget`: Return a target whose fit leaves column `ic.k` of the design out of the penalty.
 
-An estimator that adds a column of ones to the design calls this method before the fit, with the index of that column. [`factory(::AbstractRegressionTarget, ::InterceptColumn)`](@ref) returns the target unchanged, so an unpenalised target needs no method. A penalised target that must not shrink the intercept adds one, as [`ElasticNet`](@ref) does.
+An estimator that adds a column of ones to the design calls this method before the fit, with the index of that column. The leaf method of [`factory`](@ref) returns the target unchanged, so an unpenalised target needs no method. A penalised target that must not shrink the intercept adds one, as [`ElasticNet`](@ref) does.
 
 ### Arguments
 
@@ -689,7 +689,7 @@ InterceptColumn
 
   - [`AbstractPenalisedRegressionTarget`](@ref)
   - [`ElasticNet`](@ref)
-  - [`factory(::AbstractRegressionTarget, ::InterceptColumn)`](@ref)
+  - [`factory`](@ref)
 """
 @concrete struct InterceptColumn <: AbstractAlgorithm
     """
@@ -700,31 +700,6 @@ InterceptColumn
         @argcheck(k >= 1, DomainError(k, "k must be at least 1"))
         return new{typeof(k)}(k)
     end
-end
-"""
-    factory(tgt::AbstractRegressionTarget, ic::InterceptColumn) -> AbstractRegressionTarget
-
-Return a regression target unchanged when an estimator names its column of ones.
-
-An unpenalised target fits the intercept as it fits every other coefficient, so the index of the column changes nothing. A penalised target that must leave the intercept out of the penalty has a method of its own, as [`ElasticNet`](@ref) has.
-
-# Arguments
-
-  - `tgt`: The regression target.
-  - `ic`: The intercept column.
-
-# Returns
-
-  - `tgt::AbstractRegressionTarget`: The input target, unchanged.
-
-# Related
-
-  - [`InterceptColumn`](@ref)
-  - [`AbstractRegressionTarget`](@ref)
-  - [`factory`](@ref)
-"""
-function factory(tgt::AbstractRegressionTarget, ::InterceptColumn)
-    return tgt
 end
 """
     factory(tgt::AbstractRegressionTarget, w::ObsWeights)

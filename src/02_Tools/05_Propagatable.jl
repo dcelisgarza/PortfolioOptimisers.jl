@@ -232,7 +232,7 @@ The function reads the channel first, and then the tag, because one tag has two 
      1. `tag` is `:wprop`: return `obs_weights_index(xf, thread...)`. The field **is** the weights, so the method indexes it at the selected observations. An index keeps the `AbstractWeights` subtype, and a view does not. [`obs_weights_index`](@ref) states the rule for a mask of the full sample.
      2. `tag` is `:oprop` or `:fprop`: return `obs_weights_view(xf, thread...)`. The field is a composed child, so the verb recurses into it.
  2. `channel` is any other channel:
-     1. `tag` is `:fprop`: return `factory_child(xf, thread..., args...; kwargs...)`.
+     1. `tag` is `:fprop`: return `factory(xf, thread..., args...; kwargs...)`. The traversal owns the identity on a leaf, so a field that holds data or `nothing` comes back with no change.
      2. `tag` is `:vprop`: return `view_child(xf, thread..., args...)`, which calls [`port_opt_view`](@ref) on every value but a precomputed optimisation result. This channel forwards no keywords.
      3. `tag` is `:pprop`: return `sel(xf, getproperty(pr, fname))`. The prior result gives the property of the **same name**, so the field name is an argument.
      4. `tag` is `:cprop`: return `sel(xf, _ctx(args...))`, which reads the context from the threaded arguments and not from the prior.
@@ -276,7 +276,7 @@ function prop_tag_expr(channel::Symbol, tag::Symbol, fname::Symbol, xf, mod::Mod
         end
     else
         if tag === :fprop
-            return :($mod.factory_child($xf, $(thread...), args...; kwargs...))
+            return :($mod.factory($xf, $(thread...), args...; kwargs...))
         end
         if tag === :vprop
             return :($mod.view_child($xf, $(thread...), args...))
@@ -670,8 +670,8 @@ end
     @fprop field
 
 Field tag for a [`@propagatable`](@ref) struct body. It marks a composed child for
-[`factory`](@ref) propagation. A call of `factory` on the struct calls `factory_child` on
-the field.
+[`factory`](@ref) propagation. A call of `factory` on the struct calls `factory` on the
+field.
 
 # Algorithm
 
@@ -683,7 +683,7 @@ The tag never expands, because [`@propagatable`](@ref) runs first and removes it
 
  3. [`prop_channel_pairs`](@ref) builds the keyword pair of the field for each emitted method, and [`prop_tag_expr`](@ref) gives the value:
 
-      + `factory` channel: `factory_child(x.field, args...; kwargs...)`, which recurses into the child.
+      + `factory` channel: `factory(x.field, args...; kwargs...)`, which recurses into the child.
       + `obs` channel: `obs_weights_view(x.field, i)`, which recurses into the child on the observation axis.
 
  4. The generated method builds the struct again with its keyword constructor, so every check of the constructor runs again on the propagated value.
@@ -698,7 +698,6 @@ The body of this macro raises an error. Julia runs it only when the tag is outsi
   - [`@vprop`](@ref)
   - [`@wprop`](@ref)
   - [`factory`](@ref)
-  - [`factory_child`](@ref)
   - [`obs_weights_view`](@ref)
   - [`PROP_TAG_CHANNELS`](@ref)
 """
@@ -1163,7 +1162,7 @@ Define a struct, and make its propagation methods from six field tags. The tags 
 independent, and a field can carry more than one:
 
   - [`@fprop`](@ref) (factory propagation): a call of [`factory`](@ref) calls
-    `factory_child` on each tagged field. It passes runtime *values*, such as
+    `factory` on each tagged field. It passes runtime *values*, such as
     observation weights, prior results and solvers, down the tree of composed structs.
     The macro always makes a `factory(x, args...)` method. When no field carries
     `@fprop` or `@wprop`, that method returns `x`.
@@ -1191,7 +1190,7 @@ independent, and a field can carry more than one:
 When at least one field carries `@pprop` or `@cprop`, the macro makes a second method,
 `factory(x, pr::AbstractPriorResult, args...)`. This method selects the `@pprop` and
 `@cprop` fields as above. It threads `pr` into the fields that carry only `@fprop`, as
-`factory_child(getfield(x, :f), pr, args...)`. A field with both `@pprop` and `@fprop`
+`factory(getfield(x, :f), pr, args...)`. A field with both `@pprop` and `@fprop`
 takes the prior selection in this method, because `@pprop` wins. Then the method calls
 [`resolve_deferred_quantities`](@ref) on the **selected** struct. That call returns the
 struct with no change when the type has no deferred slot and no method of its own. So

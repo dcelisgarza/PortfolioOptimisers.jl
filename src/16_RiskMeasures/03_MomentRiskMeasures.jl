@@ -29,21 +29,6 @@ Selects a moment of order one or two, or the root of an even moment, for a low-o
 """
 abstract type LowOrderMomentMeasureAlgorithm <: MomentMeasureAlgorithm end
 """
-$(DocStringExtensions.TYPEDSIGNATURES)
-
-Return the moment measure algorithm `alg` unchanged.
-
-A member that holds no variance estimator has nothing that a prior or observation weights can replace. [`factory`](@ref) on [`LowOrderMoment`](@ref) calls this method for such a member. [`SecondMoment`](@ref) has a method of its own, which passes the weights to `ve`. A [`HighOrderMomentMeasureAlgorithm`](@ref) holds no variance estimator, because [`HighOrderMoment`](@ref) holds its `ve` itself.
-
-# Related
-
-  - [`MomentMeasureAlgorithm`](@ref)
-  - [`factory`](@ref)
-"""
-function factory(alg::MomentMeasureAlgorithm, args...; kwargs...)::MomentMeasureAlgorithm
-    return alg
-end
-"""
 $(DocStringExtensions.TYPEDEF)
 
 Measures the mean shortfall of the net portfolio returns below the Moment Target.

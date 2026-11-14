@@ -1160,21 +1160,6 @@ function HierarchicalRiskMeasureSettings(;
     return HierarchicalRiskMeasureSettings(scale)
 end
 """
-$(DocStringExtensions.TYPEDSIGNATURES)
-
-Return the risk measure `rs` unchanged.
-
-Identity pass-through used when a risk measure is provided in a context that calls [`factory`](@ref).
-
-# Related
-
-  - [`AbstractBaseRiskMeasure`](@ref)
-  - [`factory`](@ref)
-"""
-function factory(rs::AbstractBaseRiskMeasure, args...; kwargs...)
-    return rs
-end
-"""
     port_opt_view(rs, i, X)
 
 Get a view or subset of a risk measure for asset cluster index `i`.
@@ -2169,7 +2154,7 @@ functor_slots(::Any) = (;)
 
 Resolve one slot that [`deferred_slots`](@ref) declared, on behalf of the derived recursion in [`resolve_deferred_quantities`](@ref).
 
-A slot holds one of three things, and one rule covers all three. A child measure resolves through its own method. A vector of children resolves element by element, which is the rule [`factory_child`](@ref) already applies on the other path. Any other occupant comes back unchanged, such as a stated value, `nothing` or a **Deferred Quantity** that the enclosing type resolves itself.
+A slot holds one of three things, and one rule covers all three. A child measure resolves through its own method. A vector of children resolves element by element, which is the rule [`factory`](@ref) already applies on the other path. Any other occupant comes back unchanged, such as a stated value, `nothing` or a **Deferred Quantity** that the enclosing type resolves itself.
 
 The vector arm is bounded by the element type rather than by `AbstractArray`, so a matrix slot is a value and never a container of children.
 
@@ -2179,7 +2164,7 @@ The vector arm is bounded by the element type rather than by `AbstractArray`, so
 
   - [`resolve_deferred_quantities`](@ref)
   - [`deferred_slots`](@ref)
-  - [`factory_child`](@ref)
+  - [`factory`](@ref)
 """
 function resolve_deferred_child(slot, pr::AbstractPriorResult, slv = nothing)
     return resolve_deferred_quantities(slot, pr, slv)
