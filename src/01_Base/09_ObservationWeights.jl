@@ -370,12 +370,11 @@ function weight_observation_count(alg::AbstractObservationCountAlgorithm, ::Abst
 end
 """
     observed_sample(X::VecNum, w::Option{<:Union{ObsWeights, VecNum}},
-                    obs::AbstractVector{Bool}; kwargs...) -> (VecNum, Option{<:VecNum})
+                    obs::AbstractVector{Bool} = isfinite.(X); kwargs...)
+        -> (VecNum, Option{<:VecNum})
     observed_sample(X::MatNum, w::Option{<:Union{ObsWeights, VecNum}},
                     obs::AbstractVector{Bool}; dims::Int = 1, kwargs...)
         -> (MatNum, Option{<:VecNum})
-    observed_sample(X::VecNum, w::Option{<:Union{ObsWeights, VecNum}}; kwargs...)
-        -> (VecNum, Option{<:VecNum})
     observed_sample(X::MatNum, w::Option{<:Union{ObsWeights, VecNum}}; dims::Int = 1,
                     kwargs...) -> (MatNum, Option{<:VecNum})
 
@@ -446,10 +445,10 @@ julia> w
   - [`ObsWeights`](@ref)
 """
 function observed_sample(X::VecNum, w::Option{<:Union{ObsWeights, VecNum}},
-                         obs::AbstractVector{Bool}; kwargs...)
+                         obs::AbstractVector{Bool} = isfinite.(X); kwargs...)
     assert_observation_mask(obs, length(X))
     X_obs = all(obs) ? X : X[obs]
-    return X_obs, observed_weights(w, X_obs, obs; kwargs...)
+    return X_obs, observed_weights(w, obs, X_obs; kwargs...)
 end
 function observed_sample(X::MatNum, w::Option{<:Union{ObsWeights, VecNum}},
                          obs::AbstractVector{Bool}; dims::Int = 1, kwargs...)
@@ -462,10 +461,7 @@ function observed_sample(X::MatNum, w::Option{<:Union{ObsWeights, VecNum}},
     else
         X[:, obs]
     end
-    return X_obs, observed_weights(w, X_obs, obs; dims = dims, kwargs...)
-end
-function observed_sample(X::VecNum, w::Option{<:Union{ObsWeights, VecNum}}; kwargs...)
-    return observed_sample(X, w, isfinite.(X); kwargs...)
+    return X_obs, observed_weights(w, obs, X_obs; dims = dims, kwargs...)
 end
 function observed_sample(X::MatNum, w::Option{<:Union{ObsWeights, VecNum}}; dims::Int = 1,
                          kwargs...)
@@ -501,14 +497,16 @@ function assert_observation_mask(obs::AbstractVector{Bool}, T::Integer)::Nothing
     return nothing
 end
 """
-    observed_weights(w::Nothing, X_obs::VecNum_MatNum, obs::AbstractVector{Bool};
-                     kwargs...) -> Nothing
-    observed_weights(w::DynamicAbstractWeights, X_obs::VecNum_MatNum,
-                     obs::AbstractVector{Bool}; kwargs...) -> VecNum
-    observed_weights(w::VecNum, X_obs::VecNum_MatNum, obs::AbstractVector{Bool};
-                     kwargs...) -> VecNum
+    observed_weights(w::Nothing, obs::AbstractVector{Bool},
+                     X_obs::Option{<:VecNum_MatNum} = nothing; kwargs...) -> Nothing
+    observed_weights(w::DynamicAbstractWeights, obs::AbstractVector{Bool},
+                     X_obs::Nothing = nothing) -> DynamicAbstractWeights
+    observed_weights(w::DynamicAbstractWeights, obs::AbstractVector{Bool},
+                     X_obs::VecNum_MatNum; kwargs...) -> VecNum
+    observed_weights(w::VecNum, obs::AbstractVector{Bool},
+                     X_obs::Option{<:VecNum_MatNum} = nothing; kwargs...) -> VecNum
 
-Return the observation weights of the observed sample `X_obs`, the observations of a sample at which `obs` is `true`.
+Return the observation weights of the observed sample `X_obs`, the observations of a sample at which `obs` is `true`. With no `X_obs`, return the weights that an estimator holds, cut to the same observations, before the fit.
 
 The rule is one for every type of weights. An observation that the fit drops takes its weight with it, and the other observations keep their weights.
 
@@ -524,14 +522,17 @@ A sample with no observation of positive weight left has no value. The consumer 
 The method that Julia selects on the type of `w` is the algorithm.
 
  1. `nothing`: return `nothing`. The fit stays unweighted.
- 2. A [`DynamicAbstractWeights`](@ref): resolve it on `X_obs` with [`get_observation_weights`](@ref), and pass `kwargs...` to it.
- 3. A weight vector: return the weights of the two-argument method at `obs`. It checks that `w` has one entry for each entry of `obs`, and returns `w` itself when `obs` keeps every observation.
+ 2. A [`DynamicAbstractWeights`](@ref) with an `X_obs`: resolve it on `X_obs` with [`get_observation_weights`](@ref), and pass `kwargs...` to it.
+ 3. A [`DynamicAbstractWeights`](@ref) with no `X_obs`: return `w`. It resolves later on the sample that the fit reads, which is the observed sample.
+ 4. A weight vector: check that it has one entry for each entry of `obs`. Return `w` itself when `obs` keeps every observation, and the weights of the same type at the kept observations otherwise, through [`nothing_scalar_array_getindex`](@ref). That function also keeps the type of weights that store a range. The method ignores `X_obs`.
+
+The form with no `X_obs` is the rule for weights that an estimator holds in a field, before it reads a sample. [`shared_series_estimator`](@ref) calls it on each weights field of an estimator tree, through [`obs_weights_index`](@ref), when a Shared Series gap drops observations from the returns data.
 
 # Arguments
 
   - $(arg_dict[:oow])
-  - `X_obs`: The observed sample. A dynamic weight reads it. The other methods ignore it.
   - `obs`: `true` at each observation of the full sample that the fit reads.
+  - `X_obs`: The observed sample, or `nothing` before the fit. A dynamic weight reads it. The other methods ignore it.
   - `kwargs...`: More keyword arguments for [`get_observation_weights`](@ref). A matrix sample passes `dims` here.
 
 # Validation
@@ -540,55 +541,7 @@ The method that Julia selects on the type of `w` is the algorithm.
 
 # Returns
 
-  - `w_obs::Option{<:VecNum}`: The weights of the observed sample, of the type of `w`, or `nothing`.
-
-# Related
-
-  - [`observed_sample`](@ref)
-  - [`has_positive_weight`](@ref)
-  - [`get_observation_weights`](@ref)
-  - [`DynamicAbstractWeights`](@ref)
-"""
-function observed_weights(::Nothing, ::VecNum_MatNum, ::AbstractVector{Bool}; kwargs...)
-    return nothing
-end
-function observed_weights(w::DynamicAbstractWeights, X_obs::VecNum_MatNum,
-                          ::AbstractVector{Bool}; kwargs...)
-    return get_observation_weights(w, X_obs; kwargs...)
-end
-function observed_weights(w::VecNum, ::VecNum_MatNum, obs::AbstractVector{Bool}; kwargs...)
-    return observed_weights(w, obs)
-end
-"""
-    observed_weights(w::Nothing, obs::AbstractVector{Bool}) -> Nothing
-    observed_weights(w::DynamicAbstractWeights, obs::AbstractVector{Bool})
-        -> DynamicAbstractWeights
-    observed_weights(w::VecNum, obs::AbstractVector{Bool}) -> VecNum
-
-Return the observation weights that an estimator holds, cut to the observations at which `obs` is `true`, before the fit.
-
-This is the rule of the three-argument method for weights that an estimator holds in a field, before it reads a sample. [`shared_series_estimator`](@ref) calls it on each weights field of an estimator tree, through [`obs_weights_index`](@ref), when a Shared Series gap drops observations from the returns data.
-
-# Algorithm
-
-The method that Julia selects on the type of `w` is the algorithm.
-
- 1. `nothing`: return `nothing`. The fit stays unweighted.
- 2. A [`DynamicAbstractWeights`](@ref): return `w`. It resolves on the sample that the fit reads, which is the observed sample, as the three-argument method states.
- 3. A weight vector: check that it has one entry for each entry of `obs`. Return `w` itself when `obs` keeps every observation, and the weights of the same type at the kept observations otherwise, through [`nothing_scalar_array_getindex`](@ref). That function also keeps the type of weights that store a range.
-
-# Arguments
-
-  - $(arg_dict[:oow])
-  - `obs`: `true` at each observation of the full sample that the fit reads.
-
-# Validation
-
-  - A weight vector has `length(w) == length(obs)`. A `DimensionMismatch` that names `w` is thrown otherwise.
-
-# Returns
-
-  - `w_obs::Option{<:ObsWeights}`: The weights of the observed sample, of the type of `w`, or `nothing`.
+  - `w_obs::Option{<:ObsWeights}`: The weights of the observed sample, of the type of `w`, or `nothing`. A [`DynamicAbstractWeights`](@ref) with no `X_obs` returns itself.
 
 # Examples
 
@@ -603,16 +556,26 @@ julia> PortfolioOptimisers.observed_weights(aweights(1.0:4.0), [true, false, tru
 # Related
 
   - [`observed_sample`](@ref)
+  - [`has_positive_weight`](@ref)
+  - [`get_observation_weights`](@ref)
+  - [`DynamicAbstractWeights`](@ref)
   - [`obs_weights_index`](@ref)
   - [`shared_series_estimator`](@ref)
 """
-function observed_weights(::Nothing, ::AbstractVector{Bool})
+function observed_weights(::Nothing, ::AbstractVector{Bool},
+                          ::Option{<:VecNum_MatNum} = nothing; kwargs...)
     return nothing
 end
-function observed_weights(w::DynamicAbstractWeights, ::AbstractVector{Bool})
+function observed_weights(w::DynamicAbstractWeights, ::AbstractVector{Bool},
+                          ::Nothing = nothing)
     return w
 end
-function observed_weights(w::VecNum, obs::AbstractVector{Bool})
+function observed_weights(w::DynamicAbstractWeights, ::AbstractVector{Bool},
+                          X_obs::VecNum_MatNum; kwargs...)
+    return get_observation_weights(w, X_obs; kwargs...)
+end
+function observed_weights(w::VecNum, obs::AbstractVector{Bool},
+                          ::Option{<:VecNum_MatNum} = nothing; kwargs...)
     @argcheck(length(w) == length(obs),
               DimensionMismatch("length(w) == length(obs) must hold: an observation that the fit drops takes its own observation weight with it. Got\nlength(w) => $(length(w))\nlength(obs) => $(length(obs))"))
     return all(obs) ? w : nothing_scalar_array_getindex(w, obs)

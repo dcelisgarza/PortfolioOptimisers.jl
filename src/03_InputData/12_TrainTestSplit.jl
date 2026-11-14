@@ -90,7 +90,7 @@ The training window is the first rows of the data and the test window is the las
 """
 function safe_index(lo::Option{<:Real_CountFraction}, hi::Option{<:Real_CountFraction},
                     N::Integer, D::Real_CountFraction = FractionOf(0.75))
-    lo, hi = maybe_count_or_fraction(lo), maybe_count_or_fraction(hi)
+    lo, hi = count_or_fraction(lo), count_or_fraction(hi)
     N_l, N_h = if isnothing(lo) && isnothing(hi)
         n = split_count(count_or_fraction(D), N)
         n, N - n
@@ -227,8 +227,8 @@ julia> pipe.names
     test_size
     function TrainTestSplit(train_size::Option{<:Real_CountFraction},
                             test_size::Option{<:Real_CountFraction})
-        train_size = maybe_count_or_fraction(train_size)
-        test_size = maybe_count_or_fraction(test_size)
+        train_size = count_or_fraction(train_size)
+        test_size = count_or_fraction(test_size)
         return new{typeof(train_size), typeof(test_size)}(train_size, test_size)
     end
 end

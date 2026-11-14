@@ -358,27 +358,51 @@ end
 """
 $(DocStringExtensions.TYPEDSIGNATURES)
 
-Render the first line of an error for a log message, cut to `max_line_length` characters. A `…` at the end marks the cut. An exception renders through `showerror`, so the line holds the exception type and message. Each other value renders through `repr`. A JuMP termination status is the one exception: its method returns the text of [`solve_status_msg`](@ref), uncut, because the library writes that text and it is one line.
+Render the first line of an error for a log message, cut to `max_line_length` characters. A `…` at the end marks the cut. An exception renders through `showerror`, so the line holds the exception type and message. Each other value renders through `repr`.
+
+A JuMP termination status is the one exception. Its method states in words what the status of a failed solve means, and what to review, and it does not cut the text, because the library writes that text and it is one line. A status that says the problem has no solution is the most common failure that a user can correct. An infeasible problem asks for weights that no constraint set admits, and an unbounded problem lets the objective improve without limit. The text names the status first, so a reader can also look it up in the documentation of MathOptInterface.
 
 # Algorithm
 
- 1. Render `err` into `s`, through `showerror` when `err` is an `Exception` and through `repr` in the other case.
- 2. Take `line`, the text of `s` up to its first newline.
- 3. Return `line` unchanged when it has at most `max_line_length` characters. Otherwise return its first `max_line_length` characters and `…`.
+The method that Julia selects on the type of `err` is the algorithm.
+
+ 1. A termination status `st`:
+
+     1. Build a table from each status that says the problem is infeasible, unbounded, or one of the two, to its meaning and the part of the problem to review. A status at reduced numerical accuracy points to the settings of the solver and the scale of the problem instead.
+     2. When the table holds `st`, return the name of the status and its meaning.
+     3. Otherwise return the name of the status alone, such as an iteration limit or a numerical error. Its name states it.
+
+ 2. Each other value:
+
+     1. Render `err` into `s`, through `showerror` when `err` is an `Exception` and through `repr` in the other case.
+     2. Take `line`, the text of `s` up to its first newline.
+     3. Return `line` unchanged when it has at most `max_line_length` characters. Otherwise return its first `max_line_length` characters and `…`.
 
 # Arguments
 
-  - `err`: The error to render.
-  - `max_line_length::Integer`: The maximum number of characters of the returned line before the cut.
+  - `err`: The error to render, or the termination status that the solver reported.
+  - `max_line_length::Integer`: The maximum number of characters of the returned line before the cut. The method on a termination status ignores it.
 
 # Returns
 
-  - `line::String`: The rendered first line, cut when it is too long.
+  - `line::String`: The rendered first line, cut when it is too long. For a termination status, the name of the status, and its meaning when the status is one of the six in the table.
+
+# Examples
+
+```jldoctest
+julia> PortfolioOptimisers.first_error_line(PortfolioOptimisers.JuMP.MOI.INFEASIBLE, 200)
+"INFEASIBLE: no solution satisfies every constraint. Review the constraints and the input data."
+
+julia> PortfolioOptimisers.first_error_line(PortfolioOptimisers.JuMP.MOI.ITERATION_LIMIT, 200)
+"ITERATION_LIMIT"
+
+julia> PortfolioOptimisers.first_error_line(ErrorException(\"boom\\nsecond line\"), 200)
+"boom"
+```
 
 # Related
 
   - [`failed_solve_msg`](@ref)
-  - [`solve_status_msg`](@ref)
 """
 function first_error_line(err, max_line_length::Integer)
     s = err isa Exception ? sprint(showerror, err) : repr(err)
@@ -386,14 +410,22 @@ function first_error_line(err, max_line_length::Integer)
     return length(line) <= max_line_length ? line : first(line, max_line_length) * "…"
 end
 function first_error_line(st::JuMP.MOI.TerminationStatusCode, ::Integer)
-    return solve_status_msg(st)
+    MOI = JuMP.MOI
+    infeasible = "no solution satisfies every constraint. Review the constraints and the input data."
+    inaccurate = "the solver found this at reduced numerical accuracy. Check the settings of the solver and the scale of the problem, or try another solver."
+    details = Dict(MOI.INFEASIBLE => infeasible, MOI.LOCALLY_INFEASIBLE => infeasible,
+                   MOI.DUAL_INFEASIBLE => "the problem is unbounded if it is feasible, so the objective improves without limit. Review the objective and the constraints.",
+                   MOI.INFEASIBLE_OR_UNBOUNDED => "the problem is infeasible or unbounded, and the solver cannot tell which. Try another solver, or turn on the verbose output of the solver.",
+                   MOI.ALMOST_INFEASIBLE => inaccurate,
+                   MOI.ALMOST_DUAL_INFEASIBLE => inaccurate)
+    return haskey(details, st) ? string(st, ": ", details[st]) : string(st)
 end
 """
     failed_solve_msg(trials::AbstractDict; max_line_length::Integer = 200) -> String
 
 Build the warning text for a JuMP model that no configured solver solved to a satisfactory status. `JuMPResult` and the `res` of an [`OptimisationFailure`](@ref) hold the trials. The text has one line for each failed stage of each solver trial. The line gives the solver name, the stage that failed, and the first line of the error, cut to `max_line_length` characters. The stage is `set_optimizer`, `optimize!`, `assert_is_solved_and_feasible` or `termination_status`.
 
-The first line of the error of `JuMP.assert_is_solved_and_feasible` does not hold the termination status. So a solver that ran records its status under `termination_status`, from the public `JuMP.termination_status`, and [`solve_status_msg`](@ref) states in words what the status means. A reader sees that the problem is infeasible or unbounded without the raw trials. The solution summary also holds the status, but its type is private to JuMP, so the function does not read it.
+The first line of the error of `JuMP.assert_is_solved_and_feasible` does not hold the termination status. So a solver that ran records its status under `termination_status`, from the public `JuMP.termination_status`, and [`first_error_line`](@ref) states in words what the status means. A reader sees that the problem is infeasible or unbounded without the raw trials. The solution summary also holds the status, but its type is private to JuMP, so the function does not read it.
 
 The function never interpolates the whole trials dictionary, the solver settings, or the full exception data into the log. The returned trials still hold the raw data. [`unknown_variable_msg`](@ref) and the other functions of its family follow the same rule to leak no data. The function sorts the solver names and the stages, so the message is the same on each run.
 
@@ -403,7 +435,7 @@ The function never interpolates the whole trials dictionary, the solver settings
  2. For each solver name, in sorted order, read its entry into `trial`.
  3. Read `stages`, the stages of `trial`. An entry that is not a dictionary becomes the single stage `:trial`, so a solver that failed before the library recorded a stage still gives a line.
  4. For each stage, in sorted order, skip `:settings` and `:err`. The solver settings are input from the caller, and they never go into a log. `:err` holds the solution summary of [`optimise_JuMP_model!`](@ref), which is many lines long, and the `termination_status` line states its status.
- 5. Add one line for each other stage. The line gives the solver name, the stage, and the text of its value from [`first_error_line`](@ref). For a termination status that text is the one of [`solve_status_msg`](@ref).
+ 5. Add one line for each other stage. The line gives the solver name, the stage, and the text of its value from [`first_error_line`](@ref). For a termination status that text states what the status means.
 
 # Arguments
 
@@ -420,7 +452,6 @@ The function never interpolates the whole trials dictionary, the solver settings
   - [`empty_row_msg`](@ref)
   - [`missing_group_assets_msg`](@ref)
   - [`first_error_line`](@ref)
-  - [`solve_status_msg`](@ref)
 """
 function failed_solve_msg(trials::AbstractDict; max_line_length::Integer = 200)
     msg = "Model could not be solved satisfactorily ($(length(trials)) solver trial(s))."
@@ -435,51 +466,4 @@ function failed_solve_msg(trials::AbstractDict; max_line_length::Integer = 200)
         end
     end
     return msg
-end
-"""
-$(DocStringExtensions.TYPEDSIGNATURES)
-
-State in words what the termination status of a failed solve means, and what to review.
-
-A status that says the problem has no solution is the most common failure that a user can correct. An infeasible problem asks for weights that no constraint set admits, and an unbounded problem lets the objective improve without limit. The text names the status first, so a reader can also look it up in the documentation of MathOptInterface.
-
-# Algorithm
-
- 1. Build a table from each status that says the problem is infeasible, unbounded, or one of the two, to its meaning and the part of the problem to review. A status at reduced numerical accuracy points to the settings of the solver and the scale of the problem instead.
- 2. When the table holds `st`, return the name of the status and its meaning.
- 3. Otherwise return the name of the status alone, such as an iteration limit or a numerical error. Its name states it.
-
-# Arguments
-
-  - `st::JuMP.MOI.TerminationStatusCode`: The termination status that the solver reported.
-
-# Returns
-
-  - `msg::String`: The name of the status, and its meaning when the status is one of the five above.
-
-# Examples
-
-```jldoctest
-julia> PortfolioOptimisers.solve_status_msg(PortfolioOptimisers.JuMP.MOI.INFEASIBLE)
-"INFEASIBLE: no solution satisfies every constraint. Review the constraints and the input data."
-
-julia> PortfolioOptimisers.solve_status_msg(PortfolioOptimisers.JuMP.MOI.ITERATION_LIMIT)
-"ITERATION_LIMIT"
-```
-
-# Related
-
-  - [`failed_solve_msg`](@ref)
-  - [`first_error_line`](@ref)
-"""
-function solve_status_msg(st::JuMP.MOI.TerminationStatusCode)
-    MOI = JuMP.MOI
-    infeasible = "no solution satisfies every constraint. Review the constraints and the input data."
-    inaccurate = "the solver found this at reduced numerical accuracy. Check the settings of the solver and the scale of the problem, or try another solver."
-    details = Dict(MOI.INFEASIBLE => infeasible, MOI.LOCALLY_INFEASIBLE => infeasible,
-                   MOI.DUAL_INFEASIBLE => "the problem is unbounded if it is feasible, so the objective improves without limit. Review the objective and the constraints.",
-                   MOI.INFEASIBLE_OR_UNBOUNDED => "the problem is infeasible or unbounded, and the solver cannot tell which. Try another solver, or turn on the verbose output of the solver.",
-                   MOI.ALMOST_INFEASIBLE => inaccurate,
-                   MOI.ALMOST_DUAL_INFEASIBLE => inaccurate)
-    return haskey(details, st) ? string(st, ": ", details[st]) : string(st)
 end

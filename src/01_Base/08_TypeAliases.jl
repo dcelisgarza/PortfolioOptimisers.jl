@@ -541,6 +541,20 @@ Alias for an optional value of type `T`, which can be `nothing`.
 """
 const Option{T} = Union{Nothing, T}
 """
+    const UnresolvedValue = Union{AbstractEstimator, AbstractAlgorithm, Function}
+
+Alias for the form of a value slot that holds no value yet: an Estimator, an Algorithm or a function that computes the value. `GLOSSARY.md` names it the **Unresolved Value**.
+
+A value check, such as [`assert_unit_interval`](@ref), has no number to test in an Unresolved Value. So its no-op method takes `Option{<:UnresolvedValue}`, the Unresolved Value or the empty slot, and a form with no rule and no Unresolved Value is a `MethodError`. A repair at a constructor, such as [`count_or_fraction`](@ref), returns such a value unchanged, because the value needs no repair. A Calibration Rule, a [`CountOf`](@ref) or a [`FractionOf`](@ref), a [`TimeDependent`](@ref) schedule and a [`DynamicAbstractWeights`](@ref) are Unresolved Values.
+
+# Related
+
+  - [`Option`](@ref)
+  - [`assert_unit_interval`](@ref)
+  - [`count_or_fraction`](@ref)
+"""
+const UnresolvedValue = Union{AbstractEstimator, AbstractAlgorithm, Function}
+"""
     const MatNum_VecMatNum = Union{MatNum, VecMatNum}
 
 Alias for a union of a numeric matrix and a vector of numeric matrices.

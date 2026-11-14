@@ -1139,6 +1139,9 @@ end
         @test prod(dot(Wc[s, :], X[s, :]) for s in 2:T) ≈ S(b, T) / S(b, 1)
         @test_throws IsEmptyError ConstantRebalancedPortfolio(; w = Float64[])
         @test_throws DomainError ConstantRebalancedPortfolio(; w = [NaN, 1.0])
+        # The target is a vector of numbers: another element type has no rule in the value
+        # check, so the keyword constructor refuses it (#2088).
+        @test_throws TypeError ConstantRebalancedPortfolio(; w = Any[0.5, 0.5])
         # A view whose slice sums to zero is uniform over the selected assets.
         @test po.port_opt_view(ConstantRebalancedPortfolio(; w = [0.0, 0.0, 1.0]), 1:2).w ==
               [0.5, 0.5]

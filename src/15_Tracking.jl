@@ -824,7 +824,7 @@ function returns_tracking_path(v::AbstractVector)
     return eltype(v) <: Number ? nothing : element_path(returns_tracking_path, v)
 end
 function returns_tracking_path(p::Pair)
-    return returns_tracking_path(last(p))
+    return returns_tracking_path(p.second)
 end
 function returns_tracking_path(::Any)
     return nothing

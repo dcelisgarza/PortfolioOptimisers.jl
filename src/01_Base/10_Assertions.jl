@@ -384,11 +384,11 @@ function assert_gt0(val::Number, sym::Sym_Str = :val)::Nothing
 end
 """
     assert_unit_interval(val::Number, sym::Union{Symbol,AbstractString} = :val)
-    assert_unit_interval(args...)
+    assert_unit_interval(::Option{<:UnresolvedValue}, ::Union{Symbol,AbstractString} = :val)
 
 Assert that `val` lies strictly inside the open unit interval (`0 < val < 1`).
 
-A value of a different type selects the `args...` method, which checks nothing. With that method, a caller can check a slot whose bound accepts more than a number and write no branch, as with [`assert_nonempty_gt0_finite_val`](@ref). A Calibration Rule, an [`AbstractCalibrationAlgorithm`](@ref), states no number at construction. The library checks the range later, when the rebuild runs, on the number that the rule returns.
+An [`UnresolvedValue`](@ref), or `nothing`, selects the second method, which checks nothing. With that method, a caller can check a slot whose bound accepts more than a number and write no branch, as with [`assert_nonempty_gt0_finite_val`](@ref). A Calibration Rule, an [`AbstractCalibrationAlgorithm`](@ref), states no number at construction. The library checks the range later, when the rebuild runs, on the number that the rule returns. Each other type is a `MethodError`, so a form that a slot admits with no rule fails at construction.
 
 # Arguments
 
@@ -398,7 +398,7 @@ A value of a different type selects the `args...` method, which checks nothing. 
 # Validation
 
   - `::Number`: `0 < val < 1`, which raises a `DomainError` that names `sym` and `val`.
-  - Each other type: No rule, so the call always passes.
+  - `::Option{<:UnresolvedValue}`: No rule, so the call always passes.
 
 # Returns
 
@@ -416,18 +416,18 @@ function assert_unit_interval(val::Number, sym::Sym_Str = :val)::Nothing
               DomainError(val, "0 < $sym < 1 must hold. Got\n$sym => $val"))
     return nothing
 end
-function assert_unit_interval(args...)::Nothing
+function assert_unit_interval(::Option{<:UnresolvedValue}, ::Sym_Str = :val)::Nothing
     return nothing
 end
 """
     assert_closed_unit_interval(val::Number, sym::Union{Symbol,AbstractString} = :val)
-    assert_closed_unit_interval(args...)
+    assert_closed_unit_interval(::Option{<:UnresolvedValue}, ::Union{Symbol,AbstractString} = :val)
 
 Assert that `val` lies inside the closed unit interval (`0 <= val <= 1`).
 
 It is the closed form of [`assert_unit_interval`](@ref). The two functions differ only in whether the ends belong to the interval. A template can turn a weight fully off, or give it its full value, so the weight reaches both ends and needs this rule and not the open one.
 
-A value of a different type selects the `args...` method, which checks nothing, as in [`assert_unit_interval`](@ref).
+An [`UnresolvedValue`](@ref), or `nothing`, selects the second method, which checks nothing, as in [`assert_unit_interval`](@ref). Each other type is a `MethodError`.
 
 # Arguments
 
@@ -437,7 +437,7 @@ A value of a different type selects the `args...` method, which checks nothing, 
 # Validation
 
   - `::Number`: `0 <= val <= 1`, which raises a `DomainError` that names `sym` and `val`.
-  - Each other type: No rule, so the call always passes.
+  - `::Option{<:UnresolvedValue}`: No rule, so the call always passes.
 
 # Returns
 
@@ -454,7 +454,7 @@ function assert_closed_unit_interval(val::Number, sym::Sym_Str = :val)::Nothing
               DomainError(val, "0 <= $sym <= 1 must hold. Got\n$sym => $val"))
     return nothing
 end
-function assert_closed_unit_interval(args...)::Nothing
+function assert_closed_unit_interval(::Option{<:UnresolvedValue}, ::Sym_Str = :val)::Nothing
     return nothing
 end
 """
@@ -462,14 +462,15 @@ end
         val::Union{AbstractDict, VecPair, ArrNum, Pair, Number},
         val_sym::Union{Symbol,AbstractString} = :val
     )
-    assert_nonempty_nonneg_finite_val(args...)
+    assert_nonempty_nonneg_finite_val(::Option{<:UnresolvedValue},
+                                      ::Union{Symbol,AbstractString} = :val)
 
 Check that the input value is non-empty, non-negative and finite.
 
 # Algorithm
 
  1. Call [`assert_nonempty`](@ref), then [`assert_finite`](@ref), then [`assert_nonneg`](@ref), each on `val` and `val_sym`. The calls run in this order, so the error names the first rule that the value breaks.
- 2. A value of any other type selects the `args...` method, which checks nothing. With that method, a caller can check an optional field and write no branch.
+ 2. An [`UnresolvedValue`](@ref), or `nothing`, selects the second method, which checks nothing. With that method, a caller can check an optional field, or a field that can hold a rule for the value, and write no branch. Each other type is a `MethodError`, so a form that a slot admits with no rule fails at construction.
 
 # Arguments
 
@@ -485,7 +486,7 @@ Each rule is the rule that the type of `val` selects in the three functions of s
   - `::ArrNum`: `!isempty(val)`, `all(isfinite, val)`, `all(x -> x >= 0, val)`.
   - `::Pair`: `isfinite(val[2])` and `val[2] >= 0`.
   - `::Number`: `isfinite(val)` and `val >= 0`.
-  - Each other type: No rule, so the call always passes.
+  - `::Option{<:UnresolvedValue}`: No rule, so the call always passes.
 
 # Returns
 
@@ -507,7 +508,8 @@ function assert_nonempty_nonneg_finite_val(val::Union{AbstractDict, VecPair, Arr
     assert_nonneg(val, val_sym)
     return nothing
 end
-function assert_nonempty_nonneg_finite_val(args...)::Nothing
+function assert_nonempty_nonneg_finite_val(::Option{<:UnresolvedValue},
+                                           ::Sym_Str = :val)::Nothing
     return nothing
 end
 """
@@ -515,14 +517,15 @@ end
         val::Union{AbstractDict, VecPair, ArrNum, Pair, Number},
         val_sym::Union{Symbol,AbstractString} = :val
     )
-    assert_nonempty_gt0_finite_val(args...)
+    assert_nonempty_gt0_finite_val(::Option{<:UnresolvedValue},
+                                   ::Union{Symbol,AbstractString} = :val)
 
 Check that the input value is non-empty, greater than zero, and finite.
 
 # Algorithm
 
  1. Call [`assert_nonempty`](@ref), then [`assert_finite`](@ref), then [`assert_gt0`](@ref), each on `val` and `val_sym`. The calls run in this order, so the error names the first rule that the value breaks.
- 2. A value of any other type selects the `args...` method, which checks nothing. With that method, a caller can check an optional field and write no branch.
+ 2. An [`UnresolvedValue`](@ref), or `nothing`, selects the second method, which checks nothing. With that method, a caller can check an optional field, or a field that can hold a rule for the value, and write no branch. Each other type is a `MethodError`, so a form that a slot admits with no rule fails at construction.
 
 # Arguments
 
@@ -538,7 +541,7 @@ Each rule is the rule that the type of `val` selects in the three functions of s
   - `::ArrNum`: `!isempty(val)`, `all(isfinite, val)`, `all(x -> x > 0, val)`.
   - `::Pair`: `isfinite(val[2])` and `val[2] > 0`.
   - `::Number`: `isfinite(val)` and `val > 0`.
-  - Each other type: No rule, so the call always passes.
+  - `::Option{<:UnresolvedValue}`: No rule, so the call always passes.
 
 # Returns
 
@@ -560,7 +563,8 @@ function assert_nonempty_gt0_finite_val(val::Union{AbstractDict, VecPair, ArrNum
     assert_gt0(val, val_sym)
     return nothing
 end
-function assert_nonempty_gt0_finite_val(args...)::Nothing
+function assert_nonempty_gt0_finite_val(::Option{<:UnresolvedValue},
+                                        ::Sym_Str = :val)::Nothing
     return nothing
 end
 """
@@ -568,14 +572,15 @@ end
         val::Union{AbstractDict, VecPair, ArrNum, Pair, Number},
         val_sym::Union{Symbol,AbstractString} = :val
     )
-    assert_nonempty_finite_val(args...)
+    assert_nonempty_finite_val(::Option{<:UnresolvedValue},
+                               ::Union{Symbol,AbstractString} = :val)
 
 Check that the input value is non-empty and finite.
 
 # Algorithm
 
  1. Call [`assert_nonempty`](@ref), then [`assert_finite`](@ref), each on `val` and `val_sym`. The calls run in this order, so the error names the first rule that the value breaks.
- 2. A value of any other type selects the `args...` method, which checks nothing. With that method, a caller can check an optional field and write no branch.
+ 2. An [`UnresolvedValue`](@ref), or `nothing`, selects the second method, which checks nothing. With that method, a caller can check an optional field, or a field that can hold a rule for the value, and write no branch. Each other type is a `MethodError`, so a form that a slot admits with no rule fails at construction.
 
 # Arguments
 
@@ -591,7 +596,7 @@ Each rule is the rule that the type of `val` selects in the two functions of ste
   - `::ArrNum`: `!isempty(val)`, `all(isfinite, val)`.
   - `::Pair`: `isfinite(val[2])`.
   - `::Number`: `isfinite(val)`.
-  - Each other type: No rule, so the call always passes.
+  - `::Option{<:UnresolvedValue}`: No rule, so the call always passes.
 
 # Returns
 
@@ -610,7 +615,7 @@ function assert_nonempty_finite_val(val::Union{AbstractDict, VecPair, ArrNum, Pa
     assert_finite(val, val_sym)
     return nothing
 end
-function assert_nonempty_finite_val(args...)::Nothing
+function assert_nonempty_finite_val(::Option{<:UnresolvedValue}, ::Sym_Str = :val)::Nothing
     return nothing
 end
 """

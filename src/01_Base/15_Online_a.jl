@@ -442,20 +442,14 @@ function buffer_rows_view(G::AbstractVector, rows)
 end
 """
     sample_buffer(state::SampleBufferState)
-    sample_buffer(est)
 
 Reads the observations a sample buffer holds, `observations × assets`.
 
-This function reads the rows out of a [`SampleBufferState`](@ref). It is a view of the valid region of the backing matrix, in the order of the folds, so a refit reads it with no copy. The estimator form reads the state from the `cache` field, and it refuses an estimator that carries no buffer.
+This function reads the rows out of a [`SampleBufferState`](@ref). It is a view of the valid region of the backing matrix, in the order of the folds, so a refit reads it with no copy. To read the buffer of an estimator, pass the state that [`assert_sample_buffer`](@ref) returns. That function refuses an estimator that carries no buffer.
 
 # Arguments
 
   - `state`: The buffer to read.
-  - `est`: Estimator whose `cache` field carries the buffer.
-
-# Validation
-
-  - `est.cache` holds a [`SampleBufferState`](@ref). An `ArgumentError` is thrown otherwise.
 
 # Returns
 
@@ -469,9 +463,6 @@ This function reads the rows out of a [`SampleBufferState`](@ref). It is a view 
 """
 function sample_buffer(state::SampleBufferState)
     return view(state.X, (state.off + 1):(state.off + state.n), :)
-end
-function sample_buffer(est::Union{AbstractEstimator, StatsBase.CovarianceEstimator})
-    return sample_buffer(assert_sample_buffer(est))
 end
 """
 $(DocStringExtensions.TYPEDSIGNATURES)

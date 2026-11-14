@@ -608,13 +608,21 @@ end
     @test perr isa DomainError
     @test perr.val == 0.0
     @test occursin("0 < alpha[2] must hold", perr.msg)
-    # The composed guards take a value of any of the five shapes, and their varargs method
-    # accepts everything else without a check, which is how an absent value passes through.
+    # The composed guards take a value of any of the five shapes. Their no-op method takes
+    # an absent value or an Unresolved Value (#2108), and every other form is a
+    # `MethodError`, so a form that a slot admits with no rule fails at construction.
     @test isnothing(pe.assert_nonempty_gt0_finite_val([1.0, 2.0]))
     @test_throws DomainError pe.assert_nonempty_gt0_finite_val([1.0, 0.0])
-    @test isnothing(pe.assert_nonempty_gt0_finite_val(nothing))
-    @test isnothing(pe.assert_nonempty_nonneg_finite_val(nothing))
-    @test isnothing(pe.assert_nonempty_finite_val(nothing))
+    for f in (pe.assert_nonempty_gt0_finite_val, pe.assert_nonempty_nonneg_finite_val,
+              pe.assert_nonempty_finite_val)
+        @test isnothing(f(nothing))
+        @test isnothing(f(CountOf(5), :n))
+        @test isnothing(f(EmpiricalPrior(), "pe"))
+        @test isnothing(f(identity))
+        @test_throws MethodError f("abc")
+        @test_throws MethodError f(:a)
+        @test_throws MethodError f(nothing, :a, :b)
+    end
 end
 @testset "assert_finite refuses a container that carries one non-finite entry" begin
     pe = PortfolioOptimisers
@@ -697,12 +705,32 @@ end
     @test cerr.msg == "0 <= n7 <= 1 must hold. Got\nn7 => 1.5"
     @test sprint(showerror, oerr) ==
           "DomainError with 1.0:\n0 < alpha < 1 must hold. Got\nalpha => 1.0"
-    # Both carry the varargs method that checks nothing, which is how a slot holding a
-    # Calibration Rule passes a guard written for a number.
+    # Both carry the no-op method on `Option{<:UnresolvedValue}`, which is how a slot holding
+    # a Calibration Rule passes a guard written for a number. Every other form, and every
+    # other arity, is a `MethodError` (#2108).
     rule = CountOf(5)
     @test isnothing(pe.assert_unit_interval(nothing))
     @test isnothing(pe.assert_closed_unit_interval(nothing))
     @test isnothing(pe.assert_closed_unit_interval(rule, :n))
+    @test isnothing(pe.assert_unit_interval(rule, "n"))
+    @test isnothing(pe.assert_unit_interval(identity))
+    @test_throws MethodError pe.assert_unit_interval([0.5])
+    @test_throws MethodError pe.assert_closed_unit_interval([0.5], :n)
+    @test_throws MethodError pe.assert_unit_interval(rule, :n, :m)
+    @test pe.UnresolvedValue === Union{pe.AbstractEstimator, pe.AbstractAlgorithm, Function}
+end
+@testset "count_or_fraction returns a value that needs no repair unchanged" begin
+    pe = PortfolioOptimisers
+    # The repair owns the identity on `Option{<:UnresolvedValue}` (#2109), so the callers
+    # call it with no `isnothing` branch, and any other type is a `MethodError`.
+    @test isnothing(pe.count_or_fraction(nothing))
+    @test pe.count_or_fraction(CountOf(2)) === CountOf(2)
+    @test pe.count_or_fraction(FractionOf(0.5)) === FractionOf(0.5)
+    @test pe.count_or_fraction(identity) === identity
+    @test pe.count_or_fraction(3) === CountOf(3)
+    @test pe.count_or_fraction(0.25) === FractionOf(0.25)
+    @test_throws MethodError pe.count_or_fraction("3")
+    @test_throws MethodError pe.count_or_fraction([1, 2])
 end
 @testset "norm_factor and norm_error carry the units of the alg" begin
     pe = PortfolioOptimisers

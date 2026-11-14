@@ -17,5 +17,4 @@ zero_centrality_msg
 gross_budget_bounds_msg
 failed_solve_msg
 first_error_line
-solve_status_msg
 ```

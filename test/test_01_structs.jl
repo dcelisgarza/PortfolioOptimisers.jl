@@ -512,19 +512,23 @@ end
     @testset "A failed solve states its termination status in words" begin
         pe = PortfolioOptimisers
         MOI = pe.JuMP.MOI
-        @test pe.solve_status_msg(MOI.INFEASIBLE) ==
+        # The method of `first_error_line` on a status holds the text (#2088), and it does
+        # not cut the text to the line length.
+        @test pe.first_error_line(MOI.INFEASIBLE, 200) ==
               "INFEASIBLE: no solution satisfies every constraint. Review the constraints and the input data."
-        @test startswith(pe.solve_status_msg(MOI.LOCALLY_INFEASIBLE),
+        @test pe.first_error_line(MOI.INFEASIBLE, 5) ==
+              pe.first_error_line(MOI.INFEASIBLE, 200)
+        @test startswith(pe.first_error_line(MOI.LOCALLY_INFEASIBLE, 200),
                          "LOCALLY_INFEASIBLE: no solution satisfies every constraint.")
-        @test startswith(pe.solve_status_msg(MOI.DUAL_INFEASIBLE),
+        @test startswith(pe.first_error_line(MOI.DUAL_INFEASIBLE, 200),
                          "DUAL_INFEASIBLE: the problem is unbounded if it is feasible")
-        @test startswith(pe.solve_status_msg(MOI.INFEASIBLE_OR_UNBOUNDED),
+        @test startswith(pe.first_error_line(MOI.INFEASIBLE_OR_UNBOUNDED, 200),
                          "INFEASIBLE_OR_UNBOUNDED: the problem is infeasible or unbounded")
         for st in (MOI.ALMOST_INFEASIBLE, MOI.ALMOST_DUAL_INFEASIBLE)
-            @test occursin("at reduced numerical accuracy", pe.solve_status_msg(st))
+            @test occursin("at reduced numerical accuracy", pe.first_error_line(st, 200))
         end
         # Every other status is stated by its name alone.
-        @test pe.solve_status_msg(MOI.ITERATION_LIMIT) == "ITERATION_LIMIT"
+        @test pe.first_error_line(MOI.ITERATION_LIMIT, 200) == "ITERATION_LIMIT"
         # The first line of the error of `assert_is_solved_and_feasible` holds no status, so the
         # status has a line of its own, and the many lines of a solution summary are left out.
         slv = Solver(; name = :clarabel, solver = Clarabel.Optimizer,

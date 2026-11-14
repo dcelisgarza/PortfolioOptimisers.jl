@@ -356,7 +356,7 @@ HopCount
         # is nothing to check here. `resolve_separation` checks what it returns -- and it
         # returns it through this constructor, so the resource cap below covers a computed
         # `n` too. `CountOf` checks that the count is at least one.
-        n = maybe_count_or_fraction(n)
+        n = count_or_fraction(n)
         if isa(n, CountOf)
             assert_resource_cap(n.val, RESOURCE_LIMITS[].max_hop_count, :n, :max_hop_count)
         end

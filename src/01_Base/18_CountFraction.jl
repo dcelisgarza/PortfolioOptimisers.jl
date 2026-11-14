@@ -130,17 +130,19 @@ function FractionOf(; val::Real)::FractionOf
     return FractionOf(val)
 end
 """
-    count_or_fraction(x::AbstractCountOrFraction)
+    count_or_fraction(x::Option{<:UnresolvedValue})
     count_or_fraction(x::Integer)
     count_or_fraction(x::Real)
 
-Return the [`AbstractCountOrFraction`](@ref) that a field of a part of a set holds.
+Return the [`AbstractCountOrFraction`](@ref) that a field of a part of a set holds, or the value that the field holds in its place.
 
-The constructor of each such field calls this function, so the field always holds a [`CountOf`](@ref) or a [`FractionOf`](@ref), and each reader dispatches on the two members alone. A plain number is the shorthand of [`AbstractCountOrFraction`](@ref): the type of the number selects the member.
+The constructor of each such field calls this function, so a plain number becomes a [`CountOf`](@ref) or a [`FractionOf`](@ref), and each reader dispatches on the two members alone. A plain number is the shorthand of [`AbstractCountOrFraction`](@ref): the type of the number selects the member.
+
+The function is a repair at a constructor, so it returns unchanged each value that needs no repair: `nothing`, a member of the family, a rule or a function that computes the part, and a [`TimeDependent`](@ref) schedule. Each of these is an [`UnresolvedValue`](@ref) or `nothing`. Each other type is a `MethodError`.
 
 # Algorithm
 
- 1. Return a member of the family unchanged.
+ 1. Return `nothing`, a member of the family, or another [`UnresolvedValue`](@ref) unchanged.
  2. Return `CountOf(x)` for an `Integer`. `Bool` is an `Integer`, so `true` is a count of one.
  3. Refuse `x == 1` for any other real number. Return `FractionOf(x)` otherwise.
 
@@ -148,6 +150,10 @@ The constructor of each such field calls this function, so the field always hold
 
   - A plain real number that is not an `Integer` and equals one throws a `DomainError`. A search grid promotes the count `1` to `1.0`, and the whole set is a different part. State `CountOf(1)` or `FractionOf(1.0)`.
   - The constructors of [`CountOf`](@ref) and [`FractionOf`](@ref) check the range.
+
+# Returns
+
+  - `x::Option{<:UnresolvedValue}`: A [`CountOf`](@ref) for an `Integer`, a [`FractionOf`](@ref) for each other real number, and `x` unchanged otherwise.
 
 # Examples
 
@@ -166,8 +172,9 @@ FractionOf
   - [`AbstractCountOrFraction`](@ref)
   - [`CountOf`](@ref)
   - [`FractionOf`](@ref)
+  - [`UnresolvedValue`](@ref)
 """
-function count_or_fraction(x::AbstractCountOrFraction)
+function count_or_fraction(x::Option{<:UnresolvedValue})
     return x
 end
 function count_or_fraction(x::Integer)::CountOf
@@ -178,25 +185,6 @@ function count_or_fraction(x::Real)::FractionOf
               DomainError(x,
                           "a plain `$x` is not read as a part of a set. A search grid promotes the count `1` to `1.0`, and the whole set is a different part, so the library refuses to guess. State `CountOf(1)` for one member or `FractionOf(1.0)` for the whole set."))
     return FractionOf(x)
-end
-"""
-    maybe_count_or_fraction(x::Real)
-    maybe_count_or_fraction(x)
-
-Read a plain number through [`count_or_fraction`](@ref), and return every other value unchanged.
-
-A field such as `subset_size` takes a part of a set, a rule that computes it, a [`TimeDependent`](@ref) schedule or `nothing`. Its constructor calls this function, so a plain number becomes a [`CountOf`](@ref) or a [`FractionOf`](@ref), and the other values keep their own readers.
-
-# Related
-
-  - [`count_or_fraction`](@ref)
-  - [`AbstractCountOrFraction`](@ref)
-"""
-function maybe_count_or_fraction(x::Real)
-    return count_or_fraction(x)
-end
-function maybe_count_or_fraction(x)
-    return x
 end
 """
     const Real_CountFraction = Union{Real, AbstractCountOrFraction}

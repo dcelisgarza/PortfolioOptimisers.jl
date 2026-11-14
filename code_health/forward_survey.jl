@@ -1089,9 +1089,6 @@ const RULED_DEFAULTS = Dict{Symbol, Tuple{String, String}}(#
                                                            :regression_factor_names =>
                                                                ("keep (default)",
                                                                 "a query of the names of the loadings axis owns `nothing`, the answer \"none\". Its callee reads fields of the input, so it owns no default for the input (#2109)"),
-                                                           :maybe_count_or_fraction =>
-                                                               ("go",
-                                                                "`count_or_fraction` is a repair at a constructor, and a repair owns the identity on a value that needs none: `count_or_fraction(x::Option{<:UnresolvedValue}) = x` replaces this function (#2109, #2108 amended)"),
                                                            :update_online_member => ("go",
                                                                                      "`update_online_estimator` owns the identity on a leaf (#2074), so it replaces this function (#2109)"),
                                                            :update_online_step => ("go",

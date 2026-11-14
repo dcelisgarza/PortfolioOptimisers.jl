@@ -120,7 +120,7 @@ $(DocStringExtensions.FIELDS)
 # Constructors
 
     ConstantRebalancedPortfolio(;
-        w::Option{<:AbstractVector} = nothing,
+        w::Option{<:VecNum} = nothing,
         proj::EuclideanProjection = EuclideanProjection()
     ) -> ConstantRebalancedPortfolio
 
@@ -170,8 +170,7 @@ ConstantRebalancedPortfolio
     $(field_dict[:proj])
     """
     proj
-    function ConstantRebalancedPortfolio(w::Option{<:AbstractVector},
-                                         proj::EuclideanProjection)
+    function ConstantRebalancedPortfolio(w::Option{<:VecNum}, proj::EuclideanProjection)
         if !isnothing(w)
             assert_nonempty_nonneg_finite_val(w, :w)
             s = sum(w)
@@ -182,7 +181,7 @@ ConstantRebalancedPortfolio
         return new{typeof(w), typeof(proj)}(w, proj)
     end
 end
-function ConstantRebalancedPortfolio(; w::Option{<:AbstractVector} = nothing,
+function ConstantRebalancedPortfolio(; w::Option{<:VecNum} = nothing,
                                      proj::EuclideanProjection = EuclideanProjection())::ConstantRebalancedPortfolio
     return ConstantRebalancedPortfolio(w, proj)
 end

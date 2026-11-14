@@ -962,7 +962,7 @@ function reads_implied_volatility(v::AbstractVector)
     return eltype(v) <: Number ? false : any(reads_implied_volatility, v)
 end
 function reads_implied_volatility(p::Pair)
-    return reads_implied_volatility(last(p))
+    return reads_implied_volatility(p.second)
 end
 function reads_implied_volatility(::Any)
     return false

@@ -217,8 +217,8 @@ FractionOf
                       worst::Option{<:Real_CountFraction}, action::Symbol)
         @argcheck(!(isnothing(best) && isnothing(worst)),
                   IsNothingError("a RankRule needs at least one of best, worst"))
-        best = maybe_count_or_fraction(best)
-        worst = maybe_count_or_fraction(worst)
+        best = count_or_fraction(best)
+        worst = count_or_fraction(worst)
         assert_selection_action(action)
         return new{typeof(best), typeof(worst), typeof(action)}(best, worst, action)
     end

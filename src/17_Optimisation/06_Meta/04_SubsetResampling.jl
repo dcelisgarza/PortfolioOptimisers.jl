@@ -451,7 +451,7 @@ $(val_dict[:count_fraction_grid])
         if isa(fees, FeesEstimator)
             @argcheck(!isnothing(sets), IsNothingError("sets cannot be nothing"))
         end
-        subset_size = maybe_count_or_fraction(subset_size)
+        subset_size = count_or_fraction(subset_size)
         if isa(n_subsets, Integer)
             assert_nonempty_nonneg_finite_val(n_subsets - 2, "n_subsets - 2")
         end

@@ -327,7 +327,7 @@ IntegerConditionalValueatRiskView
     """
     sbar
     function IntegerConditionalValueatRiskView(sbar::Option{<:Real_CountFraction})
-        sbar = isnothing(sbar) ? sbar : count_or_fraction(sbar)
+        sbar = count_or_fraction(sbar)
         return new{typeof(sbar)}(sbar)
     end
 end

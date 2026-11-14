@@ -6,7 +6,7 @@ The distinction the file exists to pin is the one the ticket is named for: `Empi
 comes off a buffer it never reads, so a read-out is `O(N^2)` in the assets and independent of
 the observations folded. Test 2 pins that by construction — the read-out's `mu` and `sigma`
 are the inner estimators' own folded read-outs, bit for bit — because a regression to
-`prior(pe, sample_buffer(pe))` would change no number and pass every parity test in the file.
+`prior(pe, sample_buffer(pe.cache))` would change no number and pass every parity test in the file.
 
 The two caps are two different knobs and each has its own testset: `max_scenarios` cuts the
 scenarios and leaves the moments over every observation, in batch and online alike, and has

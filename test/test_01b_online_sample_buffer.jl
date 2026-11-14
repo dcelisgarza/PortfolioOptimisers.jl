@@ -149,8 +149,8 @@ end
         warm = po.update_online_estimator(Online(BufferProbe()))
         warm = partial_fit!(warm, view(X, 1:7, :))
         cold = partial_fit(warm, view(X, 8, :))
-        @test isequal(po.sample_buffer(warm), X[1:7, :])
-        @test isequal(po.sample_buffer(cold), X[1:8, :])
+        @test isequal(po.sample_buffer(warm.cache), X[1:7, :])
+        @test isequal(po.sample_buffer(cold.cache), X[1:8, :])
     end
 
     @testset "port_opt_view slices, obs_weights_view drops" begin
@@ -205,9 +205,9 @@ end
     @testset "The generic buffering fold" begin
         r = po.update_online_estimator(Online(BufferProbe()))
         r = partial_fit!(r, X)
-        @test isequal(po.sample_buffer(r), X)
+        @test isequal(po.sample_buffer(r.cache), X)
         r = partial_fit!(r, view(X, 1, :))
-        @test isequal(po.sample_buffer(r), vcat(X, transpose(X[1, :])))
+        @test isequal(po.sample_buffer(r.cache), vcat(X, transpose(X[1, :])))
         # An estimator that was never wrapped meets a message naming the wrapper, not a
         # `MethodError`.
         @test_throws ArgumentError partial_fit!(BufferProbe(), X)
@@ -217,7 +217,9 @@ end
             sprint(showerror, e)
         end
         @test occursin("Online", msg)
-        @test_throws ArgumentError po.sample_buffer(BufferProbe())
+        @test_throws ArgumentError po.assert_sample_buffer(BufferProbe())
+        # The reader takes the state alone: the caller resolves the estimator (#2088).
+        @test_throws MethodError po.sample_buffer(r)
         # A wrapper is not an estimator that folds: it must be resolved first.
         @test_throws ArgumentError po.assert_sample_buffer(Online(BufferProbe()))
         @test_throws ArgumentError partial_fit!(Online(BufferProbe()), X)
@@ -446,14 +448,14 @@ end
             @test isa(wrapped.cache, po.SampleBufferState)
             folded = partial_fit!(wrapped, Y)
             @test isa(folded.cache, po.SampleBufferState)
-            @test isequal(po.sample_buffer(folded), Y)
+            @test isequal(po.sample_buffer(folded.cache), Y)
             # An uncapped buffer answers what a batch fit over every observation answers.
             @test isapprox(fam.readout(folded), fam.batch(fam.est, Y))
             # The cap is the window: a capped buffer answers what a batch fit over the last
             # `max_history` observations answers, for a family that folds exactly too.
             capped = partial_fit!(po.update_online_estimator(Online(fam.est;
                                                                     max_history = w)), Y)
-            @test isequal(po.sample_buffer(capped), Y[(end - w + 1):end, :])
+            @test isequal(po.sample_buffer(capped.cache), Y[(end - w + 1):end, :])
             @test isapprox(fam.readout(capped), fam.batch(fam.est, Y[(end - w + 1):end, :]))
             # An estimator left unwrapped is untouched: it still folds into its own family
             # state, and its own state is not a buffer.
@@ -548,7 +550,7 @@ the same per-observation nature and the same silent failure.
         # arm once wrapped, and both answer what the batch fit answers.
         block = partial_fit!(po.update_online_estimator(Online(fam.est)), Y;
                              active_mask = M)
-        @test isequal(po.sample_buffer(block), Y)
+        @test isequal(po.sample_buffer(block.cache), Y)
         @test amask(block.cache) == M
         @test isapprox(fam.readout(block), fam.batch(fam.est, Y, M); nans = true)
         # One observation at a time reaches the same buffer, the same mask and the same
@@ -565,7 +567,7 @@ the same per-observation nature and the same silent failure.
         for t in axes(Y, 1)
             capped = partial_fit!(capped, view(Y, t, :); active_mask = view(M, t, :))
         end
-        @test isequal(po.sample_buffer(capped), Y[rows, :])
+        @test isequal(po.sample_buffer(capped.cache), Y[rows, :])
         @test po.sample_buffer_kwargs(capped.cache).active_mask == M[rows, :]
         @test isapprox(fam.readout(capped), fam.batch(fam.est, Y[rows, :], M[rows, :]);
                        nans = true)
@@ -573,7 +575,7 @@ the same per-observation nature and the same silent failure.
         one_block = partial_fit!(po.update_online_estimator(Online(fam.est;
                                                                    max_history = w)), Y;
                                  active_mask = M)
-        @test isequal(po.sample_buffer(one_block), Y[rows, :])
+        @test isequal(po.sample_buffer(one_block.cache), Y[rows, :])
         @test isapprox(fam.readout(one_block), fam.batch(fam.est, Y[rows, :], M[rows, :]);
                        nans = true)
     end

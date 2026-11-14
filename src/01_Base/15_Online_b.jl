@@ -799,13 +799,14 @@ function seed_window_path(v::AbstractVector)
     return element_path(seed_window_path, v)
 end
 function seed_window_path(p::Pair)
-    return seed_window_path(last(p))
+    # A Pair is a node of the tree, and the walk goes on in its value (#2088).
+    return seed_window_path(p.second)
 end
 function online_entry_state(v::AbstractVector)
     return element_path(online_entry_state, v)
 end
 function online_entry_state(p::Pair)
-    return online_entry_state(last(p))
+    return online_entry_state(p.second)
 end
 
 """

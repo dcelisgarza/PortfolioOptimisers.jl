@@ -263,12 +263,12 @@ $(val_dict[:count_fraction_grid])
                                 n_subsets::NumberSubsetsE, max_comb::Integer,
                                 window_size::Option{<:WindowSizeE}, rng::Random.AbstractRNG,
                                 seed::Option{<:Integer})
-        subset_size = maybe_count_or_fraction(subset_size)
+        subset_size = count_or_fraction(subset_size)
         if isa(n_subsets, Integer)
             assert_nonempty_nonneg_finite_val(n_subsets - 2, "n_subsets - 2")
         end
         assert_nonempty_gt0_finite_val(max_comb, :max_comb)
-        window_size = maybe_count_or_fraction(window_size)
+        window_size = count_or_fraction(window_size)
         if isa(window_size, CountOf)
             assert_nonempty_nonneg_finite_val(window_size.val - 2, "window_size - 2")
         end
