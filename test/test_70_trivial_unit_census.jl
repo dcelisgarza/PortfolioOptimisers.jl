@@ -257,7 +257,9 @@ end
                                                         (:effective_observation_count, :observation_count) => "(interface) `observation_count` walks the composites by their fields, so its composites call it: it is a function of its own, not a worker of `effective_observation_count` (#2116, #2092)",
                                                         (:partial_fit, :partial_fit!) => "(b) a measured loss (rule 4): the overrides of `Coskewness` and `Cokurtosis` fold one row in 0.29 ms and 2.53 MiB, and 38.19 ms and 151.3 MiB, where the driver `partial_fit!(copy_states(est), x)` takes 0.34 ms and 2.75 MiB, and 38.20 ms and 157.7 MiB, at 30 assets (#2092)",
                                                         # src/09_ConstraintGeneration (#2096).
-                                                        (:rebase_linear_constraints, :project_linear_constraint) => "(interface) `project_linear_constraint` walks a `LinearConstraint` by its fields `ineq` and `eq`, so its composite method calls it: it is a function of its own, and its body does not move into `rebase_linear_constraints` (#2116, #2096)")
+                                                        (:rebase_linear_constraints, :project_linear_constraint) => "(interface) `project_linear_constraint` walks a `LinearConstraint` by its fields `ineq` and `eq`, so its composite method calls it: it is a function of its own, and its body does not move into `rebase_linear_constraints` (#2116, #2096)",
+                                                        # src/11_UncertaintySets (#2098).
+                                                        (:ucs_prior, :prior) => "(b) the `Nothing` arm throws a refusal of the uncertainty sets, and `prior(pe)` in `21_Pipeline/06_OnlinePipeline.jl` and the calls of a user keep the `MethodError` of `prior(nothing, X)` (case 3, #2111)")
     # The functions whose forward methods are interface methods, with the check that shows
     # it. #2072 adds a name after a check of each one.
     interface_functions = Dict{Symbol, String}(#
@@ -316,7 +318,10 @@ end
                                                :windowed_panel => "its callee `port_opt_view` is a shared public verb (rule 3, #2092)",
                                                :coskewness => "its Coverage Universe method of a panel shares the callee `coverage_panel_moment` with 7 other functions (rule 3, #2092)",
                                                :coverage_inner_corrected => "3 functions share its callee `partial_fit_corrected` (rule 3, #2092)",
-                                               :supports_partial_fit => "its callee `folds` is a shared public verb, and a driver of the hook must call it (rule 3, #2089, #2092)")
+                                               :supports_partial_fit => "its callee `folds` is a shared public verb, and a driver of the hook must call it (rule 3, #2089, #2092)",
+                                               # src/11_UncertaintySets (#2098).
+                                               :calibration_series_vec => "one method for each series marker: the drawdown forms call `absolute_drawdown_vec` and `relative_drawdown_vec`, which 3 functions share each (rule 3, #2098)",
+                                               :calibration_series_matrix => "one method for each series marker: the drawdown forms call `absolute_drawdown_arr`, which 3 functions share, and `relative_drawdown_arr`, which 2 functions share (rule 3, #2098)")
     # The debt that #2072 removes. Do not add a pair: fix the wrapper.
     pending_forwards = Set{Tuple{Symbol, Symbol}}([(:apply_fitted_step,
                                                     :apply_fitted_steps),
@@ -348,14 +353,6 @@ end
                                                    (:blend_projection, :project),
                                                    (:bl_posteriors, :vanilla_posteriors),
                                                    (:buffer_column_view, :sample_buffer),
-                                                   (:calibration_series_matrix,
-                                                    :absolute_drawdown_arr),
-                                                   (:calibration_series_matrix,
-                                                    :relative_drawdown_arr),
-                                                   (:calibration_series_vec,
-                                                    :absolute_drawdown_vec),
-                                                   (:calibration_series_vec,
-                                                    :relative_drawdown_vec),
                                                    (:copy_step_states, :copy_states),
                                                    (:cross_sectional_basis_now,
                                                     :factor_basis_slice),
@@ -370,8 +367,6 @@ end
                                                    (:cross_val_predict, :fit_and_predict),
                                                    (:cross_val_predict,
                                                     :pipeline_cross_val_predict),
-                                                   (:cs_diagnostic_weights,
-                                                    :cs_diagnostic_weight_history),
                                                    (:difference_linearised_risk,
                                                     :difference_linearised_risk),
                                                    (:difference_risk, :difference_risk),
@@ -444,8 +439,6 @@ end
                                                    (:opinion_pooling_inner, :forward_prior),
                                                    (:opinion_pooling_kept, :forward_prior),
                                                    (:optimise, :_optimise),
-                                                   (:orthogonality_weights,
-                                                    :latest_orthogonality_weights),
                                                    (:override_fee_amortisation, :Fees),
                                                    (:owa_l_moment_crm, :ncrra_weights),
                                                    (:partial_fit!, :fold_pipeline),
@@ -469,8 +462,6 @@ end
                                                     :reset_time_dependent_fields),
                                                    (:reset_time_dependent_step,
                                                     :reset_time_dependent_estimator),
-                                                   (:resolve_calibration_slot,
-                                                    :calibrated_part),
                                                    (:resolved_constraint_block,
                                                     :ResolvedConstraintBlock),
                                                    (:resolve_deferred_child,
@@ -515,7 +506,6 @@ end
                                                    (:tail_worst_case_risk,
                                                     :worst_case_risk),
                                                    (:tracking_benchmark, :calc_net_returns),
-                                                   (:ucs_prior, :prior),
                                                    (:universe_axis_visit!,
                                                     :universe_axis_children!),
                                                    (:update_online_member,

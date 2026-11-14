@@ -805,7 +805,7 @@ The check is a set of methods rather than a list of types in one body, on the sa
  2. The occupant is an [`LpRegularisation`](@ref): check its `val`.
  3. The occupant is a vector of them: check each.
  4. The occupant is an [`AbstractNormCeilingCalibrationAlgorithm`](@ref): refuse.
- 5. The occupant is a [`CountOf`](@ref) or a [`FractionOf`](@ref): refuse. In this slot the pair states a floor of effective assets, which [`calibrated_part`](@ref) turns into a ceiling.
+ 5. The occupant is a [`CountOf`](@ref) or a [`FractionOf`](@ref): refuse. In this slot the pair states a floor of effective assets, which [`resolve_calibration_slot`](@ref) turns into a ceiling.
 
 # Arguments
 
@@ -818,7 +818,7 @@ The check is a set of methods rather than a list of types in one body, on the sa
 # Related
 
   - [`LpRegularisation`](@ref)
-  - [`calibrated_part`](@ref)
+  - [`resolve_calibration_slot`](@ref)
   - [`assert_norm_ceiling_role`](@ref)
   - [`Num_AmbRadNormCeilCal`](@ref)
   - [`set_lp_regularisation!`](@ref)

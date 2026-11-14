@@ -75,8 +75,9 @@ Cross-sectional weight vector the [`AbstractOrthogonalityMetric`](@ref) names, r
 
  1. On `nothing`, return `nothing`. The caller reads a `nothing` as a vector of ones, and skips the scaling of the loadings and the division of the projector.
  2. On [`InverseIdiosyncraticVarianceMetric`](@ref), read `d`, the idiosyncratic variances, with [`idiosyncratic_variances`](@ref), refuse an entry that is not finite or not `> 0`, and return the element-wise inverse of `d`.
- 3. On [`BenchmarkWeightMetric`](@ref) and [`RegressionWeightMetric`](@ref) over a [`CrossSectionalFactorModel`](@ref), return the last row of `bw` or of `rw`, the weights of the latest observation, through [`latest_orthogonality_weights`](@ref).
- 4. On the same two metrics over any other loadings block, throw. A block fitted per asset over the observations carries no cross-sectional weight history, so the metric has nothing to read.
+ 3. On [`BenchmarkWeightMetric`](@ref) and [`RegressionWeightMetric`](@ref) over a [`CrossSectionalFactorModel`](@ref), read the history `w`, the field `bw` or `rw`. Refuse a `nothing` history, because the block declares the field and this fit left it unset. Refuse an empty history.
+ 4. Take `wl`, the last row of `w`, as a view. These are the weights of the latest observation. The uncertainty set serves the next decision, so it reads the newest cross-section and not an average of the sample. Refuse `wl` when an entry is not finite or not `> 0`, and return it otherwise. The two methods hold one copy each of steps 3 and 4, and the copies differ only in the name of the field.
+ 5. On the same two metrics over any other loadings block, throw. A block fitted per asset over the observations carries no cross-sectional weight history, so the metric has nothing to read.
 
 # Arguments
 
@@ -86,7 +87,8 @@ Cross-sectional weight vector the [`AbstractOrthogonalityMetric`](@ref) names, r
 # Validation
 
   - On [`InverseIdiosyncraticVarianceMetric`](@ref): every idiosyncratic variance is finite and `> 0`, else a `DomainError`. `idiosyncratic_variances` itself throws when the block carries none.
-  - On a weight history: the history is non-empty, and every weight of its last row is finite and `> 0`, else an `IsEmptyError` or a `DomainError`.
+  - On a weight history: the history is not `nothing`, else an `IsNothingError` that names the field. The history is non-empty, else an `IsEmptyError`.
+  - Every weight of the last row of the history is finite and `> 0`, else a `DomainError`. A weight of zero excluded its asset from the fit, and an excluded asset gives the metric a singular direction. The Investable Mask does not remove this case. An asset can be investable, with a finite return and a stated moment, and still sit outside the estimation universe of the latest cross-section, so its weight is zero while its loadings and variance are finite. [`InverseIdiosyncraticVarianceMetric`](@ref) and the `nothing` metric read no weight history, so they accept such an asset.
   - On a weight metric over a block that carries no history: an `IsNothingError` naming the field.
 
 # Returns
@@ -120,55 +122,25 @@ function orthogonality_weights(::RegressionWeightMetric,
     return throw(IsNothingError("`RegressionWeightMetric` reads the regression weight history `rw` off the loadings block, and a `$(nameof(typeof(rr)))` carries none. A block fitted per asset over the observations states no cross-sectional weight.\nUse `InverseIdiosyncraticVarianceMetric` or `metric = nothing`, or fit the prior with a cross-sectional factor model, which fills `rw`.\nGot\nrr => $(nameof(typeof(rr)))\nrw => absent"))
 end
 function orthogonality_weights(::BenchmarkWeightMetric, rr::CrossSectionalFactorModel)
-    return latest_orthogonality_weights(rr.bw, :bw, rr)
-end
-function orthogonality_weights(::RegressionWeightMetric, rr::CrossSectionalFactorModel)
-    return latest_orthogonality_weights(rr.rw, :rw, rr)
-end
-"""
-    latest_orthogonality_weights(::Nothing, name::Symbol, rr::AbstractLoadingsRegressionResult)
-    latest_orthogonality_weights(w::MatNum, name::Symbol, ::AbstractLoadingsRegressionResult)
-
-Last row of a cross-sectional weight history, checked as a metric.
-
-# Algorithm
-
- 1. On a `nothing` history, throw. The block declares the field and this fit left it unset, and the message says so.
- 2. On a history `w`, refuse an empty one.
- 3. Take `wl`, the last row of `w`, as a view. These are the weights of the latest observation. The uncertainty set serves the next decision, so it reads the newest cross-section and not an average of the sample.
- 4. Refuse `wl` when an entry is not finite or not `> 0`, and return it otherwise.
-
-# Arguments
-
-  - `w`: Weight history, `observations × assets`, or `nothing`.
-  - `name`: Name of the field the history came from, which the refusals quote.
-  - `rr`: Fitted loadings block, quoted by the refusals.
-
-# Validation
-
-  - `!isempty(w)`, else an `IsEmptyError`.
-  - Every entry of the last row is finite and `> 0`, else a `DomainError`. A weight of zero excluded its asset from the fit, and an excluded asset gives the metric a singular direction. The Investable Mask does not remove this case. An asset can be investable, with a finite return and a stated moment, and still sit outside the estimation universe of the latest cross-section, so its weight is zero while its loadings and variance are finite. [`InverseIdiosyncraticVarianceMetric`](@ref) and the `nothing` metric read no weight history, so they accept such an asset.
-
-# Returns
-
-  - `w::VecNum`: Weights of the latest observation, one entry per asset.
-
-# Related
-
-  - [`orthogonality_weights`](@ref)
-  - [`CrossSectionalFactorModel`](@ref)
-"""
-function latest_orthogonality_weights(::Nothing, name::Symbol,
-                                      rr::AbstractLoadingsRegressionResult)
-    return throw(IsNothingError("`$(name)` is unset on this loadings block, so it carries no cross-sectional weight history to read.\nBuild the block with `$(name)` set, or select `InverseIdiosyncraticVarianceMetric` or `metric = nothing`, which read no weight history.\nGot\nrr => $(nameof(typeof(rr)))\n$(name) => nothing"))
-end
-function latest_orthogonality_weights(w::MatNum, name::Symbol,
-                                      ::AbstractLoadingsRegressionResult)
-    @argcheck(!isempty(w), IsEmptyError("$(name) cannot be empty"))
+    w = rr.bw
+    @argcheck(!isnothing(w),
+              IsNothingError("`bw` is unset on this loadings block, so it carries no cross-sectional weight history to read.\nBuild the block with `bw` set, or select `InverseIdiosyncraticVarianceMetric` or `metric = nothing`, which read no weight history.\nGot\nrr => $(nameof(typeof(rr)))\nbw => nothing"))
+    @argcheck(!isempty(w), IsEmptyError("bw cannot be empty"))
     wl = view(w, size(w, 1), :)
     @argcheck(all(x -> isfinite(x) && x > zero(x), wl),
               DomainError(wl,
-                          "every weight of the latest observation of $(name) must be finite and > 0; a weight of 0 excluded its asset from the latest cross-sectional fit and leaves the metric singular. An investable asset can sit outside the estimation universe of that fit; use `InverseIdiosyncraticVarianceMetric` or `metric = nothing`, which read no weight history"))
+                          "every weight of the latest observation of bw must be finite and > 0; a weight of 0 excluded its asset from the latest cross-sectional fit and leaves the metric singular. An investable asset can sit outside the estimation universe of that fit; use `InverseIdiosyncraticVarianceMetric` or `metric = nothing`, which read no weight history"))
+    return wl
+end
+function orthogonality_weights(::RegressionWeightMetric, rr::CrossSectionalFactorModel)
+    w = rr.rw
+    @argcheck(!isnothing(w),
+              IsNothingError("`rw` is unset on this loadings block, so it carries no cross-sectional weight history to read.\nBuild the block with `rw` set, or select `InverseIdiosyncraticVarianceMetric` or `metric = nothing`, which read no weight history.\nGot\nrr => $(nameof(typeof(rr)))\nrw => nothing"))
+    @argcheck(!isempty(w), IsEmptyError("rw cannot be empty"))
+    wl = view(w, size(w, 1), :)
+    @argcheck(all(x -> isfinite(x) && x > zero(x), wl),
+              DomainError(wl,
+                          "every weight of the latest observation of rw must be finite and > 0; a weight of 0 excluded its asset from the latest cross-sectional fit and leaves the metric singular. An investable asset can sit outside the estimation universe of that fit; use `InverseIdiosyncraticVarianceMetric` or `metric = nothing`, which read no weight history"))
     return wl
 end
 """
@@ -713,9 +685,11 @@ Return the cross-sectional weight history an [`AbstractOrthogonalityMetric`](@re
 # Algorithm
 
  1. On `nothing`, return `nothing`.
- 2. On [`BenchmarkWeightMetric`](@ref), return the history `csfm.bw` through [`cs_diagnostic_weight_history`](@ref).
- 3. On [`RegressionWeightMetric`](@ref), return the history `csfm.rw` through [`cs_diagnostic_weight_history`](@ref).
- 4. On [`InverseIdiosyncraticVarianceMetric`](@ref), read `vs`, the idiosyncratic variance history `csfm.vs`, through [`cs_diagnostic_weight_history`](@ref), and return its element-wise inverse.
+ 2. On [`BenchmarkWeightMetric`](@ref), refuse a `nothing` history `csfm.bw`, and return it otherwise.
+ 3. On [`RegressionWeightMetric`](@ref), refuse a `nothing` history `csfm.rw`, and return it otherwise.
+ 4. On [`InverseIdiosyncraticVarianceMetric`](@ref), read `vs`, the idiosyncratic variance history `csfm.vs`. Refuse a `nothing` history, and return its element-wise inverse otherwise.
+
+Each of the three methods holds its own copy of the refusal, and the copies differ only in the name of the field and in what it holds.
 
 # Arguments
 
@@ -741,41 +715,21 @@ function cs_diagnostic_weights(::Nothing, ::CrossSectionalFactorModel)
     return nothing
 end
 function cs_diagnostic_weights(::BenchmarkWeightMetric, csfm::CrossSectionalFactorModel)
-    return cs_diagnostic_weight_history(csfm.bw, "bw", "the benchmark weight history")
+    @argcheck(!isnothing(csfm.bw),
+              IsNothingError("bw cannot be nothing: an exposure diagnostic reads the benchmark weight history of the block"))
+    return csfm.bw
 end
 function cs_diagnostic_weights(::RegressionWeightMetric, csfm::CrossSectionalFactorModel)
-    return cs_diagnostic_weight_history(csfm.rw, "rw", "the regression weight history")
+    @argcheck(!isnothing(csfm.rw),
+              IsNothingError("rw cannot be nothing: an exposure diagnostic reads the regression weight history of the block"))
+    return csfm.rw
 end
 function cs_diagnostic_weights(::InverseIdiosyncraticVarianceMetric,
                                csfm::CrossSectionalFactorModel)
-    vs = cs_diagnostic_weight_history(csfm.vs, "vs", "the idiosyncratic variance history")
+    vs = csfm.vs
+    @argcheck(!isnothing(vs),
+              IsNothingError("vs cannot be nothing: an exposure diagnostic reads the idiosyncratic variance history of the block"))
     return one(real(eltype(vs))) ./ vs
-end
-"""
-    cs_diagnostic_weight_history(A::Nothing, name::AbstractString, what::AbstractString)
-    cs_diagnostic_weight_history(A::MatNum, name::AbstractString, what::AbstractString)
-
-Return a weight history of a factor model block, or refuse an absent one by name.
-
-# Arguments
-
-  - `A`: The field of the block the metric names, or `nothing`.
-  - `name`: Name of that field, which the refusal states.
-  - `what`: What the field holds, which the refusal states.
-
-# Returns
-
-  - `A::MatNum`: The history.
-
-# Related
-
-  - [`cs_diagnostic_weights`](@ref)
-"""
-function cs_diagnostic_weight_history(::Nothing, name::AbstractString, what::AbstractString)
-    return throw(IsNothingError("$name cannot be nothing: an exposure diagnostic reads $what of the block"))
-end
-function cs_diagnostic_weight_history(A::MatNum, ::AbstractString, ::AbstractString)
-    return A
 end
 
 export IdiosyncraticVarianceScaling, OrthogonalUncertaintySet

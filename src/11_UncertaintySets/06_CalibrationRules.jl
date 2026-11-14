@@ -30,7 +30,7 @@ To add a significance rule, subtype `AbstractSignificanceCalibrationAlgorithm`, 
   - [`AbstractCalibrationAlgorithm`](@ref)
   - [`Num_SigCal`](@ref)
   - [`resolve_calibration_slot`](@ref)
-  - [`calibrated_part`](@ref): a [`CountOf`](@ref) in a significance slot keeps a stated count of tail scenarios.
+  - [`resolve_calibration_slot`](@ref): a [`CountOf`](@ref) in a significance slot keeps a stated count of tail scenarios.
   - [`RateSignificance`](@ref): the rule of the family that decreases the level at a square-root rate.
 """
 abstract type AbstractSignificanceCalibrationAlgorithm <: AbstractCalibrationAlgorithm end
@@ -83,7 +83,7 @@ abstract type AbstractDeformationCalibrationAlgorithm <: AbstractCalibrationAlgo
 
 Field bound for a significance slot: the tail probability, a part of the scenarios as a [`CountOf`](@ref) or a [`FractionOf`](@ref), a rule of the family, or a plain function of the same five arguments.
 
-A plain number is the tail probability itself, so the slot takes no plain shorthand of [`count_or_fraction`](@ref). `alpha = CountOf(15)` keeps fifteen scenarios in the tail at every sample length, and [`calibrated_part`](@ref) resolves it to `15 / T`. `alpha = FractionOf(0.05)` is the level `0.05`.
+A plain number is the tail probability itself, so the slot takes no plain shorthand of [`count_or_fraction`](@ref). `alpha = CountOf(15)` keeps fifteen scenarios in the tail at every sample length, and [`resolve_calibration_slot`](@ref) resolves it to `15 / T`. `alpha = FractionOf(0.05)` is the level `0.05`.
 
 The slot names the end of the distribution, so the occupant does not have to. `alpha` names the lower tail and `beta` names the upper tail, and one rule serves both ends. So one bound serves every significance slot, and a Range measure sets its head slot to the occupant of its tail slot by default.
 
@@ -115,7 +115,7 @@ const Num_DefCal = Union{AbstractDeformationCalibrationAlgorithm, Function, Numb
 
 Returns `true` when the occupant `x` of a calibration slot is a **Calibration Rule**.
 
-A slot can hold and call two kinds of rule: an [`AbstractCalibrationAlgorithm`](@ref), and a plain function of the same five arguments. Both return `true`. A [`CountOf`](@ref) or a [`FractionOf`](@ref) in a slot whose bound admits it also returns `true`, because [`resolve_calibration_slot`](@ref) computes the quantity from it through [`calibrated_part`](@ref). All other occupants return `false`: a stated number, `nothing`, and a child measure that a container declares.
+A slot can hold and call two kinds of rule: an [`AbstractCalibrationAlgorithm`](@ref), and a plain function of the same five arguments. Both return `true`. A [`CountOf`](@ref) or a [`FractionOf`](@ref) in a slot whose bound admits it also returns `true`, because [`resolve_calibration_slot`](@ref) computes the quantity from it. All other occupants return `false`: a stated number, `nothing`, and a child measure that a container declares.
 
 A callable is not always a rule. [`calibration_slots`](@ref) also declares the children of a container. One such child is an ordered-weights builder in a reversal, which is a `Function` and computes no quantity. So this trait marks a rule, and the `Function` type does not. A type that is callable for a different purpose adds one method here that returns `false`. [`OWA_CalOccupant`](@ref) names the type that does this.
 
@@ -528,11 +528,11 @@ The site runs a rule as `alg(key, pr, w, slv, ctx)`. `key` names the **slot** an
 |:-------- |:----------------------------------------------------------------------------- |:---------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | `alpha`  | the slot owner, off a **sibling slot** it resolved first                      | [`EntropyBudget`](@ref), [`HillTailDecay`](@ref), [`RadialTailDecay`](@ref), [`TailTermParity`](@ref)                                                                  |
 | `series` | the slot owner, through [`calibration_series`](@ref)                          | [`HillTailDecay`](@ref), [`RadialTailDecay`](@ref), [`ConcentrationRadius`](@ref), [`DimensionalRateRadius`](@ref), [`DualNormRadius`](@ref), [`TailTermParity`](@ref) |
-| `p`      | the constraint or the penalty the quantity stands in                          | a [`CountOf`](@ref) or a [`FractionOf`](@ref) through [`calibrated_part`](@ref), [`DualNormRadius`](@ref)                                                              |
+| `p`      | the constraint or the penalty the quantity stands in                          | a [`CountOf`](@ref) or a [`FractionOf`](@ref) through [`resolve_calibration_slot`](@ref), [`DualNormRadius`](@ref)                                                     |
 | `cs`     | a [`CrossSectionalFactorPrior`](@ref), after the split of its Return Forecast | [`PrecisionBlend`](@ref), [`SteinShrinkage`](@ref), [`ForecastCalibrationSlope`](@ref)                                                                                 |
 | `n`      | a site that prices the empirical measure of its own rows                      | [`ConcentrationRadius`](@ref), [`RateRadius`](@ref), [`DimensionalRateRadius`](@ref), [`DualNormRadius`](@ref)                                                         |
 
-**`p` also names the family of a [`CountOf`](@ref) or a [`FractionOf`](@ref).** The pair is one occupant of two families. In a significance slot it states a part of the scenarios in the tail, and in a norm-ceiling slot it states the effective assets that the ceiling keeps. Every norm-ceiling site states the order `p` of its ceiling, and no significance site states one. So [`calibrated_part`](@ref) reads the family off `p`, the order that a ceiling reads anyway.
+**`p` also names the family of a [`CountOf`](@ref) or a [`FractionOf`](@ref).** The pair is one occupant of two families. In a significance slot it states a part of the scenarios in the tail, and in a norm-ceiling slot it states the effective assets that the ceiling keeps. Every norm-ceiling site states the order `p` of its ceiling, and no significance site states one. So [`resolve_calibration_slot`](@ref) reads the family off `p`, the order that a ceiling reads anyway.
 
 **No rule has a field for these quantities.** Each one belongs to the site, and a rule cannot know which site it reached. So a site overwrites no value of the rule, and no precedence between the two is necessary. A caller who runs a rule outside a measure builds the context that the site builds. That context is the only place where these quantities are written.
 
@@ -729,7 +729,7 @@ Where:
   - [`stated_sample_size`](@ref)
   - [`ObsWeights`](@ref)
   - [`scenario_sample_size`](@ref): the count of the rows that a measure prices.
-  - [`calibrated_part`](@ref): a [`CountOf`](@ref) in a significance slot reads this count only when observation weights are stated.
+  - [`resolve_calibration_slot`](@ref): a [`CountOf`](@ref) in a significance slot reads this count only when observation weights are stated.
   - [`ConcentrationRadius`](@ref): reads this count when the site states no `n`.
   - [`RateRadius`](@ref)
   - [`DimensionalRateRadius`](@ref)
@@ -822,7 +822,7 @@ Where:
 # Related
 
   - [`effective_sample_size`](@ref)
-  - [`calibrated_part`](@ref)
+  - [`resolve_calibration_slot`](@ref)
   - [`CalibrationContext`](@ref)
   - [`DistributionallyRobustConditionalValueatRisk`](@ref)
 
@@ -839,11 +839,11 @@ $(DocStringExtensions.TYPEDEF)
 
 Computes a significance level that decreases with the square root of the sample length.
 
-The tail probability is `c / sqrt(T)`, so the expected count of the tail is `c * sqrt(T)`. The count increases with the sample, but more slowly than the sample. The error of a sample mean decreases at the same rate. So a longer sample moves the tail further out and also puts more scenarios in it. `alpha = CountOf(n)` keeps the count fixed, through [`calibrated_part`](@ref).
+The tail probability is `c / sqrt(T)`, so the expected count of the tail is `c * sqrt(T)`. The count increases with the sample, but more slowly than the sample. The error of a sample mean decreases at the same rate. So a longer sample moves the tail further out and also puts more scenarios in it. `alpha = CountOf(n)` keeps the count fixed, through [`resolve_calibration_slot`](@ref).
 
 **`T` is the count of the scenarios that the measure prices, as for a [`CountOf`](@ref) in the slot.** The tail is a set of the rows of `pr.X`, so the expected count of the tail is `c * sqrt(T)` only when `T` counts those rows. That is [`scenario_sample_size`](@ref): the row count of `pr.X` when no observation weights are stated, and the effective sample size of the weights otherwise. Under a Scenario Cap, the rows are fewer than the observations behind the moments, and the rule reads the rows. A read of the count in `eoc` there gave a tail of `sqrt(5)` times fewer scenarios than `c * sqrt(T)`, for `max_scenarios = 250` over 1250 observations.
 
-The rule does not check the range of its value, for the reason that [`calibrated_part`](@ref) states.
+The rule does not check the range of its value, for the reason that [`resolve_calibration_slot`](@ref) states.
 
 # Fields
 
@@ -864,7 +864,6 @@ Keywords correspond to the fields of the struct. The default `c = 1` gives the r
 # Related
 
   - [`AbstractSignificanceCalibrationAlgorithm`](@ref)
-  - [`calibrated_part`](@ref)
   - [`Num_SigCal`](@ref)
   - [`resolve_calibration_slot`](@ref)
 """
@@ -922,7 +921,6 @@ Where:
 # Related
 
   - [`RateSignificance`](@ref)
-  - [`calibrated_part`](@ref)
   - [`scenario_sample_size`](@ref)
   - [`resolve_calibration_slot`](@ref)
 """
@@ -1817,7 +1815,7 @@ A ceiling applies to one norm order, and that order belongs to the constraint an
   - [`AbstractCalibrationAlgorithm`](@ref)
   - [`Num_NormCeilCal`](@ref)
   - [`CalibrationContext`](@ref)
-  - [`calibrated_part`](@ref): a [`CountOf`](@ref) or a [`FractionOf`](@ref) in a ceiling slot keeps a floor of effective assets.
+  - [`resolve_calibration_slot`](@ref): a [`CountOf`](@ref) or a [`FractionOf`](@ref) in a ceiling slot keeps a floor of effective assets.
 """
 abstract type AbstractNormCeilingCalibrationAlgorithm <: AbstractCalibrationAlgorithm end
 """
@@ -1856,7 +1854,7 @@ const Num_AmbTwtCal = Union{AbstractAmbiguityTailWeightCalibrationAlgorithm, Fun
 
 Field bound for a norm-ceiling slot: the ceiling, a floor of effective assets as a [`CountOf`](@ref) or a [`FractionOf`](@ref), a rule of the family, or a plain function of the same five arguments.
 
-A plain number is the ceiling itself, so the slot takes no plain shorthand of [`count_or_fraction`](@ref). `l2c = CountOf(10)` keeps at least ten effective assets, and `l2c = FractionOf(0.5)` keeps half of the universe effective. [`calibrated_part`](@ref) resolves each one to the ceiling against the norm order of the site.
+A plain number is the ceiling itself, so the slot takes no plain shorthand of [`count_or_fraction`](@ref). `l2c = CountOf(10)` keeps at least ten effective assets, and `l2c = FractionOf(0.5)` keeps half of the universe effective. [`resolve_calibration_slot`](@ref) resolves each one to the ceiling against the norm order of the site.
 
 The union names one rule family. So a constructor refuses a radius rule in a ceiling slot, and it refuses a ceiling rule in a radius slot in the same way. [`AbstractNormCeilingCalibrationAlgorithm`](@ref) states the difference between the two quantities.
 
@@ -1907,22 +1905,18 @@ function resolve_calibration_slot(alg::Union{AbstractNormCeilingCalibrationAlgor
     assert_nonempty_gt0_finite_val(val, key)
     return val
 end
-# A count or a fraction is one occupant of two families, and `calibrated_part` reads the
-# family off the order that a norm-ceiling site states in the context.
-function resolve_calibration_slot(part::AbstractCountOrFraction, key::Symbol,
-                                  pr::AbstractPriorResult, w, ::Any = nothing,
-                                  ctx::CalibrationContext = CalibrationContext())
-    return calibrated_part(part, ctx.p, key, pr, w)
-end
 """
-    calibrated_part(part::CountOf, p::Nothing, key::Symbol, pr::AbstractPriorResult, w)
-    calibrated_part(part::FractionOf, p::Nothing, key::Symbol, pr::AbstractPriorResult, w)
-    calibrated_part(part::AbstractCountOrFraction, p::Number, key::Symbol,
-                    pr::AbstractPriorResult, w)
+    resolve_calibration_slot(part::CountOf, key::Symbol, pr::AbstractPriorResult, w, slv,
+                             ctx::CalibrationContext{<:Any, <:Any, Nothing})
+    resolve_calibration_slot(part::FractionOf, key::Symbol, pr::AbstractPriorResult, w, slv,
+                             ctx::CalibrationContext{<:Any, <:Any, Nothing})
+    resolve_calibration_slot(part::AbstractCountOrFraction, key::Symbol,
+                             pr::AbstractPriorResult, w, slv,
+                             ctx::CalibrationContext{<:Any, <:Any, <:Number})
 
 Computes the quantity of a calibration slot that holds a [`CountOf`](@ref) or a [`FractionOf`](@ref).
 
-The pair states the size of a part of a set, and the slot states the set. A significance slot names the scenarios of the tail, and a norm-ceiling slot names the assets that stay effective. The norm order `p` of the [`CalibrationContext`](@ref) tells the two apart, because every norm-ceiling site states it and no significance site does.
+The pair states the size of a part of a set, and the slot states the set. A significance slot names the scenarios of the tail, and a norm-ceiling slot names the assets that stay effective. The norm order `ctx.p` of the [`CalibrationContext`](@ref) tells the two apart, because every norm-ceiling site states it and no significance site does. So the methods dispatch on the type of `ctx.p`. A call with no `slv` or no `ctx` takes the defaults of the generic method, `nothing` and `CalibrationContext()`. The default context states no order, so such a call reads the pair as a part of the scenarios.
 
 # A significance level that keeps the count of the tail
 
@@ -1978,18 +1972,19 @@ The infinite branch is the limit of the finite branch. ``m^{1/p - 1} \\to m^{-1}
 
 # Algorithm
 
- 1. When `p` is `nothing`, return `part.val / scenario_sample_size(pr, w)` for a [`CountOf`](@ref), and `part.val` for a [`FractionOf`](@ref).
- 2. Otherwise, check that `p >= 1`.
+ 1. When `ctx.p` is `nothing`, return `part.val / scenario_sample_size(pr, w)` for a [`CountOf`](@ref), and `part.val` for a [`FractionOf`](@ref).
+ 2. Otherwise, take `p = ctx.p`, and check that `p >= 1`.
  3. Read `N`, the column count of `pr.X`, and the floor `m` from [`effective_asset_floor`](@ref). Check that `m <= N`.
  4. Return `inv(m)` when `p` is infinite, and `m^(1/p - 1)` otherwise.
 
 # Arguments
 
   - `part`: The occupant of the slot.
-  - `p`: The norm order of the site, `ctx.p`. `nothing` reads `part` as a part of the scenarios.
   - `key`: Name of the slot that the call resolves. The refusals below name the site with it.
   - `pr`: Prior result from which the function reads the sample length and the asset count.
   - `w`: Effective observation weights, or `nothing`. A count of the universe is not a count of the sample, so the ceiling does not read them.
+  - `slv`: Effective solver, which the methods do not read.
+  - `ctx`: The facts of the site, as a [`CalibrationContext`](@ref). Its norm order `ctx.p` is `nothing` for a significance slot, and the order of the ceiling otherwise.
 
 # Validation
 
@@ -1998,11 +1993,10 @@ The infinite branch is the limit of the finite branch. ``m^{1/p - 1} \\to m^{-1}
 
 # Returns
 
-  - `val::Number`: The significance level when `p` is `nothing`, and the norm ceiling otherwise.
+  - `val::Number`: The significance level when `ctx.p` is `nothing`, and the norm ceiling otherwise.
 
 # Related
 
-  - [`resolve_calibration_slot`](@ref)
   - [`CalibrationContext`](@ref)
   - [`scenario_sample_size`](@ref)
   - [`number_effective_assets`](@ref)
@@ -2013,15 +2007,18 @@ The infinite branch is the limit of the finite branch. ``m^{1/p - 1} \\to m^{-1}
 
   - $(ref_dict[:kish1965]) Whole book, for the effective sample size of the weights. $(ref_dict[:no_original_source])
 """
-function calibrated_part(part::CountOf, ::Nothing, ::Symbol, pr::AbstractPriorResult, w)
+function resolve_calibration_slot(part::CountOf, ::Symbol, pr::AbstractPriorResult, w,
+                                  ::Any, ::CalibrationContext{<:Any, <:Any, Nothing})
     return part.val / scenario_sample_size(pr, w)
 end
-function calibrated_part(part::FractionOf, ::Nothing, ::Symbol, ::AbstractPriorResult,
-                         ::Any)
+function resolve_calibration_slot(part::FractionOf, ::Symbol, ::AbstractPriorResult, ::Any,
+                                  ::Any, ::CalibrationContext{<:Any, <:Any, Nothing})
     return part.val
 end
-function calibrated_part(part::AbstractCountOrFraction, p::Number, key::Symbol,
-                         pr::AbstractPriorResult, ::Any)
+function resolve_calibration_slot(part::AbstractCountOrFraction, key::Symbol,
+                                  pr::AbstractPriorResult, ::Any, ::Any,
+                                  ctx::CalibrationContext{<:Any, <:Any, <:Number})
+    p = ctx.p
     @argcheck(p >= one(p),
               DomainError(p,
                           "`CalibrationContext.p` is $p, and a norm ceiling is read against an order of one or more. The three constraint sites state `2`, `Inf` and the order of their own term, so an order below one reaches `$key` only from a context a caller built by hand."))
@@ -2042,7 +2039,7 @@ The floor is not rounded, because the effective number of assets is a real numbe
 
 # Related
 
-  - [`calibrated_part`](@ref)
+  - [`resolve_calibration_slot`](@ref)
 """
 function effective_asset_floor(part::CountOf, ::Integer)
     return part.val

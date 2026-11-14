@@ -392,7 +392,7 @@ The two radii are scalar budgets for the universe, and the view keeps them uncha
 
  1. Take `nothing_scalar_array_view(risk_ucs.sd, i)`, the scaling of the selected assets. A `nothing` stays `nothing`.
  2. Take `nothing_scalar_array_view(risk_ucs.mu, i)`, the characteristic vector of the same assets. A `nothing` stays `nothing`.
- 3. Build a [`SignedL1UncertaintySet`](@ref) from `risk_ucs.ep`, `risk_ucs.en` and the two views. The step rescales neither radius, because each radius is the budget for the total error of its sign over the assets that the set covers.
+ 3. Rebuild the set from the two views with [`rebuild_struct`](@ref). `risk_ucs.ep` and `risk_ucs.en` do not change. The step rescales neither radius, because each radius is the budget for the total error of its sign over the assets that the set covers.
 
 # Arguments
 
@@ -424,9 +424,9 @@ SignedL1UncertaintySet
   - [`port_opt_view`](@ref)
 """
 function port_opt_view(risk_ucs::SignedL1UncertaintySet, i, args...)::SignedL1UncertaintySet
-    return SignedL1UncertaintySet(; ep = risk_ucs.ep, en = risk_ucs.en,
-                                  sd = nothing_scalar_array_view(risk_ucs.sd, i),
-                                  mu = nothing_scalar_array_view(risk_ucs.mu, i))
+    return rebuild_struct(risk_ucs,
+                          (; sd = nothing_scalar_array_view(risk_ucs.sd, i),
+                           mu = nothing_scalar_array_view(risk_ucs.mu, i)))
 end
 """
 $(DocStringExtensions.TYPEDSIGNATURES)
@@ -438,7 +438,7 @@ The expansion is the inverse of [`port_opt_view`](@ref), and it writes the same 
 # Algorithm
 
  1. If `set.sd` is `nothing`, keep `nothing`. Else, make a zero frame of `length(imsk)` entries, and write `set.sd` at the entries that the mask keeps.
- 2. Build a [`SignedL1UncertaintySet`](@ref) from `set.ep`, `set.en` and the frame, with `pr.mu` as `mu`.
+ 2. Rebuild the set from the frame, with `pr.mu` as `mu`, with [`rebuild_struct`](@ref). `set.ep` and `set.en` do not change.
 
 # Arguments
 
@@ -465,7 +465,7 @@ function expand_investable_ucs(set::SignedL1UncertaintySet, imsk::BitVector,
         frame[imsk] = set.sd
         frame
     end
-    return SignedL1UncertaintySet(; ep = set.ep, en = set.en, sd = sd, mu = pr.mu)
+    return rebuild_struct(set, (; sd = sd, mu = pr.mu))
 end
 """
 $(DocStringExtensions.TYPEDEF)

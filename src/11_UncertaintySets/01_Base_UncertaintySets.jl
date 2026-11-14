@@ -459,9 +459,8 @@ function port_opt_view(risk_ucs::Option{<:AbstractUncertaintySetEstimator}, ::An
     return risk_ucs
 end
 """
-    investable_ucs_reduction(pr::AbstractPriorResult, rd) -> (imsk, pr, rd)
-    investable_ucs_reduction(::Nothing, pr::AbstractPriorResult, rd) -> (nothing, pr, rd)
-    investable_ucs_reduction(imsk::BitVector, pr::AbstractPriorResult, rd) -> (imsk, pr_view, rd_view)
+    investable_ucs_reduction(pr::AbstractPriorResult, rd,
+                             imsk::Option{BitVector} = investable_mask(pr)) -> (imsk, pr, rd)
 
 Reduces a Prior Result, and the returns data beside it, to the Investable Mask before an estimator fits a set on them outside an optimiser.
 
@@ -469,11 +468,11 @@ A Prior Result covers the full asset universe. An asset outside its Investable M
 
 [`expand_investable_ucs`](@ref) writes the fitted set back onto the full universe. Every Prior Result follows the same pattern of reduction and expansion.
 
-The function has three methods, and dispatch selects the branch, as in `investable_reduction`. The first method finds the mask. The `nothing` method is the path where all assets are investable, and it returns its arguments unchanged. The `BitVector` method takes the two views.
+The mask is the last positional slot, and its default reads it from the Prior Result. A mask of `nothing` is the path where all assets are investable, and the function then returns its arguments unchanged.
 
 # Algorithm
 
- 1. Find the Investable Mask of the Prior Result with [`investable_mask`](@ref).
+ 1. Take the Investable Mask `imsk`. By default, [`investable_mask`](@ref) reads it from the Prior Result.
  2. If the mask is `nothing`, return `nothing` and the two arguments unchanged.
  3. Else, take a [`port_opt_view`](@ref) of the Prior Result at `findall(imsk)`. Take the same view of the returns data when it is not `nothing`. Return the two views and the mask.
 
@@ -481,6 +480,7 @@ The function has three methods, and dispatch selects the branch, as in `investab
 
   - $(arg_dict[:pr])
   - `rd`: Returns data beside which the estimator fits the set, or `nothing`.
+  - `imsk`: The Investable Mask of `pr`, or `nothing` when all assets are investable.
 
 # Returns
 
@@ -492,13 +492,11 @@ The function has three methods, and dispatch selects the branch, as in `investab
   - [`investable_mask`](@ref)
   - [`port_opt_view`](@ref)
 """
-function investable_ucs_reduction(pr::AbstractPriorResult, rd)
-    return investable_ucs_reduction(investable_mask(pr), pr, rd)
-end
-function investable_ucs_reduction(::Nothing, pr::AbstractPriorResult, rd)
-    return nothing, pr, rd
-end
-function investable_ucs_reduction(imsk::BitVector, pr::AbstractPriorResult, rd)
+function investable_ucs_reduction(pr::AbstractPriorResult, rd,
+                                  imsk::Option{BitVector} = investable_mask(pr))
+    if isnothing(imsk)
+        return nothing, pr, rd
+    end
     idx = findall(imsk)
     return imsk, port_opt_view(pr, idx), isnothing(rd) ? nothing : port_opt_view(rd, idx)
 end
@@ -1790,7 +1788,7 @@ The set bounds a vectorised covariance. So its shape matrix is on the ``N^{2}`` 
  1. Take `nothing_scalar_array_view(risk_ucs.val, i)`, the fitted ``N \\times N`` covariance restricted to the selected assets. It takes the plain asset index, and it returns `nothing` unchanged. This step is first, because step 2 writes a new value to `i`.
  2. Find `N` as `floor(Int, sqrt(size(risk_ucs.sigma, 1)))` from the shape matrix. Expand `i` with `fourth_moment_index_generator(N, i)`, which gives the positions of the selected assets in the vectorised covariance.
  3. Take `view(risk_ucs.sigma, i, i)` with the expanded index, which gives the restricted shape matrix.
- 4. Build an [`EllipsoidalUncertaintySet`](@ref) from the two views, with `k` and `class` unchanged. The method does not calibrate the radius again on the smaller dimension. So under every radius algorithm except [`GeneralKUncertaintyAlgorithm`](@ref), the view is more conservative than a fit on the subset.
+ 4. Rebuild the set from the two views with [`rebuild_struct`](@ref). `k` and `class` do not change. The method does not calibrate the radius again on the smaller dimension. So under every radius algorithm except [`GeneralKUncertaintyAlgorithm`](@ref), the view is more conservative than a fit on the subset.
 
 # Arguments
 
@@ -1816,8 +1814,7 @@ function port_opt_view(risk_ucs::EllipsoidalUncertaintySet{<:MatNum, <:Any,
     # index, whereas the N^2 x N^2 shape matrix takes the fourth-moment index.
     val = nothing_scalar_array_view(risk_ucs.val, i)
     i = fourth_moment_index_generator(floor(Int, sqrt(size(risk_ucs.sigma, 1))), i)
-    return EllipsoidalUncertaintySet(; sigma = view(risk_ucs.sigma, i, i), k = risk_ucs.k,
-                                     class = risk_ucs.class, val = val)
+    return rebuild_struct(risk_ucs, (; sigma = view(risk_ucs.sigma, i, i), val = val))
 end
 """
 $(DocStringExtensions.TYPEDSIGNATURES)
@@ -1832,7 +1829,7 @@ The frame is zero and not `NaN`, because the shape matrix is geometry. The same 
 
  1. Find the positions of the investable pairs in the vectorised covariance with [`coverage_pair_index`](@ref), in the order of [`fourth_moment_index_generator`](@ref).
  2. Make a zero frame of `length(imsk)^2` rows and columns. Write `set.sigma` at those positions on the two axes.
- 3. Build an [`EllipsoidalUncertaintySet`](@ref) from the frame, with `k` and `class` unchanged and `pr.sigma` as `val`.
+ 3. Rebuild the set from the frame, with `pr.sigma` as `val`, with [`rebuild_struct`](@ref). `k` and `class` do not change.
 
 # Arguments
 
@@ -1860,8 +1857,7 @@ function expand_investable_ucs(set::EllipsoidalUncertaintySet{<:MatNum, <:Any,
     N2 = length(imsk)^2
     sigma = zeros(eltype(set.sigma), N2, N2)
     sigma[idx, idx] = set.sigma
-    return EllipsoidalUncertaintySet(; sigma = sigma, k = set.k, class = set.class,
-                                     val = pr.sigma)
+    return rebuild_struct(set, (; sigma = sigma, val = pr.sigma))
 end
 """
 $(DocStringExtensions.TYPEDSIGNATURES)
@@ -1874,7 +1870,7 @@ The set bounds a mean vector, so its shape matrix and its centre are both on the
 
  1. Take `view(risk_ucs.sigma, i, i)`, the ``N \\times N`` shape matrix restricted to the selected assets on the two dimensions.
  2. Take `nothing_scalar_array_view(risk_ucs.val, i)`, the fitted mean vector restricted to the same assets. It returns `nothing` unchanged.
- 3. Build an [`EllipsoidalUncertaintySet`](@ref) from the two views, with `k` and `class` unchanged. The method does not calibrate the radius again on the smaller dimension. So under every radius algorithm except [`GeneralKUncertaintyAlgorithm`](@ref), the view is more conservative than a fit on the subset.
+ 3. Rebuild the set from the two views with [`rebuild_struct`](@ref). `k` and `class` do not change. The method does not calibrate the radius again on the smaller dimension. So under every radius algorithm except [`GeneralKUncertaintyAlgorithm`](@ref), the view is more conservative than a fit on the subset.
 
 # Arguments
 
@@ -1895,9 +1891,9 @@ The set bounds a mean vector, so its shape matrix and its centre are both on the
 function port_opt_view(risk_ucs::EllipsoidalUncertaintySet{<:MatNum, <:Any,
                                                            <:MuUncertaintySetClass}, i,
                        args...)::EllipsoidalUncertaintySet
-    return EllipsoidalUncertaintySet(; sigma = view(risk_ucs.sigma, i, i), k = risk_ucs.k,
-                                     class = risk_ucs.class,
-                                     val = nothing_scalar_array_view(risk_ucs.val, i))
+    return rebuild_struct(risk_ucs,
+                          (; sigma = view(risk_ucs.sigma, i, i),
+                           val = nothing_scalar_array_view(risk_ucs.val, i)))
 end
 """
 $(DocStringExtensions.TYPEDSIGNATURES)
@@ -1911,7 +1907,7 @@ The frame is zero and not `NaN`, because the shape matrix is geometry. The same 
 # Algorithm
 
  1. Make a zero frame of `length(imsk)` rows and columns. Write `set.sigma` at `(imsk, imsk)`.
- 2. Build an [`EllipsoidalUncertaintySet`](@ref) from the frame, with `k` and `class` unchanged and `pr.mu` as `val`.
+ 2. Rebuild the set from the frame, with `pr.mu` as `val`, with [`rebuild_struct`](@ref). `k` and `class` do not change.
 
 # Arguments
 
@@ -1937,8 +1933,7 @@ function expand_investable_ucs(set::EllipsoidalUncertaintySet{<:MatNum, <:Any,
     N = length(imsk)
     sigma = zeros(eltype(set.sigma), N, N)
     sigma[imsk, imsk] = set.sigma
-    return EllipsoidalUncertaintySet(; sigma = sigma, k = set.k, class = set.class,
-                                     val = pr.mu)
+    return rebuild_struct(set, (; sigma = sigma, val = pr.mu))
 end
 """
     box_quantile_bounds(::Type{TE}, get_ij, N::Integer, q::Number, kwargs) where {TE}
