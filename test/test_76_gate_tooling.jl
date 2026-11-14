@@ -1154,10 +1154,13 @@ end
             @test occursin(open ? "after that map was charted" : "after that map closed",
                            body)
             # The sixth condition of #404 names the survey of the file (#2086), which also reads
-            # a returned named tuple (#2113).
+            # a returned named tuple (#2113), and points to the file that owns each rule (#2115).
             @test occursin("6. Its methods meet the wrapper standard and the rule for a " *
-                           "returned named tuple: `code_health/forward_survey.jl src/a.jl`",
+                           "returned named tuple, which " *
+                           "`.github/instructions/julia-source-code.instructions.md` owns",
                            body)
+            @test occursin("`code_health/forward_survey.jl src/a.jl` reports no candidate " *
+                           "without a ruling.", body)
         end
     end
     @testset "a sweep title that names no current path is reported and refused" begin
