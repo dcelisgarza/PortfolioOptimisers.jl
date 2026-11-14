@@ -219,21 +219,38 @@ end
 # at the posterior until it is tight. Every posterior of the sequence meets the view.
 # --------------------------------------------------------------------------------------
 @testset "sequential formulation constructors" begin
-    for F in (SequentialConditionalValueatRiskView, SequentialEntropicValueatRiskView,
-              SequentialRelativisticValueatRiskView)
-        f = F()
-        @test f.iters == 20
-        @test f.tol == 1e-8
-        @test F(; iters = 0, tol = 1e-4).iters == 0
-        @test_throws DomainError F(; iters = -1)
-        @test_throws DomainError F(; tol = 0.0)
-    end
-    @test isa(SequentialConditionalValueatRiskView(),
-              PO.AbstractConditionalValueatRiskViewFormulation)
-    @test isa(SequentialEntropicValueatRiskView(),
-              PO.AbstractEntropicValueatRiskViewFormulation)
-    @test isa(SequentialRelativisticValueatRiskView(),
-              PO.AbstractRelativisticValueatRiskViewFormulation)
+    f = SequentialTailView()
+    @test f.iters == 20
+    @test f.tol == 1e-8
+    @test SequentialTailView(; iters = 0, tol = 1e-4).iters == 0
+    @test_throws DomainError SequentialTailView(; iters = -1)
+    @test_throws DomainError SequentialTailView(; tol = 0.0)
+    # One sequential formulation serves every measure, and the view group names the
+    # measure. Issue #1872.
+    @test isa(f, PO.AbstractEntropyPoolingViewFormulation)
+    v = LinearConstraintEstimator(; val = "AAPL <= 0.1")
+    @test ConditionalValueatRiskView(; views = v, alg = f).alg === f
+    @test EntropicValueatRiskView(; views = v, alg = f).alg === f
+    @test RelativisticValueatRiskView(; views = v, alg = f).alg === f
+    # A vector that mixes a formulation of the measure with the shared one keeps working,
+    # and an entry of another measure is refused at construction.
+    @test length(ConditionalValueatRiskView(; views = v,
+                                            alg = [LinearConditionalValueatRiskView(), f]).alg) ==
+          2
+    @test length(EntropicValueatRiskView(; views = v,
+                                         alg = [ConicEntropicValueatRiskView(), f,
+                                                GridTailView()]).alg) == 3
+    @test length(RelativisticValueatRiskView(; views = v,
+                                             alg = [ConicRelativisticValueatRiskView(), f,
+                                                    GridTailView()]).alg) == 3
+    @test_throws ArgumentError ConditionalValueatRiskView(; views = v,
+                                                          alg = [f, GridTailView()])
+    @test_throws ArgumentError EntropicValueatRiskView(; views = v,
+                                                       alg = [f,
+                                                              LinearConditionalValueatRiskView()])
+    @test_throws ArgumentError RelativisticValueatRiskView(; views = v,
+                                                           alg = [f,
+                                                                  ConicEntropicValueatRiskView()])
 end
 
 @testset "ep_sequential_sides orients the view as a lower bound and splits its assets" begin
@@ -249,6 +266,76 @@ end
     @test xd == [x1] && isempty(xp) && r == 0.05
     xd, cd, xp, cp, r = PO.ep_sequential_sides([x1], [1.0], :eq, 0.03, 0.04)
     @test isempty(xd) && xp == [x1] && cp == [-1.0] && r == -0.03
+end
+
+@testset "the value at risk multiplier and the start of the tilt chain at their limits (#1912)" begin
+    # A level that the running mass never reaches answers the smallest loss. The 13 equal
+    # prior weights, normalised as the start of the chain normalises them, sum to a hair
+    # under one, so a level just below one is never reached. A sum of fewer than 16 entries
+    # is a plain loop, so every host gets the same mass. Over 201 entries `sum` adds in SIMD
+    # blocks, and one CI host reaches one.
+    al = prevfloat(1.0)
+    X13 = ep_sX[(end - 12):end, :]
+    rd13 = ReturnsResult(; nx = rd.nx, X = X13)
+    w13 = StatsBase.pweights(fill(inv(13), 13))
+    wi = collect(range(inv(13), inv(13); length = 13))
+    wi = wi ./ sum(wi)
+    @test foldl(+, wi ./ sum(wi)) < al
+    # At that level the measure is the mean loss, so the view fixes the mean of the posterior.
+    cv1 = ConditionalValueatRisk(; alpha = al, w = w13)(X13[:, 1])
+    @test isapprox(cv1, -LinearAlgebra.dot(w13, X13[:, 1]); rtol = 1e-10)
+    @test cv1 > 0
+    tgt = cv1 * 0.85
+    pr = prior(EntropyPoolingPrior(; sets = sets, opt = ep_jopt,
+                                   cvar_views = ConditionalValueatRiskView(;
+                                                                           alg = SequentialTailView(),
+                                                                           alpha = al,
+                                                                           views = LinearConstraintEstimator(;
+                                                                                                             val = "AAPL <= $tgt"))),
+               rd13)
+    @test isapprox(-LinearAlgebra.dot(pr.w, X13[:, 1]), tgt; rtol = 1e-5)
+    @test isapprox(ConditionalValueatRisk(; alpha = al, w = pr.w)(X13[:, 1]), tgt;
+                   rtol = 1e-5)
+    @test pr.kld > 0
+    # An asset that no scenario tells apart has a constant row, so no tilt of the posterior
+    # reaches a target above it. The view that the prior meets leaves the posterior at the
+    # prior, and the view that no reweighting meets is refused by name.
+    X2 = copy(ep_sX[(end - 60):end, :])
+    X2[:, 1] .= 0.001
+    rd2 = ReturnsResult(; nx = rd.nx, X = X2)
+    mk(t) = EntropyPoolingPrior(; sets = sets, opt = ep_jopt,
+                                cvar_views = ConditionalValueatRiskView(;
+                                                                        alg = SequentialTailView(),
+                                                                        views = LinearConstraintEstimator(;
+                                                                                                          val = "AAPL <= $t")))
+    flat = prior(mk(0.5), rd2)
+    @test isapprox(flat.w, fill(inv(size(X2, 1)), size(X2, 1)); rtol = 1e-6)
+    @test flat.kld < 1e-9
+    @test_throws DomainError prior(mk(-0.5), rd2)
+    # When the constant asset is the primal side of a view, its row and its losses are both
+    # constant, so no tilt exists, and the start returns the row it read at the prior. Only
+    # the dual side can then meet the view, and the solve moves it through its exact block.
+    T2 = size(X2, 1)
+    w2 = StatsBase.pweights(fill(inv(T2), T2))
+    cA = ConditionalValueatRisk(; alpha = ep_a, w = w2)(X2[:, 2])
+    tA = cA + 0.001 + 0.3 * (maximum(-X2[:, 2]) - cA)
+    xA, xP = -X2[:, 2], -X2[:, 1]
+    tv = PO.SequentialConditionalValueatRiskViewConstraint([xA], [1.0], [xP], [-1.0],
+                                                           zeros(T2), 0.0, ep_a, tA, 20,
+                                                           1e-8)
+    tv1 = PO.ep_refine_tail_view(tv, w2)[1]
+    # The premise: the start needs more than the row gives, and neither direction tilts.
+    @test tA - tv1.b - cA > maximum(tv1.c) == minimum(tv1.c)
+    @test isnothing(PO.ep_row_tilt(w2, xP, LinearAlgebra.dot(w2, xP)))
+    pr2 = prior(EntropyPoolingPrior(; sets = sets, opt = ep_jopt,
+                                    cvar_views = ConditionalValueatRiskView(;
+                                                                            alg = SequentialTailView(),
+                                                                            views = LinearConstraintEstimator(;
+                                                                                                              val = "AMD - AAPL >= $tA"))),
+                rd2)
+    cv2(j) = ConditionalValueatRisk(; alpha = ep_a, w = pr2.w)(X2[:, j])
+    @test isapprox(cv2(2) - cv2(1), tA; rtol = 1e-6)
+    @test pr2.kld > 0
 end
 
 @testset "the surrogate row is tight where it is read and bounds the measure elsewhere" begin
@@ -348,8 +435,8 @@ end
     @test isapprox(ep_sevar(1, pr.w) - ep_sevar(size(ep_sX, 2), pr.w), tgt, rtol = 1e-5)
     pr0_ = prior(EntropyPoolingPrior(; sets = sets, opt = ep_jopt,
                                      evar_views = EntropicValueatRiskView(;
-                                                                          alg = SequentialEntropicValueatRiskView(;
-                                                                                                                  iters = 0),
+                                                                          alg = SequentialTailView(;
+                                                                                                   iters = 0),
                                                                           views = v)),
                  ep_srd)
     @test isapprox(pr0_.kld, klds[1], rtol = 1e-6)
@@ -365,7 +452,7 @@ end
     v = LinearConstraintEstimator(; val = "AAPL <= $tgt")
     ps = prior(EntropyPoolingPrior(; sets = sets, opt = ep_jopt,
                                    cvar_views = ConditionalValueatRiskView(;
-                                                                           alg = SequentialConditionalValueatRiskView(),
+                                                                           alg = SequentialTailView(),
                                                                            views = v)),
                ep_srd)
     pi_ = prior(EntropyPoolingPrior(; sets = sets, opt = ep_mopt,
@@ -380,7 +467,7 @@ end
     v2 = LinearConstraintEstimator(; val = "AAPL - $nN == $tgt2")
     ps2 = prior(EntropyPoolingPrior(; sets = sets, opt = ep_jopt,
                                     cvar_views = ConditionalValueatRiskView(;
-                                                                            alg = SequentialConditionalValueatRiskView(),
+                                                                            alg = SequentialTailView(),
                                                                             views = v2)),
                 ep_srd)
     pi2 = prior(EntropyPoolingPrior(; sets = sets, opt = ep_mopt,
@@ -393,7 +480,7 @@ end
     v3 = LinearConstraintEstimator(; val = "AAPL >= $(ep_spcvar * 1.2)")
     ps3 = prior(EntropyPoolingPrior(; sets = sets, opt = ep_jopt,
                                     cvar_views = ConditionalValueatRiskView(;
-                                                                            alg = SequentialConditionalValueatRiskView(),
+                                                                            alg = SequentialTailView(),
                                                                             views = v3)),
                 ep_srd)
     pl3 = prior(EntropyPoolingPrior(; sets = sets, opt = ep_jopt,
@@ -438,7 +525,7 @@ end
     tgt4 = ep_spevar * 0.9
     pu = prior(EntropyPoolingPrior(; sets = sets, opt = ep_jopt,
                                    evar_views = EntropicValueatRiskView(;
-                                                                        alg = SequentialEntropicValueatRiskView(),
+                                                                        alg = SequentialTailView(),
                                                                         views = LinearConstraintEstimator(;
                                                                                                           val = "AAPL <= $tgt4"))),
                ep_srd)
@@ -447,7 +534,7 @@ end
     pu2 = prior(EntropyPoolingPrior(; sets = sets, opt = ep_jopt,
                                     rlvar_views = RelativisticValueatRiskView(;
                                                                               kappa = ep_k,
-                                                                              alg = SequentialRelativisticValueatRiskView(),
+                                                                              alg = SequentialTailView(),
                                                                               views = LinearConstraintEstimator(;
                                                                                                                 val = "AAPL <= $tgt5"))),
                 ep_srd)
@@ -542,4 +629,81 @@ end
     @test d[LE] == 2
     @test d[EQ] == 1
     @test d[(Vector{JuMP.AffExpr}, JuMP.MOI.PowerCone{Float64})] == 2 * Ts
+end
+
+@testset "a sequential CVaR view is met when the worst scenario holds at least alpha (#1923)" begin
+    #=
+    When the prior weight of the worst loss is at least `alpha`, the value at risk at the
+    prior is that loss, every excess is zero, and the surrogate row is constant on the
+    support. No tilt along the row then exists, and the start returned the row it read at the
+    prior, which no posterior meets: every solver reported the first solve infeasible. The
+    start now tilts along the coefficient-weighted losses of the primal side when the tilt
+    along the row does not exist.
+    =#
+    X10 = ep_sX[1:10, :]
+    rd10 = ReturnsResult(; nx = rd.nx, X = X10)
+    w10 = StatsBase.pweights(fill(0.1, 10))
+    cv(j, wi, a) = ConditionalValueatRisk(; alpha = a, w = wi)(X10[:, j])
+    x1 = -X10[:, 1]
+    tq = (minimum(x1) + maximum(x1)) / 2
+    mk(a, val; opt = ep_jopt) = EntropyPoolingPrior(; sets = sets, opt = opt,
+                                                    cvar_views = ConditionalValueatRiskView(;
+                                                                                            alpha = a,
+                                                                                            alg = SequentialTailView(),
+                                                                                            views = LinearConstraintEstimator(;
+                                                                                                                              val = val)))
+    # The 10 equal weights are 0.1, so `alpha = 0.05` is below the weight of the worst loss,
+    # and `alpha = 0.1` is on it. At `alpha = 0.2` the start needed no second direction.
+    for a in (0.05, 0.1, 0.2)
+        pr = prior(mk(a, "AAPL <= $tq"), rd10)
+        @test isapprox(cv(1, pr.w, a), tq; rtol = 1e-6)
+        @test pr.kld > 0
+    end
+    # The posterior is the one of smallest divergence: the integer formulation reads every
+    # scenario and finds the same posterior.
+    ps = prior(mk(0.05, "AAPL <= $tq"), rd10)
+    pi_ = prior(EntropyPoolingPrior(; sets = sets, opt = ep_mopt,
+                                    cvar_views = ConditionalValueatRiskView(; alpha = 0.05,
+                                                                            views = LinearConstraintEstimator(;
+                                                                                                              val = "AAPL <= $tq"))),
+                rd10)
+    @test isapprox(ps.kld, pi_.kld; rtol = 1e-6)
+    # Two assets on the primal side: the second direction sums their weighted losses.
+    c12 = cv(1, w10, 0.05) + cv(2, w10, 0.05)
+    t2 = (c12 - maximum(X10[:, 1] .+ X10[:, 2])) / 2
+    pr2 = prior(mk(0.05, "AAPL + AMD <= $t2"), rd10)
+    @test isapprox(cv(1, pr2.w, 0.05) + cv(2, pr2.w, 0.05), t2; rtol = 1e-6)
+    # Two primal losses that sum to a constant on the support: the sum `l` is constant too,
+    # so the start tilts along the losses of one asset. The view is feasible: a posterior
+    # with 0.02 on the worst loss of AAPL and the rest spread equally meets it.
+    Xh = copy(X10)
+    Xh[:, 2] .= 0.01 .- Xh[:, 1]
+    rdh = ReturnsResult(; nx = rd.nx, X = Xh)
+    cvh(wi) = sum(ConditionalValueatRisk(; alpha = 0.05, w = wi)(Xh[:, j]) for j in 1:2)
+    pw = fill(0.98 / 9, 10)
+    pw[argmin(Xh[:, 1])] = 0.02
+    th = (cvh(w10) + cvh(StatsBase.pweights(pw))) / 2
+    @test th < cvh(w10)
+    prh = prior(mk(0.05, "AAPL + AMD <= $th"), rdh)
+    @test isapprox(cvh(prh.w), th; rtol = 1e-6)
+    pih = prior(EntropyPoolingPrior(; sets = sets, opt = ep_mopt,
+                                    cvar_views = ConditionalValueatRiskView(; alpha = 0.05,
+                                                                            views = LinearConstraintEstimator(;
+                                                                                                              val = "AAPL + AMD <= $th"))),
+                rdh)
+    @test isapprox(prh.kld, pih.kld; rtol = 1e-6)
+    # A prior whose weights are zero outside 10 scenarios of the full sample: only the
+    # support bounds the row, and the posterior puts no mass off it.
+    wz = zeros(size(ep_sX, 1))
+    wz[1:10] .= 0.1
+    prz = prior(EntropyPoolingPrior(; sets = sets, opt = ep_jopt,
+                                    w = StatsBase.pweights(wz),
+                                    cvar_views = ConditionalValueatRiskView(; alpha = 0.05,
+                                                                            alg = SequentialTailView(),
+                                                                            views = LinearConstraintEstimator(;
+                                                                                                              val = "AAPL <= $tq"))),
+                ep_srd)
+    @test isapprox(ConditionalValueatRisk(; alpha = 0.05, w = prz.w)(ep_sX[:, 1]), tq;
+                   rtol = 1e-6)
+    @test sum(prz.w[11:end]) < 1e-6
 end

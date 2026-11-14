@@ -156,13 +156,13 @@ Cut a nested Prior Result to the last `n` scenarios that it carries.
 
 [`AugmentedBlackLittermanPrior`](@ref) fits two nested priors, one on the asset returns and one on the factor returns. A Scenario Cap in one of them keeps the last rows of its own returns alone. The two blocks of the result describe the same observations, so the result keeps the rows that both nested priors keep, and this function cuts the nested prior that carries more rows. The moments of `pr` are fitted over every observation, so the cut changes no moment.
 
-A Prior Result with `ens = nothing` states `size(pr.X, 1)` as the count of the observations that its moments read. The cut makes `X` shorter, so it writes that count in `ens`, as [`scenario_ens`](@ref) does for the cap itself.
+An entry of `nothing` in the `eoc` of a Prior Result states `size(pr.X, 1)` as the count of the observations that its moment reads. The cut makes `X` shorter, so it writes that count in each such entry, as [`scenario_moment_counts`](@ref) does for the cap itself.
 
 # Algorithm
 
  1. Take `t = size(pr.X, 1)`. When `n >= t`, return `pr`.
  2. Refuse a `pr` that carries weights, per `# Validation`.
- 3. Forward `pr` with [`forward_prior`](@ref), with `X` and `o_X` cut by [`scenario_window`](@ref), and with `ens` set to `t` when it is `nothing`.
+ 3. Forward `pr` with [`forward_prior`](@ref), with `X` and `o_X` cut by [`scenario_window`](@ref), and with each entry of `eoc` set to `t` when it is `nothing`.
 
 # Arguments
 
@@ -181,7 +181,7 @@ A Prior Result with `ens = nothing` states `size(pr.X, 1)` as the count of the o
 # Related
 
   - [`scenario_window`](@ref)
-  - [`scenario_ens`](@ref)
+  - [`scenario_moment_counts`](@ref)
   - [`AugmentedBlackLittermanPrior`](@ref)
 """
 function scenario_tail(pr::LowOrderPrior, n::Integer, name::Symbol)
@@ -193,16 +193,16 @@ function scenario_tail(pr::LowOrderPrior, n::Integer, name::Symbol)
               DimensionMismatch("`$name` answered $t weighted scenarios, and the other nested prior keeps the last $n. The two blocks of the result describe the same observations, so the result keeps $n rows, and the weights of `$name` have no meaning on fewer rows than they weigh. Put the same Scenario Cap inside `$name`, in the prior that it reweights, so that its weights state the same $n scenarios."))
     o_X = isnothing(pr.o_X) ? nothing : scenario_window(n, pr.o_X)
     return forward_prior(pr; X = scenario_window(n, pr.X), o_X = o_X,
-                         ens = something(pr.ens, t))
+                         eoc = map(c -> something(c, t), pr.eoc))
 end
 """
     keeps_observations(pe::AbstractPriorEstimator) -> false
     keeps_observations(pe::EmpiricalPrior) -> Bool
-    keeps_observations(pe::Union{<:FactorPrior, <:FactorBlackLittermanPrior,
-                                 <:BlackLittermanPrior, <:BayesianBlackLittermanPrior,
-                                 <:EntropyPoolingPrior, <:MeucciEntropyPoolingPrior,
-                                 <:HighOrderPriorEstimator,
-                                 <:HighOrderFactorPriorEstimator}) -> Bool
+    keeps_observations(pe::Union{FactorPrior, FactorBlackLittermanPrior,
+                                 BlackLittermanPrior, BayesianBlackLittermanPrior,
+                                 EntropyPoolingPrior, MeucciEntropyPoolingPrior,
+                                 HighOrderPriorEstimator,
+                                 HighOrderFactorPriorEstimator}) -> Bool
     keeps_observations(pe::AugmentedBlackLittermanPrior) -> Bool
     keeps_observations(pe::OpinionPoolingPrior) -> Bool
     keeps_observations(pe::Online{<:AbstractPriorEstimator}) -> false
@@ -259,11 +259,11 @@ end
 function keeps_observations(pe::EmpiricalPrior)::Bool
     return isnothing(pe.max_scenarios)
 end
-function keeps_observations(pe::Union{<:FactorPrior, <:FactorBlackLittermanPrior,
-                                      <:BlackLittermanPrior, <:BayesianBlackLittermanPrior,
-                                      <:EntropyPoolingPrior, <:MeucciEntropyPoolingPrior,
-                                      <:HighOrderPriorEstimator,
-                                      <:HighOrderFactorPriorEstimator})::Bool
+function keeps_observations(pe::Union{FactorPrior, FactorBlackLittermanPrior,
+                                      BlackLittermanPrior, BayesianBlackLittermanPrior,
+                                      EntropyPoolingPrior, MeucciEntropyPoolingPrior,
+                                      HighOrderPriorEstimator,
+                                      HighOrderFactorPriorEstimator})::Bool
     return keeps_observations(pe.pe)
 end
 function keeps_observations(pe::AugmentedBlackLittermanPrior)::Bool
@@ -278,10 +278,10 @@ end
 """
     kept_scenarios(pe::AbstractPriorEstimator, T::Integer)
     kept_scenarios(pe::EmpiricalPrior, T::Integer)
-    kept_scenarios(pe::Union{<:FactorPrior, <:FactorBlackLittermanPrior,
-                             <:BlackLittermanPrior, <:BayesianBlackLittermanPrior,
-                             <:EntropyPoolingPrior, <:MeucciEntropyPoolingPrior,
-                             <:HighOrderPriorEstimator, <:HighOrderFactorPriorEstimator},
+    kept_scenarios(pe::Union{FactorPrior, FactorBlackLittermanPrior,
+                             BlackLittermanPrior, BayesianBlackLittermanPrior,
+                             EntropyPoolingPrior, MeucciEntropyPoolingPrior,
+                             HighOrderPriorEstimator, HighOrderFactorPriorEstimator},
                    T::Integer)
     kept_scenarios(pe::AugmentedBlackLittermanPrior, T::Integer)
     kept_scenarios(pe::OpinionPoolingPrior, T::Integer)
@@ -321,11 +321,11 @@ end
 function kept_scenarios(pe::EmpiricalPrior, T::Integer)::Option{Int}
     return isnothing(pe.max_scenarios) ? T : min(pe.max_scenarios, T)
 end
-function kept_scenarios(pe::Union{<:FactorPrior, <:FactorBlackLittermanPrior,
-                                  <:BlackLittermanPrior, <:BayesianBlackLittermanPrior,
-                                  <:EntropyPoolingPrior, <:MeucciEntropyPoolingPrior,
-                                  <:HighOrderPriorEstimator,
-                                  <:HighOrderFactorPriorEstimator}, T::Integer)::Option{Int}
+function kept_scenarios(pe::Union{FactorPrior, FactorBlackLittermanPrior,
+                                  BlackLittermanPrior, BayesianBlackLittermanPrior,
+                                  EntropyPoolingPrior, MeucciEntropyPoolingPrior,
+                                  HighOrderPriorEstimator, HighOrderFactorPriorEstimator},
+                        T::Integer)::Option{Int}
     return kept_scenarios(pe.pe, T)
 end
 function kept_scenarios(pe::AugmentedBlackLittermanPrior, T::Integer)::Option{Int}
@@ -339,11 +339,11 @@ end
 """
     scenario_count(pe::AbstractPriorEstimator, X::MatNum, F::Option{<:MatNum},
                    pnl::Option{<:AssetPanel}; strict::Bool = false, kwargs...)
-    scenario_count(pe::Union{<:FactorPrior, <:FactorBlackLittermanPrior}, X::MatNum,
+    scenario_count(pe::Union{FactorPrior, FactorBlackLittermanPrior}, X::MatNum,
                    F::MatNum, pnl::Option{<:AssetPanel}; strict::Bool = false, kwargs...)
-    scenario_count(pe::Union{<:BlackLittermanPrior, <:BayesianBlackLittermanPrior,
-                             <:EntropyPoolingPrior, <:MeucciEntropyPoolingPrior,
-                             <:HighOrderPriorEstimator, <:HighOrderFactorPriorEstimator},
+    scenario_count(pe::Union{BlackLittermanPrior, BayesianBlackLittermanPrior,
+                             EntropyPoolingPrior, MeucciEntropyPoolingPrior,
+                             HighOrderPriorEstimator, HighOrderFactorPriorEstimator},
                    X::MatNum, F::Option{<:MatNum}, pnl::Option{<:AssetPanel}; kwargs...)
     scenario_count(pe::AugmentedBlackLittermanPrior, X::MatNum, F::MatNum,
                    pnl::Option{<:AssetPanel}; strict::Bool = false, kwargs...)
@@ -402,16 +402,16 @@ function scenario_count(pe::AbstractPriorEstimator, X::MatNum, F::Option{<:MatNu
     end
     return size(prior(pe, X, F, pnl; strict = strict, kwargs...).X, 1)
 end
-function scenario_count(pe::Union{<:FactorPrior, <:FactorBlackLittermanPrior}, ::MatNum,
+function scenario_count(pe::Union{FactorPrior, FactorBlackLittermanPrior}, ::MatNum,
                         F::MatNum, ::Option{<:AssetPanel}; strict::Bool = false,
                         kwargs...)::Int
     return scenario_count(pe.pe, F, nothing, nothing; strict = strict)
 end
-function scenario_count(pe::Union{<:BlackLittermanPrior, <:BayesianBlackLittermanPrior,
-                                  <:EntropyPoolingPrior, <:MeucciEntropyPoolingPrior,
-                                  <:HighOrderPriorEstimator,
-                                  <:HighOrderFactorPriorEstimator}, X::MatNum,
-                        F::Option{<:MatNum}, pnl::Option{<:AssetPanel}; kwargs...)::Int
+function scenario_count(pe::Union{BlackLittermanPrior, BayesianBlackLittermanPrior,
+                                  EntropyPoolingPrior, MeucciEntropyPoolingPrior,
+                                  HighOrderPriorEstimator, HighOrderFactorPriorEstimator},
+                        X::MatNum, F::Option{<:MatNum}, pnl::Option{<:AssetPanel};
+                        kwargs...)::Int
     return scenario_count(pe.pe, X, F, pnl; kwargs...)
 end
 function scenario_count(pe::AugmentedBlackLittermanPrior, X::MatNum, F::MatNum,
@@ -534,7 +534,7 @@ The returns-matrix method of [`prior`](@ref) fits `pe.pe` on the factor returns 
 
 # Returns
 
-  - `ca::NamedTuple`: The output of [`cross_sectional_observed_append`](@ref). `ca.f` holds the factor returns, one row per fitted observation.
+  - `ca::AppendedFactorModel`: The output of [`cross_sectional_observed_append`](@ref). `ca.f` holds the factor returns, one row per fitted observation.
   - `lv::BitVector`: `true` at each factor of `ca.f` that is not empty.
   - `fit::NamedTuple`: The regression, the weights, the variance history and the rows that [`cross_sectional_assemble`](@ref) reads.
   - `rde::ReturnsResult`: The returns data that the estimated members read.
@@ -559,7 +559,9 @@ function cross_sectional_regression_stage(pe::CrossSectionalFactorPrior, X::MatN
               DimensionMismatch("ts ($(length(something(ts, ())))) must have one entry for each observation of X ($(size(X, 1)))"))
     st = cross_sectional_exposure_stage(pe, X, F, pnl; ne = ne, E = E, iv = iv, ivpa = ivpa)
     (; amsk, emsk, mcap, BW, cc, Xl, rde, Ms, nf, fam, rw) = st
-    Msw = Ms[rw, :, :]
+    # Every exposure history of the stage is a view of `Ms`, so the stage copies none of them.
+    # The stage reads `Ms` through `Msw` alone, so the Neutralisation can write into it (#1973).
+    Msw = view(Ms, :, :, rw)
     Xw = X[rw, :]
     Xlw = Xl[rw, :]
     bww = BW[rw, :]
@@ -568,7 +570,7 @@ function cross_sectional_regression_stage(pe::CrossSectionalFactorPrior, X::MatN
     fb = cross_sectional_family_basis(pe.families, Msw, bww, nf, fam)
     assert_cross_sectional_lag_rows(length(rw), pe.lag)
     r = (pe.lag + 1):length(rw)
-    Zl = fb.Ms[r .- pe.lag, :, :]
+    Zl = view(fb.Ms, :, :, r .- pe.lag)
     Xr = Xlw[r, :]
     cb = cross_sectional_observed_block(cc, rw, r)
     amr = amsk[rw[r], :]
@@ -576,11 +578,11 @@ function cross_sectional_regression_stage(pe::CrossSectionalFactorPrior, X::MatN
     msk = cross_sectional_eligible(Xr, Zl, emsk[rw[r], :])
     mcl = cross_sectional_rows(mcw, r .- pe.lag)
     cross_sectional_cap_finite!(msk, mcl)
-    assert_cross_sectional_coverage(msk, cross_sectional_minra(pe, size(Zl, 3)), cb)
+    assert_cross_sectional_coverage(msk, cross_sectional_minra(pe, size(Zl, 2)), cb)
     W = cs_weights_initial(pe.wa, mcl, msk)
     # The Unseen Member rule states the return of a member of a constrained family that no
     # asset of an observation loads on (#1606).
-    Bl = Msw[r .- pe.lag, :, :]
+    Bl = view(Msw, :, :, r .- pe.lag)
     fbl = cross_sectional_basis_now(fb.fcb, r .- pe.lag)
     ud = unseen_member_design(pe.unseen, fbl, Bl, Zl, W)
     (; csr, lv) = cross_sectional_live_regression(pe.cre, ud.Z, Xr, W)
@@ -599,8 +601,8 @@ function cross_sectional_regression_stage(pe::CrossSectionalFactorPrior, X::MatN
         csr = unseen_member_returns(csr, ud.P)
     end
     vs = variance_series(pe.ve, csr.eps; dims = 1, estimation_mask = emr, active_mask = amr)
-    ca = cross_sectional_observed_append(cb, csr.f, fb.Ms[r[end], :, :], Msw[r, :, :], nf,
-                                         fam, fb.fcb)
+    ca = cross_sectional_observed_append(cb, csr.f, view(fb.Ms, :, :, r[end]),
+                                         view(Msw, :, :, r), nf, fam, fb.fcb)
     fit = (; csr = csr, W = W, vs = vs, cnt = variance_count(pe.ve, csr.eps), amr = amr,
            bwr = bwr, Xo = Xw[r, :], r = r, hist = nothing, S = nothing, Sc = nothing,
            ce = nothing, idx = rw[r], ts = isnothing(ts) ? nothing : ts[rw[r]],
@@ -754,10 +756,12 @@ end
     cross_sectional_forecast_split(ofit::AbstractOrthogonalForecastFit, rf::Nothing,
                                    csfm::CrossSectionalFactorModel,
                                    cre::AbstractCrossSectionalRegressionEstimator)
+        -> ForecastSplitResult
     cross_sectional_forecast_split(ofit::AbstractOrthogonalForecastFit,
                                    rf::AbstractReturnForecastResult,
                                    csfm::CrossSectionalFactorModel,
                                    cre::AbstractCrossSectionalRegressionEstimator)
+        -> ForecastSplitResult
 
 Split a Return Forecast Result against the latest Factor Exposures of the estimated factors of a [`CrossSectionalFactorModel`](@ref), giving its spanned coefficients and its orthogonal part before the Orthogonal Forecast Scale.
 
@@ -782,30 +786,359 @@ Split a Return Forecast Result against the latest Factor Exposures of the estima
 
 # Returns
 
-  - `g::Option{<:VecNum}`: The spanned coefficients, or `nothing`.
-  - `ap::Option{<:VecNum}`: The orthogonal part before the Orthogonal Forecast Scale, one entry per asset, or `nothing`.
+  - `res::ForecastSplitResult`: `g`, the spanned coefficients, and `ap`, the orthogonal part before the Orthogonal Forecast Scale, one entry per asset. Both are `nothing` with no Return Forecast Result.
 
 # Related
 
+  - [`ForecastSplitResult`](@ref)
   - [`cross_sectional_return_forecast`](@ref)
   - [`cross_sectional_alpha_split`](@ref)
   - [`orthogonal_forecast_rescale`](@ref)
 """
 function cross_sectional_forecast_split(::AbstractOrthogonalForecastFit, ::Nothing,
                                         ::CrossSectionalFactorModel,
-                                        ::AbstractCrossSectionalRegressionEstimator)
-    return (; g = nothing, ap = nothing)
+                                        ::AbstractCrossSectionalRegressionEstimator)::ForecastSplitResult
+    return ForecastSplitResult(nothing, nothing)
 end
 function cross_sectional_forecast_split(ofit::AbstractOrthogonalForecastFit,
                                         rf::AbstractReturnForecastResult,
                                         csfm::CrossSectionalFactorModel,
-                                        cre::AbstractCrossSectionalRegressionEstimator)
+                                        cre::AbstractCrossSectionalRegressionEstimator)::ForecastSplitResult
     rw = csfm.rw
     #! The observed factors are the trailing columns of `L`, and the fit observes their
     #! returns, so the forecast splits against the loadings the regression estimated.
     L = view(csfm.L, :, 1:size(csfm.csr.f, 2))
     (; g, ap) = cross_sectional_alpha_split(cre, rf.mu, L, @view(rw[size(rw, 1), :]))
     return orthogonal_forecast_rescale(ofit, rf, g, ap)
+end
+"""
+    cross_sectional_alpha_split(cre::AbstractCrossSectionalRegressionEstimator, mu::VecNum,
+                                L::MatNum, w::VecNum) -> ForecastSplitResult
+
+Split a Return Forecast into the part the latest Factor Exposures span and the part they do not.
+
+# Mathematical definition
+
+Under [`CrossSectionalLinearRegression`](@ref), the spanned coefficients solve a weighted least squares over the valid assets. Another Cross-Sectional Regression Estimator fits ``\\boldsymbol{g}`` by its own rule over the same assets and weights.
+
+```math
+\\begin{align}
+\\mathcal{V} &= \\left\\{i : \\alpha_{i} \\in \\mathbb{R},\\ B_{Tik} \\in \\mathbb{R} \\ \\forall k,\\ u_{i} > 0\\right\\}\\,, \\\\
+(c, \\boldsymbol{g}) &= \\underset{c,\\,\\boldsymbol{g}}{\\arg\\min} \\sum_{i \\in \\mathcal{V}} u_{i} \\left(\\alpha_{i} - c - \\sum_{k=1}^{K} B_{Tik} \\, g_{k}\\right)^{2}\\,, \\\\
+\\boldsymbol{\\alpha}^{\\perp} &= \\boldsymbol{\\alpha} - \\mathbf{B}_{T} \\, \\boldsymbol{g}\\,.
+\\end{align}
+```
+
+Where:
+
+  - ``\\mathcal{V}``: Valid assets of the split.
+  - ``\\alpha_{i}``: Return Forecast of asset ``i``.
+  - ``u_{i}``: Regression weight of asset ``i`` in the latest fit.
+  - ``c``: Intercept of the regression, held at ``0`` when the estimator fits none.
+  - $(math_dict[:alpha_perp])
+  - $(math_dict[:g_span])
+  - $(math_dict[:B_T_cs])
+  - $(math_dict[:K])
+
+The orthogonal part is ``\\boldsymbol{\\alpha} - \\mathbf{B}_{T} \\boldsymbol{g}`` and not the residual of the regression, so the intercept stays in it: the weighted mean of ``\\alpha^{\\perp}_{i}`` over ``\\mathcal{V}`` is ``c``. The split then adds up. The prior's expected return is ``\\mathbf{B}_{T} (\\lambda \\boldsymbol{\\mu}_{f} + (1 - \\lambda) \\boldsymbol{g}) + c_{\\alpha} \\boldsymbol{\\alpha}^{\\perp}``, which is ``\\boldsymbol{\\alpha}`` at ``\\lambda = 0`` and ``c_{\\alpha} = 1``, whatever the intercept. Without an intercept, ``\\mathbf{B}_{T,\\,\\mathcal{V}}^{\\intercal} \\mathbf{U} \\boldsymbol{\\alpha}^{\\perp}_{\\mathcal{V}} = \\boldsymbol{0}``, with ``\\mathbf{U}`` the diagonal matrix of the weights ``u_{i}``. The symbols ``\\lambda``, ``c_{\\alpha}`` and ``\\boldsymbol{\\mu}_{f}`` are the Spanned Shrinkage, the Orthogonal Forecast Scale and the factor mean of [`CrossSectionalFactorPrior`](@ref).
+
+# Algorithm
+
+ 1. If `mu` is zero at every asset, return a zero `g` and a zero `ap`. No regression runs.
+ 2. Copy `w` into `wv`, and set to zero the weight of every asset whose forecast, or whose row of exposures, is not finite. The weights come from the lagged fit, so a positive weight says nothing about the finiteness of the latest forecast. If no weight in `wv` is positive, return the zero split of step 1.
+ 3. Regress `mu` on `L` across the assets under `wv`, through `cre`, giving `g`.
+ 4. Subtract `L * g` from `mu`, giving `ap`.
+
+# Arguments
+
+  - `cre`: Cross-Sectional Regression Estimator of the split.
+  - `mu`: The Return Forecast, one entry per asset of the coverage universe.
+  - `L`: The latest Factor Exposures, `assets × factors`, in the basis the fit ran in.
+  - `w`: The regression weights of the latest fit, one entry per asset.
+
+# Validation
+
+  - The rules of [`cross_sectional_regression`](@ref).
+
+# Returns
+
+  - `res::ForecastSplitResult`: `g`, the spanned coefficients, one per factor of `L`, and `ap`, the orthogonal part of the forecast, one entry per asset.
+
+# Related
+
+  - [`ForecastSplitResult`](@ref)
+  - [`CrossSectionalFactorPrior`](@ref)
+  - [`cross_sectional_return_forecast`](@ref)
+  - [`cross_sectional_regression`](@ref)
+  - [`AbstractReturnForecastResult`](@ref)
+"""
+function cross_sectional_alpha_split(cre::AbstractCrossSectionalRegressionEstimator,
+                                     mu::VecNum, L::MatNum, w::VecNum)
+    N = size(L, 1)
+    K = size(L, 2)
+    Tf = promote_type(real(eltype(mu)), real(eltype(L)), real(eltype(w)))
+    if all(iszero, mu)
+        return ForecastSplitResult(zeros(Tf, K), zeros(Tf, N))
+    end
+    wv = zeros(Tf, N)
+    for i in 1:N
+        if isfinite(mu[i]) && all(isfinite, view(L, i, :))
+            wv[i] = w[i]
+        end
+    end
+    if !any(x -> x > zero(x), wv)
+        return ForecastSplitResult(zeros(Tf, K), zeros(Tf, N))
+    end
+    csr = cross_sectional_regression(cre, reshape(L, N, K, 1), reshape(mu, 1, N),
+                                     reshape(wv, 1, N))
+    g = csr.f[1, :]
+    return ForecastSplitResult(g, mu - L * g)
+end
+"""
+    cross_sectional_return_forecast(ofit::AbstractOrthogonalForecastFit, rfe::Nothing,
+                                    rd::ReturnsResult, csfm::CrossSectionalFactorModel,
+                                    cre::AbstractCrossSectionalRegressionEstimator,
+                                    reads::Bool, H::Option{<:MatNum},
+                                    rf0::Nothing = nothing) -> NamedTuple
+    cross_sectional_return_forecast(ofit::AbstractOrthogonalForecastFit,
+                                    rfe::AbstractReturnForecastEstimator, rd::ReturnsResult,
+                                    csfm::CrossSectionalFactorModel,
+                                    cre::AbstractCrossSectionalRegressionEstimator,
+                                    reads::Bool, H::Option{<:MatNum},
+                                    rf0::Option{<:AbstractReturnForecastResult} = nothing) -> NamedTuple
+
+Fit the Return Forecast of a [`CrossSectionalFactorPrior`](@ref) under its Orthogonal Forecast Fit, and split it against the latest Factor Exposures.
+
+The split is unscaled by `c`. The Orthogonal Forecast Scale `c` can be a rule that reads the orthogonal part, so [`cross_sectional_calibration`](@ref) resolves `c` after this function, and [`cross_sectional_forecast_block`](@ref) then scales the part. A prior that states no Return Forecast Estimator takes the method over `Nothing`, which returns `nothing` in each entry, so the factor mean and the zero `b` do not change. The batch fit, the online refit and the carry fold all reach the forecast through this function, so the Orthogonal Forecast Fit holds on each of them.
+
+# Algorithm
+
+ 1. Take the member that the prior fits with [`orthogonal_forecast_member`](@ref), giving `rfo`. Under [`ScoreNeutralisation`](@ref) a fitted member neutralises its scores against the estimated factors of `csfm`.
+ 2. Take `rf0` as `rf` when the carry fold gives it. Otherwise fit `rfo` on the coverage universe with [`return_forecast`](@ref), with the regression that [`orthogonal_forecast_regression`](@ref) gives, giving `rf`. `rd` holds every observation, so the Descriptors of the forecast warm up over every observation of the panel. [`return_forecast_rows`](@ref) finds the block as a suffix of `rd` by its size.
+ 3. Split `rf.mu` against the latest exposures of the estimated factors with [`cross_sectional_forecast_split`](@ref), giving `g` and `ap`. The observed factors are the trailing columns of `L`, and the split leaves them out, so `g` has one entry per column of `csr.f`. The split scales `ap` with [`orthogonal_forecast_rescale`](@ref), which changes it under [`OrthogonalPartCalibration`](@ref) alone.
+ 4. When `reads` is `true`, take the Return Forecast history of `rfo` once with [`cross_sectional_forecast_history`](@ref) from `rf`, giving `hist`. Otherwise `hist` is `nothing`.
+
+# Arguments
+
+  - `ofit`: The Orthogonal Forecast Fit of the prior.
+  - `rfe`: Return Forecast Estimator, or `nothing`.
+  - $(arg_dict[:rd]) It is the full returns data that the estimated members of the prior read, and the block is a suffix of it. Under observed factors its `X` holds the returns net of them.
+  - `csfm`: The factor-model block, built with a zero `b` and no Return Forecast.
+  - `cre`: Cross-Sectional Regression Estimator of the split.
+  - `reads`: Whether a slot of the prior reads the Return Forecast history, as [`reads_forecast_history`](@ref) answers.
+  - `H`: The rows of the Return Forecast history that the carry fold carries, or `nothing` when the history is made here.
+  - `rf0`: The Return Forecast Result that the carry fold of a forecast that folds carries, as [`folds_forecast_rows`](@ref) answers, or `nothing` to fit the member here.
+
+# Validation
+
+  - The rules of [`return_forecast`](@ref), of [`cross_sectional_alpha_split`](@ref) and, when `reads` is `true`, of [`cross_sectional_forecast_history`](@ref).
+  - The rules of [`DescriptorScores`](@ref) on the rebuilt scores under [`ScoreNeutralisation`](@ref).
+
+# Returns
+
+  - `rf::Option{<:AbstractReturnForecastResult}`: The Return Forecast Result, or `nothing`.
+  - `g::Option{<:VecNum}`: The spanned coefficients, or `nothing`.
+  - `ap::Option{<:VecNum}`: The orthogonal part before the Orthogonal Forecast Scale, one entry per asset, or `nothing`.
+  - `hist::Option{<:MatNum}`: The Return Forecast history, `observations × assets`, or `nothing`.
+
+# Related
+
+  - [`CrossSectionalFactorPrior`](@ref)
+  - [`cross_sectional_alpha_split`](@ref)
+  - [`cross_sectional_calibration`](@ref)
+  - [`cross_sectional_forecast_block`](@ref)
+  - [`cross_sectional_forecast_mu`](@ref)
+  - [`return_forecast`](@ref)
+  - [`AbstractOrthogonalForecastFit`](@ref)
+"""
+function cross_sectional_return_forecast(::AbstractOrthogonalForecastFit, ::Nothing,
+                                         ::ReturnsResult, ::CrossSectionalFactorModel,
+                                         ::AbstractCrossSectionalRegressionEstimator,
+                                         ::Bool, ::Option{<:MatNum}, ::Nothing = nothing)
+    return (; rf = nothing, g = nothing, ap = nothing, hist = nothing)
+end
+function cross_sectional_return_forecast(ofit::AbstractOrthogonalForecastFit,
+                                         rfe::AbstractReturnForecastEstimator,
+                                         rd::ReturnsResult, csfm::CrossSectionalFactorModel,
+                                         cre::AbstractCrossSectionalRegressionEstimator,
+                                         reads::Bool, H::Option{<:MatNum},
+                                         rf0::Option{<:AbstractReturnForecastResult} = nothing)
+    rfo = orthogonal_forecast_member(ofit, rfe, csfm)
+    rf = if isnothing(rf0)
+        return_forecast(rfo, rd, csfm, orthogonal_forecast_regression(ofit, cre))
+    else
+        rf0
+    end
+    (; g, ap) = cross_sectional_forecast_split(ofit, rf, csfm, cre)
+    hist = reads ? cross_sectional_forecast_history(rf, rfo, rd, csfm, H) : nothing
+    return (; rf = rf, g = g, ap = ap, hist = hist)
+end
+"""
+    cross_sectional_forecast_mu(lambda::Real, mu::VecNum, g::Nothing) -> VecNum
+    cross_sectional_forecast_mu(lambda::Real, mu::VecNum, g::VecNum) -> VecNum
+
+Blend the expected factor returns with the spanned part of a Return Forecast.
+
+A prior that states no Return Forecast Estimator has a spanned part of zero, and the method over `Nothing` takes it. There `lambda` shrinks the factor mean towards zero, and `lambda = 0` gives an expected return of zero. At `lambda = 0` the blend reads no factor mean, so a factor mean that the factor prior does not state gives a finite blend there, and `NaN` at every other `lambda`.
+
+# Mathematical definition
+
+```math
+\\begin{align}
+\\tilde{\\boldsymbol{\\mu}}_{f} &= \\lambda \\, \\boldsymbol{\\mu}_{f} + (1 - \\lambda) \\, \\boldsymbol{g}\\,.
+\\end{align}
+```
+
+Where:
+
+  - ``\\tilde{\\boldsymbol{\\mu}}_{f}``: Blended expected factor returns.
+  - ``\\lambda``: Shrinkage of the factor mean towards the spanned forecast. At ``\\lambda = 1`` the blend is the factor mean, and at ``\\lambda = 0`` it is the spanned forecast.
+  - $(math_dict[:mu_f_patt])
+  - $(math_dict[:g_span]) It is ``\\boldsymbol{0}`` when the prior states no Return Forecast Estimator.
+
+# Arguments
+
+  - `lambda`: Shrinkage of the factor mean towards the spanned forecast.
+  - `mu`: The expected factor returns of the nested factor prior, on the reduced axis.
+  - `g`: The spanned coefficients of the Return Forecast, or `nothing`.
+
+# Returns
+
+  - `mu::VecNum`: The blended expected factor returns, on the reduced axis.
+
+# Related
+
+  - [`CrossSectionalFactorPrior`](@ref)
+  - [`cross_sectional_return_forecast`](@ref)
+  - [`cross_sectional_alpha_split`](@ref)
+"""
+function cross_sectional_forecast_mu(lambda::Real, mu::VecNum, ::Nothing)
+    return lambda * (iszero(lambda) ? zero(mu) : mu)
+end
+function cross_sectional_forecast_mu(lambda::Real, mu::VecNum, g::VecNum)
+    return lambda * (iszero(lambda) ? zero(mu) : mu) + (one(lambda) - lambda) * g
+end
+"""
+$(DocStringExtensions.TYPEDSIGNATURES)
+
+Divide the scenario weights of the factor prior of a Cross-Sectional Factor Prior by their sum.
+
+A scenario weight vector states a probability measure over the scenarios only when it sums to one. A ratio estimator, such as the weighted mean ``\\sum_t w_t x_t / \\sum_t w_t``, gives the same answer at every scale of ``w``. A consumer that reads the weights as probabilities, such as a scenario risk measure that forms ``\\sum_t w_t L_t`` and divides by nothing, gives a wrong answer at every other scale. So the prior stores the weights divided by their sum, which every consumer reads correctly. A sum that is zero states no measure, so the function refuses it.
+
+The function keeps the kind of `StatsBase.Weights`, `AnalyticWeights` and `ProbabilityWeights`, as [`nothing_scalar_array_getindex`](@ref) does. The corrected variance of each of these kinds is the same at every scale of the weights. `FrequencyWeights` are counts, so their corrected variance divides by ``\\sum_t w_t - 1``, which is zero after the division. So `FrequencyWeights`, and a kind the function cannot rebuild such as `StatsBase.UnitWeights`, become `StatsBase.AnalyticWeights`, as the prior probabilities of [`EntropyPoolingPrior`](@ref) do by default. [`ScenarioProbabilities`](@ref) states the bias correction of that kind.
+
+# Mathematical definition
+
+```math
+\\begin{aligned}
+p_t &= \\frac{w_t}{\\sum_{s = 1}^{T} w_s}\\,.
+\\end{aligned}
+```
+
+Where:
+
+  - ``p_t``: The scenario weight that the prior stores for scenario ``t``.
+  - ``w_t``: The scenario weight of the factor prior for scenario ``t``.
+  - $(math_dict[:T])
+
+# Algorithm
+
+ 1. `w` is `nothing`: return `nothing`, because no weights means unweighted.
+ 2. `w` is a `StatsBase.Weights`, `AnalyticWeights` or `ProbabilityWeights`: refuse a sum that is not positive, and return weights of the same kind over `w.values` divided by the sum.
+ 3. `w` is any other `StatsBase.AbstractWeights`, `FrequencyWeights` among them: wrap its values in `StatsBase.AnalyticWeights`, and apply step 2.
+
+# Arguments
+
+  - `w`: The scenario weights of the factor prior, or `nothing`.
+
+# Validation
+
+  - The sum of `w` is positive. Raises a `DomainError` that holds the sum. StatsBase refuses a weight vector whose sum is not finite when it builds the vector, so a sum that reaches this function is finite.
+
+# Returns
+
+  - `p::Option{<:StatsBase.AbstractWeights}`: The weights `w` divided by their sum, or `nothing`.
+
+# Related
+
+  - [`cross_sectional_factor_moments`](@ref)
+  - [`CrossSectionalFactorPrior`](@ref)
+  - [`LowOrderPrior`](@ref)
+"""
+function cross_sectional_scenario_weights(::Nothing)
+    return nothing
+end
+function cross_sectional_scenario_weights(w::Union{StatsBase.Weights,
+                                                   StatsBase.AnalyticWeights,
+                                                   StatsBase.ProbabilityWeights})
+    s = sum(w)
+    @argcheck(s > zero(s),
+              DomainError(s,
+                          "the scenario weights of the factor prior sum to $s, so they state no probability measure over the scenarios. A Cross-Sectional Factor Prior divides its scenario weights by their sum, which must be positive. Give pe a factor prior whose weights are not all zero."))
+    return Base.typename(typeof(w)).wrapper(w.values / s)
+end
+function cross_sectional_scenario_weights(w::StatsBase.AbstractWeights)
+    return cross_sectional_scenario_weights(StatsBase.aweights(collect(w)))
+end
+"""
+$(DocStringExtensions.TYPEDSIGNATURES)
+
+Rebuild the asset return scenarios of a Cross-Sectional Factor Prior.
+
+The function maps the scenarios of the factor prior onto the assets through the latest loadings, rescales the standardised idiosyncratic returns by the latest idiosyncratic volatilities, and adds the two. So a scenario carries the factor risk and the idiosyncratic risk of the latest observation, whatever the risk of the observation it comes from. The two histories can differ in length, and the last rows of each pair up.
+
+# Mathematical definition
+
+```math
+\\begin{align}
+n &= \\min(S, T)\\,, \\\\
+\\hat{x}_{si} &= \\sum_{k=1}^{K} B_{Tik} \\, f_{S - n + s,\\,k} + \\sqrt{v_{Ti}} \\, \\tilde{z}_{T - n + s,\\,i}\\,, \\quad s = 1, \\ldots, n\\,.
+\\end{align}
+```
+
+Where:
+
+  - ``n``: Number of asset return scenarios.
+  - ``S``: Number of factor return scenarios.
+  - ``\\hat{x}_{si}``: Return of asset ``i`` in scenario ``s``.
+  - ``f_{sk}``: Return of factor ``k`` in factor return scenario ``s``.
+  - ``T``: Number of observations of the standardised idiosyncratic returns.
+  - $(math_dict[:B_T_cs])
+  - $(math_dict[:v_ti_idio])
+  - $(math_dict[:ztilde_ti_idio])
+  - $(math_dict[:K])
+
+A non-investable asset has a non-finite latest variance or a non-finite row of ``\\mathbf{B}_{T}``, so its column is `NaN` in every scenario. The contract of [`factor_exposure`](@ref) writes `NaN` at every inactive cell, so this also holds for an asset that is inactive at the latest observation.
+
+# Arguments
+
+  - `Fs`: Factor return scenarios on the reduced axis, `scenarios × factors`.
+  - `L`: The reduced loadings of the latest observation, `assets × factors`.
+  - `S`: The standardised idiosyncratic returns, `observations × assets`.
+  - `ev`: The latest idiosyncratic variances, one per asset.
+
+# Validation
+
+  - `L` matches `Fs` on the factor axis, and `S` and `ev` match `L` on the asset axis. Raises a `DimensionMismatch`.
+
+# Returns
+
+  - `Xs::Matrix{<:Real}`: The asset return scenarios, `scenarios × assets`.
+
+# Related
+
+  - [`cross_sectional_standardised_residuals`](@ref)
+  - [`CrossSectionalFactorPrior`](@ref)
+"""
+function cross_sectional_scenarios(Fs::MatNum, L::MatNum, S::MatNum, ev::VecNum)
+    @argcheck(size(L, 2) == size(Fs, 2),
+              DimensionMismatch("L ($(size(L, 2)) columns) must match Fs ($(size(Fs, 2)) columns)"))
+    @argcheck(size(S, 2) == size(L, 1) == length(ev),
+              DimensionMismatch("S ($(size(S, 2)) columns), L ($(size(L, 1)) rows) and ev ($(length(ev))) must agree on the asset axis"))
+    n = min(size(Fs, 1), size(S, 1))
+    Fn = view(Fs, (size(Fs, 1) - n + 1):size(Fs, 1), :)
+    Sn = view(S, (size(S, 1) - n + 1):size(S, 1), :)
+    return Fn * transpose(L) .+ Sn .* transpose(sqrt.(ev))
 end
 """
     cross_sectional_moment_prior(pe::CrossSectionalFactorPrior, f_pr::NamedTuple,
@@ -887,14 +1220,18 @@ function cross_sectional_moment_prior(pe::CrossSectionalFactorPrior, f_pr::Named
     # the last rows of each history, so the factor returns keep the rows the scenarios keep
     # (#1384).
     rs = (T - size(Xs, 1) + 1):T
-    lift = cross_sectional_lift(pe.srep, pe.mp, L, f_mu, f_pr.sigma, csfm.esigma, idx, Xs;
+    # The systematic block is assembled from the factor covariance, so its denoiser reads the
+    # count of that covariance (#1893).
+    lift = cross_sectional_lift(pe.srep, pe.mp, L, f_mu, f_pr.sigma, csfm.esigma, idx, Xs,
+                                something(f_pr.eoc[2], size(f_pr.X, 1));
                                 mtx_sqrt = pe.mtx_sqrt, kwargs...)
     fX = something(csfm.fr, cross_sectional_factor_returns(csfm))
     fpr = LowOrderPrior(; X = fX[rs, :], mu = ex.mu, sigma = ex.sigma, w = f_pr.w,
-                        ens = f_pr.ens, kld = f_pr.kld, ow = f_pr.ow, pc = f_pr.pc)
+                        ens = f_pr.ens, eoc = f_pr.eoc, kld = f_pr.kld, ow = f_pr.ow,
+                        pc = f_pr.pc)
     return LowOrderPrior(; X = Xs, o_X = oX, mu = lift.mu + rr.b, sigma = lift.sigma,
-                         chol = lift.chol, w = f_pr.w, ens = f_pr.ens, kld = f_pr.kld,
-                         ow = f_pr.ow, rr = rr, fpr = fpr)
+                         chol = lift.chol, w = f_pr.w, ens = f_pr.ens, eoc = f_pr.eoc,
+                         kld = f_pr.kld, ow = f_pr.ow, rr = rr, fpr = fpr)
 end
 """
     cross_sectional_stored_cache(csfm::CrossSectionalFactorModel, cache_reg::Bool,
@@ -923,7 +1260,7 @@ Store the cache that the refit of an entropy pooling prior reads on the block of
 """
 function cross_sectional_stored_cache(csfm::CrossSectionalFactorModel, cache_reg::Bool,
                                       amr::AbstractMatrix{Bool}, hist::Option{<:MatNum})
-    return cache_reg ? rebuild_estimator(csfm, (; amr = amr, hist = hist)) : csfm
+    return cache_reg ? rebuild_struct(csfm, (; amr = amr, hist = hist)) : csfm
 end
 """
     cross_sectional_kept_cache(f_pr::NamedTuple, pf::Option{<:AbstractPriorResult}) -> NamedTuple
@@ -964,10 +1301,10 @@ function scenario_factory(pe::CrossSectionalFactorPrior, w,
     else
         cross_sectional_cached_scenarios(rr).f
     end
-    return rebuild_estimator(pe,
-                             (;
-                              pe = scenario_factory(pe.pe, w, scenario_factor_result(pr), f,
-                                                    nothing, nothing; strict = strict)))
+    return rebuild_struct(pe,
+                          (;
+                           pe = scenario_factory(pe.pe, w, scenario_factor_result(pr), f,
+                                                 nothing, nothing; strict = strict)))
 end
 # The refit of an entropy pooling prior fits the factor prior of `scenario_factory` on the
 # factor returns of the regression. A fit that stores the cache gives the regression, the
@@ -996,8 +1333,8 @@ function scenario_prior(pe::CrossSectionalFactorPrior, w, pr::Option{<:AbstractP
     f_pr = cross_sectional_kept_cache(cross_sectional_factor_moments(fpe, pe.f_mp, fa, lv;
                                                                      strict = strict,
                                                                      kw...), pf)
-    sp = (; rf = rr.rf, cross_sectional_forecast_split(pe.ofit, rr.rf, rr, pe.cre)...,
-          hist = rr.hist)
+    (; g, ap) = cross_sectional_forecast_split(pe.ofit, rr.rf, rr, pe.cre)
+    sp = (; rf = rr.rf, g = g, ap = ap, hist = rr.hist)
     am = view(rr.amr, size(rr.amr, 1), :)
     return cross_sectional_moment_prior(pe, f_pr, rr, sp, rr.L, am, pr.X, pr.o_X; kw...)
 end
@@ -1016,7 +1353,7 @@ function prior_probability_factory(pe::CrossSectionalFactorPrior, w, X::MatNum,
     assert_cross_sectional_lag_rows(length(rw), pe.lag)
     n = length(rw) - pe.lag
     inner = prior_probability_factory(pe.pe, w, n)
-    return rebuild_estimator(factory(pe, scenario_weights(w, n)), (; pe = inner))
+    return rebuild_struct(factory(pe, scenario_weights(w, n)), (; pe = inner))
 end
 # The regression answers one factor return for each row after the Descriptor warm-up and the
 # exposure lag, so the count runs the exposure stage alone. The factor prior then counts its
@@ -1042,37 +1379,95 @@ function assert_scenario_model(pe::CrossSectionalFactorPrior)
     return assert_scenario_model(pe.pe)
 end
 """
-    scenario_ens(::Nothing, X::MatNum)
-    scenario_ens(max_scenarios::Integer, X::MatNum)
+    scenario_moment_counts(pe::EmpiricalPrior, X::MatNum, t::Integer,
+                           T_mu::Option{<:Real} = nothing; kwargs...)
+        -> Tuple{Option{<:Real}, Option{<:Real}}
 
-State the number of observations the moments of a capped Prior Result were fitted over, or `nothing` when the cap cuts nothing.
+State the effective number of observations of the mean and of the covariance of an empirical Prior Result, in the form of its field `eoc`.
 
-The count a Scenario Cap owes its readers. [`scenario_window`](@ref) cuts the rows the result carries and leaves `mu` and `sigma` fitted over every observation, so a consumer that prices a sample size off `size(pr.X, 1)` — an uncertainty set's `T`, a calibration rule's count — would read `w` rows for moments fitted over `t`, and mis-price every count by `t / w`. The result therefore states `t` in `ens` exactly when the cap cuts, and every count reader takes `ens` before the shape. When the cap does not cut, or there is no cap, the rows carried *are* the observations fitted over, and `ens` stays `nothing`, so a fit without a cap is bit-identical to what it was.
+`pe.me` fits `mu` and `pe.ce` fits `sigma` over every row of `X`. Each estimator states the number of observations that its moment is worth with [`effective_observation_count`](@ref). That is `size(X, 1)` for an unweighted estimator, and the count of its weights for a weighted one, such as the Kish count of an exponentially weighted covariance. The two estimators can carry different weights, so each moment has its own count.
 
-It is the same verb in batch and in `prior(pe)` with no data after a fold, as [`scenario_window`](@ref) is, and the two agree by construction: both read the same `t` off the same matrix.
+`T_mu` is the count of the mean that the fit of `mu` stated, from [`mean_with_count`](@ref). A [`PriorExpectedReturns`](@ref) states it, because its count is known only after the fit of its prior. When `T_mu` is `nothing`, the function reads the count of `pe.me` with [`effective_observation_count`](@ref).
+
+A Scenario Cap cuts the rows that the result carries to the last `t`, and leaves the moments fitted over every row. [`scenario_window`](@ref) makes the cut. A consumer that reads `size(pr.X, 1)` then reads `t` rows for moments fitted over `size(X, 1)`. So an entry of `eoc` states the count whenever it is not `t`, and `nothing` otherwise, through [`moment_count_entry`](@ref). A fit with no cap and no weights states `(nothing, nothing)`.
+
+It is the same function in batch and in `prior(pe)` with no data after a fold, as [`scenario_window`](@ref) is. The fold keeps the rows in its buffer, so both routes read the same counts over the same rows.
 
 # Arguments
 
-  - `max_scenarios`: The number of observations carried, or `nothing`.
-  - `X`: Asset returns the moments were fitted over, `observations × assets`, **before** the cut.
+  - `pe`: Empirical prior estimator.
+  - `X`: The returns that the moments were fitted over, `observations × assets`, **before** the cut. Under a horizon they are the log-returns.
+  - `t`: The number of rows that the result carries, after the cut.
+  - `T_mu`: The count of the mean that the fit of `mu` stated, or `nothing`.
+  - `kwargs...`: The keywords that the prior gives to the fits of `mu` and `sigma`. The function gives them to [`effective_observation_count`](@ref), so a count reads the same values as its fit.
 
 # Returns
 
-  - `ens::Option{<:Integer}`: `size(X, 1)` when `max_scenarios` cuts it, `nothing` otherwise.
+  - `eoc::Tuple`: The entries `(T_mu, T_sigma)` of the field `eoc`.
 
 # Related
 
   - [`scenario_window`](@ref)
+  - [`effective_observation_count`](@ref)
+  - [`mean_with_count`](@ref)
+  - [`moment_count_entry`](@ref)
   - [`EmpiricalPrior`](@ref)
   - [`LowOrderPrior`](@ref)
-  - [`effective_sample_size`](@ref)
 """
-function scenario_ens(::Nothing, ::MatNum)
-    return nothing
+function scenario_moment_counts(pe::EmpiricalPrior, X::MatNum, t::Integer,
+                                T_mu::Option{<:Real} = nothing; kwargs...)
+    # The count of a mean that a fit states wins, so the second fit of a prior is not paid.
+    T_mu = isnothing(T_mu) ? effective_observation_count(pe.me, X; kwargs...) : T_mu
+    return (moment_count_entry(T_mu, t),
+            moment_count_entry(effective_observation_count(pe.ce, X; kwargs...), t))
 end
-function scenario_ens(max_scenarios::Integer, X::MatNum)
-    t = size(X, 1)
-    return max_scenarios >= t ? nothing : t
+"""
+    mean_with_count(me::AbstractExpectedReturnsEstimator, X::MatNum,
+                    pnl::Option{<:AssetPanel}; dims::Int = 1, kwargs...)
+    mean_with_count(me::AbstractExpectedReturnsEstimator; kwargs...)
+
+Fit the mean of `me` as a vector, and return it with the count of the mean that the fit states.
+
+An [`EmpiricalPrior`](@ref) reads its mean through this function, and gives the count to [`scenario_moment_counts`](@ref). Most mean estimators state their count before the fit, with [`effective_observation_count`](@ref), so the function returns `nothing` as their count. A [`PriorExpectedReturns`](@ref) reads the `mu` of a prior that it fits, and a pooling prior knows its count only after its fit. So its method returns entry 1 of the `eoc` of that prior result, and the prior is fitted once.
+
+The form with no data reads a folded estimator, as `Statistics.mean(me)` does.
+
+# Algorithm
+
+The method that Julia selects is the algorithm.
+
+ 1. On a mean estimator with no method of its own, fit `mu` with `Statistics.mean`, and return `vec(mu)` with the count `nothing`.
+ 2. On [`PriorExpectedReturns`](@ref), fit the prior result `pr` with [`prior`](@ref), with no factor returns. Return `vec(pr.mu)` with the count of the mean of `pr`, from [`moment_observation_count`](@ref). The form with no data reads `prior(me.pe)`.
+
+# Arguments
+
+  - `me`: The expected returns estimator.
+  - $(arg_dict[:X])
+  - $(arg_dict[:pnl_moment])
+  - $(arg_dict[:dims])
+  - `kwargs...`: Forwarded to the fit of the mean.
+
+# Validation
+
+  - Everything the fit of the mean refuses.
+
+# Returns
+
+  - `(mu, T_mu)::Tuple`: The mean vector `mu`, and its count `T_mu`, a `Real` or `nothing`.
+
+# Related
+
+  - [`scenario_moment_counts`](@ref)
+  - [`effective_observation_count`](@ref)
+  - [`PriorExpectedReturns`](@ref)
+  - [`EmpiricalPrior`](@ref)
+"""
+function mean_with_count(me::AbstractExpectedReturnsEstimator, X::MatNum,
+                         pnl::Option{<:AssetPanel}; dims::Int = 1, kwargs...)
+    return vec(Statistics.mean(me, X, pnl; dims = dims, kwargs...)), nothing
+end
+function mean_with_count(me::AbstractExpectedReturnsEstimator; kwargs...)
+    return vec(Statistics.mean(me; kwargs...)), nothing
 end
 """
     scenario_fill_report(filled, ::Nothing)
@@ -1223,7 +1618,7 @@ function scenario_fill(X::MatNum, mu::VecNum, sigma::MatNum, strict::Bool,
         frac = length(filled) / length(X)
         if strict || isnothing(fill_limit) || worst > fill_limit
             strict_diagnostic(scenario_fill_msg(report, wi, worst, frac, fill_limit),
-                              strict)
+                              strict; id = @log_id())
             scenario_fill_remember!(named, report)
         end
     end

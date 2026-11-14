@@ -41,12 +41,15 @@ function set_wr_risk_expression!(model::JuMP.Model, X::MatNum; loss::Bool = true
     return state_build!(model, prefix, key1) do
         sc = get_constraint_scale(model)
         net_X = set_net_portfolio_returns!(model, X; prefix = prefix)
-        if !loss
-            net_X = -net_X
-        end
         wr_risk = JuMP.@variable(model)
-        state_set!(model, prefix, key2,
-                   JuMP.@constraint(model, sc * (wr_risk .+ net_X) >= 0))
+        # The gain tail subtracts `net_X` inside the macro, which builds the row on one copy
+        # of the series. A negated copy made before the macro costs a second copy (#2062).
+        cwr = if loss
+            JuMP.@constraint(model, sc * (wr_risk .+ net_X) >= 0)
+        else
+            JuMP.@constraint(model, sc * (wr_risk .- net_X) >= 0)
+        end
+        state_set!(model, prefix, key2, cwr)
         return wr_risk
     end
 end
@@ -56,7 +59,10 @@ $(DocStringExtensions.TYPEDSIGNATURES)
 Add worst-realisation risk constraints to `model`.
 
 Delegates to [`set_wr_risk_expression!`](@ref) to create `wr_risk`, then calls
-[`set_risk_bounds_and_expression!`](@ref). Returns the existing expression if already present.
+[`set_unindexed_risk_bounds_and_expression!`](@ref). [`set_wr_risk_expression!`](@ref) builds
+`wr_risk` once for each `prefix`, and [`Range`](@ref) reads the same variable. The settings of
+the first [`WorstRealisation`](@ref) take effect, and a second measure logs a warning, because
+its bound and its scale have no effect.
 
 # Arguments
 
@@ -67,21 +73,18 @@ Delegates to [`set_wr_risk_expression!`](@ref) to create `wr_risk`, then calls
 
 # Returns
 
-  - `nothing`.
+  - `wr_risk`: The risk variable.
 
 # Related
 
   - [`set_wr_risk_expression!`](@ref)
-  - [`set_risk_bounds_and_expression!`](@ref)
+  - [`set_unindexed_risk_bounds_and_expression!`](@ref)
 """
 function set_risk_constraints!(model::JuMP.Model, ::Any, r::WorstRealisation,
                                opt::RiskConstraintOwner, pr::AbstractPriorResult, args...;
                                loss::Bool = true, prefix::Symbol = Symbol(""), kwargs...)
     key = ifelse(loss, :wr_risk, :wr_risk_gain)
-    return state_build!(model, prefix, key) do
-        wr_risk = set_wr_risk_expression!(model, pr.X; loss = loss, prefix = prefix)
-        set_risk_bounds_and_expression!(model, opt, wr_risk, r.settings, key;
-                                        prefix = prefix)
-        return wr_risk
-    end
+    wr_risk = set_wr_risk_expression!(model, pr.X; loss = loss, prefix = prefix)
+    set_unindexed_risk_bounds_and_expression!(model, opt, wr_risk, r, key; prefix = prefix)
+    return wr_risk
 end

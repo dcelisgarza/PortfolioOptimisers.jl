@@ -1,6 +1,6 @@
 """
-    set_weight_norm_2_constraints!(model::JuMP.Model, val::Number)
-    set_weight_norm_2_constraints!(args...)
+    set_weight_norm_2_constraints!(model::JuMP.Model, val::Number; prefix::Symbol = Symbol(""))
+    set_weight_norm_2_constraints!(args...; prefix::Symbol = Symbol(""))
 
 Bound the 2-norm of the weights above by `val`, a ceiling that spreads the portfolio over more assets as it falls.
 
@@ -54,11 +54,8 @@ Where:
 # Arguments
 
   - $(arg_dict[:model])
-  - `val::Number`: Ceiling on the 2-norm of the weights.
-
-# Validation
-
-  - `isfinite(val)` and `val > 0`, else a `DomainError` that names `l2c`.
+  - `val::Number`: Ceiling on the 2-norm of the weights. [`resolve_constraint_block`](@ref) checks that it is finite and `> 0`, so the builder checks nothing.
+  - $(arg_dict[:prefix_kw])
 
 # Returns
 
@@ -69,32 +66,31 @@ Where:
   - [`set_weight_norm_p_constraints!`](@ref)
   - [`set_weight_norm_inf_constraints!`](@ref)
   - [`Num_NormCeilCal`](@ref)
-  - [`EffectiveAssetFloor`](@ref)
+  - [`resolve_calibration_slot`](@ref)
   - [`number_effective_assets`](@ref)
   - [`JuMPOptimiser`](@ref)
 
 # References
 
-  - $(ref_dict[:jump2026cones])
+  - $(ref_dict[:lobo1998]) Section 1.1.
 """
-function set_weight_norm_2_constraints!(args...)
+function set_weight_norm_2_constraints!(args...; prefix::Symbol = Symbol(""))
     return nothing
 end
-function set_weight_norm_2_constraints!(model::JuMP.Model, val::Number)
-    assert_nonempty_gt0_finite_val(val, :l2c)
-    w = get_w(model)
+function set_weight_norm_2_constraints!(model::JuMP.Model, val::Number;
+                                        prefix::Symbol = Symbol(""))
+    w = get_w(model, prefix)
     k = get_k(model)
     sc = get_constraint_scale(model)
-    JuMP.@variable(model, l2c)
-    JuMP.@constraints(model, begin
-                          cl2c_soc, [sc * l2c; sc * w] in JuMP.SecondOrderCone()
-                          cl2c, sc * (l2c - val * k) <= 0
-                      end)
+    l2c = state_set!(model, prefix, :l2c, JuMP.@variable(model))
+    state_set!(model, prefix, :cl2c_soc,
+               JuMP.@constraint(model, [sc * l2c; sc * w] in JuMP.SecondOrderCone()))
+    state_set!(model, prefix, :cl2c, JuMP.@constraint(model, sc * (l2c - val * k) <= 0))
     return nothing
 end
 """
-    set_weight_norm_p_constraints!(model::JuMP.Model, lps::LpReg_VecLpReg)
-    set_weight_norm_p_constraints!(args...)
+    set_weight_norm_p_constraints!(model::JuMP.Model, lps::LpReg_VecLpReg; prefix::Symbol = Symbol(""))
+    set_weight_norm_p_constraints!(args...; prefix::Symbol = Symbol(""))
 
 Bound the ``p``-norm of the weights above, once for each term of `lps`.
 
@@ -153,6 +149,7 @@ Where:
 
   - $(arg_dict[:model])
   - `lps::LpReg_VecLpReg`: One or more ``p``-norm ceilings.
+  - $(arg_dict[:prefix_kw])
 
 # Returns
 
@@ -172,42 +169,36 @@ Where:
 
 # References
 
-  - $(ref_dict[:jump2026cones])
+  - $(ref_dict[:chares2009]) Section 4.1.2, Equations 4.4 and 4.5.
 """
-function set_weight_norm_p_constraints!(args...)
+function set_weight_norm_p_constraints!(args...; prefix::Symbol = Symbol(""))
     return nothing
 end
-function set_weight_norm_p_constraints!(model::JuMP.Model, lps::LpReg_VecLpReg)
-    w = get_w(model)
+function set_weight_norm_p_constraints!(model::JuMP.Model, lps::LpReg_VecLpReg;
+                                        prefix::Symbol = Symbol(""))
+    w = get_w(model, prefix)
     k = get_k(model)
     sc = get_constraint_scale(model)
     N = length(w)
     for (i, lp) in enumerate(lps)
         val = lp.val
         p_inv = inv(lp.p)
-        t_lpc, r_lpc = JuMP.@variables(model, begin
-                                           ()
-                                           [1:N]
-                                       end)
-        state_set!(model, Symbol(""), :t_lpc_, i, t_lpc)
-        state_set!(model, Symbol(""), :r_lpc_, i, r_lpc)
-        clpc, cslpc = JuMP.@constraints(model,
-                                        begin
-                                            [i = 1:N],
-                                            [sc * r_lpc[i], sc * t_lpc, sc * w[i]] in
-                                            JuMP.MOI.PowerCone(p_inv)
-                                            sc * (sum(r_lpc) - t_lpc) == 0
-                                        end)
-        state_set!(model, Symbol(""), :clpc_, i, clpc)
-        state_set!(model, Symbol(""), :cslpc_, i, cslpc)
-        state_set!(model, Symbol(""), :clpc_bnd_, i,
+        t_lpc = state_set!(model, prefix, :t_lpc_, i, JuMP.@variable(model))
+        r_lpc = state_set!(model, prefix, :r_lpc_, i, JuMP.@variable(model, [1:N]))
+        state_set!(model, prefix, :clpc_, i,
+                   JuMP.@constraint(model, [i = 1:N],
+                                    [sc * r_lpc[i], sc * t_lpc, sc * w[i]] in
+                                    JuMP.MOI.PowerCone(p_inv)))
+        state_set!(model, prefix, :cslpc_, i,
+                   JuMP.@constraint(model, sc * (sum(r_lpc) - t_lpc) == 0))
+        state_set!(model, prefix, :clpc_bnd_, i,
                    JuMP.@constraint(model, sc * (t_lpc - val * k) <= 0))
     end
     return nothing
 end
 """
-    set_weight_norm_inf_constraints!(model::JuMP.Model, val::Number)
-    set_weight_norm_inf_constraints!(args...)
+    set_weight_norm_inf_constraints!(model::JuMP.Model, val::Number; prefix::Symbol = Symbol(""))
+    set_weight_norm_inf_constraints!(args...; prefix::Symbol = Symbol(""))
 
 Bound the largest absolute weight above by `val`, the ∞-norm ceiling of the weights.
 
@@ -262,11 +253,8 @@ Where:
 # Arguments
 
   - $(arg_dict[:model])
-  - `val::Number`: Ceiling on the largest absolute weight.
-
-# Validation
-
-  - `isfinite(val)` and `val > 0`, else a `DomainError` that names `linfc`.
+  - `val::Number`: Ceiling on the largest absolute weight. [`resolve_constraint_block`](@ref) checks that it is finite and `> 0`, so the builder checks nothing.
+  - $(arg_dict[:prefix_kw])
 
 # Returns
 
@@ -277,31 +265,101 @@ Where:
   - [`set_weight_norm_2_constraints!`](@ref)
   - [`set_weight_norm_p_constraints!`](@ref)
   - [`Num_NormCeilCal`](@ref)
-  - [`EffectiveAssetFloor`](@ref)
+  - [`resolve_calibration_slot`](@ref)
   - [`set_linf_regularisation!`](@ref): the ∞-norm penalty on the weights.
   - [`JuMPOptimiser`](@ref)
 """
-function set_weight_norm_inf_constraints!(args...)
+function set_weight_norm_inf_constraints!(args...; prefix::Symbol = Symbol(""))
     return nothing
 end
-function set_weight_norm_inf_constraints!(model::JuMP.Model, val::Number)
-    assert_nonempty_gt0_finite_val(val, :linfc)
-    w = get_w(model)
+function set_weight_norm_inf_constraints!(model::JuMP.Model, val::Number;
+                                          prefix::Symbol = Symbol(""))
+    w = get_w(model, prefix)
     k = get_k(model)
     sc = get_constraint_scale(model)
-    JuMP.@variable(model, t_linfc)
-    JuMP.@constraint(model, clinfc_nic,
-                     [sc * t_linfc;
-                      sc * w] in JuMP.MOI.NormInfinityCone(1 + length(w)))
-    JuMP.@constraint(model, clinfc, sc * (t_linfc - val * k) <= 0)
+    t_linfc = state_set!(model, prefix, :t_linfc, JuMP.@variable(model))
+    state_set!(model, prefix, :clinfc_nic,
+               JuMP.@constraint(model,
+                                [sc * t_linfc;
+                                 sc * w] in JuMP.MOI.NormInfinityCone(1 + length(w))))
+    state_set!(model, prefix, :clinfc,
+               JuMP.@constraint(model, sc * (t_linfc - val * k) <= 0))
     return nothing
+end
+"""
+    norm_epigraph!(model::JuMP.Model, t, x, p::Number, sc::Number)
+
+Adds the rows that bound the `p`-norm of `x` by `t`, ``t \\geq \\lVert \\boldsymbol{x} \\rVert_p``, scaled by `sc`, and returns them.
+
+The order picks the cone. At ``p = 1``, ``p = 2`` and ``p = \\infty`` it is the cone of the norm. At every other order it is one power cone for each entry of `x`, and one row that sums the auxiliary variables. It is the one epigraph of a norm in the library, so that [`set_norm_error_epigraph!`](@ref), [`norm_ball_dual_norm_epigraph!`](@ref) and the path budget of [`BudgetedHindsightPath`](@ref) write the same rows. It registers no name. A caller that names the rows stores what it returns.
+
+# JuMP formulation
+
+## Variables
+
+  - `t`: read. It is the caller's epigraph variable.
+  - `r`: created at an order other than `1`, `2` and `Inf`, an anonymous vector of one variable for each entry of `x`.
+
+## Constraints
+
+Every row is registered under no name.
+
+  - `cone`: ``(s_c t,\\, s_c \\boldsymbol{x}) \\in \\mathcal{K}_{p}`` for ``p \\in \\{1, 2, \\infty\\}``. At every other order it holds one row for each entry of `x`, ``(s_c r_j,\\, s_c t,\\, s_c x_j) \\in \\mathcal{P}_{1/p}``, that is ``r_j \\geq \\lvert x_j \\rvert^{p} / t^{p - 1}``.
+  - `csum`: ``s_c \\left(\\sum_{j} r_j - t\\right) = 0``, at an order other than `1`, `2` and `Inf`. With the rows of `cone`, it gives ``t^{p} \\geq \\sum_{j} \\lvert x_j \\rvert^{p}``.
+
+Where:
+
+  - ``t``: Epigraph of the norm.
+  - ``\\boldsymbol{x}``: The affine expression whose norm is bounded, with entries ``x_j``.
+  - $(math_dict[:p_norm_order])
+  - ``r_j``: Auxiliary variable of entry ``j``.
+  - $(math_dict[:sc_scale])
+  - $(math_dict[:K_q_norm])
+  - $(math_dict[:P_alpha_power])
+
+# Arguments
+
+  - $(arg_dict[:model])
+  - `t`: The epigraph variable.
+  - `x`: Affine expression, a vector of at least one entry.
+  - `p`: The norm order, `1 <= p`, with `Inf` admitted.
+  - `sc`: The constraint scale. A model with no registered scale passes `1`.
+
+# Returns
+
+  - `(cone, csum, r)`: The cone row or rows, the sum row and the auxiliary variables. `csum` and `r` are `nothing` at ``p \\in \\{1, 2, \\infty\\}``.
+
+# Related
+
+  - [`set_norm_error_epigraph!`](@ref)
+  - [`norm_ball_dual_norm_epigraph!`](@ref)
+  - [`path_budget_constraint!`](@ref)
+"""
+function norm_epigraph!(model::JuMP.Model, t, x, p::Number, sc::Number)
+    N = length(x)
+    if p == 2
+        cone = JuMP.@constraint(model, [sc * t; sc * x] in JuMP.SecondOrderCone())
+        return cone, nothing, nothing
+    elseif isone(p)
+        cone = JuMP.@constraint(model, [sc * t; sc * x] in JuMP.MOI.NormOneCone(N + 1))
+        return cone, nothing, nothing
+    elseif isinf(p)
+        cone = JuMP.@constraint(model, [sc * t; sc * x] in JuMP.MOI.NormInfinityCone(N + 1))
+        return cone, nothing, nothing
+    end
+    p_inv = inv(p)
+    r = JuMP.@variable(model, [1:N])
+    cone = JuMP.@constraint(model, [j = 1:N],
+                            [sc * r[j], sc * t, sc * x[j]] in JuMP.MOI.PowerCone(p_inv))
+    csum = JuMP.@constraint(model, sc * (sum(r) - t) == 0)
+    return cone, csum, r
 end
 """
     norm_ball_dual_norm_epigraph!(model::JuMP.Model, prefix::Symbol, i, x, p::Number)
 
 Register an epigraph variable of the dual norm of `x`, and bound it below by that norm.
 
-The dual order ``q`` picks the cone. At ``q = 2`` it is the second-order cone, as in [`set_weight_norm_2_constraints!`](@ref). At ``q = 1`` (``p = \\infty``) it is the norm-one cone, as in [`set_l1_regularisation!`](@ref). At ``q = \\infty`` (``p = 1``) it is the norm-infinity cone, as in [`set_weight_norm_inf_constraints!`](@ref). At every other order it is one power cone for each entry of `x`, as in [`set_weight_norm_p_constraints!`](@ref). The two norm-ball consumers call it, the mean builder on ``\\mathbf{L}^{\\intercal}\\boldsymbol{w}`` and the covariance builder on ``\\mathbf{L}^{\\intercal}\\operatorname{vec}(\\mathbf{W} + \\mathbf{E})``, so it takes `prefix` and `i` and registers every entry under both. A model can carry a set on each axis, and then both builders share one `prefix`, so the mean builder passes the index `w_i` and the covariance builder the index `i`. The variable equals the dual norm only where the caller's objective pulls it down.
+The dual order ``q`` picks the cone, and [`norm_epigraph!`](@ref) writes the rows. At ``q = 2`` it is the second-order cone, as in [`set_weight_norm_2_constraints!`](@ref). At ``q = 1`` (``p = \\infty``) it is the norm-one cone, as in [`set_l1_regularisation!`](@ref). At ``q = \\infty`` (``p = 1``) it is the norm-infinity cone, as in [`set_weight_norm_inf_constraints!`](@ref). At every other order it is one power cone for each entry of `x`, as in [`set_weight_norm_p_constraints!`](@ref). The two norm-ball consumers call it, the mean builder on ``\\mathbf{L}^{\\intercal}\\boldsymbol{w}`` and the covariance builder on ``\\mathbf{L}^{\\intercal}\\operatorname{vec}(\\mathbf{W} + \\mathbf{E})``, so it takes `prefix` and `i` and registers every entry under both. A model can carry a set on each axis, and then both builders share one `prefix`, so the mean builder passes the index `w_i` and the covariance builder the index `i`. The variable equals the dual norm only where the caller's objective pulls it down.
 
 # Mathematical definition
 
@@ -355,43 +413,23 @@ Where:
 
   - [`NormBallUncertaintySet`](@ref)
   - [`dual_norm_order`](@ref)
+  - [`norm_epigraph!`](@ref)
   - [`set_ucs_return_constraints!`](@ref)
   - [`set_ucs_variance_risk!`](@ref)
 
 # References
 
-  - $(ref_dict[:jump2026cones])
+  - $(ref_dict[:lobo1998]) Section 1.1.
+  - $(ref_dict[:chares2009]) Section 4.1.2, Equations 4.4 and 4.5.
 """
 function norm_ball_dual_norm_epigraph!(model::JuMP.Model, prefix::Symbol, i, x, p::Number)
-    sc = get_constraint_scale(model)
-    q = dual_norm_order(p)
     t_nbucs = state_set!(model, prefix, :t_nbucs_, i, JuMP.@variable(model))
-    if q == 2
-        state_set!(model, prefix, :nbucs_cone_, i,
-                   JuMP.@constraint(model,
-                                    [sc * t_nbucs; sc * x] in JuMP.SecondOrderCone()))
-    elseif isone(q)
-        state_set!(model, prefix, :nbucs_cone_, i,
-                   JuMP.@constraint(model,
-                                    [sc * t_nbucs;
-                                     sc * x] in JuMP.MOI.NormOneCone(1 + length(x))))
-    elseif isinf(q)
-        state_set!(model, prefix, :nbucs_cone_, i,
-                   JuMP.@constraint(model,
-                                    [sc * t_nbucs;
-                                     sc * x] in JuMP.MOI.NormInfinityCone(1 + length(x))))
-    else
-        q_inv = inv(q)
-        r_nbucs = state_set!(model, prefix, :r_nbucs_, i,
-                             JuMP.@variable(model, [1:length(x)]))
-        # One scalar row per entry rather than a JuMP container, which JET reads through
-        # the container closure and reports a builtin call on.
-        state_set!(model, prefix, :nbucs_cone_, i,
-                   [JuMP.@constraint(model,
-                                     [sc * r_nbucs[j], sc * t_nbucs, sc * x[j]] in
-                                     JuMP.MOI.PowerCone(q_inv)) for j in eachindex(x)])
-        state_set!(model, prefix, :nbucs_cone_sum_, i,
-                   JuMP.@constraint(model, sc * (sum(r_nbucs) - t_nbucs) == 0))
+    cone, csum, r_nbucs = norm_epigraph!(model, t_nbucs, x, dual_norm_order(p),
+                                         get_constraint_scale(model))
+    state_set!(model, prefix, :nbucs_cone_, i, cone)
+    if !isnothing(r_nbucs)
+        state_set!(model, prefix, :r_nbucs_, i, r_nbucs)
+        state_set!(model, prefix, :nbucs_cone_sum_, i, csum)
     end
     return t_nbucs
 end

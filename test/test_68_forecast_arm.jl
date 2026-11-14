@@ -115,6 +115,12 @@ of the ADRs; the papers' defaults are asserted where they decide the shape of th
         @test po.port_opt_view(st, [2, 4]).stat == st.stat[[2, 4]]
         @test po.port_opt_view(rf, [1, 3]).cache.stat == st.stat[[1, 3]]
         @test_throws ArgumentError po.merge_states(st, c)
+        # The statistic of the levels is the forecast of the relatives, and a folding statistic
+        # has no window of its own.
+        @test isnothing(po.window_rows(rpr.alg))
+        @test po.price_level_statistic(rpr.alg, levels(X)) ≈ xhat(rpr.alg, R)
+        ktpa = KernelTrendPattern(; window = 3)
+        @test po.price_level_statistic(ktpa, levels(X)) ≈ xhat(ktpa, R)
         @test_throws DomainError ExponentialMovingAverage(; alpha = 0)
         @test_throws DomainError ReweightedPriceRelative(; theta = 0)
         # #1172: the default is the value of the authors' code, which seeds the forecast at
@@ -217,6 +223,12 @@ of the ADRs; the papers' defaults are asserted where they decide the shape of th
                       vec(mean(emag, Rg, pnlg; dims = 1)))
         @test isequal(vec(mean(ktp, permutedims(Rg), pnlg; dims = 2)),
                       vec(mean(ktp, Rg, pnlg; dims = 1)))
+        # A mask the caller gives takes the place of the panel's: the unmasked panel with the
+        # mask as a keyword is the masked panel.
+        @test isequal(vec(mean(emag, Rg, nothing; active_mask = amskg)), vec(mean(gf)))
+        @test isequal(vec(mean(emag, Rg,
+                               AssetPanel(; amsk = trues(6, 2), emsk = trues(6, 2));
+                               active_mask = amskg)), vec(mean(gf)))
         @test isequal(vec(mean(maw, permutedims(Rg), pnlg; dims = 2)),
                       vec(mean(maw, Rg, pnlg; dims = 1)))
         # A composite is windowed even where it holds a folding member, so it keeps the
@@ -755,7 +767,11 @@ of the ADRs; the papers' defaults are asserted where they decide the shape of th
         # #1172: the numbers `SpatialMedian` states, over every five-level window of the
         # fixture. The authors' code rebases each asset to one on the first day; the paper
         # reads raw prices, here one asset quoted a hundred times higher.
-        tight(P) = po.spatial_median(P, 100_000, 1e-15)
+        # The `SpatialMedian` method of `price_level_statistic` finds the median.
+        function spatial_median(P, iters, tol)
+            return po.price_level_statistic(SpatialMedian(; iters = iters, tol = tol), P)
+        end
+        tight(P) = spatial_median(P, 100_000, 1e-15)
         wins = [levels(X[s:(s + 3), :]) for s in 1:(T - 4)]
         rebased(s, S) = wins[s] .* (vec(prod(X[1:(s + 3), :]; dims = 1)) .* S)'
         gap(S) = maximum(maxerr(tight(rebased(s, S)) ./ rebased(s, S)[end, :],
@@ -779,28 +795,27 @@ of the ADRs; the papers' defaults are asserted where they decide the shape of th
             end
             return y
         end
-        @test maximum(maxerr(po.spatial_median(P, 100, 1e-8), tight(P)) for P in wins) <
-              3e-8
+        @test maximum(maxerr(spatial_median(P, 100, 1e-8), tight(P)) for P in wins) < 3e-8
         @test maximum(maxerr(code_median(P), tight(P)) for P in wins) < 3e-8
         # A median on a level is found exactly by the optimality test at the levels; the third
         # window's median is its second level, which the iteration alone approaches from 4e-7.
-        m3 = po.spatial_median(wins[3], 100, 1e-8)
+        m3 = spatial_median(wins[3], 100, 1e-8)
         @test any(k -> m3 == wins[3][k, :], 1:5)
         # A seed on a level that is not the median takes the modified step off the level.
         Pv = [0.0 0.0; 1.0 0.0; 0.0 1.0; 5.0 5.0; 0.2 0.1]
         @test vec(median(Pv; dims = 1)) == Pv[5, :]
-        mv = po.spatial_median(Pv, 1000, 1e-14)
+        mv = spatial_median(Pv, 1000, 1e-14)
         @test po.weiszfeld_sums(Pv, mv)[3] < 1e-8 && mv != Pv[5, :]
         # A median very near a level but not on it converges slowly: the cap of 100 stops the
         # forecast about 1e-4 away while the sum of distances is within 1e-6 of its minimum.
         Ps = levels((1 .+ 0.02 .* randn(StableRNG(15), 40, 4))[6:9, :])
         cost(y) = sum(norm(Ps[i, :] .- y) for i in axes(Ps, 1))
-        ms = po.spatial_median(Ps, 100, 1e-8)
+        ms = spatial_median(Ps, 100, 1e-8)
         @test 1e-4 < maxerr(ms, tight(Ps)) < 2e-4
         @test cost(ms) - cost(tight(Ps)) < 1e-6
         # A step below `tol = 1e-8` stops it too, so a larger cap alone does not help.
-        @test maxerr(po.spatial_median(Ps, 100_000, 1e-8), tight(Ps)) > 1e-6
-        @test maxerr(po.spatial_median(Ps, 10_000, 1e-15), tight(Ps)) < 1e-8
+        @test maxerr(spatial_median(Ps, 100_000, 1e-8), tight(Ps)) > 1e-6
+        @test maxerr(spatial_median(Ps, 10_000, 1e-15), tight(Ps)) < 1e-8
         # The moving-average reversion admits the two-level window and a threshold at or
         # below one, which the paper's algorithm excludes and the step is defined for.
         @test MovingAverageReversion(; window = 2, eps = 1).me.alg.window == 2

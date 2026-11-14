@@ -405,6 +405,7 @@ TargetReturnForecast
                  │           cre ┼ CrossSectionalLinearRegression
                  │               │         alg ┼ PseudoInverseFallback()
                  │               │   intercept ┼ Bool: true
+                 │               │    leverage ┼ Bool: true
                  │               │          ex ┴ Transducers.ThreadedEx{@NamedTuple{}}: Transducers.ThreadedEx()
                  │       outlier ┼ CrossSectionalWinsoriser
                  │               │    low ┼ Float64: 0.01
@@ -666,7 +667,7 @@ The regression target of this member does not fit one cross-section at a time. E
 
 # Arguments
 
-  - `S`: The Descriptor scores, `observations × assets × descriptors`.
+  - `S`: The Descriptor scores, `assets × descriptors × observations`.
   - `y`: The target in the Forecast Unit, `observations × assets`.
   - `w`: Cross-sectional weights, `observations × assets`.
   - `nt`: Number of observations whose target has matured.
@@ -683,8 +684,8 @@ The regression target of this member does not fit one cross-section at a time. E
 """
 function target_forecast_samples(S::Arr3Num, y::MatNum, w::MatNum, nt::Integer)
     Tf = promote_type(real(eltype(S)), real(eltype(y)))
-    N = size(S, 2)
-    K = size(S, 3)
+    N = size(S, 1)
+    K = size(S, 2)
     Sf = Matrix{Tf}(undef, nt * N, K)
     yf = Vector{Tf}(undef, nt * N)
     ok = falses(nt * N)
@@ -693,13 +694,38 @@ function target_forecast_samples(S::Arr3Num, y::MatNum, w::MatNum, nt::Integer)
         j += 1
         good = w[t, i] > zero(w[t, i]) && isfinite(y[t, i])
         for k in 1:K
-            Sf[j, k] = S[t, i, k]
+            Sf[j, k] = S[i, k, t]
             good &= isfinite(Sf[j, k])
         end
         yf[j] = y[t, i]
         ok[j] = good
     end
     return Sf, yf, ok
+end
+"""
+    target_forecast_target(rfe::TargetReturnForecast, Sf::MatNum) -> AbstractRegressionTarget
+
+Return the regression target that a [`TargetReturnForecast`](@ref) fits on its flattened design.
+
+Under `intercept`, [`target_forecast_design`](@ref) appends the column of ones after the scores, so it is the last column of the flattened design. The function names it with [`InterceptColumn`](@ref), so that a penalised target such as [`ElasticNet`](@ref) does not shrink the intercept. An unpenalised target ignores the call. Without `intercept`, the function returns `rfe.tgt`.
+
+# Arguments
+
+  - `rfe`: Target Return Forecast Estimator.
+  - `Sf`: The flattened design, one column per score and the column of ones last under `intercept`.
+
+# Returns
+
+  - `tgt::AbstractRegressionTarget`: The target of every fit of the member.
+
+# Related
+
+  - [`TargetReturnForecast`](@ref)
+  - [`InterceptColumn`](@ref)
+  - [`target_forecast_fit`](@ref)
+"""
+function target_forecast_target(rfe::TargetReturnForecast, Sf::MatNum)
+    return rfe.intercept ? factory(rfe.tgt, InterceptColumn(size(Sf, 2))) : rfe.tgt
 end
 """
     target_forecast_fit(rfe::TargetReturnForecast, Sf::MatNum, yf::VecNum,
@@ -733,7 +759,7 @@ function target_forecast_fit(rfe::TargetReturnForecast, Sf::MatNum, yf::VecNum,
         return nothing
     end
     idx = findall(ok)
-    return StatsAPI.fit(rfe.tgt, Sf[idx, :], yf[idx])
+    return StatsAPI.fit(target_forecast_target(rfe, Sf), Sf[idx, :], yf[idx])
 end
 """
     target_forecast_uncalibrated(cv::Nothing, rfe::TargetReturnForecast, model,
@@ -797,10 +823,11 @@ function target_forecast_uncalibrated(cv::CrossValidationEstimator,
     yv = yf[idx]
     q = fill(Tf(NaN), m)
     fld = Base.split(cv, rdx)
+    tgt = target_forecast_target(rfe, Sf)
     for k in eachindex(fld.train_idx)
         tr = fld.train_idx[k]
         te = fld.test_idx[k]
-        q[te] = StatsAPI.predict(StatsAPI.fit(rfe.tgt, Sv[tr, :], yv[tr]), Sv[te, :])
+        q[te] = StatsAPI.predict(StatsAPI.fit(tgt, Sv[tr, :], yv[tr]), Sv[te, :])
     end
     p[idx] = q
     return p
@@ -808,7 +835,8 @@ end
 function target_forecast_uncalibrated(::PrequentialCalibration, rfe::TargetReturnForecast,
                                       ::Any, Sf::MatNum, yf::VecNum,
                                       ok::AbstractVector{Bool}, N::Integer)::VecNum
-    return target_forecast_prequential(rfe.tgt, rfe.lag + rfe.horizon - 1, Sf, yf, ok, N)
+    return target_forecast_prequential(target_forecast_target(rfe, Sf),
+                                       rfe.lag + rfe.horizon - 1, Sf, yf, ok, N)
 end
 """
     target_forecast_insample(model, Sf::MatNum, ok::AbstractVector{Bool}) -> VecNum
@@ -1002,7 +1030,6 @@ An asset enters when it carries a positive cross-sectional weight, a positive an
 """
 function target_forecast_calibration_design(P::MatNum, fwd::MatNum, vs::MatNum, w::MatNum,
                                             t::Integer)
-    Tf = promote_type(real(eltype(P)), real(eltype(fwd)), real(eltype(vs)), real(eltype(w)))
     idx = Int[]
     for i in axes(P, 2)
         if w[t, i] > zero(w[t, i]) &&
@@ -1012,8 +1039,7 @@ function target_forecast_calibration_design(P::MatNum, fwd::MatNum, vs::MatNum, 
             push!(idx, i)
         end
     end
-    return Tf.(view(P, t, idx)), Tf.(view(fwd, t, idx)),
-           Tf.(view(w, t, idx)) ./ Tf.(view(vs, t, idx))
+    return P[t, idx], fwd[t, idx], view(w, t, idx) ./ view(vs, t, idx)
 end
 """
     target_forecast_calibration(P::MatNum, fwd::MatNum, vs::MatNum, w::MatNum,
@@ -1074,7 +1100,7 @@ The method that Julia selects is the algorithm.
 # Arguments
 
   - `model`: The fitted model, or `nothing`.
-  - `S`: The Descriptor scores, `observations × assets × descriptors`.
+  - `S`: The Descriptor scores, `assets × descriptors × observations`.
 
 # Returns
 
@@ -1088,11 +1114,11 @@ The method that Julia selects is the algorithm.
 """
 function target_forecast_latest(::Nothing, S::Arr3Num)::Matrix{<:Real}
     Tf = real(eltype(S))
-    return fill(Tf(NaN), 1, size(S, 2))
+    return fill(Tf(NaN), 1, size(S, 1))
 end
 function target_forecast_latest(model, S::Arr3Num)::Matrix{<:Real}
     Tf = real(eltype(S))
-    A = Tf.(view(S, size(S, 1), :, :))
+    A = Tf.(view(S, :, :, size(S, 3)))
     P = fill(Tf(NaN), 1, size(A, 1))
     idx = Int[]
     for i in axes(A, 1)
@@ -1137,10 +1163,48 @@ function target_forecast_latest_variances(vs::MatNum)::MatNum
     return vs[size(vs, 1):size(vs, 1), :]
 end
 """
+$(DocStringExtensions.TYPEDEF)
+
+Holds the scores of a [`TargetReturnForecast`](@ref) and the histories that it fits, on one observation axis.
+
+This type is an implementation detail and is not intended for direct use. [`target_forecast_alignment`](@ref) makes it, and [`target_forecast_design`](@ref) reads it.
+
+# Fields
+
+$(DocStringExtensions.FIELDS)
+
+# Related
+
+  - [`target_forecast_alignment`](@ref)
+  - [`target_forecast_design`](@ref)
+"""
+@concrete struct AlignedScores
+    """
+    `S`: The Descriptor scores, `assets × descriptors × observations`.
+    """
+    S
+    """
+    `eps`: The idiosyncratic returns, `observations × assets`.
+    """
+    eps
+    """
+    `vs`: The idiosyncratic variances, `observations × assets`, or `nothing`.
+    """
+    vs
+    """
+    `w`: The cross-sectional weights, `observations × assets`.
+    """
+    w
+    """
+    `groups`: The group labels, `observations × assets`, or `nothing`.
+    """
+    groups
+end
+"""
     target_forecast_alignment(whole_history::Bool, S::Arr3Num, eps::MatNum,
                               vs::Option{<:MatNum}, w::MatNum,
                               groups::Option{<:AbstractMatrix{<:Integer}},
-                              rows::AbstractUnitRange) -> NamedTuple
+                              rows::AbstractUnitRange) -> AlignedScores
 
 Put the scores of a [`TargetReturnForecast`](@ref) and the histories it fits on one observation axis.
 
@@ -1152,7 +1216,7 @@ Put the scores of a [`TargetReturnForecast`](@ref) and the histories it fits on 
 # Arguments
 
   - $(arg_dict[:rf_whole_history])
-  - `S`: The Descriptor scores, `observations × assets × descriptors`, on the axis of the returns data.
+  - `S`: The Descriptor scores, `assets × descriptors × observations`, on the axis of the returns data.
   - `eps`: Idiosyncratic returns of the block, `observations × assets`.
   - `vs`: Idiosyncratic variance history of the block, `observations × assets`, or `nothing`.
   - `w`: Cross-sectional weights, `observations × assets`, on the axis of the returns data.
@@ -1161,10 +1225,11 @@ Put the scores of a [`TargetReturnForecast`](@ref) and the histories it fits on 
 
 # Returns
 
-  - `(S, eps, vs, w, groups)::NamedTuple`: The same five, on one observation axis.
+  - `al::AlignedScores`: The same five, `S`, `eps`, `vs`, `w` and `groups`, on one observation axis.
 
 # Related
 
+  - [`AlignedScores`](@ref)
   - [`TargetReturnForecast`](@ref)
   - [`return_forecast_pad`](@ref)
   - [`return_forecast_cut`](@ref)
@@ -1173,14 +1238,14 @@ Put the scores of a [`TargetReturnForecast`](@ref) and the histories it fits on 
 function target_forecast_alignment(whole_history::Bool, S::Arr3Num, eps::MatNum,
                                    vs::Option{<:MatNum}, w::MatNum,
                                    groups::Option{<:AbstractMatrix{<:Integer}},
-                                   rows::AbstractUnitRange)
+                                   rows::AbstractUnitRange)::AlignedScores
     if whole_history
-        T = size(S, 1)
-        return (; S = S, eps = return_forecast_pad(eps, rows, T),
-                vs = return_forecast_pad(vs, rows, T), w = w, groups = groups)
+        T = size(S, 3)
+        return AlignedScores(S, return_forecast_pad(eps, rows, T),
+                             return_forecast_pad(vs, rows, T), w, groups)
     end
-    return (; S = return_forecast_cut(S, rows), eps = eps, vs = vs,
-            w = return_forecast_cut(w, rows), groups = return_forecast_cut(groups, rows))
+    return AlignedScores(return_forecast_cut(S, rows), eps, vs,
+                         return_forecast_cut(w, rows), return_forecast_cut(groups, rows))
 end
 """
     return_forecast(rfe::TargetReturnForecast, rd::ReturnsResult,
@@ -1238,11 +1303,11 @@ function return_forecast(rfe::TargetReturnForecast, rd::ReturnsResult,
         return return_forecast_result(rfe, hist, fs)
     end
     d = target_forecast_design(rfe, P, csfm, return_forecast_rows(rd, csfm))
-    nt = max(size(d.Sa, 1) - forecast_target_gap(rfe), 0)
+    nt = max(size(d.Sa, 3) - forecast_target_gap(rfe), 0)
     Sf, yf, ok = target_forecast_samples(d.Sa, d.y, d.w, nt)
     model = target_forecast_fit(rfe, Sf, yf, ok)
-    cf = target_forecast_coefficient(rfe, model, Sf, yf, ok, d.fwd, d.vs, d.w, nt)
-    ocalib = target_forecast_orthogonal_coefficient(cre, cf.P, d.fwd, d.vs, d.w, rfe, csfm,
+    calib, Pm = target_forecast_coefficient(rfe, model, Sf, yf, ok, d.fwd, d.vs, d.w, nt)
+    ocalib = target_forecast_orthogonal_coefficient(cre, Pm, d.fwd, d.vs, d.w, rfe, csfm,
                                                     d.off)
     # The fit reads `NaN` at a pair of leverage one, and the forecast converts with the
     # variance the block holds there. The last row of the block is the last row of `vs`.
@@ -1251,8 +1316,8 @@ function return_forecast(rfe::TargetReturnForecast, rd::ReturnsResult,
     return TargetReturnForecastResult(;
                                       mu = vec(rfe.scale .*
                                                target_forecast_multiplier(rfe.calibrate,
-                                                                          cf.calib) .* P),
-                                      model = model, calib = cf.calib, ocalib = ocalib)
+                                                                          calib) .* P),
+                                      model = model, calib = calib, ocalib = ocalib)
 end
 """
     target_forecast_multiplier(calibrate::Bool, calib::Number) -> Number
@@ -1281,7 +1346,7 @@ end
 """
     target_forecast_coefficient(rfe::TargetReturnForecast, model, Sf::MatNum, yf::VecNum,
                                 ok::AbstractVector{Bool}, fwd::MatNum,
-                                vs::Option{<:MatNum}, w::MatNum, nt::Integer) -> NamedTuple
+                                vs::Option{<:MatNum}, w::MatNum, nt::Integer) -> Tuple
 
 Return the calibration coefficient of a [`TargetReturnForecast`](@ref), or `NaN`, and the uncalibrated prediction it was fitted on.
 
@@ -1301,6 +1366,8 @@ This function alone decides whether the calibration runs. A member that does not
 
 # Returns
 
+The plain tuple `(calib, P)`:
+
   - `calib::Real`: The calibration coefficient, or `NaN`.
   - `P::Option{<:MatNum}`: The uncalibrated prediction in return units, `matured observations × assets`, or `nothing` when the calibration does not run.
 
@@ -1315,14 +1382,12 @@ function target_forecast_coefficient(rfe::TargetReturnForecast, model, Sf::MatNu
                                      yf::VecNum, ok::AbstractVector{Bool}, fwd::MatNum,
                                      vs::Option{<:MatNum}, w::MatNum, nt::Integer)
     if !rfe.calibrate || isnothing(model) || isnothing(vs)
-        return (; calib = promote_type(real(eltype(Sf)), real(eltype(fwd)))(NaN),
-                P = nothing)
+        return promote_type(real(eltype(Sf)), real(eltype(fwd)))(NaN), nothing
     end
     p = target_forecast_uncalibrated(rfe.cv, rfe, model, Sf, yf, ok, size(w, 2))
     P = forecast_return_units(rfe.unit, target_forecast_scatter(p, nt, size(w, 2)),
                               view(vs, 1:nt, :))
-    return (; calib = target_forecast_calibration(P, fwd, vs, w, rfe.decay, rfe.min_obs),
-            P = P)
+    return target_forecast_calibration(P, fwd, vs, w, rfe.decay, rfe.min_obs), P
 end
 """
     target_forecast_orthogonal_coefficient(cre::Nothing, P::Option{<:MatNum}, fwd::MatNum,
@@ -1454,10 +1519,10 @@ function target_forecast_orthogonal_rows(cre::AbstractCrossSectionalRegressionEs
     Q = fill(Tf(NaN), size(P))
     for t in axes(P, 1)
         tb = t - off
-        if !(1 <= tb <= size(Ms, 1)) || !any(isfinite, view(P, t, :))
+        if !(1 <= tb <= size(Ms, 3)) || !any(isfinite, view(P, t, :))
             continue
         end
-        Q[t, :] = cross_sectional_alpha_split(cre, view(P, t, :), view(Ms, tb, :, est),
+        Q[t, :] = cross_sectional_alpha_split(cre, view(P, t, :), view(Ms, :, est, tb),
                                               view(rw, tb, :)).ap
     end
     return Q
@@ -1465,12 +1530,17 @@ end
 # The method of `orthogonal_forecast_rescale` that reads `κ⊥`. It takes the Result of the member
 # that states it alone, so no other Result reaches the read of `ocalib`.
 function orthogonal_forecast_rescale(::OrthogonalPartCalibration,
-                                     rf::TargetReturnForecastResult, g::VecNum, ap::VecNum)
+                                     rf::TargetReturnForecastResult, g::VecNum,
+                                     ap::VecNum)::ForecastSplitResult
     r = rf.ocalib / rf.calib
     if all(iszero, ap)
-        return (; g = g, ap = ap)
+        return ForecastSplitResult(g, ap)
     end
-    return isfinite(r) ? (; g = g, ap = r * ap) : (; g = zero(g), ap = zero(ap))
+    return if isfinite(r)
+        ForecastSplitResult(g, r * ap)
+    else
+        ForecastSplitResult(zero(g), zero(ap))
+    end
 end
 
 export TargetReturnForecast, TargetReturnForecastResult, NaNWarmup, InSampleWarmup,

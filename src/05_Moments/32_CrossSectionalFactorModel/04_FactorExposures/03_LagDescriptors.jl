@@ -476,6 +476,32 @@ function Base.copy(x::LagDescriptorState)::LagDescriptorState
     return LagDescriptorState(rolling_state_buffer(copy, x.q))
 end
 """
+$(DocStringExtensions.TYPEDEF)
+
+Holds the values of the Panel Field and of the scale that a lag Descriptor reads.
+
+This type is an implementation detail and is not intended for direct use. [`lag_descriptor_inputs`](@ref) makes it, and [`lag_descriptor_fold`](@ref) reads it. The two values are matrices of one type, so a record names them where a plain tuple would let a swap pass silently.
+
+# Fields
+
+$(DocStringExtensions.FIELDS)
+
+# Related
+
+  - [`lag_descriptor_inputs`](@ref)
+  - [`lag_descriptor_fold`](@ref)
+"""
+@concrete struct FieldScaleValues
+    """
+    `V`: The values of the field, `observations × assets`.
+    """
+    V
+    """
+    `S`: The values of the scale, `observations × assets`.
+    """
+    S
+end
+"""
     lag_descriptor_inputs(de::GrowthRate, rd::ReturnsResult)
     lag_descriptor_inputs(de::Union{ChangeToScale, ChangeInIntensity}, rd::ReturnsResult)
 
@@ -494,24 +520,25 @@ A [`GrowthRate`](@ref) reads no scale, so its scale is the field.
 
 # Returns
 
-  - `inputs::NamedTuple`: `V`, the values of the field, and `S`, the values of the scale, `observations × assets`.
+  - `inputs::FieldScaleValues`: `V`, the values of the field, and `S`, the values of the scale, `observations × assets`.
 
 # Related
 
   - [`lag_descriptor_fold`](@ref)
+  - [`FieldScaleValues`](@ref)
 """
-function lag_descriptor_inputs(de::GrowthRate, rd::ReturnsResult)
+function lag_descriptor_inputs(de::GrowthRate, rd::ReturnsResult)::FieldScaleValues
     assert_panel_field_sign(rd, [String(de.field)], false)
     V = descriptor_field_values(rd, de.field)
-    return (; V = V, S = V)
+    return FieldScaleValues(V, V)
 end
 function lag_descriptor_inputs(de::Union{ChangeToScale, ChangeInIntensity},
-                               rd::ReturnsResult)
+                               rd::ReturnsResult)::FieldScaleValues
     if de.gt0
         assert_panel_field_sign(rd, [String(de.scale)], true)
     end
-    return (; V = descriptor_field_values(rd, de.field),
-            S = descriptor_field_values(rd, de.scale))
+    return FieldScaleValues(descriptor_field_values(rd, de.field),
+                            descriptor_field_values(rd, de.scale))
 end
 """
     lag_descriptor_lagged(::Union{GrowthRate, ChangeToScale}, V::AbstractMatrix, S::AbstractMatrix)
@@ -642,7 +669,7 @@ The lagged row of observation `t` is the row `t - lag` of the block when `t > la
 
 # Returns
 
-  - `fold::NamedTuple`: `st`, the [`LagDescriptorState`](@ref) after the observations, and `D`, the Descriptor of each observation, `observations × assets`.
+  - `fold::DescriptorFold`: `st`, the [`LagDescriptorState`](@ref) after the observations, and `D`, the Descriptor of each observation, `observations × assets`.
 
 # Related
 
@@ -665,7 +692,7 @@ function lag_descriptor_fold(de::Union{GrowthRate, ChangeToScale, ChangeInIntens
         push!(q, Q[t, :])
     end
     descriptor_active_fill!(D, rd.pnl)
-    return (; st = LagDescriptorState(q), D = D)
+    return DescriptorFold(LagDescriptorState(q), D)
 end
 """
     descriptor_step(de::Union{GrowthRate, ChangeToScale, ChangeInIntensity},
@@ -686,7 +713,7 @@ The Descriptor of an observation equals the one of the batch call [`descriptor`]
 
 # Returns
 
-  - `step::NamedTuple`: `de`, the estimator with the state after the observations in `cache`, and `D`, the Descriptor of each observation, `observations × assets`.
+  - `step::DescriptorStepResult`: `de`, the estimator with the state after the observations in `cache`, and `D`, the Descriptor of each observation, `observations × assets`.
 
 # Related
 
@@ -697,7 +724,7 @@ The Descriptor of an observation equals the one of the batch call [`descriptor`]
 function descriptor_step(de::Union{GrowthRate, ChangeToScale, ChangeInIntensity},
                          rd::ReturnsResult)
     (; st, D) = lag_descriptor_fold(de, rd, de.cache)
-    return (; de = Accessors.@set(de.cache = st), D = D)
+    return DescriptorStepResult(rebuild_struct(de, (; cache = st)), D)
 end
 """
     partial_fit!(de::Union{GrowthRate, ChangeToScale, ChangeInIntensity}, rd::ReturnsResult)

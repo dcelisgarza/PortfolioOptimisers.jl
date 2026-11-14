@@ -32,6 +32,8 @@ Where:
   - $(math_dict[:rho_track])
   - ``\\varepsilon``: Tolerance, the `err` field.
 
+Page 15 of [roll1992](@cite) states the independent mode for the variance, ``(\\boldsymbol{w} - \\boldsymbol{w}_b)^\\intercal \\mathbf{\\Sigma} (\\boldsymbol{w} - \\boldsymbol{w}_b)``, and Equation 9.18 of [cajas2025](@cite) states its square root, the case of a [`StandardDeviation`](@ref). The independent mode under any other measure, and the dependent mode, are the library's own.
+
 # Fields
 
 $(DocStringExtensions.FIELDS)
@@ -72,7 +74,7 @@ RiskTrackingError
       │   fixed ┴ Bool: false
     r ┼ StandardDeviation
       │   settings ┼ RiskMeasureSettings
-      │            │   scale ┼ Int64: 1
+      │            │   scale ┼ Float64: 1.0
       │            │      ub ┼ nothing
       │            │     rke ┴ Bool: false
       │      sigma ┼ nothing
@@ -95,8 +97,8 @@ RiskTrackingError
 
 # References
 
-  - $(ref_dict[:palomar2025])
-  - $(ref_dict[:cajas2025]) Section 9.2.
+  - $(ref_dict[:roll1992]) Page 15.
+  - $(ref_dict[:cajas2025]) Section 9.2, Equation 9.18.
 """
 @concrete struct RiskTrackingError <: AbstractTracking
     """
@@ -139,16 +141,17 @@ A hierarchical or clustering optimiser calls it to build the constraint of one c
 
  1. Slice the benchmark with `port_opt_view(tr.tr, i)`.
  2. Slice the tracked measure with `port_opt_view(tr.r, i, X)`.
- 3. Build a new [`RiskTrackingError`](@ref) from the two slices, `tr.err` and `tr.alg`.
+ 3. Rebuild `tr` with the two slices, with [`rebuild_struct`](@ref). `tr.err` and `tr.alg` do not change.
 
 # Related
 
   - [`RiskTrackingError`](@ref)
   - [`port_opt_view`](@ref)
+  - [`rebuild_struct`](@ref)
 """
 function port_opt_view(tr::RiskTrackingError, i, X::MatNum, args...)
-    return RiskTrackingError(; tr = port_opt_view(tr.tr, i), r = port_opt_view(tr.r, i, X),
-                             err = tr.err, alg = tr.alg)
+    return rebuild_struct(tr,
+                          (; tr = port_opt_view(tr.tr, i), r = port_opt_view(tr.r, i, X)))
 end
 """
 $(DocStringExtensions.TYPEDSIGNATURES)
@@ -159,19 +162,20 @@ Return a [`RiskTrackingError`](@ref) whose tracked measure is resolved against a
 
  1. Advance the benchmark with `factory(tr.tr, w)`. The benchmark stays as it is when `w` is `nothing`, or when its `fixed` flag is `true`.
  2. Resolve the tracked measure with `factory(tr.r, pr, slv, ucs, w, args...; kwargs...)`, which fills the moments that it reads from `pr`.
- 3. Build a new [`RiskTrackingError`](@ref) from the two results, `tr.err` and `tr.alg`.
+ 3. Rebuild `tr` with the two results, with [`rebuild_struct`](@ref). `tr.err` and `tr.alg` do not change.
 
 # Related
 
   - [`RiskTrackingError`](@ref)
   - [`AbstractPriorResult`](@ref)
   - [`factory`](@ref)
+  - [`rebuild_struct`](@ref)
 """
 function factory(tr::RiskTrackingError, pr::AbstractPriorResult, slv::Any, ucs::Any,
                  w::Option{<:VecNum} = nothing, args...; kwargs...)::RiskTrackingError
-    return RiskTrackingError(; tr = factory(tr.tr, w),
-                             r = factory(tr.r, pr, slv, ucs, w, args...; kwargs...),
-                             err = tr.err, alg = tr.alg)
+    return rebuild_struct(tr,
+                          (; tr = factory(tr.tr, w),
+                           r = factory(tr.r, pr, slv, ucs, w, args...; kwargs...)))
 end
 """
 $(DocStringExtensions.TYPEDSIGNATURES)
@@ -197,16 +201,16 @@ Return a [`RiskTrackingError`](@ref) whose benchmark and tracked measure take th
 
  1. Advance the benchmark with `factory(tr.tr, w)`. A [`WeightsTracking`](@ref) whose `fixed` flag is `true` stays as it is.
  2. Advance the tracked measure with `factory(tr.r, w)`.
- 3. Build a new [`RiskTrackingError`](@ref) from the two results, `tr.err` and `tr.alg`.
+ 3. Rebuild `tr` with the two results, with [`rebuild_struct`](@ref). `tr.err` and `tr.alg` do not change.
 
 # Related
 
   - [`RiskTrackingError`](@ref)
   - [`factory`](@ref)
+  - [`rebuild_struct`](@ref)
 """
 function factory(tr::RiskTrackingError, w::VecNum)::RiskTrackingError
-    return RiskTrackingError(; tr = factory(tr.tr, w), r = factory(tr.r, w), err = tr.err,
-                             alg = tr.alg)
+    return rebuild_struct(tr, (; tr = factory(tr.tr, w), r = factory(tr.r, w)))
 end
 """
 $(DocStringExtensions.TYPEDEF)
@@ -243,7 +247,7 @@ Where:
   - $(math_dict[:d_ddof])
   - $(math_dict[:p_norm_order])
 
-With ``d = 0``, the ``L_2`` and ``L_1`` forms are Equations 9.16 and 9.17 of Cajas's book. With ``d = 0``, the squared ``L_2`` form is the empirical tracking error of Benidis, Feng and Palomar.
+Page 15 of [roll1992](@cite) takes the variance of the difference of the two returns as the tracking error. Equation 2 of [rudolf1999](@cite) minimises the sum of the squared differences of the two series, and its Equations 5 and 6 state the ``L_1`` and ``L_\\infty`` forms without a divisor. Equation 9 of [beasley2003](@cite) states the ``L_p`` form, but it divides by ``T`` for every ``p``, where the form above divides by ``T^{1/p}`` at ``d = 0``. With ``d = 0``, the ``L_2`` and ``L_1`` forms are Equations 9.16 and 9.17 of [cajas2025](@cite), and the squared ``L_2`` form is the empirical tracking error of Equation 13.5 of [palomar2025](@cite) and of [benidis2018](@cite). The divisor ``T - d`` is the library's own.
 
 # Fields
 
@@ -261,9 +265,15 @@ Keywords correspond to the struct's fields.
 
 ## View parameters
 
-When [`port_opt_view`](@ref) is called on this type, the following `@vprop`-tagged fields are automatically subset to the selected indices:
+[`port_opt_view`](@ref) takes the view of these `@vprop` fields at the selected indices:
 
-  - `tr`: Recursively viewed via [`port_opt_view`](@ref).
+  - `tr`: Recursively viewed through [`port_opt_view`](@ref).
+
+## Observation weight parameters
+
+[`obs_weights_view`](@ref) indexes these fields to the selected observations:
+
+  - `tr`: Recursively indexed through [`obs_weights_view`](@ref). A [`ReturnsTracking`](@ref) holds one benchmark return for each observation, so a Shared Series gap drops the benchmark return of the dropped observation with it.
 
 # Functor
 
@@ -315,12 +325,16 @@ TrackingRiskMeasure
   - [`NormError`](@ref)
   - [`norm_error`](@ref)
   - [`port_opt_view`](@ref)
+  - [`obs_weights_view`](@ref)
   - [`expected_risk`](@ref)
 
 # References
 
-  - $(ref_dict[:palomar2025])
+  - $(ref_dict[:roll1992]) Page 15.
+  - $(ref_dict[:rudolf1999]) Pages 87 and 88, Equations 2, 5 and 6.
+  - $(ref_dict[:beasley2003]) Page 629, Equation 9.
   - $(ref_dict[:cajas2025]) Section 9.2, Equations 9.16 and 9.17.
+  - $(ref_dict[:palomar2025]) Section 13.3.1, Equation 13.5.
   - $(ref_dict[:benidis2018])
 """
 @propagatable @concrete struct TrackingRiskMeasure <: RiskMeasure
@@ -331,7 +345,7 @@ TrackingRiskMeasure
     """
     $(field_dict[:tr_spec])
     """
-    @vprop tr
+    @vprop @oprop tr
     """
     $(field_dict[:tralg])
     """
@@ -382,30 +396,32 @@ $(DocStringExtensions.TYPEDSIGNATURES)
 
 Return a [`TrackingRiskMeasure`](@ref) whose benchmark takes the portfolio weights `w`.
 
-`factory(r.tr, w)` advances the benchmark. A [`WeightsTracking`](@ref) whose `fixed` flag is `false` takes `w` as its new benchmark weights, and any other benchmark stays as it is. `r.settings` and `r.alg` pass through unchanged.
+`factory(r.tr, w)` advances the benchmark. A [`WeightsTracking`](@ref) whose `fixed` flag is `false` takes `w` as its new benchmark weights, and any other benchmark stays as it is. [`rebuild_struct`](@ref) rebuilds `r` with the benchmark, and `r.settings` and `r.alg` pass through unchanged.
 
 # Related
 
   - [`TrackingRiskMeasure`](@ref)
   - [`factory`](@ref)
+  - [`rebuild_struct`](@ref)
 """
 function factory(r::TrackingRiskMeasure, w::VecNum)
-    return TrackingRiskMeasure(; settings = r.settings, tr = factory(r.tr, w), alg = r.alg)
+    return rebuild_struct(r, (; tr = factory(r.tr, w)))
 end
 """
 $(DocStringExtensions.TYPEDSIGNATURES)
 
-Return `factory(r, w)`, the [`TrackingRiskMeasure`](@ref) whose benchmark takes the portfolio weights `w`.
+Return the [`TrackingRiskMeasure`](@ref) whose benchmark takes the portfolio weights `w`, as `factory(r, w)` does.
 
-The measure reads no moment, so the prior result, the solver and the uncertainty set in the second to fourth positions are not read.
+The measure reads no moment, so the prior result, the solver and the uncertainty set in the second to fourth positions are not read. The method holds the one-line body of `factory(r, w)`, and the two give one measure.
 
 # Related
 
   - [`TrackingRiskMeasure`](@ref)
   - [`factory`](@ref)
+  - [`rebuild_struct`](@ref)
 """
 function factory(r::TrackingRiskMeasure, ::Any, ::Any, ::Any, w::VecNum, args...; kwargs...)
-    return factory(r, w)
+    return rebuild_struct(r, (; tr = factory(r.tr, w)))
 end
 """
 $(DocStringExtensions.TYPEDEF)
@@ -436,7 +452,7 @@ Where:
   - $(math_dict[:rho_track])
   - ``\\mathbf{\\Sigma}``: Covariance matrix of a [`StandardDeviation`](@ref) tracked measure.
 
-With a [`StandardDeviation`](@ref), the independent mode is ``\\sqrt{(\\boldsymbol{w} - \\boldsymbol{w}_b)^\\intercal \\mathbf{\\Sigma} (\\boldsymbol{w} - \\boldsymbol{w}_b)}``, Equation 9.18 of Cajas's book.
+With a [`StandardDeviation`](@ref), the independent mode is ``\\sqrt{(\\boldsymbol{w} - \\boldsymbol{w}_b)^\\intercal \\mathbf{\\Sigma} (\\boldsymbol{w} - \\boldsymbol{w}_b)}``, Equation 9.18 of [cajas2025](@cite). Page 15 of [roll1992](@cite) states its square, the variance of the weight difference. The independent mode under any other measure, and the dependent mode, are the library's own.
 
 # Fields
 
@@ -490,7 +506,7 @@ RiskTrackingRiskMeasure
            │   fixed ┴ Bool: false
          r ┼ Variance
            │    settings ┼ RiskMeasureSettings
-           │             │   scale ┼ Int64: 1
+           │             │   scale ┼ Float64: 1.0
            │             │      ub ┼ nothing
            │             │     rke ┴ Bool: false
            │       sigma ┼ nothing
@@ -516,7 +532,7 @@ RiskTrackingRiskMeasure
 
 # References
 
-  - $(ref_dict[:palomar2025])
+  - $(ref_dict[:roll1992]) Page 15.
   - $(ref_dict[:cajas2025]) Section 9.2, Equation 9.18.
 """
 @concrete struct RiskTrackingRiskMeasure <: RiskMeasure
@@ -539,7 +555,8 @@ RiskTrackingRiskMeasure
     function RiskTrackingRiskMeasure(settings::RiskMeasureSettings, tr::WeightsTracking,
                                      r::AbstractBaseRiskMeasure, alg::VariableTracking)
         if isa(alg, DependentVariableTracking) && isa(r, QuadExpressionRiskMeasures)
-            @warn("Risk measures that produce JuMP.QuadExpr risk expressions are not guaranteed to work. The variance with SDP constraints works because the risk measure is the trace of a matrix, an affine expression.")
+            @warn("Risk measures that produce JuMP.QuadExpr risk expressions are not guaranteed to work. The variance with SDP constraints works because the risk measure is the trace of a matrix, an affine expression.",
+                  maxlog = log_limit(:warn), _id = @log_id(typeof(r)))
         end
         r = no_bounds_no_risk_expr_risk_measure(r)
         return new{typeof(settings), typeof(tr), typeof(r), typeof(alg)}(settings, tr, r,
@@ -551,6 +568,22 @@ function RiskTrackingRiskMeasure(; settings::RiskMeasureSettings = RiskMeasureSe
                                  r::AbstractBaseRiskMeasure = Variance(),
                                  alg::VariableTracking = IndependentVariableTracking())
     return RiskTrackingRiskMeasure(settings, tr, r, alg)
+end
+"""
+    obs_weights_view(r::Union{RiskTrackingError, RiskTrackingRiskMeasure}, i)
+
+Return the tracking measure with the observation weights of the measure that it tracks cut to the observations `i`, through [`obs_weights_fields`](@ref).
+
+The two types are not [`@propagatable`](@ref), so they need this method of [`obs_weights_view`](@ref). The tracked measure `r` can hold fixed observation weights, so a cut of the returns of the solve, such as the drop of a Shared Series gap, must reach them, see [`shared_series_estimator`](@ref). The benchmark weights of `tr` are portfolio weights, and they keep their value.
+
+# Related
+
+  - [`RiskTrackingError`](@ref)
+  - [`RiskTrackingRiskMeasure`](@ref)
+  - [`obs_weights_view`](@ref)
+"""
+function obs_weights_view(r::Union{RiskTrackingError, RiskTrackingRiskMeasure}, i)
+    return obs_weights_fields(r, i)
 end
 # Deferrable slots — see `deferred_slots`. The tracked measure carries its own, so both the
 # check and the derived recursion in `resolve_deferred_quantities` reach them through `r`.
@@ -582,17 +615,16 @@ A hierarchical or clustering optimiser calls it to build the measure of one clus
 
  1. Slice the benchmark with `port_opt_view(r.tr, i)`.
  2. Slice the tracked measure with `port_opt_view(r.r, i, X)`.
- 3. Build a new [`RiskTrackingRiskMeasure`](@ref) from the two slices, `r.settings` and `r.alg`.
+ 3. Rebuild `r` with the two slices, with [`rebuild_struct`](@ref). `r.settings` and `r.alg` do not change.
 
 # Related
 
   - [`RiskTrackingRiskMeasure`](@ref)
   - [`port_opt_view`](@ref)
+  - [`rebuild_struct`](@ref)
 """
 function port_opt_view(r::RiskTrackingRiskMeasure, i, X::MatNum, args...)
-    tr = port_opt_view(r.tr, i)
-    return RiskTrackingRiskMeasure(; settings = r.settings, tr = tr,
-                                   r = port_opt_view(r.r, i, X), alg = r.alg)
+    return rebuild_struct(r, (; tr = port_opt_view(r.tr, i), r = port_opt_view(r.r, i, X)))
 end
 """
 $(DocStringExtensions.TYPEDSIGNATURES)
@@ -608,8 +640,7 @@ Return a [`RiskTrackingRiskMeasure`](@ref) whose tracked measure is resolved aga
   - [`factory`](@ref)
 """
 function factory(r::RiskTrackingRiskMeasure, pr::AbstractPriorResult, args...; kwargs...)
-    return RiskTrackingRiskMeasure(; settings = r.settings, tr = r.tr,
-                                   r = factory(r.r, pr, args...; kwargs...), alg = r.alg)
+    return rebuild_struct(r, (; r = factory(r.r, pr, args...; kwargs...)))
 end
 """
 $(DocStringExtensions.TYPEDSIGNATURES)
@@ -635,16 +666,16 @@ Return a [`RiskTrackingRiskMeasure`](@ref) whose benchmark and tracked measure t
 
  1. Advance the benchmark with `factory(r.tr, w)`. A [`WeightsTracking`](@ref) whose `fixed` flag is `true` stays as it is.
  2. Advance the tracked measure with `factory(r.r, w)`.
- 3. Build a new [`RiskTrackingRiskMeasure`](@ref) from the two results, `r.settings` and `r.alg`.
+ 3. Rebuild `r` with the two results, with [`rebuild_struct`](@ref). `r.settings` and `r.alg` do not change.
 
 # Related
 
   - [`RiskTrackingRiskMeasure`](@ref)
   - [`factory`](@ref)
+  - [`rebuild_struct`](@ref)
 """
 function factory(r::RiskTrackingRiskMeasure, w::VecNum)
-    return RiskTrackingRiskMeasure(; settings = r.settings, tr = factory(r.tr, w),
-                                   r = factory(r.r, w), alg = r.alg)
+    return rebuild_struct(r, (; tr = factory(r.tr, w), r = factory(r.r, w)))
 end
 
 # Expected-risk input kind — see `risk_input_kind`.
@@ -697,7 +728,7 @@ function supports_precomputed_returns(r::TrackingRiskMeasure{<:Any,
 end
 """
     bind_data_benchmark(r::TrackingRiskMeasure, rd)
-    bind_data_benchmark(r::Union{<:RiskTrackingError, <:RiskTrackingRiskMeasure}, rd)
+    bind_data_benchmark(r::Union{RiskTrackingError, RiskTrackingRiskMeasure}, rd)
 
 Bind the [`DataBenchmarkTracking`](@ref) that a tracking measure holds to the benchmark `B` of the returns data `rd`.
 
@@ -707,7 +738,7 @@ A [`TrackingRiskMeasure`](@ref) binds its `tr` field. A [`RiskTrackingError`](@r
 
  1. Bind the field that can hold a data benchmark with [`bind_data_benchmark`](@ref): `tr` of a [`TrackingRiskMeasure`](@ref), giving `tr`, or the tracked measure `r` of the two risk trackers, giving `inner`.
  2. Return `r` itself when the bound field is the field it replaces, by `===`.
- 3. Otherwise rebuild `r` with the bound field through its keyword constructor, with [`rebuild_estimator`](@ref).
+ 3. Otherwise rebuild `r` with the bound field through its keyword constructor, with [`rebuild_struct`](@ref).
 
 # Related
 
@@ -717,14 +748,14 @@ A [`TrackingRiskMeasure`](@ref) binds its `tr` field. A [`RiskTrackingError`](@r
 """
 function bind_data_benchmark(r::TrackingRiskMeasure, rd)
     tr = bind_data_benchmark(r.tr, rd)
-    return tr === r.tr ? r : rebuild_estimator(r, (; tr = tr))
+    return tr === r.tr ? r : rebuild_struct(r, (; tr = tr))
 end
-function bind_data_benchmark(r::Union{<:RiskTrackingError, <:RiskTrackingRiskMeasure}, rd)
+function bind_data_benchmark(r::Union{RiskTrackingError, RiskTrackingRiskMeasure}, rd)
     inner = bind_data_benchmark(r.r, rd)
-    return inner === r.r ? r : rebuild_estimator(r, (; r = inner))
+    return inner === r.r ? r : rebuild_struct(r, (; r = inner))
 end
 """
-    reader_frames(r::Union{<:RiskTrackingError, <:RiskTrackingRiskMeasure},
+    reader_frames(r::Union{RiskTrackingError, RiskTrackingRiskMeasure},
                   path::AbstractString, refit::Bool)
 
 Return the frames that the tracked measure of a risk tracker adds to the group of the optimiser that holds the tracker.
@@ -747,7 +778,7 @@ A [`RiskTrackingError`](@ref) and a [`RiskTrackingRiskMeasure`](@ref) hold the m
   - [`RiskTrackingError`](@ref)
   - [`RiskTrackingRiskMeasure`](@ref)
 """
-function reader_frames(r::Union{<:RiskTrackingError, <:RiskTrackingRiskMeasure},
+function reader_frames(r::Union{RiskTrackingError, RiskTrackingRiskMeasure},
                        path::AbstractString, refit::Bool)
     return reader_frames(r.r, join_path(path, :r), refit)
 end

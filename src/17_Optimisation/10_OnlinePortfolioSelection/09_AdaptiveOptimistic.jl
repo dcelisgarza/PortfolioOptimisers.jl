@@ -59,7 +59,7 @@ PortfolioOptimisers.DiagonalProjection
 
 # References
 
-  - $(ref_dict[:duchi2011])
+  - $(ref_dict[:duchi2011]) Equation 1 and Algorithm 1.
 """
 @concrete struct DiagonalProjection <: AbstractProjectionGeometry
     """
@@ -288,7 +288,7 @@ AdaptiveSubgradient
 
 # References
 
-  - $(ref_dict[:duchi2011])
+  - $(ref_dict[:duchi2011]) Section 3, Algorithm 1, Equation 4, Theorem 5 and Corollary 6.
 """
 @concrete struct AdaptiveSubgradient <: AbstractOnlinePortfolioSelectionAlgorithm
     """
@@ -346,39 +346,9 @@ end
 """
 $(DocStringExtensions.TYPEDEF)
 
-Abstract supertype for the Gradient Predictors, which give the hint of an optimistic step for the gradient of the next period.
-
-An [`OptimisticStep`](@ref) takes its second half-step along the hint ``M_{t+1}``.
-
-# Interfaces
-
-To implement a new predictor, subtype `AbstractGradientPredictor` and implement:
-
-  - `predictor_state_seed(pred::AbstractGradientPredictor, w::AbstractVector)`: Returns the state that the predictor keeps on the Rule State before the first row, `nothing` by default. `w` is the Start Allocation, whose length and element type the state takes.
-  - `predict_gradient!(pred::AbstractGradientPredictor, ps, obj::AbstractOnlineObjective, g::AbstractVector, v::AbstractVector, x::AbstractVector, xm::AbstractVector, rows, t::Integer) -> Tuple`: Returns the state of the predictor after the period, and the hint. The arguments are the objective `obj` of the wrapped rule, the gradient `g` of the period at the played allocation, the secondary iterate `v` that the second half-step starts from, the price relative `x` of the period as traded, the same relative `xm` after the uniform mix of the wrapped rule, the rows that the head holds through the period, and the period count `t`. `g` reads `xm`, and `xm` is `x` where the wrapped rule does not mix. A predictor that reads the relative as a price folds `x`. A predictor that evaluates the loss of the wrapped rule again reads `xm`, so the hint sees the loss that `g` saw.
-  - `rows_needed(pred::AbstractGradientPredictor)`: The rows the predictor reads at a step, `0` by default.
-
-A predictor whose state is not `nothing`, a vector or a Partial Fit State also implements:
-
-  - `predictor_state_view(ps::MyPredictorState, i) -> MyPredictorState`: The state of the predictor, sliced to the assets `i`, as a copy.
-  - `copy_predictor_state(ps::MyPredictorState) -> MyPredictorState`: A copy of the state of the predictor that shares no array with it.
-
-The head's state already slices and copies a predictor state of the other three shapes.
-
-# Related
-
-  - [`LastGradient`](@ref)
-  - [`MeanGradient`](@ref)
-  - [`ForecastGradient`](@ref)
-  - [`OptimisticStep`](@ref)
-"""
-abstract type AbstractGradientPredictor <: AbstractAlgorithm end
-"""
-$(DocStringExtensions.TYPEDEF)
-
 Takes the last gradient as the hint of the optimistic step.
 
-This is the default predictor of [`OptimisticStep`](@ref). Under it the optimistic step is the two-projection algorithm of [chiang2012](@citet), and the residual sum ``\\sum_t \\lVert \\boldsymbol{g}_t - \\boldsymbol{g}_{t-1} \\rVert_*^2`` is the path length of the gradients.
+Under it the optimistic step of a [`MirrorDescent`](@ref) rule is the two-projection algorithm of [chiang2012](@citet), and the residual sum ``\\sum_t \\lVert \\boldsymbol{g}_t - \\boldsymbol{g}_{t-1} \\rVert_*^2`` is the path length of the gradients.
 
 With `at_played = false` the predictor reads the loss of the period again at the new secondary iterate, through [`loss_gradient`](@ref). This is the online form of the Mirror-Prox method of [nemirovski2004](@citet). [rakhlin2013nips](@citet) recover Mirror Prox from the optimistic step with the hint at the secondary point, for one fixed objective, so the two agree when every period has the same loss. The secondary iterate ``\\boldsymbol{v}_{t+1}`` is not the played allocation ``\\boldsymbol{w}_t``, so the two hints of this type differ in general from the first period on.
 
@@ -397,7 +367,7 @@ Where:
   - ``M_{t+1}^{\\mathrm{MP}}``: Hint at `at_played = false` under [`LogWealth`](@ref).
   - $(math_dict[:g_t_loss]) The optimistic step takes it at the played allocation ``\\boldsymbol{w}_t``.
   - $(math_dict[:w_t_iter])
-  - $(math_dict[:x_t_rel]) Where the wrapped rule mixes, it is the mixed price relative that ``\\boldsymbol{g}_t`` reads.
+  - $(math_dict[:x_t_rel]) Where the rule mixes, it is the mixed price relative that ``\\boldsymbol{g}_t`` reads.
   - $(math_dict[:v_t_sec])
   - $(math_dict[:t_period])
   - $(math_dict[:dual_norm_geo])
@@ -423,14 +393,14 @@ LastGradient
 # Related
 
   - [`AbstractGradientPredictor`](@ref)
-  - [`OptimisticStep`](@ref)
+  - [`MirrorDescent`](@ref)
   - [`MeanGradient`](@ref)
 
 # References
 
-  - $(ref_dict[:chiang2012])
-  - $(ref_dict[:rakhlin2013nips])
-  - $(ref_dict[:nemirovski2004])
+  - $(ref_dict[:chiang2012]) Algorithm 1 in Section 3, with Section 4.1 for the Euclidean geometry and Section 4.2 for the entropic one.
+  - $(ref_dict[:rakhlin2013nips]) Section 2, Equation 1.
+  - $(ref_dict[:nemirovski2004]) Section 3, Equations 3.2 and 3.3.
 """
 struct LastGradient <: AbstractGradientPredictor
     """
@@ -474,12 +444,12 @@ MeanGradient()
 # Related
 
   - [`AbstractGradientPredictor`](@ref)
-  - [`OptimisticStep`](@ref)
+  - [`MirrorDescent`](@ref)
   - [`LastGradient`](@ref)
 
 # References
 
-  - $(ref_dict[:rakhlin2013colt])
+  - $(ref_dict[:rakhlin2013colt]) Section 1 after Equation 2, Section 2.2 and Section 5.2.
 """
 struct MeanGradient <: AbstractGradientPredictor end
 """
@@ -489,7 +459,7 @@ Forms the hint of the optimistic step from a Price Relative Forecast.
 
 The hint is the gradient that the log-wealth loss of the next period would have at the secondary iterate, if the forecast were the outcome. The forecaster is any expected-returns estimator. The state of the predictor folds the forecaster where it has an exact fold, and the predictor fits it again from the head's rows otherwise, as the `me` slot of [`ForecastReversion`](@ref) does. A flat forecast gives a hint with equal entries, and the projection onto the budget undoes the uniform shift of such a hint.
 
-The optimistic steps of [chiang2012](@cite), [rakhlin2013colt](@cite) and [rakhlin2013nips](@cite) take their hints from the past gradients. This hint is an addition of the library. It is the natural hint of the portfolio problem, where every reversion rule and every tracking rule already holds a forecast.
+The optimistic step of [chiang2012](@cite) takes the last gradient as its hint. [rakhlin2013colt](@citet) and [rakhlin2013nips](@citet) allow any hint that the learner computes from the past or from side information, so the forecast is a hint of their framework. Neither work proposes it, and it is an addition of the library. It is the natural hint of the portfolio problem, where every reversion rule and every tracking rule already holds a forecast.
 
 # Mathematical definition
 
@@ -514,7 +484,7 @@ $(DocStringExtensions.FIELDS)
 
     ForecastGradient(; me::AbstractExpectedReturnsEstimator) -> ForecastGradient
 
-Keywords correspond to the struct's fields. The predictor needs as many rows as `me`, and the wrapper needs as many rows as the larger of the predictor and the wrapped rule.
+Keywords correspond to the struct's fields. The predictor needs as many rows as `me`, and the rule needs as many rows as the larger of the predictor and its objective.
 
 ## Validation
 
@@ -533,16 +503,16 @@ ForecastGradient
 # Related
 
   - [`AbstractGradientPredictor`](@ref)
-  - [`OptimisticStep`](@ref)
+  - [`MirrorDescent`](@ref)
   - [`PriceLevelExpectedReturns`](@ref)
   - [`PriorExpectedReturns`](@ref)
   - [`forecast_relative`](@ref)
 
 # References
 
-  - $(ref_dict[:chiang2012])
-  - $(ref_dict[:rakhlin2013colt])
-  - $(ref_dict[:rakhlin2013nips])
+  - $(ref_dict[:chiang2012]) Algorithm 1 in Section 3.
+  - $(ref_dict[:rakhlin2013colt]) Section 1, Equation 3.
+  - $(ref_dict[:rakhlin2013nips]) Section 2, Equation 1.
 """
 @concrete struct ForecastGradient <: AbstractGradientPredictor
     """
@@ -608,7 +578,7 @@ A forecaster folds the path that traded, not the mixed one, so the mix does not 
 
   - [`AbstractGradientPredictor`](@ref)
   - [`predictor_state_seed`](@ref)
-  - [`OptimisticStep`](@ref)
+  - [`MirrorDescent`](@ref)
 """
 function predict_gradient!(pred::LastGradient, ::Nothing, obj::AbstractOnlineObjective,
                            g::AbstractVector, v::AbstractVector, ::AbstractVector,
@@ -640,7 +610,7 @@ Returns the state of a Gradient Predictor sliced to the assets `i`, as a copy.
 # Related
 
   - [`AbstractGradientPredictor`](@ref)
-  - [`OptimisticStepState`](@ref)
+  - [`OptimisticMirrorDescentState`](@ref)
 """
 function predictor_state_view(::Nothing, ::Any)
     return nothing
@@ -661,7 +631,7 @@ Returns a copy of the state of a Gradient Predictor that shares no array with it
 # Related
 
   - [`AbstractGradientPredictor`](@ref)
-  - [`OptimisticStepState`](@ref)
+  - [`OptimisticMirrorDescentState`](@ref)
 """
 function copy_predictor_state(::Nothing)
     return nothing
@@ -677,7 +647,7 @@ $(DocStringExtensions.TYPEDEF)
 
 Sets the learning rate of an optimistic step from the hint residuals that the step has accrued.
 
-This is the adaptive rate of Corollary 2 of [rakhlin2013nips](@cite). It needs no horizon and no bound on the residual sum ahead of time. The schedule reads the residuals that an [`OptimisticStep`](@ref) keeps on its state, and it refuses the state of any other rule by name. [`hint_residual`](@ref) states the norm of the residuals in each geometry.
+This is the adaptive rate of Corollary 2 of [rakhlin2013nips](@cite). It needs no horizon and no bound on the residual sum ahead of time. The schedule reads the residuals that a [`MirrorDescent`](@ref) rule with a `predictor` keeps on its state, and it refuses the state of any other rule by name. [`hint_residual`](@ref) states the norm of the residuals in each geometry.
 
 # Mathematical definition
 
@@ -700,7 +670,7 @@ Where:
   - $(math_dict[:W_aset])
   - $(math_dict[:D_Psi_breg])
 
-The rate is the cap ``R_{\\max}`` while ``S_{t-1} = 0``. With ``R_{\\max}`` at that supremum, [rakhlin2013nips](@citet) bound the regret over ``T`` periods by ``3.5 R_{\\max} (\\sqrt{S_T} + 1)``. Under the Euclidean geometry on the simplex the supremum is one, the default `rmax`. Under the entropic geometry the supremum is infinite, and the uniform mix `alpha` of the wrapped rule does not bound it, because the mix applies to the played allocation and not to the secondary iterate. There `rmax` is a tuning constant, and the bound does not hold.
+The rate is the cap ``R_{\\max}`` while ``S_{t-1} = 0``. With ``R_{\\max}`` at that supremum, [rakhlin2013nips](@citet) bound the regret over ``T`` periods by ``3.5 R_{\\max} (\\sqrt{S_T} + 1)``. Under the Euclidean geometry on the simplex the supremum is one, the default `rmax`. Under the entropic geometry the supremum is infinite, and the uniform mix `alpha` of the rule does not bound it, because the mix applies to the played allocation and not to the secondary iterate. There `rmax` is a tuning constant, and the bound does not hold.
 
 # Fields
 
@@ -727,12 +697,12 @@ HintResidualRate
 # Related
 
   - [`AbstractLearningRateSchedule`](@ref)
-  - [`OptimisticStep`](@ref)
+  - [`MirrorDescent`](@ref)
   - [`InverseSquareRootRate`](@ref)
 
 # References
 
-  - $(ref_dict[:rakhlin2013nips])
+  - $(ref_dict[:rakhlin2013nips]) Section 2, Corollary 2.
 """
 @concrete struct HintResidualRate <: AbstractLearningRateSchedule
     """
@@ -750,7 +720,7 @@ end
 """
 $(DocStringExtensions.TYPEDEF)
 
-Holds the two iterates of an optimistic step, its hint residuals and the states of its schedule and its predictor.
+Holds the two iterates of the optimistic step of a [`MirrorDescent`](@ref) rule with a `predictor`, its hint residuals and the states of its schedule and its predictor.
 
 # Fields
 
@@ -758,11 +728,11 @@ $(DocStringExtensions.FIELDS)
 
 # Related
 
-  - [`OptimisticStep`](@ref)
+  - [`MirrorDescent`](@ref)
   - [`MirrorDescentState`](@ref)
   - [`AbstractPartialFitState`](@ref)
 """
-@concrete struct OptimisticStepState <: AbstractPartialFitState
+@concrete struct OptimisticMirrorDescentState <: AbstractPartialFitState
     """
     $(field_dict[:pf_n])
     """
@@ -780,7 +750,7 @@ $(DocStringExtensions.FIELDS)
     """
     w0
     """
-    The schedule statistic of the wrapped rule, or `nothing`.
+    The schedule statistic of the rule, or `nothing`.
     """
     s
     """
@@ -796,19 +766,22 @@ $(DocStringExtensions.FIELDS)
     """
     ps
 end
-function merge_states(::OptimisticStepState, ::OptimisticStepState)
-    return throw(ArgumentError("an `OptimisticStepState` is not merged on its own: it holds two iterates that are order-dependent, so the head's state refuses the merge, and the state of the rule follows it."))
+function merge_states(::OptimisticMirrorDescentState, ::OptimisticMirrorDescentState)
+    return throw(ArgumentError("an `OptimisticMirrorDescentState` is not merged on its own: it holds two iterates that are order-dependent, so the head's state refuses the merge, and the state of the rule follows it."))
 end
-function Base.copy(x::OptimisticStepState)
-    return OptimisticStepState(x.n, copy(x.v), copy(x.u), copy(x.w0), copy_column(x.s),
-                               copy(x.res), copy(x.m), copy_predictor_state(x.ps))
+function Base.copy(x::OptimisticMirrorDescentState)
+    return OptimisticMirrorDescentState(x.n, copy(x.v), copy(x.u), copy(x.w0),
+                                        copy_column(x.s), copy(x.res), copy(x.m),
+                                        copy_predictor_state(x.ps))
 end
-function port_opt_view(x::OptimisticStepState, i, args...)
-    return OptimisticStepState(x.n, renormalised_view(x.v, i), renormalised_view(x.u, i),
-                               renormalised_view(x.w0, i), schedule_state_view(x.s, i),
-                               copy(x.res), x.m[i], predictor_state_view(x.ps, i))
+function port_opt_view(x::OptimisticMirrorDescentState, i, args...)
+    return OptimisticMirrorDescentState(x.n, renormalised_view(x.v, i),
+                                        renormalised_view(x.u, i),
+                                        renormalised_view(x.w0, i),
+                                        schedule_state_view(x.s, i), copy(x.res), x.m[i],
+                                        predictor_state_view(x.ps, i))
 end
-function learning_rate(sched::HintResidualRate, ::Integer, st::OptimisticStepState)
+function learning_rate(sched::HintResidualRate, ::Integer, st::OptimisticMirrorDescentState)
     a = sqrt(st.res[1]) + sqrt(st.res[2])
     if !(a > zero(a))
         return sched.rmax
@@ -816,14 +789,14 @@ function learning_rate(sched::HintResidualRate, ::Integer, st::OptimisticStepSta
     return sched.rmax * min(inv(a), one(a))
 end
 function learning_rate(::HintResidualRate, ::Integer, st)
-    return throw(ArgumentError("a `HintResidualRate` reads the hint residuals an `OptimisticStep` keeps in its state, and a `$(typeof(st).name.name)` holds none: the schedule is the optimistic step's, on the `eta` of the rule it wraps."))
+    return throw(ArgumentError("a `HintResidualRate` reads the hint residuals that a `MirrorDescent` with a `predictor` keeps in its state, and a `$(typeof(st).name.name)` holds none: the schedule is the optimistic step's, on the `eta` of a rule with a predictor."))
 end
 """
 $(DocStringExtensions.TYPEDSIGNATURES)
 
 Returns the squared hint residual of a period in the dual norm of the geometry.
 
-A [`MirrorDescent`](@ref) rule takes only the four geometries below, so an [`OptimisticStep`](@ref) never reads the residual under [`GramProjection`](@ref) or [`DiagonalProjection`](@ref), and no method serves them.
+A [`MirrorDescent`](@ref) rule takes only the four geometries below, so the optimistic step never reads the residual under [`GramProjection`](@ref) or [`DiagonalProjection`](@ref), and no method serves them.
 
 # Mathematical definition
 
@@ -847,159 +820,37 @@ Each is the square of the dual norm ``\\lVert \\boldsymbol{g}_t - M_t \\rVert_*`
 # Related
 
   - [`HintResidualRate`](@ref)
-  - [`OptimisticStepState`](@ref)
+  - [`OptimisticMirrorDescentState`](@ref)
 """
 function hint_residual(::EuclideanProjection, d::AbstractVector)
     return sum(abs2, d)
 end
-function hint_residual(::Union{<:EntropicProjection, <:TsallisProjection,
-                               <:LogBarrierProjection}, d::AbstractVector)
+function hint_residual(::Union{EntropicProjection, TsallisProjection, LogBarrierProjection},
+                       d::AbstractVector)
     return abs2(maximum(abs, d))
 end
-"""
-$(DocStringExtensions.TYPEDEF)
-
-Plays two half-steps of a first-order rule each period, the second along a hint for the gradient of the next period (OMD).
-
-This is the optimistic mirror descent of [rakhlin2013colt](@cite) and [rakhlin2013nips](@cite), as a wrapper over a [`MirrorDescent`](@ref) rule. The state of the rule holds two iterates. The secondary iterate is where the step of the next period starts, and the played allocation is one hint step ahead of it.
-
-`eta`, `proj`, `alpha` and `obj` are those of the wrapped rule. Both half-steps are its mirror step in its geometry, and the gradient is that of its objective, through [`loss_gradient`](@ref). A [`RiskLoss`](@ref) reads the head's rows, and the wrapper needs as many rows as the larger of the objective and the predictor. A schedule on `eta` counts the periods of the wrapper and reads its state. The wrapper reads the uniform mix `alpha` as the wrapped rule does.
-
-# Mathematical definition
-
-```math
-\\begin{align}
-\\boldsymbol{v}_{t+1} &= \\underset{\\boldsymbol{v} \\in \\mathcal{W}}{\\arg\\min} \\; \\eta_t \\langle \\boldsymbol{g}_t, \\boldsymbol{v} \\rangle + D_\\Psi(\\boldsymbol{v}, \\boldsymbol{v}_t)\\,, \\\\
-\\boldsymbol{w}_{t+1} &= \\underset{\\boldsymbol{w} \\in \\mathcal{W}}{\\arg\\min} \\; \\eta_{t+1} \\langle M_{t+1}, \\boldsymbol{w} \\rangle + D_\\Psi(\\boldsymbol{w}, \\boldsymbol{v}_{t+1})\\,.
-\\end{align}
-```
-
-Where:
-
-  - $(math_dict[:v_t_sec])
-  - $(math_dict[:w_t_iter]) Here it is the played allocation before the uniform mix.
-  - $(math_dict[:g_t_loss]) The rule takes it at ``\\boldsymbol{w}_t``. Under [`LogWealth`](@ref) it is ``-\\boldsymbol{x}_t / \\langle \\boldsymbol{w}_t, \\boldsymbol{x}_t \\rangle``.
-  - $(math_dict[:x_t_rel])
-  - $(math_dict[:M_t_hint])
-  - $(math_dict[:eta_t_lr])
-  - $(math_dict[:t_period])
-  - $(math_dict[:W_aset])
-  - $(math_dict[:Psi_pot])
-  - $(math_dict[:D_Psi_breg])
-  - $(math_dict[:dual_norm_geo])
-
-The rates follow equation (1) of [rakhlin2013nips](@cite), which forms ``\\boldsymbol{w}_{t+1}`` at ``\\eta_{t+1}``. A fixed rate is one rate for both half-steps. Under the zero hint the second half-step returns ``\\boldsymbol{v}_{t+1}``, so the rule is the wrapped rule.
-
-For a fixed rate ``\\eta`` and a comparator ``\\boldsymbol{w}^*`` with ``D_\\Psi(\\boldsymbol{w}^*, \\boldsymbol{v}_1) \\leq R^2``, Lemma 1 of [rakhlin2013nips](@cite), with its equation (3) at ``\\rho = \\eta``, bounds the regret by ``\\eta^{-1} R^2 + \\tfrac{\\eta}{2} \\sum_t \\lVert \\boldsymbol{g}_t - M_t \\rVert_*^2``. At the rate tuned to the residual sum, the bound is ``O(\\sqrt{\\sum_t \\lVert \\boldsymbol{g}_t - M_t \\rVert_*^2})``. The residual sum is the path length of the gradients under [`LastGradient`](@ref), and the spread of the gradients about their mean bounds it under [`MeanGradient`](@ref). [rakhlin2013colt](@citet) state that a hint that misses keeps the bound of mirror descent up to a constant, for hints no larger than the gradients in the dual norm. [`HintResidualRate`](@ref) on the `eta` of the wrapped rule is the adaptive rate of [rakhlin2013nips](@cite).
-
-# Algorithm
-
-The seven-argument [`online_update!`](@ref) runs these steps at the period's row `x`. The six-argument form calls it with the unmixed played iterate `st.u` as the Gradient Point `point`. `st` is the state of the rule: what the rule keeps from one update to the next, here an [`OptimisticStepState`](@ref).
-
- 1. Set the period `t = st.n + 1`, and form the Price-Adjusted Allocation `wh` of the book `w` after the row.
- 2. When the schedule of `eta` names a restart at `t`, re-enter the Start Allocation `st.w0` onto the set from `wh` with [`reprojection`](@ref). Put both iterates at that allocation, and the states of the schedule and the predictor at their seeds, keep `t`, and return that allocation. Stop.
- 3. When the schedule reads the period's row before the rate, write its statistic from `w` and `x`.
- 4. Read the rate `eta` and the share `alpha` of period `t`.
- 5. Mix the price relatives into `xm` with [`mixed_relatives`](@ref).
- 6. Resolve `obj` against `wh` with [`factory`](@ref), so that a benchmark or a turnover reference of a [`RiskLoss`](@ref) that is not fixed takes `wh`. Take the gradient `g` of that objective at `point`, from `xm` and the head's `rows`, with [`loss_gradient`](@ref).
- 7. Take the first half-step from the secondary iterate `st.v` on `eta .* g` with [`half_step`](@ref), which gives the new secondary iterate `v`.
- 8. Form the hint `m` and the state `ps` of the predictor with [`predict_gradient!`](@ref), from the resolved objective, `g`, `v`, `x` and `xm`.
- 9. Measure the residual `r` of `g` against the last hint `st.m` with [`hint_residual`](@ref), and shift the residual sums into `res`.
-10. When the schedule reads the past alone, write its statistic `s` from `w` and `x`.
-11. Read the rate of period `t + 1` from a state of the rule that holds the period's row. Take the second half-step from `v` on that rate times `m`, which gives the unmixed played iterate `u`.
-12. Form the played allocation from `u` with [`played_allocation`](@ref). When `alpha` is positive, project it with [`reprojection`](@ref).
-13. Return the new state and the played allocation.
-
-# Fields
-
-$(DocStringExtensions.FIELDS)
-
-# Constructors
-
-    OptimisticStep(;
-        alg::MirrorDescent = MirrorDescent(),
-        predictor::AbstractGradientPredictor = LastGradient()
-    ) -> OptimisticStep
-
-Keywords correspond to the struct's fields. The Gradient Transform of the wrapped rule must be the identity. A transform keeps a state that one gradient writes each period, and the optimistic step reads two gradients a period.
-
-## Validation
-
-  - `alg.grad` is a [`PlainGradient`](@ref). An `ArgumentError` is thrown otherwise.
-
-# Examples
-
-```jldoctest
-julia> OptimisticStep()
-OptimisticStep
-        alg ┼ MirrorDescent
-            │     eta ┼ Float64: 0.05
-            │    proj ┼ EntropicProjection()
-            │   alpha ┼ Int64: 0
-            │     obj ┼ LogWealth()
-            │    grad ┴ PlainGradient()
-  predictor ┼ LastGradient
-            │   at_played ┴ Bool: true
-```
-
-# Related
-
-  - [`AbstractOnlinePortfolioSelectionAlgorithm`](@ref)
-  - [`OnlinePortfolioSelection`](@ref)
-  - [`MirrorDescent`](@ref)
-  - [`OptimisticStepState`](@ref)
-  - [`AbstractGradientPredictor`](@ref)
-  - [`HintResidualRate`](@ref)
-
-# References
-
-  - $(ref_dict[:rakhlin2013colt])
-  - $(ref_dict[:rakhlin2013nips])
-  - $(ref_dict[:chiang2012])
-"""
-@concrete struct OptimisticStep <: AbstractOnlinePortfolioSelectionAlgorithm
-    """
-    The first-order rule that takes both half-steps.
-    """
-    alg
-    """
-    The Gradient Predictor whose hint the second half-step follows.
-    """
-    predictor
-    function OptimisticStep(alg::MirrorDescent, predictor::AbstractGradientPredictor)
-        @argcheck(isa(alg.grad, PlainGradient),
-                  ArgumentError("the optimistic step wraps a `MirrorDescent` whose Gradient Transform is the identity: a `$(typeof(alg.grad).name.name)` keeps a state written once a period from one gradient, and the optimistic step reads two. Wrap the rule with `grad = PlainGradient()`."))
-        return new{typeof(alg), typeof(predictor)}(alg, predictor)
-    end
+# A rule with a predictor takes the optimistic step: its rows and its state are the ones of
+# that step, and the update dispatches on the state.
+function rows_needed(alg::MirrorDescent{<:Any, <:Any, <:Any, <:Any, <:Any,
+                                        <:AbstractGradientPredictor})
+    return rows_needed_max(rows_needed(alg.predictor), rows_needed(alg.obj))
 end
-function OptimisticStep(; alg::MirrorDescent = MirrorDescent(),
-                        predictor::AbstractGradientPredictor = LastGradient())::OptimisticStep
-    return OptimisticStep(alg, predictor)
-end
-function port_opt_view(alg::OptimisticStep, i, args...)
-    return OptimisticStep(; alg = alg.alg,
-                          predictor = port_opt_view(alg.predictor, i, args...))
-end
-function projection_geometry(alg::OptimisticStep)
-    return alg.alg.proj
-end
-function rows_needed(alg::OptimisticStep)
-    return rows_needed_max(rows_needed(alg.predictor), rows_needed(alg.alg))
-end
-function rule_state_seed(alg::OptimisticStep, w::AbstractVector)
-    return OptimisticStepState(0, copy(w), copy(w), copy(w),
-                               schedule_state_seed(alg.alg.eta, w), zeros(eltype(w), 2),
-                               zeros(eltype(w), length(w)),
-                               predictor_state_seed(alg.predictor, w))
+function rule_state_seed(alg::MirrorDescent{<:Any, <:Any, <:Any, <:Any, <:Any,
+                                            <:AbstractGradientPredictor}, w::AbstractVector)
+    return OptimisticMirrorDescentState(0, copy(w), copy(w), copy(w),
+                                        schedule_state_seed(alg.eta, w),
+                                        zeros(eltype(w), 2), zeros(eltype(w), length(w)),
+                                        predictor_state_seed(alg.predictor, w))
 end
 """
 $(DocStringExtensions.TYPEDSIGNATURES)
 
-Takes one half-step of an [`OptimisticStep`](@ref). This is the mirror step of the wrapped rule from `u` on the scaled gradient `s`, projected onto the set in the rule's geometry from the Price-Adjusted Allocation `w`.
+Takes one half-step of the optimistic step of a [`MirrorDescent`](@ref) rule. This is the mirror step of the rule from `u` on the scaled gradient `s`, projected onto the set in the rule's geometry from the Price-Adjusted Allocation `w`.
 
 # Related
 
-  - [`OptimisticStep`](@ref)
+  - [`MirrorDescent`](@ref)
+  - [`OptimisticMirrorDescentState`](@ref)
   - [`mirror_step`](@ref)
   - [`project`](@ref)
 """
@@ -1007,8 +858,9 @@ function half_step(alg::MirrorDescent, set::AbstractAllocationSet, u::AbstractVe
                    s::AbstractVector, w::AbstractVector)
     return project(alg.proj, set, mirror_step(alg.proj, u, s), w)
 end
-function online_update!(alg::OptimisticStep, st::OptimisticStepState, w::AbstractVector,
-                        x::AbstractVector, rows, set::AbstractAllocationSet)
+function online_update!(alg::MirrorDescent, st::OptimisticMirrorDescentState,
+                        w::AbstractVector, x::AbstractVector, rows,
+                        set::AbstractAllocationSet)
     return online_update!(alg, st, w, x, rows, set, st.u)
 end
 # The seven-argument form is the primitive: the gradient is read at `point`, the unmixed
@@ -1016,43 +868,42 @@ end
 # the predictor's and reads the secondary iterate as before. The predictor is handed both the
 # traded relative and the mixed one: a forecaster folds the path that traded, and a
 # re-evaluated loss reads the vector the gradient was read on (#1210).
-function online_update!(alg::OptimisticStep, st::OptimisticStepState, w::AbstractVector,
-                        x::AbstractVector, rows, set::AbstractAllocationSet,
-                        point::AbstractVector)
-    md = alg.alg
+function online_update!(alg::MirrorDescent, st::OptimisticMirrorDescentState,
+                        w::AbstractVector, x::AbstractVector, rows,
+                        set::AbstractAllocationSet, point::AbstractVector)
     t = st.n + 1
     wh = price_adjusted_allocation(w, x)
-    if restart(md.eta, t)
+    if restart(alg.eta, t)
         # The period count survives the restart: the schedule's stages are cumulative. The
         # start re-enters the set from the book the fund holds, as it entered at the seed.
-        u0 = reprojection(md.proj, set, st.w0, wh)
-        return OptimisticStepState(t, copy(u0), copy(u0), st.w0,
-                                   schedule_state_seed(md.eta, st.w0), zero(st.res),
-                                   zero(st.m), predictor_state_seed(alg.predictor, st.w0)),
+        u0 = reprojection(alg.proj, set, st.w0, wh)
+        return OptimisticMirrorDescentState(t, copy(u0), copy(u0), st.w0,
+                                            schedule_state_seed(alg.eta, st.w0),
+                                            zero(st.res), zero(st.m),
+                                            predictor_state_seed(alg.predictor, st.w0)),
                copy(u0)
     end
     # The schedule's row enters before the rate or after the step, as the schedule says.
-    st = OptimisticStepState(st.n, st.v, st.u, st.w0,
-                             statistic_before_rate(md.eta, st.s, w, x), st.res, st.m, st.ps)
-    eta = learning_rate(md.eta, t, st)
-    alpha = mixing_share(md.eta, t, md.alpha)
+    st = OptimisticMirrorDescentState(st.n, st.v, st.u, st.w0,
+                                      statistic_before_rate(alg.eta, st.s, w, x), st.res,
+                                      st.m, st.ps)
+    eta = learning_rate(alg.eta, t, st)
+    alpha = mixing_share(alg.eta, t, alg.alpha)
     xm = mixed_relatives(x, alpha)
-    obj = factory(md.obj, wh)
+    obj = factory(alg.obj, wh)
     g = loss_gradient(obj, point, xm, rows)
-    v = half_step(md, set, st.v, eta .* g, wh)
+    v = half_step(alg, set, st.v, eta .* g, wh)
     ps, m = predict_gradient!(alg.predictor, st.ps, obj, g, v, x, xm, rows, t)
-    r = hint_residual(md.proj, g .- st.m)
+    r = hint_residual(alg.proj, g .- st.m)
     res = [st.res[1] + r, st.res[1]]
-    s = statistic_after_step(md.eta, st.s, w, x)
+    s = statistic_after_step(alg.eta, st.s, w, x)
     # The played iterate is formed at the rate of the next period, which the schedule
     # answers from the state `nst` after the row: the paper's `f_{t+1}` at `η_{t+1}`.
-    nst = OptimisticStepState(t, v, v, st.w0, s, res, m, ps)
-    u = half_step(md, set, v, learning_rate(md.eta, t + 1, nst) .* m, wh)
+    nst = OptimisticMirrorDescentState(t, v, v, st.w0, s, res, m, ps)
+    u = half_step(alg, set, v, learning_rate(alg.eta, t + 1, nst) .* m, wh)
     played = played_allocation(u, alpha)
-    return OptimisticStepState(t, v, u, st.w0, s, res, m, ps),
-           iszero(alpha) ? played : reprojection(md.proj, set, played, wh)
+    return OptimisticMirrorDescentState(t, v, u, st.w0, s, res, m, ps),
+           iszero(alpha) ? played : reprojection(alg.proj, set, played, wh)
 end
-export AdaptiveSubgradient, OptimisticStep, LastGradient, MeanGradient, ForecastGradient,
-       HintResidualRate
-public AbstractGradientPredictor, predictor_state_seed, predict_gradient!,
-       predictor_state_view, copy_predictor_state
+export AdaptiveSubgradient, LastGradient, MeanGradient, ForecastGradient, HintResidualRate
+public predictor_state_seed, predict_gradient!, predictor_state_view, copy_predictor_state

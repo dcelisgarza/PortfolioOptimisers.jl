@@ -11,11 +11,10 @@ The functions below are the steps of a [`CrossSectionalFactorPrior`](@ref) fit. 
 - The active mask and the estimation mask of the asset panel.
 - The regression of each observation on the factors that are not empty, and the moments of the factors, with no mean and no variance for a factor whose exposure is zero at every asset that the fit weights.
 - The factors whose mean and variance the factor prior states, and the assets whose loadings read only those factors. An asset that loads on another factor has no moment, and the fit refuses only when no asset has a moment.
-- The scenario weights of the factors, divided by their sum.
 - The idiosyncratic covariance of the latest observation, and the degrees of freedom and the divisor of each idiosyncratic variance.
-- The return scenarios of the assets.
 - The moments of the assets, from the moments of the factors and the loadings.
-- The forecast of the expected returns, when the prior has a return forecast estimator.
+
+The scenario weights of the factors, the return scenarios of the assets and the forecast of the expected returns are on the page of the [Prior Scenarios](@ref private-api-prior-scenarios).
 
 ```@docs
 PortfolioOptimisers.cross_sectional_prior_pairs
@@ -24,21 +23,21 @@ PortfolioOptimisers.assert_cross_sectional_benchmark_field
 PortfolioOptimisers.cross_sectional_exposure_order
 PortfolioOptimisers.cross_sectional_exposure_widths
 PortfolioOptimisers.cross_sectional_exposure_write!
+PortfolioOptimisers.cross_sectional_exposure_fill!
 PortfolioOptimisers.cross_sectional_exposure_rows
 PortfolioOptimisers.cross_sectional_exposure_history
-PortfolioOptimisers.cross_sectional_exposures_finite
+PortfolioOptimisers.cross_sectional_history_backing
+PortfolioOptimisers.assert_history_backing_axes
 PortfolioOptimisers.cross_sectional_eligible
 PortfolioOptimisers.assert_cross_sectional_coverage
 PortfolioOptimisers.cross_sectional_ready_factors
 PortfolioOptimisers.cross_sectional_determined
 PortfolioOptimisers.assert_cross_sectional_factor_moments
 PortfolioOptimisers.cross_sectional_factor_moments
-PortfolioOptimisers.cross_sectional_scenario_weights
 PortfolioOptimisers.cross_sectional_idiosyncratic_covariance
 PortfolioOptimisers.cross_sectional_variance_counts
 PortfolioOptimisers.cross_sectional_finite_mean
 PortfolioOptimisers.cross_sectional_standardised_residuals
-PortfolioOptimisers.cross_sectional_scenarios
 PortfolioOptimisers.cross_sectional_investable
 PortfolioOptimisers.cross_sectional_panel_masks
 PortfolioOptimisers.cross_sectional_cap_finite!
@@ -51,7 +50,4 @@ PortfolioOptimisers.cross_sectional_basis_now
 PortfolioOptimisers.cross_sectional_expand
 PortfolioOptimisers.cross_sectional_residual_block
 PortfolioOptimisers.cross_sectional_lift
-PortfolioOptimisers.cross_sectional_alpha_split
-PortfolioOptimisers.cross_sectional_return_forecast
-PortfolioOptimisers.cross_sectional_forecast_mu
 ```

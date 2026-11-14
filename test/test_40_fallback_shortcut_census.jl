@@ -66,11 +66,13 @@
     end
 
     # The site that miscounted, pinned by name so the regression cannot come back quietly.
-    # `fb` is the fifth field, and an estimator without a fallback reaches the shortcut
+    # `fb` is the eighth field, and an estimator without a fallback reaches the shortcut
     # while an estimator with one still reaches the generic `optimise`.
-    @test fieldnames(DiscreteAllocation) == (:slv, :sc, :so, :wf, :fb)
+    @test fieldnames(DiscreteAllocation) ==
+          (:slv, :sc, :so, :wf, :unit, :sets, :strict, :fb)
     da_type(fb) = DiscreteAllocation{Any, Float64, Float64,
-                                     PortfolioOptimisers.JuMPWeightFinaliserFormulation, fb}
+                                     PortfolioOptimisers.JuMPWeightFinaliserFormulation,
+                                     LotUnit{Int}, Nothing, Bool, fb}
     no_fb = which(PortfolioOptimisers.optimise,
                   Tuple{da_type(Nothing), FiniteAllocationInput})
     with_fb = which(PortfolioOptimisers.optimise,

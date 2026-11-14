@@ -177,23 +177,29 @@ println("Largest weight difference from the GMD column: ",
 ## 5. OWA range measures for both tails
 
 [`OrderedWeightsArrayRange`](@ref) builds a *range* measure from two OWA weight vectors, `w1`
-for the worst returns and `w2` for the best returns. You write `w2` in the same orientation as
-`w1`, and the constructor reverses it. The measure then weights the sorted returns by
-`w1 - w2`, which covers the worst returns through `w1` and the best through `w2`. Pass `rev = true` if
-your `w2` is already reversed. This is the OWA form of a risk measure for both tails.
+for the worst returns and `w2` for the best returns. The measure weights the sorted returns by
+`w1 - w2`, which covers the worst returns through `w1` and the best through `w2`. This is the
+OWA form of a risk measure for both tails.
+
+`w2` is held reversed. If you give no `w2`, the constructor reverses `w1` and uses it for the
+best returns. If you give `w2`, you must give it reversed, with `reverse(v)` for a vector or
+`reverse ∘ f` for a function. An unreversed `w2` cancels the worst returns of `w1` instead of
+adding the best returns.
 
 The default range takes `owa_tg` for both tails, which gives the same weights as `owa_tgrg`.
 Its portfolio still differs from the `TailGiniRange` column of section 3. The approximate
 formulation of a range approximates each tail on its own and adds the two, and the
-`TailGiniRange` measure of section 3 approximates the combined weights in one block. You can
-pass your own `w1` and `w2` to choose what each side measures. We also build a range
-from `owa_cvar` and `owa_wr`, the CVaR of the losses plus the largest return.
+`TailGiniRange` measure of section 3 approximates the combined weights in one block. The two
+tails give the tighter relaxation, so [`OWA_RG`](@ref), [`OWA_CVaR_RG`](@ref) and
+[`OWA_TG_RG`](@ref) build an `OrderedWeightsArrayRange`. We also build a range from `owa_cvar`
+and `owa_wr`, the CVaR of the losses plus the largest return.
 =#
 
 r_range_default = OrderedWeightsArrayRange()
 
 T_obs = T
-r_range_custom = OrderedWeightsArrayRange(; w1 = owa_cvar(T_obs), w2 = owa_wr(T_obs))
+r_range_custom = OrderedWeightsArrayRange(; w1 = owa_cvar(T_obs),
+                                          w2 = reverse(owa_wr(T_obs)))
 
 res_range_d = optimise(MeanRisk(; r = r_range_default, opt = opt))
 res_range_c = optimise(MeanRisk(; r = r_range_custom, opt = opt))

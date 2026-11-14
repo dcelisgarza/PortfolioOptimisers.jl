@@ -1,9 +1,9 @@
 """
 $(DocStringExtensions.TYPEDEF)
 
-Container for Black-Litterman investor views in canonical matrix form.
+Black-Litterman views in matrix form: the views matrix `P` and the view returns `Q`.
 
-`BlackLittermanViews` stores the views matrix `P` and the expected returns vector `Q` for use in Black-Litterman prior construction and related portfolio optimisation routines. The matrix `P` encodes the linear relationships between assets for each view, while `Q` specifies the expected value for each view.
+Each row of `P` holds the coefficients of one view over the names of one axis, assets or factors. The same entry of `Q` holds the expected return of that view. [`black_litterman_views`](@ref) assembles the pair from view equations. A caller can also construct the pair, and a Black-Litterman prior estimator then uses it as it is.
 
 # Mathematical definition
 
@@ -22,7 +22,11 @@ Where:
   - ``\\boldsymbol{q}``: ``K \\times 1`` vector of view expected returns.
   - ``\\boldsymbol{\\nu}``: ``K \\times 1`` estimation error of the views.
 
-The view uncertainty matrix ``\\boldsymbol{\\Omega}`` is **not** stored here. It is derived from ``\\mathbf{P}`` and the covariance of the distribution the views update, by [`calc_omega`](@ref) and [`bl_preroll`](@ref).
+[black1991](@citet) write the estimation error of the views as ``\\boldsymbol{\\varepsilon}``. The name "view creation model" and the symbol ``\\boldsymbol{\\nu}`` come from [cajas2025](@citet).
+
+This type does **not** hold the view uncertainty matrix ``\\boldsymbol{\\Omega}``. [`calc_omega`](@ref) and [`bl_preroll`](@ref) make it from ``\\mathbf{P}`` and from the covariance of the distribution that the views update.
+
+`excl` holds the indices of the views that the caller wrote and that `P` and `Q` do not hold. The indices count over all the views that the caller wrote, so `excl` can be longer than `Q`. [`remove_excl_views`](@ref) reads `excl` to remove the confidences of those views.
 
 # Fields
 
@@ -40,9 +44,12 @@ Keywords correspond to the struct's fields.
 
 ## Validation
 
-  - `!isempty(P)` and `!isempty(Q)`.
-  - `size(P, 1) == length(Q)`.
-  - If `excl` is provided, `!isempty(excl)` and `length(excl) <= length(Q)`.
+  - `!isempty(P)` and `!isempty(Q)`. Raises an [`IsEmptyError`](@ref).
+  - `size(P, 1) == length(Q)`. Raises a `DimensionMismatch`.
+  - If `excl` is not `nothing`:
+      + `!isempty(excl)`. Raises an [`IsEmptyError`](@ref).
+      + `allunique(excl)`. Raises an `ArgumentError`.
+      + Each entry of `excl` is in `1:(length(Q) + length(excl))`. Raises a `DomainError`.
 
 # Examples
 
@@ -61,8 +68,8 @@ BlackLittermanViews
 
 # References
 
-  - $(ref_dict[:black1992])
-  - $(ref_dict[:cajas2025]) Section 5.1.3, Equations 5.5 and 5.7.
+  - $(ref_dict[:black1991]) Appendix, item 7. $(ref_dict[:no_original_source])
+  - $(ref_dict[:cajas2025]) Section 5.1.3, Equation 5.5.
 """
 @concrete struct BlackLittermanViews <: AbstractResult
     """
@@ -84,8 +91,14 @@ BlackLittermanViews
                   DimensionMismatch("size(P, 1) = $(size(P, 1)) must match length(Q) = $(length(Q))"))
         if !isnothing(excl)
             @argcheck(!isempty(excl), IsEmptyError("excl cannot be empty"))
-            @argcheck(length(excl) <= length(Q),
-                      DimensionMismatch("length(excl) = $(length(excl)) must be <= length(Q) = $(length(Q))"))
+            @argcheck(allunique(excl),
+                      ArgumentError("excl must not repeat an index, got $excl"))
+            # `excl` indexes the views the caller wrote, the kept rows and the dropped ones, so
+            # it can be longer than `Q`. `remove_excl_views` reads it over that same count.
+            n = length(Q) + length(excl)
+            @argcheck(all(i -> one(i) <= i <= n, excl),
+                      DomainError(excl,
+                                  "`excl` indexes the views that the caller wrote, `length(Q) + length(excl) = $n`, so every entry must lie in `1:$n`."))
         end
         return new{typeof(P), typeof(Q), typeof(excl)}(P, Q, excl)
     end
@@ -95,62 +108,65 @@ function BlackLittermanViews(; P::MatNum, Q::VecNum,
     return BlackLittermanViews(P, Q, excl)
 end
 """
-    const Lc_BLV = Union{<:LinearConstraintEstimator, <:BlackLittermanViews}
+    const Lc_BLV = Union{LinearConstraintEstimator, BlackLittermanViews}
 
-Alias for a union of linear constraint estimator and Black-Litterman views types.
+Alias for the union of the two shapes of Black-Litterman views: a [`LinearConstraintEstimator`](@ref) of view equations, and a precomputed [`BlackLittermanViews`](@ref).
 
 # Related
 
   - [`LinearConstraintEstimator`](@ref)
   - [`BlackLittermanViews`](@ref)
 """
-const Lc_BLV = Union{<:LinearConstraintEstimator, <:BlackLittermanViews}
+const Lc_BLV = Union{LinearConstraintEstimator, BlackLittermanViews}
 """
     get_black_litterman_views(lcs::PR_VecPR, sets::UniverseSets,
                               key::Option{<:AbstractString} = nothing;
-                              datatype::DataType = Float64, strict::Bool = false)
+                              datatype::DataType = Float64, strict::Bool = false,
+                              ledger::Option{<:AbstractVector} = nothing)
 
-Convert parsed Black-Litterman view equations into a `BlackLittermanViews` object.
+Assemble parsed Black-Litterman view equations into a [`BlackLittermanViews`](@ref).
 
-`get_black_litterman_views` takes one or more [`ParsingResult`](@ref) objects (as produced by [`parse_equation`](@ref)), expands variable names using the provided [`UniverseSets`](@ref), and assembles the canonical views matrix `P` and expected returns vector `Q` for Black-Litterman prior construction. The result is a [`BlackLittermanViews`](@ref) object suitable for use in portfolio optimisation routines.
+The function reads one or more [`ParsingResult`](@ref) objects from [`parse_equation`](@ref). It resolves each name against one universe of a [`UniverseSets`](@ref), and it writes one row of `P` and one entry of `Q` for each view that it keeps.
 
-`key` selects **which** universe the view names resolve against, exactly as it does for [`get_linear_constraints`](@ref); `nothing` means `sets.xkey`. A view is never re-based — the estimator that owns it decides which distribution it lands on, and passes the matching key — so the assembled `P` is one row per view over `length(sets.dict[key])` columns, and the message an unresolved name produces names the axis via [`universe_axis`](@ref).
+`key` selects the universe that the names resolve against, as it does for [`get_linear_constraints`](@ref). If `key` is `nothing`, the universe is `sets.dict[sets.xkey]`. The function does not re-base a view. The estimator that owns the views selects the distribution that they update, and it passes the matching key. `P` has one row for each kept view and `length(sets.dict[key])` columns. The message for a name that does not resolve names the axis, which [`universe_axis`](@ref) reads.
 
-A view that is dropped is **dropped, not refused**. Its index joins `excl`, the remaining rows keep their order, and [`remove_excl_views`](@ref) drops the matching entry of a per-view confidence vector. When every view is dropped there is no row left and the return is `nothing`; [`bl_preroll`](@ref) is the caller that decides what that means.
+The function **drops** a view that it cannot assemble, and it does not refuse it. The index of the view goes into `excl`, and the other rows keep their order. The indices count over all the views that the caller wrote, so `excl` can be longer than `Q`. [`remove_excl_views`](@ref) removes the matching entries of a confidence vector. When the function drops every view, no row is left and it returns `nothing`. The caller, [`bl_preroll`](@ref), decides what that result means.
 
-**A row is the unit of a drop.** A view is a joint statement over several names with one right-hand side, so a name this function cannot resolve takes the whole row with it rather than only its own term: `a + c == 0.05` assembled without `c` would fit `a == 0.05`, a different and stronger claim than the caller wrote, and one the update would blend the prior against. What the name's failure was decides only whether the drop is *reported*. A name on the **counterpart axis** — read with [`counterpart_axis_names`](@ref), and in practice the Non-Investable Axis that the caller which derived the Investable Mask minted with [`investable_views`](@ref) — is dropped in silence under both settings of `strict`, because it was a correct name over the universe the caller was handed and the data moved it; the departure is announced once, by the caller that derived the Investable Mask, through [`announce_non_investable`](@ref). A name on neither axis is a typo, and is reported exactly as before.
+**The function drops a full row.** A view is one statement about several names, with one right-hand side. Thus a name that does not resolve removes the full row, and not only its own term. Without `c`, the view `a + c == 0.05` becomes `a == 0.05`, which is a different and stronger statement than the caller wrote.
+
+The cause of the failure decides only whether the function reports the drop. [`counterpart_axis_names`](@ref) reads the **counterpart axis**. In practice it is the Non-Investable Axis, which [`investable_views`](@ref) makes for the caller that derives the Investable Mask. A name on the counterpart axis was correct over the universe that the caller received, and the data removed it. The function drops its row with no report, under both settings of `strict`. The caller that derives the Investable Mask reports the departure once, through [`announce_non_investable`](@ref). A name on neither axis is a typo, and the function reports it through [`strict_diagnostic`](@ref).
 
 # Algorithm
 
  1. When `lcs` is a vector, check that it is not empty.
- 2. Resolve the universe key `k`, which is `key` when it is given and `sets.xkey` otherwise. Read the universe `nx = sets.dict[k]`, read its axis with [`universe_axis`](@ref), giving `axis` for the diagnostic messages, and read the counterpart axis with [`counterpart_axis_names`](@ref).
- 3. For each parsed view `lc`, in the order the caller wrote them, run steps 4 to 7 over the row accumulator `At`, which holds `length(nx)` coefficients and starts at zero, and start that view not dropped.
- 4. For each variable-coefficient pair `(v, c)` of `lc`, build the indicator `Ai = (nx .== v)`. When `Ai` selects no entry, mark the row dropped; report the unresolved name through [`strict_diagnostic`](@ref) unless it names the counterpart axis, and record the row into `ledger` with [`record_non_investable_drop!`](@ref) when it does. Otherwise add `Ai * c` to `At`. Every name of the row is still visited, so a row carrying two typos names both.
- 5. When the row was marked dropped, push the view's index `i` onto `excl` and go on to the next view.
- 6. When `At` is still all zeros, every name of this view resolved and the row still summed to zero. Report it through [`strict_diagnostic`](@ref), push `i` onto `excl`, and go on to the next view without writing a row.
+ 2. Find the universe key `k`, which is `key` when it is not `nothing` and `sets.xkey` otherwise. Read the universe `nx = sets.dict[k]`. Read its axis `axis` for the messages with [`universe_axis`](@ref), and read the counterpart axis with [`counterpart_axis_names`](@ref).
+ 3. For each parsed view `lc`, in the order that the caller wrote them, set each of the `length(nx)` coefficients of the row accumulator `At` to zero, mark the view as kept, and do steps 4 to 7.
+ 4. For each pair `(v, c)` of a variable and its coefficient in `lc`, build the indicator `Ai = (nx .== v)`. When `Ai` selects no entry, mark the row as dropped. If `v` is not on the counterpart axis, report it through [`strict_diagnostic`](@ref). If it is, record the row in `ledger` with [`record_non_investable_drop!`](@ref), once for each row. Otherwise add `Ai * c` to `At`. The function reads each name of the row, so it reports both typos of a row that holds two.
+ 5. When the row is marked as dropped, push the index `i` of the view onto `excl`, and go to the next view.
+ 6. When each entry of `At` is zero, each name of the view resolved and the coefficients cancel. Report the row through [`strict_diagnostic`](@ref), push `i` onto `excl`, and go to the next view. Do not write a row.
  7. Append `At` to `P` and `lc.rhs` to `Q`.
- 8. When `P` holds at least one row, reshape it to `length(nx)` rows and transpose it, so `P` is one view per row. Return a [`BlackLittermanViews`](@ref) over `P`, `Q` and `excl`, where an empty `excl` is passed as `nothing`. When `P` is empty, return `nothing`.
+ 8. When `P` holds at least one row, reshape it to `length(nx)` rows and transpose it, so each row of `P` is one view. Return a [`BlackLittermanViews`](@ref) of `P`, `Q` and `excl`, with `nothing` in place of an empty `excl`. When `P` is empty, return `nothing`.
 
 # Arguments
 
-  - `lcs`: A single [`ParsingResult`](@ref) or a vector of such objects, representing parsed Black-Litterman view equations.
-  - `sets`: A [`UniverseSets`](@ref) object specifying the universes and groupings.
+  - `lcs`: One [`ParsingResult`](@ref) or a vector of them, the parsed view equations.
+  - `sets`: The [`UniverseSets`](@ref) that the names resolve against.
   - $(arg_dict[:ekey])
-  - `datatype`: Numeric type for coefficients and expected returns.
-  - `strict`: If `true`, throws an error if a variable or group is not found in `sets`; if `false`, issues a warning.
-  - `ledger`: The Departure Ledger of the caller that derived the Investable Mask, or `nothing` when nobody is collecting. A row dropped for a name on the counterpart axis is recorded into it through [`record_non_investable_drop!`](@ref).
+  - `datatype`: The numeric type of the coefficients and of the view returns.
+  - `strict`: If `true`, a name that resolves against neither axis raises an `ArgumentError`, and a row whose coefficients cancel raises an [`IsZeroError`](@ref). If `false`, both warn.
+  - $(arg_dict[:ledger]) The function records in it each row that it drops for a name on the counterpart axis, through [`record_non_investable_drop!`](@ref).
 
 # Validation
 
   - When `lcs` is a vector, `!isempty(lcs)`.
-  - A name that matches no entry of `sets.dict[key]` and none of the counterpart axis raises through [`strict_diagnostic`](@ref) when `strict` is `true`, and warns otherwise. The message names the axis. The row is dropped either way.
-  - A name on the counterpart axis drops its row in silence, under both settings of `strict`.
-  - A view whose names all resolve and whose coefficients cancel raises the same way, and is dropped when `strict` is `false`.
-  - The assembled pair passes the [`BlackLittermanViews`](@ref) constructor's own checks.
+  - A name that matches no entry of `sets.dict[key]` and no name of the counterpart axis raises an error through [`strict_diagnostic`](@ref) when `strict` is `true`, and warns otherwise. The message names the axis. The function drops the row in both cases.
+  - A name on the counterpart axis drops its row with no report, under both settings of `strict`.
+  - A view whose names all resolve and whose coefficients cancel raises an [`IsZeroError`](@ref) when `strict` is `true`, and warns otherwise. The function drops the row in both cases.
+  - The assembled pair passes the checks of the [`BlackLittermanViews`](@ref) constructor.
 
 # Returns
 
-  - `blv::Option{<:BlackLittermanViews}`: The assembled views matrix `P`, one row per view over `length(sets.dict[key])` columns, the expected returns vector `Q`, and the indices `excl` of the views that resolved no name. `nothing` when no view resolved.
+  - `blv::Option{<:BlackLittermanViews}`: The assembled views: `P`, with one row for each kept view and `length(sets.dict[key])` columns, the view returns `Q`, and the indices `excl` of the dropped views, or `nothing` in `excl` when the function drops no view. The result is `nothing` when the function drops every view.
 
 # Examples
 
@@ -210,7 +226,7 @@ function get_black_litterman_views(lcs::PR_VecPR, sets::UniverseSets,
                 if v ∉ other
                     msg = unknown_variable_msg(v, nx, k; axis = axis,
                                                consequence = "row dropped")
-                    strict_diagnostic(msg, strict)
+                    strict_diagnostic(msg, strict; id = @log_id(v, k))
                 elseif !dropped
                     # Once per row, not once per departed name in it: the row is the unit
                     # that went, and `ni` already names every asset that left.
@@ -232,7 +248,7 @@ function get_black_litterman_views(lcs::PR_VecPR, sets::UniverseSets,
             # — so this row resolved and still summed to zero, by its own cancelling
             # coefficients or by holding no name at all. It is not a typo.
             msg = empty_row_msg(lc.eqn, nx, k; noun = "view", axis = axis)
-            strict_diagnostic(msg, strict)
+            strict_diagnostic(msg, strict; id = @log_id(lc.eqn, k), exception = IsZeroError)
             push!(excl, i)
             continue
         end
@@ -250,46 +266,46 @@ end
     black_litterman_views(views::Option{<:BlackLittermanViews}, args...; kwargs...)
     black_litterman_views(views::EqnType, sets::UniverseSets,
                           key::Option{<:AbstractString} = nothing;
-                          datatype::DataType = Float64, strict::Bool = false)
+                          datatype::DataType = Float64, strict::Bool = false,
+                          ledger::Option{<:AbstractVector} = nothing)
     black_litterman_views(views::LinearConstraintEstimator, sets::UniverseSets,
                           key::Option{<:AbstractString} = nothing;
-                          datatype::DataType = Float64, strict::Bool = false)
+                          datatype::DataType = Float64, strict::Bool = false,
+                          ledger::Option{<:AbstractVector} = nothing)
 
-Unified interface for constructing or passing through Black-Litterman investor views.
+Assemble Black-Litterman views into a [`BlackLittermanViews`](@ref), or return precomputed views unchanged.
 
-`black_litterman_views` provides a composable API for handling Black-Litterman views in portfolio optimisation workflows. It supports passing through an existing [`BlackLittermanViews`](@ref) object, constructing views from equations or constraint estimators, and converting parsed view equations into canonical matrix form.
-
-The two routes agree. A [`LinearConstraintEstimator`](@ref) assembled here and the [`BlackLittermanViews`](@ref) result of that same assembly, passed back in, give the same `P` and the same `Q`, so a caller who precomputes the pair loses nothing but the name resolution.
+The two routes give the same pair. When a caller passes back the [`BlackLittermanViews`](@ref) that this function assembled from a [`LinearConstraintEstimator`](@ref), it gets the same `P` and the same `Q`. A caller that precomputes the pair loses only the resolution of names.
 
 # Algorithm
 
- 1. When `views` is `nothing` or a [`BlackLittermanViews`](@ref), return it unchanged. The pair was assembled against whatever universe the caller held, so `sets`, `key`, `datatype` and `strict` are all ignored.
- 2. When `views` is a [`LinearConstraintEstimator`](@ref), pick the key: `views.key` when the estimator carries one, and the `key` argument otherwise. Call step 3 on `views.val` with that key.
- 3. When `views` is an `EqnType`, parse it with [`parse_equation`](@ref) under the `==` operator alone, giving the parsed views `lcs`. A Black-Litterman view is an equality, so no inequality operator is admitted.
- 4. Expand every group name in `lcs` into its member assets with [`replace_group_by_assets`](@ref), under `sets`. A group sheds its departed members there, *before* its coefficient is spread, so a Black-Litterman mean divides by the surviving count.
- 5. Assemble the canonical pair from `lcs` with [`get_black_litterman_views`](@ref), under the key of step 2, and return what it gives.
+ 1. When `views` is `nothing` or a [`BlackLittermanViews`](@ref), return it unchanged. The caller assembled the pair over its own universe, and this function cannot check it. The method ignores `sets`, `key`, `datatype`, `strict` and `ledger`.
+ 2. When `views` is a [`LinearConstraintEstimator`](@ref), select the key: `views.key` when it is not `nothing`, and the `key` argument otherwise. Do step 3 on `views.val` with that key.
+ 3. When `views` is an `EqnType`, parse it with [`parse_equation`](@ref) under the `==` operator alone. The result is the parsed views `lcs`. A Black-Litterman view is an equality, so the function accepts no inequality operator.
+ 4. Replace each group name in `lcs` by its member assets with [`replace_group_by_assets`](@ref), under `sets`. That function removes the departed members of a group *before* it divides the coefficient of the group, so the coefficient is divided among the members that remain.
+ 5. Assemble the pair from `lcs` with [`get_black_litterman_views`](@ref), under the key of step 2, and return its result.
 
 # Arguments
 
   - `views`:
 
-      + `nothing` or [`BlackLittermanViews`](@ref): it is returned unchanged, `key` and all — a precomputed `P` was assembled against whatever universe the caller had, and nothing here can re-check it.
-      + `EqnType`: The view(s) are parsed, groups are replaced by their constituent members using `sets`, calls [`get_black_litterman_views`](@ref) and constructs a [`BlackLittermanViews`](@ref) object is constructed.
-      + [`LinearConstraintEstimator`](@ref): calls the method described above using the `val` field of the estimator. Its own `key` **wins** over the one the estimator passes, which is the same precedence [`rebase_linear_constraints`](@ref) uses: the argument is the axis the caller is written against, the field is the user overriding it.
+      + `nothing` or [`BlackLittermanViews`](@ref): The method returns it unchanged. The caller assembled a precomputed `P` over its own universe, and this function cannot check it.
+      + `EqnType`: The method parses the equations, replaces each group by its member assets with `sets`, and assembles the pair with [`get_black_litterman_views`](@ref).
+      + [`LinearConstraintEstimator`](@ref): The method calls the `EqnType` method on the `val` field of the estimator. When the `key` field of the estimator is not `nothing`, it takes precedence over the `key` argument. [`rebase_linear_constraints`](@ref) uses the same precedence: the argument is the axis that the caller uses, and the field is the override of the user.
 
-  - `sets`: A [`UniverseSets`](@ref) object specifying the universes and groupings.
+  - `sets`: The [`UniverseSets`](@ref) that the names and the groups resolve against.
 
   - $(arg_dict[:ekey])
 
-  - `datatype`: Numeric type for coefficients and expected returns.
+  - `datatype`: The numeric type of the coefficients and of the view returns.
 
-  - `strict`: If `true`, throws an error if a variable or group is not found in `sets`; if `false`, issues a warning.
+  - `strict`: Passed to [`get_black_litterman_views`](@ref), which states what it raises.
 
-  - `ledger`: The Departure Ledger of the caller that derived the Investable Mask, or `nothing` when nobody is collecting. It is threaded into both [`replace_group_by_assets`](@ref) and [`get_black_litterman_views`](@ref), so a shed group and a dropped row are both recorded.
+  - $(arg_dict[:ledger]) The method passes it to [`replace_group_by_assets`](@ref) and to [`get_black_litterman_views`](@ref), so the ledger records a group that loses members and a row that the assembly drops.
 
 # Returns
 
-  - `blv::BlackLittermanViews`: An object containing the assembled views matrix `P` and expected returns vector `Q`, or `nothing` if no views are present.
+  - `blv::Option{<:BlackLittermanViews}`: The assembled views, the input when it is precomputed, or `nothing` when no view is left.
 
 # Examples
 
@@ -347,29 +363,29 @@ end
     assert_bl_views_conf(views_conf::Num_VecNum, views::LinearConstraintEstimator)
     assert_bl_views_conf(views_conf::Num_VecNum, views::BlackLittermanViews)
 
-Validate Black-Litterman view confidence specification.
+Check the view confidences of a Black-Litterman prior estimator against its views.
 
-`assert_bl_views_conf` checks that the view confidence parameter(s) provided for Black-Litterman prior construction are valid. It supports scalar and vector confidence values, and works with views specified as equations, constraint estimators, or canonical views objects. The function enforces that confidence values are strictly between 0 and 1, and that the number of confidence values matches the number of views when a vector is given.
+Each confidence must lie strictly in `(0, 1)`. A **scalar** is one confidence for all the views, for any number of views. A **vector** holds one confidence for each view that the caller wrote, so the function counts only a vector against the views. A scalar ``v`` and the constant vector of ``v`` give the same ``\\mathbf{\\Omega}`` in [`calc_omega`](@ref).
 
-A **scalar** confidence is one confidence for every view, whatever the number of views. Only a **vector** states one confidence per view, so only a vector is counted against the views. Both shapes reach the same [`calc_omega`](@ref) answer: a scalar ``v`` and the constant vector of ``v`` give the same ``\\mathbf{\\Omega}``.
+A precomputed [`BlackLittermanViews`](@ref) with `excl` holds `length(Q) + length(excl)` views that the caller wrote. [`remove_excl_views`](@ref) then removes the confidences of the views in `excl`, so one confidence remains for each row of `P`.
 
-The unit-interval bound is load-bearing rather than cosmetic. [`calc_omega`](@ref) maps a confidence ``v`` to the scale ``1/v - 1``, which is negative for every ``v > 1`` and for every ``v < 0``. A view uncertainty matrix with a negative diagonal entry is not a covariance, and the estimator returns an answer built from it rather than raising.
+The bound is necessary. [`calc_omega`](@ref) changes a confidence ``v`` into the scale ``1/v - 1``, which is negative for each ``v > 1`` and each ``v < 0``. A view uncertainty matrix with a negative diagonal entry is not a covariance. Without the bound, the estimator returns a result made from such a matrix, and it raises no error. [`calc_omega`](@ref) states why the bound also refuses the two endpoints.
 
 # Arguments
 
-  - `views_conf`: Scalar or vector of confidence values.
-  - `views`: Black-Litterman views, which may be equations.
-  - `val`: The equations of a [`LinearConstraintEstimator`](@ref), unwrapped.
+  - `views_conf`: One confidence, or a vector of confidences.
+  - `views`: The views, a [`LinearConstraintEstimator`](@ref) or a [`BlackLittermanViews`](@ref).
+  - `val`: The equations of a [`LinearConstraintEstimator`](@ref).
 
 # Validation
 
-Each method selects one shape of `views_conf` and one shape of `views`, and refuses what that pair does not admit.
+Each method selects one shape of `views_conf` and one shape of `views`, and refuses the input that the pair does not accept.
 
-  - `(::Nothing, args...)`: no confidence was given, so nothing is checked.
-  - `(::Number, ::EqnType)`: `0 < views_conf < 1`, through [`assert_unit_interval`](@ref). The count is not checked, because one scalar covers any number of equations.
-  - `(::VecNum, ::EqnType)`: when `val` is a vector of equations, `length(val) == length(views_conf)`; when `val` is one equation, `length(views_conf) == 1`. Then `all(x -> 0 < x < 1, views_conf)`.
-  - `(::Num_VecNum, ::LinearConstraintEstimator)`: selects nothing itself, and forwards `views.val` to the two methods above.
-  - `(::Num_VecNum, ::BlackLittermanViews)`: when `views_conf` is a vector, `length(views_conf) == length(views.Q)`. Then `all(x -> 0 < x < 1, views_conf)`. This is the only site that sees the confidences of a precomputed pair, because such a pair resolves no name.
+  - `(::Nothing, args...)`: There is no confidence, so the method checks nothing.
+  - `(::Number, ::EqnType)`: `0 < views_conf < 1`, through [`assert_unit_interval`](@ref). The method does not check the count, because one scalar is for any number of equations.
+  - `(::VecNum, ::EqnType)`: When `val` is a vector of equations, `length(val) == length(views_conf)`. When `val` is one equation, `length(views_conf) == 1`. Then `all(x -> 0 < x < 1, views_conf)`.
+  - `(::Num_VecNum, ::LinearConstraintEstimator)`: The method checks nothing itself, and sends `views.val` to the two methods above.
+  - `(::Num_VecNum, ::BlackLittermanViews)`: When `views_conf` is a vector, `length(views_conf) == length(views.Q) + length(views.excl)`, with no `excl` term when `views.excl` is `nothing`. Then `all(x -> 0 < x < 1, views_conf)`. A precomputed pair resolves no name, so this is the only site that sees its confidences.
 
 # Returns
 
@@ -412,8 +428,13 @@ function assert_bl_views_conf(views_conf::Num_VecNum, views::BlackLittermanViews
     # here refused `views_conf = 0.4` over two precomputed views while accepting `[0.4, 0.4]`,
     # which reaches `calc_omega` as the same number.
     if isa(views_conf, AbstractVector)
-        @argcheck(length(views_conf) == length(views.Q),
-                  DimensionMismatch("length(views_conf) ($(length(views_conf))) must match length(views.Q) ($(length(views.Q)))"))
+        # A vector holds one confidence for each view the caller wrote, as on the
+        # equation-shaped routes, and `remove_excl_views` then drops the entries of `excl`.
+        # Counted against `Q` alone, a vector over the kept rows lost an entry there and
+        # `calc_omega` broadcast the one that was left over every row.
+        n = length(views.Q) + (isnothing(views.excl) ? 0 : length(views.excl))
+        @argcheck(length(views_conf) == n,
+                  DimensionMismatch("length(views_conf) ($(length(views_conf))) must match the number of views that the caller wrote, length(views.Q) + length(views.excl) ($n)"))
     end
     # Precomputed views resolve no names, so this is the only site that sees their confidences.
     # Without the bound a confidence outside `(0, 1)` reaches `calc_omega`, whose `1/v - 1` scale

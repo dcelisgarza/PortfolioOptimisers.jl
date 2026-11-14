@@ -282,7 +282,7 @@ end
 
 Exact factor of the variance of a deviation, in units of the variance of the return.
 
-Under [`EstimatedCentring`](@ref) the location of ``n`` returns has the variance ``\\sigma^2 / n^{\\mathrm{eff}}``, so the factor is ``1 + 1 / n^{\\mathrm{eff}}``, with ``n^{\\mathrm{eff}}`` the Kish count of [`exp_weighted_variance_count`](@ref). Under [`PreCentred`](@ref) the factor is one.
+Under [`EstimatedCentring`](@ref) the location of ``n`` returns has the variance ``\\sigma^2 / n^{\\mathrm{eff}}``, so the factor is ``1 + 1 / n^{\\mathrm{eff}}``, with ``n^{\\mathrm{eff}}`` the Kish count of [`variance_count(decay::Number, X::MatNum, centring::AbstractCentring)`](@ref). Under [`PreCentred`](@ref) the factor is one.
 
 ```math
 \\begin{align}
@@ -413,7 +413,7 @@ The factor is ``1 + c_{ij}``, with ``c_{ij} = P_{ij} / (S_{1,i}\\, S_{1,j})`` an
 
 # Returns
 
-  - `F::Union{<:Number, <:MatNum}`: The matrix of the factors of the block, or one.
+  - `F::Union{Number, MatNum}`: The matrix of the factors of the block, or one.
 
 # Related
 
@@ -432,30 +432,46 @@ function centring_pair_factor(P::MatNum, obs_count::AbstractVector{<:Integer},
                    one(eltype(P)))
 end
 """
-$(DocStringExtensions.TYPEDSIGNATURES)
+$(DocStringExtensions.TYPEDEF)
 
-Record of one lagged observation, which the factor of a HAC product reads.
+Holds the record of one lagged observation, which the factor of a HAC product reads.
 
 The HAC term of an observation adds the products of its deviations with the deviations of the lagged observations. Under [`EstimatedCentring`](@ref) such a product has a non-zero mean, which reads the counts of the lagged observation, the assets valid there, and the overlap of the locations before it.
 
-# Arguments
+The constructor copies its three arguments, so a later write to the state of the fold does not reach the record.
 
-  - `obs_count`: Count of the valid returns of each asset before the lagged observation.
-  - `valid`: Mask of the assets valid at the lagged observation.
-  - `P`: The overlap of the locations before the lagged observation, or `nothing` where the estimator reads the diagonal alone.
+This type is an implementation detail and is not intended for direct use. [`centring_lag_push!`](@ref) makes it, the buffer of [`centring_lag_records`](@ref) holds it, and [`centring_lag_factor`](@ref) reads it.
 
-# Returns
+# Fields
 
-  - `(; obs_count, valid, P)::NamedTuple`: Fresh copies of the three arguments.
+$(DocStringExtensions.FIELDS)
 
 # Related
 
+  - [`centring_lag_records`](@ref)
+  - [`centring_lag_push!`](@ref)
   - [`centring_lag_factor`](@ref)
 """
-function centring_lag_record(obs_count::AbstractVector{<:Integer},
-                             valid::AbstractVector{<:Bool}, P::Option{<:MatNum})
-    return (; obs_count = copy(obs_count), valid = BitVector(valid),
-            P = isnothing(P) ? nothing : copy(P))
+@concrete struct CentringLagRecord
+    """
+    `obs_count`: Count of the valid returns of each asset before the lagged observation.
+    """
+    obs_count
+    """
+    `valid`: Mask of the assets valid at the lagged observation.
+    """
+    valid
+    """
+    `P`: The overlap of the locations before the lagged observation, or `nothing` where the estimator reads the diagonal alone.
+    """
+    P
+    function CentringLagRecord(obs_count::AbstractVector{<:Integer},
+                               valid::AbstractVector{<:Bool}, P::Option{<:MatNum})
+        oc = copy(obs_count)
+        v = BitVector(valid)
+        p = isnothing(P) ? nothing : copy(P)
+        return new{typeof(oc), typeof(v), typeof(p)}(oc, v, p)
+    end
 end
 """
     centring_lag_records(::PreCentred, hac_lags, P)
@@ -477,7 +493,7 @@ Only an estimated location gives a lagged product a non-zero mean, and only a HA
 
 # Related
 
-  - [`centring_lag_record`](@ref)
+  - [`CentringLagRecord`](@ref)
   - [`centring_lag_factor`](@ref)
 """
 function centring_lag_records(::Union{PreCentred, ZeroStartCentring}, ::Any, ::Any)
@@ -487,7 +503,7 @@ function centring_lag_records(::EstimatedCentring, ::Nothing, ::Any)
     return nothing
 end
 function centring_lag_records(::EstimatedCentring, hac_lags::Integer, P::Option{<:MatNum})
-    R = typeof(centring_lag_record(Int[], falses(0), P))
+    R = typeof(CentringLagRecord(Int[], falses(0), P))
     return DataStructures.CircularBuffer{R}(hac_lags)
 end
 """
@@ -511,7 +527,7 @@ Pushes the record of one observation into the buffer of lagged records.
 
 # Related
 
-  - [`centring_lag_record`](@ref)
+  - [`CentringLagRecord`](@ref)
 """
 function centring_lag_push!(::Nothing, ::AbstractVector{<:Integer},
                             ::AbstractVector{<:Bool}, ::Option{<:MatNum})
@@ -520,7 +536,7 @@ end
 function centring_lag_push!(records::DataStructures.CircularBuffer,
                             obs_count::AbstractVector{<:Integer},
                             valid::AbstractVector{<:Bool}, P::Option{<:MatNum})
-    return push!(records, centring_lag_record(obs_count, valid, P))
+    return push!(records, CentringLagRecord(obs_count, valid, P))
 end
 """
     hac_buffer_reset!(::Nothing, idx::AbstractVector{<:Bool})
@@ -562,7 +578,7 @@ A reset discards the history of an asset, so its location no longer holds a lagg
 
 # Related
 
-  - [`centring_lag_record`](@ref)
+  - [`CentringLagRecord`](@ref)
   - [`centring_lag_factor`](@ref)
 """
 function centring_lag_reset!(::Nothing, ::AbstractVector{<:Bool})
@@ -609,17 +625,17 @@ Where:
   - `decay`: Decay of the locations.
   - `n`: Count of the valid returns of each asset before the observation.
   - `dvalid`: Mask of the assets whose deviation at the observation exists.
-  - `records`: The lagged records of [`centring_lag_record`](@ref), oldest first.
+  - `records`: The lagged records of [`CentringLagRecord`](@ref), oldest first.
   - `w`: The Bartlett weight of a lag, as a function of the lag.
   - `diagonal`: Whether to give the diagonal alone, as a vector. Otherwise the method gives the `N × N` matrix and reads the overlap of each record.
 
 # Returns
 
-  - `G::Union{<:Number, <:VecNum, <:MatNum}`: Zero under `PreCentred`, otherwise the vector or the matrix of ``G``.
+  - `G::Union{Number, VecNum, MatNum}`: Zero under `PreCentred`, otherwise the vector or the matrix of ``G``.
 
 # Related
 
-  - [`centring_lag_record`](@ref)
+  - [`CentringLagRecord`](@ref)
   - [`centring_pair_factor`](@ref)
 """
 function centring_lag_factor(::Union{PreCentred, ZeroStartCentring}, decay::Number,

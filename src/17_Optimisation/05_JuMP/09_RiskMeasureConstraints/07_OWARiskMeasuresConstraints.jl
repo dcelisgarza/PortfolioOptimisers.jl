@@ -83,6 +83,10 @@ Where:
   - $(arg_dict[:opt_rjumpe])
   - $(arg_dict[:pr_X])
 
+# Validation
+
+  - The weight vector has one entry for each observation, through [`owa_weights`](@ref). Raises a `DimensionMismatch`.
+
 # Keyword arguments
 
   - `prefix::Symbol`: Model State namespace (default: empty, i.e. the bare key).
@@ -108,15 +112,11 @@ function set_risk_constraints!(model::JuMP.Model, i::Any,
     T = get_T(model)
     owa = set_owa_constraints!(model, X; prefix = prefix)
     ovec = range(one(eltype(X)), one(eltype(X)); length = T)
-    owa_a, owa_b = JuMP.@variables(model, begin
-                                       [1:T]
-                                       [1:T]
-                                   end)
-    state_set!(model, prefix, :owa_a_, i, owa_a)
-    state_set!(model, prefix, :owa_b_, i, owa_b)
+    owa_a = state_set!(model, prefix, :owa_a_, i, JuMP.@variable(model, [1:T]))
+    owa_b = state_set!(model, prefix, :owa_b_, i, JuMP.@variable(model, [1:T]))
     owa_risk = state_set!(model, prefix, :owa_risk_, i,
                           JuMP.@expression(model, sum(owa_a + owa_b)))
-    owa_w = isa(r.w, VecNum) ? r.w : r.w(T)
+    owa_w = owa_weights(r.w, T, :w)
     state_set!(model, prefix, :cowa_, i,
                JuMP.@constraint(model,
                                 sc * (owa * transpose(owa_w) - ovec * transpose(owa_a) -
@@ -133,8 +133,8 @@ to `model`.
 
 The exact formulation fuses the two tails rather than duplicating them. It forms the single
 weight vector ``\\boldsymbol{\\omega}_{1} - \\boldsymbol{\\omega}_{2}`` and builds one assignment dual
-over it, so the range costs the same `T × T` block as a single tail. `r.w2` is already
-reversed by the constructor of [`OrderedWeightsArrayRange`](@ref), so the difference is the
+over it, so the range costs the same `T × T` block as a single tail. [`OrderedWeightsArrayRange`](@ref)
+holds `r.w2` reversed, so the difference is the
 range weight vector.
 
 # Mathematical definition
@@ -169,6 +169,10 @@ Where:
   - $(arg_dict[:opt_rjumpe])
   - $(arg_dict[:pr_X])
 
+# Validation
+
+  - Each tail weight vector has one entry for each observation, through [`owa_weights`](@ref). Raises a `DimensionMismatch`.
+
 # Keyword arguments
 
   - `prefix::Symbol`: Model State namespace (default: empty, i.e. the bare key).
@@ -194,16 +198,12 @@ function set_risk_constraints!(model::JuMP.Model, i::Any,
     T = get_T(model)
     owa = set_owa_constraints!(model, X; prefix = prefix)
     ovec = range(one(eltype(X)), one(eltype(X)); length = T)
-    owa_a, owa_b = JuMP.@variables(model, begin
-                                       [1:T]
-                                       [1:T]
-                                   end)
-    state_set!(model, prefix, :owa_range_a_, i, owa_a)
-    state_set!(model, prefix, :owa_range_b_, i, owa_b)
+    owa_a = state_set!(model, prefix, :owa_range_a_, i, JuMP.@variable(model, [1:T]))
+    owa_b = state_set!(model, prefix, :owa_range_b_, i, JuMP.@variable(model, [1:T]))
     owa_range_risk = state_set!(model, prefix, :owa_range_risk_, i,
                                 JuMP.@expression(model, sum(owa_a + owa_b)))
-    owa_w1 = isa(r.w1, VecNum) ? r.w1 : r.w1(T)
-    owa_w2 = isa(r.w2, VecNum) ? r.w2 : r.w2(T)
+    owa_w1 = owa_weights(r.w1, T, :w1)
+    owa_w2 = owa_weights(r.w2, T, :w2)
     owa_w = owa_w1 - owa_w2
     state_set!(model, prefix, :cowa_range_, i,
                JuMP.@constraint(model,
@@ -227,10 +227,12 @@ the length of `r.alg.p`.
 
 Every permutation of the weight vector satisfies those properties, so the feasible set is a
 superset of the exact one and the risk is an upper bound on the exact OWA risk. The gap
-closes as the weight vector approaches a line. [owa3](@citet) studies that linear case. For
-the Gini mean difference and the tail Gini over samples of 500 to 10,000 observations,
-[owa3](@cite) reports the same objective value as the exact formulation, to the printed
-precision.
+closes as the weight vector approaches a line. [owa3](@citet) studies that linear case.
+Tables 1 and 3 of [owa3](@cite) compare the objective value with the exact formulations for
+the Gini mean difference and the tail Gini over samples of 500 to 1,500 observations. The
+values agree to the printed precision in every cell but one, 12.94 % against 12.93 % in
+Table 3. At 10,000 observations the exact formulations do not solve, so those rows hold no
+comparison.
 
 The gap was measured here against the functor at `T = 100`, `N = 8` with the default `p`. The
 Gini mean difference is 0.06 % high, the tail Gini is 1.7e-5 % high, and the tail Gini range
@@ -261,7 +263,7 @@ Where:
 
   - ``\\boldsymbol{\\omega}``: Is the OWA weight vector, `r.w` if it is a vector, `r.w(T)` if it is a callable.
   - ``\\hat{\\boldsymbol{r}}``: Is the vector of net portfolio returns, negated when `loss` is `false`.
-  - ``S``: Is the set of p-norm orders, `r.alg.p`.
+  - ``S``: Is the set of p-norm orders, `r.alg.p`, or the empty set when at most one entry of ``\\boldsymbol{\\omega}`` lies strictly between its minimum and its maximum. `## Relaxation` gives the reason.
   - ``t``: Is the scalar auxiliary variable, `owa_t`.
   - ``\\boldsymbol{\\nu},\\, \\boldsymbol{\\eta}``: Are the `T × 1` non-negative auxiliary variables, `owa_nu` and `owa_eta`.
   - ``\\boldsymbol{\\varepsilon},\\, \\boldsymbol{\\psi}``: Are the `T × M` auxiliary variables, `owa_epsilon` and `owa_psi`.
@@ -269,6 +271,40 @@ Where:
   - ``\\mathcal{P}_{3}^{\\alpha,\\, 1-\\alpha}``: Is the three-dimensional power cone.
   - ``T``: Is the total number of observations.
   - ``M``: Is the number of p-norm orders, `length(r.alg.p)`.
+
+# JuMP formulation
+
+## Variables
+
+  - The net portfolio returns ``\\hat{\\boldsymbol{r}}``: Read, through [`set_net_portfolio_returns!`](@ref).
+  - `owa_t_`, `owa_nu_`, `owa_eta_`, `owa_epsilon_`, `owa_psi_`, `owa_z_`, `owa_y_`: Created under no name, and stored under these keys with the index `i`. They are ``t``, ``\\boldsymbol{\\nu} \\geq 0``, ``\\boldsymbol{\\eta} \\geq 0``, ``\\boldsymbol{\\varepsilon}``, ``\\boldsymbol{\\psi}``, ``\\boldsymbol{\\zeta}`` and ``\\boldsymbol{y} \\geq 0``.
+
+## Expressions
+
+  - `aowa_risk_`: ``c_{1} t - c_{2} \\boldsymbol{1}^{\\intercal} \\boldsymbol{\\nu} + c_{3} \\boldsymbol{1}^{\\intercal} \\boldsymbol{\\eta} + \\sum_{k \\in S} d_{k} y_{k}``, the risk.
+  - `neg_owa_z_owa_p_`: ``-k \\zeta_{k}`` for each ``k \\in S``.
+  - `owa_p_o_owa_pm1_`: ``k / (k - 1)`` for each ``k \\in S``.
+
+## Constraints
+
+Every row is registered under no name, and stored under its key with the index `i`.
+
+  - `ca1_owa_`: ``s_c \\left(\\hat{\\boldsymbol{r}} - \\boldsymbol{\\nu} + \\boldsymbol{\\eta} - \\sum_{k \\in S} \\boldsymbol{\\varepsilon}_{k} + t \\boldsymbol{1}\\right) = \\boldsymbol{0}``.
+  - `ca2_owa_`: ``s_c \\left(\\zeta_{k} + y_{k} - \\boldsymbol{1}^{\\intercal} \\boldsymbol{\\psi}_{k}\\right) = 0`` for each ``k \\in S``.
+  - `ca_owa_pcone_`: ``\\left(-s_c k \\zeta_{k},\\, s_c \\tfrac{k}{k-1} \\psi_{k,\\, t},\\, s_c \\varepsilon_{k,\\, t}\\right) \\in \\mathcal{P}_{3}^{1/k,\\, 1-1/k}`` for each ``k \\in S`` and each ``t``.
+
+Where:
+
+  - $(math_dict[:sc_scale])
+  - The other symbols are those of the `Where:` list of `# Mathematical definition`.
+
+## Relaxation
+
+$(val_dict[:relax])
+
+  - The bounded quantity is `aowa_risk_`. At its minimum over the auxiliary variables, it lies at or **above** the exact OWA risk of the same portfolio, ``\\boldsymbol{\\omega}^{\\intercal} \\mathrm{sort}(\\hat{\\boldsymbol{r}})``. The dual of the programme maximises over every vector with the minimum, the maximum, the sum and the p-norms of ``-\\boldsymbol{\\omega}``, and every reordering of ``-\\boldsymbol{\\omega}`` is such a vector.
+  - The bound is exact when at most one entry of the weight vector lies strictly between its minimum and its maximum, as the vectors of [`owa_wr`](@ref) and of [`owa_cvar`](@ref) at every ``\\alpha`` do. The box and the sum then describe the convex hull of the reorderings, and every p-norm constraint is redundant. The method then sets ``S`` to the empty set, so ``M = 0`` and the model is a linear programme. The redundant cones would put the optimum at the apex of every cone, ``\\boldsymbol{\\varepsilon} = \\boldsymbol{0}`` and ``\\boldsymbol{y} = \\boldsymbol{0}``, where an interior point solver can stall. For other vectors the gap closes as the vector approaches a line, and the gaps above give its size.
+  - The bound holds while the objective or a bound pulls `aowa_risk_` down, as a minimum-risk objective does. Under [`MaximumReturn`](@ref) with no risk bound, nothing pulls, and the value of `aowa_risk_` can lie further above. Read the exact figure back with [`expected_risk`](@ref).
 
 # Arguments
 
@@ -278,6 +314,10 @@ Where:
     measure with approximate formulation.
   - $(arg_dict[:opt_rjumpe])
   - $(arg_dict[:pr_X])
+
+# Validation
+
+  - The weight vector has one entry for each observation, through [`owa_weights`](@ref). Raises a `DimensionMismatch`. The formulation reads only the sum, the extremes and the norms of the weights, so without the check a vector of the wrong length solves a different problem with no error.
 
 # Keyword arguments
 
@@ -299,7 +339,7 @@ Where:
 
 # References
 
-  - $(ref_dict[:owa3])
+  - $(ref_dict[:owa3]) Sections 2.3 and 2.4, Equations 4 and 5; Section 3, Equation 7; Section 4, Tables 1 and 3.
 """
 function set_risk_constraints!(model::JuMP.Model, i::Any,
                                r::OrderedWeightsArray{<:Any, <:Any,
@@ -310,74 +350,57 @@ function set_risk_constraints!(model::JuMP.Model, i::Any,
     X = pr.X
     T = get_T(model)
     net_X = set_net_portfolio_returns!(model, X; prefix = prefix)
-    if !loss
-        net_X = -net_X
-    end
-    owa_p = r.alg.p
-    M = length(owa_p)
-    owa_t, owa_nu, owa_eta, owa_epsilon, owa_psi, owa_z, owa_y = JuMP.@variables(model,
-                                                                                 begin
-                                                                                     ()
-                                                                                     [1:T],
-                                                                                     (lower_bound = 0)
-                                                                                     [1:T],
-                                                                                     (lower_bound = 0)
-                                                                                     [1:T,
-                                                                                      1:M]
-                                                                                     [1:T,
-                                                                                      1:M]
-                                                                                     [1:M]
-                                                                                     [1:M],
-                                                                                     (lower_bound = 0)
-                                                                                 end)
-    state_set!(model, prefix, :owa_t_, i, owa_t)
-    state_set!(model, prefix, :owa_nu_, i, owa_nu)
-    state_set!(model, prefix, :owa_eta_, i, owa_eta)
-    state_set!(model, prefix, :owa_epsilon_, i, owa_epsilon)
-    state_set!(model, prefix, :owa_psi_, i, owa_psi)
-    state_set!(model, prefix, :owa_z_, i, owa_z)
-    state_set!(model, prefix, :owa_y_, i, owa_y)
-    owa_w = isa(r.w, VecNum) ? -r.w : -r.w(T)
+    owa_w = -owa_weights(r.w, T, :w)
     owa_s = sum(owa_w)
-    owa_l = minimum(owa_w)
-    owa_h = maximum(owa_w)
+    owa_l, owa_h = extrema(owa_w)
+    # With at most one entry strictly inside the box, the box and the sum describe the convex
+    # hull of the reorderings. The p-norm cones are then redundant, and they put the optimum
+    # at the apex of every cone, where the interior point solver can stall (#1895).
+    owa_p = count(x -> owa_l < x < owa_h, owa_w) <= 1 ? empty(r.alg.p) : r.alg.p
+    M = length(owa_p)
+    owa_t = state_set!(model, prefix, :owa_t_, i, JuMP.@variable(model))
+    owa_nu = state_set!(model, prefix, :owa_nu_, i,
+                        JuMP.@variable(model, [1:T], lower_bound = 0))
+    owa_eta = state_set!(model, prefix, :owa_eta_, i,
+                         JuMP.@variable(model, [1:T], lower_bound = 0))
+    owa_epsilon = state_set!(model, prefix, :owa_epsilon_, i,
+                             JuMP.@variable(model, [1:T, 1:M]))
+    owa_psi = state_set!(model, prefix, :owa_psi_, i, JuMP.@variable(model, [1:T, 1:M]))
+    owa_z = state_set!(model, prefix, :owa_z_, i, JuMP.@variable(model, [1:M]))
+    owa_y = state_set!(model, prefix, :owa_y_, i,
+                       JuMP.@variable(model, [1:M], lower_bound = 0))
     owa_d = [LinearAlgebra.norm(owa_w, p) for p in owa_p]
-    aowa_risk, neg_owa_z_owa_p, owa_p_o_owa_pm1 = JuMP.@expressions(model,
-                                                                    begin
-                                                                        owa_s * owa_t -
-                                                                        owa_l *
-                                                                        sum(owa_nu) +
-                                                                        owa_h *
-                                                                        sum(owa_eta) +
-                                                                        LinearAlgebra.dot(owa_d,
-                                                                                          owa_y)
-                                                                        -owa_z .* owa_p
-                                                                        owa_p ./ (owa_p .-
-                                                                                  one(eltype(owa_p)))
-                                                                    end)
-    state_set!(model, prefix, :aowa_risk_, i, aowa_risk)
-    state_set!(model, prefix, :neg_owa_z_owa_p_, i, neg_owa_z_owa_p)
-    state_set!(model, prefix, :owa_p_o_owa_pm1_, i, owa_p_o_owa_pm1)
-    ca1_owa, ca2_owa, ca_owa_pcone = JuMP.@constraints(model,
-                                                       begin
-                                                           sc *
-                                                           ((net_X - owa_nu + owa_eta -
-                                                             vec(sum(owa_epsilon; dims = 2))) .+
-                                                            owa_t) == 0
-                                                           sc * (owa_z + owa_y -
-                                                                 vec(sum(owa_psi; dims = 1))) ==
-                                                           0
-                                                           [i = 1:M, j = 1:T],
-                                                           [sc * neg_owa_z_owa_p[i],
-                                                            sc *
-                                                            owa_psi[j, i] *
-                                                            owa_p_o_owa_pm1[i],
-                                                            sc * owa_epsilon[j, i]] in
-                                                           JuMP.MOI.PowerCone(inv(owa_p[i]))
-                                                       end)
+    aowa_risk = state_set!(model, prefix, :aowa_risk_, i,
+                           JuMP.@expression(model,
+                                            owa_s * owa_t - owa_l * sum(owa_nu) +
+                                            owa_h * sum(owa_eta) +
+                                            LinearAlgebra.dot(owa_d, owa_y)))
+    neg_owa_z_owa_p = state_set!(model, prefix, :neg_owa_z_owa_p_, i,
+                                 JuMP.@expression(model, -owa_z .* owa_p))
+    owa_p_o_owa_pm1 = state_set!(model, prefix, :owa_p_o_owa_pm1_, i,
+                                 JuMP.@expression(model,
+                                                  owa_p ./ (owa_p .- one(eltype(owa_p)))))
+    # A sum over one axis of a JuMP array is one `sum(view(…))` for each row or column.
+    # `sum(owa_psi; dims = 1)` reduces with a plain `+` and copies each partial sum, which
+    # cost 144 MiB on 1000 × 3 (#2062).
+    eps_sum = [sum(view(owa_epsilon, t, :)) for t in 1:T]
+    psi_sum = [sum(view(owa_psi, :, j)) for j in 1:M]
+    # The gain tail negates `net_X` inside the macro, which builds the row on one copy of the
+    # series. A negated copy made before the macro costs a second copy (#2062).
+    ca1_owa = if loss
+        JuMP.@constraint(model, sc * ((net_X - owa_nu + owa_eta - eps_sum) .+ owa_t) == 0)
+    else
+        JuMP.@constraint(model, sc * ((-net_X - owa_nu + owa_eta - eps_sum) .+ owa_t) == 0)
+    end
     state_set!(model, prefix, :ca1_owa_, i, ca1_owa)
-    state_set!(model, prefix, :ca2_owa_, i, ca2_owa)
-    state_set!(model, prefix, :ca_owa_pcone_, i, ca_owa_pcone)
+    state_set!(model, prefix, :ca2_owa_, i,
+               JuMP.@constraint(model, sc * (owa_z + owa_y - psi_sum) == 0))
+    state_set!(model, prefix, :ca_owa_pcone_, i,
+               JuMP.@constraint(model, [i = 1:M, j = 1:T],
+                                [sc * neg_owa_z_owa_p[i],
+                                 sc * owa_psi[j, i] * owa_p_o_owa_pm1[i],
+                                 sc * owa_epsilon[j, i]] in
+                                JuMP.MOI.PowerCone(inv(owa_p[i]))))
     set_risk_bounds_and_expression!(model, opt, aowa_risk, r.settings, :aowa_risk_, i;
                                     prefix = prefix)
     return aowa_risk
@@ -401,6 +424,10 @@ OWA expressions. Each tail brings its own power cone block.
   - $(arg_dict[:opt_rjumpe])
   - $(arg_dict[:pr_X])
 
+# Validation
+
+  - Each tail weight vector has one entry for each observation, through [`owa_weights`](@ref). Raises a `DimensionMismatch` that names `w1` or `w2`.
+
 # Returns
 
   - `aowa_range_risk`: The combined `loss + gain` risk expression added to the model.
@@ -417,6 +444,11 @@ function set_risk_constraints!(model::JuMP.Model, i::Any,
                                                            <:ApproxOrderedWeightsArray},
                                opt::RiskConstraintOwner, pr::AbstractPriorResult, args...;
                                prefix::Symbol = Symbol(""), kwargs...)
+    # Each tail checks its own weights, but under the name `w` of the tail. Check them here
+    # under the names that the caller gave.
+    T = get_T(model)
+    owa_weights(r.w1, T, :w1)
+    owa_weights(r.w2, T, :w2)
     return set_range_risk_constraints!(model, i, r, :aowa_range_risk_, opt, pr, args...;
                                        prefix = prefix, kwargs...)
 end
@@ -490,11 +522,9 @@ function set_sorting_network_owa!(model::JuMP.Model, alg::SortingNetworkOrderedW
     end
     l = (T + 1):2:(T + 2 * K)
     h = (T + 2):2:(T + 2 * K)
-    c_eq, c_a, c_b = JuMP.@constraints(model, begin
-                                           sc * (x[l] + x[h] - x[a] - x[b]) == 0
-                                           sc * (x[h] - x[a]) in JuMP.Nonnegatives()
-                                           sc * (x[h] - x[b]) in JuMP.Nonnegatives()
-                                       end)
+    c_eq = JuMP.@constraint(model, sc * (x[l] + x[h] - x[a] - x[b]) == 0)
+    c_a = JuMP.@constraint(model, sc * (x[h] - x[a]) in JuMP.Nonnegatives())
+    c_b = JuMP.@constraint(model, sc * (x[h] - x[b]) in JuMP.Nonnegatives())
     risk = JuMP.@expression(model, s * LinearAlgebra.dot(owa_w, x[wire]))
     return (; z, c_eq, c_a, c_b, risk)
 end
@@ -539,6 +569,7 @@ Where:
 
 # Validation
 
+  - The weight vector has one entry for each observation, through [`owa_weights`](@ref). Raises a `DimensionMismatch`.
   - The weight vector is nondecreasing. Raises a `DomainError`.
 
 # Keyword arguments
@@ -566,7 +597,7 @@ function set_risk_constraints!(model::JuMP.Model, i::Any,
                                opt::RiskConstraintOwner, pr::AbstractPriorResult, args...;
                                prefix::Symbol = Symbol(""), kwargs...)
     T = get_T(model)
-    owa_w = isa(r.w, VecNum) ? r.w : r.w(T)
+    owa_w = owa_weights(r.w, T, :w)
     net = set_sorting_network_owa!(model, r.alg, pr.X, owa_w; prefix = prefix)
     state_set!(model, prefix, :sowa_z_, i, net.z)
     state_set!(model, prefix, :csowa_eq_, i, net.c_eq)
@@ -582,7 +613,7 @@ $(DocStringExtensions.TYPEDSIGNATURES)
 
 Add JuMP risk constraints for `OrderedWeightsArrayRange` using the sorting-network formulation to `model`.
 
-The formulation fuses the two tails, as [`ExactOrderedWeightsArray`](@ref) does. It forms the single weight vector ``\\boldsymbol{\\omega}_{1} - \\boldsymbol{\\omega}_{2}`` and builds one network over it. `r.w2` is already reversed by the constructor of [`OrderedWeightsArrayRange`](@ref), so the difference is the range weight vector, and it is nondecreasing when both tails are.
+The formulation fuses the two tails, as [`ExactOrderedWeightsArray`](@ref) does. It forms the single weight vector ``\\boldsymbol{\\omega}_{1} - \\boldsymbol{\\omega}_{2}`` and builds one network over it. [`OrderedWeightsArrayRange`](@ref) holds `r.w2` reversed, so the difference is the range weight vector, and it is nondecreasing when both tails are.
 
 # Mathematical definition
 
@@ -613,6 +644,7 @@ Where:
 
 # Validation
 
+  - Each tail weight vector has one entry for each observation, through [`owa_weights`](@ref). Raises a `DimensionMismatch`.
   - The range weight vector is nondecreasing. Raises a `DomainError`.
 
 # Keyword arguments
@@ -640,8 +672,8 @@ function set_risk_constraints!(model::JuMP.Model, i::Any,
                                opt::RiskConstraintOwner, pr::AbstractPriorResult, args...;
                                prefix::Symbol = Symbol(""), kwargs...)
     T = get_T(model)
-    owa_w1 = isa(r.w1, VecNum) ? r.w1 : r.w1(T)
-    owa_w2 = isa(r.w2, VecNum) ? r.w2 : r.w2(T)
+    owa_w1 = owa_weights(r.w1, T, :w1)
+    owa_w2 = owa_weights(r.w2, T, :w2)
     net = set_sorting_network_owa!(model, r.alg, pr.X, owa_w1 - owa_w2; prefix = prefix)
     state_set!(model, prefix, :sowa_range_z_, i, net.z)
     state_set!(model, prefix, :csowa_range_eq_, i, net.c_eq)

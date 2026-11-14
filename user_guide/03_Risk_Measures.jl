@@ -137,7 +137,7 @@ catalogue = ["Dispersion and moments" =>
                   :LowOrderMoment => "Generic low-order moment measure, which includes the mean absolute deviation. Section 4 lists its aliases.",
                   :HighOrderMoment => "Generic third and fourth moment measure. Section 4 lists its aliases.",
                   :MedianAbsoluteDeviation => "Median absolute deviation, a robust counterpart of `MAD()`.",
-                  :Kurtosis => "Square root of the fourth central moment of the portfolio returns.",
+                  :Kurtosis => "Square root of the fourth central moment, read off the cokurtosis matrix.",
                   :NegativeSkewness => "Downside asymmetry from the coskewness tensor.",
                   :VarianceSkewKurtosis => "Variance, skewness, and kurtosis combined in one expression.",
                   :BrownianDistanceVariance => "Upper bound on the distance variance of the portfolio returns, built from the distances between observations."],
@@ -190,8 +190,8 @@ catalogue = ["Dispersion and moments" =>
              "Non-optimisation (diagnostics and scoring)" =>
                  [:ExpectedReturn => "Prior expected return of the portfolio.",
                   :MeanReturn => "Realised mean return of the portfolio.",
-                  :Skewness => "Standardised skewness of the return distribution.",
-                  :ThirdCentralMoment => "Unstandardised third central moment.",
+                  :Skewness => "Third central moment, read off the coskewness matrix. `VarianceSkewKurtosis` bounds it from below.",
+                  :ThirdCentralMoment => "Third central moment of the returns, or the standardised skewness with a variance estimator in `ve`.",
                   :NonOptimisationRiskRatio => "Ratio of any two non-optimisation measures.",
                   :ExpectedReturnRiskRatio => "Prior expected return over risk, a Sharpe-style score.",
                   :MeanReturnRiskRatio => "Realised mean return over risk."]]
@@ -256,9 +256,10 @@ pretty_table(family_table("Non-optimisation (diagnostics and scoring)"))
 #=
 ## 4. Generic measures and their aliases
 
-Three of the types above are generic. [`LowOrderMoment`](@ref), [`HighOrderMoment`](@ref) and
-[`OrderedWeightsArray`](@ref) each compute a family of measures, and the `alg` or `w` field
-selects the member. You can write `MAD()` for `LowOrderMoment(; alg = MeanAbsoluteDeviation())`.
+Four of the types above are generic. [`LowOrderMoment`](@ref), [`HighOrderMoment`](@ref),
+[`OrderedWeightsArray`](@ref) and [`OrderedWeightsArrayRange`](@ref) each compute a family of
+measures, and the `alg`, `w` or `w1` and `w2` fields select the member. You can write `MAD()` for
+`LowOrderMoment(; alg = MeanAbsoluteDeviation())`.
 Each row below is an exported alias that builds a measure in one call. An alias that builds a
 `HighOrderMoment` gives a measure that only a clustering optimiser accepts.
 
@@ -282,14 +283,24 @@ alias_ctors = [("FLM", FLM, "First lower partial moment."),
                ("OWA_GMD", OWA_GMD, "Gini mean difference."),
                ("OWA_CVaR", OWA_CVaR, "CVaR as an OWA."), ("OWA_TG", OWA_TG, "Tail Gini."),
                ("OWA_WR", OWA_WR, "Worst realisation as an OWA."),
-               ("OWA_RG", OWA_RG, "Range as an OWA."),
-               ("OWA_CVaR_RG", OWA_CVaR_RG, "Two-sided CVaR as an OWA."),
-               ("OWA_TG_RG", OWA_TG_RG, "Two-sided tail Gini."),
+               ("OWA_RG", OWA_RG, "Range: the worst realisation in each tail."),
+               ("OWA_CVaR_RG", OWA_CVaR_RG, "Two-sided CVaR: one CVaR tail at each end."),
+               ("OWA_TG_RG", OWA_TG_RG, "Two-sided tail Gini: one tail Gini at each end."),
                ("OWA_LMoment", OWA_LMoment, "L-moment weights of order `k`.")]
+
+function owa_name(w)
+    if isa(w, ComposedFunction)
+        return "reverse ∘ $(owa_name(w.inner))"
+    end
+    return string(isa(w, Function) ? nameof(w) : nameof(typeof(w)))
+end
 
 function expands_to(m)
     if isa(m, OrderedWeightsArray)
-        return "w = $(isa(m.w, Function) ? nameof(m.w) : nameof(typeof(m.w)))"
+        return "w = $(owa_name(m.w))"
+    end
+    if isa(m, OrderedWeightsArrayRange)
+        return "w1 = $(owa_name(m.w1)), w2 = $(owa_name(m.w2))"
     end
     parts, a = String[], m.alg
     while true

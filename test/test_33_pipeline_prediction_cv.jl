@@ -130,10 +130,9 @@ end
         # the T -> T-1 contraction: k price rows produce k-1 return rows
         @test size(pred.rd.X, 1) == length(test_idx) - 1
 
-        # the test window is subset to the *train* universe even when clean. It states the
-        # same calendar as the gapped one: a pipeline fitted on a span-stating carrier emits
-        # an Asset Panel, and `assert_universe_aligned` refuses a test window that states
-        # none, because the two did not come from one ingestion.
+        # the test window is subset to the *train* universe even when clean. A clean window
+        # with an all-true span emits no Asset Panel (#1882), and `assert_universe_aligned`
+        # reads the asset axis alone, so it passes beside a training window that holds one.
         pr_clean = PricesResult(; X = X, span = trues(size(values(X))))
         pred_clean = PortfolioOptimisers.predict(res, pr_clean, test_idx)
         @test size(pred_clean.rd.X, 2) == 1  # net portfolio returns column
@@ -168,12 +167,15 @@ end
         @test preds[1].rd.X ≈ rd.X[61:80, :] * res.w
         @test preds[2].rd.X ≈ rd.X[81:100, :] * res.w
         # The result form of fit_and_predict predicts as predict does.
-        fap = PortfolioOptimisers.fit_and_predict(res, rd; test_idx = collect(61:100))
+        fap = PortfolioOptimisers.fit_and_predict(res, rd, nothing, collect(61:100))
         @test fap.rd.X ≈ pred.rd.X
-        fapv = PortfolioOptimisers.fit_and_predict(res, rd;
-                                                   test_idx = [collect(61:80),
-                                                               collect(81:100)])
+        fapv = PortfolioOptimisers.fit_and_predict(res, rd, nothing,
+                                                   [collect(61:80), collect(81:100)])
         @test fapv[2].rd.X ≈ preds[2].rd.X
+        # It passes every keyword to `predict`, which refuses a wrong one (#2066).
+        @test_throws MethodError PortfolioOptimisers.fit_and_predict(res, rd, nothing,
+                                                                     collect(61:100);
+                                                                     w_previous = nothing)
     end
 
     @testset "predict at price level, on several windows and from a result" begin
@@ -188,7 +190,7 @@ end
         @test length(preds) == 2
         @test preds[2].rd.X ≈ R[46:59, :] * res.w
         # The result form took returns data only, and a price window was a MethodError.
-        fap = PortfolioOptimisers.fit_and_predict(res, pr; test_idx = collect(46:60))
+        fap = PortfolioOptimisers.fit_and_predict(res, pr, nothing, collect(46:60))
         @test fap.rd.X ≈ preds[2].rd.X
         # A returns window after a price fit: the fitted PricesToReturns passes it unchanged.
         rw = ReturnsResult(; nx = string.("A", 1:5), X = R, ts = timestamp(X)[2:end])
@@ -203,8 +205,9 @@ end
         # A pipeline with no optimisation result has nothing to predict with.
         res0 = fit(Pipeline(; steps = (PricesToReturns(), EmpiricalPrior())), pr)
         @test_throws PortfolioOptimisers.IsNothingError PortfolioOptimisers.fit_and_predict(res0,
-                                                                                            pr;
-                                                                                            test_idx = collect(46:60))
+                                                                                            pr,
+                                                                                            nothing,
+                                                                                            collect(46:60))
     end
 
     @testset "predict guards" begin
@@ -669,4 +672,48 @@ end
                       for pa in cc.pred for p in pa.pred)
         end
     end
+end
+
+# A second pipeline shape implements only `fit` and `predict` (#1890).
+struct Ticket1890Pipeline{T} <: PortfolioOptimisers.AbstractPipelineEstimator
+    opt::T
+end
+struct Ticket1890PipelineResult{T} <: PortfolioOptimisers.AbstractPipelineResult
+    res::T
+end
+function PortfolioOptimisers.StatsAPI.fit(pipe::Ticket1890Pipeline, rd::ReturnsResult)
+    return Ticket1890PipelineResult(optimise(pipe.opt, rd))
+end
+function PortfolioOptimisers.StatsAPI.predict(res::Ticket1890PipelineResult,
+                                              rd::ReturnsResult, args...; kwargs...)
+    return PortfolioOptimisers.StatsAPI.predict(res.res, rd, args...; kwargs...)
+end
+
+@testset "A second pipeline shape reaches the methods on the abstract types (#1890)" begin
+    rd = ReturnsResult(; nx = ["A", "B", "C"],
+                       X = [0.01 0.02 -0.01; -0.02 0.01 0.03; 0.03 -0.01 0.02;
+                            0.01 0.0 -0.02; -0.01 0.02 0.01; 0.02 0.01 0.0])
+    pipe = Ticket1890Pipeline(InverseVolatility())
+
+    # The estimator method fits over the training rows and predicts over the test rows.
+    ref = optimise(InverseVolatility(), PortfolioOptimisers.port_opt_view(rd, 1:4, :))
+    pred = PortfolioOptimisers.fit_and_predict(pipe, rd, 1:4, 5:6)
+    @test pred.res.w ≈ ref.w
+    @test pred.rd.X ≈ predict(ref, rd, 5:6).rd.X
+
+    # The result method predicts over one window, or over each of a vector of windows.
+    res = fit(pipe, rd)
+    @test PortfolioOptimisers.fit_and_predict(res, rd, nothing, 5:6).rd.X ≈
+          predict(res.res, rd, 5:6).rd.X
+    preds = PortfolioOptimisers.fit_and_predict(res, rd, nothing, [4:5, 5:6])
+    @test length(preds) == 2
+    @test preds[1].rd.X ≈ predict(res.res, rd, 4:5).rd.X
+
+    # A pipeline is not an optimiser, whatever its shape.
+    @test_throws ArgumentError PortfolioOptimisers.port_opt_view(pipe, 1:2)
+    @test_throws ArgumentError optimise(pipe, rd)
+
+    # With no training rows the method reads the pipeline out with `fit(pipe)`, which only a
+    # pipeline that holds a partial-fit state implements.
+    @test_throws MethodError PortfolioOptimisers.fit_and_predict(pipe, rd, nothing, 5:6)
 end

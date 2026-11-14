@@ -209,4 +209,45 @@ end
         @test isempty(marked)
         isempty(marked) || println(join(marked, "\n"))
     end
+
+    # ------------------------------------- check 5: a trip reaches a reader
+
+    @testset "The ratchet of `ReusableTest.yml` reds its check and runs on a red suite" begin
+        #=
+        Issue #1912. From 2026-09-01 to 2026-10-27 the ratchet tripped on all 158 green runs of
+        `dev`, and nothing turned red: the step carried `continue-on-error: true`, the step that
+        publishes the Refresh Artifact read `failure()` alone, and the `coverage` job waited for
+        a green suite. A Dependabot pull request into `main` (#488) put back the broken guard in
+        the hunk of a version bump, so a review of the version alone does not see such a change.
+        ADR 0082, amendment of 2026-10-30, states each guard that this check holds.
+
+        The check reads the text, not a YAML tree: the test environment carries no YAML parser,
+        and a guard is one line.
+        =#
+        wf = read(joinpath(ROOT, ".github", "workflows", "ReusableTest.yml"), String)
+        cut = findfirst("\n  coverage:\n", wf)
+        @test !isnothing(cut)
+        test_job, cov_job = wf[1:first(cut)], wf[first(cut):end]
+        # The steps of a job, split at their list markers.
+        steps(job) = split(job, r"\n      - ")
+        step(job, key) = only(filter(s -> occursin(key, s), steps(job)))
+        guard(s) = (m = match(r"\n\s+if: (.*)", s); isnothing(m) ? nothing : strip(m[1]))
+
+        # The ratchet decides the conclusion of its job.
+        @test !occursin(r"\n\s+continue-on-error:", cov_job)
+        tripped = "\${{ failure() && steps.ratchet.outcome == 'failure' }}"
+        @test guard(step(cov_job, "name: Report a tripped ratchet")) == tripped
+        @test guard(step(cov_job, "name: Publish the Refresh Artifact")) == tripped
+
+        # A red suite still hands over its `lcov.info`, and the `coverage` job still reads it.
+        ran = "\${{ !cancelled() && inputs.run_codecov && steps.runtest.outcome != 'skipped' }}"
+        @test occursin("id: runtest", step(test_job, "julia-runtest"))
+        @test guard(step(test_job, "julia-processcoverage")) == ran
+        publish = step(test_job, "name: Publish lcov.info for the ratchet")
+        @test occursin("id: publish_lcov", publish)
+        @test guard(publish) == ran
+        @test occursin("lcov: \${{ steps.publish_lcov.outcome }}", test_job)
+        @test occursin("\n    if: \${{ !cancelled() && inputs.run_codecov && " *
+                       "needs.test.outputs.lcov == 'success' }}", cov_job)
+    end
 end

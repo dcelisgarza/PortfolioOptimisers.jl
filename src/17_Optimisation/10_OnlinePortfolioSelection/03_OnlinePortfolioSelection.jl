@@ -13,7 +13,7 @@ The head is a naive optimiser. It fits no moment and solves no programme of its 
 
 A given `w0` is over the pinned names, and the head pins and views it with them. The first step projects it once onto the Allocation Set in the rule's geometry, as it projects the uniform start, so a start outside the set becomes feasible and is never refused. A set that reads the head's rows has no constraints before the first row, so it holds the start as given until the first update. The start reaches the first Online Update as `w`. A rule that steps from `w` continues from it. A rule whose next allocation is not a step from `w` replaces it at that update. The constant rebalanced portfolio returns its own `w`, an expert mixture returns the mix of its experts, and the Newton step solves its Gram. Such a rule can still carry `w0` forward. The gradient of the Newton step reads `w`, and an expert that steps from `w` starts at `w0`. Under every rule, the fund holds `w0` for exactly one period.
 
-**The Online Update reads the recursion's own allocation, and no flag changes that.** The previous weights of the loop reach the head through [`factory`](@ref) alone. They go into `fees` and `fb`, and never into the recursion. The fund's held book is the one base against which a turnover fee on this family measures a trade. So the online arm of the fold loop refuses a head whose `fees` carry a `tn` term when the Previous-Weights Source of the walk-forward is `nothing`. It throws an `ArgumentError` before any fold, and `pws = DriftedWeights()` is the whole configuration. A head with no `tn` fee is not checked.
+**The Online Update reads the recursion's own allocation, and no flag changes that.** The previous weights of the loop reach the head through [`factory`](@ref), into `fees` and `fb`, and the recursion never reads them as its allocation. A schedule in a field of a leader in the rule tree can also read them from `ctx.w_prev`, to select the configuration of the leader at the fold. The head then [`needs_previous_weights`](@ref), so a walk-forward runs its folds in sequence, see [`schedule_reads_previous_weights`](@ref). The fund's held book is the one base against which a turnover fee on this family measures a trade. So the online arm of the fold loop refuses a head whose `fees` carry a `tn` term when the Previous-Weights Source of the walk-forward is `nothing`. It throws an `ArgumentError` before any fold, and `pws = DriftedWeights()` is the whole configuration. A head with no `tn` fee is not checked.
 
 **Under `x_src = ExcessSource()` the head selects in the Excess Frame.** The rule's step reads the price relative of the return in excess of the benchmark, `x = 1 + r - b`. Here `b` is the benchmark return of the row, one value that every asset shares for a vector benchmark, and one value per asset for a matrix benchmark. Every reader of the rows inside a rule reads the same frame through [`head_frame_returns`](@ref): the refit and the fold of a forecaster, the scale of a [`ForecastReversion`](@ref), the window of an [`AntiCorrelation`](@ref) and the row selector of a [`FollowTheLeader`](@ref). The rows buffer keeps the raw returns and the benchmark, so the prior of a Risk Loss, the prior and each graph or exposure slot of a programme set, and a leader read the raw rows and state their own source. The source of the step, the readers of a Risk Loss and the readers of a programme set form one group. When one of them states `ExcessSource()` and another states no source and reads the raw rows, the head warns once, see [`warn_raw_readers`](@ref). A leader and the fallback are heads with their own groups. A gap in the benchmark is a gap in the frame, which the step reads as one and the head reports as a Held Gap. `predict(res, rd)` reports the raw wealth of the fund, because the fund holds the assets. Returns data with no benchmark is refused with an `ArgumentError`.
 
@@ -52,7 +52,7 @@ Where:
   - $(math_dict[:T])
   - $(math_dict[:N])
 
-The Next-Period Allocation after ``T`` rows is ``\\boldsymbol{w}_{T+1}``. Both projections are one call of [`project`](@ref), so a [`ProgrammeAllocationSet`](@ref) adds its Objective Penalty to both objectives.
+The wealth ``S_T`` is the wealth of Equation 1.1 of [cover1991](@cite), earned in the protocol of Section 2 of [lihoi2014](@cite). The Next-Period Allocation after ``T`` rows is ``\\boldsymbol{w}_{T+1}``. Both projections are one call of [`project`](@ref), so a [`ProgrammeAllocationSet`](@ref) adds its Objective Penalty to both objectives.
 
 Under `x_src = ExcessSource()`, ``r_{tj}`` is the return of asset ``j`` in excess of the benchmark, ``r_{tj} - b_{tj}``, where ``b_{tj}`` is the benchmark return of period ``t`` for asset ``j``. A vector benchmark gives every asset the same ``b_{tj}``.
 
@@ -73,7 +73,7 @@ $(DocStringExtensions.FIELDS)
         cache::Option{<:OnlinePortfolioSelectionState} = nothing
     ) -> OnlinePortfolioSelection
 
-Keywords correspond to the struct's fields. `set`, `fees` and `fb` can hold a [`TimeDependent`](@ref) per-fold schedule. `alg`, `w0`, `x_src` and `strict` are static.
+Keywords correspond to the struct's fields. `set`, `fees` and `fb` can hold a [`TimeDependent`](@ref) per-fold schedule. `alg`, `w0`, `x_src` and `strict` are static. A field of an optimiser that the rule tree on `alg` holds, such as the leader of a [`FollowTheLeader`](@ref), can hold a schedule too. The fold loop resolves it at each fold, before the step of the fold reads the leader, see [`online_step_fold`](@ref).
 
 ## Validation
 
@@ -87,14 +87,14 @@ Keywords correspond to the struct's fields. `set`, `fees` and `fb` can hold a [`
 
 ## Propagated parameters
 
-When [`factory`](@ref) is called on this type, the following fields are propagated:
+[`factory`](@ref) passes its arguments on to these fields:
 
-  - `fees`: Recursively updated via [`factory`](@ref), which threads the previous weights into a turnover fee.
-  - `fb`: Recursively updated via [`factory`](@ref).
+  - `fees`: Recursively updated through [`factory`](@ref), which threads the previous weights into a turnover fee.
+  - `fb`: Recursively updated through [`factory`](@ref).
 
 ## View parameters
 
-When [`port_opt_view`](@ref) is called on this type, the fields with a per-asset axis are subset to the selected indices: `alg` and `set` recursively, `w0` sliced and renormalised, `fees` viewed at the indices, and `cache` through the state's own view.
+[`port_opt_view`](@ref) takes the view of the fields with a per-asset axis at the selected indices: `alg` and `set` recursively, `w0` sliced and renormalised, `fees` viewed at the indices, and `cache` through the state's own view.
 
 # Examples
 
@@ -102,11 +102,12 @@ When [`port_opt_view`](@ref) is called on this type, the fields with a per-asset
 julia> OnlinePortfolioSelection()
 OnlinePortfolioSelection
      alg ┼ MirrorDescent
-         │     eta ┼ Float64: 0.05
-         │    proj ┼ EntropicProjection()
-         │   alpha ┼ Int64: 0
-         │     obj ┼ LogWealth()
-         │    grad ┴ PlainGradient()
+         │         eta ┼ Float64: 0.05
+         │        proj ┼ EntropicProjection()
+         │       alpha ┼ Int64: 0
+         │         obj ┼ LogWealth()
+         │        grad ┼ nothing
+         │   predictor ┴ nothing
      set ┼ BoundedAllocationSet
          │     wb ┼ WeightBounds
          │        │   lb ┼ Float64: 0.0
@@ -133,7 +134,8 @@ OnlinePortfolioSelection
 
 # References
 
-  - $(ref_dict[:lihoi2014])
+  - $(ref_dict[:lihoi2014]) Section 2, Algorithm 1.
+  - $(ref_dict[:cover1991]) Section 1, Equation 1.1.
 """
 @concrete struct OnlinePortfolioSelection <: NaiveOptimisationEstimator
     """
@@ -265,6 +267,88 @@ function online_portfolio_selection_td_defaults()::NamedTuple
 end
 function time_dependent_field_defaults(::OnlinePortfolioSelection)::NamedTuple
     return online_portfolio_selection_td_defaults()
+end
+"""
+    is_time_dependent(opt::OnlinePortfolioSelection)
+    assert_time_dependent_fold_count(opt::OnlinePortfolioSelection, n::Integer, all_binds::Bool = true)
+    update_time_dependent_estimator(opt::OnlinePortfolioSelection, ctx::TimeDependentContext, all_binds::Bool = true)
+
+Reads the schedules of the head: those in its own fields, in its fallback `fb`, and in the optimisers of its rule tree on `alg`.
+
+The methods of a naive optimiser read the fields and the fallback. The head adds `alg`, because a leader in the rule tree solves at each step, and a schedule in a field of the leader must resolve at the fold, see [`rule_tree_fields`](@ref). The update rebuilds the head through its keyword constructor, so the constructor checks every resolved value. A rule that holds no schedule comes back as the same object.
+
+# Algorithm
+
+The update of the head:
+
+ 1. Return `opt` unchanged when [`is_time_dependent`](@ref) is `false` for it.
+ 2. Replace each scheduled field of `opt` with its value at the fold, through [`update_time_dependent_fields`](@ref), giving the new `opt`.
+ 3. Resolve the fallback `opt.fb` and the rule `opt.alg` of the new `opt` at the same `ctx`.
+ 4. Rebuild `opt` with the two resolved values through [`rebuild_struct`](@ref).
+
+# Arguments
+
+  - `opt`: The head.
+  - `n`: The number of folds.
+  - `ctx`: The context of the fold.
+  - `all_binds`: As [`update_time_dependent_estimator`](@ref) takes it.
+
+# Validation
+
+  - Each vector schedule of the head, of its fallback and of its rule tree has `n` entries, else a `DimensionMismatch` that names the field is thrown.
+
+# Related
+
+  - [`OnlinePortfolioSelection`](@ref)
+  - [`online_step_fold`](@ref)
+  - [`is_time_dependent`](@ref)
+  - [`update_time_dependent_estimator`](@ref)
+"""
+function is_time_dependent(opt::OnlinePortfolioSelection)
+    return (!isempty(time_dependent_fields(opt)) ||
+            is_time_dependent(opt.fb) ||
+            is_time_dependent(opt.alg))
+end
+function assert_time_dependent_fold_count(opt::OnlinePortfolioSelection, n::Integer,
+                                          all_binds::Bool = true)::Nothing
+    assert_time_dependent_fields_fold_count(opt, n, all_binds)
+    assert_time_dependent_fold_count(opt.fb, n, all_binds)
+    assert_time_dependent_fold_count(opt.alg, n, all_binds)
+    return nothing
+end
+function update_time_dependent_estimator(opt::OnlinePortfolioSelection,
+                                         ctx::TimeDependentContext, all_binds::Bool = true)
+    if !is_time_dependent(opt)
+        return opt
+    end
+    opt = update_time_dependent_fields(opt, ctx, all_binds)
+    return rebuild_struct(opt,
+                          (; fb = update_time_dependent_estimator(opt.fb, ctx, all_binds),
+                           alg = update_time_dependent_estimator(opt.alg, ctx, all_binds)))
+end
+"""
+$(DocStringExtensions.TYPEDSIGNATURES)
+
+Returns `true` if the fold loop must give the head the weights of the previous fold.
+
+The previous weights reach the head on two paths. [`factory`](@ref) gives them to `fees` and to `fb`, so the head reads the turnover and fee terms of those two fields, and every schedule in its own fields, as a naive optimiser does. A schedule in a leader of the rule tree on `alg` can read them from `ctx.w_prev` of its context. The head reads `alg` through [`schedule_reads_previous_weights`](@ref) alone. A turnover or a fee of a leader measures its trade from the Price-Adjusted Allocation of the step, which `factory` gives the leader inside the rule, so it needs no weights from the loop.
+
+# Related
+
+  - [`needs_previous_weights`](@ref)
+  - [`schedule_reads_previous_weights`](@ref)
+  - [`FollowTheLeader`](@ref)
+"""
+function needs_previous_weights(opt::OnlinePortfolioSelection)::Bool
+    return (any(f -> needs_previous_weights(getfield(opt, f)),
+                time_dependent_fields(opt)) ||
+            needs_previous_weights(opt.fees) ||
+            needs_previous_weights(opt.fb) ||
+            schedule_reads_previous_weights(opt.alg))
+end
+function schedule_reads_previous_weights(opt::OnlinePortfolioSelection)::Bool
+    return (any(f -> schedule_reads_previous_weights(getfield(opt, f)),
+                schedule_tree_fields(opt)) || schedule_reads_previous_weights(opt.alg))
 end
 """
     factory(opt::OnlinePortfolioSelection, w::VecNum)
@@ -447,12 +531,13 @@ This is the Block Step, and a fold of the whole Returns Result from no state is 
 
 # Algorithm
 
- 1. Read the returns of the block in the head's frame through [`benchmark_relative_returns`](@ref), giving `R`. `R` is `rd.X - rd.B` when the head's `x_src` is [`ExcessSource`](@ref), and `rd.X` otherwise.
- 2. Read the active mask of `rd` through [`step_active_mask`](@ref), giving `amsk`.
- 3. Resolve the Allocation Set over the pinned universe through [`resolve_allocation_set`](@ref), giving `set`.
- 4. Seed the state on the first block, or pin and check the carried state, through [`online_selection_pin`](@ref), giving `state`.
- 5. Fold each row in order through [`online_selection_row!`](@ref), under the timestamp that [`row_timestamp`](@ref) gives it. The row's returns are its row of `R`, and the row of the raw returns data is viewed as a Returns Result of one observation through [`port_opt_view`](@ref). Each row updates the state `st` of the rule, the allocation `w`, the buffer `X` and the hold record `hold`, and adds one to the row count `n`. `st` is the state of the rule: what the rule keeps from one update to the next, such as a Gram matrix or a belief covariance, or `nothing` for a rule that keeps nothing.
- 6. Return the state with the new `n`, `w`, `st`, `X` and `hold`, the active mask of the last row, and the timestamps folded so far.
+ 1. Check that every [`UniverseSets`](@ref) in the tree of the head and in `set` names the columns of `rd`, in order, through [`assert_universe_axis_order`](@ref). A rule that holds an optimiser checks that optimiser when it runs on the rows.
+ 2. Read the returns of the block in the head's frame through [`benchmark_relative_returns`](@ref), giving `R`. `R` is `rd.X - rd.B` when the head's `x_src` is [`ExcessSource`](@ref), and `rd.X` otherwise.
+ 3. Read the active mask of `rd` through [`step_active_mask`](@ref), giving `amsk`.
+ 4. Resolve the Allocation Set over the pinned universe through [`resolve_allocation_set`](@ref), giving `set`.
+ 5. Seed the state on the first block, or pin and check the carried state, through [`online_selection_pin`](@ref), giving `state`.
+ 6. Fold each row in order through [`online_selection_row!`](@ref), under the timestamp that [`row_timestamp`](@ref) gives it. The row's returns are its row of `R`, and the row of the raw returns data is viewed as a Returns Result of one observation through [`port_opt_view`](@ref). Each row updates the state `st` of the rule, the allocation `w`, the buffer `X` and the hold record `hold`, and adds one to the row count `n`. `st` is the state of the rule: what the rule keeps from one update to the next, such as a Gram matrix or a belief covariance, or `nothing` for a rule that keeps nothing.
+ 7. Return the state with the new `n`, `w`, `st`, `X` and `hold`, the active mask of the last row, and the timestamps folded so far.
 
 # Arguments
 
@@ -464,6 +549,7 @@ This is the Block Step, and a fold of the whole Returns Result from no state is 
 # Validation
 
   - `rd.X` is not `nothing`. An `IsNothingError` is thrown otherwise.
+  - The rules of [`assert_universe_axis_order`](@ref).
   - The head's `x_src` is not [`ExcessSource`](@ref), or `rd` carries a benchmark. An `ArgumentError` is thrown otherwise, through [`benchmark_relative_returns`](@ref).
   - Everything [`step_active_mask`](@ref) and [`assert_pinned_context`](@ref) refuse.
   - A non-finite cell at an active asset, under `strict`. An `ArgumentError` is thrown.
@@ -484,6 +570,8 @@ function fold_online_selection(opt::OnlinePortfolioSelection,
                                rd::ReturnsResult,
                                set::AbstractAllocationSet = static_allocation_set(opt))
     @argcheck(!isnothing(rd.X), IsNothingError("rd.X cannot be nothing"))
+    assert_universe_axis_order(opt, rd)
+    assert_universe_axis_order(set, rd)
     R = benchmark_relative_returns(rd, opt.x_src)
     amsk = step_active_mask(rd)
     set = resolve_allocation_set(set, size(rd.X, 2), opt.strict, eltype(rd.X))
@@ -725,7 +813,8 @@ function report_held_steps(held::AbstractVector{<:HeldStep}, ts)
     if isempty(held)
         return nothing
     end
-    @warn("Held Step at $(ts): $(join([h.reason for h in held], "; ")).")
+    @warn("Held Step at $(ts): $(join([h.reason for h in held], "; ")).",
+          maxlog = log_limit(:warn), _id = @log_id())
     return first(held)
 end
 """
@@ -769,7 +858,7 @@ function report_row_gaps(r::AbstractVector, w::AbstractVector,
         push!(held, (obs, i))
     end
     if !isempty(held)
-        strict_diagnostic(held_gap_msg(held, nx), strict)
+        strict_diagnostic(held_gap_msg(held, nx), strict; id = @log_id())
     end
     return nothing
 end
@@ -805,16 +894,16 @@ function partial_fit!(opt::OnlinePortfolioSelection{<:Any, <:Any, <:Any, <:Any, 
                                                     <:Any, <:Any,
                                                     <:Option{<:OnlinePortfolioSelectionState}},
                       rd::ReturnsResult)
-    return rebuild_estimator(opt,
-                             (; cache = fold_online_selection(opt, opt.cache, rd),
-                              fb = step_fallback(opt.fb, rd)))
+    return rebuild_struct(opt,
+                          (; cache = fold_online_selection(opt, opt.cache, rd),
+                           fb = step_fallback(opt.fb, rd)))
 end
 """
     online_step_fold(opt::OnlinePortfolioSelection, ctx::TimeDependentContext, rd::ReturnsResult)
 
-Folds the fold's rows into the head inside the fold's own Allocation Set.
+Folds the fold's rows into the head inside the fold's own Allocation Set and the fold's own rule tree.
 
-The head is the one family whose online step is the optimisation. The Constrained Update projects the raw step of every row onto `set`, so the step reads a schedule on `set`, and not only `optimise(opt)` with no data. So the method resolves the entry here, in the same fold and before `optimise(opt)` with no data resolves the other schedules. The head that the loop threads on keeps the schedule, so fold `i + 1` resolves from the schedule and not from entry `i`. The step writes no field but the state and the fallback, so the method returns the head with its `cache` rebound and its fallback stepped through [`step_fallback`](@ref).
+The head is the one family whose online step is the optimisation. The Constrained Update projects the raw step of every row onto `set`, so the step reads a schedule on `set`, and not only `optimise(opt)` with no data. A leader in the rule tree on `alg` solves at each row, so the step also reads each schedule in a field of the leader, see [`rule_tree_fields`](@ref). So the method resolves the entry of `set` and the schedules of `alg` here, in the same fold and before `optimise(opt)` with no data resolves the other schedules. The rows fold through a head that holds the resolved rule. A rule that holds no schedule comes back as the same object, and the head is then not rebuilt. The head that the loop threads on keeps every schedule, so fold `i + 1` resolves from the schedule and not from entry `i`. The step writes no field but the state and the fallback, so the method returns the head with its `cache` rebound and its fallback stepped through [`step_fallback`](@ref).
 
 # Arguments
 
@@ -839,9 +928,11 @@ function online_step_fold(opt::OnlinePortfolioSelection{<:Any, <:Any, <:Any, <:A
                           ctx::TimeDependentContext, rd::ReturnsResult)
     set = opt.set
     set = isa(set, TimeDependent) ? time_dependent_value(set, ctx) : set
-    return rebuild_estimator(opt,
-                             (; cache = fold_online_selection(opt, opt.cache, rd, set),
-                              fb = step_fallback(opt.fb, rd)))
+    alg = update_time_dependent_estimator(opt.alg, ctx)
+    step = alg === opt.alg ? opt : rebuild_struct(opt, (; alg = alg))
+    return rebuild_struct(opt,
+                          (; cache = fold_online_selection(step, opt.cache, rd, set),
+                           fb = step_fallback(opt.fb, rd)))
 end
 """
 $(DocStringExtensions.TYPEDSIGNATURES)
@@ -873,7 +964,7 @@ The Result expands ``\\bar{\\boldsymbol{w}}`` back over the pinned universe with
  2. View the head's set at `idx`, giving `set`, and slice the allocation to `w`.
  3. Resolve the head's fee against the full set, and view it at the Investable Mask through [`investable_fees_view`](@ref), giving `fees`.
  4. Sum `w` to `s`. When no asset is active, `s` is not positive, or an entry of `w` is not finite, return an [`OptimisationFailure`](@ref) with `NaN` weights and no bounds.
- 5. Resolve the weight bounds of `set` over the active assets, giving `wb`.
+ 5. Resolve the weight bounds of `set` over the active assets, giving `wb`. The resolution reads the rows that the head holds, viewed at the active assets, so a bound that reads the returns, such as a [`ScoreWeightBounds`](@ref), scores the rows of the last step.
  6. Return `w ./ s` with `wb`, `fees` and an [`OptimisationSuccess`](@ref) whose `res` is the hold record of the state.
 
 # Arguments
@@ -912,7 +1003,9 @@ function online_selection_result(opt::OnlinePortfolioSelection,
                                        w = fill(convert(eltype(w), NaN), Nr), imsk = imsk,
                                        fb = nothing, fees = fees)
     end
-    wb = weight_bounds_constraints(set.wb, set.sets; N = Nr, strict = opt.strict,
+    # A head that keeps no rows has `nothing` here, and its view is `nothing`.
+    rows = port_opt_view(buffer_returns_result(state.X), idx)
+    wb = weight_bounds_constraints(set.wb, set.sets; rd = rows, N = Nr, strict = opt.strict,
                                    datatype = eltype(w))
     retcode, w = OptimisationSuccess(; res = state.hold), w ./ s
     return NaiveOptimisationResult(; pr = nothing, wb = wb, retcode = retcode, w = w,
@@ -1042,7 +1135,7 @@ function held_timestamps(opt::OnlinePortfolioSelection)
     return isnothing(opt.cache) ? nothing : opt.cache.ts
 end
 """
-    update_online_estimator(opt::Union{<:OnlinePortfolioSelection, <:PreviousWeights})
+    update_online_estimator(opt::Union{OnlinePortfolioSelection, PreviousWeights})
 
 Resolves the [`Online`](@ref) wrappers in the fallback of the head, at the warm-up.
 
@@ -1054,18 +1147,18 @@ The two heads step their fallback through [`step_fallback`](@ref), so a wrapper 
   - [`step_fallback`](@ref)
   - [`online_unreached_path`](@ref)
 """
-function update_online_estimator(opt::Union{<:OnlinePortfolioSelection, <:PreviousWeights})
+function update_online_estimator(opt::Union{OnlinePortfolioSelection, PreviousWeights})
     return opt
 end
-function update_online_estimator(opt::Union{<:OnlinePortfolioSelection{<:Any, <:Any, <:Any,
-                                                                       <:Any,
-                                                                       <:OptimisationEstimator},
-                                            <:PreviousWeights{<:Any, <:Any,
-                                                              <:OptimisationEstimator}})
-    return rebuild_estimator(opt, (; fb = update_online_estimator(opt.fb)))
+function update_online_estimator(opt::Union{OnlinePortfolioSelection{<:Any, <:Any, <:Any,
+                                                                     <:Any,
+                                                                     <:OptimisationEstimator},
+                                            PreviousWeights{<:Any, <:Any,
+                                                            <:OptimisationEstimator}})
+    return rebuild_struct(opt, (; fb = update_online_estimator(opt.fb)))
 end
 """
-    online_unreached_path(opt::Union{<:OnlinePortfolioSelection, <:PreviousWeights})
+    online_unreached_path(opt::Union{OnlinePortfolioSelection, PreviousWeights})
 
 Names the first [`Online`](@ref) wrapper in the head that the warm-up leaves unresolved, or answers `nothing`.
 
@@ -1076,7 +1169,7 @@ The method runs the warm-up of [`update_online_estimator`](@ref) on the head, an
   - [`online_unreached_path`](@ref)
   - [`assert_online_entry`](@ref)
 """
-function online_unreached_path(opt::Union{<:OnlinePortfolioSelection, <:PreviousWeights})
+function online_unreached_path(opt::Union{OnlinePortfolioSelection, PreviousWeights})
     return online_wrapper_path(update_online_estimator(opt))
 end
 """

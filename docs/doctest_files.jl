@@ -5,17 +5,22 @@ Run the doctests of the docstrings that named source files hold, not of the whol
     julia -t 1 --project=docs docs/doctest_files.jl src/01_Base/02_Foo.jl src/09_Bar/
     julia -t 1 --project=docs docs/doctest_files.jl --against origin/dev
     julia -t 1 --project=docs docs/doctest_files.jl --fix src/01_Base/02_Foo.jl
+    julia -t 1 --project=docs docs/doctest_files.jl --all
 
 A path names a file, or a directory and every file below it. `--against <ref>` names the `.jl`
 files under `src/` and `ext/` that the branch changes against `ref`, from the merge-base on, as
 `code_health/CodeHealth.jl` finds them. `--fix` writes the output of each failed block back into its
-docstring, as `doctest(...; fix = true)` does.
+docstring, as `doctest(...; fix = true)` does. `--all` runs the full doctest step of the CI job:
+every docstring of the module and the manual pages under `docs/src`. A green `--all` run records
+the gate stamp `doctest`.
 
 The full run of the `run-doctests` skill checks every docstring of the module and the manual pages
 under `docs/src`, which takes about nine minutes. This script checks the docstrings that the named
-files hold, and nothing else. It is the check of a branch's own blocks between rebases. It does not
-replace the full run before the push, because a change in one file can change what a block in
-another file prints.
+files hold, and nothing else. A green run of `--against origin/dev` records the stamp
+`doctest-files`, which the push guard requires of a branch whose change to `src/` reaches a
+doctest. The guard takes the scoped run as it takes a scoped run of JET. A change in one file can
+change what a block in another file prints, and the doctest job of CI, which runs every block, is
+the gate for that case.
 
 The script runs the setup of the doctest job of `.github/workflows/Docs.yml` from the text of that
 file, so its `DocTestSetup` and its two show settings cannot drift from CI. It then copies each
@@ -25,7 +30,9 @@ source file. Like the CI job, it reads the docstrings of `PortfolioOptimisers` a
 docstring that an extension module holds is out of reach.
 
 Run it in a fresh process, for the reason the `run-doctests` skill gives. A green run without
-`--fix` records the gate stamp `doctest-files` through `code_health/gate_stamp.sh`.
+`--fix` records the gate stamp `doctest-files` through `code_health/gate_stamp.sh`. A run as the
+program holds a slot of `code_health/julia_slot.jl`, so it waits for free memory rather than
+being killed for the lack of it.
 
 This file loads no package at the top, so `test/test_76_gate_tooling.jl` includes it to test the
 selection without Documenter.
@@ -36,17 +43,20 @@ include(joinpath(@__DIR__, "..", "code_health", "CodeHealth.jl"))
 
 const REPO_ROOT = CodeHealth.REPO_ROOT
 const WORKFLOW = joinpath(REPO_ROOT, ".github", "workflows", "Docs.yml")
-const USAGE = "usage: doctest_files.jl [--fix] (--against <ref> | <src file or directory>...)"
+const USAGE = "usage: doctest_files.jl [--fix] (--all | --against <ref> | <src file or directory>...)"
 
 """
     Command
 
-What one run checks: the source `paths`, and whether it fixes a failed block.
+What one run checks: the source `paths`, whether it fixes a failed block, and whether it runs the
+full doctest step of the CI job (`all`) instead.
 """
 struct Command
     paths::Vector{String}
     fix::Bool
+    all::Bool
 end
+Command(paths, fix) = Command(paths, fix, false)
 
 """
     parse_command(args; root = REPO_ROOT) -> Command
@@ -57,11 +67,13 @@ paths under `root`. A file the branch deleted is left out.
 """
 function parse_command(args::AbstractVector{<:AbstractString};
                        root::AbstractString = REPO_ROOT)
-    paths, fix, i = String[], false, 1
+    paths, fix, all, i = String[], false, false, 1
     while i <= length(args)
         a = args[i]
         if a == "--fix"
             fix = true
+        elseif a == "--all"
+            all = true
         elseif a == "--against"
             if i == length(args)
                 error(USAGE)
@@ -87,7 +99,10 @@ function parse_command(args::AbstractVector{<:AbstractString};
         end
         i += 1
     end
-    return Command(unique!(paths), fix)
+    if all && !(isempty(paths))
+        error("`--all` runs every doctest and takes no path.\n" * USAGE)
+    end
+    return Command(unique!(paths), fix, all)
 end
 
 """
@@ -155,8 +170,10 @@ end
     workflow_setup(text = read(WORKFLOW, String)) -> String
 
 The Julia code of the `Run doctest` step of the doctest job, without its last call
-`doctest(PortfolioOptimisers)`. It loads the packages, sets the two show settings, and sets the
-`DocTestSetup` of `PortfolioOptimisers`.
+`doctest(PortfolioOptimisers; doctestfilters = DOCTEST_FILTERS)`. It loads the packages, sets the
+two show settings, sets the `DocTestSetup` of `PortfolioOptimisers`, and defines
+`DOCTEST_FILTERS`, which both runs below pass on. The filter cuts each decimal number to ten
+decimals, so a block does not fail on a host that differs in the last place of a float.
 """
 function workflow_setup(text::AbstractString = read(WORKFLOW, String))
     i = findfirst("- name: Run doctest", text)
@@ -168,7 +185,7 @@ function workflow_setup(text::AbstractString = read(WORKFLOW, String))
         error("The step `Run doctest` of `$WORKFLOW` has no `julia --project=docs -e '...'` call.")
     end
     code = rstrip(m[1])
-    tail = "doctest(PortfolioOptimisers)"
+    tail = "doctest(PortfolioOptimisers; doctestfilters = DOCTEST_FILTERS)"
     if !(endswith(code, tail))
         error("The step `Run doctest` of `$WORKFLOW` no longer ends with `$tail`. Update `workflow_setup`.")
     end
@@ -176,14 +193,14 @@ function workflow_setup(text::AbstractString = read(WORKFLOW, String))
 end
 
 """
-    record_gate()
+    record_gate(gate = "doctest-files")
 
-Record the gate stamp `doctest-files`. A failure to write it never fails the run.
+Record the gate stamp `gate`. A failure to write it never fails the run.
 """
-function record_gate()
+function record_gate(gate::AbstractString = "doctest-files")
     script = joinpath(REPO_ROOT, "code_health", "gate_stamp.sh")
     try
-        cmd = Cmd(`bash $script record doctest-files`; dir = REPO_ROOT)
+        cmd = Cmd(`bash $script record $gate`; dir = REPO_ROOT)
         run(pipeline(cmd; stdout = devnull, stderr = devnull))
     catch
     end
@@ -191,13 +208,16 @@ function record_gate()
 end
 
 """
-    run_doctests(cmd) -> Int
+    run_doctests(cmd, po = Main.PortfolioOptimisers; record = record_gate) -> Int
 
 Run the doctests of `cmd` after the setup of the workflow has loaded the packages into `Main`. It
-returns the exit code: `0` when every block passes, `1` otherwise.
+returns the exit code: `0` when every block passes, `1` otherwise. A green run without `--fix`
+calls `record`, also when the named files hold no block: the push guard asks for the stamp of
+every change to the code, and a run with nothing to check is green. `po` and `record` are seams
+for `test/test_76_gate_tooling.jl`.
 """
-function run_doctests(cmd::Command)
-    po = Main.PortfolioOptimisers
+function run_doctests(cmd::Command, po::Module = Main.PortfolioOptimisers;
+                      record::Function = record_gate)
     scope, docstrings, blocks, files = scope_module(po, cmd.paths)
     for p in cmd.paths
         if isfile(p) && !(realpath(p) in files)
@@ -207,6 +227,9 @@ function run_doctests(cmd::Command)
     head = "DOCTEST files=$(length(files)) docstrings=$docstrings blocks=$blocks"
     if blocks == 0
         println(head, " status=green")
+        if !(cmd.fix)
+            record()
+        end
         return 0
     end
     Main.DocMeta.setdocmeta!(scope, :DocTestSetup,
@@ -214,7 +237,7 @@ function run_doctests(cmd::Command)
     green = false
     seconds = @elapsed try
         Main.doctest(nothing, [scope]; testset = "Doctests of $(length(files)) files",
-                     fix = cmd.fix)
+                     fix = cmd.fix, doctestfilters = Main.DOCTEST_FILTERS)
         green = true
     catch err
         if !(err isa Main.Test.TestSetException)
@@ -224,13 +247,42 @@ function run_doctests(cmd::Command)
     println(head,
             " seconds=$(round(seconds; digits = 1)) status=$(green ? "green" : "red")")
     if green && !(cmd.fix)
-        record_gate()
+        record()
+    end
+    return green ? 0 : 1
+end
+
+"""
+    run_all(cmd) -> Int
+
+Run the full doctest step of the CI job, after its setup has loaded the packages into `Main`. A
+green run without `--fix` records the stamp `doctest`.
+"""
+function run_all(cmd::Command)
+    green = false
+    seconds = @elapsed try
+        Main.doctest(Main.PortfolioOptimisers; fix = cmd.fix,
+                     doctestfilters = Main.DOCTEST_FILTERS)
+        green = true
+    catch err
+        if !(err isa Main.Test.TestSetException)
+            rethrow()
+        end
+    end
+    println("DOCTEST all seconds=$(round(seconds; digits = 1)) ",
+            "status=$(green ? "green" : "red")")
+    if green && !(cmd.fix)
+        record_gate("doctest")
     end
     return green ? 0 : 1
 end
 
 function main(args::Vector{String})
     cmd = parse_command(args)
+    if cmd.all
+        include_string(Main, "import Test\n" * workflow_setup(), WORKFLOW)
+        return Base.invokelatest(run_all, cmd)
+    end
     if isempty(cmd.paths)
         println("DOCTEST files=0 docstrings=0 blocks=0 status=green")
         return 0
@@ -243,5 +295,8 @@ end # module
 
 # `@__MODULE__` keeps a test that includes this file from running the script.
 if @__MODULE__() === Main && abspath(PROGRAM_FILE) == @__FILE__
-    exit(DoctestFiles.main(ARGS))
+    exit(DoctestFiles.CodeHealth.JuliaSlot.with_slot("doctest_files.jl $(join(ARGS, ' '))"
+                                                     ) do
+             return DoctestFiles.main(ARGS)
+         end)
 end

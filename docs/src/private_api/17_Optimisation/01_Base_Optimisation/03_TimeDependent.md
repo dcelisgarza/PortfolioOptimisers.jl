@@ -19,10 +19,13 @@ assert_special_nco_requirements(opt::VecOptE_Opt)
 assert_nearest_optimiser_schedule
 inner_fold_fields
 time_dependent_value
+typed_time_dependent_fields
 time_dependent_candidate_fields
+time_dependent_slot
 time_dependent_fields
 time_dependent_entries
-time_dependent_entry_needs_previous_weights
+schedule_reads_previous_weights
+schedule_tree_fields
 assert_time_dependent_substitution
 substitute_time_dependent_entries
 time_dependent_stand_in
@@ -32,7 +35,7 @@ assert_time_dependent_fold_count(::OptE_Opt, ::Integer, ::Bool = true)
 assert_time_dependent_fold_count(td::TDO_OptE_Opt, n::Integer, all_binds::Bool = true)
 assert_time_dependent_fold_count(opt::VecOptE_Opt_TD, n::Integer, all_binds::Bool = true)
 assert_time_dependent_fields_fold_count
-rebuild_estimator
+rebuild_struct
 is_time_dependent(::OptE_Opt)
 is_time_dependent(opt::VecOptE_Opt)
 is_time_dependent(opt::BaseOptimisationEstimator)
@@ -40,7 +43,7 @@ is_time_dependent(::TimeDependent)
 is_time_dependent(opt::VecOptE_Opt_TD)
 update_time_dependent_estimator
 update_time_dependent_fields
-reset_time_dependent_estimator(opt::Union{<:OptimisationEstimator, <:OptimisationResult})
+reset_time_dependent_estimator(opt::Union{OptimisationEstimator, OptimisationResult})
 reset_time_dependent_estimator(opt::BaseOptimisationEstimator)
 reset_time_dependent_estimator(td::TD_OptE_Opt)
 reset_time_dependent_fields

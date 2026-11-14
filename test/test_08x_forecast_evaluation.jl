@@ -114,6 +114,11 @@ ELEVEN CONVENTIONS SHAPE THE PROBES.
 include(joinpath(@__DIR__, "parity_harness.jl"))
 include(joinpath(@__DIR__, "test06c_setup.jl"))
 include(joinpath(@__DIR__, "forecast_evaluation_fixture.jl"))
+# The four fields of a `MeanTestResult`, in their order, for a test that reads them all.
+mean_test_values(r) = (r.t_stat, r.p_value, r.mean_ci_lower, r.mean_ci_upper)
+# The fields of a Result, in their order. The library defines `==` on no struct, so a test
+# that compares two answers compares these.
+result_values(r) = ntuple(i -> getfield(r, i), fieldcount(typeof(r)))
 
 @testset "The forward target family reads the history each member names" begin
     PO = PortfolioOptimisers
@@ -133,19 +138,41 @@ include(joinpath(@__DIR__, "forecast_evaluation_fixture.jl"))
     end
 
     @testset "The Panel Field member reads the named field, cut to the block" begin
-        X = PO.forecast_target_history(PanelFieldTarget(; name = "market_cap"), rd, csfm)
+        X = PO.forecast_target_history(PanelFieldTarget(; fields = "market_cap"), rd, csfm)
         @test size(X) == (fx.Tb, fx.N)
         @test isequal(X, PO.panel_field_values(rd, "market_cap")[rows, :])
     end
 
+    @testset "The Panel Field member reads a sum, a product or a Descriptor (#2005)" begin
+        mc = PO.descriptor_field_values(rd, "market_cap")
+        be = PO.descriptor_field_values(rd, "book_equity")
+        Xs = PO.forecast_target_history(PanelFieldTarget(;
+                                                         fields = ["market_cap" => 1,
+                                                                   "book_equity" => -1]),
+                                        rd, csfm)
+        @test isequal(Xs, (mc .- be)[rows, :])
+        Xp = PO.forecast_target_history(PanelFieldTarget(;
+                                                         fields = ["market_cap",
+                                                                   "book_equity"]), rd,
+                                        csfm)
+        @test isequal(Xp, (mc .* be)[rows, :])
+        de = PanelFieldLog(; field = "market_cap")
+        Xd = PO.forecast_target_history(PanelFieldTarget(; fields = de), rd, csfm)
+        @test size(Xd) == (fx.Tb, fx.N)
+        @test isequal(Xd, descriptor(de, rd)[rows, :])
+    end
+
     @testset "A Panel Field the panel does not hold is refused" begin
         @test_throws KeyError PO.forecast_target_history(PanelFieldTarget(;
-                                                                          name = "not_a_field"),
+                                                                          fields = "not_a_field"),
                                                          rd, csfm)
     end
 
     @testset "A Panel Field target with no name is refused at construction" begin
-        @test_throws PO.IsEmptyError PanelFieldTarget(; name = "")
+        @test_throws PO.IsEmptyError PanelFieldTarget(; fields = "")
+        @test_throws PO.IsEmptyError PanelFieldTarget(; fields = String[])
+        @test_throws DomainError PanelFieldTarget(; fields = ["market_cap" => Inf])
+        @test_throws TypeError PanelFieldTarget(; fields = nothing)
     end
 
     @testset "A block with no cross-sectional fit refuses the idiosyncratic target" begin
@@ -205,7 +232,7 @@ end
     end
 
     @testset "Every parameter is carried as given" begin
-        tgt = PanelFieldTarget(; name = "market_cap")
+        tgt = PanelFieldTarget(; fields = "market_cap")
         fe = forecast_evaluation(alpha, y; target = tgt, horizon = 3, lag = 2, step = 1,
                                  min_count = 5, ppy = 252)
         @test fe.target === tgt
@@ -237,19 +264,12 @@ end
     end
 
     @testset "The pair is scored in its own element type, which must hold a fraction and NaN" begin
-        # The evaluation neither converts nor refuses a pair by its type, so an integer pair
-        # fails where a statistic first writes a fraction or a NaN, and a caller converts it.
-        ai = rand(StableRNG(1), -5:5, 30, 8)
-        yi = rand(StableRNG(2), -5:5, 30, 8)
+        # The evaluation neither converts nor refuses a pair by its type. Issue #1972
+        # removed the integer pair: integer data convert at the carrier.
+        ai = float.(rand(StableRNG(1), -5:5, 30, 8))
+        yi = float.(rand(StableRNG(2), -5:5, 30, 8))
         umsk = rand(StableRNG(3), Bool, 30, 8)
-        fe = forecast_evaluation(ai, yi)
-        @test eltype(fe.alpha) == Int
-        @test_throws InexactError forecast_ic(fe)
-        @test_throws InexactError forecast_portfolio(fe)
-        @test_throws InexactError forecast_calibration(fe)
-        @test_throws InexactError forecast_quantile_spread(fe)
-        @test_throws InexactError forecast_evaluation(ai, yi; umsk = umsk)
-        @test eltype(forecast_ic(forecast_evaluation(float.(ai), float.(yi)))) == Float64
+        @test eltype(forecast_ic(forecast_evaluation(ai, yi))) == Float64
 
         fe32 = forecast_evaluation(Float32.(ai), Float32.(yi); umsk = umsk)
         @test eltype(fe32.alpha) == Float32
@@ -362,9 +382,9 @@ end
     @testset "The block prefix cuts the observation axis and keeps the asset axis" begin
         tb = 20
         cut = PO.forecast_history_block(csfm, tb)
-        @test size(cut.Ms) == (tb, fx.N, size(csfm.Ms, 3))
-        @test isequal(cut.Ms, csfm.Ms[1:tb, :, :])
-        @test isequal(cut.M, csfm.Ms[tb, :, :])
+        @test size(cut.Ms) == (fx.N, size(csfm.Ms, 2), tb)
+        @test isequal(cut.Ms, csfm.Ms[:, :, 1:tb])
+        @test isequal(cut.M, csfm.Ms[:, :, tb])
         @test isequal(cut.csr.eps, csfm.csr.eps[1:tb, :])
         @test size(cut.csr.f, 1) == tb
         @test length(cut.csr.n) == tb
@@ -448,7 +468,8 @@ end
         b_after = (tb + 1):fx.Tb
         csfmp.csr.eps[b_after, :] .= 5 .* randn(rng, length(b_after), fx.N)
         csfmp.vs[b_after, :] .= 9.0
-        csfmp.Ms[b_after, :, :] .= randn(rng, length(b_after), fx.N, size(csfm.Ms, 3))
+        csfmp.Ms[:, :, b_after] .= permutedims(randn(rng, length(b_after), fx.N,
+                                                     size(csfm.Ms, 2)), (2, 3, 1))
         histp = forecast_history(tgt, rdp, csfmp)
         @test isequal(view(histp, 1:tb, :), view(hist, 1:tb, :))
         @test !isequal(view(histp, tb + 1, :), view(hist, tb + 1, :))
@@ -602,7 +623,7 @@ end
     end
 
     @testset "The block method reads the weight history the metric names" begin
-        # `IdentityMetric` resolves to no history, so the block method and the bare method
+        # A `nothing` metric resolves to no history, so the block method and the bare method
         # with no weights are the same call.
         fx = evaluation_fixture()
         rd, csfm = fx.rd, fx.csfm
@@ -637,15 +658,17 @@ end
     s = forecast_ic_summary(ic; mt = OverlapMeanTest())
 
     @testset "The five figures of each series match the oracle" begin
-        @test keys(s) == (:spearman, :pearson)
-        @test keys(s.spearman) ==
+        @test s isa ForecastICSummaryResult
+        @test fieldnames(typeof(s)) == (:spearman, :pearson)
+        @test s.spearman isa ICSummaryResult
+        @test fieldnames(typeof(s.spearman)) ==
               (:mean_ic, :std_ic, :ic_ir, :t_stat, :p_value, :mean_ci_lower, :mean_ci_upper,
                :hit_rate)
-        @test parity_compare(collect(values(s.spearman))[[1, 2, 3, 4, 8]],
+        @test parity_compare(collect(result_values(s.spearman))[[1, 2, 3, 4, 8]],
                              [0.3333333333333333, 0.7023769168568493, 0.4745789978762494,
                               0.8219949365267862, 0.6666666666666666]; rtol = 1e-14,
                              name = "ic summary spearman").ok
-        @test parity_compare(collect(values(s.pearson))[[1, 2, 3, 4, 8]],
+        @test parity_compare(collect(result_values(s.pearson))[[1, 2, 3, 4, 8]],
                              [0.2567790285367673, 0.6206266852224849, 0.4137415207093715,
                               0.7166213350694421, 0.6666666666666666]; rtol = 1e-14,
                              name = "ic summary pearson").ok
@@ -827,7 +850,8 @@ end
         # A span that the band covers has no statistic: every pair is in the band.
         @test PO.overlap_student_law(NullMomentLaw(), trues(4), 5, 4, Float64) == (0, 0)
         @test all(isnan,
-                  values(PO.mean_test(OverlapMeanTest(), [0.1, 0.3, -0.2, 0.4], 5, nothing)))
+                  mean_test_values(PO.mean_test(OverlapMeanTest(), [0.1, 0.3, -0.2, 0.4], 5,
+                                                nothing)))
         @test all(>(0), PO.overlap_student_law(NullMomentLaw(), trues(6), 5, 6, Float64))
         # The law reads the type of the data and of the window.
         x32 = Float32.(randn(StableRNG(3), 40))
@@ -1038,6 +1062,9 @@ end
         @test WildBootstrapMeanTest(; n_sim = 19).n_sim == 19
         @test_throws DomainError WildBootstrapMeanTest(; min_obs = 1)
         @test_throws DomainError WildBootstrapMeanTest(; min_periods = 0)
+        # Issue #2013: `min_periods` is a count of windows, so it is an `Integer`.
+        @test_throws TypeError WildBootstrapMeanTest(; min_periods = 2.5)
+        @test_throws TypeError OverlapMeanTest(; min_periods = 2.5)
         o = OverlapMeanTest()
         @test o.q == 0.05 && isnothing(o.min_obs) && isnothing(o.min_periods)
         @test o.law isa NullMomentLaw
@@ -1196,7 +1223,8 @@ end
                   QuadratureSumDraws(; form = ExactLongRunForm()))
             mt = WildBootstrapMeanTest(; kernel = QuadraticSpectralKernel(), alg = a,
                                        n_sim = 19)
-            @test all(isnan, values(PO.mean_test(mt, fill(0.03, 40), 1, StableRNG(1))))
+            @test all(isnan,
+                      mean_test_values(PO.mean_test(mt, fill(0.03, 40), 1, StableRNG(1))))
         end
     end
 
@@ -1238,6 +1266,43 @@ end
               PO.mean_test(mt, v, 1, PO.mean_test_rng(mt))
         @test_throws DomainError PO.mean_test(mt, v, 0, PO.mean_test_rng(mt))
         @test_throws DomainError PO.mean_test(OverlapMeanTest(), v, 0, nothing)
+    end
+
+    @testset "A Mean Test answers a MeanTestResult that checks its values (#2089)" begin
+        v = randn(StableRNG(5), 40)
+        mt = WildBootstrapMeanTest(; n_sim = 19, seed = 1)
+        for t in (mt, OverlapMeanTest())
+            r = PO.mean_test(t, v, 1, PO.mean_test_rng(t))
+            @test r isa PO.MeanTestResult
+            @test 0 <= r.p_value <= 1
+            @test r.mean_ci_lower <= r.mean_ci_upper
+            (; t_stat, p_value) = r
+            @test (t_stat, p_value) == (r.t_stat, r.p_value)
+        end
+        # A test that cannot answer gives `NaN` in each field, and the type stays the same.
+        @test PO.mean_test(mt, [NaN, NaN], 1, PO.mean_test_rng(mt)) isa PO.MeanTestResult
+        # A loss difference with a scored entry that is not finite answers the same type.
+        k = trues(length(v))
+        dn = copy(v)
+        dn[3] = Inf
+        rn = PO.loss_difference_test(mt, dn, k, PO.mean_test_rng(mt))
+        @test rn isa PO.MeanTestResult
+        @test all(isnan, mean_test_values(rn))
+        @test PO.loss_difference_test(mt, v, k, PO.mean_test_rng(mt)) isa PO.MeanTestResult
+        # The keyword constructor takes each field by name, and both constructors check.
+        r = PO.MeanTestResult(; t_stat = 2.5, p_value = 0.04, mean_ci_lower = 0.01,
+                              mean_ci_upper = 0.09)
+        @test mean_test_values(r) == (2.5, 0.04, 0.01, 0.09)
+        @test r isa PO.AbstractResult
+        @test all(isnan, mean_test_values(PO.MeanTestResult(NaN, NaN, NaN, NaN)))
+        @test PO.MeanTestResult(1.0, 0.0, 0.1, 0.1).p_value == 0.0
+        @test_throws DomainError PO.MeanTestResult(2.5, 1.5, 0.01, 0.09)
+        @test_throws DomainError PO.MeanTestResult(2.5, -0.1, 0.01, 0.09)
+        @test_throws DomainError PO.MeanTestResult(; t_stat = 2.5, p_value = 0.04,
+                                                   mean_ci_lower = 0.09,
+                                                   mean_ci_upper = 0.01)
+        # A `NaN` bound passes the order check.
+        @test isnan(PO.MeanTestResult(1.0, 0.5, NaN, 0.1).mean_ci_lower)
     end
 
     @testset "The bootstrap is the draw-by-draw computation, on both paths" begin
@@ -1282,12 +1347,13 @@ end
         @test r1.mean_ci_lower ≈ r0.mean_ci_lower && r1.mean_ci_upper ≈ r0.mean_ci_upper
         # A divisor of zero or less has no statistic.
         m9 = WildBootstrapMeanTest(; n_sim = 19, ddof = 50)
-        @test all(isnan, values(PO.mean_test(m9, v, 1, PO.mean_test_rng(m9))))
+        @test all(isnan, mean_test_values(PO.mean_test(m9, v, 1, PO.mean_test_rng(m9))))
         # One resolved generator per summary: two equal series take different draws.
         s = exposure_ic_summary(hcat(v, v); mt = mt)
         @test s.t_stat[1] == s.t_stat[2]
         @test s.p_value[1] != s.p_value[2]
-        @test isequal(s, exposure_ic_summary(hcat(v, v); mt = mt))
+        @test isequal(result_values(s),
+                      result_values(exposure_ic_summary(hcat(v, v); mt = mt)))
     end
 
     @testset "The interval excludes zero exactly when the p-value is at most q" begin
@@ -1322,7 +1388,7 @@ end
         for v in ([NaN, NaN], [0.2, NaN], fill(0.3, 6), Float64[])
             for t in (mt, OverlapMeanTest())
                 r = PO.mean_test(t, v, 1, PO.mean_test_rng(t))
-                @test all(isnan, values(r))
+                @test all(isnan, mean_test_values(r))
             end
         end
         # A constant series whose sum over its count misses its value by round-off: the
@@ -1331,7 +1397,7 @@ end
         g = fill(0.03, 100)
         g[[1, 40, 41, 100]] .= NaN
         for v in (fill(0.03, 100), g), t in (mt, OverlapMeanTest())
-            @test all(isnan, values(PO.mean_test(t, v, 1, PO.mean_test_rng(t))))
+            @test all(isnan, mean_test_values(PO.mean_test(t, v, 1, PO.mean_test_rng(t))))
         end
         # A series whose entries are one ulp apart is constant to round-off, in every float
         # type. A spread forty times the round-off of the mean is not, and an exact type reads
@@ -1343,7 +1409,7 @@ end
         for v in (u, u32, ub),
             t in (mt, OverlapMeanTest(), OverlapMeanTest(; law = BandCountLaw()))
 
-            @test all(isnan, values(PO.mean_test(t, v, 1, PO.mean_test_rng(t))))
+            @test all(isnan, mean_test_values(PO.mean_test(t, v, 1, PO.mean_test_rng(t))))
         end
         a = 0.3 .+ repeat([0.0, 1e-13], 20)
         for t in (mt, OverlapMeanTest())
@@ -1352,7 +1418,8 @@ end
         r = repeat([3 // 10, 3 // 10 + 1 // 1000], 20)
         @test isfinite(PO.mean_test(OverlapMeanTest(), r, 1, nothing).t_stat)
         @test all(isnan,
-                  values(PO.mean_test(OverlapMeanTest(), fill(3 // 10, 40), 1, nothing)))
+                  mean_test_values(PO.mean_test(OverlapMeanTest(), fill(3 // 10, 40), 1,
+                                                nothing)))
         # An alternating series sums the untapered long-run variance below zero, and the
         # Bartlett one stays positive, so only the overlap test answers NaN.
         v = [0.5, -0.4, 0.5, -0.4, 0.5, -0.4, 0.5, -0.4]
@@ -1367,7 +1434,7 @@ end
         end
         for t in (WildBootstrapMeanTest(; n_sim = 19, min_obs = 28),
                   OverlapMeanTest(; min_obs = 28))
-            @test all(isnan, values(PO.mean_test(t, w, 1, PO.mean_test_rng(t))))
+            @test all(isnan, mean_test_values(PO.mean_test(t, w, 1, PO.mean_test_rng(t))))
         end
         # Thirty entries hold ten windows of three and seven and a half windows of four. A
         # window of `5 // 2` entries is a horizon of five at a stride of two: twelve periods,
@@ -1451,11 +1518,11 @@ end
         mt = WildBootstrapMeanTest(; n_sim = 199, seed = 3)
         fs = forecast_evaluation_summary(fe; mt = mt)
         f1 = forecast_ic_summary(forecast_ic(fe); mt = mt)
-        @test fs.spearman_t_stat[1] == f1.spearman.t_stat
-        @test fs.spearman_p_value[1] == f1.spearman.p_value
-        @test fs.pearson_p_value[1] == f1.pearson.p_value
-        @test fs.spearman_mean_ci_lower[1] == f1.spearman.mean_ci_lower
-        @test fs.pearson_mean_ci_upper[1] == f1.pearson.mean_ci_upper
+        @test fs.spearman_t_stat == f1.spearman.t_stat
+        @test fs.spearman_p_value == f1.spearman.p_value
+        @test fs.pearson_p_value == f1.pearson.p_value
+        @test fs.spearman_mean_ci_lower == f1.spearman.mean_ci_lower
+        @test fs.pearson_mean_ci_upper == f1.pearson.mean_ci_upper
         h = forecast_holding_period(fe, X; n = 3, mt = mt)
         d = forecast_decay(fe, X; n = 3, mt = mt)
         @test all(p -> 0 < p <= 1, h.spearman_p_value)
@@ -1722,9 +1789,13 @@ end
     # diverging from the evaluation.
     ic = [0.1 0.4; -0.2 NaN; 0.3 0.5; NaN 0.1]
     s = PO.exposure_ic_summary(ic; mt = OverlapMeanTest())
-    @test keys(s) ==
+    # The matrix form returns the labelled Result with no labels.
+    @test s isa ExposureICSummaryResult
+    @test fieldnames(typeof(s)) ==
           (:mean_ic, :std_ic, :ic_ir, :t_stat, :p_value, :mean_ci_lower, :mean_ci_upper,
-           :hit_rate)
+           :hit_rate, :nf, :fam)
+    @test isnothing(s.nf) && isnothing(s.fam)
+    @test PO.exposure_ic_factor_summary(ic, 1; mt = OverlapMeanTest()) isa ICSummaryResult
     for k in 1:2
         m = PO.exposure_ic_factor_summary(ic, k; mt = OverlapMeanTest())
         v = filter(isfinite, ic[:, k])
@@ -1732,6 +1803,152 @@ end
         @test m.t_stat ≈ m.ic_ir * sqrt(length(v))
     end
     @test length(s.t_stat) == 2
+end
+
+@testset "The Result of each evaluation verb checks its values" begin
+    # #2093: a public verb returns a defined type, and its constructor refuses a value that
+    # is wrong. A field that cannot be computed holds `NaN`, which every check lets pass.
+    PO = PortfolioOptimisers
+    a2 = [1.0 2.0 3.0; 3.0 1.0 2.0; 2.0 3.0 1.0; 1.0 3.0 2.0; 2.0 1.0 3.0]
+    fe = forecast_evaluation(a2, PO.forward_mean_returns(a2, 1, 1))
+
+    @testset "The three helpers let NaN and nothing pass" begin
+        @test isnothing(PO.assert_nan_or_closed_unit_interval([NaN, 0.0, 1.0], :x))
+        @test isnothing(PO.assert_nan_or_closed_unit_interval(nothing, :x))
+        @test_throws DomainError PO.assert_nan_or_closed_unit_interval([0.5, 1.5], :x)
+        @test isnothing(PO.assert_nan_or_nonneg(NaN, :x))
+        @test isnothing(PO.assert_nan_or_nonneg(nothing, :x))
+        @test_throws DomainError PO.assert_nan_or_nonneg([0.0, -0.1], :x)
+        @test isnothing(PO.assert_ordered_bounds([NaN, 0.0], [0.0, 0.0]))
+        @test_throws DomainError PO.assert_ordered_bounds(0.2, 0.1)
+        @test_throws DimensionMismatch PO.assert_ordered_bounds([0.1], [0.2, 0.3])
+    end
+
+    @testset "The summary of one series" begin
+        kw = (; mean_ic = 0.05, std_ic = 0.1, ic_ir = 0.5, t_stat = 2.5, p_value = 0.02,
+              mean_ci_lower = 0.01, mean_ci_upper = 0.09, hit_rate = 0.6)
+        s = ICSummaryResult(; kw...)
+        @test result_values(s) == values(kw)
+        @test all(isnan,
+                  result_values(ICSummaryResult(NaN, NaN, NaN, NaN, NaN, NaN, NaN, NaN)))
+        @test_throws DomainError ICSummaryResult(; kw..., p_value = 1.5)
+        @test_throws DomainError ICSummaryResult(; kw..., hit_rate = -0.1)
+        @test_throws DomainError ICSummaryResult(; kw..., std_ic = -0.1)
+        @test_throws DomainError ICSummaryResult(; kw..., mean_ci_lower = 0.1)
+        f = ForecastICSummaryResult(; spearman = s, pearson = s)
+        @test f.pearson === s
+        @test_throws TypeError ForecastICSummaryResult(; spearman = s, pearson = (; kw...))
+        e = ExposureICSummaryResult(; (k => [v, v] for (k, v) in pairs(kw))...)
+        @test isnothing(e.nf) && isnothing(e.fam) && e.p_value == [0.02, 0.02]
+        @test_throws DimensionMismatch ExposureICSummaryResult(;
+                                                               (k => [v, v]
+                                                                for (k, v) in pairs(kw))...,
+                                                               hit_rate = [0.5])
+        @test_throws DimensionMismatch ExposureICSummaryResult(;
+                                                               (k => [v, v]
+                                                                for (k, v) in pairs(kw))...,
+                                                               nf = ["a"])
+        @test_throws DomainError ExposureICSummaryResult(;
+                                                         (k => [v, v]
+                                                          for (k, v) in pairs(kw))...,
+                                                         p_value = [0.1, 2.0])
+    end
+
+    @testset "The book and the spread" begin
+        p = forecast_portfolio(fe)
+        @test p isa ForecastPortfolioResult
+        @test p.summary isa PerformanceSummaryResult
+        @test_throws DimensionMismatch PO.rebuild_struct(p, (; ret = p.ret[1:1]))
+        @test_throws DomainError PO.rebuild_struct(p, (; hit_rate = 2.0))
+        @test_throws DomainError PO.rebuild_struct(p, (; mean_turnover = -1.0))
+        @test_throws DomainError PO.rebuild_struct(p,
+                                                   (; turnover = fill(-1.0, length(p.ret))))
+        q = forecast_quantile_spread(fe; quantiles = (0.1, 0.25))
+        @test size(q.spread, 2) == length(q.ann_mean) == 2
+        @test_throws DimensionMismatch PO.rebuild_struct(q, (; ann_ir = q.ann_ir[1:1]))
+        @test_throws DomainError PO.rebuild_struct(q, (; ann_vol = [-1.0, 0.0]))
+        @test_throws DomainError PO.rebuild_struct(q, (; hit_rate = [0.5, 1.5]))
+    end
+
+    @testset "The window table and its DataFrame" begin
+        t = forecast_holding_period(fe, a2; n = 2, mt = OverlapMeanTest())
+        df = DataFrame(t)
+        @test size(df) == (2, 20)
+        @test !("dates" in names(df))
+        @test metadata(df, "dates") == t.dates
+        @test df.spearman_mean_ic == t.spearman_mean_ic
+        @test_throws DimensionMismatch PO.rebuild_struct(t, (; mean_coverage = [0.5]))
+        @test_throws DomainError PO.rebuild_struct(t, (; pearson_p_value = [0.1, 2.0]))
+        @test_throws DomainError PO.rebuild_struct(t,
+                                                   (; spearman_mean_ci_lower = [9.0, 9.0],
+                                                    spearman_mean_ci_upper = [0.0, 0.0]))
+    end
+
+    @testset "The calibration and its curve" begin
+        c = forecast_calibration(fe; bins = 2)
+        @test c isa ForecastCalibrationResult
+        @test c.curve isa ForecastCalibrationCurveResult
+        df = DataFrame(c.curve)
+        @test names(df) == ["bin", "mean_alpha", "mean_y", "count"]
+        @test df.count == c.curve.count
+        @test_throws DimensionMismatch PO.rebuild_struct(c, (; n_bins = c.n_bins + 1))
+        @test_throws DomainError PO.rebuild_struct(c, (; std_y = -1.0))
+        @test isempty(DataFrame(PO.forecast_calibration_curve(Float64[], Float64[], 3)))
+        @test PO.rebuild_struct(c.curve, (; count = c.curve.count .+ 1)).count ==
+              c.curve.count .+ 1
+        @test_throws DomainError ForecastCalibrationCurveResult(; bin = [1],
+                                                                mean_alpha = [0.0],
+                                                                mean_y = [0.0], count = [0])
+        @test_throws DimensionMismatch ForecastCalibrationCurveResult([1], [0.0, 0.0],
+                                                                      [0.0], [1])
+        @test_throws DomainError ForecastCalibrationCurveResult([2, 1], [0.0, 0.0],
+                                                                [0.0, 0.0], [1, 1])
+        @test_throws DomainError ForecastCalibrationCurveResult([0], [0.0], [0.0], [1])
+        @test_throws DomainError ForecastCalibrationCurveResult([1], [0.0], [0.0], [0])
+    end
+
+    @testset "The forecast summary" begin
+        one_fs = forecast_evaluation_summary(fe; quantiles = 0.25, mt = OverlapMeanTest())
+        @test one_fs.names isa AbstractString && size(one_fs.spread_sharpe) == (1,)
+        fs = forecast_evaluation_summary([fe, fe]; quantiles = (0.1, 0.25),
+                                         mt = OverlapMeanTest())
+        @test size(fs.spread_sharpe) == (2, 2)
+        @test_throws DomainError PO.rebuild_struct(fs, (; spearman_p_value = [0.1, 2.0]))
+        @test_throws DomainError PO.rebuild_struct(fs, (; n_silenced = [-1, 0]))
+        @test_throws DomainError PO.rebuild_struct(fs, (; ppy = 0))
+        @test_throws DimensionMismatch PO.rebuild_struct(fs, (; rank_sharpe = [0.1]))
+        @test_throws ArgumentError PO.rebuild_struct(fs, (; spread_sharpe = nothing))
+        @test_throws DimensionMismatch PO.rebuild_struct(fs,
+                                                         (; spread_sharpe = zeros(2, 3)))
+        @test_throws DomainError PO.rebuild_struct(fs,
+                                                   (; pearson_mean_ci_lower = [9.0, 9.0],
+                                                    pearson_mean_ci_upper = [0.0, 0.0]))
+        @test isnothing(forecast_evaluation_summary([fe, fe]).quantiles)
+    end
+
+    @testset "The factor, the idiosyncratic and the score summaries" begin
+        v = [0.1, 0.2]
+        f = FactorSummaryResult(; ann_return = v, ann_volatility = v, sharpe = v,
+                                autocorr = v, nf = ["a", "b"])
+        @test isnothing(f.t_rate) && f.ppy == 1
+        @test PO.port_opt_view(f, ["b"]).ann_return == [0.2]
+        @test_throws DimensionMismatch PO.rebuild_struct(f, (; nf = ["a"]))
+        @test_throws DimensionMismatch PO.rebuild_struct(f, (; coverage = [0.5]))
+        @test_throws DomainError PO.rebuild_struct(f, (; ppy = 0))
+        @test_throws DomainError PO.rebuild_struct(f, (; t_rate = [0.5, 1.5]))
+        @test_throws DomainError PO.rebuild_struct(f, (; ann_volatility = [-0.1, 0.1]))
+        @test_throws DomainError PO.rebuild_struct(f, (; mean_abs_t = [-0.1, 0.1]))
+        i = IdioCalibrationSummaryResult(; mean_cs_std = 1.0, median_cs_std = NaN,
+                                         mean_kurtosis = -0.5, mean_skewness = 0.1,
+                                         mean_tail_rate = 0.01)
+        @test i.mean_kurtosis == -0.5
+        @test_throws DomainError PO.rebuild_struct(i, (; mean_cs_std = -1.0))
+        @test_throws DomainError PO.rebuild_struct(i, (; mean_tail_rate = 1.5))
+        r = DescriptorScoresResult(; S = zeros(2, 1, 4), rows = 2:4)
+        @test r.rows == 2:4
+        @test_throws DimensionMismatch DescriptorScoresResult(zeros(2, 1, 3), 2:4)
+        @test_throws DimensionMismatch DescriptorScoresResult(zeros(2, 1, 3), 0:2)
+    end
 end
 
 @testset "A planted forecast scores, and an unplanted one does not" begin
@@ -2048,7 +2265,7 @@ const FC_ALPHA = [1.0 2.0 3.0 4.0
                   3.0 4.0 5.0 6.0]
 const FC_TIED = repeat([1.0 2.0 3.0 4.0], 4, 1)
 const FC_ORTHO = repeat([3.0 1.0 4.0 2.0], 4, 1)
-const FC_B = cat(FC_TIED, FC_ORTHO; dims = 3)
+const FC_B = permutedims(cat(FC_TIED, FC_ORTHO; dims = 3), (2, 3, 1))
 # A weight that breaks the orthogonality of `FC_ORTHO`. `IC_W` does not: its rows happen to
 # leave the weighted covariance of `[1, 2, 3, 4]` against `[3, 1, 4, 2]` at exactly zero.
 const FC_W = repeat([1.0 1.0 1.0 5.0], 4, 1)
@@ -2060,7 +2277,7 @@ const FC_G = [1.0 0.0 1.0 0.0
               0.0 1.0 0.0 1.0
               1.0 1.0 0.0 0.0
               0.0 0.0 1.0 1.0]
-const FC_BG = cat(FC_G, reverse(FC_G; dims = 2); dims = 3)
+const FC_BG = permutedims(cat(FC_G, reverse(FC_G; dims = 2); dims = 3), (2, 3, 1))
 
 @testset "The exposure axis is checked against the forecast, once" begin
     PO = PortfolioOptimisers
@@ -2077,10 +2294,10 @@ const FC_BG = cat(FC_G, reverse(FC_G; dims = 2); dims = 3)
                                                                                     0))
         # One observation short, and one asset short.
         @test_throws DimensionMismatch PO.forecast_factor_exposures(fe.alpha,
-                                                                    FC_B[1:3, :, :])
+                                                                    FC_B[:, :, 1:3])
         @test_throws DimensionMismatch PO.forecast_factor_exposures(fe.alpha,
-                                                                    FC_B[:, 1:3, :])
-        @test_throws DimensionMismatch forecast_factor_correlation(fe, FC_B[1:3, :, :])
+                                                                    FC_B[1:3, :, :])
+        @test_throws DimensionMismatch forecast_factor_correlation(fe, FC_B[:, :, 1:3])
     end
 
     @testset "A threshold below one is refused" begin
@@ -2115,7 +2332,7 @@ end
         u = ones(size(FC_ALPHA, 2))
         for k in 1:2, t in 1:T
             a = view(fe.alpha, t, :)
-            b = view(FC_B, t, :, k)
+            b = view(FC_B, :, k, t)
             @test c[t, k] == PO.cs_weighted_correlation(a, b, u; min_count = fe.min_count)
             @test cr[t, k] == PO.cs_spearman_correlation(a, b; min_count = fe.min_count)
         end
@@ -2153,7 +2370,7 @@ end
         # ranks are equal, so it has no rank correlation either. Under `:ordinal`, equal
         # values take their position on the asset axis, so the rank form answers the rank
         # correlation of the forecast with that order.
-        bc = cat(FC_TIED, fill(1.0, size(FC_ALPHA)); dims = 3)
+        bc = permutedims(cat(FC_TIED, fill(1.0, size(FC_ALPHA)); dims = 3), (2, 3, 1))
         @test all(isnan, forecast_factor_correlation(fe, bc)[:, 2])
         @test all(isnan, forecast_factor_correlation(fe, bc; rank = true)[:, 2])
         fo = forecast_evaluation(FC_ALPHA, PO.forward_mean_returns(FC_ALPHA, 1, 1);
@@ -2186,14 +2403,14 @@ end
         fro = forecast_evaluation(FC_ALPHA[:, rv], yt[:, rv]; ties = :ordinal)
         ca = forecast_factor_correlation(fe, FC_BG; rank = true)
         co = forecast_factor_correlation(fo, FC_BG; rank = true)
-        @test ca ≈ forecast_factor_correlation(far, FC_BG[:, rv, :]; rank = true)
-        @test !isapprox(co, forecast_factor_correlation(fro, FC_BG[:, rv, :]; rank = true))
+        @test ca ≈ forecast_factor_correlation(far, FC_BG[rv, :, :]; rank = true)
+        @test !isapprox(co, forecast_factor_correlation(fro, FC_BG[rv, :, :]; rank = true))
         # Row 1: the ranks of `[1, 2, 3, 4]` against the midranks of `[1, 0, 1, 0]`.
         @test ca[1, 1] ≈ -2 / sqrt(20)
         @test co[1, 1] ≈ 0.0 atol = 1e-12
         for k in 1:2, t in 1:T
             @test co[t, k] ==
-                  PO.cs_spearman_correlation(view(fe.alpha, t, :), view(FC_BG, t, :, k);
+                  PO.cs_spearman_correlation(view(fe.alpha, t, :), view(FC_BG, :, k, t);
                                              min_count = fe.min_count, ties = :ordinal)
         end
     end
@@ -2312,7 +2529,7 @@ end
         # standardiser after the fit: it maps each cross-section by one affine map, so it
         # keeps the zero weighted mean and the orthogonality that the intercept gives.
         PO = PortfolioOptimisers
-        X = csfm.Ms[:, :, 1]
+        X = permutedims(csfm.Ms[:, 1, :])
         function worst(cre)
             d = DescriptorScores(; descriptors = ds.descriptors, neutralise = "style",
                                  cre = cre, outlier = ds.outlier, scoring = ds.scoring)
@@ -2320,8 +2537,8 @@ end
             w = PO.return_forecast_weights(rd)[r.rows, :]
             wc = 0.0
             wo = 0.0
-            for k in axes(r.S, 3), t in axes(X, 1)
-                s = r.S[r.rows[t], :, k]
+            for k in axes(r.S, 2), t in axes(X, 1)
+                s = r.S[:, k, r.rows[t]]
                 m = isfinite.(s) .& isfinite.(view(X, t, :)) .& (view(w, t, :) .> 0)
                 u, s, x = w[t, m], s[m], X[t, m]
                 sc = s .- sum(u .* s) / sum(u)
@@ -2354,10 +2571,10 @@ end
     s = exposure_ic_summary(c; mt = OverlapMeanTest())
 
     @testset "No third summary ships, and the kernel answers one entry per factor" begin
-        @test keys(s) ==
+        @test fieldnames(typeof(s))[1:8] ==
               (:mean_ic, :std_ic, :ic_ir, :t_stat, :p_value, :mean_ci_lower, :mean_ci_upper,
                :hit_rate)
-        @test all(v -> length(v) == 2, values(s))
+        @test all(v -> length(v) == 2, result_values(s)[1:8])
         @test all(isfinite, s.mean_ic)
         @test all(isfinite, s.std_ic)
         @test all(isfinite, s.ic_ir)
@@ -2666,8 +2883,8 @@ end
     end
 
     @testset "Both tables carry twenty-one columns and three rows" begin
-        @test keys(h) ==
-              keys(d) ==
+        @test h isa ForecastWindowResult && d isa ForecastWindowResult
+        @test fieldnames(typeof(h)) ==
               (:period, :horizon, :lag, :dates, :spearman_mean_ic, :spearman_ic_ir,
                :spearman_t_stat, :spearman_p_value, :spearman_mean_ci_lower,
                :spearman_mean_ci_upper, :pearson_mean_ic, :pearson_ic_ir, :pearson_t_stat,
@@ -2779,7 +2996,7 @@ end
                   :pearson_ic_ir, :pearson_t_stat, :pearson_p_value, :pearson_mean_ci_lower,
                   :pearson_mean_ci_upper, :rank_ann_return, :rank_sharpe, :zscore_ann_return,
                   :zscore_sharpe, :mean_coverage)
-            @test h[k][1] == d[k][1]
+            @test getfield(h, k)[1] == getfield(d, k)[1]
         end
     end
 
@@ -2854,8 +3071,8 @@ end
 
     @testset "The two methods answer the same table" begin
         a = forecast_holding_period(fe, rd, csfm; n = 3, mt = OverlapMeanTest())
-        b = forecast_holding_period(fe, X, PO.cs_diagnostic_weights(IdentityMetric(), csfm);
-                                    n = 3, mt = OverlapMeanTest())
+        b = forecast_holding_period(fe, X, PO.cs_diagnostic_weights(nothing, csfm); n = 3,
+                                    mt = OverlapMeanTest())
         @test a.dates == b.dates
         @test isapprox(a.spearman_mean_ic, b.spearman_mean_ic)
         @test isapprox(a.pearson_mean_ic, b.pearson_mean_ic)
@@ -3092,7 +3309,7 @@ end
         w[1, 1] = 0.0
         c = forecast_calibration(fe, w)
         @test !isapprox(c.slope, plain.slope)
-        @test c.curve == plain.curve
+        @test result_values(c.curve) == result_values(plain.curve)
         @test c.mean_alpha == plain.mean_alpha
         @test c.mean_y == plain.mean_y
         @test c.n_bins == plain.n_bins
@@ -3104,7 +3321,8 @@ end
         wn = ones(size(IC_ALPHA))
         wn[1, 1] = NaN
         @test forecast_calibration(fe, wn).slope == forecast_calibration(fe, w).slope
-        @test forecast_calibration(fe, wn).curve == plain.curve
+        @test result_values(forecast_calibration(fe, wn).curve) ==
+              result_values(plain.curve)
     end
 
     @testset "A history of ones is the equal-weight case" begin
@@ -3123,7 +3341,7 @@ end
         hi = forecast_evaluation(IC_ALPHA, y; min_count = size(IC_ALPHA, 2) + 1)
         c = forecast_calibration(hi)
         @test c.slope == plain.slope
-        @test c.curve == plain.curve
+        @test result_values(c.curve) == result_values(plain.curve)
         @test c.mean_alpha == plain.mean_alpha
         @test c.n_bins == plain.n_bins
     end
@@ -3154,9 +3372,9 @@ end
 
     @testset "The block method resolves the weights the metric names" begin
         c = forecast_calibration(fe, fx.csfm)
-        @test c.slope == forecast_calibration(fe,
-                               PO.cs_diagnostic_weights(PO.IdentityMetric(), fx.csfm)).slope
-        @test c.curve == forecast_calibration(fe).curve
+        @test c.slope ==
+              forecast_calibration(fe, PO.cs_diagnostic_weights(nothing, fx.csfm)).slope
+        @test isequal(result_values(c.curve), result_values(forecast_calibration(fe).curve))
         cb = forecast_calibration(fe, fx.csfm;
                                   weighting = PO.InverseIdiosyncraticVarianceMetric(),
                                   bins = 4)
@@ -3348,8 +3566,8 @@ const FS_SPREAD = (:spread_ann_return, :spread_ann_volatility, :spread_sharpe,
                                                                                      1, 1));
                                          quantiles = (0.1,), mt = OverlapMeanTest())
         # Every column measures bit-equal, on this panel and on the gapped one (#1558).
-        @test parity_compare([[getfield(fs, f)[1] for f in FS_CORE];
-                              [getfield(fs, f)[1, 1] for f in FS_SPREAD]],
+        @test parity_compare([[getfield(fs, f) for f in FS_CORE];
+                              [getfield(fs, f)[1] for f in FS_SPREAD]],
                              [getfield(FS_REF, f) for f in (FS_CORE..., FS_SPREAD...)];
                              rtol = 1e-14, name = "summary").ok
     end
@@ -3365,15 +3583,15 @@ const FS_SPREAD = (:spread_ann_return, :spread_ann_volatility, :spread_sharpe,
                                                                                      1);
                                                              min_count = 2);
                                          quantiles = (0.25,), mt = OverlapMeanTest())
-        @test parity_compare([[getfield(fs, f)[1] for f in FS_CORE];
-                              [getfield(fs, f)[1, 1] for f in FS_SPREAD]],
+        @test parity_compare([[getfield(fs, f) for f in FS_CORE];
+                              [getfield(fs, f)[1] for f in FS_SPREAD]],
                              [getfield(FS_REF_GAP, f) for f in (FS_CORE..., FS_SPREAD...)];
                              rtol = 1e-14, name = "summary gap").ok
-        @test parity_compare([fs.mean_coverage[1], fs.min_coverage[1], fs.mean_n_scored[1]],
+        @test parity_compare([fs.mean_coverage, fs.min_coverage, fs.mean_n_scored],
                              [sum(IC_REF_GAP_COVERAGE) / 3, minimum(IC_REF_GAP_COVERAGE),
                               sum(IC_REF_GAP_COVERAGE .* 4) / 3]; rtol = 1e-14,
                              name = "summary gap coverage").ok
-        @test fs.min_n_scored[1] == 2
+        @test fs.min_n_scored == 2
     end
 end
 
@@ -3391,44 +3609,45 @@ end
 
     @testset "The coefficient block is the shared summary kernel" begin
         for (p, s) in ((:spearman, ic.spearman), (:pearson, ic.pearson))
-            @test getfield(fs, Symbol(p, :_mean_ic))[1] == s.mean_ic
-            @test getfield(fs, Symbol(p, :_std_ic))[1] == s.std_ic
-            @test getfield(fs, Symbol(p, :_ic_ir))[1] == s.ic_ir
-            @test getfield(fs, Symbol(p, :_t_stat))[1] == s.t_stat
-            @test getfield(fs, Symbol(p, :_hit_rate))[1] == s.hit_rate
+            @test getfield(fs, Symbol(p, :_mean_ic)) == s.mean_ic
+            @test getfield(fs, Symbol(p, :_std_ic)) == s.std_ic
+            @test getfield(fs, Symbol(p, :_ic_ir)) == s.ic_ir
+            @test getfield(fs, Symbol(p, :_t_stat)) == s.t_stat
+            @test getfield(fs, Symbol(p, :_hit_rate)) == s.hit_rate
         end
     end
 
     @testset "The two books are the two kinds of the portfolio verb" begin
         for (p, b) in ((:rank, rk), (:zscore, zs))
-            @test getfield(fs, Symbol(p, :_ann_return))[1] == b.summary.ann_return
-            @test getfield(fs, Symbol(p, :_ann_volatility))[1] == b.summary.ann_volatility
-            @test getfield(fs, Symbol(p, :_sharpe))[1] == b.summary.sharpe
-            @test getfield(fs, Symbol(p, :_hit_rate))[1] == b.hit_rate
-            @test getfield(fs, Symbol(p, :_mean_turnover))[1] == b.mean_turnover
+            @test getfield(fs, Symbol(p, :_ann_return)) == b.summary.ann_return
+            @test getfield(fs, Symbol(p, :_ann_volatility)) == b.summary.ann_volatility
+            @test getfield(fs, Symbol(p, :_sharpe)) == b.summary.sharpe
+            @test getfield(fs, Symbol(p, :_hit_rate)) == b.hit_rate
+            @test getfield(fs, Symbol(p, :_mean_turnover)) == b.mean_turnover
         end
     end
 
     @testset "The calibration, the spreads and the coverage are their own verbs" begin
-        @test fs.calibration_slope[1] == cb.slope
-        @test fs.mean_alpha[1] == cb.mean_alpha
-        @test fs.std_alpha[1] == cb.std_alpha
-        @test fs.mean_y[1] == cb.mean_y
-        @test fs.std_y[1] == cb.std_y
-        @test fs.n_bins[1] == cb.n_bins
-        @test fs.spread_ann_return[1, :] == qs.ann_mean
-        @test fs.spread_ann_volatility[1, :] == qs.ann_vol
-        @test fs.spread_sharpe[1, :] == qs.ann_ir
-        @test fs.spread_hit_rate[1, :] == qs.hit_rate
-        @test fs.mean_coverage[1] ≈ sum(c) / length(c)
-        @test fs.min_coverage[1] ≈ minimum(c)
+        @test fs.calibration_slope == cb.slope
+        @test fs.mean_alpha == cb.mean_alpha
+        @test fs.std_alpha == cb.std_alpha
+        @test fs.mean_y == cb.mean_y
+        @test fs.std_y == cb.std_y
+        @test fs.n_bins == cb.n_bins
+        # A summary of one evaluation holds each spread as a vector over the tail fractions.
+        @test fs.spread_ann_return == qs.ann_mean
+        @test fs.spread_ann_volatility == qs.ann_vol
+        @test fs.spread_sharpe == qs.ann_ir
+        @test fs.spread_hit_rate == qs.hit_rate
+        @test fs.mean_coverage ≈ sum(c) / length(c)
+        @test fs.min_coverage ≈ minimum(c)
     end
 
     @testset "The annualisation is the evaluation's own, and it is carried" begin
         # `ppy` reaches the summary off the Result rather than as a keyword of its own, so
         # a caller cannot annualise a table under a factor the evaluation did not use.
         @test fs.ppy == 12
-        @test fs.rank_ann_return[1] ≈
+        @test fs.rank_ann_return ≈
               12 *
               forecast_portfolio(forecast_evaluation(fe.alpha, fe.y)).summary.ann_return
     end
@@ -3449,9 +3668,18 @@ end
     two = forecast_evaluation_summary([fe, fe]; names = ["a", "b"], mt = OverlapMeanTest())
 
     @testset "The two carry the same type and the same columns" begin
-        @test typeof(one) === typeof(two)
+        # One evaluation gives scalar fields, and a vector of one gives the type of a
+        # vector of two (#1934).
+        vone = forecast_evaluation_summary([fe]; mt = OverlapMeanTest())
+        @test typeof(vone) === typeof(two)
         @test fieldnames(typeof(one)) == fieldnames(typeof(two))
         @test isa(one, PO.AbstractResult)
+        for f in fieldnames(ForecastSummaryResult)
+            v = getfield(vone, f)
+            want = f === :quantiles ? v : PO.first_summary_entry(v)
+            @test isequal(getfield(one, f), want)
+        end
+        @test one.spearman_mean_ic isa Number
     end
 
     @testset "Two evaluations of one forecast compare as identical rows" begin
@@ -3460,12 +3688,12 @@ end
             v = getfield(two, f)
             @test length(v) == 2
             @test v[1] == v[2]
-            @test v[1] == getfield(one, f)[1]
+            @test v[1] == getfield(one, f)
         end
     end
 
     @testset "An unnamed summary numbers its rows in the order they were given" begin
-        @test one.names == ["Forecast 1"]
+        @test one.names == "Forecast 1"
         @test forecast_evaluation_summary([fe, fe, fe]; mt = OverlapMeanTest()).names ==
               ["Forecast 1", "Forecast 2", "Forecast 3"]
         @test_throws DimensionMismatch forecast_evaluation_summary([fe, fe]; names = ["a"],
@@ -3494,7 +3722,14 @@ end
     @test ls.names == ["h1", "h2"]
     for f in (FS_CORE..., :n_silenced, :mean_coverage_scored, :min_coverage_scored,
               FS_SPREAD...)
-        @test isequal(getfield(ls, f), vcat(getfield(s1, f), getfield(s2, f)))
+        # A summary of one evaluation holds a spread as a vector over the tail fractions, so
+        # it is one row of the listing.
+        want = if f in FS_SPREAD
+            vcat(permutedims(getfield(s1, f)), permutedims(getfield(s2, f)))
+        else
+            vcat(getfield(s1, f), getfield(s2, f))
+        end
+        @test isequal(getfield(ls, f), want)
     end
     @test ls.ppy == [1, 12]
     err = try
@@ -3521,7 +3756,7 @@ end
                                       mt = OverlapMeanTest())
     for f in FS_SPREAD
         @test eltype(getfield(l32, f)) == Float64
-        @test isequal(getfield(l32, f)[2:2, :], getfield(s1, f))
+        @test isequal(getfield(l32, f)[2, :], getfield(s1, f))
     end
     @test_throws PO.IsEmptyError forecast_evaluation_summary(ForecastEvaluationResult[];
                                                              paired = false,
@@ -3639,14 +3874,33 @@ end
     end
 
     @testset "A Panel Field target is the same target only where it names the same field" begin
-        @test PO.forecast_summary_same_target(PO.IdiosyncraticTarget(),
-                                              PO.IdiosyncraticTarget())
-        @test !PO.forecast_summary_same_target(PO.IdiosyncraticTarget(),
-                                               PO.AssetReturnTarget())
-        @test PO.forecast_summary_same_target(PanelFieldTarget(; name = "volume"),
-                                              PanelFieldTarget(; name = "volume"))
-        @test !PO.forecast_summary_same_target(PanelFieldTarget(; name = "volume"),
-                                               PanelFieldTarget(; name = "market_cap"))
+        @test PO.same_configuration(PO.IdiosyncraticTarget(), PO.IdiosyncraticTarget())
+        @test !PO.same_configuration(PO.IdiosyncraticTarget(), PO.AssetReturnTarget())
+        @test PO.same_configuration(PanelFieldTarget(; fields = "volume"),
+                                    PanelFieldTarget(; fields = "volume"))
+        @test !PO.same_configuration(PanelFieldTarget(; fields = "volume"),
+                                     PanelFieldTarget(; fields = "market_cap"))
+        @test PO.same_configuration(PanelFieldTarget(; fields = ["a" => 1, "b" => -1]),
+                                    PanelFieldTarget(; fields = ["a" => 1, "b" => -1]))
+        @test !PO.same_configuration(PanelFieldTarget(; fields = ["a", "b"]),
+                                     PanelFieldTarget(; fields = ["a" => 1, "b" => 1]))
+    end
+
+    @testset "Two equal Descriptor targets are the same target (#2005)" begin
+        # Each call builds new vectors for `den`, `nonneg` and `gt0`, so `isequal` falls back
+        # to `===` and compares those vectors by identity. That is the defect.
+        a, b = EWAmihudIlliquidity(), EWAmihudIlliquidity()
+        @test !isequal(a, b)
+        @test PO.same_configuration(PanelFieldTarget(; fields = a),
+                                    PanelFieldTarget(; fields = b))
+        @test !PO.same_configuration(PanelFieldTarget(; fields = a),
+                                     PanelFieldTarget(;
+                                                      fields = EWAmihudIlliquidity(;
+                                                                                   half_life = 21)))
+        @test !PO.same_configuration(PanelFieldTarget(; fields = a),
+                                     PanelFieldTarget(; fields = "adj_volume"))
+        @test PO.same_configuration((1, [NaN, 2.0]), (1, [NaN, 2.0]))
+        @test !PO.same_configuration([1.0, 2.0], [1.0, 2.0, 3.0])
     end
 end
 
@@ -3781,7 +4035,7 @@ end
         blanked = forecast_evaluation_summary(forecast_evaluation(blank, y);
                                               quantiles = (0.5,), mt = OverlapMeanTest())
         for f in FS_CORE
-            @test isequal(getfield(fs, f)[1], getfield(blanked, f)[1])
+            @test isequal(getfield(fs, f)[1], getfield(blanked, f))
         end
         # The single-evaluation method carries the keyword too, and it changes nothing.
         @test isequal(forecast_evaluation_summary(late; align = true,
@@ -3840,25 +4094,25 @@ end
         # The middle date carries two assets, under the threshold of three, so it takes no
         # coefficient. Two of three dates score, and both score positive.
         @test count(isfinite, forecast_ic(thin)[:, 1]) == 2
-        @test fs.spearman_hit_rate[1] ≈ 1.0
-        @test fs.pearson_hit_rate[1] ≈ 1.0
+        @test fs.spearman_hit_rate ≈ 1.0
+        @test fs.pearson_hit_rate ≈ 1.0
         # The silenced date is the coverage's to report, once.
-        @test fs.min_coverage[1] < 1
-        @test fs.min_n_scored[1] == 2
+        @test fs.min_coverage < 1
+        @test fs.min_n_scored == 2
     end
 
     @testset "The book hit rate counts against the dates that traded" begin
         rk = forecast_portfolio(thin; kind = :rank)
         @test count(isfinite, rk.ret) == 2
-        @test fs.rank_hit_rate[1] ≈ 1.0
-        @test fs.zscore_hit_rate[1] ≈ 1.0
+        @test fs.rank_hit_rate ≈ 1.0
+        @test fs.zscore_hit_rate ≈ 1.0
     end
 
     @testset "The one denominator is the two kernels' shared convention" begin
-        @test fs.spearman_hit_rate[1] == fs.rank_hit_rate[1]
-        @test fs.spearman_hit_rate[1] ==
+        @test fs.spearman_hit_rate == fs.rank_hit_rate
+        @test fs.spearman_hit_rate ==
               PO.exposure_ic_factor_summary(forecast_ic(thin), 1; mt = OverlapMeanTest()).hit_rate
-        @test fs.rank_hit_rate[1] ==
+        @test fs.rank_hit_rate ==
               PO.forecast_hit_rate(forecast_portfolio(thin; kind = :rank).ret)
         # A series with no finite entry has no hit rate under either kernel.
         @test isnan(PO.exposure_ic_factor_summary(forecast_ic(fe), 1;
@@ -3917,11 +4171,11 @@ end
     @testset "The comparison is the same call as the single evaluation" begin
         alone = forecast_evaluation_summary(fes[2]; names = ["target"], quantiles = (0.2,),
                                             mt = OverlapMeanTest())
-        @test alone.names == ["target"]
+        @test alone.names == "target"
         for f in FS_CORE
-            @test getfield(alone, f)[1] == getfield(fs, f)[2]
+            @test getfield(alone, f) == getfield(fs, f)[2]
         end
-        @test alone.spread_ann_return[1, :] == fs.spread_ann_return[2, :]
+        @test alone.spread_ann_return == fs.spread_ann_return[2, :]
     end
 
     @testset "The block method resolves the weights the metric names" begin
@@ -3930,7 +4184,7 @@ end
                                          mt = OverlapMeanTest())
         @test wf.spearman_mean_ic == fs.spearman_mean_ic
         @test wf.pearson_mean_ic != fs.pearson_mean_ic
-        @test forecast_evaluation_summary(fes[1], px.csfm; mt = OverlapMeanTest()).pearson_mean_ic[1] ==
+        @test forecast_evaluation_summary(fes[1], px.csfm; mt = OverlapMeanTest()).pearson_mean_ic ==
               fs.pearson_mean_ic[1]
     end
 
@@ -3959,11 +4213,11 @@ end
         al = forecast_evaluation_align([late, fes[2]])
         @test al[1].dates == al[2].dates == late.dates
         @test fa.spearman_mean_ic[1] ==
-              forecast_evaluation_summary(late, px.csfm; mt = OverlapMeanTest()).spearman_mean_ic[1]
+              forecast_evaluation_summary(late, px.csfm; mt = OverlapMeanTest()).spearman_mean_ic
         @test fa.spearman_mean_ic[2] !=
-              forecast_evaluation_summary(fes[2], px.csfm; mt = OverlapMeanTest()).spearman_mean_ic[1]
+              forecast_evaluation_summary(fes[2], px.csfm; mt = OverlapMeanTest()).spearman_mean_ic
         @test fa.spearman_mean_ic[2] ==
-              forecast_evaluation_summary(al[2], px.csfm; mt = OverlapMeanTest()).spearman_mean_ic[1]
+              forecast_evaluation_summary(al[2], px.csfm; mt = OverlapMeanTest()).spearman_mean_ic
     end
 end
 
@@ -4040,18 +4294,18 @@ end
         zs = forecast_portfolio(fe; kind = :zscore)
         scored(x) = count(>(0), filter(isfinite, x)) / count(isfinite, x)
         every(x) = count(>(0), filter(isfinite, x)) / length(x)
-        @test fs.spearman_hit_rate[1] == scored(ic[:, 1]) != every(ic[:, 1])
-        @test fs.pearson_hit_rate[1] == scored(ic[:, 2]) != every(ic[:, 2])
-        @test fs.rank_hit_rate[1] == scored(rk.ret) != every(rk.ret)
-        @test fs.zscore_hit_rate[1] == scored(zs.ret) != every(zs.ret)
+        @test fs.spearman_hit_rate == scored(ic[:, 1]) != every(ic[:, 1])
+        @test fs.pearson_hit_rate == scored(ic[:, 2]) != every(ic[:, 2])
+        @test fs.rank_hit_rate == scored(rk.ret) != every(rk.ret)
+        @test fs.zscore_hit_rate == scored(zs.ret) != every(zs.ret)
     end
 
     @testset "Each book reports three figures that read no order of the returns" begin
         fs = forecast_evaluation_summary(fe; mt = OverlapMeanTest())
         rk = forecast_portfolio(fe; kind = :rank)
-        @test fs.rank_ann_return[1] == rk.summary.ann_return
-        @test fs.rank_ann_volatility[1] == rk.summary.ann_volatility
-        @test fs.rank_sharpe[1] == rk.summary.sharpe
+        @test fs.rank_ann_return == rk.summary.ann_return
+        @test fs.rank_ann_volatility == rk.summary.ann_volatility
+        @test fs.rank_sharpe == rk.summary.sharpe
         r = filter(isfinite, rk.ret)
         p = r[randperm(StableRNG(3), length(r))]
         a = performance_summary(r)
@@ -4061,9 +4315,24 @@ end
               a.sharpe ≈ b.sharpe
         @test a.sortino ≈ b.sortino && a.cvar ≈ b.cvar && a.sharpe_stderr ≈ b.sharpe_stderr
         @test !(a.max_drawdown ≈ b.max_drawdown)
-        @test length(PO.forecast_summary_row(fe, nothing, 10, OverlapMeanTest())) == 39
-        @test collect(keys(PO.forecast_summary_row(fe, nothing, 10, OverlapMeanTest()))) ==
-              collect(fieldnames(ForecastSummaryResult)[2:40])
+        row = PO.forecast_summary_row(fe, nothing, 10, OverlapMeanTest())
+        @test row isa PO.SummaryRowParts
+        @test fieldnames(typeof(row)) == (:ic, :rank, :zscore, :calibration, :coverage)
+        @test row.ic isa PO.ForecastICSummaryResult
+        @test row.rank isa ForecastPortfolioResult && row.zscore isa ForecastPortfolioResult
+        @test row.calibration isa ForecastCalibrationResult
+        @test row.coverage isa PO.CoverageFigures
+        cv0 = PO.forecast_summary_coverage(fe, nothing)
+        @test all(f -> isequal(getfield(row.coverage, f), getfield(cv0, f)),
+                  fieldnames(PO.CoverageFigures))
+        @test fs.spearman_mean_ic == row.ic.spearman.mean_ic
+        @test fs.pearson_hit_rate == row.ic.pearson.hit_rate
+        @test fs.rank_ann_return == row.rank.summary.ann_return
+        @test fs.zscore_mean_turnover == row.zscore.mean_turnover
+        @test fs.calibration_slope == row.calibration.slope
+        @test fs.n_bins == row.calibration.n_bins
+        @test fs.mean_coverage == row.coverage.mean_coverage
+        @test fs.n_silenced == row.coverage.n_silenced
     end
 
     @testset "The aligned grid is the set the definition states, on the later phase" begin
@@ -4092,15 +4361,15 @@ end
         a = forecast_evaluation_summary(fe; quantiles = 0.2, mt = OverlapMeanTest())
         b = forecast_evaluation_summary(fe; quantiles = [0.2], mt = OverlapMeanTest())
         @test a.quantiles == [0.2]
-        @test a.spread_sharpe == b.spread_sharpe && size(a.spread_sharpe) == (1, 1)
+        @test a.spread_sharpe == b.spread_sharpe && size(a.spread_sharpe) == (1,)
     end
 
     @testset "Two Panel Field targets are one target only when they name one field" begin
-        @test PO.forecast_summary_same_target(PanelFieldTarget(; name = "a"),
-                                              PanelFieldTarget(; name = "a"))
-        @test !PO.forecast_summary_same_target(PanelFieldTarget(; name = "a"),
-                                               PanelFieldTarget(; name = "b"))
-        @test !PO.forecast_summary_same_target(IdiosyncraticTarget(), AssetReturnTarget())
+        @test PO.same_configuration(PanelFieldTarget(; fields = "a"),
+                                    PanelFieldTarget(; fields = "a"))
+        @test !PO.same_configuration(PanelFieldTarget(; fields = "a"),
+                                     PanelFieldTarget(; fields = "b"))
+        @test !PO.same_configuration(IdiosyncraticTarget(), AssetReturnTarget())
     end
 end
 
@@ -4167,7 +4436,8 @@ end
         for n in (2, 8)
             t = forecast_holding_period(f32, a32, ones(Float64, 8, 4); n = n,
                                         mt = OverlapMeanTest())
-            @test all(eltype(t[k]) === Float32 for k in keys(t)[5:end])
+            @test all(eltype(getfield(t, k)) === Float32
+                      for k in fieldnames(typeof(t))[5:end])
         end
     end
 
@@ -4421,7 +4691,9 @@ end
             @test iszero(sm.ann_vol)
             @test isnan(sm.ann_ir)
         end
-        @test all(isnan, values(PO.forecast_series_summary(Float64[], 12)))
+        se = PO.forecast_series_summary(Float64[], 12)
+        @test se isa PO.SeriesFigures
+        @test all(isnan, (se.ann_mean, se.ann_vol, se.ann_ir, se.hit_rate))
         sm = PO.forecast_series_summary([NaN, 0.2], 12)
         @test sm.ann_mean ≈ 2.4
         @test isnan(sm.ann_vol) && isnan(sm.ann_ir)
@@ -4464,11 +4736,12 @@ end
         fe = forecast_evaluation(alpha[[1, 3], :], gap_y(0.1)[[1, 3], :]; min_count = 3,
                                  ppy = 4, step = 1)
         q = forecast_quantile_spread(fe; quantiles = [0.25, 0.5])
-        @test keys(q) == (:spread, :ann_mean, :ann_vol, :ann_ir, :hit_rate)
+        @test q isa ForecastQuantileSpreadResult
+        @test fieldnames(typeof(q)) == (:spread, :ann_mean, :ann_vol, :ann_ir, :hit_rate)
         for j in 1:2
             sm = PO.forecast_series_summary(q.spread[:, j], 4)
             @test isequal((q.ann_mean[j], q.ann_vol[j], q.ann_ir[j], q.hit_rate[j]),
-                          values(sm))
+                          (sm.ann_mean, sm.ann_vol, sm.ann_ir, sm.hit_rate))
         end
         @test isequal(forecast_quantile_spread(fe; quantiles = 0.25).spread,
                       q.spread[:, 1:1])
@@ -4508,7 +4781,7 @@ end
     members = (fw, ew, tgt, tgtc)
 
     @testset "No member reads b, esigma, L, fcb, rf, or the values of M" begin
-        K = size(csfm.Ms, 3)
+        K = size(csfm.Ms, 2)
         fcb = PO.FactorFamilyBasis(; fnm = ["industry"], fi = [collect(2:K)], di = [K - 1],
                                    ratios = ones(Tb, K - 2), K = K)
         full = CrossSectionalFactorModel(; M = 3 .* csfm.M .+ 1,
@@ -4528,7 +4801,7 @@ end
                           forecast_history(m, rd, csfm; step = 3))
         end
         cut = PO.forecast_history_block(full, 10)
-        @test isequal(cut.M, full.Ms[10, :, :])
+        @test isequal(cut.M, full.Ms[:, :, 10])
         @test cut.b == full.b
         @test cut.esigma == full.esigma
         @test isnothing(getfield(cut, :L))
@@ -4950,13 +5223,13 @@ end
             # the silenced dates are the dates the oracle dropped. The two means satisfy the
             # identity of `forecast_summary_coverage`.
             fs = forecast_evaluation_summary(o.fe, c.W; mt = OverlapMeanTest())
-            @test fs.n_silenced == [length(dropped)]
-            @test parity_compare([fs.mean_coverage_scored[1], fs.min_coverage_scored[1]],
+            @test fs.n_silenced == length(dropped)
+            @test parity_compare([fs.mean_coverage_scored, fs.min_coverage_scored],
                                  ss[29:30]; name = "$(case) scored coverage").ok
             nc = count(isfinite, forecast_coverage(o.fe, c.W))
             # Measured bit-equal in every case (#1558).
-            @test parity_compare([fs.mean_coverage_scored[1]],
-                                 [fs.mean_coverage[1] * nc / (nc - fs.n_silenced[1])];
+            @test parity_compare([fs.mean_coverage_scored],
+                                 [fs.mean_coverage * nc / (nc - fs.n_silenced)];
                                  rtol = 1e-14, name = "$(case) coverage identity").ok
         end
     end

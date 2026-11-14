@@ -1,5 +1,5 @@
 ```@meta
-Description = "Simple variance, private API of PortfolioOptimisers.jl: show_fields, simple_variance_kernel, simple_variance_count, SimpleVarianceState, …"
+Description = "Simple variance, private API of PortfolioOptimisers.jl: show_fields, simple_variance_count, SimpleVarianceState, variance_state_seed, Base.copy, …"
 ```
 
 # Simple variance: private API
@@ -8,7 +8,6 @@ The library uses the variance of each asset in several places, such as some esti
 
 ```@docs
 show_fields(::SimpleVariance)
-simple_variance_kernel
 simple_variance_count
 ```
 

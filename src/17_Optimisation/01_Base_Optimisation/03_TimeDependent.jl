@@ -220,9 +220,9 @@ $(DocStringExtensions.FIELDS)
 # Constructors
 
     TimeDependent(val, bind::Symbol = :outermost; default = NoDefault())
-    TimeDependent(; val::Union{<:AbstractVector, <:Base.Callable,
-                               <:PreviousWeightsFunction, <:TimeDependentCallable,
-                               <:TimeDependent}, bind::Symbol = :outermost,
+    TimeDependent(; val::Union{AbstractVector, Base.Callable,
+                               PreviousWeightsFunction, TimeDependentCallable,
+                               TimeDependent}, bind::Symbol = :outermost,
                   default = NoDefault())
 
 ## Validation
@@ -268,9 +268,9 @@ TimeDependent
     Value of the field outside every fold loop. It replaces the static default that [`time_dependent_field_defaults`](@ref) gives for the field. [`NoDefault`](@ref), the default, keeps the static default. A field with no static default needs this value.
     """
     default
-    function TimeDependent(val::Union{<:AbstractVector, <:Base.Callable,
-                                      <:PreviousWeightsFunction, <:TimeDependentCallable,
-                                      <:TimeDependent}, bind::Symbol = :outermost;
+    function TimeDependent(val::Union{AbstractVector, Base.Callable,
+                                      PreviousWeightsFunction, TimeDependentCallable,
+                                      TimeDependent}, bind::Symbol = :outermost;
                            default = NoDefault())
         @argcheck(!isa(val, TimeDependent),
                   ArgumentError("val cannot be a TimeDependent: schedules do not nest. An estimator swapped in by a schedule may carry schedules of its own — they resolve against the same fold context after the swap — but they belong in its fields, not inside this wrapper."))
@@ -297,14 +297,13 @@ function Online(::TimeDependent, args...; kwargs...)
     return throw(ArgumentError("est cannot be a TimeDependent: a schedule is not one estimator, so there is nothing for a buffer to belong to. The two wrappers resolve at different times and neither wraps the other — an `Online` resolves once at warm-up, because the buffer it seeds is threaded from step to step, and a schedule resolves once per fold, because its value is the fold's. They compose in the other order: an estimator an `Online` wraps may hold schedules of its own, which resolve per fold after the seeding, and one estimator may hold a wrapper in one field and a schedule in another."))
 end
 function TimeDependent(;
-                       val::Union{<:AbstractVector, <:Base.Callable,
-                                  <:PreviousWeightsFunction, <:TimeDependentCallable,
-                                  <:TimeDependent}, bind::Symbol = :outermost,
-                       default = NoDefault())::TimeDependent
+                       val::Union{AbstractVector, Base.Callable, PreviousWeightsFunction,
+                                  TimeDependentCallable, TimeDependent},
+                       bind::Symbol = :outermost, default = NoDefault())::TimeDependent
     return TimeDependent(val, bind; default = default)
 end
 """
-    const TD_Option{X} = Union{Nothing, <:TimeDependent, X}
+    const TD_Option{X} = Union{Nothing, TimeDependent, X}
 
 Alias for an optimiser field that takes `nothing`, a static value of type `X`, or a [`TimeDependent`](@ref) schedule.
 
@@ -315,9 +314,9 @@ The fields whose constructor signatures use this alias, or [`TD`](@ref), are the
   - [`TimeDependent`](@ref)
   - [`Option`](@ref)
 """
-const TD_Option{X} = Union{Nothing, <:TimeDependent, X}
+const TD_Option{X} = Union{Nothing, TimeDependent, X}
 """
-    const TD{X} = Union{<:TimeDependent, X}
+    const TD{X} = Union{TimeDependent, X}
 
 Alias for a required optimiser field that takes a static value of type `X` or a [`TimeDependent`](@ref) schedule, but not `nothing`.
 
@@ -329,7 +328,7 @@ The prior estimator, the returns model, the scalariser, the clustering estimator
   - [`TD_Option`](@ref)
   - [`time_dependent_field_defaults`](@ref)
 """
-const TD{X} = Union{<:TimeDependent, X}
+const TD{X} = Union{TimeDependent, X}
 """
     const TD_OptE_Opt = Union{TimeDependent{<:AbstractVector{<:OptE_Opt}},
                               TimeDependent{<:TimeDependentOptimiserCallable},
@@ -357,8 +356,8 @@ const TD_OptE_Opt = Union{TimeDependent{<:AbstractVector{<:OptE_Opt}},
                           TimeDependent{<:PreviousWeightsFunction},
                           TimeDependent{<:Base.Callable}}
 """
-    const TDO_OptE_Opt = Union{<:TD_OptE_Opt,
-                               <:TimeDependent{<:AbstractVector{<:Option{<:OptE_Opt}}}}
+    const TDO_OptE_Opt = Union{TD_OptE_Opt,
+                               TimeDependent{<:AbstractVector{<:Option{<:OptE_Opt}}}}
 
 Alias for the [`TimeDependent`](@ref) forms that an optional field which holds an optimiser takes, such as a fallback.
 
@@ -370,14 +369,14 @@ It holds every form of [`TD_OptE_Opt`](@ref), and a vector whose entries can be 
   - [`TDO_Option`](@ref)
   - [`Option`](@ref)
 """
-const TDO_OptE_Opt = Union{<:TD_OptE_Opt,
-                           <:TimeDependent{<:AbstractVector{<:Option{<:OptE_Opt}}}}
+const TDO_OptE_Opt = Union{TD_OptE_Opt,
+                           TimeDependent{<:AbstractVector{<:Option{<:OptE_Opt}}}}
 """
-    const TDO_Option{X} = Union{Nothing, <:TDO_OptE_Opt, X}
+    const TDO_Option{X} = Union{Nothing, TDO_OptE_Opt, X}
 
 Alias for an optional field that holds an optimiser, such as a fallback.
 
-The field takes `nothing`, a static value of type `X`, or a schedule of optimisers whose entries can be `nothing`, see [`TDO_OptE_Opt`](@ref). A required field that holds an optimiser does not take `nothing`, so its signature writes `Union{<:X, <:TD_OptE_Opt}`.
+The field takes `nothing`, a static value of type `X`, or a schedule of optimisers whose entries can be `nothing`, see [`TDO_OptE_Opt`](@ref). A required field that holds an optimiser does not take `nothing`, so its signature writes `Union{X, TD_OptE_Opt}`.
 
 # Related
 
@@ -386,9 +385,9 @@ The field takes `nothing`, a static value of type `X`, or a schedule of optimise
   - [`TD_Option`](@ref)
   - [`Option`](@ref)
 """
-const TDO_Option{X} = Union{Nothing, <:TDO_OptE_Opt, X}
+const TDO_Option{X} = Union{Nothing, TDO_OptE_Opt, X}
 """
-    const OptE_TD = Union{<:NonFiniteAllocationOptimisationEstimator, <:TD_OptE_Opt}
+    const OptE_TD = Union{NonFiniteAllocationOptimisationEstimator, TD_OptE_Opt}
 
 Alias for an optimisation estimator, or a [`TimeDependent`](@ref) schedule in the place of one.
 
@@ -400,9 +399,9 @@ The cross-validation fold loops that fit take this type. A schedule given direct
   - [`OptE_Opt_TD`](@ref)
   - [`cross_val_predict`](@ref)
 """
-const OptE_TD = Union{<:NonFiniteAllocationOptimisationEstimator, <:TD_OptE_Opt}
+const OptE_TD = Union{NonFiniteAllocationOptimisationEstimator, TD_OptE_Opt}
 """
-    const OptE_Opt_TD = Union{<:OptE_Opt, <:TD_OptE_Opt}
+    const OptE_Opt_TD = Union{OptE_Opt, TD_OptE_Opt}
 
 Alias for an optimisation estimator, a precomputed result, or a [`TimeDependent`](@ref) schedule in the place of one.
 
@@ -414,7 +413,7 @@ The fold loops that take a precomputed result as well as an estimator take this 
   - [`TD_OptE_Opt`](@ref)
   - [`OptE_Opt`](@ref)
 """
-const OptE_Opt_TD = Union{<:OptE_Opt, <:TD_OptE_Opt}
+const OptE_Opt_TD = Union{OptE_Opt, TD_OptE_Opt}
 """
     const VecOptE_Opt_TD = AbstractVector{<:OptE_Opt_TD}
 
@@ -559,7 +558,7 @@ A bare function gives `false`, because no code can find out what it reads.
 
  1. When `td.val` is a [`PreviousWeightsFunction`](@ref), return `true`.
  2. When `td.val` is a [`TimeDependentCallable`](@ref), return its own `needs_previous_weights`.
- 3. When `td.val` is a vector, return `true` if any entry needs the previous weights, by [`time_dependent_entry_needs_previous_weights`](@ref).
+ 3. When `td.val` is a vector, return `true` if any entry needs the previous weights, by the method of [`needs_previous_weights`](@ref) for the type of the entry.
  4. Else return `false`.
 
 # Related
@@ -574,38 +573,89 @@ function needs_previous_weights(td::TimeDependent)::Bool
     elseif isa(v, TimeDependentCallable)
         return needs_previous_weights(v)
     elseif isa(v, AbstractVector)
-        return any(time_dependent_entry_needs_previous_weights, v)
+        return any(needs_previous_weights, v)
     end
     return false
 end
 """
-    time_dependent_entry_needs_previous_weights(x)
+    needs_previous_weights(x::Any) -> Bool
+    needs_previous_weights(x::AbstractVector) -> Bool
 
-Returns `true` if an entry of a [`TimeDependent`](@ref) vector reads the weights of the previous fold.
+Return `true` if an entry of a [`TimeDependent`](@ref) vector reads the weights of the previous fold.
 
-A turnover, a fee, a tracking input, a risk measure, an optimisation estimator or result, and a nested schedule each give their own [`needs_previous_weights`](@ref). A vector entry gives `true` if any of its elements does. Every other value gives `false`.
+A turnover, a fee, a tracking input, a risk measure, a budget cost, an optimisation estimator or result, a constraint and a nested schedule each give their own method. A vector gives `true` if any of its elements does. Every other value, such as a number or a bare function, gives `false`, because no code can find out what a bare function reads.
 
 # Related
 
   - [`TimeDependent`](@ref)
   - [`needs_previous_weights`](@ref)
 """
-function time_dependent_entry_needs_previous_weights(::Any)::Bool
+function needs_previous_weights(::Any)::Bool
     return false
 end
-function time_dependent_entry_needs_previous_weights(x::Union{<:TnE_Tn, <:FeesE_Fees,
-                                                              <:Tr_VecTr,
-                                                              <:AbstractBaseRiskMeasure})::Bool
-    return needs_previous_weights(x)
+function needs_previous_weights(x::AbstractVector)::Bool
+    return any(needs_previous_weights, x)
 end
-function time_dependent_entry_needs_previous_weights(x::AbstractVector)::Bool
-    return any(time_dependent_entry_needs_previous_weights, x)
+"""
+    schedule_reads_previous_weights(x)
+
+Returns `true` if a schedule in `x` reads the weights of the previous fold from its context.
+
+[`needs_previous_weights`](@ref) answers a wider question. It also counts a turnover, a fee, a tracking input, a cost budget or a risk measure that [`factory`](@ref) gives the previous weights. This function counts only a schedule that reads `ctx.w_prev` itself, see [`TimeDependentContext`](@ref). An estimator whose [`factory`](@ref) receives its weights from a source other than the fold loop asks this question of the parts that `factory` reaches. The leader of a [`FollowTheLeader`](@ref) is such an estimator. Its `factory` receives the Price-Adjusted Allocation of the step, so only a schedule in it reads the weights of the loop.
+
+The walk reads every schedule, whatever its `bind`. A schedule that a loop nearer to it resolves still reads its context there, so the answer is `true` for it too, and the loop runs its folds in sequence.
+
+# Algorithm
+
+ 1. A [`TimeDependent`](@ref) whose value is a vector returns `true` if one of its entries does, by this function. An entry is a fixed value, so it reads no context. An optimiser entry can hold a schedule of its own.
+ 2. Any other [`TimeDependent`](@ref) answers as [`needs_previous_weights`](@ref) does: `true` for a [`PreviousWeightsFunction`](@ref), the answer of a [`TimeDependentCallable`](@ref), and `false` for a bare function.
+ 3. An optimisation estimator returns `true` if one of the fields of [`schedule_tree_fields`](@ref) does. An [`OnlinePortfolioSelection`](@ref) adds its rule tree on `alg`, and a rule walks the fields of [`rule_tree_fields`](@ref).
+ 4. A vector of optimisers or of rules returns `true` if one of its elements does.
+ 5. Every other value returns `false`.
+
+# Related
+
+  - [`needs_previous_weights`](@ref)
+  - [`schedule_tree_fields`](@ref)
+  - [`TimeDependent`](@ref)
+  - [`PreviousWeightsFunction`](@ref)
+"""
+function schedule_reads_previous_weights(::Any)::Bool
+    return false
 end
-function time_dependent_entry_needs_previous_weights(x::OptE_Opt)::Bool
-    return needs_previous_weights(x)
+function schedule_reads_previous_weights(td::TimeDependent)::Bool
+    v = td.val
+    if isa(v, AbstractVector)
+        return any(schedule_reads_previous_weights, v)
+    end
+    return needs_previous_weights(td)
 end
-function time_dependent_entry_needs_previous_weights(x::TimeDependent)::Bool
-    return needs_previous_weights(x)
+function schedule_reads_previous_weights(opt::AbstractOptimisationEstimator)::Bool
+    return any(f -> schedule_reads_previous_weights(getfield(opt, f)),
+               schedule_tree_fields(opt))
+end
+function schedule_reads_previous_weights(opt::VecOptE_Opt_TD)::Bool
+    return any(schedule_reads_previous_weights, opt)
+end
+"""
+    schedule_tree_fields(opt)
+
+Returns the names of the fields of `opt` whose type can hold a [`TimeDependent`](@ref), an optimisation estimator, or a vector of optimisers.
+
+[`schedule_reads_previous_weights`](@ref) walks these fields alone. A generated function computes the tuple once for each type, from the field types, as [`time_dependent_candidate_fields`](@ref) does. So an optimiser that holds no schedule and no inner optimiser gives an empty tuple at compile time.
+
+# Related
+
+  - [`schedule_reads_previous_weights`](@ref)
+  - [`time_dependent_candidate_fields`](@ref)
+"""
+@generated function schedule_tree_fields(::T) where {T}
+    fns = Tuple(f
+                for f in fieldnames(T)
+                if typeintersect(fieldtype(T, f),
+                                 Union{TimeDependent, AbstractOptimisationEstimator,
+                                       VecOptE_Opt_TD}) !== Union{})
+    return :($fns)
 end
 function port_opt_view(td::TimeDependent, i, args...)
     v = td.val
@@ -662,25 +712,58 @@ function inner_fold_fields(::Any)::Tuple
     return ()
 end
 """
-    time_dependent_candidate_fields(opt)
+    typed_time_dependent_fields(opt)
 
 Returns the names of the fields of `opt` whose type can hold a [`TimeDependent`](@ref).
 
-[`time_dependent_fields`](@ref) reads the values of these fields only. The type of a field decides whether it can hold a schedule. A constructor that takes a schedule, see [`TD_Option`](@ref), records it in a type parameter. So a field that holds no schedule has a type whose intersection with `TimeDependent` is empty.
+The type of a field decides whether it can hold a schedule. A constructor that takes a schedule, see [`TD_Option`](@ref), records it in a type parameter. So a field that holds no schedule has a type whose intersection with `TimeDependent` is empty.
 
-A generated function computes the tuple once for each type of optimiser. For a `JuMPOptimiser` that holds no schedule, the tuple is empty at compile time, so `split` and `_optimise` read none of its fields. The tuple comes from the field types, and no list of fields is written by hand.
+A generated function computes the tuple once for each type, from the field types, and no list of fields is written by hand. [`time_dependent_candidate_fields`](@ref) returns this tuple, and an owner of a [`ConstraintBlock`](@ref) adds the slots of its block to it.
+
+# Related
+
+  - [`time_dependent_candidate_fields`](@ref)
+  - [`TD_Option`](@ref)
+"""
+@generated function typed_time_dependent_fields(::T) where {T}
+    fns = Tuple(f
+                for f in fieldnames(T)
+                if typeintersect(fieldtype(T, f), TimeDependent) !== Union{})
+    return :($fns)
+end
+"""
+    time_dependent_candidate_fields(opt)
+
+Returns the names under which `opt` can hold a [`TimeDependent`](@ref).
+
+[`time_dependent_fields`](@ref) reads the values of these names only. The fallback returns the fields of [`typed_time_dependent_fields`](@ref). An owner of a [`ConstraintBlock`](@ref), such as [`JuMPOptimiser`](@ref), also returns the slots of its block that can hold a schedule, under their flat names. [`time_dependent_slot`](@ref) reads such a name, and [`rebuild_struct`](@ref) passes it to the keyword constructor of the owner, which replaces that slot of the block.
+
+For a `JuMPOptimiser` that holds no schedule, the tuple is empty at compile time, so `split` and `_optimise` read none of its fields.
 
 # Related
 
   - [`TimeDependent`](@ref)
   - [`TD_Option`](@ref)
   - [`time_dependent_fields`](@ref)
+  - [`time_dependent_slot`](@ref)
 """
-@generated function time_dependent_candidate_fields(::T) where {T}
-    fns = Tuple(f
-                for f in fieldnames(T)
-                if typeintersect(fieldtype(T, f), TimeDependent) !== Union{})
-    return :($fns)
+function time_dependent_candidate_fields(opt)::Tuple
+    return typed_time_dependent_fields(opt)
+end
+"""
+    time_dependent_slot(opt, f::Symbol)
+
+Returns the value that `opt` holds under the name `f` of [`time_dependent_candidate_fields`](@ref).
+
+The fallback reads the field `f`. An owner of a [`ConstraintBlock`](@ref) reads a slot of its block under the flat name of the slot, as `opt.wb` reads it. The walks of the schedules read every value through this function, so a schedule in a slot of the block resolves, resets and counts its folds as a schedule in a field does.
+
+# Related
+
+  - [`time_dependent_candidate_fields`](@ref)
+  - [`time_dependent_fields`](@ref)
+"""
+function time_dependent_slot(opt, f::Symbol)
+    return getfield(opt, f)
 end
 """
     entitled(opt, f::Symbol, all_binds::Bool)
@@ -730,7 +813,7 @@ So every ordinary fold loop passes `all_binds = true`. Such a loop is the outerm
 function time_dependent_fields(opt, all_binds::Bool = true)
     fns = time_dependent_candidate_fields(opt)
     return filter(f -> begin
-                      x = getfield(opt, f)
+                      x = time_dependent_slot(opt, f)
                       if isa(x, TimeDependent)
                           (entitled(opt, f, all_binds) || x.bind === :outermost)
                       else
@@ -741,16 +824,16 @@ end
 """
 $(DocStringExtensions.TYPEDSIGNATURES)
 
-Checks each entry of the schedules in `args` with the keyword constructor of `T`.
+Checks each entry of the schedules in `args` with the keyword constructor of `T`, or with the keyword function `T`.
 
-The constructor of an optimiser calls this function, so a type error or an error between two fields shows at construction and not in the middle of a backtest. The argument `args` holds the arguments of the constructor, and `defaults` holds the static defaults that [`time_dependent_field_defaults`](@ref) gives. A call that the check makes holds no schedule, so the recursion stops.
+The constructor of an optimiser calls this function, so a type error or an error between two fields shows at construction and not in the middle of a backtest. The argument `args` holds the arguments of the constructor, and `defaults` holds the static defaults that [`time_dependent_field_defaults`](@ref) gives. A call that the check makes holds no schedule, so the recursion stops. A check that reads only some fields of an estimator passes a keyword function of those fields as `T`, as the budget check of a [`FollowTheLeader`](@ref) leader does.
 
 # Algorithm
 
  1. Collect the names `tdfs` of the arguments that hold a [`TimeDependent`](@ref). Return when there is none.
  2. Find a static value for each of them with [`time_dependent_stand_in`](@ref). Return with no check when one of them has none. That is a function schedule in a required field, whose value exists only at a fold.
  3. Replace each schedule in `args` with its static value, giving `base`.
- 4. For each name in `tdfs`, call the keyword constructor of `T` with `base`, once for each entry of the schedule and once for its explicit `default`, see [`substitute_time_dependent_entries`](@ref).
+ 4. For each name in `tdfs`, call `T` with `base` as keywords, once for each entry of the schedule and once for its explicit `default`, see [`substitute_time_dependent_entries`](@ref).
 
 # Related
 
@@ -758,8 +841,9 @@ The constructor of an optimiser calls this function, so a type error or an error
   - [`time_dependent_fields`](@ref)
   - [`time_dependent_stand_in`](@ref)
 """
-function assert_time_dependent_substitution(::Type{T}, args::NamedTuple,
-                                            defaults::NamedTuple)::Nothing where {T}
+function assert_time_dependent_substitution(T::F, args::NamedTuple,
+                                            defaults::NamedTuple)::Nothing where {F <:
+                                                                                  Base.Callable}
     tdfs = filter(f -> isa(args[f], TimeDependent), keys(args))
     if isempty(tdfs)
         return nothing
@@ -775,10 +859,10 @@ function assert_time_dependent_substitution(::Type{T}, args::NamedTuple,
     return nothing
 end
 """
-    substitute_time_dependent_entries(::Type{T}, base::NamedTuple, f::Symbol, td::TimeDependent) where {T}
-    substitute_time_dependent_entries(::Type, ::NamedTuple, ::Symbol, ::Any)
+    substitute_time_dependent_entries(T::Base.Callable, base::NamedTuple, f::Symbol, td::TimeDependent)
+    substitute_time_dependent_entries(::Base.Callable, ::NamedTuple, ::Symbol, ::Any)
 
-Calls the keyword constructor of `T` with each vector entry of the schedule `td`, and with its explicit `default`, in the field `f` of `base`.
+Calls the keyword constructor of `T`, or the keyword function `T`, with each vector entry of the schedule `td`, and with its explicit `default`, in the field `f` of `base`.
 
 The second method takes a value that is not a schedule, and calls nothing. [`assert_time_dependent_substitution`](@ref) passes only schedules. The second method states this fact to a static analyser, which cannot read the filter at a call whose arguments hold no schedule.
 
@@ -787,8 +871,9 @@ The second method takes a value that is not a schedule, and calls nothing. [`ass
   - [`assert_time_dependent_substitution`](@ref)
   - [`TimeDependent`](@ref)
 """
-function substitute_time_dependent_entries(::Type{T}, base::NamedTuple, f::Symbol,
-                                           td::TimeDependent)::Nothing where {T}
+function substitute_time_dependent_entries(T::F, base::NamedTuple, f::Symbol,
+                                           td::TimeDependent)::Nothing where {F <:
+                                                                              Base.Callable}
     v = td.val
     if isa(v, AbstractVector)
         for x in v
@@ -801,7 +886,8 @@ function substitute_time_dependent_entries(::Type{T}, base::NamedTuple, f::Symbo
     end
     return nothing
 end
-function substitute_time_dependent_entries(::Type, ::NamedTuple, ::Symbol, ::Any)::Nothing
+function substitute_time_dependent_entries(::Base.Callable, ::NamedTuple, ::Symbol,
+                                           ::Any)::Nothing
     return nothing
 end
 """
@@ -885,7 +971,7 @@ Checks the fold count of each field of an optimiser that holds a [`TimeDependent
 function assert_time_dependent_fields_fold_count(opt, n::Integer,
                                                  all_binds::Bool = true)::Nothing
     for f in time_dependent_fields(opt, all_binds)
-        assert_time_dependent_fold_count(getfield(opt, f), n, f)
+        assert_time_dependent_fold_count(time_dependent_slot(opt, f), n, f)
     end
     return nothing
 end
@@ -942,25 +1028,30 @@ end
 """
 $(DocStringExtensions.TYPEDSIGNATURES)
 
-Rebuilds an estimator with its keyword constructor, with the fields in `repl` replaced.
+Rebuilds a struct with its keyword constructor, with the fields in `repl` replaced. The struct can be an estimator, a result, or any other type whose keyword constructor takes every field by its name.
 
 The other fields keep their values. The keyword constructor checks every rule of construction again.
 
+The function reads each field in one tuple expression, and it does not `merge` the fields with `repl`. A field with a declared `Union` type, such as the gap marks of a [`SampleBufferState`](@ref), makes the type of a merged `NamedTuple` abstract. The call to the constructor then dispatches at run time and allocates, and an online step calls this function on every fold.
+
 # Algorithm
 
- 1. Read every field of `x` into a `NamedTuple` keyed by the field names.
- 2. Merge `repl` into it, so a name in `repl` replaces the value of that field.
- 3. Call the keyword constructor of the type of `x` with the merged tuple.
+ 1. Read each field of `x` into one tuple, in the order of the fields. Take the value in `repl` when `repl` names the field.
+ 2. Keep the names of `repl` that are not fields of `x`.
+ 3. Call the keyword constructor of the type of `x` with the fields and the kept names.
 
 # Related
 
   - [`update_time_dependent_fields`](@ref)
   - [`reset_time_dependent_fields`](@ref)
 """
-function rebuild_estimator(x, repl::NamedTuple)
-    fns = fieldnames(typeof(x))
-    nt = NamedTuple{fns}(map(f -> getfield(x, f), fns))
-    return (typeof(x).name.wrapper)(; merge(nt, repl)...)
+function rebuild_struct(x, repl::NamedTuple)
+    T = typeof(x)
+    fns = fieldnames(T)
+    vals = ntuple(i -> haskey(repl, fns[i]) ? getfield(repl, fns[i]) : getfield(x, i),
+                  Val(fieldcount(T)))
+    return (T.name.wrapper)(; NamedTuple{fns}(vals)...,
+                            Base.structdiff(repl, NamedTuple{fns})...)
 end
 """
     is_time_dependent(opt)
@@ -1030,7 +1121,7 @@ The methods of [`update_time_dependent_estimator`](@ref) for the optimisers call
 
  1. Collect the names `tdfs` of the fields that the current fold loop resolves, with [`time_dependent_fields`](@ref). Return `opt` unchanged when there is none.
  2. Resolve each of them with [`time_dependent_value`](@ref), giving `repl`.
- 3. Rebuild `opt` with [`rebuild_estimator`](@ref).
+ 3. Rebuild `opt` with [`rebuild_struct`](@ref).
 
 # Related
 
@@ -1044,8 +1135,9 @@ function update_time_dependent_fields(opt, ctx::TimeDependentContext,
     if isempty(tdfs)
         return opt
     end
-    repl = NamedTuple{tdfs}(map(f -> time_dependent_value(getfield(opt, f), ctx), tdfs))
-    return rebuild_estimator(opt, repl)
+    repl = NamedTuple{tdfs}(map(f -> time_dependent_value(time_dependent_slot(opt, f), ctx),
+                                tdfs))
+    return rebuild_struct(opt, repl)
 end
 """
     time_dependent_field_defaults(opt)
@@ -1112,8 +1204,8 @@ This fallback serves every optimisation estimator and every optimisation result,
   - [`update_time_dependent_estimator`](@ref)
   - [`is_time_dependent`](@ref)
 """
-function reset_time_dependent_estimator(opt::Union{<:OptimisationEstimator,
-                                                   <:OptimisationResult})
+function reset_time_dependent_estimator(opt::Union{OptimisationEstimator,
+                                                   OptimisationResult})
     return opt
 end
 function reset_time_dependent_estimator(::Nothing)
@@ -1131,7 +1223,7 @@ The methods of [`reset_time_dependent_estimator`](@ref) for the optimisers call 
  1. Collect the names `tdfs` of the scheduled fields with [`time_dependent_fields`](@ref), which leaves out the schedules with `:nearest` in the fields of [`inner_fold_fields`](@ref). Return `opt` unchanged when there is none.
  2. Read the static defaults of `opt` with [`time_dependent_field_defaults`](@ref).
  3. Find the value of each field in `tdfs` with [`time_dependent_reset_value`](@ref), giving `repl`.
- 4. Rebuild `opt` with [`rebuild_estimator`](@ref).
+ 4. Rebuild `opt` with [`rebuild_struct`](@ref).
 
 # Related
 
@@ -1146,9 +1238,9 @@ function reset_time_dependent_fields(opt)
         return opt
     end
     defaults = time_dependent_field_defaults(opt)
-    repl = NamedTuple{tdfs}(map(f -> time_dependent_reset_value(getfield(opt, f), defaults,
-                                                                f, opt), tdfs))
-    return rebuild_estimator(opt, repl)
+    repl = NamedTuple{tdfs}(map(f -> time_dependent_reset_value(time_dependent_slot(opt, f),
+                                                                defaults, f, opt), tdfs))
+    return rebuild_struct(opt, repl)
 end
 #! End: Overload these for all estimators which can use time-dependent constraints.
 #! Begin: TimeDependent as an optimiser in its own right.
@@ -1285,12 +1377,10 @@ They are the entries of a vector schedule, and `default` when it is set. A funct
   - [`TimeDependent`](@ref)
 """
 function time_dependent_entries(td::TimeDependent)
-    v = td.val
-    entries = isa(v, AbstractVector) ? collect(Any, v) : Any[]
-    if !isa(td.default, NoDefault)
-        push!(entries, td.default)
-    end
-    return entries
+    v = isa(td.val, AbstractVector) ? td.val : Union{}[]
+    d = isa(td.default, NoDefault) ? Union{}[] : [td.default]
+    # The entries take the join of the two kinds of value, and no value is converted (#1979).
+    return append!(Vector{Base.promote_typejoin(eltype(v), eltype(d))}(v), d)
 end
 """
     reader_frames(td::TimeDependent, path::AbstractString, refit::Bool) -> ReturnsFrames
@@ -1345,19 +1435,19 @@ function returns_tracking_path(td::TimeDependent)
     path = returns_tracking_path(td.default)
     return isnothing(path) ? nothing : tree_path(:default, path)
 end
-function assert_internal_optimiser(td::Union{<:TD_OptE_Opt, <:TD_VecOptE_Opt})::Nothing
+function assert_internal_optimiser(td::Union{TD_OptE_Opt, TD_VecOptE_Opt})::Nothing
     for opt in time_dependent_entries(td)
         assert_internal_optimiser(opt)
     end
     return nothing
 end
-function assert_external_optimiser(td::Union{<:TD_OptE_Opt, <:TD_VecOptE_Opt})::Nothing
+function assert_external_optimiser(td::Union{TD_OptE_Opt, TD_VecOptE_Opt})::Nothing
     for opt in time_dependent_entries(td)
         assert_external_optimiser(opt)
     end
     return nothing
 end
-function assert_special_nco_requirements(td::Union{<:TD_OptE_Opt, <:TD_VecOptE_Opt})::Nothing
+function assert_special_nco_requirements(td::Union{TD_OptE_Opt, TD_VecOptE_Opt})::Nothing
     for opt in time_dependent_entries(td)
         assert_special_nco_requirements(opt)
     end

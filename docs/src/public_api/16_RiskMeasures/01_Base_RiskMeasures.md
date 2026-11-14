@@ -81,12 +81,12 @@ The last column names the solver that the library recommends.
 | Tail drawdown | [`PowerNormDrawdownatRisk`](@ref) ([`PNDaR`](@ref))                                                                                           | JuMP + Hierarchical | PC             | Clarabel                    |
 | Tail drawdown | [`RelativePowerNormDrawdownatRisk`](@ref) ([`R_PNDaR`](@ref))                                                                                 | Hierarchical        | PC             | Clarabel                    |
 | Dispersion    | [`PowerNormValueatRiskRange`](@ref) ([`PNVaR_RG`](@ref))                                                                                      | JuMP + Hierarchical | PC             | Clarabel                    |
-| Dispersion    | Exact [`OrderedWeightsArray`](@ref) ([`OWA_GMD`](@ref), [`OWA_RG`](@ref), [`OWA_CVaR_RG`](@ref), [`OWA_TG_RG`](@ref), [`OWA_LMoment`](@ref))  | JuMP + Hierarchical | -              | Clarabel                    |
-| Dispersion    | Approx [`OrderedWeightsArray`](@ref) ([`OWA_GMD`](@ref), [`OWA_RG`](@ref), [`OWA_CVaR_RG`](@ref), [`OWA_TG_RG`](@ref), [`OWA_LMoment`](@ref)) | JuMP + Hierarchical | PC             | Clarabel                    |
+| Dispersion    | Exact [`OrderedWeightsArray`](@ref) ([`OWA_GMD`](@ref), [`OWA_LMoment`](@ref))                                                                | JuMP + Hierarchical | -              | Clarabel                    |
+| Dispersion    | Approx [`OrderedWeightsArray`](@ref) ([`OWA_GMD`](@ref), [`OWA_LMoment`](@ref))                                                               | JuMP + Hierarchical | PC             | Clarabel                    |
 | Tail loss     | Exact [`OrderedWeightsArray`](@ref) ([`OWA_CVaR`](@ref), [`OWA_TG`](@ref), [`OWA_WR`](@ref))                                                  | JuMP + Hierarchical | -              | Clarabel                    |
 | Tail loss     | Approx [`OrderedWeightsArray`](@ref) ([`OWA_CVaR`](@ref), [`OWA_TG`](@ref), [`OWA_WR`](@ref))                                                 | JuMP + Hierarchical | PC             | Clarabel                    |
-| Dispersion    | Exact [`OrderedWeightsArrayRange`](@ref)                                                                                                      | JuMP + Hierarchical | -              | Clarabel                    |
-| Dispersion    | Approx [`OrderedWeightsArrayRange`](@ref)                                                                                                     | JuMP + Hierarchical | PC             | Clarabel                    |
+| Dispersion    | Exact [`OrderedWeightsArrayRange`](@ref) ([`OWA_RG`](@ref), [`OWA_CVaR_RG`](@ref), [`OWA_TG_RG`](@ref))                                       | JuMP + Hierarchical | -              | Clarabel                    |
+| Dispersion    | Approx [`OrderedWeightsArrayRange`](@ref) ([`OWA_RG`](@ref), [`OWA_CVaR_RG`](@ref), [`OWA_TG_RG`](@ref))                                      | JuMP + Hierarchical | PC             | Clarabel                    |
 | Drawdown      | [`AverageDrawdown`](@ref) ([`ADD`](@ref))                                                                                                     | JuMP + Hierarchical | -              | Clarabel                    |
 | Drawdown      | [`RelativeAverageDrawdown`](@ref) ([`R_ADD`](@ref))                                                                                           | Hierarchical        | -              | -                           |
 | Drawdown      | [`UlcerIndex`](@ref) ([`UCI`](@ref))                                                                                                          | JuMP + Hierarchical | SOC            | Clarabel                    |
@@ -137,16 +137,15 @@ SquareRootBound
 SquaredBound
 risk_input_kind
 coskewness_processor
-factory(rs::AbstractBaseRiskMeasure, args...; kwargs...)
 port_opt_view(rs::AbstractBaseRiskMeasure, ::Any, ::Any, args...)
 needs_previous_weights(::AbstractBaseRiskMeasure)
 bigger_is_better
 range_tails
-supports_precomputed_returns(r::AbstractBaseRiskMeasure)
+RangeTails
+supports_precomputed_returns(r::AbstractBaseRiskMeasure, ::WeightsReturnsFeesInput = risk_input_kind(r))
 supports_precomputed_returns(rs::VecBaseRM)
-supports_precomputed_returns(::NetReturnsInput, ::Any)
-supports_precomputed_returns(::WeightsInput, ::Any)
-supports_precomputed_returns(::WeightsReturnsFeesInput, r::AbstractBaseRiskMeasure)
+supports_precomputed_returns(::Any, ::NetReturnsInput)
+supports_precomputed_returns(::Any, ::WeightsInput)
 ```
 
 ## References

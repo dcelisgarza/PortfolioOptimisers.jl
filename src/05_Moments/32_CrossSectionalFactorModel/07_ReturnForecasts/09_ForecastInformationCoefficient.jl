@@ -42,7 +42,7 @@ end
     forecast_ic(fe::ForecastEvaluationResult, w::Option{<:MatNum} = nothing;
                 min_count::Integer = fe.min_count) -> Matrix{<:Real}
     forecast_ic(fe::ForecastEvaluationResult, csfm::CrossSectionalFactorModel;
-                weighting::AbstractOrthogonalityMetric = IdentityMetric(),
+                weighting::Option{<:AbstractOrthogonalityMetric} = nothing,
                 min_count::Integer = fe.min_count) -> Matrix{<:Real}
 
 Return the information coefficients of a Return Forecast, one row per evaluation date.
@@ -80,7 +80,7 @@ Where:
   - `fe`: The evaluation, from [`forecast_evaluation`](@ref).
   - `w`: Cross-sectional weight history `observations × assets`, on the axis of `fe.alpha`, or `nothing` for equal weights. The rank column reads no weights.
   - `csfm`: The fitted factor-model block the evaluation was built on. It supplies the weight history the metric names.
-  - `weighting`: A member of [`AbstractOrthogonalityMetric`](@ref). It names the weight history of the Pearson column, and [`cs_diagnostic_weights`](@ref) resolves it over the whole observation axis. The default reads equal weights.
+  - `weighting`: A member of [`AbstractOrthogonalityMetric`](@ref), or `nothing` for equal weights. It names the weight history of the Pearson column, and [`cs_diagnostic_weights`](@ref) resolves it over the whole observation axis. The default reads equal weights.
   - `min_count`: Least number of assets a cross-section needs before the function reports a coefficient of it. It defaults to the threshold the evaluation carries. A caller overrides it to read the same pairing at a second threshold.
 
 # Validation
@@ -136,7 +136,7 @@ function forecast_ic(fe::ForecastEvaluationResult, w::Option{<:MatNum} = nothing
     return ic
 end
 function forecast_ic(fe::ForecastEvaluationResult, csfm::CrossSectionalFactorModel;
-                     weighting::AbstractOrthogonalityMetric = IdentityMetric(),
+                     weighting::Option{<:AbstractOrthogonalityMetric} = nothing,
                      min_count::Integer = fe.min_count)
     return forecast_ic(fe, cs_diagnostic_weights(weighting, csfm); min_count = min_count)
 end
@@ -258,8 +258,192 @@ function forecast_ic_window(fe::ForecastEvaluationResult)
     return forecast_ic_window(fe.horizon, fe.step)
 end
 """
+$(DocStringExtensions.TYPEDEF)
+
+The summary of one information coefficient series, in eight numbers.
+
+[`exposure_ic_factor_summary`](@ref) returns it for one column of a series. [`forecast_ic_summary`](@ref) holds one for each of the two coefficients of an evaluation, in a [`ForecastICSummaryResult`](@ref). [`exposure_ic_summary`](@ref) holds the same eight figures as vectors, one entry per factor, in an [`ExposureICSummaryResult`](@ref).
+
+A field that the series cannot give holds `NaN`. A series with no finite entry has no mean and no hit rate, a series with fewer than two finite entries has no standard deviation, and the Mean Test gives `NaN` in each field that it cannot compute. A caller reads the fields by name, as `s.mean_ic` or `(; mean_ic, p_value) = s`.
+
+# Fields
+
+$(DocStringExtensions.FIELDS)
+
+# Constructors
+
+    ICSummaryResult(mean_ic::Real, std_ic::Real, ic_ir::Real, t_stat::Real, p_value::Real,
+                    mean_ci_lower::Real, mean_ci_upper::Real, hit_rate::Real)
+    ICSummaryResult(; mean_ic::Real, std_ic::Real, ic_ir::Real, t_stat::Real,
+                    p_value::Real, mean_ci_lower::Real, mean_ci_upper::Real,
+                    hit_rate::Real)
+
+The positional constructor checks the values. The keyword constructor takes each field by name, with no default, and calls it.
+
+## Validation
+
+  - `std_ic` is `NaN` or not negative. Otherwise, the constructor raises a `DomainError`.
+  - `p_value` and `hit_rate` are each `NaN` or in ``[0, 1]``. Otherwise, the constructor raises a `DomainError`.
+  - `mean_ci_lower <= mean_ci_upper` when both bounds are numbers. Otherwise, the constructor raises a `DomainError`. A `NaN` bound passes.
+
+# Examples
+
+```jldoctest
+julia> s = PortfolioOptimisers.ICSummaryResult(; mean_ic = 0.05, std_ic = 0.1, ic_ir = 0.5,
+                                               t_stat = 2.5, p_value = 0.02, mean_ci_lower = 0.01,
+                                               mean_ci_upper = 0.09, hit_rate = 0.6);
+
+julia> (s.mean_ic, s.hit_rate)
+(0.05, 0.6)
+
+julia> PortfolioOptimisers.ICSummaryResult(0.05, 0.1, 0.5, 2.5, 0.02, 0.01, 0.09, 1.5)
+ERROR: DomainError with 1.5:
+every entry of hit_rate must be NaN or in [0, 1]. Got
+count(x -> !(isnan(x) || 0 <= x <= 1), hit_rate) => 1
+[...]
+```
+
+# Related
+
+  - [`ForecastICSummaryResult`](@ref)
+  - [`ExposureICSummaryResult`](@ref)
+  - [`exposure_ic_factor_summary`](@ref)
+  - [`forecast_ic_summary`](@ref)
+  - [`MeanTestResult`](@ref)
+"""
+@concrete struct ICSummaryResult <: AbstractResult
+    """
+    Mean of the information coefficient over the observations at which it is finite.
+    """
+    mean_ic
+    """
+    Standard deviation of the information coefficient over the same observations.
+    """
+    std_ic
+    """
+    Information ratio, the mean over the standard deviation.
+    """
+    ic_ir
+    """
+    T-statistic of the mean, from the Mean Test of the summary.
+    """
+    t_stat
+    """
+    Two-sided p-value of the null hypothesis that the mean is zero.
+    """
+    p_value
+    """
+    Lower bound of the confidence interval of the mean at the level of the Mean Test.
+    """
+    mean_ci_lower
+    """
+    Upper bound of the confidence interval of the mean at the level of the Mean Test.
+    """
+    mean_ci_upper
+    """
+    Fraction of the same observations at which the information coefficient is positive.
+    """
+    hit_rate
+    function ICSummaryResult(mean_ic::Real, std_ic::Real, ic_ir::Real, t_stat::Real,
+                             p_value::Real, mean_ci_lower::Real, mean_ci_upper::Real,
+                             hit_rate::Real)
+        assert_ic_summary_values(std_ic, p_value, mean_ci_lower, mean_ci_upper, hit_rate)
+        return new{typeof(mean_ic), typeof(std_ic), typeof(ic_ir), typeof(t_stat),
+                   typeof(p_value), typeof(mean_ci_lower), typeof(mean_ci_upper),
+                   typeof(hit_rate)}(mean_ic, std_ic, ic_ir, t_stat, p_value, mean_ci_lower,
+                                     mean_ci_upper, hit_rate)
+    end
+end
+function ICSummaryResult(; mean_ic::Real, std_ic::Real, ic_ir::Real, t_stat::Real,
+                         p_value::Real, mean_ci_lower::Real, mean_ci_upper::Real,
+                         hit_rate::Real)::ICSummaryResult
+    return ICSummaryResult(mean_ic, std_ic, ic_ir, t_stat, p_value, mean_ci_lower,
+                           mean_ci_upper, hit_rate)
+end
+"""
+    assert_ic_summary_values(std_ic::Num_ArrNum, p_value::Num_ArrNum,
+                             mean_ci_lower::Num_ArrNum, mean_ci_upper::Num_ArrNum,
+                             hit_rate::Num_ArrNum)
+
+Check the values of the summary of an information coefficient series, as numbers or as vectors with one entry per factor.
+
+[`ICSummaryResult`](@ref) and [`ExposureICSummaryResult`](@ref) hold the same figures, the first as numbers and the second as vectors. So the two constructors check them with this one function, and each entry passes or fails by the same rule.
+
+# Arguments
+
+  - `std_ic`: The standard deviation of each series.
+  - `p_value`: The p-value of the mean of each series.
+  - `mean_ci_lower`: The lower bound of the interval of each mean.
+  - `mean_ci_upper`: The upper bound of the interval of each mean.
+  - `hit_rate`: The hit rate of each series.
+
+# Validation
+
+  - The rules of [`assert_nan_or_nonneg`](@ref) on `std_ic`, of [`assert_nan_or_closed_unit_interval`](@ref) on `p_value` and `hit_rate`, and of [`assert_ordered_bounds`](@ref) on the two bounds.
+
+# Returns
+
+  - `nothing`.
+
+# Related
+
+  - [`ICSummaryResult`](@ref)
+  - [`ExposureICSummaryResult`](@ref)
+"""
+function assert_ic_summary_values(std_ic::Num_ArrNum, p_value::Num_ArrNum,
+                                  mean_ci_lower::Num_ArrNum, mean_ci_upper::Num_ArrNum,
+                                  hit_rate::Num_ArrNum)::Nothing
+    assert_nan_or_nonneg(std_ic, :std_ic)
+    assert_nan_or_closed_unit_interval(p_value, :p_value)
+    assert_nan_or_closed_unit_interval(hit_rate, :hit_rate)
+    assert_ordered_bounds(mean_ci_lower, mean_ci_upper, :mean_ci_lower, :mean_ci_upper)
+    return nothing
+end
+"""
+$(DocStringExtensions.TYPEDEF)
+
+The summaries of the two information coefficient series of a Return Forecast evaluation, by name.
+
+[`forecast_ic_summary`](@ref) returns it. The two series carry names and not positions, because a column of [`forecast_ic`](@ref) carries no name, and a read of the wrong column raises no error. A caller reads a figure as `s.spearman.mean_ic` or `s.pearson.p_value`.
+
+# Fields
+
+$(DocStringExtensions.FIELDS)
+
+# Constructors
+
+    ForecastICSummaryResult(spearman::ICSummaryResult, pearson::ICSummaryResult)
+    ForecastICSummaryResult(; spearman::ICSummaryResult, pearson::ICSummaryResult)
+
+The types of the two arguments are the check, because each [`ICSummaryResult`](@ref) checks its own values. The keyword constructor takes each field by name, with no default, and calls the positional one.
+
+# Related
+
+  - [`forecast_ic_summary`](@ref)
+  - [`ICSummaryResult`](@ref)
+  - [`forecast_ic`](@ref)
+"""
+@concrete struct ForecastICSummaryResult <: AbstractResult
+    """
+    The [`ICSummaryResult`](@ref) of the rank coefficient, the first column of [`forecast_ic`](@ref).
+    """
+    spearman
+    """
+    The [`ICSummaryResult`](@ref) of the weighted Pearson coefficient, the second column of [`forecast_ic`](@ref).
+    """
+    pearson
+    function ForecastICSummaryResult(spearman::ICSummaryResult, pearson::ICSummaryResult)
+        return new{typeof(spearman), typeof(pearson)}(spearman, pearson)
+    end
+end
+function ForecastICSummaryResult(; spearman::ICSummaryResult,
+                                 pearson::ICSummaryResult)::ForecastICSummaryResult
+    return ForecastICSummaryResult(spearman, pearson)
+end
+"""
     forecast_ic_summary(ic::MatNum; lags::Integer = 0, window::Real = lags + 1,
                         mt::AbstractMeanTestEstimator = WildBootstrapMeanTest())
+        -> ForecastICSummaryResult
 
 Return the summary of the two information coefficient series of an evaluation, by name.
 
@@ -290,7 +474,7 @@ Where:
  1. Check that `ic` is not empty and carries two columns.
  2. Resolve the generator of `mt` once, with [`mean_test_rng`](@ref).
  3. Summarise the first column with [`exposure_ic_factor_summary`](@ref) at `lags` and `mt`, into `spearman`.
- 4. Summarise the second column the same way, into `pearson`.
+ 4. Summarise the second column the same way, into `pearson`, and build a [`ForecastICSummaryResult`](@ref) of the two.
 
 # Arguments
 
@@ -307,7 +491,7 @@ Where:
 
 # Returns
 
-  - `summary::NamedTuple`: `(; spearman, pearson)`, each `(; mean_ic, std_ic, ic_ir, t_stat, p_value, mean_ci_lower, mean_ci_upper, hit_rate)`.
+  - `s::ForecastICSummaryResult`: `spearman` and `pearson`, each an [`ICSummaryResult`](@ref) of the eight figures. Earlier releases returned a `NamedTuple` of two `NamedTuple`s, and a field of the Result has the name of the field of the `NamedTuple`.
 
 # Examples
 
@@ -318,13 +502,17 @@ julia> y = PortfolioOptimisers.forward_mean_returns(alpha, 1, 1);
 
 julia> fe = forecast_evaluation(alpha, y);
 
-julia> forecast_ic_summary(forecast_ic(fe); window = PortfolioOptimisers.forecast_ic_window(fe),
-                           mt = OverlapMeanTest()).spearman
-(mean_ic = 0.3333333333333333, std_ic = 0.7023769168568493, ic_ir = 0.4745789978762494, t_stat = 0.8219949365267862, p_value = 0.49748109237039406, mean_ci_lower = -1.4114676536936914, mean_ci_upper = 2.078134320360358, hit_rate = 0.6666666666666666)
+julia> s = forecast_ic_summary(forecast_ic(fe);
+                               window = PortfolioOptimisers.forecast_ic_window(fe),
+                               mt = OverlapMeanTest()).spearman;
+
+julia> (s.mean_ic, s.std_ic, s.t_stat, s.p_value, s.hit_rate)
+(0.3333333333333333, 0.7023769168568493, 0.8219949365267862, 0.49748109237039406, 0.6666666666666666)
 ```
 
 # Related
 
+  - [`ForecastICSummaryResult`](@ref)
   - [`forecast_ic`](@ref)
   - [`forecast_ic_lags`](@ref)
   - [`forecast_ic_window`](@ref)
@@ -334,22 +522,23 @@ julia> forecast_ic_summary(forecast_ic(fe); window = PortfolioOptimisers.forecas
   - [`WildBootstrapMeanTest`](@ref)
 """
 function forecast_ic_summary(ic::MatNum; lags::Integer = 0, window::Real = lags + 1,
-                             mt::AbstractMeanTestEstimator = WildBootstrapMeanTest())
+                             mt::AbstractMeanTestEstimator = WildBootstrapMeanTest())::ForecastICSummaryResult
     @argcheck(!isempty(ic), IsEmptyError("ic cannot be empty"))
     @argcheck(size(ic, 2) == 2,
               DimensionMismatch("ic must carry the two columns forecast_ic answers, the Spearman coefficient and the Pearson one, and it carries $(size(ic, 2))"))
     rng = mean_test_rng(mt)
-    return (;
-            spearman = exposure_ic_factor_summary(ic, 1; lags = lags, window = window,
-                                                  mt = mt, rng = rng),
-            pearson = exposure_ic_factor_summary(ic, 2; lags = lags, window = window,
-                                                 mt = mt, rng = rng))
+    return ForecastICSummaryResult(exposure_ic_factor_summary(ic, 1; lags = lags,
+                                                              window = window, mt = mt,
+                                                              rng = rng),
+                                   exposure_ic_factor_summary(ic, 2; lags = lags,
+                                                              window = window, mt = mt,
+                                                              rng = rng))
 end
 """
     forecast_coverage(fe::ForecastEvaluationResult,
                       w::Option{<:MatNum} = nothing) -> Vector{<:Real}
     forecast_coverage(fe::ForecastEvaluationResult, csfm::CrossSectionalFactorModel;
-                      weighting::AbstractOrthogonalityMetric = IdentityMetric()) -> Vector{<:Real}
+                      weighting::Option{<:AbstractOrthogonalityMetric} = nothing) -> Vector{<:Real}
 
 Return the share of the universe an evaluation scored, one entry per evaluation date.
 
@@ -388,7 +577,7 @@ Where:
   - `fe`: The evaluation, from [`forecast_evaluation`](@ref). Its `umsk` is the universe of the share.
   - `w`: Cross-sectional weight history `observations × assets`, on the axis of `fe.alpha`, or `nothing` for every asset of the universe.
   - `csfm`: The fitted factor-model block the evaluation was built on. It supplies the weight history the metric names.
-  - `weighting`: A member of [`AbstractOrthogonalityMetric`](@ref). It names the weight history that narrows the universe, and [`cs_diagnostic_weights`](@ref) resolves it over the whole observation axis.
+  - `weighting`: A member of [`AbstractOrthogonalityMetric`](@ref), or `nothing` for equal weights. It names the weight history that narrows the universe, and [`cs_diagnostic_weights`](@ref) resolves it over the whole observation axis.
 
 # Validation
 
@@ -460,8 +649,9 @@ function forecast_coverage(fe::ForecastEvaluationResult, w::Option{<:MatNum} = n
     return c
 end
 function forecast_coverage(fe::ForecastEvaluationResult, csfm::CrossSectionalFactorModel;
-                           weighting::AbstractOrthogonalityMetric = IdentityMetric())
+                           weighting::Option{<:AbstractOrthogonalityMetric} = nothing)
     return forecast_coverage(fe, cs_diagnostic_weights(weighting, csfm))
 end
 
-export forecast_ic, forecast_ic_summary, forecast_coverage
+export ICSummaryResult, ForecastICSummaryResult, forecast_ic, forecast_ic_summary,
+       forecast_coverage

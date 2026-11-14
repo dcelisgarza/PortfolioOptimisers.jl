@@ -103,8 +103,9 @@ include(joinpath(@__DIR__, "asset_panel_fixture.jl"))
         Px = TimeArray(collect(ts0), Pv, ["A", "B", "C"])
 
         Zs = Float64[1 2; 3 4; 5 6]          # assets × features
-        # Z3[i, j, k] == i + 10(j - 1) + 30(k - 1), so every entry names its own position.
-        Z3 = reshape(Float64.(1:60), 10, 3, 2)
+        # Z3[j, k, t] == t + 10(j - 1) + 30(k - 1), so every entry names its own position.
+        # The array is `assets × features × observations`.
+        Z3 = permutedims(reshape(Float64.(1:60), 10, 3, 2), (2, 3, 1))
         nz = ["f1", "f2"]
 
         @testset "construction validation" begin
@@ -121,7 +122,7 @@ include(joinpath(@__DIR__, "asset_panel_fixture.jl"))
             @test_throws ArgumentError ReturnsResult(; nx = nx, X = X,
                                                      pnl = matrix_panel(["f", "f"],
                                                                         rand(rng, 3, 2)))
-            # A blank never reaches a carrier: `NaN` is a blank, and the default `NoPanelFill`
+            # A blank never reaches a carrier: `NaN` is a blank, and the default fill `nothing`
             # refuses it at the build rather than letting it reach a metric that would map it
             # to a plausible wrong distance.
             @test_throws ArgumentError ReturnsResult(; nx = nx, X = X,
@@ -192,7 +193,9 @@ include(joinpath(@__DIR__, "asset_panel_fixture.jl"))
             nx = ["A", "B", "C"]
             rds = ReturnsResult(; nx = nx, X = X, pnl = matrix_panel(nz, Zs))
             rd3 = ReturnsResult(; nx = nx, X = X,
-                                pnl = matrix_panel(nz, reshape(Float64.(1:30), 5, 3, 2)))
+                                pnl = matrix_panel(nz,
+                                                   permutedims(reshape(Float64.(1:30), 5, 3,
+                                                                       2), (2, 3, 1))))
 
             # Two-argument arity: assets only. The static shape has no observation axis;
             # the time-varying one keeps all of its rows.
@@ -201,18 +204,18 @@ include(joinpath(@__DIR__, "asset_panel_fixture.jl"))
             @test panel_feature_matrix(vs.pnl)[2] == Zs[[1, 3], :]
             @test panel_feature_matrix(vs.pnl)[1] == nz
             v3 = port_opt_view(rd3, [1, 3])
-            @test size(panel_feature_matrix(v3.pnl)[2]) == (5, 2, 2)
+            @test size(panel_feature_matrix(v3.pnl)[2]) == (2, 2, 5)
             @test panel_feature_matrix(v3.pnl)[2] ==
-                  panel_feature_matrix(rd3.pnl)[2][:, [1, 3], :]
+                  panel_feature_matrix(rd3.pnl)[2][[1, 3], :, :]
 
             # Four-argument arity: observations first, assets second. A static Z ignores the
             # observation index, exactly as ivpa does.
             vs4 = port_opt_view(rds, 2:4, [1, 3])
             @test panel_feature_matrix(vs4.pnl)[2] == Zs[[1, 3], :]
             v34 = port_opt_view(rd3, 2:4, [1, 3])
-            @test size(panel_feature_matrix(v34.pnl)[2]) == (3, 2, 2)
+            @test size(panel_feature_matrix(v34.pnl)[2]) == (2, 2, 3)
             @test panel_feature_matrix(v34.pnl)[2] ==
-                  panel_feature_matrix(rd3.pnl)[2][2:4, [1, 3], :]
+                  panel_feature_matrix(rd3.pnl)[2][[1, 3], :, 2:4]
             # The third positional index selects factors and must not touch Z.
             rdf = ReturnsResult(; nx = nx, X = X, nf = ["F1", "F2"], F = rand(rng, 5, 2),
                                 pnl = matrix_panel(nz, Zs))
@@ -222,7 +225,7 @@ include(joinpath(@__DIR__, "asset_panel_fixture.jl"))
             # Views compose: a fold of a subset is a subset of the fold.
             @test panel_feature_matrix(port_opt_view(port_opt_view(rd3, [1, 3]), 2:4,
                                                      [1, 2]).pnl)[2] ==
-                  panel_feature_matrix(rd3.pnl)[2][2:4, [1, 3], :]
+                  panel_feature_matrix(rd3.pnl)[2][[1, 3], :, 2:4]
         end
 
         @testset "features are assets" begin
@@ -250,11 +253,11 @@ include(joinpath(@__DIR__, "asset_panel_fixture.jl"))
             @test PortfolioOptimisers.panel_field(port_opt_view(vsq, [2]).pnl, "prox").vals ==
                   Zsq[[3], [3]]
 
-            Zsq3 = reshape(Float64.(1:45), 5, 3, 3)
+            Zsq3 = permutedims(reshape(Float64.(1:45), 5, 3, 3), (2, 3, 1))
             rdsq3 = ReturnsResult(; nx = nx, X = X, pnl = sqp(nx, Zsq3))
             vsq3 = port_opt_view(rdsq3, 2:4, [1, 3])
             @test PortfolioOptimisers.panel_field(vsq3.pnl, "prox").vals ==
-                  Zsq3[2:4, [1, 3], [1, 3]]
+                  Zsq3[[1, 3], [1, 3], 2:4]
             @test PortfolioOptimisers.panel_field(vsq3.pnl, "prox").labels == ["A", "C"]
 
             # Equal lengths alone are not a claim that the axes mean the same thing.
@@ -285,8 +288,8 @@ include(joinpath(@__DIR__, "asset_panel_fixture.jl"))
             rrs = prices_to_returns(price_ingestion(PriceIngestion(), Px;
                                                     pnl = matrix_panel(nz, Zs)))
             @test rrs.nx == ["A", "B", "C"]
-            @test size(panel_feature_matrix(rrs.pnl)[2]) == (9, 3, 2)
-            @test all(panel_feature_matrix(rrs.pnl)[2][t, :, :] == Zs
+            @test size(panel_feature_matrix(rrs.pnl)[2]) == (3, 2, 9)
+            @test all(panel_feature_matrix(rrs.pnl)[2][:, :, t] == Zs
                       for t in 1:length(rrs.ts))
             @test panel_feature_matrix(rrs.pnl)[1] == nz
 
@@ -299,10 +302,10 @@ include(joinpath(@__DIR__, "asset_panel_fixture.jl"))
             # exactly the observation the percentage change costs: rows 2:10, every asset.
             rr3 = prices_to_returns(price_ingestion(PriceIngestion(), Px;
                                                     pnl = matrix_panel(nz, Z3)))
-            @test size(panel_feature_matrix(rr3.pnl)[2]) == (9, 3, 2)
-            @test panel_feature_matrix(rr3.pnl)[2] == Z3[2:10, :, :]
+            @test size(panel_feature_matrix(rr3.pnl)[2]) == (3, 2, 9)
+            @test panel_feature_matrix(rr3.pnl)[2] == Z3[:, :, 2:10]
             @test length(rr3.ts) ==
-                  size(panel_feature_matrix(rr3.pnl)[2], 1) ==
+                  size(panel_feature_matrix(rr3.pnl)[2], 3) ==
                   size(rr3.X, 1)
 
             # Under collapse_args the aggregated period takes the features of the last row of
@@ -315,7 +318,7 @@ include(joinpath(@__DIR__, "asset_panel_fixture.jl"))
                                                                                    last)),
                                                    Px; pnl = matrix_panel(nz, Z3)))
             @test rc.ts == [Date(2020, 1, 10)]
-            @test panel_feature_matrix(rc.pnl)[2] == Z3[[10], :, :]
+            @test panel_feature_matrix(rc.pnl)[2] == Z3[:, :, [10]]
 
             # A table that is a gap throughout is still a universe: every asset keeps its
             # column, its features and its place, and every return is non-finite. Nothing
@@ -329,7 +332,7 @@ include(joinpath(@__DIR__, "asset_panel_fixture.jl"))
                                                      pnl = matrix_panel(nz, Zs)))
             @test rall.nx == ["A", "B", "C"]
             @test all(!isfinite, rall.X)
-            @test all(panel_feature_matrix(rall.pnl)[2][t, :, :] == Zs
+            @test all(panel_feature_matrix(rall.pnl)[2][:, :, t] == Zs
                       for t in 1:length(rall.ts))
             rnof = prices_to_returns(Pall)
             @test rnof.nx == ["A", "B", "C"]
@@ -357,8 +360,8 @@ include(joinpath(@__DIR__, "asset_panel_fixture.jl"))
 
             # Timestamp windows slice a time-varying Z positionally against the price clock.
             @test panel_feature_matrix(port_opt_view(pr3, 3:6, [1, 3]).pnl)[2] ==
-                  Z3[3:6, [1, 3], :]
-            @test panel_feature_matrix(port_opt_view(pr3, 3:6).pnl)[2] == Z3[3:6, :, :]
+                  Z3[[1, 3], :, 3:6]
+            @test panel_feature_matrix(port_opt_view(pr3, 3:6).pnl)[2] == Z3[:, :, 3:6]
             @test panel_feature_matrix(port_opt_view(prs, 3:6, [1, 3]).pnl)[2] ==
                   Zs[[1, 3], :]
             # A window that touches neither of a static Z's axes leaves it alone entirely.
@@ -369,7 +372,7 @@ include(joinpath(@__DIR__, "asset_panel_fixture.jl"))
             mdf = fit_preprocessing(MissingDataFilter(; col_thr = 0.5), pr3)
             pm = apply_preprocessing(mdf, pr3)
             @test string.(TimeSeries.colnames(pm.X)) == ["A", "C"]
-            @test panel_feature_matrix(pm.pnl)[2] == Z3[:, [1, 3], :]
+            @test panel_feature_matrix(pm.pnl)[2] == Z3[[1, 3], :, :]
             # A fill changes no shape, so Z passes through untouched. The carrier states
             # a span, which is what bounds the fill (ADR 0130).
             pr3s = PricesResult(; X = Px, pnl = matrix_panel(nz, Z3),
@@ -381,11 +384,10 @@ include(joinpath(@__DIR__, "asset_panel_fixture.jl"))
             # train_test_split is a pair of port_opt_views, so it splits Z's observations.
             rr3 = prices_to_returns(PricesToReturns(), pr3)
             tr, te = train_test_split(rr3; train_size = 5)
-            @test size(panel_feature_matrix(tr.pnl)[2], 1) == size(tr.X, 1)
-            @test size(panel_feature_matrix(te.pnl)[2], 1) == size(te.X, 1)
-            @test panel_feature_matrix(tr.pnl)[2] ==
-                  panel_feature_matrix(rr3.pnl)[2][1:size(panel_feature_matrix(tr.pnl)[2],
-                                                          1), :, :]
+            @test size(panel_feature_matrix(tr.pnl)[2], 3) == size(tr.X, 1)
+            @test size(panel_feature_matrix(te.pnl)[2], 3) == size(te.X, 1)
+            @test panel_feature_matrix(tr.pnl)[2] == panel_feature_matrix(rr3.pnl)[2][:, :,
+                                                                                      1:size(panel_feature_matrix(tr.pnl)[2], 3)]
         end
 
         @testset "other ReturnsResult constructors thread Z" begin
@@ -543,7 +545,7 @@ include(joinpath(@__DIR__, "asset_panel_fixture.jl"))
 
         # A time-varying feature matrix cannot be sliced without the surviving timestamps,
         # because its observation axis is parallel to the price clock positionally.
-        Z3 = reshape(Float64.(1:40), 5, 4, 2)
+        Z3 = reshape(Float64.(1:40), 4, 2, 5)
         @test_throws ArgumentError PortfolioOptimisers.feature_row_indices(matrix_panel(["f1",
                                                                                          "f2"],
                                                                                         Z3),
@@ -629,6 +631,12 @@ include(joinpath(@__DIR__, "asset_panel_fixture.jl"))
         @test_throws DimensionMismatch PricesResult(; X = X, ivpa = [1.0, 1.0])
         @test_throws DimensionMismatch PricesResult(; X = X, B = B[:bA, :bB])
         @test_throws DimensionMismatch PricesResult(; X = X, span = trues(5, 2))
+        # A repeated timestamp is refused, because a window of `port_opt_view` finds each
+        # row by its timestamp, and it would take the first of the two rows.
+        tsd = [ts[1], ts[1], ts[2], ts[3], ts[3]]
+        Xd = TimeArray(tsd, values(X), colnames(X))
+        @test_throws "Got 2 repeated timestamp(s), and the first is $(ts[1])" PricesResult(;
+                                                                                           X = Xd)
     end
 
     @testset "the preprocessing interface refuses a half-implemented estimator" begin
@@ -1302,13 +1310,14 @@ include(joinpath(@__DIR__, "asset_panel_fixture.jl"))
         @test_throws MethodError prices_to_returns(Xc, Fc)
 
         # The bare call is exactly the two steps, and it is the layer's own path rather than
-        # a way around it, so it emits the `AssetPanel` the layer always emits. A carrier
-        # built by hand states no span, and therefore no universe.
+        # a way around it, so it emits the panel the layer emits: none for a gapless table
+        # with no Panel Field (#1882). A carrier built by hand states no span, and therefore
+        # no universe.
         pr = price_ingestion(PriceIngestion(), Xc)
         routed = prices_to_returns(Xc)
         @test isequal(routed.X, prices_to_returns(pr).X)
         @test routed.ts == tsc[2:end]
-        @test isa(routed.pnl, AssetPanel)
+        @test isequal(routed.pnl, prices_to_returns(pr).pnl)
         @test isnothing(prices_to_returns(PricesResult(; X = Xc)).pnl)
 
         # The three surviving keywords reach the carrier form unchanged.
@@ -1351,11 +1360,14 @@ include(joinpath(@__DIR__, "asset_panel_fixture.jl"))
         @test occursin("Asset Panel or Listing Span", err.msg)
 
         # A panel with its two masks and no Panel Field has an observation axis.
-        pm = AssetPanel(; pf = PortfolioOptimisers.AbstractPanelField[], amsk = trues(6, 3),
-                        emsk = trues(6, 3))
+        pm = AssetPanel(; amsk = trues(6, 3), emsk = trues(6, 3))
         @test !PortfolioOptimisers.panel_is_static(pm)
         @test PortfolioOptimisers.feature_row_indices(pm, ts[[6, 1]], ts) == [6, 1]
-        @test PortfolioOptimisers.panel_feature_names(pm) == String[]
+        @test isnothing(PortfolioOptimisers.panel_feature_names(pm))
+        @test PortfolioOptimisers.panel_feature_matrix(pm) === (nothing, nothing)
+        @test_throws IsEmptyError AssetPanel(;
+                                             pf = PortfolioOptimisers.AbstractPanelField[],
+                                             amsk = trues(6, 3), emsk = trues(6, 3))
 
         # The names follow the column order of the derived Feature Matrix, observed masks
         # after the values of their own field.
@@ -1372,26 +1384,26 @@ include(joinpath(@__DIR__, "asset_panel_fixture.jl"))
         @test PortfolioOptimisers.panel_feature_names(pnl) == panel_feature_matrix(pnl)[1]
 
         # The view cuts the label axis of a square tensor field only when it has the names.
-        @test isnothing(PortfolioOptimisers.asset_panel_view(nothing, 1:2, 1:2, nothing))
+        @test isnothing(PortfolioOptimisers.port_opt_view(nothing, 1:2, 1:2, nothing))
         sq = AssetPanel(;
                         pf = [TensorPanelField(; name = "prox", axis = "asset",
                                                labels = ["A", "B", "C"],
                                                vals = [1.0 2.0 3.0; 4.0 5.0 6.0;
                                                        7.0 8.0 9.0])])
-        @test panel_feature_matrix(PortfolioOptimisers.asset_panel_view(sq, :, [2, 3],
-                                                                        ["A", "B", "C"])) ==
+        @test panel_feature_matrix(PortfolioOptimisers.port_opt_view(sq, :, [2, 3],
+                                                                     ["A", "B", "C"])) ==
               (["prox=B", "prox=C"], [5.0 6.0; 8.0 9.0])
-        @test panel_feature_matrix(PortfolioOptimisers.asset_panel_view(sq, :, [2, 3],
-                                                                        nothing)) ==
+        @test panel_feature_matrix(PortfolioOptimisers.port_opt_view(sq, :, [2, 3],
+                                                                     nothing)) ==
               (["prox=A", "prox=B", "prox=C"], [4.0 5.0 6.0; 7.0 8.0 9.0])
         # A time-varying panel is cut on both axes, and a static one ignores the rows.
-        Z3 = reshape(Float64.(1:36), 6, 3, 2)
-        tv = PortfolioOptimisers.asset_panel_view(matrix_panel(["f1", "f2"], Z3), [2, 5],
-                                                  [1, 3], nothing)
-        @test panel_feature_matrix(tv)[2] == Z3[[2, 5], [1, 3], :]
-        st = PortfolioOptimisers.asset_panel_view(matrix_panel(["f1", "f2"], Z3[1, :, :]),
-                                                  [2, 5], [1, 3], nothing)
-        @test panel_feature_matrix(st)[2] == Z3[1, [1, 3], :]
+        Z3 = permutedims(reshape(Float64.(1:36), 6, 3, 2), (2, 3, 1))
+        tv = PortfolioOptimisers.port_opt_view(matrix_panel(["f1", "f2"], Z3), [2, 5],
+                                               [1, 3], nothing)
+        @test panel_feature_matrix(tv)[2] == Z3[[1, 3], :, [2, 5]]
+        st = PortfolioOptimisers.port_opt_view(matrix_panel(["f1", "f2"], Z3[:, :, 1]),
+                                               [2, 5], [1, 3], nothing)
+        @test panel_feature_matrix(st)[2] == Z3[[1, 3], :, 1]
     end
     @testset "the preprocessing family: its levels, its missing values and its stubs" begin
         PO = PortfolioOptimisers
@@ -2020,12 +2032,12 @@ end
 end
 
 @testset "cross_sectional_groups reads a one-hot block" begin
-    B = reshape([1.0, 0.0, 0.0, 0.0, 1.0, 0.0], 1, 2, 3)
+    B = reshape([1.0, 0.0, 0.0, 0.0, 1.0, 0.0], 2, 3, 1)
     @test cross_sectional_groups(B) == [1 PortfolioOptimisers.CS_MISSING_GROUP]
-    B2 = zeros(2, 3, 2)
+    B2 = zeros(3, 2, 2)
     B2[1, 1, 1] = 1.0
-    B2[1, 2, 2] = 1.0
-    B2[2, 3, 1] = 1.0
+    B2[2, 2, 1] = 1.0
+    B2[3, 1, 2] = 1.0
     @test cross_sectional_groups(B2) == [1 2 PortfolioOptimisers.CS_MISSING_GROUP;
                                          PortfolioOptimisers.CS_MISSING_GROUP PortfolioOptimisers.CS_MISSING_GROUP 1]
     # The derived labels drive the verb, which is the route the exposure build takes.
@@ -2460,12 +2472,14 @@ end
     res = fit_preprocessing(PriceGapFill(), pr)
     @test isa(res, PriceGapFillResult)
     @test isa(res.fill, CarriedPrice)
-    # A column with no observed price gets no fitted value and no entry, so it is untouched.
-    @test res.nx == [:A, :B, :C]
+    # A column with no observed price keeps its entry with a `missing` seed (#1974). The
+    # window holds no price of it to carry, so the replay leaves it untouched.
+    @test res.nx == [:A, :B, :C, :D]
     # C is delisted after its last price, so the window ends outside its listing and C gets
     # no seed (#1330). It keeps its entry.
-    @test isequal(res.v, [122.0, 205.0, missing])
+    @test isequal(res.v, [122.0, 205.0, missing, missing])
     Xc = values(pgf_970_quiet_apply(res, pr).X)
+    @test isequal(Xc[:, 4], X[:, 4])
     # The k = 2 interior gap takes the last priced observation, and nothing else moved.
     @test Xc[4:5, 1] == [102.0, 102.0]
     @test Xc[[1, 2, 3, 6, 7, 8], 1] == X[[1, 2, 3, 6, 7, 8], 1]
@@ -2478,6 +2492,8 @@ end
     # The same gap under a per-asset reduction: two fabricated moves instead of one real one.
     resm = fit_preprocessing(PriceGapFill(; fill = MedianValue()), pr)
     @test resm.fill === MedianValue()
+    # A statistic has no price of D to reduce, so D gets no entry.
+    @test resm.nx == [:A, :B, :C]
     @test resm.v[1] ≈ 111.0
     Xm = values(pgf_970_quiet_apply(resm, pr).X)
     @test Xm[4:5, 1] ≈ [111.0, 111.0]
@@ -2779,16 +2795,18 @@ end
     @test vec(PortfolioOptimisers.gap_fill_column!(CarriedPrice(), copy(P), trues(6, 1), 1,
                                                    9.0, 1))[4] == 50.0
     # The fitted value: the last observed training price, or the reduction of the observed
-    # training prices. An asset with no observed price has no fitted value.
+    # training prices. An asset with no observed price has no statistic, but it keeps its
+    # entry with a `missing` seed under the carry (#1974).
     P = [100.0 NaN 5.0; NaN NaN 6.0; 103.0 NaN NaN]
     ts = Date(2020, 1, 1):Day(1):Date(2020, 1, 3)
     pr = PricesResult(; X = TimeArray(collect(ts), P, [:a, :b, :c]), span = listing_span(P))
     held = fit_preprocessing(PriceGapFill(), pr)
-    @test held.nx == [:a, :c]
+    @test held.nx == [:a, :b, :c]
     # The window ends after the delisting of `c`, so its carried seed is retired (#1330).
-    @test isequal(held.v, [103.0, missing])
+    @test isequal(held.v, [103.0, missing, missing])
     @test held.te == Date(2020, 1, 3)
     med = fit_preprocessing(PriceGapFill(; fill = MedianValue()), pr)
+    @test med.nx == [:a, :c]
     @test med.v == [median([100.0, 103.0]), median([5.0, 6.0])]
     @test PortfolioOptimisers.gap_fill_seed(CarriedPrice(), [1.0, 2.0, 7.0], true) == 7.0
     @test PortfolioOptimisers.gap_fill_seed(MeanValue(), [1.0, 2.0, 6.0], true) == 3.0
@@ -2918,6 +2936,38 @@ a later window fills as the same rows of the full clock do, and that the online 
 end
 
 #=
+Issue #1974. The carry skipped, at fit time, an asset with no observed training price, so the
+replay on a later window left every gap of that asset open. The online step fills the same gap
+from the earlier prices of the block. The asset now keeps its entry with a `missing` seed, and
+the batch replay matches the online step on the two windows of the issue.
+=#
+@testset "A carry keeps an asset with no training price (#1974)" begin
+    # Training window: `A` is priced, `B` is not listed yet.
+    train = PricesResult(; X = TimeArray([Date(2024, 1, 2)], [1.0 NaN], [:A, :B]),
+                         span = BitMatrix([true false]))
+    # Test window: `B` is listed from the first row and has a gap on the second row.
+    ts = collect(Date(2024, 1, 3):Day(1):Date(2024, 1, 6))
+    test = PricesResult(; X = TimeArray(ts, [NaN 5.0; 2.0 NaN; NaN 6.0; 3.0 7.0], [:A, :B]),
+                        span = trues(4, 2))
+    res = fit_preprocessing(PriceGapFill(), train)
+    @test res.nx == [:A, :B]
+    @test isequal(res.v, [1.0, missing])
+    want = [1.0 5.0; 2.0 5.0; 2.0 6.0; 3.0 7.0]
+    @test values(apply_preprocessing(res, test).X) == want
+    pft = PortfolioOptimisers.partial_fit_transform
+    est, _ = pft(PriceGapFill(), train)
+    @test values(last(pft(est, test)).X) == want
+    # The online read-out keeps the unpriced asset as the batch fit does.
+    out = fit_preprocessing(est)
+    @test out.nx == res.nx
+    @test isequal(out.v, res.v)
+    @test values(apply_preprocessing(out, test).X) == want
+    # A statistic has no price to reduce, so the asset still gets no entry.
+    med = fit_preprocessing(PriceGapFill(; fill = MedianValue()), train)
+    @test med.nx == [:A]
+end
+
+#=
 The concatenation of Asset Panels along the observation axis.
 
 `vcat` joins the parts of one universe. A panel split into two views and joined again is the
@@ -2935,7 +2985,8 @@ function concat_test_panel(T::Integer, N::Integer; rng = StableRNG(1401))
     ten = TensorPanelField(; name = "beta", axis = "factor",
                            labels = ["size", "value", "mom"],
                            groups = ["style", "style", "momentum"],
-                           vals = randn(rng, T, N, 3), omsk = rand(rng, T, N, 3) .> 0.1)
+                           vals = permutedims(randn(rng, T, N, 3), (2, 3, 1)),
+                           omsk = permutedims(rand(rng, T, N, 3) .> 0.1, (2, 3, 1)))
     amsk = rand(rng, T, N) .> 0.1
     emsk = amsk .& (rand(rng, T, N) .> 0.2)
     return AssetPanel(; pf = [num, cat, ten], amsk = amsk, emsk = emsk)
@@ -3004,8 +3055,7 @@ end
     a = AssetPanel(; amsk = [true true; false true], emsk = [true false; false true])
     b = AssetPanel(; amsk = [true false], emsk = [true false])
     c = vcat(a, b)
-    @test isempty(c.pf)
-    @test c.pf === a.pf
+    @test isnothing(c.pf)
     @test Matrix(c.amsk) == [true true; false true; true false]
     @test Matrix(c.emsk) == [true false; false true; true false]
 end
@@ -3015,7 +3065,7 @@ end
     lifted(n) = AssetPanel(; pf = [PO.panel_field_lift(s, n)], amsk = PO.AllTrueMask(n, 3),
                            emsk = PO.AllTrueMask(n, 3))
     c = vcat(lifted(2), lifted(5))
-    @test isa(c.pf[1].vals, PO.RepeatedLeading)
+    @test isa(c.pf[1].vals, PO.RepeatedObservations)
     @test size(c.pf[1].vals) == (7, 3)
     @test c.pf[1].vals == repeat([1.0 2.0 3.0], 7)
     @test isa(c.amsk, PO.AllTrueMask) && isa(c.emsk, PO.AllTrueMask)
@@ -3025,14 +3075,30 @@ end
     d = vcat(lifted(2),
              AssetPanel(; pf = [PO.panel_field_lift(t, 1)], amsk = PO.AllTrueMask(1, 3),
                         emsk = PO.AllTrueMask(1, 3)))
-    @test isa(d.pf[1].vals, PO.RepeatedLeading)
+    @test isa(d.pf[1].vals, PO.RepeatedObservations)
+    # Equal lifts of two element types stay lazy, and the element types promote as `vcat`
+    # promotes them. The carrier converts integer data at construction (#1972), so the
+    # expected type reads the values that the field holds.
+    held(v) = NumericPanelField(; name = "size", vals = v).vals
+    lift(v, n) = AssetPanel(;
+                            pf = [PO.panel_field_lift(NumericPanelField(; name = "size",
+                                                                        vals = v), n)],
+                            amsk = PO.AllTrueMask(n, 3), emsk = PO.AllTrueMask(n, 3))
+    for (x, y) in ((Float32[1, 2, 3], [1.0, 2.0, 3.0]), ([1, 2, 3], Float32[1, 2, 3]))
+        for (p, q) in ((x, y), (y, x))
+            f = only(vcat(lift(p, 2), lift(q, 1)).pf).vals
+            @test isa(f, PO.RepeatedObservations)
+            @test eltype(f) === eltype(vcat(repeat(held(p)', 2), held(q)'))
+            @test f == repeat([1.0 2.0 3.0], 3)
+        end
+    end
     # A lift of another array makes the field time-varying, and a mask with a false cell
     # makes the mask dense.
     u = NumericPanelField(; name = "size", vals = [4.0, 5.0, 6.0])
     e = vcat(lifted(2),
              AssetPanel(; pf = [PO.panel_field_lift(u, 1)], amsk = trues(1, 3),
                         emsk = [true false true]))
-    @test !isa(e.pf[1].vals, PO.RepeatedLeading)
+    @test !isa(e.pf[1].vals, PO.RepeatedObservations)
     @test e.pf[1].vals == [1.0 2.0 3.0; 1.0 2.0 3.0; 4.0 5.0 6.0]
     @test !isa(e.amsk, PO.AllTrueMask)
     @test Matrix(e.emsk) == [true true true; true true true; true false true]
@@ -3108,7 +3174,7 @@ end
     function ten(; axis = "factor", labels = ["size", "value", "mom"],
                  groups = ["style", "style", "momentum"], n = N)
         return TensorPanelField(; name = "beta", axis = axis, labels = labels,
-                                groups = groups, vals = ones(T, n, 3))
+                                groups = groups, vals = ones(n, 3, T))
     end
     part(pf; n = N) = tv_panel(pf; T = T, N = n)
     # The schema of `base` itself joins.
@@ -3154,7 +3220,7 @@ end
 #=
 The missing-share report, the info report and the active-mask alignment of an Asset Panel (#1400).
 
-`describe` counts the cells that the builder filled, `panel_info` prints the dimensions, the mask
+`describe` counts the cells that the raw source did not observe, `panel_info` prints the dimensions, the mask
 coverage and the level coverage, and `panel_align_active` moves the start of each asset to the
 first active observation where each named Panel Field is observed. Each is checked by hand on a
 small panel, and against the oracle on the parity fixture of map #1375 with an observed mask
@@ -3171,9 +3237,10 @@ function summary_small_panel()
                                    codes = [1 2 1; 1 2 1; 1 2 1],
                                    omsk = Bool[1 1 1; 1 1 0; 1 1 1])
     beta = TensorPanelField(; name = "beta", axis = "factor", labels = ["size", "value"],
-                            vals = zeros(3, 3, 2),
-                            omsk = cat(Bool[1 1 1; 1 1 1; 1 1 1], Bool[0 1 1; 1 1 1; 1 1 0];
-                                       dims = 3))
+                            vals = zeros(3, 2, 3),
+                            omsk = permutedims(cat(Bool[1 1 1; 1 1 1; 1 1 1],
+                                                   Bool[0 1 1; 1 1 1; 1 1 0]; dims = 3),
+                                               (2, 3, 1)))
     amsk = Bool[1 1 0; 1 1 1; 1 1 1]
     emsk = Bool[1 0 0; 1 1 1; 1 1 1]
     return AssetPanel(; pf = [mcap, sector, beta], amsk = amsk, emsk = emsk)
@@ -3205,12 +3272,12 @@ function summary_parity_panel()
     io_ = trues(T, N)
     io_[1:10, 5] .= false
     rng = StableRNG(1400)
-    eo = trues(T, N, 3)
-    eo[1:3, 3, 2] .= false
-    eo[60:62, 8, 1] .= false
+    eo = trues(N, 3, T)
+    eo[3, 2, 1:3] .= false
+    eo[8, 1, 60:62] .= false
     expo = TensorPanelField(; name = "exposure", axis = "factor",
-                            labels = ["size", "value", "mom"], vals = randn(rng, T, N, 3),
-                            omsk = eo)
+                            labels = ["size", "value", "mom"],
+                            vals = permutedims(randn(rng, T, N, 3), (2, 3, 1)), omsk = eo)
     pf = [NumericPanelField(; name = "book_equity", vals = book.vals, omsk = bo),
           NumericPanelField(; name = "sales_ttm", vals = sales.vals, omsk = so),
           panel_field(pnl, "adj_close"),
@@ -3223,6 +3290,12 @@ const SUMMARY_ALIGN_CASES = ["Book" => ["book_equity"],
                              "BookSales" => ["book_equity", "sales_ttm"],
                              "SalesBook" => ["sales_ttm", "book_equity"],
                              "Industry" => ["industry"]]
+
+@testset "a static tensor Panel Field counts its missing labels for each asset" begin
+    f = TensorPanelField(; name = "beta", axis = "factor", labels = ["size", "value"],
+                         vals = zeros(3, 2), omsk = Bool[1 1; 0 1; 0 0])
+    @test PortfolioOptimisers.panel_field_missing(f) == [0, 1, 2]
+end
 
 @testset "describe counts the filled cells of each Panel Field" begin
     pnl = summary_small_panel()
@@ -3265,6 +3338,12 @@ end
     @test by.missing[1:2] == [0.0, 1.0]
     empty = AssetPanel(; amsk = trues(2, 2), emsk = trues(2, 2))
     @test size(describe(empty)) == (0, 7)
+    # A share is a Float64 also when no row holds one. An empty comprehension over the
+    # abstract Panel Fields gave a column of `Any` (#1453).
+    df = describe(empty)
+    @test eltype(df.missing) == eltype(df.active_missing) == Float64
+    only_by = AssetPanel(; pf = PO.AbstractPanelField[pnl.pf[2]])
+    @test eltype(describe(only_by; by = "sector").missing) == Float64
 end
 
 @testset "panel_info prints the dimensions, the masks, the fields and the levels" begin
@@ -3296,6 +3375,22 @@ end
                                                   codes = [1:8;])])
     @test occursin("< 10    : 8 levels (L1, L2, L3, L4, … +4 more)",
                    sprint(panel_info, many))
+    # A group of one level prints the singular (#1453).
+    @test occursin("< 10    : 1 level (L1)",
+                   sprint(panel_info,
+                          AssetPanel(;
+                                     pf = [CategoricalPanelField(; name = "g",
+                                                                 levels = ["L1"],
+                                                                 codes = [1, 1])])))
+    # The name column is as wide as the widest name in columns of text, so a name in a wide
+    # script lines up with the header. Each of the two characters takes two columns (#1453).
+    wide = AssetPanel(; pf = [NumericPanelField(; name = "市值市值", vals = [1.0, 2.0])])
+    ls = split(sprint(panel_info, wide), '\n')
+    head = ls[findfirst(l -> startswith(l, "  field"), ls)]
+    row = ls[findfirst(l -> startswith(l, "  市值市值"), ls)]
+    @test textwidth(head) == textwidth(row)
+    @test textwidth(row[1:prevind(row, findfirst("numeric", row)[1])]) ==
+          findfirst("kind", head)[1] - 1
     # A panel with no row prints no spread.
     norow = AssetPanel(; amsk = falses(0, 2), emsk = falses(0, 2))
     s = sprint(panel_info, norow)
@@ -3311,8 +3406,8 @@ end
     # oracle prints 2.
     amsk = Bool[1 0 0 0; 1 1 0 0; 1 1 1 0; 1 1 1 1]
     c = PO.panel_mask_coverage(amsk)
-    @test c.per_observation == (; min = 1, median = 2.5, max = 4)
-    @test c.durations == (; min = 1, median = 2.5, max = 4)
+    @test c.per_observation == PO.CountSpread(1, 2.5, 4)
+    @test c.durations == PO.CountSpread(1, 2.5, 4)
     s = sprint(panel_info, AssetPanel(; amsk = amsk, emsk = amsk))
     @test occursin("assets per obs.  : min 1, median 2.5, max 4", s)
     @test occursin("duration (obs.)  : min 1, median 2.5, max 4", s)
@@ -3320,33 +3415,33 @@ end
 
 @testset "panel_align_active moves the start of each asset to its first observed cell" begin
     pnl = summary_small_panel()
-    res = panel_align_active(pnl, "mcap")
+    al, n = panel_align_active(pnl, "mcap")
     # Asset 1 starts at 2; asset 2 is observed at its first cell; asset 3 is never observed
     # while active, so it leaves the universe.
-    @test res.n == 1 + 2
-    @test res.pnl.amsk == Bool[0 1 0; 1 1 0; 1 1 0]
-    @test res.pnl.emsk == res.pnl.emsk .& res.pnl.amsk
-    @test res.pnl.emsk == Bool[0 0 0; 1 1 0; 1 1 0]
-    @test res.pnl.pf === pnl.pf
+    @test n == 1 + 2
+    @test al.amsk == Bool[0 1 0; 1 1 0; 1 1 0]
+    @test al.emsk == al.emsk .& al.amsk
+    @test al.emsk == Bool[0 0 0; 1 1 0; 1 1 0]
+    @test al.pf === pnl.pf
     # The tensor field is observed at a pair when each label is. Its gap at (3, 3) follows
     # the first active cell of asset 3, which is observed, so it stays.
-    res = panel_align_active(pnl, ["beta"])
-    @test res.n == 1
-    @test res.pnl.amsk == Bool[0 1 0; 1 1 1; 1 1 1]
+    al, n = panel_align_active(pnl, ["beta"])
+    @test n == 1
+    @test al.amsk == Bool[0 1 0; 1 1 1; 1 1 1]
     # The order of the fields does not change the result, and a second call removes nothing.
-    a = panel_align_active(pnl, ["mcap", "beta", "sector"])
-    b = panel_align_active(pnl, ["sector", "beta", "mcap"])
-    @test a.pnl.amsk == b.pnl.amsk
-    @test a.n == b.n
-    @test panel_align_active(a.pnl, ["mcap", "beta", "sector"]).n == 0
+    a, na = panel_align_active(pnl, ["mcap", "beta", "sector"])
+    b, nb = panel_align_active(pnl, ["sector", "beta", "mcap"])
+    @test a.amsk == b.amsk
+    @test na == nb
+    @test panel_align_active(a, ["mcap", "beta", "sector"])[2] == 0
     # No field, or a field that cannot blank, removes nothing.
-    @test panel_align_active(pnl, String[]).n == 0
+    @test panel_align_active(pnl, String[])[2] == 0
     lifted = AssetPanel(;
                         pf = [NumericPanelField(; name = "x",
-                                                vals = PO.RepeatedLeading([1.0, 2.0, 3.0],
-                                                                          3))],
+                                                vals = PO.RepeatedObservations([1.0, 2.0,
+                                                                                3.0], 3))],
                         amsk = pnl.amsk, emsk = pnl.emsk)
-    @test panel_align_active(lifted, "x").n == 0
+    @test panel_align_active(lifted, "x")[2] == 0
     @test_throws KeyError panel_align_active(pnl, "nope")
     static = AssetPanel(; pf = [NumericPanelField(; name = "mcap", vals = [1.0, 2.0])])
     @test_throws ArgumentError panel_align_active(static, "mcap")
@@ -3401,33 +3496,33 @@ end
 @testset "panel_align_active equals the oracle on the parity fixture" begin
     pnl = summary_parity_panel()
     for (case, fs) in SUMMARY_ALIGN_CASES
-        res = panel_align_active(pnl, fs)
+        al, nal = panel_align_active(pnl, fs)
         n = Int.(vec(parity_load("AssetPanelSummary", "Align$case", "N")))
         # The oracle's second call; one call of ours gives it.
         amsk = parity_load("AssetPanelSummary", "Align$case", "ActiveMask2")
-        @test res.pnl.amsk == (amsk .== 1)
-        @test res.n == sum(n)
-        @test res.pnl.emsk ==
+        @test al.amsk == (amsk .== 1)
+        @test nal == sum(n)
+        @test al.emsk ==
               (parity_load("AssetPanelSummary", "Align$case", "EstimationMask") .== 1) .&
-              res.pnl.amsk
+              al.amsk
         first = parity_load("AssetPanelSummary", "Align$case", "ActiveMask") .== 1
         if case == "SalesBook"
             # Better: the oracle's first call walks the fields in turn, so it stops at
             # observation 5 on asset 7, where `sales_ttm` is not observed, and its second
             # call moves on to observation 10. The rule of the library is its fixed point.
             @test findfirst(first[:, 7]) == 5
-            @test findfirst(res.pnl.amsk[:, 7]) == 10
+            @test findfirst(al.amsk[:, 7]) == 10
             @test n[2] > 0
         else
             # The oracle's second call aligns nothing more, so its first call is the result.
             @test n[2] == 0
-            @test first == res.pnl.amsk
+            @test first == al.amsk
         end
     end
     # Better: the oracle refuses a tensor field; the library aligns asset 3 past the three
     # observations where the label "value" is not observed. The gap of asset 8 is not a
     # leading one, so it stays.
-    res = panel_align_active(pnl, "exposure")
-    @test res.n == 3
-    @test findfirst(res.pnl.amsk[:, 3]) == 4
+    al, n = panel_align_active(pnl, "exposure")
+    @test n == 3
+    @test findfirst(al.amsk[:, 3]) == 4
 end

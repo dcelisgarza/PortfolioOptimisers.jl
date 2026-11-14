@@ -222,3 +222,86 @@ function mirror_description(text::AbstractString, side::Symbol)
     end
     return derived_description(mirror_subject(h1, side), side, docs_block_names(text))
 end
+
+"""
+    with_description(text, line) -> String
+
+`text` with the `Description` line of its first `@meta` block set to `line`. A block that states
+no `Description` gains one at its end, and a page with no `@meta` block gains one at its top.
+"""
+function with_description(text::AbstractString, line::AbstractString)
+    entry = "Description = \"$line\""
+    m = match(r"^[ \t]*```@meta[ \t]*\n(.*?)^[ \t]*```"ms, text)
+    if isnothing(m)
+        return "```@meta\n$entry\n```\n\n" * text
+    end
+    block = m.captures[1]
+    old = r"^[ \t]*Description\s*=.*$"m
+    new_block = if occursin(old, block)
+        replace(block, old => entry; count = 1)
+    else
+        block * entry * "\n"
+    end
+    first_byte = m.offsets[1]
+    return text[1:prevind(text, first_byte)] *
+           new_block *
+           text[(first_byte + ncodeunits(block)):end]
+end
+
+"""
+    fix_mirror_pages(paths) -> Vector{String}
+
+Write the derived `Description` line into each mirror page of `paths` whose line differs, and
+return the pages it changed. A path outside both mirror trees is skipped. `test_64` reds a page
+whose line drifted, and this is the fix it names: a page gains or loses a `@docs` entry, its
+derived line moves, and nothing rewrote the line before.
+"""
+function fix_mirror_pages(paths::AbstractVector{<:AbstractString})
+    changed = String[]
+    for path in paths
+        side = mirror_side(path)
+        if isnothing(side) || !(endswith(path, ".md"))
+            continue
+        end
+        text = read(path, String)
+        line = mirror_description(text, side)
+        if meta_description(text) != line
+            write(path, with_description(text, line))
+            push!(changed, path)
+        end
+    end
+    return changed
+end
+
+"""
+    mirror_page_paths(root) -> Vector{String}
+
+Every `.md` page of both mirror trees under `root/docs/src`.
+"""
+function mirror_page_paths(root::AbstractString)
+    out = String[]
+    for side in (:public, :private)
+        tree = joinpath(root, "docs", "src", MIRROR_TREES[side])
+        if !(isdir(tree))
+            continue
+        end
+        for (dir, _, files) in walkdir(tree)
+            append!(out, joinpath(dir, f) for f in files if endswith(f, ".md"))
+        end
+    end
+    return sort!(out)
+end
+
+# `julia docs/page_metadata.jl --fix [page.md...]` rewrites the drifted `Description` lines of the
+# named mirror pages, or of every mirror page. The docs build and the census `include` this file,
+# and there the program is another file, so nothing runs.
+if abspath(PROGRAM_FILE) == @__FILE__
+    if isempty(ARGS) || first(ARGS) != "--fix"
+        println(stderr, "usage: julia docs/page_metadata.jl --fix [mirror page .md...]")
+        exit(2)
+    end
+    pages = length(ARGS) > 1 ? ARGS[2:end] : mirror_page_paths(dirname(@__DIR__))
+    for p in fix_mirror_pages(pages)
+        println("FIXED ", p)
+    end
+end

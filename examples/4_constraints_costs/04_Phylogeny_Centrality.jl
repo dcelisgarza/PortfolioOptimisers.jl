@@ -194,29 +194,27 @@ A cross-validation fold fits the graph again on different rows. A meta optimiser
 [`SubsetResampling`](@ref) fits it again on a different set of assets. A `dmax` that you tuned on
 one graph then applies to graphs that you did not tune it on.
 
-So each budget field also accepts a rule. A rule is a callable that gets the estimator, the data
-and the graph built from them, and returns the budget. `n` accepts a [`HopCountAlgorithm`](@ref),
-`dmax` accepts a [`PathLengthAlgorithm`](@ref), and either accepts a plain function with the same
-arguments. [`resolve_separation`](@ref) calls the rule when a constraint needs its budget. It passes
-the graph that the constraint already built, and a rule never needs a second graph. The library
-gives one rule for each field, [`HopCountQuantile`](@ref) and [`PathLengthQuantile`](@ref). Each
-puts the budget at a quantile of the observed separations.
+So each budget field also accepts a [`FractionOf`](@ref) of the reachable pairs to relate.
+[`resolve_separation`](@ref) turns the fraction into a budget when a constraint needs it. It puts
+the budget at that quantile of the separations over the graph that the constraint already built,
+so a fraction never needs a second graph. `HopCount(; n = FractionOf(0.25))` and
+`PathLength(; dmax = FractionOf(0.25))` each ask for the budget that relates a quarter of the pairs.
 
-A rule changes which quantity stays fixed. A fixed `dmax` keeps the radius fixed, and the number of
-related pairs changes with the graph. A quantile rule keeps the number of related pairs fixed, and
-the radius changes. The number of related pairs sets the strength of a constraint, and the
-quantile rule keeps that strength from fold to fold.
+A fraction changes which quantity stays fixed. A fixed `dmax` keeps the radius fixed, and the number
+of related pairs changes with the graph. A fraction keeps the number of related pairs fixed, and the
+radius changes. The number of related pairs sets the strength of a constraint, and the fraction
+keeps that strength from fold to fold.
 
 We split the year into four folds and fit the graph on each. For each fold we count the related
-pairs under a fixed `dmax` and under the rule `PathLengthQuantile(; q = 0.25)`, and we print the
-`dmax` that the rule resolves to.
+pairs under a fixed `dmax` and under `dmax = FractionOf(0.25)`, and we print the `dmax` that the
+fraction resolves to.
 =#
 
 folds = [1:63, 64:126, 127:189, 190:252]
 function fold_sep(sep, f)
     return count(!iszero, phylogeny_matrix(NetworkEstimator(; sep = sep), pr.X[f, :]).X)
 end
-q_rule = PathLengthQuantile(; q = 0.25)
+q_rule = FractionOf(0.25)
 function resolved_dmax(f)
     return resolve_separation(PathLength(; dmax = q_rule), NetworkEstimator(), pr.X[f, :]).dmax
 end
@@ -224,48 +222,50 @@ end
 pretty_table(DataFrame("Fold" => ["$(first(f)) to $(last(f))" for f in folds],
                        "Fixed dmax = 1.0107" =>
                            [fold_sep(PathLength(; dmax = 1.0107), f) for f in folds],
-                       "Rule: resolved dmax" =>
+                       "Fraction: resolved dmax" =>
                            [round(resolved_dmax(f); digits = 4) for f in folds],
-                       "Rule: related pairs" =>
+                       "Fraction: related pairs" =>
                            [fold_sep(PathLength(; dmax = q_rule), f) for f in folds]);
-             title = "Fixed dmax and the 0.25 quantile rule in each fold")
+             title = "Fixed dmax and the 0.25 fraction in each fold")
 
 #=
 The fixed `dmax = 1.0107` is the 0.25 quantile of the separations over the whole year. The second
 column shows that one radius relates a different number of pairs in each fold. The constraint
 then has a different strength in each fold. The fourth column shows that
-the rule relates the same number of pairs in every fold. The third column shows the radius that the
-rule moves to keep that number.
+the fraction relates the same number of pairs in every fold. The third column shows the radius that
+the fraction moves to keep that number.
 
-The two quantile rules do not do this equally well, and the cause is the unit. `q` is continuous,
-but a hop count is an integer, so [`HopCountQuantile`](@ref) must round. The hop shells of section
-2.2 are large, and the rounding moves the share of related pairs far from `q`. We ask each rule for
-six values of `q` and print the share of pairs that it relates.
+The two budgets do not do this equally well, and the cause is the unit. A fraction is continuous,
+but a hop count is an integer, so a fraction of a hop budget must round. The hop shells of section
+2.2 are large, and the rounding moves the share of related pairs far from the fraction. We ask each
+budget for six fractions and print the share of pairs that it relates.
 =#
 
 q_grid = [0.1, 0.2, 0.25, 0.3, 0.5, 0.75]
 pretty_table(DataFrame("q" => q_grid,
-                       "HopCountQuantile: n" =>
-                           [resolve_separation(HopCount(; n = HopCountQuantile(; q = q)),
-                                               NetworkEstimator(), pr.X).n for q in q_grid],
-                       "HopCountQuantile: share" =>
-                           [related_pairs(HopCount(; n = HopCountQuantile(; q = q))) /
-                            n_pairs for q in q_grid],
-                       "PathLengthQuantile: share" =>
-                           [related_pairs(PathLength(; dmax = PathLengthQuantile(; q = q))) /
-                            n_pairs for q in q_grid]);
+                       "HopCount: n" => [resolve_separation(HopCount(; n = FractionOf(q)),
+                                                            NetworkEstimator(), pr.X).n.val
+                                         for q in q_grid],
+                       "HopCount: share" =>
+                           [related_pairs(HopCount(; n = FractionOf(q))) / n_pairs
+                            for q in q_grid],
+                       "PathLength: share" =>
+                           [related_pairs(PathLength(; dmax = FractionOf(q))) / n_pairs
+                            for q in q_grid]);
              formatters = [(v, i, j) -> j in (3, 4) ? "$(round(v*100, digits=1)) %" : v],
-             title = "Resolved n and share of related pairs, by q")
+             title = "Resolved n and share of related pairs, by fraction")
 
 #=
-[`PathLengthQuantile`](@ref) relates a share of the pairs that differs from `q` by at most one
-pair. [`HopCountQuantile`](@ref) can miss `q` by a whole hop shell. Three values of `q` resolve to
-`n = 2`, because the second hop shell is large. Use `PathLengthQuantile` when you want a set share
-of the pairs.
+A fraction of the path length relates a share of the pairs that differs from `q` by at most one
+pair. A fraction of the hop budget can miss `q` by a whole hop shell. Three values of `q` resolve
+to `n = 2`, because the second hop shell is large. Use `PathLength(; dmax = FractionOf(q))` when you
+want a set share of the pairs.
 
-!!! tip "The library checks a rule when it runs, not when you store it"
-    A [`HopCountAlgorithm`](@ref) must return an `Integer`, because the library uses `0:n` as a
-    range of matrix powers. A [`PathLengthAlgorithm`](@ref) must return a `Number`. The return
+!!! tip "A budget of another kind is a rule, which the library checks when it runs"
+    A fraction covers the usual case. For a budget of another kind, `n` accepts a
+    [`HopCountAlgorithm`](@ref), `dmax` accepts a [`PathLengthAlgorithm`](@ref), and either accepts
+    a plain function with the same arguments. A [`HopCountAlgorithm`](@ref) must return an
+    `Integer`, because the library uses the hop count as a range of matrix powers. A [`PathLengthAlgorithm`](@ref) must return a `Number`. The return
     type of a callable is not part of its signature, so [`resolve_separation`](@ref) checks the
     value each time it calls the rule. Your own rule needs a type and one method. The third
     argument is the graph that the constraint built. Use it, and do not build another:
@@ -316,7 +316,7 @@ sep_sweep = ["HopCount(; n = 1)" => HopCount(; n = 1),
              "HopCount(; n = 3)" => HopCount(; n = 3),
              "PathLength(; dmax = 0.5)" => PathLength(; dmax = 0.5),
              "PathLength(; dmax = 1.5)" => PathLength(; dmax = 1.5),
-             "PathLengthQuantile(; q = 0.25)" => PathLength(; dmax = q_rule),
+             "PathLength(; dmax = FractionOf(0.25))" => PathLength(; dmax = q_rule),
              "PathLength()" => PathLength()]
 res_sweep = [optimise(MeanRisk(; obj = MinimumRisk(),
                                opt = JuMPOptimiser(; pe = pr, slv = slv,

@@ -203,3 +203,12 @@ The stream names the position of the observation within its step
 
 The positional constructor of `CrossSectionalTargetRegression` takes four arguments in place of
 three. A caller who builds it by position must add `alg`.
+
+## Amendment (2026-11-04, #1973)
+
+**The design of a cross-sectional regression is `assets × factors × observations`.** Where the
+decision above states the tensor `observations × assets × factors`, read `assets × factors ×
+observations`, so that the design of one observation is one contiguous block. A residual matrix
+stays `observations × assets`. [ADR
+0230](0230-every-rank-3-array-holds-its-observations-on-its-last-axis.md) states the rule and its
+reason.

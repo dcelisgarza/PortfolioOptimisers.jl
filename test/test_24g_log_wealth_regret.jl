@@ -18,18 +18,15 @@ form compares a prediction result against the benchmark of its own rows (#1664).
                                 rd = po.PredictionReturnsResult(; nx = ["P"], X = r,
                                                                 ts = ts))
     end
-    function newey_west(d, lags)
-        M = length(d)
-        e = d .- mean(d)
-        g(k) = dot(e[(k + 1):M], e[1:(M - k)]) / M
-        return g(0) + 2 * sum((1 - k / (lags + 1)) * g(k) for k in 1:lags; init = 0.0)
-    end
+    # A seeded Mean Test, so two calls draw the same law draw for draw.
+    mt = WildBootstrapMeanTest(; seed = 1787)
+    test_fields(r) = (r.t_stat, r.p_value, r.mean_ci_lower, r.mean_ci_upper)
 
     @testset "The hand example" begin
         a = [0.02, -0.01, 0.03]
         b = [0.025, 0.0, 0.03]
         ts = Date(2024, 1, 1) .+ Day.(0:2)
-        reg = log_wealth_regret(bare_prediction(a, ts), bare_prediction(b, ts))
+        reg = log_wealth_regret(bare_prediction(a, ts), bare_prediction(b, ts); mt = mt)
         @test isa(reg, LogWealthRegretResult)
         @test isapprox(reg.regret, 0.01494; atol = 1e-5)
         @test isapprox(reg.regret_per_period, 0.00498; atol = 1e-5)
@@ -40,24 +37,25 @@ form compares a prediction result against the benchmark of its own rows (#1664).
         @test reg.cumulative[end] == reg.regret
         @test reg.regret_per_period == reg.regret / reg.n_periods
         @test reg.n_periods == 3
-        @test reg.lags == 0
         @test reg.wealth_a ≈ prod(1 .+ a)
         @test reg.wealth_b ≈ prod(1 .+ b)
         @test reg.regret ≈ log(reg.wealth_b) - log(reg.wealth_a)
-        # The test statistic against a hand Newey–West at zero lags, and at one lag.
-        v0 = newey_west(reg.difference, 0)
-        @test reg.variance ≈ v0
-        @test reg.z ≈ sqrt(3) * mean(reg.difference) / sqrt(v0)
-        @test reg.p ≈ 2 * ccdf(Normal(), abs(reg.z))
-        reg1 = log_wealth_regret(bare_prediction(a, ts), bare_prediction(b, ts); lags = 1)
-        @test reg1.variance ≈ newey_west(reg.difference, 1)
-        @test reg1.lags == 1
-        @test reg1.regret == reg.regret
-        # The sign: swapping the two negates the regret.
-        swap = log_wealth_regret(bare_prediction(b, ts), bare_prediction(a, ts))
+        # The test is the Mean Test of the difference at a window of one row (#1787).
+        @test test_fields(reg) ==
+              test_fields(po.mean_test(mt, reg.difference, 1, po.mean_test_rng(mt)))
+        @test reg.mean_ci_lower < reg.regret_per_period < reg.mean_ci_upper
+        # The rule of zero lags of Diebold and Mariano: the mean over its standard error,
+        # against a Student law.
+        rego = log_wealth_regret(bare_prediction(a, ts), bare_prediction(b, ts);
+                                 mt = OverlapMeanTest())
+        @test rego.t_stat ≈ mean(reg.difference) / (std(reg.difference) / sqrt(3))
+        @test rego.p_value ≈ 2 * ccdf(TDist(2), abs(rego.t_stat))
+        @test rego.regret == reg.regret
+        # The sign: swapping the two negates the regret and the statistic.
+        swap = log_wealth_regret(bare_prediction(b, ts), bare_prediction(a, ts); mt = mt)
         @test swap.regret ≈ -reg.regret
-        @test swap.z ≈ -reg.z
-        @test swap.p ≈ reg.p
+        @test swap.t_stat ≈ -reg.t_stat
+        @test swap.p_value ≈ reg.p_value
     end
 
     @testset "A series against itself, and the refusals" begin
@@ -65,19 +63,13 @@ form compares a prediction result against the benchmark of its own rows (#1664).
         ts = Date(2024, 1, 1) .+ Day.(0:2)
         self = log_wealth_regret(bare_prediction(a, ts), bare_prediction(a, ts))
         @test self.regret == 0
-        @test self.variance == 0
-        @test isnan(self.z) && isnan(self.p)
+        @test all(isnan, test_fields(self))
         # Different timestamps compare nothing.
         @test_throws ArgumentError log_wealth_regret(bare_prediction(a, ts),
                                                      bare_prediction(a, ts .+ Day(1)))
         # Different lengths with no timestamps compare nothing either.
         @test_throws ArgumentError log_wealth_regret(bare_prediction(a, nothing),
                                                      bare_prediction(a[1:2], nothing))
-        # The lag budget is bounded by the rows.
-        @test_throws DomainError log_wealth_regret(bare_prediction(a, ts),
-                                                   bare_prediction(a, ts); lags = 3)
-        @test_throws DomainError log_wealth_regret(bare_prediction(a, ts),
-                                                   bare_prediction(a, ts); lags = -1)
         # A return below -1 leaves a negative wealth, so it is refused with the return as
         # the value, in either series; a `NaN` return passes and reaches the regret.
         err = try
@@ -89,23 +81,33 @@ form compares a prediction result against the benchmark of its own rows (#1664).
         @test isa(err, DomainError) && err.val == -1.5
         @test_throws DomainError log_wealth_regret(bare_prediction(a, ts),
                                                    bare_prediction([NaN, -2.0, 0.0], ts))
-        @test isnan(log_wealth_regret(bare_prediction([NaN, 0.0, 0.0], ts),
-                                      bare_prediction(a, ts)).regret)
-        # A return of -1 is a total loss: the regret is infinite and the test undefined.
+        nanr = log_wealth_regret(bare_prediction([NaN, 0.0, 0.0], ts),
+                                 bare_prediction(a, ts))
+        @test isnan(nanr.regret) && all(isnan, test_fields(nanr))
+        # A return of -1 is a total loss: the regret is infinite and the test undefined. The
+        # infinite row is a defect of the series, not a missing row, so the test does not
+        # read the other two rows alone.
         ruin = log_wealth_regret(bare_prediction([0.0, -1.0, 0.0], ts),
                                  bare_prediction(a, ts))
-        @test ruin.regret == Inf && isnan(ruin.z) && isnan(ruin.p)
-        # A difference that is a non-zero constant has no variance in exact arithmetic, so
-        # the statistic is infinite; in floating point it is very large and `p` is zero.
+        @test ruin.regret == Inf && all(isnan, test_fields(ruin))
+        # A difference that is a non-zero constant has no variance in exact arithmetic. In
+        # floating point its round-off spread passes the bound of a constant series, so the
+        # statistic is very large and the p-value is the least that the test gives.
         c = log_wealth_regret(bare_prediction(a, ts),
-                              bare_prediction((1 .+ a) .* exp(0.001) .- 1, ts))
+                              bare_prediction((1 .+ a) .* exp(0.001) .- 1, ts); mt = mt)
         @test isapprox(c.regret, 0.003; atol = 1e-12)
-        @test c.variance < 1e-25 && abs(c.z) > 1e10 && c.p == 0
-        # A population of paths reads its first path, as the summary does.
+        @test abs(c.t_stat) > 1e10 && c.p_value == 1 / (mt.n_sim + 1)
+        # A comparator with many members gives one regret for each member (#1936).
         b = [0.025, 0.0, 0.03]
         pop = bare_prediction([b, a], ts)
-        @test log_wealth_regret(bare_prediction(a, ts), pop).regret ≈
+        regs = log_wealth_regret(bare_prediction(a, ts), pop)
+        @test length(regs) == 2
+        @test regs[1].regret ≈
               log_wealth_regret(bare_prediction(a, ts), bare_prediction(b, ts)).regret
+        @test regs[2].regret == 0
+        # Two series of different lengths with no timestamps compare nothing.
+        @test_throws ArgumentError log_wealth_regret(bare_prediction(a, nothing),
+                                                     bare_prediction(b[1:2], nothing))
     end
 
     # The interior volatility-pumping fixture of the head's own test file.
@@ -210,24 +212,30 @@ form compares a prediction result against the benchmark of its own rows (#1664).
         a = [0.02, -0.01, 0.03]
         b = [0.025, 0.0, 0.03]
         tsh = Date(2024, 1, 1) .+ Day.(0:2)
-        reg = log_wealth_regret(bench_prediction(a, b, tsh))
+        reg = log_wealth_regret(bench_prediction(a, b, tsh); mt = mt)
         @test same_fields(reg,
                           log_wealth_regret(bare_prediction(a, tsh),
-                                            bare_prediction(b, tsh)))
+                                            bare_prediction(b, tsh); mt = mt))
         @test isnan(reg.path_length)
-        @test same_fields(log_wealth_regret(bench_prediction(a, b, tsh); lags = 1),
+        @test same_fields(log_wealth_regret(bench_prediction(a, b, tsh);
+                                            mt = OverlapMeanTest()),
                           log_wealth_regret(bare_prediction(a, tsh),
-                                            bare_prediction(b, tsh); lags = 1))
-        # A population reads its first path and its first benchmark series.
-        @test same_fields(log_wealth_regret(bench_prediction([a, b], [b, a], tsh)), reg)
+                                            bare_prediction(b, tsh);
+                                            mt = OverlapMeanTest()))
+        # Each member meets its own benchmark series (#1936).
+        regs = log_wealth_regret(bench_prediction([a, b], [b, a], tsh); mt = mt)
+        @test length(regs) == 2
+        @test same_fields(regs[1], reg)
+        @test same_fields(regs[2],
+                          log_wealth_regret(bare_prediction(b, tsh),
+                                            bare_prediction(a, tsh); mt = mt))
         # A multi-period result stacks the benchmark series of its folds.
         mp = MultiPeriodPredictionResult(;
                                          pred = [bench_prediction(a[1:2], b[1:2], tsh[1:2]),
                                                  bench_prediction(a[3:3], b[3:3], tsh[3:3])])
-        @test same_fields(log_wealth_regret(mp), reg)
-        # No benchmark, no comparator; the checks on the lags and the returns still hold.
+        @test same_fields(log_wealth_regret(mp; mt = mt), reg)
+        # No benchmark, no comparator; the check on the returns still holds.
         @test_throws ArgumentError log_wealth_regret(bare_prediction(a, tsh))
-        @test_throws DomainError log_wealth_regret(bench_prediction(a, b, tsh); lags = 3)
         @test_throws DomainError log_wealth_regret(bench_prediction(a, [0.0, -1.5, 0.0],
                                                                     tsh))
 
@@ -240,23 +248,23 @@ form compares a prediction result against the benchmark of its own rows (#1664).
         tst = ts[21:T]
         cv = IndexWalkForward(20, 1)
         ewv = cross_val_predict(EqualWeighted(), rdv, cv)
-        @test same_fields(log_wealth_regret(ewv),
-                          log_wealth_regret(ewv, hand_comparator(Bv[21:T], tst)))
+        @test same_fields(log_wealth_regret(ewv; mt = mt),
+                          log_wealth_regret(ewv, hand_comparator(Bv[21:T], tst); mt = mt))
         ewm = cross_val_predict(EqualWeighted(), rdm, cv)
-        @test same_fields(log_wealth_regret(ewm),
+        @test same_fields(log_wealth_regret(ewm; mt = mt),
                           log_wealth_regret(ewm,
                                             hand_comparator(Bm[21:T, :] * fill(1 / N, N),
-                                                            tst)))
+                                                            tst); mt = mt))
         ocv = OnlineIndexWalkForward(20, 1)
         ops = po.OnlinePortfolioSelection(; alg = ExponentiatedGradient())
         ov = cross_val_predict(ops, rdv, ocv)
-        @test same_fields(log_wealth_regret(ov),
-                          log_wealth_regret(ov, hand_comparator(Bv[21:T], tst)))
+        @test same_fields(log_wealth_regret(ov; mt = mt),
+                          log_wealth_regret(ov, hand_comparator(Bv[21:T], tst); mt = mt))
         om = cross_val_predict(ops, rdm, ocv)
         # The head moves its weights at every fold, so the series is collapsed fold by fold.
         bom = [dot(Bm[20 + i, :], p.res.w) for (i, p) in enumerate(om.pred)]
-        @test same_fields(log_wealth_regret(om),
-                          log_wealth_regret(om, hand_comparator(bom, tst)))
+        @test same_fields(log_wealth_regret(om; mt = mt),
+                          log_wealth_regret(om, hand_comparator(bom, tst); mt = mt))
 
         # The summary of a prediction reads the same benchmark when no keyword is given,
         # and `benchmark = nothing` turns the three excess statistics off.
@@ -278,10 +286,19 @@ form compares a prediction result against the benchmark of its own rows (#1664).
                 @test isequal(getproperty(off, f), getproperty(ps, f))
             end
         end
-        # A population reads its first benchmark series, and returns data with no
-        # benchmark give the three as `NaN`, as before.
-        @test same_fields(performance_summary(bench_prediction([a, b], [b, a], tsh)),
-                          performance_summary(a; benchmark = b))
+        # A prediction with two members gives one entry for each member, each against its
+        # own benchmark series (#1934). Returns data with no benchmark give the three as
+        # `NaN`, as before.
+        two = performance_summary(bench_prediction([a, b], [b, a], tsh))
+        @test two.members == [1, 2]
+        for (j, (x, y)) in enumerate(((a, b), (b, a)))
+            alone = performance_summary(x; benchmark = y)
+            for f in (:n_periods, :ann_return, :ann_volatility, :sharpe, :sharpe_stderr,
+                      :sortino, :calmar, :max_drawdown, :cvar, :excess_ret, :tracking_error,
+                      :information_ratio)
+                @test isequal(getfield(two, f)[j], getfield(alone, f))
+            end
+        end
         ew = performance_summary(cross_val_predict(EqualWeighted(), rd, cv))
         @test isnan(ew.excess_ret) &&
               isnan(ew.tracking_error) &&
@@ -297,7 +314,8 @@ fields of `LogWealthRegretResult`, and the benchmark and turnover fields of
 and be-the-leader collapses onto the static comparator.
 =#
 @testset "Hindsight split and the dynamic-regret surface" begin
-    using PortfolioOptimisers, Test, LinearAlgebra, Statistics, StatsBase, Dates, Clarabel
+    using PortfolioOptimisers, Test, LinearAlgebra, Statistics, StatsBase, Dates, Clarabel,
+          StableRNGs
     po = PortfolioOptimisers
     # A prediction result over a bare return series, on the timestamps handed in, with the
     # weights and names a fold would carry.
@@ -479,16 +497,130 @@ and be-the-leader collapses onto the static comparator.
         mp = MultiPeriodPredictionResult(; pred = [a, b, c])
         W = po.stacked_fold_weights(mp, po.fold_target)
         @test W == [1.0 0.0 0.0; 0.0 1.0 0.0; 0.0 0.25 0.75]
-        @test po.comparator_path_length(mp, Float64) ≈ sqrt(2) + norm([0.0, -0.75, 0.75])
+        @test po.comparator_path_length(mp, 1, Float64) ≈ sqrt(2) + norm([0.0, -0.75, 0.75])
         # A fold whose weights and names disagree is refused.
         bad = bare_prediction([0.01], ts3[1:1]; w = [0.5, 0.5], nx = ["A"])
         @test_throws DimensionMismatch po.stacked_fold_weights(MultiPeriodPredictionResult(;
                                                                                            pred = [bad,
                                                                                                    b]),
                                                                po.fold_target)
-        # A population reads its first member.
-        @test po.first_member([[0.2, 0.8], [0.5, 0.5]]) == [0.2, 0.8]
-        @test po.first_member([0.2, 0.8]) == [0.2, 0.8]
+        # Member `j` reads entry `j`; one vector belongs to every member; no benchmark stays
+        # `nothing`.
+        @test po.member_vector([[0.2, 0.8], [0.5, 0.5]], 2) == [0.5, 0.5]
+        @test po.member_vector([0.2, 0.8], 2) == [0.2, 0.8]
+        @test isnothing(po.member_vector(nothing, 1))
+    end
+
+    @testset "The exported fold readers sit on the names of each fold (#1953)" begin
+        # An asset that lists late: the folds that train on its missing rows drop it through
+        # the Investable Mask, so `res.w` keeps the universe of the fit and `rd.nx` does not.
+        rng = StableRNG(1953)
+        X = 0.01 .* randn(rng, 300, 4)
+        X[1:100, 4] .= NaN
+        ts = collect(Date(2024, 1, 1):Day(1):Date(2024, 10, 26))
+        rd = ReturnsResult(; nx = ["A", "B", "C", "D"], X = X, ts = ts)
+        p = cross_val_predict(HierarchicalRiskParity(), rd, KFold(; n = 3))
+        @test any(f -> length(f.res.w) != length(f.rd.nx), p.pred)
+        for f in p.pred
+            @test length(fold_target(f)) == length(fold_held(f)) == length(f.rd.nx)
+            @test sum(fold_target(f)) ≈ 1
+        end
+        nms, W, labels = prediction_weights(p)
+        @test nms == ["A", "B", "C", "D"]
+        @test size(W) == (length(p.pred), 4)
+        @test length(labels) == length(p.pred)
+        for (k, f) in enumerate(p.pred)
+            @test W[k, indexin(f.rd.nx, nms)] == fold_target(f)
+        end
+        @test all(n -> Base.isexported(po, n),
+                  (:fold_target, :fold_held, :prediction_weights))
+    end
+
+    @testset "A prediction with many members gives one regret for each member (#1936)" begin
+        rng = StableRNG(1936)
+        T, N = 60, 4
+        X = randn(rng, T, N) / 100 .+ 0.001
+        B = randn(StableRNG(1937), T, N) / 100
+        ts = Date(2024, 1, 1) .+ Day.(0:(T - 1))
+        nx = ["a", "b", "c", "d"]
+        rd = ReturnsResult(; nx = nx, X = X, ts = ts, nb = nx, B = B)
+        fslv = Solver(; name = :clarabel, solver = Clarabel.Optimizer,
+                      check_sol = (; allow_local = true, allow_almost = true),
+                      settings = Dict("verbose" => false))
+        mr = MeanRisk(;
+                      opt = JuMPOptimiser(; slv = fslv,
+                                          ret = ArithmeticReturn(;
+                                                                 settings = JuMPReturnsSettings(;
+                                                                                                lb = Frontier(;
+                                                                                                              N = 3)))))
+        cv = IndexWalkForward(30, 10)
+        fr = cross_val_predict(mr, rd, cv)
+        ew = cross_val_predict(EqualWeighted(), rd, cv)
+        @test length(fr.mrd.X) == 3
+        mt = WildBootstrapMeanTest(; seed = 1936)
+        tsf = fr.mrd.ts
+        # The series of member `j` alone, as a one-series prediction over the same rows.
+        alone(r) = bare_prediction(r, tsf)
+        rew = first(po.regret_series(ew))
+        # A many-member strategy against a one-series comparator: member `j` against it.
+        # The shape follows the types of the series: the pairing infers. The `path_length`
+        # of a multi-period comparator does not infer, so the two-side calls are not
+        # checked with `@inferred` (#1938).
+        @test isa(@inferred(po.member_regret(fr.mrd.X, rew, mt, nothing)), Vector)
+        @test isa(@inferred(po.member_regret(rew, rew, mt, nothing)), LogWealthRegretResult)
+        regs = log_wealth_regret(fr, ew; mt = mt)
+        @test length(regs) == 3
+        for j in 1:3
+            @test isequal(regs[j].regret,
+                          log_wealth_regret(alone(fr.mrd.X[j]), alone(rew); mt = mt).regret)
+            @test isequal(regs[j].p_value,
+                          log_wealth_regret(alone(fr.mrd.X[j]), alone(rew); mt = mt).p_value)
+        end
+        @test !all(r -> r.regret == regs[1].regret, regs)
+        # A one-series strategy against a many-member comparator: each member's own path.
+        back = log_wealth_regret(ew, fr; mt = mt)
+        @test [r.regret for r in back] ≈ -[r.regret for r in regs]
+        for j in 1:3
+            W = po.stacked_fold_weights(fr, f -> po.fold_target(f, j))
+            P = sum(norm(W[i, :] - W[i - 1, :]) for i in 2:size(W, 1))
+            @test back[j].path_length ≈ P
+            @test po.comparator_path_length(fr, j, Float64) ≈ P
+        end
+        @test length(unique(r.path_length for r in back)) == 3
+        # Two sides with many members pair by index.
+        self = log_wealth_regret(fr, fr; mt = mt)
+        @test all(r -> r.regret == 0, self)
+        # Each member meets its own benchmark series.
+        bench = @inferred log_wealth_regret(fr; mt = mt)
+        for j in 1:3
+            @test isequal(bench[j].regret,
+                          log_wealth_regret(alone(fr.mrd.X[j]), alone(fr.mrd.B[j]);
+                                            mt = mt).regret)
+        end
+        # Two members against three is refused, and names both counts.
+        two = bare_prediction([fr.mrd.X[1], fr.mrd.X[2]], tsf)
+        err = try
+            log_wealth_regret(two, fr)
+        catch e
+            e
+        end
+        @test isa(err, DimensionMismatch)
+        @test occursin("2 members", err.msg) && occursin("holds 3", err.msg)
+        # A one-series pair keeps the released scalar.
+        @test isa(log_wealth_regret(ew, ew; mt = mt), LogWealthRegretResult)
+        # The summary gives one entry for each member, each with its own series, benchmark,
+        # turnover and weights (#1934).
+        psf = performance_summary(fr)
+        @test psf.members == [1, 2, 3]
+        for j in 1:3
+            alone = performance_summary(fr.mrd.X[j]; benchmark = fr.mrd.B[j])
+            @test isequal(psf.sharpe[j], alone.sharpe)
+            @test isequal(psf.excess_ret[j], alone.excess_ret)
+            @test isequal(psf.turnover[j], po.held_path_turnover(fr, j))
+            @test psf.n_eff[j] ≈
+                  mean(f -> number_effective_assets(po.fold_target(f, j)), fr.pred)
+        end
+        @test !allequal(psf.turnover)
     end
 
     @testset "The benchmark fields of the performance summary" begin
@@ -1019,12 +1151,13 @@ end
         pop = PopulationPredictionResult(; pred = [high, low])
         @test pop.pred[1] === high
         r = ConditionalValueatRisk()
-        sorted = sort_by_measure(pop, r)
+        sca = SumScalariser()
+        sorted = sort_by_measure(sca, pop, r)
         @test all(x -> isa(x, PredictionResult), sorted)
         @test sorted[1] === low
         @test sorted[2] === high
-        @test PortfolioOptimisers.quantile_by_measure(pop, r, 1.0) === high
-        @test PortfolioOptimisers.quantile_by_measure(pop, r, 0.0) === low
+        @test PortfolioOptimisers.quantile_by_measure(sca, pop, r, 1.0) === high
+        @test PortfolioOptimisers.quantile_by_measure(sca, pop, r, 0.0) === low
     end
     @testset "A failed member keeps its weights with no previous weights" begin
         s = OptimisationSuccess()

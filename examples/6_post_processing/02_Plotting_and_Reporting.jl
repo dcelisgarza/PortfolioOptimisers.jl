@@ -121,6 +121,59 @@ We draw the same summary as a figure.
 plot_performance_summary(res_ratio, rd; ppy = 252)
 
 #=
+### Many portfolios in one table
+
+`performance_summary` also takes a vector of candidates. It gives one entry for each series, and
+`names` names the candidates. The keyword `rf` is the risk-free rate for each period, and it enters
+the Sharpe ratio, its standard error and the Sortino ratio. The keyword `measures` adds risk
+measures of your choice by name. Each one is evaluated on the same net series as the headline
+figures, and it keeps the sign of its measure. `DataFrame(ps)` writes the summary as a table, with
+one row for each entry.
+=#
+
+using DataFrames
+
+ps = performance_summary([res_min, res_ratio], rd; names = ["min risk", "max ratio"],
+                         ppy = 252, rf = rf,
+                         measures = [:cvar_99 => ConditionalValueatRisk(; alpha = 0.01),
+                                     :ulcer => UlcerIndex()])
+DataFrame(ps)
+
+#=
+A result that holds many portfolios, such as the frontier, gives one entry for each member. The
+column `member` keys each entry, and `n_eff`, the effective number of assets, shows how the
+concentration changes along the frontier. The columns `long_exposure`, `short_exposure`,
+`gross_exposure` and `net_exposure` give the size of each side of the book. A long-only book with
+a budget of one gives `1`, `0`, `1` and `1`, and a long-short book shows its leverage there.
+=#
+
+DataFrame(performance_summary(frontier, rd; ppy = 252, rf = rf))[:,
+                                                                 [:member, :ann_return,
+                                                                  :ann_volatility, :sharpe,
+                                                                  :n_eff]]
+
+#=
+### The paths of a population
+
+A combinatorial cross-validation gives many paths, and the summary of the population gives one
+entry for each path. Each figure of a path is one estimate, and the column of a figure is its
+distribution over the paths. The summary does not reduce the paths, because the mean of a ratio is
+not the ratio of the means. Reduce them yourself, for example with `describe`.
+=#
+
+ppred = cross_val_predict(MeanRisk(; obj = MinimumRisk(), opt = JuMPOptimiser(; slv = slv)),
+                          rd, CombinatorialCrossValidation(; n_folds = 5, n_test_folds = 2))
+pps = performance_summary(ppred; ppy = 252, rf = rf)
+describe(DataFrame(pps)[:, [:sharpe, :max_drawdown, :n_eff]], :mean, :median, :min, :max)
+
+#=
+The plot of a summary of many entries draws one panel for each figure, with one bar for each
+entry.
+=#
+
+plot_performance_summary(ps; size = (1000, 900))
+
+#=
 ## 6. Risk and return
 
 [`plot_measures`](@ref) plots portfolios on any pair of risk and return axes.

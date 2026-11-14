@@ -179,6 +179,8 @@ $(DocStringExtensions.FIELDS)
 
 Keywords correspond to the struct's fields.
 
+`ReturnsResult` is an entry point of integer data. An integer element type of `X`, `F`, `B`, `E` or `iv` converts once to its floating-point type through [`float_if_integer`](@ref), so every kernel downstream reads floating-point data. Every other element type stays, and a view stays a view.
+
 ## Validation
 
   - If `nx` or `X` is not `nothing`, [`check_names_and_returns_matrix`](@ref) holds for the pair: both are given, `allunique(nx)`, `!isempty(nx)`, `!isempty(X)`, and `length(nx) == size(X, 2)`.
@@ -282,6 +284,12 @@ ReturnsResult
                            B::Option{<:VecNum_MatNum}, ne::Option{<:VecStr},
                            E::Option{<:MatNum}, ts::Option{<:VecDate}, iv::Option{<:MatNum},
                            ivpa::Option{<:Num_VecNum}, pnl::Option{<:AssetPanel})
+        # The one entry point of integer data: every kernel downstream reads a float.
+        X = float_if_integer(X)
+        F = float_if_integer(F)
+        B = float_if_integer(B)
+        E = float_if_integer(E)
+        iv = float_if_integer(iv)
         check_names_and_returns_matrix(nx, X, :nx, :X)
         check_names_and_returns_matrix(nf, F, :nf, :F)
         if isa(B, VecNum) && !isnothing(nb)
@@ -376,7 +384,7 @@ This is the [`port_opt_view`](@ref) method for [`ReturnsResult`](@ref). It restr
  3. View the asset returns as `view(rd.X, :, i)`. Axis 2 is the assets, and every observation is kept.
  4. When `B` is a matrix, it holds one column per asset, so view `nb` at `i` and view `B` as `view(rd.B, :, i)`. When `B` is a vector or `nothing`, `nb` and `B` pass through unchanged.
  5. View the implied volatilities as `view(rd.iv, :, i)`, and the adjustment `ivpa` at `i`.
- 6. View the [`AssetPanel`](@ref) `pnl` with [`asset_panel_view`](@ref) at `i` on the asset axis, and give it the asset names `rd.nx`. The observation index is a `Colon`, so a time-varying panel keeps every observation. The view slices the values of every Panel Field and both universe masks on the asset axis. It also slices the label axis of a tensor Panel Field whose labels are the asset names, see [`features_are_assets`](@ref). The label axis of every other field holds features, and an asset view does not change it.
+ 6. View the [`AssetPanel`](@ref) `pnl` with [`port_opt_view`](@ref) at `i` on the asset axis, and give it the asset names `rd.nx`. The observation index is a `Colon`, so a time-varying panel keeps every observation. The view slices the values of every Panel Field and both universe masks on the asset axis. It also slices the label axis of a tensor Panel Field whose labels are the asset names, see [`features_are_assets`](@ref). The label axis of every other field holds features, and an asset view does not change it.
  7. Rebuild the [`ReturnsResult`](@ref). The factor names `nf`, the factor returns `F`, the Exogenous Series `ne` and `E`, and the timestamps `ts` pass through unchanged, because none of them has an asset axis.
 
 Each field that is `nothing` stays `nothing`. No step copies data.
@@ -468,7 +476,7 @@ Return a view of the `ReturnsResult` object for assets at indices `j`, observati
  4. View the factor names `nf` at `k`. When `k` is a `Colon`, `nf` passes through. View the factor returns as `view(rd.F, i, k)`.
  5. When `B` is a matrix, it holds one column per asset, so view `nb` at `j` and view `B` as `view(rd.B, i, j)`. When `B` is a vector, every asset shares it, so view it as `view(rd.B, i)` and pass `nb` through.
  6. View the Exogenous Series as `view(rd.E, i, :)`, and pass its names `ne` through. View the timestamps `ts` at `i`, the implied volatilities as `view(rd.iv, i, j)`, and the adjustment `ivpa` at `j`.
- 7. View the [`AssetPanel`](@ref) `pnl` with [`asset_panel_view`](@ref) at the observations `i` and the assets `j`, and give it the asset names `rd.nx`. The view slices both axes of every Panel Field and of both universe masks. It also slices the label axis of a tensor Panel Field whose labels are the asset names, see [`features_are_assets`](@ref). A static panel has no observation axis and ignores `i`, as a scalar `ivpa` ignores `j`.
+ 7. View the [`AssetPanel`](@ref) `pnl` with [`port_opt_view`](@ref) at the observations `i` and the assets `j`, and give it the asset names `rd.nx`. The view slices both axes of every Panel Field and of both universe masks. It also slices the label axis of a tensor Panel Field whose labels are the asset names, see [`features_are_assets`](@ref). A static panel has no observation axis and ignores `i`, as a scalar `ivpa` ignores `j`.
  8. Rebuild the [`ReturnsResult`](@ref).
 
 Each field that is `nothing` stays `nothing`. No step copies data.
@@ -598,7 +606,7 @@ function port_opt_view(rd::ReturnsResult, i)
     B = !isa(rd.B, MatNum) ? rd.B : view(rd.B, :, i)
     iv = isnothing(rd.iv) ? nothing : view(rd.iv, :, i)
     ivpa = nothing_scalar_array_view(rd.ivpa, i)
-    pnl = asset_panel_view(rd.pnl, :, i, rd.nx)
+    pnl = port_opt_view(rd.pnl, :, i, rd.nx)
     return ReturnsResult(; nx = nx, X = X, nf = rd.nf, F = rd.F, nb = nb, B = B, ne = rd.ne,
                          E = rd.E, ts = rd.ts, iv = iv, ivpa = ivpa, pnl = pnl)
 end
@@ -622,7 +630,7 @@ function port_opt_view(rd::ReturnsResult, i, j, k = :)
     ts = isnothing(rd.ts) ? rd.ts : view(rd.ts, i)
     iv = isnothing(rd.iv) ? rd.iv : view(rd.iv, i, j)
     ivpa = nothing_scalar_array_view(rd.ivpa, j)
-    pnl = asset_panel_view(rd.pnl, i, j, rd.nx)
+    pnl = port_opt_view(rd.pnl, i, j, rd.nx)
     return ReturnsResult(; nx = nx, X = X, nf = nf, F = F, nb = nb, B = B, ne = rd.ne,
                          E = E, ts = ts, iv = iv, ivpa = ivpa, pnl = pnl)
 end
@@ -635,7 +643,7 @@ function port_opt_view(rd::AbstractReturnsResult, args...; kwargs...)
     return throw(ArgumentError("$(typeof(rd)) subtypes AbstractReturnsResult but does not implement port_opt_view for $(length(args)) index argument(s). Extension authors: implement port_opt_view for the subtype, so that a meta-optimiser or a cross-validation fold can subselect its assets and observations. See port_opt_view(rd::ReturnsResult, ...) for the method to mirror."))
 end
 """
-    const Prices_RR = Union{<:AbstractReturnsResult, <:AbstractPricesResult}
+    const Prices_RR = Union{AbstractReturnsResult, AbstractPricesResult}
 
 Union of the two data levels cross-validation folds can be computed on: returns-level ([`AbstractReturnsResult`](@ref)) and price-level ([`AbstractPricesResult`](@ref)) data.
 
@@ -649,7 +657,7 @@ Fold generation needs only an observation count, from [`cv_nobs`](@ref), and a t
   - [`cv_timestamps`](@ref)
   - [`n_splits`](@ref)
 """
-const Prices_RR = Union{<:AbstractReturnsResult, <:AbstractPricesResult}
+const Prices_RR = Union{AbstractReturnsResult, AbstractPricesResult}
 """
     benchmark_relative_returns(rd::ReturnsResult, x_src::Option{<:DataSource}) -> Option{<:MatNum}
     benchmark_relative_returns(rd::ReturnsResult, x_src::ExcessSource) -> Option{<:MatNum}
@@ -969,6 +977,108 @@ function shared_series_cut(rd::ReturnsResult, x_src::Option{<:AbstractReturnsSou
     return benchmark_estimation_mask(rd, x_src)
 end
 """
+    shared_series_estimator(est, rows::Nothing, T::Integer) -> typeof(est)
+    shared_series_estimator(est, rows::VecInt, T::Integer)
+
+Return the estimator that a fit reads after a Shared Series gap, with each observation weight of the dropped observations dropped.
+
+[`shared_series_view`](@ref) drops the observations of a gap from every field of the returns data. An estimator can hold fixed observation weights, one for each observation of the full sample, at any depth of its tree: the weights of a covariance estimator inside a prior inside an optimiser, or the weights of a risk measure. [`observed_weights`](@ref) states the rule: an observation that the fit drops takes its weight with it, and the kept weights keep their type. So each fit that drops the rows also cuts the estimator that reads them, at the same rows.
+
+A [`DynamicAbstractWeights`](@ref) keeps its value, because it resolves on the sample that the fit reads, which has no gap left.
+
+# Algorithm
+
+The method that Julia selects is the algorithm.
+
+ 1. `rows` is `nothing`: return `est`, because the fit keeps every observation.
+ 2. `rows` is a vector: mark the kept observations in a mask of `T` entries, and cut `est` with [`obs_weights_view`](@ref) at the mask. Each weights field goes through [`obs_weights_index`](@ref), which checks that a weight vector has `T` entries.
+
+# Arguments
+
+  - `est`: The estimator of the fit: a prior, a regression, an uncertainty set, an optimiser, or a risk measure. Any other value comes back with no change.
+  - `rows`: The positions of the kept observations, from [`shared_series_rows`](@ref), or `nothing`.
+  - `T`: The number of observations of the full sample.
+
+# Validation
+
+  - Each fixed weight vector in the tree of `est` has `T` entries, as [`observed_weights`](@ref) checks. A `DimensionMismatch` that names `w` is thrown otherwise.
+
+# Returns
+
+  - `est`: The estimator with each fixed weight vector cut to the kept observations.
+
+# Examples
+
+```jldoctest
+julia> ce = Covariance(; w = aweights([1.0, 2.0, 3.0, 4.0]));
+
+julia> PortfolioOptimisers.shared_series_estimator(ce, [1, 3, 4], 4).w
+3-element AnalyticWeights{Float64, Float64, Vector{Float64}}:
+ 1.0
+ 3.0
+ 4.0
+```
+
+# Related
+
+  - [`shared_series_view`](@ref)
+  - [`shared_series_rows`](@ref)
+  - [`obs_weights_view`](@ref)
+  - [`observed_weights`](@ref)
+"""
+function shared_series_estimator(est, ::Nothing, ::Integer)
+    return est
+end
+function shared_series_estimator(est, rows::VecInt, T::Integer)
+    obs = falses(T)
+    obs[rows] .= true
+    return obs_weights_view(est, obs)
+end
+"""
+    shared_series_fit(est, rd::ReturnsResult, x_src::Option{<:AbstractReturnsSource},
+                      rf::Bool) -> Tuple{typeof(est), ReturnsResult}
+
+Return the estimator and the returns data that a fit reads, with the observations of a Shared Series gap dropped from both.
+
+This is [`shared_series_view`](@ref) for a fit that holds an estimator. The data loses the observations of the gap, and every fixed observation weight in the tree of `est` loses the same observations, through [`shared_series_estimator`](@ref). A fit that needs the kept rows after the cut, to record them, calls the three functions itself.
+
+# Algorithm
+
+ 1. Find the kept observations with [`shared_series_rows`](@ref).
+ 2. When it keeps every observation, return `est` and the data of [`shared_series_cut`](@ref).
+ 3. Otherwise count the observations of the Shared Series, cut `est` with [`shared_series_estimator`](@ref), and cut `rd` with [`shared_series_cut`](@ref).
+
+# Arguments
+
+  - `est`: The estimator of the fit.
+  - $(arg_dict[:rd])
+  - $(arg_dict[:x_src_read])
+  - `rf`: `true` when the fit reads the factor returns of `rd`.
+
+# Validation
+
+  - The rules of [`shared_series_cut`](@ref) and [`shared_series_estimator`](@ref).
+
+# Returns
+
+  - `est`: The estimator at the kept observations.
+  - `rd::ReturnsResult`: The returns data at the kept observations.
+
+# Related
+
+  - [`shared_series_view`](@ref)
+  - [`shared_series_estimator`](@ref)
+"""
+function shared_series_fit(est, rd::ReturnsResult, x_src::Option{<:AbstractReturnsSource},
+                           rf::Bool)
+    rows = shared_series_rows(rd, x_src, rf)
+    if isnothing(rows)
+        return est, shared_series_cut(rd, x_src, rows)
+    end
+    T = shared_series_length(shared_benchmark(rd.B, x_src), rf ? rd.F : nothing)
+    return shared_series_estimator(est, rows, T), shared_series_cut(rd, x_src, rows)
+end
+"""
     shared_series_gaps(rd::ReturnsResult, x_src::Option{<:AbstractReturnsSource}, rf::Bool)
         -> Option{BitVector}
 
@@ -1093,10 +1203,9 @@ function benchmark_estimation_mask(rd::ReturnsResult, B::MatNum,
     if all(isfinite, B)
         return rd
     end
-    pnl = AssetPanel(; pf = pnl.pf, amsk = pnl.amsk, emsk = pnl.emsk .& isfinite.(B))
-    return ReturnsResult(; nx = rd.nx, X = rd.X, nf = rd.nf, F = rd.F, nb = rd.nb, B = B,
-                         ne = rd.ne, E = rd.E, ts = rd.ts, iv = rd.iv, ivpa = rd.ivpa,
-                         pnl = pnl)
+    return rebuild_struct(rd,
+                          (;
+                           pnl = rebuild_struct(pnl, (; emsk = pnl.emsk .& isfinite.(B)))))
 end
 """
     asset_panel(ape::Nothing, pr, rd::ReturnsResult, X) -> AssetPanel

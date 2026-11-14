@@ -97,7 +97,13 @@
     KEEP = String[
                   # A synthetic input of `mechanism_name`: the census asks whether a
                   # file name is a mechanism name, and the file can be absent.
-                  "test/test_74_source_citation_census.jl test_28_seam_lock.jl"]
+                  "test/test_74_source_citation_census.jl test_28_seam_lock.jl",
+                  # Fixtures of `RunFiles.resolve` and `RunFiles.finished_files`: the test
+                  # writes these files to a temporary directory, or asks for a missing one.
+                  "test/test_76_gate_tooling.jl test_01_a.jl",
+                  "test/test_76_gate_tooling.jl test_01b_b.jl",
+                  "test/test_76_gate_tooling.jl test_02_c.jl",
+                  "test/test_76_gate_tooling.jl test_02_wrong.jl"]
 
     # A dead name: correct it to the file that holds the test now. The first `@testset`
     # name of the old file finds that file. If the site is right to name a missing file,

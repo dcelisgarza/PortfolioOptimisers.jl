@@ -41,7 +41,7 @@ function step_active_mask(rd::ReturnsResult)
     if isnothing(pnl) || panel_is_static(pnl)
         return nothing
     end
-    @argcheck(isempty(pnl.pf),
+    @argcheck(isnothing(pnl.pf),
               ArgumentError("the online step carries a time-varying Asset Panel through its masks alone, and this one holds $(length(pnl.pf)) Panel Field(s): this fold reads no Panel Field and records none, so the step has nowhere to keep them and a call with no returns could not rebuild the panel. Drop the fields from the panel handed to the step, or fit in batch."))
     @argcheck(pnl.emsk == pnl.amsk,
               ArgumentError("the estimation mask does not travel the online step: the exact folds of the moment layer take an active mask and no estimation mask, so an estimation universe narrower than the active one cannot be honoured online. This panel's `emsk` differs from its `amsk` at $(count(pnl.emsk .!= pnl.amsk)) cell(s). Pass the active mask as both, or fit in batch."))
@@ -252,7 +252,7 @@ function fold_returns(opt, rd::ReturnsResult,
     own_returns = !isa(returns_source(opt.pe), Option{<:DataSource})
     cache = fold_context(opt.cache, rd, rows.max_history, own_returns, own_factors,
                          !reads_exogenous_series(pe))
-    return rebuild_estimator(opt, (; pe = pe, cache = cache))
+    return rebuild_struct(opt, (; pe = pe, cache = cache))
 end
 """
 $(DocStringExtensions.TYPEDSIGNATURES)
@@ -287,9 +287,9 @@ function assert_step_tracks_no_series(opt)
     return nothing
 end
 """
-    partial_fit!(opt::Union{<:JuMPOptimisationEstimator, <:HierarchicalRiskParity, <:HierarchicalEqualRiskContribution, <:SchurComplementHierarchicalRiskParity}, rd::ReturnsResult)
-    partial_fit!(opt::Union{<:JuMPOptimiser, <:HierarchicalOptimiser, <:InverseVolatility, <:NestedClustered, <:Stacking, <:SubsetResampling}, rd::ReturnsResult)
-    partial_fit!(opt::Union{<:EqualWeighted, <:RandomWeighted, <:BestConstantRebalancedPortfolio}, rd::ReturnsResult)
+    partial_fit!(opt::Union{JuMPOptimisationEstimator, HierarchicalRiskParity, HierarchicalEqualRiskContribution, SchurComplementHierarchicalRiskParity}, rd::ReturnsResult)
+    partial_fit!(opt::Union{JuMPOptimiser, BaseClusteringOptimisationEstimator, InverseVolatility, NestedClustered, BaseStackingOptimisationEstimator, BaseSubsetResamplingOptimisationEstimator}, rd::ReturnsResult)
+    partial_fit!(opt::Union{EqualWeighted, RandomWeighted, BestConstantRebalancedPortfolio}, rd::ReturnsResult)
     partial_fit!(opt::PreviousWeights, rd::ReturnsResult)
     partial_fit!(opt::FiniteAllocationOptimisationEstimator, rd::ReturnsResult)
     partial_fit!(td::TD_OptE_Opt, rd::ReturnsResult)
@@ -335,27 +335,28 @@ After `t` observations, `optimise(opt)` equals `optimise(opt, rd[1:t])`. The `Re
   - [`returns_result`](@ref)
   - [`update_online_estimator`](@ref)
 """
-function partial_fit!(opt::Union{<:JuMPOptimisationEstimator, <:HierarchicalRiskParity,
-                                 <:HierarchicalEqualRiskContribution,
-                                 <:SchurComplementHierarchicalRiskParity},
-                      rd::ReturnsResult)
+function partial_fit!(opt::Union{JuMPOptimisationEstimator, HierarchicalRiskParity,
+                                 HierarchicalEqualRiskContribution,
+                                 SchurComplementHierarchicalRiskParity}, rd::ReturnsResult)
     # The configuration does not see the risk measures of the head, so the head passes the
     # source of its whole group, which decides the marks of a gap of a vector benchmark.
     return fold_optimiser(opt, rd, group_source(opt))
 end
-function partial_fit!(opt::Union{<:JuMPOptimiser, <:HierarchicalOptimiser,
-                                 <:InverseVolatility, <:NestedClustered, <:Stacking,
-                                 <:SubsetResampling}, rd::ReturnsResult)
+function partial_fit!(opt::Union{JuMPOptimiser, BaseClusteringOptimisationEstimator,
+                                 InverseVolatility, NestedClustered,
+                                 BaseStackingOptimisationEstimator,
+                                 BaseSubsetResamplingOptimisationEstimator},
+                      rd::ReturnsResult)
     return fold_optimiser(opt, rd, group_source(opt))
 end
 """
-    fold_optimiser(opt::Union{<:JuMPOptimisationEstimator, <:HierarchicalRiskParity,
-                              <:HierarchicalEqualRiskContribution,
-                              <:SchurComplementHierarchicalRiskParity},
+    fold_optimiser(opt::Union{JuMPOptimisationEstimator, HierarchicalRiskParity,
+                              HierarchicalEqualRiskContribution,
+                              SchurComplementHierarchicalRiskParity},
                    rd::ReturnsResult, gsrc::Option{<:AbstractReturnsSource})
-    fold_optimiser(opt::Union{<:JuMPOptimiser, <:HierarchicalOptimiser,
-                              <:InverseVolatility, <:NestedClustered, <:Stacking,
-                              <:SubsetResampling},
+    fold_optimiser(opt::Union{JuMPOptimiser, BaseClusteringOptimisationEstimator,
+                              InverseVolatility, NestedClustered, BaseStackingOptimisationEstimator,
+                              BaseSubsetResamplingOptimisationEstimator},
                    rd::ReturnsResult, gsrc::Option{<:AbstractReturnsSource})
     fold_optimiser(opt::OptimisationEstimator, rd::ReturnsResult,
                    gsrc::Option{<:AbstractReturnsSource})
@@ -392,17 +393,18 @@ The method that Julia selects is the algorithm.
   - [`fold_returns`](@ref)
   - [`fold_pipeline_owner`](@ref)
 """
-function fold_optimiser(opt::Union{<:JuMPOptimisationEstimator, <:HierarchicalRiskParity,
-                                   <:HierarchicalEqualRiskContribution,
-                                   <:SchurComplementHierarchicalRiskParity},
+function fold_optimiser(opt::Union{JuMPOptimisationEstimator, HierarchicalRiskParity,
+                                   HierarchicalEqualRiskContribution,
+                                   SchurComplementHierarchicalRiskParity},
                         rd::ReturnsResult, gsrc::Option{<:AbstractReturnsSource})
     assert_step_tracks_no_series(opt)
-    return rebuild_estimator(opt, (; opt = fold_returns(opt.opt, rd, gsrc)))
+    return rebuild_struct(opt, (; opt = fold_returns(opt.opt, rd, gsrc)))
 end
-function fold_optimiser(opt::Union{<:JuMPOptimiser, <:HierarchicalOptimiser,
-                                   <:InverseVolatility, <:NestedClustered, <:Stacking,
-                                   <:SubsetResampling}, rd::ReturnsResult,
-                        gsrc::Option{<:AbstractReturnsSource})
+function fold_optimiser(opt::Union{JuMPOptimiser, BaseClusteringOptimisationEstimator,
+                                   InverseVolatility, NestedClustered,
+                                   BaseStackingOptimisationEstimator,
+                                   BaseSubsetResamplingOptimisationEstimator},
+                        rd::ReturnsResult, gsrc::Option{<:AbstractReturnsSource})
     assert_step_tracks_no_series(opt)
     return fold_returns(opt, rd, gsrc)
 end
@@ -412,16 +414,16 @@ function fold_optimiser(opt::OptimisationEstimator, rd::ReturnsResult,
 end
 """
     optimiser_shared_series_rows(rd::ReturnsResult,
-                                 opt::Union{<:OptimisationEstimator, <:OptimisationResult})
+                                 opt::Union{OptimisationEstimator, OptimisationResult})
     optimiser_shared_series_rows(rd::ReturnsResult,
-                                 opt::Union{<:JuMPOptimisationEstimator,
-                                            <:HierarchicalRiskParity,
-                                            <:HierarchicalEqualRiskContribution,
-                                            <:SchurComplementHierarchicalRiskParity})
+                                 opt::Union{JuMPOptimisationEstimator,
+                                            HierarchicalRiskParity,
+                                            HierarchicalEqualRiskContribution,
+                                            SchurComplementHierarchicalRiskParity})
     optimiser_shared_series_rows(rd::ReturnsResult,
-                                 opt::Union{<:JuMPOptimiser, <:HierarchicalOptimiser,
-                                            <:InverseVolatility, <:NestedClustered,
-                                            <:Stacking, <:SubsetResampling})
+                                 opt::Union{JuMPOptimiser, BaseClusteringOptimisationEstimator,
+                                            InverseVolatility, NestedClustered,
+                                            BaseStackingOptimisationEstimator, BaseSubsetResamplingOptimisationEstimator})
 
 Return the observations of `rd` that one solve of `opt` keeps, or `nothing` when it keeps every observation, see [`shared_series_solve`](@ref).
 
@@ -442,21 +444,22 @@ The method that Julia selects is the algorithm.
   - [`prior_shared_series_rows`](@ref)
 """
 function optimiser_shared_series_rows(::ReturnsResult,
-                                      ::Union{<:OptimisationEstimator,
-                                              <:OptimisationResult})
+                                      ::Union{OptimisationEstimator, OptimisationResult})
     return nothing
 end
 function optimiser_shared_series_rows(rd::ReturnsResult,
-                                      opt::Union{<:JuMPOptimisationEstimator,
-                                                 <:HierarchicalRiskParity,
-                                                 <:HierarchicalEqualRiskContribution,
-                                                 <:SchurComplementHierarchicalRiskParity})
+                                      opt::Union{JuMPOptimisationEstimator,
+                                                 HierarchicalRiskParity,
+                                                 HierarchicalEqualRiskContribution,
+                                                 SchurComplementHierarchicalRiskParity})
     return prior_shared_series_rows(rd, group_source(opt), opt.opt.pe)
 end
 function optimiser_shared_series_rows(rd::ReturnsResult,
-                                      opt::Union{<:JuMPOptimiser, <:HierarchicalOptimiser,
-                                                 <:InverseVolatility, <:NestedClustered,
-                                                 <:Stacking, <:SubsetResampling})
+                                      opt::Union{JuMPOptimiser,
+                                                 BaseClusteringOptimisationEstimator,
+                                                 InverseVolatility, NestedClustered,
+                                                 BaseStackingOptimisationEstimator,
+                                                 BaseSubsetResamplingOptimisationEstimator})
     return prior_shared_series_rows(rd, group_source(opt), opt.pe)
 end
 """
@@ -515,16 +518,16 @@ function intersect_kept_rows(a::VecInt, b::VecInt)
 end
 """
     optimiser_shared_series_view(rd::ReturnsResult,
-                                 opt::Union{<:OptimisationEstimator, <:OptimisationResult},
+                                 opt::Union{OptimisationEstimator, OptimisationResult},
                                  rows = nothing)
     optimiser_shared_series_view(rd::ReturnsResult,
-                                 opt::Union{<:JuMPOptimisationEstimator,
-                                            <:HierarchicalRiskParity,
-                                            <:HierarchicalEqualRiskContribution,
-                                            <:SchurComplementHierarchicalRiskParity,
-                                            <:JuMPOptimiser, <:HierarchicalOptimiser,
-                                            <:InverseVolatility, <:NestedClustered,
-                                            <:Stacking, <:SubsetResampling},
+                                 opt::Union{JuMPOptimisationEstimator,
+                                            HierarchicalRiskParity,
+                                            HierarchicalEqualRiskContribution,
+                                            SchurComplementHierarchicalRiskParity,
+                                            JuMPOptimiser, BaseClusteringOptimisationEstimator,
+                                            InverseVolatility, NestedClustered,
+                                            BaseStackingOptimisationEstimator, BaseSubsetResamplingOptimisationEstimator},
                                  rows::Option{<:VecInt} = optimiser_shared_series_rows(rd, opt))
 
 Return the returns data that one solve of `opt` reads, with the observations that [`optimiser_shared_series_rows`](@ref) drops dropped, see [`shared_series_solve`](@ref).
@@ -538,28 +541,30 @@ An optimiser that holds a prior cuts `rd` with [`shared_series_cut`](@ref) under
   - [`shared_series_cut`](@ref)
 """
 function optimiser_shared_series_view(rd::ReturnsResult,
-                                      ::Union{<:OptimisationEstimator,
-                                              <:OptimisationResult}, ::Any = nothing)
+                                      ::Union{OptimisationEstimator, OptimisationResult},
+                                      ::Any = nothing)
     return rd
 end
 function optimiser_shared_series_view(rd::ReturnsResult,
-                                      opt::Union{<:JuMPOptimisationEstimator,
-                                                 <:HierarchicalRiskParity,
-                                                 <:HierarchicalEqualRiskContribution,
-                                                 <:SchurComplementHierarchicalRiskParity,
-                                                 <:JuMPOptimiser, <:HierarchicalOptimiser,
-                                                 <:InverseVolatility, <:NestedClustered,
-                                                 <:Stacking, <:SubsetResampling},
+                                      opt::Union{JuMPOptimisationEstimator,
+                                                 HierarchicalRiskParity,
+                                                 HierarchicalEqualRiskContribution,
+                                                 SchurComplementHierarchicalRiskParity,
+                                                 JuMPOptimiser,
+                                                 BaseClusteringOptimisationEstimator,
+                                                 InverseVolatility, NestedClustered,
+                                                 BaseStackingOptimisationEstimator,
+                                                 BaseSubsetResamplingOptimisationEstimator},
                                       rows::Option{<:VecInt} = optimiser_shared_series_rows(rd,
                                                                                             opt))
     return shared_series_cut(rd, group_source(opt), rows)
 end
 """
-    fits_prior(opt::Union{<:JuMPOptimisationEstimator, <:HierarchicalRiskParity,
-                          <:HierarchicalEqualRiskContribution,
-                          <:SchurComplementHierarchicalRiskParity})
-    fits_prior(opt::Union{<:JuMPOptimiser, <:HierarchicalOptimiser, <:InverseVolatility,
-                          <:NestedClustered, <:Stacking, <:SubsetResampling})
+    fits_prior(opt::Union{JuMPOptimisationEstimator, HierarchicalRiskParity,
+                          HierarchicalEqualRiskContribution,
+                          SchurComplementHierarchicalRiskParity})
+    fits_prior(opt::Union{JuMPOptimiser, BaseClusteringOptimisationEstimator, InverseVolatility,
+                          NestedClustered, BaseStackingOptimisationEstimator, BaseSubsetResamplingOptimisationEstimator})
 
 Answer `true` when one solve of `opt` fits its prior on the returns data, so that the prior of its result counts the observations of the data after the cut of the solve.
 
@@ -573,27 +578,30 @@ A prior that is already a result is not fitted again, and it keeps the record of
 
   - [`shared_series_solve`](@ref)
 """
-function fits_prior(opt::Union{<:JuMPOptimisationEstimator, <:HierarchicalRiskParity,
-                               <:HierarchicalEqualRiskContribution,
-                               <:SchurComplementHierarchicalRiskParity})
+function fits_prior(opt::Union{JuMPOptimisationEstimator, HierarchicalRiskParity,
+                               HierarchicalEqualRiskContribution,
+                               SchurComplementHierarchicalRiskParity})
     return fits_prior(opt.opt)
 end
-function fits_prior(opt::Union{<:JuMPOptimiser, <:HierarchicalOptimiser,
-                               <:InverseVolatility, <:NestedClustered, <:Stacking,
-                               <:SubsetResampling})
+function fits_prior(opt::Union{JuMPOptimiser, BaseClusteringOptimisationEstimator,
+                               InverseVolatility, NestedClustered,
+                               BaseStackingOptimisationEstimator,
+                               BaseSubsetResamplingOptimisationEstimator})
     return !isa(opt.pe, AbstractPriorResult)
 end
 """
-    set_result_prior(res::Union{<:NaiveOptimisationResult, <:NestedClusteredResult,
-                                <:StackingResult, <:SubsetResamplingResult,
-                                <:SchurComplementHierarchicalRiskParityResult,
-                                <:HierarchicalResult, <:ProcessedJuMPOptimiserAttributes},
+    set_result_prior(res::Union{NaiveOptimisationResult, NestedClusteredResult,
+                                StackingResult, SubsetResamplingResult,
+                                SchurComplementHierarchicalRiskParityResult,
+                                HierarchicalResult, ResolvedConstraintBlock},
                      f::Function)
+    set_result_prior(res::VecRcb, f::Function)
+    set_result_prior(res::ResolvedJuMPOptimiser, f::Function)
     set_result_prior(res::JuMPOptimisationResult, f::Function)
-    set_result_prior(res::Union{<:RiskJuMPOptimisationResult,
-                                <:NonRiskJuMPOptimisationResult,
-                                <:HierarchicalRiskParityResult,
-                                <:HierarchicalEqualRiskContributionResult},
+    set_result_prior(res::Union{RiskJuMPOptimisationResult,
+                                NonRiskJuMPOptimisationResult,
+                                HierarchicalRiskParityResult,
+                                HierarchicalEqualRiskContributionResult},
                      f::Function)
 
 Rebuild an optimisation result with the prior result `f(pr)` in place of its own prior `pr`.
@@ -604,9 +612,10 @@ Rebuild an optimisation result with the prior result `f(pr)` in place of its own
 
 The method that Julia selects is the algorithm.
 
- 1. A result that holds the prior `pr` in its first field, and the processed attributes of a JuMP head: rebuild it through its positional constructor with `f(pr)` as the first field.
- 2. The shared core of a JuMP head: rebuild it with the processed attributes of step 1, through the inner constructor, as [`set_retcode`](@ref) does.
- 3. A JuMP head, or a hierarchical head, that holds the core in its first field `jr` or `hr`: rebuild it through its positional constructor with the core of step 1 or step 2.
+ 1. A result that holds the prior `pr` in its first field, and a [`ResolvedConstraintBlock`](@ref): rebuild it through its positional constructor with `f(pr)` as the first field.
+ 2. The [`ResolvedJuMPOptimiser`](@ref) of a JuMP head: compute `f(pr)` once, and rebuild the bundle with it in its first field. Rebuild its block Result in `cbr` with the same prior, by step 1, so that the block and the bundle hold one prior. When `cbr` is a vector of block Results, rebuild its first entry, the block of the head, by step 1. Each later block keeps its own prior, because it resolved against the prior of its own block on its own rows.
+ 3. The shared core of a JuMP head: rebuild it with the bundle of step 2, through the inner constructor, as [`set_retcode`](@ref) does.
+ 4. A JuMP head, or a hierarchical head, that holds the core in its first field `jr` or `hr`: rebuild it through its positional constructor with the core of step 1 or step 2.
 
 # Validation
 
@@ -621,37 +630,45 @@ The method that Julia selects is the algorithm.
   - [`shared_series_solve`](@ref)
   - [`factory`](@ref)
 """
-function set_result_prior(res::Union{<:NaiveOptimisationResult, <:NestedClusteredResult,
-                                     <:StackingResult, <:SubsetResamplingResult,
-                                     <:SchurComplementHierarchicalRiskParityResult,
-                                     <:HierarchicalResult,
-                                     <:ProcessedJuMPOptimiserAttributes}, f::Function)
+function set_result_prior(res::Union{NaiveOptimisationResult, NestedClusteredResult,
+                                     StackingResult, SubsetResamplingResult,
+                                     SchurComplementHierarchicalRiskParityResult,
+                                     HierarchicalResult, ResolvedConstraintBlock},
+                          f::Function)
     flds = ntuple(i -> getfield(res, i), Val(fieldcount(typeof(res))))
     return (typeof(res).name.wrapper)(f(first(flds)), Base.tail(flds)...)
 end
+function set_result_prior(res::VecRcb, f::Function)
+    return [set_result_prior(first(res), f), res[2:end]...]
+end
+function set_result_prior(res::ResolvedJuMPOptimiser, f::Function)
+    # The block Result of the head holds the prior of the bundle, so both take the one prior.
+    pr = f(res.pr)
+    return ResolvedJuMPOptimiser(pr, res.fees, res.ret, res.sca, res.imsk,
+                                 set_result_prior(res.cbr, _ -> pr))
+end
 function set_result_prior(res::JuMPOptimisationResult, f::Function)
-    return JuMPOptimisationResult(set_result_prior(getfield(res, :pa), f), res.retcode,
+    return JuMPOptimisationResult(set_result_prior(getfield(res, :jor), f), res.retcode,
                                   res.sol, res.model)
 end
-function set_result_prior(res::Union{<:RiskJuMPOptimisationResult,
-                                     <:NonRiskJuMPOptimisationResult,
-                                     <:HierarchicalRiskParityResult,
-                                     <:HierarchicalEqualRiskContributionResult},
-                          f::Function)
+function set_result_prior(res::Union{RiskJuMPOptimisationResult,
+                                     NonRiskJuMPOptimisationResult,
+                                     HierarchicalRiskParityResult,
+                                     HierarchicalEqualRiskContributionResult}, f::Function)
     flds = ntuple(i -> getfield(res, i), Val(fieldcount(typeof(res))))
     return (typeof(res).name.wrapper)(set_result_prior(first(flds), f), Base.tail(flds)...)
 end
-function partial_fit!(opt::Union{<:EqualWeighted, <:RandomWeighted,
-                                 <:BestConstantRebalancedPortfolio}, rd::ReturnsResult)
+function partial_fit!(opt::Union{EqualWeighted, RandomWeighted,
+                                 BestConstantRebalancedPortfolio}, rd::ReturnsResult)
     @argcheck(!isnothing(rd.X), IsNothingError("rd.X cannot be nothing"))
     max_history = isnothing(opt.cache) ? nothing : opt.cache.max_history
-    return rebuild_estimator(opt,
-                             (;
-                              cache = fold_context(opt.cache, rd, max_history, true, true,
-                                                   true)))
+    return rebuild_struct(opt,
+                          (;
+                           cache = fold_context(opt.cache, rd, max_history, true, true,
+                                                true)))
 end
 function partial_fit!(opt::PreviousWeights, rd::ReturnsResult)
-    return rebuild_estimator(opt, (; fb = step_fallback(opt.fb, rd)))
+    return rebuild_struct(opt, (; fb = step_fallback(opt.fb, rd)))
 end
 """
     step_fallback(fb::OptimisationEstimator, rd::ReturnsResult)
@@ -721,7 +738,8 @@ function read_out_fallback(opt::OptimisationEstimator, res::OptimisationResult; 
         return res
     end
     fb = Tuple{OptimisationEstimator, OptimisationResult}[(opt, res)]
-    @warn("Using fallback method. Please ignore previous optimisation failure warnings.")
+    @warn("Using fallback method. Please ignore previous optimisation failure warnings.",
+          maxlog = log_limit(:warn), _id = @log_id(typeof(opt)))
     fbres = optimise(opt.fb; kwargs...)
     if isa(opt.fb, OptimisationEstimator) && isa(fbres.fb, FbChain)
         append!(fb, fbres.fb)
@@ -735,8 +753,8 @@ function partial_fit!(::TD_OptE_Opt, ::ReturnsResult)
     return throw(ArgumentError("a `TimeDependent` schedule of optimisers has no online step: a schedule swaps the optimiser that carries the state, and no loop resolves a schedule before stepping — a schedule reaches stateless fields only. Step one optimiser, and schedule a field that carries no state."))
 end
 """
-    online_state_seed(opt::Union{<:EqualWeighted, <:RandomWeighted, <:BestConstantRebalancedPortfolio}, max_history)
-    online_state_seed(opt::Union{<:JuMPOptimiser, <:HierarchicalOptimiser, <:InverseVolatility, <:NestedClustered, <:Stacking, <:SubsetResampling}, max_history)
+    online_state_seed(opt::Union{EqualWeighted, RandomWeighted, BestConstantRebalancedPortfolio}, max_history)
+    online_state_seed(opt::Union{JuMPOptimiser, BaseClusteringOptimisationEstimator, InverseVolatility, NestedClustered, BaseStackingOptimisationEstimator, BaseSubsetResamplingOptimisationEstimator}, max_history)
 
 Seeds the fold context that an [`Online`](@ref) wrapper declares on a head with no prior, and refuses the wrapper on an optimiser that holds a prior.
 
@@ -761,14 +779,16 @@ Seeds the fold context that an [`Online`](@ref) wrapper declares on a head with 
   - [`ReturnsBufferState`](@ref)
   - [`update_online_estimator`](@ref)
 """
-function online_state_seed(::Union{<:EqualWeighted, <:RandomWeighted,
-                                   <:BestConstantRebalancedPortfolio},
+function online_state_seed(::Union{EqualWeighted, RandomWeighted,
+                                   BestConstantRebalancedPortfolio},
                            max_history::Option{<:Integer})
     return ReturnsBufferState(; max_history = max_history)
 end
-function online_state_seed(opt::Union{<:JuMPOptimiser, <:HierarchicalOptimiser,
-                                      <:InverseVolatility, <:NestedClustered, <:Stacking,
-                                      <:SubsetResampling}, ::Option{<:Integer})
+function online_state_seed(opt::Union{JuMPOptimiser, BaseClusteringOptimisationEstimator,
+                                      InverseVolatility, NestedClustered,
+                                      BaseStackingOptimisationEstimator,
+                                      BaseSubsetResamplingOptimisationEstimator},
+                           ::Option{<:Integer})
     return throw(ArgumentError("`Online` wraps the prior, not the `$(typeof(opt).name.name)` that holds it: the optimiser's window is its prior's, so declare the step as `pe = Online(prior; max_history = …)` and the fold context follows the prior's buffer."))
 end
 """
@@ -786,7 +806,7 @@ The slot takes a prior estimator, a prior result or a schedule. This function re
   - [`Online`](@ref)
   - [`fold_prior`](@ref): refuses a prior result and a schedule at the step.
 """
-function update_online_member(pe::Union{<:AbstractPriorEstimator, <:Online})
+function update_online_member(pe::Union{AbstractPriorEstimator, Online})
     return update_online_estimator(pe)
 end
 function update_online_member(pe)
@@ -794,8 +814,8 @@ function update_online_member(pe)
 end
 """
     update_online_estimator(opt::JuMPOptimisationEstimator)
-    update_online_estimator(opt::Union{<:HierarchicalRiskParity, <:HierarchicalEqualRiskContribution, <:SchurComplementHierarchicalRiskParity})
-    update_online_estimator(opt::Union{<:JuMPOptimiser, <:HierarchicalOptimiser, <:InverseVolatility, <:NestedClustered, <:Stacking, <:SubsetResampling})
+    update_online_estimator(opt::Union{HierarchicalRiskParity, HierarchicalEqualRiskContribution, SchurComplementHierarchicalRiskParity})
+    update_online_estimator(opt::Union{JuMPOptimiser, BaseClusteringOptimisationEstimator, InverseVolatility, NestedClustered, BaseStackingOptimisationEstimator, BaseSubsetResamplingOptimisationEstimator})
 
 Resolves the [`Online`](@ref) wrappers in the prior of an optimiser, at the warm-up.
 
@@ -821,20 +841,22 @@ The JuMP and hierarchical heads resolve the bundle they hold, and the bundle, th
   - [`partial_fit!`](@ref)
 """
 function update_online_estimator(opt::JuMPOptimisationEstimator)
-    return rebuild_estimator(opt, (; opt = update_online_estimator(opt.opt)))
+    return rebuild_struct(opt, (; opt = update_online_estimator(opt.opt)))
 end
-function update_online_estimator(opt::Union{<:HierarchicalRiskParity,
-                                            <:HierarchicalEqualRiskContribution,
-                                            <:SchurComplementHierarchicalRiskParity})
-    return rebuild_estimator(opt, (; opt = update_online_estimator(opt.opt)))
+function update_online_estimator(opt::Union{HierarchicalRiskParity,
+                                            HierarchicalEqualRiskContribution,
+                                            SchurComplementHierarchicalRiskParity})
+    return rebuild_struct(opt, (; opt = update_online_estimator(opt.opt)))
 end
-function update_online_estimator(opt::Union{<:JuMPOptimiser, <:HierarchicalOptimiser,
-                                            <:InverseVolatility, <:NestedClustered,
-                                            <:Stacking, <:SubsetResampling})
-    return rebuild_estimator(opt, (; pe = update_online_member(opt.pe)))
+function update_online_estimator(opt::Union{JuMPOptimiser,
+                                            BaseClusteringOptimisationEstimator,
+                                            InverseVolatility, NestedClustered,
+                                            BaseStackingOptimisationEstimator,
+                                            BaseSubsetResamplingOptimisationEstimator})
+    return rebuild_struct(opt, (; pe = update_online_member(opt.pe)))
 end
 """
-    online_unreached_path(opt::Union{<:JuMPOptimisationEstimator, <:HierarchicalRiskParity, <:HierarchicalEqualRiskContribution, <:SchurComplementHierarchicalRiskParity, <:JuMPOptimiser, <:HierarchicalOptimiser, <:InverseVolatility, <:NestedClustered, <:Stacking, <:SubsetResampling})
+    online_unreached_path(opt::Union{JuMPOptimisationEstimator, HierarchicalRiskParity, HierarchicalEqualRiskContribution, SchurComplementHierarchicalRiskParity, JuMPOptimiser, BaseClusteringOptimisationEstimator, InverseVolatility, NestedClustered, BaseStackingOptimisationEstimator, BaseSubsetResamplingOptimisationEstimator})
     online_unreached_path(opt)
 
 Names the first [`Online`](@ref) wrapper in an optimiser that the warm-up leaves unresolved, or answers `nothing`.
@@ -865,13 +887,14 @@ The warm-up of an optimiser resolves the wrappers in its prior alone, through [`
   - [`online_wrapper_path`](@ref)
   - [`assert_batch_entry`](@ref): the refusal that `optimise(opt)` with no returns would reach later.
 """
-function online_unreached_path(opt::Union{<:JuMPOptimisationEstimator,
-                                          <:HierarchicalRiskParity,
-                                          <:HierarchicalEqualRiskContribution,
-                                          <:SchurComplementHierarchicalRiskParity,
-                                          <:JuMPOptimiser, <:HierarchicalOptimiser,
-                                          <:InverseVolatility, <:NestedClustered,
-                                          <:Stacking, <:SubsetResampling})
+function online_unreached_path(opt::Union{JuMPOptimisationEstimator, HierarchicalRiskParity,
+                                          HierarchicalEqualRiskContribution,
+                                          SchurComplementHierarchicalRiskParity,
+                                          JuMPOptimiser,
+                                          BaseClusteringOptimisationEstimator,
+                                          InverseVolatility, NestedClustered,
+                                          BaseStackingOptimisationEstimator,
+                                          BaseSubsetResamplingOptimisationEstimator})
     return online_wrapper_path(update_online_estimator(opt))
 end
 function online_unreached_path(::Any)
@@ -879,8 +902,8 @@ function online_unreached_path(::Any)
 end
 """
     assert_stateless_schedule(opt::JuMPOptimisationEstimator)
-    assert_stateless_schedule(opt::Union{<:HierarchicalRiskParity, <:HierarchicalEqualRiskContribution, <:SchurComplementHierarchicalRiskParity})
-    assert_stateless_schedule(opt::Union{<:JuMPOptimiser, <:HierarchicalOptimiser, <:InverseVolatility, <:NestedClustered, <:Stacking, <:SubsetResampling})
+    assert_stateless_schedule(opt::Union{HierarchicalRiskParity, HierarchicalEqualRiskContribution, SchurComplementHierarchicalRiskParity})
+    assert_stateless_schedule(opt::Union{JuMPOptimiser, BaseClusteringOptimisationEstimator, InverseVolatility, NestedClustered, BaseStackingOptimisationEstimator, BaseSubsetResamplingOptimisationEstimator})
     assert_stateless_schedule(opt)
 
 Refuses a [`TimeDependent`](@ref) schedule on a field that carries a state, with an error that names the field.
@@ -904,14 +927,16 @@ A schedule replaces the value of its field at every fold, and the loop threads t
 function assert_stateless_schedule(opt::JuMPOptimisationEstimator)
     return assert_stateless_schedule(opt.opt)
 end
-function assert_stateless_schedule(opt::Union{<:HierarchicalRiskParity,
-                                              <:HierarchicalEqualRiskContribution,
-                                              <:SchurComplementHierarchicalRiskParity})
+function assert_stateless_schedule(opt::Union{HierarchicalRiskParity,
+                                              HierarchicalEqualRiskContribution,
+                                              SchurComplementHierarchicalRiskParity})
     return assert_stateless_schedule(opt.opt)
 end
-function assert_stateless_schedule(opt::Union{<:JuMPOptimiser, <:HierarchicalOptimiser,
-                                              <:InverseVolatility, <:NestedClustered,
-                                              <:Stacking, <:SubsetResampling})
+function assert_stateless_schedule(opt::Union{JuMPOptimiser,
+                                              BaseClusteringOptimisationEstimator,
+                                              InverseVolatility, NestedClustered,
+                                              BaseStackingOptimisationEstimator,
+                                              BaseSubsetResamplingOptimisationEstimator})
     return assert_stateless_prior(opt.pe, opt)
 end
 function assert_stateless_schedule(::Any)
@@ -1007,17 +1032,17 @@ function assert_online_entry(est)
     assert_stateless_schedule(est)
     path = online_entry_state(est)
     @argcheck(isnothing(path),
-              ArgumentError("`$(typeof(est).name.name)` enters the online arm of the fold loop carrying a partial-fit state at `$(path)`, and the loop starts cold: its argument is the configuration alone, and the warm-up folds the first training window into an estimator that has folded nothing. Hand the loop the estimator with every `cache` at `nothing`, or read the stepped estimator out by hand with `fit_and_predict(opt, rd; test_idx)`."))
+              ArgumentError("`$(typeof(est).name.name)` enters the online arm of the fold loop carrying a partial-fit state at `$(path)`, and the loop starts cold: its argument is the configuration alone, and the warm-up folds the first training window into an estimator that has folded nothing. Hand the loop the estimator with every `cache` at `nothing`, or read the stepped estimator out by hand with `fit_and_predict(opt, rd, nothing, test_idx)`."))
     wpath = online_unreached_path(est)
     @argcheck(isnothing(wpath),
               ArgumentError("`$(typeof(est).name.name)` enters the online arm of the fold loop holding an `Online` at `$(wpath)`, where the warm-up does not resolve it. The online step forwards each observation to the prior of the optimiser alone, so a wrapper in any other field never gets a buffer, and the batch fit of `optimise(opt)` with no returns would refuse it. Move the wrapper to the prior of the optimiser, or set `$(wpath)` to the estimator it wraps, and `optimise(opt)` with no returns refits it from the folded rows."))
     return nothing
 end
 """
-    returns_result(opt::Union{<:JuMPOptimiser, <:HierarchicalOptimiser, <:InverseVolatility, <:NestedClustered, <:Stacking, <:SubsetResampling})
-    returns_result(opt::Union{<:EqualWeighted, <:RandomWeighted, <:BestConstantRebalancedPortfolio})
+    returns_result(opt::Union{JuMPOptimiser, BaseClusteringOptimisationEstimator, InverseVolatility, NestedClustered, BaseStackingOptimisationEstimator, BaseSubsetResamplingOptimisationEstimator})
+    returns_result(opt::Union{EqualWeighted, RandomWeighted, BestConstantRebalancedPortfolio})
     returns_result(opt::JuMPOptimisationEstimator)
-    returns_result(opt::Union{<:HierarchicalRiskParity, <:HierarchicalEqualRiskContribution, <:SchurComplementHierarchicalRiskParity})
+    returns_result(opt::Union{HierarchicalRiskParity, HierarchicalEqualRiskContribution, SchurComplementHierarchicalRiskParity})
 
 Rebuilds the [`ReturnsResult`](@ref) of the observations that an optimiser has folded.
 
@@ -1042,28 +1067,29 @@ This is the step of `optimise(opt)` with no returns that rebuilds the returns da
   - [`partial_fit!`](@ref)
   - [`optimise`](@ref)
 """
-function returns_result(opt::Union{<:JuMPOptimiser, <:HierarchicalOptimiser,
-                                   <:InverseVolatility, <:NestedClustered, <:Stacking,
-                                   <:SubsetResampling})
+function returns_result(opt::Union{JuMPOptimiser, BaseClusteringOptimisationEstimator,
+                                   InverseVolatility, NestedClustered,
+                                   BaseStackingOptimisationEstimator,
+                                   BaseSubsetResamplingOptimisationEstimator})
     return returns_result(partial_fit_cache(opt), prior_returns_buffer(opt.pe))
 end
-function returns_result(opt::Union{<:EqualWeighted, <:RandomWeighted,
-                                   <:BestConstantRebalancedPortfolio})
+function returns_result(opt::Union{EqualWeighted, RandomWeighted,
+                                   BestConstantRebalancedPortfolio})
     state = partial_fit_cache(opt)
     return returns_result(state, state.X)
 end
 function returns_result(opt::JuMPOptimisationEstimator)
     return returns_result(opt.opt)
 end
-function returns_result(opt::Union{<:HierarchicalRiskParity,
-                                   <:HierarchicalEqualRiskContribution,
-                                   <:SchurComplementHierarchicalRiskParity})
+function returns_result(opt::Union{HierarchicalRiskParity,
+                                   HierarchicalEqualRiskContribution,
+                                   SchurComplementHierarchicalRiskParity})
     return returns_result(opt.opt)
 end
 """
-    held_timestamps(opt::Union{<:JuMPOptimiser, <:HierarchicalOptimiser, <:InverseVolatility, <:NestedClustered, <:Stacking, <:SubsetResampling, <:EqualWeighted, <:RandomWeighted, <:BestConstantRebalancedPortfolio})
+    held_timestamps(opt::Union{JuMPOptimiser, BaseClusteringOptimisationEstimator, InverseVolatility, NestedClustered, BaseStackingOptimisationEstimator, BaseSubsetResamplingOptimisationEstimator, EqualWeighted, RandomWeighted, BestConstantRebalancedPortfolio})
     held_timestamps(opt::JuMPOptimisationEstimator)
-    held_timestamps(opt::Union{<:HierarchicalRiskParity, <:HierarchicalEqualRiskContribution, <:SchurComplementHierarchicalRiskParity})
+    held_timestamps(opt::Union{HierarchicalRiskParity, HierarchicalEqualRiskContribution, SchurComplementHierarchicalRiskParity})
     held_timestamps(::PreviousWeights)
 
 Reads the timestamps that the fold context of an optimiser holds, or answers `nothing` when it holds none.
@@ -1086,28 +1112,30 @@ The alignment check of [`Resume`](@ref) reads this accessor. The [`ReturnsBuffer
   - [`Resume`](@ref)
   - [`Pipeline`](@ref): its method reads the state that the row owner keeps.
 """
-function held_timestamps(opt::Union{<:JuMPOptimiser, <:HierarchicalOptimiser,
-                                    <:InverseVolatility, <:NestedClustered, <:Stacking,
-                                    <:SubsetResampling, <:EqualWeighted, <:RandomWeighted,
-                                    <:BestConstantRebalancedPortfolio})
+function held_timestamps(opt::Union{JuMPOptimiser, BaseClusteringOptimisationEstimator,
+                                    InverseVolatility, NestedClustered,
+                                    BaseStackingOptimisationEstimator,
+                                    BaseSubsetResamplingOptimisationEstimator,
+                                    EqualWeighted, RandomWeighted,
+                                    BestConstantRebalancedPortfolio})
     return context_timestamps(opt.cache)
 end
 function held_timestamps(opt::JuMPOptimisationEstimator)
     return held_timestamps(opt.opt)
 end
-function held_timestamps(opt::Union{<:HierarchicalRiskParity,
-                                    <:HierarchicalEqualRiskContribution,
-                                    <:SchurComplementHierarchicalRiskParity})
+function held_timestamps(opt::Union{HierarchicalRiskParity,
+                                    HierarchicalEqualRiskContribution,
+                                    SchurComplementHierarchicalRiskParity})
     return held_timestamps(opt.opt)
 end
 function held_timestamps(::PreviousWeights)
     return nothing
 end
 """
-    batch_from_state(opt::Union{<:JuMPOptimiser, <:HierarchicalOptimiser, <:InverseVolatility, <:NestedClustered, <:Stacking, <:SubsetResampling})
-    batch_from_state(opt::Union{<:EqualWeighted, <:RandomWeighted, <:BestConstantRebalancedPortfolio})
+    batch_from_state(opt::Union{JuMPOptimiser, BaseClusteringOptimisationEstimator, InverseVolatility, NestedClustered, BaseStackingOptimisationEstimator, BaseSubsetResamplingOptimisationEstimator})
+    batch_from_state(opt::Union{EqualWeighted, RandomWeighted, BestConstantRebalancedPortfolio})
     batch_from_state(opt::JuMPOptimisationEstimator)
-    batch_from_state(opt::Union{<:HierarchicalRiskParity, <:HierarchicalEqualRiskContribution, <:SchurComplementHierarchicalRiskParity})
+    batch_from_state(opt::Union{HierarchicalRiskParity, HierarchicalEqualRiskContribution, SchurComplementHierarchicalRiskParity})
     batch_from_state(opt::FiniteAllocationOptimisationEstimator)
     batch_from_state(opt::OptimisationEstimator)
 
@@ -1148,13 +1176,14 @@ The `cache` of the optimiser selects the branch. An optimiser whose `cache` is `
   - [`prior`](@ref)
   - [`prior_shared_series_rows`](@ref)
 """
-function batch_from_state(opt::Union{<:JuMPOptimiser, <:HierarchicalOptimiser,
-                                     <:InverseVolatility, <:NestedClustered, <:Stacking,
-                                     <:SubsetResampling})
+function batch_from_state(opt::Union{JuMPOptimiser, BaseClusteringOptimisationEstimator,
+                                     InverseVolatility, NestedClustered,
+                                     BaseStackingOptimisationEstimator,
+                                     BaseSubsetResamplingOptimisationEstimator})
     return batch_from_state(opt, opt.cache, opt.pe)
 end
-function batch_from_state(opt::Union{<:EqualWeighted, <:RandomWeighted,
-                                     <:BestConstantRebalancedPortfolio})
+function batch_from_state(opt::Union{EqualWeighted, RandomWeighted,
+                                     BestConstantRebalancedPortfolio})
     return batch_from_state(opt, opt.cache, nothing)
 end
 # The `cache` selects the branch, and the prior, `nothing` for an optimiser that holds none,
@@ -1164,21 +1193,21 @@ function batch_from_state(opt, ::Nothing, pe)
 end
 function batch_from_state(opt, ::AbstractPartialFitState, ::Nothing)
     rd = returns_result(opt)
-    return rebuild_estimator(opt, (; cache = nothing)), rd
+    return rebuild_struct(opt, (; cache = nothing)), rd
 end
 function batch_from_state(opt, ::AbstractPartialFitState, pe)
     rd = returns_result(opt)
-    return rebuild_estimator(opt, (; pe = prior(pe), cache = nothing)), rd
+    return rebuild_struct(opt, (; pe = prior(pe), cache = nothing)), rd
 end
 function batch_from_state(opt::JuMPOptimisationEstimator)
     inner, rd = batch_from_state(opt.opt)
-    return rebuild_estimator(opt, (; opt = inner)), rd
+    return rebuild_struct(opt, (; opt = inner)), rd
 end
-function batch_from_state(opt::Union{<:HierarchicalRiskParity,
-                                     <:HierarchicalEqualRiskContribution,
-                                     <:SchurComplementHierarchicalRiskParity})
+function batch_from_state(opt::Union{HierarchicalRiskParity,
+                                     HierarchicalEqualRiskContribution,
+                                     SchurComplementHierarchicalRiskParity})
     inner, rd = batch_from_state(opt.opt)
-    return rebuild_estimator(opt, (; opt = inner)), rd
+    return rebuild_struct(opt, (; opt = inner)), rd
 end
 """
     batch_without_state(opt, pe::AbstractPriorResult)
@@ -1310,9 +1339,10 @@ The `cache` holds the state of an incremental fit, not the configuration that a 
   - [`show_fields`](@ref)
   - [`set_show_nothing_fields!`](@ref)
 """
-function show_fields(opt::Union{<:JuMPOptimiser, <:HierarchicalOptimiser,
-                                <:InverseVolatility, <:EqualWeighted, <:RandomWeighted,
-                                <:BestConstantRebalancedPortfolio, <:NestedClustered,
-                                <:Stacking, <:SubsetResampling})
+function show_fields(opt::Union{JuMPOptimiser, BaseClusteringOptimisationEstimator,
+                                InverseVolatility, EqualWeighted, RandomWeighted,
+                                BestConstantRebalancedPortfolio, NestedClustered,
+                                BaseStackingOptimisationEstimator,
+                                BaseSubsetResamplingOptimisationEstimator})
     return filter(!=(:cache), fieldnames(typeof(opt)))
 end

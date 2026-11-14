@@ -102,15 +102,16 @@ using Dates
             os = vec(load(case, "Summary"))
             k = r.n_valid .> 0
             b = r.standardised_return[k, 1]
-            ours = [s.mahalanobis_mean[1], s.mahalanobis_median[1], s.mahalanobis_p5[1],
-                    s.mahalanobis_p95[1], s.diagonal_mean[1], s.diagonal_median[1],
-                    s.diagonal_p5[1], s.diagonal_p95[1], sum(b) / length(b),
-                    s.bias_statistic[1], s.portfolio_qlike_mean[1], s.bias_p5[1],
-                    s.bias_p25[1], s.bias_statistic[1], s.bias_p75[1], s.bias_p95[1],
-                    s.exceedance[1, 1], s.exceedance[1, 2]]
+            # A summary of one evaluation holds scalars, and `exceedance` is a vector over
+            # the levels (#1934).
+            ours = [s.mahalanobis_mean, s.mahalanobis_median, s.mahalanobis_p5,
+                    s.mahalanobis_p95, s.diagonal_mean, s.diagonal_median, s.diagonal_p5,
+                    s.diagonal_p95, sum(b) / length(b), s.bias_statistic,
+                    s.portfolio_qlike_mean, s.bias_p5, s.bias_p25, s.bias_statistic,
+                    s.bias_p75, s.bias_p95, s.exceedance[1], s.exceedance[2]]
             oracle = os[[1, 2, 4, 5, 6, 7, 9, 10, 11, 13, 16, 22, 23, 24, 25, 26, 29, 30]]
             @test parity_compare(ours, oracle; name = "$(case) summary").ok
-            @test s.n_steps[1] == size(st, 1)
+            @test s.n_steps == size(st, 1)
         end
     end
 
@@ -140,8 +141,8 @@ using Dates
         # So the diagonal rows of the summary are the oracle's too.
         s = covariance_forecast_summary(r)
         os = vec(load("CovPortfolios", "Summary"))
-        @test parity_compare([s.diagonal_mean[1], s.diagonal_median[1], s.diagonal_p5[1],
-                              s.diagonal_p95[1]], os[[6, 7, 9, 10]];
+        @test parity_compare([s.diagonal_mean, s.diagonal_median, s.diagonal_p5,
+                              s.diagonal_p95], os[[6, 7, 9, 10]];
                              name = "CovPortfolios diagonal summary").ok
     end
 
@@ -153,12 +154,17 @@ using Dates
                                                                  min_obs = 10,
                                                                  centring = PreCentred()),
                                            rd, cv; target = HorizonReturn())
-        c = covariance_forecast_compare(a, b; lags = 0)
+        mt = WildBootstrapMeanTest(; seed = 1787)
+        c = covariance_forecast_compare(a, b; mt = mt)
         k = (a.n_valid .> 0) .& (b.n_valid .> 0)
         @test count(!, k) == 1
         @test c.n_steps == count(k)
         @test c.mean_difference[1] ≈ sum(a.qlike[k] .- b.qlike[k]) / count(k)
-        @test all(isfinite, c.z)
+        @test all(isfinite, c.t_stat)
+        # The unscored step keeps its position in the series that the test reads (#1787).
+        d = ifelse.(k, a.qlike .- b.qlike, NaN)
+        @test c.p_value[1] ==
+              PortfolioOptimisers.mean_test(mt, d, 1, PortfolioOptimisers.mean_test_rng(mt)).p_value
     end
 end
 
@@ -275,12 +281,12 @@ using Dates, StatsPlots, GraphRecipes, Statistics
               ["Mahalanobis Ratio", "Diagonal Ratio", "Bias Statistic", ""]
         m, d, b = (p.series_list[k][:y] for k in 1:3)
         @test all(isnan, m[1:(M - 1)])
-        @test m[M] ≈ s.mahalanobis_mean[1] rtol = 1e-14
-        @test d[M] ≈ s.diagonal_mean[1] rtol = 1e-14
-        @test b[M] ≈ s.bias_statistic[1] rtol = 1e-14
+        @test m[M] ≈ s.mahalanobis_mean rtol = 1e-14
+        @test d[M] ≈ s.diagonal_mean rtol = 1e-14
+        @test b[M] ≈ s.bias_statistic rtol = 1e-14
         lo, hi = p.series_list[3][:fillrange]
-        @test lo[M] ≈ s.bias_p5[1] rtol = 1e-14
-        @test hi[M] ≈ s.bias_p95[1] rtol = 1e-14
+        @test lo[M] ≈ s.bias_p5 rtol = 1e-14
+        @test hi[M] ≈ s.bias_p95 rtol = 1e-14
         @test all(==(1.0), p.series_list[4][:y])
         q = plot_covariance_qlike(r; window = M)
         @test q[1][:title] == "Rolling Portfolio QLIKE Loss (window=$(M))"
@@ -454,14 +460,13 @@ using Dates, StatsPlots, GraphRecipes, Statistics
             os = o[rows, :]
             se = covariance_forecast_summary(ev; step_weighting = eq)
             sd = covariance_forecast_summary(ev)
-            @test parity_compare([se.mahalanobis_mean[1], se.mahalanobis_median[1],
-                                  se.mahalanobis_p5[1], se.mahalanobis_p95[1],
-                                  se.diagonal_mean[1], se.diagonal_median[1],
-                                  se.diagonal_p5[1], se.diagonal_p95[1]],
+            @test parity_compare([se.mahalanobis_mean, se.mahalanobis_median,
+                                  se.mahalanobis_p5, se.mahalanobis_p95, se.diagonal_mean,
+                                  se.diagonal_median, se.diagonal_p5, se.diagonal_p95],
                                  [os[1, 1], os[1, 2], os[1, 4], os[1, 5], os[2, 1],
                                   os[2, 2], os[2, 4], os[2, 5]];
                                  name = "Portfolios summary").ok
-            @test !parity_compare([sd.mahalanobis_mean[1]], [os[1, 1]]; quiet = true).ok
+            @test !parity_compare([sd.mahalanobis_mean], [os[1, 1]]; quiet = true).ok
         end
         firsts = first.(a.test_idx)
         for (fig, p, n) in

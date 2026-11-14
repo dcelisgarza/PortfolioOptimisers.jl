@@ -41,7 +41,7 @@ function exposure_forward_mean_return(R::MatNum, horizon::Integer)
     T, N = size(R)
     @argcheck(T > horizon,
               DimensionMismatch("R ($T observations) must carry more observations than horizon ($horizon)"))
-    Tf = float_if_integer(real(eltype(R)))
+    Tf = real(eltype(R))
     P = T - horizon
     y = Matrix{Tf}(undef, P, N)
     for i in 1:N, t in 1:P
@@ -101,7 +101,7 @@ A one-hot exposure, such as an industry, is a block of `0` and a block of `1`, s
 
 # Arguments
 
-  - `B`: Exposure history `observations × assets × factors`, unlagged.
+  - `B`: Exposure history `assets × factors × observations`, unlagged.
   - `R`: Asset return history `observations × assets`, on the observation axis of `B`.
   - `w`: Cross-sectional weight history `observations × assets`, or `nothing` for equal weights. The rank form reads no weights.
   - `horizon`: Forward window, in observations.
@@ -114,8 +114,8 @@ A one-hot exposure, such as an industry, is a block of `0` and a block of `1`, s
 # Validation
 
   - `!isempty(B)`.
-  - `size(R) == (size(B, 1), size(B, 2))`.
-  - `horizon >= 1` and `size(B, 1) > horizon`.
+  - `size(R) == (size(B, 3), size(B, 1))`.
+  - `horizon >= 1` and `size(B, 3) > horizon`.
   - `csfm.Ms` is not `nothing`, and without `rd` neither is `csfm.csr`. Otherwise the verb raises an `IsNothingError` that names the field.
   - With `rd`, the rules of [`exposure_ic_returns`](@ref).
   - The rules of [`cs_ranks`](@ref), when `rank`.
@@ -137,17 +137,16 @@ A one-hot exposure, such as an industry, is a block of `0` and a block of `1`, s
 function exposure_ic(B::Arr3Num, R::MatNum, w::Option{<:MatNum} = nothing;
                      horizon::Integer = 1, rank::Bool = true, ties::Symbol = :average)
     u = exposure_weights(B, w)
-    T, N, K = size(B)
+    N, K, T = size(B)
     @argcheck(size(R, 1) == T && size(R, 2) == N,
-              DimensionMismatch("R ($(size(R, 1))×$(size(R, 2))) must match B ($T×$N on its first two axes)"))
+              DimensionMismatch("R ($(size(R, 1))×$(size(R, 2))) must match B ($N assets, $T observations)"))
     @argcheck(horizon >= 1, DomainError(horizon, "horizon must be >= 1"))
     y = exposure_forward_mean_return(R, horizon)
-    Tf = typeof(sqrt(one(float_if_integer(promote_type(real(eltype(B)), real(eltype(y)),
-                                                       real(eltype(u)))))))
+    Tf = typeof(sqrt(one(promote_type(real(eltype(B)), real(eltype(y)), real(eltype(u))))))
     P = T - horizon
     ic = Matrix{Tf}(undef, P, K)
     for k in 1:K, t in 1:P
-        a = view(B, t, :, k)
+        a = view(B, :, k, t)
         b = view(y, t, :)
         ic[t, k] = if rank
             Tf(cs_spearman_correlation(a, b; ties = ties))
@@ -173,7 +172,7 @@ $(DocStringExtensions.TYPEDEF)
 
 Holds the summary of an information coefficient series per factor, with the names and the families of the factors.
 
-[`exposure_ic_summary`](@ref) returns it when it reads a [`FactorDiagnosticResult`](@ref) or a block. The method over a bare matrix returns a `NamedTuple` of the same eight vectors, and a caller reads a field of either by the same name. [`port_opt_view`](@ref) selects the factors of the summary by position, by name, or by family with a [`LabelGroup`](@ref).
+[`exposure_ic_summary`](@ref) returns it. The method over a [`FactorDiagnosticResult`](@ref) or a block keeps the names and the families of the factor axis. The method over a bare matrix has no labels, so `nf` and `fam` are `nothing`, and a factor is selected by its position. [`port_opt_view`](@ref) selects the factors of the summary by position, by name, or by family with a [`LabelGroup`](@ref). The eight figures of one factor are those of an [`ICSummaryResult`](@ref), as vectors.
 
 # Fields
 
@@ -181,18 +180,43 @@ $(DocStringExtensions.FIELDS)
 
 # Constructors
 
-    ExposureICSummaryResult(
-        mean_ic, std_ic, ic_ir, t_stat, p_value, mean_ci_lower, mean_ci_upper,
-        hit_rate, nf, fam
-    ) -> ExposureICSummaryResult
+    ExposureICSummaryResult(mean_ic::VecNum, std_ic::VecNum, ic_ir::VecNum,
+                            t_stat::VecNum, p_value::VecNum, mean_ci_lower::VecNum,
+                            mean_ci_upper::VecNum, hit_rate::VecNum,
+                            nf::Option{<:VecStr}, fam::Option{<:VecStr})
+    ExposureICSummaryResult(; mean_ic::VecNum, std_ic::VecNum, ic_ir::VecNum,
+                            t_stat::VecNum, p_value::VecNum, mean_ci_lower::VecNum,
+                            mean_ci_upper::VecNum, hit_rate::VecNum,
+                            nf::Option{<:VecStr} = nothing,
+                            fam::Option{<:VecStr} = nothing)
 
-The arguments are the fields, in the order of their declaration. The type is a Result, so [`exposure_ic_summary`](@ref) builds it and a caller reads it. It has no keyword constructor, and it checks none of its values.
+The positional constructor checks the values. The keyword constructor takes each field by name, with no default but for the two labels, and calls it.
+
+## Validation
+
+  - The eight figures have one length, the number of factors. Otherwise, the constructor raises a `DimensionMismatch`.
+  - `nf` and `fam` are each `nothing` or of that length. Otherwise, the constructor raises a `DimensionMismatch`.
+  - The rules of [`ICSummaryResult`](@ref), entry by entry: `std_ic` is `NaN` or not negative, `p_value` and `hit_rate` are `NaN` or in ``[0, 1]``, and no lower bound of the interval is above its upper bound. A breach raises a `DomainError`.
+
+# Examples
+
+```jldoctest
+julia> s = exposure_ic_summary([0.1 -0.2; 0.3 0.1; 0.2 0.0]; mt = OverlapMeanTest());
+
+julia> (s.mean_ic, s.hit_rate, s.nf)
+([0.20000000000000004, -0.03333333333333333], [1.0, 0.3333333333333333], nothing)
+```
 
 # Related
 
+  - [`ICSummaryResult`](@ref)
+
   - [`exposure_ic_summary`](@ref)
+
   - [`exposure_ic`](@ref)
+
   - [`FactorDiagnosticResult`](@ref)
+
   - [`port_opt_view`](@ref)
 """
 @concrete struct ExposureICSummaryResult <: AbstractResult
@@ -236,6 +260,33 @@ The arguments are the fields, in the order of their declaration. The type is a R
     $(field_dict[:fd_fam])
     """
     fam
+    function ExposureICSummaryResult(mean_ic::VecNum, std_ic::VecNum, ic_ir::VecNum,
+                                     t_stat::VecNum, p_value::VecNum, mean_ci_lower::VecNum,
+                                     mean_ci_upper::VecNum, hit_rate::VecNum,
+                                     nf::Option{<:VecStr}, fam::Option{<:VecStr})
+        K = length(mean_ic)
+        @argcheck(all(v -> length(v) == K,
+                      (std_ic, ic_ir, t_stat, p_value, mean_ci_lower, mean_ci_upper,
+                       hit_rate)),
+                  DimensionMismatch("the eight figures must each hold one entry per factor, $K entries like mean_ic"))
+        @argcheck(all(v -> isnothing(v) || length(v) == K, (nf, fam)),
+                  DimensionMismatch("nf and fam must each be nothing or hold one entry per factor, $K entries like mean_ic"))
+        assert_ic_summary_values(std_ic, p_value, mean_ci_lower, mean_ci_upper, hit_rate)
+        return new{typeof(mean_ic), typeof(std_ic), typeof(ic_ir), typeof(t_stat),
+                   typeof(p_value), typeof(mean_ci_lower), typeof(mean_ci_upper),
+                   typeof(hit_rate), typeof(nf), typeof(fam)}(mean_ic, std_ic, ic_ir,
+                                                              t_stat, p_value,
+                                                              mean_ci_lower, mean_ci_upper,
+                                                              hit_rate, nf, fam)
+    end
+end
+function ExposureICSummaryResult(; mean_ic::VecNum, std_ic::VecNum, ic_ir::VecNum,
+                                 t_stat::VecNum, p_value::VecNum, mean_ci_lower::VecNum,
+                                 mean_ci_upper::VecNum, hit_rate::VecNum,
+                                 nf::Option{<:VecStr} = nothing,
+                                 fam::Option{<:VecStr} = nothing)::ExposureICSummaryResult
+    return ExposureICSummaryResult(mean_ic, std_ic, ic_ir, t_stat, p_value, mean_ci_lower,
+                                   mean_ci_upper, hit_rate, nf, fam)
 end
 """
     port_opt_view(s::ExposureICSummaryResult, i, args...)
@@ -272,7 +323,7 @@ function port_opt_view(s::ExposureICSummaryResult, i, args...)::ExposureICSummar
 end
 """
     exposure_ic_summary(ic::MatNum; lags::Integer = 0, window::Real = lags + 1,
-                        mt::AbstractMeanTestEstimator = WildBootstrapMeanTest()) -> NamedTuple
+                        mt::AbstractMeanTestEstimator = WildBootstrapMeanTest()) -> ExposureICSummaryResult
     exposure_ic_summary(ic::FactorDiagnosticResult; lags::Integer = 0,
                         window::Real = lags + 1,
                         mt::AbstractMeanTestEstimator = WildBootstrapMeanTest()) -> ExposureICSummaryResult
@@ -332,11 +383,11 @@ Where:
 
 # Returns
 
-  - `summary::NamedTuple`: `(; mean_ic, std_ic, ic_ir, t_stat, p_value, mean_ci_lower, mean_ci_upper, hit_rate)`, each one entry per factor, on the method over a matrix.
-  - `s::ExposureICSummaryResult`: On the other two methods, the same eight vectors, with the names and the family labels of the factor axis of the series. The block method returned the `NamedTuple` in earlier releases, and a field of the Result has the name of the field of the `NamedTuple`.
+  - `s::ExposureICSummaryResult`: The eight figures, each one entry per factor. The method over a matrix gives `nothing` for `nf` and `fam`, and the other two methods give the names and the family labels of the factor axis of the series. The method over a matrix returned a `NamedTuple` of the eight vectors in earlier releases, and a field of the Result has the name of the field of the `NamedTuple`.
 
 # Related
 
+  - [`ExposureICSummaryResult`](@ref)
   - [`exposure_ic`](@ref)
   - [`exposure_ic_factor_summary`](@ref)
   - [`forecast_factor_correlation`](@ref)
@@ -344,11 +395,11 @@ Where:
   - [`WildBootstrapMeanTest`](@ref)
 """
 function exposure_ic_summary(ic::MatNum; lags::Integer = 0, window::Real = lags + 1,
-                             mt::AbstractMeanTestEstimator = WildBootstrapMeanTest())
+                             mt::AbstractMeanTestEstimator = WildBootstrapMeanTest())::ExposureICSummaryResult
     @argcheck(!isempty(ic), IsEmptyError("ic cannot be empty"))
     resolve_mean_test_window(lags, window)
     P, K = size(ic)
-    Tm = float_if_integer(real(eltype(ic)))
+    Tm = real(eltype(ic))
     Ts = typeof(sqrt(one(Tm)))
     mean_ic = Vector{Tm}(undef, K)
     std_ic = Vector{Ts}(undef, K)
@@ -371,15 +422,14 @@ function exposure_ic_summary(ic::MatNum; lags::Integer = 0, window::Real = lags 
         mean_ci_upper[k] = m.mean_ci_upper
         hit_rate[k] = m.hit_rate
     end
-    return (; mean_ic = mean_ic, std_ic = std_ic, ic_ir = ic_ir, t_stat = t_stat,
-            p_value = p_value, mean_ci_lower = mean_ci_lower, mean_ci_upper = mean_ci_upper,
-            hit_rate = hit_rate)
+    return ExposureICSummaryResult(mean_ic, std_ic, ic_ir, t_stat, p_value, mean_ci_lower,
+                                   mean_ci_upper, hit_rate, nothing, nothing)
 end
 """
     exposure_ic_factor_summary(ic::MatNum, k::Integer; lags::Integer = 0,
                                window::Real = lags + 1,
                                mt::AbstractMeanTestEstimator = WildBootstrapMeanTest(),
-                               rng = mean_test_rng(mt))
+                               rng = mean_test_rng(mt)) -> ICSummaryResult
 
 Return the eight summary numbers of one factor's information coefficient series.
 
@@ -410,10 +460,11 @@ The test reads the rows at their positions in `ic`. A row whose coefficient is `
 
 # Returns
 
-  - `m::NamedTuple`: `(; mean_ic, std_ic, ic_ir, t_stat, p_value, mean_ci_lower, mean_ci_upper, hit_rate)`, eight numbers.
+  - `m::ICSummaryResult`: The eight numbers.
 
 # Related
 
+  - [`ICSummaryResult`](@ref)
   - [`exposure_ic_summary`](@ref)
   - [`forecast_ic_summary`](@ref)
   - [`forecast_ic_lags`](@ref)
@@ -422,10 +473,10 @@ The test reads the rows at their positions in `ic`. A row whose coefficient is `
 function exposure_ic_factor_summary(ic::MatNum, k::Integer; lags::Integer = 0,
                                     window::Real = lags + 1,
                                     mt::AbstractMeanTestEstimator = WildBootstrapMeanTest(),
-                                    rng = mean_test_rng(mt))
+                                    rng = mean_test_rng(mt))::ICSummaryResult
     w = resolve_mean_test_window(lags, window)
     P = size(ic, 1)
-    Tm = float_if_integer(real(eltype(ic)))
+    Tm = real(eltype(ic))
     Ts = typeof(sqrt(one(Tm)))
     n = 0
     s = zero(Tm)
@@ -450,25 +501,22 @@ function exposure_ic_factor_summary(ic::MatNum, k::Integer; lags::Integer = 0,
     sd = n > 1 ? sqrt(q / (n - 1)) : Ts(NaN)
     ir = isfinite(m) && isfinite(sd) && sd > zero(Ts) ? m / sd : Ts(NaN)
     res = mean_test(mt, view(ic, :, k), w, rng)
-    return (; mean_ic = m, std_ic = sd, ic_ir = ir, t_stat = res.t_stat,
-            p_value = res.p_value, mean_ci_lower = res.mean_ci_lower,
-            mean_ci_upper = res.mean_ci_upper, hit_rate = n > 0 ? Tm(h) / Tm(n) : Tm(NaN))
+    return ICSummaryResult(m, sd, ir, res.t_stat, res.p_value, res.mean_ci_lower,
+                           res.mean_ci_upper, n > 0 ? Tm(h) / Tm(n) : Tm(NaN))
 end
 function exposure_ic_summary(ic::FactorDiagnosticResult; lags::Integer = 0,
                              window::Real = lags + 1,
-                             mt::AbstractMeanTestEstimator = WildBootstrapMeanTest())
+                             mt::AbstractMeanTestEstimator = WildBootstrapMeanTest())::ExposureICSummaryResult
     @argcheck(ndims(ic.X) == 2 && ic.dims == (2,),
               ArgumentError("exposure_ic_summary reads a series `pairs × factors`, whose factor axis is its second dimension. Got size(ic.X) => $(size(ic.X)) and ic.dims => $(ic.dims)"))
-    s = exposure_ic_summary(ic.X; lags = lags, window = window, mt = mt)
-    return ExposureICSummaryResult(s.mean_ic, s.std_ic, s.ic_ir, s.t_stat, s.p_value,
-                                   s.mean_ci_lower, s.mean_ci_upper, s.hit_rate, ic.nf,
-                                   ic.fam)
+    return rebuild_struct(exposure_ic_summary(ic.X; lags = lags, window = window, mt = mt),
+                          (; nf = ic.nf, fam = ic.fam))
 end
 function exposure_ic_summary(csfm::CrossSectionalFactorModel,
                              rd::Option{<:ReturnsResult} = nothing; horizon::Integer = 1,
                              rank::Bool = true, reduced::Bool = false,
                              ties::Symbol = :average,
-                             mt::AbstractMeanTestEstimator = WildBootstrapMeanTest())
+                             mt::AbstractMeanTestEstimator = WildBootstrapMeanTest())::ExposureICSummaryResult
     return exposure_ic_summary(exposure_ic(csfm, rd; horizon = horizon, rank = rank,
                                            reduced = reduced, ties = ties);
                                lags = horizon - 1, mt = mt)
@@ -498,7 +546,7 @@ Without `rd`, the function reconstructs the asset returns from the systematic re
 
   - `csfm.Ms` is not `nothing`. Otherwise the verb raises an `IsNothingError` that names `Ms`.
   - Without `rd`, `csfm.csr` is not `nothing`. Otherwise the verb raises an `IsNothingError` that names `csr`.
-  - Without `rd`, `size(csfm.Ms, 1) > csfm.lag`, and the factor returns carry the observation axis of `csfm.Ms` and the factor axis of its reduced exposures.
+  - Without `rd`, `size(csfm.Ms, 3) > csfm.lag`, and the factor returns carry the observation axis of `csfm.Ms` and the factor axis of its reduced exposures.
   - With `rd`, the rules of [`exposure_ic_returns`](@ref).
 
 # Returns
@@ -520,7 +568,7 @@ function exposure_ic_data(csfm::CrossSectionalFactorModel, ::Nothing, reduced::B
 end
 function exposure_ic_data(csfm::CrossSectionalFactorModel, rd::ReturnsResult, reduced::Bool)
     Ms = cs_diagnostic_exposures(csfm)
-    R = exposure_ic_returns(csfm.idx, rd.X, size(Ms, 1))
+    R = exposure_ic_returns(csfm.idx, rd.X, size(Ms, 3))
     return exposure_ic_exposures(csfm.fcb, Ms, reduced), R, csfm.rw
 end
 function exposure_ic_data(::CrossSectionalFactorModel, ::Nothing,
@@ -533,16 +581,15 @@ end
 function exposure_ic_data(csfm::CrossSectionalFactorModel, Ms::Arr3Num,
                           csr::CrossSectionalRegression, reduced::Bool)
     lag = cs_regression_lag(csfm.lag)
-    T, N = size(Ms, 1), size(Ms, 2)
+    T, N = size(Ms, 3), size(Ms, 1)
     @argcheck(T > lag,
               DimensionMismatch("Ms ($T observations) must carry more observations than lag ($lag)"))
     Bd = exposure_ic_exposures(csfm.fcb, Ms, true)
     F = cross_sectional_factor_returns(csfm)
-    K = size(Bd, 3)
+    K = size(Bd, 2)
     @argcheck(size(F, 1) == T && size(F, 2) == K,
               DimensionMismatch("the factor returns ($(size(F, 1))×$(size(F, 2))) must match Ms ($T observations) and the reduced exposures ($K factors)"))
-    Tf = float_if_integer(promote_type(real(eltype(Ms)), real(eltype(F)),
-                                       real(eltype(csr.eps))))
+    Tf = promote_type(real(eltype(Ms)), real(eltype(F)), real(eltype(csr.eps)))
     start = max(1, lag)
     P = T - start + 1
     R = fill(Tf(NaN), P, N)
@@ -553,14 +600,14 @@ function exposure_ic_data(csfm::CrossSectionalFactorModel, Ms::Arr3Num,
             for i in 1:N
                 s = zero(Tf)
                 for k in 1:K
-                    s += Tf(Bd[j, i, k]) * Tf(F[tau, k])
+                    s += Tf(Bd[i, k, j]) * Tf(F[tau, k])
                 end
                 R[r, i] = s + Tf(csr.eps[tau, i])
             end
         end
     end
     Bf = exposure_ic_exposures(csfm.fcb, Ms, reduced)
-    return Bf[start:T, :, :], R, cs_lagged_rows(csfm.rw, start:T)
+    return Bf[:, :, start:T], R, cs_lagged_rows(csfm.rw, start:T)
 end
 """
     exposure_ic_returns(idx, X::Nothing, T::Integer)
@@ -617,7 +664,7 @@ A block that carries no family re-basis has one axis, so that case returns the h
 # Arguments
 
   - `fcb`: The `fcb` field of a [`CrossSectionalFactorModel`](@ref), or `nothing`.
-  - `Ms`: Unlagged exposure history `observations × assets × factors`.
+  - `Ms`: Unlagged exposure history `assets × factors × observations`.
   - `reduced`: Map the history through the re-basis.
 
 # Returns

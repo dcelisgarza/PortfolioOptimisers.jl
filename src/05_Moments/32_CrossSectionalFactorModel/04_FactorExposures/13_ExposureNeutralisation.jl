@@ -122,12 +122,12 @@ The normal equations of the least squares give ``\\sum_{i} \\omega_{tik} e_{tik}
 
 # Arguments
 
-  - `Ms::AbstractArray{<:Real, 3}`: Exposure history, `observations × assets × factors`. The function changes it in place.
+  - `Ms::AbstractArray{<:Real, 3}`: Exposure history, `assets × factors × observations`. The function changes it in place.
   - `neutralise`: Pairs of `key => targets`. The key and each target is a factor name or a Factor Family label, as a `String` or a `Symbol`, and the targets are one name or a vector of names. A family key neutralises each of its members independently against the same targets.
   - `cre`: Cross-sectional regression estimator of the fit.
   - `bw::MatNum`: Benchmark weight history, `observations × assets`.
-  - `nf::VecStr`: Names of the raw factor axis, of length `size(Ms, 3)`.
-  - `fam::VecStr`: Family label of each raw factor, of length `size(Ms, 3)`.
+  - `nf::VecStr`: Names of the raw factor axis, of length `size(Ms, 2)`.
+  - `fam::VecStr`: Family label of each raw factor, of length `size(Ms, 2)`.
   - `ct`: Cross-sectional transform that scores each residual.
 
 # Validation
@@ -158,13 +158,13 @@ function neutralise_exposures!(Ms::AbstractArray{<:Real, 3},
                                nf::VecStr, fam::VecStr,
                                ct::AbstractCrossSectionalTransform = CrossSectionalStandardiser())::Nothing
     @argcheck(!isempty(Ms), IsEmptyError("Ms cannot be empty"))
-    T, N, K = size(Ms)
+    N, K, T = size(Ms)
     @argcheck(length(nf) == K,
               DimensionMismatch("nf ($(length(nf))) must match the factor axis of Ms ($K)"))
     @argcheck(length(fam) == K,
               DimensionMismatch("fam ($(length(fam))) must match the factor axis of Ms ($K)"))
     @argcheck(size(bw) == (T, N),
-              DimensionMismatch("bw ($(size(bw, 1))×$(size(bw, 2))) must match Ms ($T×$N) on the observation and asset axes"))
+              DimensionMismatch("bw ($(size(bw, 1))×$(size(bw, 2))) must match Ms ($N assets, $T observations) on the observation and asset axes"))
     @argcheck(isempty(neutralise) || !(eltype(Ms) <: Integer),
               ArgumentError("a Neutralisation writes a real residual into Ms, and the element type $(eltype(Ms)) of Ms cannot hold it. Convert Ms to a floating-point type"))
     for pr in neutralise
@@ -175,16 +175,19 @@ function neutralise_exposures!(Ms::AbstractArray{<:Real, 3},
         @argcheck(isempty(ovl),
                   ArgumentError("the Neutralisation key $key names the factors $([nf[i] for i in ovl]), which are also its targets, and a factor cannot be neutralised against itself"))
         for j in Iterators.flatten((kidx, tidx))
-            inf = findfirst(isinf, view(Ms, :, :, j))
+            inf = findfirst(isinf, view(Ms, :, j, :))
             @argcheck(isnothing(inf),
-                      DomainError(Ms[inf, j],
-                                  "the exposure of asset $(inf[2]) to the factor $(nf[j]) at observation $(inf[1]) is infinite. A Neutralisation reads NaN as a missing exposure, and it refuses an infinity, because an infinity survives the fit and the transform. Replace it with NaN or with a finite value"))
+                      DomainError(Ms[inf[1], j, inf[2]],
+                                  "the exposure of asset $(inf[1]) to the factor $(nf[j]) at observation $(inf[2]) is infinite. A Neutralisation reads NaN as a missing exposure, and it refuses an infinity, because an infinity survives the fit and the transform. Replace it with NaN or with a finite value"))
         end
-        X = Ms[:, :, tidx]
+        X = Ms[:, tidx, :]
         for k in kidx
-            W = neutralisation_weights(Ms, X, bw, k)
-            csr = cross_sectional_regression(cre, X, view(Ms, :, :, k), W)
-            Ms[:, :, k] = cross_sectional_transform(ct, csr.eps; w = W)
+            # The response of the fit is one exposure, `observations × assets` as the returns
+            # of a fit are, so the fit reads the transpose of its slice.
+            y = transpose(view(Ms, :, k, :))
+            W = neutralisation_weights(y, X, bw)
+            csr = cross_sectional_regression(cre, X, y, W)
+            Ms[:, k, :] = transpose(cross_sectional_transform(ct, csr.eps; w = W))
         end
     end
     return nothing
@@ -216,22 +219,18 @@ function neutralisation_names(targets::AbstractVector{<:Union{AbstractString, Sy
 end
 """
     neutralisation_weights(y::MatNum, X::AbstractArray{<:Real, 3}, bw::MatNum)
-    neutralisation_weights(Ms::AbstractArray{<:Real, 3}, X::AbstractArray{<:Real, 3},
-                           bw::MatNum, k::Integer)
 
 Return the regression weights of one Neutralisation.
 
 The weight of an asset is zero where its response or one of its target exposures is not finite, because a cross-sectional fit refuses a non-finite entry at a positive weight. The weight is also zero where the base weight is not finite or not positive.
 
-The response is one Factor Exposure in [`neutralise_exposures!`](@ref), and one Descriptor score in [`neutralise_scores!`](@ref). The four-argument method takes the exposure by its raw factor index and calls the three-argument method, so the two Neutralisations use one rule.
+The response is one Factor Exposure in [`neutralise_exposures!`](@ref), which passes the exposure of one factor as `transpose(view(Ms, :, k, :))`, and one Descriptor score in [`neutralise_scores!`](@ref). So the two Neutralisations use one rule.
 
 # Arguments
 
   - `y::MatNum`: The response that the Neutralisation fits, `observations × assets`.
-  - `Ms::AbstractArray{<:Real, 3}`: Exposure history, `observations × assets × factors`.
-  - `X::AbstractArray{<:Real, 3}`: Target exposures, `observations × assets × targets`.
+  - `X::AbstractArray{<:Real, 3}`: Target exposures, `assets × targets × observations`.
   - `bw::MatNum`: Base weight history, `observations × assets`. It holds the benchmark weights in a Neutralisation of Factor Exposures, and the estimation mask in a Neutralisation of Descriptor scores.
-  - `k::Integer`: Raw index of the factor that the Neutralisation fits.
 
 # Returns
 
@@ -253,8 +252,8 @@ function neutralisation_weights(y::MatNum, X::AbstractArray{<:Real, 3}, bw::MatN
             continue
         end
         ok = true
-        for p in axes(X, 3)
-            if !isfinite(X[t, i, p])
+        for p in axes(X, 2)
+            if !isfinite(X[i, p, t])
                 ok = false
                 break
             end
@@ -264,8 +263,4 @@ function neutralisation_weights(y::MatNum, X::AbstractArray{<:Real, 3}, bw::MatN
         end
     end
     return W
-end
-function neutralisation_weights(Ms::AbstractArray{<:Real, 3}, X::AbstractArray{<:Real, 3},
-                                bw::MatNum, k::Integer)
-    return neutralisation_weights(view(Ms, :, :, k), X, bw)
 end

@@ -146,27 +146,26 @@ sample as `kappa` approaches one.
 A VaR view is linear in the posterior probabilities, so [`ValueatRiskView`](@ref) has no `alg`
 and needs no solver. A CVaR, EVaR or RLVaR view is not linear in them. It needs auxiliary
 variables, and therefore a [`JuMPEntropyPooling`](@ref) in `opt`. One case is an exception. A
-lower bound on the EVaR or RLVaR of one asset, with [`GridEntropicValueatRiskView`](@ref) or
-[`GridRelativisticValueatRiskView`](@ref) set in `alg`, becomes a set of linear rows, and the
-default [`OptimEntropyPooling`](@ref) solves it.
+lower bound on the EVaR or RLVaR of one asset, with [`GridTailView`](@ref) set in `alg`,
+becomes a set of linear rows, and the default [`OptimEntropyPooling`](@ref) solves it.
 
 The `alg` field of a tail view group sets how the model writes each view. Left at `nothing`, a
 lower bound, or an equality at or above the prior value, takes
 [`LinearConditionalValueatRiskView`](@ref), [`ConicEntropicValueatRiskView`](@ref) or
 [`ConicRelativisticValueatRiskView`](@ref), each of which states the view exactly. An upper
 bound, or an equality below the prior value, on one asset takes
-[`IntegerConditionalValueatRiskView`](@ref), [`GridEntropicValueatRiskView`](@ref) or
-[`GridRelativisticValueatRiskView`](@ref). These need a mixed-integer conic solver, and the two
-grid forms state the view only at the points of their grid.
+[`IntegerConditionalValueatRiskView`](@ref) for the CVaR, or [`GridTailView`](@ref) for the
+EVaR and the RLVaR. These need a mixed-integer conic solver, and the grid states the view only
+at the points of its grid.
 
 A view over several assets whose coefficients all have one sign, such as a group, is a sum of
 the measures of its assets with positive weights, and a lower bound on it takes the same exact
 formulations. A relative view has coefficients of both signs. A relative CVaR view takes the
 integer formulation, and so does a CVaR upper bound on a group, or a CVaR equality below the prior
 value of a group. A grid covers one asset, so on the EVaR and the RLVaR these views take
-[`SequentialEntropicValueatRiskView`](@ref) or [`SequentialRelativisticValueatRiskView`](@ref),
-which solve a convex program a few times and need no integer variable.
-[`SequentialConditionalValueatRiskView`](@ref) gives the CVaR the same option.
+[`SequentialTailView`](@ref), which solves a convex program a few times and needs no integer
+variable. The same formulation gives the CVaR that option, because the view group, and not the
+formulation, names the measure.
 
 For an [`EntropicValueatRiskView`](@ref) or a [`RelativisticValueatRiskView`](@ref), a grid
 formulation in `alg` sets how the library builds the grid: its width `pct`, its number of points
@@ -228,10 +227,10 @@ end
 
 A target below the prior needs the other formulation.
 [`ConicRelativisticValueatRiskView`](@ref) bounds the RLVaR from below only, so a `<=` view
-takes [`GridRelativisticValueatRiskView`](@ref) instead. The grid picks one of its points with
+takes [`GridTailView`](@ref) instead. The grid picks one of its points with
 a binary vector, so it needs a solver for mixed-integer conic programs. Pajarito is one such
 solver, and here it uses HiGHS for the outer approximation and Clarabel for the cones.
-[`SequentialRelativisticValueatRiskView`](@ref) is the other way to state a `<=` view. It
+[`SequentialTailView`](@ref) is the other way to state a `<=` view. It
 bounds the RLVaR from above with a constraint that is linear in the posterior probabilities.
 It computes that constraint again at each new posterior and solves again until the bound is
 tight, so it needs no integer variable.
@@ -290,7 +289,7 @@ pretty_table(DataFrame(["Prior" => ["empirical", "RLVaR >= 1.05 prior, conic",
     ``T`` is the number of observations. A longer sample, a smaller `alpha`, a smaller `kappa`,
     or two such views in one model can make a conic solver stop short of a solution. Give the
     `slv` field of `opt` a vector of solver configurations, shorten the sample, or state the
-    view with [`GridRelativisticValueatRiskView`](@ref). Its lower-bound constraints are linear
+    view with [`GridTailView`](@ref). Its lower-bound constraints are linear
     in the posterior probabilities, and it adds no cone.
 =#
 

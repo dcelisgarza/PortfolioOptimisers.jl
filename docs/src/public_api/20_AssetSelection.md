@@ -1,5 +1,5 @@
 ```@meta
-Description = "Asset selection, public API of PortfolioOptimisers.jl: ScoreSelector, CompleteAssetSelector, AbstractSelectionRule, ThresholdRule, RankRule, QuantileRule, …"
+Description = "Asset selection, public API of PortfolioOptimisers.jl: ScoreSelector, CompleteAssetSelector, AbstractAssetScorer, AbstractSelectionRule, ThresholdRule, …"
 ```
 
 # Asset selection
@@ -21,17 +21,24 @@ ScoreSelector
 CompleteAssetSelector
 ```
 
+## Scoring assets with an asset scorer
+
+The `score` of a selector can also be an asset scorer, which reads the whole returns data and not one asset alone. [`FoldRiskScorer`](@ref) scores a risk measure over the test windows of a cross-validation scheme, and [`WeightMassScorer`](@ref) scores the weight that an optimiser gives each asset. To write a scorer of your own, subtype [`PortfolioOptimisers.AbstractAssetScorer`](@ref), and give it an [`asset_scores`](@ref PortfolioOptimisers.asset_scores) method and a [`bigger_is_better`](@ref) method.
+
+```@docs
+PortfolioOptimisers.AbstractAssetScorer
+```
+
 ## Selection rules
 
-A rule turns the scores into a mask of the assets to keep. [`ThresholdRule`](@ref) compares the raw scores with fixed bounds, and ignores which end is better, because a zero-variance filter must drop the assets with low variance. [`RankRule`](@ref) and [`QuantileRule`](@ref) read [`bigger_is_better`](@ref), and take a count or a fraction of the assets from each end.
+A rule turns the scores into a mask of the assets to keep. [`ThresholdRule`](@ref) compares the raw scores with fixed bounds, and ignores which end is better, because a zero-variance filter must drop the assets with low variance. [`RankRule`](@ref) reads [`bigger_is_better`](@ref), and takes a [`CountOf`](@ref) or a [`FractionOf`](@ref) of the assets from each end.
 
-An ordinal rule drops every asset of a tie at its cut, so it can keep fewer assets than you ask for. If the 20th and 21st assets have the same score, `RankRule(; best = 20)` keeps 19. The rule drops both tied assets, because it has no reason to keep one of them and not the other.
+An ordinal rule drops every asset of a tie at its cut, so it can keep fewer assets than you ask for. If the 20th and 21st assets have the same score, `RankRule(; best = CountOf(20))` keeps 19. The rule drops both tied assets, because it has no reason to keep one of them and not the other.
 
 ```@docs
 PortfolioOptimisers.AbstractSelectionRule
 ThresholdRule
 RankRule
-QuantileRule
 ```
 
 ## Discarding redundant assets

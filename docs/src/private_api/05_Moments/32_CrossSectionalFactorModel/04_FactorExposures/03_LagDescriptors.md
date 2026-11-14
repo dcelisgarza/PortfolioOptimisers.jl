@@ -1,5 +1,5 @@
 ```@meta
-Description = "Lag Descriptors, private API of PortfolioOptimisers.jl: LagDescriptorState, assert_descriptor_lag, Base.copy, lag_descriptor_inputs, lag_descriptor_lagged, …"
+Description = "Lag Descriptors, private API of PortfolioOptimisers.jl: LagDescriptorState, FieldScaleValues, assert_descriptor_lag, Base.copy, lag_descriptor_inputs, …"
 ```
 
 # Lag Descriptors: private API
@@ -8,6 +8,7 @@ Description = "Lag Descriptors, private API of PortfolioOptimisers.jl: LagDescri
 
 ```@docs
 LagDescriptorState
+FieldScaleValues
 ```
 
 ## Functions

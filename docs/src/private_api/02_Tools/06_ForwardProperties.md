@@ -1,5 +1,5 @@
 ```@meta
-Description = "Forward properties, private API of PortfolioOptimisers.jl: forward_nonnothing, forward_flatten_path, forward_walk_expr, forward_setproperties."
+Description = "Forward properties, private API of PortfolioOptimisers.jl: forward_nonnothing, forward_flatten_path, forward_walk_expr, forward_rule_options, …"
 ```
 
 # Forward properties: private API
@@ -10,5 +10,6 @@ Description = "Forward properties, private API of PortfolioOptimisers.jl: forwar
 forward_nonnothing
 forward_flatten_path
 forward_walk_expr
+forward_rule_options
 forward_setproperties
 ```

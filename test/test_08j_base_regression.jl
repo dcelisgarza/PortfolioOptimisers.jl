@@ -524,6 +524,13 @@ using Accessors: Accessors
         @test_throws DimensionMismatch PO.Regression(; M = M, esigma = zeros(3, 2))
     end
 
+    @testset "the idiosyncratic covariance view cuts a vector once and a matrix twice" begin
+        @test isnothing(PO.idiosyncratic_covariance_view(nothing, [1, 3]))
+        @test PO.idiosyncratic_covariance_view([1.0, 2.0, 3.0], [1, 3]) == [1.0, 3.0]
+        @test PO.idiosyncratic_covariance_view([1.0 0.5; 0.5 2.0], [2]) ==
+              reshape([2.0], 1, 1)
+    end
+
     @testset "port_opt_view cuts esigma on every axis it has" begin
         M = [1.0 2.0; 3.0 4.0; 5.0 6.0]
         i = [1, 3]
@@ -565,6 +572,46 @@ using Accessors: Accessors
                                                                        nothing, nothing)
         @test_throws DimensionMismatch PO.set_idiosyncratic_covariance(re, [1.0, 2.0, 3.0],
                                                                        [1, 2], nothing)
+    end
+    @testset "Statements the /unslop pass corrected (#463)" begin
+        # `orthogonality_weights` refuses a variance that is not finite, and not only a
+        # variance that is not positive.
+        M = [1.0 2.0; 3.0 4.0]
+        metric = PO.InverseIdiosyncraticVarianceMetric()
+        @test PO.orthogonality_weights(metric,
+                                       PO.Regression(; M = M, esigma = [0.5, 0.25])) ==
+              [2.0, 4.0]
+        @test_throws DomainError PO.orthogonality_weights(metric,
+                                                          PO.Regression(; M = M,
+                                                                        esigma = [0.5, Inf]))
+        @test_throws DomainError PO.orthogonality_weights(metric,
+                                                          PO.Regression(; M = M,
+                                                                        esigma = [0.5, 0.0]))
+        # `LinearModel()` is the default of each estimator that takes a regression target,
+        # and the cross-sectional linear regression takes none.
+        @test isa(PO.StepwiseRegression().tgt, PO.LinearModel)
+        @test isa(PO.DimensionReductionRegression().retgt, PO.LinearModel)
+        @test isa(PO.CrossSectionalTargetRegression().tgt, PO.LinearModel)
+        @test isa(PO.ImpliedVolatilityRegression().re, PO.LinearModel)
+        @test !hasfield(typeof(PO.CrossSectionalLinearRegression()), :tgt)
+        # `set_row_key` has two callers beside `FactorPrior`, and both keep an unset `L` unset.
+        rr = PO.Regression(; M = [1.0 2.0; 3.0 4.0; 5.0 6.0], idx = [3, 5, 7],
+                           ts = PO.Dates.Date(2020, 1, 1) .+ PO.Dates.Day.(0:2))
+        rf = PO.forget_row_positions(rr)
+        @test isnothing(rf.idx)
+        @test rf.ts == rr.ts
+        @test isnothing(getfield(rf, :L))
+        rm = PO.map_row_positions(rr, [10, 11, 12, 13, 14, 15, 16])
+        @test rm.idx == [12, 14, 16]
+        @test isnothing(getfield(rm, :L))
+        # The three ways a position meets the kept rows (#1912).
+        @test PO.kept_row_positions(nothing, [2, 3]) == [2, 3]
+        @test isnothing(PO.kept_row_positions(nothing, nothing))
+        @test isnothing(PO.kept_row_positions([5, 6, 7], nothing))
+        @test PO.kept_row_positions([5, 6, 7], [3, 1]) == [7, 5]
+        # A factor row that is not finite is a regressor of no asset (#1912).
+        @test isnothing(PO.assert_finite_factor_rows([1.0 2.0; 3.0 4.0]))
+        @test_throws PO.IsNonFiniteError PO.assert_finite_factor_rows([1.0 2.0; NaN 4.0])
     end
 end
 
@@ -624,7 +671,7 @@ with no `kwargs` field. Every verb an estimator reads therefore reaches it throu
 the `# Interfaces` section of `AbstractRegressionTarget` names, never through a field that only
 the library's targets carry, and its results must equal the library's.
 =#
-struct CallerTestTarget{W} <: PortfolioOptimisers.AbstractRegressionTarget
+struct CallerTestTarget{W} <: PortfolioOptimisers.AbstractUnpenalisedRegressionTarget
     w::W
 end
 CallerTestTarget() = CallerTestTarget(nothing)
@@ -644,7 +691,7 @@ function PortfolioOptimisers.regression_target_weights(tgt::CallerTestTarget)
     return tgt.w
 end
 # A target that states its fit and no other method.
-struct BareTestTarget <: PortfolioOptimisers.AbstractRegressionTarget end
+struct BareTestTarget <: PortfolioOptimisers.AbstractUnpenalisedRegressionTarget end
 function PortfolioOptimisers.StatsAPI.fit(::BareTestTarget, A::AbstractMatrix,
                                           y::AbstractVector)
     return StatsAPI.fit(PO.GLM.LinearModel, A, y)
@@ -1009,6 +1056,8 @@ end
         raw = MVS.fit(MVS.PPCA, Fs; maxoutdim = 5)
         @test all(isnan, raw.W)
         @test_throws ArgumentError MVS.projection(raw)
+        # `prep_dim_red_reg` calls `predict` first, and the `PPCA` docstring names it.
+        @test_throws ArgumentError StatsAPI.predict(raw, Fs)
 
         # The library checks the width first, so the caller meets a `DomainError` that names
         # `maxoutdim` and the factor count. It is raised at the fit, before `MultivariateStats`
@@ -1073,7 +1122,7 @@ end
         w = pweights(range(0.5, 1.5; length = T))
         function roundtrip(re)
             x1, Vp, mu, sigma = PO.prep_dim_red_reg(re, F)
-            beta = PO._regression(re, y, mu, sigma, x1, Vp)
+            beta = PO._regression(re, y, mu, sigma, x1, Vp).beta
             pred = beta[1] .+ F * beta[2:end]
             pred_pc = StatsAPI.predict(StatsAPI.fit(re.retgt, x1, y))
             return maximum(abs, pred .- pred_pc)
@@ -1098,7 +1147,7 @@ end
         # Equations 4.18 to 4.20 computed by hand against `_regression`.
         re = DimensionReductionRegression()
         x1, Vp, mu, sigma = PO.prep_dim_red_reg(re, F)
-        beta = PO._regression(re, y, mu, sigma, x1, Vp)
+        beta = PO._regression(re, y, mu, sigma, x1, Vp).beta
         beta_pc = StatsAPI.coef(StatsAPI.fit(re.retgt, x1, y))[2:end]
         @test isapprox(beta[2:end], Vp * beta_pc ./ sigma)
         @test isapprox(beta[1], mean(y) - dot(beta[2:end], mu))
@@ -1244,7 +1293,7 @@ end
 end
 
 #=
-Check `src/05_Moments/32_CrossSectionalFactorModel/01_CrossSectionalRegression.jl` against the mathematics its docstrings
+Check `src/05_Moments/32_CrossSectionalFactorModel/01_CrossSectionalRegression_a.jl` and `_b.jl` against the mathematics their docstrings
 state, and against the stored oracle of map #643. Issue #679.
 
 THREE FACTS SHAPE THE PROBES.
@@ -1278,7 +1327,7 @@ testset compares the file against itself.
 # `pinv` is the minimum-norm solution, which is what `PseudoInverseFallback` returns on a
 # deficient design and what the closed form returns on a full-rank one.
 function reference_cross_sectional_fit(Z, X, W; intercept = false)
-    T, N, K = size(Z)
+    N, K, T = size(Z)
     f = zeros(T, K)
     b = zeros(T)
     n = zeros(Int, T)
@@ -1289,7 +1338,7 @@ function reference_cross_sectional_fit(Z, X, W; intercept = false)
             continue
         end
         w = W[t, idx]
-        A = Z[t, idx, :]
+        A = Z[idx, :, t]
         y = X[t, idx]
         ybar = 0.0
         xbar = zeros(K)
@@ -1312,9 +1361,9 @@ end
 # zero-weight pair and a missing return, so the eligibility contract is exercised throughout.
 function cross_sectional_panel(; T = 6, N = 25, K = 4, seed = 987)
     rng = StableRNG(seed)
-    Z = randn(rng, T, N, K)
+    Z = permutedims(randn(rng, T, N, K), (2, 3, 1))
     beta = randn(rng, T, K)
-    X = permutedims(reduce(hcat, Z[t, :, :] * beta[t, :] for t in 1:T)) .+
+    X = permutedims(reduce(hcat, Z[:, :, t] * beta[t, :] for t in 1:T)) .+
         0.02 * randn(rng, T, N)
     W = 1.0 .+ rand(rng, T, N)
     W[1, 1:3] .= 0.0
@@ -1324,11 +1373,11 @@ function cross_sectional_panel(; T = 6, N = 25, K = 4, seed = 987)
 end
 
 # A regression target the library does not know, for `cross_sectional_least_squares`.
-struct LeverageTestTarget <: PortfolioOptimisers.AbstractRegressionTarget end
+struct LeverageTestTarget <: PortfolioOptimisers.AbstractUnpenalisedRegressionTarget end
 
 # A caller's own weighted least-squares target, which states no basis invariance, so the fit
 # hands it the design itself (#1719). Its solve is a pseudo-inverse.
-struct PinvTestTarget{W} <: PortfolioOptimisers.AbstractRegressionTarget
+struct PinvTestTarget{W} <: PortfolioOptimisers.AbstractUnpenalisedRegressionTarget
     w::W
 end
 struct PinvTestFit{C}
@@ -1355,7 +1404,7 @@ struct BareTestRegression <: PortfolioOptimisers.AbstractCrossSectionalRegressio
 @testset "Cross-sectional regression" begin
     Z, X, W, beta = cross_sectional_panel()
     # Rows 2 onwards carry no missing entry, so a probe that needs a clean panel takes them.
-    Zc, Xc, Wc = Z[2:end, :, :], X[2:end, :], W[2:end, :]
+    Zc, Xc, Wc = Z[:, :, 2:end], X[2:end, :], W[2:end, :]
 
     @testset "The closed form recovers the factor returns" begin
         csr = cross_sectional_regression(CrossSectionalLinearRegression(), Z, X, W)
@@ -1381,7 +1430,7 @@ struct BareTestRegression <: PortfolioOptimisers.AbstractCrossSectionalRegressio
         @test csr.b ≈ b
         # A design that already carries a constant column makes the intercept redundant, so
         # the fitted values match the ones the no-intercept fit produces on that design.
-        Zi = cat(Zc, ones(size(Zc, 1), size(Zc, 2), 1); dims = 3)
+        Zi = cat(Zc, ones(size(Zc, 1), 1, size(Zc, 3)); dims = 2)
         with_int = cross_sectional_regression(cre, Zi, Xc, Wc)
         no_int = cross_sectional_regression(CrossSectionalLinearRegression(), Zi, Xc, Wc)
         @test predict(with_int, Zi) ≈ predict(no_int, Zi)
@@ -1404,6 +1453,31 @@ struct BareTestRegression <: PortfolioOptimisers.AbstractCrossSectionalRegressio
         for t in axes(shift, 1)
             @test all(x -> isapprox(x, ci.b[t]), shift[t, :])
         end
+    end
+
+    @testset "The one-pass residuals give the bits of the two-step form" begin
+        # `cross_sectional_residuals` fuses `X - cross_sectional_systematic(f, b, Z)`: same
+        # roundings in the same order, so the bits and the element type agree, with and
+        # without an intercept, and when the returns and the fit differ in element type.
+        rs = StableRNG(1973)
+        nt, na, nk = 7, 5, 3
+        for (TX, TF) in ((Float64, Float64), (Float32, Float64), (Float64, Float32))
+            Xr = randn(rs, TX, nt, na)
+            Xr[2, 3] = NaN
+            fr = randn(rs, TF, nt, nk)
+            Zr = randn(rs, TF, na, nk, nt)
+            for br in (randn(rs, TF, nt), nothing)
+                two = Xr - PortfolioOptimisers.cross_sectional_systematic(fr, br, Zr)
+                one = PortfolioOptimisers.cross_sectional_residuals(Xr, fr, br, Zr)
+                @test isequal(one, two)
+                @test eltype(one) == eltype(two)
+            end
+        end
+        # `X` holds four assets where `Z` holds five.
+        Xw, fw, Zw = randn(rs, nt, na - 1), randn(rs, nt, nk), randn(rs, na, nk, nt)
+        @test_throws DimensionMismatch PortfolioOptimisers.cross_sectional_residuals(Xw, fw,
+                                                                                     nothing,
+                                                                                     Zw)
     end
 
     @testset "The eligibility contract" begin
@@ -1468,9 +1542,9 @@ struct BareTestRegression <: PortfolioOptimisers.AbstractCrossSectionalRegressio
         Zd = copy(Zc)
         # The second factor is twice the first, so the numerical rank falls by one and the
         # two coefficients are no longer separately identified.
-        Zd[:, :, 2] = 2 .* Zd[:, :, 1]
-        @test PortfolioOptimisers.cross_sectional_rank(Zd[1, :, :]) == size(Zd, 3) - 1
-        @test PortfolioOptimisers.cross_sectional_rank(Zc[1, :, :]) == size(Zc, 3)
+        Zd[:, 2, :] = 2 .* Zd[:, 1, :]
+        @test PortfolioOptimisers.cross_sectional_rank(Zd[:, :, 1]) == size(Zd, 2) - 1
+        @test PortfolioOptimisers.cross_sectional_rank(Zc[:, :, 1]) == size(Zc, 2)
         # A design with no row has rank zero and reads no pivot.
         @test PortfolioOptimisers.cross_sectional_rank(zeros(0, 3)) == 0
         fallback = cross_sectional_regression(CrossSectionalLinearRegression(), Zd, Xc, Wc)
@@ -1488,9 +1562,9 @@ struct BareTestRegression <: PortfolioOptimisers.AbstractCrossSectionalRegressio
         @test predict(unchecked, Zd) ≈ predict(minnorm, Zd)
         # The two part on a SQUARE design, which `\` sends to an LU factorisation instead.
         # An exactly singular one throws, and the pseudo-inverse answers it.
-        Zs = Zd[:, 1:size(Zd, 3), :]
-        Xs = Xc[:, 1:size(Zd, 3)]
-        Ws = Wc[:, 1:size(Zd, 3)]
+        Zs = Zd[1:size(Zd, 2), :, :]
+        Xs = Xc[:, 1:size(Zd, 2)]
+        Ws = Wc[:, 1:size(Zd, 2)]
         @test_throws LinearAlgebra.SingularException cross_sectional_regression(CrossSectionalLinearRegression(;
                                                                                                                alg = UncheckedSolve()),
                                                                                 Zs, Xs, Ws)
@@ -1509,8 +1583,8 @@ struct BareTestRegression <: PortfolioOptimisers.AbstractCrossSectionalRegressio
             sprint(showerror, e)
         end
         @test occursin("observation 1", msg)
-        @test occursin("rank $(size(Zd, 3) - 1)", msg)
-        @test occursin("$(size(Zd, 2)) eligible assets", msg)
+        @test occursin("rank $(size(Zd, 2) - 1)", msg)
+        @test occursin("$(size(Zd, 1)) eligible assets", msg)
         # A target refuses before it fits, with the message of the linear member.
         tmsg = try
             cross_sectional_regression(CrossSectionalTargetRegression(;
@@ -1568,7 +1642,7 @@ struct BareTestRegression <: PortfolioOptimisers.AbstractCrossSectionalRegressio
         end
         # The projection on its own keeps the linear predictor, and lands on the answer of
         # the pseudo-inverse. At rank zero it returns its argument.
-        D = Zd[1, :, :] .* sqrt.(Wc[1, :])
+        D = Zd[:, :, 1] .* sqrt.(Wc[1, :])
         r = PortfolioOptimisers.cross_sectional_rank(D)
         f = randn(StableRNG(1625), size(D, 2))
         p = PortfolioOptimisers.cross_sectional_row_space(f, D, r)
@@ -1584,7 +1658,13 @@ struct BareTestRegression <: PortfolioOptimisers.AbstractCrossSectionalRegressio
                                                                                         alg = MinimumNormSolve())
         @test_throws ArgumentError CrossSectionalTargetRegression(LinearModel(),
                                                                   MinimumNormSolve(), false,
+                                                                  true,
                                                                   PortfolioOptimisers.FLoops.SequentialEx())
+        # `NormalEquationsSolve()` gives a design that fails its test to the projection, so
+        # the same rule refuses a target that is not basis invariant, and names the member.
+        @test_throws "NormalEquationsSolve() projects the fit of LeverageTestTarget" CrossSectionalTargetRegression(;
+                                                                                                                    tgt = LeverageTestTarget(),
+                                                                                                                    alg = NormalEquationsSolve())
         # The projection keeps the answer of a target only when the target reads the design
         # through the linear predictor alone, which `is_basis_invariant` states. A target
         # that keeps its default answer is refused under the default, and named.
@@ -1602,7 +1682,7 @@ struct BareTestRegression <: PortfolioOptimisers.AbstractCrossSectionalRegressio
         PO = PortfolioOptimisers
         seq = PO.FLoops.SequentialEx()
         T, N = 3, 40
-        Z0 = randn(StableRNG(1), T, N, 3)
+        Z0 = permutedims(randn(StableRNG(1), T, N, 3), (2, 3, 1))
         Xn = randn(StableRNG(3), T, N) ./ 100
         Wn = ones(T, N)
         noise = randn(StableRNG(2), T, N)
@@ -1613,8 +1693,8 @@ struct BareTestRegression <: PortfolioOptimisers.AbstractCrossSectionalRegressio
         # Before the fix it dropped the third column from 2e9: `[-1.36e-3, 5.02e-4, 0]`.
         for d in (1e-5, 1e-7, 1e-9, 1e-11)
             Zn = copy(Z0)
-            Zn[:, :, 3] = Z0[:, :, 1] .+ d .* noise
-            D = sqrt.(Wn[1, :]) .* Zn[1, :, :]
+            Zn[:, 3, :] = Z0[:, 1, :] .+ d .* permutedims(noise)
+            D = sqrt.(Wn[1, :]) .* Zn[:, :, 1]
             @test PO.cross_sectional_rank(D) == 3
             tol = 100 * LinearAlgebra.cond(D) * eps()
             for alg in
@@ -1638,20 +1718,20 @@ struct BareTestRegression <: PortfolioOptimisers.AbstractCrossSectionalRegressio
             end
         end
         # The whitened fit of a full-rank design equals the plain fit to rounding.
-        A = Zc[1, :, :]
+        A = Zc[:, :, 1]
         y = Xc[1, :]
         w = Wc[1, :]
         tgt = PO.factory(LinearModel(), StatsBase.aweights(w))
         plain = PO.StatsAPI.coef(PO.StatsAPI.fit(tgt, A, y))
-        @test PO.cross_sectional_target_coef(tgt, A, y, A .* sqrt.(w)) ≈ plain
+        @test PO.cross_sectional_target_coef(tgt, A, y, A .* sqrt.(w)).f ≈ plain
         # A target that is not basis-invariant fits the design itself.
         own = PO.factory(PinvTestTarget(nothing), StatsBase.aweights(w))
-        @test PO.cross_sectional_target_coef(own, A, y, A .* sqrt.(w)) ==
+        @test PO.cross_sectional_target_coef(own, A, y, A .* sqrt.(w)).f ==
               PO.StatsAPI.coef(PO.StatsAPI.fit(own, A, y))
         # On an exactly dependent design every member of a GLM target means what it means
         # for the linear member, and so does a caller's own target.
         Zd = copy(Zc)
-        Zd[:, :, 2] = 2 .* Zd[:, :, 1]
+        Zd[:, 2, :] = 2 .* Zd[:, 1, :]
         for intercept in (false, true)
             linear = cross_sectional_regression(CrossSectionalLinearRegression(;
                                                                                intercept = intercept),
@@ -1689,7 +1769,7 @@ struct BareTestRegression <: PortfolioOptimisers.AbstractCrossSectionalRegressio
                                                                                     intercept = intercept),
                                                      Zd, Xc, Wc).f
                 end
-                @test_throws "has rank $(size(Zd, 3) - 1)" cross_sectional_regression(CrossSectionalTargetRegression(;
+                @test_throws "has rank $(size(Zd, 2) - 1)" cross_sectional_regression(CrossSectionalTargetRegression(;
                                                                                                                      tgt = tgt,
                                                                                                                      alg = RankDeficiencyRefusal(),
                                                                                                                      intercept = intercept),
@@ -1799,7 +1879,7 @@ struct BareTestRegression <: PortfolioOptimisers.AbstractCrossSectionalRegressio
             end
         end
         Zd = copy(Zc)
-        Zd[:, :, 2] = 2 .* Zd[:, :, 1]
+        Zd[:, 2, :] = 2 .* Zd[:, 1, :]
         We = copy(W)
         We[2, :] .= 0.0
         for cre in (CrossSectionalLinearRegression(; alg = RankDeficiencyRefusal()),
@@ -1809,7 +1889,7 @@ struct BareTestRegression <: PortfolioOptimisers.AbstractCrossSectionalRegressio
                   m0
             m7 = message(() -> PO.cross_sectional_block_regression(cre, Zd, Xc, Wc, 7))
             @test m7 == replace(m0, "observation 1 " => "observation 8 ")
-            lv = trues(size(Zd, 3))
+            lv = trues(size(Zd, 2))
             @test message(() -> PO.cross_sectional_live_regression(cre, Zd, Xc, Wc, lv, 7)) ==
                   m7
             # The offset changes the name in a refusal alone, never the fit.
@@ -1828,7 +1908,7 @@ struct BareTestRegression <: PortfolioOptimisers.AbstractCrossSectionalRegressio
         @test csr.f ==
               cross_sectional_regression(CrossSectionalLinearRegression(), Zc, Xc, Wc).f
         @test PO.cross_sectional_live_regression(BlockTestRegression(), Zc, Xc, Wc,
-                                                 trues(size(Zc, 3)), 7).csr.f == csr.f
+                                                 trues(size(Zc, 2)), 7).csr.f == csr.f
         @test_throws MethodError PO.cross_sectional_block_regression(BareTestRegression(),
                                                                      Zc, Xc, Wc, 7)
     end
@@ -1840,11 +1920,11 @@ struct BareTestRegression <: PortfolioOptimisers.AbstractCrossSectionalRegressio
         @test all(x -> 0 <= x <= 1, r2)
         @test mean_cross_sectional_r2(csr, Z, X, W) ≈ sum(r2) / length(r2)
         # An exact fit scores one. Four assets and four factors leave no residual.
-        Ze = Zc[:, 1:size(Zc, 3), :]
-        Xe = Xc[:, 1:size(Zc, 3)]
-        We = Wc[:, 1:size(Zc, 3)]
+        Ze = Zc[1:size(Zc, 2), :, :]
+        Xe = Xc[:, 1:size(Zc, 2)]
+        We = Wc[:, 1:size(Zc, 2)]
         exact = cross_sectional_regression(CrossSectionalLinearRegression(), Ze, Xe, We)
-        @test cross_sectional_r2(exact, Ze, Xe, We) ≈ ones(size(Ze, 1))
+        @test cross_sectional_r2(exact, Ze, Xe, We) ≈ ones(size(Ze, 3))
         # An observation with no eligible asset has no ratio, and the mean skips it.
         Wn = copy(W)
         Wn[2, :] .= 0.0
@@ -1855,7 +1935,7 @@ struct BareTestRegression <: PortfolioOptimisers.AbstractCrossSectionalRegressio
               sum(filter(isfinite, r2n)) / count(isfinite, r2n)
         # A cross-section whose returns are all equal has a zero total sum of squares, so
         # its ratio is undefined too, and a panel of such observations has no mean at all.
-        Zf = ones(2, 3, 1)
+        Zf = ones(3, 1, 2)
         Xf = ones(2, 3)
         Wf = ones(2, 3)
         csf = cross_sectional_regression(CrossSectionalLinearRegression(), Zf, Xf, Wf)
@@ -1866,9 +1946,9 @@ struct BareTestRegression <: PortfolioOptimisers.AbstractCrossSectionalRegressio
     @testset "The systematic part on a tensor the fit did not see" begin
         csr = cross_sectional_regression(CrossSectionalLinearRegression(), Zc, Xc, Wc)
         # The asset axis may differ, and the observation and factor axes may not.
-        @test size(predict(csr, Zc[:, 1:3, :])) == (size(Zc, 1), 3)
-        @test_throws DimensionMismatch predict(csr, Zc[1:2, :, :])
+        @test size(predict(csr, Zc[1:3, :, :])) == (size(Zc, 3), 3)
         @test_throws DimensionMismatch predict(csr, Zc[:, :, 1:2])
+        @test_throws DimensionMismatch predict(csr, Zc[:, 1:2, :])
     end
 
     @testset "The result and its view" begin
@@ -1876,7 +1956,7 @@ struct BareTestRegression <: PortfolioOptimisers.AbstractCrossSectionalRegressio
                                          Zc, Xc, Wc)
         v = PortfolioOptimisers.port_opt_view(csr, [1, 3, 5])
         # The asset axis of a cross-sectional result is the second one, so only `eps` moves.
-        @test size(v.eps) == (size(Zc, 1), 3)
+        @test size(v.eps) == (size(Zc, 3), 3)
         @test v.eps == csr.eps[:, [1, 3, 5]]
         @test v.f === csr.f
         @test v.n === csr.n
@@ -1892,9 +1972,9 @@ struct BareTestRegression <: PortfolioOptimisers.AbstractCrossSectionalRegressio
         # of its own: the fit reproduces its return, whatever the return is. Its residual is
         # zero in exact arithmetic, and the subtraction would leave only round-off.
         T, N = 3, 5
-        Zh = zeros(T, N, 2)
-        Zh[:, :, 1] .= 1.0
-        Zh[:, 4, 2] .= 1.0
+        Zh = zeros(N, 2, T)
+        Zh[:, 1, :] .= 1.0
+        Zh[4, 2, :] .= 1.0
         Xh = [0.1 0.7 0.3 0.123456789 -0.2; 0.3 -0.1 0.25 0.987654321 0.4;
               -0.3 0.2 0.1 0.333333333 0.05]
         Wh = [1.0 2.0 1.0 3.0 1.0; 1.0 1.0 1.0 1.0 1.0; 1.0 1.0 1.0 0.0 1.0]
@@ -1912,7 +1992,7 @@ struct BareTestRegression <: PortfolioOptimisers.AbstractCrossSectionalRegressio
             @test cross_sectional_regression(cre, Zh, 1e-9 .* Xh, Wh).h1 == mark
         end
         # With an intercept, the level's own column still gives asset 4 its direction.
-        Zi = Zh[:, :, 2:2]
+        Zi = Zh[:, 2:2, :]
         csr = cross_sectional_regression(CrossSectionalLinearRegression(; intercept = true),
                                          Zi, Xh, Wh)
         @test csr.h1 == mark
@@ -1937,12 +2017,15 @@ struct BareTestRegression <: PortfolioOptimisers.AbstractCrossSectionalRegressio
               BitVector([false, false, true])
         # With the intercept column, the constant minus the level's column is the other
         # level's own direction, so a lone member of either level is marked, and a level of
-        # two members on each side marks nothing.
-        @test lo([0.0; 0.0; 1.0;;], [1.0, 1.0, 1.0], true) ==
+        # two members on each side marks nothing. Under an intercept the verb reads the
+        # exposures centred on their weighted means, as the regression hands them over.
+        cen(A, w) = A .- (w' * A) ./ sum(w)
+        @test lo(cen([0.0; 0.0; 1.0;;], ones(3)), ones(3), true) ==
               BitVector([false, false, true])
-        @test lo([0.0; 1.0; 1.0;;], [1.0, 1.0, 1.0], true) ==
+        @test lo(cen([0.0; 1.0; 1.0;;], ones(3)), ones(3), true) ==
               BitVector([true, false, false])
-        @test lo([0.0; 0.0; 1.0; 1.0;;], [1.0, 2.0, 1.0, 3.0], true) == falses(4)
+        w4 = [1.0, 2.0, 1.0, 3.0]
+        @test lo(cen([0.0; 0.0; 1.0; 1.0;;], w4), w4, true) == falses(4)
         # A result a caller builds by hand states no mark, and the constructor checks one.
         f = [1.0 2.0; 3.0 4.0]
         e = [0.1 0.2 0.3; 0.4 0.5 0.6]
@@ -1979,6 +2062,12 @@ struct BareTestRegression <: PortfolioOptimisers.AbstractCrossSectionalRegressio
                                                                                b = Float64[])
         @test_throws DimensionMismatch CrossSectionalRegression(; f = f, eps = eps, n = n,
                                                                 b = [1.0, 2.0, 3.0])
+        # The residual count has one entry per observation, and a view keeps it (#1900).
+        @test isnothing(CrossSectionalRegression(; f = f, eps = eps, n = n).edof)
+        @test_throws DimensionMismatch CrossSectionalRegression(; f = f, eps = eps, n = n,
+                                                                edof = [1, 1, 1])
+        csre = CrossSectionalRegression(; f = f, eps = eps, n = n, edof = [1.5, 1.0])
+        @test PortfolioOptimisers.port_opt_view(csre, [1, 3]).edof === csre.edof
     end
 
     @testset "The cache of a refit: the live mask, the active mask and the forecast history (#1751)" begin
@@ -2074,16 +2163,14 @@ struct BareTestRegression <: PortfolioOptimisers.AbstractCrossSectionalRegressio
         end
     end
 
-    @testset "The working type is the one a division of the panel lands in" begin
-        Zi = ones(Int, 2, 3, 1)
-        Zi[:, 2, 1] .= 2
-        Zi[:, 3, 1] .= 3
+    @testset "The working type is the promotion of the panel" begin
+        # Issue #1972 removed the integer case: integer data convert at the carrier.
+        Zi = ones(Int, 3, 1, 2)
+        Zi[2, 1, :] .= 2
+        Zi[3, 1, :] .= 3
         Xi = [1 2 3; 2 4 6]
         Wi = ones(Int, 2, 3)
-        csr = cross_sectional_regression(CrossSectionalLinearRegression(), Zi, Xi, Wi)
-        @test eltype(csr.f) == Float64
-        @test csr.f ≈ [1.0; 2.0;;]
-        # The division widens nothing that is already wide enough.
+        # The fit widens nothing that is already wide enough.
         csr32 = cross_sectional_regression(CrossSectionalLinearRegression(),
                                            Array{Float32}(Zi), Float32.(Xi), Float32.(Wi))
         @test eltype(csr32.f) == Float32
@@ -2095,16 +2182,37 @@ struct BareTestRegression <: PortfolioOptimisers.AbstractCrossSectionalRegressio
         @test r2 ≈ ones(Float32, 2)
         @test mean_cross_sectional_r2(csr32, Array{Float32}(Zi), Float32.(Xi),
                                       Float32.(Wi)) isa Float32
-        @test eltype(cross_sectional_r2(csr, Zi, Xi, Wi)) == Float64
         # A `Rational` panel keeps its type in `f`, but both members solve in floating
         # point, so the fit lands near the exact slope 13//14 rather than on it, #1352. The
         # float reference carries the tolerance, because `≈` of two `Rational`s has none.
-        Zr = reshape(Rational{Int}[1, 2, 3], 1, 3, 1)
+        Zr = reshape(Rational{Int}[1, 2, 3], 3, 1, 1)
         for cre in (CrossSectionalLinearRegression(), CrossSectionalTargetRegression())
             csrr = cross_sectional_regression(cre, Zr, Rational{Int}[1 3 2],
                                               ones(Rational{Int}, 1, 3))
             @test eltype(csrr.f) == Rational{Int}
             @test csrr.f[1] ≈ 13 / 14
+        end
+        # Inputs of mixed types fit in their promotion, as the promoted data do. Gathers in the
+        # type of each input solved a `Float32` design against `Float64` returns, gave `GLM`
+        # vectors of two types, and overflowed `Rational` weights in the weighted mean of an
+        # intercept (R37 of #1817). A `Float32` solve misses by about 1e-7. The residuals of
+        # the two calls differ in the last bit on a CI host and not on a local one, in 43 of
+        # the 62 red runs after 2ee4e9dfc8 (run 43573334652), so they compare at 1e-12.
+        rng = StableRNG(181737)
+        Zm, Xm, Wm = randn(rng, 30, 3, 4), randn(rng, 4, 30), 0.5 .+ rand(rng, 4, 30)
+        mixes = ((Float32.(Zm), Xm, Float32.(Wm)), (Zm, Float32.(Xm), Wm),
+                 (Zm, Xm, rationalize.(Wm; tol = 1e-6)))
+        for (Z, X, W) in mixes, intercept in (false, true),
+            mk in (CrossSectionalLinearRegression, CrossSectionalTargetRegression)
+
+            T = promote_type(eltype(Z), eltype(X), eltype(W))
+            cre = mk(; intercept)
+            a = cross_sectional_regression(cre, Z, X, W)
+            b = cross_sectional_regression(cre, T.(Z), T.(X), T.(W))
+            @test eltype(a.f) == T
+            @test isapprox(a.f, b.f; rtol = 1e-12)
+            @test isapprox(a.eps, b.eps; rtol = 1e-12)
+            @test isequal(a.b, b.b)
         end
     end
 end
@@ -2571,14 +2679,14 @@ using Dates
 
 @testset "CrossSectionalFactorModel" begin
     # One fixture, written out rather than generated: 4 observations, 3 assets, 2 factors.
-    # `Ms[end, :, :] == M`, as the exposure history of a fitted model does.
+    # `Ms[:, :, end] == M`, as the exposure history of a fitted model does.
     M = [1.0 2.0; 3.0 4.0; 5.0 6.0]
     b = [0.1, 0.2, 0.3]
-    Ms = zeros(4, 3, 2)
-    Ms[1, :, :] = [0.5 1.0; 1.5 2.0; 2.5 3.0]
-    Ms[2, :, :] = [0.6 1.1; 1.6 2.1; 2.6 3.1]
-    Ms[3, :, :] = [0.7 1.2; 1.7 2.2; 2.7 3.2]
-    Ms[4, :, :] = M
+    Ms = zeros(3, 2, 4)
+    Ms[:, :, 1] = [0.5 1.0; 1.5 2.0; 2.5 3.0]
+    Ms[:, :, 2] = [0.6 1.1; 1.6 2.1; 2.6 3.1]
+    Ms[:, :, 3] = [0.7 1.2; 1.7 2.2; 2.7 3.2]
+    Ms[:, :, 4] = M
     csr = CrossSectionalRegression(; f = [0.01 0.02; 0.03 0.04; 0.05 0.06; 0.07 0.08],
                                    eps = [0.11 0.12 0.13; 0.14 0.15 0.16; 0.17 0.18 0.19;
                                           0.21 0.22 0.23], n = [3, 3, 3, 3],
@@ -2643,9 +2751,9 @@ using Dates
         @test_throws DimensionMismatch CrossSectionalFactorModel(; M = M, b = b,
                                                                  fam = ["style"])
         @test_throws DimensionMismatch CrossSectionalFactorModel(; M = M, b = b,
-                                                                 Ms = zeros(4, 2, 2))
+                                                                 Ms = zeros(2, 2, 4))
         @test_throws DimensionMismatch CrossSectionalFactorModel(; M = M, b = b,
-                                                                 Ms = zeros(4, 3, 3))
+                                                                 Ms = zeros(3, 3, 4))
         @test_throws DimensionMismatch CrossSectionalFactorModel(; M = M, b = b,
                                                                  csr = CrossSectionalRegression(;
                                                                                                 f = csr.f,
@@ -2718,7 +2826,7 @@ using Dates
         @test v.M == M[i, :]
         @test v.L == L[i, :]
         @test v.b == b[i]
-        @test v.Ms == Ms[:, i, :]
+        @test v.Ms == Ms[i, :, :]
         @test v.vs == vs[:, i]
         @test v.esigma == esigma_diag[i]
         @test v.rw == rw[:, i]
@@ -2813,17 +2921,17 @@ using Dates
         # that place until issue #715 measured the residue.
         rng = StableRNG(987654321)
         To, No, Ko = 6, 5, 2
-        Z = randn(rng, To, No, Ko)
+        Z = permutedims(randn(rng, To, No, Ko), (2, 3, 1))
         Xr = randn(rng, To, No) ./ 20
         Wr = fill(1.0, To, No)
         fit = cross_sectional_regression(CrossSectionalLinearRegression(; intercept = true),
                                          Z, Xr, Wr)
-        csfm = CrossSectionalFactorModel(; M = Z[end, :, :], b = randn(rng, No) ./ 100,
+        csfm = CrossSectionalFactorModel(; M = Z[:, :, end], b = randn(rng, No) ./ 100,
                                          csr = fit, Ms = Z)
         # The loadings are the last slice of the exposure history.
-        @test csfm.M == csfm.Ms[end, :, :]
+        @test csfm.M == csfm.Ms[:, :, end]
         for t in 1:To
-            r = Xr[t, :] - csfm.Ms[t, :, :] * fit.f[t, :] - fit.eps[t, :]
+            r = Xr[t, :] - csfm.Ms[:, :, t] * fit.f[t, :] - fit.eps[t, :]
             # The residue of the identity is one number repeated across the assets.
             @test all(x -> isapprox(x, fit.b[t]; atol = 1e-12), r)
             # It is the intercept of the fit, and not the factor-orthogonal expected return.
@@ -2890,37 +2998,37 @@ end
     PO = PortfolioOptimisers
     rng = StableRNG(1_367)
     T, N = 5, 4
-    Ms = randn(rng, T, N, 3)
+    Ms = permutedims(randn(rng, T, N, 3), (2, 3, 1))
     f = randn(rng, T, 2)
     fx = randn(rng, T, 1)
     csr = CrossSectionalRegression(; f = f, eps = randn(rng, T, N), n = fill(N, T))
-    blk = CrossSectionalFactorModel(; M = Ms[T, :, :], b = zeros(N), csr = csr, Ms = Ms,
+    blk = CrossSectionalFactorModel(; M = Ms[:, :, T], b = zeros(N), csr = csr, Ms = Ms,
                                     nf = ["a", "b", "usd"], fam = ["s", "s", "currency"],
                                     fx = fx)
     @test cross_sectional_factor_returns(blk) == hcat(f, fx)
-    @test cross_sectional_factor_returns(CrossSectionalFactorModel(; M = Ms[T, :, 1:2],
+    @test cross_sectional_factor_returns(CrossSectionalFactorModel(; M = Ms[:, 1:2, T],
                                                                    b = zeros(N), csr = csr)) ===
           f
     # A view on the assets keeps the observed returns, which have no asset axis.
     @test PO.port_opt_view(blk, [1, 3]).fx === fx
     # The label of an observed factor is free; only the count is structural.
-    @test CrossSectionalFactorModel(; M = Ms[T, :, :], b = zeros(N), csr = csr, fx = fx,
+    @test CrossSectionalFactorModel(; M = Ms[:, :, T], b = zeros(N), csr = csr, fx = fx,
                                     fam = ["s", "t", "anything"]) isa
           CrossSectionalFactorModel
-    @test_throws PO.IsNothingError CrossSectionalFactorModel(; M = Ms[T, :, :],
+    @test_throws PO.IsNothingError CrossSectionalFactorModel(; M = Ms[:, :, T],
                                                              b = zeros(N), fx = fx)
-    @test_throws DimensionMismatch CrossSectionalFactorModel(; M = Ms[T, :, :],
+    @test_throws DimensionMismatch CrossSectionalFactorModel(; M = Ms[:, :, T],
                                                              b = zeros(N), csr = csr,
                                                              fx = fx[1:4, :])
-    @test_throws DimensionMismatch CrossSectionalFactorModel(; M = Ms[T, :, :],
+    @test_throws DimensionMismatch CrossSectionalFactorModel(; M = Ms[:, :, T],
                                                              b = zeros(N), csr = csr,
                                                              fx = hcat(fx, fx))
-    @test_throws PO.IsEmptyError CrossSectionalFactorModel(; M = Ms[T, :, :], b = zeros(N),
+    @test_throws PO.IsEmptyError CrossSectionalFactorModel(; M = Ms[:, :, T], b = zeros(N),
                                                            csr = csr, fx = zeros(T, 0))
     @test_throws PO.IsNothingError cross_sectional_factor_returns(CrossSectionalFactorModel(;
-                                                                                            M = Ms[T,
+                                                                                            M = Ms[:,
                                                                                                    :,
-                                                                                                   :],
+                                                                                                   T],
                                                                                             b = zeros(N)))
 end
 
@@ -3081,4 +3189,60 @@ end
             @test !f.excess && isempty(f.raw)
         end
     end
+end
+
+@testset "A dimension reduction regression names its column of ones (#1886)" begin
+    using Test, PortfolioOptimisers, StableRNGs, StatsBase, Statistics, LinearAlgebra
+    PO = PortfolioOptimisers
+    S = PO.StatsAPI
+    rng = StableRNG(21)
+    T, K, N = 120, 4, 3
+    F = 0.01 .* randn(rng, T, K)
+    X = F * randn(rng, K, N) .+ 0.005 .* randn(rng, T, N) .+ 0.002
+    aw = StatsBase.aweights(rand(rng, T))
+    # The fitted values of the reduced fit, intercept included, equal the values that the
+    # recovered loadings and intercept rebuild on the original factors.
+    function gap(re, y)
+        x1, Vp, mu, sigma = PO.prep_dim_red_reg(re, F)
+        fitted = S.predict(S.fit(factory(re.retgt, InterceptColumn(1)), x1, y), x1)
+        beta = PO._regression(re, y, mu, sigma, x1, Vp).beta
+        return maximum(abs.(fitted .- (beta[1] .+ F * beta[2:end])))
+    end
+    weighted(tgt) = factory(DimensionReductionRegression(; retgt = tgt), aw)
+    en = ElasticNet(; strength = FixedStrength(; gamma = 0.02))
+    for re in
+        (DimensionReductionRegression(; retgt = en), weighted(LinearModel()), weighted(en),
+         weighted(ElasticNet()),
+         weighted(ElasticNet(; strength = FixedStrength(; gamma = 0.02),
+                             ve = SimpleVariance())))
+        @test gap(re, X[:, 1]) < 1e-14
+    end
+    @test weighted(en).retgt.w === aw && weighted(en).ve.w === aw
+    # The penalty shrinks the loadings and keeps the intercept unpenalised: at a strength
+    # that zeroes every slope, the intercept is the weighted mean of each asset.
+    big = ElasticNet(; strength = FixedStrength(; gamma = 1e10))
+    rb = regression(weighted(big), X, F)
+    @test rb.b ≈ vec(mean(X, aw; dims = 1)) && all(iszero, rb.M)
+    @test regression(DimensionReductionRegression(; retgt = big), X, F).b ≈
+          vec(mean(X; dims = 1))
+    @test norm(regression(DimensionReductionRegression(; retgt = en), X, F).M) <
+          norm(regression(DimensionReductionRegression(), X, F).M)
+    # An unpenalised target ignores the call, so the default fit does not move.
+    @test factory(LinearModel(), InterceptColumn(1)) === LinearModel()
+    # #1899: the residual count of each asset is the count of its own fit. A least-squares
+    # fit keeps the integer count of a projection for every asset, and a penalised fit
+    # spends fewer parameters than its columns.
+    rl = regression(DimensionReductionRegression(), X, F)
+    x1, Vp, mu, sigma = PO.prep_dim_red_reg(DimensionReductionRegression(), F)
+    @test eltype(rl.edof) == Int && rl.edof == fill(size(x1, 1) - size(x1, 2), N)
+    re = DimensionReductionRegression(; retgt = ElasticNet())
+    rn = regression(re, X, F)
+    x1, Vp, mu, sigma = PO.prep_dim_red_reg(re, F)
+    counts = [S.fit(factory(ElasticNet(), InterceptColumn(1)), x1, X[:, i]).rdof
+              for i in 1:N]
+    @test eltype(rn.edof) == Float64 && rn.edof ≈ counts
+    # On this fixture the penalty sets one component of one asset to zero, so that asset
+    # spends one parameter fewer than the others.
+    p = size(x1, 1) - size(x1, 2)
+    @test all(>=(p), rn.edof) && count(>(p + 0.5), rn.edof) == 1
 end

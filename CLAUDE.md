@@ -1,195 +1,96 @@
-# PortfolioOptimisers.jl — working agreements
+# Working agreements for PortfolioOptimisers.jl
 
 A Julia portfolio-optimisation library. Estimators are configuration, Results are data, and the
-domain vocabulary is normative — read `GLOSSARY.md` before touching anything you cannot already name.
+domain vocabulary is normative. Read `GLOSSARY.md` before you touch anything that you cannot already
+name.
 
 ## Orientation
 
-- **`CODING_STANDARDS.md` is the map.** It routes a subject — a docstring, an `export`, a constructor, a
-  test — to the file that owns the rule and to the check that fails when the rule breaks. Start
-  there when you do not know which file governs what you are about to change. It carries no rules
-  of its own, so it never overrides the file it points at. `/improve-standards` audits it.
-- **`GLOSSARY.md` is the glossary.** It defines the domain language (Prior, Constraint Space,
-  Universe Sets, Feature Matrix, Objective Penalty, …) and is hand-written. When you introduce or
-  rename a concept, update it in the same change.
-- **`docs/adr/` records decisions.** An ADR whose decision reached `main` is **amended, never
-  rewritten**: append a `## Amendment (YYYY-MM-DD)` section. Such an ADR describes released
-  behaviour, so an ADR describing superseded behaviour is correct history, not a bug. An ADR whose
-  decision has **not** reached `main` is still a draft — rewrite it in place, because no reader
-  outside the branch ever saw the text you would be amending.
+- **`CODING_STANDARDS.md` is the map.** It routes a subject, such as a docstring, an `export`, a
+  constructor or a test, to the file that owns the rule and to the check that fails when the rule
+  breaks. It carries no rules of its own. `/improve-standards` audits it.
+- **`GLOSSARY.md` defines the domain language.** When you introduce or rename a concept, update it
+  in the same change.
+- **`docs/adr/` records decisions.** Its `README.md` states when an ADR is amended and when it is
+  rewritten in place.
+- **`src/CLAUDE.md` lists the design rules for library code**, one line each, with a link to the
+  section that owns each rule. Read it, and the sections it links, before you change or plan a
+  change to a file under `src/` or `ext/`.
 
 ## Parallel sessions
 
-Sessions run in parallel, so the checkout is not yours alone. Two rules keep them apart.
-
-**Work in your own worktree.** Create it with the `EnterWorktree` tool before your first edit.
-Commit there, then rebase onto `dev`, so the merge is a fast-forward that carries only your work.
-Merge into the local `dev`, and push `dev` to `origin`, never the worktree branch. After the merge,
-leave the worktree with `ExitWorktree`, then delete the branch. Never commit a change you did not
-make: check `git status` before you stage, and stage the files you edited by name rather than with
-`git add -A`.
-
-**Do not edit a file at the same time as another session.** Two sessions can change the same file
-during one ticket, one after the other. Only a simultaneous edit loses work. The session that
-finishes last commits the common file. That session rebases onto the commit of the session that
-finished first, then adds its own change to the current text.
-
-Three files are shared by every sweep ticket, and a fourth by every ticket that adds an ADR, so
-this rule bites hardest there:
-
-- `code_health/sweep_manifest.toml` — one row per source file.
-- `src/01_Base/01_DocstringDictionaries/` — `arg_dict`, `math_dict` and their siblings, one
-  subject to a file, so two sessions collide only when they add keys of one subject.
-- `test/test_26_docs.jl` — the library-wide ratchets, `DETAILS_TOTAL`, `NO_RELATED_TOTAL` and
-  `MATH_COPY_TOTAL`.
-- `docs/adr/README.md` — the ADR index, one row per ADR, so two new ADRs add adjacent rows.
-
-A ratchet is one number for the whole library. Two sessions that each lower it write two different
-numbers, and a merge keeps one of them. Lower a ratchet in the commit that pays it, and rebase
-before you merge so you lower the number that is current.
+- **Work in your own worktree.** Create it with the `EnterWorktree` tool before your first edit.
+  Commit there, rebase onto `dev`, merge into the local `dev` as a fast-forward, and push `dev` to
+  `origin`, never the worktree branch. Then leave with `ExitWorktree` and delete the branch.
+- **Never commit a change you did not make.** Check `git status`, and stage the files you edited
+  by name, never with `git add -A`.
+- **Do not edit a file at the same time as another session.** The session that finishes last
+  rebases onto the first, then adds its change to the current text. The `sweep-conform` skill
+  lists the files that every sweep ticket shares, and the rule for a library-wide ratchet.
+- **Do not spawn a fork subagent.** A fork copies the whole conversation and runs on the model of
+  this session. Spawn the general-purpose or the Explore agent, give it the context it needs in the
+  prompt, and choose its model for its task with the model parameter of the Agent tool: haiku for a
+  lookup or a search with a known target, sonnet for reading code across files, a census of sites
+  or a routine edit, and opus for a design question, a review that must judge, or a hard defect.
 
 ## Running Julia
 
-- **Go through the kaimon MCP tools** to explore and probe, not `julia` on Bash. `ex(e="…")`
-  evaluates in a REPL the user shares live. Start a REPL for your own worktree with
-  `start_session(project_path=…)`, and pass its session key to every `ex` call. A REPL that another
-  session opened is not yours to restart. Test files, doctests and the `code_health/` gates run in
-  a fresh bare process instead.
-- **Single-threaded**: `julia -t 1`, `BLAS.set_num_threads(1)`. Never kick off the full test suite
-  or a docs build — those are the maintainer's to run.
-- Run **targeted** `test_*.jl` files for the area you changed with
-  `julia -t 1 --project=test test/run_files.jl --done=<path> test_X.jl …`, as a background Bash
-  command. It runs each file after the `init_code` preamble of `test/runtests.jl`,
-  prints one `RESULT` line per file, and writes the verdict to `<path>` when it ends.
-  Narrow it with `--testset=<regex>`, `--time-depth=<N>`, `--timeout=<seconds>`; a red listed in
-  `test/known_red.toml` is named on its `RESULT` line (the header of `test/run_files.jl` explains).
-- **A targeted test is one whose result the change can alter.** Trace from the changed code to the
-  test files that assert a value passing through it, add the file of the new test, and add the
-  censuses that read what the commit touched. A file that only names a changed type is not
-  targeted. After a rebase, rerun the files that both your change and the new commits of `dev`
-  reach, and `code_health/gate_stamp.sh drop` every other stale stamp.
-- On a Revise world-age warning, **restart the session and cold-load**. If a session wedges, shut it
-  down and start a new one rather than fighting it.
+- **Go through the kaimon MCP tools** to explore and probe, not `julia` on Bash. Start a REPL for
+  your own worktree with `start_session(project_path=…)`, and pass its session key to every `ex`
+  call. A REPL that another session opened is not yours to restart.
+- **Run single-threaded**, with `julia -t 1` and `BLAS.set_num_threads(1)`. Never start the full
+  test suite or a docs build. Those are the maintainer's to run.
+- **Load the `run-tests` skill before you run a test file, a coverage run or a gate.** It holds the
+  machine slots, the targeted tests, the coverage rules and the stamps that the push guard reads.
+- On a Revise world-age warning, **restart the session and cold-load**. If a session hangs, shut it
+  down and start a new one.
 
 ## Editing
 
-- **Only edit `.jl`.** These are written by the docs build and are untracked:
+- **Only edit `.jl`.** The docs build writes these files, and git does not track them:
   `examples/**/*.ipynb`, `docs/src/examples/**`, `docs/src/user_guide/**`,
-  `docs/src/capability_catalogue.md`, `docs/src/TypeHierarchy.md`.
-  Their sources are `examples/**/*.jl`, `user_guide/*.jl`, `docs/capability_catalogue.jl`,
-  `docs/generate_type_hierarchy.jl`.
-  `docs/src/public_api/**` and `docs/src/private_api/**` are hand-written. No gate reads a
-  generated page from the tree: the Docs build writes them fresh and its cross-reference check
-  fails on a link to a page that does not exist, so a broken link in one is fixed at the `.jl`
-  source alone (ADR 0151).
-- **JuliaFormatter runs over the whole repository, and every file it reaches is formatted in
-  place.** It escapes a quote inside a jldoctest block as `\"`, which is normal output: inside a
-  `"""` docstring `\"` renders as `"`, and the doctests pass. **Do not revert the escaping.**
-- Long string literals and docstring prose are exempt from the margin in practice; code lines are
-  not.
-
-## Doctests
-
-- See the `run-doctests` skill for the fresh-process rule and the exact CI invocation to mirror.
-
-## Design rules
-
-- **Estimators never hold Results internally.** Enforce it with the field's *type bound*, not a
-  runtime check; precomputed structure belongs on the Result type. The rule has one exception, and
-  [ADR 0106](docs/adr/0106-a-partial-fit-state-is-the-one-result-an-estimator-holds.md) states it:
-  a partial-fit state is a Result that no consumer reads, so an estimator may hold one in a field
-  bound to `Union{Nothing, <:AbstractPartialFitState}`. That bound is the enforcement, and it still
-  refuses every other Result.
-- **A numeric type is derived, never coerced.** Read it off the arguments with `eltype`, `typeof`,
-  `real` and `promote_type`, or off the operation that widens it, and take an index with the
-  in-function conversion `ceil(Int, x)` rather than `Int(ceil(x))`. Never wrap a derived type in
-  `float`, and never read it off a division such as `typeof(one(T) / one(T))`: both clobber a
-  `Rational` and every type that needed no repair. When integer data must hold a fraction or a
-  `NaN`, pass the type of the data to `float_if_integer`, which floats an `Integer` and keeps every
-  other type. The library must stay open to number types it has never seen — an AD dual, a unit-carrying
-  quantity, a `Rational`, a number type another package defines — and every forced type closes it to
-  one of them. [`.github/instructions/julia-source-code.instructions.md`](.github/instructions/julia-source-code.instructions.md)
-  § *Numeric types come from the data* owns the rule, and
-  `test/test_55_numeric_coercion_census.jl` gates it.
-- **Prefer a per-type method over a new dependency** for reflection-style work. Derive the field
-  list, write the constructor name once per type, and use the ordinary keyword constructor.
-- Docstring field text is centralised in `field_dict` / `arg_dict` in
-  `src/01_Base/01_DocstringDictionaries/`, and an entry
-  that loses its last user is deleted. When a description must interpolate a key and when prose is
-  permitted is stated by
-  [`.github/instructions/julia-docstrings.instructions.md`](.github/instructions/julia-docstrings.instructions.md),
-  which owns that rule.
-- **A user-facing name is declared without approval (#1489).** A name that users are meant to
-  extend is `public`: an abstract type they subtype, and a verb that a subtype implements. A name
-  that users are meant to use directly is exported: a type they construct, a function they call.
-  When a name is unambiguously one of the two, declare it in the change that adds it. Ask the
-  maintainer only when it is ambiguous whether users extend or use the name at all.
-  - An `# Interfaces` section marks an extension point (ADR 0154), so its type and the verbs it
-    names are `public`. A family whose concrete members are exported is an extension point.
-  - A helper that the section tells an implementer to call is `public` too, and a caller or a
-    check that the library runs is named in plain code, with no link. ADR 0154 states the rule,
-    and `test/test_66_public_declaration_census.jl` gates it.
-  - An abstract type is extended, not used, so it is `public`, not exported. Export one only when
-    users plainly write it by name in their own code, and ask when that is not plain.
-  - Internal machinery stays undeclared. A name that only the library calls is neither.
-
-  `test/test_43_exported_abstract_type_census.jl` holds every exported and every `public` abstract
-  type on an allow-list, so a declared abstract type is an edit to that list in the same change.
-  **Do not restate the count here or anywhere else.** It has moved four times, and each written
-  copy went stale where it stood.
+  `docs/src/capability_catalogue.md`, `docs/src/TypeHierarchy.md`. Their sources are
+  `examples/**/*.jl`, `user_guide/*.jl`, `docs/capability_catalogue.jl` and
+  `docs/generate_type_hierarchy.jl`. `docs/src/public_api/**` and `docs/src/private_api/**` are
+  hand-written. Fix a broken link in a generated page at its `.jl` source alone (ADR 0151).
+- **Edit a `.jl` file with the Edit tool.** A change at many sites goes through the kaimon edit
+  tool with an absolute file path. A Python replace from a Bash heredoc halves a backslash.
+- **JuliaFormatter escapes a quote inside a jldoctest block as `\"`.** This is normal output. Do
+  not revert the escaping. Long string literals and docstring prose are exempt from the margin.
+  Code lines are not.
+- **Doctests:** see the `run-doctests` skill.
 
 ## Defects you find
 
 - **Fix a defect as soon as you find it when the fix is small, or when it belongs to the work in
-  hand.** Cover it with a test, and name the fix in your report. A defect you walk past is a defect
-  the next reader must find again.
-- **File an issue when the fix is large, or when it needs the maintainer's decision.** Put every
-  piece of context you hold into the issue: the reproduction, the file and the line, the cause you
-  found, the fix you would make, and the reason you did not make it. Someone else must be able to
-  work from the issue alone.
-- **Link the issue to the work that found it.** Name the issue in the pull request, the commit, or
-  the report for that work, and name that work in the issue.
+  hand.** Cover it with a test, and name the fix in your report.
+- **File an issue when the fix is large, or when it needs the maintainer's decision.** Give the
+  reproduction, the file and the line, the cause, the fix you would make, and the reason you did
+  not make it. Name the work that found it, and name the issue in that work.
+- **A name or an interface that a library precedent settles is not the maintainer's decision**,
+  and a breaking change is not either (`.github/instructions/julia-source-code.instructions.md`
+  § *A design is chosen by the standing test*). A case that the same mechanism reaches belongs to
+  the fix in hand.
 
 ## Functionality you add
 
-Every file under `src/` and `ext/` carries a row in [`code_health/sweep_manifest.toml`](code_health/sweep_manifest.toml)
-naming the child map of the systematic audit that owns it. `test/test_45_sweep_census.jl` reds the
-build when a file carries no row, and when a file's unit count leaves its row.
-
-Wire your addition into the audit in the same change:
-
-1. Add or correct the file's row. The census prints the line to paste. Take `map` from the check
-   below: it names the map when the directory uses one, and lists the candidates when the directory
-   uses several. Set `swept = false`. A swept row also records the name of the binding each unit
-   attaches to. A unit added to a swept file, or replaced one for one in it, keeps
-   `swept = true`: the commit sweeps the new units itself, and steps 3 and 4 do not apply. If the
-   commit cannot sweep them, it sets `swept = false` and takes all four steps (ADR 0148).
-2. Cover every line of a new file, or give it a Coverage Exemption. ADR 0082 owns that rule.
-3. Reopen the child map that owns the file, and reopen its umbrella, issue #404.
-4. Open one sub-issue of that child map for the addition, so it is swept as systematically as the
-   code it joins.
-
-`julia --project=code_health code_health/sweep_check.jl --fetch` reports all four steps for the
-files your branch touches, and prints the line to paste for step 1. It measures and writes nothing.
-The `sweep-conform` skill runs it before the commit, and the `sweep-file-issues` skill does steps 3
-and 4.
-
-Defer a feature whose design is not settled. Leave its row at `swept = false`, record it in the
-child map's *Not yet specified* section, and take steps 3 and 4 when the design settles.
+Every file under `src/` and `ext/` carries a row in `code_health/sweep_manifest.toml`, and an
+addition joins the systematic audit of #404 in the same change. Before the first commit that
+changes `src/` or `ext/`, load the `sweep-conform` skill. It gives the four steps of an addition,
+the check that reports them (`code_health/sweep_check.jl --fetch`), and the order of the gates in
+its § *Land the branch*. The `sweep-file-issues` skill does steps 3 and 4. Defer a feature whose
+design is not settled, as `sweep-conform` states.
 
 ## Repo etiquette
 
-- Never link to or post in repositories outside `dcelisgarza`'s — name external sources in prose.
-- Branch before committing if you are on the default branch.
+- **Never link to or post in repositories outside `dcelisgarza`'s.** Name external sources in
+  prose. `CODING_STANDARDS.md` lists the exceptions for a docs site and for a bibliography entry,
+  and `test/test_64_docs_page_metadata_census.jl` fails on a link to an external repository.
 - **A session that works an issue commits without being asked.** It commits, rebases and pushes
   `dev` as § *Parallel sessions* states. Any other session commits only when asked.
-- **Assign an issue to your `gh` account when you start to fix it.** Run
-  `gh issue edit <number> --add-assignee @me` before your first edit. Every issue you fix, close or
-  leave open with a part of the work done, carries your account as an assignee.
-- **Close an issue yourself after you commit the work that resolves it.** This holds for every kind
-  of issue: a defect, a feature, a sweep sub-issue, a map. Name the issue in the commit message, for
-  example `Fix #493: …`. A closing keyword does not close the issue: GitHub acts on the keyword only
-  when the commit reaches the default branch `main`, and `main` is current to the last release. Run
-  `gh issue close <number> --comment "…"` after you commit, and name the commit in the comment. If
-  the commit resolves only a part of the issue, leave the issue open. Close it after the commit that
-  finishes the work.
+- **Assign the issue to your `gh` account before your first edit**, with
+  `gh issue edit <number> --add-assignee @me`.
+- **Close the issue yourself after the commit that resolves it**, with
+  `gh issue close <number> --comment "…"` that names the commit. A closing keyword acts only when
+  the commit reaches `main`, the default branch. Leave the issue open while a part of the work
+  remains.

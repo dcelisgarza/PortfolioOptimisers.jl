@@ -232,8 +232,8 @@ function CombinatorialCrossValidationResult(; train_idx::VecVecInt, test_idx::Ve
     return CombinatorialCrossValidationResult(train_idx, test_idx, path_ids)
 end
 """
-    const CombCVER = Union{<:CombinatorialCrossValidation,
-                           <:CombinatorialCrossValidationResult}
+    const CombCVER = Union{CombinatorialCrossValidation,
+                           CombinatorialCrossValidationResult}
 
 Alias for a combinatorial cross-validation estimator or result.
 
@@ -244,7 +244,7 @@ Matches either a [`CombinatorialCrossValidation`](@ref) estimator or a [`Combina
   - [`CombinatorialCrossValidation`](@ref)
   - [`CombinatorialCrossValidationResult`](@ref)
 """
-const CombCVER = Union{<:CombinatorialCrossValidation, <:CombinatorialCrossValidationResult}
+const CombCVER = Union{CombinatorialCrossValidation, CombinatorialCrossValidationResult}
 function n_splits(n_folds::Integer, n_test_folds::Integer)
     return binomial(n_folds, n_test_folds)
 end
@@ -645,9 +645,8 @@ function fit_and_predict(opt::OptE_TD, rd::ReturnsResult, cv::CombCVER; cols = :
     predictions, _ = fold_loop(opt, length(train_idx), ex, Vector{PredictionResult};
                                rd = rd, train_idx = train_idx, test_idx = test_idx, cv = cv
                                ) do fold
-        return fit_and_predict(fold.est, fold.rd; train_idx = fold.train,
-                               test_idx = fold.test, cols = cols, wd = wd, hwd = hwd,
-                               fa = fa, store_weight_path = store_weight_path,
+        return fit_and_predict(fold.est, fold.rd, fold.train, fold.test, cols; wd = wd,
+                               hwd = hwd, fa = fa, store_weight_path = store_weight_path,
                                strict = strict, w_prev = fold.w_prev)
     end
     return PopulationPredictionResult(; pred = sort_predictions(cv_res, predictions))

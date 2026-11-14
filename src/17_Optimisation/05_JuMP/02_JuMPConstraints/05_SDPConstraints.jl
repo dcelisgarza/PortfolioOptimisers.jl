@@ -3,7 +3,7 @@
 
 Returns the Model State namespace that owns the weights registered under `prefix`.
 
-One lifted matrix ``\\mathbf{W}`` belongs to one weight vector, and so do the marks that describe the measures built on it, `variance_flag` and `rc_variance`. A build that registers weights it did not make also registers `w_owner`, the namespace that owns them. A programme Allocation Set in a leader's model registers the model's own `w` under `:aset_` with the owner `Symbol("")`. A build under [`DependentVariableTracking`](@ref) registers the weights of its enclosing build under its tracking prefix, with the owner of those weights. So the set's ceiling, the inner measures of the tracking build and the head's measures read one ``\\mathbf{W}`` and one set of marks. A prefix without `w_owner` owns itself. An [`IndependentVariableTracking`](@ref) prefix is one of these, because the benchmark shifts its weights.
+One lifted matrix ``\\mathbf{W}`` belongs to one weight vector, and so do the marks that describe the measures built on it, `variance_flag` and `rc_variance`. A build that registers weights it did not make also registers `w_owner`, the namespace that owns them. A later block of a JuMP head, such as the block of a programme Allocation Set in a leader's model, registers the model's own `w` under its namespace `blk_i_` with the owner `Symbol("")`. A build under [`DependentVariableTracking`](@ref) registers the weights of its enclosing build under its tracking prefix, with the owner of those weights. So the set's ceiling, the inner measures of the tracking build and the head's measures read one ``\\mathbf{W}`` and one set of marks. A prefix without `w_owner` owns itself. An [`IndependentVariableTracking`](@ref) prefix is one of these, because the benchmark shifts its weights.
 
 # Arguments
 
@@ -18,7 +18,7 @@ One lifted matrix ``\\mathbf{W}`` belongs to one weight vector, and so do the ma
 
   - [`set_sdp_constraints!`](@ref)
   - [`get_w`](@ref)
-  - [`add_allocation_set_constraints!`](@ref)
+  - [`set_block_constraints!`](@ref)
   - [`RiskTrackingRiskMeasure`](@ref)
   - [`RiskTrackingError`](@ref)
 """

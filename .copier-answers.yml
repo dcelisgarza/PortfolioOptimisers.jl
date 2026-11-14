@@ -27,7 +27,7 @@ ExplicitImportsChecklist: exclude_all_qualified_accesses_are_public
 JuliaIndentation: 4
 JuliaMinCIVersion: '1.11'
 JuliaMinVersion: '1.11'
-License: MIT
+License: EUPL-1.2
 LicenseCopyrightHolders: Daniel Celis Garza
 MarkdownIndentation: 2
 PackageName: PortfolioOptimisers

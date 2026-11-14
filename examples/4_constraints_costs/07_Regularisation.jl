@@ -236,8 +236,9 @@ than L1. How much a penalty changes the weights depends on its size against
 the rest of the objective, which here is the risk. The penalty is the coefficient times the
 norm of the weights.
 
-The number of effective assets, [`number_effective_assets`](@ref), is `1/(w ⋅ w)`. It measures
-how concentrated the weights are, and it is not a count of the weights that are not zero. A
+The number of effective assets, [`number_effective_assets`](@ref), is
+`sum(abs, w)^2 / (w ⋅ w)`. On these long-only weights, which sum to one, it is `1/(w ⋅ w)`. It
+measures how concentrated the weights are, and it is not a count of the weights that are not zero. A
 portfolio that holds fewer assets can still have more effective assets, if its weights are more
 even. A larger number of effective assets means a less concentrated portfolio.
 
@@ -346,30 +347,42 @@ rest of the change.
 
 ### 3.3 The three norm ceilings
 
-[`EffectiveAssetFloor`](@ref) is the one rule for the ceilings. You give it a fraction of the
-universe, and it returns the ceiling on the norm that keeps the effective number of assets at or
-above `m = fraction * N`. The effective number of assets of order `p` is `(sum(abs.(w) .^ p))^(1
-/ (1 - p))`. The ceiling is `m^(1 / p - 1)`, which is `1 / sqrt(m)` for `p = 2` and `1 / m` for
-`p = Inf`.
+A ceiling takes a floor of effective assets in place of a number. You give it a
+[`FractionOf`](@ref) the universe, or a [`CountOf`](@ref) assets, and the library computes the
+ceiling on the norm that keeps the effective number of assets at or above `m`, with
+`m = fraction * N` or `m = count`. The effective number of assets of order `p` is
+`(sum(abs.(w) .^ p))^(1 / (1 - p))`. The ceiling is `m^(1 / p - 1)`, which is `1 / sqrt(m)` for
+`p = 2` and `1 / m` for `p = Inf`.
 
-The order `p` comes from the constraint, not from the rule. `l2c` uses 2, `lpc` uses the `p` of
-its [`LpRegularisation`](@ref), and `linfc` uses `Inf`. When we call the rule ourselves, we pass
-the order in a `CalibrationContext`, as we did for the `lp` radius. We print the size of the
+The order `p` comes from the constraint, not from the floor. `l2c` uses 2, `lpc` uses the `p` of
+its [`LpRegularisation`](@ref), and `linfc` uses `Inf`. When we resolve the floor ourselves, we
+pass the order in a `CalibrationContext`, as we did for the `lp` radius. We print the size of the
 universe, the floor and the three ceilings.
 =#
 
 N = size(pr.X, 2)
 println("universe = $N assets, floor = $(0.5 * N) effective assets")
 
-eaf = EffectiveAssetFloor(; fraction = 0.5)
+eaf = FractionOf(0.5)
 
 ceiling_table = DataFrame(:slot => ["l2c", "lpc, p = 5", "linfc"],
                           :norm_order => ["2", "5", "Inf"],
                           :ceiling =>
-                              [eaf(:l2c, pr, nothing, nothing, CalibrationContext(; p = 2)),
-                               eaf(:lpc, pr, nothing, nothing, CalibrationContext(; p = 5)),
-                               eaf(:linfc, pr, nothing, nothing,
-                                   CalibrationContext(; p = Inf))])
+                              [PortfolioOptimisers.resolve_calibration_slot(eaf, :l2c, pr,
+                                                                            nothing,
+                                                                            nothing,
+                                                                            CalibrationContext(;
+                                                                                               p = 2)),
+                               PortfolioOptimisers.resolve_calibration_slot(eaf, :lpc, pr,
+                                                                            nothing,
+                                                                            nothing,
+                                                                            CalibrationContext(;
+                                                                                               p = 5)),
+                               PortfolioOptimisers.resolve_calibration_slot(eaf, :linfc, pr,
+                                                                            nothing,
+                                                                            nothing,
+                                                                            CalibrationContext(;
+                                                                                               p = Inf))])
 pretty_table(ceiling_table; formatters = [numfmt])
 
 #=
@@ -378,7 +391,7 @@ optimiser that has no ceiling. For each portfolio we print the effective number 
 order 2, and of the order that its ceiling uses.
 =#
 
-ceil_rule = EffectiveAssetFloor(; fraction = 0.5)
+ceil_rule = FractionOf(0.5)
 copts = [JuMPOptimiser(; pe = pr, slv = slv, wb = WeightBounds(; lb = -1, ub = 1), sbgt = 1,
                        bgt = 1),
          JuMPOptimiser(; pe = pr, slv = slv, wb = WeightBounds(; lb = -1, ub = 1), sbgt = 1,
@@ -412,7 +425,8 @@ ceilings that give one.
 =#
 
 try
-    eaf(:l2c, pr, nothing, nothing, CalibrationContext())
+    PortfolioOptimisers.resolve_calibration_slot(eaf, :l2c, pr, nothing, nothing,
+                                                 CalibrationContext())
 catch e
     println(sprint(showerror, e))
 end

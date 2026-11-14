@@ -66,3 +66,16 @@ fit under each member.
   block that is positive semidefinite to round-off.
 - The carry method `fold_prior_step` dispatches on the type parameter of `cache` by its place, so
   the new field moved that place from 25 to 26. Each later field moves it again.
+
+## Amendment (2026-10-28, #1867)
+
+**`srep = nothing` does not repair the systematic block, and `NoSystematicRepair` is removed.**
+`NoSystematicRepair()` named no rule of its own. It skipped the `:pdm` step on the systematic
+block, and ADR 0222 spells a skipped procedure as `nothing`. So `CrossSectionalFactorPrior.srep`
+is bound to `Option{<:AbstractSystematicRepair}`, with the default `nothing`.
+`systematic_processing!(::Nothing, mp::MatrixProcessing, sigma, X)` runs every step of `mp` except
+`:pdm`, then takes the symmetric part, as the table above states.
+`assert_systematic_repair(::Nothing, mp)` refuses an `mp` that is not a `MatrixProcessing`, and
+its message names `srep = nothing`. The default and the numbers do not move. Where the decision
+above names `NoSystematicRepair()`, read `srep = nothing`. The removal is a clean break with no
+deprecation, as ADR 0044 and ADR 0213 set.

@@ -18,7 +18,7 @@
     - `fold_weight_matrix` puts zeros outside each cluster of a `ClusterUniverse`.
     - A fold count or a clock that disagrees raises `DimensionMismatch`, and a
       time-varying panel without a clock raises `IsNothingError`.
-    - Integer returns give the weights of the same returns as `Float64` (#1363).
+    - A `Rational` returns matrix keeps its type in the buffer of outer returns (#1363).
     =#
 
     PO = PortfolioOptimisers
@@ -34,7 +34,7 @@
     # The normalised inner weight matrix, written from its definition.
     wtilde(W) = abs.(W) ./ map(x -> iszero(x) ? one(x) : x, sum(abs.(W); dims = 1))
     opti = [InverseVolatility(), EqualWeighted(), InverseVolatility()]
-    cv = OptimisationCrossValidation(; cv = KFold(; n = 4))
+    cv = KFold(; n = 4)
 
     @testset "combination_weights is its closed form" begin
         s = [3.0, 1.0, 2.0]
@@ -132,7 +132,7 @@
     @testset "rebuild_returns_result stacks the predictions" begin
         st = Stacking(; opti = opti, opto = InverseVolatility(), cv = cv)
         preds = PO.sub_portfolio_predictions(PO.MultiPeriodPredictionResult, opti,
-                                             PO.FullUniverse(), rd, cv.cv, st.ex)
+                                             PO.FullUniverse(), rd, cv, st.ex)
         heights = [length(p.mrd.X) for p in preds]
         ro = PO.rebuild_returns_result(rd, preds, PO.FullUniverse(), RenormaliseActive())
         @test ro.X == hcat([p.mrd.X for p in preds]...)
@@ -172,7 +172,7 @@
         @test PO.sub_portfolio_view(PO.FullUniverse(), rn.pr, 1) === rn.pr
 
         preds = PO.sub_portfolio_predictions(PO.MultiPeriodPredictionResult, nco.opti, u,
-                                             rd, cv.cv, nco.ex)
+                                             rd, cv, nco.ex)
         W2 = PO.fold_weight_matrix(preds, u, 2, N)
         for k in eachindex(cls)
             @test W2[cls[k], k] == preds[k].pred[2].res.w
@@ -190,7 +190,7 @@
 
     @testset "the folds must agree" begin
         preds = PO.sub_portfolio_predictions(PO.MultiPeriodPredictionResult, opti,
-                                             PO.FullUniverse(), rd, cv.cv,
+                                             PO.FullUniverse(), rd, cv,
                                              PO.FLoops.SequentialEx())
         preds5 = PO.sub_portfolio_predictions(PO.MultiPeriodPredictionResult, opti,
                                               PO.FullUniverse(), rd, KFold(; n = 5),
@@ -198,7 +198,7 @@
         @test_throws DimensionMismatch PO.assert_fold_alignment([preds[1], preds5[2]])
         rd_shift = ReturnsResult(; nx = string.(1:N), X = X, ts = ts .+ PO.Dates.Day(1))
         preds_s = PO.sub_portfolio_predictions(PO.MultiPeriodPredictionResult, opti,
-                                               PO.FullUniverse(), rd_shift, cv.cv,
+                                               PO.FullUniverse(), rd_shift, cv,
                                                PO.FLoops.SequentialEx())
         @test_throws DimensionMismatch PO.assert_fold_alignment([preds[1], preds_s[2]])
         @test PO.assert_fold_alignment(preds) === preds[1].pred
@@ -214,8 +214,8 @@
     end
 
     @testset "a scheme with no rng is shared" begin
-        @test PO.sub_portfolio_cv(cv.cv) === cv.cv
-        # No scheme that `OptimisationCrossValidation` accepts has an `rng` field.
+        @test PO.sub_portfolio_cv(cv) === cv
+        # No scheme that the `cv` field of a meta-optimiser accepts has an `rng` field.
         function leaves(S, acc = Any[])
             for s in subtypes(S)
                 isabstracttype(s) ? leaves(s, acc) : push!(acc, s)
@@ -226,6 +226,39 @@
                    leaves(PO.OptimisationCrossValidationEstimator))
     end
 
+    @testset "cv and scorer are flat fields, and a scorer needs a combinatorial scheme" begin
+        ccv = CombinatorialCrossValidation(; n_folds = 4, n_test_folds = 2)
+        nqp = NearestQuantilePrediction()
+        ocv = OnlineIndexWalkForward(100, 50)
+        stack(c, s) = Stacking(; opti = opti, opto = InverseVolatility(), cv = c,
+                               scorer = s)
+        nest(c, s) = NestedClustered(; opti = InverseVolatility(),
+                                     opto = InverseVolatility(), cv = c, scorer = s)
+        for mk in (stack, nest)
+            @test mk(ccv, nqp).scorer === nqp
+            @test isnothing(mk(ccv, nothing).scorer)
+            @test mk(ocv, nothing).cv === ocv
+            # A scorer that the scheme never reads is refused at construction.
+            for c in (nothing, cv, ocv)
+                err = @test_throws ArgumentError mk(c, nqp)
+                @test occursin("CombinatorialCrossValidation", err.value.msg)
+            end
+            # A split result is not a scheme, and an estimator holds no result.
+            @test_throws TypeError mk(split(cv, rd), nothing)
+        end
+        # The combinatorial path selects each path with the scorer of the meta-optimiser,
+        # and `nothing` selects with `NearestQuantilePrediction`.
+        calls = Ref(0)
+        pick(p) = (calls[] += 1; nqp(p))
+        r0 = optimise(stack(ccv, nothing), rd)
+        r1 = optimise(stack(ccv, pick), rd)
+        @test calls[] == length(opti)
+        @test r1.w ≈ r0.w
+        @test r1.cv === ccv
+        @test r1.scorer === pick
+        @test isnothing(r0.scorer)
+    end
+
     @testset "a categorical field reaches the outer problem as a tensor field" begin
         lvl = ["Fin", "Tech"]
         pnl = asset_panel([CategoricalPanelInput(; name = "sector",
@@ -233,54 +266,23 @@
         rdc = ReturnsResult(; nx = string.(1:N), X = X, ts = ts, pnl = pnl)
         st = Stacking(; opti = opti, opto = InverseVolatility(), cv = cv)
         preds = PO.sub_portfolio_predictions(PO.MultiPeriodPredictionResult, opti,
-                                             PO.FullUniverse(), rdc, cv.cv, st.ex)
+                                             PO.FullUniverse(), rdc, cv, st.ex)
         ro = PO.rebuild_returns_result(rdc, preds, PO.FullUniverse(), RenormaliseActive())
         f = PO.panel_field(ro.pnl, "sector")
         @test f isa TensorPanelField
-        @test size(f.vals) == (T, 3, 2)
-        @test all(sum(f.vals; dims = 3) .≈ 1)
+        # `assets × labels × observations` (ADR 0230): the labels of each cell sum to one.
+        @test size(f.vals) == (3, 2, T)
+        @test all(sum(f.vals; dims = 2) .≈ 1)
         # Neither removed method exists: no path gives either of them an argument.
         @test !hasmethod(PO.panel_field_stack, Tuple{Vector{PO.CategoricalPanelField}})
         @test !hasmethod(PO.fold_asset_panel,
                          Tuple{Nothing, Any, Matrix{Float64}, Any, Any})
     end
 
-    @testset "integer returns give the weights of the same returns as Float64" begin
-        #=
-        #1363: a weight, a fee and a net return are fractions, so a meta-optimiser that took
-        its matrix of inner weights, its weight bounds, its fees or its buffer of outer
-        returns from the element type of integer returns threw `InexactError`. Each path
-        below threw before the fix.
-        =#
+    @testset "a Rational returns matrix keeps its type in the outer buffer" begin
+        # Issue #1972 removed the integer case: integer data convert at the carrier.
         Xi = rand(StableRNG(2), -3:3, 120, 6)
         nx = string.("A", 1:6)
-        rdi = ReturnsResult(; nx = nx, X = Xi)
-        rdf = ReturnsResult(; nx = nx, X = Matrix{Float64}(Xi))
-        sets = UniverseSets(; dict = Dict("nx" => nx))
-        fees = FeesEstimator(; l = ["A1" => 0.001], dl = 0.0005)
-        kcv = OptimisationCrossValidation(; cv = KFold(; n = 3))
-        ew = EqualWeighted()
-        sti = [EqualWeighted(), InverseVolatility()]
-        opts = [NestedClustered(; opti = ew, opto = ew),
-                NestedClustered(; opti = ew, opto = ew, cv = kcv),
-                NestedClustered(; opti = ew, opto = ew, fees = fees, sets = sets),
-                Stacking(; opti = sti, opto = ew),
-                Stacking(; opti = sti, opto = ew, cv = kcv),
-                Stacking(; opti = sti, opto = ew, fees = fees, sets = sets),
-                SubsetResampling(; opt = ew, subset_size = 3, n_subsets = 4, seed = 7),
-                SubsetResampling(; opt = ew, subset_size = 3, n_subsets = 4, seed = 7,
-                                 fees = fees, sets = sets)]
-        for opt in opts
-            wi = optimise(opt, rdi).w
-            wf = optimise(opt, rdf).w
-            @test eltype(wi) == Float64
-            @test isapprox(wi, wf; rtol = 0, atol = eps(Float64))
-        end
-        # The buffer of outer returns holds a net return, a fraction, for integer inputs.
-        _, _, _, _, _, Xo = PO.prepare_outer_rd(rdi, [1 0; 0 1; 1 0; 0 1; 1 0; 0 1],
-                                                RenormaliseActive())
-        @test eltype(Xo) == Float64
-        # A type that is not an integer is kept.
         rdr = ReturnsResult(; nx = nx, X = Rational{Int}.(Xi))
         _, _, _, _, _, Xr = PO.prepare_outer_rd(rdr, Rational{Int}.(ones(Int, 6, 2)),
                                                 RenormaliseActive())
@@ -303,7 +305,7 @@ end
       point. An inner frontier raises `ArgumentError`.
     - An asset outside the Investable Mask gets a zero weight, and the other weights are
       those of a run without the asset.
-    - The constructor, `narrow_optimiser_vector`, the check for `NestedClustered` and the
+    - The constructor, `erase_optimiser_vector`, the check for `NestedClustered` and the
       time-dependent methods behave as their docstrings state.
     =#
 
@@ -317,7 +319,7 @@ end
     ew = EqualWeighted()
     ivo = InverseVolatility()
     opti = [ivo, ew]
-    cv = OptimisationCrossValidation(; cv = KFold(; n = 4))
+    cv = KFold(; n = 4)
     # The closed form of `InverseVolatility` on a returns matrix, the outer map `𝒪` here.
     inverse_volatility(R) = (v = 1 ./ vec(std(R; dims = 1)); v / sum(v))
     inner_weights(res) = hcat([x.w for x in res.resi]...)
@@ -400,7 +402,8 @@ end
         @test res.w[keep] ≈ ref.w
         # The positional constructor does not expand the weights a second time.
         @test PO.StackingResult(res.pr, res.wb, res.fees, res.resi, res.reso, res.cv,
-                                res.retcode, res.w, res.imsk, res.fb).w === res.w
+                                res.scorer, res.retcode, res.w, res.imsk, res.fb).w ===
+              res.w
     end
 
     @testset "the constructor validates its arguments" begin
@@ -427,17 +430,28 @@ end
                wf = IterativeWeightFinaliser())
     end
 
-    @testset "narrow_optimiser_vector" begin
+    @testset "erase_optimiser_vector" begin
+        # #1939: every vector leaves with the element type `OptE_Opt_TD`, so the type of a
+        # Stacking does not change with the types of its inner optimisers.
+        erased = Vector{PO.OptE_Opt_TD}([ivo, ew])
+        @test PO.erase_optimiser_vector(erased) === erased
         typed = [ivo, ivo]
-        @test PO.narrow_optimiser_vector(typed) === typed
+        @test eltype(PO.erase_optimiser_vector(typed)) === PO.OptE_Opt_TD
+        @test PO.erase_optimiser_vector(typed) == typed
         td = TimeDependent([ivo, ew], :nearest; default = ew)
         mixed = Any[ivo, td]
-        narrowed = PO.narrow_optimiser_vector(mixed)
-        @test eltype(narrowed) == Union{typeof(ivo), typeof(td)}
-        @test narrowed == mixed
+        @test eltype(PO.erase_optimiser_vector(mixed)) === PO.OptE_Opt_TD
+        @test PO.erase_optimiser_vector(mixed) == mixed
         tdf = TimeDependent([opti, opti]; default = opti)
-        @test PO.narrow_optimiser_vector(tdf) === tdf
-        @test_throws ArgumentError PO.narrow_optimiser_vector(Any[ivo, "a"])
+        @test PO.erase_optimiser_vector(tdf) === tdf
+        @test_throws ArgumentError PO.erase_optimiser_vector(Any[ivo, "a"])
+        # Two Stackings over different inner optimisers have one type for `opti`, also
+        # when the positional constructor builds them, as a lens update does.
+        s1 = Stacking(; opti = [ivo, ivo], opto = ivo)
+        s2 = Stacking(; opti = [ivo, ew], opto = ivo)
+        @test typeof(s1.opti) === typeof(s2.opti) === Vector{PO.OptE_Opt_TD}
+        s3 = PO.Accessors.set(s1, PO.parse_lens("opti[2]"), ew)
+        @test typeof(s3) === typeof(s2)
     end
 
     @testset "NestedClustered refuses a precomputed result in a Stacking" begin
@@ -704,7 +718,7 @@ end
         # The same optimisers pass with estimators in those slots.
         @test NestedClustered(; opti = HierarchicalRiskParity(),
                               opto = InverseVolatility()) isa NestedClustered
-        cv = OptimisationCrossValidation(; cv = KFold(; n = 2))
+        cv = KFold(; n = 2)
         @test NestedClustered(; opti = InverseVolatility(),
                               opto = NestedClustered(; opti = InverseVolatility(),
                                                      opto = InverseVolatility(), cv = cv)) isa

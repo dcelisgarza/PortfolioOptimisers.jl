@@ -145,3 +145,15 @@ and as a bound the tracking stays one-sided; that defect is outside this decisio
 present removed it. A head that minimises a variance builds the programme it built before.
 `test/test_27_prefix_registration.jl` covers the owner, the nested chain and each role, and
 `test/test_67b_constrained_update.jl` covers the set's ceilings in both models.
+
+## Amendment (2026-11-13): a later Constraint Block takes the namespace `blk_i_`, and `:aset_` is gone
+
+The amendment of 2026-09-24 names one more build that registers weights that it did not make: a
+programme Allocation Set in a leader's model, under `:aset_`. That prefix is gone.
+[ADR 0237](0237-a-constraint-block-holds-the-feasible-set-of-a-programme-and-the-entry-of-a-head-takes-a-list-of-blocks.md)
+gives the model of a JuMP head a list of Constraint Blocks. Block `i` after the first takes the
+Model State namespace `blk_i_`, so the set of a leader re-solve takes `blk_2_` (#2044, #2047).
+Phase 1 of the builder registers the weights of the model under that namespace with
+`w_owner = Symbol("")`. So `weights_prefix` keeps `W`, `variance_flag` and `rc_variance` with the
+weights, as the amendment of 2026-09-24 decided. Every builder with a fixed name takes the prefix
+of its block (#2041). The rule of the owner does not change.

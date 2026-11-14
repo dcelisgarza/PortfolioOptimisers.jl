@@ -1,10 +1,11 @@
 ```@meta
-Description = "Rank covariance, private API of PortfolioOptimisers.jl: RankCovarianceEstimator, show_fields."
+Description = "Rank covariance, private API of PortfolioOptimisers.jl: RankCovarianceEstimator, constant_column_correlation!, show_fields."
 ```
 
 # Rank covariance: private API
 
 ```@docs
 RankCovarianceEstimator
-PortfolioOptimisers.show_fields(::Union{<:KendallCovariance, <:SpearmanCovariance})
+constant_column_correlation!
+PortfolioOptimisers.show_fields(::Union{KendallCovariance, SpearmanCovariance})
 ```

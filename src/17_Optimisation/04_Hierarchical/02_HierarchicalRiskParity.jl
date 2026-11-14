@@ -12,14 +12,14 @@ The constructor's substitution check and [`time_dependent_field_defaults`](@ref)
   - [`assert_time_dependent_substitution`](@ref)
 """
 function hierarchical_risk_parity_td_defaults()::NamedTuple
-    return (; r = Variance(), sca = SumScalariser())
+    return (; r = Variance(), sca = nothing)
 end
 """
 $(DocStringExtensions.TYPEDEF)
 
 Allocates weights by recursively bisecting the dendrogram's leaf order and splitting each part's weight in inverse proportion to the risk of its two halves.
 
-This is the Hierarchical Risk Parity algorithm. It clusters the assets, orders the leaves, then splits that order until every part holds one asset. It solves no optimisation problem, so it accepts a risk measure that is not convex. The resolved weight bounds clamp the split factor at every split, and the weight finaliser of `opt` acts on the result. [`_optimise`](@ref) states the steps.
+This is the Hierarchical Risk Parity algorithm. It clusters the assets, orders the leaves, then splits that order until every part holds one asset. The split is stage 3 of [lopezdeprado2016](@cite), recursive bisection, which measures the risk of a half as a variance. Section 12.1.3 of [cajas2025](@cite) extends it to any risk measure, and so does this type. It solves no optimisation problem, so it accepts a risk measure that is not convex. The resolved weight bounds clamp the split factor at every split, and the weight finaliser of `opt` acts on the result. [`_optimise`](@ref) states the steps.
 
 # Mathematical definition
 
@@ -59,7 +59,7 @@ $(DocStringExtensions.FIELDS)
     HierarchicalRiskParity(;
         opt::HierarchicalOptimiser = HierarchicalOptimiser(),
         r::TD{<:OptRM_VecOptRM} = Variance(),
-        sca::TD{<:Scalariser} = SumScalariser(),
+        sca::TD_Option{<:Scalariser} = nothing,
         fb::TDO_Option{<:OptE_Opt} = nothing
     ) -> HierarchicalRiskParity
 
@@ -75,11 +75,11 @@ Keywords correspond to the struct's fields. Fields typed [`TD`](@ref) or [`TDO_O
 
 ## Propagated parameters
 
-When [`factory`](@ref) is called on this type, the following `@fprop`-tagged fields are automatically propagated:
+[`factory`](@ref) passes its arguments on to these `@fprop` fields:
 
-  - `opt`: Recursively updated via [`factory`](@ref).
-  - `r`: Recursively updated via [`factory`](@ref).
-  - `fb`: Recursively updated via [`factory`](@ref).
+  - `opt`: Recursively updated through [`factory`](@ref).
+  - `r`: Recursively updated through [`factory`](@ref).
+  - `fb`: Recursively updated through [`factory`](@ref).
 
 ## View parameters
 
@@ -173,7 +173,7 @@ HierarchicalRiskParity
       │    mtx_sqrt ┼ EigenFallbackSquareRoot()
       │   ratio_alg ┼ SquareRootRatio()
       │      corner ┴ nothing
-  sca ┼ SumScalariser()
+  sca ┼ nothing
    fb ┴ nothing
 ```
 
@@ -192,8 +192,8 @@ HierarchicalRiskParity
 
 # References
 
-  - $(ref_dict[:lopezdeprado2016])
-  - $(ref_dict[:cajas2025]) Section 12.1.
+  - $(ref_dict[:lopezdeprado2016]) Online supplementary materials, Stage 3 and Appendix A.2.
+  - $(ref_dict[:cajas2025]) Section 12.1.3.
 """
 @propagatable @concrete struct HierarchicalRiskParity <: ClusteringOptimisationEstimator
     """
@@ -213,7 +213,8 @@ HierarchicalRiskParity
     """
     @fprop fb
     function HierarchicalRiskParity(opt::HierarchicalOptimiser, r::TD{<:OptRM_VecOptRM},
-                                    sca::TD{<:Scalariser}, fb::TDO_Option{<:OptE_Opt})
+                                    sca::TD_Option{<:Scalariser},
+                                    fb::TDO_Option{<:OptE_Opt})
         assert_no_nearest_bind_optimiser_schedule(fb, :fb, :HierarchicalRiskParity)
         if isa(r, AbstractVector)
             @argcheck(!isempty(r), IsEmptyError("r cannot be empty"))
@@ -229,7 +230,7 @@ HierarchicalRiskParity
 end
 function HierarchicalRiskParity(; opt::HierarchicalOptimiser = HierarchicalOptimiser(),
                                 r::TD{<:OptRM_VecOptRM} = Variance(),
-                                sca::TD{<:Scalariser} = SumScalariser(),
+                                sca::TD_Option{<:Scalariser} = nothing,
                                 fb::TDO_Option{<:OptE_Opt} = nothing)::HierarchicalRiskParity
     return HierarchicalRiskParity(opt, r, sca, fb)
 end
@@ -286,7 +287,7 @@ The optimiser calls it after [`investable_reduction`](@ref), so the benchmark ha
 
  1. Bind the measures `hrp.r` to `rd` with [`bind_data_benchmark`](@ref), giving `r`.
  2. Return `hrp` itself when `r === hrp.r`.
- 3. Otherwise rebuild `hrp` with `r` through its keyword constructor, with [`rebuild_estimator`](@ref).
+ 3. Otherwise rebuild `hrp` with `r` through its keyword constructor, with [`rebuild_struct`](@ref).
 
 # Related
 
@@ -296,11 +297,11 @@ The optimiser calls it after [`investable_reduction`](@ref), so the benchmark ha
 """
 function bind_data_benchmark(hrp::HierarchicalRiskParity, rd::ReturnsResult)
     r = bind_data_benchmark(hrp.r, rd)
-    return r === hrp.r ? hrp : rebuild_estimator(hrp, (; r = r))
+    return r === hrp.r ? hrp : rebuild_struct(hrp, (; r = r))
 end
 function non_investable_universe(hrp::HierarchicalRiskParity,
                                  ni::VecStr)::HierarchicalRiskParity
-    return rebuild_estimator(hrp, (; opt = non_investable_universe(hrp.opt, ni)))
+    return rebuild_struct(hrp, (; opt = non_investable_universe(hrp.opt, ni)))
 end
 """
     split_factor_weight_constraints(alpha::Number, wb::WeightBounds, w::VecNum,
@@ -404,7 +405,8 @@ Run the Hierarchical Risk Parity optimisation for a single risk measure.
   - [`_optimise`](@ref)
 """
 function _optimise(hrp::HierarchicalRiskParity{<:Any, <:OptimisationRiskMeasure},
-                   rd::ReturnsResult = ReturnsResult(); kwargs...)
+                   rd::ReturnsResult = ReturnsResult(); rmsk::Option{BitVector} = nothing,
+                   kwargs...)
     hrp = reset_time_dependent_estimator(hrp)
     pr = prior(hrp.opt.pe, rd)
     # Resolve the fee on the caller's universe before `investable_reduction` narrows `sets`.
@@ -412,14 +414,14 @@ function _optimise(hrp::HierarchicalRiskParity{<:Any, <:OptimisationRiskMeasure}
     # asset. A liquidation charge keyed by name cannot resolve at all once its `w` sits on
     # the complement while `sets` sits on the mask. `investable_fees_view` then places the
     # resolved fee on the axes the mask leaves.
-    # A weight is a quotient of two risks, so an integer sample takes a float weight type,
-    # and every other sample keeps its own type.
-    T = float_if_integer(eltype(pr.X))
+    # A weight is a quotient of two risks, so it takes the type of the returns. A `Float32`
+    # sample stays in `Float32`.
+    T = eltype(pr.X)
     # An asset that a `FeatureDistance` of the clustering cannot read in the window of its
     # Asset Panel departs with the non-investable assets (`feature_readable_mask`). So does
     # an asset with a gap in the rows that a plain graph reader reads (`graph_reader_mask`).
-    imsk = feature_readable_mask(hrp.opt.cle, investable_mask(pr), rd)
-    imsk = graph_reader_mask(hrp.opt.cle, imsk, pr, rd, hrp.opt.strict)
+    # A fit again after a refusal of the distance reader passes its mask as `rmsk`.
+    imsk = distance_reader_entry_mask(hrp.opt.cle, pr, rd, hrp.opt.strict; rmsk = rmsk)
     fees = investable_fees_view(fees_constraints(hrp.opt.fees, hrp.opt.sets;
                                                  strict = hrp.opt.strict, datatype = T),
                                 imsk, pr.X)
@@ -432,17 +434,28 @@ function _optimise(hrp::HierarchicalRiskParity{<:Any, <:OptimisationRiskMeasure}
     # the distance the clustering is built from never sees a `NaN`, and the cluster count
     # is chosen on the investable universe. The weights are expanded back in
     # `HierarchicalResult`.
+    hrp0, pr0, rd0 = hrp, pr, rd
     _, pr, hrp, rd = investable_reduction(imsk, pr, hrp, rd)
     hrp = bind_data_benchmark(hrp, rd)
     X = pr.X
     # No `branchorder`: recursive bisection splits `clr.res.order`, so the leaf
     # permutation is the algorithm's input and must stay `:optimal` (ADR 0055).
-    clr = clusterise(hrp.opt.cle, pr; rd = rd, iv = rd.iv, ivpa = rd.ivpa)
+    # A distance reader that refuses an asset the prior kept raises before it clusters. Fit
+    # again from the same prior result, without that asset (`distance_reader_refusal_mask`).
+    clr = distance_reader_call(clusterise, hrp.opt.cle, pr; rd = rd, iv = rd.iv,
+                               ivpa = rd.ivpa)
+    if clr isa DistanceReaderRefusalError
+        return _optimise(rebuild_struct(hrp0,
+                                        (; opt = rebuild_struct(hrp0.opt, (; pe = pr0)))),
+                         rd0;
+                         rmsk = distance_reader_refusal_mask(clr, imsk, rd0,
+                                                             hrp0.opt.strict), kwargs...)
+    end
     assert_clustering_universe(clr, size(X, 2))
     r = factory(hrp.r, pr, hrp.opt.slv)
     wu = Matrix{T}(undef, size(X, 2), 2)
     rku = unitary_expected_risks(r, X, cfees)
-    wb = weight_bounds_constraints(hrp.opt.wb, hrp.opt.sets; N = size(X, 2),
+    wb = weight_bounds_constraints(hrp.opt.wb, hrp.opt.sets; rd = rd, N = size(X, 2),
                                    strict = hrp.opt.strict, datatype = T)
     w = ones(T, size(X, 2))
     items = [clr.res.order]
@@ -477,7 +490,7 @@ function _optimise(hrp::HierarchicalRiskParity{<:Any, <:OptimisationRiskMeasure}
                                         sca = hrp.sca, fb = nothing)
 end
 """
-    hrp_scalarised_risk(sca::Scalariser, wu::MatNum, rkus::VecVecNum, lc::VecNum,
+    hrp_scalarised_risk(sca::Option{<:Scalariser}, wu::MatNum, rkus::VecVecNum, lc::VecNum,
                         rc::VecNum, rs::VecOptRM, X::MatNum,
                         fees::Option{<:Fees}) -> Tuple
 
@@ -534,8 +547,9 @@ The four cases are [`SumScalariser`](@ref), [`MaxScalariser`](@ref), [`MinScalar
   - [`unitary_expected_risks`](@ref)
   - [`herc_intra_cluster_weights`](@ref)
 """
-function hrp_scalarised_risk(sca::Scalariser, wu::MatNum, rkus::VecVecNum, lc::VecNum,
-                             rc::VecNum, rs::VecOptRM, X::MatNum, fees::Option{<:Fees})
+function hrp_scalarised_risk(sca::Option{<:Scalariser}, wu::MatNum, rkus::VecVecNum,
+                             lc::VecNum, rc::VecNum, rs::VecOptRM, X::MatNum,
+                             fees::Option{<:Fees})
     return scalarise(sca, zip(rs, rkus); by = sum) do (r, rku)
         fill!(wu, zero(eltype(wu)))
         wu[lc, 1] .= inv.(view(rku, lc))
@@ -570,7 +584,8 @@ Run the Hierarchical Risk Parity optimisation for a vector of risk measures, sca
   - [`_optimise`](@ref)
 """
 function _optimise(hrp::HierarchicalRiskParity{<:Any, <:VecOptRM},
-                   rd::ReturnsResult = ReturnsResult(); kwargs...)
+                   rd::ReturnsResult = ReturnsResult(); rmsk::Option{BitVector} = nothing,
+                   kwargs...)
     hrp = reset_time_dependent_estimator(hrp)
     pr = prior(hrp.opt.pe, rd)
     # Resolve the fee on the caller's universe before `investable_reduction` narrows `sets`.
@@ -578,14 +593,14 @@ function _optimise(hrp::HierarchicalRiskParity{<:Any, <:VecOptRM},
     # asset. A liquidation charge keyed by name cannot resolve at all once its `w` sits on
     # the complement while `sets` sits on the mask. `investable_fees_view` then places the
     # resolved fee on the axes the mask leaves.
-    # A weight is a quotient of two risks, so an integer sample takes a float weight type,
-    # and every other sample keeps its own type.
-    T = float_if_integer(eltype(pr.X))
+    # A weight is a quotient of two risks, so it takes the type of the returns. A `Float32`
+    # sample stays in `Float32`.
+    T = eltype(pr.X)
     # An asset that a `FeatureDistance` of the clustering cannot read in the window of its
     # Asset Panel departs with the non-investable assets (`feature_readable_mask`). So does
     # an asset with a gap in the rows that a plain graph reader reads (`graph_reader_mask`).
-    imsk = feature_readable_mask(hrp.opt.cle, investable_mask(pr), rd)
-    imsk = graph_reader_mask(hrp.opt.cle, imsk, pr, rd, hrp.opt.strict)
+    # A fit again after a refusal of the distance reader passes its mask as `rmsk`.
+    imsk = distance_reader_entry_mask(hrp.opt.cle, pr, rd, hrp.opt.strict; rmsk = rmsk)
     fees = investable_fees_view(fees_constraints(hrp.opt.fees, hrp.opt.sets;
                                                  strict = hrp.opt.strict, datatype = T),
                                 imsk, pr.X)
@@ -598,17 +613,28 @@ function _optimise(hrp::HierarchicalRiskParity{<:Any, <:VecOptRM},
     # the distance the clustering is built from never sees a `NaN`, and the cluster count
     # is chosen on the investable universe. The weights are expanded back in
     # `HierarchicalResult`.
+    hrp0, pr0, rd0 = hrp, pr, rd
     _, pr, hrp, rd = investable_reduction(imsk, pr, hrp, rd)
     hrp = bind_data_benchmark(hrp, rd)
     X = pr.X
     # No `branchorder`: recursive bisection splits `clr.res.order`, so the leaf
     # permutation is the algorithm's input and must stay `:optimal` (ADR 0055).
-    clr = clusterise(hrp.opt.cle, pr; rd = rd, iv = rd.iv, ivpa = rd.ivpa)
+    # A distance reader that refuses an asset the prior kept raises before it clusters. Fit
+    # again from the same prior result, without that asset (`distance_reader_refusal_mask`).
+    clr = distance_reader_call(clusterise, hrp.opt.cle, pr; rd = rd, iv = rd.iv,
+                               ivpa = rd.ivpa)
+    if clr isa DistanceReaderRefusalError
+        return _optimise(rebuild_struct(hrp0,
+                                        (; opt = rebuild_struct(hrp0.opt, (; pe = pr0)))),
+                         rd0;
+                         rmsk = distance_reader_refusal_mask(clr, imsk, rd0,
+                                                             hrp0.opt.strict), kwargs...)
+    end
     assert_clustering_universe(clr, size(X, 2))
     r = factory(hrp.r, pr, hrp.opt.slv)
     wu = Matrix{T}(undef, size(X, 2), 2)
     rkus = [unitary_expected_risks(ri, X, cfees) for ri in r]
-    wb = weight_bounds_constraints(hrp.opt.wb, hrp.opt.sets; N = size(X, 2),
+    wb = weight_bounds_constraints(hrp.opt.wb, hrp.opt.sets; rd = rd, N = size(X, 2),
                                    strict = hrp.opt.strict, datatype = T)
     w = ones(T, size(X, 2))
     items = [clr.res.order]

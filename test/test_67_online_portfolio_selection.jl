@@ -677,19 +677,22 @@ end
         @test po.rows_needed(OPS(; alg = NewtonStep())) == 0
         # The spatial median is the coordinatewise median of a symmetric cloud, and the
         # modified iteration stays defined on a data point.
+        function spatial_median(P, iters, tol)
+            return po.price_level_statistic(SpatialMedian(; iters = iters, tol = tol), P)
+        end
         P = [1.0 0.0; -1.0 0.0; 0.0 1.0; 0.0 -1.0]
-        @test isapprox(po.spatial_median(P, 100, 1e-10), [0.0, 0.0]; atol = 1e-8)
+        @test isapprox(spatial_median(P, 100, 1e-10), [0.0, 0.0]; atol = 1e-8)
         P2 = [0.0 0.0; 1.0 0.0; 0.0 1.0]
-        y = po.spatial_median(P2, 200, 1e-12)
+        y = spatial_median(P2, 200, 1e-12)
         @test all(isfinite, y) &&
               sum(norm(P2[i, :] .- y) for i in 1:3) <=
               sum(norm(P2[i, :]) for i in 1:3) + 1e-12
         @test_throws IsEmptyError mean(PriceLevelExpectedReturns(), zeros(0, 3))
         # Every row on the iterate is the median; a data point with balanced directions
         # holds the iterate.
-        @test po.spatial_median(ones(4, 2), 10, 1e-8) == [1.0, 1.0]
+        @test spatial_median(ones(4, 2), 10, 1e-8) == [1.0, 1.0]
         P3 = [0.0 0.0; 1.0 0.0; -1.0 0.0; 0.0 1.0; 0.0 -1.0]
-        @test po.spatial_median(P3, 10, 1e-8) == [0.0, 0.0]
+        @test spatial_median(P3, 10, 1e-8) == [0.0, 0.0]
         # A forecast that is the same at every asset moves nothing.
         flat = ReturnsResult(; nx = ["A", "B"], X = [0.01 0.01; 0.02 0.02; -0.01 -0.01])
         @test optimise(OPS(; alg = MovingAverageReversion(; window = 3)), flat).w ==
@@ -1024,8 +1027,11 @@ end
         exm = ReturnsResult(; nx = nx, X = R - Bm, ts = ts)
         u = [0.1, 0.2, 0.3, 0.4]
         grad(src, r) = po.loss_gradient(loss(src), u, ones(N), r)
+        # The two gradients differ in the last bit on a CI host since Julia 1.13.4 (run
+        # 43514736851), so they compare at 1e-12.
         for (b, e) in ((rdb, exv), (rdm, exm)), t in (2, 8, 30)
-            @test grad(xs, rows(b, 1:t)) == grad(nothing, rows(e, 1:t))
+            @test isapprox(grad(xs, rows(b, 1:t)), grad(nothing, rows(e, 1:t));
+                           rtol = 1e-12)
             @test !isapprox(grad(xs, rows(b, 1:t)), grad(nothing, rows(b, 1:t)))
         end
         # The head: the loss's prior and the step in the Excess Frame together equal the
@@ -1139,6 +1145,9 @@ end
         @test prod(dot(Wc[s, :], X[s, :]) for s in 2:T) ≈ S(b, T) / S(b, 1)
         @test_throws IsEmptyError ConstantRebalancedPortfolio(; w = Float64[])
         @test_throws DomainError ConstantRebalancedPortfolio(; w = [NaN, 1.0])
+        # The target is a vector of numbers: another element type has no rule in the value
+        # check, so the keyword constructor refuses it (#2088).
+        @test_throws TypeError ConstantRebalancedPortfolio(; w = Any[0.5, 0.5])
         # A view whose slice sums to zero is uniform over the selected assets.
         @test po.port_opt_view(ConstantRebalancedPortfolio(; w = [0.0, 0.0, 1.0]), 1:2).w ==
               [0.5, 0.5]
@@ -1163,7 +1172,7 @@ end
 
         # The passive-aggressive step, Algorithm 1 of the paper, under the three step-length
         # rules, at thresholds below, at and above one.
-        steps = ((NoSlack(), (l, d) -> l / d),
+        steps = ((nothing, (l, d) -> l / d),
                  (LinearSlack(; C = 5), (l, d) -> min(5, l / d)),
                  (QuadraticSlack(; C = 5), (l, d) -> l / (d + 1 / 10)))
         for (slack, f) in steps, eps in (0.5, 1.0, 1.01)
@@ -1177,17 +1186,19 @@ end
             end
             @test maxerr(Wp, Hp) < 1e-13
         end
-        # Under NoSlack the raw step keeps the budget and earns exactly eps on the period.
+        # Under `slack = nothing` the raw step keeps the budget and earns exactly eps on the period.
         w4, x4 = [0.1, 0.2, 0.3, 0.4], [0.9, 1.0, 1.1, 1.2]
         d4 = x4 .- mean(x4)
         q4 = w4 .-
-             po.passive_aggressive_step(NoSlack(), dot(w4, x4) - 0.5, sum(abs2, d4)) .* d4
+             po.passive_aggressive_step(nothing, dot(w4, x4) - 0.5, sum(abs2, d4)) .* d4
         @test sum(q4) ≈ 1 && dot(q4, x4) ≈ 0.5
-        # NoSlack is the limit of the other two rules as C grows.
+        # `slack = nothing` is the limit of the other two rules as C grows.
         for s in (LinearSlack(; C = 1e12), QuadraticSlack(; C = 1e12))
             @test po.passive_aggressive_step(s, 0.3, 0.02) ≈
-                  po.passive_aggressive_step(NoSlack(), 0.3, 0.02)
+                  po.passive_aggressive_step(nothing, 0.3, 0.02)
         end
+        # The default step is PAMR, `slack = nothing` (#1867).
+        @test isnothing(PassiveAggressiveMeanReversion().slack)
         # Every asset moved alike: the step is zero.
         @test po.online_update!(PassiveAggressiveMeanReversion(; eps = 0.0), nothing, w4,
                                 fill(1.3, N), nothing, simplex)[2] ≈ w4

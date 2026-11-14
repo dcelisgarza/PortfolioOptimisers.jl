@@ -11,7 +11,9 @@ ArithRetMu
 resolve_deferred_quantities(rt::ArithmeticReturn, pr::AbstractPriorResult)
 no_bounds_returns_estimator(r::ArithmeticReturn, flag::Bool)
 no_bounds_returns_settings
+resolved_expected_return
 unit_scale_returns_estimator
+no_return_expr_returns_estimator
 no_bounds_optimiser
 PortfolioOptimisers.reader_frames(::ArithmeticReturn, ::AbstractString, ::Bool)
 ```

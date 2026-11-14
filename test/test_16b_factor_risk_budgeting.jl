@@ -12,7 +12,7 @@ include(joinpath(@__DIR__, "test16_setup.jl"))
         rb = RiskBudgeting(; r = r, opt = opt, rba = FactorRiskBudgeting(; re = rr))
         res = optimise(rb, rd)
         @test isa(res.retcode, OptimisationSuccess)
-        rkc = factor_risk_contribution(factory(r, pr, slv), res.w, pr.X; re = res.prb.rr)
+        rkc = factor_risk_contribution(factory(r, pr, slv), res.w, pr.X; re = res.rbr.rr)
         v1 = minimum(rkc[1:5])
         v2 = maximum(rkc[1:5])
         rtol = if i ∈ (1, 2, 10, 17)
@@ -40,16 +40,17 @@ include(joinpath(@__DIR__, "test16_setup.jl"))
         end
         @test success
 
-        rtol = if i ∈ (9, 15, 16, 17, 22, 27)
-            5e-3
-        elseif i == 14
-            5e-2
-        elseif i == 21
-            5e-3
-        elseif i ∈ (12, 18, 19)
+        # The pins were generated again after `k` gained its bound (#1844, #1845). They hold
+        # at 1e-6 on the host that made them. Each rtol is the largest `find_tol` over 20
+        # red CI runs of both host kinds (40536176678 to 40988847855) and over a local run
+        # under the CI flags (R14 of #1817). 20 needs 5e-4 on the second host kind since run
+        # 43500807458 (runs 43520317481 and 43560900102).
+        rtol = if i ∈ (11, 18, 19, 20, 22)
             5e-4
-        elseif i ∈ (10, 11)
-            5e-4
+        elseif i ∈ (10, 21)
+            1e-3
+        elseif i ∈ (9, 17)
+            5e-3
         else
             1e-4
         end
@@ -73,7 +74,7 @@ include(joinpath(@__DIR__, "test16_setup.jl"))
                                                      rkb = RiskBudget(; val = 1:5)))
         res = optimise(rb, rd)
         @test isa(res.retcode, OptimisationSuccess)
-        rkc = factor_risk_contribution(factory(r, pr, slv), res.w, pr.X; re = res.prb.rr)
+        rkc = factor_risk_contribution(factory(r, pr, slv), res.w, pr.X; re = res.rbr.rr)
         v1, m1 = findmin(rkc[1:5])
         v2, m2 = findmax(rkc[1:5])
         @test m1 == 1
@@ -104,25 +105,20 @@ include(joinpath(@__DIR__, "test16_setup.jl"))
         end
         @test success
 
-        rtol = if i ∈ (12, 18, 22) || Sys.isapple() && i == 20 || Sys.iswindows() && i == 10
-            # 12 is host-sensitive: reproduces at 1e-4 on a developer machine, needs 5e-4 on CI.
-            #
-            # 18 is host-sensitive too, and it is the reason this row is no longer keyed on
-            # the platform. It was granted 1e-3 on macOS alone and 5e-4 everywhere else, and
-            # it fails at 5e-4 on a Linux developer machine while CI passes at the same
-            # commit: the solve is a weight drift, not a failed solve, and the exported tip
-            # reproduces the drift to the last digit. So the threshold sits inside the
-            # spread of the hosts rather than on one platform's side of it. Issue #518.
+        # The pins were generated again after `k` gained its bound (#1844, #1845). They hold
+        # at 1e-6 on the host that made them. Each rtol is the largest `find_tol` over 20
+        # red CI runs of both host kinds (40536176678 to 40988847855) and over a local run
+        # under the CI flags (R14 of #1817). Before, cases 12 and 18 drifted between hosts
+        # at the same commit (#518). Since run 43500807458, 1 needs 5e-4 on the second host
+        # kind, and 27 needs 5e-4 there and 5e-3 on the first (runs 43520317481, 43560900102
+        # and 43573334652).
+        rtol = if i ∈ (1, 6, 10, 11, 20, 21, 22)
+            5e-4
+        elseif i == 18
             1e-3
-        elseif i ∈ (1, 10) || Sys.isapple() && i ∈ (2, 6)
-            5e-4
-        elseif i ∈ (15, 16, 17, 19, 27)
+        elseif i ∈ (19, 27)
             5e-3
-        elseif i in (13, 14)
-            1e-2
-        elseif i ∈ (20, 24)
-            5e-4
-        elseif i == 21
+        elseif i == 17
             5e-2
         else
             1e-4
@@ -148,7 +144,7 @@ include(joinpath(@__DIR__, "test16_setup.jl"))
                                            wb = WeightBounds(; lb = nothing, ub = nothing)))
     res = optimise(rb, rd)
     @test isa(res.retcode, OptimisationSuccess)
-    rkc = factor_risk_contribution(r, res.w, pr.X; re = res.prb.rr)
+    rkc = factor_risk_contribution(r, res.w, pr.X; re = res.rbr.rr)
     rkc[1:5] /= sum(rkc[1:5])
     ## The budget is now resolved against the *factor* axis, so the key is `sets.tfkey`.
     rkb = risk_budget_constraints(rb.rba.rkb, xfsets, xfsets.tfkey)
@@ -170,13 +166,23 @@ end
     ## A `RiskBudgetEstimator` still requires sets, and the message names the factor axis.
     @test_throws IsNothingError FactorRiskBudgeting(; re = rr, rkb = rkbe)
 
-    ## The pre-migration shape — factor names under the asset key, no factor axis declared —
-    ## is now a missing-axis error, reported against `sets.tfkey` rather than a `KeyError`
-    ## about an asset universe the user never wrote in.
+    ## The pre-migration shape, factor names under the asset key, declares a wrong asset
+    ## axis. The head refuses it, and the message names the factor key where the factors go.
+    msg = try
+        optimise(RiskBudgeting(;
+                               rba = FactorRiskBudgeting(; re = rr, rkb = rkbe,
+                                                         sets = fsets), opt = opt), rd)
+    catch e
+        sprint(showerror, e)
+    end
+    @test occursin("Declare the factors under the factor key `nf`", msg)
+    ## A universe of the assets alone declares no factor axis: a missing-axis error, reported
+    ## against `sets.tfkey`.
+    asets = UniverseSets(; dict = Dict("nx" => rd.nx))
     @test_throws KeyError optimise(RiskBudgeting(;
                                                  rba = FactorRiskBudgeting(; re = rr,
                                                                            rkb = rkbe,
-                                                                           sets = fsets),
+                                                                           sets = asets),
                                                  opt = opt), rd)
 
     ## A declared factor axis of the wrong length is caught against `rr.L`.
@@ -194,7 +200,7 @@ end
                                      rba = FactorRiskBudgeting(; re = rr,
                                                                rkb = RiskBudget(;
                                                                                 val = 1:5),
-                                                               sets = fsets), opt = opt),
+                                                               sets = asets), opt = opt),
                        rd).retcode, OptimisationSuccess)
 
     ## `sets` is `@vprop`: a view slices the asset axis and leaves the factor axis and the

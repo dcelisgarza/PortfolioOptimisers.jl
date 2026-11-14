@@ -205,9 +205,9 @@ end
     # A grid of its own on the group.
     pr3 = prior(EntropyPoolingPrior(; sets = sets, opt = ep_mopt,
                                     rlvar_views = RelativisticValueatRiskView(;
-                                                                              alg = GridRelativisticValueatRiskView(;
-                                                                                                                    pct = 0.8,
-                                                                                                                    K = 21),
+                                                                              alg = GridTailView(;
+                                                                                                 pct = 0.8,
+                                                                                                 K = 21),
                                                                               views = LinearConstraintEstimator(;
                                                                                                                 val = "AAPL <= $tgt"))),
                 ep_srd)
@@ -223,7 +223,7 @@ end
     for opt in (OptimEntropyPooling(), JuMPEntropyPooling(; slv = slv))
         pr = prior(EntropyPoolingPrior(; sets = sets, opt = opt,
                                        rlvar_views = RelativisticValueatRiskView(;
-                                                                                 alg = GridRelativisticValueatRiskView(),
+                                                                                 alg = GridTailView(),
                                                                                  views = v)),
                    ep_srd)
         # The grid enforces the bound at its points alone, so the answer is approximate.
@@ -238,7 +238,7 @@ end
     # reaches the model divided by its bound, and the constant that releases it is the
     # largest scaled coefficient less one, which the data fix row by row. The default `M`
     # multiplies that constant by one.
-    dflt = GridRelativisticValueatRiskView()
+    dflt = GridTailView()
     @test dflt.pct == 0.5
     @test dflt.K == 11
     @test dflt.M == 1
@@ -270,9 +270,8 @@ end
         r = PO.ep_rlvar(x, ep_sw0, ep_a, kappa)
         epc = Dict{Any, Any}()
         tvs = Any[]
-        PO.ep_add_rlvar_view!(epc, tvs, GridRelativisticValueatRiskView(), [x], [1.0], ep_a,
-                              kappa, op, m * r.rlvar, ep_sw0, [r.z], r.rlvar,
-                              "AAPL <= $(m * r.rlvar)")
+        PO.ep_add_rlvar_view!(epc, tvs, GridTailView(), [x], [1.0], ep_a, kappa, op,
+                              m * r.rlvar, ep_sw0, [r.z], r.rlvar, "AAPL <= $(m * r.rlvar)")
         return epc, tvs
     end
     # The grid of each half, built again, and whether the row of each of its points is finite.
@@ -282,7 +281,7 @@ end
     # host (#1635), so each half is checked against its own grid, never against a count.
     grid(kappa, m, op) = begin
         r = PO.ep_rlvar(x, ep_sw0, ep_a, kappa)
-        alg = GridRelativisticValueatRiskView()
+        alg = GridTailView()
         t, z = PO.ep_rlvar_grid(x, ep_sw0 ./ sum(ep_sw0), ep_a, kappa, op, m * r.rlvar, r.z,
                                 r.rlvar, alg.pct, alg.K; iters = alg.iters, tol = alg.tol,
                                 tilt_iters = alg.tilt_iters)
@@ -292,7 +291,7 @@ end
     end
     # Nothing overflows here, so the grid keeps every point it built.
     _, tvs = add(0.7, 0.75, :leq)
-    @test length(only(tvs).z) == GridRelativisticValueatRiskView().K
+    @test length(only(tvs).z) == GridTailView().K
     # The upper-bound half keeps exactly the points of its grid whose row is finite and whose
     # bound is positive, and each kept row is finite.
     _, tvs = add(0.9, 0.75, :leq)
@@ -312,7 +311,7 @@ end
     epc, _ = add(0.9, 0.75, :geq)
     lhs, rhs = epc[:ineq]
     _, _, fin, _ = grid(0.9, 0.75, :geq)
-    @test 0 < count(fin) < GridRelativisticValueatRiskView().K
+    @test 0 < count(fin) < GridTailView().K
     @test size(lhs, 1) == length(rhs) == count(fin)
     @test all(isfinite, lhs)
     @test all(isfinite, rhs)
@@ -579,11 +578,11 @@ end
     # it out.
     pr = prior(EntropyPoolingPrior(; sets = sets, opt = ep_jopt,
                                    evar_views = EntropicValueatRiskView(;
-                                                                        alg = GridEntropicValueatRiskView(),
+                                                                        alg = GridTailView(),
                                                                         views = v)), rd)
     pr2 = prior(EntropyPoolingPrior(; sets = sets, opt = ep_jopt,
                                     evar_views = EntropicValueatRiskView(;
-                                                                         alg = GridEntropicValueatRiskView(),
+                                                                         alg = GridTailView(),
                                                                          views = v,
                                                                          args = (PO.Optim.Brent(),),
                                                                          zlo_frac = sqrt(eps(Float64)))),
@@ -594,7 +593,7 @@ end
     # grid is centred on in the last digits.
     pr3 = prior(EntropyPoolingPrior(; sets = sets, opt = ep_jopt,
                                     evar_views = EntropicValueatRiskView(;
-                                                                         alg = GridEntropicValueatRiskView(),
+                                                                         alg = GridTailView(),
                                                                          views = v,
                                                                          zlo_frac = 1e-8)),
                 rd)
@@ -618,14 +617,14 @@ end
                              e.evar, "AAPL")
         tvs[1].z
     end
-    zanc = grid_of(GridEntropicValueatRiskView())
-    zone = grid_of(GridEntropicValueatRiskView(; iters = 1))
+    zanc = grid_of(GridTailView())
+    zone = grid_of(GridTailView(; iters = 1))
     @test zone == PO.ep_evar_grid(x, ep_w0, ep_a, :geq, tgt, e.z, 0.5, 11)
     @test zanc != zone
     @test isapprox(zanc[6] / e.z, 0.23115, rtol = 1e-4)
     # A tolerance the iteration cannot miss stops it at the first step, which lands short of
     # the anchor the default tolerance reaches.
-    @test grid_of(GridEntropicValueatRiskView(; tol = 1.0)) != zanc
+    @test grid_of(GridTailView(; tol = 1.0)) != zanc
 end
 
 @testset "a CVaR or EVaR view naming an asset the universe does not hold" begin
@@ -662,18 +661,18 @@ end
     add(pct, op; a = ep_a, ea = e) = begin
         epc = Dict{Symbol, Any}()
         tvs = Any[]
-        PO.ep_add_evar_view!(epc, tvs, GridEntropicValueatRiskView(; pct = pct), [x], [1.0],
-                             a, op, 0.7 * ea.evar, ep_sw0, [ea.z], ea.evar,
+        PO.ep_add_evar_view!(epc, tvs, GridTailView(; pct = pct), [x], [1.0], a, op,
+                             0.7 * ea.evar, ep_sw0, [ea.z], ea.evar,
                              "AAPL <= $(0.7 * ea.evar)")
         return epc, tvs
     end
     # Nothing overflows at the default half-width, so the grid keeps every point it built.
-    _, tvs = add(GridEntropicValueatRiskView().pct, :leq)
-    @test length(only(tvs).z) == GridEntropicValueatRiskView().K
+    _, tvs = add(GridTailView().pct, :leq)
+    @test length(only(tvs).z) == GridTailView().K
     # The lowest point overflows here, and the ones that remain carry finite rows.
     _, tvs = add(0.999, :leq)
     tv = only(tvs)
-    @test length(tv.z) < GridEntropicValueatRiskView().K
+    @test length(tv.z) < GridTailView().K
     for zk in tv.z
         c, isc = PO.ep_evar_grid_row(x, tv.rhs, zk)
         @test all(isfinite, c)
@@ -727,8 +726,8 @@ end
     # second order at its minimum, so a `tol` of `1e-10` on the value buys far less on `z`.
     epc = Dict{Symbol, Any}()
     tvs = Any[]
-    PO.ep_add_evar_view!(epc, tvs, GridEntropicValueatRiskView(; K = 1), [x], [1.0], ep_a,
-                         :leq, tgt, ep_w0, [e.z], e.evar, "AAPL <= $tgt")
+    PO.ep_add_evar_view!(epc, tvs, GridTailView(; K = 1), [x], [1.0], ep_a, :leq, tgt,
+                         ep_w0, [e.z], e.evar, "AAPL <= $tgt")
     @test isapprox(only(only(tvs).z), anc.z, rtol = 1e-6)
 end
 
@@ -801,24 +800,38 @@ end
     @test PO.ep_sbar(nothing, T, ep_a, ep_w0, ord) ==
           max(2 * ceil(Int, ep_a * T), ceil(Int, 2 * ep_a * T))
     @test PO.ep_sbar(nothing, T, ep_a, ep_w0, ord) == 102
-    @test PO.ep_sbar(5, T) == 5
-    @test PO.ep_sbar(2 * T, T) == T
-    @test PO.ep_sbar(0.1, T) == ceil(Int, 0.1 * T)
-    @test PO.ep_sbar(1e-6, T) == 1
+    @test PO.ep_sbar(CountOf(5), T) == 5
+    @test PO.ep_sbar(CountOf(2 * T), T) == T
+    @test PO.ep_sbar(FractionOf(0.1), T) == ceil(Int, 0.1 * T)
+    @test PO.ep_sbar(FractionOf(1e-6), T) == 1
 
     # `ep_assert_reachable_view` is the open band between the best and the worst
-    # realisation. Both ends are refused, and everything strictly inside passes.
+    # realisation. Both ends are refused, and everything strictly inside passes and binds.
     x = -rd.X[:, 1]
     lo, hi = extrema(x)
-    @test isnothing(PO.ep_assert_reachable_view(:eq, (lo + hi) / 2, [x], [1.0], ep_w0, "e",
-                                                "EVaR"))
-    @test isnothing(PO.ep_assert_reachable_view(:geq, prevfloat(hi), [x], [1.0], ep_w0, "e",
-                                                "EVaR"))
-    @test isnothing(PO.ep_assert_reachable_view(:leq, nextfloat(lo), [x], [1.0], ep_w0, "e",
-                                                "EVaR"))
+    @test PO.ep_assert_reachable_view(:eq, (lo + hi) / 2, [x], [1.0], ep_w0, "e",
+                                      "EVaR") === true
+    @test PO.ep_assert_reachable_view(:geq, prevfloat(hi), [x], [1.0], ep_w0, "e",
+                                      "EVaR") === true
+    @test PO.ep_assert_reachable_view(:leq, nextfloat(lo), [x], [1.0], ep_w0, "e",
+                                      "EVaR") === true
     for (op, v) in ((:geq, hi), (:leq, lo), (:eq, hi), (:eq, lo))
         @test_throws DomainError PO.ep_assert_reachable_view(op, v, [x], [1.0], ep_w0, "e",
                                                              "EVaR")
+    end
+    # The CVaR of one asset reaches its worst loss at a positive posterior, so under
+    # `worst = true` the upper end passes. The lower end, and anything past either end,
+    # stays refused (#1925).
+    for op in (:geq, :eq)
+        @test PO.ep_assert_reachable_view(op, hi, [x], [1.0], ep_w0, "e", "CVaR";
+                                          worst = true) === true
+        @test_throws DomainError PO.ep_assert_reachable_view(op, nextfloat(hi), [x], [1.0],
+                                                             ep_w0, "e", "CVaR";
+                                                             worst = true)
+    end
+    for op in (:leq, :eq)
+        @test_throws DomainError PO.ep_assert_reachable_view(op, lo, [x], [1.0], ep_w0, "e",
+                                                             "CVaR"; worst = true)
     end
     # Over several assets the band is the coefficient-weighted sum of the per-asset ends,
     # with the ends exchanged where the coefficient is negative.
@@ -826,12 +839,29 @@ end
     lo2, hi2 = extrema(y)
     hib = hi - 2 * lo2
     lob = lo - 2 * hi2
-    @test isnothing(PO.ep_assert_reachable_view(:eq, (lob + hib) / 2, [x, y], [1.0, -2.0],
-                                                ep_w0, "e", "CVaR"))
+    @test PO.ep_assert_reachable_view(:eq, (lob + hib) / 2, [x, y], [1.0, -2.0], ep_w0, "e",
+                                      "CVaR") === true
     @test_throws DomainError PO.ep_assert_reachable_view(:geq, hib, [x, y], [1.0, -2.0],
                                                          ep_w0, "e", "CVaR")
     @test_throws DomainError PO.ep_assert_reachable_view(:leq, lob, [x, y], [1.0, -2.0],
                                                          ep_w0, "e", "CVaR")
+    # The joint edge of several assets is not checked, so `worst = true` leaves it refused.
+    @test_throws DomainError PO.ep_assert_reachable_view(:geq, hi + hi2, [x, y], [1.0, 1.0],
+                                                         ep_w0, "e", "CVaR"; worst = true)
+    # A left-hand side that is constant on the support has no edge. A view that the prior
+    # meets binds no posterior and returns `false`. Any other view is refused (#1925).
+    xc = fill(-0.001, length(x))
+    for (op, v) in
+        ((:geq, -0.001), (:geq, -0.0011), (:leq, -0.001), (:leq, -0.0009), (:eq, -0.001))
+        @test PO.ep_assert_reachable_view(op, v, [xc], [1.0], ep_w0, "e", "EVaR") === false
+    end
+    for (op, v) in ((:geq, -0.0009), (:leq, -0.0011), (:eq, -0.0009), (:eq, -0.0011))
+        @test_throws DomainError PO.ep_assert_reachable_view(op, v, [xc], [1.0], ep_w0, "e",
+                                                             "EVaR")
+    end
+    # Two constant assets sum to a constant, so their view binds nothing either.
+    @test PO.ep_assert_reachable_view(:eq, -0.003, [xc, xc], [1.0, 2.0], ep_w0, "e",
+                                      "CVaR") === false
 
     # A posterior puts no mass where the prior puts none, so an observation of zero prior
     # probability widens neither band. Issue #1260: with the worst loss at zero prior, a
@@ -847,7 +877,7 @@ end
     @test LinearAlgebra.dot(qz, cz) ≈ 2.9
     @test_throws DomainError PO.ep_assert_reachable_view(:geq, 5.0, [cz], [1.0], wz, "e",
                                                          "EVaR")
-    @test isnothing(PO.ep_assert_reachable_view(:geq, 2.9, [cz], [1.0], wz, "e", "EVaR"))
+    @test PO.ep_assert_reachable_view(:geq, 2.9, [cz], [1.0], wz, "e", "EVaR") === true
 
     # `ep_check_tail_window` warns where the window of an integer CVaR carrier binds, which
     # is where it holds no more than `alpha`, and never for a window of the whole sample.
@@ -926,4 +956,126 @@ end
     @test PO.factor_residual_config(EntropyPoolingPrior(; pe = FactorPrior())) ==
           PO.factor_residual_config(FactorPrior())
     @test isnothing(PO.factor_residual_config(EntropyPoolingPrior()))
+end
+
+@testset "a tail view at an edge that a posterior meets passes (#1925)" begin
+    #=
+    `ep_assert_reachable_view` refused `rhs == hi` for every measure. The CVaR of one asset
+    equals its worst loss when the posterior puts at least `alpha` on the scenarios of that
+    loss, and such a posterior is positive on every scenario. The posterior of smallest
+    divergence then scales the prior by `alpha / q` on those scenarios and by
+    `(1 - alpha) / (1 - q)` on the rest, where `q` is their prior mass. Its divergence is the
+    closed form `klhi`, which reads no solver.
+    =#
+    x1 = -ep_sX[:, 1]
+    hi = maximum(x1)
+    q = count(==(hi), x1) / ep_sT
+    klhi = ep_a * log(ep_a / q) + (1 - ep_a) * log((1 - ep_a) / (1 - q))
+    cvw(wi, j = 1) = ConditionalValueatRisk(; alpha = ep_a, w = wi)(ep_sX[:, j])
+    tv(val, alg = nothing; f = ConditionalValueatRiskView) = f(; alpha = ep_a, alg = alg,
+                                                               views = LinearConstraintEstimator(;
+                                                                                                 val = val))
+    mk(val, alg = nothing; opt = ep_jopt) = EntropyPoolingPrior(; sets = sets, opt = opt,
+                                                                cvar_views = tv(val, alg))
+    for (val, alg, opt, rtol) in
+        (("AAPL >= $hi", LinearConditionalValueatRiskView(), ep_jopt, 1e-5),
+         ("AAPL == $hi", nothing, ep_jopt, 1e-5),
+         ("AAPL >= $hi", SequentialTailView(), ep_jopt, 1e-5),
+         ("AAPL >= $hi", IntegerConditionalValueatRiskView(), ep_mopt, 1e-6))
+        pr = prior(mk(val, alg; opt = opt), ep_srd)
+        @test isapprox(pr.kld, klhi; rtol = rtol)
+        @test isapprox(cvw(pr.w), hi; rtol = 1e-6)
+        @test all(>(0), pr.w)
+    end
+    # The reproduction of #1925: ten equal weights of 0.1 put more than `alpha` on the worst
+    # loss, so the prior meets the view at the worst loss.
+    X10 = ep_sX[1:10, :]
+    rd10 = ReturnsResult(; nx = rd.nx, X = X10)
+    h10 = maximum(-X10[:, 1])
+    @test ConditionalValueatRisk(; alpha = ep_a)(X10[:, 1]) == h10
+    pr10 = prior(mk("AAPL >= $h10"), rd10)
+    @test pr10.kld < 1e-8
+    # Past the worst loss, and for the measures that reach it only in a limit, the edge stays
+    # refused. So does the joint edge of two assets, which the check does not read.
+    @test_throws DomainError prior(mk("AAPL >= $(nextfloat(hi))"), ep_srd)
+    for (f, key) in ((EntropicValueatRiskView, :evar_views),
+                     (RelativisticValueatRiskView, :rlvar_views))
+        pe = EntropyPoolingPrior(; sets = sets, opt = ep_jopt,
+                                 NamedTuple{(key,)}((tv("AAPL >= $hi"; f = f),))...)
+        @test_throws DomainError prior(pe, ep_srd)
+    end
+    h2 = maximum(-ep_sX[:, 2])
+    @test_throws DomainError prior(mk("AAPL + AMD >= $(hi + h2)"), ep_srd)
+    # A constant asset: every measure of every posterior is the constant loss, so a view
+    # that the prior meets binds nothing, and the posterior is the prior. The prior value of
+    # an EVaR or an RLVaR is a little above the constant, so a view at the constant took the
+    # formulation of a view below the prior value, which failed (#1925).
+    Xc = copy(ep_sX[1:61, :])
+    Xc[:, 1] .= 0.001
+    rdc = ReturnsResult(; nx = rd.nx, X = Xc)
+    for (f, key) in
+        ((ConditionalValueatRiskView, :cvar_views), (EntropicValueatRiskView, :evar_views),
+         (RelativisticValueatRiskView, :rlvar_views))
+        pe(val) = EntropyPoolingPrior(; sets = sets, opt = ep_jopt,
+                                      NamedTuple{(key,)}((tv(val; f = f),))...)
+        for val in
+            ("AAPL >= -0.001", "AAPL <= -0.001", "AAPL == -0.001", "AAPL >= -0.0011",
+             "AAPL <= -0.0009")
+            pr = prior(pe(val), rdc)
+            @test iszero(pr.kld)
+            @test pr.w == fill(1 / 61, 61)
+        end
+        for val in ("AAPL >= -0.0009", "AAPL <= -0.0011", "AAPL == -0.0011")
+            @test_throws DomainError prior(pe(val), rdc)
+        end
+    end
+end
+
+@testset "a JuMP posterior puts no mass where the prior puts none (R28 of #1817)" begin
+    #=
+    The relative entropy cone of the JuMP solve read every observation, and a solver meets a
+    zero reference of the cone only to its tolerance. The posterior put about 1e-9 on each
+    observation of zero prior probability, so `kld` was `Inf`. `LogEntropyPooling` refused
+    any zero prior probability, because `log(0)` put an `Inf` coefficient in the objective.
+    The reference of the tail view is the closed form of the CVaR edge of #1925 over the
+    support, which reads no solver. The `Optim` route gives exact zeros off the support, so
+    it is the reference of the mean view.
+    =#
+    x1 = -ep_sX[:, 1]
+    jw = argmax(x1)
+    q = fill(1.0, ep_sT)
+    q[jw] = 0.0
+    q[(jw == 1) + 1] = 0.0
+    q ./= sum(q)
+    ws = StatsBase.pweights(q)
+    sup = q .> 0
+    hs = maximum(x1[sup])
+    qs = sum(q[sup .& (x1 .== hs)])
+    kls = ep_a * log(ep_a / qs) + (1 - ep_a) * log((1 - ep_a) / (1 - qs))
+    mv = LinearConstraintEstimator(; val = "AAPL == $(sum(q .* ep_sX[:, 1]) + 0.001)")
+    po = prior(EntropyPoolingPrior(; sets = sets, w = ws, mu_views = mv), ep_srd)
+    @test all(iszero, po.w[.!sup])
+    for alg in (ExpEntropyPooling(), LogEntropyPooling())
+        opt = JuMPEntropyPooling(; slv = slv, alg = alg)
+        pr = prior(EntropyPoolingPrior(; sets = sets, opt = opt, w = ws,
+                                       cvar_views = ConditionalValueatRiskView(;
+                                                                               alpha = ep_a,
+                                                                               views = LinearConstraintEstimator(;
+                                                                                                                 val = "AAPL >= $hs"))),
+                   ep_srd)
+        @test all(iszero, pr.w[.!sup])
+        @test all(>(0), pr.w[sup])
+        # The solve meets the edge to its tolerance, so the divergence falls a little under
+        # the closed form: 1.1e-5 relative on a local host.
+        @test isapprox(pr.kld, kls; rtol = 1e-4)
+        pm = prior(EntropyPoolingPrior(; sets = sets, opt = opt, w = ws, mu_views = mv),
+                   ep_srd)
+        @test all(iszero, pm.w[.!sup])
+        # `isapprox(pm.w, po.w; rtol)`, in a form whose failure prints both norms. The JuMP
+        # posterior misses the `Optim` one by a relative norm of 1.6e-5 on a developer machine
+        # under the CI flags, at 07e51899a0 and after it, and by about 2.9e-5 on the first CI
+        # host kind (runs 43500807458 to 43573334652), so the bound is 1e-4.
+        @test PO.LinearAlgebra.norm(pm.w - po.w) <= 1e-4 * PO.LinearAlgebra.norm(po.w)
+        @test isapprox(pm.kld, po.kld; rtol = 1e-4)
+    end
 end

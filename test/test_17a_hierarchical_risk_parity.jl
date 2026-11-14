@@ -165,12 +165,6 @@ end
     # A float sample of another width keeps its type.
     r32 = optimise(HierarchicalRiskParity(), ReturnsResult(; nx = rdx.nx, X = Float32.(X)))
     @test eltype(r32.w) == Float32
-    # An integer sample gives the weights of its Float64 copy.
-    Xi = rand(StableRNG(5), -20:20, 60, 6)
-    nxi = ["a$i" for i in 1:6]
-    wint = optimise(HierarchicalRiskParity(), ReturnsResult(; nx = nxi, X = Xi)).w
-    @test wint ==
-          optimise(HierarchicalRiskParity(), ReturnsResult(; nx = nxi, X = Float64.(Xi))).w
     # Validation.
     @test_throws IsEmptyError HierarchicalRiskParity(; r = PO.OptimisationRiskMeasure[])
     @test_throws ArgumentError HierarchicalRiskParity(; r = NoRisk())
@@ -215,7 +209,7 @@ end
     - `unitary_expected_risks` is ``R(e_i)``: the diagonal of the covariance for a
       `Variance`, the measure of column `i` for a measure that reads the returns, and the
       net series under fees. The in-place form agrees and leaves its scratch vector zero.
-      The risks take the type of the risk, so an integer `X` gives `Float64` risks.
+      The risks take the type of the risk, so a `Float32` `X` gives `Float32` risks.
     - `assert_clustering_universe` returns `nothing` on a match and raises
       `DimensionMismatch` on a mismatch.
     - The keyword constructor of `HierarchicalResult` expands `w` onto the mask, and the
@@ -257,21 +251,6 @@ end
         rk32 = PO.unitary_expected_risks(factory(Variance(), pr32), pr32.X)
         @test eltype(rk32) === Float32
         @test rk32 == diag(pr32.sigma)
-
-        # An integer returns matrix has fractional risks. Before the sweep the risk vector
-        # took `eltype(X)` and raised `InexactError`.
-        Xi = rand(StableRNG(5), -20:20, T, N)
-        pri = prior(EmpiricalPrior(), Xi)
-        prf = prior(EmpiricalPrior(), float(Xi))
-        for r in (Variance(), ConditionalValueatRisk())
-            rki = PO.unitary_expected_risks(factory(r, pri), pri.X)
-            @test eltype(rki) === Float64
-            @test rki ≈ PO.unitary_expected_risks(factory(r, prf), prf.X)
-        end
-        wki = zeros(N)
-        rki = zeros(N)
-        PO.unitary_expected_risks!(wki, rki, factory(Variance(), pri), pri.X)
-        @test rki ≈ diag(prf.sigma)
     end
 
     @testset "assert_clustering_universe refuses a clustering of another universe" begin

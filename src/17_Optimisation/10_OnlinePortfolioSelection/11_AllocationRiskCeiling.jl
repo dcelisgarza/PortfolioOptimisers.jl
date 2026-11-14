@@ -50,6 +50,49 @@ function assert_risk_ceiling(rs::VecRM)::Nothing
     return nothing
 end
 """
+    assert_return_floor(ret::Nothing)
+    assert_return_floor(ret::JuMPReturnsEstimator)
+    assert_return_floor(rets::VecJRE)
+
+Refuses a return term whose floor a [`ProgrammeAllocationSet`](@ref) cannot hold.
+
+The floor of a term is its `settings.lb`. A [`Frontier`](@ref) or a vector of floors asks for one allocation at each floor, and a one-step projection returns one allocation. The model would hold the floors in `:ret_frontier`, and no solve would read them. So the function refuses both forms, as [`assert_risk_ceiling`](@ref) refuses them for a ceiling. A floor that is `nothing` or a number passes.
+
+# Arguments
+
+  - `ret`: The return floor of the set, `nothing`, or a vector of return terms.
+
+# Validation
+
+  - `settings.lb` of a term is `nothing` or a number. An `ArgumentError` is thrown otherwise.
+
+# Returns
+
+  - `nothing`.
+
+# Related
+
+  - [`ProgrammeAllocationSet`](@ref)
+  - [`assert_risk_ceiling`](@ref)
+  - [`set_return_bounds!`](@ref)
+  - [`assert_frontier_sweep_owner`](@ref): the same refusal for an optimiser that solves its model once.
+"""
+function assert_return_floor(::Nothing)::Nothing
+    return nothing
+end
+function assert_return_floor(ret::JuMPReturnsEstimator)::Nothing
+    lb = ret.settings.lb
+    @argcheck(!isa(lb, Front_NumVec),
+              ArgumentError("the floor of a `$(nameof(typeof(ret)))` on a ProgrammeAllocationSet is its `settings.lb`, `nothing` or a number; got `$lb`. A frontier or a vector of floors asks for many allocations, and a one-step projection returns one."))
+    return nothing
+end
+function assert_return_floor(rets::VecJRE)::Nothing
+    for ret in rets
+        assert_return_floor(ret)
+    end
+    return nothing
+end
+"""
     risk_reads_rows(r::Nothing)
     risk_reads_rows(r::Variance)
     risk_reads_rows(r::StandardDeviation)
@@ -90,11 +133,10 @@ function risk_reads_rows(rs::VecRM)
 end
 """
     allocation_set_prior(set::ProgrammeAllocationSet, X::Option{<:ReturnsResult})
-    allocation_set_prior(set::BoundedAllocationSet, X::Option{<:ReturnsResult})
 
 Fits the prior result that a programme set's row-reading slots are built on.
 
-The set fits its `pe` on the rows that the head holds, the same way a batch head fits a prior on any returns data. The prior reads its own source, whatever the source of the head's step is. When it states `x_src = ExcessSource()` the fit reads `X - B`, which [`benchmark_relative_returns`](@ref) gives. The fit reads the Asset Panel beside the rows, so the result answers `NaN` at an asset outside the prior's Coverage Universe. A set that reads no rows fits nothing, and a bounded set never fits anything.
+The set fits its `pe` on the rows that the head holds, the same way a batch head fits a prior on any returns data. The prior reads its own source, whatever the source of the head's step is. When it states `x_src = ExcessSource()` the fit reads `X - B`, which [`benchmark_relative_returns`](@ref) gives. The fit reads the Asset Panel beside the rows, so the result answers `NaN` at an asset outside the prior's Coverage Universe. A set that reads no rows fits nothing. A [`BoundedAllocationSet`](@ref) reads no rows, so no caller asks it for a prior.
 
 # Algorithm
 
@@ -126,12 +168,9 @@ The set fits its `pe` on the rows that the head holds, the same way a batch head
 function allocation_set_prior(set::ProgrammeAllocationSet, X::Option{<:ReturnsResult})
     if isnothing(rows_needed(set))
         @argcheck(!isnothing(X),
-                  ArgumentError("a ProgrammeAllocationSet with a slot that reads the head's rows — a ceiling built on its prior, a tracking error, a centrality or phylogeny estimator, an exposure row, a return floor or a Calibration Rule — reads them inside an Online Update alone; `project` was called with none."))
+                  ArgumentError("a ProgrammeAllocationSet with a slot that reads the head's rows — weight bounds that read the returns, a ceiling built on its prior, a tracking error, a centrality or phylogeny estimator, an exposure row, a return floor or a Calibration Rule — reads them inside an Online Update alone; `project` was called with none."))
         return prior(set.pe, X)
     end
-    return nothing
-end
-function allocation_set_prior(::BoundedAllocationSet, ::Option{<:ReturnsResult})
     return nothing
 end
 """
@@ -166,7 +205,7 @@ end
 
 Refuses a programme set prior that cannot price an asset the model trades, and names the asset.
 
-The projection programme reduces the model to the prior's Investable Mask before it builds, so its prior always passes. A leader's model trades the Investable Mask of the leader's own prior, and the set fits its prior on the same rows. When both priors are plain, the two masks agree and the check passes. When the set's `pe` is plain and the leader's prior is mask-aware, a young asset that the leader trades can have no price in the set's prior. Its ceiling would then carry `NaN`, so the check refuses it here, before the model reaches the solver.
+The direct call of [`set_allocation_set_constraints!`](@ref) calls it, because its model has a fixed width. A young asset that the model trades can have no price in the set's prior, when the set's `pe` is plain. Its ceiling would then carry `NaN`, so the check refuses it here, before the model reaches the solver. The projection programme and the leader re-solve of [`FollowTheLeader`](@ref) do not call it. Each one resolves the set through the shared entry, which drops such an asset with the warning of [`allocation_set_priced_mask`](@ref).
 
 # Algorithm
 
@@ -189,8 +228,8 @@ The projection programme reduces the model to the prior's Investable Mask before
 
 # Related
 
-  - [`assemble_allocation_set!`](@ref)
-  - [`add_allocation_set_constraints!`](@ref)
+  - [`resolve_allocation_set_step`](@ref)
+  - [`allocation_set_priced_mask`](@ref)
   - [`investable_mask`](@ref)
 """
 function assert_set_prior_priced(::Nothing, ::Any)::Nothing
@@ -207,6 +246,300 @@ function assert_set_prior_priced(pr::AbstractPriorResult, X::ReturnsResult)::Not
     return throw(ArgumentError("the Allocation Set's prior cannot price $(non_investable_names(X.nx, imsk)), which the programme trades: an asset outside the set prior's Coverage Universe over the rows it was fitted on has no covariance, no mean and no loadings for a ceiling, a floor or a tracking error to read. Give the set a `pe` whose universe covers the programme's — a mask-aware one under a `CoveragePolicy`, or the held estimator's own — or shorten the window the set reads."))
 end
 """
+    fit_allocation_set_block(b::Tuple{ProgrammeAllocationSet, ReturnsResult})
+    fit_allocation_set_block(b::Tuple{ProgrammeAllocationSet, ReturnsResult, Option{<:AbstractPriorResult}})
+
+Fits the prior of an entry of the keyword `blocks` of [`resolve_jump_optimiser`](@ref), and gives the entry with its prior.
+
+An entry is the block of a [`ProgrammeAllocationSet`](@ref) beside the block of a JuMP head, or the one block of the bare head of [`projection_programme`](@ref). It is the set after stage 1, [`resolve_allocation_set`](@ref), and after `factory(set, w)`, with the rows `X` that the online head holds. The set reads its risk ceilings `r`, its return floor `ret` and the slots of its block against its own prior on `X`, so the entry carries the rows and no Result of a step lives in an estimator. An entry with a third value carries the prior result of the set already. The entry of a fit again after a refusal has one, and so has an entry for a sub-problem, from [`allocation_set_block_step`](@ref). The function fits nothing for such an entry.
+
+# Arguments
+
+  - `b`: The entry, `(set, X)` or `(set, X, pr)`.
+
+# Returns
+
+  - `(set, X, pr)::Tuple`: The entry with the prior result of the set, [`allocation_set_prior`](@ref) of the set on `X`. `pr` is `nothing` when the set reads no rows.
+
+# Related
+
+  - [`resolve_jump_optimiser`](@ref)
+  - [`allocation_set_prior`](@ref)
+  - [`allocation_set_entry_mask`](@ref)
+  - [`resolve_allocation_set_block`](@ref)
+"""
+function fit_allocation_set_block(b::Tuple{ProgrammeAllocationSet, ReturnsResult})
+    set, X = b
+    return (set, X, allocation_set_prior(set, X))
+end
+function fit_allocation_set_block(b::Tuple{ProgrammeAllocationSet, ReturnsResult,
+                                           Option{<:AbstractPriorResult}})
+    return b
+end
+"""
+    allocation_set_priced_mask(imsk::Option{BitVector}, pmsk::Nothing, X::ReturnsResult, strict::Bool)
+    allocation_set_priced_mask(imsk::Option{BitVector}, pmsk::BitVector, X::ReturnsResult, strict::Bool)
+
+Intersects the Investable Mask of a JuMP head with the assets that the prior of a block of a set prices.
+
+The prior of a set reads the rows of the online head, and the prior of the head reads its own rows. A young asset that the head keeps can then have no price in the prior of the set, when the `pe` of the set is plain and the prior of the head is mask-aware. A ceiling, a floor or a tracking error of the set would read `NaN` at that asset. So the asset departs from every block, as an asset that a distance reader refuses departs, see [`distance_reader_refusal_mask`](@ref). The function warns once, and it names the assets and the remedies. Under `strict` it refuses them. An asset that the head already left out raises no warning.
+
+# Algorithm
+
+ 1. When `pmsk` is `nothing`, the prior of the set prices every asset. Return `imsk`.
+ 2. Find the assets that `imsk` keeps and `pmsk` leaves out. A `nothing` mask keeps every asset. When there is none, return the intersection of the two masks.
+ 3. Refuse the assets under `strict`. Otherwise warn, and name them from `X.nx`, or by their indices when `X` has no names.
+ 4. Return the intersection of the two masks.
+
+# Arguments
+
+  - `imsk`: The Investable Mask of the head and of the blocks before this one, or `nothing` when every asset is investable.
+  - `pmsk`: The Investable Mask of the prior of the set, [`investable_mask`](@ref).
+  - `X`: The rows of the set, read for the asset names.
+  - `strict`: The `strict` flag of the online head that holds the set, [`projection_step_strict`](@ref).
+
+# Validation
+
+  - Under `strict = true`, the prior of the set prices every asset that `imsk` keeps. Raises an [`IsNonFiniteError`](@ref).
+  - At least one asset stays. Raises an [`IsEmptyError`](@ref).
+
+# Returns
+
+  - `imsk::Option{BitVector}`: The intersected mask.
+
+# Related
+
+  - [`allocation_set_entry_mask`](@ref)
+  - [`distance_reader_refusal_mask`](@ref)
+  - [`investable_mask`](@ref)
+"""
+function allocation_set_priced_mask(imsk::Option{BitVector}, ::Nothing, ::ReturnsResult,
+                                    ::Bool)
+    return imsk
+end
+function allocation_set_priced_mask(imsk::Option{BitVector}, pmsk::BitVector,
+                                    X::ReturnsResult, strict::Bool)
+    held = something(imsk, trues(length(pmsk)))
+    keep = held .& pmsk
+    gap = held .& .!pmsk
+    if !any(gap)
+        return keep
+    end
+    assets = something(X.nx, eachindex(gap))[gap]
+    msg = "the prior of the Allocation Set cannot price $(count(gap)) asset(s) that the programme keeps: $(assets). An asset outside the Coverage Universe of the set prior over the rows that it reads has no mean, no covariance and no loadings for a ceiling, a floor or a tracking error to read"
+    remedy = "To keep them, give the set a `pe` whose universe covers the programme's, a mask-aware one under a `CoveragePolicy` or the prior of the held estimator, or shorten the window that the set reads."
+    @argcheck(!strict,
+              IsNonFiniteError("$(msg), and `strict = true` refuses them. $(remedy)"))
+    @warn("$(msg), so the fit leaves these assets out of the Investable Mask and gives each a zero weight. $(remedy) Pass `strict = true` to refuse them.",
+          maxlog = log_limit(:warn), _id = @log_id())
+    @argcheck(any(keep),
+              IsEmptyError("the prior of the Allocation Set prices no asset that the programme keeps, so the fit has no asset left. $(remedy)"))
+    return keep
+end
+"""
+    allocation_set_entry_mask(imsk::Option{BitVector}, b::Tuple{ProgrammeAllocationSet, ReturnsResult, Nothing})
+    allocation_set_entry_mask(imsk::Option{BitVector}, b::Tuple{ProgrammeAllocationSet, ReturnsResult, AbstractPriorResult})
+
+Intersects the Investable Mask of a JuMP head with the mask of a block of a set, at the entry of the head.
+
+The shared entry [`resolve_block_entry`](@ref) folds the function over the entries of its blocks. A JuMP head first composes the mask of its own block with [`distance_reader_entry_mask`](@ref), in [`resolve_jump_optimiser`](@ref). The bare head of [`projection_programme`](@ref) starts from the mask of the prior of its set, so the set prices every asset that the bare head keeps, and no asset raises the warning of [`allocation_set_priced_mask`](@ref). The mask of the block of a set follows the same rules as the mask of the head, on the prior and the rows of the set. So an asset that one block cannot read departs from every block. A set that reads no rows fits no prior and has no distance reader, so its block keeps the mask.
+
+# Algorithm
+
+ 1. When the prior `pr` of the entry is `nothing`, return `imsk`.
+ 2. Read the `strict` flag of the online head with [`projection_step_strict`](@ref).
+ 3. Intersect `imsk` with the assets that `pr` prices, with [`allocation_set_priced_mask`](@ref).
+ 4. Compose the result with the assets that a [`FeatureDistance`](@ref) of the readers `ple` and `cte` of the set can read, [`feature_readable_mask`](@ref), on `X`.
+ 5. Compose the result with the assets that a plain graph reader of the set can read, [`graph_reader_mask`](@ref), on `pr` and `X`, and return it.
+
+# Arguments
+
+  - `imsk`: The Investable Mask of the head and of the blocks before this one, or `nothing` when every asset is investable.
+  - `b`: The fitted entry `(set, X, pr)`, from [`fit_allocation_set_block`](@ref).
+
+# Validation
+
+  - The rules of [`allocation_set_priced_mask`](@ref), [`feature_readable_mask`](@ref) and [`graph_reader_mask`](@ref), under the `strict` flag of the online head.
+
+# Returns
+
+  - `imsk::Option{BitVector}`: The intersected mask.
+
+# Related
+
+  - [`resolve_jump_optimiser`](@ref)
+  - [`distance_reader_entry_mask`](@ref)
+  - [`allocation_set_priced_mask`](@ref)
+  - [`resolve_allocation_set_block`](@ref)
+"""
+function allocation_set_entry_mask(imsk::Option{BitVector},
+                                   ::Tuple{ProgrammeAllocationSet, ReturnsResult, Nothing})
+    return imsk
+end
+function allocation_set_entry_mask(imsk::Option{BitVector},
+                                   b::Tuple{ProgrammeAllocationSet, ReturnsResult,
+                                            AbstractPriorResult})
+    set, X, pr = b
+    strict = projection_step_strict()
+    readers = (set.ple, set.cte)
+    pmsk = allocation_set_priced_mask(imsk, investable_mask(pr), X, strict)
+    return graph_reader_mask(readers, feature_readable_mask(readers, pmsk, X), pr, X,
+                             strict)
+end
+"""
+$(DocStringExtensions.TYPEDSIGNATURES)
+
+Resolves the block of a set at the Investable Mask of a head, to its [`ResolvedConstraintBlock`](@ref), or to the refusal of one of its distance readers.
+
+The shared entry [`resolve_block_entry`](@ref) calls it for each entry of its blocks, after the mask holds the masks of every block. The head is a JuMP head, [`resolve_jump_optimiser`](@ref), or the bare head of [`projection_programme`](@ref). The block resolves against the prior of the set on the rows of the set, and not against the prior of the head. A distance reader of the set can still refuse an asset that the prior of the set keeps. The function then returns the [`DistanceReaderRefusalError`](@ref), and the one refusal branch of the entry fits again without the asset.
+
+# Algorithm
+
+ 1. Reduce the set, its rows `X` and its prior `pr` to `imsk` with [`programme_investable_reduction`](@ref). The reduction declares the Non-Investable Axis on the `sets` of the set.
+ 2. Resolve stage 2 of the reduced block with [`resolve_constraint_block`](@ref), through [`distance_reader_call`](@ref). The block reads the solver of the set, and the `strict` flag of the online head, [`projection_step_strict`](@ref).
+ 3. Return the block Result, or the refusal.
+
+# Arguments
+
+  - `b`: The fitted entry `(set, X, pr)`, from [`fit_allocation_set_block`](@ref).
+  - `imsk`: The Investable Mask of the entry, or `nothing` when every asset is investable.
+
+# Validation
+
+  - The rules of [`resolve_constraint_block`](@ref).
+
+# Returns
+
+  - `cbr::Union{ResolvedConstraintBlock, DistanceReaderRefusalError}`: The block Result, or the refusal of a distance reader.
+
+# Related
+
+  - [`resolve_jump_optimiser`](@ref)
+  - [`resolve_constraint_block`](@ref)
+  - [`distance_reader_call`](@ref)
+  - [`allocation_set_entry_mask`](@ref)
+"""
+function resolve_allocation_set_block(b::Tuple{ProgrammeAllocationSet, ReturnsResult,
+                                               Option{<:AbstractPriorResult}},
+                                      imsk::Option{BitVector})
+    set, X, pr = b
+    setr, Xr, prr = programme_investable_reduction(imsk, set, X, pr)
+    return distance_reader_call(resolve_constraint_block, setr.cbe, prr, Xr; slv = set.slv,
+                                strict = projection_step_strict())
+end
+"""
+    resolve_block_entry(f, args::Tuple, imsk::Option{BitVector}, blocks::Tuple,
+                        rd::ReturnsResult, strict::Bool;
+                        rmsk::Option{BitVector} = nothing) -> Tuple
+
+Resolves every block of a head at its entry, with one refusal branch for the readers of every block. This is the shared entry for a list of blocks.
+
+Two heads call it. [`resolve_jump_optimiser`](@ref) passes the block of a JuMP head as the first block, and the blocks of the sets after it. [`projection_programme`](@ref) is a bare head: it holds no block of its own, and it passes the block of its set alone, on the rows of the step. The function `f` resolves the block of the head at a mask. It takes the mask and `args...`, and it returns the values of the head and a `Tuple` of the Results of its blocks, one Result or none. [`no_head_block`](@ref) is the `f` of a bare head. The function takes `f` and its arguments, not a closure, as [`distance_reader_call`](@ref) does, so a variable of the entry that it reads is not boxed.
+
+A distance reader of a block, its `cte` or its `ple`, can refuse an asset that its prior keeps, see [`DistanceReaderRefusalError`](@ref). The function then fits again without that asset, with the mask of [`distance_reader_refusal_mask`](@ref) in `rmsk`, from the same prior results. That mask already holds the masks of every block, so no mask warns a second time. Two readers can refuse different assets, and the fit again meets the refusal of the other one. The first refusal in the order of the blocks wins.
+
+# Algorithm
+
+ 1. On the first fit, intersect `imsk` with the mask of each entry of `blocks`, [`allocation_set_entry_mask`](@ref). On a fit again, take `rmsk`.
+ 2. Resolve the block of the head with `f(imsk, args...)`. Resolve each entry of `blocks` at the mask with [`resolve_allocation_set_block`](@ref).
+ 3. If a block gives a [`DistanceReaderRefusalError`](@ref), take the `strict` flag of its owner: `strict` for the block of the head, and [`projection_step_strict`](@ref) for the block of a set. Fit again from step 1 with the mask of [`distance_reader_refusal_mask`](@ref), and return its value.
+ 4. Return the mask, the values of the head and the Results of every block.
+
+# Arguments
+
+  - `f`: The resolver of the block of the head, `f(imsk, args...) -> (head, cbrs::Tuple)`.
+  - `args`: The arguments of `f` after the mask.
+  - `imsk`: The Investable Mask of the head, or `nothing` when every asset is investable.
+  - `blocks`: The fitted entries `(set, X, pr)` of the sets, from [`fit_allocation_set_block`](@ref).
+  - `rd`: The rows of the head on its full universe, read for the asset names of a refusal.
+  - `strict`: The `strict` flag of the readers of the block of the head.
+  - `rmsk`: The mask of a fit again after a refusal, or `nothing` on the first fit.
+
+# Validation
+
+  - The rules of [`allocation_set_entry_mask`](@ref) and [`distance_reader_refusal_mask`](@ref).
+
+# Returns
+
+  - `(imsk, head, cbrs)::Tuple`: The Investable Mask of the entry, the values that `f` gave for the head, and the `Tuple` of the block Results, the block of the head first.
+
+# Related
+
+  - [`resolve_jump_optimiser`](@ref)
+  - [`projection_programme`](@ref)
+  - [`resolve_allocation_set_block`](@ref)
+  - [`distance_reader_refusal_mask`](@ref)
+"""
+function resolve_block_entry(f::F, args::Tuple, imsk::Option{BitVector}, blocks::Tuple,
+                             rd::ReturnsResult, strict::Bool;
+                             rmsk::Option{BitVector} = nothing) where {F}
+    imsk = isnothing(rmsk) ? foldl(allocation_set_entry_mask, blocks; init = imsk) : rmsk
+    head, hcbrs = f(imsk, args...)
+    cbrs = (hcbrs..., map(b -> resolve_allocation_set_block(b, imsk), blocks)...)
+    i = findfirst(x -> x isa DistanceReaderRefusalError, cbrs)
+    if isnothing(i)
+        return imsk, head, cbrs
+    end
+    # A distance reader that refuses an asset the prior kept raises before it builds its
+    # graph. The block of the head refuses under the flag of the head, and the block of a
+    # set under the flag of the online head that holds the set.
+    s = i <= length(hcbrs) ? strict : projection_step_strict()
+    return resolve_block_entry(f, args, imsk, blocks, rd, strict;
+                               rmsk = distance_reader_refusal_mask(cbrs[i], imsk, rd, s))
+end
+"""
+    no_head_block(imsk::Option{BitVector}) -> Tuple
+
+The resolver of the block of a bare head, for [`resolve_block_entry`](@ref). A bare head holds no block of its own, so the function gives no values of the head and no block Result.
+
+# Returns
+
+  - `(nothing, ())::Tuple`.
+
+# Related
+
+  - [`resolve_block_entry`](@ref)
+  - [`projection_programme`](@ref)
+"""
+function no_head_block(::Option{BitVector})::Tuple
+    return nothing, ()
+end
+"""
+$(DocStringExtensions.TYPEDSIGNATURES)
+
+Gives an entry of the keyword `blocks` for a sub-problem on the reduced universe, from the block Result that the entry resolved to.
+
+[`constraint_block_steps`](@ref) calls it for each block after the first of a bundle. A sub-problem of [`NearOptimalCentering`](@ref) solves on the reduced prior and rows of the head. So its entry holds the set and the rows viewed at the Investable Mask, the reduced prior of the block, and the resolved slots of the block. The entry then fits no prior again, its mask keeps every asset, and its readers hold their results, so no reader runs again. The risk ceilings `r` and the return floor `ret` of the set are viewed at the mask with the rest of the set.
+
+# Algorithm
+
+ 1. View the set and its rows `X` at `imsk` with [`programme_investable_reduction`](@ref), with no prior. The block Result already holds the reduced prior.
+ 2. Put the resolved slots of `cbr` into the block of the viewed set with [`constraint_block_from_resolved`](@ref).
+ 3. Return the set, the viewed rows and the prior of `cbr`.
+
+# Arguments
+
+  - `b`: The entry that the bundle resolved, `(set, X)` or `(set, X, pr)`.
+  - `cbr`: The block Result of the entry.
+  - `imsk`: The Investable Mask of the bundle, or `nothing` when every asset is investable.
+
+# Returns
+
+  - `(set, X, pr)::Tuple`: The entry for the sub-problem.
+
+# Related
+
+  - [`constraint_block_steps`](@ref)
+  - [`fit_allocation_set_block`](@ref)
+  - [`jump_optimiser_from_attributes`](@ref)
+"""
+function allocation_set_block_step(b::Tuple{ProgrammeAllocationSet, ReturnsResult, Vararg},
+                                   cbr::ResolvedConstraintBlock, imsk::Option{BitVector})
+    setr, Xr, _ = programme_investable_reduction(imsk, b[1], b[2], nothing)
+    return (rebuild_struct(setr, (; cbe = constraint_block_from_resolved(setr.cbe, cbr))),
+            Xr, cbr.pr)
+end
+"""
     set_allocation_risk_ceiling!(model::JuMP.Model, r::Nothing, set::ProgrammeAllocationSet, pr, pl; prefix::Symbol = Symbol(""))
     set_allocation_risk_ceiling!(model::JuMP.Model, r::RiskMeasure, set::ProgrammeAllocationSet, pr, pl; prefix::Symbol = Symbol(""))
     set_allocation_risk_ceiling!(model::JuMP.Model, rs::VecRM, set::ProgrammeAllocationSet, pr::Nothing, pl; prefix::Symbol = Symbol(""))
@@ -218,7 +551,7 @@ Each ceiling goes through the measure's own JuMP builder, [`set_risk_constraints
 
 The source of the covariance matrix does not change the formulation. With a prior result, each measure is resolved against it first. Without one, every ceiling is a [`Variance`](@ref) or a [`StandardDeviation`](@ref) that holds its matrix, on a set that reads no rows, and the builder reads that matrix with `pr = nothing`.
 
-Under a `prefix`, the builders put their entries in that namespace. [`assemble_allocation_set!`](@ref) registers the head's `w` under the prefix before any builder runs. This keeps the ceiling's entries apart from the entries of the head's own measures. The lifted matrix ``\\mathbf{W}`` and the marks belong to the weights, [`weights_prefix`](@ref), so in a leader's model the ceiling, the set's phylogeny and the leader's measures read one ``\\mathbf{W}``.
+Under a `prefix`, the builders put their entries in that namespace. The block builder [`set_block_constraints!`](@ref) registers the head's `w` under the prefix before any builder runs. This keeps the ceiling's entries apart from the entries of the head's own measures. The lifted matrix ``\\mathbf{W}`` and the marks belong to the weights, [`weights_prefix`](@ref), so in a leader's model the ceiling, the set's phylogeny and the leader's measures read one ``\\mathbf{W}``.
 
 # Algorithm
 
@@ -282,6 +615,47 @@ function set_allocation_risk_ceiling!(model::JuMP.Model, rs::VecRM,
                                       pl; prefix::Symbol = Symbol(""))::Nothing
     ceilings = [no_risk_expr_risk_measure(factory(r, pr, set.slv)) for r in rs]
     set_risk_constraints!(model, ceilings, set, pr, pl, nothing; prefix = prefix)
+    return nothing
+end
+"""
+$(DocStringExtensions.TYPEDSIGNATURES)
+
+Adds the risk ceilings `r` and the return floor `ret` of a programme set to a model. This is the bounds builder of the set.
+
+`r` and `ret` are flat fields of the set and not slots of its [`ConstraintBlock`](@ref), because a [`JuMPOptimiser`](@ref) holds no bound that stands alone. So the block builder [`set_block_constraints!`](@ref) does not add them, and this builder reads them beside the [`ResolvedConstraintBlock`](@ref) of the set: its prior `cbr.pr`, its rows `cbr.rd` and its phylogeny `cbr.plr`. The set must come after `factory(set, w)`, so a [`WeightsTracking`](@ref) benchmark or a [`TurnoverRiskMeasure`](@ref) reference that is not fixed holds the Price-Adjusted Allocation of the step.
+
+The owner calls it after [`mark_risk_minimised!`](@ref), where the ceilings of the set ran through the custom constraints of a leader before. A ceiling clears its `rke` and a floor clears its `rte`, so neither joins the risk expression or the return expression of the objective of the owner. The set stays the [`RiskConstraintOwner`](@ref) of its ceilings. `nothing` in a field adds nothing.
+
+# Algorithm
+
+ 1. Bind each [`DataBenchmarkTracking`](@ref) of the ceilings to the benchmark of the rows `cbr.rd`, and add the ceilings with [`set_allocation_risk_ceiling!`](@ref).
+ 2. Resolve the floor against the prior `cbr.pr` with [`factory`](@ref), and add it with [`set_allocation_return_floor!`](@ref), with the rows.
+
+# Arguments
+
+  - $(arg_dict[:model])
+  - `set`: The programme set, after `factory(set, w)`.
+  - `cbr`: The Result of the block of the set.
+  - $(arg_dict[:prefix_kw])
+
+# Returns
+
+  - `nothing`.
+
+# Related
+
+  - [`set_allocation_risk_ceiling!`](@ref)
+  - [`set_allocation_return_floor!`](@ref)
+  - [`set_block_constraints!`](@ref)
+  - [`ProgrammeAllocationSet`](@ref)
+"""
+function set_allocation_risk_return_bounds!(model::JuMP.Model, set::ProgrammeAllocationSet,
+                                            cbr::ResolvedConstraintBlock;
+                                            prefix::Symbol = Symbol(""))::Nothing
+    set_allocation_risk_ceiling!(model, bind_data_benchmark(set.r, cbr.rd), set, cbr.pr,
+                                 cbr.plr; prefix = prefix)
+    set_allocation_return_floor!(model, factory(set.ret, cbr.pr), cbr.pr; prefix = prefix,
+                                 rd = cbr.rd)
     return nothing
 end
 """
@@ -378,6 +752,6 @@ Where:
   - [`weights_bound_tolerance`](@ref)
 """
 function clip_at_zero(w::AbstractVector, lb = zero(eltype(w)))
-    tol = weights_bound_tolerance(float_if_integer(eltype(w)))
+    tol = weights_bound_tolerance(eltype(w))
     return ifelse.(w .<= tol, zero.(w) .+ lb, w)
 end

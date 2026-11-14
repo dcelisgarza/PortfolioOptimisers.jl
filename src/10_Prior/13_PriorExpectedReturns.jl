@@ -7,6 +7,8 @@ The adapter lets the posterior mean of a [`BlackLittermanPrior`](@ref) drive a [
 
 [`supports_partial_fit`](@ref) gives for the adapter the answer it gives for the prior. [`partial_fit!`](@ref) forwards the rows to the prior, and `mean(me)` reads the `mu` of the folded prior. An [`EmpiricalPrior`](@ref) keeps its rows, so `supports_partial_fit` is `false` for it, and the estimator that holds the adapter refits it from the rows that estimator holds. For the online portfolio selection head, those rows are the head's own buffer. [`rows_needed`](@ref) is `nothing` for an adapter that does not fold, so the head keeps every row, and each step costs one prior fit over all the rows so far. To bound the rows, wrap the adapter in a [`WindowedExpectedReturns`](@ref).
 
+The mean is worth the count that the prior states for its mean, entry 1 of its `eoc`. [`effective_observation_count`](@ref) fits the prior to read that count, because a pooling prior knows it only after its fit. An [`EmpiricalPrior`](@ref) over the adapter reads the mean and the count from one fit, through [`mean_with_count`](@ref).
+
 The adapter fits the whole prior, so a covariance that the prior cannot form makes the mean throw, although `mu` alone is defined. Under the default [`EmpiricalPrior`](@ref), a column of constant returns, such as a suspended asset in the head's buffer, makes the positive-definite repair of the covariance throw an `ArgumentError`. To fit such rows, give the prior a covariance without that repair, `PortfolioOptimisersCovariance(; mp = MatrixProcessing(; pdm = nothing))`.
 
 # Mathematical definition
@@ -108,6 +110,31 @@ function port_opt_view(me::PriorExpectedReturns, i, args...)
     return PriorExpectedReturns(; pe = port_opt_view(me.pe, i, args...))
 end
 """
+    obs_weights_view(me::PriorExpectedReturns, i) -> PriorExpectedReturns
+
+Return the adapter with the observation weights of its prior cut to the observations `i`.
+
+The prior of the adapter fits on the returns of the fit that holds the adapter, and an estimator in that prior can hold fixed observation weights. A Shared Series gap drops observations from those returns, so the weights must lose the same observations, see [`shared_series_estimator`](@ref). The adapter is not [`@propagatable`](@ref), so this method cuts its prior with [`obs_weights_view`](@ref).
+
+# Arguments
+
+  - `me`: The adapter.
+  - `i`: The observations to keep: a mask of the full sample, or their positions.
+
+# Returns
+
+  - `me::PriorExpectedReturns`: The adapter at the kept observations.
+
+# Related
+
+  - [`PriorExpectedReturns`](@ref)
+  - [`obs_weights_view`](@ref)
+  - [`shared_series_estimator`](@ref)
+"""
+function obs_weights_view(me::PriorExpectedReturns, i)::PriorExpectedReturns
+    return PriorExpectedReturns(; pe = obs_weights_view(me.pe, i))
+end
+"""
     Statistics.mean(me::PriorExpectedReturns, X::MatNum; dims::Int = 1, kwargs...)
     Statistics.mean(me::PriorExpectedReturns, X::MatNum, pnl::Option{<:AssetPanel}; dims::Int = 1, kwargs...)
     Statistics.mean(me::PriorExpectedReturns; kwargs...)
@@ -161,6 +188,25 @@ function Statistics.mean(me::PriorExpectedReturns, X::MatNum, pnl::Option{<:Asse
 end
 function Statistics.mean(me::PriorExpectedReturns; kwargs...)
     return reshape(prior(me.pe; kwargs...).mu, 1, :)
+end
+# The mean is the `mu` of the prior, so it is worth the count that the prior states for its
+# mean. A pooling prior knows that count only after its fit, so these methods fit the prior.
+# An `EmpiricalPrior` reads the count from its own fit through `mean_with_count`.
+function effective_observation_count(me::PriorExpectedReturns, X::MatNum; kwargs...)
+    return moment_observation_count(prior(me.pe, X, nothing, nothing; kwargs...), 1)
+end
+function effective_observation_count(me::PriorExpectedReturns; kwargs...)
+    return moment_observation_count(prior(me.pe; kwargs...), 1)
+end
+function mean_with_count(me::PriorExpectedReturns, X::MatNum, pnl::Option{<:AssetPanel};
+                         dims::Int = 1, kwargs...)
+    assert_dims(dims)
+    pr = prior(me.pe, X, nothing, pnl; dims = dims, kwargs...)
+    return vec(pr.mu), moment_observation_count(pr, 1)
+end
+function mean_with_count(me::PriorExpectedReturns; kwargs...)
+    pr = prior(me.pe; kwargs...)
+    return vec(pr.mu), moment_observation_count(pr, 1)
 end
 """
     partial_fit!(me::PriorExpectedReturns, X::VecNum_MatNum; kwargs...)

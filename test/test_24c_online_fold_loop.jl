@@ -80,9 +80,31 @@ assets is what keeps the JuMP families cheap.
             @test isnothing(fold.train)
             @test fold.test == cvr.test_idx[fold.i]
             @test same_fields(po.returns_result(fold.est), rows(rdg, cvr.train_idx[fold.i]))
-            return po.fit_and_predict(fold.est, fold.rd; test_idx = fold.test)
+            return po.fit_and_predict(fold.est, fold.rd, nothing, fold.test)
         end
         @test seen == 1:n
+    end
+
+    @testset "A meta-optimiser steps its inner cross-validation under an Online Scheme" begin
+        # The `cv` field of a meta-optimiser takes an Online Scheme, and the outer problem
+        # reads the same returns as under the expanding batch scheme.
+        metas = (cv -> Stacking(; opti = [mr, InverseVolatility()],
+                                opto = InverseVolatility(), cv = cv),
+                 cv -> NestedClustered(; opti = mr, opto = InverseVolatility(), cv = cv))
+        for mk in metas
+            b = optimise(mk(batch_cv), rd)
+            o = optimise(mk(online_cv), rd)
+            @test o.cv === online_cv
+            @test isapprox(o.reso.w, b.reso.w; atol = weight_tol(mr))
+            @test isapprox(o.w, b.w; atol = weight_tol(mr))
+        end
+        # The inner Online Scheme is a scheme, not a sample buffer, so neither the batch
+        # entry nor the entry of an outer online arm refuses it.
+        st = first(metas)(online_cv)
+        @test isnothing(po.online_wrapper_path(st))
+        @test isnothing(po.online_unreached_path(st))
+        @test length(cross_val_predict(st, rd, OnlineIndexWalkForward(100, 30)).pred) ==
+              n_splits(OnlineIndexWalkForward(100, 30), rd)
     end
 
     @testset "A benchmark-relative walk fits X - B at every fold (#1645, #1651)" begin
@@ -153,7 +175,7 @@ assets is what keeps the JuMP families cheap.
             # Fold `i` has folded `1 : test_start_i - p`, and nothing beyond.
             @test rdp.X == X[1:(first(cvr.test_idx[i]) - 1 - p), :]
             @test folded[i] == last(cvr.train_idx[i])
-            return po.fit_and_predict(fold.est, fold.rd; test_idx = fold.test)
+            return po.fit_and_predict(fold.est, fold.rd, nothing, fold.test)
         end
         # The purged rows of fold `i` are folded by fold `i + 1`.
         for i in 1:(n - 1)
@@ -369,7 +391,7 @@ assets is what keeps the JuMP families cheap.
                      test_idx = cvr.test_idx, cv = online_cv) do fold
             @test fold.est.opt.wb == wbs[fold.i]
             @test !isnothing(fold.est.opt.cache)
-            return po.fit_and_predict(fold.est, fold.rd; test_idx = fold.test)
+            return po.fit_and_predict(fold.est, fold.rd, nothing, fold.test)
         end
         # A schedule on an inner optimiser of a meta-optimiser carries no state either, so
         # the online arm takes it and resolves it per fold.
@@ -392,7 +414,7 @@ assets is what keeps the JuMP families cheap.
             @test isa(fold.est.opt.pe, EmpiricalPrior)
             @test isa(po.partial_fit_cache(fold.est.opt.pe), po.SampleBufferState)
             @test isnothing(po.online_entry_state(wrapped))
-            return po.fit_and_predict(fold.est, fold.rd; test_idx = fold.test)
+            return po.fit_and_predict(fold.est, fold.rd, nothing, fold.test)
         end
         # A wrapped prior refits from its buffer and reaches the expanding batch weights.
         @test isapprox(weights(cross_val_predict(wrapped, rd, online_cv)),
@@ -505,7 +527,7 @@ assets is what keeps the JuMP families cheap.
                                                 tn = Turnover(; w = tnw, val = 0.5),
                                                 wb = sched(k), sets = sets), fb = fb)
         end
-        threaded(p) = p.res.jr.pa.tn.w
+        threaded(p) = p.res.jr.jor.tn.w
         sfd = SelfFinancingDrift()
         online_d = OnlineIndexWalkForward(w, t; purged_size = p, wd = sfd,
                                           pws = DriftedWeights())
@@ -565,7 +587,7 @@ assets is what keeps the JuMP families cheap.
                          FLoops.SequentialEx(); rd = rd, train_idx = cvr.train_idx,
                          test_idx = cvr.test_idx, cv = online_cv) do fold
                 push!(seen, fold.i)
-                return po.fit_and_predict(fold.est, fold.rd; test_idx = fold.test)
+                return po.fit_and_predict(fold.est, fold.rd, nothing, fold.test)
             end
             nothing
         catch e
@@ -588,19 +610,54 @@ assets is what keeps the JuMP families cheap.
         for i in (1, 3)
             train, test = cvr.train_idx[i], cvr.test_idx[i]
             stepped = partial_fit!(po.update_online_estimator(mr), rows(rd, train))
-            cold = po.fit_and_predict(mr, rd; train_idx = train, test_idx = test)
-            warm = po.fit_and_predict(stepped, rd; test_idx = test)
+            cold = po.fit_and_predict(mr, rd, train, test)
+            warm = po.fit_and_predict(stepped, rd, nothing, test)
             @test isapprox(warm.res.w, cold.res.w; atol = 1e-5)
             @test isapprox(warm.rd.X, cold.rd.X; atol = 1e-5)
+            # The result form ignores the training window and predicts as `predict` does.
+            # It passes every keyword to `predict`, which refuses a wrong one (#2066).
+            @test po.fit_and_predict(cold.res, rd, train, test).rd.X == cold.rd.X
+            @test_throws MethodError po.fit_and_predict(cold.res, rd, train, test;
+                                                        w_previous = nothing)
             # And with an asset view: the stepped estimator is sliced as the cold one is.
-            cold = po.fit_and_predict(mr, rd; train_idx = train, test_idx = test,
-                                      cols = 2:6)
-            warm = po.fit_and_predict(stepped, rd; test_idx = test, cols = 2:6)
+            cold = po.fit_and_predict(mr, rd, train, test, 2:6)
+            warm = po.fit_and_predict(stepped, rd, nothing, test, 2:6)
             @test isapprox(warm.res.w, cold.res.w; atol = 1e-5)
             @test warm.rd.nx == cold.rd.nx == nx[2:6]
         end
         # A cold estimator with no window has nothing to read out.
-        @test_throws ArgumentError po.fit_and_predict(mr, rd; test_idx = cvr.test_idx[1])
+        @test_throws ArgumentError po.fit_and_predict(mr, rd, nothing, cvr.test_idx[1])
+    end
+
+    @testset "The context of a fold carries what the fold loop hands it (#1912)" begin
+        cvr = split(online_cv, rd)
+        n = length(cvr.test_idx)
+        # A schedule that is a function of the context records what the online arm hands it.
+        seen = TimeDependentContext[]
+        function record(ctx)
+            push!(seen, ctx)
+            return mr
+        end
+        sched_fn = NestedClustered(; opti = TimeDependent(record), opto = mr)
+        res = cross_val_predict(sched_fn, rd, online_cv)
+        @test length(res.pred) == n
+        @test sort!(unique(c.i for c in seen)) == 1:n
+        @test all(c -> c.n == n && c.test_idx == cvr.test_idx, seen)
+        @test all(c -> c.train_idx == cvr.train_idx, seen)
+        @test all(c -> isnothing(c.path_id) && c.rd.nx == nx, seen)
+        # The first fold has no previous weights, and each later fold carries the weights
+        # that the fold before it gave.
+        for c in seen
+            if c.i == 1
+                @test isnothing(c.w_prev)
+            else
+                @test c.w_prev == res.pred[c.i - 1].res.w
+            end
+        end
+        # The fold loop inlines the constructor, so the line of its signature has no counter
+        # in a run through the verb. A direct call pins the same record the loop builds.
+        ctx = po.fold_context(2, n, rd, cvr.train_idx, cvr.test_idx, nothing, nothing)
+        @test ctx.i == 2 && ctx.n == n && ctx.test_idx == cvr.test_idx
     end
 
     @testset "The search and the Pipeline take the loop at their doors" begin

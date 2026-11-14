@@ -48,6 +48,8 @@ Where:
   - `lt_flag::Bool`: Whether to add the long threshold.
   - `st_flag::Bool`: Whether to add the short threshold (long-short method only).
 
+The long-short method with no `st`, `ss` and `st_flag` serves a long-only call that reads a long-short bundle of the weights, which an earlier call declared ([`mip_indicators!`](@ref)). It adds the long threshold alone, with the registered big-M expression `ss`.
+
 # Returns
 
   - `nothing`.
@@ -69,6 +71,12 @@ function set_threshold_constraints!(model::JuMP.Model, sp::AbstractMIPSpace,
                                                          0)
     end
     return nothing
+end
+function set_threshold_constraints!(model::JuMP.Model, sp::AbstractMIPSpace,
+                                    ind::LongShortIndicators, wx, lt::Option{<:Threshold},
+                                    lt_flag::Bool)
+    return set_threshold_constraints!(model, sp, ind, wx, lt, nothing,
+                                      shared_get(model, :ss), lt_flag, false)
 end
 function set_threshold_constraints!(model::JuMP.Model, sp::AbstractMIPSpace,
                                     ind::LongShortIndicators, wx, lt::Option{<:Threshold},

@@ -78,7 +78,7 @@ end
 # A test-local target that fits as a `LinearModel` and keeps the default answer of
 # `is_basis_invariant`, so a move of the dropped member under it fits every observation again
 # (#1614).
-struct BasisBoundTarget <: PortfolioOptimisers.AbstractRegressionTarget end
+struct BasisBoundTarget <: PortfolioOptimisers.AbstractUnpenalisedRegressionTarget end
 function PortfolioOptimisers.factory(::BasisBoundTarget, w::PortfolioOptimisers.ObsWeights)
     return factory(LinearModel(), w)
 end
@@ -173,7 +173,7 @@ end
         unseen_rows(st) = [s
                            for s in axes(st.W, 1)
                            if !isnothing(po.unseen_member_change(st.fcb,
-                                                                 view(st.Ms, s, :, :),
+                                                                 view(st.Ms, :, :, s),
                                                                  view(st.W, s, :) .> 0, s))]
         for (dl, de, mv) in ((energy_panel(150, 4.0), (0, 150, 190, 225, 226, 300), 2),
                              (energy_panel(229, 100.0), (0, 228, 260, 300), 2)),

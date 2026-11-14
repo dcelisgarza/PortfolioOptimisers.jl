@@ -170,6 +170,13 @@ function PortfolioOptimisers.plot_histogram(ret::VecNum;
     if !(points >= 0)
         throw(DomainError(points, "points must be >= 0"))
     end
+    # A return that is not finite, such as the return of a fold that failed to solve, is
+    # absent for the figure: the bins, the moments and every line read the finite returns.
+    fin = filter(isfinite, ret)
+    if isempty(fin)
+        throw(DomainError(ret, "the return series must hold at least one finite return"))
+    end
+    ret = fin
     T = length(ret)
     npts = points == 0 ? ceil(Int, 4 * sqrt(T)) : points
     mu_r = mean(ret)

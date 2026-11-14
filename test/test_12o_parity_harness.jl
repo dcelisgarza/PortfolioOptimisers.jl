@@ -168,7 +168,7 @@ stretch, and the regime statistic read an active asset outside the estimation un
     # one. This file measures the masks.
     pe = EmpiricalPrior(; me = ExpWeightedExpectedReturns(),
                         ce = RegimeAdjustedExpWeightedCovariance(; centring = PreCentred(),
-                                                                 debias = RawStatistic(),
+                                                                 debias = nothing,
                                                                  regime_lohi_mult = (0.7,
                                                                                      1.6)))
     load(c, o) = parity_load("CrossSectionalFactorPrior", c, o)
@@ -285,18 +285,19 @@ end
             @test (.!f.omsk .& A) == (om[:, cols] .& A)
         end
         nz, Z = panel_feature_matrix(pnl)
+        # `Z` is `assets × features × observations` (ADR 0230); read one feature as
+        # `observations × assets`, the layout of the oracle's columns.
+        zcol(c) = permutedims(Z[:, findfirst(==(c), nz), :])
         oh = parity_load("panel_feature_matrix", "SmallRaw", "OneHot")
         lv = [("industry", l) for l in panel_field(pnl, "industry").levels]
         append!(lv, [("currency", l) for l in panel_field(pnl, "currency").levels])
         for (k, (name, l)) in enumerate(lv)
-            @test vec(Z[:, :, findfirst(==("$(name)=$(l)"), nz)])[vec(A)] == oh[vec(A), k]
+            @test vec(zcol("$(name)=$(l)"))[vec(A)] == oh[vec(A), k]
         end
         for (k, name) in enumerate(num)
             cols = ((k - 1) * N + 1):(k * N)
-            @test Z[:, :, findfirst(==("$(name)::observed"), nz)][A] ==
-                  Float64.(.!om[:, cols])[A]
-            @test Z[:, :, findfirst(==(name), nz)][A] ==
-                  blank_to_val(of[:, cols], A, 0.0)[A]
+            @test zcol("$(name)::observed")[A] == Float64.(.!om[:, cols])[A]
+            @test zcol(name)[A] == blank_to_val(of[:, cols], A, 0.0)[A]
         end
     end
 
@@ -353,7 +354,7 @@ end
                            for n in num]; amsk = A[rows, cols], emsk = pnl.emsk[rows, cols])
         @test all(panel_field(sub, n).vals == panel_field(v, n).vals for n in num)
         @test PO.feature_row_indices(pnl, [3, 7, 20], collect(1:80)) == [3, 7, 20]
-        @test PO.asset_panel_view(nothing, rows, cols, nothing) === nothing
+        @test PO.port_opt_view(nothing, rows, cols, nothing) === nothing
     end
 
     @testset "The carriers keep the panel" begin
@@ -534,6 +535,9 @@ include(joinpath(@__DIR__, "parity_grid.jl"))
     loadv(c, o) = vec(load(c, o))
     pc(a, b, name; rtol = 1e-12, scale = :cell) = parity_compare(a, b; rtol = rtol,
                                                                  scale = scale, name = name).ok
+    # The five numbers of an `IdioCalibrationSummaryResult`, in the order of the oracle.
+    summary_values(s) = [s.mean_cs_std, s.median_cs_std, s.mean_kurtosis, s.mean_skewness,
+                         s.mean_tail_rate]
     fxs = parity_small_panel()
     fxl = parity_large_panel()
     rds = grid_fixture(fxs)
@@ -549,7 +553,7 @@ include(joinpath(@__DIR__, "parity_grid.jl"))
     cases = [("Small", "Base"), ("Small", "Lag2"), ("Small", "FamOne"), ("Small", "FamTwo"),
              ("Small", "Currency"), ("Small", "Macro"), ("Large", "Base"),
              ("Large", "FamOne")]
-    weightings = (BenchmarkWeightMetric(), IdentityMetric(), RegressionWeightMetric())
+    weightings = (BenchmarkWeightMetric(), nothing, RegressionWeightMetric())
 
     @testset "The regression group, $(fix) $(c)" for (fix, c) in cases
         csfm = block(fix, c)
@@ -583,10 +587,10 @@ include(joinpath(@__DIR__, "parity_grid.jl"))
         d = PO.cs_regression_data(csfm)
         mask, u = PO.cs_diagnostic_mask_weights(d.B, d.eps, d.w)
         for r in findall(.!idf)
-            A = sqrt.(u[r, mask[r, :]]) .* d.B[r, mask[r, :], :]
+            A = sqrt.(u[r, mask[r, :]]) .* d.B[mask[r, :], :, r]
             kb = sort(qr(A, ColumnNorm()).p[1:rank(A)])
             wr = isnothing(d.w) ? nothing : d.w[r:r, :]
-            tb = vec(cs_regression_t_stats(d.B[r:r, :, kb], d.f[r:r, kb], d.eps[r:r, :],
+            tb = vec(cs_regression_t_stats(d.B[:, kb, r:r], d.f[r:r, kb], d.eps[r:r, :],
                                            wr))
             ib = .!isnan.(t[r, kb])
             @test any(ib) && pc(t[r, kb][ib], tb[ib], "$(n) basis t $(r)"; rtol = 1e-13)
@@ -628,7 +632,7 @@ include(joinpath(@__DIR__, "parity_grid.jl"))
         u = ifelse.(isfinite.(d.eps), d.w, 0.0)
         G = cs_gram(d.B, u)
         K = size(G, 2)
-        @test pc(reshape(permutedims(G, (1, 3, 2)), size(G, 1), K * K),
+        @test pc(reshape(permutedims(G, (3, 2, 1)), size(G, 3), K * K),
                  load("DiagSmallBase", "Gram"), "gram"; scale = :array)
     end
 
@@ -636,7 +640,7 @@ include(joinpath(@__DIR__, "parity_grid.jl"))
         csfm = block(fix, c)
         n = "Diag$(fix)$(c)"
         B = csfm.Ms
-        K = size(B, 3)
+        K = size(B, 2)
         # The oracle's benchmark weight needs a finite return. Its observed-factor path reads
         # the returns net of the observed factor, `X_t - z_(t-1) m_t`, which the stored case
         # builds for it, and that return is `NaN` at the first active observation of a listing,
@@ -686,7 +690,7 @@ include(joinpath(@__DIR__, "parity_grid.jl"))
     @testset "The exposure information coefficient, $(fix) $(c)" for (fix, c) in cases
         csfm = block(fix, c)
         n = "Diag$(fix)$(c)"
-        K = size(csfm.Ms, 3)
+        K = size(csfm.Ms, 2)
         Q = load(n, "ICSummary")
         for (h, o) in ((1, load(n, "IC1")), (3, load(n, "IC3"))),
             (j, rank) in enumerate((true, false))
@@ -827,8 +831,9 @@ include(joinpath(@__DIR__, "parity_grid.jl"))
                               idio_kurtosis(ek, vk; ahead = ahead))
                 @test isequal(idio_skewness(csfm; ahead = ahead),
                               idio_skewness(ek, vk; ahead = ahead))
-                @test isequal(idio_calibration_summary(csfm; ahead = ahead),
-                              idio_calibration_summary(ek, vk; ahead = ahead))
+                @test isequal(summary_values(idio_calibration_summary(csfm; ahead = ahead)),
+                              summary_values(idio_calibration_summary(ek, vk;
+                                                                      ahead = ahead)))
             end
             @test isequal(idio_vol_ic(csfm), idio_vol_ic(ek, vk))
             continue
@@ -844,7 +849,7 @@ include(joinpath(@__DIR__, "parity_grid.jl"))
         @test pc(idio_kurtosis(csfm; ahead = false), I[:, 4], "$(n) kurtosis";
                  scale = :array)
         @test pc(idio_skewness(csfm; ahead = false), I[:, 5], "$(n) skewness")
-        @test pc(collect(values(idio_calibration_summary(csfm; ahead = false))),
+        @test pc(summary_values(idio_calibration_summary(csfm; ahead = false)),
                  loadv(n, "IdioSummary"), "$(n) summary")
         Dp = load(n, "IdioDependence")
         @test pc(idio_vol_ic(csfm; ties = :ordinal), Dp[:, 1], "$(n) vol ic")
@@ -860,7 +865,7 @@ include(joinpath(@__DIR__, "parity_grid.jl"))
         # maxrel 2.4e-11 and maxscaled 2.6e-15, so the check is `:array`.
         @test pc(idio_kurtosis(csfm), A[:, 3], "$(n) ahead kurtosis"; scale = :array)
         @test pc(idio_skewness(csfm), A[:, 4], "$(n) ahead skewness")
-        @test pc(collect(values(idio_calibration_summary(csfm))),
+        @test pc(summary_values(idio_calibration_summary(csfm)),
                  loadv(n, "AheadIdioSummary"), "$(n) ahead summary")
     end
 

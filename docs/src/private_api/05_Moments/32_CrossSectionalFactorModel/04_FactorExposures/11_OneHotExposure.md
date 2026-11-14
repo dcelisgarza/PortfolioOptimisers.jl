@@ -1,5 +1,5 @@
 ```@meta
-Description = "One-Hot Exposure, private API of PortfolioOptimisers.jl: one_hot_field, one_hot_exposure_names, one_hot_level_fill!, one_hot_observed_fill!."
+Description = "One-Hot Exposure, private API of PortfolioOptimisers.jl: one_hot_field, one_hot_exposure_names, one_hot_fill!, one_hot_inputs."
 ```
 
 # One-Hot Exposure: private API
@@ -9,6 +9,6 @@ Description = "One-Hot Exposure, private API of PortfolioOptimisers.jl: one_hot_
 ```@docs
 one_hot_field
 one_hot_exposure_names
-one_hot_level_fill!
-one_hot_observed_fill!
+one_hot_fill!
+one_hot_inputs
 ```

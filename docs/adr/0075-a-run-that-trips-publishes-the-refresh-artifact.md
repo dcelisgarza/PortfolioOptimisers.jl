@@ -206,3 +206,29 @@ file's preamble scopes it to the library's domain, and a published artifact is r
 reads redundantly against its own verb, and the gate's shape decision already uses "publish" for the
 provenance block a green run prints. "Remedial" composes with no other word in this map's
 vocabulary, while "refresh" is already the name of the act that writes the file.
+
+## Amendment (2026-11-12, #2060)
+
+The design picks the route, not the number. The three routes stay, but their order is no longer an
+order of preference. Route 1 applies when the lower form is also the better design. The record of
+the rise applies when the higher number comes from the correct form: the precedent of the library,
+a signature that a test can call, or the file of the subject. The number must stay within its
+threshold in `code_health/rulings.toml`, and the commit names the rise and its reason. The message
+ends with one more line: "Never change a signature, a type bound or the home of a function only to
+pass a ratchet."
+
+The message of the decision above put route 1 first, "in order of preference", and the developer
+guide added "This is the route to take whenever you can". Nothing stated that a lower number must
+also be a better design. In the work of #2043, a new helper took `strict` as its fourth argument,
+as its siblings take it, and the file maximum of `arg` rose from 3 to 4. A session took route 1.
+It removed the argument and read the scoped value `projection_step_strict()` inside the function.
+The gate went green, but the change broke the precedent and hid a dependency on a scoped value.
+The maintainer found it with a question.
+
+An audit of the commits since 2026-08-01 that changed `code_health/complexity_baseline.toml` found
+no other such change on `dev`. Each row that fell came from a defect fix, from the removal of a
+duplicate, or from per-type methods in place of branches.
+
+`routes` in `code_health/CodeHealth.jl` prints the new text.
+`docs/src/contribute/3-code-health.md` § *When the correct form raises a number* states the rule,
+and the developer guide and the `sweep-conform` skill point to it.

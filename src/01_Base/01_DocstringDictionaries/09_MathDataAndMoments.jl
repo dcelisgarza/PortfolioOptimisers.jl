@@ -5,7 +5,7 @@
 unique_key_dict!(math_dict, :math_dict,
                  # Data, target and linear constraints.
                  :Xv => "``\\boldsymbol{X}``: Data vector `observations × 1`.",#
-                 :tgt => "``t``: Target value, usually the unweighted (or weighted) expected value ``E[\\boldsymbol{X}]``.",#
+                 :tgt => "``t``: Target value. It is usually the expected value ``E[\\boldsymbol{X}]``, weighted or unweighted.",#
                  :A => "``\\mathbf{A}``: Constraint coefficient matrix.",#
                  :B => "``\\boldsymbol{B}``: Constraint response vector.",#
                  :x => "``\\boldsymbol{x}``: Constrained variable.",#
@@ -22,6 +22,7 @@ unique_key_dict!(math_dict, :math_dict,
                  :r_tj => "``r_{tj}``: Return of asset ``j`` at time ``t``.",#
                  :mu_hat_j => "``\\hat{\\mu}_j``: Estimated mean of asset ``j``.",#
                  :sigma2_hat_j => "``\\hat{\\sigma}^2_j``: Estimated variance of asset ``j``.",#
+                 :V_tj_series => "``\\mathbf{V}_{tj}``: Point-in-time variance of asset ``j`` at observation ``t``. No observation after ``t`` enters it.",#
                  :sigma_hat_i => "``\\hat{\\sigma}_i``: Estimated standard deviation of asset ``i``.",#
                  :sigma_rv_hat_i => "``\\hat{\\sigma}^{\\mathrm{rv}}_i``: Predicted realised volatility of asset ``i`` for the period that follows the sample.",#
                  :Sigma_hat => "``\\hat{\\mathbf{\\Sigma}}``: Estimated covariance matrix.",#
@@ -38,7 +39,7 @@ unique_key_dict!(math_dict, :math_dict,
                  :h_step => "``h``: Horizon of a step, the number of observations the forecast is judged on.",#
                  :M_steps => "``M``: Steps of the walk-forward, the number of forecasts a run scores.",#
                  :z_band => "``z_{\\alpha/2}``: Upper ``\\alpha / 2`` quantile of the standard normal distribution.",#
-                 :c_weight_bias => "``c``: Bias correction of the weighted denominator. It is fixed by the **type** of the weights, never by the estimator: `corrected = false` gives ``c = 0`` for every type, and `corrected = true` gives ``c = 1`` for `StatsBase.FrequencyWeights`, ``c = \\sum_t w_t^2 / \\sum_t w_t`` for `StatsBase.AnalyticWeights` and ``c = \\sum_t w_t / T`` for `StatsBase.ProbabilityWeights`.",#
+                 :c_weight_bias => "``c``: Bias correction of the weighted denominator. The type of the weights sets it, and the estimator does not. `corrected = false` gives ``c = 0`` for all types. `corrected = true` gives ``c = 1`` for `StatsBase.FrequencyWeights`, ``c = \\sum_t w_t^2 / \\sum_t w_t`` for `StatsBase.AnalyticWeights` and ``c = \\sum_t w_t / T`` for `StatsBase.ProbabilityWeights`.",#
                  # Shrinkage of the sample expected returns.
                  :mu_hat_shrink => "``\\hat{\\boldsymbol{\\mu}}``: ``N \\times 1`` vector of sample expected returns, whose ``i``-th entry is ``\\hat{\\mu}_i``.",#
                  :b_shrink_tgt => "``\\boldsymbol{b}``: ``N \\times 1`` shrinkage target vector, every entry of which holds the same value.",#
@@ -55,13 +56,14 @@ unique_key_dict!(math_dict, :math_dict,
                  # Pairwise distance and correlation.
                  :d_ij_dist => "``d_{i,\\,j}``: Pairwise distance between assets ``i`` and ``j``.",#
                  :rho_ij => "``\\rho_{i,\\,j}``: Pairwise correlation coefficient between assets ``i`` and ``j``.",#
-                 :D_mat_dist => "``\\mathbf{D}``: Distance matrix.",#
-                 :D_ij_dist => "``D_{i,\\,j}``: Distance between assets ``i`` and ``j``.",#
-                 :S_ij_sim => "``S_{i,\\,j}``: Similarity between assets ``i`` and ``j``.",#
+                 :D_mat_dist => "``\\mathbf{D}``: The distance matrix.",#
+                 :D_ij_dist => "``D_{i,\\,j}``: The distance between assets ``i`` and ``j``.",#
+                 :S_ij_sim => "``S_{i,\\,j}``: The similarity between assets ``i`` and ``j``.",#
                  # Feature matrices and the collapse of a feature window.
                  :z_i_feature => "``\\boldsymbol{z}_{i}``: Feature vector of asset ``i``, its row of the feature matrix.",#
-                 :z_tik_feature => "``z_{t,\\,i,\\,k}``: Feature window entry: feature ``k`` of asset ``i`` at observation ``t``.",#
+                 :z_tik_feature => "``z_{t,\\,i,\\,k}``: Value of feature ``k`` of asset ``i`` at observation ``t``, one entry of the feature window.",#
                  :zbar_ik_feature => "``\\bar{z}_{i,\\,k}``: Collapsed feature ``k`` of asset ``i``, the aggregate of ``z_{t,\\,i,\\,k}`` over the observation axis.",#
+                 :a_ti_window => "``a_{t,\\,i}``: Window activity of asset ``i`` at observation ``t``, `1` when the active mask of the feature window marks the asset active and `0` otherwise.",#
                  # Spectral denoising: the Marcenko-Pastur split of a spectrum.
                  :lambda_i_eig => "``\\lambda_i``: ``i``-th eigenvalue of the input matrix.",#
                  :lambda_plus_mp => "``\\lambda_+``: Marčenko-Pastur upper bound of the noise band. An eigenvalue is noise when ``\\lambda_i \\leq \\lambda_+``, and signal when ``\\lambda_i > \\lambda_+``.",#
@@ -74,7 +76,7 @@ unique_key_dict!(math_dict, :math_dict,
                  # Norm-based error family.
                  :a_norm_err => "``\\boldsymbol{a}``: Portfolio weight or return vector ``T \\times 1``.",#
                  :b_norm_err => "``\\boldsymbol{b}``: Benchmark vector ``T \\times 1``.",#
-                 :d_ddof => "``d``: Degrees of freedom, `ddof`. When ``T`` is not provided the denominator is 1.",#
+                 :d_ddof => "``d``: Degrees of freedom, `ddof`. When the caller gives no ``T``, the denominator is 1.",#
                  :p_norm_order => "``p``: Norm order.",#
                  :tr_l2 => "``\\mathrm{TE}_{L_2}(\\boldsymbol{a},\\boldsymbol{b})``: L2-norm error.",#
                  :tr_l2sq => "``\\mathrm{TE}_{L_2^2}(\\boldsymbol{a},\\boldsymbol{b})``: Squared L2-norm error.",#
@@ -85,10 +87,10 @@ unique_key_dict!(math_dict, :math_dict,
                  # and `02_SmythBrobyCovariance.jl` and `03_GerberIQCovariance_a.jl`
                  # build on the same symbols.
                  :x_ti_ret => "``x_{t,\\,i}``: Return of asset ``i`` at observation ``t``.",#
-                 :t_threshold => "``t``: Threshold parameter, read as a standalone symbol; a subscript ``t`` is the observation index. An asset crosses at an observation when its return is at least ``t`` of its own standard deviations away from zero, and a return of exactly zero never crosses.",#
+                 :t_threshold => "``t``: Threshold parameter, when ``t`` is a symbol that stands alone. A subscript ``t`` is the observation index. An asset crosses at an observation when its return is at least ``t`` of its own standard deviations away from zero. A return of exactly zero never crosses.",#
                  :sigma_i_asset => "``\\sigma_i``: Standard deviation of asset ``i``.",#
                  :mu_hat_i_rank => "``\\hat{\\mu}_i``: ``i``-th entry of the characteristic vector, sorted non-increasing.",#
-                 :sigma_i_ucs => "``\\sigma_i``: Per-asset scaling of the ``i``-th entry of the characteristic vector; ``1`` when the set is unscaled.",#
+                 :sigma_i_ucs => "``\\sigma_i``: Scale factor of the ``i``-th entry of the characteristic vector. It is ``1`` when the set has no scaling.",#
                  :oslash => "``\\oslash``: Element-wise division.",#
                  :U_gerber => "``\\mathbf{U} \\in \\{0,1\\}^{T \\times N}``: Up indicator matrix, ``U_{t,\\,i} = \\mathbf{1}[x_{t,\\,i} \\geq t \\, \\sigma_i \\land x_{t,\\,i} > 0]``.",#
                  :D_gerber => "``\\mathbf{D} \\in \\{0,1\\}^{T \\times N}``: Down indicator matrix, ``D_{t,\\,i} = \\mathbf{1}[x_{t,\\,i} \\leq -t \\, \\sigma_i \\land x_{t,\\,i} < 0]``.",#
@@ -101,18 +103,18 @@ unique_key_dict!(math_dict, :math_dict,
                  # The Smyth-Broby family. `02_SmythBrobyCovariance.jl` states the
                  # statistic, and it shares the Gerber symbols above.
                  :r_tilde_sb => "``\\tilde{r}_{t,\\,i} = (x_{t,\\,i} - \\mu_i) / \\sigma_i``: Centred, standardised return of asset ``i`` at observation ``t``.",#
-                 :c1_sb => "``c_1``: Confusion-zone threshold. It is read against the **raw, uncentred** return, and it rejects an observation only when both assets fall inside it.",#
-                 :c2_sb => "``c_2``: Indecision-zone threshold. It is read against the **centred, standardised** return, and it rejects an observation when both assets fall inside it. A centred return of exactly zero is inside it at every ``c_2``.",#
-                 :c3_sb => "``c_3``: Outer cut-off. It is read against the centred, standardised return, and it rejects an observation when either asset exceeds it.",#
+                 :c1_sb => "``c_1``: Confusion-zone threshold on the raw, uncentred return. The confusion zone rejects an observation only when both assets are inside it.",#
+                 :c2_sb => "``c_2``: Indecision-zone threshold on the centred, standardised return. The indecision zone rejects an observation when both assets are inside it. A centred return of exactly zero is inside the zone at every ``c_2``.",#
+                 :c3_sb => "``c_3``: Outer cut-off on the centred, standardised return. The cut-off rejects an observation when either asset is above it.",#
                  :kappa_sb => "``\\kappa``: Amplitude kernel of a pair, the geometric mean of the two gross standardised magnitudes.",#
                  :gamma_sb => "``\\gamma``: Divergence of a pair, the absolute difference of the two standardised magnitudes.",#
-                 :n_sb => "``n``: Severity exponent. It sets how hard the divergence of a pair is penalised.",#
-                 :delta_sb => "``\\delta``: Smyth-Broby contribution of one admitted observation, in place of the Gerber vote.",#
+                 :n_sb => "``n``: Severity exponent. The denominator of ``\\delta`` is ``1 + \\gamma^{n}``, so a larger ``n`` gives a larger penalty to a divergence above one.",#
+                 :delta_sb => "``\\delta``: Smyth-Broby contribution of one admitted observation, in place of the Gerber count of one.",#
                  :CDN_sb => "``C``, ``D``, ``N``: Concordant, discordant and neutral observation sets of a pair, over the admitted observations.",#
                  :possum_sb => "``\\mathrm{pos}``, ``\\mathrm{neg}``, ``\\mathrm{nn}``: Contribution sums of a pair over ``C``, ``D`` and ``N``.",#
                  :poscount_sb => "``c^{+}``, ``c^{-}``, ``c^{0}``: Observation counts of a pair over ``C``, ``D`` and ``N``.",#
-                 :pqu_sb => "``p``, ``q``, ``u``: Concordant, discordant and neutral scores of a pair, chosen from the sums and the counts by the marker prefix.",#
-                 :h_ij_sb => "``h_{i,\\,j} = p - q``: Net score of the pair, before any normalisation.",#
+                 :pqu_sb => "``p``, ``q``, ``u``: Concordant, discordant and neutral scores of a pair. The marker prefix selects them from the sums and the counts.",#
+                 :h_ij_sb => "``h_{i,\\,j} = p - q``: Net score of the pair, before any division.",#
                  # The higher comoments. `18_Coskewness.jl` and `19_Cokurtosis.jl`
                  # build both matrices from one deviation matrix and one pairwise
                  # expansion of it, so the two files share these four symbols.
@@ -143,6 +145,8 @@ unique_key_dict!(math_dict, :math_dict,
                  :cal_s_radius => "``s``: Scale of the radius, in the units of the series the slot owner prices.",#
                  :cal_s_i_series => "``\\hat{s}_{i}``: Sample dispersion of the series the slot owner prices, over column ``i``. It is ``\\sqrt{\\hat{\\mathbf{\\Sigma}}_{ii}}`` under a [`ReturnsSeries`](@ref), and the dispersion of column ``i`` of the drawdown sample under a drawdown marker.",#
                  :cal_T_e => "``T_{e}``: Effective sample size, which is Kish's when the observation weights are stated.",#
+                 :cal_T_n => "``T_{n}``: Scenario count of the measure, the number of scenarios that it prices.",#
+                 :cal_T_c => "``T_{c}``: Sample size of the radius. It is the count `n` that the site states in its [`CalibrationContext`](@ref), and ``T_{e}`` when the site states none.",#
                  # The idiosyncratic diagnostics of a cross-sectional fit. Each symbol is
                  # stated by two or more Units of that file.
                  :eps_ti_idio => "``\\varepsilon_{ti}``: Idiosyncratic return of asset ``i`` at observation ``t``.",#
@@ -154,6 +158,12 @@ unique_key_dict!(math_dict, :math_dict,
                  :m_pt_idio => "``m_{pt}``: Central moment of order ``p`` of the finite standardised returns of observation ``t``.",#
                  :a_t_series => "``a_{t}``: Diagnostic series value at observation ``t``.",#
                  :A_series_fin => "``\\mathcal{A}``: Finite observations of a diagnostic series, those at which ``a_{t}`` is finite.",#
+                 # The weight policies of a cross-sectional regression. Each symbol is
+                 # stated by two or more Units of that file.
+                 :w_ti_cs => "``w_{t,i}``: Cross-sectional regression weight of asset ``i`` at observation ``t``.",#
+                 :m_ti_mcap => "``m_{t,i}``: Market capitalisation of asset ``i`` at observation ``t``.",#
+                 :p_mcap => "``p``: Market capitalisation power.",#
+                 :M_cs_mask => "``\\mathcal{M}``: Eligibility mask, the set of pairs ``(t, i)`` that enter the fit.",#
                  :rho_S_cs => "``\\rho_{S}``: Cross-sectional rank correlation, over the assets at which both cross-sections are finite. Under the default `ties = :average`, equal values share the mean of their ranks. Under `ties = :ordinal`, they take consecutive ranks, in the order of the asset axis.",#
                  # The factor model summary of `32_CrossSectionalFactorModel/`. Each symbol
                  # is stated by two or more Units of `10_FactorModelSummary.jl`.
@@ -258,4 +268,11 @@ unique_key_dict!(math_dict, :math_dict,
                  :F_fam_att => "``\\mathcal{F}``: Raw factors of one family.",#
                  :Q_t_att => "``\\mathbf{Q}_{t}``: Regression weight matrix of observation ``t``, diagonal, holding the cross-sectional weight of each asset.",#
                  :Omega_t_att => "``\\boldsymbol{\\Omega}_{t}``: Idiosyncratic variance matrix of observation ``t``, diagonal, holding the idiosyncratic variance of each asset.",#
-                 :V_t_att => "``\\mathbf{V}_{t}``: Sandwich covariance of the factor returns the cross-sectional fit estimates at observation ``t``, ``K \\times K``.")
+                 :V_t_att => "``\\mathbf{V}_{t}``: Sandwich covariance of the factor returns the cross-sectional fit estimates at observation ``t``, ``K \\times K``.",#
+                 # The regime adjustment of an exponentially weighted moment.
+                 :g_t_regime => "``g_{t}``: Regime statistic of observation ``t``, which the regime state smooths.",#
+                 :A_t_regime => "``\\mathcal{A}_{t}``, ``n_{t}``: Scored assets of observation ``t``, the assets whose returns the regime statistic reads, and their count.",#
+                 :z2_it_regime => "``z_{i,t}^{2}``: Standardised squared return of asset ``i`` at observation ``t``, the squared deviation over the variance that the estimate before ``t`` predicts.",#
+                 :s_t_regime => "``s_{t}``: Smoothed regime state after observation ``t``.",#
+                 :lambda_r_regime => "``\\lambda_{r}``: Decay of the regime state, the `regime_decay` field.",#
+                 :mult_regime => "``\\mathrm{mult}(s)``: Volatility multiplier of a regime state ``s``. The estimator scales its variance or its covariance by the square of the multiplier.")

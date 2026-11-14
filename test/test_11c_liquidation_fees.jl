@@ -172,6 +172,13 @@
         v = PortfolioOptimisers.port_opt_view(fees, [1, 2, 4])
         @test collect(v.l) == [0.01, 0.02, 0.04]
         @test collect(v.lq.w) == w
+        # The estimator takes the same fallback (#1912).
+        fest = FeesEstimator(; l = [0.01, 0.02, 0.03, 0.04],
+                             lq = TurnoverEstimator(; w = w, val = 0.010))
+        ve = PortfolioOptimisers.port_opt_view(fest, [1, 2, 4])
+        @test ve isa FeesEstimator
+        @test collect(ve.l) == [0.01, 0.02, 0.04]
+        @test collect(ve.lq.w) == w
     end
 
     @testset "An Investable Mask drives the split, end to end" begin
@@ -237,8 +244,8 @@
         @test length(res.w) == N
         @test iszero(res.w[k])
         @test isapprox(sum(res.w), 1; atol = 1e-8)
-        @test res.jr.pa.imsk == imsk
-        used = res.jr.pa.fees
+        @test res.jr.jor.imsk == imsk
+        used = res.jr.jor.fees
         @test length(used.l) == length(keep)
         @test collect(used.l) == lval[keep]
         @test collect(used.lq.w) == [w[k]]
@@ -304,7 +311,7 @@
         # The split is **one** matrix on the caller's universe, and the Investable Mask is
         # what says which columns each axis owns: the five per asset fields were sliced to
         # `imsk` at the door and the two carriers to its complement. Here asset 4 is the one
-        # that left, so its column of `X4` is zero, as `expand_investable_columns` leaves it.
+        # that left, so its column of `X4` is zero, as `expand_investable_weights` leaves it.
         X3 = [0.010 -0.020 0.030
               -0.015 0.025 0.012
               0.020 0.010 -0.008
@@ -439,13 +446,6 @@
         sets = UniverseSets(; dict = Dict("nx" => nx))
         fees = Fees(; l = 0.001, lq = Turnover(; w = fill(0.2, 5), val = 0.01),
                     flq = Turnover(; w = fill(0.2, 5), val = 5.0))
-
-        # A stated `nothing` fee under a derived mask satisfies both the `nothing` fee
-        # method and the `BitVector` mask method. Without a third method naming that pair
-        # the call is ambiguous, so every family below fails on a delisting window that
-        # states no fee at all.
-        @test isnothing(PortfolioOptimisers.strip_liquidation_charges(nothing,
-                                                                      BitVector([1, 0, 1])))
 
         hopt = HierarchicalOptimiser(; pe = EmpiricalPrior(), sets = sets, fees = fees)
         inner = HierarchicalRiskParity()

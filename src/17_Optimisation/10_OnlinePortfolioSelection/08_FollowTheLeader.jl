@@ -88,8 +88,7 @@ Prefix()
 
 # References
 
-  - $(ref_dict[:gaivoronski2000])
-  - $(ref_dict[:lihoi2014]) Section 3.2.3.
+  - $(ref_dict[:gaivoronski2000]) Section 2, Definition 2, Equations 5 and 6.
 """
 struct Prefix <: AbstractSampleSelector end
 function select_rows(::Prefix, X::AbstractMatrix)
@@ -103,7 +102,7 @@ $(DocStringExtensions.TYPEDEF)
 
 Selects the last `W` periods, the sample of the successive variable rebalanced portfolio.
 
-Under the default log-optimal estimator the leader is the best constant rebalanced portfolio of a moving window. [gaivoronski2000](@citet) call the rule the successive variable rebalanced portfolio, and [lihoi2014](@citet) call it the variable rebalanced portfolio (VRP). Before `W` periods exist the sample is every period so far, as in [gaivoronski2000](@cite).
+Under the default log-optimal estimator the leader is the best constant rebalanced portfolio of a moving window. [gaivoronski2000](@citet) call the rule the successive variable rebalanced portfolio. Before `W` periods exist the sample is every period so far, as in [gaivoronski2000](@cite).
 
 # Mathematical definition
 
@@ -149,8 +148,7 @@ LastRows
 
 # References
 
-  - $(ref_dict[:gaivoronski2000])
-  - $(ref_dict[:lihoi2014]) Section 3.2.3.
+  - $(ref_dict[:gaivoronski2000]) Section 4, Definition 8, Equations 47 and 48.
 """
 @concrete struct LastRows <: AbstractSampleSelector
     """
@@ -314,7 +312,7 @@ $(DocStringExtensions.TYPEDEF)
 
 Selects the periods whose preceding window falls in the same histogram cell as the latest window (BH).
 
-This is the histogram rule of [gyorfischafer2003](@citet). [gyorfischafer2003](@citet) quantise each price relative vector by a partition of the positive orthant, and a period matches when its window gives the same string of cell labels as the latest window. [gyorfischafer2003](@citet) leave the partition to the user. The consistency theorem of [gyorfischafer2003](@cite) asks for a nested sequence of partitions whose cells shrink. [gyorfischafer2003](@citet) mix the experts of that sequence by wealth. That mixture is an [`ExpertMixture`](@ref) over [`FollowTheLeader`](@ref) rules with one selector each.
+This is the partitioning portfolio of [gyorfischafer2003](@citet). [lihoi2014](@citet) state it as a similarity set and call the selector histogram-based, and they name its log-optimal rule BH. [gyorfischafer2003](@citet) quantise each price relative vector by a finite partition of the feature space, and a period matches when its window gives the same string of cell labels as the latest window. [gyorfischafer2003](@citet) leave the partition to the user. The consistency theorem of [gyorfischafer2003](@cite) asks for a nested sequence of partitions whose cells shrink. [gyorfischafer2003](@citet) mix the experts of that sequence by wealth. That mixture is an [`ExpertMixture`](@ref) over [`FollowTheLeader`](@ref) rules with one selector each.
 
 # Mathematical definition
 
@@ -371,8 +369,8 @@ HistogramMatch
 
 # References
 
-  - $(ref_dict[:gyorfischafer2003])
-  - $(ref_dict[:lihoi2014]) Section 3.4.1.
+  - $(ref_dict[:gyorfischafer2003]) Section 16.4, Theorem 2.
+  - $(ref_dict[:lihoi2014]) Sections 3.4.1 and 3.4.3.
 """
 @concrete struct HistogramMatch <: AbstractPatternMatchSelector
     """
@@ -426,7 +424,7 @@ $(DocStringExtensions.TYPEDEF)
 
 Selects the periods whose preceding window lies within `radius` of the latest window (BK).
 
-This is the kernel rule of [gyorfi2006](@citet) under the uniform kernel, in the Euclidean norm of the flattened windows. The experts of [gyorfi2006](@cite) run over a grid of windows ``w`` and radii ``c / \\ell``, and [gyorfi2006](@citet) mix them by wealth. That mixture is an [`ExpertMixture`](@ref) over [`FollowTheLeader`](@ref) rules with one selector each, and each selector holds one radius.
+This is the kernel rule of [gyorfi2006](@citet) under the uniform kernel, in the Euclidean norm of the flattened windows. [lihoi2014](@citet) call its log-optimal rule BK. The experts of [gyorfi2006](@cite) run over a grid of windows ``w`` and radii ``c / \\ell``, and [gyorfi2006](@citet) mix them by wealth. That mixture is an [`ExpertMixture`](@ref) over [`FollowTheLeader`](@ref) rules with one selector each, and each selector holds one radius.
 
 Three later rules use this selector under another objective, which the held estimator on the rule's `opt` states. The semi-log-optimal rule of [gyorfi2007semilog](@citet) maximises the second-order expansion of the log at one. The Markowitz-type rule of [ottucsakvajda2007](@citet) maximises a mean-variance utility. The rule of [gyorfivajda2008](@citet) compares windows of one period and maximises the log return net of proportional costs.
 
@@ -479,10 +477,11 @@ KernelMatch
 
 # References
 
-  - $(ref_dict[:gyorfi2006])
-  - $(ref_dict[:gyorfi2007semilog])
-  - $(ref_dict[:ottucsakvajda2007])
-  - $(ref_dict[:gyorfivajda2008])
+  - $(ref_dict[:gyorfi2006]) Section 3, Equation 3.1 and Theorem 3.1.
+  - $(ref_dict[:gyorfi2007semilog]) Section 3 and Equations 4.1 to 4.3.
+  - $(ref_dict[:ottucsakvajda2007]) Sections 3.1 and 5, Equation 5.3.
+  - $(ref_dict[:gyorfivajda2008]) Section 2, Algorithms 1 and 2, Equations 6 and 7.
+  - $(ref_dict[:lihoi2014]) Sections 3.4.1 and 3.4.3.
 """
 @concrete struct KernelMatch <: AbstractPatternMatchSelector
     """
@@ -512,7 +511,7 @@ $(DocStringExtensions.TYPEDEF)
 
 Selects the periods whose preceding windows are the `neighbours` nearest to the latest window (BNN).
 
-This is the nearest-neighbour rule of [gyorfi2008](@citet), in the Euclidean norm of the flattened windows. The rule of [gyorfi2008](@cite) invests at period ``n = t + 1`` with ``\\lfloor p\\, n \\rfloor`` neighbours, a count that grows with the history. So `neighbours` is an `Integer` count or a fraction in `(0, 1)`. The fraction applies to the ``t - w`` candidates and not to the period, so the count never exceeds the candidates. It is below the count of [gyorfi2008](@cite) by at most ``\\lceil p (w + 1) \\rceil``. A fraction that rounds down to zero gives the empty sample. [gyorfi2008](@citet) assume that ties have zero probability. Here the earlier period wins a tie at the boundary.
+This is the nearest-neighbour rule of [gyorfi2008](@citet), in the Euclidean norm of the flattened windows. [lihoi2014](@citet) call its log-optimal rule BNN. The rule of [gyorfi2008](@cite) invests at period ``n = t + 1`` with ``\\lfloor p\\, n \\rfloor`` neighbours, a count that grows with the history. So `neighbours` is a [`CountOf`](@ref) or a [`FractionOf`](@ref). The fraction applies to the ``t - w`` candidates and not to the period, so the count never exceeds the candidates. It is below the count of [gyorfi2008](@cite) by at most ``\\lceil p (w + 1) \\rceil``. A fraction that rounds down to zero gives the empty sample. [gyorfi2008](@citet) assume that ties have zero probability. Here the earlier period wins a tie at the boundary.
 
 # Mathematical definition
 
@@ -529,8 +528,8 @@ Where:
   - $(math_dict[:w_win])
   - $(math_dict[:x_win])
   - ``\\ell``: Neighbour count at period ``t``.
-  - ``k``: Count, the `neighbours` field when it is an `Integer`.
-  - ``p``: Fraction, the `neighbours` field when it is a real in `(0, 1)`.
+  - ``k``: Count, the `val` of the `neighbours` field when it is a [`CountOf`](@ref).
+  - ``p``: Fraction, the `val` of the `neighbours` field when it is a [`FractionOf`](@ref).
   - $(math_dict[:t_period])
 
 The distance between two windows is the Euclidean norm of their difference.
@@ -541,14 +540,17 @@ $(DocStringExtensions.FIELDS)
 
 # Constructors
 
-    NearestNeighbourMatch(; window::Integer = 5, neighbours::Real = 0.1) -> NearestNeighbourMatch
+    NearestNeighbourMatch(; window::Integer = 5,
+                          neighbours::Real_CountFraction = FractionOf(0.1)) -> NearestNeighbourMatch
 
-Keywords correspond to the struct's fields.
+Keywords correspond to the struct's fields. A plain `neighbours` is read through [`count_or_fraction`](@ref).
 
 ## Validation
 
   - `window >= 1`. A `DomainError` is thrown otherwise.
-  - `neighbours >= 1` for an `Integer`, and `0 < neighbours < 1` for another real. A `DomainError` is thrown otherwise.
+  - `neighbours` passes [`count_or_fraction`](@ref).
+
+$(val_dict[:count_fraction_grid])
 
 # Examples
 
@@ -556,7 +558,8 @@ Keywords correspond to the struct's fields.
 julia> NearestNeighbourMatch()
 NearestNeighbourMatch
       window ┼ Int64: 5
-  neighbours ┴ Float64: 0.1
+  neighbours ┼ FractionOf
+             │   val ┴ Float64: 0.1
 ```
 
 # Related
@@ -567,7 +570,8 @@ NearestNeighbourMatch
 
 # References
 
-  - $(ref_dict[:gyorfi2008])
+  - $(ref_dict[:gyorfi2008]) Section 3, Equations 3.1 to 3.3 and Theorem 3.1.
+  - $(ref_dict[:lihoi2014]) Sections 3.4.1 and 3.4.3.
 """
 @concrete struct NearestNeighbourMatch <: AbstractPatternMatchSelector
     """
@@ -575,49 +579,43 @@ NearestNeighbourMatch
     """
     window
     """
-    The number of neighbours to keep, an `Integer` count or a fraction in `(0, 1)` of the candidate rows.
+    The number of neighbours to keep, a [`CountOf`](@ref) or a [`FractionOf`](@ref) of the candidate rows.
     """
     neighbours
-    function NearestNeighbourMatch(window::Integer, neighbours::Real)
+    function NearestNeighbourMatch(window::Integer, neighbours::Real_CountFraction)
         assert_pattern_window(window)
-        if isa(neighbours, Integer)
-            @argcheck(neighbours >= 1,
-                      DomainError(neighbours, "a count must be at least 1"))
-        else
-            @argcheck(zero(neighbours) < neighbours < one(neighbours),
-                      DomainError(neighbours, "a fraction must lie in (0, 1)"))
-        end
+        neighbours = count_or_fraction(neighbours)
         return new{typeof(window), typeof(neighbours)}(window, neighbours)
     end
 end
 function NearestNeighbourMatch(; window::Integer = 5,
-                               neighbours::Real = 0.1)::NearestNeighbourMatch
+                               neighbours::Real_CountFraction = FractionOf(0.1))::NearestNeighbourMatch
     return NearestNeighbourMatch(window, neighbours)
 end
 """
-    neighbour_count(neighbours::Integer, n::Integer)
-    neighbour_count(neighbours::Real, n::Integer)
+    neighbour_count(neighbours::CountOf, n::Integer)
+    neighbour_count(neighbours::FractionOf, n::Integer)
 
 Returns the number of neighbours that a nearest-neighbour selector keeps out of `n` candidates.
 
 # Arguments
 
-  - `neighbours`: The count, an `Integer`, or the fraction, a real in `(0, 1)`.
+  - `neighbours`: The [`CountOf`](@ref) or the [`FractionOf`](@ref) of the candidates.
   - `n`: The number of candidates.
 
 # Returns
 
-  - `l::Integer`: `min(neighbours, n)` for a count, and `floor(Int, neighbours * n)` for a fraction.
+  - `l::Integer`: `min(neighbours.val, n)` for a count, and `floor(Int, neighbours.val * n)` for a fraction.
 
 # Related
 
   - [`NearestNeighbourMatch`](@ref)
 """
-function neighbour_count(neighbours::Integer, n::Integer)
-    return min(neighbours, n)
+function neighbour_count(neighbours::CountOf, n::Integer)
+    return min(neighbours.val, n)
 end
-function neighbour_count(neighbours::Real, n::Integer)
-    return floor(Int, neighbours * n)
+function neighbour_count(neighbours::FractionOf, n::Integer)
+    return floor(Int, neighbours.val * n)
 end
 function matched_rows(sel::NearestNeighbourMatch, ::AbstractMatrix, cands::AbstractVector,
                       latest::AbstractVector)
@@ -694,7 +692,7 @@ CorrelationMatch
 # References
 
   - $(ref_dict[:li2011corn]) Equation 6, Algorithms 1 to 3 and Section 5.2.
-  - $(ref_dict[:wang2018racorn]) Equation 3.
+  - $(ref_dict[:wang2018racorn]) Section 3.2, Equation 3 and Section 4.2.
 """
 @concrete struct CorrelationMatch <: AbstractPatternMatchSelector
     """
@@ -789,7 +787,7 @@ julia> ClusterMatch(; clusterer = ClustersEstimator()).window
 
 # References
 
-  - $(ref_dict[:khedmatiazin2020])
+  - $(ref_dict[:khedmatiazin2020]) Page 113546. $(ref_dict[:no_original_source])
 """
 @concrete struct ClusterMatch <: AbstractPatternMatchSelector
     """
@@ -826,76 +824,20 @@ function matched_rows(sel::ClusterMatch, ::AbstractMatrix, cands::AbstractVector
     return findall(==(labels[n + 1]), view(labels, 1:n))
 end
 """
-$(DocStringExtensions.TYPEDEF)
-
-Adds the head's Allocation Set to the programme of a follow-the-leader re-solve, the Allocation Set Constraint.
-
-The type is a [`CustomJuMPConstraint`](@ref) that holds the resolved set, the Price-Adjusted Allocation of the step and the head's rows. A [`FollowTheLeader`](@ref) rule appends it to the `ccnt` of its held optimiser for one solve. [`add_custom_constraint!`](@ref) on it calls [`add_allocation_set_constraints!`](@ref), which runs the set's own builders on the leader's model. So the feasible region of the programme is the set intersected with the region of the held optimiser. The turnover ceiling measures from the Price-Adjusted Allocation. The variance ceiling and the tracking error read the set's own `pe` on the head's rows, as they do in a projection. A constraint can live on the set or on the held optimiser, and a caller who wants one home leaves the other bare.
-
-# Fields
-
-$(DocStringExtensions.FIELDS)
-
-## View parameters
-
-When [`port_opt_view`](@ref) is called on this type, its fields are subset to the selected assets. `set` takes its own view, against the unreduced returns matrix of the head's rows when they exist, because the view of a tracking estimator asks for it. The view slices `w`, and `X` takes the view of the rows. The reduction of the held estimator to its Investable Mask views its `ccnt` with the rest of the optimiser. So the set stays in the reduced programme. A custom constraint with no view drops out of it.
-
-# Related
-
-  - [`FollowTheLeader`](@ref)
-  - [`add_allocation_set_constraints!`](@ref): the builders that this constraint calls.
-  - [`CustomJuMPConstraint`](@ref)
-  - [`AbstractAllocationSet`](@ref)
-  - [`investable_reduction`](@ref): the reduction that views this constraint with the held optimiser.
-"""
-@concrete struct AllocationSetConstraint <: CustomJuMPConstraint
-    """
-    The Allocation Set, resolved over the pinned universe.
-    """
-    set
-    """
-    The Price-Adjusted Allocation the step trades from.
-    """
-    w
-    """
-    The rows that the head holds through the period, as a [`ReturnsResult`](@ref), or `nothing`.
-    """
-    X
-    function AllocationSetConstraint(set::T1, w::T2,
-                                     X::T3) where {T1 <: AbstractAllocationSet,
-                                                   T2 <: AbstractVector,
-                                                   T3 <: Option{<:ReturnsResult}}
-        return new{T1, T2, T3}(set, w, X)
-    end
-end
-function add_custom_constraint!(model::JuMP.Model, ccnt::AllocationSetConstraint, ::Any,
-                                ::Any)::Nothing
-    add_allocation_set_constraints!(model, ccnt.set, ccnt.w, ccnt.X)
-    return nothing
-end
-function port_opt_view(c::AllocationSetConstraint{<:Any, <:Any, Nothing}, i, args...)
-    return AllocationSetConstraint(port_opt_view(c.set, i, args...), c.w[i], nothing)
-end
-function port_opt_view(c::AllocationSetConstraint{<:Any, <:Any, <:ReturnsResult}, i,
-                       args...)
-    return AllocationSetConstraint(port_opt_view(c.set, i, c.X.X), c.w[i],
-                                   port_opt_view(c.X, i))
-end
-"""
-    const LeaderOptimiser = Union{<:BestConstantRebalancedPortfolio, <:JuMPOptimisationEstimator}
+    const LeaderOptimiser = Union{BestConstantRebalancedPortfolio, JuMPOptimisationEstimator}
 
 Groups the optimisation estimators that a follow-the-leader rule can re-solve under the head's Allocation Set.
 
-A leader of a [`FollowTheLeader`](@ref) rule must honour the set. The solver-free [`BestConstantRebalancedPortfolio`](@ref) takes a bounded set on its own `wb` and `sets` slots. A JuMP estimator takes any set through the [`AllocationSetConstraint`](@ref) on its `ccnt`. No other estimator has a slot for the set, so the alias excludes it.
+A leader of a [`FollowTheLeader`](@ref) rule must honour the set. The solver-free [`BestConstantRebalancedPortfolio`](@ref) takes a bounded set on its own `wb` and `sets` slots. A JuMP estimator takes any set as a second block of its entry, the keyword `blocks` of [`resolve_jump_optimiser`](@ref). No other estimator has a slot or an entry for the set, so the alias excludes it. Each member of the fallback chain of the held estimator is a member of the alias too, see [`assert_leader_chain`](@ref).
 
 # Related
 
   - [`FollowTheLeader`](@ref)
+  - [`leader_allocation`](@ref)
   - [`BestConstantRebalancedPortfolio`](@ref)
   - [`JuMPOptimisationEstimator`](@ref)
 """
-const LeaderOptimiser = Union{<:BestConstantRebalancedPortfolio,
-                              <:JuMPOptimisationEstimator}
+const LeaderOptimiser = Union{BestConstantRebalancedPortfolio, JuMPOptimisationEstimator}
 """
 $(DocStringExtensions.TYPEDEF)
 
@@ -909,7 +851,7 @@ The objective is the held estimator's. [`BestConstantRebalancedPortfolio`](@ref)
 
 The solver-free default runs Cover's fixed point, which stops on a certificate, a bound on the shortfall of its log wealth from the leader's. At a leader that drops an asset, the weight of that asset decays slowly. So the default budget can stop before the certificate meets `tol`, and the rule then warns once and names the certificate. On the first 30 rows of the returns `0.02 .* randn(StableRNG(11), 40, 4)` the default stops 0.066 from the leader in weight and 6.2e-5 short of it in log wealth. At `iters = 10_000_000` the certificate meets `tol = 1e-12` after 1 437 030 steps, 1.6e-9 from the leader in weight. A JuMP head solves the leader to the solver's tolerance, and the two forms agree to that tolerance at a leader inside the simplex.
 
-**The re-solve takes the head's Allocation Set as its feasible region.** The rule wraps the set, the Price-Adjusted Allocation and the head's rows into an [`AllocationSetConstraint`](@ref), and appends it to the `ccnt` of the held JuMP estimator for the solve. It passes the Price-Adjusted Allocation through [`factory`](@ref) as a fold loop does, so a turnover term or a fee on `opt` reads the same book. It plays the optimum with no projection, because the projected leader is not the leader. The solver-free estimator has no model. So a [`BoundedAllocationSet`](@ref) goes into its `wb` and `sets`, and the rule plays its repaired fixed point. The head refuses a [`ProgrammeAllocationSet`](@ref) over the solver-free estimator at construction. Under a programme set the constrained leader is [`MeanRisk`](@ref) under [`LogarithmicReturn`](@ref).
+**The re-solve takes the head's Allocation Set as its feasible region.** The rule passes the set as a second block of the entry of the held JuMP estimator, the keyword `blocks` of [`resolve_jump_optimiser`](@ref), with the rows that the head holds, see [`leader_block`](@ref). The block of the set reads the prior of the set on those rows, and the block of the held estimator reads its own prior on the sample. The rule passes the Price-Adjusted Allocation through [`factory`](@ref) to the held estimator and to the set, as a fold loop does, so a turnover term or a fee on `opt` reads the same book as the set. It plays the optimum with no projection, because the projected leader is not the leader. A constraint of the set and one of the held estimator meet in one model as two constraints, each in its own namespace. So the leader is the optimum over the set and the feasible set of the held estimator together. The constraints of the held estimator restrict the leader, but they do not bind the allocation that the rule plays. At `gamma > 0` the rule projects the damped mix onto the set alone, so the mix can leave the feasible set of the held estimator. A held estimator with no constraint of its own gives the leader over the set alone, which is the rule of the literature. The default `wb` of a [`JuMPOptimiser`](@ref) is `WeightBounds()`, the long-only bounds. So on a set that admits a negative weight, state `wb = nothing` on the held estimator, or the leader stays long-only. The budget is the exception, because the head owns it. The re-solve sets the net budget of the held estimator, and of each member of its fallback chain, to the budget of one, so the leader's model holds the row `Σw = k`, see [`leader_chain`](@ref). So the held estimator takes `bgt = nothing`, a budget of one, or a [`BudgetRange`](@ref) that holds one, and a gross budget that the budget of one can reach. The constructor refuses every other budget and every [`BudgetCostEstimator`](@ref), see [`assert_leader_budget`](@ref). The fallback chain passes the block to each member. So the constructor refuses a member that cannot take the set, see [`assert_leader_chain`](@ref). The solver-free estimator has no model. So a [`BoundedAllocationSet`](@ref) goes into its `wb` and `sets`, and the rule plays its repaired fixed point. The head refuses a [`ProgrammeAllocationSet`](@ref) over the solver-free estimator at construction. Under a programme set the constrained leader is [`MeanRisk`](@ref) under [`LogarithmicReturn`](@ref).
 
 **The rule projects the damped mix alone.** It uses the Euclidean geometry on `proj`, with the Price-Adjusted Allocation as the reference. On a static convex set the projection returns the mix unchanged. A turnover ceiling or a MIP kind needs the repair on a day when the mix leaves the set. The rule skips the projection by type on a [`BoundedAllocationSet`](@ref), and at `gamma = 0`. An empty sample, or a sample too small for the estimator, gives the uniform portfolio projected onto the set, as in [gyorfischafer2003,gyorfi2006,gyorfi2008,li2011corn](@cite). A JuMP head fits a covariance, so it needs two rows. A re-solve that fails after the fallback chain of the held estimator is a Held Step. The rule then plays the Price-Adjusted Allocation, so the fund trades nothing that period.
 
@@ -919,7 +861,7 @@ The solver-free default runs Cover's fixed point, which stops on a certificate, 
 
 ```math
 \\begin{align}
-\\boldsymbol{w}^\\star_t &= \\underset{\\boldsymbol{w} \\in \\mathcal{W}}{\\arg\\max}\\; \\sum_{i \\in C_t} \\log \\langle \\boldsymbol{w}, \\boldsymbol{x}_i \\rangle\\,, \\\\
+\\boldsymbol{w}^\\star_t &= \\underset{\\boldsymbol{w} \\in \\mathcal{W} \\cap \\mathcal{W}_{\\mathrm{opt}}}{\\arg\\max}\\; \\sum_{i \\in C_t} \\log \\langle \\boldsymbol{w}, \\boldsymbol{x}_i \\rangle\\,, \\\\
 \\boldsymbol{w}_{t+1} &= \\mathrm{Proj}_{\\mathcal{W}}\\left( (1 - \\gamma)\\, \\boldsymbol{w}^\\star_t + \\gamma\\, \\boldsymbol{w}_t \\right)\\,.
 \\end{align}
 ```
@@ -929,6 +871,7 @@ Where:
   - $(math_dict[:w_star_lead]) The first line is the leader under the default log-optimal estimator. Another estimator on `opt` replaces the objective.
   - $(math_dict[:w_var_lead])
   - $(math_dict[:W_aset])
+  - ``\\mathcal{W}_{\\mathrm{opt}}``: Feasible set of the constraints of the held estimator on `opt`. With no constraint of its own, it holds every allocation, and the leader is the optimum over ``\\mathcal{W}`` alone.
   - $(math_dict[:C_t_sample])
   - $(math_dict[:x_t_rel])
   - $(math_dict[:w_t_iter])
@@ -936,7 +879,7 @@ Where:
   - $(math_dict[:Proj_W_euclid])
   - $(math_dict[:t_period])
 
-At ``\\gamma = 0`` the rule plays the leader. The leader lies in ``\\mathcal{W}``, so the mix leaves ``\\mathcal{W}`` only when ``\\boldsymbol{w}_t`` is outside it, as under a turnover ceiling, or when ``\\mathcal{W}`` is not convex, as under a cardinality bound. Under the log-optimal estimator and [`Prefix`](@ref), the leader on ``\\mathcal{W} = \\Delta_N`` is the best constant rebalanced portfolio of the first ``t`` periods. The Exp-Concave-FTL of [hazankale2012](@citet) is
+At ``\\gamma = 0`` the rule plays the leader. The leader lies in ``\\mathcal{W}``, so the mix leaves ``\\mathcal{W}`` only when ``\\boldsymbol{w}_t`` is outside it, as under a turnover ceiling, or when ``\\mathcal{W}`` is not convex, as under a cardinality bound. The projection reads ``\\mathcal{W}`` alone, so at ``\\gamma > 0`` the played allocation can leave ``\\mathcal{W}_{\\mathrm{opt}}``. Under the log-optimal estimator and [`Prefix`](@ref), the leader on ``\\mathcal{W} = \\Delta_N`` is the best constant rebalanced portfolio of the first ``t`` periods. The Exp-Concave-FTL of [hazankale2012](@citet) is
 
 ```math
 \\begin{align}
@@ -978,10 +921,19 @@ Keywords correspond to the struct's fields.
 ## Validation
 
   - `0 <= gamma <= 1`. A `DomainError` is thrown otherwise.
+  - The budgets of a JuMP estimator on `opt` admit the budget of one of the head, see [`assert_leader_budget`](@ref):
+      + `bgt` is `nothing`, one, or a [`BudgetRange`](@ref) that holds one. A `DomainError` is thrown otherwise.
+      + `bgt` is not a [`BudgetCostEstimator`](@ref). An `ArgumentError` is thrown otherwise.
+      + `sbgt`, `gbgt` and `wb` pass [`assert_gross_budget_admissible`](@ref) with a net budget of one. So `gbgt` reaches one, and it is not given beside a number in `sbgt`. An `ArgumentError` is thrown otherwise.
+      + The same holds for each entry and the explicit `default` of a [`TimeDependent`](@ref) schedule in these fields.
+  - Each member of the fallback chain of `opt` can take the head's Allocation Set, see [`assert_leader_chain`](@ref):
+      + Under a JuMP estimator, each member is a JuMP estimator, and its budgets meet the rules above. An `ArgumentError` is thrown otherwise.
+      + Under the solver-free [`BestConstantRebalancedPortfolio`](@ref), each member is a `BestConstantRebalancedPortfolio`. An `ArgumentError` is thrown otherwise.
+      + No member is a precomputed result. An `ArgumentError` is thrown otherwise.
 
 ## View parameters
 
-When [`port_opt_view`](@ref) is called on this type, `opt` is viewed to the selected indices and `sel`, `gamma` and `proj` are carried unchanged.
+[`port_opt_view`](@ref) takes the view of `opt` at the selected indices and carries `sel`, `gamma` and `proj` unchanged.
 
 # Examples
 
@@ -1010,7 +962,7 @@ FollowTheLeader
   - [`AbstractOnlinePortfolioSelectionAlgorithm`](@ref)
   - [`OnlinePortfolioSelection`](@ref)
   - [`AbstractSampleSelector`](@ref)
-  - [`AllocationSetConstraint`](@ref): the adapter that adds the head's set to the programme.
+  - [`leader_allocation`](@ref): the re-solve that gives the head's set to the held estimator.
   - [`BestConstantRebalancedPortfolio`](@ref): the default estimator.
   - [`ExpertMixture`](@ref): the mixture by wealth over a grid of these rules.
   - [`FollowTheLeadingHistory`](@ref)
@@ -1019,14 +971,13 @@ FollowTheLeader
 
 # References
 
-  - $(ref_dict[:gaivoronski2000])
+  - $(ref_dict[:gaivoronski2000]) Section 2, Definitions 2 and 4, and Section 4, Definition 8.
   - $(ref_dict[:hazankale2012]) Section 2.2, Equation 1.
-  - $(ref_dict[:lihoi2014]) Sections 3.2.3 and 3.4.
-  - $(ref_dict[:gyorfischafer2003])
-  - $(ref_dict[:gyorfi2006])
-  - $(ref_dict[:gyorfi2008])
-  - $(ref_dict[:li2011corn])
-  - $(ref_dict[:khedmatiazin2020])
+  - $(ref_dict[:gyorfischafer2003]) Section 16.4.
+  - $(ref_dict[:gyorfi2006]) Section 3.
+  - $(ref_dict[:gyorfi2008]) Section 3.
+  - $(ref_dict[:li2011corn]) Section 4.3.
+  - $(ref_dict[:khedmatiazin2020]) Page 113546. $(ref_dict[:no_original_source])
 """
 @concrete struct FollowTheLeader <: AbstractOnlinePortfolioSelectionAlgorithm
     """
@@ -1051,6 +1002,8 @@ FollowTheLeader
                                               T4 <: EuclideanProjection}
         @argcheck(zero(gamma) <= gamma <= one(gamma),
                   DomainError(gamma, "gamma must lie in [0, 1]"))
+        assert_leader_budget(opt)
+        assert_leader_chain(opt, opt.fb)
         return new{T1, T2, T3, T4}(sel, opt, gamma, proj)
     end
 end
@@ -1071,6 +1024,135 @@ function assert_rule_admits_set(alg::FollowTheLeader{<:Any,
                                                      <:BestConstantRebalancedPortfolio},
                                 ::ProgrammeAllocationSet)::Nothing
     return throw(ArgumentError("a `FollowTheLeader` over the solver-free `BestConstantRebalancedPortfolio` has no model a `ProgrammeAllocationSet` can enter: the constrained leader under a programme set is `MeanRisk` under `LogarithmicReturn` and `MaximumReturn`, with the set's solver, on `opt`."))
+end
+"""
+    assert_leader_budget(opt::BestConstantRebalancedPortfolio)
+    assert_leader_budget(opt::JuMPOptimisationEstimator)
+
+Assert that the budgets of the held estimator of a [`FollowTheLeader`](@ref) rule admit the budget of one that the online head owns.
+
+The head owns the budget: `Σw = 1` holds on every Allocation Set, and cash is an asset with price relative one. The re-solve keeps that budget as the row `Σw = k` in the leader's model. It sets the net budget of the held optimiser, and of each member of its fallback chain, to one, see [`leader_chain`](@ref). A budget that excludes one would then lose its effect with no message, and before the re-solve took the set as a block it left an empty feasible set, so that every step was a Held Step. The configuration alone decides it, so the constructor refuses it.
+
+The solver-free estimator states no budget, because its fixed point lies on the simplex. A JuMP estimator is checked through the budgets of its [`JuMPOptimiser`](@ref) with [`leader_budget_admits_one`](@ref). Each entry and the explicit `default` of a [`TimeDependent`](@ref) schedule in `bgt`, `sbgt`, `gbgt` or `wb` are checked with the other fields at their static values, through [`assert_time_dependent_substitution`](@ref). A function schedule has a value only at a fold, so the check reads it only through its `default`.
+
+# Algorithm
+
+The JuMP method:
+
+ 1. Collect `args`, the `bgt`, `sbgt`, `gbgt` and `wb` of `jo`, the [`JuMPOptimiser`](@ref) of `opt`.
+ 2. Check the values in `args` with [`leader_budget_admits_one`](@ref). A schedule passes this step.
+ 3. Check each entry and the explicit `default` of each schedule in `args` with [`leader_budget_admits_one`](@ref), through [`assert_time_dependent_substitution`](@ref). The other fields take their static values, and `jump_optimiser_td_defaults` gives the static defaults.
+
+# Arguments
+
+  - `opt`: The held estimator.
+
+# Validation
+
+  - The rules of [`leader_budget_admits_one`](@ref) for the budgets of a JuMP estimator.
+
+# Returns
+
+  - `nothing`.
+
+# Related
+
+  - [`FollowTheLeader`](@ref)
+  - [`leader_budget_admits_one`](@ref)
+  - [`assert_net_budget_admits_one`](@ref)
+"""
+function assert_leader_budget(::BestConstantRebalancedPortfolio)::Nothing
+    return nothing
+end
+function assert_leader_budget(opt::JuMPOptimisationEstimator)::Nothing
+    jo = opt.opt
+    args = (; bgt = jo.bgt, sbgt = jo.sbgt, gbgt = jo.gbgt, wb = jo.wb)
+    leader_budget_admits_one(; args...)
+    assert_time_dependent_substitution(leader_budget_admits_one, args,
+                                       jump_optimiser_td_defaults())
+    return nothing
+end
+"""
+$(DocStringExtensions.TYPEDSIGNATURES)
+
+Assert that the static budgets of a held optimiser admit the budget of one of the online head.
+
+The net budget goes through [`assert_net_budget_admits_one`](@ref). The short and the gross budgets go through [`assert_gross_budget_admissible`](@ref) with the net budget of one in the place of `bgt`, as a [`ProgrammeAllocationSet`](@ref) checks its own. The head fixes the net exposure at one. So a number in `sbgt` and any `gbgt` over-determine the gross exposure, and a gross budget below one leaves no feasible weights.
+
+# Arguments
+
+  - `bgt`: The net budget of the held optimiser.
+  - `sbgt`: The short budget of the held optimiser.
+  - `gbgt`: The gross budget of the held optimiser.
+  - `wb`: The weight bounds of the held optimiser.
+
+# Validation
+
+  - The rules of [`assert_net_budget_admits_one`](@ref) for `bgt`.
+  - The rules of [`assert_gross_budget_admissible`](@ref) for `1`, `sbgt`, `gbgt` and `wb`.
+
+# Related
+
+  - [`assert_leader_budget`](@ref)
+"""
+function leader_budget_admits_one(; bgt, sbgt, gbgt, wb)::Nothing
+    assert_net_budget_admits_one(bgt)
+    assert_gross_budget_admissible(1, sbgt, gbgt, wb)
+    return nothing
+end
+"""
+    assert_net_budget_admits_one(bgt::Number)
+    assert_net_budget_admits_one(bgt::BudgetRange)
+    assert_net_budget_admits_one(bgt::BudgetCostEstimator)
+    assert_net_budget_admits_one(bgt)
+
+Assert that the net budget `bgt` of the held optimiser of a [`FollowTheLeader`](@ref) rule admits the budget of one.
+
+The re-solve sets `bgt` to one, so the leader's model holds the head's row `Σw = k` in the place of the rows of `bgt`, see [`leader_chain`](@ref). A number writes `Σw = k · bgt`, so the replacement keeps its feasible set only when it is one. A [`BudgetRange`](@ref) writes `k · lb ≤ Σw ≤ k · ub`, so the replacement narrows it to the budget of one only when its interval holds one. `nothing` writes no row, and the head's row fixes the budget.
+
+A [`BudgetCostEstimator`](@ref) is refused in every form. It charges its cost against the budget, `Σw + c(w) ∈ k · [lb, ub]`, with `c(w) ≥ 0` the cost of the move from its reference `w`. The head's row `Σw = k` turns this into `c(w) ∈ k · [lb − 1, ub − 1]`, a band on the cost that the wealth recursion of the head never pays, and the replacement of `bgt` with one would drop the cost with no message. [`factory`](@ref factory(bgt::BudgetCosts, w::VecNum)) sets the reference to the Price-Adjusted Allocation of the step, or keeps the caller's vector when `fixed` is `true`. A budget of one pins the leader to that reference, so the leader never trades, a budget below one leaves no feasible weights, and a budget above one bounds the cost of the move from the reference. None of these is a cost charged against the budget. A cost that the series pays is the `fees` of the head. A cost that the leader weighs is the `fees` of the held [`JuMPOptimiser`](@ref), which `factory` measures from the Price-Adjusted Allocation of the step, and a ceiling on the trade is a [`Turnover`](@ref) on `tn`.
+
+`nothing`, a [`TimeDependent`](@ref) schedule and any other [`BudgetEstimator`](@ref) pass. [`assert_leader_budget`](@ref) checks the entries of a schedule.
+
+# Arguments
+
+  - `bgt`: The net budget of the held optimiser.
+
+# Validation
+
+  - A number is one. A `DomainError` is thrown otherwise.
+  - The interval of a `BudgetRange` holds one. A `DomainError` is thrown otherwise.
+  - `bgt` is not a `BudgetCostEstimator`. An `ArgumentError` is thrown otherwise.
+
+# Returns
+
+  - `nothing`.
+
+# Related
+
+  - [`assert_leader_budget`](@ref)
+  - [`set_budget_constraints!`](@ref)
+  - [`leader_chain`](@ref)
+"""
+function assert_net_budget_admits_one(bgt::Number)::Nothing
+    @argcheck(isone(bgt),
+              DomainError(bgt,
+                          "the held optimiser of a `FollowTheLeader` has the net budget `bgt = $bgt`. The online head owns the budget of one: the re-solve sets the net budget of the held optimiser to one, so the leader's model holds the row `sum(w) == k`, and `bgt = $bgt` would have no effect. Set `bgt = nothing` or `bgt = 1` on the held `JuMPOptimiser`. A budget below one is a cash column with price relative one, and a leverage cap is a `gbgt` of at least one."))
+    return nothing
+end
+function assert_net_budget_admits_one(bgt::BudgetRange)::Nothing
+    lb = bgt.lb
+    ub = bgt.ub
+    @argcheck((isnothing(lb) || lb <= one(lb)) && (isnothing(ub) || one(ub) <= ub),
+              DomainError((lb, ub),
+                          "the held optimiser of a `FollowTheLeader` has the net budget range `lb = $lb`, `ub = $ub`, which excludes one. The online head owns the budget of one: the re-solve sets the net budget of the held optimiser to one, so the leader's model holds the row `sum(w) == k`, which the range excludes. Use a range that holds one, `bgt = nothing` or `bgt = 1` on the held `JuMPOptimiser`."))
+    return nothing
+end
+function assert_net_budget_admits_one(::BudgetCostEstimator)::Nothing
+    return throw(ArgumentError("the held optimiser of a `FollowTheLeader` has a `BudgetCostEstimator` in `bgt`. It charges its cost against the budget, `sum(w) + c(w)` in `k * [lb, ub]`, but the online head owns the budget of one: the re-solve sets the net budget of the held optimiser to one, so the leader's model holds the row `sum(w) == k`, and the cost would have no effect. With that row, the cost would leave `c(w)` in `k * [lb - 1, ub - 1]`, a band on the cost of the move from the estimator's reference `w`, which the head's wealth recursion never pays. The reference is the step's Price-Adjusted Allocation, or the caller's vector when `fixed` is `true`. A budget of one pins the leader to that reference, and a budget below one leaves no feasible weights. A cost that the series pays is the `fees` of the head. A cost that the leader weighs is the `fees` of the held `JuMPOptimiser`, measured from the step's Price-Adjusted Allocation, and a ceiling on the trade is a `Turnover` on `tn`."))
+end
+function assert_net_budget_admits_one(::Any)::Nothing
+    return nothing
 end
 """
     leader_min_rows(opt::LeaderOptimiser)
@@ -1097,57 +1179,150 @@ function leader_min_rows(opt::LeaderOptimiser)
     return max(holds_second_moment(opt) ? 2 : 1, fit_min_rows(opt))
 end
 """
-    append_custom_constraint(ccnt::Nothing, c::CustomJuMPConstraint)
-    append_custom_constraint(ccnt::CustomJuMPConstraint, c::CustomJuMPConstraint)
-    append_custom_constraint(ccnt::AbstractVector{<:CustomJuMPConstraint}, c::CustomJuMPConstraint)
+    assert_leader_chain(opt::LeaderOptimiser, fb::Nothing)
+    assert_leader_chain(opt::JuMPOptimisationEstimator, fb::JuMPOptimisationEstimator)
+    assert_leader_chain(opt::BestConstantRebalancedPortfolio, fb::BestConstantRebalancedPortfolio)
+    assert_leader_chain(opt::LeaderOptimiser, fb)
 
-Appends the Allocation Set Constraint to the custom constraints of the held estimator.
+Assert that each member of the fallback chain of the held estimator of a [`FollowTheLeader`](@ref) rule can take the head's Allocation Set.
+
+[`optimise`](@ref) runs the fallback `fb` of a member that fails, and it passes its keyword arguments to each member. So the second block that [`leader_allocation`](@ref) passes to a JuMP estimator reaches each member of its chain, and the leader of each member honours the set. A member of another kind does not read the block, and a precomputed result has nothing to solve, so either one answers outside the set. The solver-free estimator takes a bounded set through its own bounds and passes no block. So each member of its chain is solver-free too, and [`leader_chain`](@ref) gives each one the bounds of the set. The rule is that each member has the kind of the held estimator.
+
+# Algorithm
+
+ 1. When `fb` is `nothing`, return.
+ 2. When `fb` has the kind of `opt`, check the budgets of a JuMP member with [`assert_leader_budget`](@ref), and check the chain of `fb`.
+ 3. Otherwise, throw.
 
 # Arguments
 
-  - `ccnt`: The custom constraints of the held estimator, `nothing`, one constraint, or a vector of them.
-  - `c`: The [`AllocationSetConstraint`](@ref) to append.
+  - `opt`: The held estimator, or the member of the chain before `fb`.
+  - `fb`: The fallback of `opt`.
+
+# Validation
+
+  - `fb` is `nothing` or has the kind of `opt`. An `ArgumentError` is thrown otherwise.
+  - The rules of [`assert_leader_budget`](@ref) for a JuMP member.
 
 # Returns
 
-  - `c` alone when `ccnt` is `nothing`, the vector `[ccnt, c]` for one constraint, and `vcat(ccnt, c)` for a vector.
+  - `nothing`.
 
 # Related
 
   - [`FollowTheLeader`](@ref)
+  - [`LeaderOptimiser`](@ref)
+  - [`leader_chain`](@ref)
 """
-function append_custom_constraint(::Nothing, c::CustomJuMPConstraint)
-    return c
+function assert_leader_chain(::LeaderOptimiser, ::Nothing)::Nothing
+    return nothing
 end
-function append_custom_constraint(ccnt::CustomJuMPConstraint, c::CustomJuMPConstraint)
-    return [ccnt, c]
+function assert_leader_chain(::JuMPOptimisationEstimator,
+                             fb::JuMPOptimisationEstimator)::Nothing
+    assert_leader_budget(fb)
+    return assert_leader_chain(fb, fb.fb)
 end
-function append_custom_constraint(ccnt::AbstractVector{<:CustomJuMPConstraint},
-                                  c::CustomJuMPConstraint)
-    return vcat(ccnt, c)
+function assert_leader_chain(::BestConstantRebalancedPortfolio,
+                             fb::BestConstantRebalancedPortfolio)::Nothing
+    return assert_leader_chain(fb, fb.fb)
+end
+function assert_leader_chain(opt::LeaderOptimiser, fb)::Nothing
+    return throw(ArgumentError("the fallback chain of the held estimator of a `FollowTheLeader` holds a `$(nameof(typeof(fb)))` after a `$(nameof(typeof(opt)))`. The re-solve gives the head's Allocation Set to a JuMP estimator as a block of its entry, and the chain passes that block to each member. The solver-free `BestConstantRebalancedPortfolio` takes a bounded set through its own bounds. A member of another kind, or a precomputed result, would answer outside the set. Give each member of the chain the kind of the held estimator: a JuMP estimator under a JuMP estimator, and a `BestConstantRebalancedPortfolio` under a `BestConstantRebalancedPortfolio`."))
+end
+"""
+    leader_chain(opt::Nothing, set::AbstractAllocationSet, k::Number)
+    leader_chain(opt::JuMPOptimisationEstimator, set::AbstractAllocationSet, k::Number)
+    leader_chain(opt::BestConstantRebalancedPortfolio, set::BoundedAllocationSet, k::Number)
+
+Gives the held estimator of a [`FollowTheLeader`](@ref) rule, and each member of its fallback chain, the parts of the head's Allocation Set that do not reach it as a block.
+
+The online head owns the budget of one, and the block of the set carries no budget row. So the function sets the net budget `bgt` of each JuMP member to `k`, and the leader's model holds the row `Σw = k`. [`assert_leader_budget`](@ref) admits only a budget that holds one, so the replacement changes no feasible set that the constructor admits. Without the replacement, `bgt = nothing` would solve away from the budget of one, and the wealth recursion would read weights that do not sum to one. The solver-free estimator has no model and takes no block. So each member of its chain takes the bounds `wb` and the `sets` of the bounded set.
+
+# Arguments
+
+  - `opt`: The held estimator after `factory(opt, w)`, a member of its chain, or `nothing` at the end of the chain.
+  - `set`: The head's Allocation Set, resolved once per fold.
+  - `k`: The budget of one, `one(eltype(w))` for the Price-Adjusted Allocation `w` of the step.
+
+# Returns
+
+  - `opt'`: `opt` and its chain, with the budget or the bounds of the set, or `nothing` at the end of the chain.
+
+# Related
+
+  - [`leader_allocation`](@ref)
+  - [`assert_leader_chain`](@ref)
+  - [`assert_leader_budget`](@ref)
+"""
+function leader_chain(::Nothing, ::AbstractAllocationSet, ::Number)::Nothing
+    return nothing
+end
+function leader_chain(opt::JuMPOptimisationEstimator, set::AbstractAllocationSet, k::Number)
+    return rebuild_struct(opt,
+                          (; opt = rebuild_struct(opt.opt, (; bgt = k)),
+                           fb = leader_chain(opt.fb, set, k)))
+end
+function leader_chain(opt::BestConstantRebalancedPortfolio, set::BoundedAllocationSet,
+                      k::Number)
+    return rebuild_struct(opt,
+                          (; wb = set.wb, sets = set.sets,
+                           fb = leader_chain(opt.fb, set, k)))
+end
+"""
+    leader_block(set::ProgrammeAllocationSet, opt::JuMPOptimisationEstimator, w::AbstractVector, X::ReturnsResult)
+    leader_block(set::BoundedAllocationSet, opt::JuMPOptimisationEstimator, w::AbstractVector, X::ReturnsResult)
+
+Gives the entry of the head's Allocation Set in the keyword `blocks` of the entry of a held JuMP estimator.
+
+The entry is `(set, X)`, as [`fit_allocation_set_block`](@ref) states: the set after stage 1 and after `factory(set, w)`, and the rows that the head holds. So the block of the set reads its own prior on the rows of the head, and its turnover ceilings and its tracking errors read the Price-Adjusted Allocation of the step. The entry is an argument of one solve, so no estimator holds a Result. A [`BoundedAllocationSet`](@ref) holds no block. Its feasible set is the budget of one and its bounds, so the function puts its bounds `wb` and its `sets` into a [`ProgrammeAllocationSet`](@ref) whose block holds those two slots alone. That set takes the solver of the held estimator. Its block reads no rows and resolves no Calibration Rule, so no reader reads the solver, and the set fits no prior.
+
+# Arguments
+
+  - `set`: The head's Allocation Set, resolved once per fold.
+  - `opt`: The held estimator.
+  - `w`: The Price-Adjusted Allocation of the step.
+  - `X`: Every row that the head holds, as a [`ReturnsResult`](@ref).
+
+# Returns
+
+  - `(set', X)::Tuple`: The entry.
+
+# Related
+
+  - [`leader_allocation`](@ref)
+  - [`resolve_jump_optimiser`](@ref)
+  - [`fit_allocation_set_block`](@ref)
+"""
+function leader_block(set::ProgrammeAllocationSet, ::JuMPOptimisationEstimator,
+                      w::AbstractVector, X::ReturnsResult)::Tuple
+    return factory(set, w), X
+end
+function leader_block(set::BoundedAllocationSet, opt::JuMPOptimisationEstimator,
+                      ::AbstractVector, X::ReturnsResult)::Tuple
+    return ProgrammeAllocationSet(; slv = opt.opt.slv, wb = set.wb, sets = set.sets), X
 end
 """
     leader_allocation(opt::BestConstantRebalancedPortfolio, rd::ReturnsResult, w::AbstractVector, set::BoundedAllocationSet, X)
-    leader_allocation(opt::JuMPOptimisationEstimator, rd::ReturnsResult, w::AbstractVector, set::AbstractAllocationSet, X)
+    leader_allocation(opt::JuMPOptimisationEstimator, rd::ReturnsResult, w::AbstractVector, set::AbstractAllocationSet, X::ReturnsResult)
 
 Re-solves the held estimator on the sample under the head's Allocation Set, and returns the leader, or `nothing` on a Held Step.
 
-The estimator runs the batch path that it runs on any `ReturnsResult`. An estimator with no prior reduces to the Coverage Universe of the sample, an estimator with a prior reduces to the Investable Mask of its prior, and both return a zero at every asset outside it. A leader that stopped short of its certificate still trades, so the solver-free method warns and plays the fixed point.
+The estimator runs the batch path that it runs on any `ReturnsResult`. An estimator with no prior reduces to the Coverage Universe of the sample, an estimator with a prior reduces to the Investable Mask of its prior, and both return a zero at every asset outside it. A JuMP estimator takes the set as a second block of its entry, so the one refusal branch of the entry covers the readers of the set, and an asset that the prior of the set cannot price departs with a warning, as in a batch fit with two blocks. A leader that stopped short of its certificate still trades, so the solver-free method warns and plays the fixed point.
 
 # Algorithm
 
 The solver-free method:
 
- 1. Build `bcrp`, a copy of `opt` whose `wb` and `sets` are those of `set`.
- 2. Optimise `factory(bcrp, w)` on `rd`, giving `res`.
+ 1. Give `opt` and each member of its chain the bounds and the `sets` of `set` with [`leader_chain`](@ref).
+ 2. Optimise the result of `factory` with `w` on `rd`, giving `res`.
  3. When the fixed point stopped at `iters` before its certificate met `tol`, warn once and name the certificate.
  4. Return `res.w`.
 
 The JuMP method:
 
  1. Pass `w` into `opt` with [`factory`](@ref).
- 2. Append an [`AllocationSetConstraint`](@ref) over `set`, `w` and `X` to the `ccnt` of the estimator.
- 3. Optimise on `rd`, giving `res`. When its retcode is an [`OptimisationSuccess`](@ref), return `res.w`.
+ 2. Set the net budget of `opt` and of each member of its chain to one with [`leader_chain`](@ref).
+ 3. Optimise on `rd` with the entry of the set, [`leader_block`](@ref), as the keyword `blocks`, giving `res`. When its retcode is an [`OptimisationSuccess`](@ref), return `res.w`.
  4. Otherwise record a Held Step through [`record_held_step!`](@ref) with the trials of the solver, and return `nothing`.
 
 # Arguments
@@ -1156,7 +1331,7 @@ The JuMP method:
   - `rd`: The rows that the head holds, as a [`ReturnsResult`](@ref), viewed at the sample. It holds the returns as they are, `NaN` where no return exists, under the pinned names and the Asset Panel of the buffer.
   - `w`: The Price-Adjusted Allocation of the step.
   - `set`: The resolved Allocation Set of the head, a [`BoundedAllocationSet`](@ref) for the solver-free method.
-  - `X`: Every row that the head holds, as a [`ReturnsResult`](@ref), or `nothing`. The JuMP method passes it to the set's builders, and the solver-free method does not read it.
+  - `X`: Every row that the head holds, as a [`ReturnsResult`](@ref). The JuMP method gives it to the block of the set, and the solver-free method does not read it.
 
 # Returns
 
@@ -1165,30 +1340,24 @@ The JuMP method:
 # Related
 
   - [`FollowTheLeader`](@ref)
-  - [`AllocationSetConstraint`](@ref)
+  - [`leader_block`](@ref)
+  - [`leader_chain`](@ref)
   - [`HeldStep`](@ref)
 """
 function leader_allocation(opt::BestConstantRebalancedPortfolio, rd::ReturnsResult,
                            w::AbstractVector, set::BoundedAllocationSet, ::Any)
-    bcrp = BestConstantRebalancedPortfolio(; wb = set.wb, fees = opt.fees, sets = set.sets,
-                                           wf = opt.wf, fb = opt.fb, iters = opt.iters,
-                                           tol = opt.tol, strict = opt.strict,
-                                           cache = opt.cache)
-    res = optimise(factory(bcrp, w), rd)
+    res = optimise(factory(leader_chain(opt, set, one(eltype(w))), w), rd)
     fp = isa(res.retcode, OptimisationSuccess) ? res.retcode.res : nothing
     if isa(fp, NamedTuple) && !get(fp, :converged, true)
-        @warn("the solver-free leader stopped at `iters = $(opt.iters)` on $(size(rd.X, 1)) selected rows, $(fp.gap) or less short of the optimal log wealth; later short steps are not reported. The exact leader is `MeanRisk` under `LogarithmicReturn` and `MaximumReturn` on a solver.",
-              maxlog = 1)
+        @warn("the solver-free leader stopped at `iters = $(opt.iters)` on $(size(rd.X, 1)) selected rows, $(fp.gap) or less short of the optimal log wealth; later short steps at this `iters` are not reported. The exact leader is `MeanRisk` under `LogarithmicReturn` and `MaximumReturn` on a solver.",
+              maxlog = log_limit(:warn, 1), _id = @log_id(opt.iters))
     end
     return res.w
 end
 function leader_allocation(opt::JuMPOptimisationEstimator, rd::ReturnsResult,
-                           w::AbstractVector, set::AbstractAllocationSet,
-                           X::Option{<:ReturnsResult})
-    opt = factory(opt, w)
-    ccnt = append_custom_constraint(opt.opt.ccnt, AllocationSetConstraint(set, w, X))
-    opt = Accessors.@set opt.opt.ccnt = ccnt
-    res = optimise(opt, rd)
+                           w::AbstractVector, set::AbstractAllocationSet, X::ReturnsResult)
+    lead = leader_chain(factory(opt, w), set, one(eltype(w)))
+    res = optimise(lead, rd; blocks = (leader_block(set, opt, w, X),))
     if isa(res.retcode, OptimisationSuccess)
         return res.w
     end
@@ -1288,7 +1457,7 @@ julia> alg.opt.r[2].settings.scale
 
 # References
 
-  - $(ref_dict[:lai2020spolc]) Equation 51 and Section 4.2.1.
+  - $(ref_dict[:lai2020spolc]) Section 3.4, Equation 51 and Section 4.2.1.
 """
 function ShortTermLossControlPortfolio(; window::Integer = 5, gamma::Real = 0.025,
                                        slv::Slv_VecSlv,
@@ -1599,7 +1768,7 @@ Keywords correspond to the struct's fields.
 
 ## View parameters
 
-When [`port_opt_view`](@ref) is called on this type, the base rule is viewed and the rest is carried unchanged.
+[`port_opt_view`](@ref) takes the view of the base rule and carries the rest unchanged.
 
 # Examples
 
@@ -1628,7 +1797,7 @@ FollowTheLeadingHistory
 
 # References
 
-  - $(ref_dict[:hazanseshadhri2009]) Algorithm 1, Lemmas 3.1 and 3.2, and Appendix A.
+  - $(ref_dict[:hazanseshadhri2009]) Algorithm 1, Property 3.1, Lemmas 3.1 and 3.2, Section 4 and Appendix A.
 """
 @concrete struct FollowTheLeadingHistory <: AbstractOnlinePortfolioSelectionAlgorithm
     """
@@ -1739,7 +1908,7 @@ Where:
 
 # References
 
-  - $(ref_dict[:hazanseshadhri2009]) Appendix A.
+  - $(ref_dict[:hazanseshadhri2009]) Section 3.1 and Appendix A.
 """
 function expert_alive(born::Integer, t::Integer)
     k = trailing_zeros(born)
@@ -1784,5 +1953,4 @@ end
 export Prefix, LastRows, HistogramMatch, KernelMatch, NearestNeighbourMatch,
        CorrelationMatch, ClusterMatch, FollowTheLeader, ShortTermLossControlPortfolio,
        LowDimensionEnsemblePortfolio, FollowTheLeadingHistory
-public AbstractSampleSelector, AbstractPatternMatchSelector, select_rows, matched_rows,
-       AllocationSetConstraint
+public AbstractSampleSelector, AbstractPatternMatchSelector, select_rows, matched_rows

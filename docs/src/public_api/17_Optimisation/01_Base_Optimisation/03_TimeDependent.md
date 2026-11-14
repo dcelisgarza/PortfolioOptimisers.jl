@@ -17,5 +17,6 @@ TimeDependentOptimiserCallable
 needs_previous_weights(opt::VecOptE_Opt)
 needs_previous_weights(td::TimeDependent)
 needs_previous_weights(opt::VecOptE_Opt_TD)
+needs_previous_weights(::Any)
 time_dependent_field_defaults
 ```

@@ -40,9 +40,12 @@ end
     below the census holds that.
     =#
     hand_allowed = Dict(:ScopedConfig => "a `mutable` holder whose `@atomic` default and whose `ScopedValue{Union{Nothing, T}}` share one parameter",
-                        :RepeatedLeading => "an `AbstractArray{T, N}`, whose supertype reads the element type and the rank",
+                        :RepeatedObservations => "an `AbstractArray{T, N}`, whose supertype reads the element type and the rank",
                         :MinimumSquaredDistance => "the parameter is the one of its supertype `SquaredOrderedWeightsArrayAlgorithm{T}`",
-                        :MinimumSumSquares => "the parameter is the one of its supertype `SquaredOrderedWeightsArrayAlgorithm{T}`")
+                        :MinimumSumSquares => "the parameter is the one of its supertype `SquaredOrderedWeightsArrayAlgorithm{T}`",
+                        :CountOf => "#2013: the positional form is the main form of the type, and `@concrete` appends a generic positional constructor that skips the check of the inner one, so `CountOf(5.0)` would hold a count that is not an `Integer`. The inner constructor is the only one, and it holds the bound",
+                        :FractionOf => "#2013: as `CountOf`, so `FractionOf(0.5 + 0im)` is a `MethodError` and not a fraction",
+                        :ClusterNode => "`left` and `right` hold a `ClusterNode{T, H}` of the parameters of the node itself. With `@concrete`, the type would hold the shape of the subtree, and each new dendrogram would compile again")
     #=
     ADR 0049 bounds the similarity of the first three fields in the header on purpose. `@concrete`
     also writes a generic positional constructor, and a bound in the header is what makes that

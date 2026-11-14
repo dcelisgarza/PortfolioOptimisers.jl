@@ -11,17 +11,6 @@ Abstract supertype for all cross-validation result types.
 """
 abstract type CrossValidationResult <: AbstractResult end
 """
-$(DocStringExtensions.TYPEDEF)
-
-Abstract supertype for all cross-validation algorithm types.
-
-# Related
-
-  - [`CrossValidationEstimator`](@ref)
-  - [`CrossValidationResult`](@ref)
-"""
-abstract type CrossValidationAlgorithm <: AbstractAlgorithm end
-"""
 $(DocStringExtensions.TYPEDSIGNATURES)
 
 Give a split result back unchanged.
@@ -41,7 +30,7 @@ function Base.split(res::CrossValidationResult, args...)
     return res
 end
 """
-    CVER = Union{<:CVE_Onl, <:CrossValidationResult}
+    CVER = Union{CVE_Onl, CrossValidationResult}
 
 Union of all cross-validation schemes, plain or online, and result types.
 
@@ -50,7 +39,7 @@ Union of all cross-validation schemes, plain or online, and result types.
   - [`CVE_Onl`](@ref)
   - [`CrossValidationResult`](@ref)
 """
-const CVER = Union{<:CVE_Onl, <:CrossValidationResult}
+const CVER = Union{CVE_Onl, CrossValidationResult}
 """
 $(DocStringExtensions.TYPEDEF)
 
@@ -142,21 +131,6 @@ function n_splits(res::OptimisationCrossValidationResult, ::Prices_RR)
     return n_splits(res)
 end
 """
-    OptCVER
-
-Union of all optimisation cross-validation estimators and results.
-
-# Related
-
-  - [`OptimisationCrossValidationEstimator`](@ref)
-  - [`OptimisationCrossValidationResult`](@ref)
-  - [`NonSeqCVER`](@ref)
-  - [`SeqCVER`](@ref)
-"""
-const OptCVER = Union{<:OptimisationCrossValidationEstimator,
-                      <:OptimisationCrossValidationResult}
-
-"""
     NonSeqCVER
 
 Union of all non-sequential cross-validation estimators and results.
@@ -170,8 +144,8 @@ Union of all non-sequential cross-validation estimators and results.
   - [`SeqCVER`](@ref)
   - [`folds_are_time_ordered`](@ref)
 """
-const NonSeqCVER = Union{<:NonSequentialCrossValidationEstimator,
-                         <:NonSequentialCrossValidationResult}
+const NonSeqCVER = Union{NonSequentialCrossValidationEstimator,
+                         NonSequentialCrossValidationResult}
 """
     SeqCVER
 
@@ -183,8 +157,7 @@ Union of all sequential cross-validation estimators and results.
   - [`SequentialCrossValidationResult`](@ref)
   - [`NonSeqCVER`](@ref)
 """
-const SeqCVER = Union{<:SequentialCrossValidationEstimator,
-                      <:SequentialCrossValidationResult}
+const SeqCVER = Union{SequentialCrossValidationEstimator, SequentialCrossValidationResult}
 """
 $(DocStringExtensions.TYPEDSIGNATURES)
 
@@ -272,12 +245,19 @@ cv_timestamps(pr::AbstractPricesResult) = TimeSeries.timestamp(pr.X)
 """
 $(DocStringExtensions.TYPEDEF)
 
-Abstract supertype for cross-validation estimators used in non-optimisation contexts
-(e.g. resampling for hierarchical clustering or phylogeny methods).
+Abstract supertype for the cross-validation schemes that the `cv` field of a meta-optimiser does
+not take.
+
+The `cv` field of [`NestedClustered`](@ref) and [`Stacking`](@ref) is bound to [`OptCVE_Onl`](@ref), so a scheme of this
+branch reaches an optimiser through [`cross_val_predict`](@ref). [`MultipleRandomised`](@ref) is the one
+member. It draws random asset subsets, applies an inner walk-forward to each, and backtests an
+optimiser on every path.
 
 # Related
 
   - [`CrossValidationEstimator`](@ref)
+  - [`NonOptimisationSequentialCrossValidationEstimator`](@ref)
+  - [`NonOptimisationCrossValidationResult`](@ref)
 """
 abstract type NonOptimisationCrossValidationEstimator <: CrossValidationEstimator end
 """
@@ -296,20 +276,6 @@ abstract type NonOptimisationSequentialCrossValidationEstimator <:
 """
 $(DocStringExtensions.TYPEDEF)
 
-Abstract supertype for non-sequential non-optimisation cross-validation estimators. A
-non-sequential scheme makes folds that are not a timeline, such as randomly sampled or
-combinatorial folds.
-
-# Related
-
-  - [`NonOptimisationCrossValidationEstimator`](@ref)
-  - [`NonOptimisationNonSequentialCrossValidationResult`](@ref)
-"""
-abstract type NonOptimisationNonSequentialCrossValidationEstimator <:
-              NonOptimisationCrossValidationEstimator end
-"""
-$(DocStringExtensions.TYPEDEF)
-
 Abstract supertype for result types produced by non-optimisation cross-validation
 routines.
 
@@ -318,7 +284,6 @@ routines.
   - [`CrossValidationResult`](@ref)
   - [`NonOptimisationCrossValidationEstimator`](@ref)
   - [`NonOptimisationSequentialCrossValidationResult`](@ref)
-  - [`NonOptimisationNonSequentialCrossValidationResult`](@ref)
 """
 abstract type NonOptimisationCrossValidationResult <: CrossValidationResult end
 """
@@ -333,6 +298,24 @@ Abstract supertype for sequential non-optimisation cross-validation result types
 """
 abstract type NonOptimisationSequentialCrossValidationResult <:
               NonOptimisationCrossValidationResult end
+# The non-sequential pair below is the empty cell of the non-optimisation branch. No scheme
+# subtypes it yet. A future twin of `MultipleRandomised` over a `KFold` or a combinatorial inner
+# scheme, whose folds are not a timeline, can uncomment the pair and subtype it (#1873).
+#=
+"""
+$(DocStringExtensions.TYPEDEF)
+
+Abstract supertype for non-sequential non-optimisation cross-validation estimators. A
+non-sequential scheme makes folds that are not a timeline, such as randomly sampled or
+combinatorial folds.
+
+# Related
+
+  - [`NonOptimisationCrossValidationEstimator`](@ref)
+  - [`NonOptimisationNonSequentialCrossValidationResult`](@ref)
+"""
+abstract type NonOptimisationNonSequentialCrossValidationEstimator <:
+              NonOptimisationCrossValidationEstimator end
 """
 $(DocStringExtensions.TYPEDEF)
 
@@ -345,6 +328,7 @@ Abstract supertype for non-sequential non-optimisation cross-validation result t
 """
 abstract type NonOptimisationNonSequentialCrossValidationResult <:
               NonOptimisationCrossValidationResult end
+=#
 """
 $(DocStringExtensions.TYPEDEF)
 
@@ -647,7 +631,8 @@ function warn_ruined_members(::Nothing, ::Nothing, ::Integer)::Nothing
 end
 function warn_ruined_members(::Nothing, ruined::VecInt, n::Integer)::Nothing
     if !isempty(ruined)
-        @warn "the drifted wealth of $(length(ruined)) of $(n) population member(s) is not positive, so their held weights are `NaN` and their members are dropped: $(ruined)"
+        @warn("the drifted wealth of $(length(ruined)) of $(n) population member(s) is not positive, so their held weights are `NaN` and their members are dropped: $(ruined)",
+              maxlog = log_limit(:warn), _id = @log_id())
     end
     return nothing
 end
@@ -863,8 +848,9 @@ Represents the outer collection of cross-validation paths, where each inner vect
   - [`CombinatorialCrossValidation`](@ref)
 """
 const VecVecPredRes = AbstractVector{<:VecPredRes}
-function expected_risk(r::BaseRM_VecBaseRM, pred::PredictionResult; kwargs...)
-    return expected_risk_from_returns(r, pred.rd.X; kwargs...)
+function expected_risk(sca::Option{<:Scalariser}, r::BaseRM_VecBaseRM,
+                       pred::PredictionResult; kwargs...)
+    return expected_risk_from_returns(sca, r, pred.rd.X; kwargs...)
 end
 """
 $(DocStringExtensions.TYPEDSIGNATURES)
@@ -1169,6 +1155,11 @@ arrays of the state in place, the held timestamps among them. The Result then na
 which no fold ends, and `Resume` refuses it. [`partial_fit!`](@ref) states this contract for a
 kept estimator.
 
+The type of `opt` is not a type parameter of the Result. The field is bound to
+`Union{Nothing, AbstractEstimator}`, so the Results of two online runs with different optimisers
+have one type, and a verb that reads the Result compiles one time for both. No verb reads
+`opt` except [`Resume`](@ref), and `Resume` carries the type of `opt` in its own type parameter.
+
 # Fields
 
 $(DocStringExtensions.FIELDS)
@@ -1212,7 +1203,7 @@ Keywords correspond to the struct's fields. `pred` is required. The constructor 
     """
     $(field_dict[:opt_pred])
     """
-    opt
+    opt::Union{Nothing, AbstractEstimator}
     function MultiPeriodPredictionResult(pred::VecPredRes, id::Any,
                                          opt::Option{<:AbstractEstimator})
         @argcheck(!isempty(pred), IsEmptyError("pred cannot be empty"))
@@ -1232,7 +1223,8 @@ Keywords correspond to the struct's fields. `pred` is required. The constructor 
         ivpa = rd[end].ivpa
         mrd = PredictionReturnsResult(; nx = nx, X = X, nf = nf, F = F, nb = nb, B = B,
                                       ne = ne, E = E, ts = ts, iv = iv, ivpa = ivpa)
-        return new{typeof(pred), typeof(mrd), typeof(id), typeof(opt)}(pred, mrd, id, opt)
+        # ADR 0067, amendment of 2026-11-02, measures the cost of `opt` as a type parameter.
+        return new{typeof(pred), typeof(mrd), typeof(id)}(pred, mrd, id, opt)
     end
 end
 function MultiPeriodPredictionResult(; pred::VecPredRes, id::Any = nothing,
@@ -1258,9 +1250,10 @@ const VecMPredRes = AbstractVector{<:MultiPeriodPredictionResult}
     compute(res, pred.res; broadcast)
     compute(rd, pred.rd; broadcast)
 end
-function expected_risk(r::BaseRM_VecBaseRM, mpred::MultiPeriodPredictionResult; kwargs...)
+function expected_risk(sca::Option{<:Scalariser}, r::BaseRM_VecBaseRM,
+                       mpred::MultiPeriodPredictionResult; kwargs...)
     X = mpred.mrd.X
-    return expected_risk_from_returns(r, X; kwargs...)
+    return expected_risk_from_returns(sca, r, X; kwargs...)
 end
 """
 $(DocStringExtensions.TYPEDSIGNATURES)
@@ -1290,7 +1283,7 @@ function rolling_window_measure(r::BaseRM_VecBaseRM, mpred::MultiPeriodPredictio
     return rolling_window_measure(r, mpred.mrd.X, window; kwargs...)
 end
 """
-    PredRes_MultiPredRes = Union{<:PredictionResult, <:MultiPeriodPredictionResult}
+    PredRes_MultiPredRes = Union{PredictionResult, MultiPeriodPredictionResult}
 
 Alias for a single-fold or multi-period prediction result.
 
@@ -1302,7 +1295,7 @@ Matches either a [`PredictionResult`](@ref) or a [`MultiPeriodPredictionResult`]
   - [`MultiPeriodPredictionResult`](@ref)
   - [`VecPredRes_MultiPredRes`](@ref)
 """
-const PredRes_MultiPredRes = Union{<:PredictionResult, <:MultiPeriodPredictionResult}
+const PredRes_MultiPredRes = Union{PredictionResult, MultiPeriodPredictionResult}
 """
     VecPredRes_MultiPredRes = AbstractVector{<:PredRes_MultiPredRes}
 
@@ -1362,11 +1355,21 @@ function PopulationPredictionResult(;
                                                                                                  0))::PopulationPredictionResult
     return PopulationPredictionResult(pred)
 end
-function expected_risk(r::BaseRM_VecBaseRM, preds::VecMPredRes; kwargs...)
-    return [expected_risk(r, pred; kwargs...) for pred in preds]
+function expected_risk(sca::Option{<:Scalariser}, r::BaseRM_VecBaseRM, preds::VecMPredRes;
+                       kwargs...)
+    return [expected_risk(sca, r, pred; kwargs...) for pred in preds]
 end
-function expected_risk(r::BaseRM_VecBaseRM, ppred::PopulationPredictionResult; kwargs...)
-    return [expected_risk(r, p; kwargs...) for p in ppred.pred]
+function expected_risk(sca::Option{<:Scalariser}, r::BaseRM_VecBaseRM,
+                       ppred::PopulationPredictionResult; kwargs...)
+    return [expected_risk(sca, r, p; kwargs...) for p in ppred.pred]
+end
+# The keyword form of every prediction method above. It takes `sca` out of the keywords and
+# calls the positional form, which every internal caller calls, as `expected_risk` on weights
+# does. The methods of a `PrRM`, which refuse a prediction, are positional too, so both forms
+# reach them.
+function expected_risk(r::BaseRM_VecBaseRM, p::Union{AbstractPredictionResult, VecMPredRes};
+                       sca::Option{<:Scalariser} = nothing, kwargs...)
+    return expected_risk(sca, r, p; kwargs...)
 end
 """
 $(DocStringExtensions.TYPEDSIGNATURES)
@@ -1423,36 +1426,39 @@ function rolling_window_measure(r::BaseRM_VecBaseRM, ppred::PopulationPrediction
     return [rolling_window_measure(r, p, window; kwargs...) for p in ppred.pred]
 end
 """
-    sort_by_measure(ppred::PopulationPredictionResult, r::BaseRM_VecBaseRM; kwargs...)
+    sort_by_measure(sca::Option{<:Sca_VecToScaM}, ppred::PopulationPredictionResult,
+                    r::BaseRM_VecBaseRM; kwargs...)
 
-Sort the successful paths in a [`PopulationPredictionResult`](@ref) by their expected
-risk under `r`. A path in which any fold returned a failure code is left out.
+Sort the successful paths in a [`PopulationPredictionResult`](@ref) from the best to the worst
+under `r`. A path in which any fold returned a failure code is left out.
 
-A path whose measure is not finite goes **after** every finite one, under both directions of
-the ranking, because a non-finite number is not a best and must not be the answer of a
-`first`. The finite members are sorted among themselves, and the non-finite ones keep their own
-order at the end.
+A path whose measure is not finite goes **after** every finite one, because a non-finite
+number is not a best and must not be the answer of a `first`. The finite members are sorted
+among themselves, and the non-finite ones keep their own order at the end.
 
-The direction of the ranking comes from [`bigger_is_better`](@ref), which **throws** on a vector
-of measures that disagree on polarity. [`quantile_by_measure`](@ref) takes an explicit `sign`
-instead, so it admits a mixed vector.
+The rank reads the [`oriented_score`](@ref) of each path, which orients each measure before it
+reduces a vector. So a vector of measures that disagree on orientation is admitted, and the
+reduction reads oriented scores: [`MinScalariser`](@ref) ranks by the worst measure of each
+path and [`MaxScalariser`](@ref) by the best.
 
 # Algorithm
 
- 1. Keep the successful members of `ppred` with [`successful_members`](@ref).
- 2. Compute the expected risk of each member under `r`, giving `rks`.
- 3. Sort the members whose `rks` is finite by `rks`, in descending order when [`bigger_is_better`](@ref) holds of `r` and in ascending order otherwise.
- 4. Append the members whose `rks` is not finite, in their own order.
+ 1. Check `kwargs` with [`assert_path_reduction`](@ref).
+ 2. Keep the successful members of `ppred` with [`successful_members`](@ref).
+ 3. Compute the oriented score of each member under `r` and `sca` with [`oriented_score`](@ref), giving `rks`.
+ 4. Sort the members whose `rks` is finite by `rks`, in descending order.
+ 5. Append the members whose `rks` is not finite, in their own order.
 
 # Arguments
 
+  - $(arg_dict[:sca_path])
   - `ppred::PopulationPredictionResult`: Population prediction to sort.
-  - `r::BaseRM_VecBaseRM`: Risk measure used for ranking, or a vector of them. A vector is scalarised by `kwargs.sca`, defaulting to [`SumScalariser`](@ref).
-  - `kwargs...`: Keyword arguments forwarded to `expected_risk`.
+  - `r::BaseRM_VecBaseRM`: Risk measure used for ranking, or a vector of them.
+  - `kwargs...`: Keyword arguments forwarded to [`oriented_score`](@ref).
 
 # Validation
 
-  - A vector `r` whose measures disagree on polarity raises in [`bigger_is_better`](@ref).
+  - `kwargs` must not contain `sca`, through [`assert_path_reduction`](@ref).
 
 # Returns
 
@@ -1461,47 +1467,50 @@ instead, so it admits a mixed vector.
 # Related
 
   - [`quantile_by_measure`](@ref)
-  - [`bigger_is_better`](@ref)
+  - [`oriented_score`](@ref)
   - [`PopulationPredictionResult`](@ref)
-  - [`expected_risk`](@ref)
 """
-function sort_by_measure(ppred::PopulationPredictionResult, r::BaseRM_VecBaseRM; kwargs...)
+function sort_by_measure(sca::Option{<:Sca_VecToScaM}, ppred::PopulationPredictionResult,
+                         r::BaseRM_VecBaseRM; kwargs...)
+    assert_path_reduction(kwargs, "kwargs")
     pred = successful_members(ppred)
-    rks = [expected_risk(r, x; kwargs...) for x in pred]
+    rks = [oriented_score(sca, r, x; kwargs...) for x in pred]
     fin = isfinite.(rks)
     idx = findall(fin)
-    return [pred[idx[sortperm(rks[idx]; rev = bigger_is_better(r))]]; pred[findall(!, fin)]]
+    return [pred[idx[sortperm(rks[idx]; rev = true)]]; pred[findall(!, fin)]]
 end
 """
-    quantile_by_measure(ppred::PopulationPredictionResult, r::BaseRM_VecBaseRM, q::Real;
-                        r_kwargs::NamedTuple = (;), q_kwargs::NamedTuple = (;),
-                        sign::Integer = 1)
+    quantile_by_measure(sca::Option{<:Sca_VecToScaM}, ppred::PopulationPredictionResult,
+                        r::BaseRM_VecBaseRM, q::Real; r_kwargs::NamedTuple = (;),
+                        q_kwargs::NamedTuple = (;))
 
-Select the successful path in `ppred` whose expected risk under `r` is closest to the `q`-th quantile of the risk distribution across all successful paths.
+Select the successful path in `ppred` whose risk under `r` is closest to the `q`-th quantile of the risks across all successful paths.
+
+The risk of a path is its negated [`oriented_score`](@ref), so a larger risk is worse whatever the orientation of `r`. `q = 0` selects the best path and `q = 1` the worst. The score orients each measure before it reduces a vector, so a vector of measures that disagree on orientation is admitted.
 
 A path whose measure is not finite takes no part. It is dropped before the quantile, so one failed path cannot make the quantile non-finite and cannot be the answer.
 
-[`sort_by_measure`](@ref) calls [`bigger_is_better`](@ref) for its direction, so it **throws** on a vector of measures that disagree on polarity. This function takes an explicit `sign` instead. The caller gives the one fact that `bigger_is_better` cannot infer, so a mixed vector is admitted.
-
 # Algorithm
 
- 1. Keep the successful members of `ppred` with [`successful_members`](@ref).
- 2. Compute `sign` times the expected risk of each member under `r`, giving `rks`.
- 3. Drop the members whose `rks` is not finite.
- 4. Compute the `q`-th quantile of `rks` with `Statistics.quantile`, giving `rkq`.
- 5. Return the first member whose `abs(rks[i] - rkq)` is the smallest.
+ 1. Check `r_kwargs` with [`assert_path_reduction`](@ref).
+ 2. Keep the successful members of `ppred` with [`successful_members`](@ref).
+ 3. Compute the negated oriented score of each member under `r` and `sca` with [`oriented_score`](@ref), giving `rks`.
+ 4. Drop the members whose `rks` is not finite.
+ 5. Compute the `q`-th quantile of `rks` with `Statistics.quantile`, giving `rkq`.
+ 6. Return the first member whose `abs(rks[i] - rkq)` is the smallest.
 
 # Arguments
 
+  - $(arg_dict[:sca_path])
   - `ppred::PopulationPredictionResult`: Population prediction result.
-  - `r::BaseRM_VecBaseRM`: Risk measure for computing path risks, or a vector of them. A vector is scalarised by `r_kwargs.sca`, defaulting to [`SumScalariser`](@ref).
+  - `r::BaseRM_VecBaseRM`: Risk measure for computing path risks, or a vector of them.
   - `q::Real`: Quantile level in `[0, 1]`.
-  - `r_kwargs::NamedTuple = (;)`: Keyword arguments forwarded to `expected_risk`.
+  - `r_kwargs::NamedTuple = (;)`: Keyword arguments forwarded to [`oriented_score`](@ref). It must not contain `sca`.
   - `q_kwargs::NamedTuple = (;)`: Keyword arguments forwarded to `Statistics.quantile`.
-  - `sign::Integer = 1`: Orientation of the risk scale. Use `1` when a larger risk is worse, `-1` when it is better. This is what lets a mixed vector through, see below.
 
 # Validation
 
+  - `r_kwargs` must not contain `sca`, through [`assert_path_reduction`](@ref).
   - At least one successful member must have a finite measure. With none, `Statistics.quantile` receives an empty vector and throws.
 
 # Returns
@@ -1511,14 +1520,16 @@ A path whose measure is not finite takes no part. It is dropped before the quant
 # Related
 
   - [`sort_by_measure`](@ref)
+  - [`oriented_score`](@ref)
   - [`PopulationPredictionResult`](@ref)
-  - [`expected_risk`](@ref)
 """
-function quantile_by_measure(ppred::PopulationPredictionResult, r::BaseRM_VecBaseRM,
+function quantile_by_measure(sca::Option{<:Sca_VecToScaM},
+                             ppred::PopulationPredictionResult, r::BaseRM_VecBaseRM,
                              q::Real; r_kwargs::NamedTuple = (;),
-                             q_kwargs::NamedTuple = (;), sign::Integer = 1)
+                             q_kwargs::NamedTuple = (;))
+    assert_path_reduction(r_kwargs, "r_kwargs")
     pred = successful_members(ppred)
-    rks = [sign*expected_risk(r, p; r_kwargs...) for p in pred]
+    rks = [-oriented_score(sca, r, p; r_kwargs...) for p in pred]
     fin = findall(isfinite, rks)
     rks = rks[fin]
     pred = pred[fin]

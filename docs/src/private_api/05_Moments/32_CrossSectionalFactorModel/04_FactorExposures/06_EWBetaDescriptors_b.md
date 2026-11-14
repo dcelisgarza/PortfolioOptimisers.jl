@@ -1,5 +1,5 @@
 ```@meta
-Description = "EW beta descriptors (b), private API of PortfolioOptimisers.jl: EWMacroSensitivityState, EWDownsideBetaState, Base.copy, ew_macro_sensitivity_state, …"
+Description = "EW beta descriptors (b), private API of PortfolioOptimisers.jl: EWMacroSensitivityState, EWDownsideBetaState, BetaSeries, CarriedReference, Base.copy, …"
 ```
 
 # EW beta descriptors (b): private API
@@ -9,6 +9,8 @@ Description = "EW beta descriptors (b), private API of PortfolioOptimisers.jl: E
 ```@docs
 EWMacroSensitivityState
 EWDownsideBetaState
+BetaSeries
+CarriedReference
 ```
 
 ## Functions

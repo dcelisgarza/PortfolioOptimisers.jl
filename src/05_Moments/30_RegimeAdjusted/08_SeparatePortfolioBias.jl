@@ -1,6 +1,38 @@
 """
+$(DocStringExtensions.TYPEDEF)
+
+Holds the three sums of the weights of the separate correlation path at one count of
+observations.
+
+This type is an implementation detail and is not intended for direct use.
+[`separate_path_sums!`](@ref) makes it, and [`separate_direction_moments`](@ref) reads it.
+
+# Fields
+
+$(DocStringExtensions.FIELDS)
+
+# Related
+
+  - [`separate_path_sums!`](@ref)
+  - [`separate_direction_moments`](@ref)
+"""
+@concrete struct SeparatePathSums
+    """
+    `mix`: The sum ``A = s_{\\lambda\\lambda_{c}} - s_{\\lambda_{c}\\lambda_{c}}``, which weights the share of the noise of the variances in the variance of a direction.
+    """
+    mix
+    """
+    `spread`: The sum ``B = s_{\\lambda\\lambda} - 2 s_{\\lambda\\lambda_{c}} + s_{\\lambda_{c}\\lambda_{c}}``, which weights the share in its square.
+    """
+    spread
+    """
+    `shift`: The sum ``S``, which scales the shift of the mean of the estimated variance.
+    """
+    shift
+end
+"""
     portfolio_regime_bias(::Nothing, ce::RegimeAdjustedExpWeightedCovariance, target::PortfolioTarget, C::MatNum, idx::AbstractVector{<:Integer}, K::Integer)
-    portfolio_regime_bias(bias::NamedTuple, ce::RegimeAdjustedExpWeightedCovariance, target::PortfolioTarget, C::MatNum, idx::AbstractVector{<:Integer}, K::Integer)
+    portfolio_regime_bias(bias::PortfolioBiasStore, ce::RegimeAdjustedExpWeightedCovariance, target::PortfolioTarget, C::MatNum, idx::AbstractVector{<:Integer}, K::Integer)
 
 Returns the bias factor of each direction of the portfolio target, at `K` observations.
 
@@ -36,7 +68,7 @@ separate path is within 0.07 % of the multiplier of one decay on the same data o
 the factor holds no second order of the estimated correlation. Under the default
 `cor_vol = BiasCorrectedVolatility()`, at 12 assets, an equicorrelation of 0.5, half-lives of 10
 and 20 and 20 observations, the ratio is 1.0172, and 1.0095 at 40. At ``R = I`` it is within
-0.05 % at 20 observations. Under `RawVolatility()` the correlation state weights its first
+0.05 % at 20 observations. Under `cor_vol = nothing` the correlation state weights its first
 products by ``1 / (1 - \\lambda^{t})``, which the factor does not hold, and the same ratios read
 1.0802 and 1.0448. Under HAC the three tables and the weight sums read the Bartlett weights of
 `hac_lags`. At two lags and equal weights, on the same data, the separate path reads 0.06 % to
@@ -56,7 +88,7 @@ measure left out the first scored row of a zero block, which the statistic now s
 
 # Returns
 
-  - `f::Union{<:Number, <:VecNum}`: One where `bias` is `nothing`, the factor of every direction
+  - `f::Union{Number, VecNum}`: One where `bias` is `nothing`, the factor of every direction
     on one decay, and the factor of each direction on the separate path.
 
 # Related
@@ -71,7 +103,8 @@ function portfolio_regime_bias(::Nothing, ce::RegimeAdjustedExpWeightedCovarianc
                                ::Integer)
     return one(ce.decay)
 end
-function portfolio_regime_bias(bias::NamedTuple, ce::RegimeAdjustedExpWeightedCovariance,
+function portfolio_regime_bias(bias::PortfolioBiasStore,
+                               ce::RegimeAdjustedExpWeightedCovariance,
                                target::PortfolioTarget, C::MatNum,
                                idx::AbstractVector{<:Integer}, K::Integer)
     if !has_separate_cor_decay(ce)
@@ -121,11 +154,11 @@ Where:
   - `C::MatNum`: Bias-corrected covariance block of the contributing assets.
   - `p::AbstractVector`: Weights of the direction over those assets.
   - `min_val::Number`: Floor applied to each variance.
-  - `sums::NamedTuple`: `mix`, `spread` and `shift` of [`separate_path_sums!`](@ref).
+  - `sums::SeparatePathSums`: `mix`, `spread` and `shift` of [`separate_path_sums!`](@ref).
 
 # Returns
 
-  - `(theta, mu)::Tuple{<:Number, <:Number}`: The weight ``\\theta`` and the shift ``\\mu``, both
+  - `(theta, mu)::Tuple{Number, Number}`: The weight ``\\theta`` and the shift ``\\mu``, both
     zero where the variance of the direction is not positive.
 
 # Related
@@ -134,7 +167,7 @@ Where:
   - [`separate_path_sums!`](@ref)
 """
 function separate_direction_moments(C::MatNum, p::AbstractVector, min_val::Number,
-                                    sums::NamedTuple)
+                                    sums::SeparatePathSums)
     Cp = C * p
     v = LinearAlgebra.dot(p, Cp)
     if !(v > zero(v))
@@ -197,10 +230,11 @@ Where:
 
 # Returns
 
-  - `sums::NamedTuple`: `mix` ``A``, `spread` ``B`` and `shift` ``S``.
+  - `sums::SeparatePathSums`: The sums ``A``, ``B`` and ``S``.
 
 # Related
 
+  - [`SeparatePathSums`](@ref)
   - [`separate_direction_moments`](@ref)
   - [`exp_weight_convolution_table`](@ref)
   - [`exp_weight_cross_sum`](@ref)
@@ -224,7 +258,7 @@ function separate_path_sums!(conv::VecNum, ce::RegimeAdjustedExpWeightedCovarian
     sv = exp_weight_cross_sum(lv, lv, K, ce.hac_lags)
     svc = exp_weight_cross_sum(lv, lc, K, ce.hac_lags)
     sc = exp_weight_cross_sum(lc, lc, K, ce.hac_lags)
-    return (; mix = svc - sc, spread = sv - 2 * svc + sc, shift = svc - sv - (sc - Y) / 2)
+    return SeparatePathSums(svc - sc, sv - 2 * svc + sc, svc - sv - (sc - Y) / 2)
 end
 """
 $(DocStringExtensions.TYPEDSIGNATURES)
@@ -327,10 +361,11 @@ $(DocStringExtensions.TYPEDSIGNATURES)
 Mask of the assets whose row of the covariance state the regime statistic can read.
 
 Where `cor_decay` is `nothing`, the state steps at every observation, so every asset is built.
-On the separate path, [`update_var_cor!`](@ref) writes the block only when the diagonal of the
-correlation state is above `min_val`. Under HAC an asset contributes nothing on its first row,
-so the block can stay at its zero seed for the first rows. A written asset has a diagonal equal
-to its variance state, so an asset with a positive variance and a zero diagonal is not built.
+On the separate path, [`update_var_cor!`](@ref) writes the row of an asset only when its
+diagonal of the correlation state is above `min_val`, and it sets the row of every other asset
+with a positive variance to zero. Under HAC an asset contributes nothing on its first row, so its
+row can stay at zero for the first rows. A written asset has a diagonal equal to its variance
+state, so an asset with a positive variance and a zero diagonal is not built.
 A constant asset has a variance of zero, and it stays built: its row is zero by design.
 
 # Arguments

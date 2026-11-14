@@ -111,10 +111,16 @@ ratchet about 5 seconds, so you can run any of the three as often as you like. *
 
 The coverage check takes about 10 seconds, and it needs an `lcov.info` that it cannot make itself.
 In CI the `coverage` job of `.github/workflows/ReusableTest.yml` downloads the one the test job of
-the same run wrote, so the gate runs wherever the suite runs. The step that runs the ratchet carries
-`continue-on-error: true`, so a ratchet that trips annotates the run and leaves the test check
-green. Locally, run the suite with coverage on and process it, or download the `lcov`
-artifact from any green run of `Test.yml` and point `COVERAGE_LCOV` at it. ADR 0082.
+the same run wrote, so the gate runs wherever the suite runs, on a red suite too. A ratchet that
+trips annotates the run and turns the `Coverage ratchet` check red. The test check keeps the
+verdict of the suite alone. Locally, run the suite with coverage on and process it, or download the
+`lcov` artifact from any run of `Test.yml` and point `COVERAGE_LCOV` at it. ADR 0082.
+
+Before you push a change to a code line under `src/` or `ext/`, run its targeted test files with
+`test/run_files.jl --coverage=<absolute source dir>`. Each `PATCH` line names a line that your
+change added and that CI reads as a miss, also in a method that no test calls. Cover it, or give it
+a Coverage Exemption. A clean run records the `coverage` stamp that the push guard of
+`code_health/gate_stamp.sh` asks for.
 
 `coverage.jl` takes one more verb than the others. `terminal` answers #404's closing question
 for a child map's own files, and names the definitions that still hold an uncovered line.
@@ -149,14 +155,25 @@ For each JET report on the file, reach one of two verdicts.
 - **It is real.** Fix it. Reproduce the failure first, so you know what you fixed.
 - **It is a false positive.** Dismiss it. See [Dismissing a JET report](@ref code_health_dismissal) below.
 
+Do not change a form that a well-established dependency recommends only to silence JET. The
+developers of such a package analyse it with JET, and their best practice wins over a JET report.
+JET can report a call to an intrinsic, such as `getfield` or `getindex`, through the machinery of
+that package. Keep the form, and dismiss the report with the Rationale
+`a-form-its-package-recommends` in `code_health/rulings.toml`. The JuMP container
+`JuMP.@constraint(model, [i = 1:N], ...)` is the case that set the rule (#1870, #1883). A review
+rejects a change that replaces the form only to remove such a report.
+
 About 180 of the 315 reports measured at baseline belong to a single systematic noise class, so
 expect most reports on a file to end in a Dismissal rather than a fix.
 
 ### 4. Work complexity second
 
-Lower the number by ordinary refactoring. The file's number is the **maximum** over its definitions,
-so only the worst definition moves it. Fix the worst one, remeasure, and repeat until the file's
-number falls below the threshold or you reach a definition you judge irreducible.
+Lower the number by ordinary refactoring that also makes the design better. The file's number is
+the **maximum** over its definitions, so only the worst definition moves it. Fix the worst one,
+remeasure, and repeat until the file's number falls below the threshold or you reach a definition
+you judge irreducible. A definition that already has the correct form is irreducible. Do not remove
+an argument, loosen a type bound or move a function to another subject only to lower the number
+([When the correct form raises a number](@ref code_health_correct_form)).
 
 If a definition cannot fall, see [Exempting a complexity number](@ref code_health_exemption) below.
 
@@ -342,6 +359,31 @@ commit, so the reviewer sees the correctness fix and the number it cost, togethe
 
 The reverse case needs no rule. A complexity refactor that introduces a JET report turns the JET
 gate red, so it simply cannot land.
+
+## [When the correct form raises a number](@id code_health_correct_form)
+
+The design picks the route, not the number. Lower the number only when the lower form is also the
+better design. When the higher number comes from the correct form, record the rise of your own row.
+The correct form is one of these:
+
+- the precedent of the library, such as an argument that the sibling functions also take;
+- a signature that a test can call directly, with no scope to set first;
+- the file of the subject of the code.
+
+The number must stay within its threshold in `code_health/rulings.toml`. Above the threshold, a
+complexity number needs an [Exemption](@ref code_health_exemption), and a file above the size
+threshold splits by subject. Record the rise with `refresh --accept-rise`, and name the rise and its
+reason in the commit.
+
+Never change a signature, a type bound or the home of a function only to pass a ratchet. The gate
+then goes green, and the design gets worse. A review rejects such a change.
+
+Issue #2060 is the case that set the rule. A new helper took `strict` as its fourth argument, as its
+siblings `distance_reader_refusal_mask` and `graph_reader_mask` take it, and the file maximum of
+`arg` rose from 3 to 4. A session removed the argument and read the scoped value
+`projection_step_strict()` inside the function. The gate went green, but the change broke the
+precedent, hid a dependency on a scoped value, and made a direct test of `strict` set the scope
+first. The commit keeps the argument and records the rise of the one row.
 
 The scheduled job notices the rise. It normally skips a file it has already filed, but it refiles a
 file whose number now stands above the number it carried when its last issue closed, so the higher

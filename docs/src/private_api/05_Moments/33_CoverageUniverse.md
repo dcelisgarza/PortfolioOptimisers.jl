@@ -30,11 +30,9 @@ PortfolioOptimisers.coverage_pair_index
 PortfolioOptimisers.expand_columns
 PortfolioOptimisers.reduce_columns
 PortfolioOptimisers.expand_rows
-PortfolioOptimisers.expand_vector
 PortfolioOptimisers.expand_moment
 PortfolioOptimisers.expand_count
 PortfolioOptimisers.expand_regression
-PortfolioOptimisers.expand_idiosyncratic_covariance
 ```
 
 ## The check for missing returns
@@ -60,14 +58,9 @@ An estimator with a [`CoveragePolicy`](@ref) fits each asset, or each pair of as
 PortfolioOptimisers.coverage_panel_moment
 PortfolioOptimisers.coverage_panel_moment(f, est, ::Nothing, X::MatNum, pnl::Option{<:AssetPanel}, expand)
 PortfolioOptimisers.coverage_panel_moment(f, est, ::CoveragePolicy, X::MatNum, pnl::Option{<:AssetPanel}, ::Any)
-PortfolioOptimisers.coverage_variance_series
 PortfolioOptimisers.coverage_series_frame
-PortfolioOptimisers.coverage_variance_series(ce::AbstractCovarianceEstimator, ::Nothing, X::MatNum, pnl::Option{<:AssetPanel})
-PortfolioOptimisers.coverage_variance_series(ce::AbstractCovarianceEstimator, ::CoveragePolicy, X::MatNum, pnl::Option{<:AssetPanel})
-PortfolioOptimisers.variance_series(ce::Covariance, X::MatNum, pnl::Option{<:AssetPanel}; dims::Int = 1, kwargs...)
-PortfolioOptimisers.variance_series(ve::SimpleVariance, X::MatNum, pnl::Option{<:AssetPanel}; dims::Int = 1, kwargs...)
+PortfolioOptimisers.variance_series(ce::Union{Covariance{<:Any, <:Any, <:Any, <:Any, <:CoveragePolicy}, SimpleVariance{<:Any, <:Any, <:Any, <:CoveragePolicy}}, X::MatNum, pnl::Option{<:AssetPanel}; dims::Int = 1, kwargs...)
 PortfolioOptimisers.coverage_floor
 PortfolioOptimisers.coverage_keyword_reduction
-PortfolioOptimisers.coverage_keyword_mask
 PortfolioOptimisers.coverage_columns
 ```

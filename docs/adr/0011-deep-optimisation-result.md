@@ -263,3 +263,11 @@ not move.
 The result stays flat and a member by supertype only. With the fee, its field set still differs
 from `HierarchicalResult` by `r` and `gamma`. The keyword constructor takes `fees` with no
 default, as `HierarchicalResult` does, so a caller who builds the result by hand passes it.
+
+## Amendment (2026-11-12)
+
+The fall-through field `pa` of `JuMPOptimisationResult` is `jor`, a `ResolvedJuMPOptimiser`, and
+the field `prb` of the risk budgeting Results is `rbr` (ADR 0237, #2042). The resolved constraints
+of the bundle are in its block Result `cbr`, and a named forward rule keeps the reads `res.wb`,
+`res.tn`, `res.lcsr` and the other constraints of the bundle of v0.33. The structure of this
+decision does not change: `res.pr` still falls through to the prior of the bundle.

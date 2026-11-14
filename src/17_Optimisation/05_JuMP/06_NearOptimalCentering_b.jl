@@ -41,34 +41,35 @@ end
 function solve_noc!(noc::NearOptimalCentering{<:Any, <:Any, <:Any, <:Any, <:Any, <:Any,
                                               <:Any, <:Any, <:Any, <:Any, <:Any,
                                               <:ConstrainedNearOptimalCentering},
-                    model::JuMP.Model, rk_opts::VecNum, rt_opts::VecNum,
-                    opt::BaseJuMPOptimisationEstimator,
-                    attrs::ProcessedJuMPOptimiserAttributes, ::Any, ::Any, ::Any,
-                    w_min::VecNum, w_max::VecNum, ::Val{false}, ::Val{true}, args...)
+                    model::JuMP.Model, rk_opts::VecNum, rt_opts::VecNum, s_rk::Number,
+                    s_rt::Number, opt::BaseJuMPOptimisationEstimator,
+                    attrs::ResolvedJuMPOptimiser, ::Any, ::Any, ::Any, w_min::VecNum,
+                    w_max::VecNum, ::Val{false}, ::Val{true}, args...)
     risk_frontier = compute_risk_ubs(model, noc, opt.pe, opt.fees, w_min, w_max, args...)
     risk_axis = set_risk_frontier_parameters!(model, risk_frontier)
-    noc_rk, noc_rt = set_noc_anchor_parameters!(model, noc, attrs, rk_opts, rt_opts)
+    p_rk, p_rt, rk_units, rt_units = set_noc_anchor_parameters!(model, noc, attrs, rk_opts,
+                                                                rt_opts, s_rk, s_rt)
     return frontier_sweep!(model, noc, eltype(opt.pe.X),
                            frontier_sweep_axes(nothing, risk_axis)) do i
-        return set_noc_anchor!(noc_rk, noc_rt, rk_opts, rt_opts, i)
+        return set_noc_anchor!(p_rk, p_rt, rk_units, rt_units, i)
     end
 end
 function solve_noc!(noc::NearOptimalCentering{<:Any, <:Any, <:Any, <:Any, <:Any, <:Any,
                                               <:Any, <:Any, <:Any, <:Any, <:Any,
                                               <:ConstrainedNearOptimalCentering},
-                    model::JuMP.Model, rk_opts::VecNum, rt_opts::VecNum,
-                    opt::BaseJuMPOptimisationEstimator,
-                    attrs::ProcessedJuMPOptimiserAttributes, ::Any, ::Any,
-                    rt_ends::Option{<:VecPair}, w_min::VecNum, w_max::VecNum, ::Val{true},
-                    ::Val{true}, args...)
+                    model::JuMP.Model, rk_opts::VecNum, rt_opts::VecNum, s_rk::Number,
+                    s_rt::Number, opt::BaseJuMPOptimisationEstimator,
+                    attrs::ResolvedJuMPOptimiser, ::Any, ::Any, rt_ends::Option{<:VecPair},
+                    w_min::VecNum, w_max::VecNum, ::Val{true}, ::Val{true}, args...)
     ret_frontier = compute_ret_lbs(shared_get(model, :ret_frontier), rt_ends)
     risk_frontier = compute_risk_ubs(model, noc, opt.pe, opt.fees, w_min, w_max, args...)
     risk_axis = set_risk_frontier_parameters!(model, risk_frontier)
     ret_axis = set_ret_frontier_parameters!(model, ret_frontier)
-    noc_rk, noc_rt = set_noc_anchor_parameters!(model, noc, attrs, rk_opts, rt_opts)
+    p_rk, p_rt, rk_units, rt_units = set_noc_anchor_parameters!(model, noc, attrs, rk_opts,
+                                                                rt_opts, s_rk, s_rt)
     return frontier_sweep!(model, noc, eltype(opt.pe.X),
                            frontier_sweep_axes(ret_axis, risk_axis)) do i
-        return set_noc_anchor!(noc_rk, noc_rt, rk_opts, rt_opts, i)
+        return set_noc_anchor!(p_rk, p_rt, rk_units, rt_units, i)
     end
 end
 """
@@ -116,7 +117,8 @@ function get_overall_retcode(w_min_retcode, w_opt_retcode, w_max_retcode, noc_re
     return if isempty(msg)
         OptimisationSuccess()
     else
-        @warn("Failed to solve optimisation problem. Check `retcode.res` for details.")
+        @warn("Failed to solve optimisation problem. Check `retcode.res` for details.",
+              maxlog = log_limit(:warn), _id = @log_id())
         OptimisationFailure(;
                             res = (; msg = msg, w_min = w_min_retcode,
                                    w_opt = w_opt_retcode, w_max = w_max_retcode,
@@ -124,15 +126,20 @@ function get_overall_retcode(w_min_retcode, w_opt_retcode, w_max_retcode, noc_re
     end
 end
 """
-    assemble_near_optimal_centering_model!(alg, model, noc, setup, rd)
+    assemble_near_optimal_centering_model!(alg, model, noc, setup, rd; blocks = ())
 
 Run the model-assembly middle of the Near Optimal Centering variant `alg`.
 
 The two variants share a head and a Result, and differ only in the middle and in the solve.
 This is the middle. [`ConstrainedNearOptimalCentering`](@ref) delegates to the shared
-[`assemble_jump_model!`](@ref). [`UnconstrainedNearOptimalCentering`](@ref) runs the four
-steps of that sequence it needs — non-fixed fees, risk, scalarisation, return — and then the
-same [`assert_frontier_sweep_cap`](@ref) tail.
+[`assemble_jump_model!`](@ref), whose block builder adds every block, the weight bounds and the
+budgets among them.
+[`UnconstrainedNearOptimalCentering`](@ref) adds the weight bounds and the budgets of `opt`
+with [`set_weight_constraints!`](@ref), and the weight bounds and the budgets of each block
+after the first with [`set_block_weight_constraints!`](@ref). It adds no other row of a block.
+It then runs the four steps of that sequence it needs —
+non-fixed fees, risk, scalarisation, return — and then the same
+[`assert_frontier_sweep_cap`](@ref) tail.
 
 [`set_non_fixed_fees!`](@ref) runs before the risk build, as it does in
 [`assemble_jump_model!`](@ref). It is what makes the model's return expression net of fees,
@@ -158,6 +165,7 @@ phylogeny argument is `nothing` because the variant applies no phylogeny constra
   - `noc::NearOptimalCentering`: Dispatch object for the risk and custom constraint builders.
   - `setup::NearOptimalSetup`: Setup bundle from [`near_optimal_centering_setup`](@ref).
   - $(arg_dict[:rd])
+  - `blocks`: The blocks after the block of `noc.opt`, as [`assemble_jump_model!`](@ref) takes them.
 
 # Returns
 
@@ -174,8 +182,16 @@ phylogeny argument is `nothing` because the variant applies no phylogeny constra
 function assemble_near_optimal_centering_model!(::UnconstrainedNearOptimalCentering,
                                                 model::JuMP.Model,
                                                 noc::NearOptimalCentering,
-                                                setup::NearOptimalSetup, rd::ReturnsResult)
-    (; r, opt) = setup
+                                                setup::NearOptimalSetup, rd::ReturnsResult;
+                                                blocks::Tuple = ())
+    (; r, opt, attrs) = setup
+    # The centring solve keeps the bounds and the budgets of each block and no other row of
+    # a block, so it adds them itself, outside the block builder. A later block takes no net
+    # budget, because the head owns it.
+    set_weight_constraints!(model, opt.wb, opt)
+    for (_, cbri, prefix) in later_constraint_blocks(blocks, attrs)
+        set_block_weight_constraints!(model, cbri, nothing; prefix = prefix)
+    end
     set_non_fixed_fees!(model, opt.fees)
     set_risk_and_scalarise!(model, r, noc, opt, opt.pe, nothing, opt.fees; rd = rd)
     set_return_constraints!(model, opt.ret, MinimumRisk(), opt.pe; rd = rd)
@@ -185,10 +201,43 @@ end
 function assemble_near_optimal_centering_model!(::ConstrainedNearOptimalCentering,
                                                 model::JuMP.Model,
                                                 noc::NearOptimalCentering,
-                                                setup::NearOptimalSetup, rd::ReturnsResult)
+                                                setup::NearOptimalSetup, rd::ReturnsResult;
+                                                blocks::Tuple = ())
     (; r, opt, attrs) = setup
-    assemble_jump_model!(model, noc, opt, attrs, rd, r)
+    assemble_jump_model!(model, noc, opt, attrs, rd, r; blocks = blocks)
     return nothing
+end
+"""
+    anchor_cone_scale(delta::Num_VecNum, anchor::Num_VecNum)
+
+Return the scale that divides the slack of an anchor cone of the barrier of [`NearOptimalCentering`](@ref).
+
+The scale is the width `delta` of the near optimal region, which is the slack of the cone at the anchor of the objective. When the width is negligible against the bound `anchor`, the scale is one, and the cone keeps its slack in the units of the bound. The anchors of a degenerate region are one portfolio, so its width is of the order of the rounding error. A slack divided by that width puts the tolerance of the solver at the scale of the rounding error, and the solve stops without progress. The width can also be negative by a rounding error, so the bound sits outside the region by that error. A scale below one makes the error larger. With the anchors of the factor exposure test of `test_02`, a width of `-1.1e-13` and a risk bound of `0.0073`, the slack divided by the bound stopped at `NUMERICAL_ERROR` under `--check-bounds=yes` and coverage, and the slack in the units of the bound solved.
+
+# Algorithm
+
+ 1. Compute ``s = \\max_{i} |\\delta_{i}|`` and ``m``, the [`bound_scale`](@ref) of `anchor`.
+ 2. Return ``1`` when `isapprox(m + s, m)`, and ``s`` otherwise.
+
+# Arguments
+
+  - `delta::Num_VecNum`: The width, `rk_delta` or `rt_delta` of [`NearOptimalSetup`](@ref).
+  - `anchor::Num_VecNum`: The bound of the cone, `rk_opt` or `rt_opt`, or one for each point of a sweep.
+
+# Returns
+
+  - The scale, a positive number.
+
+# Related
+
+  - [`bound_scale`](@ref)
+  - [`set_near_optimal_centering_constraints!`](@ref)
+  - [`solve_near_optimal_centering!`](@ref)
+"""
+function anchor_cone_scale(delta::Num_VecNum, anchor::Num_VecNum)
+    s = maximum(abs, delta; init = abs(zero(eltype(delta))))
+    m = bound_scale(anchor)
+    return ifelse(isapprox(m + s, m), one(s), s)
 end
 """
     solve_near_optimal_centering!(alg, model, noc, setup)
@@ -198,7 +247,9 @@ Run the solve tail of the Near Optimal Centering variant `alg`.
 Reads the arguments each [`solve_noc!`](@ref) overload needs off `setup`, so the two variants
 share one `_optimise` head. The constrained variant sweeps both frontier registries, so it
 passes the two `Val` flags that select the sweeping overload; the unconstrained variant
-registers no frontier bound and passes neither.
+registers no frontier bound and passes neither. Both variants pass the
+[`anchor_cone_scale`](@ref) of the widths `rk_delta` and `rt_delta` of the near optimal
+region, which divide the anchor cones of the barrier.
 
 # Arguments
 
@@ -221,20 +272,23 @@ registers no frontier bound and passes neither.
 function solve_near_optimal_centering!(::UnconstrainedNearOptimalCentering,
                                        model::JuMP.Model, noc::NearOptimalCentering,
                                        setup::NearOptimalSetup)
-    (; rk_opt, rt_opt, opt, attrs) = setup
-    return solve_noc!(noc, model, rk_opt, rt_opt, opt, attrs)
+    (; rk_opt, rt_opt, rk_delta, rt_delta, opt, attrs) = setup
+    return solve_noc!(noc, model, rk_opt, rt_opt, anchor_cone_scale(rk_delta, rk_opt),
+                      anchor_cone_scale(rt_delta, rt_opt), opt, attrs)
 end
 function solve_near_optimal_centering!(::ConstrainedNearOptimalCentering, model::JuMP.Model,
                                        noc::NearOptimalCentering, setup::NearOptimalSetup)
-    (; rk_opt, rt_opt, opt, attrs, rt_min, rt_max, rt_ends, w_min, w_max) = setup
-    return solve_noc!(noc, model, rk_opt, rt_opt, opt, attrs, rt_min, rt_max, rt_ends,
-                      w_min, w_max, Val(shared_has(model, :ret_frontier)),
+    (; rk_opt, rt_opt, rk_delta, rt_delta, opt, attrs, rt_min, rt_max, rt_ends, w_min, w_max) = setup
+    return solve_noc!(noc, model, rk_opt, rt_opt, anchor_cone_scale(rk_delta, rk_opt),
+                      anchor_cone_scale(rt_delta, rt_opt), opt, attrs, rt_min, rt_max,
+                      rt_ends, w_min, w_max, Val(shared_has(model, :ret_frontier)),
                       Val(shared_has(model, :risk_frontier)))
 end
 function _optimise(noc::NearOptimalCentering, rd::ReturnsResult = ReturnsResult();
-                   str_names::Bool = false, save::Bool = true, kwargs...)
+                   str_names::Bool = false, save::Bool = true, blocks::Tuple = (),
+                   kwargs...)
     noc = reset_time_dependent_estimator(noc)
-    setup = near_optimal_centering_setup(noc, rd; kwargs...)
+    setup = near_optimal_centering_setup(noc, rd; blocks = blocks, kwargs...)
     (; w_opt, r, opt, attrs, w_min_retcode, w_opt_retcode, w_max_retcode) = setup
     # The setup reduced its own locals. These are this method's, and they reach
     # `assemble_near_optimal_centering_model!` directly.
@@ -247,12 +301,11 @@ function _optimise(noc::NearOptimalCentering, rd::ReturnsResult = ReturnsResult(
     set_model_observations!(model, size(opt.pe.X, 1))
     set_maximum_ratio_factor_variables!(model, MinimumRisk())
     set_w!(model, opt.pe.X, w_opt)
-    set_weight_constraints!(model, opt.wb, opt)
-    assemble_near_optimal_centering_model!(noc.alg, model, noc, setup, rd)
+    assemble_near_optimal_centering_model!(noc.alg, model, noc, setup, rd; blocks = blocks)
     noc_retcode, sol = solve_near_optimal_centering!(noc.alg, model, noc, setup)
     retcode = get_overall_retcode(w_min_retcode, w_opt_retcode, w_max_retcode, noc_retcode)
     return NearOptimalCenteringResult(;
-                                      jr = JuMPOptimisationResult(; pa = attrs,
+                                      jr = JuMPOptimisationResult(; jor = attrs,
                                                                   retcode = retcode,
                                                                   sol = sol,
                                                                   model = ifelse(save,

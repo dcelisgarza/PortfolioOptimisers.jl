@@ -34,7 +34,7 @@ Where:
   - [`set_liquidation_fees!`](@ref)
   - [`Fees`](@ref)
 """
-function add_to_fees!(model::JuMP.Model, expr::Union{<:Number, <:JuMP.AbstractJuMPScalar})
+function add_to_fees!(model::JuMP.Model, expr::Union{Number, JuMP.AbstractJuMPScalar})
     if !shared_has(model, :fees)
         # A number takes no later term in place, so the first term starts an affine
         # expression, whatever its own type.
@@ -84,7 +84,7 @@ Where:
   - [`add_fees_to_ret!`](@ref)
 """
 function add_to_one_time_fees!(model::JuMP.Model,
-                               expr::Union{<:Number, <:JuMP.AbstractJuMPScalar})
+                               expr::Union{Number, JuMP.AbstractJuMPScalar})
     if !shared_has(model, :one_time_fees)
         # A number takes no later term in place, so the first term starts an affine
         # expression, whatever its own type.
@@ -183,10 +183,8 @@ function set_turnover_fees!(model::JuMP.Model, tn::Turnover)
     wt = tn.w
     val = tn.val
     JuMP.@variable(model, t_ftn[1:N])
-    JuMP.@expressions(model, begin
-                          x_ftn, w - wt * k
-                          ftn, dot_scalar(val, t_ftn)
-                      end)
+    JuMP.@expression(model, x_ftn, w - wt * k)
+    JuMP.@expression(model, ftn, dot_scalar(val, t_ftn))
     JuMP.@constraint(model, cftn[i = 1:N],
                      [sc * t_ftn[i]; sc * x_ftn[i]] in JuMP.MOI.NormOneCone(2))
     add_to_fees!(model, ftn)
@@ -630,10 +628,8 @@ function set_proportional_fees!(model::JuMP.Model, fl::Num_VecNum, fs::Num_VecNu
     sc = get_constraint_scale(model)
     N = length(w)
     JuMP.@variable(model, t_fp[1:N])
-    JuMP.@constraints(model, begin
-                          cfp_l, sc * (fl ⊙ w - t_fp) <= 0
-                          cfp_s, sc * (fs ⊙ w + t_fp) >= 0
-                      end)
+    JuMP.@constraint(model, cfp_l, sc * (fl ⊙ w - t_fp) <= 0)
+    JuMP.@constraint(model, cfp_s, sc * (fs ⊙ w + t_fp) >= 0)
     JuMP.@expression(model, fp, sum(t_fp))
     add_to_fees!(model, fp)
     return nothing
@@ -713,7 +709,7 @@ Where:
   - [`FirstObservationFees`](@ref)
 """
 function charge_one_time_fees(model::JuMP.Model, net, one_time, ::Number,
-                              ::Union{Nothing, <:FirstObservationFees})
+                              ::Union{Nothing, FirstObservationFees})
     # One entry is charged, so one entry is touched. Writing the charge as a selector vector
     # times `one_time` would build two arrays and put a zero multiple of the fee into every
     # other observation's expression, which the model then carries for nothing. `net` is

@@ -4,15 +4,15 @@ $(DocStringExtensions.TYPEDSIGNATURES)
 Add `pairs` to the documentation dictionary `dict`, and throw if a key already holds a
 different description.
 
-A `Dict` is last-wins, so a key written twice drops the earlier description with no warning
-and makes its prose unreachable. The files of `src/01_Base/01_DocstringDictionaries/` fill
-each table in parts, so a key can be written twice in two files as well as in one. This
-function is the guard against both: it fails at load time and names both descriptions, so
-the duplicate is visible instead of silent.
+A `Dict` keeps the last value written to a key. A key written twice drops the earlier
+description with no warning, and no docstring can read that description again. The files of
+`src/01_Base/01_DocstringDictionaries/` fill each table in parts, so a key can occur twice in
+one file or in two files. This function fails at load time in both cases, and its message names
+both descriptions.
 
-A key that returns with the description it already holds changes nothing. That is how a
-second evaluation of the same file reads, for example when Revise evaluates an edited file
-again.
+A key that comes back with the description that it already holds changes nothing. A second
+evaluation of the same file writes each key in this way, for example when Revise evaluates an
+edited file again.
 
 # Algorithm
 
@@ -21,13 +21,13 @@ again.
 
 # Arguments
 
-  - `dict::Dict{Symbol, String}`: The table to fill. It is changed in place.
-  - `name::Symbol`: Name of the table, used in the error message.
-  - `pairs`: The key-description pairs, in the order they are written.
+  - `dict::Dict{Symbol, String}`: The table to fill. The function changes it in place.
+  - `name::Symbol`: The name of the table, which the error message shows.
+  - `pairs`: The key-description pairs, in the order that the caller writes them.
 
 # Validation
 
-  - A key that `dict` already holds, from an earlier call or from an earlier pair of this one, keeps its description. A different description raises an `ArgumentError` naming `name`, the key, and both descriptions.
+  - A key that `dict` already holds, from an earlier call or from an earlier pair of this call, keeps its description. A different description raises an `ArgumentError` that names `name`, the key, and both descriptions.
 
 # Returns
 
@@ -55,26 +55,23 @@ end
 """
     arg_dict
 
-Maps a parameter key to the docstring description of the corresponding argument or
-field, so that a single description is written once here and interpolated into every
-docstring that mentions that parameter (via `\$(arg_dict[key])` for `# Arguments`
-entries, or through the derived [`field_dict`](@ref) for `# Fields` entries).
+Maps a parameter key to the description of the argument or field that has that key. Each
+description is written once, in this table. A `# Arguments` entry interpolates
+`\$(arg_dict[key])`, and a `# Fields` entry reads the same text from [`field_dict`](@ref).
 
-Each value has the form ``"`name`: description."``, where `name` is the display name
-the caller sees and everything after the first `:` is the prose; `field_dict`
-strips the ``"`name`: "`` prefix. A few illustrative entries:
+Each value has the form ``"`name`: description."``. The `name` is the name that the caller
+sees, and the prose starts after the first `:`. `field_dict` removes the ``"`name`: "``
+prefix. Four entries of the table are:
 
     :ce   => "`ce`: Covariance estimator."
     :oow  => "`w`: Optional observation weights vector `observations × 1`, ..."
     :per  => "`pr`: Prior estimator or result."
     :pler => "`pl`: Network estimator, phylogeny result, clustering estimator, or clustering result."
-    :plsrc => "`pl`: Network estimator or clustering estimator -- a source that refits, never a precomputed result."
 
 The five `*_Arg*.jl` files of `src/01_Base/01_DocstringDictionaries/` fill the table, one
-subject to a file, and together they are the full table of keys and descriptions. A key
-must appear once: [`unique_key_dict!`](@ref) fills the table and refuses a key that another
-entry holds with a different description, because a `Dict` drops the earlier entry in
-silence.
+subject to a file. A key must occur once. [`unique_key_dict!`](@ref) fills the table, and it
+refuses a key that another entry holds with a different description, because a `Dict` drops
+the earlier entry with no warning.
 
 # Related
 
@@ -86,9 +83,9 @@ const arg_dict = Dict{Symbol, String}()
 """
     field_dict
 
-Derived dictionary mapping argument keys to field description strings, used for `\$(FIELDS)`-style docstring interpolation.
+Maps an argument key to the description of a field. An inline field docstring interpolates this table, and `\$(DocStringExtensions.FIELDS)` shows the result under `# Fields`.
 
-Each entry is derived from [`arg_dict`](@ref) by stripping the leading parameter name prefix (everything up to and including the first `:`). `07_FieldDict.jl` fills it after the last file of `arg_dict`, so it holds one entry for each key of `arg_dict`.
+Each entry is the value of [`arg_dict`](@ref) for the same key, with the name prefix removed. The prefix is all the text up to the first `:`, and the `:` itself. `07_FieldDict.jl` fills the table after the last file of `arg_dict`, so the table holds one entry for each key of `arg_dict`.
 
 # Related
 
@@ -101,9 +98,9 @@ const field_dict = Dict{Symbol, String}()
 """
     err_name_dict
 
-Maps high-order-moment argument keys to the domain noun used in error messages, so a
-message names what the caller supplied (e.g. `cokurtosis`) rather than the bare field
-symbol. The symbol itself is appended at the call site, giving messages like
+Maps the key of a high-order moment argument to the noun that an error message uses. The
+message names what the caller gave, for example `cokurtosis`, and not only the name of the
+field. The call site adds the field name after the noun, and the message reads
 ``cokurtosis (`kt`) cannot be empty``.
 
 # Related
@@ -116,9 +113,9 @@ const err_name_dict = Dict{Symbol, String}()
 """
     val_dict
 
-Validation rules for certain arg_dict terms used in the documentation of `PortfolioOptimisers.jl`.
+Maps a key of [`arg_dict`](@ref) to the validation rule that a `## Validation` subsection states for that argument.
 
-`:relax` is the exception: it is the fixed opening sentence of a `## Relaxation` subsection under `# JuMP formulation`, held here so that the wording cannot drift between docstrings.
+The key `:relax` is the one exception. Its value is the first sentence of each `## Relaxation` subsection under `# JuMP formulation`. The table holds it so that all docstrings use the same words.
 
 # Related
 
@@ -131,7 +128,7 @@ const val_dict = Dict{Symbol, String}()
 """
     ret_dict
 
-Dictionary containing return value descriptions for common parameters used in `PortfolioOptimisers.jl`.
+Maps a key to the description of a return value that many `# Returns` sections share.
 
 # Related
 
@@ -144,13 +141,13 @@ const ret_dict = Dict{Symbol, String}()
 """
     math_dict
 
-Dictionary of mathematical notation descriptions used for docstring interpolation throughout `PortfolioOptimisers.jl`.
+Maps a key to the definition of a mathematical symbol. A `Where:` bullet of a docstring interpolates the definition.
 
-Keys are symbols that identify mathematical variables or subscripts; values are LaTeX-formatted strings suitable for embedding in docstrings.
+A key names a mathematical variable or a subscript. Its value is a string in LaTeX that a docstring can contain as it is.
 
-A key owns a definition, not a glyph: one glyph carries different quantities in different families, so a second quantity on the same glyph takes its own key under its own symbol.
+A key holds one definition, not one glyph. One glyph can stand for different quantities in different families, so each quantity gets its own key.
 
-The four `*_Math*.jl` files of `src/01_Base/01_DocstringDictionaries/` fill the table, one subject to a file. A key must appear once: [`unique_key_dict!`](@ref) refuses a key that another entry holds with a different description.
+The four `*_Math*.jl` files of `src/01_Base/01_DocstringDictionaries/` fill the table, one subject to a file. A key must occur once. [`unique_key_dict!`](@ref) refuses a key that another entry holds with a different description.
 
 # Related
 
@@ -165,18 +162,18 @@ const math_dict = Dict{Symbol, String}()
     ref_dict
 
 Maps a key of `docs/src/References.bib` to the formatted `# References` bullet for that
-work, so the reference text is written once here and interpolated wherever a docstring
-cites it.
+work. The table holds the text of each reference once, and each docstring that cites the work
+interpolates it.
 
-Each value is a complete bullet body: the citation marker for the key, followed by the
-reference in the style `DocumenterCitations` renders in the bibliography. A citing docstring
-writes the whole bullet as one interpolation of this table and never pastes the reference
-prose inline. A pasted copy drifts from the entry in `References.bib` and from the other
-copies of itself: before this table existed, `gerber2025squeezing` was pasted 31 times and
-`mlp1` 13 times.
+Each value is the complete text of one bullet. It starts with the citation marker for the key,
+and the reference follows in the style that `DocumenterCitations` uses in the bibliography. A
+docstring writes the whole bullet as one interpolation of this table. It never contains a
+copy of the reference text. A copy goes out of step with the entry in `References.bib` and
+with the other copies. Before this table existed, the docstrings held 31 copies of
+`gerber2025squeezing` and 13 copies of `mlp1`.
 
-`13_References.jl` fills the table, and it is the single source of truth. A key must appear
-once: [`unique_key_dict!`](@ref) fills the table and refuses a repeat.
+`13_References.jl` fills the table, and no other file holds the text of a reference. A key
+must occur once. [`unique_key_dict!`](@ref) fills the table and refuses a repeated key.
 
 # Related
 

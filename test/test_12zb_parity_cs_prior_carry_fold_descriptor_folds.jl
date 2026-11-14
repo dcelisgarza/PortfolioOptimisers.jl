@@ -78,7 +78,7 @@ end
 # A test-local target that fits as a `LinearModel` and keeps the default answer of
 # `is_basis_invariant`, so a move of the dropped member under it fits every observation again
 # (#1614).
-struct BasisBoundTarget <: PortfolioOptimisers.AbstractRegressionTarget end
+struct BasisBoundTarget <: PortfolioOptimisers.AbstractUnpenalisedRegressionTarget end
 function PortfolioOptimisers.factory(::BasisBoundTarget, w::PortfolioOptimisers.ObsWeights)
     return factory(LinearModel(), w)
 end
@@ -167,6 +167,7 @@ end
             st = de
             for (a, b) in blocks
                 r = po.descriptor_step(st, rows(syn, a:b))
+                @test r isa po.DescriptorStepResult
                 @test same(r.D, full[a:b, :])
                 @test same(po.descriptor_step(st, rows(syn, a:b)).D, r.D)
                 @test same(partial_fit!(st, rows(syn, a:b)).cache.cs[end],
@@ -238,6 +239,7 @@ end
             st = de
             for (a, b) in blocks
                 r = po.descriptor_step(st, rows(syn, a:b))
+                @test r isa po.DescriptorStepResult
                 @test same(r.D, full[a:b, :])
                 @test same(po.descriptor_step(st, rows(syn, a:b)).D, r.D)
                 @test same(partial_fit!(st, rows(syn, a:b)).cache.s, r.de.cache.s)
@@ -320,6 +322,7 @@ end
             st = de
             for (a, b) in blocks
                 r = po.descriptor_step(st, rows(syn, a:b))
+                @test r isa po.DescriptorStepResult
                 @test same(r.D, full[a:b, :])
                 @test same(po.descriptor_step(st, rows(syn, a:b)).D, r.D)
                 @test same(partial_fit!(st, rows(syn, a:b)).cache.q[end], r.de.cache.q[end])
@@ -422,6 +425,7 @@ end
             st = de
             for (a, b) in blocks
                 r = po.descriptor_step(st, rows(syn, a:b))
+                @test r isa po.DescriptorStepResult
                 @test same(r.D, full[a:b, :])
                 @test same(po.descriptor_step(st, rows(syn, a:b)).D, r.D)
                 @test same(partial_fit!(st, rows(syn, a:b)).cache.ve.variance,
@@ -445,15 +449,17 @@ end
         # batch call, also where `min_obs` counts observations across the cut.
         rm = po.market_return_series(syn, "market_cap")
         B, Vm = po.ew_beta_series(syn.X, rm, 0.8, 7, 1e-12, syn.pnl.amsk)
-        b1 = po.ew_beta_series!(po.ew_beta_state(nothing, syn.X, rm, 0.8), syn.X[1:4, :],
-                                rm[1:4], 0.8, 7, 1e-12, syn.pnl.amsk[1:4, :])
-        b2 = po.ew_beta_series!(po.ew_beta_state(b1.st, syn.X, rm, 0.8), syn.X[5:160, :],
-                                rm[5:160], 0.8, 7, 1e-12, syn.pnl.amsk[5:160, :])
-        @test same([b1.B; b2.B], B) && same([b1.Vm; b2.Vm], Vm) && b2.st.t == 160
+        B1, Vm1, st1 = po.ew_beta_series!(po.ew_beta_state(nothing, syn.X, rm, 0.8),
+                                          syn.X[1:4, :], rm[1:4], 0.8, 7, 1e-12,
+                                          syn.pnl.amsk[1:4, :])
+        B2, Vm2, st2 = po.ew_beta_series!(po.ew_beta_state(st1, syn.X, rm, 0.8),
+                                          syn.X[5:160, :], rm[5:160], 0.8, 7, 1e-12,
+                                          syn.pnl.amsk[5:160, :])
+        @test same([B1; B2], B) && same([Vm1; Vm2], Vm) && st2.t == 160
         @test occursin("cannot merge two states fitted on disjoint blocks",
-                       message(() -> po.merge_states(b1.st, b2.st)))
+                       message(() -> po.merge_states(st1, st2)))
         @test occursin("the beta state carries 60 assets, and the step brings 5",
-                       message(() -> po.ew_beta_state(b1.st, syn.X[:, 1:5], rm, 0.8)))
+                       message(() -> po.ew_beta_state(st1, syn.X[:, 1:5], rm, 0.8)))
         @test occursin("hold one entry per asset",
                        message(() -> po.EWBetaState(; b = [0.0], mu = [0.0, 0.0],
                                                     cv = [0.0], n = [0], act = trues(1),
@@ -476,6 +482,13 @@ end
         wv = EWVolatility(; ce = WindowedVariance(; window = 20))
         @test isnothing(po.descriptor_step(wv, rows(syn, 1:5)))
         @test isnothing(po.carry_lookback(wv))
+        # The answer of a step names its two values, and its keyword constructor refuses a
+        # value that is not an estimator and a matrix (#2093).
+        sr = po.DescriptorStepResult(; de = wv, D = [0.1 NaN])
+        @test sr.de === wv && isequal(sr.D, [0.1 NaN])
+        @test po.DescriptorStepResult(wv, [0.1 0.2]).D == [0.1 0.2]
+        @test_throws TypeError po.DescriptorStepResult(; de = 1.0, D = [0.1 0.2])
+        @test_throws TypeError po.DescriptorStepResult(; de = wv, D = [0.1, 0.2])
         @test isnothing(po.ew_volatility_fold(wv, syn, nothing).st)
         # On the carry fold each Descriptor counts as one row, so the carry keeps the rows of
         # the lag alone, and every step equals the batch fit.
@@ -571,6 +584,7 @@ end
             st = de
             for (a, b) in blocks
                 r = po.descriptor_step(st, rows(rd, a:b))
+                @test r isa po.DescriptorStepResult
                 @test same(r.D, full[a:b, :])
                 @test same(po.descriptor_step(st, rows(rd, a:b)).D, r.D)
                 @test copied(partial_fit!(st, rows(rd, a:b)).cache, r.de.cache)
@@ -630,6 +644,18 @@ end
                        message(() -> po.EWDownsideBetaState(; cd = [0.0, 0.0], n = [0],
                                                             vd = 0.0, t = 0)))
         @test po.show_fields(EWDownsideBeta()) == (:mcap, :decay, :min_obs, :mar, :min_val)
+        # Two states of the macro sensitivity do not merge: the second block starts from the first.
+        @test isa(m.st, po.EWMacroSensitivityState)
+        @test occursin("an EWMacroSensitivityState cannot merge",
+                       message(() -> po.merge_states(m.st, copy(m.st))))
+        # A carried Descriptor pads the rows before its own with `NaN`, keeps them when they fill the returns.
+        Nd = length(rd.nx)
+        carried = po.CarriedDescriptor(ones(2, Nd))
+        padded = descriptor(carried, rows(rd, 1:5))
+        @test size(padded) == (5, Nd)
+        @test all(isnan, padded[1:3, :]) && padded[4:5, :] == ones(2, Nd)
+        @test descriptor(carried, rows(rd, 1:2)) == ones(2, Nd)
+        @test_throws DimensionMismatch descriptor(carried, rows(rd, 1:1))
         # On the carry fold each Descriptor counts as one row, so the carry keeps the rows of
         # the lag alone, and the exposures of every step equal those of the batch fit.
         ewb = ["market" => ConstantExposure(),

@@ -9,4 +9,5 @@ HighestMeanScore
 SearchCrossValidationResult
 AbstractSearchCrossValidationResult
 CrossValidationSearchScorer
+candidate_scores
 ```

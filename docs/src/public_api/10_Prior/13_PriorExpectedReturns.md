@@ -1,5 +1,5 @@
 ```@meta
-Description = "Prior expected returns, public API of PortfolioOptimisers.jl: PriorExpectedReturns, mean, partial_fit!."
+Description = "Prior expected returns, public API of PortfolioOptimisers.jl: PriorExpectedReturns, mean, partial_fit!, obs_weights_view."
 ```
 
 # [Prior expected returns](@id api-prior-expected-returns)
@@ -10,4 +10,5 @@ Description = "Prior expected returns, public API of PortfolioOptimisers.jl: Pri
 PriorExpectedReturns
 mean(me::PriorExpectedReturns, X::MatNum; dims::Int = 1, kwargs...)
 partial_fit!(me::PriorExpectedReturns, X::VecNum_MatNum; kwargs...)
+obs_weights_view(me::PriorExpectedReturns, i)
 ```

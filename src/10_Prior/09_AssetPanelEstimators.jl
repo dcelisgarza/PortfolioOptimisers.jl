@@ -70,7 +70,7 @@ The diagonal is ``f(0)``, the largest entry of ``\\mathbf{Z}``, because a decay 
 
 `decay` sets the fall-off, and `sep` on the source sets the budget. The budget is the only truncation. The two are separate because an exponential never reaches zero, so a fall-off cannot state a budget. Under the default [`LinearDecay`](@ref) and a [`HopCount`](@ref) budget of `n`, the asset itself scores `n + 1`, a direct neighbour scores `n`, and a pair `n` hops apart scores `1`. Under [`ExponentialDecay`](@ref) or [`ReciprocalDecay`](@ref) the diagonal is `1`, and the parameter of the decay sets the fall-off whatever the budget.
 
-[`NoDecay`](@ref) scores `1` at every separation, so `Proximity(; decay = NoDecay())` gives `1` inside the budget and `0` outside it. The result is the indicator of the neighbourhood that the budget selects, not a matrix of ones.
+`decay = nothing` scores `1` at every separation, so `Proximity(; decay = nothing)` gives `1` inside the budget and `0` outside it. The result is the indicator of the neighbourhood that the budget selects, not a matrix of ones.
 
 # Hop counts and path lengths
 
@@ -89,7 +89,7 @@ $(DocStringExtensions.FIELDS)
 # Constructors
 
     Proximity(;
-        decay::AbstractSeparationDecayAlgorithm = LinearDecay()
+        decay::Option{<:AbstractSeparationDecayAlgorithm} = LinearDecay()
     ) -> Proximity
 
 Keywords correspond to the struct's fields.
@@ -111,20 +111,22 @@ Proximity
   - [`PathLength`](@ref)
   - [`AbstractSeparationDecayAlgorithm`](@ref)
   - [`LinearDecay`](@ref)
-  - [`NoDecay`](@ref)
+  - [`separation_decay`](@ref)
   - [`PhylogenyPanel`](@ref)
   - [`separation_matrix`](@ref)
+  - [`Option`](@ref)
 """
 @concrete struct Proximity <: AbstractPhylogenyFeatureAlgorithm
     """
     $(field_dict[:sdecay])
     """
     decay
-    function Proximity(decay::AbstractSeparationDecayAlgorithm)
+    function Proximity(decay::Option{<:AbstractSeparationDecayAlgorithm})
         return new{typeof(decay)}(decay)
     end
 end
-function Proximity(; decay::AbstractSeparationDecayAlgorithm = LinearDecay())::Proximity
+function Proximity(;
+                   decay::Option{<:AbstractSeparationDecayAlgorithm} = LinearDecay())::Proximity
     return Proximity(decay)
 end
 """
@@ -135,7 +137,7 @@ end
 
 Turn a graph source or a partition source into a square `assets × assets` feature matrix.
 
-This is the kernel of [`PhylogenyPanel`](@ref). Every method returns a matrix of element type `float_if_integer(eltype(X))`, which is the element type of the returns, or `Float64` for integer returns. It is never the `Int` or `BitMatrix` that the phylogeny routines give, so [`AngularDist`](@ref) keeps its BLAS `gemm` path, a `Float32` history gives a `Float32` matrix, and a fractional score fits into the matrix of an integer history.
+This is the kernel of [`PhylogenyPanel`](@ref). Every method returns a matrix of element type `eltype(X)`, which is the element type of the returns. It is never the `Int` or `BitMatrix` that the phylogeny routines give, so [`AngularDist`](@ref) keeps its BLAS `gemm` path and a `Float32` history gives a `Float32` matrix.
 
 `pl` is an estimator, a [`NetworkEstimator`](@ref) or a [`ClustersEstimator`](@ref). It is never a precomputed [`PhylogenyResult`](@ref) or [`Clusters`](@ref), because an Estimator does not hold a Result. So each call builds the structure from `X`, and the structure follows a cross-validation fold or the subproblem of a meta-optimiser.
 
@@ -173,11 +175,11 @@ Over a graph source, under [`Proximity`](@ref):
  1. Build the structure from `X` through [`separation_graph`](@ref), giving `g`.
  2. Resolve the separation algorithm against the structure through [`resolve_separation`](@ref), giving `sep`.
  3. Measure the separations through [`separation_matrix`](@ref), giving `d`.
- 4. Read the budget through [`separation_budget`](@ref), and score `d` in the element type `float_if_integer(eltype(X))` through [`_proximity_features`](@ref), giving `Z`.
+ 4. Read the budget through [`separation_budget`](@ref), and score `d` in the element type `eltype(X)` through [`_proximity_features`](@ref), giving `Z`.
 
 Over a partition source, under any algorithm:
 
- 1. Build the co-membership matrix from `X` through [`phylogeny_matrix`](@ref), and convert it to the element type `float_if_integer(eltype(X))`.
+ 1. Build the co-membership matrix from `X` through [`phylogeny_matrix`](@ref), and convert it to the element type `eltype(X)`.
  2. Add the identity, which restores the diagonal that [`phylogeny_matrix`](@ref) subtracts, giving `Z`.
 
 # Arguments
@@ -189,7 +191,7 @@ Over a partition source, under any algorithm:
 
 # Returns
 
-  - `Z::Matrix`: Square `assets × assets` feature matrix of element type `float_if_integer(eltype(X))`.
+  - `Z::Matrix`: Square `assets × assets` feature matrix of element type `eltype(X)`.
 
 # Related
 
@@ -207,7 +209,7 @@ function phylogeny_features end
 # the docstring's caveat -- the resulting distance carries the partition and nothing more.
 function phylogeny_features(::AbstractPhylogenyFeatureAlgorithm,
                             pl::AbstractClustersEstimator, X::MatNum; kwargs...)::Matrix
-    return Matrix{float_if_integer(eltype(X))}(phylogeny_matrix(pl, X; dims = 1, kwargs...).X) +
+    return Matrix{eltype(X)}(phylogeny_matrix(pl, X; dims = 1, kwargs...).X) +
            LinearAlgebra.I
 end
 """
@@ -230,7 +232,7 @@ This is the loop of the [`Proximity`](@ref) method of [`phylogeny_features`](@re
   - `sep`: Separation algorithm that measured `d`, forwarded to [`is_related`](@ref).
   - `d`: Separation matrix from [`separation_matrix`](@ref).
   - `dmax`: Separation budget from [`separation_budget`](@ref).
-  - `et`: Element type of the result. [`phylogeny_features`](@ref) passes `float_if_integer(eltype(X))`, so that [`AngularDist`](@ref) keeps its BLAS `gemm` path.
+  - `et`: Element type of the result. [`phylogeny_features`](@ref) passes `eltype(X)`, so that [`AngularDist`](@ref) keeps its BLAS `gemm` path.
 
 # Returns
 
@@ -273,16 +275,15 @@ function phylogeny_features(alg::Proximity, pl::AbstractNetworkEstimator, X::Mat
     g = separation_graph(pl.sep, pl, X; dims = 1, kwargs...)
     sep = resolve_separation(pl.sep, pl, X, g; dims = 1, kwargs...)
     d = separation_matrix(sep, g)
-    return _proximity_features(alg, sep, d, separation_budget(sep, pl, d),
-                               float_if_integer(eltype(X)))
+    return _proximity_features(alg, sep, d, separation_budget(sep, pl, d), eltype(X))
 end
 """
     panel_axis_labels(names::Nothing, n::Integer) -> Vector{String}
     panel_axis_labels(names::VecStr, n::Integer) -> Vector{String}
 
-Name the trailing axis of a [`TensorPanelField`](@ref) that a producer builds, from the returns data or by position.
+Name the label axis of a [`TensorPanelField`](@ref) that a producer builds, from the returns data or by position.
 
-The field of a producer has a labelled trailing axis, and neither a loadings matrix nor a proximity matrix holds names for that axis. The returns data is the one place that holds them. `rd.nx` names the assets of a proximity field, and `rd.nf` names the factors of a loadings field. When the returns data gives no names, or a wrong number of them, the labels are the positions `"1"` to `"n"`.
+The field of a producer has a labelled label axis, and neither a loadings matrix nor a proximity matrix holds names for that axis. The returns data is the one place that holds them. `rd.nx` names the assets of a proximity field, and `rd.nf` names the factors of a loadings field. When the returns data gives no names, or a wrong number of them, the labels are the positions `"1"` to `"n"`.
 
 The function checks the count. A reduced or re-based `L` has fewer columns than the returns data has factors, and the names of the returns data then belong to other columns.
 
@@ -300,7 +301,7 @@ The method that Julia selects is the algorithm.
 
 # Returns
 
-  - `labels::Vector{String}`: One label per entry of the trailing axis.
+  - `labels::Vector{String}`: One label per entry of the label axis.
 
 # Related
 
@@ -319,7 +320,7 @@ end
     returns_asset_names(rd::Nothing) -> nothing
     returns_asset_names(rd::AbstractReturnsResult) -> Option{<:VecStr}
 
-Read the asset names that label the trailing axis of a producer's field, or `nothing`.
+Read the asset names that label the label axis of a producer's field, or `nothing`.
 
 The kernel hands a producer the two values that it received, `pr` and `rd`. Only `rd` names the assets, so this function reads `rd`, and returns `nothing` when there is none.
 
@@ -403,7 +404,7 @@ Builds an Asset Panel that holds the factor loadings of the wrapped prior.
 
 `L` is `assets × reduced_dimensions`, and [`DimensionReductionRegression`](@ref) sets it. It holds the coordinates of each asset in the reduced space. `M` holds the loadings on every factor, rebuilt from `L`. `pr.rr.L` always has a value, because [`Regression`](@ref) returns `M` when `L` is unset. So this producer needs no branch, and it works behind the time-series and the cross-sectional regression estimators alike.
 
-Both matrices have one row per asset, so the asset axis of the panel is the asset axis of the returns data, with no transpose. The trailing axis holds factors or reduced dimensions, not assets, so a loadings panel is never square in the sense of [`features_are_assets`](@ref).
+Both matrices have one row per asset, so the asset axis of the panel is the asset axis of the returns data, with no transpose. The label axis holds factors or reduced dimensions, not assets, so a loadings panel is never square in the sense of [`features_are_assets`](@ref).
 
 # Validation
 
@@ -435,7 +436,7 @@ Builds an Asset Panel that holds a square proximity matrix, graded from a graph 
 
 In an `assets × assets` proximity matrix, feature `k` of a row reads "is close to asset `k`". So a metric over the rows measures the overlap of two neighbourhoods, which is a standard measure of topological similarity, and it needs almost no new estimation code. `PhylogenyPanel` returns the matrix as one tensor Panel Field, `"proximity"` on the axis `"asset"`.
 
-It is the one producer whose trailing axis is the asset axis, and it needs no flag for that. It refits, so a subproblem gets its own square matrix over its own assets, not a slice of a larger matrix. Where a panel supplied by hand meets a view, [`features_are_assets`](@ref) compares the labels of the field with the asset names of the returns data.
+It is the one producer whose label axis is the asset axis, and it needs no flag for that. It refits, so a subproblem gets its own square matrix over its own assets, not a slice of a larger matrix. Where a panel supplied by hand meets a view, [`features_are_assets`](@ref) compares the labels of the field with the asset names of the returns data.
 
 # Fields
 
@@ -452,19 +453,19 @@ Keywords correspond to the struct's fields.
 
 ## Propagated parameters
 
-When [`factory`](@ref) is called on this type, the following `@fprop`-tagged fields are automatically propagated:
+[`factory`](@ref) passes its arguments on to these `@fprop` fields:
 
-  - `pl`: Recursively updated via [`factory`](@ref).
+  - `pl`: Recursively updated through [`factory`](@ref).
 
 ## View parameters
 
-When [`port_opt_view`](@ref) is called on this type, the following `@vprop`-tagged fields are automatically subset to the selected indices:
+[`port_opt_view`](@ref) takes the view of these `@vprop` fields at the selected indices:
 
-  - `pl`: Recursively viewed via [`port_opt_view`](@ref).
+  - `pl`: Recursively viewed through [`port_opt_view`](@ref).
 
 # Why the diagonal includes self
 
-The diagonal selects between two different algorithms. The table measures a three-node path `1 - 2 - 3` under the default [`AngularDist`](@ref) and the default one-hop budget. The decay is [`NoDecay`](@ref), so the diagonal is the only difference between the two columns.
+The diagonal selects between two different algorithms. The table measures a three-node path `1 - 2 - 3` under the default [`AngularDist`](@ref) and the default one-hop budget. The decay is `nothing`, so the diagonal is the only difference between the two columns.
 
 | pair            | zero diagonal | self included |
 |:--------------- | -------------:| -------------:|
@@ -523,7 +524,8 @@ PhylogenyPanel
       │         │     args ┼ Tuple{}: ()
       │         │   kwargs ┴ @NamedTuple{}: NamedTuple()
       │     sep ┼ HopCount
-      │         │   n ┴ Int64: 1
+      │         │   n ┼ CountOf
+      │         │     │   val ┴ Int64: 1
       │   x_src ┴ nothing
   alg ┼ Proximity
       │   decay ┴ LinearDecay()
@@ -563,7 +565,7 @@ end
 
 Build the static [`AssetPanel`](@ref) of a producer, at the point of use.
 
-Each method returns a panel that holds one [`TensorPanelField`](@ref), because a loadings matrix and a proximity matrix are each one quantity with a labelled third axis. The labels of the trailing axis come from the returns data or from the regression block where a name exists, and are positions otherwise. [`panel_axis_labels`](@ref) and [`regression_factor_names`](@ref) state the rule.
+Each method returns a panel that holds one [`TensorPanelField`](@ref), because a loadings matrix and a proximity matrix are each one quantity with a labelled second axis. The labels of the label axis come from the returns data or from the regression block where a name exists, and are positions otherwise. [`panel_axis_labels`](@ref) and [`regression_factor_names`](@ref) state the rule.
 
 A producer runs on the prior and the returns of its own subproblem, so no view reads the panel that it builds, and a fold refits it. Called on its own, on a prior fitted on a point-in-time Asset Panel, a [`RegressionPanel`](@ref) reads the loadings on the Investable Mask of the prior and answers for the full universe. Outside the mask each asset gets a zero row and a false observed mask, so an optimiser can take the panel back. [`expand_investable_loadings`](@ref) states the rule.
 
@@ -582,7 +584,7 @@ A [`RegressionPanel`](@ref) takes seven steps:
 A [`PhylogenyPanel`](@ref) takes three steps:
 
  1. Grade the structure into an `assets × assets` matrix with [`phylogeny_features`](@ref), giving `Zp`.
- 2. Label the trailing axis with [`panel_axis_labels`](@ref), from [`returns_asset_names`](@ref).
+ 2. Label the label axis with [`panel_axis_labels`](@ref), from [`returns_asset_names`](@ref).
  3. Return the panel that holds `Zp` as the field `"proximity"` on the axis `"asset"`.
 
 # Arguments

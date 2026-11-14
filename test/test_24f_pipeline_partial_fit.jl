@@ -49,7 +49,7 @@ what keeps the JuMP families cheap.
     w, t, p = 60, 20, 3
     batch_cv = IndexWalkForward(w, t; purged_size = p, expand_train = true)
     online_cv = OnlineIndexWalkForward(w, t; purged_size = p)
-    rows(d, i) = po.pipeline_data_view(d, i)
+    rows(d, i) = po.port_opt_view(d, i, :)
     weight_tol(pipe) = isa(pipe.steps[end], po.JuMPOptimisationEstimator) ? 1e-5 : 1e-10
     same_carrier(a, b) = isequal(a.nx, b.nx) &&
                          isequal(a.ts, b.ts) &&
@@ -107,7 +107,7 @@ what keeps the JuMP families cheap.
         end
         # The public door reads a hand-stepped pipeline out and predicts on a window.
         spipe = stepped(prices_pipe, pr, blocks)
-        pred = po.fit_and_predict(spipe, pr; test_idx = 84:100)
+        pred = po.fit_and_predict(spipe, pr, nothing, 84:100)
         @test isapprox(pred.res.w, fit(prices_pipe, rows(pr, 1:80)).w; atol = 1e-5)
         # The state and the Fold Context render only where set.
         @test !occursin("cache", sprint(show, MIME"text/plain"(), prices_pipe))
@@ -190,6 +190,19 @@ what keeps the JuMP families cheap.
                              po.partial_fit!(PriceGapFill(), rows(pr, 71:160)).cache)
         @test isequal(gm.v, po.partial_fit!(PriceGapFill(), pr).cache.v)
         @test gm.te == ts[end]
+        # A copy of a state aliases nothing.
+        gs = po.partial_fit!(PriceGapFill(), pr).cache
+        gc = copy(gs)
+        @test isequal(gc.v, gs.v) && gc.held == gs.held && gc.te == gs.te
+        @test gc.v !== gs.v && gc.held !== gs.held && gc.nx !== gs.nx
+        # The gap counts of a filter add over blocks, and the copy aliases nothing.
+        fa = po.partial_fit!(MissingDataFilter(), rows(pr, 1:70)).cache
+        fb = po.partial_fit!(MissingDataFilter(), rows(pr, 71:160)).cache
+        fm = po.merge_states(fa, fb)
+        @test fm.miss == fa.miss .+ fb.miss && fm.n == fa.n + fb.n == 160
+        @test fm.miss == po.partial_fit!(MissingDataFilter(), pr).cache.miss
+        fc = copy(fm)
+        @test fc.miss == fm.miss && fc.miss !== fm.miss && fc.n == fm.n
         # The two window-valued configurations and a caller's algorithm answer `false`.
         @test !po.supports_partial_fit(PriceGapFill(; fill = MeanValue()))
         @test !po.supports_partial_fit(MissingDataFilter(; row_thr = 0.5))
@@ -370,7 +383,7 @@ what keeps the JuMP families cheap.
             @test isnothing(fold.train)
             train = fit(pipes[1], rows(pr, cvr.train_idx[fold.i])).ctx.returns
             @test same_carrier(fit(fold.est).ctx.returns, train)
-            return po.fit_and_predict(fold.est, fold.rd; test_idx = fold.test)
+            return po.fit_and_predict(fold.est, fold.rd, nothing, fold.test)
         end
         @test seen == 1:n
         # The multiple-randomised form views the data and folds the pipeline afresh per

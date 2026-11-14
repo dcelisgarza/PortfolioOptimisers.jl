@@ -12,4 +12,5 @@ finite_columns
 factor_plot_prior
 investable_plot_view
 attribution_plot_axis
+plots_extension_hint
 ```

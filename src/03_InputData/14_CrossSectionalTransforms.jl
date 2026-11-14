@@ -1150,8 +1150,11 @@ end
     cross_sectional_transform(ct::CrossSectionalStandardiser, X::MatNum; w::Option{<:MatNum} = nothing, groups::Option{<:AbstractMatrix{<:Integer}} = nothing)
     cross_sectional_transform(ct::CrossSectionalGaussianRank, X::MatNum; w::Option{<:MatNum} = nothing, groups::Option{<:AbstractMatrix{<:Integer}} = nothing)
     cross_sectional_transform(ct::CrossSectionalPercentileRank, X::MatNum; w::Option{<:MatNum} = nothing, groups::Option{<:AbstractMatrix{<:Integer}} = nothing)
+    cross_sectional_transform(::Nothing, X::MatNum; w::Option{<:MatNum} = nothing, groups::Option{<:AbstractMatrix{<:Integer}} = nothing)
 
 Transform each observation of a matrix against the other assets of that same observation.
+
+An Exposure Estimator holds its outlier slot and its scoring slot as `Option{<:AbstractCrossSectionalTransform}`, where `nothing` skips the step. The method on `Nothing` returns `X` unchanged, without a check, so a member calls this function on each slot and never writes the two branches.
 
 The benchmark weights and the group labels are arguments and never fields, because one transform runs against a different benchmark and a different classification at every call site, while the transform itself is one configuration.
 
@@ -1170,7 +1173,7 @@ Four rules are shared by every member:
 
 # Arguments
 
-  - `ct`: Cross-sectional transform.
+  - `ct`: Cross-sectional transform, or `nothing` to skip the step.
   - `X::MatNum`: Data matrix `observations × assets`, where a `NaN` marks a missing cell.
   - `w`: Benchmark weight matrix `observations × assets`, or `nothing`.
   - `groups`: Group label matrix `observations × assets`, or `nothing`. [`CS_MISSING_GROUP`](@ref) labels an asset that carries no group.
@@ -1183,7 +1186,7 @@ Four rules are shared by every member:
 
 # Returns
 
-  - `Y::Matrix{<:AbstractFloat}`: Transformed matrix `observations × assets`, carrying a missing marker wherever `X` did.
+  - `Y::Matrix{<:AbstractFloat}`: Transformed matrix `observations × assets`, carrying a missing marker wherever `X` did. `X` itself when `ct` is `nothing`.
 
 # Examples
 
@@ -1311,6 +1314,10 @@ function cross_sectional_transform(ct::CrossSectionalPercentileRank, X::MatNum;
     est = cross_sectional_estimation_mask(fin, w)
     return cross_sectional_percentile_ranks(A, fin, est, groups, ct.min_group_size)
 end
+function cross_sectional_transform(::Nothing, X::MatNum; w::Option{<:MatNum} = nothing,
+                                   groups::Option{<:AbstractMatrix{<:Integer}} = nothing)
+    return X
+end
 """
     cross_sectional_standardise!(Y::AbstractMatrix, A::AbstractMatrix, fin::AbstractMatrix{Bool}, est::AbstractMatrix{Bool}, w::Option{<:MatNum}, groups::Nothing, mgs::Integer, atol::Real) -> nothing
     cross_sectional_standardise!(Y::AbstractMatrix, A::AbstractMatrix, fin::AbstractMatrix{Bool}, est::AbstractMatrix{Bool}, w::Option{<:MatNum}, groups::AbstractMatrix{<:Integer}, mgs::Integer, atol::Real) -> nothing
@@ -1433,10 +1440,11 @@ end
 """
     cross_sectional_groups(B::AbstractArray{<:Real, 3}) -> Matrix{Int}
     cross_sectional_groups(pnl::AssetPanel, name::AbstractString) -> Matrix{Int}
+    cross_sectional_groups(pnl::Option{<:AssetPanel}, name::Nothing) -> Nothing
 
 Derive the group labels of a cross-sectional transform from a one-hot block, or from a categorical Panel Field of an Asset Panel.
 
-Both forms return the `observations × assets` label matrix [`cross_sectional_transform`](@ref) takes, where a label is the position of a level in the level order and [`CS_MISSING_GROUP`](@ref) marks an asset with no level.
+Both forms return the `observations × assets` label matrix [`cross_sectional_transform`](@ref) takes, where a label is the position of a level in the level order and [`CS_MISSING_GROUP`](@ref) marks an asset with no level. No grouping field gives no group labels, `nothing`, as the slot `groups::Option` of [`cross_sectional_transform`](@ref) reads it: each observation is one cross-section.
 
 In the one-hot form, an asset carries a one in the column of the level it belongs to, and an asset whose row sets no level has no group. In the panel form, the codes of a [`CategoricalPanelField`](@ref) are the labels, and two kinds of cell have no group. A cell its fill policy wrote (`omsk` is `false`) has none: the fill resolved a blank so that the Panel Field holds no blank, and a fill value is not a membership, so the read undoes it, as [`OneHotExposure`](@ref) and [`descriptor_field_values`](@ref) do for the same cell. A cell outside the universe (`amsk` is `false`) has none either: the panel keeps a code there, and a group that counted it would count an asset the universe does not hold.
 
@@ -1454,9 +1462,9 @@ Panel form:
 
 # Arguments
 
-  - `B::AbstractArray{<:Real, 3}`: One-hot block `observations × assets × levels`.
+  - `B::AbstractArray{<:Real, 3}`: One-hot block `assets × levels × observations`.
   - `pnl::AssetPanel`: Asset Panel holding the categorical Panel Field.
-  - `name::AbstractString`: Name of the categorical Panel Field to read.
+  - `name`: Name of the categorical Panel Field to read, or `nothing` for no grouping field.
 
 # Validation
 
@@ -1465,21 +1473,16 @@ Panel form:
 
 # Returns
 
-  - `groups::Matrix{Int}`: Group label matrix `observations × assets`. A label is the position of the level in the Panel Field's own level order, and [`CS_MISSING_GROUP`](@ref) marks an asset that sets none, whose level was written by a fill policy, or that is outside the universe.
+  - `groups::Option{<:Matrix{Int}}`: Group label matrix `observations × assets`, or `nothing` when `name` is `nothing`. A label is the position of the level in the Panel Field's own level order, and [`CS_MISSING_GROUP`](@ref) marks an asset that sets none, whose level was written by a fill policy, or that is outside the universe.
 
 # Examples
 
 ```jldoctest
-julia> B = reshape([1.0, 0.0, 0.0, 1.0, 0.0, 0.0], 1, 2, 3)
-1×2×3 Array{Float64, 3}:
+julia> B = reshape([1.0, 0.0, 0.0, 1.0, 0.0, 0.0], 2, 3, 1)
+2×3×1 Array{Float64, 3}:
 [:, :, 1] =
- 1.0  0.0
-
-[:, :, 2] =
- 0.0  1.0
-
-[:, :, 3] =
- 0.0  0.0
+ 1.0  0.0  0.0
+ 0.0  1.0  0.0
 
 julia> cross_sectional_groups(B)
 1×2 Matrix{Int64}:
@@ -1498,16 +1501,19 @@ julia> cross_sectional_groups(B)
   - [`descriptor_field_values`](@ref)
 """
 function cross_sectional_groups(B::AbstractArray{<:Real, 3})::Matrix{Int}
-    G = fill(CS_MISSING_GROUP, size(B, 1), size(B, 2))
-    for t in axes(B, 1), i in axes(B, 2)
-        for l in axes(B, 3)
-            if !iszero(B[t, i, l])
+    G = fill(CS_MISSING_GROUP, size(B, 3), size(B, 1))
+    for t in axes(B, 3), i in axes(B, 1)
+        for l in axes(B, 2)
+            if !iszero(B[i, l, t])
                 G[t, i] = l
                 break
             end
         end
     end
     return G
+end
+function cross_sectional_groups(::Option{<:AssetPanel}, ::Nothing)::Nothing
+    return nothing
 end
 function cross_sectional_groups(pnl::AssetPanel, name::AbstractString)::Matrix{Int}
     f = panel_field(pnl, name)

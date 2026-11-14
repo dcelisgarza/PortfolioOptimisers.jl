@@ -241,14 +241,14 @@ Both slots run before the Descriptors are combined, so a Descriptor measured in 
 
   - [`CompositeExposure`](@ref)
   - [`descriptor`](@ref)
-  - [`exposure_transform`](@ref)
+  - [`cross_sectional_transform`](@ref)
 """
 function composite_score(de::AbstractDescriptorEstimator, rd::ReturnsResult,
                          outlier::Option{<:AbstractCrossSectionalTransform},
                          scoring::Option{<:AbstractCrossSectionalTransform}, w::MatNum,
                          groups::Option{<:AbstractMatrix{<:Integer}})::MatNum
-    S = exposure_transform(outlier, descriptor(de, rd), w, groups)
-    return exposure_transform(scoring, S, w, groups)
+    S = cross_sectional_transform(outlier, descriptor(de, rd); w = w, groups = groups)
+    return cross_sectional_transform(scoring, S; w = w, groups = groups)
 end
 """
     composite_accumulate!(num::AbstractMatrix{<:Real}, den::AbstractMatrix{<:Real},
@@ -383,7 +383,7 @@ julia> factor_exposure(xe, rd)
 function factor_exposure(xe::CompositeExposure, rd::ReturnsResult;
                          strict::Bool = false)::Matrix{<:Real}
     w = exposure_benchmark_weights(rd, xe.bw; strict = strict)
-    groups = exposure_group_labels(rd, xe.group)
+    groups = cross_sectional_groups(rd.pnl, xe.group)
     des = xe.descriptors
     wv = composite_weights(xe.weights, length(des))
     S = composite_score(des[1], rd, xe.outlier, xe.scoring, w, groups)
@@ -397,7 +397,11 @@ function factor_exposure(xe::CompositeExposure, rd::ReturnsResult;
                                               groups), wv[k])
     end
     composite_finalise!(num, den, xe.min_coverage)
-    return length(des) > 1 ? exposure_transform(xe.scoring, num, w, groups) : num
+    return if length(des) > 1
+        cross_sectional_transform(xe.scoring, num; w = w, groups = groups)
+    else
+        num
+    end
 end
 function lookback(xe::CompositeExposure)::Option{<:Integer}
     return lookback(xe.descriptors)
@@ -407,8 +411,8 @@ function carry_lookback(xe::CompositeExposure)::Option{<:Integer}
 end
 function descriptor_carry(xe::CompositeExposure, rd::ReturnsResult, m::Integer)
     cs = map(de -> descriptor_carry(de, rd, m), xe.descriptors)
-    return (; xf = Accessors.@set(xe.descriptors = map(c -> c.xf, cs)),
-            xv = Accessors.@set(xe.descriptors = map(c -> c.xv, cs)))
+    return CarriedEstimators(rebuild_struct(xe, (; descriptors = map(c -> c.xf, cs))),
+                             rebuild_struct(xe, (; descriptors = map(c -> c.xv, cs))))
 end
 
 export CompositeExposure

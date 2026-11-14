@@ -409,3 +409,86 @@ reads them in the same call. It registers no bundle, so the asset bits stay the 
 takes its bounds from the asset weight bounds through `w1 = Bᵀw`, and the builder refuses asset
 bounds that are not finite. Verified in `test_19_factor_risk_contribution.jl`, "An integer factor
 phylogeny gates the factor weights".
+
+## Amendment 6 (2026-11-12)
+
+The bundle is `ResolvedJuMPOptimiser`, which `resolve_jump_optimiser` makes, and it holds the
+constraints in a `ResolvedConstraintBlock` in `cbr` (ADR 0237, #2042). The middle reads the
+resolved constraints, the settings `card`, `scard`, `ss`, `xbgt` and `ccnt`, and the norm ceilings
+and the penalties from `cbr`. The norm ceilings and the penalties resolve their Calibration Rules
+at stage 2 of the block, `resolve_constraint_block`, and not in the middle, so the middle resolves
+nothing. Stage 2 also checks the range of the four numbers that reach the model raw, and the four
+builders no longer check it. The middle still reads `tr` and `sca` from `opt`, because the head
+binds its tracking errors to its rows. The order of the builders does not change.
+
+## Amendment 7 (2026-11-12)
+
+The middle runs once for each block (ADR 0237, #2044). One builder adds a `ResolvedConstraintBlock`
+to a model in two phases, and every programme that holds a block calls it: a JuMP head in
+`assemble_jump_model!`, and a `ProgrammeAllocationSet` in its projection and in the model of a
+leader. `assemble_allocation_set!`, the copy of the middle for the set, is gone.
+
+1. **Phase 1, `set_block_constraints!`**, adds the rows before the risk step of the owner: the
+   weight bounds and the short and gross budgets of the block, the linear and centrality rows, the
+   MIP and sub-group MIP kinds, the turnover ceilings, the tracking errors, the norm ceilings and
+   the penalties.
+2. **The owner's steps** follow: the fees, the risk measures, the return terms and
+   `mark_risk_minimised!`. The risk measures read the phylogeny of the owner's first block.
+3. **Phase 2, `set_block_post_risk_constraints!`**, adds the integer and the semidefinite
+   phylogeny rows and the custom constraints. The semidefinite rows read the marks of the
+   objective of the owner.
+
+**Decision 3 changes.** The middle now adds the weight bounds and the budgets, because the bounds
+are a slot of the block and a second block must add its own. A head builds its weights and stops
+there. The block builder takes the net budget of the owner of the block, for the long-short and
+gross budgets, and the block of a set takes `nothing`. A head whose formulation is long-only
+(`RiskBudgeting` with a logarithm on the weights, `RelaxedRiskBudgeting` on the assets) checks its
+bounds with `assert_long_only_weight_bounds` where it builds its weights. Decision 6 changes with
+it: the unconstrained `NearOptimalCentering` adds the bounds and the budgets of its block in its
+own middle, and no other row of the block.
+
+**The namespaces.** The first block takes the empty prefix and the names of today. A block after
+the first takes a Model State namespace, and phase 1 registers the weights of the model under it
+with `w_owner = Symbol("")`. Every builder of the block, the bounds and the budgets among them,
+registers its entries under the prefix, so a kind on two blocks gives two sets of rows. The MIP
+bits, the long and short parts of the weights, the pin of `xbgt` and the lifted matrix belong to
+the weights, and the blocks share them. When a long-only block comes first, a later block that
+states a short or a gross budget makes long and short parts of its own under its prefix. Every row
+stays registered in the model, so that a reader of the model can find it.
+
+**The bounds builder of a set.** The risk ceilings `r` and the return floor `ret` of a
+`ProgrammeAllocationSet` are fields of the set, not slots of its block. `set_allocation_risk_return_bounds!`
+adds them between the two phases of the set's block. A ceiling clears its `rke`, and the floor now
+clears its `rte`, so neither joins the risk or the return expression of the objective of the owner.
+
+The heads add the block of the owner alone. The heads that add every block of a list come in #2045.
+Verified in `test/test_67b_constrained_update.jl`, "One builder adds two blocks to one model
+(#2044)", and by the head tests, whose reference values do not move.
+
+## Amendment 8 (2026-11-13)
+
+Every JuMP head adds every block that its entry gets (ADR 0237, #2045). `MeanRisk`,
+`RiskBudgeting`, `RelaxedRiskBudgeting`, `FactorRiskContribution` and both `NearOptimalCentering`
+heads take the keyword `blocks` of `_optimise` by name, and give it to `resolve_jump_optimiser` and
+to `assemble_jump_model!`. The fallback chain of `optimise` passes the keyword to each member, so a
+fallback solves on the same blocks.
+
+The middle of a head with more than one block runs in this order:
+
+1. Phase 1 of the block of the head, with the net budget, the fees and the tracking errors of the
+   head. Then phase 1 of each later block, with no net budget and no fees, and the set as the
+   owner.
+2. The fees, the risk measures, the return terms and `mark_risk_minimised!` of the head.
+3. The bounds builder `set_allocation_risk_return_bounds!` of each set, after the marks.
+4. Phase 2 of the block of the head, then phase 2 of each later block. A later block then adds
+   its custom objective terms with the `obj` of the assembly, the set and its block Result. The
+   objective builder of the head adds the terms of the block of the head alone.
+
+Block `i` after the first takes the prefix `blk_i_` (`later_constraint_blocks`). The set that owns
+it is viewed at the Investable Mask of the bundle. The frontier model of a `MaximumRatio` under a
+`Frontier` adds the same blocks. **Decision 6 changes again**: the unconstrained
+`NearOptimalCentering` adds the bounds and the budgets of every block, and no other row of a
+block. Its barrier keeps a term for the bounds of the head alone.
+
+Verified in `test/test_67b_constrained_update.jl`, "Every JuMP head adds every block that it gets
+(#2045)". A head with one block builds the model of Amendment 7.

@@ -1,5 +1,5 @@
 ```@meta
-Description = "Errors, public API of PortfolioOptimisers.jl: IsNothingError, IsEmptyError, IsNonFiniteError, PropertyPathError, ConflictingArgumentError, …"
+Description = "Errors, public API of PortfolioOptimisers.jl: IsNothingError, IsEmptyError, IsNonFiniteError, IsZeroError, PropertyPathError, ConflictingArgumentError, …"
 ```
 
 # Errors
@@ -12,10 +12,12 @@ When a check fails, the library throws one of the error types below. The type na
 IsNothingError
 IsEmptyError
 IsNonFiniteError
+IsZeroError
 PropertyPathError
 ConflictingArgumentError
 ObservationWeightsError
 NonPositiveWealthError
 PosdefRepairError
+DistanceReaderRefusalError
 Base.showerror(io::IO, err::PortfolioOptimisersError)
 ```

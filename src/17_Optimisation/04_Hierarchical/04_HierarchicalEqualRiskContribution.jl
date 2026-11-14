@@ -12,15 +12,14 @@ The constructor's substitution check and [`time_dependent_field_defaults`](@ref)
   - [`assert_time_dependent_substitution`](@ref)
 """
 function herc_td_defaults()::NamedTuple
-    return (; ri = Variance(), ro = Variance(), scai = SumScalariser(),
-            scao = SumScalariser())
+    return (; ri = Variance(), ro = Variance(), scai = nothing, scao = nothing)
 end
 """
 $(DocStringExtensions.TYPEDEF)
 
 Splits weight down the dendrogram between clusters by their outer risk `ro`, then splits each cluster's share between its assets by their inner risk `ri`.
 
-This is the Hierarchical Equal Risk Contribution algorithm. It differs from [`HierarchicalRiskParity`](@ref) in two ways. It stops at the optimal number of clusters, not at the individual assets, and it splits at the branches of the dendrogram, not at the halves of a leaf order. The name is the source's. The portfolio is not a risk parity portfolio, and the clusters do not contribute equally to risk. It solves no optimisation problem, so it accepts a risk measure that is not convex. The weight finaliser of `opt` acts on the result, and [`_optimise`](@ref) states the steps.
+This is the Hierarchical Equal Risk Contribution algorithm of Section 1 of [raffinot2018](@cite). It differs from [`HierarchicalRiskParity`](@ref) in two ways. It stops at the optimal number of clusters, not at the individual assets, and it splits at the branches of the dendrogram, not at the halves of a leaf order. The dendrogram split follows the hierarchical clustering based allocation of [raffinot2017](@cite), which [raffinot2018](@cite) reviews in the same section. The name is the source's. The portfolio is not a risk parity portfolio, and the clusters do not contribute equally to risk. It solves no optimisation problem, so it accepts a risk measure that is not convex. The weight finaliser of `opt` acts on the result, and [`_optimise`](@ref) states the steps.
 
 # Mathematical definition
 
@@ -51,6 +50,8 @@ Where:
   - ``v_i``: Share of asset ``i`` in the weight of its cluster.
   - $(math_dict[:w_i_asset])
 
+The split factor ``\\alpha_n`` is Step 2.4 of Section 12.2.2 of [cajas2025](@cite), where the risk of a branch is the sum of the risks of its clusters. The branch with the lower risk receives more weight. Step 3 of [raffinot2018](@cite) prints the factor of the first branch as ``\\mathcal{RC}_1 / (\\mathcal{RC}_1 + \\mathcal{RC}_2)``, which gives the first branch more weight when its risk is higher. This type does not follow that print. The shares ``v_i`` are the naive risk parity weights of Step 4 of [raffinot2018](@cite).
+
 When `ri` is a vector, [`herc_intra_cluster_weights`](@ref) states the shares ``v_i`` that the scalariser `scai` makes. When `ro` is a vector, [`herc_cluster_risk`](@ref) states the risk ``\\tilde{\\rho}_o(C_k)`` that the scalariser `scao` makes.
 
 The weights of the two branches of a node sum to the weight of the node, and the shares inside a cluster sum to one, so ``\\sum_k W(C_k) = 1`` and ``\\sum_i w_i = 1``. When ``K = 2`` the one split gives each cluster a weight in inverse proportion to its risk. When ``K > 2`` a cluster's weight is a product of split factors, and it is in general not the weight of a flat inverse-risk allocation over the ``K`` clusters. The weights depend on the merge tree and on the cut. They do not depend on the order of the leaves.
@@ -65,8 +66,8 @@ $(DocStringExtensions.FIELDS)
         opt::HierarchicalOptimiser = HierarchicalOptimiser(),
         ri::TD{<:OptRM_VecOptRM} = Variance(),
         ro::TD{<:OptRM_VecOptRM} = ri,
-        scai::TD{<:Scalariser} = SumScalariser(),
-        scao::TD{<:Scalariser} = scai,
+        scai::TD_Option{<:Scalariser} = nothing,
+        scao::TD_Option{<:Scalariser} = scai,
         ex::FLoops.Transducers.Executor = FLoops.ThreadedEx(),
         fb::TDO_Option{<:OptE_Opt} = nothing
     ) -> HierarchicalEqualRiskContribution
@@ -84,12 +85,12 @@ Keywords correspond to the struct's fields. Fields typed [`TD`](@ref) or [`TDO_O
 
 ## Propagated parameters
 
-When [`factory`](@ref) is called on this type, the following `@fprop`-tagged fields are automatically propagated:
+[`factory`](@ref) passes its arguments on to these `@fprop` fields:
 
-  - `opt`: Recursively updated via [`factory`](@ref).
-  - `ri`: Recursively updated via [`factory`](@ref).
-  - `ro`: Recursively updated via [`factory`](@ref).
-  - `fb`: Recursively updated via [`factory`](@ref).
+  - `opt`: Recursively updated through [`factory`](@ref).
+  - `ri`: Recursively updated through [`factory`](@ref).
+  - `ro`: Recursively updated through [`factory`](@ref).
+  - `fb`: Recursively updated through [`factory`](@ref).
 
 ## View parameters
 
@@ -196,8 +197,8 @@ HierarchicalEqualRiskContribution
        │    mtx_sqrt ┼ EigenFallbackSquareRoot()
        │   ratio_alg ┼ SquareRootRatio()
        │      corner ┴ nothing
-  scai ┼ SumScalariser()
-  scao ┼ SumScalariser()
+  scai ┼ nothing
+  scao ┼ nothing
     ex ┼ Transducers.ThreadedEx{@NamedTuple{}}: Transducers.ThreadedEx()
     fb ┴ nothing
 ```
@@ -218,8 +219,8 @@ HierarchicalEqualRiskContribution
 # References
 
   - $(ref_dict[:raffinot2017])
-  - $(ref_dict[:raffinot2018])
-  - $(ref_dict[:cajas2025]) Section 12.2.
+  - $(ref_dict[:raffinot2018]) Section 1, Steps 1 to 4.
+  - $(ref_dict[:cajas2025]) Section 12.2.2, Steps 2.1 to 3.
 """
 @propagatable @concrete struct HierarchicalEqualRiskContribution <:
                                ClusteringOptimisationEstimator
@@ -254,8 +255,8 @@ HierarchicalEqualRiskContribution
     function HierarchicalEqualRiskContribution(opt::HierarchicalOptimiser,
                                                ri::TD{<:OptRM_VecOptRM},
                                                ro::TD{<:OptRM_VecOptRM},
-                                               scai::TD{<:Scalariser},
-                                               scao::TD{<:Scalariser},
+                                               scai::TD_Option{<:Scalariser},
+                                               scao::TD_Option{<:Scalariser},
                                                ex::FLoops.Transducers.Executor,
                                                fb::TDO_Option{<:OptE_Opt})
         assert_no_nearest_bind_optimiser_schedule(fb, :fb,
@@ -285,8 +286,8 @@ function HierarchicalEqualRiskContribution(;
                                            opt::HierarchicalOptimiser = HierarchicalOptimiser(),
                                            ri::TD{<:OptRM_VecOptRM} = Variance(),
                                            ro::TD{<:OptRM_VecOptRM} = ri,
-                                           scai::TD{<:Scalariser} = SumScalariser(),
-                                           scao::TD{<:Scalariser} = scai,
+                                           scai::TD_Option{<:Scalariser} = nothing,
+                                           scao::TD_Option{<:Scalariser} = scai,
                                            ex::FLoops.Transducers.Executor = FLoops.ThreadedEx(),
                                            fb::TDO_Option{<:OptE_Opt} = nothing)::HierarchicalEqualRiskContribution
     return HierarchicalEqualRiskContribution(opt, ri, ro, scai, scao, ex, fb)
@@ -354,7 +355,7 @@ The optimiser calls it after [`investable_reduction`](@ref), so the benchmark ha
  1. Bind the inner measures `hec.ri` to `rd` with [`bind_data_benchmark`](@ref), giving `ri`.
  2. Bind the outer measures `hec.ro` the same way, giving `ro`.
  3. Return `hec` itself when `ri === hec.ri` and `ro === hec.ro`.
- 4. Otherwise rebuild `hec` with `ri` and `ro` through its keyword constructor, with [`rebuild_estimator`](@ref).
+ 4. Otherwise rebuild `hec` with `ri` and `ro` through its keyword constructor, with [`rebuild_struct`](@ref).
 
 # Related
 
@@ -368,11 +369,11 @@ function bind_data_benchmark(hec::HierarchicalEqualRiskContribution, rd::Returns
     return if ri === hec.ri && ro === hec.ro
         hec
     else
-        rebuild_estimator(hec, (; ri = ri, ro = ro))
+        rebuild_struct(hec, (; ri = ri, ro = ro))
     end
 end
 function non_investable_universe(hec::HierarchicalEqualRiskContribution, ni::VecStr)
-    return rebuild_estimator(hec, (; opt = non_investable_universe(hec.opt, ni)))
+    return rebuild_struct(hec, (; opt = non_investable_universe(hec.opt, ni)))
 end
 """
     herc_unitary_risks(r::OptimisationRiskMeasure, X::MatNum, fees::Option{<:Fees}) -> VecNum
@@ -406,9 +407,9 @@ function herc_unitary_risks(rs::VecOptRM, X::MatNum, fees::Option{<:Fees})
     return [unitary_expected_risks(r, X, fees) for r in rs]
 end
 """
-    herc_intra_cluster_weights(sca::Scalariser, r::OptimisationRiskMeasure, rku::VecNum,
+    herc_intra_cluster_weights(sca::Option{<:Scalariser}, r::OptimisationRiskMeasure, rku::VecNum,
                                cl::VecInt) -> VecNum
-    herc_intra_cluster_weights(sca::Scalariser, rs::VecOptRM, rkus::VecVecNum,
+    herc_intra_cluster_weights(sca::Option{<:Scalariser}, rs::VecOptRM, rkus::VecVecNum,
                                cl::VecInt) -> VecNum
 
 Return the shares that divide the weight of cluster `cl` between its assets.
@@ -441,7 +442,7 @@ Where:
   - ``u_i``: The combined weight of asset ``i`` before the normalisation.
   - ``v_i``: Share of asset ``i`` in the weight of ``C``.
 
-The four cases are [`SumScalariser`](@ref), [`MaxScalariser`](@ref), [`MinScalariser`](@ref) and [`LogSumExpScalariser`](@ref). Under a sum, ``\\boldsymbol{v}`` is the average of the ``\\boldsymbol{v}^{(k)}`` weighted by ``s_k``. A maximum or a minimum selects one measure by its total scaled unitary risk over ``C``, and ``\\boldsymbol{v}`` is that measure's ``\\boldsymbol{v}^{(k)}``. The shares sum to one under every scalariser, so the cluster keeps the weight that the split factors give it.
+The four cases are [`SumScalariser`](@ref), [`MaxScalariser`](@ref), [`MinScalariser`](@ref) and [`LogSumExpScalariser`](@ref). `nothing` takes the sum. Under a sum, ``\\boldsymbol{v}`` is the average of the ``\\boldsymbol{v}^{(k)}`` weighted by ``s_k``. A maximum or a minimum selects one measure by its total scaled unitary risk over ``C``, and ``\\boldsymbol{v}`` is that measure's ``\\boldsymbol{v}^{(k)}``. The shares sum to one under every scalariser, so the cluster keeps the weight that the split factors give it.
 
 # Arguments
 
@@ -461,12 +462,12 @@ The four cases are [`SumScalariser`](@ref), [`MaxScalariser`](@ref), [`MinScalar
   - [`herc_unitary_risks`](@ref)
   - [`scalarise`](@ref)
 """
-function herc_intra_cluster_weights(::Scalariser, ::OptimisationRiskMeasure, rku::VecNum,
-                                    cl::VecInt)
+function herc_intra_cluster_weights(::Option{<:Scalariser}, ::OptimisationRiskMeasure,
+                                    rku::VecNum, cl::VecInt)
     v = inv.(view(rku, cl))
     return v ./= sum(v)
 end
-function herc_intra_cluster_weights(sca::Union{SumScalariser, LogSumExpScalariser},
+function herc_intra_cluster_weights(sca::Union{Nothing, SumScalariser, LogSumExpScalariser},
                                     rs::VecOptRM, rkus::VecVecNum, cl::VecInt)
     u = scalarise(sca, pairs(rs)) do (k, r)
         return r.settings.scale * herc_intra_cluster_weights(sca, r, rkus[k], cl)
@@ -481,9 +482,9 @@ function herc_intra_cluster_weights(sca::Union{MaxScalariser, MinScalariser}, rs
     return herc_intra_cluster_weights(sca, rs[k], rkus[k], cl)
 end
 """
-    herc_cluster_risk(sca::Scalariser, r::OptimisationRiskMeasure, rku::VecNum,
+    herc_cluster_risk(sca::Option{<:Scalariser}, r::OptimisationRiskMeasure, rku::VecNum,
                       cl::VecInt, X::MatNum, fees::Option{<:Fees}) -> Number
-    herc_cluster_risk(sca::Scalariser, rs::VecOptRM, rkus::VecVecNum, cl::VecInt,
+    herc_cluster_risk(sca::Option{<:Scalariser}, rs::VecOptRM, rkus::VecVecNum, cl::VecInt,
                       X::MatNum, fees::Option{<:Fees}) -> Number
 
 Return the risk of the naive risk parity sub-portfolio of cluster `cl`, the risk from which HERC forms its split factors.
@@ -538,14 +539,14 @@ The risk of one measure carries no scale. Every cluster would carry the same sca
   - [`herc_unitary_risks`](@ref)
   - [`scalarise`](@ref)
 """
-function herc_cluster_risk(sca::Scalariser, r::OptimisationRiskMeasure, rku::VecNum,
-                           cl::VecInt, X::MatNum, fees::Option{<:Fees})
-    w = zeros(float_if_integer(eltype(X)), size(X, 2))
+function herc_cluster_risk(sca::Option{<:Scalariser}, r::OptimisationRiskMeasure,
+                           rku::VecNum, cl::VecInt, X::MatNum, fees::Option{<:Fees})
+    w = zeros(eltype(X), size(X, 2))
     w[cl] = herc_intra_cluster_weights(sca, r, rku, cl)
     return expected_risk(r, w, X, fees)
 end
-function herc_cluster_risk(sca::Scalariser, rs::VecOptRM, rkus::VecVecNum, cl::VecInt,
-                           X::MatNum, fees::Option{<:Fees})
+function herc_cluster_risk(sca::Option{<:Scalariser}, rs::VecOptRM, rkus::VecVecNum,
+                           cl::VecInt, X::MatNum, fees::Option{<:Fees})
     return scalarise(sca, pairs(rs)) do (k, r)
         return r.settings.scale * herc_cluster_risk(sca, r, rkus[k], cl, X, fees)
     end
@@ -588,9 +589,9 @@ function herc_risk(hec::HierarchicalEqualRiskContribution, pr::AbstractPriorResu
     riku = herc_unitary_risks(ri, X, fees)
     ro = hec.ri === hec.ro ? ri : factory(hec.ro, pr, hec.opt.slv)
     roku = hec.ri === hec.ro ? riku : herc_unitary_risks(ro, X, fees)
-    # A weight is a quotient of two risks, so an integer sample takes a float weight type,
-    # and every other sample keeps its own type.
-    T = float_if_integer(eltype(X))
+    # A weight is a quotient of two risks, so it takes the type of the returns. A `Float32`
+    # sample stays in `Float32`.
+    T = eltype(X)
     w = Vector{T}(undef, size(X, 2))
     rkcl = Vector{T}(undef, length(cls))
     FLoops.@floop hec.ex for (i, cl) in pairs(cls)
@@ -629,7 +630,7 @@ Run the Hierarchical Equal Risk Contribution optimisation.
 """
 function _optimise(hec::HierarchicalEqualRiskContribution,
                    rd::ReturnsResult = ReturnsResult(); branchorder::Symbol = :optimal,
-                   kwargs...)
+                   rmsk::Option{BitVector} = nothing, kwargs...)
     hec = reset_time_dependent_estimator(hec)
     pr = prior(hec.opt.pe, rd)
     # Resolve the fee on the caller's universe before `investable_reduction` narrows `sets`.
@@ -637,14 +638,14 @@ function _optimise(hec::HierarchicalEqualRiskContribution,
     # asset. A liquidation charge keyed by name cannot resolve at all once its `w` sits on
     # the complement while `sets` sits on the mask. `investable_fees_view` then places the
     # resolved fee on the axes the mask leaves.
-    # A weight is a quotient of two risks, so an integer sample takes a float weight type,
-    # and every other sample keeps its own type.
-    T = float_if_integer(eltype(pr.X))
+    # A weight is a quotient of two risks, so it takes the type of the returns. A `Float32`
+    # sample stays in `Float32`.
+    T = eltype(pr.X)
     # An asset that a `FeatureDistance` of the clustering cannot read in the window of its
     # Asset Panel departs with the non-investable assets (`feature_readable_mask`). So does
     # an asset with a gap in the rows that a plain graph reader reads (`graph_reader_mask`).
-    imsk = feature_readable_mask(hec.opt.cle, investable_mask(pr), rd)
-    imsk = graph_reader_mask(hec.opt.cle, imsk, pr, rd, hec.opt.strict)
+    # A fit again after a refusal of the distance reader passes its mask as `rmsk`.
+    imsk = distance_reader_entry_mask(hec.opt.cle, pr, rd, hec.opt.strict; rmsk = rmsk)
     fees = investable_fees_view(fees_constraints(hec.opt.fees, hec.opt.sets;
                                                  strict = hec.opt.strict, datatype = T),
                                 imsk, pr.X)
@@ -657,12 +658,22 @@ function _optimise(hec::HierarchicalEqualRiskContribution,
     # the distance the clustering is built from never sees a `NaN`, and the cluster count
     # is chosen on the investable universe. The weights are expanded back in
     # `HierarchicalResult`.
+    hec0, pr0, rd0 = hec, pr, rd
     _, pr, hec, rd = investable_reduction(imsk, pr, hec, rd)
     hec = bind_data_benchmark(hec, rd)
     X = pr.X
     N = size(X, 2)
-    clr = clusterise(hec.opt.cle, pr; rd = rd, iv = rd.iv, ivpa = rd.ivpa,
-                     branchorder = branchorder)
+    # A distance reader that refuses an asset the prior kept raises before it clusters. Fit
+    # again from the same prior result, without that asset (`distance_reader_refusal_mask`).
+    clr = distance_reader_call(clusterise, hec.opt.cle, pr; rd = rd, iv = rd.iv,
+                               ivpa = rd.ivpa, branchorder = branchorder)
+    if clr isa DistanceReaderRefusalError
+        return _optimise(rebuild_struct(hec0,
+                                        (; opt = rebuild_struct(hec0.opt, (; pe = pr0)))),
+                         rd0; branchorder = branchorder,
+                         rmsk = distance_reader_refusal_mask(clr, imsk, rd0,
+                                                             hec0.opt.strict), kwargs...)
+    end
     assert_clustering_universe(clr, N)
     idx = assignments(clr)
     cls = [findall(x -> x == i, idx) for i in 1:(clr.k)]
@@ -693,8 +704,8 @@ function _optimise(hec::HierarchicalEqualRiskContribution,
         empty!(lc)
         empty!(rc)
     end
-    wb = weight_bounds_constraints(hec.opt.wb, hec.opt.sets; N = N, strict = hec.opt.strict,
-                                   datatype = T)
+    wb = weight_bounds_constraints(hec.opt.wb, hec.opt.sets; rd = rd, N = N,
+                                   strict = hec.opt.strict, datatype = T)
     retcode, w = finalise_weight_bounds(hec.opt.wf, wb, w / sum(w))
     return HierarchicalEqualRiskContributionResult(;
                                                    hr = HierarchicalResult(; pr = pr,

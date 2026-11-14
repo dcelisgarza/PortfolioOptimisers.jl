@@ -13,7 +13,6 @@ AbstractCovarianceEstimator
 AbstractVarianceEstimator
 AbstractExpectedReturnsEstimator
 port_opt_view(ce::StatsBase.CovarianceEstimator, ::Any, args...)
-factory(ce::StatsBase.CovarianceEstimator, args...)
 port_opt_view(me::AbstractExpectedReturnsEstimator, ::Any, args...)
 factory(me::AbstractExpectedReturnsEstimator, args...; kwargs...)
 port_opt_view(alg::AbstractExpectedReturnsAlgorithm, ::Any, args...)

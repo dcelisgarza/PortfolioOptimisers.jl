@@ -270,13 +270,13 @@ $(DocStringExtensions.TYPEDSIGNATURES)
 
 Run one forward pass of an exponentially weighted update over the observations of `X`, and call `f` after each observation.
 
-Each verb of [`ExpWeightedExpectedReturns`](@ref) runs the recursion through this method. `f` receives the index of the observation and the cache after that observation, so a caller can read the mean at every observation in one pass.
+Each verb of [`ExpWeightedExpectedReturns`](@ref) runs the recursion through this method. `f` receives the index of the observation and the cache after that observation, so a caller can read the mean at every observation in one pass. A verb that needs only the last cache passes `Returns(nothing)` as `f`.
 
 # Algorithm
 
  1. Check `dims`, and check that `active_mask` has the size of `X`.
  2. Count the assets `N` along the dimension that is not `dims`.
- 3. If `state` is `nothing`, make a cold state: `mu` is `N` zeros, `obs_count` is `N` zeros, and `active` is `N` values `true`. The element type of `mu` is [`float_if_integer`](@ref) of `eltype(X)`, so an integer `X` gives a float state, a `Float32` `X` gives a `Float32` state, and a `Rational` `X` gives an exact state. Otherwise, check that `state` holds `N` assets, and continue from it.
+ 3. If `state` is `nothing`, make a cold state: `mu` is `N` zeros, `obs_count` is `N` zeros, and `active` is `N` values `true`. The element type of `mu` is `eltype(X)`, so a `Float32` `X` gives a `Float32` state, and a `Rational` `X` gives an exact state. Otherwise, check that `state` holds `N` assets, and continue from it.
  4. For each observation `i` along `dims`, in order, fold the observation and its row of `active_mask` into the cache with [`process_observation!`](@ref). Then call `f(i, cache)`.
  5. Return the cache.
 
@@ -318,10 +318,8 @@ function exp_weighted_pass!(f, est::ExpWeightedExpectedReturns, X::MatNum, dims:
     N = size(X, setdiff((1, 2), (dims,))[1])
 
     cache = if isnothing(state)
-        # A mean holds a fraction, so an integer sample takes a float state, and every
-        # other sample keeps its own type: a `Float32` sample stays `Float32`.
-        ExpWeightedExpectedReturnsState(zeros(float_if_integer(eltype(X)), N),
-                                        zeros(Int, N), trues(N))
+        # The state keeps the type of the sample: a `Float32` sample stays `Float32`.
+        ExpWeightedExpectedReturnsState(zeros(eltype(X), N), zeros(Int, N), trues(N))
     else
         @argcheck(length(state.mu) == N,
                   DimensionMismatch("the state holds $(length(state.mu)) assets, and `X` holds $N"))
@@ -334,35 +332,6 @@ function exp_weighted_pass!(f, est::ExpWeightedExpectedReturns, X::MatNum, dims:
     end
 
     return cache
-end
-"""
-$(DocStringExtensions.TYPEDSIGNATURES)
-
-Run one forward pass of an exponentially weighted update over the observations of `X`, and read no intermediate cache.
-
-It calls the method that takes a callback, with a callback that does nothing. A verb that needs only the last cache calls this method.
-
-# Arguments
-
-  - `est`: Estimator of the exponentially weighted family.
-  - $(arg_dict[:X])
-  - `dims::Int`: Dimension along which the observations run.
-  - `active_mask::Option{<:AbstractMatrix{<:Bool}}`: Optional boolean matrix with the same size as `X`.
-  - `state`: Optional state to continue from. A `nothing` starts from the cold state.
-
-# Returns
-
-  - `cache`: The cache after the last observation.
-
-# Related
-
-  - [`ExpWeightedExpectedReturns`](@ref)
-  - [`exp_weighted_moment`](@ref)
-"""
-function exp_weighted_pass!(est::ExpWeightedExpectedReturns, X::MatNum, dims::Int,
-                            active_mask::Option{<:AbstractMatrix{<:Bool}},
-                            state::Option{<:ExpWeightedExpectedReturnsState} = nothing)
-    return exp_weighted_pass!((args...) -> nothing, est, X, dims, active_mask, state)
 end
 """
 $(DocStringExtensions.TYPEDSIGNATURES)
@@ -460,8 +429,13 @@ julia> length(mean(me, X))
 """
 function Statistics.mean(me::ExpWeightedExpectedReturns, X::MatNum; dims::Int = 1,
                          active_mask::Option{<:AbstractMatrix{<:Bool}} = nothing, kwargs...)
-    cache = exp_weighted_pass!(me, X, dims, active_mask)
+    cache = exp_weighted_pass!(Returns(nothing), me, X, dims, active_mask)
     return exp_weighted_moment(cache, me)
+end
+# The weights of the mean are proportional to `decay^k` over the rows, so the count is their
+# Kish count, the closed form of `exp_weighted_kish_count`.
+function effective_observation_count(me::ExpWeightedExpectedReturns, X::MatNum; kwargs...)
+    return exp_weighted_kish_count(me.decay, size(X, 1))
 end
 """
     Statistics.mean(
@@ -541,9 +515,8 @@ function partial_fit!(me::ExpWeightedExpectedReturns{<:Any, <:Any,
                                                      <:Option{<:ExpWeightedExpectedReturnsState}},
                       X::MatNum; dims::Int = 1,
                       active_mask::Option{<:AbstractMatrix{<:Bool}} = nothing, kwargs...)
-    cache = exp_weighted_pass!(me, X, dims, active_mask, me.cache)
-    Accessors.@reset me.cache = cache
-    return me
+    cache = exp_weighted_pass!(Returns(nothing), me, X, dims, active_mask, me.cache)
+    return cache === me.cache ? me : rebuild_struct(me, (; cache = cache))
 end
 """
     partial_fit!(

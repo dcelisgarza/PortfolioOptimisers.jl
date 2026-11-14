@@ -156,3 +156,78 @@ and an `ExpertMixture` over `FollowTheLeader` experts apply both rulings per exp
   [#1162](https://github.com/dcelisgarza/PortfolioOptimisers.jl/issues/1162), writes its set
   builders so that they take a model and add to it, since the adapter calls them on a model it did
   not build.
+
+## Amendment (2026-11-12): the budget has one home, and the constructor refuses a held budget that excludes one
+
+The Decision states that "both homes hold", and that a bound in both places is a redundant row,
+not a clash. That holds for every constraint kind except the budget. ADR 0159 gives the budget to
+the head: `Σw = 1` holds on every set, and cash is a column. The adapter writes that budget into
+the leader's model as the row `Σw = k`. So a net budget on `opt` meets it in one model. The
+reproduction of issue #2034 measured the result: a held `bgt = 0.5` gives an infeasible leader at
+steps 2 to 40, each a Held Step, under a programme set and under the default bounded set.
+
+`FollowTheLeader` now refuses at construction every held budget that excludes one, because the
+configuration alone decides the result (`assert_leader_budget`):
+
+- `bgt` must be `nothing`, one, or a `BudgetRange` that holds one. A range that holds one is a
+  redundant row, as any other bound in both homes is.
+- `bgt` must not be a `BudgetCostEstimator`, in any form. Such an estimator charges its cost
+  against the budget, `Σw + c(w) ∈ k · [lb, ub]`. With the head's row this is
+  `c(w) ∈ k · [lb − 1, ub − 1]`, a band on the cost that the wealth recursion never pays. Its
+  reference `w` is the caller's fixed vector, because `factory` does not reach `bgt`. Measured on
+  the reproduction of #2034: `bgt = 1` pins the leader to the reference at every step,
+  `bgt = 0.98` holds every step, and `bgt = 1.002` keeps the leader on an L1 ball of radius 0.2
+  about the reference. None of these is a cost charged against the budget. A cost that the series
+  pays is the head's `fees` (ADR 0160). A cost that the leader weighs is the `fees` of `opt`, which
+  `factory` measures from `ŵ_t`, and a ceiling on the trade is a `Turnover`.
+- `sbgt`, `gbgt` and `wb` of `opt` pass `assert_gross_budget_admissible` with a net budget of one,
+  as a `ProgrammeAllocationSet` checks its own. So a `gbgt` beside a number in `sbgt`
+  over-determines the gross exposure, and a `gbgt` below one leaves no feasible weights, because
+  the gross exposure is at least `|Σw|`.
+- Each entry and the explicit `default` of a `TimeDependent` schedule in these fields meets the
+  same rules.
+
+The same mechanism reached `JuMPOptimiser` and the set: a gross budget below the least magnitude
+of the net budget is infeasible. `assert_gross_budget_admissible` now refuses it for all three
+owners. Part 2 of #2034, the row `Σw = k` that the head keeps in the leader's model when the
+block of map #1213 replaces the adapter, belongs to #2047. Issue #2049 records that a schedule
+inside a held optimiser never resolves at a fold, and #2050 records that `factory` does not reach
+the reference of a cost estimator.
+
+## Amendment (2026-11-13): the set enters the re-solve as a second block, not on `ccnt`
+
+[ADR 0237](0237-a-constraint-block-holds-the-feasible-set-of-a-programme-and-the-entry-of-a-head-takes-a-list-of-blocks.md)
+gives a programme a list of Constraint Blocks, and the entry of a JuMP head takes the blocks after
+its own as the keyword `blocks`. So the decision to put the set on the `ccnt` of the held
+optimiser goes, and `AllocationSetConstraint` and `append_custom_constraint` leave the library.
+The `ccnt` route had three defects: `ccnt` is the extension point for a constraint that the
+library does not name, the adapter held a `ReturnsResult` in an estimator, and the readers of the
+set ran in the model build, after the head fixed its Investable Mask (#2030).
+
+`leader_allocation` passes `((factory(set, ŵ_t), X),)` as `blocks`, with the rows `X` that the
+head holds (`leader_block`). The block of the set reads the prior of the set on those rows, and
+the block of the held optimiser reads its own prior on the sample. The set is the owner of its
+block, so its rows take the namespace `blk_2_`, and a kind on both the set and the held optimiser
+gives two constraints. A `BoundedAllocationSet` has no block, so the re-solve puts its `wb` and
+`sets` into a `ProgrammeAllocationSet` whose block holds those two slots alone, with the solver of
+the held optimiser. Its block reads no rows and resolves no Calibration Rule, so no reader reads
+the solver.
+
+**The budget of one.** The block of the set carries no budget row (ADR 0237). So the re-solve sets
+the net budget `bgt` of the held optimiser to one (`leader_chain`), and the leader's model holds
+the row `Σw = k` of the owner. The constructor admits only a budget that holds one, so the
+replacement changes no admitted feasible set. Without it, `bgt = nothing` solves away from the
+budget, and the wealth recursion reads weights that do not sum to one (part 2 of #2034).
+
+**The fallback chain.** The Decision says that the fallback chain of the held optimiser runs first,
+and that its answer is the leader. `optimise` passes `blocks` to each member of the chain, so the
+leader of a fallback now honours the set (#2035). `leader_chain` sets the budget of one on each
+JuMP member, and gives each solver-free member the bounds of a bounded set. The constructor of
+`FollowTheLeader` refuses a member that cannot take the set (`assert_leader_chain`): each member
+has the kind of the held estimator, a JuMP estimator under a JuMP estimator and a
+`BestConstantRebalancedPortfolio` under a `BestConstantRebalancedPortfolio`, and no member is a
+precomputed result. A member of another kind ignores the block, and a precomputed result has
+nothing to solve, so either one would answer outside the set.
+
+The rest of the Decision holds: the optimum is the leader with no projection, the damped mix is
+projected once more in the Euclidean geometry, and a failed re-solve is a Held Step.

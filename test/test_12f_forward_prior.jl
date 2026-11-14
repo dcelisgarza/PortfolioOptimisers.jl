@@ -414,27 +414,30 @@ const f_views = LinearConstraintEstimator(; val = ["$(rd.nf[1]) == 0.004"])
     @test isapprox(expected_risk(factory(rm, old), wt, pr.X), r_flat)
 end
 
-@testset "Defect 2: the uncertainty set is sized off ens, not T" begin
+@testset "Defect 2: the uncertainty set is sized off the count of the moments, not T" begin
     pe = BlackLittermanPrior(; pe = ep_asset, sets = sets, views = bl_views)
     pr = prior(pe, rd)
     T = size(rd.X, 1)
 
-    # `choose_scaling_parameter` prefers `pr.ens` and falls back to `size(pr.X, 1)`.
+    # `choose_scaling_parameter` reads the count of the moment in `pr.eoc` and falls back
+    # to `size(pr.X, 1)`. The pooled weights bind it, and it is their Kish count (#1893).
     ue = NormalUncertaintySet(; pe = pe, alg = EllipsoidalUncertaintySetAlgorithm())
-    @test PO.choose_scaling_parameter(ue, pr) == pr.ens
-    @test pr.ens < T
+    T_mu = PO.moment_observation_count(pr, 1)
+    @test PO.choose_scaling_parameter(ue, pr, 1) == T_mu
+    @test T_mu ≈ sum(pr.w)^2 / sum(abs2, pr.w)
+    @test T_mu < T
 
     # The set scales as `1/T`, so pinning `ens = T` recovers exactly the set the
     # pre-fix carrier produced, and the two differ by the factor that was lost.
     pinned = NormalUncertaintySet(; pe = pe, alg = EllipsoidalUncertaintySetAlgorithm(),
                                   ens = float(T))
-    @test isapprox(tr(mu_ucs(ue, rd).sigma) / tr(mu_ucs(pinned, rd).sigma), T / pr.ens)
+    @test isapprox(tr(mu_ucs(ue, rd).sigma) / tr(mu_ucs(pinned, rd).sigma), T / T_mu)
 
-    # The pre-fix carrier: with `ens` dropped, the fallback sized the set off a
+    # The pre-fix carrier: with the counts dropped, the fallback sized the set off a
     # sample count ~2x too large.
     old = LowOrderPrior(; X = pr.X, mu = pr.mu, sigma = pr.sigma)
-    @test isnothing(old.ens)
-    @test PO.choose_scaling_parameter(ue, old) == T
+    @test old.eoc == (nothing, nothing)
+    @test PO.choose_scaling_parameter(ue, old, 1) == T
 end
 
 @testset "Defect 3: the same defect through FactorPrior over a pooled factor prior" begin
@@ -448,22 +451,25 @@ end
     # is the provenance that travels with it.
     @test pr.w == f_pooled.w
     @test pr.ens == f_pooled.ens
+    @test pr.eoc == f_pooled.eoc
     @test pr.kld == f_pooled.kld
-    @test pr.ens < T
+    T_mu = PO.moment_observation_count(pr, 1)
+    @test T_mu < T
 
     ue = NormalUncertaintySet(; pe = pe, alg = EllipsoidalUncertaintySetAlgorithm())
     pinned = NormalUncertaintySet(; pe = pe, alg = EllipsoidalUncertaintySetAlgorithm(),
                                   ens = float(T))
-    @test PO.choose_scaling_parameter(ue, pr) == pr.ens
-    @test isapprox(tr(mu_ucs(ue, rd).sigma) / tr(mu_ucs(pinned, rd).sigma), T / pr.ens)
+    @test PO.choose_scaling_parameter(ue, pr, 1) == T_mu
+    @test isapprox(tr(mu_ucs(ue, rd).sigma) / tr(mu_ucs(pinned, rd).sigma), T / T_mu)
 
     # The pre-fix carrier: `w` present, diagnostics dropped, so every uncertainty
     # set built on a factor prior over a pooled factor prior was silently too small.
     old = LowOrderPrior(; X = pr.X, mu = pr.mu, sigma = pr.sigma, chol = pr.chol, w = pr.w,
                         rr = pr.rr, fpr = pr.fpr)
     @test isnothing(old.ens)
+    @test old.eoc == (nothing, nothing)
     @test isnothing(old.kld)
-    @test PO.choose_scaling_parameter(ue, old) == T
+    @test PO.choose_scaling_parameter(ue, old, 1) == T
 end
 
 @testset "Behaviour change: high order factor moments behind Black-Litterman" begin
@@ -604,6 +610,16 @@ end
                                                sets = xfsets, views = contrary_f_views), rd)
     @test bbl_dn.fpr.sigma != bbl.fpr.sigma
     @test bbl_dn.sigma == bbl.sigma
+    # `mp` processes the asset covariance after the posterior mean is formed, as in the
+    # other three members. So a processing estimator that changes the covariance moves
+    # neither the mean nor the identity. R8 of #1817 found the mean read the processed one.
+    bbl_amp = prior(BayesianBlackLittermanPrior(; pe = FactorPrior(; pe = ep_factor),
+                                                mp = MatrixProcessing(; dn = Denoise()),
+                                                sets = xfsets, views = contrary_f_views),
+                    rd)
+    @test bbl_amp.sigma != bbl.sigma
+    @test bbl_amp.mu == bbl.mu
+    @test identity_gap(bbl_amp) < 1e-12
 
     # `AugmentedBlackLittermanPrior` — both halves are posterior, and the identity
     # still fails, so the warning it carries is about the model rather than about a

@@ -259,8 +259,8 @@ four files inside five thousand words. Three of the six open sweep tickets measu
 named an Authority, and none named `CODING_STANDARDS.md`.
 
 The block is constant text, so it costs the job no judgement, and it is never machine-read. #404
-keeps the rules of this effort alone; every rule of the tree itself lives at one of these four
-files.
+keeps the rules of this effort alone; every rule of the tree itself lives in a file that this
+block names, or in a file that `CODING_STANDARDS.md` routes to.
 """
 const ROUTING = """
 ## Routing
@@ -270,7 +270,9 @@ Read before you start:
 - `CODING_STANDARDS.md` — which file owns the rule you are about to apply, and which check holds it.
 - `.github/instructions/julia-docstrings.instructions.md` — the Authority for a docstring rule.
 - `.github/instructions/julia-source-code.instructions.md` — the Authority for a rule about code
-  under `src/` and `ext/`.
+  under `src/` and `ext/`. Its § *A design is chosen by the standing test* decides between two
+  forms of the code.
+- `src/CLAUDE.md` — the design rules for library code, one line each, with a link to the owner.
 - `GLOSSARY.md` — the domain vocabulary. Use its words, and add a word you introduce.
 
 `CODING_STANDARDS.md` is the map. Open it first when you do not know which file governs the change.
@@ -286,7 +288,7 @@ number_or_dash(x) = x === nothing ? "—" : string(x)
     body_of(candidate, commit) -> String
 
 The sub-issue of ADR 0084. It mirrors the child map that owns it, one file wide: the fixed
-`ROUTING` block, a Destination naming the file and its measured row, the five conditions of #404
+`ROUTING` block, a Destination naming the file and its measured row, the six conditions of #404
 restated compactly (condition 2 names the original source of a formulation and the standard note
 of `.github/instructions/julia-docstrings.instructions.md` § *The original source*), the sentence that the committed files are the authority, and Notes that point
 at #404 without copying a rule.
@@ -313,7 +315,7 @@ function body_of(c::Candidate, commit::AbstractString)
     println(io, "| --- | ---: | ---: | ---: |")
     println(io, "| `", c.path, "` | ", c.units, " | ", number_or_dash(c.misses), " | ",
             number_or_dash(c.lines), " |\n")
-    println(io, "Five conditions, from #", UMBRELLA, ":\n")
+    println(io, "Six conditions, from #", UMBRELLA, ":\n")
     println(io, "1. Its documentation states the mathematics.")
     println(io, "2. Its code agrees with that statement, checked with real numbers. Each ",
             "formulation is checked against its original source, the work that first states ",
@@ -321,7 +323,14 @@ function body_of(c::Candidate, commit::AbstractString)
     println(io, "3. Its lines are covered, or exempted with a reason.")
     println(io, "4. Its prose passes `/unslop`.")
     println(io, "5. Its code carries no performance trap: `code_health/perf.jl scan ",
-            c.path, "` lists no Finding that a Dismissal does not cover.\n")
+            c.path, "` lists no Finding that a Dismissal does not cover.")
+    println(io,
+            "6. Its methods meet the wrapper standard and the rule for a returned named ",
+            "tuple, which `.github/instructions/julia-source-code.instructions.md` owns in ",
+            "§ *A wrapper is for convenience or for a dispatch problem* and § *A function ",
+            "returns a defined type or a plain tuple, not a named tuple*: ",
+            "`code_health/forward_survey.jl ", c.path,
+            "` reports no candidate without a ruling.\n")
     println(io, "Take the numbers from `code_health/sweep_manifest.toml` and ",
             "`code_health/coverage_baseline.toml`, not from this table.\n")
     println(io, "## Notes\n")

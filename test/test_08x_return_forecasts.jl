@@ -99,8 +99,10 @@ end
         spnl = asset_panel([NumericPanelInput(; name = "a", vals = [1.0, 2.0])])
         srd = ReturnsResult(; nx = ["A1", "A2"], X = zeros(2, 2), pnl = spnl)
         @test_throws PO.IsNothingError PO.return_forecast_weights(srd)
-        rdn = ReturnsResult(; nx = ["A1", "A2"], X = zeros(2, 2))
-        @test_throws PO.IsNothingError PO.return_forecast_weights(rdn)
+        # #1882: returns with no panel read as the mask-only panel of their finiteness, so
+        # every asset with a finite return enters the estimate.
+        rdn = ReturnsResult(; nx = ["A1", "A2"], X = [0.0 NaN; 0.0 0.0])
+        @test PO.return_forecast_weights(rdn) == [1.0 0.0; 1.0 1.0]
     end
 end
 
@@ -156,15 +158,15 @@ end
 
     @testset "The third axis is the Descriptor axis, in the written order" begin
         @test size(S) == (2, 2, 2)
-        @test S[:, :, 1] == a
-        @test S[:, :, 2] == b
+        @test permutedims(S[:, 1, :]) == a
+        @test permutedims(S[:, 2, :]) == b
     end
 
     @testset "A block with no factor axis refuses a Neutralisation" begin
         dsn = DescriptorScores(; descriptors = [Passthrough(; field = "a")],
                                neutralise = "style", outlier = nothing, scoring = nothing)
         @test_throws PO.IsNothingError descriptor_scores(dsn, rd, csfm)
-        Ms = reshape([1.0 1.0; 1.0 1.0], 2, 2, 1)
+        Ms = reshape([1.0 1.0; 1.0 1.0], 2, 1, 2)
         @test_throws PO.IsNothingError descriptor_scores(dsn, rd,
                                                          forecast_hand_block(2; Ms = Ms))
         @test_throws PO.IsNothingError descriptor_scores(dsn, rd,
@@ -179,7 +181,7 @@ end
     @testset "A Neutralisation against a factor leaves the residual of that fit" begin
         # The one target is the score itself, so every residual is zero, with or without an
         # intercept.
-        Ms = reshape(Float64.(a), 2, 2, 1)
+        Ms = reshape(permutedims(Float64.(a)), 2, 1, 2)
         blk = forecast_hand_block(2; Ms = Ms, nf = ["style"], fam = ["style"])
         dsn = DescriptorScores(; descriptors = [Passthrough(; field = "a")],
                                neutralise = ["style"], outlier = nothing, scoring = nothing)
@@ -190,7 +192,7 @@ end
     @testset "`cre` decides whether the residual is merely orthogonal or uncorrelated (#950, #1521)" begin
         # A target exposure with a non-zero cross-sectional mean under equal weights, and a
         # score that is not a multiple of it, so the two fits disagree.
-        x = reshape([1.0, 2.0, 6.0], 1, 3, 1)
+        x = reshape([1.0, 2.0, 6.0], 3, 1, 1)
         y = [1.0 3.0 2.0]
         rd3 = forecast_hand_panel(["a" => y])
         blk3 = forecast_hand_block(3; Ms = x, nf = ["style"], fam = ["style"])
@@ -225,8 +227,8 @@ end
             # A market column of ones beside `x`. The column space already holds the
             # constant, so the intercept adds nothing, and the residual is the one of the
             # fit of `y` on `[1 x]`: slope `Sxy / Sxx = 1 / 14` through `(x̄, ȳ) = (3, 2)`.
-            Mm = cat(ones(1, 3, 1), x; dims = 3)
-            blkm = CrossSectionalFactorModel(; M = Mm[end, :, :], b = zeros(3), Ms = Mm,
+            Mm = cat(ones(3, 1, 1), x; dims = 2)
+            blkm = CrossSectionalFactorModel(; M = Mm[:, :, end], b = zeros(3), Ms = Mm,
                                              nf = ["market", "style"],
                                              fam = ["market", "style"])
             nm = ["market", "style"]
@@ -247,7 +249,7 @@ end
                                outlier = nothing,
                                scoring = CrossSectionalStandardiser(; min_group_size = 2),
                                group = "g")
-        @test size(descriptor_scores(dsg, rdg, csfm).S) == (2, 2, 1)
+        @test size(descriptor_scores(dsg, rdg, csfm).S) == (2, 1, 2)
     end
 end
 
@@ -263,9 +265,11 @@ end
     emsk = trues(4, 5)
     emsk[3, 5] = false
     rd = forecast_hand_panel(["a" => a, "b" => b]; emsk = emsk)
-    Ms = zeros(3, 5, 2)
-    Ms[:, :, 1] = [1.0 2.0 3.0 NaN 5.0; 2.0 1.0 4.0 3.0 1.0; 3.0 3.0 1.0 2.0 4.0]
-    Ms[:, :, 2] = [0.5 -1.0 2.0 1.0 0.0; 1.5 0.5 -0.5 2.0 1.0; -1.0 2.0 0.5 1.0 3.0]
+    Ms = zeros(5, 2, 3)
+    Ms[:, 1, :] = permutedims([1.0 2.0 3.0 NaN 5.0; 2.0 1.0 4.0 3.0 1.0;
+                               3.0 3.0 1.0 2.0 4.0])
+    Ms[:, 2, :] = permutedims([0.5 -1.0 2.0 1.0 0.0; 1.5 0.5 -0.5 2.0 1.0;
+                               -1.0 2.0 0.5 1.0 3.0])
     blk = CrossSectionalFactorModel(; M = ones(5, 2), b = zeros(5), Ms = Ms,
                                     nf = ["size", "value"], fam = ["style", "style"])
 
@@ -281,7 +285,7 @@ end
         S = fill(NaN, size(D))
         for t in 2:4
             d = zscore(D[t, :], emsk[t, :])
-            B = Ms[t - 1, :, k]
+            B = Ms[:, k, t - 1]
             X = intercept ? [ones(5) B] : B
             fit = emsk[t, :] .& isfinite.(d) .& vec(all(isfinite, B; dims = 2))
             coef = X[fit, :] \ d[fit]
@@ -305,8 +309,8 @@ end
                                   outlier = nothing)
             res = descriptor_scores(ds, rd, blk)
             @test res.rows == 2:4
-            @test agrees(res.S[:, :, 1], closed_form(a, [2], intercept))
-            @test agrees(res.S[:, :, 2], closed_form(b, [2], intercept))
+            @test agrees(permutedims(res.S[:, 1, :]), closed_form(a, [2], intercept))
+            @test agrees(permutedims(res.S[:, 2, :]), closed_form(b, [2], intercept))
         end
     end
 
@@ -316,7 +320,7 @@ end
                               cre = CrossSectionalLinearRegression(; intercept = true),
                               outlier = nothing)
         R = closed_form(a, [1, 2], true)
-        @test agrees(descriptor_scores(ds, rd, blk).S[:, :, 1], R)
+        @test agrees(permutedims(descriptor_scores(ds, rd, blk).S[:, 1, :]), R)
         # The asset without a `size` exposure has no residual, and the others fit without it.
         @test isnan(R[2, 4]) && count(isfinite, R[2, :]) == 4
     end
@@ -325,7 +329,7 @@ end
         ds = DescriptorScores(; descriptors = [Passthrough(; field = "b")],
                               outlier = nothing)
         S = descriptor_scores(ds, rd, blk).S
-        @test all(isapprox(S[t, :, 1], zscore(b[t, :], emsk[t, :]); rtol = 1e-12)
+        @test all(isapprox(S[:, 1, t], zscore(b[t, :], emsk[t, :]); rtol = 1e-12)
                   for t in 1:4)
     end
 
@@ -345,11 +349,12 @@ end
                                outlier = nothing, scoring = nothing)
         Sm = descriptor_scores(dsm, rdm, blk3).S
         @test eltype(Sm) === BigFloat
-        @test Sm[:, :, 2] == big.(b3)
+        @test permutedims(Sm[:, 2, :]) == big.(b3)
         # A wider exposure history widens the residual under a Neutralisation.
         rdn = panel([NumericPanelInput(; name = "a", vals = a3)])
         x = big.(b3)
-        blkn = forecast_hand_block(3; Ms = reshape(x, 3, 3, 1), nf = ["s"], fam = ["s"])
+        blkn = forecast_hand_block(3; Ms = reshape(permutedims(x), 3, 1, 3), nf = ["s"],
+                                   fam = ["s"])
         dsn = DescriptorScores(; descriptors = [Passthrough(; field = "a")],
                                neutralise = "s", outlier = nothing, scoring = nothing)
         Sn = descriptor_scores(dsn, rdn, blkn).S
@@ -359,13 +364,13 @@ end
         for t in 1:3
             yc = big.(a3[t, :]) .- mean(big.(a3[t, :]))
             xc = x[t, :] .- mean(x[t, :])
-            @test Sn[t, :, 1] ≈ yc - xc * (dot(xc, yc) / dot(xc, xc)) rtol = 1e-60
+            @test Sn[:, 1, t] ≈ yc - xc * (dot(xc, yc) / dot(xc, xc)) rtol = 1e-60
         end
         # A score type without `NaN` cannot mark the rows before a block that starts late.
         ar = Rational{Int}.(round.(Int, a3))
         rdr = panel([NumericPanelInput(; name = "a", vals = ar)])
-        blkr = forecast_hand_block(3; Ms = reshape(ar[2:3, :], 2, 3, 1), nf = ["s"],
-                                   fam = ["s"])
+        blkr = forecast_hand_block(3; Ms = reshape(permutedims(ar[2:3, :]), 3, 1, 2),
+                                   nf = ["s"], fam = ["s"])
         @test_throws ArgumentError descriptor_scores(dsn, rdr, blkr)
     end
 end
@@ -481,7 +486,7 @@ end
         rf = return_forecast(FixedWeightedReturnForecast(; scores = ds1, scale = 1.0), rd,
                              csfm)
         S = descriptor_scores(ds1, rd, csfm).S
-        @test rf.hist ≈ S[:, :, 1]
+        @test rf.hist ≈ permutedims(S[:, 1, :])
     end
 
     @testset "The Sharpe unit converts the whole history" begin
@@ -530,7 +535,7 @@ end
     @testset "A signed weight accumulates its absolute value" begin
         num = zeros(1, 2)
         den = zeros(1, 2)
-        PO.signed_composite_accumulate!(num, den, reshape([1.0, NaN], 1, 2, 1), [-0.5])
+        PO.signed_composite_accumulate!(num, den, reshape([1.0, NaN], 2, 1, 1), [-0.5])
         @test num == [-0.5 0.0]
         @test den == [0.5 0.0]
     end
@@ -560,12 +565,12 @@ end
     # The closed form of the docstring, one cell at a time.
     function closed_form(S, omega, mc)
         w = omega ./ sum(abs, omega)
-        Z = fill(NaN, size(S, 1), size(S, 2))
-        for t in axes(S, 1), i in axes(S, 2)
-            V = [k for k in axes(S, 3) if isfinite(S[t, i, k])]
+        Z = fill(NaN, size(S, 3), size(S, 1))
+        for t in axes(S, 3), i in axes(S, 1)
+            V = [k for k in axes(S, 2) if isfinite(S[i, k, t])]
             W = sum(k -> abs(w[k]), V; init = 0.0)
             if W > 0 && W >= mc
-                Z[t, i] = sum(k -> w[k] * S[t, i, k], V) / W
+                Z[t, i] = sum(k -> w[k] * S[i, k, t], V) / W
             end
         end
         return Z
@@ -574,7 +579,7 @@ end
     @testset "Without a scoring transform the composite is the raw closed form" begin
         ds = DescriptorScores(; descriptors = descriptors, outlier = nothing,
                               scoring = nothing)
-        Z = closed_form(cat(a, b, c; dims = 3), omega, mc)
+        Z = closed_form(permutedims(cat(a, b, c; dims = 3), (2, 3, 1)), omega, mc)
         @test isnan(Z[1, 4]) && isnan(Z[4, 2])
         @test Z[2, 3] ≈ a[2, 3]
         for (unit, g) in ((IdiosyncraticReturnUnit(), ones(T, N)),
@@ -618,7 +623,7 @@ end
         rf = return_forecast(FixedWeightedReturnForecast(; scores = ds, scale = gamma,
                                                          weights = [-2.0]), rd, csfm)
         @test rf.weights == [-1.0]
-        @test isequal(rf.hist, -gamma .* S[:, :, 1])
+        @test isequal(rf.hist, -gamma .* permutedims(S[:, 1, :]))
     end
 
     @testset "The number type comes from the scores, the weights and the scale" begin
@@ -657,17 +662,17 @@ end
                            weights = [0.4, 0.6], min_coverage = 0.5, outlier = ct_out,
                            scoring = ct_sco, group = "industry", bw = "market_cap")
     Lo = factor_exposure(OneHotExposure(; field = "industry", family = "industry"), rd)
-    K = 1 + size(Lo, 3)
-    Ms = Array{Float64, 3}(undef, T, N, K)
-    Ms[:, :, 1] = factor_exposure(xc, rd)
-    for k in 1:size(Lo, 3)
-        Ms[:, :, k + 1] = Lo[:, :, k]
+    K = 1 + size(Lo, 2)
+    Ms = Array{Float64, 3}(undef, N, K, T)
+    Ms[:, 1, :] = permutedims(factor_exposure(xc, rd))
+    for k in 1:size(Lo, 2)
+        Ms[:, k + 1, :] = Lo[:, k, :]
     end
-    nf = ["style"; ["ind$k" for k in 1:size(Lo, 3)]]
-    fam = ["style"; fill("industry", size(Lo, 3))]
+    nf = ["style"; ["ind$k" for k in 1:size(Lo, 2)]]
+    fam = ["style"; fill("industry", size(Lo, 2))]
     vs = [pnl.amsk[t, i] ? 0.0004 * (1.5 + sin(0.3 * t + 0.7 * i)) : NaN
           for t in 1:T, i in 1:N]
-    csfm = CrossSectionalFactorModel(; M = Ms[end, :, :], b = zeros(N), Ms = Ms, vs = vs,
+    csfm = CrossSectionalFactorModel(; M = Ms[:, :, end], b = zeros(N), Ms = Ms, vs = vs,
                                      nf = nf, fam = fam)
     descriptors = [Passthrough(; field = "book_equity"),
                    Passthrough(; field = "market_cap")]
@@ -847,11 +852,9 @@ end
         end
     end
 
-    @testset "The forward mean floats integer returns, keeps a float type, and refuses a Rational" begin
+    @testset "The forward mean keeps a float type, and refuses a Rational" begin
+        # Issue #1972 removed the integer case: integer data convert at the carrier.
         Xi = [1 2; 3 4; 5 7; 6 1]
-        Yi = PO.forward_mean_returns(Xi, 2, 1)
-        @test eltype(Yi) === Float64
-        @test isequal(Yi, [4.0 5.5; 5.5 4.0; NaN NaN; NaN NaN])
         @test eltype(PO.forward_mean_returns(Float32.(X), 3, 1)) === Float32
         Yb = PO.forward_mean_returns(big.(X), 3, 1)
         @test eltype(Yb) === BigFloat
@@ -882,7 +885,7 @@ end
         @test PO.return_forecast_rows(rd, forecast_hand_block(2; vs = fill(0.1, 6, 2))) ==
               1:6
         @test PO.return_forecast_rows(rd, forecast_hand_block(2)) == 1:6
-        exposed = forecast_hand_block(2; Ms = rand(rng, 5, 2, 1))
+        exposed = forecast_hand_block(2; Ms = permutedims(rand(rng, 5, 2, 1), (2, 3, 1)))
         @test PO.return_forecast_block_observations(exposed) == 5
         long = forecast_hand_block(2; vs = fill(0.1, 7, 2))
         @test_throws DimensionMismatch PO.return_forecast_rows(rd, long)
@@ -890,17 +893,14 @@ end
 
     @testset "A cut takes the block rows, and a pad puts NaN before them" begin
         A = rand(rng, 6, 2)
-        A3 = rand(rng, 6, 2, 3)
+        A3 = permutedims(rand(rng, 6, 2, 3), (2, 3, 1))
         @test PO.return_forecast_cut(A, 3:6) == A[3:6, :]
-        @test PO.return_forecast_cut(A3, 3:6) == A3[3:6, :, :]
+        @test PO.return_forecast_cut(A3, 3:6) == A3[:, :, 3:6]
         @test isnothing(PO.return_forecast_cut(nothing, 3:6))
         B = PO.return_forecast_pad(A[3:6, :], 3:6, 6)
         @test all(isnan, B[1:2, :])
         @test B[3:6, :] == A[3:6, :]
         @test isnothing(PO.return_forecast_pad(nothing, 3:6, 6))
-        Bi = PO.return_forecast_pad([1 2; 3 4], 2:3, 3)
-        @test eltype(Bi) === Float64
-        @test isequal(Bi, [NaN NaN; 1.0 2.0; 3.0 4.0])
         @test eltype(PO.return_forecast_pad(Float32[1 2; 3 4], 2:3, 3)) === Float32
         @test_throws ArgumentError PO.return_forecast_pad(Rational{Int}[1 2; 3 4], 2:3, 3)
     end
@@ -1040,7 +1040,7 @@ end
               [2.0 4.0]
         w = [1.0 0.0]
         @test PO.ew_forecast_weights(IdiosyncraticSharpeUnit(), w, [0.5 0.25]) === w
-        S = reshape([1.0, NaN, 2.0, 3.0], 1, 2, 2)
+        S = reshape([1.0, NaN, 2.0, 3.0], 2, 2, 1)
         @test PO.ew_forecast_valid(S, [0.1 0.2], [0.3 0.4], [1.0 1.0]) == [true false]
         @test PO.ew_forecast_valid(S, [0.1 0.2], [0.3 0.4], [0.0 1.0]) == [false false]
         @test PO.ew_forecast_valid(S, [NaN 0.2], [0.3 0.4], [1.0 1.0]) == [false false]
@@ -1055,8 +1055,8 @@ end
         @test PO.ew_forecast_solve([1.0 1.0; 1.0 1.0], [2.0, 2.0], 0.0, 1) ≈ [1.0, 1.0]
         @test PO.ew_forecast_solve([2.0 0.0; 0.0 4.0], [2.0, 4.0], 0.0, 1) ≈ [1.0, 1.0]
         @test PO.ew_forecast_solve([2.0 0.0; 0.0 2.0], [2.0, 2.0], 1.0, 1) ≈ [0.5, 0.5]
-        H = PO.ew_forecast_history(reshape([1.0, 2.0, 3.0, 4.0], 2, 2, 1),
-                                   reshape([5.0], 1, 1), 1)
+        H = PO.ew_forecast_history(permutedims(reshape([1.0, 2.0, 3.0, 4.0], 2, 2, 1),
+                                               (2, 3, 1)), reshape([5.0], 1, 1), 1)
         @test isequal(H, [NaN NaN; 10.0 20.0])
     end
 
@@ -1317,7 +1317,8 @@ end
             @test isnan(rf.calib)
             @test all(isnan, rf.mu)
         end
-        Sf, yf, ok = PO.target_forecast_samples(cat(a[1:3, :], b[1:3, :]; dims = 3),
+        Sf, yf, ok = PO.target_forecast_samples(permutedims(cat(a[1:3, :], b[1:3, :];
+                                                                dims = 3), (2, 3, 1)),
                                                 eps[2:4, :], ones(3, 3), 3)
         p = PO.target_forecast_uncalibrated(KFold(; n = 7), TargetReturnForecast(; kw...),
                                             nothing, Sf, yf, ok, 3)
@@ -1358,7 +1359,8 @@ end
                               csfm).calib ==
               return_forecast(TargetReturnForecast(; k3...), rd, csfm).calib
         # Each method of the verb, on the flattened samples.
-        Sf, yf, ok = PO.target_forecast_samples(cat(a[1:3, :], b[1:3, :]; dims = 3),
+        Sf, yf, ok = PO.target_forecast_samples(permutedims(cat(a[1:3, :], b[1:3, :];
+                                                                dims = 3), (2, 3, 1)),
                                                 eps[2:4, :], ones(3, 3), 3)
         rfe = TargetReturnForecast(; kw...)
         model = PO.target_forecast_fit(rfe, Sf, yf, ok)
@@ -1375,7 +1377,8 @@ end
         # observation 3 the fit on observations 1 and 2.
         A = [vec(transpose(a[1:3, :])) vec(transpose(b[1:3, :]))]
         y = vec(transpose(eps[2:4, :]))
-        Sf, yf, ok = PO.target_forecast_samples(cat(a[1:3, :], b[1:3, :]; dims = 3),
+        Sf, yf, ok = PO.target_forecast_samples(permutedims(cat(a[1:3, :], b[1:3, :];
+                                                                dims = 3), (2, 3, 1)),
                                                 eps[2:4, :], ones(3, 3), 3)
         rfe = TargetReturnForecast(; scores = ds, target_outlier = nothing, decay = 0.5,
                                    min_obs = 1)
@@ -1508,6 +1511,26 @@ end
         @test p[1:3] ≈ Sf[1:3, :] * (Sf[4:9, :] \ yf[4:9])
         @test isfinite(rfc.calib)
         @test rfc.mu ≈ rfc.calib .* rf.mu
+        # #1886: every fit names the last column, the column of ones, to the target. An
+        # elastic net at a strength that zeroes both slopes keeps the intercept at the mean of
+        # the target it fits: in the fit of every sample, in the out-of-fold fits, and in the
+        # prequential fits.
+        big = ElasticNet(; strength = PO.FixedStrength(; gamma = 1e8))
+        ebig = TargetReturnForecast(; scores = ds, target_outlier = nothing, tgt = big,
+                                    calibrate = false, intercept = true)
+        @test PO.target_forecast_target(ebig, Sf).ic == 3
+        @test PO.target_forecast_target(TargetReturnForecast(; scores = ds, tgt = big),
+                                        Sf) === big
+        re = return_forecast(ebig, rd, csfm)
+        @test PortfolioOptimisers.StatsAPI.coef(re.model) ≈ [0, 0, mean(yf)]
+        @test re.mu ≈ fill(mean(yf), 3)
+        pk = PO.target_forecast_uncalibrated(KFold(; n = 3), ebig, nothing, Sf, yf,
+                                             trues(9), 3)
+        @test pk[1:3] ≈ fill(mean(yf[4:9]), 3)
+        pq = PO.target_forecast_uncalibrated(PrequentialCalibration(), ebig, nothing, Sf,
+                                             yf, trues(9), 3)
+        @test all(isnan, pq[1:3])
+        @test pq[4:6] ≈ fill(mean(yf[1:3]), 3) && pq[7:9] ≈ fill(mean(yf[1:6]), 3)
     end
 
     @testset "A sample set with no valid pair fits nothing" begin
@@ -1526,10 +1549,10 @@ end
         @test PO.target_forecast_scatter([1.0, 2.0, 3.0, 4.0], 2, 2) == [1.0 2.0; 3.0 4.0]
         @test isnothing(PO.target_forecast_latest_variances(nothing))
         @test PO.target_forecast_latest_variances([1.0 2.0; 3.0 4.0]) == [3.0 4.0]
-        @test all(isnan, PO.target_forecast_latest(nothing, reshape([1.0, 2.0], 1, 2, 1)))
+        @test all(isnan, PO.target_forecast_latest(nothing, reshape([1.0, 2.0], 2, 1, 1)))
         @test PO.target_forecast_multiplier(false, NaN) == 1
         @test PO.target_forecast_multiplier(true, 2.5) == 2.5
-        S = reshape([1.0, NaN, 2.0, 3.0], 1, 2, 2)
+        S = reshape([1.0, NaN, 2.0, 3.0], 2, 2, 1)
         Sf, yf, ok = PO.target_forecast_samples(S, [0.1 0.2], [1.0 1.0], 1)
         @test ok == [true, false]
         @test isequal(Sf, [1.0 2.0; NaN 3.0])
@@ -1565,7 +1588,7 @@ least squares, written on top of `StatsAPI` as the `# Interfaces` section of
 model, and `coef` and `predict` read it. The threshold `delta` is in the units of the response,
 so the fit needs no scale estimate. The library ships no such target.
 =#
-struct HuberTestTarget{T, W} <: PortfolioOptimisers.AbstractRegressionTarget
+struct HuberTestTarget{T, W} <: PortfolioOptimisers.AbstractUnpenalisedRegressionTarget
     delta::T
     w::W
 end
@@ -1598,7 +1621,7 @@ end
 PortfolioOptimisers.StatsAPI.coef(m::HuberTestFit) = m.coef
 PortfolioOptimisers.StatsAPI.predict(m::HuberTestFit, A::AbstractMatrix) = A * m.coef
 # A least-squares target that states no weight method.
-struct UnweightedTestTarget <: PortfolioOptimisers.AbstractRegressionTarget end
+struct UnweightedTestTarget <: PortfolioOptimisers.AbstractUnpenalisedRegressionTarget end
 function PortfolioOptimisers.StatsAPI.fit(::UnweightedTestTarget, A::AbstractMatrix,
                                           y::AbstractVector)
     return HuberTestFit(A \ y)
@@ -1615,9 +1638,9 @@ end
     PO = PortfolioOptimisers
     rng = StableRNG(1397)
     T, N, K = 3, 15, 2
-    Z = randn(rng, T, N, K)
+    Z = permutedims(randn(rng, T, N, K), (2, 3, 1))
     beta = randn(rng, T, K)
-    X = permutedims(reduce(hcat, Z[t, :, :] * beta[t, :] for t in 1:T)) .+
+    X = permutedims(reduce(hcat, Z[:, :, t] * beta[t, :] for t in 1:T)) .+
         0.01 * randn(rng, T, N)
     # One gross outlier per observation, so the Huber threshold binds.
     X[:, 1] .+= 1.0
@@ -1645,7 +1668,7 @@ end
         @test isa(csr, CrossSectionalRegression)
         for t in 1:T
             psi = huber_test_psi.(csr.eps[t, :], delta)
-            A = Z[t, :, :]
+            A = Z[:, :, t]
             scale = sum(W[t, :] .* abs.(psi) .* sum(abs, A; dims = 2))
             # Measured: at most 1.3e-14 of the scale weighted, and at least 1.8e-2 unweighted.
             @test maximum(abs, A' * (W[t, :] .* psi)) <= 1e-12 * scale
@@ -1720,14 +1743,14 @@ end
                            weights = [0.4, 0.6], min_coverage = 0.5, outlier = ct_out,
                            scoring = ct_sco, group = "industry", bw = "market_cap")
     Lo = factor_exposure(OneHotExposure(; field = "industry", family = "industry"), rd)
-    K = 1 + size(Lo, 3)
-    Ms = Array{Float64, 3}(undef, T, N, K)
-    Ms[:, :, 1] = factor_exposure(xc, rd)
-    for k in 1:size(Lo, 3)
-        Ms[:, :, k + 1] = Lo[:, :, k]
+    K = 1 + size(Lo, 2)
+    Ms = Array{Float64, 3}(undef, N, K, T)
+    Ms[:, 1, :] = permutedims(factor_exposure(xc, rd))
+    for k in 1:size(Lo, 2)
+        Ms[:, k + 1, :] = Lo[:, k, :]
     end
-    nf = ["style"; ["ind$k" for k in 1:size(Lo, 3)]]
-    fam = ["style"; fill("industry", size(Lo, 3))]
+    nf = ["style"; ["ind$k" for k in 1:size(Lo, 2)]]
+    fam = ["style"; fill("industry", size(Lo, 2))]
     vs = [pnl.amsk[t, i] ? 0.0004 * (1.5 + sin(0.3 * t + 0.7 * i)) : NaN
           for t in 1:T, i in 1:N]
     eps = [if pnl.amsk[t, i]
@@ -1737,7 +1760,7 @@ end
            end
            for t in 1:T, i in 1:N]
     csr = CrossSectionalRegression(; f = zeros(T, K), eps = eps, n = fill(N, T))
-    csfm = CrossSectionalFactorModel(; M = Ms[end, :, :], b = zeros(N), csr = csr, Ms = Ms,
+    csfm = CrossSectionalFactorModel(; M = Ms[:, :, end], b = zeros(N), csr = csr, Ms = Ms,
                                      vs = vs, nf = nf, fam = fam)
     descriptors = [Passthrough(; field = "book_equity"),
                    Passthrough(; field = "market_cap")]
@@ -1883,10 +1906,11 @@ end
 
     @testset "The early coefficient takes the type of its inputs" begin
         rfe = TargetReturnForecast(; scores = ds, calibrate = false)
-        c = PO.target_forecast_coefficient(rfe, nothing, zeros(Float32, 2, 2),
-                                           zeros(Float32, 2), trues(2),
-                                           zeros(Float32, 2, 2), nothing,
-                                           ones(Float32, 2, 2), 1).calib
+        c, P = PO.target_forecast_coefficient(rfe, nothing, zeros(Float32, 2, 2),
+                                              zeros(Float32, 2), trues(2),
+                                              zeros(Float32, 2, 2), nothing,
+                                              ones(Float32, 2, 2), 1)
+        @test isnothing(P)
         @test isa(c, Float32)
         @test isnan(c)
         @test isa(PO.target_forecast_multiplier(false, c), Float32)
@@ -1968,30 +1992,32 @@ THREE MORE CONVENTIONS SHAPE THESE PROBES.
     @testset "The Descriptors warm up over the carrier, not inside the block" begin
         sc = descriptor_scores(ds, rd, csfm)
         S = sc.S
-        @test size(S) == (T, N, 2)
+        @test size(S) == (N, 2, T)
         @test sc.rows == rows
         # The momentum reads a skip of two, so its first two rows read nothing at all.
-        @test all(isnan, view(S, 1:2, :, 1))
+        @test all(isnan, view(S, :, 1, 1:2))
         # The same recipe on the block alone warms up a second time, so it states fewer
         # scores over the very same rows.
         Sb = descriptor_scores(ds, PO.port_opt_view(rd, rows, :), csfm).S
-        @test size(Sb) == (Tb, N, 2)
-        @test count(isfinite, S[rows, :, 1]) > count(isfinite, Sb[:, :, 1])
+        @test size(Sb) == (N, 2, Tb)
+        @test count(isfinite, S[:, 1, rows]) > count(isfinite, Sb[:, 1, :])
     end
 
     @testset "A Neutralisation writes NaN on the rows before the block" begin
         # The block states an exposure only on its own rows, so a score before them has
         # nothing to neutralise against. That is also why a Neutralisation drops the
         # boundary band of the target member: the band's scores leave this step `NaN`.
-        Ms = reshape(descriptor(Passthrough(; field = "market_cap"), rd)[rows, :], Tb, N, 1)
+        Ms = reshape(permutedims(descriptor(Passthrough(; field = "market_cap"), rd)[rows,
+                                                                                     :]), N,
+                     1, Tb)
         blk = CrossSectionalFactorModel(; M = ones(N, 1), b = zeros(N), csr = csr, vs = vs,
                                         Ms = Ms, nf = ["style"], fam = ["style"])
         dsn = DescriptorScores(; descriptors = [Passthrough(; field = "book_equity")],
                                neutralise = ["style"], outlier = nothing, scoring = nothing)
         sc = descriptor_scores(dsn, rd, blk)
         @test sc.rows == rows
-        @test all(isnan, view(sc.S, 1:(first(rows) - 1), :, 1))
-        @test any(isfinite, view(sc.S, rows, :, 1))
+        @test all(isnan, view(sc.S, :, 1, 1:(first(rows) - 1)))
+        @test any(isfinite, view(sc.S, :, 1, rows))
     end
 
     @testset "The fixed weighted member matches the stored case on the block's rows" begin
@@ -2014,7 +2040,8 @@ THREE MORE CONVENTIONS SHAPE THESE PROBES.
         S = descriptor_scores(ds, rd, csfm).S
         w = PO.return_forecast_weights(rd)
         al = PO.target_forecast_alignment(true, S, eps, nothing, w,
-                                          PO.exposure_group_labels(rd, "industry"), rows)
+                                          PO.cross_sectional_groups(rd.pnl, "industry"),
+                                          rows)
         @test size(al.eps) == (T, N)
         @test all(isnan, view(al.eps, 1:(first(rows) - 1), :))
         fwd = PO.forward_mean_returns(al.eps, 2, 1)
@@ -2024,7 +2051,7 @@ THREE MORE CONVENTIONS SHAPE THESE PROBES.
         @test any(isfinite, view(fwd, (first(rows) - gap):(first(rows) - 1), :))
         # The cut alignment states the block's rows and nothing before them.
         cut = PO.target_forecast_alignment(false, S, eps, nothing, w, nothing, rows)
-        @test size(cut.S) == (Tb, N, 2)
+        @test size(cut.S) == (N, 2, Tb)
         @test isequal(cut.eps, eps)
         @test isnothing(cut.groups)
     end

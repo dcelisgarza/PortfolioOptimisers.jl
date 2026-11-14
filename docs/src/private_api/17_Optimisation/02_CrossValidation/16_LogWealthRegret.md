@@ -1,5 +1,5 @@
 ```@meta
-Description = "Log-wealth regret, private API of PortfolioOptimisers.jl: regret_series, regret_benchmark, first_member, fold_target, fold_held, stacked_fold_weights, …"
+Description = "Log-wealth regret, private API of PortfolioOptimisers.jl: regret_series, regret_benchmark, member_vector, stacked_fold_weights, weights_by_name, …"
 ```
 
 # Log-wealth regret: private API
@@ -7,13 +7,12 @@ Description = "Log-wealth regret, private API of PortfolioOptimisers.jl: regret_
 ```@docs
 PortfolioOptimisers.regret_series
 PortfolioOptimisers.regret_benchmark
-PortfolioOptimisers.first_member
-PortfolioOptimisers.fold_target
-PortfolioOptimisers.fold_held
+PortfolioOptimisers.member_vector
 PortfolioOptimisers.stacked_fold_weights
+PortfolioOptimisers.weights_by_name
 PortfolioOptimisers.comparator_path_length
+PortfolioOptimisers.member_regret
 PortfolioOptimisers.series_regret
-PortfolioOptimisers.path_norm_epigraph!
 PortfolioOptimisers.row_bound_view
 PortfolioOptimisers.path_row_constraints!
 PortfolioOptimisers.path_budget_constraint!

@@ -3,7 +3,7 @@ $(DocStringExtensions.TYPEDEF)
 
 Result type for [`GreedyAllocation`](@ref).
 
-`shares`, `cost` and `w` carry the sign of the position. A short position has a negative share count, a negative cost and a negative weight. `fees` is the charge that the two sides paid over the whole horizon, and the short side's part of it is not negated. `cash` is the cash left over after the allocation of the long side.
+`shares`, `cost` and `w` carry the sign of the position. A short position has a negative share count, a negative cost and a negative weight. `fees` is the charge that the two sides paid over the whole horizon, and the short side's part of it is not negated. `cash` is the cash that the account holds after both sides trade, as the collateral algorithm of the input states it. It includes the cash that no side received, and it is negative when the book borrows. Under the default [`ProceedsCollateral`](@ref), `sum(cost) + cash + fees` is the cash of the input.
 
 # Fields
 
@@ -31,7 +31,7 @@ Keywords correspond to the struct's fields.
 
 # References
 
-  - $(ref_dict[:martin2021])
+  - $(ref_dict[:martin2021]) Methods, page 3. $(ref_dict[:no_original_source])
 """
 @concrete struct GreedyAllocationResult <: FiniteAllocationOptimisationResult
     """
@@ -79,7 +79,9 @@ $(DocStringExtensions.TYPEDEF)
 
 Greedy Allocation portfolio optimiser.
 
-`GreedyAllocation` converts continuous portfolio weights to discrete share quantities with a greedy allocation in two passes. The first pass buys each asset up to its target weight, in descending order of target weight. The second pass spends the leftover cash, one `unit` at a time, on the asset whose realised weight is furthest below its target.
+`GreedyAllocation` converts continuous portfolio weights to discrete share quantities with a greedy allocation in two passes. [martin2021](@cite) states only that the package it describes converts optimal weights into a discrete allocation, in its Methods on page 3. It does not state the passes. The first pass buys each asset up to its target weight in whole lots, in descending order of target weight. The second pass spends the leftover cash, one lot at a time, on the asset whose realised weight is furthest below its target.
+
+`unit` states the lot unit of each asset, so the share count of an asset is a whole number of lots times its lot unit. The default `LotUnit(1)` buys whole shares. A lot unit below one buys fractional shares, and a lot unit above one buys board lots. A [`LotUnitEstimator`](@ref) resolves the lot unit against `sets`.
 
 [`optimise`](@ref) allocates the long and the short side of a portfolio as two separate sub-problems. Each sub-problem receives its own share of the cash, and renormalises its own weights to sum to one. The definition below describes one sub-problem, so its targets ``\\boldsymbol{w}`` satisfy ``\\sum_i w_i = 1``. A side whose target weights are all zero buys nothing. `optimise` negates the short side's shares when it recombines the two sides.
 
@@ -89,7 +91,7 @@ Order the assets so that ``w_1 \\geq w_2 \\geq \\ldots \\geq w_N``. The first pa
 
 ```math
 \\begin{align}
-x_i &= \\mathrm{round}\\!\\left(\\left\\lfloor \\frac{w_i C}{p_i \\, \\mathrm{unit}} \\right\\rfloor \\mathrm{unit}\\right)\\,, \\\\
+x_i &= l_i \\left\\lfloor \\frac{w_i C}{p_i l_i} \\right\\rfloor\\,, \\\\
 r &\\leftarrow r - x_i p_i - \\Delta F_i\\,,
 \\end{align}
 ```
@@ -101,9 +103,9 @@ The second pass repeats, while ``r > 0``,
 ```math
 \\begin{align}
 \\boldsymbol{d} &= \\boldsymbol{w} - \\frac{\\boldsymbol{x} \\odot \\boldsymbol{p}}{\\sum_{j=1}^{N} x_j p_j}\\,, \\\\
-i^* &= \\underset{i:\\, p_i \\, \\mathrm{unit} + \\Delta F_i \\leq r}{\\arg\\max}\\; d_i\\,, \\\\
-x_{i^*} &\\leftarrow x_{i^*} + \\mathrm{unit}\\,, \\\\
-r &\\leftarrow r - p_{i^*} \\mathrm{unit} - \\Delta F_{i^*}\\,.
+i^* &= \\underset{i:\\, p_i l_i + \\Delta F_i \\leq r}{\\arg\\max}\\; d_i\\,, \\\\
+x_{i^*} &\\leftarrow x_{i^*} + l_{i^*}\\,, \\\\
+r &\\leftarrow r - p_{i^*} l_{i^*} - \\Delta F_{i^*}\\,.
 \\end{align}
 ```
 
@@ -116,7 +118,7 @@ Where:
   - ``\\boldsymbol{w}``: Target weight vector of this sub-problem, renormalised to sum to one.
   - ``C``: Cash allocated to this sub-problem.
   - ``\\boldsymbol{p}``: Asset price vector.
-  - ``\\mathrm{unit}``: Number of shares that one purchase buys.
+  - $(math_dict[:l_lot_unit])
   - ``\\boldsymbol{d}``: Weight deficit, the target weight less the realised weight.
   - ``F(\\boldsymbol{x})``: Fee of this sub-problem, from [`allocation_fee`](@ref). It is zero when the input states no fee, and it includes the constant forced exit of [`allocation_liquidation_fee`](@ref) when the universe lost an asset.
   - ``\\Delta F_i``: Amount that a purchase of the asset ``i`` adds to the fee, from [`greedy_fee_delta`](@ref).
@@ -124,7 +126,7 @@ Where:
   - ``\\odot``: Element-wise (Hadamard) product.
   - ``N``: Number of assets in this sub-problem.
 
-The rounding truncates to a multiple of `unit`, and then applies `Base.round` with `args` and `kwargs`, as [`roundmult`](@ref) does. It does not round to the nearest multiple. With the default `args` and `kwargs`, `Base.round` rounds to an integer, so a fractional `unit` needs `digits` or `sigdigits` in `kwargs` to keep a multiple of `unit`.
+The first pass floors the lot count, so it never buys more than the target of an asset. Both passes count whole lots and compute each share count as the lot count times the lot unit. So a share count is a multiple of its lot unit to within one rounding of a product, whatever the lot unit is.
 
 # Fields
 
@@ -133,9 +135,9 @@ $(DocStringExtensions.FIELDS)
 # Constructors
 
     GreedyAllocation(;
-        unit::Number = 1,
-        args::Tuple = (),
-        kwargs::NamedTuple = (;),
+        unit::LuE_Lu = LotUnit(),
+        sets::Option{<:UniverseSets} = nothing,
+        strict::Bool = false,
         fb::Option{<:FOptE_FOpt} = nothing
     ) -> GreedyAllocation
 
@@ -150,9 +152,10 @@ Keywords correspond to the struct's fields.
 ```jldoctest
 julia> GreedyAllocation()
 GreedyAllocation
-    unit ┼ Int64: 1
-    args ┼ Tuple{}: ()
-  kwargs ┼ @NamedTuple{}: NamedTuple()
+    unit ┼ LotUnit
+         │   val ┴ Int64: 1
+    sets ┼ nothing
+  strict ┼ Bool: false
       fb ┴ nothing
 ```
 
@@ -162,11 +165,12 @@ GreedyAllocation
   - [`GreedyAllocationResult`](@ref)
   - [`FiniteAllocationOptimisationEstimator`](@ref)
   - [`DiscreteAllocation`](@ref)
-  - [`roundmult`](@ref)
+  - [`LotUnit`](@ref)
+  - [`LotUnitEstimator`](@ref)
 
 # References
 
-  - $(ref_dict[:martin2021])
+  - $(ref_dict[:martin2021]) Methods, page 3. $(ref_dict[:no_original_source])
 """
 @concrete struct GreedyAllocation <: FiniteAllocationOptimisationEstimator
     """
@@ -174,75 +178,31 @@ GreedyAllocation
     """
     unit
     """
-    Additional positional arguments forwarded to `round`.
+    $(field_dict[:sets_alloc])
     """
-    args
+    sets
     """
-    $(field_dict[:kwargs])
+    $(field_dict[:strict_opt])
     """
-    kwargs
+    strict
     """
     $(field_dict[:fb])
     """
     fb
-    function GreedyAllocation(unit::Number, args::Tuple, kwargs::NamedTuple,
+    function GreedyAllocation(unit::LuE_Lu, sets::Option{<:UniverseSets}, strict::Bool,
                               fb::Option{<:FOptE_FOpt} = nothing)
-        @argcheck(unit > zero(unit), DomainError(unit, "`unit` must be positive"))
-        return new{typeof(unit), typeof(args), typeof(kwargs), typeof(fb)}(unit, args,
-                                                                           kwargs, fb)
+        if isa(unit, LotUnitEstimator)
+            @argcheck(!isnothing(sets),
+                      IsNothingError("sets cannot be nothing when unit is a LotUnitEstimator"))
+        end
+        return new{typeof(unit), typeof(sets), typeof(strict), typeof(fb)}(unit, sets,
+                                                                           strict, fb)
     end
 end
-function GreedyAllocation(; unit::Number = 1, args::Tuple = (), kwargs::NamedTuple = (;),
+function GreedyAllocation(; unit::LuE_Lu = LotUnit(),
+                          sets::Option{<:UniverseSets} = nothing, strict::Bool = false,
                           fb::Option{<:FOptE_FOpt} = nothing)::GreedyAllocation
-    return GreedyAllocation(unit, args, kwargs, fb)
-end
-"""
-    roundmult(val, prec, args...; kwargs...) -> Number
-
-Truncate `val` towards zero to a multiple of `prec`, then round that multiple with `Base.round`.
-
-This is not a round to the nearest multiple of `prec`. `div` truncates, so `roundmult(7.5, 2)` is `6.0`, and the nearest multiple of `2` is `8.0`. The default `Base.round` rounds to an integer, so a `prec` below one can give a value that is not a multiple of `prec`. For example, `roundmult(1.25, 0.3)` is `1.0`. Pass `digits` or `sigdigits` in `kwargs` to keep the multiple, as in `roundmult(1.25, 0.3; digits = 1)`, which is `1.2`. `RoundDown` in `args` does not keep it, because it also rounds to an integer.
-
-# Mathematical definition
-
-```math
-\\mathrm{roundmult}(v, q) = \\mathrm{round}\\!\\left(\\mathrm{trunc}\\!\\left(\\frac{v}{q}\\right) q\\right)\\,.
-```
-
-Where:
-
-  - ``v``: Value to truncate, `val`.
-  - ``q``: Multiple to truncate to, `prec`.
-  - ``\\mathrm{trunc}``: Truncation towards zero, which `div` computes.
-  - ``\\mathrm{round}``: `Base.round` with `args` and `kwargs`.
-
-# Arguments
-
-  - `val::Number`: Value to truncate.
-  - `prec::Number`: Multiple to truncate to.
-  - `args...`: Positional arguments forwarded to `Base.round`, such as a `RoundingMode`.
-  - `kwargs...`: Keyword arguments forwarded to `Base.round`, such as `digits` or `sigdigits`.
-
-# Returns
-
-  - `res::Number`: The truncated and rounded value.
-
-# Examples
-
-```jldoctest
-julia> PortfolioOptimisers.roundmult(7.5, 2)
-6.0
-
-julia> PortfolioOptimisers.roundmult(26.58, 1)
-26.0
-```
-
-# Related
-
-  - [`GreedyAllocation`](@ref)
-"""
-function roundmult(val::Number, prec::Number, args...; kwargs...)
-    return round(div(val, prec) * prec, args...; kwargs...)
+    return GreedyAllocation(unit, sets, strict, fb)
 end
 """
     greedy_fee_delta(::Nothing, ::VecNum, shares::VecNum, ::Integer, ::Number)
@@ -305,8 +265,8 @@ function greedy_fee_delta(sf::NamedTuple, p::VecNum, shares::VecNum, i::Integer,
     return delta
 end
 """
-    finite_sub_allocation!(w::VecNum, p::VecNum, cash::Number, bgt::Number,
-                           sf::Option{<:NamedTuple}, ga::GreedyAllocation, args...)
+    finite_sub_allocation!(w::VecNum, p::VecNum, lu::Num_VecNum, cash::Number, bgt::Number,
+                           sf::Option{<:NamedTuple}, ga::GreedyAllocation)
 
 Run the greedy two-pass allocation over one side, long or short, of the portfolio.
 
@@ -315,27 +275,28 @@ This method runs the two passes of [`GreedyAllocation`](@ref) for a single side.
 # Algorithm
 
  1. If `w` is empty, charge `fee`, the [`allocation_fee`](@ref) of the empty book. Return three empty vectors, `cash - fee` and `fee`. An empty side can still owe the forced exit of [`allocation_liquidation_fee`](@ref).
- 2. Sort the assets by descending target weight into `idx`. View `w` and `p` in that order, and put the charge in that order with [`permute_side_fees`](@ref).
+ 2. Sort the assets by descending target weight into `idx`. View `w`, `p` and a vector `lu` in that order, and put the charge in that order with [`permute_side_fees`](@ref).
  3. Charge `fee`, the fee of the empty book, and start the running cash `acash = cash - fee`. This fee is not zero when the side held money before the trade, because the turnover fee charges the sale, or when the universe lost an asset.
  4. Renormalise `w` to sum to one. A side whose target weights are all zero keeps them at zero.
- 5. In the first pass, go through the order and buy `n_shares` of each asset. Stop at the first asset whose `cost` is more than `acash`.
- 6. In the second pass, while `acash > 0`, compute the `deficit` of each asset. Buy `unit` shares of the affordable asset with the largest positive deficit, and stop when no such asset remains.
- 7. Compute `cost = p .* shares` and the realised weights `aw`, rescaled to sum to `bgt`. Charge `fee`, the fee of the whole book, and compute `acash = cash - sum(cost) - fee`.
- 8. Permute `shares`, `cost` and `aw` back to the caller's order with `invperm(idx)`.
+ 5. In the first pass, go through the order and buy `n_lots`, the floor of the lots of the target of each asset. Stop at the first asset whose `cost` is more than `acash`.
+ 6. In the second pass, while `acash > 0`, compute the `deficit` of each asset. Buy one lot of the affordable asset with the largest positive deficit, and stop when no such asset remains.
+ 7. Both passes count the lots of each asset, and set its share count to the lot count times its lot unit.
+ 8. Compute `cost = p .* shares` and the realised weights `aw`, rescaled to sum to `bgt`. Charge `fee`, the fee of the whole book, and compute `acash = cash - sum(cost) - fee`.
+ 9. Permute `shares`, `cost` and `aw` back to the caller's order with `invperm(idx)`.
 
 # Arguments
 
   - `w::VecNum`: Target weights of this side.
   - `p::VecNum`: Asset prices of this side, in the same order as `w`.
+  - `lu::Num_VecNum`: Lot unit of this side, one scalar for every asset or one value for each asset in the order of `w`.
   - `cash::Number`: Cash allocated to this side.
   - `bgt::Number`: Budget of this side, used to rescale the realised weights.
   - `sf::Option{<:NamedTuple}`: This side's charge, from [`allocation_side_fees`](@ref), or `nothing`.
-  - `ga::GreedyAllocation`: Allocator that holds `unit`, `args` and `kwargs`.
-  - `args...`: Ignored. The discrete allocator's method takes the same positional arguments.
+  - `ga::GreedyAllocation`: Allocator of the side. The method reads none of its fields, because [`allocation_lot_unit`](@ref) resolved its lot unit to `lu`.
 
 # Returns
 
-  - `shares::VecNum`: Share count per asset, in the caller's asset order.
+  - `shares::VecNum`: Share count per asset, in the caller's asset order. Each entry is a whole number of lots of its lot unit.
   - `cost::VecNum`: `shares .* p`, in the caller's order.
   - `aw::VecNum`: Realised weights, rescaled to sum to `bgt`. All zero when nothing was bought.
   - `acash::Number`: Cash left over after the shares and the fee.
@@ -347,11 +308,11 @@ This method runs the two passes of [`GreedyAllocation`](@ref) for a single side.
   - [`allocation_fee`](@ref)
   - [`allocation_liquidation_fee`](@ref)
   - [`greedy_fee_delta`](@ref)
-  - [`roundmult`](@ref)
+  - [`allocation_lot_unit`](@ref)
   - [`finite_sub_allocation`](@ref)
 """
-function finite_sub_allocation!(w::VecNum, p::VecNum, cash::Number, bgt::Number,
-                                sf::Option{<:NamedTuple}, ga::GreedyAllocation, args...)
+function finite_sub_allocation!(w::VecNum, p::VecNum, lu::Num_VecNum, cash::Number,
+                                bgt::Number, sf::Option{<:NamedTuple}, ga::GreedyAllocation)
     if isempty(w)
         # An empty side buys nothing, but it can still owe the forced exit: a delisted asset
         # carries a zero target weight, so it lands on the long side even when that side
@@ -364,26 +325,32 @@ function finite_sub_allocation!(w::VecNum, p::VecNum, cash::Number, bgt::Number,
     idx = sortperm(w; rev = true)
     w = view(w, idx)
     p = view(p, idx)
+    lu = nothing_scalar_array_view(lu, idx)
     sf = permute_side_fees(sf, idx)
 
     N = length(w)
-    shares = zeros(eltype(w), N)
+    # The passes count whole lots, and each share count is its lot count times its lot unit,
+    # so a share count carries one rounding of a product and no sum of rounding errors.
+    lots = zeros(Int, N)
+    shares = zeros(promote_type(eltype(w), eltype(lu)), N)
     # Selling out is a trade, so a side that held money owes a turnover fee before it buys.
     fee = allocation_fee(sf, p, shares)
     acash = cash - fee
     # A side whose target weights are all zero keeps them at zero, and buys nothing.
     sw = sum(w)
     w /= ifelse(iszero(sw), one(sw), sw)
-    unit = ga.unit
 
-    # First loop
+    # First loop: the whole lots of each target, floored so that no asset buys above it.
     for (i, (wi, _pi)) in enumerate(zip(w, p))
-        n_shares = roundmult(wi * cash / _pi, unit, ga.args...; ga.kwargs...)
+        li = nothing_scalar_array_getindex(lu, i)
+        n_lots = floor(Int, wi * cash / (_pi * li))
+        n_shares = n_lots * li
         cost = n_shares * _pi + greedy_fee_delta(sf, p, shares, i, n_shares)
         if cost > acash
             break
         end
         acash -= cost
+        lots[i] = n_lots
         shares[i] = n_shares
     end
 
@@ -400,25 +367,28 @@ function finite_sub_allocation!(w::VecNum, p::VecNum, cash::Number, bgt::Number,
 
         # Try to buy tickers whose deficit is the greatest.
         i = argmax(deficit)
-        cost = p[i] * unit + greedy_fee_delta(sf, p, shares, i, unit)
+        li = nothing_scalar_array_getindex(lu, i)
+        cost = p[i] * li + greedy_fee_delta(sf, p, shares, i, li)
 
         # If we can't afford it, go through the rest of the tickers from highest deviation to lowest.
-        # The purchase below spends `p[i] * unit` and what it adds to the fee, so that is what must
-        # be affordable: testing `p[i]` alone overdraws the budget whenever `unit > 1`, and refuses
-        # affordable buys when `unit < 1`.
+        # The purchase below spends `p[i] * li` and what it adds to the fee, so that is what must
+        # be affordable: testing `p[i]` alone overdraws the budget whenever `li > 1`, and refuses
+        # affordable buys when `li < 1`.
         while cost > acash
             deficit[i] = 0
             i = argmax(deficit)
             if deficit[i] <= 0
                 break
             end
-            cost = p[i] * unit + greedy_fee_delta(sf, p, shares, i, unit)
+            li = nothing_scalar_array_getindex(lu, i)
+            cost = p[i] * li + greedy_fee_delta(sf, p, shares, i, li)
         end
         if deficit[i] <= 0
             break
         end
-        # Buy one share*unit at a time.
-        shares[i] += unit
+        # Buy one lot at a time.
+        lots[i] += 1
+        shares[i] = lots[i] * li
         acash -= cost
     end
     cost = p .* shares
@@ -433,16 +403,22 @@ function finite_sub_allocation!(w::VecNum, p::VecNum, cash::Number, bgt::Number,
     return view(shares, idx), view(cost, idx), view(aw, idx), acash, fee
 end
 function _optimise(ga::GreedyAllocation, fai::FiniteAllocationInput; kwargs...)
-    w, p, cash, pcash, T, fees, ca = fai.w, fai.prices, fai.cash, fai.prev_cash,
-                                     fai.horizon, fai.fees, fai.ca
-    lbgt, sbgt, lidx, sidx = setup_alloc_optim(w)
-    lsf, ssf = allocation_side_fees(fees, T, pcash, lidx, sidx)
+    p, cash, ca = fai.prices, fai.cash, fai.ca
+    w, lbgt, sbgt, lidx, sidx, lsf, ssf = prepare_finite_allocation(fai)
+    lu = allocation_lot_unit(ga.unit, ga.sets, ga.strict, fai)
     sshares, scost, sw, _, sfee = finite_sub_allocation!(-view(w, sidx), view(p, sidx),
+                                                         nothing_scalar_array_view(lu,
+                                                                                   sidx),
                                                          ca(w, p, cash), sbgt, ssf, ga)
     lcash = ca(w, p, cash, sum(scost), sfee)
-    lshares, lcost, lw, lcash, lfee = finite_sub_allocation!(view(w, lidx), view(p, lidx),
-                                                             lcash, lbgt, lsf, ga)
-    res = Matrix{eltype(w)}(undef, length(w), 3)
+    lshares, lcost, lw, _, lfee = finite_sub_allocation!(view(w, lidx), view(p, lidx),
+                                                         nothing_scalar_array_view(lu,
+                                                                                   lidx),
+                                                         lcash, lbgt, lsf, ga)
+    # The account keeps the cash that no side received, so the rule states it.
+    rcash = ca(w, p, cash, sum(scost), sfee, sum(lcost), lfee)
+    # An unpriced asset is on neither side, so its row keeps the zero it starts with.
+    res = zeros(eltype(w), length(w), 3)
     res[lidx, 1] = lshares
     res[sidx, 1] = -sshares
     res[lidx, 2] = lcost
@@ -451,7 +427,7 @@ function _optimise(ga::GreedyAllocation, fai::FiniteAllocationInput; kwargs...)
     res[sidx, 3] = -sw
     return GreedyAllocationResult(; retcode = OptimisationSuccess(),
                                   shares = view(res, :, 1), cost = view(res, :, 2),
-                                  w = view(res, :, 3), cash = lcash, fees = lfee + sfee,
+                                  w = view(res, :, 3), cash = rcash, fees = lfee + sfee,
                                   fb = nothing)
 end
 """
@@ -464,13 +440,14 @@ This method takes a `GreedyAllocation` with no fallback. The generic `optimise` 
 
 # Algorithm
 
- 1. Split the target weights into the long and the short side with [`setup_alloc_optim`](@ref).
- 2. Split the fee into the charge of each side with [`allocation_side_fees`](@ref).
- 3. Allocate the short side on its negated weights with [`finite_sub_allocation!`](@ref), with the short cash that `fai.ca` gives.
- 4. Compute the long side's cash with `fai.ca`, from the money of the shares that the short side sold and the fee that it paid. See [`AbstractCollateralAlgorithm`](@ref).
- 5. Allocate the long side with [`finite_sub_allocation!`](@ref).
- 6. Negate the short side's shares, costs and weights, and put the two sides into one vector per quantity, in the caller's asset order.
- 7. Return the long side's leftover cash as `cash`, and the sum of the fees of the two sides as `fees`.
+ 1. Read the target weights, the long and the short side, and the charge of each side with [`prepare_finite_allocation`](@ref). It removes each Unpriced Asset from its side, and gives its target weight to the rule `fai.upw`.
+ 2. Resolve the lot unit of each asset with [`allocation_lot_unit`](@ref). Each side views a vector lot unit with its own mask.
+ 3. Start every share count, cost and weight at zero, so an Unpriced Asset holds zero in each.
+ 4. Allocate the short side on its negated weights with [`finite_sub_allocation!`](@ref), with the short cash that `fai.ca` gives.
+ 5. Compute the long side's cash with `fai.ca`, from the money of the shares that the short side sold and the fee that it paid. See [`AbstractCollateralAlgorithm`](@ref).
+ 6. Allocate the long side with [`finite_sub_allocation!`](@ref).
+ 7. Negate the short side's shares, costs and weights, and put the two sides into one vector per quantity, in the caller's asset order.
+ 8. Return the cash that the account holds after the trade as `cash`, from the third method of `fai.ca`, and the sum of the fees of the two sides as `fees`. The cash includes the cash that no side received, such as the weight of an Unpriced Asset under `upw = nothing`.
 
 # Arguments
 

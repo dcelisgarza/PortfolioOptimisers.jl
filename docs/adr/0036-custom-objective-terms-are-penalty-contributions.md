@@ -196,3 +196,32 @@ omission — does not obviously settle whether an objective term belongs in it. 
 formulation question for a later decision, not a defect fix. `UnconstrainedNearOptimalCentering`
 and `set_near_optimal_objective_function!` now state the behaviour, and ADR 0008's amendment 3
 records the wider census of what that variant reads.
+
+## Amendment (2026-11-12)
+
+The bundle that a Custom Objective Term and a Custom Constraint receive is `ResolvedJuMPOptimiser`
+(ADR 0237, #2042). It holds `pr`, `fees`, `ret`, `sca`, `imsk` and the Resolved Constraint Block
+`cbr`, and a named forward rule keeps the reads of v0.33, such as `attrs.wb` and `attrs.plr`. The
+bundle stays the extension point of decision 4.
+
+## Amendment (2026-11-13)
+
+A Custom Objective Term gets the objective of the model, and not the objective of each solve
+(#2065). The considered option "Give the hook the *declared* objective" is now the decision, in
+this form: `assemble_jump_model!` calls the hook once for each model, with the `obj` of the
+assembly, after phase 2 of the block of the head. `set_portfolio_objective_function!` no longer
+calls it, and takes `(model, obj)`.
+
+The per-solve objective had a defect that the option above did not weigh. The Objective Penalty
+is registered once and keeps every contribution, and no solve resets it. So each call of the
+hook added the term again. A `Frontier` sweep sets the objective of each end point on the same
+model, and a point of a one-term sweep counted the term three times. The terms of a later
+block (#2045) and the penalties `l1`, `l2`, `lp` and `linf` already went in once, in the
+assembly. The head now does the same.
+
+The two reasons for the rejection do not apply to this form. The assembly already takes an
+`obj`, so `RiskBudgeting` and `RelaxedRiskBudgeting` give `MinimumRisk` and need no accessor.
+The constrained `NearOptimalCentering` gives `MinimumRisk` to its centring model, as before. The
+cost of the old decision changes: an end point of a sweep now gives the term the declared
+objective, so a term cannot change at an end point. A term still moves the end points, because
+the end points solve with the penalty.

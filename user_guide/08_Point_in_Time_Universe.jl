@@ -59,7 +59,8 @@ never spreads to a neighbouring asset.
 
 ## 2. The panel states the universe
 
-The layer also builds the [`AssetPanel`](@ref) in `rd.pnl`. Its active mask `amsk` says when each
+The layer also builds the [`AssetPanel`](@ref) in `rd.pnl`. A table with no gap and no feature data
+gives no panel, because its masks would be true everywhere. The active mask `amsk` says when each
 asset is in the universe, and the layer builds it from the gaps of each price column. A leading run
 of gaps is an asset not yet listed, a trailing run is a delisting, and an interior run is a
 suspension on an asset that is still listed. Its estimation mask `emsk` is the active mask and

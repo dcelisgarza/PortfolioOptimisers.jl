@@ -47,7 +47,41 @@ function forecast_hit_rate(x::AbstractVector{<:Real})
     return iszero(n) ? Tf(NaN) : Tf(h) / Tf(n)
 end
 """
-    forecast_series_summary(x::AbstractVector{<:Real}, ppy::Real)
+$(DocStringExtensions.TYPEDEF)
+
+Holds the four figures of one series: its annualised mean, its annualised volatility, its information ratio and its hit rate.
+
+This type is an implementation detail and is not intended for direct use. [`forecast_series_summary`](@ref) makes it, and [`forecast_quantile_spread`](@ref) reads it. The four values travel together out of the function, so a record names them where a plain tuple would let a swap pass silently.
+
+# Fields
+
+$(DocStringExtensions.FIELDS)
+
+# Related
+
+  - [`forecast_series_summary`](@ref)
+  - [`forecast_quantile_spread`](@ref)
+"""
+@concrete struct SeriesFigures
+    """
+    `ann_mean`: The annualised mean of the finite entries.
+    """
+    ann_mean
+    """
+    `ann_vol`: The annualised standard deviation of the finite entries.
+    """
+    ann_vol
+    """
+    `ann_ir`: The ratio of `ann_mean` to `ann_vol`.
+    """
+    ann_ir
+    """
+    `hit_rate`: The fraction of the finite entries that are positive.
+    """
+    hit_rate
+end
+"""
+    forecast_series_summary(x::AbstractVector{<:Real}, ppy::Real) -> SeriesFigures
 
 Return the annualised mean, volatility and information ratio of a series, and its hit rate.
 
@@ -83,10 +117,11 @@ Where:
 
 # Returns
 
-  - `summary::NamedTuple`: `(; ann_mean, ann_vol, ann_ir, hit_rate)`.
+  - `summary::SeriesFigures`: The four figures, as the fields `ann_mean`, `ann_vol`, `ann_ir` and `hit_rate` of a [`SeriesFigures`](@ref).
 
 # Related
 
+  - [`SeriesFigures`](@ref)
   - [`forecast_quantile_spread`](@ref)
   - [`forecast_hit_rate`](@ref)
   - [`performance_summary`](@ref)
@@ -99,8 +134,7 @@ function forecast_series_summary(x::AbstractVector{<:Real}, ppy::Real)
     ann_mean = m * ppy
     ann_vol = v * sqrt(Tf(ppy))
     ann_ir = ann_vol > zero(Tf) ? ann_mean / ann_vol : Tf(NaN)
-    return (; ann_mean = ann_mean, ann_vol = ann_vol, ann_ir = ann_ir,
-            hit_rate = forecast_hit_rate(x))
+    return SeriesFigures(ann_mean, ann_vol, ann_ir, forecast_hit_rate(x))
 end
 """
     forecast_cross_section!(valid::AbstractVector{Bool}, key::AbstractVector{<:Real},
@@ -313,7 +347,84 @@ function forecast_portfolio_weights(alpha::AbstractMatrix{<:Real},
     return w
 end
 """
-    forecast_portfolio(fe::ForecastEvaluationResult; kind::Symbol = :rank) -> NamedTuple
+$(DocStringExtensions.TYPEDEF)
+
+The long-short book that a Return Forecast states by itself, and its score.
+
+[`forecast_portfolio`](@ref) returns it. The weights, the return and the turnover have one entry for each evaluation date, and the summary reads the return with its gaps dropped. A caller reads the fields by name, as `p.ret` or `p.summary.sharpe`.
+
+# Fields
+
+$(DocStringExtensions.FIELDS)
+
+# Constructors
+
+    ForecastPortfolioResult(w::MatNum, ret::VecNum, turnover::VecNum,
+                            summary::AbstractResult, hit_rate::Real, mean_turnover::Real)
+    ForecastPortfolioResult(; w::MatNum, ret::VecNum, turnover::VecNum,
+                            summary::AbstractResult, hit_rate::Real, mean_turnover::Real)
+
+The positional constructor checks the values. The keyword constructor takes each field by name, with no default, and calls it. [`forecast_portfolio`](@ref) gives a [`PerformanceSummaryResult`](@ref) as `summary`.
+
+## Validation
+
+  - `w` has one row for each entry of `ret`, and `turnover` has one entry for each entry of `ret`. Otherwise, the constructor raises a `DimensionMismatch`.
+  - `hit_rate` is `NaN` or in ``[0, 1]``. Otherwise, the constructor raises a `DomainError`.
+  - No entry of `turnover` and no `mean_turnover` is negative. A `NaN` passes. Otherwise, the constructor raises a `DomainError`.
+
+# Related
+
+  - [`forecast_portfolio`](@ref)
+  - [`forecast_portfolio_weights`](@ref)
+  - [`PerformanceSummaryResult`](@ref)
+  - [`ForecastEvaluationResult`](@ref)
+"""
+@concrete struct ForecastPortfolioResult <: AbstractResult
+    """
+    Portfolio weights, `evaluation dates × assets`.
+    """
+    w
+    """
+    Portfolio target return, one entry per evaluation date, `NaN` below the `min_count` of the evaluation.
+    """
+    ret
+    """
+    Turnover, one entry per evaluation date, `NaN` at the first date and wherever `ret` is `NaN`.
+    """
+    turnover
+    """
+    The [`PerformanceSummaryResult`](@ref) of `ret` with its gaps dropped.
+    """
+    summary
+    """
+    Fraction of the finite entries of `ret` that are positive.
+    """
+    hit_rate
+    """
+    Mean of the finite entries of `turnover`.
+    """
+    mean_turnover
+    function ForecastPortfolioResult(w::MatNum, ret::VecNum, turnover::VecNum,
+                                     summary::AbstractResult, hit_rate::Real,
+                                     mean_turnover::Real)
+        @argcheck(size(w, 1) == length(ret) == length(turnover),
+                  DimensionMismatch("w ($(size(w, 1)) rows), ret ($(length(ret))) and turnover ($(length(turnover))) must each hold one entry per evaluation date"))
+        assert_nan_or_closed_unit_interval(hit_rate, :hit_rate)
+        assert_nan_or_nonneg(turnover, :turnover)
+        assert_nan_or_nonneg(mean_turnover, :mean_turnover)
+        return new{typeof(w), typeof(ret), typeof(turnover), typeof(summary),
+                   typeof(hit_rate), typeof(mean_turnover)}(w, ret, turnover, summary,
+                                                            hit_rate, mean_turnover)
+    end
+end
+function ForecastPortfolioResult(; w::MatNum, ret::VecNum, turnover::VecNum,
+                                 summary::AbstractResult, hit_rate::Real,
+                                 mean_turnover::Real)::ForecastPortfolioResult
+    return ForecastPortfolioResult(w, ret, turnover, summary, hit_rate, mean_turnover)
+end
+"""
+    forecast_portfolio(fe::ForecastEvaluationResult; kind::Symbol = :rank)
+        -> ForecastPortfolioResult
 
 Score the long-short portfolio that a Return Forecast states by itself.
 
@@ -368,7 +479,7 @@ The book of a gap date stays in `w`, because [`forecast_portfolio_weights`](@ref
 
 # Returns
 
-  - `portfolio::NamedTuple`: `(; w, ret, turnover, summary, hit_rate, mean_turnover)`.
+  - `p::ForecastPortfolioResult`: The six fields below. Earlier releases returned a `NamedTuple` of the same fields.
 
       + `w::MatNum`: Portfolio weights, `evaluation dates × assets`. A date below `fe.min_count` keeps its book, and a date with no scorable asset carries the book of the date before it.
       + `ret::VecNum`: Portfolio target return, one entry per evaluation date, `NaN` below `fe.min_count`.
@@ -379,6 +490,7 @@ The book of a gap date stays in `w`, because [`forecast_portfolio_weights`](@ref
 
 # Related
 
+  - [`ForecastPortfolioResult`](@ref)
   - [`forecast_portfolio_weights`](@ref)
   - [`forecast_quantile_spread`](@ref)
   - [`forecast_evaluation`](@ref)
@@ -386,7 +498,8 @@ The book of a gap date stays in `w`, because [`forecast_portfolio_weights`](@ref
   - [`performance_summary`](@ref)
   - [`calc_turnover`](@ref)
 """
-function forecast_portfolio(fe::ForecastEvaluationResult; kind::Symbol = :rank)
+function forecast_portfolio(fe::ForecastEvaluationResult;
+                            kind::Symbol = :rank)::ForecastPortfolioResult
     alpha::AbstractMatrix{<:Real} = fe.alpha
     y::AbstractMatrix{<:Real} = fe.y
     dates::AbstractVector{<:Integer} = fe.dates
@@ -411,10 +524,10 @@ function forecast_portfolio(fe::ForecastEvaluationResult; kind::Symbol = :rank)
     turnover = calc_turnover(w)
     turnover[.!isfinite.(ret)] .= Tf(NaN)
     ftn = turnover[isfinite.(turnover)]
-    return (; w = w, ret = ret, turnover = turnover,
-            summary = performance_summary(ret[isfinite.(ret)]; ppy = ppy),
-            hit_rate = forecast_hit_rate(ret),
-            mean_turnover = isempty(ftn) ? Tf(NaN) : sum(ftn) / length(ftn))
+    return ForecastPortfolioResult(w, ret, turnover,
+                                   performance_summary(ret[isfinite.(ret)]; ppy = ppy),
+                                   forecast_hit_rate(ret),
+                                   isempty(ftn) ? Tf(NaN) : sum(ftn) / length(ftn))
 end
 """
     forecast_tail_spread(av::AbstractVector{<:Real}, yv::AbstractVector{<:Real}, q::Real)
@@ -474,8 +587,77 @@ function forecast_tail_spread(av::AbstractVector{<:Real}, yv::AbstractVector{<:R
     return sh / nh - sl / nl
 end
 """
+$(DocStringExtensions.TYPEDEF)
+
+The top-minus-bottom spread of a Return Forecast at each evaluation date, and the four figures of each column, one column per tail fraction.
+
+[`forecast_quantile_spread`](@ref) returns it. The four figures are those of [`forecast_series_summary`](@ref), one entry per column of `spread`. A caller reads the fields by name, as `q.spread` or `q.ann_ir`.
+
+# Fields
+
+$(DocStringExtensions.FIELDS)
+
+# Constructors
+
+    ForecastQuantileSpreadResult(spread::MatNum, ann_mean::VecNum, ann_vol::VecNum,
+                                 ann_ir::VecNum, hit_rate::VecNum)
+    ForecastQuantileSpreadResult(; spread::MatNum, ann_mean::VecNum, ann_vol::VecNum,
+                                 ann_ir::VecNum, hit_rate::VecNum)
+
+The positional constructor checks the values. The keyword constructor takes each field by name, with no default, and calls it.
+
+## Validation
+
+  - The four figures hold one entry for each column of `spread`. Otherwise, the constructor raises a `DimensionMismatch`.
+  - No entry of `ann_vol` is negative. A `NaN` passes. Otherwise, the constructor raises a `DomainError`.
+  - Each entry of `hit_rate` is `NaN` or in ``[0, 1]``. Otherwise, the constructor raises a `DomainError`.
+
+# Related
+
+  - [`forecast_quantile_spread`](@ref)
+  - [`forecast_series_summary`](@ref)
+  - [`ForecastSummaryResult`](@ref)
+"""
+@concrete struct ForecastQuantileSpreadResult <: AbstractResult
+    """
+    The spread, `evaluation dates × quantiles`, `NaN` below the `min_count` of the evaluation.
+    """
+    spread
+    """
+    Annualised mean of each column of `spread`.
+    """
+    ann_mean
+    """
+    Annualised standard deviation of each column of `spread`.
+    """
+    ann_vol
+    """
+    Ratio of the annualised mean to the annualised standard deviation of each column.
+    """
+    ann_ir
+    """
+    Fraction of the finite dates of each column that are positive.
+    """
+    hit_rate
+    function ForecastQuantileSpreadResult(spread::MatNum, ann_mean::VecNum, ann_vol::VecNum,
+                                          ann_ir::VecNum, hit_rate::VecNum)
+        Q = size(spread, 2)
+        @argcheck(all(v -> length(v) == Q, (ann_mean, ann_vol, ann_ir, hit_rate)),
+                  DimensionMismatch("ann_mean, ann_vol, ann_ir and hit_rate must each hold one entry per column of spread ($Q)"))
+        assert_nan_or_nonneg(ann_vol, :ann_vol)
+        assert_nan_or_closed_unit_interval(hit_rate, :hit_rate)
+        return new{typeof(spread), typeof(ann_mean), typeof(ann_vol), typeof(ann_ir),
+                   typeof(hit_rate)}(spread, ann_mean, ann_vol, ann_ir, hit_rate)
+    end
+end
+function ForecastQuantileSpreadResult(; spread::MatNum, ann_mean::VecNum, ann_vol::VecNum,
+                                      ann_ir::VecNum,
+                                      hit_rate::VecNum)::ForecastQuantileSpreadResult
+    return ForecastQuantileSpreadResult(spread, ann_mean, ann_vol, ann_ir, hit_rate)
+end
+"""
     forecast_quantile_spread(fe::ForecastEvaluationResult;
-                             quantiles = (0.1,)) -> NamedTuple
+                             quantiles = (0.1,)) -> ForecastQuantileSpreadResult
 
 Score the top-minus-bottom spread of a Return Forecast, one column per quantile.
 
@@ -499,7 +681,7 @@ Score the top-minus-bottom spread of a Return Forecast, one column per quantile.
 
 # Returns
 
-  - `spreads::NamedTuple`: `(; spread, ann_mean, ann_vol, ann_ir, hit_rate)`.
+  - `q::ForecastQuantileSpreadResult`: The five fields below. Earlier releases returned a `NamedTuple` of the same fields.
 
       + `spread::MatNum`: The spread, `evaluation dates × quantiles`, `NaN` below `fe.min_count`.
       + `ann_mean::VecNum`: Annualised mean of each column.
@@ -509,13 +691,15 @@ Score the top-minus-bottom spread of a Return Forecast, one column per quantile.
 
 # Related
 
+  - [`ForecastQuantileSpreadResult`](@ref)
   - [`forecast_tail_spread`](@ref)
   - [`forecast_series_summary`](@ref)
   - [`forecast_portfolio`](@ref)
   - [`forecast_evaluation`](@ref)
   - [`ForecastEvaluationResult`](@ref)
 """
-function forecast_quantile_spread(fe::ForecastEvaluationResult; quantiles = (0.1,))
+function forecast_quantile_spread(fe::ForecastEvaluationResult;
+                                  quantiles = (0.1,))::ForecastQuantileSpreadResult
     @argcheck(!isempty(quantiles), IsEmptyError("quantiles cannot be empty"))
     @argcheck(all(q -> isfinite(q) && zero(q) < q <= 0.5, quantiles),
               DomainError(quantiles, "every quantile must be finite and in (0, 0.5]"))
@@ -541,10 +725,11 @@ function forecast_quantile_spread(fe::ForecastEvaluationResult; quantiles = (0.1
         end
     end
     summaries = [forecast_series_summary(view(spread, :, j), ppy) for j in 1:Q]
-    return (; spread = spread, ann_mean = [s.ann_mean for s in summaries],
-            ann_vol = [s.ann_vol for s in summaries],
-            ann_ir = [s.ann_ir for s in summaries],
-            hit_rate = [s.hit_rate for s in summaries])
+    return ForecastQuantileSpreadResult(spread, [s.ann_mean for s in summaries],
+                                        [s.ann_vol for s in summaries],
+                                        [s.ann_ir for s in summaries],
+                                        [s.hit_rate for s in summaries])
 end
 
-export forecast_portfolio, forecast_quantile_spread
+export ForecastPortfolioResult, ForecastQuantileSpreadResult, forecast_portfolio,
+       forecast_quantile_spread

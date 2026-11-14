@@ -10,10 +10,3 @@ NwE_Pl_ClE_Cl
 NwE_ClE
 NwE_ClE_Cl
 ```
-
-## References
-
-```@bibliography
-Pages = [@__FILE__]
-Canonical = false
-```

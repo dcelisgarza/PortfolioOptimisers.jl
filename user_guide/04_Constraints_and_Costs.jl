@@ -121,7 +121,7 @@ loadings that the optimiser used. The `MTUM` row shows the floor of the constrai
 =#
 
 pretty_table(DataFrame("Factor" => rd_f.nf,
-                       "Exposure" => transpose(res_fac.pa.pr.rr.M) * res_fac.w);
+                       "Exposure" => transpose(res_fac.jor.pr.rr.M) * res_fac.w);
              formatters = [resfmt], title = "Realised factor exposures")
 
 #=

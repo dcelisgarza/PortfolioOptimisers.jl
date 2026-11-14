@@ -13,7 +13,7 @@ A Calibration Rule resolves against the prior result, so a calibrated slot reads
 # Related
 
   - [`rows_needed`](@ref)
-  - [`resolve_allocation_set_rows`](@ref)
+  - [`resolve_constraint_block`](@ref)
   - [`is_calibration_rule`](@ref)
 """
 function calibrated(x::Any)
@@ -23,216 +23,143 @@ function calibrated(x::AbstractVector)
     return any(calibrated, x)
 end
 """
-$(DocStringExtensions.TYPEDSIGNATURES)
-
-Resolves the slots of a [`ProgrammeAllocationSet`](@ref) that read the head's rows, at every step.
-
-This is the second stage of the set's resolution. [`resolve_allocation_set`](@ref) resolves the slots keyed by name once per fold. This function resolves the rest on the prior result `pr` that is fitted on the rows `rd` that the head holds, as [`processed_jump_optimiser_attributes`](@ref) and [`assemble_jump_model!`](@ref) resolve them for a batch head. Each reader of the rows reads its own source, as the same reader of a JuMP head does. A set that reads no rows has no prior, and its slots come back as they are.
-
-# Algorithm
-
-The method on a prior result runs these steps.
-
- 1. Read `strict` from the current [`ProjectionStep`](@ref).
- 2. When `lcse` is keyed by exposure, build `lcsr` from it through [`linear_constraints`](@ref) with the prior's factor regression `pr.rr` and the rows. The regression of its constraint space states its own source. Otherwise `lcsr` is `lcse`.
- 3. Fit the centrality rows `ctr` and the phylogeny result `plr`, as a [`JuMPOptimiser`](@ref) does. Each estimator reads the rows or the prior, as its own `x_src` states. The prior goes to them as `pr`, and the implied volatilities `rd.iv` and their adjustment `rd.ivpa` go to them as `iv` and `ivpa`, so an [`ImpliedVolatility`](@ref) in a slot reads the surface of the rows.
- 4. Resolve the return floor `ret` against the prior.
- 5. Resolve the Calibration Rules of the norm ceilings `l2c`, `linfc` and `lpc`, and of the penalties `l1`, `l2`, `lp` and `linf`, against the prior and the set's solver.
- 6. Return the resolved slots and `rd`.
-
-# Arguments
-
-  - `set`: The programme set, resolved once per fold.
-  - `pr`: The prior result fitted on `rd`, or `nothing` when the set reads no rows.
-  - `rd`: The rows the head holds, a [`ReturnsResult`](@ref).
-
-# Validation
-
-  - A prior result with no rows. An `IsNothingError` is thrown. The prior is fitted on the rows, so this pair does not occur in the library.
-
-# Returns
-
-  - `attrs::NamedTuple`: `lcsr`, `ctr`, `plr`, `ret`, `l2c`, `lpc`, `linfc`, `l1`, `l2`, `lp`, `linf`, and the rows `rd`, which are `nothing` when the set reads no rows.
-
-# Related
-
-  - [`resolve_allocation_set`](@ref)
-  - [`set_allocation_set_constraints!`](@ref)
-  - [`linear_constraints`](@ref)
-  - [`centrality_constraints`](@ref)
-  - [`phylogeny_constraints`](@ref)
-  - [`resolve_calibration_slot`](@ref)
-"""
-function resolve_allocation_set_rows(::ProgrammeAllocationSet, ::AbstractPriorResult,
-                                     ::Nothing)
-    return throw(IsNothingError("a programme set's prior result is fitted on the rows that the head holds, so a result with no rows cannot resolve the row-reading slots."))
-end
-function resolve_allocation_set_rows(set::ProgrammeAllocationSet, ::Nothing, ::Any)
-    return (; lcsr = set.lcse, ctr = set.cte, plr = set.ple, ret = set.ret, l2c = set.l2c,
-            lpc = set.lpc, linfc = set.linfc, l1 = set.l1, l2 = set.l2, lp = set.lp,
-            linf = set.linf, rd = nothing)
-end
-function resolve_allocation_set_rows(set::ProgrammeAllocationSet, pr::AbstractPriorResult,
-                                     rd::ReturnsResult)
-    strict = projection_step_strict()
-    slv = set.slv
-    lcsr = if exposure_keyed(set.lcse)
-        linear_constraints(set.lcse, set.sets; datatype = eltype(rd.X), strict = strict,
-                           rr = pr.rr, rd = rd)
-    else
-        set.lcse
-    end
-    ctr = centrality_constraints(set.cte, pr; iv = rd.iv, ivpa = rd.ivpa, rd = rd,
-                                 strict = strict)
-    plr = phylogeny_constraints(set.ple, pr; iv = rd.iv, ivpa = rd.ivpa, rd = rd)
-    ret = factory(set.ret, pr)
-    l2c = resolve_calibration_slot(set.l2c, :l2c, pr, pr.w, slv,
-                                   CalibrationContext(; p = 2))
-    linfc = resolve_calibration_slot(set.linfc, :linfc, pr, pr.w, slv,
-                                     CalibrationContext(; p = Inf))
-    lpc = norm_ceiling_factory(set.lpc, pr, slv)
-    l1 = resolve_calibration_slot(set.l1, :l1, pr, pr.w, slv)
-    l2 = factory(set.l2, pr, slv)
-    lp = factory(set.lp, pr, slv)
-    linf = resolve_calibration_slot(set.linf, :linf, pr, pr.w, slv)
-    return (; lcsr, ctr, plr, ret, l2c, lpc, linfc, l1, l2, lp, linf, rd)
-end
-"""
     set_allocation_set_constraints!(model::JuMP.Model, set::BoundedAllocationSet, w::AbstractVector, X, pr = nothing)
+    set_allocation_set_constraints!(model::JuMP.Model, set::BoundedAllocationSet, cbr::Nothing)
     set_allocation_set_constraints!(model::JuMP.Model, set::ProgrammeAllocationSet, w::AbstractVector, X)
     set_allocation_set_constraints!(model::JuMP.Model, set::ProgrammeAllocationSet, w::AbstractVector, X, pr)
+    set_allocation_set_constraints!(model::JuMP.Model, set::ProgrammeAllocationSet, cbr::ResolvedConstraintBlock)
 
 Adds the constraints of a resolved Allocation Set to the bare projection model.
 
-The model must already hold `w`, `k`, the two scales and the observation count. On both kinds of set the function adds the weight bounds and the budget of one. On a [`ProgrammeAllocationSet`](@ref) it also adds every other kind of the set, through the builders a JuMP optimiser uses and in the order [`assemble_jump_model!`](@ref) runs them. [`assemble_allocation_set!`](@ref) lists that order.
+The model must already hold `w`, `k`, the two scales and the observation count. On both kinds of set the function adds the weight bounds and the budget of one. On a [`ProgrammeAllocationSet`](@ref) the projection is the owner of the model, and the set is the owner of its block. The projection writes the budget of one, and the block builder [`set_block_constraints!`](@ref) adds every kind of the block, which a JuMP optimiser adds through the same builder. The bounds builder [`set_allocation_risk_return_bounds!`](@ref) adds the risk ceilings and the return floor of the set between the two phases of the block.
 
-[`projection_programme`](@ref) calls the five-argument form with the prior it fitted and reduced to the Investable Mask. The four-argument form fits the prior on `X` itself. A JuMP head does not call this function. Its Allocation Set Constraint calls [`add_allocation_set_constraints!`](@ref), which runs the same builders under names that do not collide with the head's own. The prior must price every asset the model trades.
+[`projection_programme`](@ref) calls the three-argument form. It resolves the block of the set through the shared entry of a bare head, [`resolve_projection_entry`](@ref), and gives the set viewed at the Investable Mask and the Result of its block. The four-argument and the five-argument forms are the direct call. They resolve the step themselves, on a model that already holds the width of `w`, so they cannot drop an asset. A direct call refuses an asset that the prior cannot price, with [`assert_set_prior_priced`](@ref), and a distance reader of the set that refuses an asset raises its [`DistanceReaderRefusalError`](@ref). A JuMP head does not call this function. The leader re-solve of [`FollowTheLeader`](@ref) passes the set as a second block of the entry of the head, and [`assemble_jump_model!`](@ref) adds the block with the same builders under the namespace `blk_2_`.
 
 # Algorithm
 
  1. In the four-argument form, fit the set's prior `pr` on `X` with [`allocation_set_prior`](@ref), and call the five-argument form.
- 2. Add the weight bounds, the budget of one, and the short and gross budgets with [`set_allocation_set_bounds!`](@ref).
- 3. On a programme set, add every other kind with [`assemble_allocation_set!`](@ref) under the empty prefix.
+ 2. In the five-argument form on a programme set, resolve the step with [`resolve_allocation_set_step`](@ref), which gives the set after `factory(set, w)` and the Result `cbr` of its block, and call the three-argument form.
+ 3. On a bounded set, add the weight bounds and the budget of one with [`set_allocation_set_bounds!`](@ref), and return `set.wb` with no block Result.
+ 4. On a programme set, add the budget of one with [`set_budget_constraints!`](@ref). Add the block, the ceilings and the floor with [`add_allocation_set_block!`](@ref) under the empty prefix. Return the bounds of the step and `cbr`.
 
 # Arguments
 
   - $(arg_dict[:model])
-  - `set`: The Allocation Set, resolved once per fold.
+  - `set`: The Allocation Set, resolved once per fold. In the three-argument form, the set after `factory(set, w)`, viewed at the Investable Mask of the step.
   - `w`: The Price-Adjusted Allocation the step trades from. It is the reference of the turnover ceilings and of a tracking benchmark that is not fixed.
   - `X`: The rows the head holds through the period, a [`ReturnsResult`](@ref), or `nothing`.
   - `pr`: The prior result that the slots which read the rows are built on, [`allocation_set_prior`](@ref) of the set on `X`, or `nothing` when the set reads no rows.
+  - `cbr`: The [`ResolvedConstraintBlock`](@ref) of the set at the step, or `nothing` for a bounded set.
 
 # Validation
 
   - A slot that reads the rows, with `X === nothing`. The four-argument form throws an `ArgumentError`, because a projection gets the rows only inside an Online Update.
-  - A prior whose Investable Mask leaves out an asset the model trades. [`assert_set_prior_priced`](@ref) throws an `ArgumentError`.
+  - In the direct call, a prior whose Investable Mask leaves out an asset the model trades. [`assert_set_prior_priced`](@ref) throws an `ArgumentError`.
 
 # Returns
 
-  - `nothing`.
+  - `(wb, cbr)::Tuple`: The weight bounds of the step that the model holds, and the [`ResolvedConstraintBlock`](@ref) of the set, or `nothing` for a bounded set. [`projection_programme`](@ref) reads the floor of `wb` under a barrier geometry.
 
 # Related
 
   - [`ProgrammeAllocationSet`](@ref)
   - [`BoundedAllocationSet`](@ref)
-  - [`add_allocation_set_constraints!`](@ref)
+  - [`resolve_projection_entry`](@ref)
+  - [`leader_block`](@ref)
   - [`assemble_jump_model!`](@ref)
   - [`set_allocation_risk_ceiling!`](@ref)
 """
 function set_allocation_set_constraints!(model::JuMP.Model, set::BoundedAllocationSet,
-                                         ::AbstractVector, ::Any, ::Any = nothing)::Nothing
+                                         ::AbstractVector, ::Any, ::Any = nothing)::Tuple
+    return set_allocation_set_constraints!(model, set, nothing)
+end
+function set_allocation_set_constraints!(model::JuMP.Model, set::BoundedAllocationSet,
+                                         ::Nothing)::Tuple
     set_allocation_set_bounds!(model, set.wb)
-    return nothing
+    return set.wb, nothing
 end
 function set_allocation_set_constraints!(model::JuMP.Model, set::ProgrammeAllocationSet,
                                          w::AbstractVector,
-                                         X::Option{<:ReturnsResult})::Nothing
+                                         X::Option{<:ReturnsResult})::Tuple
     return set_allocation_set_constraints!(model, set, w, X, allocation_set_prior(set, X))
 end
 function set_allocation_set_constraints!(model::JuMP.Model, set::ProgrammeAllocationSet,
                                          w::AbstractVector, X::Option{<:ReturnsResult},
-                                         pr::Option{<:AbstractPriorResult})::Nothing
-    set_allocation_set_bounds!(model, set.wb, set.sbgt, set.gbgt)
-    assemble_allocation_set!(model, set, w, X, pr, Symbol(""))
-    return nothing
+                                         pr::Option{<:AbstractPriorResult})::Tuple
+    setw, cbr = resolve_allocation_set_step(set, w, X, pr)
+    return set_allocation_set_constraints!(model, setw, cbr)
 end
-"""
-    add_allocation_set_constraints!(model::JuMP.Model, set::BoundedAllocationSet, w::AbstractVector, X)
-    add_allocation_set_constraints!(model::JuMP.Model, set::ProgrammeAllocationSet, w::AbstractVector, X)
-
-Adds the constraints of a resolved Allocation Set to a JuMP head's model during its assembly.
-
-This is the arm of the Allocation Set Constraint that a [`FollowTheLeader`](@ref) rule appends to its held optimiser. The head's builders have already registered their named entries: the weight bounds, the budgets, and the turnover and tracking-error terms under their indices. So this function adds the set's rows under other names than the bare projection model uses. It adds the bounds, the budget of one, and the short and gross budgets as anonymous rows. It adds every other kind through the same builders as [`set_allocation_set_constraints!`](@ref), in the same order. A builder that takes a prefix gets `:aset_`. A builder that takes an index gets the first index the model has not used. The function registers the head's `w` under the prefix, so the entries of a set's risk ceiling never collide with the head's own risk measures.
-
-The set's penalties and the `p · tr(W)` term of its semidefinite phylogeny go into the Objective Penalty, which the head's objective builder adds to the head's objective. The tracking errors read the rows `X` that the head holds, and their row count. The set's prior is fitted on those rows, as the leader's prior is. The leader's model trades only the Investable Mask of its own prior, so [`assert_set_prior_priced`](@ref) refuses a set prior that prices fewer assets than the leader's.
-
-Some builders register their entries under one fixed name per model: a MIP kind, the exact long-short pin, a norm ceiling, a penalty and an integer phylogeny. State such a kind on the set or on the held optimiser, not on both. When it is on both, the second registration fails with an error that names the entry.
-
-# Algorithm
-
- 1. Add the bounds and the budgets as anonymous rows with [`add_allocation_set_bounds!`](@ref).
- 2. On a programme set, fit the set's prior on `X` with [`allocation_set_prior`](@ref), and add every other kind with [`assemble_allocation_set!`](@ref) under the prefix `:aset_`.
-
-# Arguments
-
-  - $(arg_dict[:model])
-  - `set`: The Allocation Set, resolved once per fold.
-  - `w`: The Price-Adjusted Allocation the step trades from.
-  - `X`: The rows the head holds through the period, a [`ReturnsResult`](@ref), or `nothing`.
-
-# Returns
-
-  - `nothing`.
-
-# Related
-
-  - [`set_allocation_set_constraints!`](@ref)
-  - [`AllocationSetConstraint`](@ref)
-  - [`FollowTheLeader`](@ref)
-"""
-function add_allocation_set_constraints!(model::JuMP.Model, set::BoundedAllocationSet,
-                                         ::AbstractVector, ::Any)::Nothing
-    add_allocation_set_bounds!(model, set.wb, nothing, nothing)
-    return nothing
-end
-function add_allocation_set_constraints!(model::JuMP.Model, set::ProgrammeAllocationSet,
-                                         w::AbstractVector,
-                                         X::Option{<:ReturnsResult})::Nothing
-    add_allocation_set_bounds!(model, set.wb, set.sbgt, set.gbgt)
-    assemble_allocation_set!(model, set, w, X, allocation_set_prior(set, X), :aset_)
-    return nothing
+function set_allocation_set_constraints!(model::JuMP.Model, set::ProgrammeAllocationSet,
+                                         cbr::ResolvedConstraintBlock)::Tuple
+    # The bare projection owns the budget of one, so it writes the row itself and gives the
+    # block no net budget (ADR 0237).
+    set_budget_constraints!(model, 1, get_w(model))
+    add_allocation_set_block!(model, set, cbr, Symbol(""))
+    return cbr.wb, cbr
 end
 """
 $(DocStringExtensions.TYPEDSIGNATURES)
 
-Adds every kind of a programme set other than the bounds and the budgets, in the order [`assemble_jump_model!`](@ref) runs them.
+Resolves a programme set for one step of an online head, to the set after `factory(set, w)` and the [`ResolvedConstraintBlock`](@ref) of its block.
 
-Both arms call it after they add the bounds. The bare projection model passes the empty prefix `Symbol("")`. A leader's model passes `:aset_`. Then the builders that take an index use the first free index, and the head's `w` is registered under the prefix.
+The direct call of [`set_allocation_set_constraints!`](@ref) has a model of a fixed width, so it resolves the step here and does not drop an asset. Then [`add_allocation_set_block!`](@ref) adds the Result with the block builder. [`projection_programme`](@ref) does not call it. It resolves the block through the shared entry of a bare head, [`resolve_projection_entry`](@ref), which drops an asset that the prior cannot price or that a reader refuses.
 
 # Algorithm
 
  1. Check that the prior prices every asset in `X` with [`assert_set_prior_priced`](@ref).
- 2. Resolve the slots that read the rows with [`resolve_allocation_set_rows`](@ref). This gives `lcsr`, `ctr`, `plr`, `ret`, `l2c`, `lpc`, `linfc`, `l1`, `l2`, `lp`, `linf` and `rd`.
- 3. When `prefix` is not empty, register the model's `w` under it, with the owner `w_owner = Symbol("")`. Then [`weights_prefix`](@ref) keeps the lifted `W`, `variance_flag` and `rc_variance` in the bare namespace, because the weights are the leader's.
- 4. Add the linear rows `lcsr`, then the centrality rows `ctr`.
- 5. Add the MIP kinds, then the sub-group MIP kinds.
- 6. Add the turnover ceilings, each with its reference replaced by `w`, through [`set_allocation_turnover!`](@ref).
- 7. When the set has tracking errors, resolve each against `w`, so that a benchmark that is not fixed takes `w`. Cut each benchmark series to the row count of the prior with [`prefix_tracking_benchmark`](@ref). Bind each [`DataBenchmarkTracking`](@ref) to the benchmark of the rows `rd` with [`bind_data_benchmark`](@ref), and add the rows.
- 8. Add the norm ceilings `l2c`, `lpc` and `linfc`.
- 9. Add the penalties `l1`, `l2`, `lp` and `linf` to the Objective Penalty.
-10. Resolve the risk ceilings against `w` with [`factory`](@ref), so that a [`WeightsTracking`](@ref) benchmark or a [`TurnoverRiskMeasure`](@ref) reference that is not fixed takes `w`, as in steps 6 and 7. A measure that holds neither stays as it is. Bind each [`DataBenchmarkTracking`](@ref) of the ceilings to the benchmark of the rows `rd`, and add the ceilings with [`set_allocation_risk_ceiling!`](@ref).
-11. Add the return floor `ret` with [`set_allocation_return_floor!`](@ref), with the rows.
-12. Add the integer phylogeny rows and the semidefinite phylogeny rows of `plr`.
-13. Add the custom constraints.
+ 2. Give the set the Price-Adjusted Allocation `w` with `factory(set, w)`, so a turnover ceiling, a tracking error, a risk ceiling, a custom constraint and a custom objective term that read the previous weights read the book of the step.
+ 3. Resolve stage 2 of the block of the set against `pr` and `X` with [`resolve_constraint_block`](@ref), under the solver of the set and the `strict` flag of the current [`ProjectionStep`](@ref).
+ 4. Check the bounds of the step against the budget of one with [`assert_feasible_bounds`](@ref). A bound that reads the rows resolves only here ([`bounds_read_rows`](@ref)).
 
 # Arguments
 
-  - $(arg_dict[:model])
   - `set`: The programme set, resolved once per fold.
   - `w`: The Price-Adjusted Allocation the step trades from.
   - `X`: The rows the head holds through the period, a [`ReturnsResult`](@ref), or `nothing`.
   - `pr`: The set's prior result on `X`, or `nothing` when the set reads no rows.
-  - `prefix`: `Symbol("")` on the bare projection model, `:aset_` in a leader's model.
+
+# Validation
+
+  - The rules of [`assert_set_prior_priced`](@ref), [`resolve_constraint_block`](@ref) and [`assert_feasible_bounds`](@ref).
+
+# Returns
+
+  - `(set', cbr)::Tuple`: The set after `factory(set, w)`, and the Result of its block.
+
+# Related
+
+  - [`add_allocation_set_block!`](@ref)
+  - [`resolve_constraint_block`](@ref)
+"""
+function resolve_allocation_set_step(set::ProgrammeAllocationSet, w::AbstractVector,
+                                     X::Option{<:ReturnsResult},
+                                     pr::Option{<:AbstractPriorResult})::Tuple
+    assert_set_prior_priced(pr, X)
+    setw = factory(set, w)
+    cbr = resolve_constraint_block(setw.cbe, pr, X; slv = setw.slv,
+                                   strict = projection_step_strict())
+    assert_feasible_bounds(cbr.wb)
+    return setw, cbr
+end
+"""
+$(DocStringExtensions.TYPEDSIGNATURES)
+
+Adds the block of a programme set to a model with the block builder, and the set's risk ceilings and return floor with its bounds builder.
+
+The set is the owner of its block, so the builder gets no net budget and no fees, as the set had none before the block. The owner of the model writes the budget of one. The bare projection passes the empty prefix `Symbol("")`. Another prefix puts the rows of the set in that namespace, beside the rows of the owner of the model, as [`assemble_jump_model!`](@ref) puts a later block under `blk_i_`.
+
+# Algorithm
+
+ 1. Add phase 1 of the block with [`set_block_constraints!`](@ref), with the set as the owner and its tracking errors from [`allocation_set_tracking`](@ref).
+ 2. Add the risk ceilings and the return floor with [`set_allocation_risk_return_bounds!`](@ref).
+ 3. Add phase 2 of the block with [`set_block_post_risk_constraints!`](@ref).
+
+# Arguments
+
+  - $(arg_dict[:model])
+  - `set`: The programme set, after `factory(set, w)`.
+  - `cbr`: The Result of its block, from [`resolve_allocation_set_step`](@ref).
+  - `prefix`: The Model State namespace of the block, `Symbol("")` on the bare projection model.
 
 # Returns
 
@@ -240,53 +167,45 @@ Both arms call it after they add the bounds. The bare projection model passes th
 
 # Related
 
-  - [`set_allocation_set_constraints!`](@ref)
-  - [`add_allocation_set_constraints!`](@ref)
-  - [`resolve_allocation_set_rows`](@ref)
+  - [`resolve_allocation_set_step`](@ref)
+  - [`set_block_constraints!`](@ref)
+  - [`set_allocation_risk_return_bounds!`](@ref)
 """
-function assemble_allocation_set!(model::JuMP.Model, set::ProgrammeAllocationSet,
-                                  w::AbstractVector, X::Option{<:ReturnsResult},
-                                  pr::Option{<:AbstractPriorResult},
-                                  prefix::Symbol)::Nothing
-    bare = prefix == Symbol("")
-    assert_set_prior_priced(pr, X)
-    (; lcsr, ctr, plr, ret, l2c, lpc, linfc, l1, l2, lp, linf, rd) = resolve_allocation_set_rows(set,
-                                                                                                 pr,
-                                                                                                 X)
-    if !bare
-        state_build!(() -> get_w(model), model, prefix, :w)
-        state_build!(() -> Symbol(""), model, prefix, :w_owner)
-    end
-    set_linear_weight_constraints!(model, lcsr, state_key(prefix, :lcs_ineq_),
-                                   state_key(prefix, :lcs_eq_))
-    set_linear_weight_constraints!(model, ctr, state_key(prefix, :cent_ineq_),
-                                   state_key(prefix, :cent_eq_))
-    set_mip_constraints!(model, set.wb, set.card, set.gcarde, plr, set.lt, set.st, nothing,
-                         set.ss, set.xbgt)
-    set_smip_constraints!(model, set.wb, set.scard, set.sgcarde, set.smtx, set.sgmtx,
-                          set.slt, set.sst, set.sglt, set.sgst, set.ss)
-    set_allocation_turnover!(model, factory(set.tn, w), bare)
-    if !isnothing(set.tr)
-        # The constructor refuses a data benchmark under a prior of the Excess Frame, so a
-        # data benchmark binds to the raw rows that the set's prior reads.
-        tr = bind_data_benchmark(prefix_tracking_benchmark(factory(set.tr, w),
-                                                           size(pr.X, 1)), rd)
-        set_tracking_error_constraints!(model, pr, tr, set, plr, nothing; prefix = prefix)
-    end
-    set_weight_norm_2_constraints!(model, l2c)
-    set_weight_norm_p_constraints!(model, lpc)
-    set_weight_norm_inf_constraints!(model, linfc)
-    set_l1_regularisation!(model, l1)
-    set_l2_regularisation!(model, l2)
-    set_lp_regularisation!(model, lp)
-    set_linf_regularisation!(model, linf)
-    set_allocation_risk_ceiling!(model, bind_data_benchmark(factory(set.r, w), rd), set, pr,
-                                 plr; prefix = prefix)
-    set_allocation_return_floor!(model, ret, pr, bare; rd = rd)
-    set_iplg_constraints!(model, plr)
-    set_sdp_phylogeny_constraints!(model, plr; prefix = prefix)
-    add_custom_constraint!(model, set.ccnt, set, nothing)
+function add_allocation_set_block!(model::JuMP.Model, set::ProgrammeAllocationSet,
+                                   cbr::ResolvedConstraintBlock, prefix::Symbol)::Nothing
+    set_block_constraints!(model, cbr, set, nothing, nothing;
+                           tr = allocation_set_tracking(set.tr, cbr), prefix = prefix)
+    set_allocation_risk_return_bounds!(model, set, cbr; prefix = prefix)
+    set_block_post_risk_constraints!(model, cbr, set, nothing; prefix = prefix)
     return nothing
+end
+"""
+    allocation_set_tracking(tr::Nothing, cbr::ResolvedConstraintBlock)
+    allocation_set_tracking(tr, cbr::ResolvedConstraintBlock)
+
+Binds the tracking errors of a programme set to the rows of its block.
+
+The set comes after `factory(set, w)`, so a benchmark that is not fixed already holds the Price-Adjusted Allocation of the step. The function cuts each benchmark series to the row count of the prior of the block with [`prefix_tracking_benchmark`](@ref), and binds each [`DataBenchmarkTracking`](@ref) to the benchmark of the rows `cbr.rd` with [`bind_data_benchmark`](@ref). The constructor of the set refuses a data benchmark under a prior of the Excess Frame, so a data benchmark binds to the raw rows that the set's prior reads.
+
+# Arguments
+
+  - `tr`: The tracking errors of the set, or `nothing`.
+  - `cbr`: The Result of the block of the set.
+
+# Returns
+
+  - `tr'`: The bound tracking errors, or `nothing`.
+
+# Related
+
+  - [`add_allocation_set_block!`](@ref)
+  - [`prefix_tracking_benchmark`](@ref)
+"""
+function allocation_set_tracking(::Nothing, ::ResolvedConstraintBlock)::Nothing
+    return nothing
+end
+function allocation_set_tracking(tr, cbr::ResolvedConstraintBlock)
+    return bind_data_benchmark(prefix_tracking_benchmark(tr, size(cbr.pr.X, 1)), cbr.rd)
 end
 """
     prefix_tracking_benchmark(tr, T::Integer)
@@ -308,7 +227,7 @@ The head's rows are the first rows of the fold, up to the current period, so a b
 
 # Related
 
-  - [`assemble_allocation_set!`](@ref)
+  - [`allocation_set_tracking`](@ref)
   - [`set_tracking_error_constraints!`](@ref)
   - [`ReturnsTracking`](@ref)
 """
@@ -326,61 +245,20 @@ function prefix_tracking_benchmark(trs::AbstractVector, T::Integer)
     return [prefix_tracking_benchmark(tr, T) for tr in trs]
 end
 """
-    set_allocation_turnover!(model::JuMP.Model, tn::Nothing, bare::Bool)
-    set_allocation_turnover!(model::JuMP.Model, tn::Turnover, bare::Bool)
-    set_allocation_turnover!(model::JuMP.Model, tns::VecTn, bare::Bool)
-
-Adds a programme set's turnover ceilings, whose reference is already the step's Price-Adjusted Allocation.
-
-On the bare projection model the ceilings take the indices one to the number of ceilings. In a leader's model each ceiling takes the first index that the model has not used, so the set's terms do not replace the head's own.
-
-# Arguments
-
-  - $(arg_dict[:model])
-  - `tn`: The turnover ceilings, one [`Turnover`](@ref), a vector of them, or `nothing`.
-  - `bare`: `true` on the bare projection model, `false` in a leader's model.
-
-# Returns
-
-  - `nothing`.
-
-# Related
-
-  - [`set_turnover_constraints!`](@ref)
-  - [`free_state_index`](@ref)
-"""
-function set_allocation_turnover!(::JuMP.Model, ::Nothing, ::Bool)::Nothing
-    return nothing
-end
-function set_allocation_turnover!(model::JuMP.Model, tn::Turnover, bare::Bool)::Nothing
-    set_allocation_turnover!(model, [tn], bare)
-    return nothing
-end
-function set_allocation_turnover!(model::JuMP.Model, tns::VecTn, bare::Bool)::Nothing
-    if bare
-        set_turnover_constraints!(model, tns)
-        return nothing
-    end
-    for tn in tns
-        _set_turnover_constraints!(model, tn, free_state_index(model, :t_tn_))
-    end
-    return nothing
-end
-"""
-    set_allocation_return_floor!(model::JuMP.Model, ret::Nothing, pr, bare::Bool; kwargs...)
-    set_allocation_return_floor!(model::JuMP.Model, ret::JuMPReturnsEstimator, pr::AbstractPriorResult, bare::Bool; kwargs...)
-    set_allocation_return_floor!(model::JuMP.Model, rets::VecJRE, pr::AbstractPriorResult, bare::Bool; kwargs...)
+    set_allocation_return_floor!(model::JuMP.Model, ret::Nothing, pr; prefix::Symbol = Symbol(""), kwargs...)
+    set_allocation_return_floor!(model::JuMP.Model, ret::JuMPReturnsEstimator, pr::AbstractPriorResult; prefix::Symbol = Symbol(""), kwargs...)
+    set_allocation_return_floor!(model::JuMP.Model, rets::VecJRE, pr::AbstractPriorResult; prefix::Symbol = Symbol(""), kwargs...)
 
 Adds a programme set's return floor.
 
-For each term, the per-index arm of [`set_return_constraints!`](@ref) writes the return expression on the prior's expected returns and the row of its `settings.lb`. The term's scale is set to one first. On the bare projection model the terms take the indices one to the number of terms. In a leader's model each term takes the first index the model has not used. The function does not use a term in the objective, as a scalarised return or the normalisation of a ratio, because the objective of the projection is the geometry's divergence.
+For each term, the per-index arm of [`set_return_constraints!`](@ref) writes the return expression on the prior's expected returns and the row of its `settings.lb`. The term clears its `rte` first with [`no_return_expr_returns_estimator`](@ref), as a risk ceiling clears its `rke`, so it adds nothing to `ret_vec`, the return expression of the objective of the owner. The terms take the indices one to the number of terms under `prefix`, so in a leader's model they do not replace the head's own. The function does not use a term in the objective, as a scalarised return or the normalisation of a ratio, because the objective of the projection is the geometry's divergence.
 
 # Arguments
 
   - $(arg_dict[:model])
   - `ret`: The return floor, one return estimator, a vector of them, or `nothing`.
   - `pr`: The set's prior result.
-  - `bare`: `true` on the bare projection model, `false` in a leader's model.
+  - $(arg_dict[:prefix_kw])
   - `kwargs...`: Forwarded to [`set_return_constraints!`](@ref). The rows that the head holds arrive as `rd`.
 
 # Returns
@@ -390,220 +268,44 @@ For each term, the per-index arm of [`set_return_constraints!`](@ref) writes the
 # Related
 
   - [`set_return_constraints!`](@ref)
-  - [`free_state_index`](@ref)
+  - [`set_allocation_risk_return_bounds!`](@ref)
 """
-function set_allocation_return_floor!(::JuMP.Model, ::Nothing, ::Any, ::Bool;
-                                      kwargs...)::Nothing
+function set_allocation_return_floor!(::JuMP.Model, ::Nothing, ::Any;
+                                      prefix::Symbol = Symbol(""), kwargs...)::Nothing
     return nothing
 end
 function set_allocation_return_floor!(model::JuMP.Model, ret::JuMPReturnsEstimator,
-                                      pr::AbstractPriorResult, bare::Bool;
+                                      pr::AbstractPriorResult; prefix::Symbol = Symbol(""),
                                       kwargs...)::Nothing
-    set_allocation_return_floor!(model, [ret], pr, bare; kwargs...)
+    set_allocation_return_floor!(model, [ret], pr; prefix = prefix, kwargs...)
     return nothing
 end
 function set_allocation_return_floor!(model::JuMP.Model, rets::VecJRE,
-                                      pr::AbstractPriorResult, bare::Bool;
+                                      pr::AbstractPriorResult; prefix::Symbol = Symbol(""),
                                       kwargs...)::Nothing
     for (i, ret) in enumerate(rets)
-        j = bare ? i : free_state_index(model, :ret_)
-        set_return_constraints!(model, j, unit_scale_returns_estimator(ret), pr; kwargs...)
+        set_return_constraints!(model, i, no_return_expr_returns_estimator(ret), pr;
+                                prefix = prefix, kwargs...)
     end
     return nothing
 end
 """
-$(DocStringExtensions.TYPEDSIGNATURES)
+    set_allocation_set_bounds!(model::JuMP.Model, wb::WeightBounds)
 
-Adds an Allocation Set's weight bounds, its budget of one, and its short and gross budgets to a model that already names its own.
+Adds the weight bounds and the budget of one of a [`BoundedAllocationSet`](@ref) to the bare projection model.
 
-The rows are the inequalities that [`set_allocation_set_bounds!`](@ref) writes, registered under no name. The short and gross budgets read the model's long and short parts when the model holds them. Otherwise the function makes two anonymous vectors of parts and bounds them by `w`.
-
-# JuMP formulation
-
-## Variables
-
-  - `w`, `k`: read from the model.
-  - `lw`, `sw`: long and short parts. They are read from the model when it holds them. Otherwise, when the set has a short or a gross budget, they are two anonymous vectors of ``N`` variables, each bounded below by zero.
-
-## Constraints
-
-Every row is registered under no name.
-
-  - ``s_c (\\boldsymbol{w} - k \\boldsymbol{l}) \\geq 0``, when an entry of ``\\boldsymbol{l}`` is finite.
-  - ``s_c (\\boldsymbol{w} - k \\boldsymbol{u}) \\leq 0``, when an entry of ``\\boldsymbol{u}`` is finite.
-  - ``s_c \\left(\\sum_{i=1}^{N} w_i - k\\right) = 0``.
-  - ``s_c (\\boldsymbol{w} - \\boldsymbol{lw}) \\leq 0`` and ``s_c (\\boldsymbol{w} + \\boldsymbol{sw}) \\geq 0``, when the function makes the parts.
-  - The rows of [`anonymous_budget_rows!`](@ref) on ``\\sum_i sw_i`` for the short budget, and on ``\\sum_i (lw_i + sw_i)`` for the gross budget.
-
-Where:
-
-  - $(math_dict[:sc_scale])
-  - $(math_dict[:k_budget])
-  - $(math_dict[:w_port])
-  - $(math_dict[:N])
-  - ``\\boldsymbol{l}``, ``\\boldsymbol{u}``: Lower and upper weight bounds of the set, resolved.
-  - ``\\boldsymbol{lw}``, ``\\boldsymbol{sw}``: Long and short parts of ``\\boldsymbol{w}``, each ``N \\times 1`` and non-negative.
-
-# Arguments
-
-  - $(arg_dict[:model])
-  - `wb`: The set's resolved [`WeightBounds`](@ref).
-  - `sbgt`: The short budget, a number, a [`BudgetRange`](@ref), or `nothing`.
-  - `gbgt`: The gross budget, a number, a [`BudgetRange`](@ref), or `nothing`.
-
-# Validation
-
-  - `Σ lb ≤ 1 ≤ Σ ub` over the resolved bounds, through [`assert_feasible_bounds`](@ref).
-
-# Related
-
-  - [`add_allocation_set_constraints!`](@ref)
-  - [`set_allocation_set_bounds!`](@ref)
-  - [`anonymous_budget_rows!`](@ref)
-"""
-function add_allocation_set_bounds!(model::JuMP.Model, wb::WeightBounds, sbgt,
-                                    gbgt)::Nothing
-    assert_feasible_bounds(wb)
-    w = get_w(model)
-    k = get_k(model)
-    sc = get_constraint_scale(model)
-    if w_finite_flag(wb.lb)
-        JuMP.@constraint(model, sc * (w ⊖ k * wb.lb) >= 0)
-    end
-    if w_finite_flag(wb.ub)
-        JuMP.@constraint(model, sc * (w ⊖ k * wb.ub) <= 0)
-    end
-    JuMP.@constraint(model, sc * (sum(w) - k) == 0)
-    return add_allocation_set_bounds!(model, w, sc, sbgt, gbgt)
-end
-# The short and the gross budgets read the long and the short parts of `w`. Without either
-# budget, no row reads them, so the parts are not built.
-function add_allocation_set_bounds!(::JuMP.Model, ::Any, ::Any, ::Nothing,
-                                    ::Nothing)::Nothing
-    return nothing
-end
-function add_allocation_set_bounds!(model::JuMP.Model, w, sc, sbgt, gbgt)::Nothing
-    lw, sw = if shared_has(model, :sw)
-        shared_get(model, :lw), shared_get(model, :sw)
-    else
-        N = length(w)
-        lw = JuMP.@variable(model, [1:N], lower_bound = 0)
-        sw = JuMP.@variable(model, [1:N], lower_bound = 0)
-        JuMP.@constraint(model, sc * (w - lw) <= 0)
-        JuMP.@constraint(model, sc * (w + sw) >= 0)
-        lw, sw
-    end
-    anonymous_budget_rows!(model, sum(sw), sbgt)
-    anonymous_budget_rows!(model, sum(lw) + sum(sw), gbgt)
-    return nothing
-end
-"""
-    anonymous_budget_rows!(model::JuMP.Model, expr, bgt::Nothing)
-    anonymous_budget_rows!(model::JuMP.Model, expr, bgt::Number)
-    anonymous_budget_rows!(model::JuMP.Model, expr, bgt::BudgetRange)
-
-Adds one budget on an expression as rows under no name.
-
-A number fixes the expression at `k · bgt`. A [`BudgetRange`](@ref) bounds it on each side that is set. `nothing` adds no row.
-
-# JuMP formulation
-
-## Variables
-
-  - `k`: read from the model.
-
-## Constraints
-
-Every row is registered under no name.
-
-  - ``s_c (e - k b) = 0``, when the budget is a number.
-  - ``s_c (e - k b_l) \\geq 0`` and ``s_c (e - k b_u) \\leq 0``, when the budget is a range, each row only when its bound is set.
-
-Where:
-
-  - $(math_dict[:sc_scale])
-  - $(math_dict[:k_budget])
-  - ``e``: The expression the budget bounds.
-  - ``b``: The budget, when it is a number.
-  - ``b_l``, ``b_u``: Lower and upper bounds of the range.
-
-# Arguments
-
-  - $(arg_dict[:model])
-  - `expr`: The expression the budget bounds.
-  - `bgt`: A number, a [`BudgetRange`](@ref), or `nothing`.
-
-# Returns
-
-  - `nothing`.
-
-# Related
-
-  - [`add_allocation_set_bounds!`](@ref)
-  - [`set_budget_constraints!`](@ref)
-"""
-function anonymous_budget_rows!(::JuMP.Model, ::Any, ::Nothing)::Nothing
-    return nothing
-end
-function anonymous_budget_rows!(model::JuMP.Model, expr, bgt::Number)::Nothing
-    k = get_k(model)
-    sc = get_constraint_scale(model)
-    JuMP.@constraint(model, sc * (expr - k * bgt) == 0)
-    return nothing
-end
-function anonymous_budget_rows!(model::JuMP.Model, expr, bgt::BudgetRange)::Nothing
-    k = get_k(model)
-    sc = get_constraint_scale(model)
-    if !isnothing(bgt.lb)
-        JuMP.@constraint(model, sc * (expr - k * bgt.lb) >= 0)
-    end
-    if !isnothing(bgt.ub)
-        JuMP.@constraint(model, sc * (expr - k * bgt.ub) <= 0)
-    end
-    return nothing
-end
-"""
-$(DocStringExtensions.TYPEDSIGNATURES)
-
-Returns the first index `i`, counted from one, at which the Model State holds no entry `name`.
-
-A builder keyed by an index uses it to add the set's term next to the head's own terms, which hold the indices from one up.
-
-# Returns
-
-  - `i::Int`: The first free index.
-
-# Related
-
-  - [`add_allocation_set_constraints!`](@ref)
-  - [`state_set!`](@ref)
-"""
-function free_state_index(model::JuMP.Model, name::Symbol)
-    i = 1
-    while state_has(model, Symbol(""), name, i)
-        i += 1
-    end
-    return i
-end
-"""
-    set_allocation_set_bounds!(model::JuMP.Model, wb::WeightBounds, sbgt = nothing, gbgt = nothing)
-
-Adds an Allocation Set's weight bounds, its budget of one, and its short and gross budgets to the bare projection model.
-
-[`set_weight_constraints!`](@ref) writes the bounds, the short budget and the gross budget, with no net budget. A negative lower bound then builds the long and short parts of `w` and leaves the long part free. Under [`JuMPOptimiser`](@ref), a net budget with no short budget fixes the long part at the net budget, which forbids every short position. An Allocation Set lets the book hold short positions, so the function passes no net budget there. It adds `Σw = k` after that, through [`set_budget_constraints!`](@ref).
+[`set_weight_constraints!`](@ref) writes the bounds with no net budget, and the function adds `Σw = k` after that, through [`set_budget_constraints!`](@ref). A [`ProgrammeAllocationSet`](@ref) does not come here: the block builder [`set_block_constraints!`](@ref) adds its bounds and its short and gross budgets.
 
 # Algorithm
 
  1. Check the bounds against the budget with [`assert_feasible_bounds`](@ref).
- 2. Add the bounds, the short budget and the gross budget with [`set_weight_constraints!`](@ref), with no net budget.
+ 2. Add the bounds with [`set_weight_constraints!`](@ref), with no net budget.
  3. Add the budget `Σw = k` with [`set_budget_constraints!`](@ref).
 
 # Arguments
 
   - $(arg_dict[:model])
   - `wb`: The set's resolved [`WeightBounds`](@ref).
-  - `sbgt`: The short budget, a number, a [`BudgetRange`](@ref), or `nothing`.
-  - `gbgt`: The gross budget, a number, a [`BudgetRange`](@ref), or `nothing`.
 
 # Validation
 
@@ -613,12 +315,10 @@ Adds an Allocation Set's weight bounds, its budget of one, and its short and gro
 
   - [`set_allocation_set_constraints!`](@ref)
   - [`BoundedAllocationSet`](@ref)
-  - [`ProgrammeAllocationSet`](@ref)
 """
-function set_allocation_set_bounds!(model::JuMP.Model, wb::WeightBounds, sbgt = nothing,
-                                    gbgt = nothing)::Nothing
+function set_allocation_set_bounds!(model::JuMP.Model, wb::WeightBounds)::Nothing
     assert_feasible_bounds(wb)
-    set_weight_constraints!(model, wb, nothing, sbgt; gbgt = gbgt)
+    set_weight_constraints!(model, wb, nothing, nothing)
     set_budget_constraints!(model, 1, get_w(model))
     return nothing
 end
@@ -759,11 +459,11 @@ function set_projection_objective!(model::JuMP.Model, proj::TsallisProjection,
                                    q::AbstractVector)::Nothing
     pos, w, sc, so = barrier_objective_entries(model, q)
     a = proj.alpha
-    JuMP.@variable(model, t_proj[1:length(pos)])
+    P = length(pos)
+    JuMP.@variable(model, t_proj[1:P])
     # `t_i ≤ w_i^α` is the power cone `w_i^α · 1^(1 − α) ≥ |t_i|`.
-    for (i, j) in enumerate(pos)
-        JuMP.@constraint(model, [sc * w[j], sc, sc * t_proj[i]] in JuMP.MOI.PowerCone(a))
-    end
+    JuMP.@constraint(model, [i = 1:P],
+                     [sc * w[pos[i]], sc, sc * t_proj[i]] in JuMP.MOI.PowerCone(a))
     # The bracket is `(1 − α)` times the divergence up to a constant. The division restores
     # the divergence, so a penalty weighs against it as under every other geometry.
     set_divergence_objective!(model,
@@ -893,7 +593,7 @@ It refuses a raw step with a negative entry or with no positive entry. It fixes 
 
 ## Constraints
 
-  - Under no name: ``s_c w_i = 0`` for each ``i`` with ``q_i = 0``.
+  - Under no name, one vector row: ``s_c w_i = 0`` for each ``i`` with ``q_i = 0``. A `q` with no zero entry writes no row.
 
 Where:
 
@@ -929,8 +629,9 @@ function barrier_objective_entries(model::JuMP.Model, q::AbstractVector)
                           "a barrier projection needs a positive entry: a raw step of zeros has no projection, because a zero stays zero under the potential"))
     w = get_w(model)
     sc = get_constraint_scale(model)
-    for i in findall(iszero, q)
-        JuMP.@constraint(model, sc * w[i] == 0)
+    zs = findall(iszero, q)
+    if !isempty(zs)
+        JuMP.@constraint(model, sc * view(w, zs) == 0)
     end
     return findall(x -> x > zero(x), q), w, sc, get_objective_scale(model)
 end
@@ -1006,6 +707,8 @@ A solved programme returns its weights. A programme that does not solve, or whos
 
 A set that reads the rows fits its prior on the rows of the step, as a batch head does. The programme then runs on the prior's Investable Mask, also as a batch head does. It solves over the assets the prior prices, and gives a zero weight to every other asset. Under a time-varying panel, an asset without a listing for part of the window is outside the universe of a plain prior until the window no longer holds that part. So the programme gives it a zero, which is the one zero in the recursion's allocation that the rule's step did not make. A batch head gives the same zero. The asset comes back at the first step at which the prior prices it, and the rule's geometry decides whether the raw step then gives it weight, as for a zero in the Start Allocation. A set that reads no rows fits no prior and solves over the full universe.
 
+The programme is a bare head of the shared entry [`resolve_block_entry`](@ref): it holds no block of its own, and it passes the block of its set. So the mask of the step follows the rules of the entry of a JuMP head. An asset that a [`FeatureDistance`](@ref) of a reader of the set cannot read, an asset with a gap in the rows that a plain graph reader of the set reads, and an asset that a distance reader of the set refuses each take a zero weight at the step, with a warning. Under the `strict` flag of the step, the programme refuses them.
+
 # Mathematical definition
 
 ```math
@@ -1029,13 +732,8 @@ Where:
 
  1. Read the rows `X` of the current [`ProjectionStep`](@ref).
  2. When [`allocation_set_ready`](@ref) gives a reason, record the Held Step with it and return a copy of `w`. Stop.
- 3. Fit the set's prior `pr` on `X` with [`allocation_set_prior`](@ref), and read its Investable Mask `imsk`.
- 4. Reduce `set`, `X` and `pr` to the mask with [`programme_investable_reduction`](@ref). Reduce the geometry and `q` to the mask with [`investable_geometry_view`](@ref), and view `w` at the mask, which gives `wr`.
- 5. Make a bare model with the set's two scales and the row count of `X`, zero when there are no rows. Register `k = 1`, and the vector `w` of weight variables.
- 6. Add the set's constraints with [`set_allocation_set_constraints!`](@ref), with `wr` as the reference.
- 7. Add the set's custom objective terms with [`add_custom_objective_term!`](@ref), with the geometry as the objective and the set as the owner.
- 8. Set the objective with [`set_projection_objective!`](@ref).
- 9. Solve on [`projection_solver`](@ref) with [`solve_projection_programme!`](@ref), which solves a second stage only under a geometry whose divergence has many minimisers. When the solve gives an allocation, return it with a zero at every asset outside the mask. Otherwise record the Held Step with the solver trials, and return a copy of `w`.
+ 3. Resolve the set for the step with [`resolve_projection_entry`](@ref). A programme set resolves its block through the shared entry of a bare head, [`resolve_block_entry`](@ref). The entry fits the set's prior on `X`, composes the Investable Mask `imsk`, resolves the block at the mask, and fits again without an asset that a distance reader of the set refuses.
+ 4. Build and solve the programme at `imsk` with the five-argument method, which takes the entry of the step, and return its value. It reduces the geometry and `q` to the mask, adds the set's constraints, the custom objective terms and the objective, and solves on [`projection_solver`](@ref) with [`solve_projection_programme!`](@ref), which solves a second stage only under a geometry whose divergence has many minimisers. A solve that gives an allocation returns it with a zero at every asset outside the mask. Otherwise the method records the Held Step with the solver trials, and returns a copy of `w`.
 
 # JuMP formulation
 
@@ -1067,6 +765,7 @@ Where:
 
   - [`project`](@ref)
   - [`HeldStep`](@ref)
+  - [`resolve_projection_entry`](@ref)
   - [`optimise_JuMP_model!`](@ref)
 """
 function projection_programme(proj::AbstractProjectionGeometry, set::AbstractAllocationSet,
@@ -1077,46 +776,170 @@ function projection_programme(proj::AbstractProjectionGeometry, set::AbstractAll
         record_held_step!(reason, nothing)
         return copy(w)
     end
-    pr = allocation_set_prior(set, X)
-    imsk = prior_investable_mask(pr)
-    set, X, pr = programme_investable_reduction(imsk, set, X, pr)
-    proj, q = investable_geometry_view(imsk, proj, q)
-    wr = investable_weights_view(imsk, w)
+    return projection_programme(proj, resolve_projection_entry(set, w, X), q, w, X)
+end
+"""
+    projection_programme(proj::AbstractProjectionGeometry, e::Tuple, q::AbstractVector,
+                         w::AbstractVector, X::Option{<:ReturnsResult})
+
+Builds and solves the projection programme of one step at the Investable Mask `imsk`, from the entry `e = (imsk, set, cbr)` that the shared entry resolved for the step.
+
+[`resolve_projection_entry`](@ref) gives the entry. The method takes the three values as one `Tuple`, so a bounded set always comes with no block Result and a programme set with its own block Result. The entry already dropped every asset that a distance reader of the set refuses, so the model is built once, at the final mask. The refused asset takes a zero weight at the step, as an asset that the prior cannot price does. The Investable Mask of the Recursion Result does not change, because it is the active mask of the last row.
+
+# Algorithm
+
+ 1. Reduce the geometry and `q` to the mask with [`investable_geometry_view`](@ref).
+ 2. Make a bare model with the set's two scales and the row count of `X`, zero when there are no rows. Register `k = 1`, and the vector `w` of weight variables.
+ 3. Add the set's constraints with the three-argument form of [`set_allocation_set_constraints!`](@ref). This gives the weight bounds `wb` of the step.
+ 4. Refuse a floor of `wb` that the geometry does not admit, with [`assert_geometry_admits_bounds`](@ref).
+ 5. Add the set's custom objective terms with the block builder [`set_block_objective_terms!`](@ref), with the geometry as the objective and the set as the owner. The terms read `cbr`.
+ 6. Set the objective with [`set_projection_objective!`](@ref).
+ 7. Solve on [`projection_solver`](@ref) with [`solve_projection_programme!`](@ref). When the solve gives an allocation, take its answer on the mask with [`programme_answer`](@ref), and return it with a zero at every asset outside the mask. Otherwise record the Held Step with the solver trials, and return a copy of `w`.
+
+# JuMP formulation
+
+## Variables
+
+  - `w`: created, with the base name `w`, one variable for each asset in the mask. It is registered in the Model State under the key `w`.
+
+## Expressions
+
+  - `k`: the constant one.
+
+Where:
+
+  - $(math_dict[:w_port])
+  - $(math_dict[:k_budget])
+
+# Arguments
+
+  - `proj`: The geometry.
+  - `e`: The entry of the step, `(imsk, set, cbr)`: the Investable Mask of the step, or `nothing` when every asset is investable; the set after `factory(set, w)`, viewed at the mask; and the Result of the block of a programme set, or `nothing` for a bounded set.
+  - `q`: The raw step.
+  - `w`: The Price-Adjusted Allocation the step trades from.
+  - `X`: The rows of the step, or `nothing`.
+
+# Validation
+
+  - The rules of [`assert_geometry_admits_bounds`](@ref) on the bounds of the step.
+
+# Returns
+
+  - `w'::Vector`: The projected allocation, or `w` copied on a Held Step.
+
+# Related
+
+  - [`resolve_projection_entry`](@ref)
+  - [`resolve_block_entry`](@ref)
+  - [`set_block_objective_terms!`](@ref)
+  - [`resolve_jump_optimiser`](@ref)
+"""
+function projection_programme(proj::AbstractProjectionGeometry, e::Tuple, q::AbstractVector,
+                              w::AbstractVector, X::Option{<:ReturnsResult})
+    imsk, set, cbr = e
+    projr, qr = investable_geometry_view(imsk, proj, q)
     model = JuMP.Model()
     set_model_scales!(model, projection_scale(set, :sc), projection_scale(set, :so))
     set_model_observations!(model, isnothing(X) ? 0 : size(X.X, 1))
     JuMP.@expression(model, k, 1)
-    wv = state_set!(model, Symbol(""), :w,
-                    JuMP.@variable(model, [1:length(q)], base_name = "w"))
-    set_allocation_set_constraints!(model, set, wr, X, pr)
-    add_custom_objective_term!(model, proj, allocation_set_cobj(set), set, nothing)
-    set_projection_objective!(model, proj, q)
-    res, wn = solve_projection_programme!(model, proj, q, projection_solver(proj, set))
+    state_set!(model, Symbol(""), :w,
+               JuMP.@variable(model, [1:length(qr)], base_name = "w"))
+    wb, _ = set_allocation_set_constraints!(model, set, cbr)
+    assert_geometry_admits_bounds(projr, wb)
+    # A block's custom objective terms get the objective, the owner of the block and the
+    # Result of the block (ADR 0237).
+    set_block_objective_terms!(model, cbr, projr, set)
+    set_projection_objective!(model, projr, qr)
+    res, wn = solve_projection_programme!(model, projr, qr, projection_solver(projr, set))
     if !isnothing(wn)
-        return expand_investable_weights(imsk, wn)
+        return expand_investable_weights(imsk, programme_answer(projr, wn, wb))
     end
     record_held_step!("the projection onto the `$(nameof(typeof(set)))` in the `$(nameof(typeof(proj)))` geometry did not solve, and the step trades nothing",
                       res.trials)
     return copy(w)
 end
 """
+    resolve_projection_entry(set::BoundedAllocationSet, w::AbstractVector, X)
+    resolve_projection_entry(set::ProgrammeAllocationSet, w::AbstractVector, X::ReturnsResult)
+    resolve_projection_entry(set::ProgrammeAllocationSet, w::AbstractVector, X::Nothing)
+
+Resolves the Allocation Set of a projection programme for one step, through the shared entry of a bare head.
+
+The projection programme holds no block of its own, so it is a bare head of [`resolve_block_entry`](@ref), with [`no_head_block`](@ref) as the resolver of its block. It passes the block of its set as the one block. The set is the owner of the prior of the step, so the mask of that prior is the mask of the bare head, and the set prices every asset that the head keeps. The entry then composes the mask with the readers of the set, resolves the block at the mask, and fits again without an asset that a distance reader of the set refuses, as for the blocks of a JuMP head. A bounded set holds no block and fits no prior, so it resolves to itself. A programme set with no rows, `X === nothing` outside an Online Update, fits no prior, so it has no mask and runs no reader, and stage 2 of its block resolves alone. [`allocation_set_prior`](@ref) refuses such a set when a slot reads the rows.
+
+# Algorithm
+
+ 1. On a bounded set, return no mask, the set and no block Result. Stop.
+ 2. Give the set the Price-Adjusted Allocation `w` with `factory(set, w)`, so a turnover ceiling, a tracking error, a risk ceiling, a custom constraint and a custom objective term that read the previous weights read the book of the step.
+ 3. With no rows, resolve the block with [`resolve_constraint_block`](@ref) on no prior, check the bounds with [`assert_feasible_bounds`](@ref), and return no mask, the set and the block Result. Stop.
+ 4. Fit the prior of the set on `X` with [`fit_allocation_set_block`](@ref).
+ 5. Resolve the block through [`resolve_block_entry`](@ref), from the mask of the prior, [`prior_investable_mask`](@ref), under the `strict` flag of the step, [`projection_step_strict`](@ref).
+ 6. Check the bounds of the step against the budget of one with [`assert_feasible_bounds`](@ref). A bound that reads the rows resolves only at stage 2 ([`bounds_read_rows`](@ref)).
+ 7. View the set at the mask with [`programme_investable_reduction`](@ref), for the builders. Return the mask, the viewed set and the block Result.
+
+# Arguments
+
+  - `set`: The set, resolved once per fold.
+  - `w`: The Price-Adjusted Allocation the step trades from.
+  - `X`: The rows the head holds through the period, a [`ReturnsResult`](@ref), or `nothing`.
+
+# Validation
+
+  - The rules of [`allocation_set_prior`](@ref), [`resolve_block_entry`](@ref) and [`assert_feasible_bounds`](@ref).
+  - Under the `strict` flag of the step, no reader of the set drops an asset. Raises an [`IsNonFiniteError`](@ref).
+
+# Returns
+
+  - `(imsk, set', cbr)::Tuple`: The Investable Mask of the step, the set viewed at it, and the [`ResolvedConstraintBlock`](@ref) of the set, or `nothing` for a bounded set.
+
+# Related
+
+  - [`projection_programme`](@ref)
+  - [`resolve_block_entry`](@ref)
+  - [`resolve_allocation_set_block`](@ref)
+"""
+function resolve_projection_entry(set::BoundedAllocationSet, ::AbstractVector, ::Any)::Tuple
+    return nothing, set, nothing
+end
+function resolve_projection_entry(set::ProgrammeAllocationSet, w::AbstractVector,
+                                  X::ReturnsResult)::Tuple
+    b = fit_allocation_set_block((factory(set, w), X))
+    imsk, _, cbrs = resolve_block_entry(no_head_block, (), prior_investable_mask(b[3]),
+                                        (b,), X, projection_step_strict())
+    # The entry returns after its last fit again, so the one block is resolved.
+    cbr = only(cbrs)::ResolvedConstraintBlock
+    assert_feasible_bounds(cbr.wb)
+    setr, _, _ = programme_investable_reduction(imsk, b[1], X, nothing)
+    return imsk, setr, cbr
+end
+function resolve_projection_entry(set::ProgrammeAllocationSet, w::AbstractVector,
+                                  ::Nothing)::Tuple
+    # With no rows the set fits no prior, so it has no mask and runs no reader: stage 2
+    # alone resolves the block. `allocation_set_prior` refuses a set that reads the rows.
+    setw = factory(set, w)
+    cbr = resolve_constraint_block(setw.cbe, allocation_set_prior(setw, nothing), nothing;
+                                   slv = setw.slv, strict = projection_step_strict())
+    assert_feasible_bounds(cbr.wb)
+    return nothing, setw, cbr
+end
+"""
     programme_investable_reduction(imsk::Nothing, set::AbstractAllocationSet, X::Option{<:ReturnsResult}, pr)
-    programme_investable_reduction(imsk::BitVector, set::AbstractAllocationSet, X::ReturnsResult, pr::AbstractPriorResult)
+    programme_investable_reduction(imsk::BitVector, set::AbstractAllocationSet, X::ReturnsResult, pr::Option{<:AbstractPriorResult})
     programme_investable_reduction(imsk::BitVector, set::AbstractAllocationSet, X, pr)
 
 Reduces the set, the rows that the head holds and the set's prior to the prior's Investable Mask.
 
-The projection programme then runs on the assets the prior can price, as a batch head does with [`investable_reduction`](@ref). The caller views the raw step and the Price-Adjusted Allocation at the same mask with [`investable_weights_view`](@ref).
+The projection programme then runs on the assets the prior can price, as a batch head does with [`investable_reduction`](@ref). The shared entry reduces the block of a set to the mask of every block in this way, [`resolve_allocation_set_block`](@ref), and [`resolve_projection_entry`](@ref) views the set for the builders of the projection. The projection views the raw step at the same mask with [`investable_geometry_view`](@ref).
 
-Dispatch selects one of three methods. A `nothing` mask means that every asset is investable, which is true at every step on a static panel and at every step of a set that reads no rows. That method returns its arguments unchanged. The `BitVector` method takes the views at `findall(imsk)`. The third method refuses a mask with no rows or no prior, because a mask comes from a prior fitted on the rows, so this pair does not occur in the library. The set is viewed against the full returns matrix of the rows, because a view of a tracking estimator needs it. The Price-Adjusted Allocation is cut to the mask and is not renormalised, as the batch reduction cuts a turnover reference. So an asset the prior cannot price leaves the reference, and the programme allocates the budget of one over the investable assets. The function writes no warning for such an asset, because the Investable Mask of the Recursion Result already shows it at every step.
+Dispatch selects one of three methods. A `nothing` mask means that every asset is investable, which is true at every step on a static panel and at every step of a set that reads no rows. That method returns its arguments unchanged. The `BitVector` method takes the views at `findall(imsk)`. A set that reads no rows has no prior, and the method views the set and the rows alone. This pair occurs at the entry of a JuMP head, whose own prior gives the mask. The third method refuses a mask with no rows, because a mask is read on the rows. The set is viewed against the full returns matrix of the rows, because a view of a tracking estimator needs it. After the view, the method declares the names outside the mask on the Non-Investable Axis of the set's `sets`, with [`non_investable_universe`](@ref), as [`investable_reduction`](@ref) does for a head. So a row of `lcse` or `gcarde` that names such an asset drops at stage 2 of the block, and `strict` does not refuse the name. The Price-Adjusted Allocation is cut to the mask and is not renormalised, as the batch reduction cuts a turnover reference. So an asset the prior cannot price leaves the reference, and the programme allocates the budget of one over the investable assets. The function writes no warning for such an asset, because the Investable Mask of the Recursion Result already shows it at every step.
 
 # Validation
 
-  - A mask with no rows or no prior. An `IsNothingError` is thrown.
+  - A mask with no rows. An `IsNothingError` is thrown.
 
 # Returns
 
-  - `(set, X, pr)::Tuple`: The three reduced to the mask, or unchanged.
+  - `(set, X, pr)::Tuple`: The three reduced to the mask, or unchanged. `pr` stays `nothing` when the set has no prior.
 
 # Related
 
@@ -1131,18 +954,23 @@ function programme_investable_reduction(::Nothing, set::AbstractAllocationSet,
     return set, X, pr
 end
 function programme_investable_reduction(imsk::BitVector, set::AbstractAllocationSet,
-                                        X::ReturnsResult, pr::AbstractPriorResult)
+                                        X::ReturnsResult, pr::Option{<:AbstractPriorResult})
     idx = findall(imsk)
-    return port_opt_view(set, idx, X.X), port_opt_view(X, idx), port_opt_view(pr, idx)
+    # The view drops the Non-Investable Axis, so the set declares it after the view, as
+    # `investable_reduction` declares it for a head. Stage 2 of the block then drops a row
+    # that names a departed asset, and does not refuse the name.
+    return non_investable_universe(port_opt_view(set, idx, X.X),
+                                   non_investable_names(X.nx, imsk)), port_opt_view(X, idx),
+           port_opt_view(pr, idx)
 end
 function programme_investable_reduction(::BitVector, ::AbstractAllocationSet, ::Any, ::Any)
-    return throw(IsNothingError("an Investable Mask is derived from a prior fitted on the rows that the head holds, so a mask with no rows or no prior result cannot be reduced on."))
+    return throw(IsNothingError("an Investable Mask is read on the rows that the head holds, so a mask with no rows cannot be reduced on."))
 end
 """
     investable_geometry_view(imsk::Nothing, proj::AbstractProjectionGeometry, q::AbstractVector)
     investable_geometry_view(imsk::BitVector, proj::AbstractProjectionGeometry, q::AbstractVector)
     investable_geometry_view(imsk::BitVector, proj::DiagonalProjection, q::AbstractVector)
-    investable_geometry_view(imsk::BitVector, proj::GramProjection, q::AbstractVector)
+    investable_geometry_view(imsk::BitVector, proj::GramProjection{<:Any, <:AbstractMatrix}, q::AbstractVector)
 
 Reduces the Projection Geometry and the raw step `q` to the Investable Mask of a projection programme.
 
@@ -1168,7 +996,7 @@ Where:
   - ``\\tilde{\\boldsymbol{q}}_P``: Raw step of the reduced programme.
   - ``c``: Term that does not depend on ``\\boldsymbol{w}_P``.
 
-So the reduced Gram geometry holds ``\\mathbf{A}_{PP}`` and projects ``\\tilde{\\boldsymbol{q}}_P``. A Gram geometry with no matrix keeps no matrix, and [`set_projection_objective!`](@ref) refuses it.
+So the reduced Gram geometry holds ``\\mathbf{A}_{PP}`` and projects ``\\tilde{\\boldsymbol{q}}_P``. The Gram method reads a bound matrix. [`NewtonStep`](@ref), the one rule that takes a [`GramProjection`](@ref), binds the matrix before the view through [`gram_geometry`](@ref).
 
 # Returns
 
@@ -1194,11 +1022,10 @@ function investable_geometry_view(imsk::BitVector, proj::DiagonalProjection,
                                   q::AbstractVector)
     return DiagonalProjection(proj.h[imsk]), investable_weights_view(imsk, q)
 end
-function investable_geometry_view(imsk::BitVector, proj::GramProjection, q::AbstractVector)
+function investable_geometry_view(imsk::BitVector,
+                                  proj::GramProjection{<:Any, <:AbstractMatrix},
+                                  q::AbstractVector)
     A = proj.A
-    if isnothing(A)
-        return proj, investable_weights_view(imsk, q)
-    end
     zmsk = .!imsk
     App = A[imsk, imsk]
     qp = q[imsk] .+ LinearAlgebra.Symmetric(App) \ (A[imsk, zmsk] * q[zmsk])
@@ -1287,25 +1114,6 @@ function projection_scale(::BoundedAllocationSet, ::Symbol)
     return 1
 end
 """
-    allocation_set_cobj(set::ProgrammeAllocationSet)
-    allocation_set_cobj(set::BoundedAllocationSet)
-
-Returns the custom objective terms that a projection programme adds to its objective.
-
-A programme set gives its `cobj`. A bounded set carries no objective term, so it gives `nothing`.
-
-# Related
-
-  - [`projection_programme`](@ref)
-  - [`add_custom_objective_term!`](@ref)
-"""
-function allocation_set_cobj(set::ProgrammeAllocationSet)
-    return set.cobj
-end
-function allocation_set_cobj(::BoundedAllocationSet)
-    return nothing
-end
-"""
     project(proj::GramProjection, set::BoundedAllocationSet, q::AbstractVector, w::AbstractVector)
     project(proj::EuclideanProjection, set::ProgrammeAllocationSet, q::AbstractVector, w::AbstractVector)
     project(proj::EntropicProjection, set::ProgrammeAllocationSet, q::AbstractVector, w::AbstractVector)
@@ -1315,16 +1123,17 @@ end
 
 Projects a raw step onto the Allocation Set by the programme of [`projection_programme`](@ref).
 
-These are the programme arms of the Constrained Update. They cover every pair of a geometry and a set except the scalar roots on the bounded set. Under [`EntropicProjection`](@ref), [`TsallisProjection`](@ref) and [`LogBarrierProjection`](@ref), [`clip_at_zero`](@ref) sets every entry of the answer within the tolerance of its element type to zero. The solver gives a weight that the set forces to zero slightly above or slightly below zero, and the next step must read it as zero for either sign. A zero then stays zero at every later step, because the divergence from a zero entry is infinite. When the set later needs that asset, the step is a Held Step.
+These are the programme arms of the Constrained Update. They cover every pair of a geometry and a set except the scalar roots on the bounded set. Under [`EntropicProjection`](@ref), [`TsallisProjection`](@ref) and [`LogBarrierProjection`](@ref), [`programme_answer`](@ref) sets every entry of the answer within the tolerance of its element type to zero. The solver gives a weight that the set forces to zero slightly above or slightly below zero, and the next step must read it as zero for either sign. A zero then stays zero at every later step, because the divergence from a zero entry is infinite. When the set later needs that asset, the step is a Held Step.
 
 # Validation
 
-  - Under [`EntropicProjection`](@ref), [`TsallisProjection`](@ref) and [`LogBarrierProjection`](@ref): `all(>= 0, lb)` over the resolved bounds. A `DomainError` is thrown otherwise.
+  - Under [`EntropicProjection`](@ref), [`TsallisProjection`](@ref) and [`LogBarrierProjection`](@ref): `all(>= 0, lb)` over the bounds of the step, through [`assert_geometry_admits_bounds`](@ref) in [`projection_programme`](@ref). A `DomainError` is thrown otherwise.
 
 # Related
 
   - [`project`](@ref)
   - [`projection_programme`](@ref)
+  - [`programme_answer`](@ref)
   - [`ProgrammeAllocationSet`](@ref)
   - [`GramProjection`](@ref)
 """
@@ -1336,23 +1145,40 @@ function project(proj::EuclideanProjection, set::ProgrammeAllocationSet, q::Abst
                  w::AbstractVector)
     return projection_programme(proj, set, q, w)
 end
-function project(proj::EntropicProjection, set::ProgrammeAllocationSet, q::AbstractVector,
-                 w::AbstractVector)
-    @argcheck(all(x -> x >= zero(x), set.wb.lb),
-              DomainError(set.wb.lb,
-                          "the entropic projection admits no negative lower bound: `log w` is undefined below zero"))
-    return clip_at_zero(projection_programme(proj, set, q, w), set.wb.lb)
-end
-function project(proj::GramProjection, set::ProgrammeAllocationSet, q::AbstractVector,
-                 w::AbstractVector)
+function project(proj::Union{EntropicProjection, GramProjection, TsallisProjection,
+                             LogBarrierProjection}, set::ProgrammeAllocationSet,
+                 q::AbstractVector, w::AbstractVector)
     return projection_programme(proj, set, q, w)
 end
-function project(proj::Union{<:TsallisProjection, <:LogBarrierProjection},
-                 set::ProgrammeAllocationSet, q::AbstractVector, w::AbstractVector)
-    @argcheck(all(x -> x >= zero(x), set.wb.lb),
-              DomainError(set.wb.lb,
-                          "a barrier projection admits no negative lower bound: the potential is undefined below zero"))
-    return clip_at_zero(projection_programme(proj, set, q, w), set.wb.lb)
+"""
+    programme_answer(proj::AbstractProjectionGeometry, w::AbstractVector, wb::WeightBounds)
+
+Returns the answer of a solved projection programme, on the assets of the step.
+
+Under [`EntropicProjection`](@ref), [`TsallisProjection`](@ref) and [`LogBarrierProjection`](@ref), [`clip_at_zero`](@ref) sets every entry within the tolerance of its element type to its floor in `wb`. Every other geometry returns `w`. The floor is the floor of the bounds of the step, which [`set_allocation_set_constraints!`](@ref) returns, so a bound that reads the rows clips at its own floor.
+
+# Arguments
+
+  - `proj`: The geometry, viewed at the Investable Mask.
+  - `w`: The weights of the solve, on the assets of the mask.
+  - `wb`: The weight bounds of the step, on the same assets.
+
+# Returns
+
+  - `w'::AbstractVector`: The answer on the assets of the mask.
+
+# Related
+
+  - [`projection_programme`](@ref)
+  - [`clip_at_zero`](@ref)
+"""
+function programme_answer(::AbstractProjectionGeometry, w::AbstractVector, ::WeightBounds)
+    return w
+end
+function programme_answer(::Union{EntropicProjection, TsallisProjection,
+                                  LogBarrierProjection}, w::AbstractVector,
+                          wb::WeightBounds)
+    return clip_at_zero(w, something(wb.lb, zero(eltype(w))))
 end
 """
     blend_projection(proj::EuclideanProjection, set::BoundedAllocationSet, q::AbstractVector, w::AbstractVector)

@@ -1,8 +1,7 @@
-# Literature acronym aliases — each is a `const` pointing at the canonical long-form type.
-# These are exported so callers who know the acronym can discover and use it directly via
-# autocomplete without having to look up the full spelling.  Each alias is unambiguous in
-# GLOSSARY.md; ambiguous abbreviations (e.g. MAD ↔ Mean vs Median)
-# are intentionally omitted.
+# Literature acronym aliases. Each `const` points at the canonical long-form type, and each
+# factory function builds a canonical type with a fixed algorithm. They are exported so a caller
+# who knows the acronym finds it by autocomplete. An acronym is aliased only when GLOSSARY.md
+# makes it unambiguous.
 
 # ── Clustering / hierarchical optimisers ──────────────────────────────────────
 """
@@ -115,7 +114,7 @@ const UcVariance = UncertaintySetVariance
           w::Option{<:ObsWeights} = nothing,
           mu::Option{<:Num_VecNum_VecScalar} = nothing) -> LowOrderMoment
 
-Alias for the first Lower Moment (FLM) risk measure [`LowOrderMoment`](@ref) + [`FirstLowerMoment`](@ref).
+Alias for the First Lower Moment (FLM) risk measure, a [`LowOrderMoment`](@ref) with [`FirstLowerMoment`](@ref).
 """
 function FLM(; settings::RiskMeasureSettings = RiskMeasureSettings(),
              w::Option{<:ObsWeights} = nothing,
@@ -127,7 +126,7 @@ end
           w::Option{<:ObsWeights} = nothing,
           mu::Option{<:Num_VecNum_VecScalar} = nothing) -> LowOrderMoment
 
-Alias for the Mean Absolute Deviation (MAD) risk measure [`LowOrderMoment`](@ref) + [`MeanAbsoluteDeviation`](@ref).
+Alias for the Mean Absolute Deviation (MAD) risk measure, a [`LowOrderMoment`](@ref) with [`MeanAbsoluteDeviation`](@ref). It does not build [`MedianAbsoluteDeviation`](@ref), which is a different risk measure.
 """
 function MAD(; settings::RiskMeasureSettings = RiskMeasureSettings(),
              w::Option{<:ObsWeights} = nothing,
@@ -142,7 +141,7 @@ end
           ve::AbstractVarianceEstimator = SimpleVariance(; me = nothing),
           alg::SecondMomentFormulation = SquaredSOCRiskExpr()) -> LowOrderMoment
 
-Alias for the Second Central Moment (SCM) risk measure [`LowOrderMoment`](@ref) + [`SecondMoment`](@ref) + [`FullMoment`](@ref). This can represent the scenario based variance or standard deviation.
+Alias for the Second Central Moment (SCM) risk measure, a [`LowOrderMoment`](@ref) with [`SecondMoment`](@ref) and [`FullMoment`](@ref). It reports the variance of the portfolio returns over the scenarios, and their standard deviation when `alg` is [`SOCRiskExpr`](@ref).
 """
 function SCM(; settings::RiskMeasureSettings = RiskMeasureSettings(),
              w::Option{<:ObsWeights} = nothing,
@@ -159,7 +158,7 @@ end
           ve::AbstractVarianceEstimator = SimpleVariance(; me = nothing),
           alg::SecondMomentFormulation = SquaredSOCRiskExpr()) -> LowOrderMoment
 
-Alias for the Second Lower Moment (SLM) risk measure [`LowOrderMoment`](@ref) + [`SecondMoment`](@ref) + [`SemiMoment`](@ref). This can represent the scenario based semi-variance or semi-standard deviation.
+Alias for the Second Lower Moment (SLM) risk measure, a [`LowOrderMoment`](@ref) with [`SecondMoment`](@ref) and [`SemiMoment`](@ref). It reports the semi-variance of the portfolio returns over the scenarios, and their semi-standard deviation when `alg` is [`SOCRiskExpr`](@ref).
 """
 function SLM(; settings::RiskMeasureSettings = RiskMeasureSettings(),
              w::Option{<:ObsWeights} = nothing,
@@ -175,7 +174,7 @@ end
           mu::Option{<:Num_VecNum_VecScalar} = nothing, p::Integer = 2,
           ddof::Integer = 0) -> LowOrderMoment
 
-Alias for the square root of the central even moment of order `2p` [`LowOrderMoment`](@ref) + [`EvenMoment`](@ref) + [`FullMoment`](@ref).
+Alias for the `p`-th root of the central even moment of order `2p`, a [`LowOrderMoment`](@ref) with [`EvenMoment`](@ref) and [`FullMoment`](@ref).
 """
 function ECM(; settings::RiskMeasureSettings = RiskMeasureSettings(),
              w::Option{<:ObsWeights} = nothing,
@@ -190,7 +189,7 @@ end
           mu::Option{<:Num_VecNum_VecScalar} = nothing, p::Integer = 2,
           ddof::Integer = 0) -> LowOrderMoment
 
-Alias for the square root of the lower even moment of order `2p` [`LowOrderMoment`](@ref) + [`EvenMoment`](@ref) + [`SemiMoment`](@ref).
+Alias for the `p`-th root of the lower even moment of order `2p`, a [`LowOrderMoment`](@ref) with [`EvenMoment`](@ref) and [`SemiMoment`](@ref).
 """
 function ELM(; settings::RiskMeasureSettings = RiskMeasureSettings(),
              w::Option{<:ObsWeights} = nothing,
@@ -204,7 +203,7 @@ end
           w::Option{<:ObsWeights} = nothing,
           mu::Option{<:Num_VecNum_VecScalar} = nothing) -> HighOrderMoment
 
-Alias for the Third Lower Moment (TLM) risk measure [`HighOrderMoment`](@ref) + [`ThirdLowerMoment`](@ref).
+Alias for the Third Lower Moment (TLM) risk measure, a [`HighOrderMoment`](@ref) with [`ThirdLowerMoment`](@ref).
 """
 function TLM(; settings::RiskMeasureSettings = RiskMeasureSettings(),
              w::Option{<:ObsWeights} = nothing,
@@ -217,22 +216,21 @@ end
           mu::Option{<:Num_VecNum_VecScalar} = nothing,
           ve::AbstractVarianceEstimator = SimpleVariance(; me = nothing)) -> HighOrderMoment
 
-Alias for the Standardised Third Lower Moment (SSK) risk measure [`HighOrderMoment`](@ref) + [`StandardisedHighOrderMoment`](@ref) + [`ThirdLowerMoment`](@ref). This represents the scenario based semi-skewness of the return distribution.
+Alias for the Standardised Third Lower Moment (SSK) risk measure, a [`HighOrderMoment`](@ref) with [`ThirdLowerMoment`](@ref) and a variance estimator in `ve`. It is the semi-skewness of the portfolio returns over the scenarios.
 """
 function SSK(; settings::RiskMeasureSettings = RiskMeasureSettings(),
              w::Option{<:ObsWeights} = nothing,
              mu::Option{<:Num_VecNum_VecScalar} = nothing,
              ve::AbstractVarianceEstimator = SimpleVariance(; me = nothing))::HighOrderMoment
-    return HighOrderMoment(; settings = settings, w = w, mu = mu,
-                           alg = StandardisedHighOrderMoment(; ve = ve,
-                                                             alg = ThirdLowerMoment()))
+    return HighOrderMoment(; settings = settings, w = w, mu = mu, alg = ThirdLowerMoment(),
+                           ve = ve)
 end
 """
     FTCM(; settings::RiskMeasureSettings = RiskMeasureSettings(),
           w::Option{<:ObsWeights} = nothing,
           mu::Option{<:Num_VecNum_VecScalar} = nothing) -> HighOrderMoment
 
-Alias for the Fourth Central Moment (FTCM) risk measure [`HighOrderMoment`](@ref) + [`FourthMoment`](@ref) + [`FullMoment`](@ref).
+Alias for the Fourth Central Moment (FTCM) risk measure, a [`HighOrderMoment`](@ref) with [`FourthMoment`](@ref) and [`FullMoment`](@ref).
 """
 function FTCM(; settings::RiskMeasureSettings = RiskMeasureSettings(),
               w::Option{<:ObsWeights} = nothing,
@@ -245,7 +243,7 @@ end
           w::Option{<:ObsWeights} = nothing,
           mu::Option{<:Num_VecNum_VecScalar} = nothing) -> HighOrderMoment
 
-Alias for the Fourth Lower Moment (FTLM) risk measure [`HighOrderMoment`](@ref) + [`FourthMoment`](@ref) + [`SemiMoment`](@ref).
+Alias for the Fourth Lower Moment (FTLM) risk measure, a [`HighOrderMoment`](@ref) with [`FourthMoment`](@ref) and [`SemiMoment`](@ref).
 """
 function FTLM(; settings::RiskMeasureSettings = RiskMeasureSettings(),
               w::Option{<:ObsWeights} = nothing,
@@ -259,15 +257,13 @@ end
          mu::Option{<:Num_VecNum_VecScalar} = nothing,
          ve::AbstractVarianceEstimator = SimpleVariance(; me = nothing)) -> HighOrderMoment
 
-Alias for the Standardised Fourth Central Moment (KT) risk measure [`HighOrderMoment`](@ref) + [`StandardisedHighOrderMoment`](@ref) + [`FourthMoment`](@ref) + [`FullMoment`](@ref). This represents the scenario based kurtosis of the return distribution.
+Alias for the Standardised Fourth Central Moment (KT) risk measure, a [`HighOrderMoment`](@ref) with [`FourthMoment`](@ref), [`FullMoment`](@ref) and a variance estimator in `ve`. It is the kurtosis of the portfolio returns over the scenarios.
 """
 function KT(; settings::RiskMeasureSettings = RiskMeasureSettings(),
             w::Option{<:ObsWeights} = nothing, mu::Option{<:Num_VecNum_VecScalar} = nothing,
             ve::AbstractVarianceEstimator = SimpleVariance(; me = nothing))::HighOrderMoment
     return HighOrderMoment(; settings = settings, w = w, mu = mu,
-                           alg = StandardisedHighOrderMoment(; ve = ve,
-                                                             alg = FourthMoment(;
-                                                                                alg = FullMoment())))
+                           alg = FourthMoment(; alg = FullMoment()), ve = ve)
 end
 """
     SKT(; settings::RiskMeasureSettings = RiskMeasureSettings(),
@@ -275,16 +271,14 @@ end
           mu::Option{<:Num_VecNum_VecScalar} = nothing,
           ve::AbstractVarianceEstimator = SimpleVariance(; me = nothing)) -> HighOrderMoment
 
-Alias for the Standardised Fourth Lower Moment (SKT) risk measure [`HighOrderMoment`](@ref) + [`StandardisedHighOrderMoment`](@ref) + [`FourthMoment`](@ref) + [`SemiMoment`](@ref). This represents the scenario based semi-kurtosis of the return distribution.
+Alias for the Standardised Fourth Lower Moment (SKT) risk measure, a [`HighOrderMoment`](@ref) with [`FourthMoment`](@ref), [`SemiMoment`](@ref) and a variance estimator in `ve`. It is the semi-kurtosis of the portfolio returns over the scenarios.
 """
 function SKT(; settings::RiskMeasureSettings = RiskMeasureSettings(),
              w::Option{<:ObsWeights} = nothing,
              mu::Option{<:Num_VecNum_VecScalar} = nothing,
              ve::AbstractVarianceEstimator = SimpleVariance(; me = nothing))::HighOrderMoment
     return HighOrderMoment(; settings = settings, w = w, mu = mu,
-                           alg = StandardisedHighOrderMoment(; ve = ve,
-                                                             alg = FourthMoment(;
-                                                                                alg = SemiMoment())))
+                           alg = FourthMoment(; alg = SemiMoment()), ve = ve)
 end
 
 # ── Risk measures — Value-at-Risk family ──────────────────────────────────────
@@ -462,7 +456,7 @@ const OWA = OrderedWeightsArray
     OWA_GMD(; settings::RiskMeasureSettings = RiskMeasureSettings(),
               alg::OrderedWeightsArrayFormulation = ApproxOrderedWeightsArray()) -> OrderedWeightsArray
 
-Alias for the Gini Mean Difference (GMD) [`OrderedWeightsArray`](@ref) risk measure using [`owa_gmd`](@ref) weights.
+Alias for the Gini Mean Difference (GMD) [`OrderedWeightsArray`](@ref) risk measure with [`owa_gmd`](@ref) weights.
 """
 function OWA_GMD(; settings::RiskMeasureSettings = RiskMeasureSettings(),
                  alg::OrderedWeightsArrayFormulation = ApproxOrderedWeightsArray())
@@ -473,7 +467,7 @@ end
                alpha::Number = 0.05,
                alg::OrderedWeightsArrayFormulation = ApproxOrderedWeightsArray()) -> OrderedWeightsArray
 
-Alias for the Conditional Value at Risk (CVaR) [`OrderedWeightsArray`](@ref) risk measure using [`OrderedWeightsArrayConditionalValueatRisk`](@ref) weights at significance level `alpha`.
+Alias for the Conditional Value at Risk (CVaR) [`OrderedWeightsArray`](@ref) risk measure with [`OrderedWeightsArrayConditionalValueatRisk`](@ref) weights at significance level `alpha`.
 """
 function OWA_CVaR(; settings::RiskMeasureSettings = RiskMeasureSettings(),
                   alpha::Number = 0.05,
@@ -490,7 +484,7 @@ end
              a_sim::Integer = 100,
              alg::OrderedWeightsArrayFormulation = ApproxOrderedWeightsArray()) -> OrderedWeightsArray
 
-Alias for the Tail Gini (TG) [`OrderedWeightsArray`](@ref) risk measure using [`OrderedWeightsArrayTailGini`](@ref) weights.
+Alias for the Tail Gini (TG) [`OrderedWeightsArray`](@ref) risk measure with [`OrderedWeightsArrayTailGini`](@ref) weights.
 """
 function OWA_TG(; settings::RiskMeasureSettings = RiskMeasureSettings(),
                 alpha_i::Number = 1e-4, alpha::Number = 0.05, a_sim::Integer = 100,
@@ -504,7 +498,7 @@ end
     OWA_WR(; settings::RiskMeasureSettings = RiskMeasureSettings(),
              alg::OrderedWeightsArrayFormulation = ApproxOrderedWeightsArray()) -> OrderedWeightsArray
 
-Alias for the Worst Realisation (WR) [`OrderedWeightsArray`](@ref) risk measure using [`owa_wr`](@ref) weights.
+Alias for the Worst Realisation (WR) [`OrderedWeightsArray`](@ref) risk measure with [`owa_wr`](@ref) weights.
 """
 function OWA_WR(; settings::RiskMeasureSettings = RiskMeasureSettings(),
                 alg::OrderedWeightsArrayFormulation = ApproxOrderedWeightsArray())
@@ -512,30 +506,32 @@ function OWA_WR(; settings::RiskMeasureSettings = RiskMeasureSettings(),
 end
 """
     OWA_RG(; settings::RiskMeasureSettings = RiskMeasureSettings(),
-             alg::OrderedWeightsArrayFormulation = ApproxOrderedWeightsArray()) -> OrderedWeightsArray
+             alg::OrderedWeightsArrayFormulation = ApproxOrderedWeightsArray()) -> OrderedWeightsArrayRange
 
-Alias for the Range (RG) [`OrderedWeightsArray`](@ref) risk measure using [`owa_rg`](@ref) weights.
+Alias for the Range (RG) [`OrderedWeightsArrayRange`](@ref) risk measure, with [`owa_wr`](@ref) weights in the loss tail and their reversal in the gain tail. Its value is that of [`owa_rg`](@ref).
 """
 function OWA_RG(; settings::RiskMeasureSettings = RiskMeasureSettings(),
                 alg::OrderedWeightsArrayFormulation = ApproxOrderedWeightsArray())
-    return OrderedWeightsArray(; settings = settings, w = owa_rg, alg = alg)
+    return OrderedWeightsArrayRange(; settings = settings, w1 = owa_wr, alg = alg)
 end
 """
     OWA_CVaR_RG(; settings::RiskMeasureSettings = RiskMeasureSettings(),
                   alpha::Number = 0.05,
                   beta::Number = alpha,
-                  alg::OrderedWeightsArrayFormulation = ApproxOrderedWeightsArray()) -> OrderedWeightsArray
+                  alg::OrderedWeightsArrayFormulation = ApproxOrderedWeightsArray()) -> OrderedWeightsArrayRange
 
-Alias for the Conditional Value at Risk Range (CVaR RG) [`OrderedWeightsArray`](@ref) risk measure using [`OrderedWeightsArrayConditionalValueatRiskRange`](@ref) weights.
+Alias for the Conditional Value at Risk Range (CVaR RG) [`OrderedWeightsArrayRange`](@ref) risk measure, with [`OrderedWeightsArrayConditionalValueatRisk`](@ref) weights at `alpha` in the loss tail and the reversed weights at `beta` in the gain tail. Its value is that of [`owa_cvarrg`](@ref).
 """
 function OWA_CVaR_RG(; settings::RiskMeasureSettings = RiskMeasureSettings(),
                      alpha::Number = 0.05, beta::Number = alpha,
                      alg::OrderedWeightsArrayFormulation = ApproxOrderedWeightsArray())
-    return OrderedWeightsArray(; settings = settings,
-                               w = OrderedWeightsArrayConditionalValueatRiskRange(;
-                                                                                  alpha = alpha,
-                                                                                  beta = beta),
-                               alg = alg)
+    return OrderedWeightsArrayRange(; settings = settings,
+                                    w1 = OrderedWeightsArrayConditionalValueatRisk(;
+                                                                                   alpha = alpha),
+                                    w2 = reverse ∘
+                                         OrderedWeightsArrayConditionalValueatRisk(;
+                                                                                   alpha = beta),
+                                    alg = alg)
 end
 """
     OWA_TG_RG(; settings::RiskMeasureSettings = RiskMeasureSettings(),
@@ -545,22 +541,23 @@ end
                 beta_i::Number = alpha_i,
                 beta::Number = alpha,
                 b_sim::Integer = a_sim,
-                alg::OrderedWeightsArrayFormulation = ApproxOrderedWeightsArray()) -> OrderedWeightsArray
+                alg::OrderedWeightsArrayFormulation = ApproxOrderedWeightsArray()) -> OrderedWeightsArrayRange
 
-Alias for the Tail Gini Range (TG RG) [`OrderedWeightsArray`](@ref) risk measure using [`OrderedWeightsArrayTailGiniRange`](@ref) weights.
+Alias for the Tail Gini Range (TG RG) [`OrderedWeightsArrayRange`](@ref) risk measure, with [`OrderedWeightsArrayTailGini`](@ref) weights at `alpha_i`, `alpha` and `a_sim` in the loss tail and the reversed weights at `beta_i`, `beta` and `b_sim` in the gain tail. Its value is that of [`owa_tgrg`](@ref).
 """
 function OWA_TG_RG(; settings::RiskMeasureSettings = RiskMeasureSettings(),
                    alpha_i::Number = 1e-4, alpha::Number = 0.05, a_sim::Integer = 100,
                    beta_i::Number = alpha_i, beta::Number = alpha, b_sim::Integer = a_sim,
                    alg::OrderedWeightsArrayFormulation = ApproxOrderedWeightsArray())
-    return OrderedWeightsArray(; settings = settings,
-                               w = OrderedWeightsArrayTailGiniRange(; alpha_i = alpha_i,
-                                                                    alpha = alpha,
-                                                                    a_sim = a_sim,
-                                                                    beta_i = beta_i,
-                                                                    beta = beta,
-                                                                    b_sim = b_sim),
-                               alg = alg)
+    return OrderedWeightsArrayRange(; settings = settings,
+                                    w1 = OrderedWeightsArrayTailGini(; alpha_i = alpha_i,
+                                                                     alpha = alpha,
+                                                                     a_sim = a_sim),
+                                    w2 = reverse ∘
+                                         OrderedWeightsArrayTailGini(; alpha_i = beta_i,
+                                                                     alpha = beta,
+                                                                     a_sim = b_sim),
+                                    alg = alg)
 end
 """
     OWA_LMoment(; settings::RiskMeasureSettings = RiskMeasureSettings(),
@@ -568,7 +565,7 @@ end
                   k::Integer = 2,
                   alg::OrderedWeightsArrayFormulation = ApproxOrderedWeightsArray()) -> OrderedWeightsArray
 
-Alias for the L-Moment [`OrderedWeightsArray`](@ref) risk measure using [`LinearMoment`](@ref) weights of order `k`.
+Alias for the L-Moment [`OrderedWeightsArray`](@ref) risk measure with [`LinearMoment`](@ref) weights of order `k`.
 """
 function OWA_LMoment(; settings::RiskMeasureSettings = RiskMeasureSettings(),
                      method::AbstractOrderedWeightsArrayEstimator = NormalisedConstantRelativeRiskAversion(),
@@ -933,15 +930,15 @@ const GLinMod = GeneralisedLinearModel
 """
     ZeroVarianceFilter(; tol::Number = 1e-12) -> ScoreSelector
 
-Alias for the zero-variance asset selector [`ScoreSelector`](@ref) + [`SCM`](@ref) + [`ThresholdRule`](@ref).
+Alias for the zero-variance asset selector, a [`ScoreSelector`](@ref) that scores with [`SCM`](@ref) and selects with a [`ThresholdRule`](@ref).
 
-Keeps assets whose second central moment strictly exceeds `tol`, dropping constant and
-near-constant columns before they reach a prior or an optimiser. The bound is exclusive, so
+It keeps the assets whose second central moment strictly exceeds `tol`, so it drops constant
+and near-constant columns before they reach a prior or an optimiser. The bound is exclusive, so
 `tol = 0` still drops an exactly-constant asset.
 
-Spelled with `SCM()` rather than [`Variance`](@ref): `Variance` is a [`WeightsInput`](@ref)
-risk measure whose functor consumes portfolio weights, so it cannot score a single asset's
-return series.
+It scores with `SCM()` and not with [`Variance`](@ref). `Variance` is a [`WeightsInput`](@ref)
+risk measure whose functor takes portfolio weights, so it cannot score the return series of one
+asset.
 
 # Validation
 

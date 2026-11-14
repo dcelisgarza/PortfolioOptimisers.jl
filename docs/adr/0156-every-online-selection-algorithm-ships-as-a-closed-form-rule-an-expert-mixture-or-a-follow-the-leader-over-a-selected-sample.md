@@ -191,3 +191,14 @@ slot, because a slot needs a bound.
   the maintainer for the paper before set 2 builds that row.
 - The map's *Not yet specified* loses "the second algorithm set" and gains the three build sets
   by name.
+
+## Amendment (2026-10-28)
+
+Issue #1867: `NoSlack` is removed. `PassiveAggressiveMeanReversion(; slack = nothing)` is PAMR,
+and `nothing` is the default. `LinearSlack(; C)` and `QuadraticSlack(; C)` stay for PAMR-1 and
+PAMR-2. The typed slot of the Decision above is now bound to
+`Option{<:AbstractPassiveAggressiveSlack}`. `passive_aggressive_step(::Nothing, loss, denom)`
+takes the full step `loss / denom`, the step that `NoSlack` took, so no number moves.
+
+The slack of PAMR is a skipped procedure: the step takes no cap and no softening. ADR 0222 spells
+such a slot with `nothing`, not with a singleton that names no rule of its own.

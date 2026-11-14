@@ -250,11 +250,11 @@ function PortfolioOptimisers.plot_exposure_distribution(csfm::PortfolioOptimiser
                                                         nf::Option{<:AbstractVector} = nothing,
                                                         kwargs...)
     Ms = PortfolioOptimisers.cs_diagnostic_exposures(csfm)
-    labels = exposure_diagnostic_labels(csfm, nf, size(Ms, 3))
+    labels = exposure_diagnostic_labels(csfm, nf, size(Ms, 2))
     slice = if isnothing(observation)
-        vec(view(Ms, :, :, factor))
+        vec(view(Ms, :, factor, :))
     else
-        vec(view(Ms, observation, :, factor))
+        vec(view(Ms, :, factor, observation))
     end
     values = filter(isfinite, slice)
     span = isnothing(observation) ? "all observations" : "observation $observation"
@@ -330,8 +330,9 @@ end
 const FACTOR_SUMMARY_LABELS = ["Ann. Return", "Ann. Vol", "Sharpe", "Autocorr", "Mean |t|",
                                "t Rate", "Mean VIF", "Stability", "Coverage"]
 function factor_summary_columns(fs::PortfolioOptimisers.FactorSummaryResult)
-    vals = Any[fs.ann_return, fs.ann_volatility, fs.sharpe, fs.autocorr, fs.mean_abs_t,
-               fs.t_rate, fs.mean_vif, fs.stability, fs.coverage]
+    # The literal takes the element type of the figures, a vector or `nothing` (#1979).
+    vals = [fs.ann_return, fs.ann_volatility, fs.sharpe, fs.autocorr, fs.mean_abs_t,
+            fs.t_rate, fs.mean_vif, fs.stability, fs.coverage]
     keep = [i for i in eachindex(vals) if !isnothing(vals[i])]
     K = length(fs.ann_return)
     M = Matrix{Float64}(undef, length(keep), K)

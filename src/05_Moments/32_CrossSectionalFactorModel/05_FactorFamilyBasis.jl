@@ -74,7 +74,7 @@ FactorFamilyBasis
   - [`reduce_factor_names`](@ref): the names of the reduced axis.
   - [`reduce_exposures`](@ref) and [`reduce_loadings`](@ref): exposures onto the reduced axis.
   - [`reduce_factor_returns`](@ref), [`reduce_factor_mu`](@ref) and [`reduce_factor_covariance`](@ref): the reduced-axis moments.
-  - [`expand_factor_returns`](@ref), [`expand_factor_mu`](@ref) and [`expand_factor_covariance`](@ref): the raw-axis moments.
+  - [`expand_factor_returns`](@ref) and [`expand_factor_covariance`](@ref): the raw-axis moments.
   - [`project_factor_coordinates`](@ref): raw coordinates, such as a factor exposure of a portfolio, into the reduced basis.
   - [`dropped_factor_weights`](@ref): the reduced-axis weights of the dropped factors.
 """
@@ -350,9 +350,7 @@ julia> PortfolioOptimisers.factor_basis_slice(fcb, 2:3).ratios
 """
 function factor_basis_slice(fcb::FactorFamilyBasis, i)::FactorFamilyBasis
     R = fcb.ratios[i, :]
-    return FactorFamilyBasis(; fnm = fcb.fnm, fi = fcb.fi, di = fcb.di,
-                             ratios = isa(R, AbstractMatrix) ? R : reshape(R, 1, :),
-                             K = fcb.K)
+    return rebuild_struct(fcb, (; ratios = isa(R, AbstractMatrix) ? R : reshape(R, 1, :)))
 end
 """
     append_passthrough_factors(fcb::Nothing, n::Integer) -> nothing
@@ -412,8 +410,7 @@ function append_passthrough_factors(fcb::FactorFamilyBasis, n::Integer)::FactorF
     if iszero(n)
         return fcb
     end
-    return FactorFamilyBasis(; fnm = fcb.fnm, fi = fcb.fi, di = fcb.di, ratios = fcb.ratios,
-                             K = fcb.K + n)
+    return rebuild_struct(fcb, (; K = fcb.K + n))
 end
 """
 $(DocStringExtensions.TYPEDSIGNATURES)
@@ -507,7 +504,7 @@ end
 
 Build the compact change of basis of the requested constrained Factor Families.
 
-The element type of the ratios is the promoted type of `Ms` and `bw`, and an integer type becomes a floating-point type. So a `Rational` history gives exact ratios, and a `Float32` history gives `Float32` ratios. A dropped factor whose benchmark-weighted exposure is small but not zero gives large finite ratios. The builder accepts them, and they are ill-conditioned. To avoid them, state a dropped factor with a large exposure, or let the automatic choice pick one.
+The element type of the ratios is the promoted type of `Ms` and `bw`. So a `Rational` history gives exact ratios, and a `Float32` history gives `Float32` ratios. A dropped factor whose benchmark-weighted exposure is small but not zero gives large finite ratios. The builder accepts them, and they are ill-conditioned. To avoid them, state a dropped factor with a large exposure, or let the automatic choice pick one.
 
 # Mathematical definition
 
@@ -548,10 +545,10 @@ Where:
 # Arguments
 
   - `families`: Pairs of `family label => dropped factor name`, in the order the families take columns of `ratios`. A `nothing` on the right asks for the automatic choice of the dropped factor.
-  - `Ms::Arr3Num`: Exposure history, `observations × assets × factors`.
+  - `Ms::Arr3Num`: Exposure history, `assets × factors × observations`.
   - `bw::MatNum`: Benchmark weight history, `observations × assets`.
-  - `nf::VecStr`: Names of the raw factor axis, of length `size(Ms, 3)`.
-  - `fam::VecStr`: Family label of each raw factor, of length `size(Ms, 3)`.
+  - `nf::VecStr`: Names of the raw factor axis, of length `size(Ms, 2)`.
+  - `fam::VecStr`: Family label of each raw factor, of length `size(Ms, 2)`.
 
 # Validation
 
@@ -571,7 +568,7 @@ Where:
 # Examples
 
 ```jldoctest
-julia> Ms = reshape([1.0, 1.0, 1.0, 0.0, 0.0, 1.0, 1.0, 0.0], 2, 2, 2);
+julia> Ms = reshape([1.0, 1.0, 0.0, 1.0, 1.0, 0.0, 1.0, 0.0], 2, 2, 2);
 
 julia> factor_family_basis([\"ind\" => nothing], Ms, [0.5 0.5; 0.5 0.5], [\"ind=a\", \"ind=b\"],
                            [\"ind\", \"ind\"])
@@ -593,13 +590,13 @@ function factor_family_basis(families::AbstractVector{<:Pair}, Ms::Arr3Num, bw::
                              nf::VecStr, fam::VecStr)::FactorFamilyBasis
     @argcheck(!isempty(families), IsEmptyError("families cannot be empty"))
     @argcheck(!isempty(Ms), IsEmptyError("Ms cannot be empty"))
-    T, N, K = size(Ms)
+    N, K, T = size(Ms)
     @argcheck(size(bw) == (T, N),
               DimensionMismatch("bw ($(size(bw, 1))×$(size(bw, 2))) must match Ms ($T×$N) on the observation and asset axes"))
     assert_factor_axis_length(length(nf), K, :nf)
     assert_factor_axis_length(length(fam), K, :fam)
     @argcheck(allunique(nf), ArgumentError("nf must not repeat a factor name"))
-    Tf = float_if_integer(promote_type(real(eltype(Ms)), real(eltype(bw))))
+    Tf = promote_type(real(eltype(Ms)), real(eltype(bw)))
     c = weighted_family_exposures(Ms, bw, Tf)
     fnm = String[]
     fi = Vector{Int}[]
@@ -640,7 +637,7 @@ Return the benchmark-weighted exposure of every raw factor at every observation.
 
 # Arguments
 
-  - `Ms::Arr3Num`: Exposure history, `observations × assets × factors`.
+  - `Ms::Arr3Num`: Exposure history, `assets × factors × observations`.
   - `bw::MatNum`: Benchmark weight history, `observations × assets`.
   - `Tf::Type{<:Real}`: Element type of the answer.
 
@@ -658,7 +655,7 @@ Return the benchmark-weighted exposure of every raw factor at every observation.
   - [`factor_family_basis`](@ref)
 """
 function weighted_family_exposures(Ms::Arr3Num, bw::MatNum, Tf::Type{<:Real})
-    T, N, K = size(Ms)
+    N, K, T = size(Ms)
     c = zeros(Tf, T, K)
     w = zeros(Tf, N)
     for t in 1:T
@@ -677,7 +674,7 @@ function weighted_family_exposures(Ms::Arr3Num, bw::MatNum, Tf::Type{<:Real})
         @argcheck(s > zero(s),
                   ArgumentError("the benchmark weights of observation $t sum to $s, and they must sum to a strictly positive number once a non-finite weight is read as zero"))
         for k in 1:K, i in 1:N
-            x = Ms[t, i, k]
+            x = Ms[i, k, t]
             if isfinite(x)
                 c[t, k] += w[i] * Tf(x) / s
             end

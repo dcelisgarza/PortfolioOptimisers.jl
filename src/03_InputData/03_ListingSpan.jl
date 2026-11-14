@@ -93,7 +93,7 @@ function Base.show(io::IO, ::MIME"text/plain", s::ListingSpan)
     return show(io, s)
 end
 """
-    listing_span(X::AbstractMatrix{<:Union{Missing, <:Real}}) -> ListingSpan
+    listing_span(X::AbstractMatrix{<:Union{Missing, Real}}) -> ListingSpan
 
 Derive the Listing Span of every asset column of a price panel by the Span Rule.
 
@@ -161,7 +161,7 @@ julia> Matrix(span)
   - [`PortfolioOptimisers.ListingSpan`](@ref)
   - [`prices_to_returns`](@ref)
 """
-function listing_span(X::AbstractMatrix{<:Union{Missing, <:Real}})
+function listing_span(X::AbstractMatrix{<:Union{Missing, Real}})
     @argcheck(!isempty(X),
               IsEmptyError("`X` cannot be empty: a Listing Span names one interval per asset column of a price panel"))
     T, N = size(X)
@@ -247,7 +247,7 @@ end
 """
     universe_masks(
         span::AbstractMatrix{Bool},
-        R::AbstractMatrix{<:Union{Missing, <:Real}}
+        R::AbstractMatrix{<:Union{Missing, Real}}
     ) -> Tuple{AbstractMatrix{Bool}, BitMatrix}
 
 Project a listing statement onto the returns clock and intersect it with finiteness to make the two universe masks of an Asset Panel.
@@ -333,7 +333,7 @@ julia> emsk
   - [`PortfolioOptimisers.assert_panel_masks`](@ref)
 """
 function universe_masks(span::AbstractMatrix{Bool},
-                        R::AbstractMatrix{<:Union{Missing, <:Real}})
+                        R::AbstractMatrix{<:Union{Missing, Real}})
     n, N = size(span)
     m, Nr = size(R)
     @argcheck(N == Nr,

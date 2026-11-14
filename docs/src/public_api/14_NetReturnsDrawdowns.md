@@ -12,6 +12,7 @@ SelfFinancingDrift
 DriftedWeights
 TargetWeights
 HeldWeightsResult
+held_weights_drift
 calc_net_returns(w::VecNum, X::MatNum, args...)
 calc_net_returns(w::MatNum, X::MatNum, args...)
 calc_net_returns(w::VecVecNum, X::MatNum, fees, wd::AbstractWeightDrift, obs = nothing)

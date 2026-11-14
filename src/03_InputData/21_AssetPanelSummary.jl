@@ -39,7 +39,7 @@ end
 
 Return the count of cells that one pair of observation and asset holds in a Panel Field.
 
-A numeric and a categorical Panel Field hold one cell for each pair. A tensor Panel Field holds one cell for each label of its trailing axis.
+A numeric and a categorical Panel Field hold one cell for each pair. A tensor Panel Field holds one cell for each label of its label axis.
 
 # Algorithm
 
@@ -67,15 +67,15 @@ end
 """
     panel_field_missing(f::AbstractPanelField) -> AbstractArray{<:Integer}
 
-Count the cells of a Panel Field that the builder filled, for each pair of observation and asset.
+Count the cells of a Panel Field that the raw source did not observe, for each pair of observation and asset.
 
-A cell is missing when the observed mask of the Panel Field is false there. A Panel Field with no observed mask cannot blank, so it has no missing cell. A tensor Panel Field holds one cell for each label, so its count for one pair is from `0` to the count of labels.
+A cell is missing when the observed mask of the Panel Field is false there. A fill policy wrote the value of a missing cell, or the cell holds a placeholder. A Panel Field with no observed mask cannot blank, so it has no missing cell. A tensor Panel Field holds one cell for each label, so its count for one pair is from `0` to the count of labels.
 
 # Algorithm
 
  1. Read the axes of the Panel Field with [`panel_field_axes`](@ref).
- 2. The observed mask is `nothing`: return zeros over the axes.
- 3. Otherwise put the cells of each pair in one row, and count the false cells of each row.
+ 2. If the observed mask is `nothing`, return zeros over the axes.
+ 3. Otherwise count the false cells of each pair: one cell on a field with no label axis, and the cells of every label, on the second axis, on a tensor field. The count is over the observation and asset axes, so the count of a time-varying tensor field takes the observations first.
 
 # Arguments
 
@@ -96,8 +96,18 @@ function panel_field_missing(f::AbstractPanelField)
     return panel_field_missing(f.omsk, panel_field_axes(f))
 end
 panel_field_missing(::Nothing, ax::Dims) = zeros(Int, ax)
-function panel_field_missing(omsk::AbstractArray{Bool}, ax::Dims)
+# A field with no label axis has one cell for each pair.
+function panel_field_missing(omsk::AbstractArray{Bool, D}, ax::NTuple{D, Int}) where {D}
     return reshape(count(!, reshape(omsk, prod(ax), :); dims = 2), ax)
+end
+# A static tensor field is `assets × labels`.
+function panel_field_missing(omsk::AbstractMatrix{Bool}, ::Tuple{Int})
+    return vec(count(!, omsk; dims = 2))
+end
+# A time-varying tensor field is `assets × labels × observations`, and the count is
+# `observations × assets`.
+function panel_field_missing(omsk::AbstractArray{Bool, 3}, ::Tuple{Int, Int})
+    return permutedims(dropdims(count(!, omsk; dims = 2); dims = 2))
 end
 """
     panel_active_cells(pnl::AssetPanel) -> AbstractArray{Bool}
@@ -108,7 +118,7 @@ A static panel has no active mask. Each asset of a static panel is in its univer
 
 # Algorithm
 
- 1. The panel is static: return a true array over [`panel_axes`](@ref).
+ 1. If the panel is static, return a true array over [`panel_axes`](@ref).
  2. Otherwise return the active mask.
 
 # Arguments
@@ -129,7 +139,45 @@ function panel_active_cells(pnl::AssetPanel)
     return panel_is_static(pnl) ? trues(panel_axes(pnl)) : pnl.amsk
 end
 """
-    panel_field_coverage(f::AbstractPanelField, act::AbstractArray{Bool}) -> NamedTuple
+$(DocStringExtensions.TYPEDEF)
+
+Holds the counts of the cells and of the missing cells of one Panel Field, over all cells and over the active cells.
+
+This type is an implementation detail and is not intended for direct use. [`panel_field_coverage`](@ref) makes it, and [`DataFrames.describe(pnl::AssetPanel)`](@ref) and [`panel_info`](@ref) read it.
+
+# Fields
+
+$(DocStringExtensions.FIELDS)
+
+# Related
+
+  - [`panel_field_coverage`](@ref)
+  - [`panel_info_fields`](@ref)
+"""
+@concrete struct PanelFieldCoverage
+    """
+    `cells`: The count of cells.
+    """
+    cells
+    """
+    `missing`: The count of missing cells.
+    """
+    missing
+    """
+    `active`: The count of active cells.
+    """
+    active
+    """
+    `active_missing`: The count of missing active cells.
+    """
+    active_missing
+    """
+    `assets_missing`: The count of assets whose active cells are all missing.
+    """
+    assets_missing
+end
+"""
+    panel_field_coverage(f::AbstractPanelField, act::AbstractArray{Bool}) -> PanelFieldCoverage
 
 Count the cells and the missing cells of a Panel Field, over all cells and over the active cells.
 
@@ -146,10 +194,11 @@ Count the cells and the missing cells of a Panel Field, over all cells and over 
 
 # Returns
 
-  - `cov::NamedTuple`: `cells`, the count of cells; `missing`, the count of missing cells; `active`, the count of active cells; `active_missing`, the count of missing active cells; `assets_missing`, the count of assets whose active cells are all missing.
+  - `cov::PanelFieldCoverage`: The five counts.
 
 # Related
 
+  - [`PanelFieldCoverage`](@ref)
   - [`panel_field_missing`](@ref)
   - [`panel_active_cells`](@ref)
   - [`DataFrames.describe(pnl::AssetPanel)`](@ref)
@@ -162,25 +211,25 @@ function panel_field_coverage(f::AbstractPanelField, act::AbstractArray{Bool})
     A = reshape(act, :, N)
     assets_missing = count(j -> any(view(A, :, j)) &&
                                 all(t -> !A[t, j] || M[t, j] == K, axes(A, 1)), 1:N)
-    return (; cells = length(miss) * K, missing = sum(miss), active = count(act) * K,
-            active_missing = sum(m * a for (m, a) in zip(miss, act); init = 0),
-            assets_missing)
+    return PanelFieldCoverage(length(miss) * K, sum(miss), count(act) * K,
+                              sum(m * a for (m, a) in zip(miss, act); init = 0),
+                              assets_missing)
 end
 """
     DataFrames.describe(pnl::AssetPanel; by::Option{<:AbstractString} = nothing)
 
-Report the share of the cells of each Panel Field of an [`AssetPanel`](@ref) that the builder filled.
+Report the share of the cells of each Panel Field of an [`AssetPanel`](@ref) that the raw source did not observe.
 
-A cell is missing when the observed mask of its Panel Field is false. The builder fills that cell by the fill policy of the field, and the observed mask keeps the record, so a filled cell stays missing in this report. A Panel Field with no observed mask cannot blank, and has no missing cell.
+A cell is missing when the observed mask of its Panel Field is false. The builder writes the value of that cell by the fill policy of the field, or stores a placeholder when no fill reaches it. The observed mask keeps the record, so a filled cell stays missing in this report. A Panel Field with no observed mask cannot blank, and has no missing cell.
 
 With `by = nothing` the table has one row for each Panel Field. With `by` the name of a [`CategoricalPanelField`](@ref), the table has one row for each other Panel Field and each level of `by`. A cell belongs to a level when it is active, and when `by` is observed there and holds that level. A tensor Panel Field counts one cell for each label.
 
-A share is a fraction in `[0, 1]`, not a percentage. A table that reports a percentage gives the share times 100. A share over no cell is `NaN`: an empty set has no share.
+A share is a `Float64` fraction in `[0, 1]`, not a percentage. A table that reports a percentage gives the share times 100. A share over no cell is `NaN`, because an empty set has no share.
 
 # Algorithm
 
  1. Read the active cells with [`panel_active_cells`](@ref).
- 2. `by = nothing`: count the cells of each Panel Field with [`panel_field_coverage`](@ref), and divide each missing count by its cell count.
+ 2. If `by` is `nothing`, count the cells of each Panel Field with [`panel_field_coverage`](@ref), and divide each missing count by its cell count.
  3. Otherwise read the categorical Panel Field `by` with [`panel_field`](@ref). For each other Panel Field and each level, count the cells of the level with [`panel_level_coverage`](@ref), and divide.
 
 # Arguments
@@ -240,25 +289,26 @@ julia> describe(pnl; by = \"sector\")
 function DataFrames.describe(pnl::AssetPanel; by::Option{<:AbstractString} = nothing)
     act = panel_active_cells(pnl)
     if isnothing(by)
-        cs = [panel_field_coverage(f, act) for f in pnl.pf]
-        return DataFrames.DataFrame(; field = String[f.name for f in pnl.pf],
-                                    kind = Symbol[panel_field_kind(f) for f in pnl.pf],
+        cs = [panel_field_coverage(f, act) for f in each_panel_field(pnl)]
+        return DataFrames.DataFrame(; field = String[f.name for f in each_panel_field(pnl)],
+                                    kind = Symbol[panel_field_kind(f)
+                                                  for f in each_panel_field(pnl)],
                                     cells = Int[c.cells for c in cs],
-                                    missing = [c.missing / c.cells for c in cs],
+                                    missing = Float64[c.missing / c.cells for c in cs],
                                     active_cells = Int[c.active for c in cs],
-                                    active_missing = [c.active_missing / c.active
-                                                      for c in cs],
+                                    active_missing = Float64[c.active_missing / c.active
+                                                             for c in cs],
                                     assets_missing = Int[c.assets_missing for c in cs])
     end
     g = panel_field(pnl, by)
     @argcheck(g isa CategoricalPanelField,
               ArgumentError("a missing-share report groups the cells by the levels of a categorical Panel Field, and \"$by\" is a $(panel_field_kind(g)) Panel Field"))
     rows = [(; field = f.name, level = l, panel_level_coverage(f, g, k, act)...)
-            for f in pnl.pf if f.name != by for (k, l) in pairs(g.levels)]
+            for f in each_panel_field(pnl) if f.name != by for (k, l) in pairs(g.levels)]
     return DataFrames.DataFrame(; field = String[r.field for r in rows],
                                 level = String[r.level for r in rows],
                                 cells = Int[r.cells for r in rows],
-                                missing = [r.missing / r.cells for r in rows])
+                                missing = Float64[r.missing / r.cells for r in rows])
 end
 """
     panel_level_coverage(f::AbstractPanelField, g::CategoricalPanelField, k::Integer,
@@ -332,13 +382,43 @@ function panel_level_cells(g::CategoricalPanelField, k::Integer, act::AbstractAr
     return member
 end
 """
-    panel_spread(v::AbstractVector{<:Real}) -> Option{NamedTuple}
+$(DocStringExtensions.TYPEDEF)
+
+Holds the minimum, the median and the maximum of a vector of counts.
+
+This type is an implementation detail and is not intended for direct use. [`panel_spread`](@ref) makes it, and [`panel_info_mask`](@ref) prints it.
+
+# Fields
+
+$(DocStringExtensions.FIELDS)
+
+# Related
+
+  - [`panel_spread`](@ref)
+  - [`PanelMaskCoverage`](@ref)
+"""
+@concrete struct CountSpread
+    """
+    `min`: The smallest count.
+    """
+    min
+    """
+    `median`: The median of the counts.
+    """
+    median
+    """
+    `max`: The largest count.
+    """
+    max
+end
+"""
+    panel_spread(v::AbstractVector{<:Real}) -> Option{CountSpread}
 
 Return the minimum, the median and the maximum of a vector of counts, or `nothing` when it is empty.
 
 # Algorithm
 
- 1. `v` is empty: return `nothing`.
+ 1. If `v` is empty, return `nothing`.
  2. Otherwise return the minimum, the median and the maximum of `v`.
 
 # Arguments
@@ -347,10 +427,11 @@ Return the minimum, the median and the maximum of a vector of counts, or `nothin
 
 # Returns
 
-  - `s::Option{NamedTuple}`: `min`, `median` and `max`, or `nothing`.
+  - `s::Option{CountSpread}`: The spread, or `nothing`.
 
 # Related
 
+  - [`CountSpread`](@ref)
   - [`panel_mask_coverage`](@ref)
   - [`Option`](@ref)
 """
@@ -358,10 +439,52 @@ function panel_spread(v::AbstractVector{<:Real})
     if isempty(v)
         return nothing
     end
-    return (; min = minimum(v), median = Statistics.median(v), max = maximum(v))
+    return CountSpread(minimum(v), Statistics.median(v), maximum(v))
 end
 """
-    panel_mask_coverage(msk::AbstractMatrix{Bool}) -> NamedTuple
+$(DocStringExtensions.TYPEDEF)
+
+Holds the counts of the cells of one universe mask, and the spread of its assets for each observation and of its observations for each asset.
+
+This type is an implementation detail and is not intended for direct use. [`panel_mask_coverage`](@ref) makes it, and [`panel_info_mask`](@ref) prints it.
+
+# Fields
+
+$(DocStringExtensions.FIELDS)
+
+# Related
+
+  - [`panel_mask_coverage`](@ref)
+  - [`CountSpread`](@ref)
+"""
+@concrete struct PanelMaskCoverage
+    """
+    `cells`: The count of cells.
+    """
+    cells
+    """
+    `in_mask`: The count of true cells.
+    """
+    in_mask
+    """
+    `per_observation`: The spread of the count of assets for each observation, or `nothing` when the mask has no observation.
+    """
+    per_observation
+    """
+    `assets`: The count of assets with one true cell or more.
+    """
+    assets
+    """
+    `N`: The count of assets.
+    """
+    N
+    """
+    `durations`: The spread of the count of observations for each asset with one true cell or more, or `nothing` when no asset has one.
+    """
+    durations
+end
+"""
+    panel_mask_coverage(msk::AbstractMatrix{Bool}) -> PanelMaskCoverage
 
 Count the cells of a universe mask, and the spread of its assets for each observation and of its observations for each asset.
 
@@ -377,25 +500,28 @@ Count the cells of a universe mask, and the spread of its assets for each observ
 
 # Returns
 
-  - `cov::NamedTuple`: `cells`, the count of cells; `in_mask`, the count of true cells; `per_observation`, the spread of the count of assets for each observation; `assets`, the count of assets with one true cell or more; `N`, the count of assets; `durations`, the spread of the count of observations for each of those assets.
+  - `cov::PanelMaskCoverage`: The counts and the two spreads.
 
 # Related
 
+  - [`PanelMaskCoverage`](@ref)
   - [`panel_spread`](@ref)
   - [`panel_info`](@ref)
 """
 function panel_mask_coverage(msk::AbstractMatrix{Bool})
     per_asset = vec(sum(msk; dims = 1))
     durations = filter(>(0), per_asset)
-    return (; cells = length(msk), in_mask = count(msk),
-            per_observation = panel_spread(vec(sum(msk; dims = 2))),
-            assets = length(durations), N = size(msk, 2),
-            durations = panel_spread(durations))
+    return PanelMaskCoverage(length(msk), count(msk), panel_spread(vec(sum(msk; dims = 2))),
+                             length(durations), size(msk, 2), panel_spread(durations))
 end
 """
     panel_percent(x::Real) -> Real
 
 Return a share as a percentage, rounded to one decimal, for a report.
+
+# Algorithm
+
+ 1. Multiply `x` by 100, and round the product to one decimal.
 
 # Arguments
 
@@ -422,7 +548,7 @@ Print the coverage of one universe mask of an Asset Panel.
 
 The method that Julia selects is the algorithm.
 
- 1. `msk` is `nothing`: the panel is static, so print that it has no mask.
+ 1. If `msk` is `nothing`, the panel is static. Print that it has no mask.
  2. Otherwise read [`panel_mask_coverage`](@ref), and print the true cells, the spread of the assets for each observation, the count of assets in the mask and the spread of their durations.
 
 # Arguments
@@ -468,12 +594,12 @@ end
 
 Print the levels of one categorical Panel Field, grouped by the smallest count of assets that holds each level over the observations.
 
-A level with few assets gives a noisy cross-sectional estimate, so the report puts each level in one of four groups: fewer than 10 assets, 10 to 19, 20 to 49, and 50 or more. The count of one level at one observation is the count of cells of the level, see [`panel_level_cells`](@ref). A static panel has one count for each level.
+A level with few assets gives a noisy cross-sectional estimate, so the report puts each level in one of four groups: fewer than 10 assets, 10 to 19, 20 to 49, and 50 or more. The count of one level at one observation is the count of cells of the level, see [`panel_level_cells`](@ref). An observation where the level holds no asset counts zero, so a level that holds no asset at one observation or more is in the first group. A static panel has one count for each level.
 
 # Algorithm
 
  1. For each level, mark its cells with [`panel_level_cells`](@ref), count them at each observation, and take the minimum.
- 2. For each group, print the count of its levels and their names. A group of more than six levels prints the first four names and the count of the others.
+ 2. For each group, print the count of its levels and their names. A group of more than six levels prints the first four names and the count of the others. A group of one level prints `1 level`.
 
 # Arguments
 
@@ -506,8 +632,8 @@ function panel_info_levels(io::IO, pnl::AssetPanel, g::CategoricalPanelField,
         else
             "$(join(view(ls, 1:4), ", ")), … +$(length(ls) - 4) more"
         end
-        println(io, "    ", rpad(label, 8), ": ", length(ls), " levels",
-                isempty(ls) ? "" : " ($names)")
+        println(io, "    ", rpad(label, 8), ": ", length(ls),
+                isone(length(ls)) ? " level" : " levels", isempty(ls) ? "" : " ($names)")
     end
     return nothing
 end
@@ -520,7 +646,7 @@ The numbers are the ones of [`DataFrames.describe(pnl::AssetPanel)`](@ref), with
 
 # Algorithm
 
- 1. Pad the name column to the longest Panel Field name.
+ 1. Pad the name column to the widest Panel Field name, as `textwidth` measures it. A name in a wide script, such as Chinese, takes two columns for each character.
  2. Print the header, then one line for each Panel Field from its counts.
 
 # Arguments
@@ -541,12 +667,12 @@ The numbers are the ones of [`DataFrames.describe(pnl::AssetPanel)`](@ref), with
   - [`panel_percent`](@ref)
 """
 function panel_info_fields(io::IO, pnl::AssetPanel, cs::AbstractVector)::Nothing
-    w = maximum(f -> length(f.name), pnl.pf; init = 5)
+    w = maximum(f -> textwidth(f.name), each_panel_field(pnl); init = 5)
     println(io, "\nPanel Fields")
     println(io, "  ", rpad("field", w), "  ", rpad("kind", 11), lpad("cells", 7),
             lpad("missing %", 11), lpad("active cells", 14), lpad("active missing %", 18),
             lpad("assets missing", 16))
-    for (f, c) in zip(pnl.pf, cs)
+    for (f, c) in zip(each_panel_field(pnl), cs)
         println(io, "  ", rpad(f.name, w), "  ", rpad(string(panel_field_kind(f)), 11),
                 lpad(c.cells, 7), lpad(panel_percent(c.missing / c.cells), 11),
                 lpad(c.active, 14), lpad(panel_percent(c.active_missing / c.active), 18),
@@ -558,7 +684,7 @@ end
     panel_info_header(io::IO, pnl::AssetPanel, ts::Option{<:AbstractVector},
                       cs::AbstractVector) -> nothing
 
-Print the dimensions of an Asset Panel and the missing share of its cells, the first lines of [`panel_info`](@ref).
+Print the dimensions of an Asset Panel and the missing share of its cells. These lines start the report of [`panel_info`](@ref).
 
 # Algorithm
 
@@ -597,7 +723,7 @@ function panel_info_header(io::IO, pnl::AssetPanel, ts::Option{<:AbstractVector}
     println(io, "Asset Panel")
     println(io, "  observations : ", static ? "none, the panel is static" : "$(ax[1])$span")
     println(io, "  assets       : ", ax[end])
-    println(io, "  Panel Fields : ", length(pnl.pf))
+    println(io, "  Panel Fields : ", length(each_panel_field(pnl)))
     println(io, "  cells        : ", prod(ax), static ? "" : " (observations × assets)")
     println(io, "  missing      : ",
             panel_percent(sum(c.missing for c in cs; init = 0) /
@@ -611,13 +737,13 @@ end
 
 Print a report of an [`AssetPanel`](@ref): its dimensions, the coverage of its two universe masks, the missing share of each Panel Field, and the levels of each categorical Panel Field.
 
-The panel holds no timestamps. Pass the timestamps of the [`ReturnsResult`](@ref) or the [`PricesResult`](@ref) that holds the panel as `ts`, and the report prints the first and the last. A missing cell is a cell that the builder filled, as [`DataFrames.describe(pnl::AssetPanel)`](@ref) states. The `show` of the panel is the tree of its fields, as for each Result, and this report does not replace it.
+The panel holds no timestamps. Pass the timestamps of the [`ReturnsResult`](@ref) or the [`PricesResult`](@ref) that holds the panel as `ts`, and the report prints the first and the last. A missing cell is a cell that the raw source did not observe, as [`DataFrames.describe(pnl::AssetPanel)`](@ref) states. The `show` of the panel is the tree of its fields, as for each Result, and this report does not replace it.
 
 # Algorithm
 
  1. Count the cells of each Panel Field with [`panel_field_coverage`](@ref). Print the dimensions and the missing share of the cells with [`panel_info_header`](@ref).
  2. Print the coverage of the active mask with [`panel_info_mask`](@ref). Print the estimation mask the same way, or print that it equals the active mask.
- 3. Print the counts of each Panel Field with [`panel_info_fields`](@ref), the numbers of [`DataFrames.describe(pnl::AssetPanel)`](@ref) with the shares as percentages.
+ 3. Print the counts of each Panel Field with [`panel_info_fields`](@ref). These are the numbers of [`DataFrames.describe(pnl::AssetPanel)`](@ref), with the shares as percentages.
  4. Print the levels of each categorical Panel Field with [`panel_info_levels`](@ref).
 
 # Arguments
@@ -689,7 +815,7 @@ categorical Panel Fields
 function panel_info(io::IO, pnl::AssetPanel;
                     ts::Option{<:AbstractVector} = nothing)::Nothing
     act = panel_active_cells(pnl)
-    cs = [panel_field_coverage(f, act) for f in pnl.pf]
+    cs = [panel_field_coverage(f, act) for f in each_panel_field(pnl)]
     panel_info_header(io, pnl, ts, cs)
     panel_info_mask(io, "active mask", pnl.amsk)
     if !panel_is_static(pnl) && isequal(pnl.emsk, pnl.amsk)
@@ -698,7 +824,7 @@ function panel_info(io::IO, pnl::AssetPanel;
         panel_info_mask(io, "estimation mask", pnl.emsk)
     end
     panel_info_fields(io, pnl, cs)
-    gs = filter(g -> g isa CategoricalPanelField, pnl.pf)
+    gs = filter(g -> g isa CategoricalPanelField, each_panel_field(pnl))
     if !isempty(gs)
         println(io, "\ncategorical Panel Fields")
     end
@@ -719,7 +845,7 @@ A tensor Panel Field holds an observed value for a pair of observation and asset
 
 # Algorithm
 
- 1. The observed mask is `nothing`: return `nothing`.
+ 1. If the observed mask is `nothing`, return `nothing`.
  2. Otherwise return the pairs that [`panel_field_missing`](@ref) counts no missing cell for.
 
 # Arguments
@@ -740,15 +866,15 @@ function panel_observed_cells(f::AbstractPanelField)
     return isnothing(f.omsk) ? nothing : iszero.(panel_field_missing(f))
 end
 """
-    panel_align_active(pnl::AssetPanel, fields) -> NamedTuple
+    panel_align_active(pnl::AssetPanel, fields) -> Tuple{AssetPanel, Int}
 
 Remove the leading active cells of each asset of an [`AssetPanel`](@ref) until each named Panel Field holds an observed value.
 
-An asset enters the universe of a panel when its active mask is true, and a field of the asset can start later, for example a book value that is first reported months after the listing. The function moves the start of each asset to the first active observation where each named Panel Field is observed. Only the leading cells are removed: a missing cell after that observation stays active. An asset with no such observation leaves the universe. The estimation mask is intersected with the new active mask, so it stays a subset. An observation can be left with no active asset, and the panel admits it, as it admits a view with no asset.
+An asset enters the universe of a panel when its active mask is true, and a field of the asset can start later. An example is a book value that the company first reports months after the listing. The function moves the start of each asset to the first active observation where each named Panel Field is observed. It removes only the leading cells, so a missing cell after that observation stays active. An asset with no such observation leaves the universe. The function intersects the estimation mask with the new active mask, so the estimation mask stays a subset. An observation can have no active asset after the alignment. The panel accepts it, as it accepts a view with no asset.
 
 After the alignment, the first active cell of each asset is observed in each named Panel Field. A second call removes nothing, and the order of `fields` does not change the result.
 
-A tensor Panel Field is observed at a pair of observation and asset when each of its labels is observed there. A Panel Field with no observed mask cannot blank, and is observed at each cell. The Panel Fields do not change: a removed cell keeps its value and its observed mask.
+A tensor Panel Field is observed at a pair of observation and asset when each of its labels is observed there. A Panel Field with no observed mask cannot blank, and is observed at each cell. The Panel Fields do not change, so a removed cell keeps its value and its observed mask.
 
 # Algorithm
 
@@ -768,7 +894,10 @@ A tensor Panel Field is observed at a pair of observation and asset when each of
 
 # Returns
 
-  - `res::NamedTuple`: `pnl`, the aligned Asset Panel; `n`, the count of cells removed from the active mask.
+  - `pnl′::AssetPanel`: The aligned Asset Panel.
+  - `n::Int`: The count of cells removed from the active mask.
+
+The two values are a plain tuple, as `findmax` returns: `pnl′, n = panel_align_active(pnl, fields)`.
 
 # Examples
 
@@ -779,12 +908,12 @@ julia> pnl = AssetPanel(;
                                                 omsk = Bool[0 1; 0 0; 1 1; 1 0])],
                         amsk = trues(4, 2), emsk = trues(4, 2));
 
-julia> res = panel_align_active(pnl, \"book\");
+julia> aligned, n = panel_align_active(pnl, \"book\");
 
-julia> res.n
+julia> n
 2
 
-julia> res.pnl.amsk
+julia> aligned.amsk
 4×2 BitMatrix:
  0  1
  0  1
@@ -815,7 +944,7 @@ function panel_align_active(pnl::AssetPanel, fields)
             amsk[t, j] = false
         end
     end
-    return (; pnl = AssetPanel(; pf = pnl.pf, amsk = amsk, emsk = pnl.emsk .& amsk), n)
+    return AssetPanel(; pf = pnl.pf, amsk = amsk, emsk = pnl.emsk .& amsk), n
 end
 
 export panel_info, panel_align_active

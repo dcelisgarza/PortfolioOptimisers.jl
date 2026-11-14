@@ -134,3 +134,34 @@ evidence: one row, one gate, one precedence, plus the transforms the row needs. 
 above is unchanged at both ends — a tag with no table row is not a tag, and a row with no transform
 errors rather than taking another tag's. ADRs 0002, 0010, 0012 and 0013 still decide what the tags
 mean; this still decides how the set is spelled. The set is now two-dimensional.
+
+## Amendment (2026-11-03)
+
+Issue #1960 adds a sixth tag, `@oprop`, and widens the gate of the `obs` channel. The new row
+of `PROP_TAG_CHANNELS` is:
+
+```julia
+obs = (gate = (:wprop, :fprop, :oprop), precedence = (:wprop, :oprop, :fprop))
+```
+
+A Shared Series gap drops observations from the returns data of a whole fit, and every fixed
+observation weight in the tree of its estimator must lose them too (ADR 0229).
+`shared_series_estimator` cuts the tree with `obs_weights_view`, so the channel must reach a
+weights field at any depth. A `@fprop` child opens the channel, as the amendment of ADR 0107 of
+2026-09-26 asked.
+
+Some children read the observations, but `factory` must not reach them: the prior of an
+optimiser, its clustering estimator, and the regression of a factor risk budget.
+`factory(opt, w)` passes portfolio weights to the fees, and a `@fprop` on the prior would pass
+them on. `@oprop` marks such a child for the `obs` channel alone. Its transform is
+`obs_weights_view`, and no other channel names it, so `check_prop_tag_macros` probes it once.
+
+The `@wprop` transform of the `obs` channel is now `obs_weights_index`. For a mask of the full
+sample it calls `observed_weights(w, obs)`, which checks the length of a weight vector, so a
+vector of the wrong length raises and is not cut short with no message. For a set of positions it
+is `nothing_scalar_array_getindex`, as before.
+
+A risk measure stacks `@pprop @wprop` on its weights field, the stack that the docstring of
+`@propagatable` already names. The `prior` channel still selects the field first. The
+`factory` channel now replaces it with an incoming `ObsWeights`, as it does for a moment
+estimator.

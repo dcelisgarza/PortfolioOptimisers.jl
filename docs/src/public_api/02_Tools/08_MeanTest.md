@@ -1,5 +1,5 @@
 ```@meta
-Description = "Mean test, public API of PortfolioOptimisers.jl: AbstractMeanTestEstimator, OverlapMeanTest, WildBootstrapMeanTest, mean_test, mean_test_rng, …"
+Description = "Mean test, public API of PortfolioOptimisers.jl: AbstractMeanTestEstimator, OverlapMeanTest, WildBootstrapMeanTest, mean_test, MeanTestResult, …"
 ```
 
 # Mean test
@@ -11,6 +11,7 @@ AbstractMeanTestEstimator
 OverlapMeanTest
 WildBootstrapMeanTest
 mean_test
+MeanTestResult
 mean_test_rng
 ```
 

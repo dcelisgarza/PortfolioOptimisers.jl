@@ -45,9 +45,10 @@ function descriptor_raw_field(rd::ReturnsResult, name::AbstractString)
     Z = panel_feature_matrix(rd.pnl)[2]
     col = findfirst(==(name), panel_feature_matrix(rd.pnl)[1])
     ocol = findfirst(==(name * "::observed"), panel_feature_matrix(rd.pnl)[1])
-    V = Matrix{Float64}(Z[:, :, col])
+    # `Z` is `assets × features × observations` (ADR 0230); `V` is `observations × assets`.
+    V = Matrix{Float64}(permutedims(Z[:, col, :]))
     if !isnothing(ocol)
-        V[iszero.(Z[:, :, ocol])] .= NaN
+        V[iszero.(permutedims(Z[:, ocol, :]))] .= NaN
     end
     return V
 end
@@ -213,6 +214,15 @@ end
     @test_throws IsEmptyError PortfolioOptimisers.descriptor_field_values(rd,
                                                                           Pair{String, Int}[])
     @test_throws KeyError PortfolioOptimisers.descriptor_field_values(rd, "mcp")
+    # A vector of names reads their product, and a NaN in a factor is a NaN in the product.
+    M = PortfolioOptimisers.descriptor_field_values(rd, ["mcap", "debt"])
+    @test M[1, :] == [0.5, 2.0, 4.5]
+    @test isnan(M[2, 1]) && isnan(M[2, 2])
+    @test_throws IsEmptyError PortfolioOptimisers.descriptor_field_values(rd, String[])
+    # `nothing` reads the absolute returns, and a Descriptor Estimator gives its Descriptor.
+    @test PortfolioOptimisers.descriptor_field_values(rd, nothing) == abs.(rd.X)
+    de = PanelFieldRatio(; num = "debt", den = "mcap")
+    @test isequal(PortfolioOptimisers.descriptor_field_values(rd, de), descriptor(de, rd))
     # A carrier with no panel cannot be read, and a categorical field is not one number.
     bare = ReturnsResult(; nx = ["A1", "A2", "A3"], X = zeros(3, 3))
     @test_throws IsNothingError PortfolioOptimisers.descriptor_field_values(bare, "mcap")
@@ -227,13 +237,14 @@ end
     # A field that cannot blank carries no observed-mask column, and reads back whole.
     @test PortfolioOptimisers.descriptor_field_values(rdc, "mcap") == ones(2, 2)
     # The read lands in the type a division of the field lands in, which is the one that
-    # carries a NaN: an exact integer field reads in Float64, a Float32 field stays Float32,
-    # and every archetype that reads it can then write NaN on an inactive or blank cell.
+    # carries a NaN: a Float32 field stays Float32, and every archetype that reads it can
+    # then write NaN on an inactive or blank cell. Issue #1972 removed the integer field:
+    # integer values convert at the field.
     ami = [true true; true false]
-    pint = asset_panel([NumericPanelInput(; name = "shares", vals = [10 20; 30 40]),
+    pint = asset_panel([NumericPanelInput(; name = "shares", vals = [10.0 20.0; 30.0 40.0]),
                         NumericPanelInput(; name = "gap",
-                                          vals = Union{Missing, Int}[10 missing; 30 40],
-                                          alg = ConstantPanelFill(; val = 0)),
+                                          vals = Union{Missing, Float64}[10 missing; 30 40],
+                                          alg = ConstantPanelFill(; val = 0.0)),
                         NumericPanelInput(; name = "f32", vals = Float32[1 2; 3 4])];
                        amsk = ami, emsk = ami)
     rdi = ReturnsResult(; nx = ["A1", "A2"], X = zeros(2, 2), pnl = pint)
@@ -646,13 +657,12 @@ end
 
     L3 = fill(one(Complex{Float64}), 2, 2, 2)
     PortfolioOptimisers.exposure_active_fill!(L3, pnl)
-    @test isnan(real(L3[1, 2, 1])) && L3[1, 1, 1] == 1
+    @test isnan(real(L3[2, 1, 1])) && L3[1, 1, 1] == 1
 
-    B = fill(one(Complex{Float64}), 2, 2, 2)
-    PortfolioOptimisers.one_hot_observed_fill!(B, [true false; true true])
-    @test isnan(real(B[1, 2, 1])) && B[1, 1, 1] == 1
-    PortfolioOptimisers.one_hot_observed_fill!(B, nothing)
-    @test B[1, 1, 1] == 1
+    B = Array{Complex{Float64}}(undef, 2, 2, 2)
+    PortfolioOptimisers.one_hot_fill!(B, [1 2; 2 1], [true false; true true])
+    @test isnan(real(B[2, 1, 1])) && isnan(real(B[2, 2, 1]))
+    @test B[1, 1, 1] == 1 && iszero(B[1, 2, 1]) && B[1, 2, 2] == 1 && iszero(B[1, 1, 2])
 
     X = Complex{Float64}[1 2; 3 4]
     @test isnan(real(PortfolioOptimisers.ew_active_returns(X, pnl)[1, 2]))
@@ -676,10 +686,12 @@ end
     @test PortfolioOptimisers.ew_volatility_input(FullMoment(), X, 0) === X
 
     Ms = zeros(Complex{Float64}, 2, 2, 2)
-    PortfolioOptimisers.cross_sectional_exposure_write!(Ms, X, 1, 1, "f")
-    @test Ms[:, :, 1] == X
-    PortfolioOptimisers.cross_sectional_exposure_write!(Ms, reshape(X, 2, 2, 1), 2, 1, "f")
-    @test Ms[:, :, 2] == X
+    PortfolioOptimisers.cross_sectional_exposure_write!(Ms, X, 1:2, 1, 1, "f")
+    @test Ms[:, 1, :] == transpose(X)
+    PortfolioOptimisers.cross_sectional_exposure_write!(Ms,
+                                                        reshape(Matrix(transpose(X)), 2, 1,
+                                                                2), 1:2, 2, 1, "f")
+    @test Ms[:, 2, :] == transpose(X)
 
     @test PortfolioOptimisers.target_forecast_multiplier(true, 2 + 0im) == 2 + 0im
     @test PortfolioOptimisers.target_forecast_multiplier(false, 2 + 0im) == 1
@@ -709,14 +721,12 @@ Base.convert(::Type{NaNProbe726}, x::Float64) = throw(DomainError(x, "NaNProbe72
                                                                              pnl)
         @test_throws ArgumentError PortfolioOptimisers.exposure_active_fill!(ones(T, 2, 2,
                                                                                   2), pnl)
-        @test_throws ArgumentError PortfolioOptimisers.one_hot_observed_fill!(ones(T, 2, 2,
-                                                                                   2), omsk)
-        @test isnothing(PortfolioOptimisers.one_hot_observed_fill!(ones(T, 2, 2, 2),
-                                                                   nothing))
-    end
-    for T in (Int, Rational{Int})
-        @test_throws ArgumentError PortfolioOptimisers.one_hot_level_fill!(zeros(T, 2, 2,
-                                                                                 2))
+        # The one-hot fill converts NaN before it writes, so it refuses the type even when
+        # every cell is live, as the fill of the unset levels did before #1971.
+        for live in (omsk, trues(2, 2))
+            @test_throws ArgumentError PortfolioOptimisers.one_hot_fill!(ones(T, 2, 2, 2),
+                                                                         [1 2; 2 1], live)
+        end
     end
 
     # The type of the array is kept: a Float32 array takes NaN32, a BigFloat array a BigFloat.
@@ -746,6 +756,13 @@ end
     V3 = PortfolioOptimisers.descriptor_field_values(rd, ["f32" => 2])
     @test eltype(V3) === Float32
     @test V3 == Float32[2 4; 6 8]
+    # A product of Panel Fields takes the promoted type the same way (#2005).
+    P1 = PortfolioOptimisers.descriptor_field_values(rd, ["f32", "f64"])
+    P2 = PortfolioOptimisers.descriptor_field_values(rd, ["f64", "f32"])
+    @test eltype(P1) === Float64 && eltype(P2) === Float64
+    @test P1 == P2
+    @test P1 == [1e-9 0.0; 0.0 10.0]
+    @test eltype(PortfolioOptimisers.descriptor_field_values(rd, ["f32"])) === Float32
 end
 
 @testset "The log-return check names the first return at or below -1 (#726)" begin
@@ -965,10 +982,13 @@ end
             L = PO.lookback(xe)
             B = factor_exposure(xe, rd)
             Bc = factor_exposure(xe, lookback_cut(rd, L))
-            @test size(Bc, 1) == L
-            @test any(isfinite, selectdim(B, 1, size(B, 1)))
-            @test lookback_agrees(vec(selectdim(Bc, 1, L)),
-                                  vec(selectdim(B, 1, size(B, 1))), exact)
+            # A one-factor member is observations × assets, a rank-3 block holds its
+            # observations last.
+            od = ndims(B) == 3 ? 3 : 1
+            @test size(Bc, od) == L
+            @test any(isfinite, selectdim(B, od, size(B, od)))
+            @test lookback_agrees(vec(selectdim(Bc, od, L)),
+                                  vec(selectdim(B, od, size(B, od))), exact)
         end
         # A derived member reads the exposure of its source on the same rows, so the prior
         # counts the rows of the source.
@@ -1118,16 +1138,20 @@ end
         @test PortfolioOptimisers.assert_rolling_sign(1) === nothing
         @test PortfolioOptimisers.assert_rolling_sign(-1.0) === nothing
     end
-    @testset "A carrier without returns or without an Asset Panel is refused" begin
+    @testset "A carrier without returns is refused, and one without a panel reads finiteness" begin
         @test_throws PortfolioOptimisers.IsNothingError descriptor(Reversal(; window = 1),
                                                                    ReturnsResult())
         @test_throws PortfolioOptimisers.IsNothingError descriptor(MaxReturn(; window = 1),
                                                                    ReturnsResult())
-        rd = ReturnsResult(; nx = ["A", "B"], X = [0.1 0.1; 0.2 0.2])
-        @test_throws PortfolioOptimisers.IsNothingError descriptor(Reversal(; window = 1),
-                                                                   rd)
-        @test_throws PortfolioOptimisers.IsNothingError descriptor(MaxReturn(; window = 1),
-                                                                   rd)
+        # The ingestion layer emits no panel for a gapless table, so a carrier with no panel
+        # reads as every asset active (#1882).
+        X = [0.1 0.1; 0.2 0.2]
+        rd = ReturnsResult(; nx = ["A", "B"], X = X)
+        rdp = ReturnsResult(; nx = ["A", "B"], X = X,
+                            pnl = AssetPanel(; amsk = trues(2, 2), emsk = trues(2, 2)))
+        for d in (Reversal(; window = 1), MaxReturn(; window = 1))
+            @test isequal(descriptor(d, rd), descriptor(d, rdp))
+        end
     end
 end
 
@@ -1252,17 +1276,7 @@ end
 end
 
 @testset "The rolling Descriptors derive their number type from the returns (#741)" begin
-    # An integer panel raised InexactError: Int64(NaN) at the first NaN of the warm-up. It
-    # is now floated, and gives the answer of the same panel in Float64 bit for bit.
-    Xi = [0 1; 2 0; 1 3; 4 2; 0 1]
-    Xf = Float64.(Xi)
-    for de in
-        (RollingMax(; window = 2), MaxReturn(; window = 3), RollingLogReturn(; window = 2),
-         Reversal(; window = 1))
-        Di = descriptor(de, rolling_hand_panel(Xi))
-        @test eltype(Di) == Float64
-        @test isequal(Di, descriptor(de, rolling_hand_panel(Xf)))
-    end
+    # Issue #1972 removed the integer case: integer data convert at the carrier.
     # A Float32 panel keeps a Float32 Descriptor.
     X32 = Float32[0.1 0.2; 0.05 -0.1; 0.3 0.0]
     for de in (RollingLogReturn(; window = 2), RollingMax(; window = 2))
@@ -1575,9 +1589,10 @@ function ew_raw_field(rd::ReturnsResult, name::AbstractString)
     Z = panel_feature_matrix(rd.pnl)[2]
     col = findfirst(==(name), panel_feature_matrix(rd.pnl)[1])
     ocol = findfirst(==(name * "::observed"), panel_feature_matrix(rd.pnl)[1])
-    V = Matrix{Float64}(Z[:, :, col])
+    # `Z` is `assets × features × observations` (ADR 0230); `V` is `observations × assets`.
+    V = Matrix{Float64}(permutedims(Z[:, col, :]))
     if !isnothing(ocol)
-        V[iszero.(Z[:, :, ocol])] .= NaN
+        V[iszero.(permutedims(Z[:, ocol, :]))] .= NaN
     end
     return V
 end
@@ -1667,10 +1682,14 @@ end
         @test_throws Exception DaysToCover(; num = "", den = "b")
         @test_throws Exception EWVolatility(; mar = NaN)
     end
-    @testset "A Descriptor over the returns still refuses a carrier with no Asset Panel" begin
-        rd = ReturnsResult(; nx = ["A", "B"], X = [0.01 0.02; 0.03 0.04])
-        @test_throws Exception descriptor(EWMomentum(; half_life = 2, skip = 0), rd)
-        @test_throws Exception descriptor(EWVolatility(; half_life = 2), rd)
+    @testset "A Descriptor over the returns reads a carrier with no Asset Panel as all active" begin
+        X = [0.01 0.02; 0.03 0.04]
+        rd = ReturnsResult(; nx = ["A", "B"], X = X)
+        rdp = ReturnsResult(; nx = ["A", "B"], X = X,
+                            pnl = AssetPanel(; amsk = trues(2, 2), emsk = trues(2, 2)))
+        for d in (EWMomentum(; half_life = 2, skip = 0), EWVolatility(; half_life = 2))
+            @test isequal(descriptor(d, rd), descriptor(d, rdp))
+        end
     end
 end
 
@@ -1989,18 +2008,9 @@ end
 end
 
 @testset "The volatility Descriptors derive their number type from the returns" begin
-    Xi = [1 2; -1 0; 1 1; 0 -2; 2 1]
-    Xf = Float64.(Xi)
-    rdi = ew_hand_panel(["market_cap" => ones(size(Xi))], Xi)
-    rdf = ew_hand_panel(["market_cap" => ones(size(Xi))], Xf)
-    # The default estimator built its state in the type of the returns, so an integer panel
-    # raised an `InexactError` at the first `NaN` of the warm-up.
-    for de in (EWVolatility(; half_life = 2), EWDownsideVolatility(; half_life = 2),
-               EWResidualVolatility(; half_life = 2, beta_half_life = 2),
-               EWResidualDownsideVolatility(; half_life = 2, beta_half_life = 2))
-        @test isequal(descriptor(de, rdi), descriptor(de, rdf))
-    end
-    rd32 = ew_hand_panel(["market_cap" => ones(size(Xi))], Float32.(Xi) ./ 100)
+    # Issue #1972 removed the integer case: integer data convert at the carrier.
+    Xf = [1.0 2.0; -1.0 0.0; 1.0 1.0; 0.0 -2.0; 2.0 1.0]
+    rd32 = ew_hand_panel(["market_cap" => ones(size(Xf))], Float32.(Xf) ./ 100)
     @test eltype(descriptor(EWVolatility(; half_life = 2), rd32)) == Float32
 end
 
@@ -2021,21 +2031,10 @@ end
 end
 
 @testset "The mean Descriptors derive their number type from the returns" begin
-    Xi = [0 1; 1 0; 2 1; 0 0; 1 2]
-    Xf = Float64.(Xi)
+    # Issue #1972 removed the integer case: integer data convert at the carrier.
+    Xf = [0.0 1.0; 1.0 0.0; 2.0 1.0; 0.0 0.0; 1.0 2.0]
     vol = [10.0 20.0; 30.0 40.0; 50.0 60.0; 70.0 80.0; 90.0 100.0]
-    rdi = ew_hand_panel(["adj_volume" => copy(vol)], Xi)
-    rdf = ew_hand_panel(["adj_volume" => copy(vol)], Xf)
-    # `EWMean` built its delayed input, and `ew_mean_series` its series, in the type of the
-    # returns, so an integer panel raised an `InexactError` at the first `NaN`.
-    for de in
-        (EWMean(; decay = 0.5, min_obs = 1), EWMean(; decay = 0.5, min_obs = 2, skip = 1),
-         EWVolumeRatio(; num = nothing, den = "adj_volume", decay = 0.5, min_obs = 1))
-        @test isequal(descriptor(de, rdi), descriptor(de, rdf))
-    end
-    @test isequal(PortfolioOptimisers.ew_mean_series(Xi, 0.5, 1),
-                  PortfolioOptimisers.ew_mean_series(Xf, 0.5, 1))
-    rd32 = ew_hand_panel(["adj_volume" => copy(vol)], Float32.(Xi) ./ 100)
+    rd32 = ew_hand_panel(["adj_volume" => copy(vol)], Float32.(Xf) ./ 100)
     @test eltype(descriptor(EWMean(; decay = 0.5, min_obs = 1), rd32)) == Float32
 end
 
@@ -2884,10 +2883,6 @@ end
         @test isnan(E[2, 1])
         @test E[1, 1] ≈ 0.0
         @test E[2, 2] ≈ 0.1
-        # Integer arguments hold the `NaN` of a missing cell in their floating point type.
-        Ei = PortfolioOptimisers.ew_residual_returns([1 2; 3 4], [1, 2], [1 1; 2 2],
-                                                     [true false; true true])
-        @test isequal(Ei, [0.0 NaN; -1.0 0.0])
     end
     @testset "At the first valid observation the residual is zero up to the floor" begin
         # The beta includes observation 1, so β = (1 - λ) x r_m / ((1 - λ) r_m² + min_val) and
@@ -3122,70 +3117,18 @@ end
 end
 
 @testset "EW beta descriptors: the number type comes from the data" begin
-    Xi = [1 2
-          -1 0
-          1 1
-          2 -1
-          0 3]
-    W = [1.0 2.0
-         3.0 4.0
-         5.0 6.0
-         1.0 1.0
-         2.0 1.0]
-    amsk = trues(5, 2)
-    amsk[3, 2] = false
-    rdi = ewb_hand_panel(Xi, W; amsk = amsk)
-    rdf = ewb_hand_panel(Float64.(Xi), W; amsk = amsk)
-    @testset "Integer returns give the Descriptor of the same returns as floats" begin
-        @test isequal(descriptor(EWMarketBeta(; half_life = 1), rdi),
-                      descriptor(EWMarketBeta(; half_life = 1), rdf))
-        @test isequal(descriptor(EWMarketBeta(; half_life = 1, agg_obs = 2), rdi),
-                      descriptor(EWMarketBeta(; half_life = 1, agg_obs = 2), rdf))
-        @test isequal(descriptor(EWDownsideBeta(; half_life = 1), rdi),
-                      descriptor(EWDownsideBeta(; half_life = 1), rdf))
-        @test isequal(descriptor(EWMacroSensitivity(; half_life = 1, agg_obs = 2), rdi;
-                                 ref = [1, 0, -1, 2, 1]),
-                      descriptor(EWMacroSensitivity(; half_life = 1, agg_obs = 2), rdf;
-                                 ref = [1.0, 0.0, -1.0, 2.0, 1.0]))
-    end
-    @testset "The helpers float an integer and keep every other type" begin
-        A = PortfolioOptimisers.ew_agg_series([1 2; 3 4], 2)
-        @test A == [2.0 3.0]
-        @test eltype(A) == Float64
+    # Issue #1972 removed the integer case: integer data convert at the carrier.
+    @testset "The helpers keep every non-integer type" begin
         R = PortfolioOptimisers.ew_agg_series([1//2 1//3; 1//4 1//5], 2)
         @test R == [3//8 4//15]
         @test eltype(R) == Rational{Int}
         @test eltype(PortfolioOptimisers.ew_agg_series(Float32[1 2; 3 4], 2)) == Float32
-        @test isequal(PortfolioOptimisers.ew_beta_expand([1 2; 3 4], 3, 2),
-                      [NaN NaN; 1.0 2.0; 1.0 2.0])
         @test PortfolioOptimisers.ew_beta_expand([1//2 1//3; 1//4 1//5], 2, 1) ==
               [1//2 1//3; 1//4 1//5]
-        # The kernels run from a new state, as the batch call does.
-        function downside(X, rm, mar)
-            st = PortfolioOptimisers.ew_downside_beta_state(nothing, X, rm, 0.5)
-            return PortfolioOptimisers.ew_downside_beta_series!(st, X, rm, 0.5, 1, mar,
-                                                                1e-12).B
-        end
-        B = downside([1 2; -1 0], [1, -1], 0)
-        @test eltype(B) == Float64
-        @test B ≈ downside([1.0 2.0; -1.0 0.0], [1.0, -1.0], 0.0) nans = true
-        function partial(X, rm, rf)
-            st = PortfolioOptimisers.ew_macro_sensitivity_state(X, rm, rf, 0.5)
-            return PortfolioOptimisers.ew_macro_sensitivity_series!(st, X, rm, rf, 0.5, 1,
-                                                                    1e-12).B
-        end
-        M = partial([1 2; -1 0; 2 1], [1, -1, 0], [1, 0, 2])
-        @test isequal(M,
-                      partial([1.0 2.0; -1.0 0.0; 2.0 1.0], [1.0, -1.0, 0.0],
-                              [1.0, 0.0, 2.0]))
-        Bi, Vi = PortfolioOptimisers.ew_beta_series([1 2; -1 0; 2 1], [1, -1, 0], 0.5, 1,
-                                                    1e-12)
-        Bf, Vf = PortfolioOptimisers.ew_beta_series([1.0 2.0; -1.0 0.0; 2.0 1.0],
-                                                    [1.0, -1.0, 0.0], 0.5, 1, 1e-12)
-        @test isequal(Bi, Bf)
-        @test isequal(Vi, Vf)
-        V = PortfolioOptimisers.ew_beta_residual_variance([1 2; -1 0; 2 1], [1, -1, 0],
-                                                          [1 2; 1 1; 1 1], 0.5, 1)
+        V = PortfolioOptimisers.ew_beta_residual_variance([1.0 2.0; -1.0 0.0; 2.0 1.0],
+                                                          [1.0, -1.0, 0.0],
+                                                          [1.0 2.0; 1.0 1.0; 1.0 1.0], 0.5,
+                                                          1)
         @test V[2, :] ≈ [0.5 * (-1 - 1 * -1)^2, 0.5 * (0 - 2 * -1)^2]
         @test eltype(V) == Float64
     end

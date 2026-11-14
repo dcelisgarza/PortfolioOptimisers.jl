@@ -61,7 +61,7 @@ Return the keep-mask over the asset columns of `rd`.
 
 A concrete [`AbstractAssetSelector`](@ref) must implement this method, and no other. [`fit_preprocessing`](@ref) calls it on the Coverage Universe of the training window, and [`apply_preprocessing`](@ref) replays the result on every later window.
 
-`rd` is the returns data reduced to its Coverage Universe, so every column of it is finite and active at every row. A selector needs no finiteness guard. A score that is not finite on a live column is a defect of the score, and [`asset_scores`](@ref) refuses it.
+`rd` is the returns data reduced to its Coverage Universe, so every column of it is finite and active at every row. A selector needs no finiteness guard. A score that is not finite on a column of finite returns is a defect of the score, and [`asset_scores`](@ref) refuses it.
 
 A selector reads `rd.nx` and the `observations × assets` matrix `rd.X`. The reduction reads `rd.pnl`, and [`ClusterGroups`](@ref) gives the whole of `rd` to [`clusterise`](@ref), so the family reads the fields `nx`, `X` and `pnl` of [`AbstractReturnsResult`](@ref). A selector never sees a prior result.
 

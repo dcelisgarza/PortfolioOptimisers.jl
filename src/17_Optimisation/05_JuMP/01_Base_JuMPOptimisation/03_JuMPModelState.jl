@@ -34,7 +34,10 @@ const SHARED_STATE = Set{Symbol}([# Pure functions of the prior `pr`: identical 
                                   # falls on. A nested build charges the same fee as its
                                   # parent, so all three are shared rather than prefixed.
                                   :one_time_fees, :fee_fa, :decomposition_contract,
-                                  :mip_indicators, :ss,
+                                  # The big-M constant of every MIP builder. The bundle of
+                                  # MIP bits is not here: it belongs to the weights, so it
+                                  # goes under their owner, `weights_prefix`, as `W` does.
+                                  :ss,
                                   # Weight shaping: outer level only. A nested build shifts
                                   # the weights through its own prefixed `:w`; it does not
                                   # reshape the long/short parts. `:w_gross_ub` bounds the

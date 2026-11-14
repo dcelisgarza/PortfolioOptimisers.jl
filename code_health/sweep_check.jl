@@ -618,7 +618,8 @@ function check_tracker(path, row, map_names, tracker, survey)
                       [if survey
                            "An addition owes one. The standing backlog of an open map does not."
                        else
-                           "File it:"
+                           "The branch touches this file, so file it now with the " *
+                           "`sweep-file-issues` skill, even when the gap predates the branch:"
                        end, "  julia --project=code_health code_health/sweep_triage.jl \\",
                        "    --fetch --file $path",
                        "  code_health/sweep_issues.sh apply --dry-run",
@@ -779,9 +780,13 @@ function main(args)
     base = opts.all ? nothing : merge_base(resolve_base(opts.base))
     failures = 0
     censused = 0
+    # Every `[fail]` with its path, repeated at the end: a reader who reads the tail of a long
+    # report, as a session does, then still sees each one with its command.
+    unmet = Pair{String, Finding}[]
     stale = check_titles(tracker, keys(rows))
     if !(isempty(stale))
         failures += length(stale)
+        append!(unmet, ["the open `$LABEL` issues" => s for s in stale])
         print_findings(stdout, "the open `$LABEL` issues", stale)
     end
     for f in scope
@@ -793,6 +798,7 @@ function main(args)
             append!(fs, pc)
         end
         failures += count(x -> x.level === :fail, fs)
+        append!(unmet, [f => x for x in fs if x.level === :fail])
         print_findings(stdout, f, fs)
     end
     if censused > 0
@@ -821,6 +827,11 @@ function main(args)
     println("\nSteps 3 and 4:  julia --project=code_health code_health/sweep_triage.jl \\")
     println("                  --fetch --file <path>")
     println("                code_health/sweep_issues.sh apply")
+    println("\nThe unmet duties again, each with its command:\n")
+    for (path, x) in unmet
+        print_findings(stdout, path, [x])
+    end
+    println("UNMET: ", failures)
     return 1
 end
 

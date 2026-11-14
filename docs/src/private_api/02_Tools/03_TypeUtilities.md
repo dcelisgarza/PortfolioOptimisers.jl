@@ -1,5 +1,5 @@
 ```@meta
-Description = "Type utilities, private API of PortfolioOptimisers.jl: concrete_typed_array_if_abstract, float_if_integer."
+Description = "Type utilities, private API of PortfolioOptimisers.jl: concrete_typed_array_if_abstract, narrow_mixed_vector, float_if_integer."
 ```
 
 # Type utilities: private API
@@ -8,5 +8,6 @@ Description = "Type utilities, private API of PortfolioOptimisers.jl: concrete_t
 
 ```@docs
 concrete_typed_array_if_abstract
+narrow_mixed_vector
 float_if_integer
 ```

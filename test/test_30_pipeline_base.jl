@@ -279,15 +279,16 @@ include(joinpath(@__DIR__, "asset_panel_fixture.jl"))
         Pv = 100 .+ cumsum(rand(StableRNG(987654321), 10, 3); dims = 1)
         Pv[:, 2] .= NaN                       # asset "A2" is entirely missing
         Px = TimeArray(collect(ts), Pv, ["A1", "A2", "A3"])
-        # Z3[i, j, k] == i + 10(j - 1) + 30(k - 1), so every entry names its own position.
-        Z3 = reshape(Float64.(1:60), 10, 3, 2)
+        # Z3[j, k, t] == t + 10(j - 1) + 30(k - 1), so every entry names its own position.
+        # The array is `assets × features × observations`.
+        Z3 = permutedims(reshape(Float64.(1:60), 10, 3, 2), (2, 3, 1))
         nz = ["f1", "f2"]
         pipe = Pipeline(; steps = (MissingDataFilter(; col_thr = 0.5), PricesToReturns()))
 
         rd = fit(pipe, PricesResult(; X = Px, pnl = matrix_panel(nz, Z3))).ctx.returns
         @test !isnothing(rd.pnl)
         @test rd.nx == ["A1", "A3"]
-        @test panel_feature_matrix(rd.pnl)[2] == Z3[2:10, [1, 3], :]
+        @test panel_feature_matrix(rd.pnl)[2] == Z3[[1, 3], :, 2:10]
         @test panel_feature_matrix(rd.pnl)[1] == nz
         # Both universe masks are the carrier's own two axes.
         @test size(rd.pnl.amsk) == size(rd.pnl.emsk) == size(rd.X)
@@ -878,7 +879,7 @@ end
         opts = ((MeanRisk(;
                           opt = JuMPOptimiser(; slv = slv,
                                               tr = TrackingError(; tr = dbt, err = 0.01))),
-                 "`opt.tr.tr`"),
+                 "`opt.cbe.tr.tr`"),
                 (MeanRisk(; r = TrackingRiskMeasure(; tr = dbt),
                           opt = JuMPOptimiser(; slv = slv)), "`r.tr`"),
                 (MeanRisk(; r = [Variance(), TrackingRiskMeasure(; tr = dbt)],
@@ -1432,10 +1433,15 @@ end
         @test_throws DomainError RankRule(; best = 0, worst = 0)
         @test_throws ArgumentError RankRule(; best = 1, action = :nonsense)
 
-        @test_throws PO.IsNothingError QuantileRule()
-        @test_throws DomainError QuantileRule(; best = 0.0)
-        @test_throws DomainError QuantileRule(; worst = 1.0)
-        @test_throws ArgumentError QuantileRule(; best = 0.5, action = :nonsense)
+        # Issue #2013: one rule takes a count or a fraction at each tail, and the wrapper
+        # states which. A plain number is read by its type, and a plain `1.0` is refused,
+        # because a search grid promotes the count `1` to it.
+        @test RankRule(; best = 3, worst = 0.2).best === CountOf(3)
+        @test RankRule(; best = 3, worst = 0.2).worst === FractionOf(0.2)
+        @test RankRule(; best = FractionOf(1)).best === FractionOf(1)
+        @test_throws DomainError RankRule(; best = 0.0)
+        @test_throws DomainError RankRule(; worst = 1.0)
+        @test_throws ArgumentError RankRule(; best = FractionOf(0.5), action = :nonsense)
     end
 
     @testset "rule semantics" begin
@@ -1458,10 +1464,10 @@ end
         # counts saturate rather than throwing, so a grid search over k survives
         @test all(PO.rule_keep(RankRule(; best = 99), s, false))
 
-        # quantile bounds are fractions of the universe
-        @test findall(PO.rule_keep(QuantileRule(; best = 0.4), s, false)) == [1, 2]
-        @test findall(PO.rule_keep(QuantileRule(; worst = 0.2, action = :drop), s, false)) ==
-              [1, 2, 3, 4]
+        # a fraction is a share of the universe
+        @test findall(PO.rule_keep(RankRule(; best = FractionOf(0.4)), s, false)) == [1, 2]
+        @test findall(PO.rule_keep(RankRule(; worst = FractionOf(0.2), action = :drop), s,
+                                   false)) == [1, 2, 3, 4]
 
         # thresholds are literal: they ignore bigger_is_better
         @test findall(PO.rule_keep(ThresholdRule(; lo = 1.5, hi = 4.5), s, false)) ==
@@ -1521,9 +1527,9 @@ end
         @test fit_preprocessing(ScoreSelector(; score = MeanReturn(),
                                               rule = RankRule(; worst = 1)), rd).nx == ["A"]
 
-        # non-finite scores are rejected rather than sorted arbitrarily
-        @test_throws DomainError PO.asset_scores(MaximumDrawdown(),
-                                                 [NaN 0.1; NaN 0.2; NaN -0.1])
+        # a column outside the Coverage Universe scores NaN rather than being sorted
+        sn = PO.asset_scores(MaximumDrawdown(), [NaN 0.1; NaN 0.2; NaN -0.1])
+        @test isnan(sn[1]) && isfinite(sn[2])
     end
 
     @testset "ZeroVarianceFilter alias" begin
@@ -1612,28 +1618,82 @@ end
         # an omitted bound disables that side alone
         @test findall(PO.rule_keep(ThresholdRule(; hi = 3.0), s, false)) == [1, 2]
 
-        # QuantileRule rounds an exact half UP: 0.05 of ten assets is one, not none
+        # A fraction rounds an exact half UP: 0.05 of ten assets is one, not none
         s10 = collect(1.0:10.0)
-        @test count(PO.rule_keep(QuantileRule(; best = 0.05), s10, false)) == 1
-        @test count(PO.rule_keep(QuantileRule(; best = 0.04), s10, false)) == 0
+        @test count(PO.rule_keep(RankRule(; best = FractionOf(0.05)), s10, false)) == 1
+        @test count(PO.rule_keep(RankRule(; best = FractionOf(0.04)), s10, false)) == 0
+        @test PO.rule_tail_count(FractionOf(0.625), 4) == 3
+        @test PO.rule_tail_count(CountOf(50), 30) == 50
+        @test isnothing(PO.rule_tail_count(nothing, 30))
 
         # `:drop` is the exact complement of `:keep` on the same rule and scores
         @test PO.rule_keep(RankRule(; best = 2, action = :drop), s, false) ==
               .!PO.rule_keep(RankRule(; best = 2), s, false)
-        @test PO.rule_keep(QuantileRule(; best = 0.4, worst = 0.2, action = :drop), s,
+        @test PO.rule_keep(RankRule(; best = FractionOf(0.4), worst = FractionOf(0.2),
+                                    action = :drop), s, false) ==
+              .!PO.rule_keep(RankRule(; best = FractionOf(0.4), worst = FractionOf(0.2)), s, false)
+        # One tail a count and the other a fraction, which two rules could not state.
+        @test PO.rule_keep(RankRule(; best = CountOf(2), worst = FractionOf(0.2)), s10,
                            false) ==
-              .!PO.rule_keep(QuantileRule(; best = 0.4, worst = 0.2), s, false)
+              PO.rule_keep(RankRule(; best = 2, worst = 2), s10, false)
+    end
+
+    @testset "a non-finite score is outside every tail and every band (#1933)" begin
+        s = [0.3, NaN, 0.1, 0.2, 0.4]
+        # The table of #1933. Before the fix, the first four rows kept no asset: the NaN
+        # sorted to the cut end and took a slot of the count.
+        @test findall(PO.tail_mask(s, 1, true, :best)) == [5]
+        @test findall(PO.tail_mask(s, 2, true, :best)) == [1, 5]
+        @test findall(PO.tail_mask(s, 1, false, :worst)) == [5]
+        @test findall(PO.tail_mask(s, 2, false, :worst)) == [1, 5]
+        @test findall(PO.tail_mask(s, 2, false, :best)) == [3, 4]
+        # The count saturates at the four finite scores, and the NaN stays out.
+        @test findall(PO.tail_mask(s, 4, true, :best)) == [1, 3, 4, 5]
+        @test findall(PO.tail_mask(s, 9, true, :best)) == [1, 3, 4, 5]
+        # An infinite score is outside both tails too.
+        @test findall(PO.tail_mask([1.0, Inf, 2.0, -Inf], 1, true, :best)) == [3]
+        @test findall(PO.tail_mask([1.0, Inf, 2.0, -Inf], 1, true, :worst)) == [1]
+
+        # The same rows through rule_keep, both orientations.
+        @test findall(PO.rule_keep(RankRule(; best = 1), s, true)) == [5]
+        @test findall(PO.rule_keep(RankRule(; best = 2), s, true)) == [1, 5]
+        @test findall(PO.rule_keep(RankRule(; worst = 2), s, false)) == [1, 5]
+        @test findall(PO.rule_keep(RankRule(; best = 2), s, false)) == [3, 4]
+        # `:drop` takes the complement among the finite scores, so it does not keep the NaN.
+        @test findall(PO.rule_keep(RankRule(; best = 1, action = :drop), s, true)) ==
+              [1, 3, 4]
+        @test findall(PO.rule_keep(RankRule(; worst = 1, action = :drop), s, false)) ==
+              [1, 3, 4]
+        @test !PO.rule_keep(RankRule(; best = 1, action = :drop), s, false)[2]
+
+        # A fraction converts with the four finite scores: 0.5 of 4 is 2, not 0.5 of 5 = 3.
+        @test findall(PO.rule_keep(RankRule(; best = FractionOf(0.5)), s, false)) == [3, 4]
+        @test findall(PO.rule_keep(RankRule(; best = FractionOf(0.5)), s, true)) == [1, 5]
+        @test findall(PO.rule_keep(RankRule(; worst = FractionOf(0.25), action = :drop), s,
+                                   false)) == [1, 3, 4]
+
+        # ThresholdRule drops a NaN and an infinite score, also on the side with no bound.
+        @test findall(PO.rule_keep(ThresholdRule(; hi = 1.0), [0.3, NaN, -Inf, Inf, 0.4],
+                                   false)) == [1, 5]
+        @test findall(PO.rule_keep(ThresholdRule(; lo = 0.0), [0.3, NaN, -Inf, Inf, 0.4],
+                                   false)) == [1, 5]
+
+        # With no finite score, every rule keeps no asset, so fit_preprocessing throws.
+        @test !any(PO.rule_keep(RankRule(; best = 2), [NaN, NaN], false))
+        @test !any(PO.rule_keep(RankRule(; best = 1, action = :drop), [NaN, NaN], false))
+        @test !any(PO.rule_keep(RankRule(; best = FractionOf(0.5)), [NaN, NaN], false))
+        @test !any(PO.rule_keep(ThresholdRule(; lo = 0.0), [NaN, NaN], false))
     end
 
     @testset "selection rule validators" begin
-        @test_throws PO.IsNothingError PO.assert_tail_counts(nothing, nothing, :RankRule)
-        @test_throws DomainError PO.assert_tail_counts(-1, nothing, :RankRule)
-        @test_throws DomainError PO.assert_tail_counts(nothing, -1, :RankRule)
-        @test_throws DomainError PO.assert_tail_counts(0, 0, :RankRule)
-        # a zero on one side is legal: the rule still takes an asset from the other
-        @test isnothing(PO.assert_tail_counts(0, 2, :RankRule))
-        @test findall(PO.rule_keep(RankRule(; best = 0, worst = 2), [1.0, 2.0, 3.0, 4.0],
-                                   false)) == [3, 4]
+        @test_throws PO.IsNothingError RankRule(nothing, nothing, :keep)
+        @test_throws DomainError RankRule(-1, nothing, :keep)
+        @test_throws DomainError RankRule(nothing, -1, :keep)
+        # Issue #2013: a count is at least one, so a tail of zero is refused, and
+        # `nothing` states a tail that takes no asset.
+        @test_throws DomainError RankRule(0, 2, :keep)
+        @test findall(PO.rule_keep(RankRule(; worst = 2), [1.0, 2.0, 3.0, 4.0], false)) ==
+              [3, 4]
 
         @test_throws ArgumentError PO.assert_selection_action(:nonsense)
         @test isnothing(PO.assert_selection_action(:keep))
@@ -1644,10 +1704,56 @@ end
         # the score of column i is `score(X[:, i])`, computed one column at a time
         @test PO.asset_scores(SCM(), XZ) == [SCM()(view(XZ, :, i)) for i in axes(XZ, 2)]
 
-        # a NaN score is rejected: Skewness divides by a zero standard deviation
+        # a NaN score is rejected: the standardised third moment divides by a zero standard
+        # deviation
         Xc = [0.1 0.0; -0.1 0.0; 0.2 0.0]
-        @test isnan(Skewness()(view(Xc, :, 2)))
-        @test_throws DomainError PO.asset_scores(Skewness(), Xc)
+        sks = ThirdCentralMoment(; ve = SimpleVariance())
+        @test isnan(sks(view(Xc, :, 2)))
+        @test_throws DomainError PO.asset_scores(sks, Xc)
+        # a column with a non-finite return is not live: it is not scored and its score is
+        # NaN, as an Asset Scorer gives it
+        Xg = [0.1 NaN -0.2; -0.1 0.1 0.3; 0.2 0.0 -0.1; 0.0 -0.1 0.2]
+        sg = PO.asset_scores(ConditionalValueatRisk(), Xg)
+        @test sg isa Vector{Float64}
+        @test isnan(sg[2]) && !isnan(sg[1]) && !isnan(sg[3])
+        @test sg[[1, 3]] == PO.asset_scores(ConditionalValueatRisk(), Xg[:, [1, 3]])
+        rdg = ReturnsResult(; nx = ["A", "B", "C"], X = Xg)
+        @test isequal(PO.asset_scores(ConditionalValueatRisk(), rdg), sg)
+        # no live column is a refusal of the Coverage Universe, as for an Asset Scorer
+        @test_throws IsEmptyError PO.asset_scores(SCM(), fill(NaN, 3, 2))
+        # an Asset Panel that turns off a column with finite returns makes it not live
+        amsk = trues(4, 3)
+        amsk[2, 1] = false
+        rdp = ReturnsResult(; nx = ["A", "B", "C"], X = Xg[:, [1, 1, 3]],
+                            pnl = AssetPanel(; amsk = amsk, emsk = amsk))
+        sp = PO.asset_scores(ConditionalValueatRisk(), rdp)
+        @test isnan(sp[1]) && !isnan(sp[2]) && !isnan(sp[3])
+        @test sp[2] == PO.asset_scores(ConditionalValueatRisk(), Xg[:, [1]])[1]
+        # a live column with a non-finite score still throws, and names only that column
+        e = try
+            PO.asset_scores(sks, hcat(Xg[1:3, 2], Xc[:, 2], Xg[1:3, 1]))
+        catch err
+            err
+        end
+        @test e isa DomainError && occursin("columns [2]", e.msg)
+        # a score selector drops the gapped asset
+        @test PO.select_assets(ScoreSelector(; score = ConditionalValueatRisk(),
+                                             rule = RankRule(; best = 2)), rdg) ==
+              [true, false, true]
+        # A measure that reads a comoment matrix cannot score a column, and the refusal
+        # names the measure of the returns that can (#1846).
+        @test occursin("ThirdCentralMoment(; ve = SimpleVariance())",
+                       sprint(showerror, try
+                                  PO.assert_scoreable(Skewness())
+                              catch e
+                                  e
+                              end))
+        @test occursin("HighOrderMoment(; alg = FourthMoment())",
+                       sprint(showerror, try
+                                  PO.assert_scoreable(Kurtosis())
+                              catch e
+                                  e
+                              end))
         # a drawdown measure on a constant column is finite, so it is not that case
         @test isfinite(MaximumDrawdown()(view(Xc, :, 2)))
 
@@ -1742,8 +1848,9 @@ end
                                                        dead)
 
         # The reduction happens once, in the funnel, so a selector that reads values sees a
-        # clean block and `asset_scores` keeps its refusal for a live column.
-        @test_throws DomainError PO.asset_scores(MaximumDrawdown(), [NaN 0.1; NaN 0.2])
+        # clean block and `asset_scores` scores a column that is not live with `NaN`.
+        sn = PO.asset_scores(MaximumDrawdown(), [NaN 0.1; NaN 0.2])
+        @test isnan(sn[1]) && isfinite(sn[2])
     end
 
     @testset "the fitted universe replays" begin
@@ -2001,6 +2108,10 @@ struct UnimplementedRedundancy <: PortfolioOptimisers.AbstractRedundancyAlgorith
         end
         @test occursin("does not implement redundancy_keep", e2.msg)
         @test occursin("requires_score", e2.msg)
+        # the generic `requires_score` already answers `true`, so an implementer adds it
+        # only to answer `false`, and the message says that (#550)
+        @test occursin("returning false when it can pick a survivor without a score",
+                       e2.msg)
     end
 
     @testset "correlation_components partitions the universe" begin
@@ -2144,6 +2255,103 @@ struct UnimplementedRedundancy <: PortfolioOptimisers.AbstractRedundancyAlgorith
         @test !any(POx.groups_argbest([Int[]], [1.0, 2.0], false))
     end
 
+    @testset "a non-finite score never survives a redundancy algorithm (#1933)" begin
+        s = [0.3, NaN, 0.1, 0.2, 0.4]
+        # A NaN first in its group: before the fix, `best` stayed on it and the group kept
+        # no asset. Now the best finite member survives.
+        @test findall(POx.groups_argbest([[2, 1, 3], [4, 5]], s, false)) == [3, 4]
+        @test findall(POx.groups_argbest([[2, 1, 3], [4, 5]], s, true)) == [1, 5]
+        # A NaN later in its group is skipped, and so is an infinite score.
+        @test findall(POx.groups_argbest([[1, 2, 3]], s, false)) == [3]
+        @test findall(POx.groups_argbest([[1, 2]], [1.0, -Inf], false)) == [1]
+        # A group with no finite score keeps no asset, also a group of one member.
+        @test !any(POx.groups_argbest([[2]], s, false))
+        @test !any(POx.groups_argbest([[1, 2]], [NaN, Inf], true))
+
+        rng = StableRNG(1933)
+        a = randn(rng, 200)
+        X = hcat(a, a .+ 0.01 .* randn(rng, 200), randn(rng, 200))
+        rd = ReturnsResult(; nx = ["A", "B", "C"], X = X)
+        # A and B are a correlated pair, and C is uncorrelated with both.
+        @test POx.find_uncorrelated_indices(X; t = 0.9) == [2, 3]
+        # A NaN on one asset of the pair drops that asset alone. Before the fix the
+        # comparison fell to the tie branch and dropped both.
+        @test POx.find_uncorrelated_indices(X; t = 0.9, scores = [NaN, 1.0, 2.0]) == [2, 3]
+        @test POx.find_uncorrelated_indices(X; t = 0.9, scores = [1.0, NaN, 2.0]) == [1, 3]
+        # Two NaN drop both, and an unpaired NaN asset does not survive either.
+        @test POx.find_uncorrelated_indices(X; t = 0.9, scores = [NaN, NaN, 2.0]) == [3]
+        @test POx.find_uncorrelated_indices(X; t = 0.9, scores = [1.0, 2.0, NaN]) == [1]
+        # The rule reads a given score alone. A constant column puts a NaN in every column of
+        # the correlation matrix under a `ce` with no repair. The default summary marks no
+        # asset as unscored, no pair reaches the threshold, and every asset survives. Before
+        # R30 of #1817, every asset left and the selector threw.
+        Xc = hcat(randn(rng, 200, 2), zeros(200), randn(rng, 200))
+        rdc = ReturnsResult(; nx = ["A", "B", "C", "D"], X = Xc)
+        @test all(isnan, [mean(c) for c in eachcol(cor(Covariance(), Xc))])
+        @test POx.find_uncorrelated_indices(Xc; ce = Covariance(), t = 0.9) == 1:4
+        @test fit_preprocessing(RedundancySelector(;
+                                                   alg = PairwiseCorrelation(;
+                                                                             ce = Covariance(),
+                                                                             t = 0.9)),
+                                rdc).nx == ["A", "B", "C", "D"]
+        # Through the selectors, with a reward score: B is the better finite asset of the
+        # pair under both algorithms.
+        @test findall(POx.redundancy_keep(PairwiseCorrelation(; t = 0.9), rd,
+                                          [NaN, 5.0, 2.0], true)) == [2, 3]
+        @test findall(POx.redundancy_keep(CorrelationComponents(; t = 0.9), rd,
+                                          [NaN, 5.0, 2.0], true)) == [2, 3]
+    end
+
+    @testset "a constant column does not make the default drop score NaN (#2004)" begin
+        #=
+        Issue #2004. The correlation with a constant column D is NaN under `Covariance()`,
+        and the default summary of every column was NaN. `PairwiseCorrelation` then removed
+        both assets of the pair A, B through the tie branch, and `CorrelationComponents`
+        kept no asset and threw. The summary now skips the undefined correlation, so the
+        result is the result without D, plus D.
+        =#
+        rng = StableRNG(2004)
+        a = randn(rng, 200)
+        X = hcat(a, a .+ 0.01 .* randn(rng, 200), randn(rng, 200), zeros(200))
+        rd = ReturnsResult(; nx = ["A", "B", "C", "D"], X = X)
+        rd3 = ReturnsResult(; nx = ["A", "B", "C"], X = X[:, 1:3])
+        rho = cor(Covariance(), X)
+        # The column of D is NaN at every entry, its diagonal included (#2029).
+        @test all(isnan, rho[:, 4])
+        for m in (MeanValue(), MeanValue(; w = aweights([1.0, 2.0, 3.0, 4.0])))
+            s = [POx.finite_vec_to_real_measure(m, c) for c in eachcol(rho)]
+            @test all(isfinite, s[1:3]) && isnan(s[4])
+            # The member of the pair A, B with the lower summary survives, and C and D have
+            # no partner. A tie would remove both members, so the data must not tie.
+            @test s[1] != s[2]
+            k = s[1] < s[2] ? 1 : 2
+            @test POx.find_uncorrelated_indices(X; ce = Covariance(), t = 0.9,
+                                                measure = m) == [k, 3, 4]
+            for alg in (PairwiseCorrelation, CorrelationComponents)
+                sel = fit_preprocessing(RedundancySelector(;
+                                                           alg = alg(; ce = Covariance(),
+                                                                     t = 0.9, measure = m)),
+                                        rd)
+                @test sel.nx == rd.nx[[k, 3, 4]]
+            end
+        end
+        # The result without D is the same pair member and C.
+        s3 = [mean(c) for c in eachcol(cor(Covariance(), X[:, 1:3]))]
+        k3 = s3[1] < s3[2] ? 1 : 2
+        @test k3 == (if POx.finite_vec_to_real_measure(MeanValue(), rho[:, 1]) <
+                        POx.finite_vec_to_real_measure(MeanValue(), rho[:, 2])
+                         1
+                     else
+                         2
+                     end)
+        for alg in (PairwiseCorrelation, CorrelationComponents)
+            sel3 = fit_preprocessing(RedundancySelector(;
+                                                        alg = alg(; ce = Covariance(),
+                                                                  t = 0.9)), rd3)
+            @test sel3.nx == rd3.nx[[k3, 3]]
+        end
+    end
+
     @testset "pipeline integration" begin
         @test PortfolioOptimisers.pipe_writes(RedundancySelector()) == :returns
         @test PortfolioOptimisers.pipe_reads(RedundancySelector()) == (:returns,)
@@ -2224,22 +2432,36 @@ end
         split_count = PortfolioOptimisers.split_count
 
         # A count saturates at the observation total.
-        @test split_count(3, 10, :train_size) == 3
-        @test split_count(10, 10, :train_size) == 10
-        @test split_count(15, 10, :train_size) == 10
+        @test split_count(CountOf(3), 10) == 3
+        @test split_count(CountOf(10), 10) == 10
+        @test split_count(CountOf(15), 10) == 10
 
         # A fraction that lands exactly on an integer takes that integer, and one that
         # floors below one row is clamped up to one, so rounding alone never empties a
-        # window.
-        @test split_count(0.5, 10, :train_size) == 5
-        @test split_count(0.01, 10, :train_size) == 1
-        @test split_count(0.9999, 10, :train_size) == 9
+        # window. The whole set is a fraction of one.
+        @test split_count(FractionOf(0.5), 10) == 5
+        @test split_count(FractionOf(0.01), 10) == 1
+        @test split_count(FractionOf(0.9999), 10) == 9
+        @test split_count(FractionOf(1.0), 10) == 10
 
-        # A count must be positive, and a fraction must lie strictly inside (0, 1).
-        @test_throws DomainError split_count(0, 10, :train_size)
-        @test_throws DomainError split_count(-1, 10, :train_size)
-        @test_throws DomainError split_count(0.0, 10, :train_size)
-        @test_throws DomainError split_count(1.0, 10, :train_size)
+        # Issue #2013: a count is an `Integer` and a fraction lies in (0, 1]. The pair
+        # checks the range, and a plain `1.0` is refused, because a search grid promotes
+        # the count `1` to it.
+        @test_throws DomainError CountOf(0)
+        @test_throws DomainError CountOf(-1)
+        @test_throws MethodError CountOf(5.0)
+        @test_throws MethodError FractionOf(0.5 + 0im)
+        @test CountOf(; val = 3) === CountOf(3)
+        @test FractionOf(; val = 1 // 4) === FractionOf(1 // 4)
+        @test_throws DomainError FractionOf(0.0)
+        @test_throws DomainError FractionOf(1.5)
+        @test_throws DomainError PortfolioOptimisers.count_or_fraction(1.0)
+        @test_throws DomainError TrainTestSplit(; test_size = 1.0)
+        @test_throws DomainError TrainTestSplit(; test_size = 5.0)
+        @test TrainTestSplit(; train_size = 10, test_size = 0.2).train_size === CountOf(10)
+        @test TrainTestSplit(; train_size = 10, test_size = 0.2).test_size ===
+              FractionOf(0.2)
+        @test safe_index(CountOf(80), FractionOf(0.2), 100) == (1:80, 81:100)
     end
 
     @testset "train_test_split free function" begin
@@ -2386,17 +2608,17 @@ end
 
         # a fraction rounds down to whole rows in exact arithmetic: 0.29 * 100 is
         # 28.999999999999996, and a floor of that product lost the 29th row
-        @test all(k -> split_count(k / 100, 100, :train_size) == k, 1:99)
-        @test all(k -> split_count(Float32(k / 100), 100, :train_size) == k, 1:99)
-        @test all(k -> split_count(k / 7, 7, :train_size) == k, 1:6)
-        @test split_count(0.295, 100, :train_size) == 29
-        @test split_count(0.305, 100, :train_size) == 30
+        @test all(k -> split_count(FractionOf(k / 100), 100) == k, 1:99)
+        @test all(k -> split_count(FractionOf(Float32(k / 100)), 100) == k, 1:99)
+        @test all(k -> split_count(FractionOf(k / 7), 7) == k, 1:6)
+        @test split_count(FractionOf(0.295), 100) == 29
+        @test split_count(FractionOf(0.305), 100) == 30
         @test safe_index(0.29, nothing, 100) == (1:29, 30:100)
 
-        # a fraction is any Real in (0, 1), so an exact Rational resolves exactly
-        @test split_count(29 // 100, 100, :train_size) == 29
-        @test split_count(1 // 3, 10, :train_size) == 3
-        @test_throws DomainError split_count(3 // 2, 10, :train_size)
+        # a fraction is any Real in (0, 1], so an exact Rational resolves exactly
+        @test split_count(FractionOf(29 // 100), 100) == 29
+        @test split_count(FractionOf(1 // 3), 10) == 3
+        @test_throws DomainError FractionOf(3 // 2)
         rd10 = ReturnsResult(; nx = ["A"], X = reshape(collect(0.1:0.1:1.0), 10, 1))
         tr, te = train_test_split(rd10; test_size = 1 // 5)
         @test (size(tr.X, 1), size(te.X, 1)) == (8, 2)
@@ -2481,7 +2703,8 @@ end
                         NestedClustered(; opti = EqualWeighted(), opto = EqualWeighted()),
                     "Stacking" =>
                         Stacking(; opti = [EqualWeighted()], opto = EqualWeighted()),
-                    "SubsetResampling" => SubsetResampling(; opt = EqualWeighted()),
+                    "SubsetResampling" =>
+                        SubsetResampling(; subset_size = 0.8, opt = EqualWeighted()),
                     "EqualWeighted" => EqualWeighted(),
                     "InverseVolatility" => InverseVolatility(),
                     "RandomWeighted" => RandomWeighted())
@@ -2540,7 +2763,7 @@ end
         rather than a configuration. Declaring rather than probing for `:opt` is what keeps
         that name collision from being mistaken for a configuration to route through.
         =#
-        sr = SubsetResampling(; opt = EqualWeighted())
+        sr = SubsetResampling(; subset_size = 0.8, opt = EqualWeighted())
         @test hasfield(typeof(sr), :opt)
         @test PO.pipe_config_field(sr) === nothing
     end
@@ -2863,9 +3086,18 @@ end
             end
             return out
         end
+        #=
+        Two families take the empty fallback by design. A JuMP constraint configures the
+        model and computes nothing from data, and a lot unit reaches only a finite
+        allocator, which is not a step of a Pipeline.
+        =#
         families = [S
                     for S in concrete_subtypes(PO.AbstractConstraintEstimator)
-                    if parentmodule(S) === PO && !(S <: PO.JuMPConstraintEstimator)]
+                    if parentmodule(S) === PO &&
+                           !(S <: PO.JuMPConstraintEstimator) &&
+                           S !== LotUnitEstimator]
+        @test which(PO.pipe_constraint_targets, Tuple{LotUnitEstimator}) ===
+              which(PO.pipe_constraint_targets, Tuple{PO.AbstractConstraintEstimator})
         @test !isempty(families)
         #=
         Asked of the type rather than of an instance: a family declares by defining a
@@ -2873,8 +3105,16 @@ end
         fallback's own signature tests for.
         =#
         fallback = which(PO.pipe_constraint_targets, Tuple{PO.AbstractConstraintEstimator})
+        @test PO.pipe_constraint_targets(ScoreWeightBounds(; score = SCM(), val = 0.1)) ==
+              (:wb,)
         for S in families
             @test which(PO.pipe_constraint_targets, Tuple{S}) !== fallback
+            #=
+            "Implement both methods, or neither." A family with a target and no step value
+            passes the construction check and raises a `MethodError` at the fit, as
+            `ScoreWeightBounds` did after fcc522decd (R42 of #1817).
+            =#
+            @test hasmethod(PO.constraint_step_value, Tuple{S, PO.PipelineContext})
         end
         # Every declared target is a real one, and every choice is a legal annotation.
         @test all(t -> t in PO.PIPELINE_ROUTING_TARGETS, PO.PIPELINE_THRESHOLD_TARGETS)
@@ -3153,8 +3393,8 @@ end
 
     #=
     Seven methods, and the pair of argument types alone decides which one runs. Two of the
-    seven exist to catch a `nothing` on one side, and the catch-all closes the family with no
-    check at all. Each block below selects one method and drives its raises.
+    seven exist to catch a `nothing` on one side, and a no-op on the two bound types closes
+    the family with no check at all. Each block below selects one method and drives its raises.
     =#
     vb = PortfolioOptimisers.validate_bounds
 
@@ -3184,17 +3424,24 @@ end
         @test_throws DomainError vb([0.1, 0.9], [0.3, 0.5])
     end
 
-    @testset "(VecNum, Any) and (Any, VecNum)" begin
+    @testset "(VecNum, Nothing) and (Nothing, VecNum)" begin
         @test isnothing(vb([0.1, 0.2], nothing))
         @test isnothing(vb(nothing, [0.1, 0.2]))
         @test_throws PortfolioOptimisers.IsEmptyError vb(Float64[], nothing)
         @test_throws PortfolioOptimisers.IsEmptyError vb(nothing, Float64[])
     end
 
-    @testset "the catch-all checks nothing" begin
+    @testset "the no-op on the two bound types checks nothing" begin
         @test isnothing(vb(nothing, nothing))
         @test isnothing(vb(0.9, nothing))
         @test isnothing(vb(nothing, 0.1))
+        # The value check closes on the set that reaches it: any other type or arity has no
+        # rule (#2108, #2096).
+        @test_throws MethodError vb()
+        @test_throws MethodError vb(0.1)
+        @test_throws MethodError vb(0.1, 0.2, 0.3)
+        @test_throws MethodError vb("a", nothing)
+        @test_throws MethodError vb([0.1], "b")
     end
 
     @testset "the estimator route validates the resolved pair" begin
@@ -3263,5 +3510,206 @@ end
         @test_throws PortfolioOptimisers.IsEmptyError weight_bounds_constraints(WeightBounds(0.0,
                                                                                              1.0))
         @test_throws PortfolioOptimisers.IsEmptyError weight_bounds_constraints(nothing)
+    end
+end
+
+# A returns-level step that drops the first observation of each window. It makes no promise
+# that it keeps them, so a prediction through it records no rows (#1926).
+struct HelperDropFirstRow <: PortfolioOptimisers.AbstractReturnsPreprocessingEstimator end
+PortfolioOptimisers.fit_preprocessing(est::HelperDropFirstRow, ::Any) = est
+function PortfolioOptimisers.apply_preprocessing(::HelperDropFirstRow,
+                                                 rd::PortfolioOptimisers.AbstractReturnsResult)
+    return PortfolioOptimisers.port_opt_view(rd, 2:size(rd.X, 1), :)
+end
+@testset "Pipeline step helpers on their small shapes (#1912)" begin
+    using Dates, StableRNGs
+    PO = PortfolioOptimisers
+    rd = ReturnsResult(; nx = ["a", "b"], X = [0.1 -0.2; -0.1 0.2; 0.05 0.1; 0.01 0.02])
+    prs = PricesResult(;
+                       X = TimeArray(Date(2020, 1, 1) .+ Day.(0:4),
+                                     [1.0 2; 1.1 2.1; 1.2 2.2; 1.1 2.4; 1.3 2.3],
+                                     ["a", "b"]))
+    # A longer returns history for the walk-forward folds.
+    rdl = ReturnsResult(; nx = ["a", "b", "c"],
+                        X = randn(StableRNG(1919), 40, 3) ./ 100 .+ 0.001,
+                        ts = Date(2024, 1, 1) .+ Day.(0:39))
+    wf = IndexWalkForward(20, 5)
+    expanding = IndexWalkForward(20, 5; expand_train = true)
+    online = OnlineIndexWalkForward(20, 5)
+    nfold = n_splits(wf, rdl)
+    weights(res) = hcat([p.res.w for p in res.pred]...)
+    nets(res) = [p.rd.X for p in res.pred]
+    iv = InverseVolatility()
+    ew = EqualWeighted()
+    wrapped = PipelineStep(; est = EmpiricalPrior(), writes = :prior)
+    callable = PipelineStep(; est = c -> prior(EmpiricalPrior(), c.returns),
+                            reads = (:returns,), writes = :prior)
+    pipe = Pipeline(; steps = ("prior" => EmpiricalPrior(), "opt" => iv))
+    @testset "fitted steps keep the observations" begin
+        # A prediction records the rows of its window when every fitted step kept them. A
+        # prior and an optimiser, an asset selector, a nested Pipeline and a Pipeline fitted
+        # on prices all keep them, so each prediction on returns data records its window.
+        pipes = (pipe, Pipeline(; steps = (CompleteAssetSelector(), EmpiricalPrior(), iv)),
+                 Pipeline(; steps = ("inner" => pipe,)))
+        for p in pipes
+            @test predict(fit(p, rd), rd, 2:3).idx == 2:3
+        end
+        conv = Pipeline(; steps = (PricesToReturns(), EmpiricalPrior(), iv))
+        @test predict(fit(conv, prs), rd, 2:3).idx == 2:3
+        # A returns step that drops an observation does not keep them, so the prediction
+        # records no rows (#1926).
+        drop = Pipeline(; steps = (HelperDropFirstRow(), EmpiricalPrior(), iv))
+        @test isnothing(predict(fit(drop, rd), rd, 2:4).idx)
+    end
+    @testset "a step that no schedule changes goes through every fold untouched" begin
+        # The schedule on the optimisation step makes the Pipeline time-dependent, so each
+        # fold swaps the schedule in and the fold-less fit falls back on the default. A
+        # wrapped prior and a callable prior stay as they are, so the folds equal the folds
+        # of the bare pipelines they alternate between.
+        sched = TimeDependent([isodd(i) ? iv : ew for i in 1:nfold]; default = iv)
+        bare_iv = cross_val_predict(Pipeline(; steps = (EmpiricalPrior(), iv)), rdl, wf)
+        bare_ew = cross_val_predict(Pipeline(; steps = (EmpiricalPrior(), ew)), rdl, wf)
+        fixed = fit(Pipeline(; steps = (EmpiricalPrior(), iv)), rdl)
+        for first in (wrapped, callable)
+            td = Pipeline(; steps = (first, sched))
+            res = cross_val_predict(td, rdl, wf)
+            @test weights(res)[:, 1:2:end] == weights(bare_iv)[:, 1:2:end]
+            @test weights(res)[:, 2:2:end] == weights(bare_ew)[:, 2:2:end]
+            @test weights(bare_iv) != weights(bare_ew)
+            @test fit(td, rdl).ctx.opt.w == fixed.ctx.opt.w
+        end
+        # A step that wraps the schedule, or a nested Pipeline that holds it, resolves it for
+        # each fold, and the fold-less fit falls back on the default. A step that kept the
+        # schedule unresolved would run the default in every fold, or refuse the fit (#1926).
+        for step in (PipelineStep(; est = sched, writes = :opt),
+                     PipelineStep(; est = Pipeline(; steps = (EmpiricalPrior(), sched)), writes = :opt))
+            td = if isa(step.est, Pipeline)
+                Pipeline(; steps = (step,))
+            else
+                Pipeline(; steps = (EmpiricalPrior(), step))
+            end
+            res = cross_val_predict(td, rdl, wf)
+            @test weights(res)[:, 1:2:end] == weights(bare_iv)[:, 1:2:end]
+            @test weights(res)[:, 2:2:end] == weights(bare_ew)[:, 2:2:end]
+            @test fit(td, rdl).ctx.opt.w == fixed.ctx.opt.w
+        end
+    end
+    @testset "the previous weights reach a step that wraps a reader" begin
+        # A fee on the turnover reads the weights of the previous fold from the second fold
+        # on. A turnover that is `fixed` reads none, so the first fold agrees and the later
+        # folds do not.
+        w0 = fill(1 / 3, 3)
+        reads = InverseVolatility(; fees = Fees(; tn = Turnover(; w = w0, val = 0.01)))
+        pinned = InverseVolatility(;
+                                   fees = Fees(;
+                                               tn = Turnover(; w = w0, val = 0.01,
+                                                             fixed = true)))
+        cv = IndexWalkForward(20, 5; pws = DriftedWeights())
+        bare = cross_val_predict(Pipeline(; steps = (EmpiricalPrior(), reads)), rdl, cv)
+        fixed = cross_val_predict(Pipeline(; steps = (EmpiricalPrior(), pinned)), rdl, cv)
+        @test nets(bare)[1] == nets(fixed)[1]
+        @test nets(bare)[2] != nets(fixed)[2]
+        for first in (wrapped, callable)
+            res = cross_val_predict(Pipeline(; steps = (first, reads)), rdl, cv)
+            @test weights(res) == weights(bare)
+            @test nets(res) == nets(bare)
+        end
+        # A step that wraps the reader gives it the weights of the previous fold too. A step
+        # that kept the reader as written would read none, as the `fixed` turnover does
+        # (#1926).
+        res = cross_val_predict(Pipeline(;
+                                         steps = (EmpiricalPrior(),
+                                                  PipelineStep(; est = reads,
+                                                               writes = :opt))), rdl, cv)
+        @test nets(res) == nets(bare)
+        @test nets(res)[2] != nets(fixed)[2]
+    end
+    @testset "constraint steps and slots" begin
+        step = PipelineStep(; est = AssetSetsMatrixEstimator(; val = "nx"),
+                            writes = :constraints, target = :smtx)
+        con = fit(Pipeline(; steps = (step,)), rd).ctx.constraints
+        @test con.target == :smtx
+        @test con.res == Bool[1 0; 0 1]
+        # The default name of a step is the slot it writes.
+        split_pipe = Pipeline(;
+                              steps = (TrainTestSplit(; test_size = 0.25),
+                                       PricesToReturns(), EmpiricalPrior(), iv))
+        @test split_pipe.names == ("split", "returns", "prior", "opt")
+    end
+    @testset "a replaced slot is left out of the frames of the optimiser" begin
+        # A step that writes the `sigma` set replaces the `ucs` of each uncertainty set
+        # variance in the vector `r`. Left in, the raw readers beside an excess prior are
+        # named with their path in a warning. The step that replaces them leaves them out.
+        ex = ExcessSource()
+        pe(s) = EmpiricalPrior(; x_src = s)
+        ue(s) = DeltaUncertaintySet(; pe = pe(s))
+        ucv = UncertaintySetVariance(; ucs = ue(nothing))
+        slot = Solver(; name = :placeholder, solver = nothing)
+        raw = Logging.with_logger(Logging.NullLogger()) do
+            return MeanRisk(; opt = JuMPOptimiser(; pe = pe(ex), slv = slot),
+                            r = [ucv, Variance(), ucv])
+        end
+        prior_step = PipelineStep(; est = pe(ex), writes = :prior)
+        sigma_step = PipelineStep(; est = ue(ex), reads = (:returns,),
+                                  writes = :uncertainty, target = :sigma)
+        @test_logs (:warn, r"`steps\[2\]\.r\[1\]\.ucs\.pe`, `steps\[2\]\.r\[3\]\.ucs\.pe`") Pipeline(;
+                                                                                                     steps = (prior_step,
+                                                                                                              raw))
+        @test_logs min_level = Logging.Warn Pipeline(;
+                                                     steps = (prior_step, sigma_step, raw))
+        # The group of the Excess Frame has nothing to read when a Pipeline with no
+        # `PricesToReturns` step is fitted on prices. The view passes the empty slot on, so
+        # the step refuses it by name.
+        @test_throws PO.IsNothingError fit(Pipeline(;
+                                                    steps = (InverseVolatility(;
+                                                                               pe = pe(ex)),)),
+                                           prs)
+    end
+    @testset "the online steps of a Pipeline" begin
+        # An asset selector folds nothing and is refitted at the read-out, the prior owns
+        # the rows, and a schedule or a wrapped prior passes through the warm-up and the
+        # copy of the state. The online walk equals the expanding batch walk-forward, and
+        # the capped walk equals the rolling one.
+        sched = TimeDependent([isodd(i) ? iv : ew for i in 1:nfold]; default = iv)
+        selector = CompleteAssetSelector()
+        for p in (Pipeline(; steps = (selector, EmpiricalPrior(), sched)),
+                  Pipeline(; steps = (selector, wrapped, iv)))
+            @test isapprox(weights(cross_val_predict(p, rdl, online)),
+                           weights(cross_val_predict(p, rdl, expanding)); atol = 1e-12)
+        end
+        td = Pipeline(; steps = (selector, EmpiricalPrior(), sched))
+        @test isapprox(weights(cross_val_predict(Online(td), rdl, online)),
+                       weights(cross_val_predict(td, rdl, expanding)); atol = 1e-12)
+        @test isapprox(weights(cross_val_predict(Online(td; max_history = 20), rdl, online)),
+                       weights(cross_val_predict(td, rdl, wf)); atol = 1e-12)
+        capped = Pipeline(;
+                          steps = (selector, Online(EmpiricalPrior(); max_history = 20),
+                                   iv))
+        plain = Pipeline(; steps = (selector, EmpiricalPrior(), iv))
+        @test isapprox(weights(cross_val_predict(capped, rdl, online)),
+                       weights(cross_val_predict(plain, rdl, wf)); atol = 1e-12)
+        # A schedule that is shorter than the folds is refused through the wrapper.
+        short = Pipeline(;
+                         steps = (EmpiricalPrior(), TimeDependent([iv, ew]; default = iv)))
+        @test_throws DimensionMismatch cross_val_predict(Online(short), rdl, online)
+        # The walks above reach none of these fallbacks, so the direct calls pin them: a value
+        # that is no step owns no rows, selects no universe, caps nothing, and passes through
+        # the warm-up and the copy of the state. A wrapped prior is copied, and the view of a
+        # buffer keeps its own type.
+        @test !PO.is_universe_step(1) && PO.is_universe_step(selector)
+        @test !PO.is_row_owner(1)
+        @test PO.is_row_owner(EmpiricalPrior()) && PO.is_row_owner(iv)
+        @test isnothing(PO.step_online_cap(1))
+        @test PO.update_online_step(3) === 3
+        @test PO.copy_step_states(3) === 3
+        folded = PipelineStep(; est = partial_fit!(EmpiricalPrior(), rdl.X),
+                              writes = :prior)
+        cw = PO.copy_step_states(folded)
+        @test cw.writes == :prior && !(cw.est.cache === folded.est.cache)
+        @test prior(cw.est).mu == prior(folded.est).mu
+        @test isnothing(PO.port_opt_view(PO.PipelineBufferState(), [1]).data)
+        bv = PO.port_opt_view(PO.PipelineBufferState(; data = prs), [1]).data.X
+        @test values(bv) == values(prs.X)[:, 1:1]
+        @test TimeSeries.colnames(bv) == TimeSeries.colnames(prs.X)[1:1]
     end
 end

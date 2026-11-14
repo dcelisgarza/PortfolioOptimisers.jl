@@ -145,7 +145,7 @@ function charges_nothing(v)
     return isnothing(v) || isempty(v)
 end
 """
-    charge_asset_fees(R::MatNum, w::VecNum, fees::Option{<:Fees}, imsk::Option{<:BitVector} = nothing)
+    charge_asset_fees(R::MatNum, w::VecNum, fees::Fees, imsk::Option{<:BitVector} = nothing)
 
 Subtract a per asset fee from a per asset return matrix, on the clock the fee states and in the columns it was priced on.
 
@@ -155,16 +155,15 @@ A reduced [`Fees`](@ref) lives on **two** axes: the five per asset fields were s
 
 # Algorithm
 
- 1. A `nothing` `fees` returns `R` unchanged. It charges no fee rather than a zero fee.
- 2. Read the pair of pairs `((am_i, am_l), (ot_i, ot_l))` of [`calc_asset_fees`](@ref), over the row count of `R`. The weights it is handed are the investable ones, because that is the axis the five per asset fields were sliced to; `lq` and `flq` read `w` for its element type alone.
- 3. On a `nothing` `imsk`, charge the investable axis over the whole matrix, and refuse a `fees` that carries a liquidation: no mask says where the exits are, so the charge has nowhere to land, and dropping it would overstate the net return.
- 4. On a `BitVector` `imsk`, charge the investable axis in the `imsk` columns and the liquidation axis in the complement's, each by the same two steps: the per period vector on every observation, and the one-off vector on the first alone. Under an [`AmortisedFees`](@ref) the one-off vector is zero, because step 2 spread that cost into the per period one.
+ 1. Read the pair of pairs `((am_i, am_l), (ot_i, ot_l))` of [`calc_asset_fees`](@ref), over the row count of `R`. The weights it is handed are the investable ones, because that is the axis the five per asset fields were sliced to; `lq` and `flq` read `w` for its element type alone.
+ 2. On a `nothing` `imsk`, charge the investable axis over the whole matrix, and refuse a `fees` that carries a liquidation: no mask says where the exits are, so the charge has nowhere to land, and dropping it would overstate the net return.
+ 3. On a `BitVector` `imsk`, charge the investable axis in the `imsk` columns and the liquidation axis in the complement's, each by the same two steps: the per period vector on every observation, and the one-off vector on the first alone. Under an [`AmortisedFees`](@ref) the one-off vector is zero, because step 1 spread that cost into the per period one.
 
 # Arguments
 
   - `R`: Gross per asset return matrix (observations × assets), on the caller's universe.
   - `w`: Portfolio weights, on the same universe as `R`.
-  - `fees`: [`Fees`](@ref) structure, or `nothing`.
+  - `fees`: [`Fees`](@ref) structure.
   - `imsk`: The Investable Mask, or `nothing` when no asset left.
 
 # Validation
@@ -189,9 +188,6 @@ A reduced [`Fees`](@ref) lives on **two** axes: the five per asset fields were s
   - [`calc_asset_one_off_fees`](@ref)
   - [`charge_fees`](@ref)
 """
-function charge_asset_fees(R::MatNum, ::VecNum, ::Nothing, ::Option{<:BitVector} = nothing)
-    return R
-end
 function charge_asset_fees(R::MatNum, w::VecNum, fees::Fees, ::Nothing = nothing)
     (am_i, am_l), (ot_i, ot_l) = calc_asset_fees(w, size(R, 1), fees)
     # An unset term is `nothing` under an amortising clock and empty otherwise, and both mean
@@ -293,9 +289,8 @@ end
 """
     investable_reduction(X::MatNum, w, fees::Option{<:Fees}, strict::Bool)
     investable_reduction(rd::AbstractReturnsResult, w, fees::Option{<:Fees}, strict::Bool)
-    investable_reduction(pr::AbstractPriorResult, w, fees::Option{<:Fees}, strict::Bool)
-    investable_reduction(imsk::Nothing, pr::AbstractPriorResult, w, fees::Option{<:Fees}, strict::Bool)
-    investable_reduction(imsk::BitVector, pr::AbstractPriorResult, w, fees::Option{<:Fees}, strict::Bool)
+    investable_reduction(pr::AbstractPriorResult, w, fees::Option{<:Fees}, strict::Bool,
+                         imsk::Option{BitVector} = investable_mask(pr))
 
 Reduce a prior result, the weights scored against it and the fees charged on them to the Investable Mask.
 
@@ -312,8 +307,8 @@ A bare returns matrix and a [`ReturnsResult`](@ref) carry no moments, so no mask
 # Algorithm
 
  1. Return `nothing`, `pr` and the weights unchanged, and the fee through [`investable_fees_view`](@ref) under a `nothing` mask, when `pr` is a matrix or a returns result.
- 2. Derive the Investable Mask once with [`investable_mask`](@ref).
- 3. Return the same when every asset is investable.
+ 2. Take the Investable Mask `imsk`. By default, [`investable_mask`](@ref) derives it once from the prior.
+ 3. Return the same when the mask is `nothing`, which means that every asset is investable.
  4. Otherwise report the held non-investable assets through [`strict_diagnostic`](@ref).
  5. Return the mask, a [`port_opt_view`](@ref) of the prior at `findall(imsk)`, the view of the weights at the mask, and the fee through [`investable_fees_view`](@ref) at the mask and the prior's unreduced `pr.X`.
 
@@ -323,6 +318,7 @@ A bare returns matrix and a [`ReturnsResult`](@ref) carry no moments, so no mask
   - `w`: Portfolio weights, a population of them, or a weight path (observations × assets).
   - `fees`: [`Fees`](@ref) the figure is charged against, or `nothing`.
   - `strict`: Whether a held non-investable asset raises rather than warns.
+  - `imsk`: The Investable Mask of `pr`, or `nothing` when every asset is investable. Only a prior result takes it.
 
 # Validation
 
@@ -342,32 +338,25 @@ A bare returns matrix and a [`ReturnsResult`](@ref) carry no moments, so no mask
   - [`port_opt_view`](@ref)
   - [`strict_diagnostic`](@ref)
 """
-function investable_reduction(X::MatNum, w::Union{<:VecNum, <:VecVecNum, <:MatNum},
+function investable_reduction(X::MatNum, w::Union{VecNum, VecVecNum, MatNum},
                               fees::Option{<:Fees}, ::Bool)
     return nothing, X, w, investable_fees_view(fees, nothing, X)
 end
 function investable_reduction(rd::AbstractReturnsResult,
-                              w::Union{<:VecNum, <:VecVecNum, <:MatNum},
-                              fees::Option{<:Fees}, ::Bool)
+                              w::Union{VecNum, VecVecNum, MatNum}, fees::Option{<:Fees},
+                              ::Bool)
     return nothing, rd, w, investable_fees_view(fees, nothing, rd.X)
 end
-function investable_reduction(pr::AbstractPriorResult,
-                              w::Union{<:VecNum, <:VecVecNum, <:MatNum},
-                              fees::Option{<:Fees}, strict::Bool)
-    return investable_reduction(investable_mask(pr), pr, w, fees, strict)
-end
-function investable_reduction(::Nothing, pr::AbstractPriorResult,
-                              w::Union{<:VecNum, <:VecVecNum, <:MatNum},
-                              fees::Option{<:Fees}, ::Bool)
-    return nothing, pr, w, investable_fees_view(fees, nothing, pr.X)
-end
-function investable_reduction(imsk::BitVector, pr::AbstractPriorResult,
-                              w::Union{<:VecNum, <:VecVecNum, <:MatNum},
-                              fees::Option{<:Fees}, strict::Bool)
+function investable_reduction(pr::AbstractPriorResult, w::Union{VecNum, VecVecNum, MatNum},
+                              fees::Option{<:Fees}, strict::Bool,
+                              imsk::Option{BitVector} = investable_mask(pr))
+    if isnothing(imsk)
+        return nothing, pr, w, investable_fees_view(fees, nothing, pr.X)
+    end
     held = held_non_investable(imsk, w)
     if !isempty(held)
         strict_diagnostic("a value-level verb cannot score a holding the prior could not estimate. Assets $(held) are not investable, and the weights hold them. Their weights are dropped, so the figure describes the portfolio without them. Pass `strict = true` to refuse instead, reduce the weights to the investable universe, or refit the prior over a history that covers these assets.",
-                          strict)
+                          strict; id = @log_id())
     end
     # The fee is viewed at `pr.X`, the prior's **unreduced** returns matrix, because its two
     # liquidation charges live on the complement of the mask and the view derives that
@@ -442,7 +431,7 @@ function held_gap_pairs(W::MatNum, X::MatNum)
             for t in axes(X, 1) if !iszero(W[t, i]) && !isfinite(X[t, i])]
 end
 """
-    filter_held_gaps(w::Union{<:VecNum, <:VecVecNum, <:MatNum}, X::MatNum, strict::Bool;
+    filter_held_gaps(w::Union{VecNum, VecVecNum, MatNum}, X::MatNum, strict::Bool;
                      nx::Option{<:VecStr} = nothing)
 
 Return the window with every non-finite entry replaced by zero, and name the Held Gaps.
@@ -483,14 +472,14 @@ A fold hands this verb the window **viewed at the Investable Mask**, so a column
   - [`strict_diagnostic`](@ref)
   - [`predict(res::NonFiniteAllocationOptimisationResult, rd::ReturnsResult)`](@ref)
 """
-function filter_held_gaps(w::Union{<:VecNum, <:VecVecNum, <:MatNum}, X::MatNum,
-                          strict::Bool; nx::Option{<:VecStr} = nothing)
+function filter_held_gaps(w::Union{VecNum, VecVecNum, MatNum}, X::MatNum, strict::Bool;
+                          nx::Option{<:VecStr} = nothing)
     if all(isfinite, X)
         return X
     end
     held = held_gap_pairs(w, X)
     if !isempty(held)
-        strict_diagnostic(held_gap_msg(held, nx), strict)
+        strict_diagnostic(held_gap_msg(held, nx), strict; id = @log_id())
     end
     return map(x -> isfinite(x) ? x : zero(x), X)
 end
@@ -1425,7 +1414,8 @@ function calc_net_returns(w::VecVecNum, X::MatNum, fees, wd::AbstractWeightDrift
         assert_positive_wealth(drift_wealth(drift_position_values(wd, first(w), X),
                                             first(w)), obs, 1)
     elseif !isempty(ruined)
-        @warn "the drifted wealth of $(length(ruined)) of $(length(w)) population member(s) is not positive, so their series are `NaN` and their members are dropped: $(ruined)"
+        @warn("the drifted wealth of $(length(ruined)) of $(length(w)) population member(s) is not positive, so their series are `NaN` and their members are dropped: $(ruined)",
+              maxlog = log_limit(:warn), _id = @log_id())
     end
     return ret
 end
@@ -1770,13 +1760,25 @@ A Previous-Weights Source names the weights [`fold_loop`](@ref) threads from a f
 
 An unset source follows the scheme's Weight Drift: it threads the target weights when the scheme drifts nothing, and the drifted weights when it drifts. [`resolve_previous_weights_source`](@ref) applies that rule before the fold loop runs, and it maps [`TargetWeights`](@ref) to `nothing`, the target read of the loop.
 
-The two walk-forward schemes carry this family in their `pws` field, bound to `Option{<:AbstractPreviousWeightsSource}`. A scheme whose folds are not a timeline carries no such field: no fold of it has a fold behind it, so it has no previous weights of any kind to thread.
+The three timeline schemes, [`IndexWalkForward`](@ref), [`DateWalkForward`](@ref) and [`HindsightSplit`](@ref), carry this family in their `pws` field, bound to `Option{<:AbstractPreviousWeightsSource}`, beside their Weight Drift `wd`. A scheme whose folds are not a timeline carries no such field: no fold of it has a fold behind it, so it has no previous weights of any kind to thread.
+
+# The four settings of the two switches
+
+| `wd` of the scheme     | `pws` of the scheme             | Return series of a fold                    | The next fold starts from | Drift that runs        | Use                                                          |
+|:---------------------- |:------------------------------- |:------------------------------------------ |:------------------------- |:---------------------- |:------------------------------------------------------------ |
+| `nothing`              | `nothing` or `TargetWeights()`  | `X * w` net of fees, at the target weights | the target weights        | none                   | The reading of the decision, to compare optimisers.          |
+| `SelfFinancingDrift()` | `nothing` or `DriftedWeights()` | the wealth ratio of the drifted holdings   | the held weights          | the `wd` of the scheme | The reading of the fund, for both the series and the trades. |
+| `SelfFinancingDrift()` | `TargetWeights()`               | the wealth ratio of the drifted holdings   | the target weights        | the `wd` of the scheme | The series of the fund, with the turnover of the decision.   |
+| `nothing`              | `DriftedWeights()`              | `X * w` net of fees, at the target weights | the held weights          | `SelfFinancingDrift()` | The trades of the fund, with the series of the decision.     |
+
+The first two rows are the consistent pairs, which an unset `pws` gives. The last two rows are the mixed pairs, which an explicit `pws` gives. A fold whose drift is none carries no [`HeldWeightsResult`](@ref). The first and third rows thread no source to the fold loop, so an [`OnlinePortfolioSelection`](@ref) head whose fees carry a turnover term refuses them.
 
 # Interfaces
 
-In order to implement a new previous-weights source which will work seamlessly with the library, subtype `AbstractPreviousWeightsSource` with a `wd::AbstractWeightDrift` field, the Weight Drift `held_weights_drift` runs when the scheme sets no drift of its own, and implement the following method:
+In order to implement a new previous-weights source which will work seamlessly with the library, subtype `AbstractPreviousWeightsSource`. A new source is a sibling of [`TargetWeights`](@ref) and [`DriftedWeights`](@ref), and it can implement the following methods:
 
   - `previous_weights(pws::AbstractPreviousWeightsSource, prev::PredictionResult) -> VecNum_VecVecNum`: Read the weights the previous fold threads into the fold that follows it. A fallback method reads the held weights of the previous fold, `prev.hw.w`, so it is only needed when the source threads something else.
+  - `held_weights_drift(wd::Nothing, pws::AbstractPreviousWeightsSource) -> AbstractWeightDrift`: Give the Weight Drift that computes the held weights when the scheme drifts nothing. A fallback method gives [`SelfFinancingDrift`](@ref), so it is only needed when the source drifts its held weights in another way.
 
 # Related
 
@@ -1784,9 +1786,11 @@ In order to implement a new previous-weights source which will work seamlessly w
   - [`TargetWeights`](@ref)
   - [`resolve_previous_weights_source`](@ref)
   - [`previous_weights`](@ref)
+  - [`held_weights_drift`](@ref)
   - [`AbstractWeightDrift`](@ref)
   - [`IndexWalkForward`](@ref)
   - [`DateWalkForward`](@ref)
+  - [`HindsightSplit`](@ref)
 """
 abstract type AbstractPreviousWeightsSource <: AbstractAlgorithm end
 """
@@ -1796,24 +1800,13 @@ Thread the weights a fold **held** after its last observation into the fold that
 
 The target weights of the previous fold are the weights the optimiser chose, so a turnover, a tracking or a fee estimator that reads them measures the change in the decision. This source threads the weights the portfolio held after the last observation of that fold instead, so the same estimators measure the trades a fund places. A scheme that sets a Weight Drift and no `pws` threads this source, through [`resolve_previous_weights_source`](@ref).
 
-`wd` names the Weight Drift the held weights are computed under, and it is read **only** when the scheme's own `wd` is `nothing`. A scheme that drifts its return series drifts its held weights the same way, because one drift runs per fold and [`HeldWeightsResult`](@ref) records the form that ran.
-
-# Fields
-
-$(DocStringExtensions.FIELDS)
-
-# Constructors
-
-    DriftedWeights(; wd::AbstractWeightDrift = SelfFinancingDrift()) -> DriftedWeights
-
-Keyword arguments correspond to the struct's fields.
+A scheme that drifts its return series drifts its held weights the same way, because one drift runs per fold and [`HeldWeightsResult`](@ref) records the form that ran. A scheme that drifts nothing computes the held weights under [`SelfFinancingDrift`](@ref), through [`held_weights_drift`](@ref). The table of [`AbstractPreviousWeightsSource`](@ref) gives the four settings of `wd` and `pws`.
 
 # Examples
 
 ```jldoctest
 julia> DriftedWeights()
-DriftedWeights
-  wd ┴ SelfFinancingDrift()
+DriftedWeights()
 ```
 
 # Related
@@ -1823,21 +1816,11 @@ DriftedWeights
   - [`SelfFinancingDrift`](@ref)
   - [`HeldWeightsResult`](@ref)
   - [`previous_weights`](@ref)
+  - [`held_weights_drift`](@ref)
   - [`resolve_previous_weights_source`](@ref)
   - [`fold_loop`](@ref)
 """
-@concrete struct DriftedWeights <: AbstractPreviousWeightsSource
-    """
-    $(field_dict[:pws_wd])
-    """
-    wd
-    function DriftedWeights(wd::AbstractWeightDrift)
-        return new{typeof(wd)}(wd)
-    end
-end
-function DriftedWeights(; wd::AbstractWeightDrift = SelfFinancingDrift())::DriftedWeights
-    return DriftedWeights(wd)
-end
+struct DriftedWeights <: AbstractPreviousWeightsSource end
 """
 $(DocStringExtensions.TYPEDEF)
 
@@ -1845,7 +1828,7 @@ Thread the **target** weights of a fold into the fold that follows it, whatever 
 
 An unset `pws` follows the scheme's `wd`: it threads the target weights when `wd` is `nothing`, and the drifted weights through [`DriftedWeights`](@ref) when `wd` is set. Those are the two consistent pairs, because a fund that drifts holds the drifted weights at the end of the fold, and the trade it places next starts there. This source states the target weights explicitly, so a scheme can drift its return series and still measure the change in the decision. That mixed pair separates the turnover of the decision from the turnover the fund executes.
 
-[`resolve_previous_weights_source`](@ref) reads this source as the target read of the fold loop, so it carries no Weight Drift of its own, and it reaches no method of [`previous_weights`](@ref).
+[`resolve_previous_weights_source`](@ref) reads this source as the target read of the fold loop, so it reaches no method of [`previous_weights`](@ref). The table of [`AbstractPreviousWeightsSource`](@ref) gives the four settings of `wd` and `pws`.
 
 # Examples
 
@@ -2033,16 +2016,22 @@ end
 """
     weight_path(hw::Nothing, w::VecNum, X::MatNum)
     weight_path(hw::Nothing, w::VecVecNum, X::MatNum)
-    weight_path(hw::HeldWeightsResult, w::VecNum_VecVecNum, args...)
+    weight_path(hw::HeldWeightsResult{<:Any, <:MatNum_VecMatNum}, w::VecNum_VecVecNum, args...)
+    weight_path(hw::HeldWeightsResult{<:Any, Nothing, <:VecNum}, w::VecNum_VecVecNum, args...)
+    weight_path(hw::HeldWeightsResult{<:Any, Nothing, <:VecVecNum}, w::VecNum_VecVecNum, args...)
 
 Read the weight path of a fold, from the record the fold carries.
 
 A fold that carries no record held its target weights on every one of its observations, so its path is the constant path of `w`. A fold that carries one gives the stored path when `store_weight_path` asked for it, and rebuilds the path from the record's own start weights, asset returns and Weight Drift when it did not. The rebuild is bit-identical to the store, because the record carries the form that ran and the weights it started from.
 
+Dispatch on the type of the stored path `U` of the record, and on the type of its start weights `w0`, selects the method, so no method tests a field.
+
 # Algorithm
 
  1. On `nothing`, repeat `w` over the rows of `X`.
- 2. On a record, read [`rebuild_weight_path`](@ref), which gives the stored path or rebuilds it.
+ 2. On a record that stores its path `U`, return it.
+ 3. On a record that stores no path, under a single weight vector, run the drift of the record over its asset returns from `w0`, and give its path. A non-finite start vector, which is a failed fold with nothing to hold, gives a `NaN` path, as the store would.
+ 4. On a record that stores no path, under a population, run the drift member by member, and fill a member whose wealth is not positive, or whose start vector is not finite, with `NaN`. That is what the store holds for such a member, so the rebuild stays bit-identical to it. [`held_weights_result`](@ref) already raised on a population every member of which is ruined, so no record that reaches this verb holds one.
 
 # Arguments
 
@@ -2057,7 +2046,6 @@ A fold that carries no record held its target weights on every one of its observ
 # Related
 
   - [`HeldWeightsResult`](@ref)
-  - [`rebuild_weight_path`](@ref)
   - [`weight_path(wd::AbstractWeightDrift, w::VecNum, X::MatNum, obs)`](@ref)
   - [`PredictionResult`](@ref)
 """
@@ -2067,51 +2055,23 @@ end
 function weight_path(::Nothing, w::VecVecNum, X::MatNum)
     return [repeat(transpose(wi), size(X, 1)) for wi in w]
 end
-function weight_path(hw::HeldWeightsResult, ::VecNum_VecVecNum, args...)
-    return rebuild_weight_path(hw.U, hw.wd, hw.w0, hw.X)
+function weight_path(hw::HeldWeightsResult{<:Any, <:MatNum_VecMatNum}, ::VecNum_VecVecNum,
+                     args...)
+    return hw.U
 end
-"""
-    rebuild_weight_path(U::MatNum_VecMatNum, wd::AbstractWeightDrift, w::VecNum_VecVecNum, X::MatNum)
-    rebuild_weight_path(U::Nothing, wd::AbstractWeightDrift, w::VecNum, X::MatNum)
-    rebuild_weight_path(U::Nothing, wd::AbstractWeightDrift, w::VecVecNum, X::MatNum)
-
-Give a stored weight path, or rebuild one that was not stored.
-
-The stored path is read by dispatch on `U`, so [`weight_path`](@ref) tests nothing. A rebuild reruns the drift that made the record over the record's own asset returns, which is what makes it bit-identical to the store.
-
-# Algorithm
-
- 1. On a stored `U`, return it.
- 2. On `nothing` under a single weight vector, run the drift over `X` and give its path. A non-finite start vector, which is a failed fold with nothing to hold, gives a `NaN` path, as the store would.
- 3. On `nothing` under a population, run the drift member by member, and fill a member whose wealth is not positive, or whose start vector is not finite, with `NaN`. That is what the store holds for such a member, so the rebuild stays bit-identical to it. [`held_weights_result`](@ref) already raised on a population every member of which is ruined, so no record reaching this verb holds one.
-
-# Arguments
-
-  - `U`: Stored weight path, or `nothing`.
-  - `wd`: Weight drift that made the record.
-  - `w`: Weights the drift started from, `w0` of the record.
-  - `X`: Asset returns of the fold.
-
-# Returns
-
-  - `MatNum_VecMatNum`: The weight path.
-
-# Related
-
-  - [`weight_path`](@ref)
-  - [`HeldWeightsResult`](@ref)
-"""
-function rebuild_weight_path(U::MatNum_VecMatNum, ::AbstractWeightDrift, ::VecNum_VecVecNum,
-                             ::MatNum)
-    return U
-end
-function rebuild_weight_path(::Nothing, wd::AbstractWeightDrift, w::VecNum, X::MatNum)
+function weight_path(hw::HeldWeightsResult{<:Any, Nothing, <:VecNum}, ::VecNum_VecVecNum,
+                     args...)
+    w = hw.w0
+    X = hw.X
     if !all(isfinite, w)
         return fill(convert(promote_type(eltype(X), eltype(w)), NaN), size(X))
     end
-    return weight_path(wd, w, X)
+    return weight_path(hw.wd, w, X)
 end
-function rebuild_weight_path(::Nothing, wd::AbstractWeightDrift, w::VecVecNum, X::MatNum)
+function weight_path(hw::HeldWeightsResult{<:Any, Nothing, <:VecVecNum}, ::VecNum_VecVecNum,
+                     args...)
+    (; X, wd) = hw
+    w = hw.w0
     Tw = promote_type(eltype(X), eltype(first(w)))
     Us = Vector{Matrix{Tw}}(undef, length(w))
     for (i, wi) in pairs(w)
@@ -2136,13 +2096,13 @@ end
 
 Resolve the one Weight Drift a fold runs, from the two switches of its scheme.
 
-It reads the source that [`resolve_previous_weights_source`](@ref) gives, and either switch alone asks for a drift. A scheme that drifts its return series drifts its held weights the same way. A scheme that drifts nothing but threads drifted weights runs the form the [`DriftedWeights`](@ref) source carries, because the series stays at the target weights and the holdings still move.
+It reads the source that [`resolve_previous_weights_source`](@ref) gives, and either switch alone asks for a drift. A scheme that drifts its return series drifts its held weights the same way. A scheme that drifts nothing but threads drifted weights runs [`SelfFinancingDrift`](@ref), because the series stays at the target weights and the holdings still move. A new sibling of [`DriftedWeights`](@ref) that drifts its held weights in another way adds a method on `wd::Nothing` and its own type.
 
 # Algorithm
 
  1. Neither switch is set: no drift runs, and the fold carries no [`HeldWeightsResult`](@ref).
  2. `wd` is set: it is the form that runs, whatever `pws` is.
- 3. Only `pws` is set: the form it carries is the form that runs.
+ 3. Only `pws` is set: [`SelfFinancingDrift`](@ref) runs, unless the source has a method of its own.
 
 # Arguments
 
@@ -2156,7 +2116,9 @@ It reads the source that [`resolve_previous_weights_source`](@ref) gives, and ei
 # Related
 
   - [`AbstractWeightDrift`](@ref)
+  - [`AbstractPreviousWeightsSource`](@ref)
   - [`DriftedWeights`](@ref)
+  - [`SelfFinancingDrift`](@ref)
   - [`held_weights_result`](@ref)
   - [`HeldWeightsResult`](@ref)
 """
@@ -2166,8 +2128,8 @@ end
 function held_weights_drift(wd::AbstractWeightDrift, ::Any)
     return wd
 end
-function held_weights_drift(::Nothing, pws::AbstractPreviousWeightsSource)
-    return pws.wd
+function held_weights_drift(::Nothing, ::AbstractPreviousWeightsSource)
+    return SelfFinancingDrift()
 end
 """
     nan_held_member(X::MatNum, store_weight_path::Bool, ::Type{Tw})
@@ -2314,7 +2276,7 @@ function held_weights_result(wd::AbstractWeightDrift, w::VecVecNum, X::MatNum,
 end
 """
     drift_observations(ts::Nothing, test_idx)
-    drift_observations(ts::Any, test_idx)
+    drift_observations(ts::VecDate, test_idx)
 
 Name the observations of a fold, for the message a non-positive wealth raises.
 
@@ -2327,7 +2289,7 @@ A fold that carries timestamps names its observations by their labels. A fold th
 
 # Arguments
 
-  - `ts`: Timestamps of the fold, or `nothing`.
+  - `ts`: Timestamps of the fold, or `nothing`. Any other type is a `MethodError`.
   - `test_idx`: Absolute panel rows of the fold.
 
 # Returns
@@ -2342,37 +2304,8 @@ A fold that carries timestamps names its observations by their labels. A fold th
 function drift_observations(::Nothing, test_idx)
     return test_idx
 end
-function drift_observations(ts, ::Any)
+function drift_observations(ts::VecDate, ::Any)
     return ts
-end
-"""
-    expand_investable_columns(imsk::BitVector, A::MatNum)
-
-Expand a per asset history of the investable universe back onto the full asset universe.
-
-The column of a non-investable asset is filled with zero, which is what [`filter_held_gaps`](@ref) writes over its whole `NaN` column anyway. A drift over a zero column at a zero weight moves no wealth, so the expanded history rebuilds the same weight path the reduced one did.
-
-# Arguments
-
-  - `imsk`: The Investable Mask, `true` at every asset whose prior moments were finite.
-  - `A`: A history over the investable assets, `observations × investable assets`.
-
-# Returns
-
-  - `A::MatNum`: The history over the full asset universe.
-
-# Related
-
-  - [`expand_held_weights`](@ref)
-  - [`expand_investable_weights`](@ref)
-  - [`filter_held_gaps`](@ref)
-"""
-function expand_investable_columns(imsk::BitVector, A::MatNum)
-    @argcheck(count(imsk) == size(A, 2),
-              DimensionMismatch("the investable mask keeps $(count(imsk)) of $(length(imsk)) assets, but the history holds $(size(A, 2)) columns; the mask and the history must come from the same reduction"))
-    out = zeros(eltype(A), size(A, 1), length(imsk))
-    out[:, imsk] = A
-    return out
 end
 """
     expand_held_weights(imsk::Nothing, hw)
@@ -2401,8 +2334,7 @@ A fold reduces its test window to the Investable Mask before it reads it, so the
 # Related
 
   - [`HeldWeightsResult`](@ref)
-  - [`expand_investable_columns`](@ref)
-  - [`expand_held_member`](@ref)
+  - [`expand_investable_weights`](@ref)
   - [`held_weights_result`](@ref)
 """
 function expand_held_weights(::Nothing, hw)
@@ -2412,52 +2344,11 @@ function expand_held_weights(::BitVector, ::Nothing)
     return nothing
 end
 function expand_held_weights(imsk::BitVector, hw::HeldWeightsResult)
-    return HeldWeightsResult(; X = expand_investable_columns(imsk, hw.X),
-                             U = expand_held_member(imsk, hw.U),
-                             w0 = expand_held_member(imsk, hw.w0),
-                             w = expand_held_member(imsk, hw.w), wd = hw.wd)
-end
-"""
-    expand_held_member(imsk::BitVector, x::Nothing)
-    expand_held_member(imsk::BitVector, x::VecNum)
-    expand_held_member(imsk::BitVector, x::MatNum)
-    expand_held_member(imsk::BitVector, x::VecVecNum)
-    expand_held_member(imsk::BitVector, x::VecMatNum)
-
-Expand one member of a Held Weights record back onto the full asset universe.
-
-The member's type is the picker, so [`expand_held_weights`](@ref) states no branch of its own. A weight vector expands through [`expand_investable_weights`](@ref) and a weight path through [`expand_investable_columns`](@ref); a population expands member by member; an absent path stays absent.
-
-# Arguments
-
-  - `imsk`: The Investable Mask, `true` at every asset whose prior moments were finite.
-  - `x`: Held weights, a weight path, a population of either, or `nothing`.
-
-# Returns
-
-  - The member over the full asset universe.
-
-# Related
-
-  - [`expand_held_weights`](@ref)
-  - [`expand_investable_columns`](@ref)
-  - [`expand_investable_weights`](@ref)
-"""
-function expand_held_member(::BitVector, ::Nothing)
-    return nothing
-end
-function expand_held_member(imsk::BitVector, x::VecNum)
-    return expand_investable_weights(imsk, x)
-end
-function expand_held_member(imsk::BitVector, x::MatNum)
-    return expand_investable_columns(imsk, x)
-end
-function expand_held_member(imsk::BitVector, x::VecVecNum)
-    return [expand_investable_weights(imsk, xi) for xi in x]
-end
-function expand_held_member(imsk::BitVector, x::VecMatNum)
-    return [expand_investable_columns(imsk, xi) for xi in x]
+    return HeldWeightsResult(; X = expand_investable_weights(imsk, hw.X),
+                             U = expand_investable_weights(imsk, hw.U),
+                             w0 = expand_investable_weights(imsk, hw.w0),
+                             w = expand_investable_weights(imsk, hw.w), wd = hw.wd)
 end
 export calc_net_returns, calc_net_asset_returns, calc_turnover, cumulative_returns,
        drawdowns, SelfFinancingDrift, DriftedWeights, TargetWeights, HeldWeightsResult
-public AbstractPreviousWeightsSource
+public AbstractPreviousWeightsSource, held_weights_drift

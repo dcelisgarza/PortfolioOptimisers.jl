@@ -1,12 +1,10 @@
 ```@meta
-Description = "Forecast rules, private API of PortfolioOptimisers.jl: copy_forecaster, copy_forecaster_prior, assert_forecaster, forecaster_seed, forecast_min_rows, …"
+Description = "Forecast rules, private API of PortfolioOptimisers.jl: assert_forecaster, forecaster_seed, forecast_min_rows, holds_second_moment, flat_where_undefined, …"
 ```
 
 # Forecast rules: private API
 
 ```@docs
-PortfolioOptimisers.copy_forecaster
-PortfolioOptimisers.copy_forecaster_prior
 PortfolioOptimisers.assert_forecaster
 PortfolioOptimisers.forecaster_seed
 PortfolioOptimisers.forecast_min_rows

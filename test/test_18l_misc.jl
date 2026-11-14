@@ -80,9 +80,9 @@ end
     @test isapprox(sum(res1.w), 1)
     @test isapprox(sum(res1.w[res1.w .< zero(eltype(res1.w))]), -1)
     @test isapprox(sum(res1.w[res1.w .>= zero(eltype(res1.w))]), 2)
-    @test all(res1.pa.wb.lb[1:2:end] .<= res1.w[1:2:end])
-    @test all(abs.(res1.w[1:2:end] .- res1.pa.wb.ub[1:2:end]) .< 5e-10)
-    @test all(res1.pa.wb.lb[2:2:end] .<= res1.w[2:2:end] .<= res1.pa.wb.ub[2:2:end])
+    @test all(res1.jor.wb.lb[1:2:end] .<= res1.w[1:2:end])
+    @test all(abs.(res1.w[1:2:end] .- res1.jor.wb.ub[1:2:end]) .< 5e-10)
+    @test all(res1.jor.wb.lb[2:2:end] .<= res1.w[2:2:end] .<= res1.jor.wb.ub[2:2:end])
 end
 
 @testset "Buy-in threshold" begin
@@ -470,9 +470,9 @@ end
 
 @testset "A narrow weight type keeps the step of the finite difference" begin
     # The step widens the type of the weights. Before, `Float16` weights rounded the step
-    # away, so every contribution was zero, `Float32` weights rounded it 1.3 % off, and
-    # integer weights raised `InexactError`. The differences left are the rounding of the
-    # weights themselves.
+    # away, so every contribution was zero, and `Float32` weights rounded it 1.3 % off. The
+    # differences left are the rounding of the weights themselves. Issue #1972 removed the
+    # integer case: integer weights are outside the domain.
     r = StandardDeviation()
     N = length(pr.mu)
     w = fill(inv(N), N)
@@ -481,14 +481,9 @@ end
     @test isapprox(risk_contribution(r, Float32.(w), pr), rc; rtol = 1e-6)
     @test isapprox(risk_contribution(r, Float16.(w), pr), rc; rtol = 1e-3)
     @test isapprox(risk_gradient(r, Float32.(w), pr), risk_gradient(r, w, pr); rtol = 1e-6)
-    @test isapprox(risk_contribution(r, [1; zeros(Int, N - 1)], pr),
-                   risk_contribution(r, [1.0; zeros(N - 1)], pr))
     # A vector of measures sums the gradients in the promoted type. Before, the sum took the
-    # type of the weights: integer weights raised `InexactError`, and `Float16` weights
-    # rounded each term to `Float16`.
+    # type of the weights, and `Float16` weights rounded each term to `Float16`.
     rs = [StandardDeviation(), ConditionalValueatRisk()]
-    @test isapprox(risk_gradient(rs, [1; zeros(Int, N - 1)], pr),
-                   risk_gradient(rs, [1.0; zeros(N - 1)], pr))
     @test isapprox(risk_gradient(rs, Float16.(w), pr), risk_gradient(rs, w, pr);
                    rtol = 1e-8)
 end
@@ -667,7 +662,7 @@ end
     # inner or outer optimiser. The outer problem reads the raw returns of the
     # sub-portfolios, in the path without folds and in the cross-validated path
     # (ADR 0215, decision 3).
-    for cv in (nothing, OptimisationCrossValidation(; cv = KFold(; n = 5))),
+    for cv in (nothing, KFold(; n = 5)),
         mk in (s -> Stacking(; pe = EmpiricalPrior(; x_src = s), cv = cv,
                              opti = [MeanRisk(; opt = jo(nothing)), InverseVolatility()],
                              opto = MeanRisk(; opt = jo(nothing))),
@@ -712,11 +707,13 @@ end
     @test PO.group_source(nco) === nothing
     st = Stacking(; pe = epx, opti = [InverseVolatility()], opto = InverseVolatility())
     @test PO.group_frames(st).excess && isempty(PO.group_frames(st).raw)
-    sr = SubsetResampling(; opt = MeanRisk(; opt = JuMPOptimiser(; pe = epx, slv = s1)))
+    sr = SubsetResampling(; subset_size = 0.8,
+                          opt = MeanRisk(; opt = JuMPOptimiser(; pe = epx, slv = s1)))
     @test PO.group_source(sr) === nothing
     @test PO.group_frames(InverseVolatility(; pe = epx)).excess
+    # The slot is a slot of the Constraint Block, so its path passes through the block (#2039).
     @test PO.group_frames(JuMPOptimiser(; pe = epx, slv = s1, cte = CentralityConstraint())).raw ==
-          ["cte"]
+          ["cbe.cte"]
     @test PO.group_frames(HierarchicalOptimiser(; pe = epx)).raw == ["cle"]
     rb = RiskBudgeting(; opt = JuMPOptimiser(; pe = eraw, slv = s1),
                        rba = FactorRiskBudgeting(; re = StepwiseRegression(; x_src = xs)))
@@ -759,7 +756,7 @@ end
                opt -> SchurComplementHierarchicalRiskParity(),
                opt -> NestedClustered(; opti = InverseVolatility(), opto = InverseVolatility()),
                opt -> Stacking(; opti = [InverseVolatility()], opto = InverseVolatility()),
-               opt -> SubsetResampling(; opt = InverseVolatility()))
+               opt -> SubsetResampling(; subset_size = 0.8, opt = InverseVolatility()))
         @test_logs mk(JuMPOptimiser(; pe = epx, slv = s1))
     end
 

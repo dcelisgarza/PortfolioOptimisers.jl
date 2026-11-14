@@ -23,7 +23,7 @@ PortfolioOptimisers.window_rows
 PortfolioOptimisers.folds
 PortfolioOptimisers.memory_rows
 PortfolioOptimisers.price_level_statistic
-PortfolioOptimisers.fold_statistic
+PortfolioOptimisers.fold_statistic(::ExponentialMovingAverage, ::PortfolioOptimisers.Option{<:AbstractVector}, ::AbstractVector)
 PortfolioOptimisers.cold_statistic
 mean(me::PriceLevelExpectedReturns, X::MatNum; dims::Int = 1, active_mask::Option{<:AbstractMatrix{<:Bool}} = nothing, kwargs...)
 mean(me::PriceLevelExpectedReturns, X::MatNum, pnl::Option{<:AssetPanel}; dims::Int = 1, kwargs...)

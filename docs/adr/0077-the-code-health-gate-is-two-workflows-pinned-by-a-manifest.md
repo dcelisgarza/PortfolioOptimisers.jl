@@ -176,3 +176,58 @@ in the commit that moved the Manifest, and no binding number rose, so no row nee
 `16_PanelDataFrame.jl` from 4 to 0 and `02_ConditionalXatRisk.jl` from 8 to 4. The other rows moved because sessions record only their own rows, so `dev`
 carried drift under the thresholds, and a refresh imports it. The coverage baseline's provenance
 line was moved by hand, for the reason the first amendment gives.
+
+## Amendment (2026-10-21)
+
+The push trigger of both workflows is `main`, `dev*` and `agents/**`. The `build` job of each
+skips on a pull request from `dev*` or `agents/**` in this repository, because the push to that
+branch already runs it (#1783). The flag of a new Rationale is the job `rationale` of
+`Complexity.yml`, which runs on every pull request.
+[ADR 0220](0220-a-pull-request-from-a-pushed-branch-skips-the-jobs-its-push-runs.md) records the
+decision and its cost.
+
+## Amendment (2026-10-26)
+
+The pin is **Julia 1.13.3**, and JET is **0.13.1**. The juliaup `release` channel moved from
+1.13.2 to 1.13.3 and deleted the 1.13.2 binary. The maintainer also updated JET.
+`code_health/Manifest.toml` took `Pkg.update("JET")` under 1.13.3, with Pkg loaded from the
+default environment. Only `julia_version`, JET (0.12.3 to 0.13.1) and two stdlib jlls
+(`MozillaCACerts_jll`, `PCRE2_jll`) moved. CodeComplexity and JuliaSyntax keep their versions.
+
+The size, complexity, expansion, performance, prose and JET baselines were refreshed under 1.13.3
+in the commit that moved the Manifest. That commit changes no file under `src/` or `ext/`. No
+binding number of the first five rose, and three complexity rows fell. JET needed `--accept-rise`
+for ten rows. Seven rose in the `main` run, among them `20_Base_Regression.jl` from 9 to 22, and
+three rose in the `plots_ext` run, among them `02_DimensionReductionRegression.jl` from 1 to 27.
+Eight rows fell. With no source change in the commit, every rise is the analyser's. The coverage
+baseline's provenance line was moved by hand, for the reason the first amendment gives.
+
+## Amendment (2026-10-26, #1832)
+
+The push trigger of `JET.yml` has no `paths:` filter. The pull-request trigger keeps it. The
+ruleset of `main` now requires the checks `JET - push` and `Complexity - push` on the head of a
+pull request into `main`. A filter that skips the push run leaves that check pending, and the
+merge waits forever. This is the case that the second item of the Consequences warned about. From
+2026-10-22 to 2026-10-26, the filter skipped 4 of 117 pushes to `dev`, so the removal costs little.
+The `build` job of each workflow carries the event in its name, `JET - push` or
+`Complexity - push`.
+[ADR 0220](0220-a-pull-request-from-a-pushed-branch-skips-the-jobs-its-push-runs.md) records the
+ruleset and the names.
+
+## Amendment (2026-11-14)
+
+The pin is **Julia 1.13.4**. The juliaup `release` channel moved from 1.13.3 to 1.13.4, so every
+gate run on it refused to check against provenance that named 1.13.3. The maintainer asked to move
+the pin and to remove the 1.13.3 binary. `code_health/Manifest.toml` took `Pkg.update()` under
+1.13.4, with Pkg loaded from the default environment. Only `julia_version`, five dependencies of
+the package (DiffRules, FillArrays, ForwardDiff, LogExpFunctions, StaticArrays) and three stdlib
+jlls (`MozillaCACerts_jll`, `OpenBLAS_jll`, `p7zip_jll`) moved. JET stays at 0.13.1, and
+CodeComplexity and JuliaSyntax keep their versions.
+
+The size, complexity, expansion, performance, prose and JET baselines were refreshed under 1.13.4
+in the commit that moved the Manifest. That commit changes no file under `src/` or `ext/`. No
+binding number rose, so no row needed `--accept-rise`. JET fell in four rows by 13 reports each:
+`20_Base_Regression.jl` and `02_DimensionReductionRegression.jl`, in the `main` run and in the
+`plots_ext` run. These are the rows that rose under 1.13.3. The binding complexity numbers fell in
+31 files, because `dev` carried drift under the thresholds, and a refresh imports it. The coverage
+baseline's provenance line was moved by hand, for the reason the first amendment gives.

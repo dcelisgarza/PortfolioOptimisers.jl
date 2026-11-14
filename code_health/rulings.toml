@@ -214,7 +214,7 @@ reads. Each such array is a distinct output of its iteration, and it has its own
 buffer before the loop would alias every stored copy to the last one. The ADR names this case and \
 says that it takes a Dismissal. Found by issue #1312 at twelve sites: the bisection frontier of \
 the hierarchical optimisers, the test-index lists of the combinatorial split, the family lists of \
-the cross-sectional factor axis, the NaN weight matrices of `rebuild_weight_path`, the copies that \
+the cross-sectional factor axis, the NaN weight matrices of `weight_path` on a record, the copies that \
 `replace_prior_views` returns, and the index lists `replace_coprior_views` records per row."""
 
 [rationale.a-slice-the-result-keeps]
@@ -245,6 +245,53 @@ factor risk contribution: `set_risk_constraints!` under `Variance`, which reads 
 `set_factor_risk_contribution_constraints!`, whose hedge constraint holds one row per entry of \
 `transpose(b2) * pr.sigma * w` (#1351). Approved by the maintainer on 2026-09-26 (#845)."""
 
+[rationale.a-form-its-package-recommends]
+text = """
+The code writes a construct in the form that a well-established dependency recommends, and JET \
+reports a call inside the machinery of that dependency. The machinery includes the packages that \
+the dependency itself depends on. The developers of such a package analyse \
+it with JET themselves, and their best practice is reasoned with those reports in view. JET has \
+known false positives. Inference can narrow the element type of a container to `Union{}` through \
+a closure or an abstract type parameter, and JET then reports a call to an intrinsic or a builtin, \
+such as `getfield` or `getindex`, that the running code does not make. Inference can also split \
+a local of type `Union{Nothing, T}` that the dependency always assigns before the call, because \
+the order of its control flow decides the assignment and inference does not follow that order. \
+JET then reports a `MethodErrorReport` with a `union split` on the `Nothing` branch, which the \
+running code does not take. A JET report alone is \
+therefore not a reason to change the recommended form, and a change made only to silence such a \
+report is rejected. The Rationale covers only a form that the package documents as its \
+recommendation. It does not cover code that departs from that form, or code of this library \
+that JET reports. The maintainer stated the rule on 2026-10-28, in #1870, for the JuMP container \
+`JuMP.@constraint(model, [i = 1:N], ...)`, which the Constraints page of the JuMP manual gives for \
+an indexed family of rows. JET reads the container through `JuMP.Containers.container` and \
+reports `invalid builtin function call` on `getfield`. Issue #1883 restored the container at four \
+sites where a loop of scalar rows had replaced it to avoid the report. Affirmed against Julia \
+1.13.3, JET 0.13.1 and JuMP 1.32.1. The maintainer extended the rule to the dependencies of the \
+recommended package, and to the union split of a local that the dependency always assigns, on \
+2026-11-05. The dismissals of `src/03_InputData/11_PricesToReturns.jl` take the extension to a \
+dependency: `DataFrames.DataFrame(::TimeArray)`, the documented conversion of a `TimeArray` to a \
+table, reaches `@sync` of Base, whose locals `c_ex` and `racy` JET reads as maybe undefined. The \
+dismissals of `src/05_Moments/32_CrossSectionalFactorModel/13_CrossSectionalFactorisation.jl` cite \
+the documented forms of LinearAlgebra, `mul!`, `ldiv!` and the pivoted QR, with the `τ` of its \
+LAPACK wrapper. No dismissal cites the union split of a local now. Affirmed against Julia 1.13.3, \
+JET 0.13.1 and DataFrames 1.8.2."""
+
+[rationale.a-union-split-that-loses-the-type-of-its-value]
+text = """
+The report is a defect of JET. A constructor takes an argument `x` of a small union of concrete \
+types, such as `Option{<:Bool}`, and builds `new{typeof(x)}(x)`, the form of every struct of the \
+library. The running code gives the concrete parameter of each value: `nothing` builds a \
+parameter `Nothing`, and `true` builds a parameter `Bool`, so the struct never holds a union. JET \
+splits the union of `typeof(x)` and the union of `x` apart, and loses the link between them. It \
+checks each pair of a type and a value, and it reports the pair that the running code cannot make, \
+such as `convert(::Type{Bool}, ::Nothing)` with a `union split`. The library keeps its form, \
+and a change made only to silence the report is rejected. The Rationale covers only that pair: a \
+constructor whose parameter is the `typeof` of the argument that it stores. A probe of a struct \
+with one field and no code of the library gives the same report, and a constructor that takes the \
+parameter as a static parameter, `x::X where {X}`, gives none. The maintainer stated the rule on \
+2026-11-05, for the `bib` field of `PanelFieldScorer`. Affirmed against Julia 1.13.3 and JET \
+0.13.1."""
+
 # --- exemptions ------------------------------------------------------------
 #
 # Keyed (path, definition, metric), dropped before the file's maximum is taken. An Exemption binds
@@ -253,7 +300,11 @@ factor risk contribution: `set_risk_constraints!` under `Variance`, which reads 
 # The seventeen below are issue #356's, written before the scheduled job first runs. They name
 # every constructor standing above the argument-count threshold of 10, not only the one that drives
 # its file, because `src/17_Optimisation/05_JuMP/03_JuMPOptimiser_a.jl` holds a second at 19. Nineteen
-# definitions sit over seventeen keys, because the key holds no line.
+# definitions sit over seventeen keys, because the key holds no line. Issue #2040 removed the key of
+# `ProgrammeAllocationSet`: the set holds a Constraint Block, and its constructor takes 7 arguments.
+# Issue #2042 removed the key of `ProcessedJuMPOptimiserAttributes`, the second constructor of
+# `03_JuMPOptimiser_a.jl`: its successor `ResolvedJuMPOptimiser` holds the block Result, and its
+# constructor takes 6 arguments.
 
 [[exemption]]
 path = "src/03_InputData/10_ReturnsResult.jl"
@@ -261,9 +312,40 @@ definition = "ReturnsResult"
 metric = "arg"
 rationale = "keyword-constructor-arity"
 
+# The Constraint Block of ADR 0237 takes the 32 slots that `JuMPOptimiser` held before it, so its
+# constructor carries the arity that the constructor of `JuMPOptimiser` carried.
 [[exemption]]
-path = "src/17_Optimisation/10_OnlinePortfolioSelection/04_ProgrammeAllocationSet.jl"
-definition = "ProgrammeAllocationSet"
+path = "src/17_Optimisation/05_JuMP/02_JuMPConstraints/14_ConstraintBlock.jl"
+definition = "ConstraintBlock"
+metric = "arg"
+rationale = "keyword-constructor-arity"
+
+# The Resolved Constraint Block of ADR 0237 holds one field for each slot of the block, and its
+# prior and rows, so its constructor takes 32 arguments (#2042).
+[[exemption]]
+path = "src/17_Optimisation/05_JuMP/02_JuMPConstraints/14_ConstraintBlock.jl"
+definition = "ResolvedConstraintBlock"
+metric = "arg"
+rationale = "keyword-constructor-arity"
+
+# The columnar Results of the forecast evaluation and of the factor model summary check their
+# values in their constructors (#2093), so each constructor takes one argument for each column:
+# 46 for `ForecastSummaryResult`, 21 for `ForecastWindowResult`, 12 for `FactorSummaryResult`.
+[[exemption]]
+path = "src/05_Moments/32_CrossSectionalFactorModel/07_ReturnForecasts/14_ForecastSummary.jl"
+definition = "ForecastSummaryResult"
+metric = "arg"
+rationale = "keyword-constructor-arity"
+
+[[exemption]]
+path = "src/05_Moments/32_CrossSectionalFactorModel/07_ReturnForecasts/12_ForecastForwardWindows.jl"
+definition = "ForecastWindowResult"
+metric = "arg"
+rationale = "keyword-constructor-arity"
+
+[[exemption]]
+path = "src/05_Moments/32_CrossSectionalFactorModel/10_FactorModelSummary.jl"
+definition = "FactorSummaryResult"
 metric = "arg"
 rationale = "keyword-constructor-arity"
 
@@ -370,12 +452,6 @@ rationale = "keyword-constructor-arity"
 [[exemption]]
 path = "src/17_Optimisation/05_JuMP/03_JuMPOptimiser_a.jl"
 definition = "JuMPOptimiser"
-metric = "arg"
-rationale = "keyword-constructor-arity"
-
-[[exemption]]
-path = "src/17_Optimisation/05_JuMP/03_JuMPOptimiser_a.jl"
-definition = "ProcessedJuMPOptimiserAttributes"
 metric = "arg"
 rationale = "keyword-constructor-arity"
 
@@ -506,18 +582,6 @@ rationale = "a-definition-a-file-split-moved-unchanged"
 [[exemption]]
 path = "src/10_Prior/06_EntropyPooling/03_EntropyPoolingPrior_c.jl"
 definition = "ep_prior"
-metric = "cog"
-rationale = "a-definition-a-file-split-moved-unchanged"
-
-[[exemption]]
-path = "src/17_Optimisation/05_JuMP/03_JuMPOptimiser_a.jl"
-definition = "JuMPOptimiser"
-metric = "cyc"
-rationale = "a-definition-a-file-split-moved-unchanged"
-
-[[exemption]]
-path = "src/17_Optimisation/05_JuMP/03_JuMPOptimiser_a.jl"
-definition = "JuMPOptimiser"
 metric = "cog"
 rationale = "a-definition-a-file-split-moved-unchanged"
 
@@ -782,11 +846,13 @@ definition = "optimal_number_clusters"
 misses = 1
 rationale = "a-cut-into-one-cluster-is-always-valid"
 
+# Run 41046186365 (#1912): the `function` line of this method reads 0 while every line of its body
+# carries hits, and the body is reached by each fold of a price-level statistic.
 [[coverage_exemption]]
-path = "src/09_ConstraintGeneration/02_LinearConstraintGeneration_a.jl"
-definition = "LinearConstraint"
+path = "src/05_Moments/34_PriceLevelExpectedReturns.jl"
+definition = "fold_statistic_row"
 misses = 1
-rationale = "a-signature-line-counter-the-test-job-cannot-reach"
+rationale = "a-signature-line-counter-on-a-method-whose-body-is-reached"
 
 # Two constants of one shape, one row each. The `const` line of each holds the `map` closure that
 # builds the union, and the count of 1 is the synthetic zero that the line draws.
@@ -807,6 +873,257 @@ path = "src/22_Plotting.jl"
 definition = "investable_plot_view"
 misses = 1
 rationale = "a-signature-line-counter-on-a-method-whose-body-is-reached"
+
+# Run 41195231259 (#1922): the `function` line of the `Val{:sigma_ucs}` method reads 0 while its
+# body runs 54 times through the `sigma` routes of a Pipeline. The one count it had came from a
+# direct call on a value with no field `r`, the branch that 2d2abb4c5f removed.
+[[coverage_exemption]]
+path = "src/21_Pipeline/02_StepExecution.jl"
+definition = "pipe_target_paths"
+misses = 1
+rationale = "a-signature-line-counter-on-a-method-whose-body-is-reached"
+
+# Run 42092565579: the `function` line of the `BitVector` method reads 0 while its body runs 54
+# times, through the gapped universe of `FactorPrior` in `test_54_coverage_universe.jl`.
+[[coverage_exemption]]
+path = "src/10_Prior/03_FactorPrior.jl"
+definition = "coverage_regression"
+misses = 1
+rationale = "a-signature-line-counter-on-a-method-whose-body-is-reached"
+
+# Run 42928050611 (ebde4ddb88, R31 of #1817): the `function` line of the `::Any` method reads 0
+# while its `return` line runs, through the grid over a `MeanRisk` in `test_30b_asset_scorers.jl`.
+# A local `run_files.jl --coverage` of that file alone gives the same single miss, on that line.
+# ebde4ddb88 added a second caller, the constructor of `WeightMassScorer`. The file had no miss
+# before it.
+[[coverage_exemption]]
+path = "src/21_Pipeline/07_AssetScorers.jl"
+definition = "weight_mass_grid"
+misses = 1
+rationale = "a-signature-line-counter-on-a-method-whose-body-is-reached"
+
+# Run 43573334652 (570ddf393f): the `function` line of `undefined_correlation_diagonal!` reads 0
+# while its body runs 22752 times on its `findall` line and 2709 times in its loop, through
+# `cov2cor_nan!` and the correlation of `Covariance`. The line has read 0 on every run since
+# dc3d282e50 (#2028) added the method.
+[[coverage_exemption]]
+path = "src/05_Moments/01_Base_Moments.jl"
+definition = "undefined_correlation_diagonal!"
+misses = 1
+rationale = "a-signature-line-counter-on-a-method-whose-body-is-reached"
+
+# --- JET dismissals --------------------------------------------------------
+#
+# Keyed (file, kind, message), ADR 0071. A Dismissal matches every report of its fingerprint in
+# the file, and its count is for a human reader.
+#
+# Each entry below covers the two `getfield` reports that JET gives for each JuMP container
+# `[i = 1:N]` in the file. Issue #1883 measured every report of 18 of these files on 2026-10-28,
+# and each `getfield` report sat on a container line. The weight finalisers entered with #1870,
+# whose one container raised the file from 0 to 2. A file with a `getfield` report from other code
+# takes no entry here, because the entry would also cover that report. Those files are the
+# entropy pooling moment views, the tail view solve, the Meucci prior and the meta optimisation.
+
+# The leverage read of #1971 takes the forms that the LinearAlgebra manual gives: the division of
+# the gathered columns by the `UpperTriangular` factor of the pivoted QR, and the product of `F.Q`
+# with the first `r` columns of the identity. JET analyses the method under its declared types, an
+# abstract `D` and an untyped `F`, and reports inside the broadcast and the tuple machinery of
+# LinearAlgebra. The product line carried its report in `01_CrossSectionalRegression.jl` before the
+# file split, and the division line replaced the `Q` path of a well-conditioned design. Measured on
+# 2026-11-04 with Julia 1.13.3 and JET 0.13.1: the two reports are the only two of the file.
+
+[[dismissal]]
+file = "src/05_Moments/32_CrossSectionalFactorModel/13_CrossSectionalFactorisation.jl"
+kind = "MethodErrorReport"
+message = "no matching method found `newindex(::LinearAlgebra.BandIndex, ::Tuple{Bool}, ::Tuple{Int64})`"
+count = 1
+rationale = "a-form-its-package-recommends"
+
+[[dismissal]]
+file = "src/05_Moments/32_CrossSectionalFactorModel/13_CrossSectionalFactorisation.jl"
+kind = "BuiltinErrorReport"
+message = "BoundsError: attempt to access Tuple{Int64} at index [2]: getfield"
+count = 1
+rationale = "a-form-its-package-recommends"
+
+# The in-place kernels of #1973 call the documented in-place forms of LinearAlgebra on a view of a
+# task buffer: `mul!(gram, D', D)` and `mul!(v, A', y)`, and `ldiv!(F, b)` on a pivoted `QR`. JET
+# reports inside the machinery of those forms (`sizeof`, `getfield`, and a `τ` of the LAPACK
+# wrapper), and the probe of 211 fits gives the bits of the allocating forms.
+[[dismissal]]
+file = "src/05_Moments/32_CrossSectionalFactorModel/13_CrossSectionalFactorisation.jl"
+kind = "BuiltinErrorReport"
+message = "invalid builtin function call: sizeof"
+count = 1
+rationale = "a-form-its-package-recommends"
+
+[[dismissal]]
+file = "src/05_Moments/32_CrossSectionalFactorModel/13_CrossSectionalFactorisation.jl"
+kind = "BuiltinErrorReport"
+message = "invalid builtin function call: getfield"
+count = 2
+rationale = "a-form-its-package-recommends"
+
+[[dismissal]]
+file = "src/05_Moments/32_CrossSectionalFactorModel/13_CrossSectionalFactorisation.jl"
+kind = "UndefVarErrorReport"
+message = "local variable `τ` may be undefined"
+count = 1
+rationale = "a-form-its-package-recommends"
+
+# `DataFrames.DataFrame(::TimeArray)`, the documented conversion of a `TimeArray` to a table,
+# reaches `@sync` of Base (`base/task.jl`), whose locals `c_ex` and `racy` JET reads as maybe
+# undefined. The reports appeared under #1973 part E, which changed no line of this file.
+[[dismissal]]
+file = "src/03_InputData/11_PricesToReturns.jl"
+kind = "UndefVarErrorReport"
+message = "local variable `c_ex` may be undefined"
+count = 3
+rationale = "a-form-its-package-recommends"
+
+[[dismissal]]
+file = "src/03_InputData/11_PricesToReturns.jl"
+kind = "UndefVarErrorReport"
+message = "local variable `racy` may be undefined"
+count = 1
+rationale = "a-form-its-package-recommends"
+
+[[dismissal]]
+file = "src/10_Prior/06_EntropyPooling/03_EntropyPoolingPrior_a.jl"
+kind = "BuiltinErrorReport"
+message = "invalid builtin function call: getfield"
+count = 14
+rationale = "a-form-its-package-recommends"
+
+[[dismissal]]
+file = "src/17_Optimisation/02_CrossValidation/16_LogWealthRegret.jl"
+kind = "BuiltinErrorReport"
+message = "invalid builtin function call: getfield"
+count = 8
+rationale = "a-form-its-package-recommends"
+
+[[dismissal]]
+file = "src/17_Optimisation/05_JuMP/02_JuMPConstraints/02_Returns_and_ObjectiveFunctions/03_ReturnConstraints.jl"
+kind = "BuiltinErrorReport"
+message = "invalid builtin function call: getfield"
+count = 4
+rationale = "a-form-its-package-recommends"
+
+[[dismissal]]
+file = "src/17_Optimisation/05_JuMP/02_JuMPConstraints/03_BudgetConstraints.jl"
+kind = "BuiltinErrorReport"
+message = "invalid builtin function call: getfield"
+count = 4
+rationale = "a-form-its-package-recommends"
+
+[[dismissal]]
+file = "src/17_Optimisation/05_JuMP/02_JuMPConstraints/09_TurnoverConstraints.jl"
+kind = "BuiltinErrorReport"
+message = "invalid builtin function call: getfield"
+count = 2
+rationale = "a-form-its-package-recommends"
+
+[[dismissal]]
+file = "src/17_Optimisation/05_JuMP/02_JuMPConstraints/10_FeesConstraints.jl"
+kind = "BuiltinErrorReport"
+message = "invalid builtin function call: getfield"
+count = 2
+rationale = "a-form-its-package-recommends"
+
+[[dismissal]]
+file = "src/17_Optimisation/05_JuMP/02_JuMPConstraints/11_TrackingErrorConstraints.jl"
+kind = "BuiltinErrorReport"
+message = "invalid builtin function call: getfield"
+count = 2
+rationale = "a-form-its-package-recommends"
+
+[[dismissal]]
+file = "src/17_Optimisation/05_JuMP/02_JuMPConstraints/12_RegularisationConstraints.jl"
+kind = "BuiltinErrorReport"
+message = "invalid builtin function call: getfield"
+count = 2
+rationale = "a-form-its-package-recommends"
+
+[[dismissal]]
+file = "src/17_Optimisation/05_JuMP/02_JuMPConstraints/13_WeightNormConstraints.jl"
+kind = "BuiltinErrorReport"
+message = "invalid builtin function call: getfield"
+count = 4
+rationale = "a-form-its-package-recommends"
+
+[[dismissal]]
+file = "src/17_Optimisation/05_JuMP/06_NearOptimalCentering_a.jl"
+kind = "BuiltinErrorReport"
+message = "invalid builtin function call: getfield"
+count = 4
+rationale = "a-form-its-package-recommends"
+
+[[dismissal]]
+file = "src/17_Optimisation/05_JuMP/07_RiskBudgeting.jl"
+kind = "BuiltinErrorReport"
+message = "invalid builtin function call: getfield"
+count = 2
+rationale = "a-form-its-package-recommends"
+
+[[dismissal]]
+file = "src/17_Optimisation/05_JuMP/08_RelaxedRiskBudgeting.jl"
+kind = "BuiltinErrorReport"
+message = "invalid builtin function call: getfield"
+count = 2
+rationale = "a-form-its-package-recommends"
+
+[[dismissal]]
+file = "src/17_Optimisation/05_JuMP/09_RiskMeasureConstraints/01_BaseRiskConstraints.jl"
+kind = "BuiltinErrorReport"
+message = "invalid builtin function call: getfield"
+count = 2
+rationale = "a-form-its-package-recommends"
+
+[[dismissal]]
+file = "src/17_Optimisation/05_JuMP/09_RiskMeasureConstraints/03_MomentRiskMeasureConstraints.jl"
+kind = "BuiltinErrorReport"
+message = "invalid builtin function call: getfield"
+count = 6
+rationale = "a-form-its-package-recommends"
+
+[[dismissal]]
+file = "src/17_Optimisation/05_JuMP/09_RiskMeasureConstraints/04_KurtosisConstraints.jl"
+kind = "BuiltinErrorReport"
+message = "invalid builtin function call: getfield"
+count = 2
+rationale = "a-form-its-package-recommends"
+
+[[dismissal]]
+file = "src/17_Optimisation/05_JuMP/09_RiskMeasureConstraints/07_OWARiskMeasuresConstraints.jl"
+kind = "BuiltinErrorReport"
+message = "invalid builtin function call: getfield"
+count = 2
+rationale = "a-form-its-package-recommends"
+
+[[dismissal]]
+file = "src/17_Optimisation/05_JuMP/09_RiskMeasureConstraints/16_TrackingRiskMeasureConstraints.jl"
+kind = "BuiltinErrorReport"
+message = "invalid builtin function call: getfield"
+count = 2
+rationale = "a-form-its-package-recommends"
+
+[[dismissal]]
+file = "src/17_Optimisation/10_OnlinePortfolioSelection/12_AllocationSetProgramme.jl"
+kind = "BuiltinErrorReport"
+message = "invalid builtin function call: getfield"
+count = 2
+rationale = "a-form-its-package-recommends"
+
+# The inner constructor of `PanelFieldScorer` takes `bib::Option{<:Bool}` and builds
+# `new{…, typeof(bib), …}(…, bib, …)`, the form of every struct of the library. JET splits
+# `typeof(bib)` and `bib` apart, and reports the pair of the type `Bool` with the value `nothing`.
+# Measured on 2026-11-05 with Julia 1.13.3 and JET 0.13.1: the report is the only one of the file.
+[[dismissal]]
+file = "src/21_Pipeline/07_AssetScorers.jl"
+kind = "MethodErrorReport"
+message = "no matching method found `convert(::Type{Bool}, ::Nothing)` (1/4 union split)"
+count = 1
+rationale = "a-union-split-that-loses-the-type-of-its-value"
 
 # --- performance dismissals ------------------------------------------------
 #
@@ -834,7 +1151,7 @@ rationale = "an-allocation-the-loop-keeps"
 [[perf_dismissal]]
 file = "src/14_NetReturnsDrawdowns.jl"
 rule = "loop_allocation"
-definition = "rebuild_weight_path"
+definition = "weight_path"
 rationale = "an-allocation-the-loop-keeps"
 
 [[perf_dismissal]]

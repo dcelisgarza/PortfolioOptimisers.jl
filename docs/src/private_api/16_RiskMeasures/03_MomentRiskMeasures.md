@@ -1,5 +1,5 @@
 ```@meta
-Description = "Moment Risk Measures, private API of PortfolioOptimisers.jl: MomentMeasureAlgorithm, LowOrderMomentMeasureAlgorithm, …"
+Description = "Moment Risk Measures, private API of PortfolioOptimisers.jl: MomentMeasureAlgorithm, LowOrderMomentMeasureAlgorithm, HighOrderMomentMeasureAlgorithm, …"
 ```
 
 # Moment Risk Measures: private API
@@ -7,9 +7,7 @@ Description = "Moment Risk Measures, private API of PortfolioOptimisers.jl: Mome
 ```@docs
 MomentMeasureAlgorithm
 LowOrderMomentMeasureAlgorithm
-UnstandardisedLowOrderMomentMeasureAlgorithm
 HighOrderMomentMeasureAlgorithm
-UnstandardisedHighOrderMomentMeasureAlgorithm
 LoHiOrderMoment
 calc_moment_target(::LoHiOrderMoment{<:Any, Nothing, Nothing, <:Any}, ::Any, x::VecNum)
 calc_moment_target(r::LoHiOrderMoment{<:Any, <:StatsBase.AbstractWeights, Nothing, <:Any}, ::Any, x::VecNum)

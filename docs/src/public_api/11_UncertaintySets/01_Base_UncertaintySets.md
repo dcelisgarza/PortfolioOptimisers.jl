@@ -23,7 +23,7 @@ ChiSqKUncertaintyAlgorithm
 EllipsoidalUncertaintySet
 EllipsoidalUncertaintySetAlgorithm
 NormBallUncertaintySetAlgorithm
-ucs(uc::Option{<:Tuple{<:Option{<:AbstractUncertaintySetResult}, <:Option{<:AbstractUncertaintySetResult}}}, args...; kwargs...)
+ucs(uc::Option{<:Tuple{Option{<:AbstractUncertaintySetResult}, Option{<:AbstractUncertaintySetResult}}}, args...; kwargs...)
 ucs(uc::AbstractUncertaintySetEstimator, rd::ReturnsResult; kwargs...)
 ucs(ue::AbstractPriorUncertaintySetEstimator, ::AbstractPriorResult; kwargs...)
 ucs(uc::AbstractUncertaintySetEstimator, rd::ReturnsResult, pr::AbstractPriorResult; kwargs...)
@@ -40,6 +40,7 @@ port_opt_view(risk_ucs::BoxUncertaintySet{<:VecNum, <:VecNum}, i, args...)
 port_opt_view(risk_ucs::BoxUncertaintySet{<:MatNum, <:MatNum}, i, args...)
 port_opt_view(risk_ucs::EllipsoidalUncertaintySet{<:MatNum, <:Any, <:SigmaUncertaintySetClass}, i, args...)
 port_opt_view(risk_ucs::EllipsoidalUncertaintySet{<:MatNum, <:Any, <:MuUncertaintySetClass}, i, args...)
+obs_weights_view(uc::AbstractUncertaintySetEstimator, i)
 ```
 
 ## References

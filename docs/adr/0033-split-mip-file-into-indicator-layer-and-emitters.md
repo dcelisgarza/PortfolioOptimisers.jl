@@ -120,3 +120,9 @@ for the feature.**
 - **[ADR 0021](0021-unify-mip-constraints-over-mip-space.md)** — extends its "write the builders
   once against `AbstractMIPSpace`" decision to the cardinality/group-cardinality emitters and the
   builder selector, which ADR 0021 left space-specific.
+
+## Amendment (2026-10-27)
+
+Item 5 calls `k` free. Since #1844 and #1845 the `k` of `RiskBudgeting` is a variable bounded by
+`k >= kmin >= 0` (ADR 0126), so "free" means only that `k` is not the number `1`. The log barrier still fixes the scale of the
+unscaled weights, and `effective_k` still answers `1` under a unit budget.

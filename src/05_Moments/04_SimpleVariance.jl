@@ -1,11 +1,11 @@
 """
 $(DocStringExtensions.TYPEDEF)
 
-Computes the marginal variance and standard deviation, optionally weighted and optionally bias-corrected.
+Computes the marginal variance and standard deviation, with optional observation weights and an optional bias correction.
 
-`me` centres the data when no `mean` is supplied, `w` weights the observations, and `corrected` selects the bias correction. `me` reaches the matrix methods only: the vector methods leave the centring to `Statistics`.
+`me` centres the data when the caller gives no `mean`. `w` weights the observations, and `corrected` selects the bias correction. Only the matrix methods use `me`. The vector methods let `Statistics` centre the data.
 
-`w` weights the whole estimate, so it reaches the centre as well as the deviations. The matrix methods send `me` through [`factory`](@ref), which replaces the weights of `me` with `w`, and `Statistics` centres a weighted vector on its weighted mean. Both paths therefore answer the same number over the same data, and `w` wins over the weights that `me` carries. Pass `mean` for a centre that `w` does not describe.
+`w` weights the whole estimate, so it weights the centre and the deviations. The matrix methods send `me` through [`factory`](@ref), which replaces the weights of `me` with `w`. `Statistics` centres a weighted vector on its weighted mean. The two paths give the same number for the same data, and `w` replaces the weights that `me` holds. Pass `mean` for a centre that `w` does not describe.
 
 # Fields
 
@@ -26,30 +26,31 @@ Keywords correspond to the struct's fields.
 ## Validation
 
   - $(val_dict[:oow])
-  - `corrected = true` needs a weight type that carries a bias correction. See the bias-correction bullet of [`var(ve::SimpleVariance, X::MatNum; dims::Int = 1, mean = nothing, kwargs...)`](@ref).
+  - $(val_dict[:cvg_me])
+  - `corrected = true` needs a weight type that has a bias correction. The constructor does not check it, and `StatsBase` throws an `ArgumentError` at the fit. See the bias-correction bullet of [`var(ve::SimpleVariance, X::MatNum; dims::Int = 1, mean = nothing, kwargs...)`](@ref).
 
 ## Propagated parameters
 
-When [`factory`](@ref) is called on this type, the following `@fprop`-tagged fields are automatically propagated:
+[`factory`](@ref) passes its arguments on to these `@fprop` fields:
 
-  - `me`: Recursively updated via [`factory`](@ref).
+  - `me`: Recursively updated through [`factory`](@ref).
   - `w`: Replaced with the incoming [`ObsWeights`](@ref).
-  - `cache`: Carried unchanged via [`factory`](@ref).
+  - `cache`: Carried unchanged through [`factory`](@ref).
 
 ## View parameters
 
-When [`port_opt_view`](@ref) is called on this type, the following `@vprop`-tagged fields are automatically subset to the selected indices:
+[`port_opt_view`](@ref) takes the view of these `@vprop` fields at the selected indices:
 
-  - `me`: Recursively viewed via [`port_opt_view`](@ref).
-  - `cache`: Sliced to the selected assets via [`port_opt_view`](@ref).
+  - `me`: Recursively viewed through [`port_opt_view`](@ref).
+  - `cache`: Sliced to the selected assets through [`port_opt_view`](@ref).
 
 ## Observation weight parameters
 
-When [`obs_weights_view`](@ref) is called on this type, the following fields are automatically indexed to the selected observations:
+[`obs_weights_view`](@ref) indexes these fields to the selected observations:
 
-  - `me`: Recursively indexed via [`obs_weights_view`](@ref).
-  - `w`: Indexed to the selected observations via [`obs_weights_view`](@ref).
-  - `cache`: Dropped via [`obs_weights_view`](@ref), because no slice of a state exists on the observation axis.
+  - `me`: Recursively indexed through [`obs_weights_view`](@ref).
+  - `w`: Indexed to the selected observations through [`obs_weights_view`](@ref).
+  - `cache`: Removed by [`obs_weights_view`](@ref), because a state has no slice on the observation axis.
 
 # Examples
 
@@ -111,6 +112,7 @@ SimpleVariance
                             cvg::Option{<:CoveragePolicy},
                             cache::Option{<:AbstractPartialFitState})
         assert_nonempty_nonneg_finite_val(w, :w)
+        assert_coverage_fittable(cvg, me, w, "SimpleVariance")
         return new{typeof(me), typeof(w), typeof(corrected), typeof(cvg), typeof(cache)}(me,
                                                                                          w,
                                                                                          corrected,
@@ -130,11 +132,11 @@ $(DocStringExtensions.TYPEDSIGNATURES)
 
 Renders every field of a [`SimpleVariance`](@ref) except `cache`, and `cvg` only where a policy is set.
 
-The state a `cache` holds is the running detail of an incremental fit, not the configuration a reader looks the type up for, and it prints under the estimator at every site that renders one. Set `set_show_nothing_fields!(:SimpleVariance, true)` to render it. `cvg` is read from the instance rather than from the type, as it is for [`SimpleExpectedReturns`](@ref), which states the reason.
+A `cache` holds the state of an incremental fit. That state is not part of the configuration, and it prints under the estimator at each site that renders the estimator. Set `set_show_nothing_fields!(:SimpleVariance, true)` to render it. The method reads `cvg` from the instance and not from the type, as the method for [`SimpleExpectedReturns`](@ref) does. That method states the reason.
 
 # Arguments
 
-  - `ve`: Variance estimator, read for its `cvg` field.
+  - `ve`: The variance estimator. The method reads only its `cvg` field.
 
 # Returns
 
@@ -151,86 +153,29 @@ function show_fields(ve::SimpleVariance)
     return isnothing(ve.cvg) ? (:me, :w, :corrected) : (:me, :w, :corrected, :cvg)
 end
 """
-$(DocStringExtensions.TYPEDSIGNATURES)
-
-Dispersion kernel shared by the [`SimpleVariance`](@ref) methods of `Statistics.std` and `Statistics.var`.
-
-# Algorithm
-
-The matrix method:
-
- 1. Check that `dims` is `1` or `2`.
- 2. Resolve the centring vector `mu` from `me` and `ve.w` with [`weighted_centre`](@ref), which reads `mean` when the caller gave one.
- 3. Resolve the observation weights from `ve.w` against `X` with [`get_observation_weights`](@ref), giving `w`.
- 4. When `w` is `nothing`, call `f(X; dims = dims, corrected = ve.corrected, mean = mu)`.
- 5. Otherwise call `f(X, w, dims; corrected = ve.corrected, mean = mu)`.
-
-The vector method:
-
- 1. Resolve the observation weights from `ve.w` against `X`, giving `w`.
- 2. When `w` is `nothing`, call `f(X; corrected = ve.corrected, mean = mean)`.
- 3. Otherwise call `f(X, w; corrected = ve.corrected, mean = mean)`.
-
-The two methods reach one centre by two routes. The matrix method resolves a centre before it calls `f`, and [`weighted_centre`](@ref) takes that centre from `me` after [`factory`](@ref) writes `ve.w` into it. The vector method passes `mean` through, so a `mean` of `nothing` leaves `f` to centre on the **weighted** mean of `X`. One `SimpleVariance` therefore answers a one-column matrix and the matching vector with one number. `ve.w` wins over the weights that `me` carries, which is what [`factory`](@ref) does on every other path, and `mean` takes any other centre.
-
-[`weighted_centre`](@ref) calls [`factory`](@ref) only when `ve.w` is not `nothing`. That test is a performance guard and not a second contract: `ve.w` is a field, so its type decides the branch, and the guard keeps a windowed loop from rebuilding the estimator tree of `me` once per window.
-
-# Arguments
-
-  - `f`: Dispersion function to apply, either `Statistics.std` or `Statistics.var`.
-  - `ve::SimpleVariance`: Variance estimator. Supplies the observation weights and the `corrected` flag.
-  - `me::AbstractExpectedReturnsEstimator`: Expected returns estimator used when no `mean` is provided. Matrix methods only.
-  - `X::VecNum_MatNum`: Data matrix or vector.
-  - `dims::Int = 1`: Dimension along which to operate. Matrix methods only.
-  - `mean = nothing`: Precomputed mean.
-  - `kwargs...`: Forwarded to the mean and weight resolution. Matrix methods only.
-
-# Validation
-
-  - $(val_dict[:dims]) Matrix methods only.
-
-# Returns
-
-  - `sigma::Union{<:Number, <:ArrNum}`: Dispersion of `X` computed by `f`.
-
-# Related
-
-  - [`SimpleVariance`](@ref)
-  - [`weighted_centre`](@ref)
-  - [`get_observation_weights`](@ref)
-"""
-function simple_variance_kernel(f::F, ve::SimpleVariance,
-                                me::AbstractExpectedReturnsEstimator, X::MatNum;
-                                dims::Int = 1, mean = nothing,
-                                active_mask::Option{<:AbstractMatrix{<:Bool}} = nothing,
-                                kwargs...) where {F}
-    return coverage_variance(f, ve, ve.cvg, me, X; dims = dims, mean = mean,
-                             active_mask = active_mask, kwargs...)
-end
-"""
     coverage_variance(f, ve, cvg, me, X; dims::Int = 1, mean = nothing,
                       active_mask = nothing, kwargs...) -> ArrNum
     coverage_variance(f, ve, cvg, X::VecNum; mean = nothing) -> Number
 
 Routes a dispersion fit to the Coverage Universe arm or to the available-case arm.
 
-The `cvg` field of the estimator is passed as the third argument, so the arm is chosen by **dispatch on the policy** rather than by a branch on its value, exactly as [`coverage_mean`](@ref) does for a sample mean. `f` is `Statistics.var` or `Statistics.std`, and the available-case arm maps one onto the other through [`coverage_moment_map`](@ref).
+The `cvg` field of the estimator is the third argument, so dispatch on the policy selects the arm, not a branch on its value. [`coverage_mean`](@ref) does the same for a sample mean. `f` is `Statistics.var` or `Statistics.std`. The available-case arm computes a variance, and [`coverage_moment_map`](@ref) changes it to the result that `f` asks for.
 
 # Arguments
 
   - `f`: `Statistics.var` or `Statistics.std`.
-  - `ve`: Variance estimator.
-  - `cvg`: The policy the estimator carries, which selects the arm.
+  - `ve`: The variance estimator.
+  - `cvg`: The policy that the estimator holds. It selects the arm.
   - `me`: The estimator that centres the fit.
   - $(arg_dict[:X])
   - $(arg_dict[:dims])
   - `mean`: A precomputed centre, or `nothing`.
-  - `active_mask`: The active mask of the Asset Panel, `observations × assets`, or `nothing`. The Coverage Universe arm refuses an inactive cell, as it refuses a non-finite return.
-  - `kwargs...`: Additional keyword arguments passed to the centring estimator and the weights.
+  - `active_mask`: The active mask of the Asset Panel, `observations × assets`, or `nothing`. The Coverage Universe arm refuses an inactive cell, as it refuses a return that is not finite.
+  - `kwargs...`: More keyword arguments for the centring estimator and for the observation weights.
 
 # Returns
 
-  - `val`: The dispersion, of the shape `f` gives.
+  - `val`: The dispersion, with the shape that `f` gives.
 
 # Related
 
@@ -243,12 +188,38 @@ function coverage_variance end
 """
 $(DocStringExtensions.TYPEDSIGNATURES)
 
-`Nothing` method of [`coverage_variance`](@ref). The Coverage Universe arm, which is the body [`simple_variance_kernel`](@ref) has always had: it refuses a gapped sample with [`assert_finite_sample`](@ref). A cell is a gap when its return is non-finite or when `active_mask` is `false` there, so the arm refuses an inactive cell too.
+The `Nothing` method of [`coverage_variance`](@ref) is the Coverage Universe arm, which the [`SimpleVariance`](@ref) methods of `Statistics.std` and `Statistics.var` reach when `ve.cvg` is `nothing`. A cell is a gap when its return is not finite or when `active_mask` is `false` at that cell, so the arm refuses an inactive cell too.
+
+# Algorithm
+
+The matrix method, this one:
+
+ 1. Check that `dims` is `1` or `2`. Refuse a gapped sample with [`assert_finite_sample`](@ref).
+ 2. Get the centring vector `mu` from `me` and `ve.w` with [`weighted_centre`](@ref). It uses `mean` if the caller gave one.
+ 3. Get the observation weights `w` from `ve.w` and `X` with [`get_observation_weights`](@ref).
+ 4. When `w` is `nothing`, call `f(X; dims = dims, corrected = ve.corrected, mean = mu)`.
+ 5. Otherwise call `Statistics.var(X, w, dims; corrected = ve.corrected, mean = mu)`. Write `NaN` in each entry when the divisor of `w` is not positive, with [`weighted_moment_guard`](@ref). Then change the variance to the result of `f` with [`coverage_moment_map`](@ref).
+
+The vector method, the `Nothing` method of the vector arm:
+
+ 1. Refuse a gapped series with [`assert_finite_sample`](@ref). Get the observation weights `w` from `ve.w` and `X`.
+ 2. When `w` is `nothing`, call `f(X; corrected = ve.corrected, mean = mean)`.
+ 3. Otherwise call `Statistics.var(X, w; corrected = ve.corrected, mean = mean)`. Return `NaN` when the divisor of `w` is not positive, with [`weighted_moment_guard`](@ref). Then change the variance to the result of `f` with [`coverage_moment_map`](@ref).
+
+A corrected fit on one observation of positive weight has a divisor of zero. Its result is then `NaN`, as the unweighted fit on one observation is, and not the `Inf` that the rounding of the weighted mean gives. The guard reads the variance before the square root, because a divisor below zero gives a variance below zero. `StatsBase` takes the weighted standard deviation as the square root of the weighted variance, so a valid result does not change.
+
+The two methods get one centre by two routes. The matrix method gets a centre before it calls `f`. [`weighted_centre`](@ref) takes that centre from `me` after [`factory`](@ref) writes `ve.w` into `me`. The vector method passes `mean` to `f` without change, so a `mean` of `nothing` lets `f` centre on the weighted mean of `X`.
+
+One `SimpleVariance` gives the same number for a one-column matrix and for the matching vector. `ve.w` replaces the weights that `me` holds, as [`factory`](@ref) does on all other paths. Pass `mean` for any other centre.
+
+[`weighted_centre`](@ref) calls [`factory`](@ref) only when `ve.w` is not `nothing`. That test is for performance and is not a second contract. `ve.w` is a field, so its type decides the branch. The test stops a windowed loop from a rebuild of the estimator tree of `me` in each window.
 
 # Related
 
   - [`coverage_variance`](@ref)
-  - [`simple_variance_kernel`](@ref)
+  - [`SimpleVariance`](@ref)
+  - [`weighted_centre`](@ref)
+  - [`get_observation_weights`](@ref)
 """
 function coverage_variance(f::F, ve::SimpleVariance, ::Nothing,
                            me::AbstractExpectedReturnsEstimator, X::MatNum; dims::Int = 1,
@@ -262,21 +233,25 @@ function coverage_variance(f::F, ve::SimpleVariance, ::Nothing,
     return if isnothing(w)
         f(X; dims = dims, corrected = ve.corrected, mean = mu)
     else
-        f(X, w, dims; corrected = ve.corrected, mean = mu)
+        coverage_moment_map(f,
+                            weighted_moment_guard(Statistics.var(X, w, dims;
+                                                                 corrected = ve.corrected,
+                                                                 mean = mu), w,
+                                                  ve.corrected))
     end
 end
 """
 $(DocStringExtensions.TYPEDSIGNATURES)
 
-[`CoveragePolicy`](@ref) method of [`coverage_variance`](@ref). The available-case arm: each asset's dispersion is fitted on that asset's own finite and active observations, and the batch answer **is** the incremental one, because the arm folds the block through [`partial_fit!`](@ref) and reads the state out.
+The [`CoveragePolicy`](@ref) method of [`coverage_variance`](@ref) is the available-case arm. It fits the dispersion of each asset on the finite and active observations of that asset. The batch result is the incremental result, because the arm folds the block through [`partial_fit!`](@ref) and then reads the state.
 
-The centre is the fold's own running mean, so a `mean` a caller passes is refused rather than silently dropped: an available-case fit centres each asset on that asset's own observations, and a centre fitted over the whole window is not that.
+The centre is the running mean of the fold, so the arm refuses a `mean` from the caller, and it does not ignore that `mean` without a message. An available-case fit centres each asset on the observations of that asset, and a centre fitted over the whole window is different.
 
 # Algorithm
 
- 1. Fold every row of `X` into a fresh state with [`partial_fit!`](@ref), carrying the active mask.
- 2. Read the state out with [`var(ve::SimpleVariance, state::SimpleVarianceState)`](@ref).
- 3. Map the variance onto the answer `f` asks for with [`coverage_moment_map`](@ref), and orient it as the caller's `dims` asks.
+ 1. Fold each row of `X` into a new state with [`partial_fit!`](@ref), together with its row of the active mask.
+ 2. Read the state with [`var(ve::SimpleVariance, state::SimpleVarianceState)`](@ref).
+ 3. Change the variance to the result that `f` asks for with [`coverage_moment_map`](@ref). Orient the result as the `dims` of the caller sets.
 
 # Related
 
@@ -299,46 +274,41 @@ function coverage_variance(f::F, ve::SimpleVariance, cvg::CoveragePolicy,
     return isone(dims) ? permutedims(val) : reshape(val, :, 1)
 end
 """
-    coverage_moment_map(f::typeof(Statistics.var), v::VecNum) -> VecNum
-    coverage_moment_map(f::typeof(Statistics.std), v::VecNum) -> VecNum
+    coverage_moment_map(f::typeof(Statistics.var), v::Num_ArrNum) -> Num_ArrNum
+    coverage_moment_map(f::typeof(Statistics.std), v::Num_ArrNum) -> Num_ArrNum
 
-Maps an available-case variance onto the answer the caller's verb asks for.
+Changes a variance to the result that the verb of the caller asks for.
 
-[`coverage_variance`](@ref) fits a variance whichever verb called it, because the state carries a second-moment accumulator and nothing else, so the standard deviation is its square root. Dispatching on the verb rather than comparing it keeps the choice at compile time.
+[`coverage_variance`](@ref) fits a variance for both verbs. In the available-case arm, the state holds only a second-moment accumulator. In the weighted Coverage Universe arm, [`weighted_moment_guard`](@ref) reads the variance before the square root, because a divisor below zero gives a variance below zero, which has no square root. The standard deviation is the square root of that variance, as in `StatsBase`. The method dispatches on the verb and does not compare it, so the compiler makes the choice.
 
 # Arguments
 
   - `f`: `Statistics.var` or `Statistics.std`.
-  - `v`: The available-case variance.
+  - `v`: The variance, one number or an array.
 
 # Returns
 
-  - `val::VecNum`: `v` itself, or its entrywise square root.
+  - `val::Num_ArrNum`: `v` without change, or its element-wise square root.
 
 # Related
 
   - [`coverage_variance`](@ref)
   - [`SimpleVariance`](@ref)
 """
-function coverage_moment_map(::typeof(Statistics.var), v::VecNum)
+function coverage_moment_map(::typeof(Statistics.var), v::Num_ArrNum)
     return v
 end
-function coverage_moment_map(::typeof(Statistics.std), v::VecNum)
+function coverage_moment_map(::typeof(Statistics.std), v::Num_ArrNum)
     return sqrt.(v)
-end
-function simple_variance_kernel(f::F, ve::SimpleVariance, X::VecNum;
-                                mean = nothing) where {F}
-    return coverage_variance(f, ve, ve.cvg, X; mean = mean)
 end
 """
 $(DocStringExtensions.TYPEDSIGNATURES)
 
-`Nothing` method of the vector arm of [`coverage_variance`](@ref). The Coverage Universe arm over one asset's series, which refuses a gapped series with [`assert_finite_sample`](@ref).
+The `Nothing` method of the vector arm of [`coverage_variance`](@ref) is the Coverage Universe arm over the series of one asset. It refuses a gapped series with [`assert_finite_sample`](@ref). The matrix method of this arm states the algorithm of both.
 
 # Related
 
   - [`coverage_variance`](@ref)
-  - [`simple_variance_kernel`](@ref)
 """
 function coverage_variance(f::F, ve::SimpleVariance, ::Nothing, X::VecNum;
                            mean = nothing) where {F}
@@ -347,13 +317,17 @@ function coverage_variance(f::F, ve::SimpleVariance, ::Nothing, X::VecNum;
     return if isnothing(w)
         f(X; corrected = ve.corrected, mean = mean)
     else
-        f(X, w; corrected = ve.corrected, mean = mean)
+        coverage_moment_map(f,
+                            weighted_moment_guard(Statistics.var(X, w;
+                                                                 corrected = ve.corrected,
+                                                                 mean = mean), w,
+                                                  ve.corrected))
     end
 end
 """
 $(DocStringExtensions.TYPEDSIGNATURES)
 
-[`CoveragePolicy`](@ref) method of the vector arm of [`coverage_variance`](@ref). One asset has no pair, so available-case estimation over its series is the ordinary fit over the finite entries of it, and the coverage floor is read against the length of the series.
+This is the [`CoveragePolicy`](@ref) method of the vector arm of [`coverage_variance`](@ref). One asset has no pair, so the available-case fit over its series is the ordinary fit over its finite entries. The method compares the coverage floor with the fraction of finite entries in the series. It returns `NaN` if too few finite entries remain, or if the policy does not admit the asset. It refuses a `mean` from the caller, as the matrix method does.
 
 # Related
 
@@ -366,7 +340,7 @@ function coverage_variance(f::F, ve::SimpleVariance, cvg::CoveragePolicy, X::Vec
     @argcheck(isnothing(mean),
               ArgumentError("an available-case variance centres each asset on that asset's own observations, so it cannot take a centre fitted over the whole window. Pass `mean = nothing`, or clear `cvg`."))
     Xf = filter(isfinite, X)
-    Tf = float_if_integer(eltype(X))
+    Tf = eltype(X)
     return if length(Xf) - ve.corrected < 1 ||
               !admits(cvg.alg, length(Xf) / max(length(X), 1), true, 0, cvg.min_coverage)
         Tf(NaN)
@@ -383,9 +357,9 @@ end
         kwargs...,
     ) -> ArrNum
 
-Compute the standard deviation using a [`SimpleVariance`](@ref) estimator for a matrix.
+Compute the standard deviation of a matrix with a [`SimpleVariance`](@ref) estimator.
 
-This method computes the standard deviation of the input matrix `X` using the configuration specified in `ve`.
+The method computes the standard deviation of each asset in `X`, as `ve` configures it.
 
 # Mathematical definition
 
@@ -397,7 +371,7 @@ This method computes the standard deviation of the input matrix `X` using the co
 
 Where:
 
-  - ``\\hat{\\sigma}_j``: Estimated standard deviation of asset ``j``.
+  - ``\\hat{\\sigma}_j``: The estimated standard deviation of asset ``j``.
   - $(math_dict[:sigma2_hat_j])
 
 [`var(ve::SimpleVariance, X::MatNum; dims::Int = 1, mean = nothing, kwargs...)`](@ref) defines ``\\hat{\\sigma}^2_j`` in each of the four cases that `ve.w` and `ve.corrected` select.
@@ -405,12 +379,12 @@ Where:
 # Algorithm
 
  1. Check that `dims` is `1` or `2`.
- 2. When `mean` is `nothing`, compute the centring vector `mu` with `ve.me`, after [`factory`](@ref) writes `ve.w` into it; otherwise take `mu` from `mean`.
- 3. Resolve the observation weights from `ve.w` against `X`, giving `w`.
+ 2. When `mean` is `nothing`, compute the centring vector `mu` with `ve.me`, after [`factory`](@ref) writes `ve.w` into it. Otherwise take `mu` from `mean`.
+ 3. Get the observation weights `w` from `ve.w` and `X`.
  4. When `w` is `nothing`, take the unweighted standard deviation of `X` along `dims`, centred on `mu`.
  5. Otherwise take the standard deviation of `X` weighted by `w` along `dims`, centred on `mu`.
 
-``\\hat{\\mu}_j`` comes from `ve.me`, and `ve.w` reaches `ve.me` through [`factory`](@ref). A `SimpleVariance` whose `w` is set therefore weights the centre and the squared deviations alike, so a vector and its one-column matrix answer the same number. Pass `mean` for any other centre.
+``\\hat{\\mu}_j`` comes from `ve.me`, and `ve.w` gets to `ve.me` through [`factory`](@ref). A `SimpleVariance` with a `w` applies the same weights to the centre and to the squared deviations. A vector and its one-column matrix give the same number. Pass `mean` for any other centre.
 
 # Arguments
 
@@ -418,12 +392,12 @@ Where:
   - $(arg_dict[:X])
   - $(arg_dict[:dims])
   - $(arg_dict[:omean])
-  - `kwargs...`: Additional keyword arguments passed to the mean estimator.
+  - `kwargs...`: More keyword arguments for the mean estimator `ve.me` and for [`get_observation_weights`](@ref).
 
 # Validation
 
   - $(val_dict[:dims])
-  - `corrected = true` needs a weight type that carries a bias correction. A plain `StatsBase.Weights` carries none, and `StatsBase` raises an `ArgumentError`.
+  - `corrected = true` needs a weight type that has a bias correction. A plain `StatsBase.Weights` has none, and `StatsBase` throws an `ArgumentError`.
 
 # Returns
 
@@ -456,18 +430,18 @@ julia> std(sv, Xmat; dims = 1)
 """
 function Statistics.std(ve::SimpleVariance, X::MatNum; dims::Int = 1, mean = nothing,
                         kwargs...)
-    return simple_variance_kernel(Statistics.std, ve, ve.me, X; dims = dims, mean = mean,
-                                  kwargs...)
+    return coverage_variance(Statistics.std, ve, ve.cvg, ve.me, X; dims = dims, mean = mean,
+                             kwargs...)
 end
 """
 $(DocStringExtensions.TYPEDSIGNATURES)
 
-`SimpleVariance{Nothing}` overload of [`std(ve::SimpleVariance, X::MatNum; dims::Int = 1, mean = nothing, kwargs...)`](@ref). Uses [`SimpleExpectedReturns`](@ref) to compute the mean when none is provided, ignoring the `me` field.
+This is the `SimpleVariance{Nothing}` method of [`std(ve::SimpleVariance, X::MatNum; dims::Int = 1, mean = nothing, kwargs...)`](@ref). When the caller gives no `mean`, it computes the mean with a [`SimpleExpectedReturns`](@ref), because the `me` field is `nothing`.
 """
 function Statistics.std(ve::SimpleVariance{Nothing}, X::MatNum; dims::Int = 1,
                         mean = nothing, kwargs...)
-    return simple_variance_kernel(Statistics.std, ve, SimpleExpectedReturns(), X;
-                                  dims = dims, mean = mean, kwargs...)
+    return coverage_variance(Statistics.std, ve, ve.cvg, SimpleExpectedReturns(), X;
+                             dims = dims, mean = mean, kwargs...)
 end
 """
     Statistics.std(
@@ -476,21 +450,21 @@ end
         mean = nothing
     ) -> Number
 
-Compute the standard deviation using a [`SimpleVariance`](@ref) estimator for a vector.
+Compute the standard deviation of a vector with a [`SimpleVariance`](@ref) estimator.
 
-This method computes the standard deviation of the input vector `X` using the configuration specified in `ve`.
+The method computes the standard deviation of the series `X`, as `ve` configures it.
 
 # Mathematical definition
 
-[`var(ve::SimpleVariance, X::MatNum; dims::Int = 1, mean = nothing, kwargs...)`](@ref) defines the variance in each of the four cases that `ve.w` and `ve.corrected` select, and this method returns its square root.
+[`var(ve::SimpleVariance, X::MatNum; dims::Int = 1, mean = nothing, kwargs...)`](@ref) defines the variance in each of the four cases that `ve.w` and `ve.corrected` select. This method returns its square root.
 
 # Algorithm
 
- 1. Resolve the observation weights from `ve.w` against `X`, giving `w`.
+ 1. Get the observation weights `w` from `ve.w` and `X`.
  2. When `w` is `nothing`, take the unweighted standard deviation of `X`, centred on `mean`.
  3. Otherwise take the standard deviation of `X` weighted by `w`, centred on `mean`.
 
-The vector methods ignore `ve.me`: a `mean` of `nothing` reaches `Statistics.std`, which centres on the mean of `X` — the **weighted** mean when `w` is not `nothing`. The matrix methods resolve the centre from `ve.me` under the same `ve.w`, so the two paths answer the same number for the same data.
+The vector methods ignore `ve.me`. A `mean` of `nothing` goes to `Statistics.std`, which centres on the mean of `X`. That mean is the weighted mean when `w` is not `nothing`. The matrix methods get the centre from `ve.me` with the same `ve.w`, so the two paths give the same number for the same data.
 
 # Arguments
 
@@ -500,7 +474,7 @@ The vector methods ignore `ve.me`: a `mean` of `nothing` reaches `Statistics.std
 
 # Validation
 
-  - `corrected = true` needs a weight type that carries a bias correction. A plain `StatsBase.Weights` carries none, and `StatsBase` raises an `ArgumentError`.
+  - `corrected = true` needs a weight type that has a bias correction. A plain `StatsBase.Weights` has none, and `StatsBase` throws an `ArgumentError`.
 
 # Returns
 
@@ -541,7 +515,7 @@ julia> std(svw, X)
   - [`var(ve::SimpleVariance, X::VecNum; mean = nothing)`](@ref)
 """
 function Statistics.std(ve::SimpleVariance, X::VecNum; mean = nothing)
-    return simple_variance_kernel(Statistics.std, ve, X; mean = mean)
+    return coverage_variance(Statistics.std, ve, ve.cvg, X; mean = mean)
 end
 """
     Statistics.var(
@@ -552,9 +526,9 @@ end
         kwargs...
     ) -> ArrNum
 
-Compute the variance using a [`SimpleVariance`](@ref) estimator for a matrix.
+Compute the variance of a matrix with a [`SimpleVariance`](@ref) estimator.
 
-This method computes the variance of the input matrix `X` using the configuration specified in `ve`.
+The method computes the variance of each asset in `X`, as `ve` configures it.
 
 # Mathematical definition
 
@@ -594,12 +568,12 @@ Where:
 # Algorithm
 
  1. Check that `dims` is `1` or `2`.
- 2. When `mean` is `nothing`, compute the centring vector `mu` with `ve.me`, after [`factory`](@ref) writes `ve.w` into it; otherwise take `mu` from `mean`.
- 3. Resolve the observation weights from `ve.w` against `X`, giving `w`.
+ 2. When `mean` is `nothing`, compute the centring vector `mu` with `ve.me`, after [`factory`](@ref) writes `ve.w` into it. Otherwise take `mu` from `mean`.
+ 3. Get the observation weights `w` from `ve.w` and `X`.
  4. When `w` is `nothing`, take the unweighted variance of `X` along `dims`, centred on `mu`.
  5. Otherwise take the variance of `X` weighted by `w` along `dims`, centred on `mu`.
 
-``\\hat{\\mu}_j`` comes from `ve.me`, and `ve.w` reaches `ve.me` through [`factory`](@ref). A `SimpleVariance` whose `w` is set therefore weights the centre and the squared deviations alike, so a vector and its one-column matrix answer the same number. Pass `mean` for any other centre.
+``\\hat{\\mu}_j`` comes from `ve.me`, and `ve.w` gets to `ve.me` through [`factory`](@ref). A `SimpleVariance` with a `w` applies the same weights to the centre and to the squared deviations. A vector and its one-column matrix give the same number. Pass `mean` for any other centre.
 
 # Arguments
 
@@ -607,12 +581,12 @@ Where:
   - $(arg_dict[:X])
   - $(arg_dict[:dims])
   - $(arg_dict[:omean])
-  - `kwargs...`: Additional keyword arguments passed to the mean estimator.
+  - `kwargs...`: More keyword arguments for the mean estimator `ve.me` and for [`get_observation_weights`](@ref).
 
 # Validation
 
   - $(val_dict[:dims])
-  - `corrected = true` needs a weight type that carries a bias correction. A plain `StatsBase.Weights` carries none, and `StatsBase` raises an `ArgumentError`.
+  - `corrected = true` needs a weight type that has a bias correction. A plain `StatsBase.Weights` has none, and `StatsBase` throws an `ArgumentError`.
 
 # Returns
 
@@ -645,18 +619,18 @@ julia> var(sv, Xmat; dims = 1)
 """
 function Statistics.var(ve::SimpleVariance, X::MatNum; dims::Int = 1, mean = nothing,
                         kwargs...)
-    return simple_variance_kernel(Statistics.var, ve, ve.me, X; dims = dims, mean = mean,
-                                  kwargs...)
+    return coverage_variance(Statistics.var, ve, ve.cvg, ve.me, X; dims = dims, mean = mean,
+                             kwargs...)
 end
 """
 $(DocStringExtensions.TYPEDSIGNATURES)
 
-`SimpleVariance{Nothing}` overload of [`var(ve::SimpleVariance, X::MatNum; dims::Int = 1, mean = nothing, kwargs...)`](@ref). Uses [`SimpleExpectedReturns`](@ref) to compute the mean when none is provided, ignoring the `me` field.
+This is the `SimpleVariance{Nothing}` method of [`var(ve::SimpleVariance, X::MatNum; dims::Int = 1, mean = nothing, kwargs...)`](@ref). When the caller gives no `mean`, it computes the mean with a [`SimpleExpectedReturns`](@ref), because the `me` field is `nothing`.
 """
 function Statistics.var(ve::SimpleVariance{Nothing}, X::MatNum; dims::Int = 1,
                         mean = nothing, kwargs...)
-    return simple_variance_kernel(Statistics.var, ve, SimpleExpectedReturns(), X;
-                                  dims = dims, mean = mean, kwargs...)
+    return coverage_variance(Statistics.var, ve, ve.cvg, SimpleExpectedReturns(), X;
+                             dims = dims, mean = mean, kwargs...)
 end
 """
     Statistics.var(
@@ -665,21 +639,21 @@ end
         mean = nothing
     ) -> Number
 
-Compute the variance using a [`SimpleVariance`](@ref) estimator for a vector.
+Compute the variance of a vector with a [`SimpleVariance`](@ref) estimator.
 
-This method computes the variance of the input vector `X` using the configuration specified in `ve`.
+The method computes the variance of the series `X`, as `ve` configures it.
 
 # Mathematical definition
 
-[`var(ve::SimpleVariance, X::MatNum; dims::Int = 1, mean = nothing, kwargs...)`](@ref) defines the variance in each of the four cases that `ve.w` and `ve.corrected` select, and this method returns it for a single series.
+[`var(ve::SimpleVariance, X::MatNum; dims::Int = 1, mean = nothing, kwargs...)`](@ref) defines the variance in each of the four cases that `ve.w` and `ve.corrected` select. This method returns it for one series.
 
 # Algorithm
 
- 1. Resolve the observation weights from `ve.w` against `X`, giving `w`.
+ 1. Get the observation weights `w` from `ve.w` and `X`.
  2. When `w` is `nothing`, take the unweighted variance of `X`, centred on `mean`.
  3. Otherwise take the variance of `X` weighted by `w`, centred on `mean`.
 
-The vector methods ignore `ve.me`: a `mean` of `nothing` reaches `Statistics.var`, which centres on the mean of `X` — the **weighted** mean when `w` is not `nothing`. The matrix methods resolve the centre from `ve.me` under the same `ve.w`, so the two paths answer the same number for the same data.
+The vector methods ignore `ve.me`. A `mean` of `nothing` goes to `Statistics.var`, which centres on the mean of `X`. That mean is the weighted mean when `w` is not `nothing`. The matrix methods get the centre from `ve.me` with the same `ve.w`, so the two paths give the same number for the same data.
 
 # Arguments
 
@@ -689,7 +663,7 @@ The vector methods ignore `ve.me`: a `mean` of `nothing` reaches `Statistics.var
 
 # Validation
 
-  - `corrected = true` needs a weight type that carries a bias correction. A plain `StatsBase.Weights` carries none, and `StatsBase` raises an `ArgumentError`.
+  - `corrected = true` needs a weight type that has a bias correction. A plain `StatsBase.Weights` has none, and `StatsBase` throws an `ArgumentError`.
 
 # Returns
 
@@ -730,14 +704,14 @@ julia> var(svw, X)
   - [`var(ve::SimpleVariance, X::MatNum; dims::Int = 1, mean = nothing, kwargs...)`](@ref)
 """
 function Statistics.var(ve::SimpleVariance, X::VecNum; mean = nothing)
-    return simple_variance_kernel(Statistics.var, ve, X; mean = mean)
+    return coverage_variance(Statistics.var, ve, ve.cvg, X; mean = mean)
 end
 """
 $(DocStringExtensions.TYPEDEF)
 
-Carries the running observation count, mean and per-asset second-moment accumulator of an incremental variance fit.
+Holds the observation count, the running mean and the per-asset second-moment accumulator of an incremental variance fit.
 
-The state of [`SimpleVariance`](@ref) under [`partial_fit!`](@ref). `M` is the accumulator ``\\sum_t (r_{tj} - \\hat{\\mu}_j)^2`` and not the variance, so [`var(ve::SimpleVariance, state::SimpleVarianceState)`](@ref) divides it by the count, or by the count less one when `ve.corrected` holds.
+It is the state of [`SimpleVariance`](@ref) under [`partial_fit!`](@ref). `M` is the accumulator ``\\sum_t (r_{tj} - \\hat{\\mu}_j)^2`` and not the variance, so [`var(ve::SimpleVariance, state::SimpleVarianceState)`](@ref) divides it by the count, or by the count less one when `ve.corrected` is `true`.
 
 # Fields
 
@@ -763,10 +737,10 @@ Keywords correspond to the struct's fields. A state seeded for `N` assets is `Si
 
 ## View parameters
 
-When [`port_opt_view`](@ref) is called on this type, its fields are subset to the selected assets:
+[`port_opt_view`](@ref) takes the view of its fields at the selected assets:
 
-  - `mu`: Sliced to the selected indices via [`port_opt_view`](@ref).
-  - `M`: Sliced to the selected indices via [`port_opt_view`](@ref).
+  - `mu`: Sliced to the selected indices through [`port_opt_view`](@ref).
+  - `M`: Sliced to the selected indices through [`port_opt_view`](@ref).
 
 # Examples
 
@@ -818,7 +792,8 @@ Folds two [`SimpleVarianceState`](@ref) fitted on disjoint blocks into the state
 # Algorithm
 
  1. Refuse the pair with [`assert_mergeable_states`](@ref).
- 2. Fold the counts, the means and the accumulators with [`chan_merge`](@ref), whose elementwise method reads a per-asset accumulator.
+ 2. If one of the two states holds no coverage counts, fold the counts, the means and the accumulators with [`chan_merge`](@ref). Its element-wise method reads a per-asset accumulator.
+ 3. Otherwise, fold the mean and the accumulator of each asset with the per-asset counts `nu` of the two states. An asset with no observation in the two blocks keeps a mean and an accumulator of zero. Merge the coverage counts too.
 
 # Arguments
 
@@ -831,7 +806,7 @@ Folds two [`SimpleVarianceState`](@ref) fitted on disjoint blocks into the state
 
 # Returns
 
-  - `state::SimpleVarianceState`: The state the two blocks give when they are fitted as one block.
+  - `state::SimpleVarianceState`: The state of the two blocks, as if one fit read them as one block.
 
 # Related
 
@@ -868,7 +843,7 @@ $(DocStringExtensions.TYPEDSIGNATURES)
 
 Copies a [`SimpleVarianceState`](@ref), so the copy shares no array with the original.
 
-The `copy` method of the [`AbstractPartialFitState`](@ref) interface, which [`partial_fit`](@ref) calls before it folds. The count is a scalar and passes through, and the running mean and the per-asset accumulator are copied.
+This method is the `copy` method of the [`AbstractPartialFitState`](@ref) interface, which [`partial_fit`](@ref) calls before it folds. The count is a scalar, and the method uses it without change. The method copies the running mean, the per-asset accumulator and the coverage counts.
 
 # Arguments
 
@@ -876,7 +851,7 @@ The `copy` method of the [`AbstractPartialFitState`](@ref) interface, which [`pa
 
 # Returns
 
-  - `state::SimpleVarianceState`: A fresh state, equal to `x`, whose `mu` and `M` are fresh vectors.
+  - `state::SimpleVarianceState`: A new state, equal to `x`, whose `mu` and `M` are new vectors.
 
 # Related
 
@@ -893,13 +868,13 @@ $(DocStringExtensions.TYPEDSIGNATURES)
 
 Slices a [`SimpleVarianceState`](@ref) to the selected assets.
 
-The Welford accumulator of one asset reads that asset's observations alone, and reads no other asset. So the slice of the state is the state of the sliced universe, entry for entry, and the count is shared by every asset and passes through. The slice copies by index and does not `view`: a later [`partial_fit!`](@ref) on the viewed estimator would otherwise write through into the arrays of the estimator the view was taken from.
+The Welford accumulator of one asset reads only the observations of that asset, so the slice of the state is the state of the sliced universe, entry for entry. All the assets share the count, so the method uses it without change. The slice copies by index and does not use a `view`. With a `view`, a later [`partial_fit!`](@ref) on the viewed estimator writes into the arrays of the original estimator.
 
 # Arguments
 
   - `x`: The state to slice.
-  - `i`: Index or indices of the assets to keep.
-  - `args...`: Additional positional arguments (ignored).
+  - `i`: The index or the indices of the assets to keep.
+  - `args...`: More positional arguments, which the method ignores.
 
 # Returns
 
@@ -917,7 +892,7 @@ end
 """
 $(DocStringExtensions.TYPEDSIGNATURES)
 
-[`SimpleVarianceState`](@ref) method of [`partial_fit!`](@ref). Folds one observation into the running count, mean and per-asset accumulator.
+The [`SimpleVarianceState`](@ref) method of [`partial_fit!`](@ref) folds one observation into the count, the running mean and the per-asset accumulator.
 
 # Mathematical definition
 
@@ -932,22 +907,22 @@ n &\\leftarrow n + 1\\\\
 
 Where:
 
-  - ``n``: observation count.
-  - ``\\boldsymbol{x}``: the observation.
-  - ``\\boldsymbol{\\mu}``: the running mean.
-  - ``\\boldsymbol{d}``: deviation of the observation from the mean **before** the fold.
-  - ``\\boldsymbol{M}``: the running per-asset accumulator.
+  - ``n``: The observation count.
+  - ``\\boldsymbol{x}``: The observation.
+  - ``\\boldsymbol{\\mu}``: The running mean.
+  - ``\\boldsymbol{d}``: The deviation of the observation from the mean before the fold.
+  - ``\\boldsymbol{M}``: The running per-asset accumulator.
 
-The last line reads ``\\boldsymbol{\\mu}`` **after** the third line moved it, where ``\\boldsymbol{d}`` read it before. That asymmetry is Welford's, and it is what keeps the accumulator non-negative.
+The last line reads ``\\boldsymbol{\\mu}`` after the third line changed it, but ``\\boldsymbol{d}`` reads it before the change. This asymmetry is the one of Welford, and it keeps the accumulator non-negative.
 
 # Algorithm
 
- 1. Refuse an observation whose length is not the number of assets the state describes.
+ 1. Refuse an observation whose length is not the number of assets that the state describes.
  2. Add one to the count.
- 3. Take the deviation of the observation from the mean before the fold, giving `d`.
- 4. Move `mu` in place along `d`, by the reciprocal of the new count.
- 5. Add `d` times the deviation from the mean **after** the fold to `M`, in place.
- 6. Rebind the count with `Accessors.@reset`, and return the state.
+ 3. Take the deviation `d` of the observation from the mean before the fold.
+ 4. Add `d`, divided by the new count, to `mu` in place.
+ 5. Add `d` times the deviation from the mean after the fold to `M`, in place.
+ 6. Build the state with the new count through its positional constructor, and return it.
 """
 function partial_fit!(state::SimpleVarianceState, x::VecNum)
     @argcheck(length(x) == length(state.mu),
@@ -956,12 +931,12 @@ function partial_fit!(state::SimpleVarianceState, x::VecNum)
     d = x .- state.mu
     state.mu .+= d ./ n
     state.M .+= d .* (x .- state.mu)
-    return Accessors.@reset state.n = n
+    return SimpleVarianceState(n, state.mu, state.M, state.cvg)
 end
 """
 $(DocStringExtensions.TYPEDSIGNATURES)
 
-`Nothing` method of the coverage arm of [`partial_fit!`](@ref) for a [`SimpleVarianceState`](@ref). An estimator that carries no [`CoveragePolicy`](@ref) folds through [`partial_fit!(state::SimpleVarianceState, x::VecNum)`](@ref). A plain state carries one count for every asset, so it cannot skip an inactive cell. [`inactive_as_nonfinite`](@ref) writes `NaN` there, and the asset then answers `NaN`, as the Asset Panel method answers an asset outside the Coverage Universe of the same rows.
+This is the `Nothing` method of the coverage arm of [`partial_fit!`](@ref) for a [`SimpleVarianceState`](@ref). An estimator that holds no [`CoveragePolicy`](@ref) folds through [`partial_fit!(state::SimpleVarianceState, x::VecNum)`](@ref). A plain state holds one count for all the assets, so it cannot skip an inactive cell. [`inactive_as_nonfinite`](@ref) writes `NaN` in that cell, and the variance of the asset is then `NaN`. The Asset Panel method gives the same `NaN` for an asset outside the Coverage Universe of the same rows.
 
 # Related
 
@@ -976,7 +951,7 @@ end
 """
 $(DocStringExtensions.TYPEDSIGNATURES)
 
-[`CoveragePolicy`](@ref) method of the coverage arm of [`partial_fit!`](@ref) for a [`SimpleVarianceState`](@ref). Folds one observation into the running per-asset count, mean and accumulator, reading each asset's own observations alone.
+This is the [`CoveragePolicy`](@ref) method of the coverage arm of [`partial_fit!`](@ref) for a [`SimpleVarianceState`](@ref). It folds one observation into the count, the running mean and the accumulator of each asset. Each asset reads only its own observations.
 
 # Mathematical definition
 
@@ -989,34 +964,34 @@ M_j &\\leftarrow M_j + d_j (r_{tj} - \\mu_j)\\, ,
 \\end{align}
 ```
 
-for every asset ``j`` that is finite and active at observation ``t``, and no line at all for an asset that is not. Where:
+for each asset ``j`` that is finite and active at observation ``t``. The method applies no line to an asset that is not finite and active. Where:
 
-  - ``\\nu_j``: the number of observations at which asset ``j`` was finite and active.
+  - ``\\nu_j``: The number of observations at which asset ``j`` is finite and active.
   - $(math_dict[:r_tj])
-  - ``\\mu_j``: the running mean of asset ``j``.
-  - ``d_j``: the deviation of asset ``j`` from its mean before the fold.
-  - ``M_j``: the running second-moment accumulator of asset ``j``.
+  - ``\\mu_j``: The running mean of asset ``j``.
+  - ``d_j``: The deviation of asset ``j`` from its mean before the fold.
+  - ``M_j``: The running second-moment accumulator of asset ``j``.
 
-The last line reads ``\\mu_j`` after the third line moved it, which is Welford's asymmetry, so the accumulator is exact per asset and a skipped observation costs the asset nothing.
+The last line reads ``\\mu_j`` after the third line changed it, which is the asymmetry of Welford. The accumulator is exact for each asset, and a skipped observation has no effect on the asset.
 
 # Algorithm
 
- 1. Refuse an observation whose length is not the number of assets the state describes.
- 2. Read the valid assets and the newly inactive ones with [`coverage_valid`](@ref).
- 3. Apply the algorithm's fold-time rule with [`fold_inactive!`](@ref).
- 4. Fold each valid asset's return into its own count, mean and accumulator.
- 5. Move the per-asset bookkeeping on with [`coverage_step!`](@ref), add one to the observation count, and return the state.
+ 1. Refuse an observation whose length is not the number of assets that the state describes.
+ 2. Read the valid assets, and the assets that became inactive at this observation, with [`coverage_valid`](@ref).
+ 3. Apply the fold-time rule of the coverage algorithm with [`fold_inactive!`](@ref).
+ 4. Fold the return of each valid asset into the count, the mean and the accumulator of that asset.
+ 5. Update the per-asset records with [`coverage_step!`](@ref). Add one to the observation count, and return the state.
 
 # Arguments
 
-  - `state`: The state to fold into, mutated in place.
-  - `x`: One observation, one entry per asset.
-  - `cvg`: The policy the estimator carries.
+  - `state`: The state to fold into. The method changes it in place.
+  - `x`: One observation, with one entry for each asset.
+  - `cvg`: The policy that the estimator holds.
   - `active_mask`: The active mask of the Asset Panel at this observation, or `nothing`.
 
 # Validation
 
-  - `length(x)` is the number of assets the state describes. A `DimensionMismatch` is thrown otherwise.
+  - `length(x)` is the number of assets that the state describes. A `DimensionMismatch` is thrown otherwise.
 
 # Returns
 
@@ -1047,12 +1022,12 @@ function partial_fit!(state::SimpleVarianceState, x::VecNum, cvg::CoveragePolicy
         end
     end
     coverage_step!(counts, valid, active_mask)
-    return Accessors.@reset state.n = state.n + 1
+    return SimpleVarianceState(state.n + 1, state.mu, state.M, counts)
 end
 """
 $(DocStringExtensions.TYPEDSIGNATURES)
 
-[`SimpleVarianceState`](@ref) method of [`fold_inactive!`](@ref) under [`ResetCoverage`](@ref). Zeroes the count, the centre, the running mean and the accumulator of every asset that has just gone inactive, so that a relisting starts the asset cold. The centre of a per-asset state is `nothing`, because its `mu` is already the cell's centre, and [`coverage_reset!`](@ref) passes that through.
+This is the [`SimpleVarianceState`](@ref) method of [`fold_inactive!`](@ref) under [`ResetCoverage`](@ref). It sets to zero the count, the centre, the running mean and the accumulator of each asset that became inactive at this observation. A relisted asset then starts cold. The centre of a per-asset state is `nothing`, because its `mu` is already the centre of the cell. [`coverage_reset!`](@ref) does nothing to a `nothing`.
 
 # Related
 
@@ -1073,26 +1048,28 @@ $(DocStringExtensions.TYPEDSIGNATURES)
 
 Folds every observation of a block into the partial-fit state of a [`SimpleVariance`](@ref) estimator.
 
-The block arm of the [`partial_fit!`](@ref) interface. Welford's update reads one observation at a time, so the block is folded row by row and the answer is the answer of the same rows handed over one at a time.
+This method is the block arm of the [`partial_fit!`](@ref) interface. The Welford update reads one observation at a time, so the method folds the block one row at a time. The result equals the result of the same rows given one at a time.
 
 # Algorithm
 
- 1. Orient `X` to `observations × assets`, transposing it when `dims == 2`.
- 2. Fold each row in turn with the single-observation arm of [`partial_fit!`](@ref), rebinding the estimator each time.
+ 1. Orient `X` and `active_mask` to `observations × assets`. Transpose them when `dims == 2`.
+ 2. Fold each row in order with the single-observation arm of [`partial_fit!`](@ref), together with its row of the active mask. Rebind the estimator after each row.
 
 # Arguments
 
-  - `ve`: Variance estimator.
+  - `ve`: The variance estimator.
   - $(arg_dict[:X])
   - $(arg_dict[:dims])
+  - `active_mask`: The active mask of the Asset Panel, with the same size as `X`, or `nothing`.
 
 # Validation
 
   - $(val_dict[:dims])
+  - If `active_mask` is not `nothing`, its size is the size of `X` after the orientation. A `DimensionMismatch` is thrown otherwise.
 
 # Returns
 
-  - `ve::SimpleVariance`: The estimator carrying the state after the last row.
+  - `ve::SimpleVariance`: The estimator that holds the state after the last row.
 
 # Related
 
@@ -1118,52 +1095,60 @@ end
 """
 $(DocStringExtensions.TYPEDSIGNATURES)
 
-[`SimpleVariance`](@ref) method of [`partial_fit!`](@ref). Folds one observation into the state the `cache` field carries, seeding it on the first call.
+The [`SimpleVariance`](@ref) method of [`partial_fit!`](@ref) folds one observation into the state of the `cache` field. On the first call, it seeds that state.
 
 # Algorithm
 
- 1. Refuse a configuration no incremental fit reproduces, with [`assert_partial_fittable`](@ref).
+ 1. Refuse a configuration that no incremental fit can reproduce, with [`assert_partial_fittable`](@ref).
  2. Seed a [`SimpleVarianceState`](@ref) of zeros over `length(x)` assets when `ve.cache` holds `nothing`, with [`variance_state_seed`](@ref).
- 3. Fold `x` into the state.
- 4. Rebind `ve.cache` with `Accessors.@reset`, and return the estimator.
+ 3. Fold `x` into the state, with the policy `ve.cvg` and the active mask.
+ 4. Rebuild the estimator with the new state in `cache` through [`rebuild_struct`](@ref), and return it.
 """
 function partial_fit!(ve::SimpleVariance{<:Any, <:Any, <:Any, <:Any,
                                          <:Option{<:SimpleVarianceState}}, x::VecNum;
                       active_mask::Option{<:AbstractVector{<:Bool}} = nothing)
     assert_partial_fittable(ve.me, ve.w, "SimpleVariance")
     state = variance_state_seed(ve.cache, x, ve.cvg)
-    return Accessors.@reset ve.cache = partial_fit!(state, x, ve.cvg, active_mask)
+    return rebuild_struct(ve, (; cache = partial_fit!(state, x, ve.cvg, active_mask)))
 end
 """
-$(DocStringExtensions.TYPEDSIGNATURES)
+    variance_state_seed(cache::Nothing, x::VecNum,
+                        cvg::Option{<:CoveragePolicy} = nothing) -> SimpleVarianceState
+    variance_state_seed(cache::SimpleVarianceState, x::VecNum,
+                        cvg::Option{<:CoveragePolicy} = nothing) -> SimpleVarianceState
 
-Returns the [`SimpleVarianceState`](@ref) an incremental variance fit folds into, seeding one of zeros when the estimator carries none.
+Returns the [`SimpleVarianceState`](@ref) that an incremental variance fit folds into. If the estimator holds no state, the function seeds a state of zeros.
 
-The seed is written here rather than inside [`partial_fit!`](@ref), so the fold reads as one line and the branch that reads the `cache` field has one home.
+The seed is in this function and not in [`partial_fit!`](@ref), so the fold is one line, and the dispatch on the type of the `cache` field is in one place.
 
 # Arguments
 
-  - `cache`: The state the estimator carries, or `nothing`.
-  - `x`: One observation, `assets × 1`, read for its length and its element type.
+  - `cache`: The state that the estimator holds, or `nothing`.
+  - `x`: One observation, `assets × 1`. The function reads only its length and its element type.
+  - `cvg`: The policy that the estimator holds. It decides if the seed holds per-asset counts.
 
 # Returns
 
-  - `state::SimpleVarianceState`: The state `cache` holds, or a state of zeros over `length(x)` assets.
+  - `state::SimpleVarianceState`: The state that `cache` holds, or a state of zeros over `length(x)` assets.
 
 # Related
 
   - [`SimpleVarianceState`](@ref)
   - [`partial_fit!`](@ref)
 """
-function variance_state_seed(cache::Option{<:SimpleVarianceState}, x::VecNum,
-                             cvg::Option{<:CoveragePolicy} = nothing)
+function variance_state_seed(::Nothing, x::VecNum, cvg::Option{<:CoveragePolicy} = nothing)
     N = length(x)
-    Tf = float_if_integer(eltype(x))
-    return if isnothing(cache)
-        SimpleVarianceState(0, zeros(Tf, N), zeros(Tf, N),
-                            coverage_counts_seed(cvg, nothing, N, Tf, false))
+    Tf = eltype(x)
+    return SimpleVarianceState(0, zeros(Tf, N), zeros(Tf, N),
+                               coverage_counts_seed(cvg, nothing, N, Tf, false))
+end
+function variance_state_seed(cache::SimpleVarianceState, x::VecNum,
+                             cvg::Option{<:CoveragePolicy} = nothing)
+    counts = coverage_counts_seed(cvg, cache.cvg, length(x), eltype(x), false)
+    return if counts === cache.cvg
+        cache
     else
-        Accessors.@reset cache.cvg = coverage_counts_seed(cvg, cache.cvg, N, Tf, false)
+        SimpleVarianceState(cache.n, cache.mu, cache.M, counts)
     end
 end
 """
@@ -1175,9 +1160,9 @@ end
         ve::SimpleVariance
     ) -> VecNum
 
-Read the variance of an incremental fit out of a [`SimpleVarianceState`](@ref).
+Read the variance of an incremental fit from a [`SimpleVarianceState`](@ref).
 
-The two-argument method reads a state the caller holds, and the one-argument method reads the state the `cache` field of `ve` carries. Both return the per-asset variance as a vector, `assets × 1`, where the batch method over a matrix returns a row when `dims = 1`.
+The two-argument method reads a state that the caller holds. The one-argument method reads the state in the `cache` field of `ve`. Both methods return the per-asset variance as a vector, `assets × 1`. The batch method over a matrix returns a row when `dims = 1`.
 
 # Mathematical definition
 
@@ -1190,14 +1175,14 @@ The two-argument method reads a state the caller holds, and the one-argument met
 Where:
 
   - $(math_dict[:sigma2_hat_j])
-  - ``M_j``: running accumulator of asset ``j``.
-  - ``n``: observation count.
-  - ``c``: one when `ve.corrected` holds, and zero otherwise.
+  - ``M_j``: The running accumulator of asset ``j``.
+  - ``n``: The observation count.
+  - ``c``: One when `ve.corrected` is `true`, and zero otherwise.
 
 # Algorithm
 
- 1. Refuse a configuration no incremental fit reproduces, with [`assert_partial_fittable`](@ref).
- 2. Take the divisor `n - c`, and return a vector of `NaN` when it is below one, in the way `min_obs` reads an asset with too few observations.
+ 1. Refuse a configuration that no incremental fit can reproduce, with [`assert_partial_fittable`](@ref).
+ 2. Take the divisor `n - c`. Return a vector of `NaN` when the divisor is less than one. `min_obs` reads an asset with too few observations in the same way.
  3. Otherwise divide the accumulator by the divisor.
 
 # Arguments
@@ -1207,13 +1192,13 @@ Where:
 
 # Validation
 
-  - `ve` carries no observation weights. An `ArgumentError` is thrown otherwise.
-  - `ve.me` is a [`SimpleExpectedReturns`](@ref) carrying no observation weights, or `nothing`. An `ArgumentError` is thrown otherwise.
+  - `ve` holds no observation weights. An `ArgumentError` is thrown otherwise.
+  - `ve.me` is `nothing`, or a [`SimpleExpectedReturns`](@ref) that holds no observation weights. An `ArgumentError` is thrown otherwise.
   - `ve.cache` is not `nothing`, for the one-argument method. An `ArgumentError` is thrown otherwise.
 
 # Returns
 
-  - `vr::VecNum`: Per-asset variance of the fit, `assets × 1`, or `NaN` where the state holds too few observations.
+  - `vr::VecNum`: The per-asset variance of the fit, `assets × 1`, with `NaN` where the state holds too few observations.
 
 # Examples
 
@@ -1240,7 +1225,7 @@ end
 """
 $(DocStringExtensions.TYPEDSIGNATURES)
 
-`Nothing` method of [`coverage_variance`](@ref) for a state, which `var(ve)` with no data calls. Every asset shares one count, so the whole answer is `NaN` until the count passes the Bessel correction.
+This is the `Nothing` method of [`coverage_variance`](@ref) for a state. `var(ve)` with no data calls it. All the assets share one count, so the result is all `NaN` until the count is more than the Bessel correction.
 
 # Related
 
@@ -1254,7 +1239,7 @@ end
 """
 $(DocStringExtensions.TYPEDSIGNATURES)
 
-[`CoveragePolicy`](@ref) method of [`coverage_variance`](@ref) for a state, which `var(ve)` with no data calls. Each asset's accumulator is divided by that asset's own count less the Bessel correction, and an asset the policy refuses is `NaN`.
+This is the [`CoveragePolicy`](@ref) method of [`coverage_variance`](@ref) for a state. `var(ve)` with no data calls it. The method divides the accumulator of each asset by the count of that asset less the Bessel correction. An asset that the policy refuses is `NaN`.
 
 # Related
 
@@ -1274,9 +1259,9 @@ end
 """
     Statistics.std(ve::SimpleVariance, state::SimpleVarianceState) -> VecNum
 
-Read the standard deviation of an incremental fit out of a [`SimpleVarianceState`](@ref).
+Read the standard deviation of an incremental fit from a [`SimpleVarianceState`](@ref).
 
-`std(ve)` with no data reads the state that the `cache` field of `ve` carries through this method.
+`std(ve)` with no data reads the state in the `cache` field of `ve` through this method.
 
 # Arguments
 
@@ -1285,7 +1270,7 @@ Read the standard deviation of an incremental fit out of a [`SimpleVarianceState
 
 # Returns
 
-  - `sd::VecNum`: Per-asset standard deviation of the fit, `assets × 1`, or `NaN` where the state holds too few observations.
+  - `sd::VecNum`: The per-asset standard deviation of the fit, `assets × 1`, with `NaN` where the state holds too few observations.
 
 # Related
 
@@ -1307,9 +1292,9 @@ end
     simple_variance_count(w::StatsBase.AbstractWeights, corrected::Bool,
                           f::AbstractVector{Bool})
 
-Effective count and divisor of one column of a [`SimpleVariance`](@ref), over the rows that `f` marks.
+Return the effective count and the divisor of one column of a [`SimpleVariance`](@ref), over the rows that `f` marks.
 
-The weight type is the dispatch. Frequency weights count replicated observations, so their count is their sum. A column with no gap reads the weights as they stand, so the common case copies nothing. Every other weight type counts with Kish's formula. The divisor is the divisor of `StatsBase`, restated in the count, so it follows the bias correction of each weight type without a copy of it here.
+The function dispatches on the weight type. Frequency weights count replicated observations, so their count is their sum. All other weight types count with the Kish formula. A column with no gap reads the weights without change, so the usual case copies nothing. The divisor is the divisor of `StatsBase`, stated in the count. It follows the bias correction of each weight type, and this function holds no copy of that rule.
 
 # Mathematical definition
 
@@ -1326,48 +1311,52 @@ m &= \\dfrac{n \\, D}{\\sum_{t \\in \\mathcal{F}} w_{t}}\\,.
 
 Where:
 
-  - ``n``: Effective count of the observations.
-  - ``m``: Divisor of the variance in that count. With no weights it is ``n - 1`` when `corrected` is `true`, and ``n`` otherwise.
-  - ``\\mathcal{F}``: Rows that `f` marks.
+  - ``n``: The effective count of the observations.
+  - ``m``: The divisor of the variance for that count. With no weights it is ``n - 1`` when `corrected` is `true`, and ``n`` otherwise.
+  - ``\\mathcal{F}``: The rows that `f` marks.
   - $(math_dict[:w_t_obs])
-  - ``D``: Divisor of the weighted variance of `StatsBase`, the inverse of `StatsBase.varcorrection(w, corrected)`.
+  - ``D``: The divisor of the weighted variance of `StatsBase`. It is the inverse of `StatsBase.varcorrection(w, corrected)`.
 
 # Arguments
 
-  - `w`: Observation weights, or `nothing`.
+  - `w`: The observation weights, or `nothing`.
   - `corrected`: The `corrected` field of the estimator.
-  - `f`: Rows of the column that enter the estimate.
+  - `f`: The rows of the column that the estimate reads.
 
 # Returns
 
-  - `(; n, m)::NamedTuple`: The effective count and the divisor.
+  - `cnt::VarianceCount`: The effective count and the divisor, two numbers.
 
 # Related
 
+  - [`VarianceCount`](@ref)
   - [`variance_count`](@ref)
   - [`SimpleVariance`](@ref)
 """
 function simple_variance_count(::Nothing, corrected::Bool, f::AbstractVector{Bool})
     n = count(f)
-    return (; n = n, m = n - corrected)
+    return VarianceCount(n, n - corrected)
 end
 function simple_variance_count(w::StatsBase.FrequencyWeights, corrected::Bool,
                                f::AbstractVector{Bool})
     wf = all(f) ? w : w[f]
     n = sum(wf)
-    return (; n = n, m = inv(StatsBase.varcorrection(wf, corrected)))
+    return VarianceCount(n, inv(StatsBase.varcorrection(wf, corrected)))
 end
 function simple_variance_count(w::StatsBase.AbstractWeights, corrected::Bool,
                                f::AbstractVector{Bool})
     wf = all(f) ? w : w[f]
     s = sum(wf)
     n = s^2 / sum(abs2, wf)
-    return (; n = n, m = n / (s * StatsBase.varcorrection(wf, corrected)))
+    return VarianceCount(n, n / (s * StatsBase.varcorrection(wf, corrected)))
 end
+# Each column reads its finite rows with their weights, through `observed_sample`, so a dynamic
+# weight resolves on the rows that the column reads, as the weighted available-case fit does.
 function variance_count(ve::SimpleVariance, X::MatNum)
-    w = get_observation_weights(ve.w, X; dims = 1)
-    cnt = [simple_variance_count(w, ve.corrected, isfinite.(view(X, :, i)))
-           for i in axes(X, 2)]
-    return (; n = getindex.(cnt, :n), m = getindex.(cnt, :m))
+    cnt = map(axes(X, 2)) do i
+        x, w = observed_sample(view(X, :, i), ve.w)
+        return simple_variance_count(w, ve.corrected, trues(length(x)))
+    end
+    return VarianceCount(getproperty.(cnt, :n), getproperty.(cnt, :m))
 end
 export SimpleVariance, var, std

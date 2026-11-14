@@ -495,6 +495,36 @@
         # step with split.
         @test PortfolioOptimisers.walk_forward_date_range(rd.ts, Month(1), Day(-10),
                                                           identity)[1] < rd.ts[1]
+        # It also moves the end of the range forward, so an anchor in the ten days after the
+        # last timestamp shifts back into the data. Here 2021-03-01 becomes 2021-02-19. A range
+        # that stops at the last timestamp loses that date and ends at 2021-01-22. So does a
+        # shift by range arithmetic, `(2020-12-22):Month(1):(2021-02-19)`, whose month step
+        # passes 2021-02-19 at 2021-02-22. The offset must move each date.
+        ts_end = Date(2021, 1, 1):Day(1):Date(2021, 2, 25)
+        @test collect(PortfolioOptimisers.walk_forward_date_range(ts_end, Month(1),
+                                                                  Day(-10), identity)) ==
+              [Date(2020, 12, 22), Date(2021, 1, 22), Date(2021, 2, 19)]
+        # Under a fixed step and a fixed offset, the shift stays a range and moves each date.
+        r_fixed = PortfolioOptimisers.walk_forward_date_range(ts_end, Week(1), Day(-3),
+                                                              identity)
+        @test r_fixed isa StepRange
+        @test collect(r_fixed) ==
+              [d - Day(3) for d in Date(2021, 1, 1):Week(1):Date(2021, 2, 28)]
+        # So the anchor of 2021-02-19, row 50, opens a fold (R7 of #1817). Under `reduce_test`
+        # it starts the last test window, which runs to the last row. Without it, the anchor
+        # closes the one test window. A range that stops at 2021-01-22 gives the one window
+        # 22:56 under `reduce_test`, and no fold without it.
+        rde = ReturnsResult(; nx = ["a", "b"], X = zeros(length(ts_end), 2),
+                            ts = collect(ts_end))
+        for previous in (false, true), train_size in (1, Day(20))
+            cv = DateWalkForward(train_size, 1; period = Month(1), period_offset = Day(-10),
+                                 previous = previous, reduce_test = true)
+            @test split(cv, rde).test_idx == [22:49, 50:56]
+            @test n_splits(cv, rde) == 2
+        end
+        cv = DateWalkForward(1, 1; period = Month(1), period_offset = Day(-10))
+        @test split(cv, rde).test_idx == [22:49]
+        @test n_splits(cv, rde) == 1
         for cv in (DateWalkForward(12, 3; period = Month(1), period_offset = Day(-10)),
                    DateWalkForward(12, 3; period = Month(1), period_offset = Day(-10),
                                    previous = true),
@@ -715,6 +745,19 @@
         # An integer `train_size` of zero dates is empty on any data.
         @test_throws DomainError DateWalkForward(0, 1)
         @test DateWalkForward(1, 1) isa DateWalkForward
+        # Issue #2012: a period `train_size` of zero or less passed the constructor and failed
+        # at the split, and a zero or a negative `period` failed with a message that did not
+        # name it.
+        for train_size in (Day(0), Day(-5), Month(0), Day(-1) + Month(0))
+            @test_throws DomainError DateWalkForward(train_size, 1)
+        end
+        for period in (Day(0), Day(-1), Month(0), Day(-1) - Month(1))
+            @test_throws DomainError DateWalkForward(10, 1; period = period)
+            @test_throws DomainError OnlineDateWalkForward(10, 1; period = period)
+        end
+        # A compound period with one positive part moves a date forward.
+        @test DateWalkForward(Month(1) - Day(1), 1; period = Month(1) - Day(1)) isa
+              DateWalkForward
     end
     @testset "A scheme with a shuffle property set to true is refused" begin
         # No scheme of the library shuffles, but a scheme a user defines can carry a
@@ -755,6 +798,13 @@
         @test_throws DomainError KFold(; purged_size = -1)
         @test_throws DomainError KFold(; embargo_size = -1)
         @test KFold(; purged_size = 0, embargo_size = 0) isa KFold
+        # Issue #2012: one fold is the test set of its own split and leaves it no training
+        # rows. The split then failed with "reducing over an empty collection".
+        @test_throws DomainError KFold(; n = 1)
+        @test_throws DomainError KFold(; n = 0)
+        @test_throws DomainError KFold(; n = -3)
+        @test KFold(; n = 2) isa KFold
+        @test all(!isempty, split(KFold(; n = 2), rd).train_idx)
     end
     @testset "MultipleRandomised" begin
         cv = IndexWalkForward(127, 171)
@@ -772,7 +822,7 @@
             @test train_idx[idx] == train0
             @test test_idx[idx] == test0
             @test all(path_ids[idx] .== i)
-            @test all(length.(asset_idx[idx]) .== cv.subset_size)
+            @test all(length.(asset_idx[idx]) .== cv.subset_size.val)
         end
         @test n_splits(cv, rd) == n_splits(cv_res) == length(path_ids)
 
@@ -805,7 +855,7 @@
         @test length(train_idx) == length(train_idx) == N
         @test all(length.(train_idx) .== cv.cv.train_size)
         @test all(length.(test_idx) .== cv.cv.test_size)
-        @test all(length.(asset_idx) .== cv.subset_size)
+        @test all(length.(asset_idx) .== cv.subset_size.val)
         @test unique(asset_idx) == asset_idx
         @test unique.(asset_idx) == asset_idx
         # The window draw and the asset draw swapped order in the one stream the seed governs
@@ -821,7 +871,7 @@
         @test length(train_idx) == length(train_idx) == cv.n_subsets * N
         @test all(length.(train_idx) .== cv.cv.train_size)
         @test all(length.(test_idx) .== cv.cv.test_size)
-        @test all(length.(asset_idx) .== cv.subset_size)
+        @test all(length.(asset_idx) .== cv.subset_size.val)
         @test unique(asset_idx) != asset_idx
         @test unique.(asset_idx) == asset_idx
 
@@ -919,7 +969,7 @@
         # Every drawn column is live throughout the whole sample, which is every path's
         # window here, and every subset holds exactly `subset_size` of them.
         for cols in resm.asset_idx
-            @test length(cols) == cvm.subset_size
+            @test length(cols) == cvm.subset_size.val
             @test cols == unique(cols)
             @test isempty(intersect(cols, [3, 7]))
         end
@@ -949,7 +999,8 @@
     mapped back to the grid through the list of those columns.
     =#
     @testset "a failed candidate never wins the search" begin
-        fci = PortfolioOptimisers.finite_candidate_index
+        # The winner of the search, rank 1 of the order (#1937).
+        fci(s, S) = only(first(PortfolioOptimisers.finite_candidate_order(s, S, 1)))
         hms = PortfolioOptimisers.HighestMeanScore()
 
         # The census matrix: `argmax` over the column means `[0.80, NaN, 0.50]` returns 2
@@ -1019,19 +1070,28 @@
         # The non-finite member is last under BOTH directions of the ranking. A sort that
         # put it first under one of them would make it the answer of a `first`.
         for r in (MaximumDrawdown(), MeanReturn())
-            sorted = sort_by_measure(ppred, r)
+            sorted = sort_by_measure(SumScalariser(), ppred, r)
             @test length(sorted) == 3
             @test !isfinite(expected_risk(r, sorted[end]))
             @test all(isfinite, [expected_risk(r, p) for p in sorted[1:2]])
         end
         # the finite members are still ordered among themselves
-        srt = sort_by_measure(ppred, MaximumDrawdown())
+        srt = sort_by_measure(SumScalariser(), ppred, MaximumDrawdown())
         @test expected_risk(MaximumDrawdown(), srt[1]) <
               expected_risk(MaximumDrawdown(), srt[2])
 
         # the quantile is taken over the finite members, so it does not throw
-        @test PortfolioOptimisers.quantile_by_measure(ppred, MaximumDrawdown(), 0.5) isa
+        @test PortfolioOptimisers.quantile_by_measure(SumScalariser(), ppred,
+                                                      MaximumDrawdown(), 0.5) isa
               MultiPeriodPredictionResult
+
+        # A single-fold member keeps itself when the population numbers it (#1912).
+        single = quiet.pred[1]
+        mixed = PopulationPredictionResult(;
+                                           pred = PortfolioOptimisers.PredRes_MultiPredRes[single,
+                                                                                           quiet])
+        @test mixed.pred[1] === single
+        @test mixed.pred[2].id == 2 && mixed.pred[2].pred === quiet.pred
 
         #=
         Issue #1250: a population built by hand from `cross_val_predict` streams numbers its
@@ -1090,18 +1150,16 @@
             @test nqp(0.0) === ppred.pred[argmin(rks)]
             @test nqp(1.0) === ppred.pred[argmax(rks)]
         end
-        # sign = -1 at q selects the path of sign = 1 at 1 - q when alpha equals beta
-        for (a, b) in ((1.0, 1.0), (0.0, 0.0), (0.5, 0.5)), q in 0:0.05:1
-            s(q) = NearestQuantilePrediction(; r = r, q = q,
-                                             q_kwargs = (alpha = a, beta = b))
-            @test s(q)(ppred, -1) === s(1 - q)(ppred, 1)
+        # a measure of which a bigger value is better is negated, so q = 1 is its worst path
+        mr = MeanReturn()
+        mrs = [expected_risk(mr, p) for p in ppred.pred]
+        for q in 0:0.05:1
+            @test NearestQuantilePrediction(; r = mr, q = q)(ppred) ===
+                  ppred.pred[argmin(abs.(-mrs .- quantile(-mrs, q)))]
         end
-        # and not always when alpha differs from beta
-        asym = NearestQuantilePrediction(; r = r, q = 0.3,
-                                         q_kwargs = (alpha = 0.0, beta = 1.0))
-        asym_flip = NearestQuantilePrediction(; r = r, q = 0.7,
-                                              q_kwargs = (alpha = 0.0, beta = 1.0))
-        @test asym(ppred, -1) !== asym_flip(ppred, 1)
+        @test NearestQuantilePrediction(; r = mr, q = 1.0)(ppred) ===
+              ppred.pred[argmin(mrs)]
+        @test sort_by_measure(nothing, ppred, mr)[1] === ppred.pred[argmax(mrs)]
         # a tie goes to the first member in population order
         tie = PopulationPredictionResult(;
                                          pred = [member(Xs[1]), member(Xs[1]),
@@ -1110,18 +1168,74 @@
         @test NearestQuantilePrediction(; r = r, q = 0.0)(tie).id ==
               argmin([expected_risk(r, p) for p in tie.pred])
         @test NearestQuantilePrediction(; r = r, q = 1.0)(tie).id == 1
-        # a vector of measures is scalarised through r_kwargs, and sums by default
+        # a vector of measures is reduced through the field sca on oriented scores, and sums
+        # by default: MinScalariser reads the worst measure, MaxScalariser the best one
         rv = [ConditionalValueatRisk(), MaximumDrawdown()]
-        vmax = [max(expected_risk(rv[1], p), expected_risk(rv[2], p)) for p in ppred.pred]
-        vsum = [expected_risk(rv[1], p) + expected_risk(rv[2], p) for p in ppred.pred]
-        @test NearestQuantilePrediction(; r = rv, r_kwargs = (sca = MaxScalariser(),))(ppred) ===
-              ppred.pred[argmin(abs.(vmax .- quantile(vmax, 0.5)))]
-        @test NearestQuantilePrediction(; r = rv)(ppred) ===
-              ppred.pred[argmin(abs.(vsum .- quantile(vsum, 0.5)))]
-        # a mixed-polarity vector is admitted here and refused by sort_by_measure
+        c1 = [expected_risk(rv[1], p) for p in ppred.pred]
+        c2 = [expected_risk(rv[2], p) for p in ppred.pred]
+        nearest(v, q = 0.5) = ppred.pred[argmin(abs.(v .- quantile(v, q)))]
+        nqp_sca(sca) = NearestQuantilePrediction(; r = rv, sca = sca)(ppred)
+        @test NearestQuantilePrediction(; r = rv)(ppred) === nearest(c1 .+ c2)
+        @test nqp_sca(MinScalariser()) === nearest(max.(c1, c2))
+        @test nqp_sca(MaxScalariser()) === nearest(min.(c1, c2))
+        middle = PortfolioOptimisers.Statistics.middle
+        @test nqp_sca(MedianValue()) === nearest(middle.(c1, c2))
+        @test nqp_sca(minimum) === nearest(max.(c1, c2))
+        # a scale weighs each oriented score, and a negative scale counts against it
+        rw = [ConditionalValueatRisk(; settings = RiskMeasureSettings(; scale = 2)),
+              MaximumDrawdown(; settings = RiskMeasureSettings(; scale = -1))]
+        @test NearestQuantilePrediction(; r = rw)(ppred) === nearest(2 .* c1 .- c2)
+        #=
+        A vector of mixed orientation gives one orientation (#1982). The raw sum of a mean return
+        and a drawdown with one sign rewarded a higher drawdown, or a lower mean return.
+        =#
         mixed = [MeanReturn(), MaximumDrawdown()]
-        @test NearestQuantilePrediction(; r = mixed)(ppred) isa MultiPeriodPredictionResult
-        @test_throws ArgumentError sort_by_measure(ppred, mixed)
+        mdd = [expected_risk(mixed[2], p) for p in ppred.pred]
+        for q in (0.0, 0.25, 0.5, 0.75, 1.0)
+            @test NearestQuantilePrediction(; r = mixed, q = q)(ppred) ===
+                  nearest(mdd .- mrs, q)
+        end
+        @test sort_by_measure(SumScalariser(), ppred, mixed) ==
+              ppred.pred[sortperm(mrs .- mdd; rev = true)]
+        @test sort_by_measure(MedianValue(), ppred, rv) ==
+              ppred.pred[sortperm(middle.(-c1, -c2); rev = true)]
+        #=
+        Issue #1997: the reduction is the argument or the field `sca`. A `sca` in the keywords
+        that reach a reader of a risk would be ignored for one measure, so it is refused.
+        Issue #2069: `nothing` is the default of every scalariser slot, and it gives the sum of
+        `SumScalariser` for a vector. For one measure it is inert.
+        =#
+        @test_throws ConflictingArgumentError NearestQuantilePrediction(; r = rv,
+                                                                        r_kwargs = (sca = MaxScalariser(),))
+        @test_throws ConflictingArgumentError PortfolioOptimisers.quantile_by_measure(SumScalariser(),
+                                                                                      ppred,
+                                                                                      rv,
+                                                                                      0.5;
+                                                                                      r_kwargs = (sca = MaxScalariser(),))
+        @test_throws ConflictingArgumentError sort_by_measure(SumScalariser(), ppred, rv;
+                                                              sca = MaxScalariser())
+        @test NearestQuantilePrediction(; r = rv).sca === nothing
+        for q in (0.0, 0.5, 1.0)
+            @test NearestQuantilePrediction(; r = rv, q = q)(ppred) ===
+                  NearestQuantilePrediction(; r = rv, sca = SumScalariser(), q = q)(ppred)
+        end
+        @test PortfolioOptimisers.quantile_by_measure(nothing, ppred, rv, 0.5) ===
+              PortfolioOptimisers.quantile_by_measure(SumScalariser(), ppred, rv, 0.5)
+        @test sort_by_measure(nothing, ppred, rv) ==
+              sort_by_measure(SumScalariser(), ppred, rv)
+        @test NearestQuantilePrediction(; r = r, sca = nothing, q = 0.0)(ppred) ===
+              ppred.pred[argmin(rks)]
+        @test NearestQuantilePrediction(; r = r, sca = nothing).sca === nothing
+        # the scores themselves: one measure ignores the reduction, nothing gives the sum
+        p1 = ppred.pred[1]
+        os = PortfolioOptimisers.oriented_score
+        @test os(nothing, mr, p1) == expected_risk(mr, p1)
+        @test os(MaxScalariser(), rv[1], p1) == -c1[1]
+        @test os(nothing, rw, p1) == -2 * c1[1] + c2[1]
+        @test os(nothing, rw, p1) == os(SumScalariser(), rw, p1)
+        @test os(MaxValue(), rw, p1) == max(-2 * c1[1], c2[1])
+        @test os(SumScalariser(), mixed, p1) == mrs[1] - mdd[1]
+        @test os(MinValue(), mixed, p1) == min(mrs[1], -mdd[1])
         # a failed fold takes its path out, and no solved path leaves nothing to rank
         bad = member(Xs[1]; res = resbad)
         @test !PortfolioOptimisers.member_solved(bad)
@@ -1156,7 +1270,14 @@
         @test sel isa PredictionResult
         @test findfirst(p -> p === sel, fpop.pred) ==
               argmin(abs.(rks .- quantile(rks, 0.5)))
-        @test expected_risk(r, sort_by_measure(fpop, r)[1]) == minimum(rks)
+        @test expected_risk(r, sort_by_measure(SumScalariser(), fpop, r)[1]) == minimum(rks)
+        # a vector reads the series of a single fold once, as it reads the series of a path
+        f1 = fpop.pred[1]
+        @test PortfolioOptimisers.prediction_returns(f1) === f1.rd.X
+        @test os(SumScalariser(), rv, f1) ==
+              -(expected_risk(rv[1], f1) + expected_risk(rv[2], f1))
+        @test os(nothing, mixed, f1) ==
+              expected_risk(mixed[1], f1) - expected_risk(mixed[2], f1)
     end
     @testset "A clustering optimiser in the fold loop refuses a precomputed prior (#1277)" begin
         # A precomputed prior is the full sample's, so every fold would read its test rows.
@@ -1196,8 +1317,8 @@
         # A search scores each candidate through the fold loop, so it refuses what
         # cross_val_predict refuses, for every scheme and for the randomised form.
         pinned = HierarchicalRiskParity(; opt = HierarchicalOptimiser(; pe = pr))
-        p = concrete_typed_array([["opt.wb" => [WeightBounds(; lb = 0.0, ub = 1.0),
-                                                WeightBounds(; lb = 0.0, ub = 0.5)]]])
+        p = [["opt.wb" =>
+                  [WeightBounds(; lb = 0.0, ub = 1.0), WeightBounds(; lb = 0.0, ub = 0.5)]]]
         for cv in (KFold(), CombinatorialCrossValidation(; n_folds = 4, n_test_folds = 2))
             @test refused(() -> search_cross_validation(pinned,
                                                         GridSearchCrossValidation(p;
@@ -1211,12 +1332,11 @@
                                                     rd), "opt.opt.pe")
         # A lens that writes a precomputed prior is refused, and one that replaces it in every
         # candidate is not.
-        writes = concrete_typed_array([["opt.pe" => [EmpiricalPrior(), pr]]])
+        writes = [["opt.pe" => [EmpiricalPrior(), pr]]]
         @test refused(() -> search_cross_validation(HierarchicalRiskParity(),
                                                     GridSearchCrossValidation(writes), rd),
                       "opt.opt.pe")
-        replaces = concrete_typed_array([["opt.pe" => [EmpiricalPrior(),
-                                                       EmpiricalPrior(; horizon = 2)]]])
+        replaces = [["opt.pe" => [EmpiricalPrior(), EmpiricalPrior(; horizon = 2)]]]
         res = search_cross_validation(pinned, GridSearchCrossValidation(replaces), rd)
         @test isa(res.opt.opt.pe, EmpiricalPrior)
         # A schedule is refused when an entry or its default is a precomputed prior, and a
@@ -1340,18 +1460,18 @@
         cv = IndexWalkForward(127, 171)
         eff_front = cross_val_predict(mr, rd, cv)
         @test isapprox(expected_risk(ConditionalValueatRisk(), eff_front.pred[1]),
-                       [0.024450301999433727, 0.024723562386898636, 0.025066646276899775,
-                        0.02663111818533806, 0.029764365435746204, 0.03323299305996294,
-                        0.03671242838292266, 0.04134221000889687, 0.0450895044038192,
-                        0.04832602663684721, 0.0511628965158686, 0.05340368857766957,
-                        0.05661783776523725, 0.06099862497988366, 0.06930432105395043],
+                       [0.02445046885084411, 0.02472319226792424, 0.02506586558678047,
+                        0.02663155361179255, 0.02976673052184226, 0.03323222416496702,
+                        0.036712639006072634, 0.04134317972260926, 0.045089404073354745,
+                        0.048325818464971665, 0.05116290216078244, 0.0534036724420851,
+                        0.056617886046499755, 0.06099861581582468, 0.06930432399167247],
                        rtol = 1e-6)
         @test isapprox(expected_risk(ConditionalValueatRisk(), eff_front),
-                       [0.028515793837902887, 0.02866686671424732, 0.029422544736518733,
-                        0.030690615991116957, 0.032553278762297584, 0.034629093774793916,
-                        0.03693523868040396, 0.03925372497308569, 0.04197103384502677,
-                        0.045277821913963394, 0.049019700143647246, 0.05252956796830584,
-                        0.05670666006046363, 0.06106323762304805, 0.06731010011882382],
+                       [0.028515408671007006, 0.028664636084724932, 0.029422608592514263,
+                        0.030690215512675742, 0.0325542389368768, 0.034629075757684064,
+                        0.036935240319419596, 0.0392542101735727, 0.041971441676642976,
+                        0.04527886720764179, 0.04901970961421756, 0.0525286960782263,
+                        0.0567066656523088, 0.061063231382393154, 0.0673101066787791],
                        rtol = 1e-6)
 
         # #1004: a frontier fold gives one portfolio per sweep point, and a term that reads
@@ -1462,6 +1582,49 @@
             @test isapprox(bb[end] - bn[end], -oneoff / Ti)
         end
     end
+    @testset "A fold with a fee rebuilds through public names (#1968)" begin
+        @test Base.ispublic(PortfolioOptimisers, :investable_fees_view)
+        @test Base.ispublic(PortfolioOptimisers, :folds_are_time_ordered)
+        Xr = 0.01 .* randn(StableRNG(5), 130, 4)
+        # D leaves the mask of the folds whose training window holds these rows.
+        Xr[35:45, 4] .= NaN
+        tsr = collect(Date(2024, 1, 1):Day(1):(Date(2024, 1, 1) + Day(129)))
+        rdr = ReturnsResult(; nx = ["A", "B", "C", "D"], X = Xr, ts = tsr)
+        feer = Fees(; tn = Turnover(; w = fill(0.25, 4), val = 0.01), l = 0.001,
+                    lq = Turnover(; w = fill(0.25, 4), val = 0.02))
+        # The rebuild of fold `k` from its target weights on the full universe and its mask.
+        # The fold loop threads the target of fold `k - 1` into the fee of fold `k` exactly
+        # when `folds_are_time_ordered(cv)` holds, because the fee needs previous weights.
+        function rebuild_matches(p, cv, threaded)
+            return map(eachindex(p.pred)) do k
+                fk = p.pred[k]
+                imsk = BitVector(in(fk.rd.nx).(rdr.nx))
+                feek = if k > 1 && threaded
+                    PortfolioOptimisers.factory(feer, p.pred[k - 1].res.w)
+                else
+                    feer
+                end
+                red = PortfolioOptimisers.investable_fees_view(feek, imsk, 4)
+                res = NaiveOptimisationResult(; pr = nothing, wb = nothing, fees = red,
+                                              retcode = OptimisationSuccess(),
+                                              w = fk.res.w[imsk], imsk = imsk, fb = nothing)
+                rdk = PortfolioOptimisers.port_opt_view(rdr, fk.idx, :)
+                return isapprox(predict(res, rdk).rd.X, fk.rd.X)
+            end
+        end
+        for cv in (IndexWalkForward(30, 20), KFold())
+            p = cross_val_predict(InverseVolatility(; fees = feer), rdr, cv)
+            ordered = PortfolioOptimisers.folds_are_time_ordered(cv)
+            @test ordered == (cv isa IndexWalkForward)
+            @test all(rebuild_matches(p, cv, ordered))
+            if ordered
+                # A fold of the walk-forward is reduced, so the rebuild reaches the mask.
+                @test any(f -> length(f.rd.nx) < 4, p.pred)
+                # The fee of every later fold read the weights of the fold before it.
+                @test !any(rebuild_matches(p, cv, false)[2:end])
+            end
+        end
+    end
     @testset "The rolling window measure reads a prediction's own series (#770)" begin
         # The realised-history reading takes a fold result and reads nothing but the series
         # `predict` already stored, so it needs neither weights nor fees. The four
@@ -1520,42 +1683,36 @@
         mr = Stacking(; opti = [MeanRisk(; opt = optl2), RiskBudgeting(; opt = opt)],
                       opto = MeanRisk(; opt = opt))
         r = MeanReturnRiskRatio(; rk = LowOrderMoment(; alg = SecondMoment()))
-        p = concrete_typed_array([["opti[2].opt.l1" =>
-                                       range(; start = 0.0005, stop = 0.0008, length = 3),
-                                   "opti[1].opt.l2.val" =>
-                                       range(; start = 0.0004, stop = 0.0007, length = 3)],
-                                  ["opti[1].opt.l2.val" =>
-                                       range(; start = 0.0004, stop = 0.0007, length = 3)],
-                                  [PropertyLens(:l1) ∘ PropertyLens(:opt) ∘ IndexLens(2) ∘
-                                   PropertyLens(:opti) =>
-                                       range(; start = 0.0009, stop = 0.0012, length = 3)],
-                                  [:(opti[2]) =>
-                                       [MeanRisk(; opt = opt, obj = MaximumUtility()),
-                                        MeanRisk(; opt = opt, obj = MaximumRatio())]]])
+        # #1939: a vector of grids of different types infers the element type `Vector`, and
+        # the constructors narrow it, so the literal needs no `concrete_typed_array`.
+        p = [["opti[2].opt.l1" => range(; start = 0.0005, stop = 0.0008, length = 3),
+              "opti[1].opt.l2.val" => range(; start = 0.0004, stop = 0.0007, length = 3)],
+             ["opti[1].opt.l2.val" => range(; start = 0.0004, stop = 0.0007, length = 3)],
+             [PropertyLens(:l1) ∘ PropertyLens(:opt) ∘ IndexLens(2) ∘ PropertyLens(:opti) =>
+                  range(; start = 0.0009, stop = 0.0012, length = 3)],
+             [:(opti[2]) => [MeanRisk(; opt = opt, obj = MaximumUtility()),
+                             MeanRisk(; opt = opt, obj = MaximumRatio())]]]
+        @test !(p isa AbstractVector{<:AbstractVector{<:Pair}})
 
         gs_cv = GridSearchCrossValidation(p; r = r)
+        @test gs_cv.p == p
         gs_res1 = search_cross_validation(mr, gs_cv, rd)
-        rs_cv1 = RandomisedSearchCrossValidation(p; rng = StableRNG(42), r = r)
+        # The four sets hold 9 + 3 + 3 + 2 = 17 points. A trial count of 17 draws every
+        # point, so the randomised search scores the grid and finds the same winner.
+        rs_cv1 = RandomisedSearchCrossValidation(p; rng = StableRNG(42), r = r, n_iter = 17)
         rs_res1 = search_cross_validation(mr, rs_cv1, rd)
         @test gs_res1.val_grid[gs_res1.idx] == rs_res1.val_grid[rs_res1.idx]
         @test gs_res1.lens_grid[gs_res1.idx] == rs_res1.lens_grid[rs_res1.idx]
-        p = concrete_typed_array([Dict("opti[2].opt.l1" =>
-                                           range(; start = 0.0005, stop = 0.0008,
-                                                 length = 3),
-                                       "opti[1].opt.l2.val" =>
-                                           range(; start = 0.0004, stop = 0.0007,
-                                                 length = 3)),
-                                  Dict("opti[1].opt.l2.val" =>
-                                           range(; start = 0.0004, stop = 0.0007,
-                                                 length = 3)),
-                                  Dict(PropertyLens(:l1) ∘ PropertyLens(:opt) ∘
-                                       IndexLens(2) ∘ PropertyLens(:opti) =>
-                                           range(; start = 0.0009, stop = 0.0012,
-                                                 length = 3)),
-                                  Dict(:(opti[2]) =>
-                                           [MeanRisk(; opt = opt, obj = MaximumUtility()),
-                                            MeanRisk(; opt = opt, obj = MaximumRatio())])])
-        rs_cv2 = RandomisedSearchCrossValidation(p; rng = StableRNG(42), r = r)
+        p = [Dict("opti[2].opt.l1" => range(; start = 0.0005, stop = 0.0008, length = 3),
+                  "opti[1].opt.l2.val" =>
+                      range(; start = 0.0004, stop = 0.0007, length = 3)),
+             Dict("opti[1].opt.l2.val" =>
+                      range(; start = 0.0004, stop = 0.0007, length = 3)),
+             Dict(PropertyLens(:l1) ∘ PropertyLens(:opt) ∘ IndexLens(2) ∘
+                  PropertyLens(:opti) => range(; start = 0.0009, stop = 0.0012, length = 3)),
+             Dict(:(opti[2]) => [MeanRisk(; opt = opt, obj = MaximumUtility()),
+                                 MeanRisk(; opt = opt, obj = MaximumRatio())])]
+        rs_cv2 = RandomisedSearchCrossValidation(p; rng = StableRNG(42), r = r, n_iter = 17)
         rs_res2 = search_cross_validation(mr, rs_cv2, rd)
         rev = rs_res2.val_grid[rs_res2.idx] != rs_res1.val_grid[rs_res1.idx]
         if rev
@@ -1566,11 +1723,9 @@
             @test rs_res2.lens_grid[rs_res2.idx] == rs_res1.lens_grid[rs_res1.idx]
         end
 
-        p = concrete_typed_array(["opti[2]" =>
-                                      [MeanRisk(; opt = opt, obj = MaximumUtility()),
-                                       MeanRisk(; opt = opt, obj = MaximumRatio())],
-                                  "opti[2].opt.l1" =>
-                                      range(; start = 0.0005, stop = 0.002, length = 3)])
+        p = ["opti[2]" => [MeanRisk(; opt = opt, obj = MaximumUtility()),
+                           MeanRisk(; opt = opt, obj = MaximumRatio())],
+             "opti[2].opt.l1" => range(; start = 0.0005, stop = 0.002, length = 3)]
         gs_cv = GridSearchCrossValidation(p; r = r)
         gs_res = search_cross_validation(mr, gs_cv, rd)
 
@@ -1716,6 +1871,32 @@
         # Liveness: valid property and index paths still build working lenses.
         @test PortfolioOptimisers.parse_lens("opt.pe.ce") isa Base.Callable
         @test PortfolioOptimisers.parse_lens("a[2]") isa Base.Callable
+    end
+    @testset "Search grid keys, symbol indices and the empty grid (#1912)" begin
+        pe = PortfolioOptimisers
+        # A key reaches its field through a chain of lenses whose root is a bare symbol (`opt`),
+        # and a symbol index (`check_sol[allow_local]`) reads a field of a NamedTuple. The
+        # setting only decides whether a solution is accepted, so both candidates solve the
+        # same problem and score alike, and the winner carries the setting of its candidate.
+        sk = Solver(; name = :sk, solver = Clarabel.Optimizer,
+                    check_sol = (; allow_local = true, allow_almost = true),
+                    settings = "verbose" => false)
+        mk = MeanRisk(; opt = JuMPOptimiser(; slv = sk))
+        key = "opt.slv.check_sol[allow_local]"
+        res_k = search_cross_validation(mk,
+                                        GridSearchCrossValidation([key => [false, true]]),
+                                        rd)
+        @test res_k.val_grid == [(false,), (true,)]
+        @test size(res_k.test_scores, 2) == 2
+        @test res_k.test_scores[:, 1] == res_k.test_scores[:, 2]
+        @test res_k.opt.opt.slv.check_sol.allow_local == res_k.val_grid[res_k.idx][1]
+        @test res_k.opt.opt.slv.check_sol.allow_almost
+        # A vector of dictionaries holds only String, Symbol or Integer keys.
+        gk = GridSearchCrossValidation([Dict("opt.l1" => [0.1, 0.2])])
+        @test length(gk.p) == 1
+        @test_throws ArgumentError GridSearchCrossValidation([Dict(1.5 => [0.1, 0.2])])
+        # No grid is empty: the constructor refuses one.
+        @test_throws IsEmptyError GridSearchCrossValidation(Pair{String, Vector{Int}}[])
     end
     @testset "parse_lens recursion caps" begin
         # Same trust boundary as the equation parser (ADR 0027): an over-long / deeply
@@ -1998,7 +2179,13 @@
             @test isnothing(PO.held_weights_drift(nothing, nothing))
             @test PO.held_weights_drift(sfd, nothing) === sfd
             @test PO.held_weights_drift(sfd, dw) === sfd
-            @test PO.held_weights_drift(nothing, dw) === dw.wd
+            # The source carries no drift of its own (#1860): a scheme that drifts nothing
+            # computes the held weights under the self-financing drift, and every source
+            # without a method of its own does the same.
+            @test Base.issingletontype(DriftedWeights)
+            @test PO.held_weights_drift(nothing, dw) === SelfFinancingDrift()
+            @test PO.held_weights_drift(nothing, TargetWeights()) === SelfFinancingDrift()
+            @test PO.resolve_previous_weights_source(nothing, sfd) === DriftedWeights()
         end
         @testset "HeldWeightsResult checks the shapes of its members" begin
             X24 = [0.01 0.02; -0.01 0.03]
@@ -2301,17 +2488,17 @@
                 @test out24.retcode === rcf
                 @test out24.w == res24.w
             end
-            rrb = RelaxedRiskBudgetingResult(resr.jr, resr.prb, nothing)
+            rrb = RelaxedRiskBudgetingResult(resr.jr, resr.rbr, nothing)
             @test PO.set_retcode(rrb, rcf).retcode === rcf
         end
         @testset "the meta results rebuild themselves" begin
-            st = StackingResult(nothing, nothing, nothing, [resj], resj, nothing,
+            st = StackingResult(nothing, nothing, nothing, [resj], resj, nothing, nothing,
                                 OptimisationSuccess(), resj.w, nothing, nothing)
             @test PO.set_retcode(st, rcf).retcode === rcf
             @test PO.set_retcode(st, rcf).w == resj.w
             nc = NestedClusteredResult(nothing, nothing, nothing, nothing, [resj], resj,
-                                       nothing, OptimisationSuccess(), resj.w, nothing,
-                                       nothing)
+                                       nothing, nothing, OptimisationSuccess(), resj.w,
+                                       nothing, nothing)
             @test PO.set_retcode(nc, rcf).retcode === rcf
             sr = SubsetResamplingResult(nothing, nothing, nothing, [resj],
                                         reshape(collect(1.0:length(resj.w)), length(resj.w),
@@ -2380,7 +2567,7 @@
                             opt = JuMPOptimiser(; slv = slv, tn = tn, wb = sched(k),
                                                 sets = sets), fb = fb)
         end
-        threaded(p) = p.res.jr.pa.tn.w
+        threaded(p) = p.res.jr.jor.tn.w
         @testset "batch, no drift: the fold after a failure reads the last solved fold" begin
             res = cross_val_predict(mk(2), rd, cv)
             p1, p2, p3 = res.pred[1], res.pred[2], res.pred[3]

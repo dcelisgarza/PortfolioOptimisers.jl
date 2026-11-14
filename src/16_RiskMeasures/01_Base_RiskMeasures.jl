@@ -3,9 +3,9 @@ $(DocStringExtensions.TYPEDEF)
 
 Abstract supertype for all risk measure estimators.
 
-Defines the interface for risk measure types, which quantify portfolio risk using various statistical or econometric methods. All concrete risk measure types should subtype `AbstractBaseRiskMeasure` to ensure consistency and composability within the optimisation framework.
+A risk measure gives one number for the risk of a portfolio. Every concrete risk measure subtypes `AbstractBaseRiskMeasure`, and the four traits of this file, [`risk_input_kind`](@ref), [`supports_precomputed_returns`](@ref), [`bigger_is_better`](@ref) and [`needs_previous_weights`](@ref), dispatch on it.
 
-All concrete risk measures can be used as functors (callable structs) to compute their associated risk quantity.
+Every concrete risk measure is a functor, a callable struct that computes its risk.
 
 # Related
 
@@ -40,7 +40,7 @@ end
 
 Return whether a larger value of risk measure `r` is preferred over a smaller one.
 
-The default implementation returns `false` (lower risk is better) for all [`AbstractBaseRiskMeasure`](@ref) subtypes. Ratio-based or return-like measures that should be maximised may override this method to return `true`.
+The default returns `false`, so a lower value is better, for every [`AbstractBaseRiskMeasure`](@ref) subtype. A ratio or a return-like measure that a caller maximises declares a method that returns `true`. An [`AbstractAssetScorer`](@ref) has no default, and each concrete scorer declares its own method.
 
 # Returns
 
@@ -69,13 +69,13 @@ function needs_previous_weights(r::VecBaseRM)::Bool
     return any(needs_previous_weights, r)
 end
 """
-    const BaseRM_VecBaseRM = Union{<:AbstractBaseRiskMeasure, <:VecBaseRM}
+    const BaseRM_VecBaseRM = Union{AbstractBaseRiskMeasure, VecBaseRM}
 
 Argument bound for every value-level reader of a risk measure: one measure or several.
 
 Mirrors [`JRE_VecJRE`](@ref) on the return side. A method bounded here serves a measure and a vector of them with one body, so the value-level surface needs one method per arity rather than two.
 
-A vector is scalarised into **one** number by the `sca` keyword, which defaults to [`SumScalariser`](@ref) and is silently inert on a single measure.
+A vector is scalarised into **one** number by the `sca` keyword, which defaults to `nothing`, gives the sum of [`SumScalariser`](@ref), and is silently inert on a single measure.
 
 # Related
 
@@ -85,13 +85,13 @@ A vector is scalarised into **one** number by the `sca` keyword, which defaults 
   - [`expected_risk`](@ref)
   - [`Scalariser`](@ref)
 """
-const BaseRM_VecBaseRM = Union{<:AbstractBaseRiskMeasure, <:VecBaseRM}
+const BaseRM_VecBaseRM = Union{AbstractBaseRiskMeasure, VecBaseRM}
 """
 $(DocStringExtensions.TYPEDSIGNATURES)
 
 Return whether every element of `rs` shares the same polarity, and throw when they do not.
 
-The scalarised value of a mixed vector such as `[Variance(), ExpectedReturn()]` has **no** defined orientation, so neither `all` nor `any` is correct. Both are wrong in silence, and the consumers are load-bearing: [`RankRule`](@ref) and [`QuantileRule`](@ref) take counts from each tail, and the flag decides which tail is best.
+The scalarised value of a mixed vector such as `[Variance(), ExpectedReturn()]` has **no** defined orientation, so neither `all` nor `any` is correct. Both are wrong in silence, and the consumers are load-bearing: [`RankRule`](@ref) takes a count or a fraction from each tail, and the flag decides which tail is best.
 
 # Validation
 
@@ -115,7 +115,7 @@ $(DocStringExtensions.TYPEDSIGNATURES)
 
 Return whether every element of `rs` supports evaluation on a precomputed return series.
 
-Answers by `all`, matching the `&&` the two ratio composites already use. Note the polarity against its neighbour: [`needs_previous_weights`](@ref) on the same alias answers by `any`. Both are correct — "does the vector need it" is not "can the vector do it".
+It answers by `all`, as the `&&` of the two ratio composites does. [`needs_previous_weights`](@ref) on the same alias answers by `any`. Both are correct, because the question "does the vector need it" is not the question "can the vector do it".
 
 # Related
 
@@ -182,7 +182,7 @@ struct WeightsInput <: RiskInputKind end
 
 Return the [`RiskInputKind`](@ref) of risk measure `r`, declaring what its functor consumes when [`expected_risk`](@ref) evaluates it.
 
-There is no default: every concrete [`AbstractBaseRiskMeasure`](@ref) (other than composite measures handled by explicit `expected_risk` methods) must declare its kind beside its type definition. Returning one of [`NetReturnsInput`](@ref), [`WeightsReturnsFeesInput`](@ref), or [`WeightsInput`](@ref). An undeclared measure throws, rather than silently routing to the wrong input shape.
+There is no default. Every concrete [`AbstractBaseRiskMeasure`](@ref) declares its kind beside its type definition, as one of [`NetReturnsInput`](@ref), [`WeightsReturnsFeesInput`](@ref) or [`WeightsInput`](@ref). The composite measures that their own `expected_risk` methods route are the exception. An undeclared measure throws, so it never reaches the wrong input shape.
 
 # Validation
 
@@ -201,7 +201,7 @@ function risk_input_kind(r::AbstractBaseRiskMeasure)
     return throw(ArgumentError("`risk_input_kind` is not defined for `$(typeof(r))`. Every concrete `AbstractBaseRiskMeasure` must declare its input kind beside its definition by adding a method returning one of `NetReturnsInput()`, `WeightsReturnsFeesInput()`, or `WeightsInput()`."))
 end
 """
-    range_tails(r::RiskMeasure) -> @NamedTuple{loss, gain}
+    range_tails(r::RiskMeasure) -> RangeTails
 
 Decompose a *range* risk measure into the two point measures it is the sum of.
 
@@ -224,10 +224,11 @@ There is no default. A measure that is not a range, or one that fuses, throws ra
 
 # Returns
 
-  - `(; loss, gain)`: The loss-tail and gain-tail point measures.
+  - `tails::RangeTails`: The loss-tail and gain-tail point measures. A method of a range of your own builds it, and its constructor refuses a tail that adds to the risk expression.
 
 # Related
 
+  - [`RangeTails`](@ref)
   - [`set_range_risk_constraints!`](@ref)
   - [`GenericValueatRiskRange`](@ref)
   - [`RiskMeasureSettings`](@ref)
@@ -240,15 +241,15 @@ end
 
 Backstop for the single-argument *precomputed-returns* functor contract `r(x::VecNum)`.
 
-This method is only ever reached by a measure that defines **no** `VecNum` functor of its
-own — e.g. a composite carrying a weights-only variance term such as `VarianceSkewKurtosis`.
-For such a measure the precomputed-returns form is undefined, so this throws.
+A call reaches this method only for a measure that defines **no** `VecNum` functor of its
+own, such as `VarianceSkewKurtosis`, which carries a variance term that reads the weights.
+Such a measure has no precomputed-returns form, so this method throws.
 
-It is *not* the primary safety mechanism. A [`WeightsInput`](@ref) measure's own functor
-`r(w)` shares this `r(::VecNum)` signature and would otherwise silently consume a return
-series *as weights*; dispatch alone cannot tell the two apart. Eligibility is therefore
-decided up front by [`supports_precomputed_returns`](@ref), which the contract entry
-[`expected_risk_from_returns`](@ref) consults before ever calling the functor.
+This method is not the first guard. The functor `r(w)` of a [`WeightsInput`](@ref) measure
+has the same `r(::VecNum)` signature, and it would read a return series as weights with no
+error. Dispatch cannot tell the two apart. So [`supports_precomputed_returns`](@ref) decides
+the eligibility first, and the contract entry [`expected_risk_from_returns`](@ref) reads it
+before it calls the functor.
 
 # Validation
 
@@ -269,11 +270,11 @@ function (r::AbstractBaseRiskMeasure)(::VecNum)
 end
 """
     assert_observation_weights(w::VecNum, w_sym::Sym_Str = :w)
-    assert_observation_weights(args...)
+    assert_observation_weights(::Option{<:UnresolvedValue}, ::Sym_Str = :w)
 
 Validate the observation weights of a risk measure.
 
-A risk measure divides by the sum of its observation weights, so a weight vector that sums to zero has no value to give. This assertion refuses it with the rules of [`assert_nonempty_nonneg_finite_val`](@ref) and one rule more. A [`DynamicAbstractWeights`](@ref) has no values until it resolves against the data, so it selects the `args...` method, and [`checked_observation_weights`](@ref) validates its values after it resolves.
+A risk measure divides by the sum of its observation weights, so a weight vector that sums to zero has no value to give. This assertion refuses it with the rules of [`assert_nonempty_nonneg_finite_val`](@ref) and one rule more. A [`DynamicAbstractWeights`](@ref) is an [`UnresolvedValue`](@ref): it has no values until it resolves against the data, so it selects the second method, and [`checked_observation_weights`](@ref) validates its values after it resolves. `nothing` selects the second method too. Each other type is a `MethodError`, so a form that a slot admits with no rule fails at construction.
 
 # Arguments
 
@@ -284,7 +285,7 @@ A risk measure divides by the sum of its observation weights, so a weight vector
 
   - `w` is not empty, finite and nonnegative, through [`assert_nonempty_nonneg_finite_val`](@ref).
   - `sum(w) > 0`, so at least one observation carries weight. Otherwise a `DomainError` is raised.
-  - Any other type, `nothing` and a [`DynamicAbstractWeights`](@ref) among them, passes.
+  - `::Option{<:UnresolvedValue}`: No rule, so the call always passes.
 
 # Returns
 
@@ -304,7 +305,7 @@ function assert_observation_weights(w::VecNum, w_sym::Sym_Str = :w)::Nothing
                           "0 < sum($w_sym) must hold, so that at least one observation carries weight. Got\nsum($w_sym) => $sw"))
     return nothing
 end
-function assert_observation_weights(args...)::Nothing
+function assert_observation_weights(::Option{<:UnresolvedValue}, ::Sym_Str = :w)::Nothing
     return nothing
 end
 """
@@ -340,7 +341,7 @@ The rows of `X`, or the entries of a return series `X`, are the observations. A 
   - [`assert_observation_weights`](@ref)
   - [`ObsWeights`](@ref)
 """
-function checked_observation_weights(w::Option{<:Union{<:ObsWeights, <:VecNum}},
+function checked_observation_weights(w::Option{<:Union{ObsWeights, VecNum}},
                                      X::VecNum_MatNum)
     w = get_observation_weights(w, X)
     if isnothing(w)
@@ -354,11 +355,11 @@ function checked_observation_weights(w::Option{<:Union{<:ObsWeights, <:VecNum}},
 end
 """
     assert_half_open_unit_interval(val::Number, sym::Sym_Str = :val)
-    assert_half_open_unit_interval(args...)
+    assert_half_open_unit_interval(::Option{<:UnresolvedValue}, ::Sym_Str = :val)
 
 Validate that `0 <= val < 1`.
 
-The significance level of a tail measure whose limit at zero is defined takes this interval. At `val = 0` the tail holds only the worst observation with positive weight, which [`worst_positive_weight_loss`](@ref) gives. A level of one would hold the whole sample, so it stays open. A Calibration Rule has no value until it resolves, so it selects the `args...` method, and the rebuild after the resolution checks the number.
+The significance level of a tail measure whose limit at zero is defined takes this interval. At `val = 0` the tail holds only the worst observation with positive weight, which [`worst_positive_weight_loss`](@ref) gives. A level of one would hold the whole sample, so it stays open. A Calibration Rule is an [`UnresolvedValue`](@ref): it has no value until it resolves, so it selects the second method, and the rebuild after the resolution checks the number. Each other type is a `MethodError`, so a form that a slot admits with no rule fails at construction.
 
 # Arguments
 
@@ -368,7 +369,7 @@ The significance level of a tail measure whose limit at zero is defined takes th
 # Validation
 
   - `0 <= val < 1`. Otherwise a `DomainError` is raised.
-  - Any other type passes.
+  - `::Option{<:UnresolvedValue}`: No rule, so the call always passes.
 
 # Returns
 
@@ -385,7 +386,8 @@ function assert_half_open_unit_interval(val::Number, sym::Sym_Str = :val)::Nothi
               DomainError(val, "0 <= $sym < 1 must hold. Got\n$sym => $val"))
     return nothing
 end
-function assert_half_open_unit_interval(args...)::Nothing
+function assert_half_open_unit_interval(::Option{<:UnresolvedValue},
+                                        ::Sym_Str = :val)::Nothing
     return nothing
 end
 """
@@ -394,7 +396,7 @@ end
 
 Return the largest loss of `x` among the observations with positive weight.
 
-This is the value of a tail measure at significance level zero. [`ConditionalValueatRisk`](@ref) and [`EntropicValueatRisk`](@ref) read it on the returns, and [`ConditionalDrawdownatRisk`](@ref) and [`EntropicDrawdownatRisk`](@ref) read it on the drawdowns. An observation with zero weight has no probability, so it cannot be the worst outcome. [`WorstRealisation`](@ref) and [`MaximumDrawdown`](@ref) read every observation instead.
+This is the value of a tail measure at significance level zero. [`ConditionalValueatRisk`](@ref) and [`EntropicValueatRisk`](@ref) read it on the returns, [`PRM`](@ref) reads it as the value of [`PowerNormValueatRisk`](@ref) under the condition of that measure, and [`ConditionalDrawdownatRisk`](@ref) and [`EntropicDrawdownatRisk`](@ref) read it on the drawdowns. An observation with zero weight has no probability, so it cannot be the worst outcome. [`WorstRealisation`](@ref) and [`MaximumDrawdown`](@ref) read every observation instead.
 
 # Arguments
 
@@ -417,129 +419,148 @@ function worst_positive_weight_loss(x::VecNum, w::VecNum)
     return -minimum(x[t] for t in axes(x, 1) if zero(w[t]) < w[t])
 end
 """
-    supports_precomputed_returns(r::AbstractBaseRiskMeasure) -> Bool
-    supports_precomputed_returns(rk::RiskInputKind, r::AbstractBaseRiskMeasure) -> Bool
+    positive_weight_rows(::Nothing, T::Integer) -> Base.OneTo
+    positive_weight_rows(w::VecNum, T::Integer) -> Vector{Int}
 
-Whether risk measure `r` has a well-defined *precomputed-returns* form — i.e. whether its
-expected risk can be evaluated on an already-reduced net-return series `x` alone, via the
-functor `r(x::VecNum)`.
+Return the indices of the observations with positive weight.
 
-The contract is well-defined exactly when the measure's result is a function of the series
-alone:
+A programme with one row for each observation builds its rows on these indices. An observation with zero weight has no probability, so its row does not change the optimum. But the row of a large loss makes a cone programme harder to solve, and an exponential cone row can stop the solver far from the optimum. [`ERM`](@ref), [`RRM`](@ref), [`PRM`](@ref) and the JuMP constraint layer of their measures read it.
 
-  - [`NetReturnsInput`](@ref) measures (quantile / drawdown families): always `true` — their
-    functor *is* the net-returns functor.
-  - The moment family ([`LowOrderMoment`](@ref), [`HighOrderMoment`](@ref), [`Skewness`](@ref),
-    [`Kurtosis`](@ref), [`MedianAbsoluteDeviation`](@ref), [`ThirdCentralMoment`](@ref)):
-    `true` iff its target is weight-independent (`mu` is `nothing`, a scalar, or a centering
-    function); a per-asset `mu` (`VecNum`/`VecScalar`) reduces as `dot(w, mu)` and needs the
-    weights the series no longer carries, so `false`.
-  - [`WeightsInput`](@ref) measures, tracking measures, and variance-carrying composites
-    (`VarianceSkewKurtosis`): `false` — "risk of a bare return series" is undefined for them.
+# Arguments
 
-This predicate is what makes the precomputed-returns contract *safe*. Because a
-`WeightsInput` measure's functor `r(w)` shares the `r(::VecNum)` signature with the contract,
-dispatch alone cannot distinguish weights from returns; [`expected_risk_from_returns`](@ref)
-consults this predicate and throws an explanatory error for ineligible measures rather than
-silently consuming the series as weights.
+  - `w`: Resolved observation weights from [`checked_observation_weights`](@ref), or `nothing`.
+  - `T`: Number of observations.
+
+# Returns
+
+  - The indices `1:T` when `w` is `nothing`. Otherwise, the indices `t` with `w[t] > 0`.
+
+# Related
+
+  - [`worst_positive_weight_loss`](@ref)
+  - [`checked_observation_weights`](@ref)
+"""
+function positive_weight_rows(::Nothing, T::Integer)
+    return Base.OneTo(T)
+end
+function positive_weight_rows(w::VecNum, ::Integer)
+    return findall(v -> zero(v) < v, w)::Vector{Int}
+end
+"""
+    supports_precomputed_returns(r::AbstractBaseRiskMeasure,
+                                 rk::RiskInputKind = risk_input_kind(r)) -> Bool
+
+Return whether risk measure `r` has a *precomputed-returns* form, that is, whether the
+functor `r(x::VecNum)` can evaluate its expected risk on a net-return series `x` alone.
+
+The form exists exactly when the value of the measure is a function of the series alone:
+
+  - A [`NetReturnsInput`](@ref) measure, of the quantile and the drawdown families, always
+    answers `true`. Its functor is the net-returns functor.
+  - A measure of the moment family, [`LowOrderMoment`](@ref), [`HighOrderMoment`](@ref),
+    [`MedianAbsoluteDeviation`](@ref) and [`ThirdCentralMoment`](@ref), answers `true` when
+    its target does not read the weights.
+    That is the case when `mu` is `nothing`, a scalar or a centring function. A per-asset
+    `mu`, a `VecNum` or a `VecScalar`, reduces as `dot(w, mu)` and needs the weights that the
+    series no longer carries, so the answer is `false`.
+  - A [`WeightsInput`](@ref) measure, such as [`Variance`](@ref), [`Skewness`](@ref) and
+    [`Kurtosis`](@ref), a tracking measure and a composite that carries a variance, such as
+    `VarianceSkewKurtosis`, answer `false`. The risk of a bare return
+    series has no definition for them.
+
+This predicate keeps the precomputed-returns contract safe. The functor `r(w)` of a
+`WeightsInput` measure has the same `r(::VecNum)` signature as the contract, so dispatch
+cannot tell weights from returns. [`expected_risk_from_returns`](@ref) reads this predicate,
+and it throws an error that explains the refusal for an ineligible measure. It never reads
+the series as weights.
+
+The kind of the measure is the second slot, and its default is [`risk_input_kind`](@ref) of
+the measure. A measure that declares its own one-argument method answers for itself. Every
+other call dispatches on the kind: `(::Any, ::NetReturnsInput)` answers `true` and
+`(::Any, ::WeightsInput)` answers `false`. This method takes a [`WeightsReturnsFeesInput`](@ref)
+measure that declares no method of its own. Every such measure declares it beside its
+definition. A moment measure declares
+`supports_precomputed_returns(r::T) = weight_independent_target(r.mu)`, and a measure that
+reads the weights, such as a tracking measure or a composite that carries a variance, declares
+`supports_precomputed_returns(::T) = false`. The completeness test in `test_09_risk_measures.jl`
+makes the omission fail in CI.
+
+# Validation
+
+  - A [`WeightsReturnsFeesInput`](@ref) measure that reaches this method declared no method of its own. It throws an `ArgumentError` that states the declaration to write.
 
 # Related
 
   - [`expected_risk_from_returns`](@ref)
   - [`risk_input_kind`](@ref)
   - [`RiskInputKind`](@ref)
+  - [`WeightsReturnsFeesInput`](@ref)
+  - [`weight_independent_target`](@ref)
 """
-function supports_precomputed_returns(r::AbstractBaseRiskMeasure)
-    return supports_precomputed_returns(risk_input_kind(r), r)
+function supports_precomputed_returns(r::AbstractBaseRiskMeasure,
+                                      ::WeightsReturnsFeesInput = risk_input_kind(r))
+    return throw(ArgumentError("`$(typeof(r))` is a `WeightsReturnsFeesInput` risk measure that does not declare `supports_precomputed_returns`. Declare it at the measure's definition site: a moment measure as `supports_precomputed_returns(r::$(typeof(r))) = weight_independent_target(r.mu)`; a weights-dependent measure (tracking, variance-carrying composite) as `supports_precomputed_returns(::$(typeof(r))) = false`."))
 end
 """
 $(DocStringExtensions.TYPEDSIGNATURES)
 
-Return `true`: [`NetReturnsInput`](@ref) measures always support precomputed returns —
-their functor *is* the net-returns functor.
+Return `true`. A [`NetReturnsInput`](@ref) measure always supports precomputed returns,
+because its functor is the net-returns functor.
 
 # Related
 
   - [`supports_precomputed_returns`](@ref)
   - [`NetReturnsInput`](@ref)
 """
-supports_precomputed_returns(::NetReturnsInput, ::Any) = true
+supports_precomputed_returns(::Any, ::NetReturnsInput)::Bool = true
 """
 $(DocStringExtensions.TYPEDSIGNATURES)
 
-Return `false`: [`WeightsInput`](@ref) measures never support precomputed returns —
-their functor consumes portfolio weights, not a return series.
+Return `false`. A [`WeightsInput`](@ref) measure never supports precomputed returns,
+because its functor reads portfolio weights, not a return series.
 
 # Related
 
   - [`supports_precomputed_returns`](@ref)
   - [`WeightsInput`](@ref)
 """
-supports_precomputed_returns(::WeightsInput, ::Any) = false
+supports_precomputed_returns(::Any, ::WeightsInput)::Bool = false
 """
 $(DocStringExtensions.TYPEDSIGNATURES)
 
-Erroring tripwire for [`WeightsReturnsFeesInput`](@ref) measures that have not declared
-[`supports_precomputed_returns`](@ref) at their own definition site. Every such measure
-must declare it there: moment measures as `supports_precomputed_returns(r::T) = weight_independent_target(r.mu)`; weights-dependent measures (tracking, variance-carrying
-composites) as `supports_precomputed_returns(::T) = false`. Reaching this leaf means a
-measure forgot to declare it — throws an `ArgumentError` with instructions rather than
-silently mis-routing (and the completeness test in `test_09_risk_measures.jl` turns that
-into a CI failure).
-
-# Validation
-
-  - Throws an `ArgumentError` on every call. Reaching this leaf means the measure declared no `supports_precomputed_returns` method of its own, and the message states the declaration to write.
-
-# Returns
-
-  - Nothing is returned. The method always raises.
-
-# Related
-
-  - [`supports_precomputed_returns`](@ref)
-  - [`WeightsReturnsFeesInput`](@ref)
-  - [`weight_independent_target`](@ref)
-"""
-function supports_precomputed_returns(::WeightsReturnsFeesInput, r::AbstractBaseRiskMeasure)
-    return throw(ArgumentError("`$(typeof(r))` is a `WeightsReturnsFeesInput` risk measure that does not declare `supports_precomputed_returns`. Declare it at the measure's definition site: a moment measure as `supports_precomputed_returns(r::$(typeof(r))) = weight_independent_target(r.mu)`; a weights-dependent measure (tracking, variance-carrying composite) as `supports_precomputed_returns(::$(typeof(r))) = false`."))
-end
-"""
-$(DocStringExtensions.TYPEDSIGNATURES)
-
-Return `true`: a `Nothing` target is trivially weight-independent and can be evaluated
-on a bare return series.
+Return `true`. A `nothing` target reads no weights, so a bare return series is enough to
+evaluate it.
 
 # Related
 
   - [`supports_precomputed_returns`](@ref)
   - [`weight_independent_target`](@ref)
 """
-weight_independent_target(::Nothing) = true
+weight_independent_target(::Nothing)::Bool = true
 """
 $(DocStringExtensions.TYPEDSIGNATURES)
 
-Return `true`: a scalar target does not require portfolio weights and can be evaluated
-on a bare return series.
+Return `true`. A scalar target reads no portfolio weights, so a bare return series is
+enough to evaluate it.
 
 # Related
 
   - [`supports_precomputed_returns`](@ref)
   - [`weight_independent_target`](@ref)
 """
-weight_independent_target(::Number) = true
+weight_independent_target(::Number)::Bool = true
 """
 $(DocStringExtensions.TYPEDSIGNATURES)
 
-Return `false`: the target type requires portfolio weights (e.g. a per-asset `mu` involves
-`dot(w, mu)`) and cannot be evaluated on a bare return series.
+Return `false`. The target reads the portfolio weights, as a per-asset `mu` does through
+`dot(w, mu)`, so a bare return series is not enough to evaluate it.
 
 # Related
 
   - [`supports_precomputed_returns`](@ref)
   - [`weight_independent_target`](@ref)
 """
-weight_independent_target(::Any) = false
+weight_independent_target(::Any)::Bool = false
 """
 $(DocStringExtensions.TYPEDSIGNATURES)
 
@@ -573,7 +594,7 @@ $(DocStringExtensions.TYPEDEF)
 
 Abstract supertype for risk measures that are not intended for use in portfolio optimisation routines.
 
-These risk measures are typically used for analysis, reporting, or diagnostics, and are not designed to be included as objectives or constraints in optimisation problems. Subtype this when implementing a risk measure that should not be selectable by optimisation algorithms.
+These risk measures serve analysis, reports and diagnostics. No optimiser takes one as an objective or as a constraint. Subtype this for a risk measure that an optimiser must not accept.
 
 # Related
 
@@ -588,7 +609,7 @@ $(DocStringExtensions.TYPEDEF)
 
 Abstract supertype for risk measures that are intended for use in portfolio optimisation routines.
 
-All concrete risk measures that can be used as objectives or constraints in optimisation problems should subtype `OptimisationRiskMeasure`. This ensures compatibility with the optimisation framework and enables composability with other estimators and algorithms.
+Every concrete risk measure that an optimiser takes as an objective or as a constraint subtypes `OptimisationRiskMeasure`, through [`RiskMeasure`](@ref) or [`HierarchicalRiskMeasure`](@ref).
 
 # Related
 
@@ -611,7 +632,7 @@ Alias for an abstract vector of [`OptimisationRiskMeasure`](@ref) elements.
 """
 const VecOptRM = AbstractVector{<:OptimisationRiskMeasure}
 """
-    const OptRM_VecOptRM = Union{<:OptimisationRiskMeasure, <:VecOptRM}
+    const OptRM_VecOptRM = Union{OptimisationRiskMeasure, VecOptRM}
 
 Union type accepting a single [`OptimisationRiskMeasure`](@ref) or a vector of them.
 
@@ -620,17 +641,17 @@ Union type accepting a single [`OptimisationRiskMeasure`](@ref) or a vector of t
   - [`OptimisationRiskMeasure`](@ref)
   - [`VecOptRM`](@ref)
 """
-const OptRM_VecOptRM = Union{<:OptimisationRiskMeasure, <:VecOptRM}
+const OptRM_VecOptRM = Union{OptimisationRiskMeasure, VecOptRM}
 """
 $(DocStringExtensions.TYPEDEF)
 
 Abstract supertype for standard risk measures used in portfolio optimisation.
 
-Subtype `RiskMeasure` to implement concrete risk measures that quantify portfolio risk and can be used as objectives or constraints in optimisation problems. This type ensures compatibility with the optimisation framework and enables composability with other estimators and algorithms.
+Subtype `RiskMeasure` for a concrete risk measure that a `JuMP` optimiser builds into its model, as an objective or as a constraint. A clustering optimiser accepts it too.
 
 # Interfaces
 
-In order to implement a new risk measure that works seamlessly with the library, subtype `RiskMeasure` with a `settings::RiskMeasureSettings` field — `set_risk_expression!` reads its `scale` and `rke`, `set_risk_upper_bound!` its `ub`, and [`expected_risk`](@ref) its `scale` when several measures combine — and implement the following methods:
+To implement a new risk measure, subtype `RiskMeasure` with a `settings::RiskMeasureSettings` field, and implement the methods below. `set_risk_expression!` reads the `scale` and the `rke` of the field, `set_risk_upper_bound!` reads its `ub`, and [`expected_risk`](@ref) reads its `scale` when several measures combine.
 
 ## `risk_input_kind`
 
@@ -682,6 +703,74 @@ Each has a fallback on [`AbstractBaseRiskMeasure`](@ref):
 """
 abstract type RiskMeasure <: OptimisationRiskMeasure end
 """
+$(DocStringExtensions.TYPEDEF)
+
+Holds the **Range Tails** of a range risk measure: the two point measures whose sum is the range.
+
+[`range_tails`](@ref) returns it, and a range of your own builds it in its method of that verb. The `loss` tail reads the net portfolio returns, and the `gain` tail reads their negation at the second level of the range. An upper bound and a risk-expression contribution belong to the range as a whole, which registers them once from the composite expression. So each tail carries `rke = false`, and the constructor refuses a tail that does not.
+
+# Fields
+
+$(DocStringExtensions.FIELDS)
+
+# Constructors
+
+    RangeTails(loss::RiskMeasure, gain::RiskMeasure) -> RangeTails
+    RangeTails(; loss::RiskMeasure, gain::RiskMeasure) -> RangeTails
+
+# Validation
+
+  - `loss.settings.rke` and `gain.settings.rke` are `false`. Otherwise an `ArgumentError` is raised.
+
+# Examples
+
+```jldoctest
+julia> off = RiskMeasureSettings(; rke = false);
+
+julia> tails = PortfolioOptimisers.RangeTails(;
+                                              loss = ConditionalValueatRisk(; settings = off,
+                                                                            alpha = 0.05),
+                                              gain = ConditionalValueatRisk(; settings = off,
+                                                                            alpha = 0.1));
+
+julia> (tails.loss.alpha, tails.gain.alpha)
+(0.05, 0.1)
+
+julia> PortfolioOptimisers.RangeTails(; loss = ConditionalValueatRisk(),
+                                      gain = ConditionalValueatRisk())
+ERROR: ArgumentError: Each tail of a range carries `rke = false`, because the range registers its risk expression once. Got
+loss.settings.rke => true
+gain.settings.rke => true
+Stacktrace:
+[...]
+```
+
+# Related
+
+  - [`range_tails`](@ref)
+  - [`RiskMeasure`](@ref)
+  - [`RiskMeasureSettings`](@ref)
+  - [`GenericValueatRiskRange`](@ref)
+"""
+@concrete struct RangeTails
+    """
+    The point measure of the losses, at the first level of the range.
+    """
+    loss
+    """
+    The point measure of the gains, read on the negated returns at the second level of the range.
+    """
+    gain
+    function RangeTails(loss::RiskMeasure, gain::RiskMeasure)
+        @argcheck(!loss.settings.rke && !gain.settings.rke,
+                  ArgumentError("Each tail of a range carries `rke = false`, because the range registers its risk expression once. Got\nloss.settings.rke => $(loss.settings.rke)\ngain.settings.rke => $(gain.settings.rke)"))
+        return new{typeof(loss), typeof(gain)}(loss, gain)
+    end
+end
+function RangeTails(; loss::RiskMeasure, gain::RiskMeasure)::RangeTails
+    return RangeTails(loss, gain)
+end
+"""
     const VecRM = AbstractVector{<:RiskMeasure}
 
 Alias for an abstract vector of [`RiskMeasure`](@ref) elements.
@@ -694,7 +783,7 @@ Alias for an abstract vector of [`RiskMeasure`](@ref) elements.
 """
 const VecRM = AbstractVector{<:RiskMeasure}
 """
-    const RM_VecRM = Union{<:RiskMeasure, <:VecRM}
+    const RM_VecRM = Union{RiskMeasure, VecRM}
 
 Union type accepting a single [`RiskMeasure`](@ref) or a vector of them.
 
@@ -703,7 +792,7 @@ Union type accepting a single [`RiskMeasure`](@ref) or a vector of them.
   - [`RiskMeasure`](@ref)
   - [`VecRM`](@ref)
 """
-const RM_VecRM = Union{<:RiskMeasure, <:VecRM}
+const RM_VecRM = Union{RiskMeasure, VecRM}
 """
 $(DocStringExtensions.TYPEDEF)
 
@@ -713,7 +802,7 @@ Subtype `HierarchicalRiskMeasure` to implement risk measures that operate on hie
 
 # Interfaces
 
-A hierarchical measure is only ever evaluated at the value level, through [`expected_risk`](@ref), so it builds no `JuMP` model and needs no model builder. In order to implement a new one that works seamlessly with the library, subtype `HierarchicalRiskMeasure` with a `settings::HierarchicalRiskMeasureSettings` field — [`expected_risk`](@ref) reads its `scale` when several measures combine — and implement the following methods:
+A hierarchical measure is only ever evaluated at the value level, through [`expected_risk`](@ref), so it builds no `JuMP` model and needs no model builder. To implement a new one, subtype `HierarchicalRiskMeasure` with a `settings::HierarchicalRiskMeasureSettings` field, and implement the methods below. [`expected_risk`](@ref) reads the `scale` of the field when several measures combine.
 
 ## `risk_input_kind`
 
@@ -765,7 +854,7 @@ A settings object carries the three things a risk measure needs that are not par
 
 # Interfaces
 
-In order to implement a new concrete settings type, subtype `AbstractRiskMeasureSettings` and give it these fields:
+To implement a new concrete settings type, subtype `AbstractRiskMeasureSettings` and give it these fields:
 
 ## Required fields
 
@@ -788,7 +877,7 @@ $(DocStringExtensions.TYPEDEF)
 
 Abstract supertype for risk measure settings used in JuMP-based optimisation routines.
 
-All concrete settings types compatible with JuMP optimisation (e.g. [`RiskMeasureSettings`](@ref), [`MaxRiskMeasureSettings`](@ref)) should subtype `JuMPRiskMeasureSettings`.
+Every concrete settings type that a `JuMP` optimisation reads subtypes `JuMPRiskMeasureSettings`. [`RiskMeasureSettings`](@ref) and [`MaxRiskMeasureSettings`](@ref) are the two that the library defines.
 
 # Related
 
@@ -806,7 +895,7 @@ A bound and the risk expression it bounds are not always in the same units. A co
 
 # Interfaces
 
-In order to implement a new bound transformation, subtype `FrontierBoundEstimator` and implement:
+To implement a new bound transformation, subtype `FrontierBoundEstimator` and implement:
 
 ## Required method name
 
@@ -837,7 +926,7 @@ $(DocStringExtensions.TYPEDEF)
 
 Applies a square-root transformation to bound values before enforcing them.
 
-The conversion is `sqrt(ub)`. The caller writes the bound against the **measure**, and the model enforces it against the square root of that quantity, so a bound on a variance becomes a bound on a standard deviation. Used when the risk expression is in standard-deviation units but the user-supplied bound is in variance units (e.g. kurtosis and negative-skewness SOC formulations). This is also the transformation the default [`Variance`](@ref) formulation takes, so a `Variance` frontier is evenly spaced in **standard-deviation** units, and its variances are **not** evenly spaced.
+The conversion is `sqrt(ub)`. The caller writes the bound against the **measure**, and the model enforces it against the square root of that quantity, so a bound on a variance becomes a bound on a standard deviation. A formulation uses it when the risk expression is in standard-deviation units and the bound of the caller is in variance units, as the second-order cone forms of [`Kurtosis`](@ref) and [`NegativeSkewness`](@ref) are. This is also the transformation the default [`Variance`](@ref) formulation takes, so a `Variance` frontier is evenly spaced in **standard-deviation** units, and its variances are **not** evenly spaced.
 
 # Related
 
@@ -852,7 +941,7 @@ $(DocStringExtensions.TYPEDEF)
 
 Passes bound values through unchanged (identity transformation).
 
-The conversion is `ub` itself. The caller writes the bound against the **measure**, and the model enforces it against that same quantity. Used when the risk expression and the user-supplied bound are already in the same units (e.g. SDP variance formulation where both sides are in variance units). This is the default of [`Frontier`](@ref), so a sweep that names no `bound` is evenly spaced in the units of the measure.
+The conversion is `ub` itself. The caller writes the bound against the **measure**, and the model enforces it against that same quantity. A formulation uses it when the risk expression and the bound of the caller are in the same units, as the semidefinite form of [`Variance`](@ref) is, with both in variance units. This is the default of [`Frontier`](@ref), so a sweep that names no `bound` is evenly spaced in the units of the measure.
 
 # Related
 
@@ -867,7 +956,7 @@ $(DocStringExtensions.TYPEDEF)
 
 Applies a squaring transformation to bound values before enforcing them.
 
-The conversion is `ub^2`. The caller writes the bound against the **measure**, and the model enforces it against the square of that quantity, so a bound on a standard deviation becomes a bound on a variance. Used when the risk expression is in squared units but the user-supplied bound is in linear units (e.g. kurtosis SDP formulation).
+The conversion is `ub^2`. The caller writes the bound against the **measure**, and the model enforces it against the square of that quantity, so a bound on a standard deviation becomes a bound on a variance. A formulation uses it when the risk expression is in squared units and the bound of the caller is in linear units, as the kurtosis term of [`VarianceSkewKurtosis`](@ref) is under a second-moment formulation that is not quadratic.
 
 # Related
 
@@ -882,9 +971,28 @@ $(DocStringExtensions.TYPEDEF)
 
 Sweeps the efficient frontier by solving the model once at each of `N` evenly spaced bound values.
 
-Stand this in a risk measure's bound slot instead of a number. The optimisation then reads the span off two corner portfolios, divides it into `N` levels, and returns one portfolio per level. The corners are a minimum-risk solve and a maximum-return solve, so the span covers the whole attainable range of the bound.
+Stand this in a risk measure's bound slot instead of a number. The optimisation then reads the span off two corner portfolios, divides it into `N` levels, and returns one portfolio per level. The corners are a minimum-risk solve and a maximum-return solve of the whole model. When the bound is on the measure that the minimum-risk solve minimises, the span covers the whole attainable range of the bound. When the bound is on one term of a composite measure, or on one measure of several, the span runs between the values of the bound at the two corners, and the term can reach a lower value than its value at the minimum-risk corner.
 
 The levels are evenly spaced in the units of the **risk expression** the bound is applied to, which `bound` names, and not in the units of the measure. See [`SquareRootBound`](@ref) for the case where the two differ.
+
+!!! warning "A sweep under `MaximumRatio`"
+
+    Under [`MaximumRatio`](@ref), a sweep needs a solver wrapper. This holds for a `Frontier` and for a vector of bounds, on a risk ceiling and on a return floor of [`JuMPReturnsSettings`](@ref). The objective homogenises the model with one more variable, the ratio factor. A sweep builds the model once and writes each level into a `JuMP.Parameter`. The bound row multiplies that parameter by the ratio factor. A solver that receives the parameter as a variable sees a product of two variables, and a conic solver such as Clarabel refuses it with `MOI.UnsupportedConstraint{MOI.ScalarQuadraticFunction{Float64}, MOI.LessThan{Float64}}`. Each point then returns an [`OptimisationFailure`](@ref).
+
+    Wrap the solver in the `Optimizer` of [ParametricOptInterface](https://jump.dev/ParametricOptInterface.jl/stable/). The wrapper puts the value of each parameter into the row before the solve, so the solver receives a linear row. Version 0.15 or later takes the type of the inner solver, and passes the `settings` of the [`Solver`](@ref) to it.
+
+    ```julia
+    import ParametricOptInterface as POI
+    using Clarabel
+    slv = Solver(; name = :clarabel, solver = () -> POI.Optimizer(Clarabel.Optimizer),
+                 settings = Dict(\"verbose\" => false))
+    ```
+
+    The span of a `Frontier` does not read the homogenised model. A minimum-risk solve on that model gives the maximum-ratio portfolio, and a maximum-return solve is unbounded. So the span comes from a second model that is not homogenised, with [`resolve_ratio_frontier!`](@ref), and it is the span of the same `Frontier` under [`MinimumRisk`](@ref). The second model costs one more model build. A risk ceiling above the risk of the maximum-ratio portfolio does not bind, so every level above that risk returns the maximum-ratio portfolio.
+
+    Under every other objective the ratio factor is the number `1`, and the sweep needs no wrapper. The [efficient frontier](@ref example-efficient-frontier) example sweeps a `MaximumRatio` frontier in this way.
+
+Page 82 of [markowitz1952](@cite) states the efficient set for the variance, as the minimum variance for a given expected return and the maximum expected return for a given variance. Equations 8.7 and 8.10 of [cajas2025](@cite) state the two programmes for a general convex risk measure, and the text of that section builds a frontier by a sweep of the bound.
 
 # Fields
 
@@ -899,17 +1007,13 @@ $(DocStringExtensions.FIELDS)
 
 Creates a `Frontier` with `N` points, a scaling factor of `1`, and the specified `bound` strategy. Used to set appropriate frontier bounds in [`variance_risk_bounds_val`](@ref) and [`second_moment_bound_val`](@ref).
 
-    PortfolioOptimisers._Frontier(;
-        N::Integer = 20,
-        factor::Number,
-        bound::FrontierBoundEstimator
-    ) -> Frontier
+    Frontier(N::Integer, factor::Number = 1, bound::FrontierBoundEstimator = LinearBound()) -> Frontier
 
-Internal constructor. Keywords correspond to the struct's fields.
+Creates a `Frontier` whose `factor` and `bound` a formulation chose. The keyword form pins `factor` to `1`, because a caller states a bound in the units of the measure and knows nothing of the internal scaling of the model. A formulation does know: it reads the `Frontier` of the caller, keeps its `N`, and rebuilds it with the conversion that its own risk expression needs, as [`variance_risk_bounds_val`](@ref) and [`second_moment_bound_val`](@ref) do. The sweep values come later, in [`rebuild_risk_frontier`](@ref), once the two corner portfolios are known: `bound` transforms each end of the span, `factor` multiplies both, and `range` divides the result into `N` levels.
 
 ## Validation
 
-  - `N > 0` and `N <= RESOURCE_LIMITS[].max_frontier` (each sweep point runs a full solve; see [`RESOURCE_LIMITS`](@ref)). This is the cheap early check on **one** bound. The sweep across several swept bounds is their product, capped separately at Model Assembly by [`assert_frontier_sweep_cap`](@ref).
+  - `N > 1` and `N <= RESOURCE_LIMITS[].max_frontier`. The sweep runs from the minimum-risk end to the maximum-return end, so it needs two points. Each sweep point runs a full solve, see [`RESOURCE_LIMITS`](@ref). This is the cheap early check on **one** bound. The sweep across several swept bounds is their product, capped separately at Model Assembly by [`assert_frontier_sweep_cap`](@ref).
   - `isfinite(factor)` and `factor > 0`.
 
 # Examples
@@ -933,6 +1037,7 @@ Frontier
 
 # References
 
+  - $(ref_dict[:markowitz1952]) Page 82.
   - $(ref_dict[:cajas2025]) Sections 8.2.1 and 8.2.2, Equations 8.7 and 8.10.
 """
 @concrete struct Frontier <: AbstractAlgorithm
@@ -950,7 +1055,9 @@ Frontier
     bound
     function Frontier(N::Integer, factor::Number = 1,
                       bound::FrontierBoundEstimator = LinearBound())::Frontier
-        @argcheck(N > zero(N), DomainError(N, "N must be > 0"))
+        @argcheck(N > one(N),
+                  DomainError(N,
+                              "N must be > 1: the sweep runs from the minimum-risk end to the maximum-return end, and one point cannot hold both. To solve at one bound, give the bound as a number."))
         assert_resource_cap(N, RESOURCE_LIMITS[].max_frontier, :N, :max_frontier)
         @argcheck(isfinite(factor), IsNonFiniteError("factor must be finite, got $factor"))
         @argcheck(factor > zero(factor), DomainError(factor, "factor must be positive"))
@@ -962,38 +1069,7 @@ function Frontier(; N::Integer = 20,
     return Frontier(N, 1, bound)
 end
 """
-    _Frontier(; N = 20, factor, bound)
-
-Build a [`Frontier`](@ref) whose `factor` and `bound` a formulation chose, rather than the caller.
-
-The keyword constructor `Frontier(; N, bound)` pins `factor` to `1`, because a caller states a bound in the units of the measure and knows nothing of the model's internal scaling. A formulation does know: it reads the caller's `Frontier`, keeps its `N`, and rebuilds it with the conversion its own risk expression needs. That is what [`variance_risk_bounds_val`](@ref) and [`second_moment_bound_val`](@ref) do.
-
-This builds a `Frontier`, not the sweep values. The values are built later, in [`rebuild_risk_frontier`](@ref), once the two corner portfolios are known: `bound` transforms each end of the span, `factor` multiplies both, and `range` divides the result into `N` levels.
-
-# Arguments
-
-  - `N`: Number of sweep points (default 20).
-  - `factor`: Multiplier applied to both ends of the span, after `bound` has transformed them.
-  - `bound`: [`FrontierBoundEstimator`](@ref) converting the span into the units of the risk expression.
-
-# Returns
-
-  - `Frontier`: The rebuilt sweep specification.
-
-# Related
-
-  - [`Frontier`](@ref)
-  - [`variance_risk_bounds_val`](@ref)
-  - [`second_moment_bound_val`](@ref)
-  - [`rebuild_risk_frontier`](@ref)
-  - [`MeanRisk`](@ref)
-  - [`NearOptimalCentering`](@ref)
-"""
-function _Frontier(; N::Integer = 20, factor::Number, bound::FrontierBoundEstimator)
-    return Frontier(N, factor, bound)
-end
-"""
-    const RkRtBounds = Union{<:Num_VecNum, <:Frontier}
+    const RkRtBounds = Union{Num_VecNum, Frontier}
 
 Union type for risk-measure upper bound specifications.
 
@@ -1005,9 +1081,9 @@ Accepts either a scalar/vector numeric bound or a [`Frontier`](@ref) sweep confi
   - [`Num_VecNum`](@ref)
   - [`RiskMeasureSettings`](@ref)
 """
-const RkRtBounds = Union{<:Num_VecNum, <:Frontier}
+const RkRtBounds = Union{Num_VecNum, Frontier}
 """
-    const Front_NumVec = Union{<:VecNum, <:Frontier}
+    const Front_NumVec = Union{VecNum, Frontier}
 
 Union type for frontier or numeric-vector specifications used internally for risk bounds.
 
@@ -1017,13 +1093,13 @@ Union type for frontier or numeric-vector specifications used internally for ris
   - [`VecNum`](@ref)
   - [`RkRtBounds`](@ref)
 """
-const Front_NumVec = Union{<:VecNum, <:Frontier}
+const Front_NumVec = Union{VecNum, Frontier}
 """
 $(DocStringExtensions.TYPEDEF)
 
 Weights a risk measure inside an aggregate, and bounds its risk expression from above.
 
-This is the settings type of every measure the optimiser minimises. `ub` is the maximum level of risk the solution may reach, the ``\\bar{\\phi}`` of Equation 8.10 of [cajas2025](@cite); sweeping it is how the book builds an efficient frontier, which is what a [`Frontier`](@ref) in that slot does. `scale` weights the measure against its siblings when several are given, and `rke` decides whether it reaches the aggregate at all.
+This is the settings type of every measure the optimiser minimises. `ub` is the maximum level of risk the solution may reach. Page 82 of [markowitz1952](@cite) states this bound for the variance, as the maximum expected return for a given variance or less. Equation 8.10 of [cajas2025](@cite) states it for a general convex risk measure as ``\\bar{\\phi}``, and a sweep of it builds an efficient frontier, which is what a [`Frontier`](@ref) in that slot does. `scale` weights the measure against its siblings when several are given, and `rke` decides whether it reaches the aggregate at all.
 
 # Fields
 
@@ -1065,6 +1141,7 @@ RiskMeasureSettings
 
 # References
 
+  - $(ref_dict[:markowitz1952]) Page 82.
   - $(ref_dict[:cajas2025]) Section 8.2.2, Equation 8.10.
 """
 @concrete struct RiskMeasureSettings <: JuMPRiskMeasureSettings
@@ -1143,21 +1220,6 @@ function HierarchicalRiskMeasureSettings(;
     return HierarchicalRiskMeasureSettings(scale)
 end
 """
-$(DocStringExtensions.TYPEDSIGNATURES)
-
-Return the risk measure `rs` unchanged.
-
-Identity pass-through used when a risk measure is provided in a context that calls [`factory`](@ref).
-
-# Related
-
-  - [`AbstractBaseRiskMeasure`](@ref)
-  - [`factory`](@ref)
-"""
-function factory(rs::AbstractBaseRiskMeasure, args...; kwargs...)
-    return rs
-end
-"""
     port_opt_view(rs, i, X)
 
 Get a view or subset of a risk measure for asset cluster index `i`.
@@ -1192,28 +1254,32 @@ Abstract supertype for scalarisation strategies used to combine multiple risk me
 
 Subtype `Scalariser` to implement different methods for aggregating risk measures. These strategies are used in portfolio optimisation routines that require a single risk value from multiple risk measures.
 
+Section 4.7.4 of [boydvandenberghe2004](@cite) states the weighted sum as a scalarisation of a vector objective. No copy of the work that first states it was found. The family ports the `cvxpy.transforms.scalarize` module of [diamondboyd2016](@cite), which adds the maximum and the log-sum-exp.
+
 ## Two consumers, and only one of them is restricted
 
 A scalariser is read at two levels, and they are not equally permissive.
 
-  - **The model level.** A `JuMP` optimiser builds the aggregation into the model as an expression, so the strategy must have a convex form. This is what [`NonHierarchicalScalariser`](@ref) and [`HierarchicalScalariser`](@ref) separate: the two subtypes name the **consumers** that can build a given strategy, not a property of the resulting number. `JuMPOptimiser.sca` is bounded `NonHierarchicalScalariser` and refuses the hierarchical half; the clustering optimisers compute each cluster's risk separately and accept either.
-  - **The value level.** [`expected_risk`](@ref) and the readers around it evaluate the measures first and combine the resulting **numbers**, so nothing convex is being built and no strategy can be refused on those grounds. Every `sca` keyword and every `sca` result field at this level is bounded [`Scalariser`](@ref), and **all four scalarisers are admitted**, [`MinScalariser`](@ref) included.
+  - **The model level.** A `JuMP` optimiser builds the aggregation into the model as an expression, so the strategy must have a convex form. [`NonHierarchicalScalariser`](@ref) and [`HierarchicalScalariser`](@ref) separate the strategies on this property. The two subtypes name the **consumers** that can build a strategy, not a property of the number it gives. `JuMPOptimiser.sca` is bounded to `NonHierarchicalScalariser`, so it refuses the hierarchical half. The clustering optimisers compute the risk of each cluster separately and accept either half.
+  - **The value level.** [`expected_risk`](@ref) and the readers around it evaluate the measures first and combine the **numbers** they give. Nothing convex is built, so no strategy is refused for its form. Every `sca` keyword and every `sca` result field at this level is bounded to [`Scalariser`](@ref), and **all four scalarisers are admitted**, [`MinScalariser`](@ref) included.
 
-So a `HierarchicalScalariser` on a value-level call is not a misuse, and the word "hierarchical" in the subtype name describes which estimators accept it rather than where the number is meaningful.
+So a `HierarchicalScalariser` on a value-level call is correct. The word "hierarchical" in the name of the subtype says which estimators accept the strategy, not where its number has a meaning.
 
 ## The weights are the measures' own `scale`
 
-Every strategy below is a **weighted** aggregation, and it reads its weights from one place: the `scale` field of each measure's settings. Both levels apply it before the strategy runs — the model in [`set_risk_expression!`](@ref), which pushes `scale * r_expr`, and the value level in [`expected_risk`](@ref), which multiplies each element by `r.settings.scale`. Stating it once here is why no strategy below carries a weight vector of its own.
+Every strategy below is a **weighted** aggregation, and it reads its weights from one place, the `scale` field of the settings of each measure. Both levels apply the weight before the strategy runs. The model applies it in [`set_risk_expression!`](@ref), which pushes `scale * r_expr`. The value level applies it in [`expected_risk`](@ref), which multiplies each element by `r.settings.scale`. So no strategy below carries a weight vector of its own.
 
-## Two of the three model forms are exact only while the objective pushes
+## The model reports an upper bound unless the objective pulls it down
 
-[`SumScalariser`](@ref) builds an expression, so the model agrees with the value level whatever the objective is. The other two build a **variable** bounded below by the aggregation, and a minimising objective is what pulls it down onto the aggregation. Under [`MaximumReturn`](@ref) nothing pulls, so `model[:risk]` reports an upper bound rather than the aggregation; read the exact figure back with [`expected_risk`](@ref).
+[`SumScalariser`](@ref) builds an expression, so it adds no gap of its own. `model[:risk]` is the sum of the entries of `risk_vec` whatever the objective is. The other two build a **variable** that the aggregation bounds from below, and a minimising objective pulls the variable down onto the aggregation. Under [`MaximumReturn`](@ref) nothing pulls, so `model[:risk]` reports an upper bound of the aggregation. Read the exact figure back with [`expected_risk`](@ref).
 
-The bound the model **enforces** is unaffected. An `ub` on the aggregate constrains the variable, and the variable stands above the aggregation, so the aggregation satisfies the bound too. It is the reported figure that stands above it, and reading the aggregate back from [`expected_risk`](@ref) gives the exact one.
+An entry of `risk_vec` is exact only when the model of its own measure is exact. Most measures enter through an epigraph variable, and [`Variance`](@ref) under its default [`SquaredSOCRiskExpr`](@ref) is one of them. Under [`MaximumReturn`](@ref) that variable also stands above the value of its measure. So [`SumScalariser`](@ref) reports an upper bound there too, unless every measure has an exact expression, as [`Variance`](@ref) under [`QuadRiskExpr`](@ref) has.
+
+The bound that the model **enforces** does not change. An `ub` on the aggregate constrains the variable, and the variable stands above the aggregation, so the aggregation satisfies the bound too. Only the reported figure stands above the aggregation, and [`expected_risk`](@ref) gives the exact figure.
 
 # Interfaces
 
-In order to implement a new scalarisation strategy, subtype [`NonHierarchicalScalariser`](@ref) when the aggregation has a convex `JuMP` form and [`HierarchicalScalariser`](@ref) when it does not, then implement:
+To implement a new scalarisation strategy, subtype [`NonHierarchicalScalariser`](@ref) when the aggregation has a convex `JuMP` form and [`HierarchicalScalariser`](@ref) when it does not, then implement:
 
 ## Required method name
 
@@ -1243,8 +1309,8 @@ In order to implement a new scalarisation strategy, subtype [`NonHierarchicalSca
 
 # References
 
-  - $(ref_dict[:boydvandenberghe2004]) Vector optimisation and scalarisation.
-  - $(ref_dict[:diamondboyd2016]) The `cvxpy.transforms.scalarize` module, which this family ports.
+  - $(ref_dict[:boydvandenberghe2004]) Section 4.7.4, page 178. $(ref_dict[:no_original_source])
+  - $(ref_dict[:diamondboyd2016]) Module `cvxpy.transforms.scalarize`.
 """
 abstract type Scalariser <: AbstractEstimator end
 """
@@ -1254,7 +1320,7 @@ Abstract supertype for scalarisation strategies that combine multiple risk measu
 
 Subtype `NonHierarchicalScalariser` when the aggregation has a convex `JuMP` form, so a `JuMP` optimiser can build it into the model as well as a clustering optimiser can compute it per cluster. `JuMPOptimiser.sca` is bounded here.
 
-The split names a **consumer**, not a property of the number. It does not restrict the value-level readers, which admit all four scalarisers — see [`Scalariser`](@ref).
+The split names a **consumer**, not a property of the number. It does not restrict the value-level readers, which admit all four scalarisers, as [`Scalariser`](@ref) states.
 
 # Related
 
@@ -1272,7 +1338,7 @@ Abstract supertype for scalarisation strategies that combine multiple risk measu
 
 Subtype `HierarchicalScalariser` when the aggregation has no convex `JuMP` form. `JuMPOptimiser.sca` is bounded [`NonHierarchicalScalariser`](@ref) and refuses this half; the clustering optimisers compute each cluster's risk separately and accept it.
 
-The split names a **consumer**, not a property of the number. At the value level the measures are evaluated first and the strategy combines plain numbers, so nothing is being built and all four scalarisers are admitted — see [`Scalariser`](@ref).
+The split names a **consumer**, not a property of the number. The value level evaluates the measures first and the strategy combines plain numbers, so nothing is built and all four scalarisers are admitted, as [`Scalariser`](@ref) states.
 
 # Related
 
@@ -1286,7 +1352,7 @@ $(DocStringExtensions.TYPEDEF)
 
 Adds the scaled risk measures together.
 
-This is the default everywhere a `sca` keyword appears, and the only strategy whose model form is an expression rather than a variable with constraints: [`scalarise_risk_expression!`](@ref) sums `risk_vec` into one affine or quadratic expression, so it is also the only one that takes a quadratic risk expression without a reformulation.
+Every `sca` field and keyword defaults to `nothing`, and `nothing` gives this sum. It is the only strategy whose model form is an expression rather than a variable with constraints: [`scalarise_risk_expression!`](@ref) sums `risk_vec` into one affine or quadratic expression, so it is also the only one that takes a quadratic risk expression without a reformulation.
 
 # Mathematical definition
 
@@ -1315,7 +1381,7 @@ Where:
 
 # References
 
-  - $(ref_dict[:boydvandenberghe2004]) Vector optimisation and scalarisation.
+  - $(ref_dict[:boydvandenberghe2004]) Section 4.7.4, page 178, Equation 4.60. $(ref_dict[:no_original_source])
   - $(ref_dict[:diamondboyd2016]) `cvxpy.transforms.scalarize.weighted_sum`.
 """
 struct SumScalariser <: NonHierarchicalScalariser end
@@ -1324,7 +1390,7 @@ $(DocStringExtensions.TYPEDEF)
 
 Reports the largest of the scaled risk measures, so the aggregate is the worst of them.
 
-The model form is a free variable held above every entry of `risk_vec`, which the objective then pushes down onto the largest. Under a minimum-risk objective the model agrees with [`expected_risk`](@ref); under a maximum-return objective it reports an upper bound instead, which is the shared caveat in [`Scalariser`](@ref). In clustering optimisations each cluster's risk is computed separately, so there is no coherence in which measure wins between clusters.
+The model form is a free variable held above every entry of `risk_vec`, and the objective pushes it down onto the largest entry. Under a minimum-risk objective the model agrees with [`expected_risk`](@ref). Under a maximum-return objective it reports an upper bound, as [`Scalariser`](@ref) states for every strategy. A clustering optimisation computes the risk of each cluster separately, so a different measure can be the largest in each cluster.
 
 # Mathematical definition
 
@@ -1363,8 +1429,7 @@ $(val_dict[:relax])
 
 # References
 
-  - $(ref_dict[:boydvandenberghe2004]) Vector optimisation and scalarisation.
-  - $(ref_dict[:diamondboyd2016]) `cvxpy.transforms.scalarize.max`.
+  - $(ref_dict[:diamondboyd2016]) `cvxpy.transforms.scalarize.max`. $(ref_dict[:no_original_source])
 """
 struct MaxScalariser <: NonHierarchicalScalariser end
 """
@@ -1372,9 +1437,9 @@ $(DocStringExtensions.TYPEDEF)
 
 Reports the smallest of the scaled risk measures, so the aggregate is the mildest of them.
 
-It is this library's own extension: the source family carries a weighted sum, a maximum and a log-sum-exp, and no minimum. In clustering optimisations each cluster's risk is computed separately, so there is no coherence in which measure wins between clusters.
+This library adds it. The source family has a weighted sum, a maximum and a log-sum-exp, and no minimum. A clustering optimisation computes the risk of each cluster separately, so a different measure can be the smallest in each cluster.
 
-It is the one [`HierarchicalScalariser`](@ref), because minimising a minimum is not convex and a `JuMP` optimiser cannot build it. That bound is the **model's**: at the value level the measures are already numbers, so `MinScalariser` is admitted by every `sca` keyword and every `sca` result field there, on equal footing with the other three.
+It is the one [`HierarchicalScalariser`](@ref), because the minimisation of a minimum is not convex and a `JuMP` optimiser cannot build it. That restriction applies to the **model** only. At the value level the measures are already numbers, so every `sca` keyword and every `sca` result field there admits `MinScalariser`, as it admits the other three.
 
 # Mathematical definition
 
@@ -1432,17 +1497,17 @@ The aggregate is never below the maximum and never more than ``\\log N / \\gamma
 \\end{align}
 ```
 
-So a large ``\\gamma`` gives the maximum. Under a minimum-risk objective the model agrees with [`expected_risk`](@ref) to within that bound, and under a maximum-return objective it reports an upper bound instead — the shared caveat in [`Scalariser`](@ref).
+Section 3.1.5 of [boydvandenberghe2004](@cite) states the bound for ``\\gamma = 1``. No earlier source of it was found. So a large ``\\gamma`` gives the maximum. Under a minimum-risk objective the model agrees with [`expected_risk`](@ref), which states the smoothed maximum. Under a maximum-return objective it reports an upper bound, as [`Scalariser`](@ref) states for every strategy.
 
 !!! warning
 
-    A small ``\\gamma`` does **not** give the weighted sum. The bound above shows why: the aggregate never falls below the maximum, and ``\\log N / \\gamma`` diverges. What survives is the shape — subtracting that divergent term recovers the weighted **mean**. An additive constant does not move a minimiser, so the *portfolio* a small ``\\gamma`` selects tends to the weighted sum's, while the *number* reported does not. The model degenerates first: ``\\gamma`` small enough to make the divergent term negligible can already fail to solve.
+    A small ``\\gamma`` does **not** give the weighted sum. The bound above shows why. The aggregate never falls below the maximum, and ``\\log N / \\gamma`` diverges. When that divergent term is subtracted, what is left tends to the weighted **mean**. An additive constant does not move a minimiser, so the *portfolio* that a small ``\\gamma`` selects tends to the portfolio of the weighted sum, but the *number* that it reports does not. The model fails first: a ``\\gamma`` small enough to make the divergent term negligible can already fail to solve.
 
 !!! warning
 
-    The model form is an exponential cone, which cannot hold a quadratic risk expression. Both [`Variance`](@ref) formulations produce one, so a `Variance` under this scalariser aborts the solve with `MOI.UnsupportedConstraint{MOI.ScalarQuadraticFunction{Float64}, MOI.GreaterThan{Float64}}`. Use [`StandardDeviation`](@ref) instead, or [`SumScalariser`](@ref), which sums a quadratic expression directly. Nothing refuses the combination up front.
+    The model form is an exponential cone, which cannot hold a quadratic risk expression. Both [`Variance`](@ref) formulations produce one, so a `Variance` under this scalariser fails to solve. The optimisation warns and returns an [`OptimisationFailure`](@ref) with `NaN` weights, and its `res` holds `MOI.UnsupportedConstraint{MOI.ScalarQuadraticFunction{Float64}, MOI.GreaterThan{Float64}}` for each solver. Use [`StandardDeviation`](@ref) instead, or [`SumScalariser`](@ref), which sums a quadratic expression directly. Nothing refuses the combination up front.
 
-In clustering optimisations each cluster's risk is computed separately, so there is no coherence between clusters, and the value level has no cone to build: it evaluates the measures first and reduces the numbers, where a large ``\\gamma`` is safe because `LogExpFunctions.logsumexp` shifts by the maximum before it exponentiates.
+A clustering optimisation computes the risk of each cluster separately, and the value level builds no cone. It evaluates the measures first and reduces the numbers. A large ``\\gamma`` is safe there, because `LogExpFunctions.logsumexp` subtracts the maximum before it exponentiates.
 
 # JuMP formulation
 
@@ -1452,6 +1517,7 @@ $(val_dict[:relax])
 
   - The bounded quantity is `risk`, the free variable [`scalarise_risk_expression!`](@ref) creates for this strategy. The rows `u_risk_lse` and `risk_lse` state the exponential-cone form of the log-sum-exp, which holds `model[:risk]` at or **above** the smoothed maximum.
   - The bound is tight while the objective pulls `risk` down, which a minimum-risk objective does. Under [`MaximumReturn`](@ref) nothing pulls, and `model[:risk]` is then an upper bound.
+  - A tight bound holds the smoothed maximum, not the maximum. The gap to the maximum is at most ``\\log N / \\gamma``, and it is equal to that value when all ``N`` scaled measures are equal. The gap closes as ``\\gamma`` grows, and as one measure exceeds the others by more than a few multiples of ``1 / \\gamma``.
   - An `ub` on the aggregate is unaffected, on the terms [`MaxScalariser`](@ref) states. Read the exact figure back with [`expected_risk`](@ref).
 
 # Fields
@@ -1490,8 +1556,8 @@ LogSumExpScalariser
 
 # References
 
-  - $(ref_dict[:boydvandenberghe2004]) The log-sum-exp function and its bound on the maximum.
-  - $(ref_dict[:diamondboyd2016]) `cvxpy.transforms.scalarize.log_sum_exp`.
+  - $(ref_dict[:boydvandenberghe2004]) Section 3.1.5, page 72. $(ref_dict[:no_original_source])
+  - $(ref_dict[:diamondboyd2016]) `cvxpy.transforms.scalarize.log_sum_exp`. $(ref_dict[:no_original_source])
 """
 @concrete struct LogSumExpScalariser <: NonHierarchicalScalariser
     """
@@ -1558,20 +1624,20 @@ function scalarise_logsumexp(vs::AbstractVector{<:Tuple})
     return ntuple(k -> scalarise_logsumexp([v[k] for v in vs]), Val(length(first(vs))))
 end
 """
-    scalarise(f, sca::Scalariser, itr; by = nothing)
+    scalarise(f, sca::Option{<:Scalariser}, itr; by = nothing)
 
 Reduce per-risk-measure values into a single scalarised value.
 
-Applies `f` to every element of `itr` (typically a vector of risk measures, or `pairs` thereof) and combines the results according to the scalariser. `f` must return a `Number`, an `AbstractArray`, or a `Tuple` of these, and must return freshly allocated values (no views into buffers reused across iterations), since results may be retained across iterations.
+Applies `f` to every element of `itr`, a vector of risk measures or the `pairs` of one, and combines the results by the rule of the scalariser. `f` must return a `Number`, an `AbstractArray`, or a `Tuple` of these, and must return freshly allocated values (no views into buffers reused across iterations), since results may be retained across iterations.
 
 The combining rules are:
 
-  - [`SumScalariser`](@ref): slot-wise sum of all values. `f` is expected to include the measure's `settings.scale` weight in its result.
+  - [`SumScalariser`](@ref) and `nothing`: slot-wise sum of all values. `f` is expected to include the measure's `settings.scale` weight in its result. `nothing` is the default of every `sca` field and keyword, and it gives the sum.
 
   - [`MaxScalariser`](@ref)/[`MinScalariser`](@ref):
 
       + `by === nothing`: slot-wise (elementwise) maximum/minimum across values.
-      + `by` given: winner-take-all — returns the single `f` result whose `by(result)` is largest/smallest (ties keep the earliest).
+      + `by` given: returns the one `f` result whose `by(result)` is the largest or the smallest. A tie keeps the earliest result.
 
   - [`LogSumExpScalariser`](@ref): slot-wise `logsumexp` of `gamma`-scaled values, divided by `gamma`.
 
@@ -1588,7 +1654,7 @@ The combining rules are:
 # Arguments
 
   - `f`: Per-element evaluation closure, applied to each element of `itr`.
-  - `sca`: Scalarisation strategy.
+  - `sca`: Scalarisation strategy. `nothing` gives the rule of [`SumScalariser`](@ref).
   - `itr`: Iterable of risk measures (or `pairs` of them, when `f` needs the index).
   - `by`: Optional selection key for `MaxScalariser`/`MinScalariser`; ignored by the other scalarisers.
 
@@ -1603,7 +1669,7 @@ The combining rules are:
   - [`scalarise_map`](@ref)
   - [`scalarise_logsumexp`](@ref)
 """
-function scalarise(f, ::SumScalariser, itr; by = nothing)
+function scalarise(f, ::Option{<:SumScalariser}, itr; by = nothing)
     acc = nothing
     for el in itr
         v = f(el)
@@ -1646,22 +1712,42 @@ function scalarise(f, sca::LogSumExpScalariser, itr; by = nothing)
     return scalarise_map(x -> x / sca.gamma, scalarise_logsumexp(vs))
 end
 """
+    const Sca_VecToScaM = Union{Scalariser, VectorToScalarMeasure, Function}
+
+Union of the reductions that a score of a vector of risk measures accepts: a [`Scalariser`](@ref), a [`VectorToScalarMeasure`](@ref) or a plain function from a vector to a number.
+
+A score reduces numbers that are already computed, so it needs no convex form and no derivative. So it admits the two families and a function, as [`Num_VecToScaM`](@ref) admits a reduction or a function. The readers of a risk, such as [`expected_risk`](@ref), keep the bound [`Scalariser`](@ref). Each slot takes `Option` of its bound, and `nothing` gives the rule of [`SumScalariser`](@ref).
+
+# Related
+
+  - [`Scalariser`](@ref)
+  - [`VectorToScalarMeasure`](@ref)
+  - [`Num_VecToScaM`](@ref)
+  - [`oriented_score`](@ref)
+"""
+const Sca_VecToScaM = Union{Scalariser, VectorToScalarMeasure, Function}
+"""
     nothing_scalar_array_selector(risk_variable::Nothing, prior_variable::Nothing)
     nothing_scalar_array_selector(risk_variable::Num_ArrNum_VecScalar_DynWeights, ::Any)
     nothing_scalar_array_selector(risk_variable::Nothing, prior_variable::Num_ArrNum_VecScalar_DynWeights)
 
-Function for selecting a non-nothing value when provided by a risk measure, or fall back to a value contained in a prior result
+Select the value that a risk measure states, or fall back to the value of a prior result when the measure states none.
 
 # Arguments
 
-  - `risk_variable` : The risk-side input.
-  - `prior_variable` : The prior-side input.
+  - `risk_variable`: The risk-side input.
+  - `prior_variable`: The prior-side input.
 
 # Returns
 
   - If both inputs are `nothing` returns `nothing`.
   - If `risk_variable` is not `nothing`, returns `risk_variable`.
   - If `risk_variable` is `nothing` and `prior_variable` is not `nothing`, returns `prior_variable`.
+
+# Related
+
+  - [`sel`](@ref)
+  - [`risk_measure_nothing_scalar_array_view`](@ref)
 """
 function nothing_scalar_array_selector(::Nothing, ::Nothing)
     return nothing
@@ -1709,44 +1795,9 @@ function risk_measure_nothing_scalar_array_view(::Nothing, prior_variable::ArrNu
     return nothing_scalar_array_view(prior_variable, i)
 end
 """
-    solver_selector(risk_solvers, slv)
-
-Select the appropriate solver for a risk measure computation.
-
-Returns the risk-measure-specific solver if provided, otherwise falls back to the optimiser-level solver. Neither is refused rather than answered with `nothing`: a `JuMP` model that carries no solver cannot be solved, and the refusal names that where the caller can act on it. [`sel`](@ref) never reaches the refusal, because a both-`nothing` call routes to [`nothing_scalar_array_selector`](@ref) on the operand types instead.
-
-# Arguments
-
-  - `risk_solvers`: Risk-measure-specific solver(s) or `nothing`.
-  - `slv`: Optimiser-level solver(s) or `nothing`.
-
-# Validation
-
-  - Throws an `ArgumentError` when `risk_solvers` and `slv` are both `nothing`.
-
-# Returns
-
-  - `Slv_VecSlv`: The selected solver or solvers.
-
-# Related
-
-  - [`Slv_VecSlv`](@ref)
-  - [`ERM`](@ref)
-  - [`RRM`](@ref)
-"""
-function solver_selector(risk_solvers::Slv_VecSlv, ::Any)
-    return risk_solvers
-end
-function solver_selector(::Nothing, slv::Slv_VecSlv)
-    return slv
-end
-function solver_selector(::Nothing, ::Nothing)
-    return throw(ArgumentError("Both risk_solver and prior_solver are `nothing`, cannot solve JuMP model."))
-end
-"""
     const DeferredQuantity = Union{...}
 
-The dynamic half of a **Deferred Quantity**: an Estimator standing in a risk-measure slot where a prior-derived value goes. `isa(x, DeferredQuantity)` answers "is this slot deferred?" — the four moment-estimator families that compute one of the four deferrable quantities, plus [`AbstractPriorEstimator`](@ref), which computes all of them at once.
+The dynamic half of a **Deferred Quantity**: an Estimator standing in a risk-measure slot where a prior-derived value goes. `isa(x, DeferredQuantity)` answers the question "is this slot deferred?". The union holds the four moment-estimator families, each of which computes one of the four deferrable quantities, and [`AbstractPriorEstimator`](@ref), which computes all four at once.
 
 The union exists because no supertype already answers the question: [`AbstractCovarianceEstimator`](@ref) is a `StatsBase.CovarianceEstimator` and not an [`AbstractEstimator`](@ref).
 
@@ -1758,11 +1809,11 @@ The union exists because no supertype already answers the question: [`AbstractCo
   - [`SkSlot`](@ref)
   - [`resolve_slot`](@ref)
 """
-const DeferredQuantity = Union{<:AbstractExpectedReturnsEstimator,
-                               <:StatsBase.CovarianceEstimator, <:CoskewnessEstimator,
-                               <:CokurtosisEstimator, <:AbstractPriorEstimator}
+const DeferredQuantity = Union{AbstractExpectedReturnsEstimator,
+                               StatsBase.CovarianceEstimator, CoskewnessEstimator,
+                               CokurtosisEstimator, AbstractPriorEstimator}
 """
-    const MuSlot = Union{<:Num_VecNum_VecScalar, <:AbstractExpectedReturnsEstimator, <:AbstractPriorEstimator}
+    const MuSlot = Union{Num_VecNum_VecScalar, AbstractExpectedReturnsEstimator, AbstractPriorEstimator}
 
 Field bound for an expected-returns slot: the value itself, or the Estimator that computes it. See [`DeferredQuantity`](@ref).
 
@@ -1771,10 +1822,10 @@ Field bound for an expected-returns slot: the value itself, or the Estimator tha
   - [`DeferredQuantity`](@ref)
   - [`resolve_slot`](@ref)
 """
-const MuSlot = Union{<:Num_VecNum_VecScalar, <:AbstractExpectedReturnsEstimator,
-                     <:AbstractPriorEstimator}
+const MuSlot = Union{Num_VecNum_VecScalar, AbstractExpectedReturnsEstimator,
+                     AbstractPriorEstimator}
 """
-    const SigmaSlot = Union{<:MatNum, <:StatsBase.CovarianceEstimator, <:AbstractPriorEstimator}
+    const SigmaSlot = Union{MatNum, StatsBase.CovarianceEstimator, AbstractPriorEstimator}
 
 Field bound for a covariance slot: the matrix itself, or the Estimator that computes it. See [`DeferredQuantity`](@ref).
 
@@ -1783,9 +1834,9 @@ Field bound for a covariance slot: the matrix itself, or the Estimator that comp
   - [`DeferredQuantity`](@ref)
   - [`resolve_slot`](@ref)
 """
-const SigmaSlot = Union{<:MatNum, <:StatsBase.CovarianceEstimator, <:AbstractPriorEstimator}
+const SigmaSlot = Union{MatNum, StatsBase.CovarianceEstimator, AbstractPriorEstimator}
 """
-    const KtSlot = Union{<:MatNum, <:CokurtosisEstimator, <:AbstractPriorEstimator}
+    const KtSlot = Union{MatNum, CokurtosisEstimator, AbstractPriorEstimator}
 
 Field bound for a cokurtosis slot: the matrix itself, or the Estimator that computes it. See [`DeferredQuantity`](@ref).
 
@@ -1794,9 +1845,9 @@ Field bound for a cokurtosis slot: the matrix itself, or the Estimator that comp
   - [`DeferredQuantity`](@ref)
   - [`resolve_slot`](@ref)
 """
-const KtSlot = Union{<:MatNum, <:CokurtosisEstimator, <:AbstractPriorEstimator}
+const KtSlot = Union{MatNum, CokurtosisEstimator, AbstractPriorEstimator}
 """
-    const SkSlot = Union{<:MatNum, <:CoskewnessEstimator, <:AbstractPriorEstimator}
+    const SkSlot = Union{MatNum, CoskewnessEstimator, AbstractPriorEstimator}
 
 Field bound for a coskewness slot: the matrix itself, or the Estimator that computes it. See [`DeferredQuantity`](@ref).
 
@@ -1805,7 +1856,7 @@ Field bound for a coskewness slot: the matrix itself, or the Estimator that comp
   - [`DeferredQuantity`](@ref)
   - [`resolve_slot`](@ref)
 """
-const SkSlot = Union{<:MatNum, <:CoskewnessEstimator, <:AbstractPriorEstimator}
+const SkSlot = Union{MatNum, CoskewnessEstimator, AbstractPriorEstimator}
 """
     deferred_factors(pr::AbstractPriorResult)
 
@@ -1820,37 +1871,67 @@ function deferred_factors(pr::AbstractPriorResult)
     return isnothing(pr.fpr) ? nothing : pr.fpr.X
 end
 """
+$(DocStringExtensions.TYPEDEF)
+
+Holds the fit of a [`CoskewnessEstimator`](@ref) in a **Deferred Quantity**: the coskewness matrix, its negative spectral part and the processor that built that part.
+
+`sk` and `V` come out of one call of [`coskewness`](@ref), and `V` never travels without `sk`. [`fit_deferred_quantity`](@ref) returns it, and [`deferred_quantity`](@ref) and [`deferred_derived_quantity`](@ref) read its fields by the name of the slot.
+
+# Fields
+
+$(DocStringExtensions.FIELDS)
+
+# Related
+
+  - [`fit_deferred_quantity`](@ref)
+  - [`deferred_quantity`](@ref)
+  - [`deferred_derived_quantity`](@ref)
+  - [`coskewness_processor`](@ref)
+  - [`NegativeSkewness`](@ref)
+"""
+@concrete struct CoskewnessFit <: AbstractResult
+    """
+    The coskewness matrix of the fit.
+    """
+    sk
+    """
+    The negative spectral coskewness that the same call gave.
+    """
+    V
+    """
+    The matrix-processing estimator that built `V`, from [`coskewness_processor`](@ref), or `nothing`.
+    """
+    skmp
+end
+"""
     fit_deferred_quantity(dq::DeferredQuantity, pr::AbstractPriorResult)
 
 Run a **Deferred Quantity** against the optimisation's own prior result and return what it produces: a moment estimator gives its quantity, an [`AbstractPriorEstimator`](@ref) gives a whole [`AbstractPriorResult`](@ref).
 
-The estimator sees `pr.original_X` — the returns the **caller** supplied, sliced by any [`port_opt_view`](@ref) the measure crossed. `pr.w` is threaded through [`factory`](@ref), so a weighted prior **replaces** the estimator's own observation weights and an unweighted prior leaves them alone.
+The estimator sees `pr.original_X`, the returns that the **caller** supplied, sliced by any [`port_opt_view`](@ref) that the measure crossed. `pr.w` is threaded through [`factory`](@ref), so a weighted prior **replaces** the estimator's own observation weights and an unweighted prior leaves them alone.
 
 `pr.original_X` rather than `pr.X`, because the two differ on a factor route. [`FactorPrior`](@ref), [`FactorBlackLittermanPrior`](@ref) and [`AugmentedBlackLittermanPrior`](@ref) all overwrite `X` with the reconstruction `F * transpose(M) .+ transpose(b)`, which spans only the factors: it has rank `size(F, 2)`, and it carries no residual. Fitting a covariance estimator on it returns a **singular** matrix whenever there are more assets than factors, and a prior estimator in a slot could not regress it against those same factors. Off a factor route `original_X === X`, so nothing moves.
 
-A [`CokurtosisEstimator`](@ref) gives its tensor. A [`CoskewnessEstimator`](@ref) gives the **pair** `(sk, V)` together with the matrix-processing estimator that built `V`, as a named tuple — `V` is derived from `sk` and never travels on its own. See [`coskewness_processor`](@ref).
-
-`mean` is the centre the higher moment is taken about. [`deferred_centre`](@ref) supplies it, so that the resolved `mu` and the resolved `kt` or `sk` describe one distribution. `nothing` leaves the estimator to centre on its own `me`.
+A [`CokurtosisEstimator`](@ref) gives its tensor. A [`CoskewnessEstimator`](@ref) gives the **pair** `(sk, V)` and the matrix-processing estimator that built `V`, as a [`CoskewnessFit`](@ref). `V` is derived from `sk` and never travels on its own. See [`coskewness_processor`](@ref). A co-moment estimator takes its tensor about the centre of its own `me`.
 
 # Algorithm
 
  1. Rebuild `dq` against the prior's observation weights with `factory(dq, pr.w)`. The two co-moment arms bind the rebuilt estimator as `kte` and `ske`.
  2. Run the rebuilt estimator on `pr.original_X`, through the verb of its own family: `Statistics.mean` for an expected-returns estimator, `Statistics.cov` for a covariance estimator, [`cokurtosis`](@ref) for a cokurtosis estimator, [`coskewness`](@ref) for a coskewness estimator, and [`prior`](@ref) for a prior estimator, which also takes `deferred_factors(pr)`.
- 3. Pass `mean` on to the two co-moment verbs, so the tensor is taken about the centre the caller named.
- 4. Return the quantity the verb gave. The coskewness arm returns the named tuple `(; sk, V, skmp)` instead, because `V` comes out of the same call and [`coskewness_processor`](@ref) names the estimator that built it.
+ 3. Return the quantity the verb gave. The coskewness arm returns a [`CoskewnessFit`](@ref) instead, because `V` comes out of the same call and [`coskewness_processor`](@ref) names the estimator that built it.
 
 # Returns
 
-  - The deferred quantity: a vector for an expected-returns estimator, a matrix for a covariance or a cokurtosis estimator, an [`AbstractPriorResult`](@ref) for a prior estimator, and the named tuple `(; sk, V, skmp)` for a coskewness estimator.
+  - The deferred quantity: a vector for an expected-returns estimator, a matrix for a covariance or a cokurtosis estimator, an [`AbstractPriorResult`](@ref) for a prior estimator, and a [`CoskewnessFit`](@ref) for a coskewness estimator.
 
 # Related
 
   - [`DeferredQuantity`](@ref)
   - [`resolve_slot`](@ref)
   - [`deferred_factors`](@ref)
-  - [`deferred_centre`](@ref)
   - [`LowOrderPrior`](@ref)
   - [`_wprop`](@ref)
+  - [`CoskewnessFit`](@ref)
 """
 function fit_deferred_quantity(dq::AbstractExpectedReturnsEstimator,
                                pr::AbstractPriorResult)
@@ -1862,16 +1943,14 @@ end
 function fit_deferred_quantity(dq::AbstractPriorEstimator, pr::AbstractPriorResult)
     return prior(factory(dq, pr.w), pr.original_X, deferred_factors(pr))
 end
-function fit_deferred_quantity(dq::CokurtosisEstimator, pr::AbstractPriorResult;
-                               mean = nothing)
+function fit_deferred_quantity(dq::CokurtosisEstimator, pr::AbstractPriorResult)
     kte = factory(dq, pr.w)
-    return cokurtosis(kte, pr.original_X; mean = mean)
+    return cokurtosis(kte, pr.original_X)
 end
-function fit_deferred_quantity(dq::CoskewnessEstimator, pr::AbstractPriorResult;
-                               mean = nothing)
+function fit_deferred_quantity(dq::CoskewnessEstimator, pr::AbstractPriorResult)
     ske = factory(dq, pr.w)
-    sk, V = coskewness(ske, pr.original_X; mean = mean)
-    return (; sk = sk, V = V, skmp = coskewness_processor(ske))
+    sk, V = coskewness(ske, pr.original_X)
+    return CoskewnessFit(sk, V, coskewness_processor(ske))
 end
 """
     coskewness_processor(ske::CoskewnessEstimator)
@@ -1904,99 +1983,15 @@ function coskewness_processor(ske::WindowedCoskewness)
     return coskewness_processor(ske.ske)
 end
 """
-    deferred_centre(dq, pr::AbstractPriorResult)
-
-Return the centre that a **Deferred Quantity** in a `kt` or `sk` slot takes its moment about, or `nothing` when the estimator names none.
-
-A higher moment is a moment **about a centre**, so the tensor and the centre are one pair of quantities out of one object. When the measure leaves `mu` unstated, the centre comes from the co-moment estimator's own `me` run on `pr.original_X`, is threaded back into the fit as `mean =`, and becomes the resolved `mu`. The measure then centres on exactly the vector its tensor was built about.
-
-A stated `mu` wins and is threaded in its place. An [`AbstractPriorEstimator`](@ref) centres itself, so the answer is `nothing` and the centre is read off the prior result it produced instead.
-
-The [`CokurtosisEstimator`](@ref) and [`CoskewnessEstimator`](@ref) interfaces do not require an `me` field, so the default answers `nothing`. Declare a method for an estimator that names one.
-
-# Related
-
-  - [`fit_deferred_quantity`](@ref)
-  - [`centring_target`](@ref)
-  - [`Kurtosis`](@ref)
-  - [`Skewness`](@ref)
-"""
-function deferred_centre(::Any, ::AbstractPriorResult)
-    return nothing
-end
-function deferred_centre(dq::Cokurtosis, pr::AbstractPriorResult)
-    return vec(Statistics.mean(factory(dq, pr.w).me, pr.original_X))
-end
-function deferred_centre(dq::Coskewness, pr::AbstractPriorResult)
-    return vec(Statistics.mean(factory(dq, pr.w).me, pr.original_X))
-end
-"""
-    centring_target(mu)
-
-Turn a resolved `mu` into the per-asset centre that [`cokurtosis`](@ref) and [`coskewness`](@ref) take as `mean =`.
-
-Those two subtract the centre from the `T × N` returns matrix before they build the tensor, so the centre is a row rather than a column. A `VecScalar` contributes its scalar to every asset, which is the per-asset image of the portfolio-level target `dot(w, mu.v) + mu.s`. `nothing` leaves the estimator to centre on its own `me`.
-
-# Related
-
-  - [`deferred_centre`](@ref)
-  - [`fit_deferred_quantity`](@ref)
-  - [`calc_moment_target`](@ref)
-"""
-function centring_target(::Nothing)
-    return nothing
-end
-function centring_target(mu::Number)
-    return mu
-end
-function centring_target(mu::VecNum)
-    return transpose(mu)
-end
-function centring_target(mu::VecScalar)
-    return transpose(mu.v) .+ mu.s
-end
-"""
-    fit_deferred_moment(dq, pr::AbstractPriorResult, centre)
-
-Run a **Deferred Quantity** that stands in a `kt` or `sk` slot, about the centre `centre`.
-
-A co-moment estimator takes the centre as `mean =` ([`centring_target`](@ref) puts it in the shape the estimator wants), so the tensor is built about exactly the vector the measure will resolve `mu` to.
-
-Every other occupant centres itself and has no channel to take one, so `centre` is dropped. That is the case of an [`AbstractPriorEstimator`](@ref) in the slot: it computes its own `mu` and its own tensor about that `mu`, and the centre is read **back** off the result it produced rather than pushed into it. A `mu` the caller stated alongside such a slot still wins as the measure's centring target, and the docstring's consistency warning is what covers the gap.
-
-# Algorithm
-
- 1. Return `fit_deferred_quantity(dq, pr)` when `dq` is neither a [`CokurtosisEstimator`](@ref) nor a [`CoskewnessEstimator`](@ref). Such an occupant has no channel to take a centre, so `centre` is dropped.
- 2. Put `centre` into the row shape a co-moment estimator wants with [`centring_target`](@ref).
- 3. Run [`fit_deferred_quantity`](@ref) with that row as `mean`, and return what it gives.
-
-# Returns
-
-  - The moment the fit produced, taken about `centre` on the two co-moment arms.
-
-# Related
-
-  - [`fit_deferred_quantity`](@ref)
-  - [`deferred_centre`](@ref)
-  - [`centring_target`](@ref)
-"""
-function fit_deferred_moment(dq, pr::AbstractPriorResult, ::Any)
-    return fit_deferred_quantity(dq, pr)
-end
-function fit_deferred_moment(dq::Union{<:CokurtosisEstimator, <:CoskewnessEstimator},
-                             pr::AbstractPriorResult, centre)
-    return fit_deferred_quantity(dq, pr; mean = centring_target(centre))
-end
-"""
     deferred_quantity(fitted, key::Symbol)
 
 Read the quantity named by `key` off what [`fit_deferred_quantity`](@ref) produced.
 
-A moment estimator produced the quantity itself, so it is returned and `key` is inert. A [`CoskewnessEstimator`](@ref) produced a named tuple, because `sk` and `V` come out of one call. An [`AbstractPriorEstimator`](@ref) produced a prior result, so `key` picks the one wanted from the several it computed.
+A moment estimator produced the quantity itself, so it is returned and `key` is inert. A [`CoskewnessEstimator`](@ref) produced a [`CoskewnessFit`](@ref), because `sk` and `V` come out of one call. An [`AbstractPriorEstimator`](@ref) produced a prior result, so `key` picks the one wanted from the several it computed.
 
 # Validation
 
-  - Throws an `ArgumentError` when `fitted` is a `NamedTuple` carrying no `key`, and when `fitted` is an [`AbstractPriorResult`](@ref) carrying no property `key`. The slot named an estimator that computes something else, and a silent `nothing` would reach the model builders as though the caller had stated none. This is the difference from [`deferred_derived_quantity`](@ref), which answers `nothing` for a key its fit does not carry.
+  - Throws an `ArgumentError` when `fitted` is a [`CoskewnessFit`](@ref) carrying no field `key`, and when `fitted` is an [`AbstractPriorResult`](@ref) carrying no property `key`. The slot named an estimator that computes something else, and a silent `nothing` would reach the model builders as though the caller had stated none. This is the difference from [`deferred_derived_quantity`](@ref), which answers `nothing` for a key its fit does not carry.
 
 # Returns
 
@@ -2011,10 +2006,10 @@ A moment estimator produced the quantity itself, so it is returned and `key` is 
 function deferred_quantity(fitted, ::Symbol)
     return fitted
 end
-function deferred_quantity(fitted::NamedTuple, key::Symbol)
-    @argcheck(haskey(fitted, key),
+function deferred_quantity(fitted::CoskewnessFit, key::Symbol)
+    @argcheck(hasfield(CoskewnessFit, key),
               ArgumentError("The fit in this slot produced no `$key`, so it cannot supply it. Name an estimator that computes `$key`."))
-    return fitted[key]
+    return getfield(fitted, key)
 end
 function deferred_quantity(fitted::AbstractPriorResult, key::Symbol)
     @argcheck(hasproperty(fitted, key),
@@ -2030,7 +2025,7 @@ A measure that carries **two or more independently deferrable slots** takes a `p
 
 The precedence is the map's: a stated slot wins, `pe` fills the rest, and a slot that neither names is left `nothing` so the consumer's own prior fallback still applies.
 
-A measure with exactly one deferrable slot takes no `pe`. It widens that slot instead, and a derived companion — `chol` with `sigma`, `V` with `sk` — travels with it out of the same fit rather than being fanned out separately.
+A measure with exactly one deferrable slot takes no `pe`. It widens that slot instead. A derived companion, such as `chol` with `sigma` or `V` with `sk`, comes out of the same fit with it, and is not fanned out separately.
 
 # Algorithm
 
@@ -2097,22 +2092,21 @@ end
 """
     deferred_derived_quantity(fitted, key::Symbol)
 
-Read a **derived** quantity named by `key` off what [`fit_deferred_quantity`](@ref) produced — `chol`, the factorisation that travels with `sigma`; `V`, the negative spectral part that travels with `sk`; `mu`, the centre a higher moment was taken about; `skmp`, the processor that built `V`.
+Read a **derived** quantity named by `key` off what [`fit_deferred_quantity`](@ref) produced. The three derived quantities are `chol`, the factorisation that comes with `sigma`, `V`, the negative spectral part that comes with `sk`, and `skmp`, the processor that built `V`.
 
-A prior result carries all four. A coskewness estimator produced a named tuple carrying `V` and `skmp` but no centre. Anything else produced only its own quantity, so the answer is `nothing` and the consumer keeps whatever fallback it already had. This is the difference from [`deferred_quantity`](@ref), which refuses a `key` the fit does not carry.
+A prior result carries all three. A coskewness estimator produced a [`CoskewnessFit`](@ref) carrying `V` and `skmp`. Anything else produced only its own quantity, so the answer is `nothing` and the consumer keeps whatever fallback it already had. This is the difference from [`deferred_quantity`](@ref), which refuses a `key` the fit does not carry.
 
 # Related
 
   - [`fit_deferred_quantity`](@ref)
   - [`deferred_quantity`](@ref)
   - [`sigma_chol_selector`](@ref)
-  - [`deferred_centre`](@ref)
 """
 function deferred_derived_quantity(::Any, ::Symbol)
     return nothing
 end
-function deferred_derived_quantity(fitted::NamedTuple, key::Symbol)
-    return haskey(fitted, key) ? fitted[key] : nothing
+function deferred_derived_quantity(fitted::CoskewnessFit, key::Symbol)
+    return hasfield(CoskewnessFit, key) ? getfield(fitted, key) : nothing
 end
 function deferred_derived_quantity(fitted::AbstractPriorResult, key::Symbol)
     return hasproperty(fitted, key) ? getproperty(fitted, key) : nothing
@@ -2122,7 +2116,7 @@ end
 
 Resolve one risk-measure slot against prior result `pr` and return a plain value.
 
-A slot that holds a **Deferred Quantity** is run against `pr` and the quantity named by `key` is read back. Anything else — a stated value, `nothing`, a centring strategy — is returned unchanged, so the caller can apply the ordinary prior fallback ([`sel`](@ref)) on top.
+A slot that holds a **Deferred Quantity** is run against `pr`, and the quantity named by `key` is read back. Any other occupant, such as a stated value, `nothing` or a centring strategy, comes back unchanged, so the caller can apply the ordinary prior fallback of [`sel`](@ref) after it.
 
 This is the whole of the third state. The other two are unchanged: `nothing` still falls back to the prior's own field, and a stated value still wins.
 
@@ -2187,9 +2181,9 @@ Declare the slots of `x` that may hold a **Deferred Quantity**, as a `NamedTuple
 
 This is the declaration both consumers read. [`assert_resolved_slots`](@ref) refuses a slot that a value-level entry point cannot resolve, and [`resolve_deferred_quantities`](@ref) derives its container recursion from it. A type that names its slots here needs no forwarding method of its own.
 
-A slot that holds a child measure is declared here too. Both consumers recurse into whatever a slot holds, so a container names its children and each child names its own slots; nothing walks fields blindly. That matters because a risk measure holds Estimators that are **not** deferred slots — a variance estimator in `ve`, an uncertainty-set estimator in `ucs` — and a blind walk would refuse them.
+A slot that holds a child measure is declared here too. Both consumers recurse into whatever a slot holds, so a container names its children and each child names its own slots; nothing walks fields blindly. This matters because a risk measure holds Estimators that are **not** deferred slots, such as a variance estimator in `ve` or an uncertainty-set estimator in `ucs`, and a walk over every field would refuse them.
 
-A type that resolves a quantity of its own — a matrix out of a covariance estimator, a tensor and the centre it was taken about out of a co-moment estimator — declares a [`resolve_deferred_quantities`](@ref) method beside this one. That method is per type because slots that travel together must be resolved together, which no derivation can know. Declaring the slots without the method is refused at the first call rather than passed over.
+A type that resolves a quantity of its own declares a [`resolve_deferred_quantities`](@ref) method beside this one. A matrix out of a covariance estimator is such a quantity, and so are a tensor and its centre out of a co-moment estimator. The method is per type, because slots that come out of one fit must be resolved together, and no derivation can know which slots those are. A type that declares the slots and no method is refused at the first call.
 
 # Related
 
@@ -2205,7 +2199,7 @@ Declare the slots of `x` that its functor reads **as they stand**, as a `NamedTu
 
 [`assert_resolved_slots`](@ref) reads this beside [`deferred_slots`](@ref). A slot named here that holds `nothing` is refused at a value-level entry point with an error that names it, because nothing on that route fills it and the functor would otherwise meet the `nothing` several frames down, as `dot(w, nothing, w)` inside `LinearAlgebra`.
 
-A slot is named here only when `nothing` there has **no** value-level reading. The covariance a [`Variance`](@ref) contracts the weights with is one: the functor is `dot(w, r.sigma, w)`, and a bare matrix cannot stand in. A moment measure's `mu` is not: `nothing` there means *centre on the sample mean*, which the functor computes from the returns, so [`LowOrderMoment`](@ref) declares no method. A slot that holds a child measure is not named here either — the child names its own, and [`assert_resolved_slots`](@ref) reaches it through [`deferred_slots`](@ref). A container that reads a **grandchild** directly names it by the path the caller wrote, so a refusal reads `VarianceSkewKurtosis.sk.sk`.
+A slot is named here only when `nothing` there has **no** value-level reading. The covariance a [`Variance`](@ref) contracts the weights with is one: the functor is `dot(w, r.sigma, w)`, and a bare matrix cannot stand in. A moment measure's `mu` is not: `nothing` there means *centre on the sample mean*, which the functor computes from the returns, so [`LowOrderMoment`](@ref) declares no method. A slot that holds a child measure is not named here either. The child names its own slots, and [`assert_resolved_slots`](@ref) reaches it through [`deferred_slots`](@ref). So the functor of [`VarianceSkewKurtosis`](@ref) reads the matrices of its children, and a refusal names the child, such as `Skewness.sk`.
 
 # Related
 
@@ -2219,7 +2213,7 @@ functor_slots(::Any) = (;)
 
 Resolve one slot that [`deferred_slots`](@ref) declared, on behalf of the derived recursion in [`resolve_deferred_quantities`](@ref).
 
-A slot holds one of three things, and one rule covers all three. A child measure resolves through its own method. A vector of children resolves element by element, which is the rule [`factory_child`](@ref) already applies on the other path. Anything else — a stated value, `nothing`, a **Deferred Quantity** the enclosing type resolves itself — is returned unchanged.
+A slot holds one of three things, and one rule covers all three. A child measure resolves through its own method. A vector of children resolves element by element, which is the rule [`factory`](@ref) already applies on the other path. Any other occupant comes back unchanged, such as a stated value, `nothing` or a **Deferred Quantity** that the enclosing type resolves itself.
 
 The vector arm is bounded by the element type rather than by `AbstractArray`, so a matrix slot is a value and never a container of children.
 
@@ -2229,13 +2223,13 @@ The vector arm is bounded by the element type rather than by `AbstractArray`, so
 
   - [`resolve_deferred_quantities`](@ref)
   - [`deferred_slots`](@ref)
-  - [`factory_child`](@ref)
+  - [`factory`](@ref)
 """
 function resolve_deferred_child(slot, pr::AbstractPriorResult, slv = nothing)
     return resolve_deferred_quantities(slot, pr, slv)
 end
-function resolve_deferred_child(slot::AbstractArray{<:Union{<:AbstractEstimator,
-                                                            <:AbstractAlgorithm}},
+function resolve_deferred_child(slot::AbstractArray{<:Union{AbstractEstimator,
+                                                            AbstractAlgorithm}},
                                 pr::AbstractPriorResult, slv = nothing)
     return [resolve_deferred_child(s, pr, slv) for s in slot]
 end
@@ -2333,7 +2327,7 @@ The empty answer is what keeps a container's key out of the merge. A container n
 # Algorithm
 
  1. Read the slots `x` declares with [`calibration_slots`](@ref), giving `slots`.
- 2. Return an empty `NamedTuple` when [`is_calibration_rule`](@ref) answers `false` for every entry of `slots`. A stated number resolves to itself, so the walk is skipped. A stated number resolves to itself, so the walk would move nothing.
+ 2. Return an empty `NamedTuple` when [`is_calibration_rule`](@ref) answers `false` for every entry of `slots`. A stated number resolves to itself, so the walk would move nothing.
  3. Read every field of `x` into `props`, by index, which is the shape [`rebuild_with_slots`](@ref) builds. A field read by name would name a field some type reaching this method does not carry.
  4. Settle the effective observation weights `w`, as `sel(props.w, pr.w)` where `x` carries the field and `sel(nothing, pr.w)` where it does not.
  5. Settle the effective solver `sv`, as `sel(props.slv, slv)` where `x` carries the field and `sel(nothing, slv)` where it does not.
@@ -2422,9 +2416,9 @@ end
 
 Refuse a **Deferred Quantity**, or an empty slot the functor reads, that reached a value-level entry point, which has no prior result to resolve or fill it with.
 
-[`expected_risk`](@ref) takes either a prior result or a plain returns matrix. Given the prior it resolves the measure through [`factory`](@ref) first. Given the matrix it cannot: that call has no `pr.w` to thread and no factor returns to reach, so resolving there would use a different rule than the settled one. So it refuses instead, naming the slot and the Estimator standing in it — without the refusal the failure lands several frames down, inside a kernel that expected a matrix.
+[`expected_risk`](@ref) takes either a prior result or a plain returns matrix. Given the prior it resolves the measure through [`factory`](@ref) first. Given the matrix it cannot: that call has no `pr.w` to thread and no factor returns to reach, so resolving there would use a different rule than the settled one. So it refuses, and the error names the slot and the Estimator in it. Without the refusal, the failure happens several frames down, inside a kernel that expected a matrix.
 
-The same check refuses a slot that holds `nothing` when the functor reads it as it stands. `Variance()` is built with `sigma` at `nothing`, and the prior route fills it through [`factory`](@ref); the matrix route has nothing to fill it from, and `dot(w, nothing, w)` raised a bare `MethodError` inside `LinearAlgebra` that named neither the measure nor the slot. Which slots those are is declared by [`functor_slots`](@ref), so a slot whose `nothing` **has** a value-level reading — a moment measure's `mu`, which then means the sample mean — is never refused. Resolving the slot from the matrix instead would pick an estimator the caller never named, and would make the matrix route and the prior route disagree whenever the prior is not empirical, so the check refuses the slot with an error that names it and states the two ways out.
+The same check refuses a slot that holds `nothing` when the functor reads it as it stands. `Variance()` is built with `sigma` at `nothing`, and the prior route fills it through [`factory`](@ref); the matrix route has nothing to fill it from, and `dot(w, nothing, w)` raised a bare `MethodError` inside `LinearAlgebra` that named neither the measure nor the slot. [`functor_slots`](@ref) declares which slots those are, so a slot whose `nothing` **has** a value-level reading is never refused. The `mu` of a moment measure is such a slot, and `nothing` there means the sample mean. Resolving the slot from the matrix instead would pick an estimator the caller never named, and would make the matrix route and the prior route disagree whenever the prior is not empirical, so the check refuses the slot with an error that names it and states the two ways out.
 
 This is the shape [`HopCount`](@ref) and [`PathLength`](@ref) already use: the consumer resolves, the kernel refuses.
 
@@ -2439,7 +2433,7 @@ The message names both types with `nameof`, not by printing the type. A printed 
  3. Walk the pairs that [`functor_slots`](@ref) declares for `x`, and refuse an occupant that is `nothing`.
  4. Return `nothing` once the three walks are spent.
 
-The order is the precedence. A Deferred Quantity on `x` is named before anything below it, because its fit is what would fill the empty slots of the children — a `VarianceSkewKurtosis` whose `pe` is deferred has an empty `sigma` on its `vr` for that reason alone. A child is walked before the slots `x` reads off it, for the same reason one level down: a `Skewness` whose `pe` is deferred has an empty `sk`, and that is the slot the container reads.
+The order is the precedence. A Deferred Quantity on `x` is named before anything below it, because its fit is what would fill the empty slots of the children. A `VarianceSkewKurtosis` whose `pe` is deferred has an empty `sigma` on its `vr` for that reason alone. A child is walked before the slots `x` reads off it, for the same reason one level down: a `Skewness` whose `pe` is deferred has an empty `sk`, and that is the slot the container reads.
 
 # Validation
 
@@ -2473,8 +2467,8 @@ function assert_resolved_slots(x)
     end
     return nothing
 end
-function assert_resolved_slots(xs::AbstractArray{<:Union{<:AbstractEstimator,
-                                                         <:AbstractAlgorithm}})
+function assert_resolved_slots(xs::AbstractArray{<:Union{AbstractEstimator,
+                                                         AbstractAlgorithm}})
     for x in xs
         assert_resolved_slots(x)
     end
@@ -2487,7 +2481,7 @@ Apply the prior fallback to a covariance slot and its factorisation **as a pair*
 
 `chol` is a factorisation of `sigma`. Pairing a factor with a covariance matrix it does not factorise would let the model optimise one quantity while the functor evaluates another. So the pair falls back to the prior only when the measure names neither; a stated `sigma` with no factor keeps no factor, and the consumer derives the right one.
 
-The Deferred-Quantity state never reaches here: [`resolve_deferred_quantities`](@ref) has already turned it into the pair the fit produced. Nor does a stated `chol` without a matrix `sigma` beside it — [`assert_derived_slot_has_source`](@ref) refuses both that and a `chol` stated beside a deferred `sigma` at construction, so the two arms below see only value states.
+The Deferred-Quantity state never reaches here: [`resolve_deferred_quantities`](@ref) has already turned it into the pair the fit produced. Nor does a stated `chol` without a matrix `sigma` beside it. [`assert_derived_slot_has_source`](@ref) refuses that state at construction, and it refuses a `chol` stated beside a deferred `sigma` too, so the two methods below see only value states.
 
 A stated `chol` is never rebuilt from `sigma`. Under a factor prior the factorisation is sparse and special, and a rebuild would throw that structure away.
 
@@ -2553,48 +2547,46 @@ end
 """
     sel(risk_variable, source_variable)
 
-Unified risk-measure selector emitted by the [`@pprop`](@ref)/[`@cprop`](@ref) tags. Prefers
-the risk-measure value `risk_variable` when present, otherwise falls back to `source_variable`
-(a prior moment for `@pprop`, or a threaded optimiser value for `@cprop`). Dispatches on
-operand types to the appropriate leaf selector and inlines to zero cost:
+Select the value of a risk-measure slot, for the [`@pprop`](@ref) and [`@cprop`](@ref) tags
+that emit this call. The value of the measure, `risk_variable`, wins when it is present.
+Otherwise the call falls back to `source_variable`, which is a moment of the prior for
+`@pprop` and a value that the optimiser threads for `@cprop`. The types of the operands
+select the selector:
 
-  - solvers (`Slv_VecSlv`) → [`solver_selector`](@ref)
-  - uncertainty sets (`UcSE_UcS`) → [`ucs_selector`](@ref)
-  - a **Deferred Quantity** or a **Calibration Rule** → kept, because a slot the caller filled with the method that computes the value is a stated slot
-  - everything else (moments) → [`nothing_scalar_array_selector`](@ref)
+  - A solver, [`Slv_VecSlv`](@ref), is selected here. The solver of the measure wins, and a measure with no solver takes the solver of the optimiser.
+  - An uncertainty set, `UcSE_UcS`, goes to [`ucs_selector`](@ref).
+  - A **Deferred Quantity** or a **Calibration Rule** is kept, because a slot that the caller filled with the method that computes the value is a stated slot.
+  - Every other value, such as a moment, goes to [`nothing_scalar_array_selector`](@ref).
 
-The Deferred-Quantity arm exists because [`@propagatable`](@ref) runs the selection **before** [`resolve_deferred_quantities`](@ref), so a `@pprop` slot that admits a Deferred Quantity reaches here still holding one. The prior must not fill such a slot: the caller stated the method, and the resolution that follows replaces it with the value that method produced. The same reading covers a Calibration Rule.
+The Deferred-Quantity method exists because [`@propagatable`](@ref) runs the selection **before** [`resolve_deferred_quantities`](@ref), so a `@pprop` slot that admits a Deferred Quantity still holds one here. The prior must not fill such a slot. The caller stated the method, and the resolution that follows replaces it with the value that the method gives. The same holds for a Calibration Rule.
 
-Note: the `solver_selector` both-`nothing` "cannot solve" error is not reachable through
-`sel` (both-`nothing` routes to the moment selector and returns `nothing`); the
-`JuMPOptimiser` solver-required invariant makes that case unreachable in the pipeline.
+A call with two `nothing` operands goes to [`nothing_scalar_array_selector`](@ref) and returns
+`nothing`. A `JuMPOptimiser` always carries a solver, so the pipeline never meets a slot of a
+solver with two `nothing` operands.
 
 # Related
 
   - [`@pprop`](@ref)
   - [`@cprop`](@ref)
   - [`nothing_scalar_array_selector`](@ref)
-  - [`solver_selector`](@ref)
   - [`ucs_selector`](@ref)
 """
 function sel(risk_variable, source_variable)
     return nothing_scalar_array_selector(risk_variable, source_variable)
 end
-function sel(risk_variable::Slv_VecSlv, source_variable)
-    return solver_selector(risk_variable, source_variable)
-end
-sel(::Nothing, source_variable::Slv_VecSlv) = solver_selector(nothing, source_variable)
+sel(risk_variable::Slv_VecSlv, ::Any) = risk_variable
+sel(::Nothing, source_variable::Slv_VecSlv) = source_variable
 sel(risk_variable::UcSE_UcS, source_variable) = ucs_selector(risk_variable, source_variable)
 sel(::Nothing, source_variable::UcSE_UcS) = ucs_selector(nothing, source_variable)
 sel(risk_variable::DeferredQuantity, ::Any) = risk_variable
-sel(risk_variable::Union{<:AbstractCalibrationAlgorithm, <:Function}, ::Any) = risk_variable
+sel(risk_variable::Union{AbstractCalibrationAlgorithm, Function}, ::Any) = risk_variable
 """
     _ctx(args...)
 
-Locate the lone threaded optimiser context value (a solver, `Slv_VecSlv`) in the variadic
-tail of a prior `factory` call, returning `nothing` if none is present. Emitted by the
-[`@cprop`](@ref) tag as the source argument to [`sel`](@ref). The tuple scan is unrolled by
-the compiler, so it is type-stable and allocation-free.
+Find the one optimiser value that a prior `factory` call threads, a solver of type
+`Slv_VecSlv`, in the variadic tail of the call, and return `nothing` when the tail holds
+none. The [`@cprop`](@ref) tag emits this call as the source argument of [`sel`](@ref). The
+compiler unrolls the scan of the tuple, so the call is type-stable and does not allocate.
 
 # Related
 
@@ -2606,35 +2598,41 @@ _ctx(a::Slv_VecSlv, args...) = a
 _ctx(::Any, args...) = _ctx(args...)
 """
     expected_risk(r, args...; kwargs...)
+    expected_risk(sca::Option{<:Scalariser}, r, args...; kwargs...)
 
 Compute the expected value of a risk measure.
 
 Generic function extended by concrete risk measure types. Each method computes the risk value associated with its risk measure type, given a portfolio (or its return distribution).
 
+A vector of measures takes a [`Scalariser`](@ref) `sca`. The keyword form takes it as a keyword and calls the positional form, which takes it first. A single measure ignores it.
+
 # Related
 
   - [`AbstractBaseRiskMeasure`](@ref)
+  - [`Scalariser`](@ref)
 """
 function expected_risk end
 """
     expected_risk_from_returns(r, X; kwargs...)
+    expected_risk_from_returns(sca::Option{<:Scalariser}, r, X; kwargs...)
 
 Compute the expected risk of a measure from a precomputed net-return series.
 
-Generic function extended by concrete risk measure types that support the precomputed-returns contract. Only measures with `supports_precomputed_returns(r) == true` should implement this method.
+Generic function extended by concrete risk measure types that support the precomputed-returns contract. Only a measure with `supports_precomputed_returns(r) == true` implements a method. A vector of measures takes a [`Scalariser`](@ref) `sca`, as [`expected_risk`](@ref) does.
 
 # Related
 
   - [`AbstractBaseRiskMeasure`](@ref)
   - [`supports_precomputed_returns`](@ref)
+  - [`Scalariser`](@ref)
 """
 function expected_risk_from_returns end
 """
     no_bounds_risk_measure(r, args...; kwargs...)
 
-Add a risk measure to a JuMP model without upper-bound constraints.
+Return a copy of risk measure `r` with no bound, and with its `scale` and its risk-expression flag kept.
 
-Generic function extended by concrete risk measure types.
+Generic function extended by concrete risk measure types. It builds no model. A [`HierarchicalRiskMeasure`](@ref) and a [`NonOptimisationRiskMeasure`](@ref) return unchanged.
 
 # Related
 
@@ -2645,9 +2643,9 @@ function no_bounds_risk_measure end
 """
     no_bounds_no_risk_expr_risk_measure(r, args...; kwargs...)
 
-Add a risk measure to a JuMP model without upper-bound constraints and without adding a risk expression variable.
+Return a copy of risk measure `r` with no bound, with its risk-expression flag disabled and with a unit `scale`.
 
-Generic function extended by concrete risk measure types.
+Generic function extended by concrete risk measure types. It builds no model. A [`HierarchicalRiskMeasure`](@ref) and a [`NonOptimisationRiskMeasure`](@ref) return unchanged.
 
 # Related
 
@@ -2658,9 +2656,9 @@ function no_bounds_no_risk_expr_risk_measure end
 """
     no_risk_expr_risk_measure(r, args...; kwargs...)
 
-Return a copy of risk measure `r` with its risk-expression flag disabled while preserving its upper-bound constraint.
+Return a copy of risk measure `r` with its risk-expression flag disabled, and with its bound and its `scale` kept.
 
-Generic function extended by concrete risk measure types. For hierarchical risk measures, returns `r` unchanged.
+Generic function extended by concrete risk measure types. A [`HierarchicalRiskMeasure`](@ref) and a [`NonOptimisationRiskMeasure`](@ref) return unchanged.
 
 # Related
 
@@ -2673,9 +2671,9 @@ function no_risk_expr_risk_measure end
 """
     bounds_risk_measure(r, ub, args...; kwargs...)
 
-Return a copy of risk measure `r` with its upper-bound constraint set to `ub`.
+Return a copy of risk measure `r` with its bound set to `ub`.
 
-Generic function extended by concrete risk measure types. For hierarchical risk measures, returns `r` unchanged.
+Generic function extended by concrete risk measure types. The bound is the `ub` of a [`RiskMeasureSettings`](@ref), and the `lb` of a [`MaxRiskMeasureSettings`](@ref). A [`HierarchicalRiskMeasure`](@ref) and a [`NonOptimisationRiskMeasure`](@ref) return unchanged.
 
 # Related
 
@@ -2693,7 +2691,8 @@ export Frontier, RiskMeasureSettings, HierarchicalRiskMeasureSettings, SumScalar
 # The verbs the `# Interfaces` sections of `RiskMeasure` and `HierarchicalRiskMeasure` name
 # (ADR 0154, #1775). Public, not exported: they are only ever extended, and an extension must
 # qualify them as `PortfolioOptimisers.risk_input_kind` and so on anyway.
-public risk_input_kind, supports_precomputed_returns, bigger_is_better, range_tails
+public risk_input_kind, supports_precomputed_returns, bigger_is_better, range_tails,
+       RangeTails
 # The `# Interfaces`-marked types and verbs of #1137 (ADR 0154): AbstractRiskMeasureSettings
 # names required fields only; FrontierBoundEstimator and Scalariser each name the verb(s) an
 # extension must implement.

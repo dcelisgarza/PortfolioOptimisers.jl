@@ -391,7 +391,7 @@ $(val_dict[:relax])
 function set_variance_risk!(model::JuMP.Model, i::Any, r::Variance,
                             pr::Option{<:AbstractPriorResult}, ::LinearBound;
                             prefix::Symbol = Symbol(""))
-    return set_sdp_variance_risk!(model, i, r, pr; prefix = prefix)
+    return set_sdp_variance_risk!(model, i, r, pr, r.ratio_alg; prefix = prefix)
 end
 function set_variance_risk!(model::JuMP.Model, i::Any, r::Variance,
                             pr::Option{<:AbstractPriorResult}, ::SquareRootBound;
@@ -403,7 +403,7 @@ $(DocStringExtensions.TYPEDSIGNATURES)
 
 Build the semidefinite variance expression, the trace of the covariance matrix times the lifted weight matrix.
 
-The trace on the lift of [`set_sdp_constraints!`](@ref) has degree one in the weights and ``k``, where the second-order cone expressions have degree two. So when [`sdp_objective_lift_flag`](@ref) is `true`, under [`MaximumRatio`](@ref) with [`SquareRootRatio`](@ref), the objective term reads the lift with a constant corner of [`set_sdp_objective_lift!`](@ref), which has degree two, and the model maximises the Sharpe ratio. The bound then reads the trace on the first lift, and the method builds that trace only when `settings.ub` holds a bound. Otherwise the term and the bound read one trace. The method dispatches on `r.ratio_alg`: under [`LinearRatio`](@ref) the term never reads the lift with a constant corner, so that method builds the one trace. The `# Mathematical definition` of [`MaximumRatio`](@ref) states the rule. The bound acts on the trace in the units of a variance.
+The trace on the lift of [`set_sdp_constraints!`](@ref) has degree one in the weights and ``k``, where the second-order cone expressions have degree two. So when [`sdp_objective_lift_flag`](@ref) is `true`, under [`MaximumRatio`](@ref) with [`SquareRootRatio`](@ref), the objective term reads the lift with a constant corner of [`set_sdp_objective_lift!`](@ref), which has degree two, and the model maximises the Sharpe ratio. The bound then reads the trace on the first lift, and the method builds that trace only when `settings.ub` holds a bound. Otherwise the term and the bound read one trace. The caller passes `r.ratio_alg`, and the method dispatches on it: under [`LinearRatio`](@ref) the term never reads the lift with a constant corner, so that method builds the one trace. The `# Mathematical definition` of [`MaximumRatio`](@ref) states the rule. The bound acts on the trace in the units of a variance.
 
 # JuMP formulation
 
@@ -441,6 +441,7 @@ $(val_dict[:relax])
   - $(arg_dict[:ci])
   - `r::Variance`: The measure.
   - $(arg_dict[:pr_sigma])
+  - `ratio_alg`: The [`RatioFormulation`](@ref) of the measure, `r.ratio_alg`.
 
 # Keyword arguments
 
@@ -456,11 +457,6 @@ $(val_dict[:relax])
   - [`set_sdp_constraints!`](@ref)
   - [`rc_variance_constraints!`](@ref)
 """
-function set_sdp_variance_risk!(model::JuMP.Model, i::Any, r::Variance,
-                                pr::Option{<:AbstractPriorResult};
-                                prefix::Symbol = Symbol(""))
-    return set_sdp_variance_risk!(model, i, r, pr, r.ratio_alg; prefix = prefix)
-end
 function set_sdp_variance_risk!(model::JuMP.Model, i::Any, r::Variance,
                                 pr::Option{<:AbstractPriorResult}, ::LinearRatio;
                                 prefix::Symbol = Symbol(""))
@@ -582,10 +578,10 @@ A [`Frontier`](@ref) keeps its `N`, and takes `bound` as its [`FrontierBoundEsti
   - [`SquareRootBound`](@ref)
   - [`SquaredBound`](@ref)
   - [`variance_risk_bounds_expr`](@ref)
-  - [`_Frontier`](@ref)
+  - [`Frontier`](@ref)
 """
 function variance_risk_bounds_val(bound::FrontierBoundEstimator, ub::Frontier)
-    return _Frontier(; N = ub.N, factor = 1, bound = bound)
+    return Frontier(ub.N, 1, bound)
 end
 function variance_risk_bounds_val(::LinearBound, ub::Num_VecNum)
     return ub
@@ -662,7 +658,7 @@ $(val_dict[:relax])
 
 # References
 
-  - $(ref_dict[:sdprp])
+  - $(ref_dict[:sdprp]) Formulations 9, 10 and 16.
 """
 function rc_variance_constraints!(args...; kwargs...)
     return nothing
@@ -865,6 +861,19 @@ Build the worst-case variance of an uncertainty set over the covariance matrix.
 
 The box, the ellipsoid and the norm ball bound the covariance matrix, so each lifts the weights into ``\\mathbf{W}`` with [`set_sdp_constraints!`](@ref) and states the dual of its worst case over ``\\mathbf{W}``. A caller can pass another lifted matrix in the keyword `W`. [`set_risk_constraints!`](@ref) passes ``\\mathbf{W}_c`` of [`set_sdp_objective_lift!`](@ref) for the objective term under [`MaximumRatio`](@ref), with the namespace `lift_` after `prefix`, so the dual variables of that term have names of their own. The compact set bounds a quadratic form in the weights, so it lifts nothing and leaves the programme a second-order cone programme. It takes the square root of its centre under the `mtx_sqrt` of the [`UncertaintySetVariance`](@ref), so under the default it accepts a singular centre, as [`Variance`](@ref) does.
 
+Equation 7 of [sousalobo2000](@cite) first states the dual of the box. Its constraint
+``\\mathbf{Z} + \\mathbf{\\Lambda}_u - \\mathbf{\\Lambda}_l = -\\boldsymbol{w} \\boldsymbol{w}^\\intercal``
+has the wrong sign: the dual of the worst case needs
+``\\mathbf{\\Lambda}_u - \\mathbf{\\Lambda}_l \\succeq \\boldsymbol{w} \\boldsymbol{w}^\\intercal``,
+as Equation 6.11 of [fengpalomar2016](@cite) states. Equation 6.15 of [fengpalomar2016](@cite)
+first states the dual of the ellipsoid. That dual equals the worst case when
+``\\mathbf{K} \\mathbf{\\Omega} \\mathbf{K} = \\mathbf{\\Omega}`` for the
+[`commutation_matrix`](@ref) ``\\mathbf{K}``, so that the transpose of each matrix of the set is
+in the set. For another ``\\mathbf{\\Omega}`` it lies at or above the worst case. Equations 11.21
+and 11.27 of [cajas2025](@cite) add the homogenisation ``k`` that [`MaximumRatio`](@ref) needs.
+The worst case of the compact set is this library's own construction, as
+[`OrthogonalUncertaintySet`](@ref) states.
+
 # Mathematical definition
 
 ```math
@@ -878,7 +887,7 @@ R_{\\mathrm{cpt}} &= \\lVert \\mathbf{G} \\boldsymbol{w} \\rVert_{2}^{2} + \\kap
 
 Where:
 
-  - ``R_{\\mathrm{box}}``, ``R_{\\mathrm{ell}}``, ``R_{\\mathrm{nb}}``, ``R_{\\mathrm{cpt}}``: Worst-case variance of the box, the ellipsoid, the norm ball and the compact set. The first three state the worst case over ``\\mathbf{W}``, and they give the worst case of ``\\boldsymbol{w}`` at ``\\mathbf{W} = \\boldsymbol{w} \\boldsymbol{w}^\\intercal / k``.
+  - ``R_{\\mathrm{box}}``, ``R_{\\mathrm{ell}}``, ``R_{\\mathrm{nb}}``, ``R_{\\mathrm{cpt}}``: Worst-case variance of the box, the ellipsoid, the norm ball and the compact set. The first three state the worst case over ``\\mathbf{W}``. The ellipsoid and the norm ball give the worst case of ``\\boldsymbol{w}`` at ``\\mathbf{W} = \\boldsymbol{w} \\boldsymbol{w}^\\intercal / k``. At that matrix the box gives the worst case over a box that drops the condition ``\\mathbf{\\Sigma} \\succeq 0``, which can be larger. The part of ``\\mathbf{W}`` above ``\\boldsymbol{w} \\boldsymbol{w}^\\intercal / k`` takes the place of the dual matrix of that condition, so the minimum over ``\\mathbf{W}`` is the worst case with it.
   - ``\\mathbf{\\Sigma}_l``, ``\\mathbf{\\Sigma}_u``: Lower and upper bounds of the box, `lb` and `ub`.
   - ``\\mathbf{A}_l``, ``\\mathbf{A}_u``: Dual matrices of the two sides of the box.
   - ``\\hat{\\mathbf{\\Sigma}}``: Centre of the set, the set's `val` when it states one and `sigma` otherwise.
@@ -963,14 +972,15 @@ $(val_dict[:relax])
   - [`ucs_variance_risk_bounds!`](@ref)
   - [`set_sdp_constraints!`](@ref)
   - [`UncertaintySetVariance`](@ref)
-  - [`ucs_variance`](@ref): The value-level worst case, which omits ``\\mathbf{E}`` and so lies at or above the model's value.
+  - [`ucs_variance`](@ref): The value-level worst case, which omits ``\\mathbf{E}`` for the ellipsoid and the norm ball and fixes ``\\mathbf{W} = \\boldsymbol{w} \\boldsymbol{w}^\\intercal`` for the box, and so lies at or above the model's value.
   - [`norm_ball_dual_norm_epigraph!`](@ref)
 
 # References
 
-  - $(ref_dict[:robustaa])
-  - $(ref_dict[:fengpalomar2016])
-  - $(ref_dict[:cajas2025]) Section 11.3.
+  - $(ref_dict[:sousalobo2000]) Sections 4 and 5.2.6, Equation 7.
+  - $(ref_dict[:fengpalomar2016]) Section 6.1.3, Equations 6.10 to 6.15.
+  - $(ref_dict[:bertsimas2011]) Section 2.2, Theorem 2. $(ref_dict[:no_original_source])
+  - $(ref_dict[:cajas2025]) Sections 11.3.1 and 11.3.2, Equations 11.21 and 11.27.
 """
 function set_ucs_variance_risk!(model::JuMP.Model, i::Any, ucs::BoxUncertaintySet, args...;
                                 prefix::Symbol = Symbol(""),
@@ -1017,14 +1027,11 @@ function set_ucs_variance_risk!(model::JuMP.Model, i::Any, ucs::EllipsoidalUncer
     k = ucs.k
     G = transpose(matrix_square_root(mtx_sqrt, ucs.sigma))
     t_eucs = state_set!(model, prefix, :t_eucs, i, JuMP.@variable(model))
-    x_eucs, ucs_variance_risk = JuMP.@expressions(model,
-                                                  begin
-                                                      G * vec(WpE)
-                                                      LinearAlgebra.dot(transpose(sigma),
-                                                                        WpE) + k * t_eucs
-                                                  end)
-    state_set!(model, prefix, :x_eucs, i, x_eucs)
-    state_set!(model, prefix, :eucs_variance_risk_, i, ucs_variance_risk)
+    x_eucs = state_set!(model, prefix, :x_eucs, i, JuMP.@expression(model, G * vec(WpE)))
+    ucs_variance_risk = state_set!(model, prefix, :eucs_variance_risk_, i,
+                                   JuMP.@expression(model,
+                                                    LinearAlgebra.dot(transpose(sigma),
+                                                                      WpE) + k * t_eucs))
     state_set!(model, prefix, :ge_soc, i,
                JuMP.@constraint(model,
                                 [sc * t_eucs; sc * x_eucs] in JuMP.SecondOrderCone()))
@@ -1121,9 +1128,9 @@ The box, the ellipsoid and the covariance norm ball bound the covariance matrix,
 function sdp_lifted_set(::Any)
     return false
 end
-function sdp_lifted_set(::Union{<:BoxUncertaintySet, <:EllipsoidalUncertaintySet,
-                                <:NormBallUncertaintySet{<:Any, <:Any, <:Any,
-                                                         <:SigmaUncertaintySetClass}})
+function sdp_lifted_set(::Union{BoxUncertaintySet, EllipsoidalUncertaintySet,
+                                NormBallUncertaintySet{<:Any, <:Any, <:Any,
+                                                       <:SigmaUncertaintySetClass}})
     return true
 end
 """

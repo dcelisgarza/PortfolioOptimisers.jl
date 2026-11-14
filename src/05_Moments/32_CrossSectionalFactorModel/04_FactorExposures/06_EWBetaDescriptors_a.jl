@@ -12,7 +12,7 @@ An asset outside the universe has no return, so its cell must not advance a recu
 
 # Returns
 
-  - `Xm::Matrix{<:Real}`: The returns, `NaN` wherever the active mask is `false`. Integer returns become floating point numbers, so that a cell can hold `NaN`. Every other element type is kept.
+  - `Xm::Matrix{<:Real}`: The returns, `NaN` wherever the active mask is `false`. The element type of the returns is kept.
 
 # Related
 
@@ -22,7 +22,7 @@ An asset outside the universe has no return, so its cell must not advance a recu
   - [`descriptor_active_fill!`](@ref)
 """
 function ew_active_returns(X::AbstractMatrix{<:Number}, pnl::AssetPanel)
-    Xm = Matrix{float_if_integer(eltype(X))}(X)
+    Xm = Matrix{eltype(X)}(X)
     descriptor_active_fill!(Xm, pnl)
     return Xm
 end
@@ -56,7 +56,7 @@ Where:
 
 # Returns
 
-  - `B::Matrix{<:Real}`: The aggregated series, `div(observations, agg_obs) × assets`. An integer series gives floating point means, and every other element type is kept.
+  - `B::Matrix{<:Real}`: The aggregated series, `div(observations, agg_obs) × assets`. The element type of the series is kept.
 
 # Examples
 
@@ -73,7 +73,7 @@ julia> PortfolioOptimisers.ew_agg_series([1.0 2.0; 3.0 NaN; 5.0 6.0], 2)
   - [`EWMacroSensitivity`](@ref)
 """
 function ew_agg_series(A::AbstractMatrix{<:Real}, agg_obs::Integer)
-    Tf = float_if_integer(eltype(A))
+    Tf = eltype(A)
     T, N = size(A)
     K = div(T, agg_obs)
     B = Matrix{Tf}(undef, K, N)
@@ -144,7 +144,7 @@ The recursion advances once per complete window, so each observation takes the b
 
 # Returns
 
-  - `B::Matrix{<:Real}`: The betas, `T × assets`. Integer betas become floating point numbers, and every other element type is kept.
+  - `B::Matrix{<:Real}`: The betas, `T × assets`. The element type of the inputs is kept.
 
 # Examples
 
@@ -167,7 +167,7 @@ julia> PortfolioOptimisers.ew_beta_expand([1.0 2.0; 3.0 4.0], 5, 2)
 function ew_beta_expand(Ba::AbstractMatrix{<:Number}, T::Integer, agg_obs::Integer,
                         b0::Option{<:AbstractVector{<:Number}} = nothing,
                         r0::Integer = 0)::Matrix
-    Tf = float_if_integer(eltype(Ba))
+    Tf = eltype(Ba)
     B = Matrix{Tf}(undef, T, size(Ba, 2))
     for t in 1:T
         k = div(r0 + t, agg_obs)
@@ -320,8 +320,34 @@ function merge_states(::EWBlockState, ::EWBlockState)
     return throw(ArgumentError("an EWBlockState cannot merge two states fitted on disjoint blocks: the recursion of the second block starts from the state after the first one. Fold the second block into the state of the first with partial_fit!."))
 end
 """
+$(DocStringExtensions.TYPEDEF)
+
+Holds the observations of a step of an [`EWBlockState`](@ref) joined to the carried ones, and the observations after the last complete window.
+
+This type is an implementation detail and is not intended for direct use. [`ew_block_rows`](@ref) makes it, and [`ew_beta_fold`](@ref) reads it. The two values are arrays of one element type, so a record names them where a plain tuple would let a swap pass silently.
+
+# Fields
+
+$(DocStringExtensions.FIELDS)
+
+# Related
+
+  - [`ew_block_rows`](@ref)
+  - [`EWBlockState`](@ref)
+"""
+@concrete struct JoinedRows
+    """
+    `A`: The joined observations.
+    """
+    A
+    """
+    `P`: A copy of the observations after the last complete window, which the state carries.
+    """
+    P
+end
+"""
     ew_block_rows(P::AbstractVecOrMat{<:Real}, Y::AbstractVecOrMat{<:Real},
-                  agg_obs::Integer) -> NamedTuple
+                  agg_obs::Integer) -> JoinedRows
 
 Joins the observations that an [`EWBlockState`](@ref) carries to the observations of a step, and splits the result at the end of the last complete window.
 
@@ -335,18 +361,19 @@ Joins the observations that an [`EWBlockState`](@ref) carries to the observation
 
 # Returns
 
-  - `rows::NamedTuple`: `A`, the joined observations, and `P`, a copy of the observations after the last complete window.
+  - `rows::JoinedRows`: `A`, the joined observations, and `P`, a copy of the observations after the last complete window.
 
 # Related
 
   - [`EWBlockState`](@ref)
   - [`ew_beta_fold`](@ref)
+  - [`JoinedRows`](@ref)
 """
 function ew_block_rows(P::AbstractVecOrMat{<:Real}, Y::AbstractVecOrMat{<:Real},
-                       agg_obs::Integer)
+                       agg_obs::Integer)::JoinedRows
     A = isempty(P) ? Y : vcat(P, Y)
     n = div(size(A, 1), agg_obs) * agg_obs
-    return (; A = A, P = collect(selectdim(A, 1, (n + 1):size(A, 1))))
+    return JoinedRows(A, collect(selectdim(A, 1, (n + 1):size(A, 1))))
 end
 """
     ew_beta_residual_variance(X::AbstractMatrix{<:Real}, rm::AbstractVector{<:Real},
@@ -416,9 +443,9 @@ julia> PortfolioOptimisers.ew_beta_residual_variance([0.1 0.2; -0.1 0.3; 0.05 -0
 """
 function ew_beta_residual_variance(X::AbstractMatrix{<:Real}, rm::AbstractVector{<:Real},
                                    B::AbstractMatrix{<:Real}, decay::Real, min_obs::Integer,
-                                   v0::AbstractVector{<:Real} = zeros(float_if_integer(promote_type(eltype(X),
-                                                                                                    eltype(rm),
-                                                                                                    eltype(B))),
+                                   v0::AbstractVector{<:Real} = zeros(promote_type(eltype(X),
+                                                                                   eltype(rm),
+                                                                                   eltype(B)),
                                                                       size(X, 2)),
                                    b0::AbstractVector{<:Real} = similar(B, size(X, 2)),
                                    k0::Integer = 0)
@@ -562,7 +589,7 @@ end
 """
     ew_beta_shrink(b::AbstractVector{<:Real}, bev::AbstractVector{<:Real},
                    L::AbstractVector{<:Integer}, w::AbstractVector{<:Real},
-                   min_group_size::Integer, bounds::Tuple{<:Real, <:Real},
+                   min_group_size::Integer, bounds::Tuple{Real, Real},
                    min_val::Real) -> Vector{<:Real}
 
 Shrink one cross-section of raw betas toward the capitalisation-weighted mean of its group.
@@ -639,8 +666,7 @@ julia> PortfolioOptimisers.ew_beta_shrink([0.8, 1.4], [0.01, 0.01], [1, 1], [1.0
 """
 function ew_beta_shrink(b::AbstractVector{<:Real}, bev::AbstractVector{<:Real},
                         L::AbstractVector{<:Integer}, w::AbstractVector{<:Real},
-                        min_group_size::Integer, bounds::Tuple{<:Real, <:Real},
-                        min_val::Real)
+                        min_group_size::Integer, bounds::Tuple{Real, Real}, min_val::Real)
     s = collect(b)
     vld = [!isnan(b[i]) &&
                L[i] != CS_MISSING_GROUP &&
@@ -669,7 +695,7 @@ function ew_beta_shrink(b::AbstractVector{<:Real}, bev::AbstractVector{<:Real},
     return s
 end
 """
-    assert_ew_shrinkage_bounds(bounds::Tuple{<:Real, <:Real}) -> nothing
+    assert_ew_shrinkage_bounds(bounds::Tuple{Real, Real}) -> nothing
 
 Check the bounds an exponentially weighted shrinkage clamps its weight to.
 
@@ -690,7 +716,7 @@ Check the bounds an exponentially weighted shrinkage clamps its weight to.
   - [`EWBeta`](@ref)
   - [`ew_beta_shrink`](@ref)
 """
-function assert_ew_shrinkage_bounds(bounds::Tuple{<:Real, <:Real})::Nothing
+function assert_ew_shrinkage_bounds(bounds::Tuple{Real, Real})::Nothing
     lo, hi = bounds
     @argcheck(zero(lo) <= lo <= hi <= one(hi),
               DomainError(bounds,
@@ -731,7 +757,7 @@ $(DocStringExtensions.TYPEDEF)
 
 Exponentially weighted beta of the returns against the market return, at every observation.
 
-This is the archetype of every market beta Descriptor. The beta is the exponentially weighted covariance of an asset with the market, divided by the exponentially weighted variance of the market. [`market_return_series`](@ref) builds the market return from the Asset Panel. Where the estimator names a categorical Panel Field in `group`, [`ew_beta_shrink`](@ref) shrinks each raw beta toward the capitalisation-weighted mean beta of its group.
+This is the archetype of every market beta Descriptor. The beta is the exponentially weighted covariance of an asset with the market, divided by the exponentially weighted variance of the market. [sharpe1964](@citet) defines the beta of an asset as the slope of the regression of its return on the return of the market, which is the covariance over the variance (pages 438 and 439). The exponential weights and the recursion below are this library's own, and no source for them was found. [`market_return_series`](@ref) builds the market return from the Asset Panel. Where the estimator names a categorical Panel Field in `group`, [`ew_beta_shrink`](@ref) shrinks each raw beta toward the capitalisation-weighted mean beta of its group.
 
 # Mathematical definition
 
@@ -767,7 +793,7 @@ $(DocStringExtensions.FIELDS)
     EWBeta(; mcap::AbstractString = "market_cap", decay::Real, min_obs::Integer,
            agg_obs::Integer = 1, group::Option{<:AbstractString} = nothing,
            min_group_size::Integer = 5,
-           bounds::Tuple{<:Real, <:Real} = (0.0, 1.0), min_val::Real = 1e-12,
+           bounds::Tuple{Real, Real} = (0.0, 1.0), min_val::Real = 1e-12,
            cache::Option{<:AbstractPartialFitState} = nothing) -> EWBeta
 
 Keywords correspond to the struct's fields. `decay` and `min_obs` take no default, because their values depend on the data frequency. [`EWMarketBeta`](@ref) takes a half-life instead, and converts it through [`half_life_decay`](@ref) and [`half_life_min_obs`](@ref).
@@ -808,7 +834,7 @@ EWBeta
 
 # References
 
-  - $(ref_dict[:sharpe1964])
+  - $(ref_dict[:sharpe1964]) Pages 438 and 439.
 """
 @concrete struct EWBeta <: AbstractDescriptorEstimator
     """
@@ -849,7 +875,7 @@ EWBeta
     cache
     function EWBeta(mcap::AbstractString, decay::Real, min_obs::Integer, agg_obs::Integer,
                     group::Option{<:AbstractString}, min_group_size::Integer,
-                    bounds::Tuple{<:Real, <:Real}, min_val::Real,
+                    bounds::Tuple{Real, Real}, min_val::Real,
                     cache::Option{<:AbstractPartialFitState})
         assert_panel_terms(mcap, :mcap)
         assert_ew_decay(decay)
@@ -866,21 +892,51 @@ EWBeta
 end
 function EWBeta(; mcap::AbstractString = "market_cap", decay::Real, min_obs::Integer,
                 agg_obs::Integer = 1, group::Option{<:AbstractString} = nothing,
-                min_group_size::Integer = 5, bounds::Tuple{<:Real, <:Real} = (0.0, 1.0),
+                min_group_size::Integer = 5, bounds::Tuple{Real, Real} = (0.0, 1.0),
                 min_val::Real = 1e-12,
                 cache::Option{<:AbstractPartialFitState} = nothing)::EWBeta
     return EWBeta(mcap, decay, min_obs, agg_obs, group, min_group_size, bounds, min_val,
                   cache)
 end
 """
+$(DocStringExtensions.TYPEDEF)
+
+Holds the Descriptor of an [`EWBeta`](@ref) and the two cross-sections of the shrinkage that its state carries after the last window.
+
+This type is an implementation detail and is not intended for direct use. [`ew_beta_output`](@ref) makes it, and [`ew_beta_fold`](@ref) reads it. `v` and `s` are vectors of one type, so a record names them where a plain tuple would let a swap pass silently.
+
+# Fields
+
+$(DocStringExtensions.FIELDS)
+
+# Related
+
+  - [`ew_beta_output`](@ref)
+  - [`EWBlockState`](@ref)
+"""
+@concrete struct EWBetaOutput
+    """
+    `D`: The Descriptor before the active mask is applied, `observations × assets`.
+    """
+    D
+    """
+    `v`: The residual variance after the last window, or `nothing` with no group.
+    """
+    v
+    """
+    `s`: The shrunk beta after the last window, or `nothing` with no group.
+    """
+    s
+end
+"""
     ew_beta_output(group::Nothing, de::EWBeta, rd::ReturnsResult,
                    Ba::AbstractMatrix{<:Real}, Vm::AbstractVector{<:Real},
                    Xa::AbstractMatrix{<:Real}, rma::AbstractVector{<:Real},
-                   b0::AbstractVector{<:Real}, st::EWBlockState) -> NamedTuple
+                   b0::AbstractVector{<:Real}, st::EWBlockState) -> EWBetaOutput
     ew_beta_output(group::AbstractString, de::EWBeta, rd::ReturnsResult,
                    Ba::AbstractMatrix{<:Real}, Vm::AbstractVector{<:Real},
                    Xa::AbstractMatrix{<:Real}, rma::AbstractVector{<:Real},
-                   b0::AbstractVector{<:Real}, st::EWBlockState) -> NamedTuple
+                   b0::AbstractVector{<:Real}, st::EWBlockState) -> EWBetaOutput
 
 Turn the raw betas of the recursion into the Descriptor of an [`EWBeta`](@ref).
 
@@ -912,7 +968,7 @@ The windows of `Ba` follow the windows that the state `st` folded, and the obser
 
 # Returns
 
-  - `out::NamedTuple`: `D`, the Descriptor before the active mask is applied, `observations × assets`, and `v` and `s`, the residual variance and the shrunk beta after the last window, or `nothing` with no group.
+  - `out::EWBetaOutput`: `D`, the Descriptor before the active mask is applied, `observations × assets`, and `v` and `s`, the residual variance and the shrunk beta after the last window, or `nothing` with no group.
 
 # Related
 
@@ -926,8 +982,8 @@ function ew_beta_output(::Nothing, de::EWBeta, rd::ReturnsResult,
                         Ba::AbstractMatrix{<:Real}, ::AbstractVector{<:Real},
                         ::AbstractMatrix{<:Real}, ::AbstractVector{<:Real},
                         b0::AbstractVector{<:Real}, st::EWBlockState)
-    return (; D = ew_beta_expand(Ba, size(rd.X, 1), de.agg_obs, b0, size(st.X, 1)),
-            v = nothing, s = nothing)
+    return EWBetaOutput(ew_beta_expand(Ba, size(rd.X, 1), de.agg_obs, b0, size(st.X, 1)),
+                        nothing, nothing)
 end
 function ew_beta_output(group::AbstractString, de::EWBeta, rd::ReturnsResult,
                         Ba::AbstractMatrix{<:Real}, Vm::AbstractVector{<:Real},
@@ -935,13 +991,11 @@ function ew_beta_output(group::AbstractString, de::EWBeta, rd::ReturnsResult,
                         b0::AbstractVector{<:Real}, st::EWBlockState)
     W = Matrix(descriptor_field_values(rd, de.mcap))
     L = cross_sectional_groups(descriptor_asset_panel(rd), group)
-    Tf = float_if_integer(eltype(Ba))
+    Tf = eltype(Ba)
     T, N = size(W)
     k0 = st.st.t
     r0 = size(st.X, 1)
-    v0 = something(st.v,
-                   zeros(float_if_integer(promote_type(eltype(Xa), eltype(rma), eltype(Ba))),
-                         N))
+    v0 = something(st.v, zeros(promote_type(eltype(Xa), eltype(rma), eltype(Ba)), N))
     Vr = ew_beta_residual_variance(Xa, rma, Ba, de.decay, de.min_obs, v0, b0, k0)
     en = 2 * decay_half_life(de.decay)
     agg_obs = de.agg_obs
@@ -960,7 +1014,7 @@ function ew_beta_output(group::AbstractString, de::EWBeta, rd::ReturnsResult,
             B[t, :] = s
         end
     end
-    return (; D = B, v = isempty(Vr) ? v0 : Vr[end, :], s = s)
+    return EWBetaOutput(B, isempty(Vr) ? v0 : Vr[end, :], s)
 end
 """
     descriptor(de::EWBeta, rd::ReturnsResult) -> Matrix{<:Real}
@@ -1027,7 +1081,7 @@ end
                  decay::Real = half_life_decay(half_life),
                  min_obs::Integer = half_life_min_obs(half_life), agg_obs::Integer = 1,
                  group::Option{<:AbstractString} = nothing, min_group_size::Integer = 5,
-                 bounds::Tuple{<:Real, <:Real} = (0.0, 1.0),
+                 bounds::Tuple{Real, Real} = (0.0, 1.0),
                  min_val::Real = 1e-12) -> EWBeta
 
 Exponentially weighted sensitivity of an asset to the market portfolio.
@@ -1076,8 +1130,7 @@ function EWMarketBeta(; mcap::AbstractString = "market_cap", half_life::Real = 6
                       decay::Real = half_life_decay(half_life),
                       min_obs::Integer = half_life_min_obs(half_life), agg_obs::Integer = 1,
                       group::Option{<:AbstractString} = nothing,
-                      min_group_size::Integer = 5,
-                      bounds::Tuple{<:Real, <:Real} = (0.0, 1.0),
+                      min_group_size::Integer = 5, bounds::Tuple{Real, Real} = (0.0, 1.0),
                       min_val::Real = 1e-12)::EWBeta
     return EWBeta(; mcap = mcap, decay = decay, min_obs = min_obs, agg_obs = agg_obs,
                   group = group, min_group_size = min_group_size, bounds = bounds,

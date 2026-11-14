@@ -3,7 +3,7 @@ $(DocStringExtensions.TYPEDSIGNATURES)
 
 Return the big-M style scaling constant used by MIP constraints.
 
-When `ss` is a number it is returned directly. When `nothing`, the value is derived from the largest finite bound magnitude in `wb` multiplied by 1000, defaulting to `1000.0` when all bounds are infinite or absent.
+When `ss` is a number it is returned directly. When `nothing`, the value is derived from the largest finite bound magnitude in `wb` multiplied by 1000, defaulting to `1000.0` when all bounds are infinite. The optimiser expands an absent bound to a vector before the MIP builders run, so both sides of `wb` are vectors.
 
 # Arguments
 
@@ -23,22 +23,10 @@ function get_mip_ss(ss::Number, args...)
     return ss
 end
 function get_mip_ss(::Nothing, wb::WeightBounds)
-    lb = wb.lb
-    ub = wb.ub
-    lb_mag = if isnothing(lb)
-        0.0
-    else
-        idx = isfinite.(lb)
-        lbv = view(lb, idx)
-        isempty(lbv) ? 0.0 : maximum(abs, lbv)
-    end
-    ub_mag = if isnothing(ub)
-        0.0
-    else
-        idx = isfinite.(ub)
-        ubv = view(ub, idx)
-        isempty(ubv) ? 0.0 : maximum(abs, ubv)
-    end
+    lbv = view(wb.lb, isfinite.(wb.lb))
+    ubv = view(wb.ub, isfinite.(wb.ub))
+    lb_mag = isempty(lbv) ? 0.0 : maximum(abs, lbv)
+    ub_mag = isempty(ubv) ? 0.0 : maximum(abs, ubv)
     return (iszero(lb_mag) && iszero(ub_mag)) ? 1000.0 : max(lb_mag, ub_mag) * 1000.0
 end
 """
@@ -87,24 +75,39 @@ abstract type AbstractMIPSpace end
 """
 $(DocStringExtensions.TYPEDEF)
 
-Asset-space MIP constraints: indicators gate the portfolio weights `w` directly and model keys use the bare names (`:ib`, `:i_mip`, `:w_mip_lt`, ...).
+Asset-space MIP constraints: indicators gate the portfolio weights `w` directly.
+
+The space carries two Model State namespaces. The rows of one call, such as the gates of its bounds, its thresholds and its cardinality, take `prefix`. The bits of the weights take `owner`, the namespace that owns the weights under `prefix` ([`weights_prefix`](@ref)), because one bit for each asset is a fact of the weights and not of one call. [`mip_bit_space`](@ref) gives the space of the bits. With the empty `prefix` of a head, both are empty, and the model keys are the bare names (`:ib`, `:i_mip`, `:w_mip_lt`, ...).
+
+# Fields
+
+  - `prefix::Symbol`: Model State namespace of the rows of the call.
+  - `owner::Symbol`: Model State namespace of the bits of the weights.
 
 # Related
 
   - [`AbstractMIPSpace`](@ref)
   - [`SubsetMIPSpace`](@ref)
+  - [`mip_bit_space`](@ref)
 """
-struct AssetMIPSpace <: AbstractMIPSpace end
+struct AssetMIPSpace <: AbstractMIPSpace
+    prefix::Symbol
+    owner::Symbol
+end
+function AssetMIPSpace(prefix::Symbol = Symbol(""))
+    return AssetMIPSpace(prefix, prefix)
+end
 """
 $(DocStringExtensions.TYPEDEF)
 
-Sub-group MIP constraints: indicators gate the sub-group weights `smtx * w` and weight bounds map through the selection matrix. Model keys are namespaced as `Symbol(pfx, name, :_, i, :_)` so multiple sub-groups (and the cardinality/group-cardinality variants) do not collide.
+Sub-group MIP constraints: indicators gate the sub-group weights `smtx * w` and weight bounds map through the selection matrix. Model keys are namespaced as `Symbol(pfx, name, :_, i, :_)` under `prefix`, so multiple sub-groups (and the cardinality/group-cardinality variants) do not collide, and neither do two calls under two prefixes. A sub-group bit is a fact of one call, so the bits take `prefix` too.
 
 # Fields
 
   - $(arg_dict[:smtx_arg])
   - `pfx::Symbol`: Key prefix; `:s` for cardinality sub-groups, `:sg` for group-cardinality sub-groups.
   - `i::Integer`: Index of the selection matrix, used in key naming.
+  - `prefix::Symbol`: Model State namespace of the call. The weights are read under it.
 
 # Related
 
@@ -116,9 +119,10 @@ Sub-group MIP constraints: indicators gate the sub-group weights `smtx * w` and 
     smtx
     pfx::Symbol
     i
-    function SubsetMIPSpace(smtx::T1, pfx::Symbol,
-                            i::T2) where {T1 <: MatNum, T2 <: Integer}
-        return new{T1, T2}(smtx, pfx, i)
+    prefix::Symbol
+    function SubsetMIPSpace(smtx::T1, pfx::Symbol, i::T2,
+                            prefix::Symbol = Symbol("")) where {T1 <: MatNum, T2 <: Integer}
+        return new{T1, T2}(smtx, pfx, i, prefix)
     end
 end
 """
@@ -126,35 +130,57 @@ $(DocStringExtensions.TYPEDSIGNATURES)
 
 Map a logical MIP builder name to the model key for the given space.
 
-Asset space returns the name unchanged; sub-group space returns `Symbol(pfx, name, :_, i, :_)`; factor space ([`FactorMIPSpace`](@ref)) returns `Symbol(:frc_, name)`.
+Asset space returns the name under the `prefix` of the space; sub-group space returns `Symbol(pfx, name, :_, i, :_)` under its `prefix`; factor space ([`FactorMIPSpace`](@ref)) returns `Symbol(:frc_, name)`. [`state_key`](@ref) joins the prefix, so the empty prefix gives the names of a head.
 
 # Related
 
   - [`AbstractMIPSpace`](@ref)
 """
-function mip_key(::AssetMIPSpace, name::Symbol)
-    return name
+function mip_key(sp::AssetMIPSpace, name::Symbol)
+    return state_key(sp.prefix, name)
 end
 function mip_key(sp::SubsetMIPSpace, name::Symbol)
-    return Symbol(sp.pfx, name, :_, sp.i, :_)
+    return state_key(sp.prefix, Symbol(sp.pfx, name, :_, sp.i, :_))
+end
+"""
+    mip_bit_space(sp::AbstractMIPSpace)
+    mip_bit_space(sp::AssetMIPSpace)
+
+Return the space whose keys name the bits of `sp` and the rows that define them.
+
+The bits of the asset space belong to the weights, so the method for [`AssetMIPSpace`](@ref) returns the space of `sp.owner`. Two calls on one weight vector under two prefixes then read one bit for each asset. The bits of every other space belong to the call, so the general method returns `sp`.
+
+# Related
+
+  - [`AssetMIPSpace`](@ref)
+  - [`mip_indicators!`](@ref)
+  - [`pin_decomposition!`](@ref)
+"""
+function mip_bit_space(sp::AbstractMIPSpace)
+    return sp
+end
+function mip_bit_space(sp::AssetMIPSpace)
+    return AssetMIPSpace(sp.owner)
 end
 """
 $(DocStringExtensions.TYPEDSIGNATURES)
 
 Return the weight expression the MIP indicators gate.
 
-Asset space returns the portfolio weights `w`; sub-group space registers and returns the sub-group weight expression `smtx * w` under the space's `:mtx_expr` key; factor space returns the factor weights `w1`.
+Asset space returns the portfolio weights `w` under its `prefix`; sub-group space registers and returns the sub-group weight expression `smtx * w` under the space's `:mtx_expr` key; factor space returns the factor weights `w1`.
 
 # Related
 
   - [`AbstractMIPSpace`](@ref)
   - [`mip_bounds`](@ref)
 """
-function mip_wx!(model::JuMP.Model, ::AssetMIPSpace)
-    return get_w(model)
+function mip_wx!(model::JuMP.Model, sp::AssetMIPSpace)
+    return get_w(model, sp.prefix)
 end
 function mip_wx!(model::JuMP.Model, sp::SubsetMIPSpace)
-    return model[mip_key(sp, :mtx_expr)] = JuMP.@expression(model, sp.smtx * get_w(model))
+    return model[mip_key(sp, :mtx_expr)] = JuMP.@expression(model,
+                                                            sp.smtx *
+                                                            get_w(model, sp.prefix))
 end
 """
 $(DocStringExtensions.TYPEDSIGNATURES)
@@ -291,9 +317,11 @@ $(DocStringExtensions.TYPEDSIGNATURES)
 Return the *held* indicator — the per-asset quantity that is 1 when the asset is in the
 portfolio. This is what cardinality counts and what integer phylogeny gates on.
 
-[`SignIndicators`](@ref) deliberately has no method: it carries no held bit, and the
-declaration step only chooses it when nothing in the model consumes one. A caller that would
-need a held indicator therefore fails at the call of `held` with a `MethodError`, rather than reading a
+Only [`HeldIndicators`](@ref) has a method. The threshold and fixed-fee constraints of
+[`LongShortIndicators`](@ref) read its long and short bits, and cardinality reads
+[`held_bin`](@ref). [`SignIndicators`](@ref) carries no held bit, and the declaration step only
+chooses it when nothing in the model consumes one. A caller that would need a held indicator of
+another bundle therefore fails at the call of `held` with a `MethodError`, rather than reading a
 sign bit and silently miscounting.
 
 # Related
@@ -301,9 +329,6 @@ sign bit and silently miscounting.
   - [`AbstractMIPIndicators`](@ref)
 """
 function held(ind::HeldIndicators)
-    return ind.i_mip
-end
-function held(ind::LongShortIndicators)
     return ind.i_mip
 end
 """
@@ -336,9 +361,9 @@ function held_bin(ind::LongShortIndicators)
     return ind.i_mip
 end
 """
-    set_mip_indicators!(model::JuMP.Model, ind::AbstractMIPIndicators)
+    set_mip_indicators!(model::JuMP.Model, prefix::Symbol, ind::AbstractMIPIndicators)
 
-Register the asset-space MIP indicator bundle as the Model-State entry `:mip_indicators`.
+Register the asset-space MIP indicator bundle as the Model-State entry `:mip_indicators` under `prefix`.
 
 This is what lets a *late* emitter — integer phylogeny, applied after the fact in
 [`assemble_jump_model!`](@ref) — reach the held indicator through [`mip_indicators`](@ref) and
@@ -347,34 +372,104 @@ value. With the bundle in Model State, the per-builder raw keys (`:ib`, `:ilb`/`
 private to the bundle: nothing outside a builder reaches an indicator by key.
 
 Only the asset space registers a bundle. Sub-group builders consume theirs immediately, in the
-same call, and never pass them to a late emitter.
+same call, and never pass them to a late emitter. [`mip_indicators!`](@ref) registers the bundle of the weights under their owner, and a bundle that one call declares for itself under the prefix of that call.
+
+# Validation
+
+  - The entry is free under `prefix`. Otherwise [`state_set!`](@ref) raises an `ArgumentError`.
 
 # Related
 
   - [`mip_indicators`](@ref)
+  - [`mip_indicators!`](@ref)
   - [`AbstractMIPIndicators`](@ref)
   - [`set_iplg_constraints!`](@ref)
 """
-function set_mip_indicators!(model::JuMP.Model, ind::AbstractMIPIndicators)
-    shared_set!(model, :mip_indicators, ind)
+function set_mip_indicators!(model::JuMP.Model, prefix::Symbol, ind::AbstractMIPIndicators)
+    state_set!(model, prefix, :mip_indicators, ind)
     return nothing
 end
 """
-    mip_indicators(model::JuMP.Model)
+    mip_indicators(model::JuMP.Model, prefix::Symbol = Symbol(""))
 
-Return the registered asset-space MIP indicator bundle, or `nothing` when no MIP builder ran.
+Return the asset-space MIP indicator bundle of a call under `prefix`, or `nothing` when no MIP builder ran.
 
-`nothing` means the model has no MIP features, so there is no held indicator for a late emitter
+The bundle of the call is the one registered under `prefix`, when that call declared its own. Otherwise it is the bundle of the weights, registered under their owner, [`weights_prefix`](@ref). `nothing` means the model has no MIP features, so there is no held indicator for a late emitter
 to gate on.
 
 # Related
 
   - [`set_mip_indicators!`](@ref)
+  - [`mip_indicators!`](@ref)
   - [`AbstractMIPIndicators`](@ref)
   - [`held_bin`](@ref)
 """
-function mip_indicators(model::JuMP.Model)
-    return shared_has(model, :mip_indicators) ? shared_get(model, :mip_indicators) : nothing
+function mip_indicators(model::JuMP.Model, prefix::Symbol = Symbol(""))
+    for p in (prefix, weights_prefix(model, prefix))
+        if state_has(model, p, :mip_indicators)
+            return state_get(model, p, :mip_indicators)
+        end
+    end
+    return nothing
+end
+"""
+    serves_mip_kind(ind::AbstractMIPIndicators, kind::Type{<:AbstractMIPIndicators})
+
+Return `true` when the bundle `ind` can serve a call whose features ask for a bundle of type `kind`.
+
+A bundle serves a call of its own kind. A [`LongShortIndicators`](@ref) bundle serves every call: its held indicator is `ilb + isb`, its long and short bits give the sign, and its gates carry each threshold. A [`HeldIndicators`](@ref) bundle has no sign, and a [`SignIndicators`](@ref) bundle has no held bit, so neither serves a call of another kind.
+
+# Related
+
+  - [`mip_indicators!`](@ref)
+  - [`AbstractMIPIndicators`](@ref)
+"""
+function serves_mip_kind(ind::AbstractMIPIndicators, kind::Type{<:AbstractMIPIndicators})
+    return isa(ind, kind)
+end
+function serves_mip_kind(::LongShortIndicators, ::Type{<:AbstractMIPIndicators})
+    return true
+end
+"""
+    mip_indicators!(model::JuMP.Model, sp::AbstractMIPSpace, kind::Type{<:AbstractMIPIndicators}, wb::WeightBounds, wx::VecNum, ss::Option{<:Number})
+    mip_indicators!(model::JuMP.Model, sp::AssetMIPSpace, kind::Type{<:AbstractMIPIndicators}, wb::WeightBounds, wx::VecNum, ss::Option{<:Number})
+
+Return the indicator bundle that a MIP builder of the kind `kind` gates on, and declare it when the model has none to give.
+
+The bits of a sub-group belong to the call, so the general method declares a new bundle each time. The bits of the asset space belong to the weights. So the method for [`AssetMIPSpace`](@ref) returns the bundle of the weights when [`serves_mip_kind`](@ref) states that it can serve `kind`. Two calls under two prefixes then add their rows on one bit for each asset, and their rows intersect exactly.
+
+# Algorithm
+
+The method for [`AssetMIPSpace`](@ref):
+
+ 1. Read the bundle of the weights, registered under `sp.owner`, with [`mip_indicators`](@ref).
+ 2. When it serves `kind`, return it.
+ 3. When the weights hold no bundle, declare one of the kind `kind` in the space of the bits, [`mip_bit_space`](@ref), and register it under `sp.owner`.
+ 4. Otherwise the bundle of the weights is of a kind that cannot serve the call. Declare a bundle of the kind `kind` under `sp.prefix`, and register it there. The rows of each call still hold on the weights, because each bit states a fact of the weights. The model then carries more binaries than one bundle needs.
+
+# Related
+
+  - [`serves_mip_kind`](@ref)
+  - [`declare_mip_indicators!`](@ref)
+  - [`set_mip_indicators!`](@ref)
+  - [`run_mip_builder!`](@ref)
+"""
+function mip_indicators!(model::JuMP.Model, sp::AbstractMIPSpace,
+                         kind::Type{<:AbstractMIPIndicators}, wb::WeightBounds, wx::VecNum,
+                         ss::Option{<:Number})
+    return declare_mip_indicators!(model, sp, kind, wb, wx, ss)
+end
+function mip_indicators!(model::JuMP.Model, sp::AssetMIPSpace,
+                         kind::Type{<:AbstractMIPIndicators}, wb::WeightBounds, wx::VecNum,
+                         ss::Option{<:Number})
+    ind = mip_indicators(model, sp.owner)
+    if !isnothing(ind) && serves_mip_kind(ind, kind)
+        return ind
+    end
+    bsp = isnothing(ind) ? mip_bit_space(sp) : AssetMIPSpace(sp.prefix)
+    ind = declare_mip_indicators!(model, bsp, kind, wb, wx, ss)
+    set_mip_indicators!(model, bsp.prefix, ind)
+    return ind
 end
 """
 $(DocStringExtensions.TYPEDSIGNATURES)
@@ -423,8 +518,9 @@ Return the gates and binaries the exact-decomposition constraints key on.
 are always the binaries themselves, because the slack-closing constraints must key on a bit
 that is exactly 0 or 1 even when the budget is free and the gates relax.
 
-For [`HeldIndicators`](@ref) the held bit doubles as the sign: this bundle is only asked for a
-decomposition under a long-only weight bound, where held and long coincide.
+For [`HeldIndicators`](@ref) the held bit doubles as the sign. This bundle is asked for a
+decomposition only under a [`WeightsFromParts`](@ref) head, whose sign pair reads the gates
+alone, so the bundle has gates and no binaries.
 
 # Related
 
@@ -447,6 +543,12 @@ counterpart of [`long_gate`](@ref), which carries the full explanation.
 function short_gate(ind::HeldIndicators)
     return 1 .- ind.ib
 end
+function long_gate(ind::LongShortIndicators)
+    return ind.il
+end
+function short_gate(ind::LongShortIndicators)
+    return ind.is
+end
 """
 $(DocStringExtensions.TYPEDSIGNATURES)
 
@@ -454,13 +556,17 @@ Return the long *binary* the slack-closing exact-decomposition constraints key o
 bit itself, never a continuous relaxation (see [`long_gate`](@ref) for why the binaries and
 gates differ).
 
+Only the long-short and the sign bundles have a method. The slack-closing rows belong to a
+[`PartsBoundWeights`](@ref) head, and the held builder pins the decomposition only for a
+[`WeightsFromParts`](@ref) head, see [`set_exact_budget_constraints!`](@ref).
+
 # Related
 
   - [`short_bin`](@ref)
   - [`long_gate`](@ref)
 """
-function long_bin(ind::HeldIndicators)
-    return ind.ib
+function long_bin(ind::LongShortIndicators)
+    return ind.ilb
 end
 """
 $(DocStringExtensions.TYPEDSIGNATURES)
@@ -469,23 +575,13 @@ Return the short *binary* the slack-closing exact-decomposition constraints key 
 bit itself, never a continuous relaxation (see [`long_gate`](@ref) for why the binaries and
 gates differ).
 
+Only the long-short and the sign bundles have a method, as for [`long_bin`](@ref).
+
 # Related
 
   - [`long_bin`](@ref)
   - [`long_gate`](@ref)
 """
-function short_bin(ind::HeldIndicators)
-    return 1 .- ind.ib
-end
-function long_gate(ind::LongShortIndicators)
-    return ind.il
-end
-function short_gate(ind::LongShortIndicators)
-    return ind.is
-end
-function long_bin(ind::LongShortIndicators)
-    return ind.ilb
-end
 function short_bin(ind::LongShortIndicators)
     return ind.isb
 end
@@ -542,9 +638,6 @@ Where:
   - [`w_finite_flag`](@ref)
   - [`WeightBounds`](@ref)
 """
-function mip_wb(::JuMP.Model, ::AbstractMIPSpace, ::Nothing, args...)
-    return nothing
-end
 function mip_wb(model::JuMP.Model, sp::AbstractMIPSpace, wb::WeightBounds, wx::VecNum,
                 il::VecNum, is::VecNum)
     sc = get_constraint_scale(model)
@@ -574,8 +667,8 @@ $(DocStringExtensions.TYPEDSIGNATURES)
 Declare the long-only *held* indicators and the constraints that give them meaning.
 
 Creates one binary per asset and, when the budget `k` is a free variable, the continuous
-relaxation `ibf = ib * k` with its big-M linking constraints. Applies [`mip_wb`](@ref), which
-is what forces `w = 0` for an unheld asset and so makes the bit *mean* held.
+relaxation `ibf = ib * k` with its big-M linking constraints. The caller then applies [`mip_wb`](@ref), which
+is what forces `w = 0` for an unheld asset and so makes the bit *mean* held. Each call that reads the bundle applies its own [`mip_wb`](@ref), with its own bounds, so the declaration writes none.
 
 Emits no feature constraints — thresholds, fees, cardinality, phylogeny, and budgets are the
 business of their own emitters, which take the returned bundle.
@@ -595,11 +688,11 @@ business of their own emitters, which take the returned bundle.
 # Related
 
   - [`HeldIndicators`](@ref)
-  - [`declare_long_short_indicators!`](@ref)
-  - [`declare_sign_indicators!`](@ref)
+  - [`mip_indicators!`](@ref)
 """
-function declare_held_indicators!(model::JuMP.Model, sp::AbstractMIPSpace, wb::WeightBounds,
-                                  wx::VecNum, ss::Option{<:Number})
+function declare_mip_indicators!(model::JuMP.Model, sp::AbstractMIPSpace,
+                                 ::Type{HeldIndicators}, wb::WeightBounds, wx::VecNum,
+                                 ss::Option{<:Number})
     k = get_k(model)
     sc = get_constraint_scale(model)
     N = length(wx)
@@ -616,9 +709,7 @@ function declare_held_indicators!(model::JuMP.Model, sp::AbstractMIPSpace, wb::W
                                                         ((ibf + ssx * (1 .- ib)) .- k) >= 0)
         model[mip_key(sp, :i_mip)] = JuMP.@expression(model, ibf)
     end
-    ind = HeldIndicators(ib, i_mip)
-    mip_wb(model, sp, wb, wx, ind)
-    return ind
+    return HeldIndicators(ib, i_mip)
 end
 """
 $(DocStringExtensions.TYPEDSIGNATURES)
@@ -626,10 +717,10 @@ $(DocStringExtensions.TYPEDSIGNATURES)
 Declare the long-short indicators and the constraints that give them meaning.
 
 Creates a long and a short binary per asset, forces them mutually exclusive (`ilb + isb <= 1`,
-so an asset is long, short, or inactive), builds the continuous relaxations `ilf`/`isf` with
-their big-M linking constraints when the budget is free, and applies [`mip_wb`](@ref).
+so an asset is long, short, or inactive), and builds the continuous relaxations `ilf`/`isf` with
+their big-M linking constraints when the budget is free. Each call that reads the bundle applies its own [`mip_wb`](@ref).
 
-Emits no feature constraints; see [`declare_held_indicators!`](@ref).
+Emits no feature constraints; see the [`HeldIndicators`](@ref) method.
 
 # Arguments
 
@@ -646,10 +737,11 @@ Emits no feature constraints; see [`declare_held_indicators!`](@ref).
 # Related
 
   - [`LongShortIndicators`](@ref)
-  - [`declare_held_indicators!`](@ref)
+  - [`mip_indicators!`](@ref)
 """
-function declare_long_short_indicators!(model::JuMP.Model, sp::AbstractMIPSpace,
-                                        wb::WeightBounds, wx::VecNum, ss::Option{<:Number})
+function declare_mip_indicators!(model::JuMP.Model, sp::AbstractMIPSpace,
+                                 ::Type{LongShortIndicators}, wb::WeightBounds, wx::VecNum,
+                                 ss::Option{<:Number})
     k = get_k(model)
     sc = get_constraint_scale(model)
     ss = set_mip_ss_expr!(model, ss, wb)
@@ -677,9 +769,7 @@ function declare_long_short_indicators!(model::JuMP.Model, sp::AbstractMIPSpace,
         is = model[mip_key(sp, :is)] = JuMP.@expression(model, isf)
     end
     model[mip_key(sp, :i_mip_ub)] = JuMP.@constraint(model, sc * (i_mip .- 1) <= 0)
-    ind = LongShortIndicators(ilb, isb, il, is, i_mip)
-    mip_wb(model, sp, wb, wx, ind)
-    return ind
+    return LongShortIndicators(ilb, isb, il, is, i_mip)
 end
 """
 $(DocStringExtensions.TYPEDSIGNATURES)
@@ -705,10 +795,11 @@ only chosen when nothing in the model consumes a held indicator.
 # Related
 
   - [`SignIndicators`](@ref)
-  - [`declare_long_short_indicators!`](@ref)
+  - [`mip_indicators!`](@ref)
 """
-function declare_sign_indicators!(model::JuMP.Model, sp::AbstractMIPSpace, wb::WeightBounds,
-                                  wx::VecNum, ss::Option{<:Number})
+function declare_mip_indicators!(model::JuMP.Model, sp::AbstractMIPSpace,
+                                 ::Type{SignIndicators}, wb::WeightBounds, wx::VecNum,
+                                 ss::Option{<:Number})
     set_mip_ss_expr!(model, ss, wb)
     N = length(wx)
     xb = model[mip_key(sp, :xbgt_ib)] = JuMP.@variable(model, [1:N], binary = true)
@@ -792,12 +883,13 @@ function short_mip_threshold_constraints(model::JuMP.Model, sp::AbstractMIPSpace
                                          lt_flag::Bool, st_flag::Bool, ffl_flag::Bool,
                                          ffs_flag::Bool, xbgt_flag::Bool = false)
     wx = mip_wx!(model, sp)
-    ind = declare_long_short_indicators!(model, sp, wb, wx, ss)
+    ind = mip_indicators!(model, sp, LongShortIndicators, wb, wx, ss)
+    mip_wb(model, sp, wb, wx, ind)
     ss = set_mip_ss_expr!(model, ss, wb)
     set_threshold_constraints!(model, sp, ind, wx, lt, st, ss, lt_flag, st_flag)
     set_fixed_fees!(model, sp, ind, ffl, ffs, ffl_flag, ffs_flag)
     if xbgt_flag
-        set_exact_budget_constraints!(model, sp, ind, wx, ss)
+        pin_decomposition!(model, sp, ind, wx, ss)
     end
     return ind
 end
@@ -851,7 +943,7 @@ Where:
   - $(arg_dict[:ss_arg])
   - $(arg_dict[:lt_flag_arg])
   - `ffl_flag::Bool`: Whether to add fixed fee expressions. Emitted by [`set_fixed_fees!`](@ref) against `ib`.
-  - $(arg_dict[:xbgt_flag_arg]) Under a long-only weight bound the held bit doubles as the sign, so this builder's `ib` can serve it.
+  - $(arg_dict[:xbgt_flag_arg]) [`run_mip_builder!`](@ref) sets it here only for a [`WeightsFromParts`](@ref) head, whose sign pair this builder's `ib` serves.
 
 # Returns
 
@@ -873,7 +965,10 @@ function mip_constraints(model::JuMP.Model, sp::AbstractMIPSpace, wb::WeightBoun
                          ss::Option{<:Number}, lt_flag::Bool, ffl_flag::Bool,
                          xbgt_flag::Bool)
     wx = mip_wx!(model, sp)
-    ind = declare_held_indicators!(model, sp, wb, wx, ss)
+    # The bundle of the weights can be a long-short one that an earlier call declared. The
+    # gate, the threshold and the fee each have a method for it.
+    ind = mip_indicators!(model, sp, HeldIndicators, wb, wx, ss)
+    mip_wb(model, sp, wb, wx, ind)
     set_threshold_constraints!(model, sp, ind, wx, lt, lt_flag)
     set_fixed_fees!(model, sp, ind, ffl, nothing, ffl_flag, false)
     if xbgt_flag
@@ -881,7 +976,7 @@ function mip_constraints(model::JuMP.Model, sp::AbstractMIPSpace, wb::WeightBoun
         # big-M expression on its free-budget branch, so under a constant budget `ss` is still
         # the raw argument. `set_mip_ss_expr!` is idempotent.
         ss = set_mip_ss_expr!(model, ss, wb)
-        set_exact_budget_constraints!(model, sp, ind, wx, ss)
+        pin_decomposition!(model, sp, ind, wx, ss)
     end
     return ind
 end
@@ -917,10 +1012,44 @@ It declares the sign bit and hands it to [`set_exact_budget_constraints!`](@ref)
 function sign_mip_constraints(model::JuMP.Model, sp::AbstractMIPSpace, wb::WeightBounds,
                               ss::Option{<:Number})
     wx = mip_wx!(model, sp)
-    ind = declare_sign_indicators!(model, sp, wb, wx, ss)
+    ind = mip_indicators!(model, sp, SignIndicators, wb, wx, ss)
     ss = set_mip_ss_expr!(model, ss, wb)
-    set_exact_budget_constraints!(model, sp, ind, wx, ss)
+    pin_decomposition!(model, sp, ind, wx, ss)
     return ind
+end
+"""
+    pin_decomposition!(model::JuMP.Model, sp::AbstractMIPSpace, ind::AbstractMIPIndicators, wx::VecNum, ss)
+
+Pin the long/short decomposition of the weights with [`set_exact_budget_constraints!`](@ref), once for each model.
+
+The rows bind the shared parts `lw` and `sw`, which are facts of the weights and not of one call. So the rows take the keys of the space of the bits, [`mip_bit_space`](@ref), and a second call that asks for the pin adds no row. The bundle `ind` of the first call that asks gives the gates.
+
+# Arguments
+
+  - $(arg_dict[:model])
+  - `sp::AbstractMIPSpace`: Weight space of the call.
+  - `ind::AbstractMIPIndicators`: Indicator bundle of the call.
+  - `wx::VecNum`: Weight expression from [`mip_wx!`](@ref).
+  - `ss`: Big-M expression, as registered by [`set_mip_ss_expr!`](@ref).
+
+# Returns
+
+  - `nothing`.
+
+# Related
+
+  - [`set_exact_budget_constraints!`](@ref)
+  - [`mip_bit_space`](@ref)
+"""
+function pin_decomposition!(model::JuMP.Model, sp::AbstractMIPSpace,
+                            ind::AbstractMIPIndicators, wx::VecNum, ss)
+    bsp = mip_bit_space(sp)
+    # `mip_key` composes the whole key, so the interface reads it under the empty prefix.
+    if state_has(model, Symbol(""), mip_key(bsp, :xbgt_lw_ub))
+        return nothing
+    end
+    set_exact_budget_constraints!(model, bsp, ind, wx, ss)
+    return nothing
 end
 """
 $(DocStringExtensions.TYPEDSIGNATURES)
@@ -1005,6 +1134,10 @@ Both route to [`set_exact_budget_constraints!`](@ref), which reads the contract 
 
 Pinning needs a per-asset *sign* bit, which the long-only [`mip_constraints`](@ref) does not have — its `ib` marks an asset as *held* and is what cardinality counts. So an explicit `xbgt` is served by [`sign_mip_constraints`](@ref) when nothing else in the model needs binaries (`N` of them), and otherwise routed to [`short_mip_threshold_constraints`](@ref), whose `ilb`/`isb` it reuses for free. It is ignored when the model has no short side, there being no decomposition to pin.
 
+# Two calls on one weight vector
+
+The bits belong to the weights, as `lw`, `sw` and the lifted matrix `W` do. A call under a prefix whose weights another namespace owns ([`weights_prefix`](@ref)) reads the bundle of the owner, when that bundle serves its features ([`serves_mip_kind`](@ref)). So two calls under two prefixes share one bit for each asset. Each call adds its own gates of its bounds, ``w_i \\leq u_i z_i`` and ``w_i \\geq \\ell_i z_i``, its own threshold ``w_i \\geq t_i z_i``, and its own cardinality ``\\sum_i z_i \\leq c`` on the shared ``z``. The rows of the two calls then intersect exactly. A bundle of a kind that cannot serve the second call gives that call a bundle of its own under its prefix ([`mip_indicators!`](@ref)). The pin of the decomposition is written once, by the first call that asks for it ([`pin_decomposition!`](@ref)).
+
 # Arguments
 
   - $(arg_dict[:model])
@@ -1017,6 +1150,7 @@ Pinning needs a per-asset *sign* bit, which the long-only [`mip_constraints`](@r
   - `fees::Option{<:Fees}`: Optional fee specification.
   - $(arg_dict[:ss_arg])
   - `xbgt::Bool = false`: Whether to pin the long/short decomposition so the budgets hold exactly. See the section above.
+  - $(arg_dict[:prefix_kw]) The bits take the owner of the weights instead, see the section above.
 
 # Returns
 
@@ -1038,7 +1172,7 @@ function set_mip_constraints!(model::JuMP.Model, wb::WeightBounds, card::Option{
                               gcard::Option{<:LinearConstraint}, pl::Option{<:PlC_VecPlC},
                               lt::Option{<:Threshold}, st::Option{<:Threshold},
                               fees::Option{<:Fees}, ss::Option{<:Number},
-                              xbgt::Bool = false)
+                              xbgt::Bool = false; prefix::Symbol = Symbol(""))
     card_flag = !isnothing(card)
     gcard_flag = !isnothing(gcard)
     iplg_flag = isa(pl, IntegerPhylogeny) ||
@@ -1069,7 +1203,9 @@ function set_mip_constraints!(model::JuMP.Model, wb::WeightBounds, card::Option{
          pin_flag)
         return nothing
     end
-    sp = AssetMIPSpace()
+    # The rows of this call take `prefix`, and the bits take the owner of the weights, so a
+    # second call on the same weights reads the bits of the first.
+    sp = AssetMIPSpace(prefix, weights_prefix(model, prefix))
     # `xbgt` needs a per-asset *sign* bit, which only the long-short builder has: the
     # long-only builder's `ib` marks an asset as held and carries no sign. When nothing here
     # consumes a held indicator, the long-short builder's third state (inactive) is dead
@@ -1084,14 +1220,14 @@ function set_mip_constraints!(model::JuMP.Model, wb::WeightBounds, card::Option{
                                ffl_flag ||
                                ffs_flag ||
                                wfp_flag)
+    # `mip_indicators!` registers the bundle in Model State, so integer phylogeny can gate on
+    # the held indicator from its own emitter, called late in `assemble_jump_model!` beside
+    # the semidefinite one, without the bundle being hand-threaded back. Only a bundle that
+    # carries a held indicator is ever read there, and by this function's own guards a
+    # sign-only bundle rules out any integer phylogeny -- so the late `held_bin` read is never
+    # reached for it.
     ind = run_mip_builder!(model, sp, wb, lt, st, ss, lt_flag, st_flag; ffl, ffs, ffl_flag,
                            ffs_flag, xbgt_flag, pin_flag, sign_only)
-    # Register the bundle in Model State so integer phylogeny can gate on the held indicator
-    # from its own emitter, called late in `assemble_jump_model!` beside the semidefinite one,
-    # without the bundle being hand-threaded back. Only a bundle that carries a held indicator
-    # is ever read there, and by this function's own guards a sign-only bundle rules out any
-    # integer phylogeny -- so the late `held_bin` read is never reached for it.
-    set_mip_indicators!(model, ind)
     set_card_constraints!(model, sp, ind, card)
     set_gcard_constraints!(model, sp, ind, gcard)
     return nothing

@@ -209,3 +209,20 @@ slice" that it quotes from #659 no longer holds for a **fitted** set. ADR 0189 (
 view of every fitted uncertainty set the projection of the set: the compact covariance set keeps
 the sliced rows of its basis and completes them with a factor `R` of the rows it drops, so a
 cluster portfolio pays what it pays as a portfolio of the full universe.
+
+## Amendment (2026-10-26)
+
+The rule "reduce, fit, expand" now reaches a fourth returns-data family. The two prior-result
+methods of `mu_ucs` for `CharacteristicUncertaintySet` ranked the full `pr.mu` (#1812). On a prior
+fitted on a point-in-time Asset Panel, the `NaN` entries reached the calibration of the radius. The
+methods now reduce with `investable_ucs_reduction`, calibrate on the reduced prior, and write the
+set back with `expand_investable_ucs`, as the delta, normal, ARCH and orthogonal families do.
+
+The frame of the l1 sets follows the rule of the orthogonal geometry above. The set is the norm
+ball `{mu + sd .* u : ‖u‖₁ ≤ eps}` with the map `diag(sd)`. So `sd` is geometry, and it carries
+zero outside the mask, as a zero row of a norm-ball map does. `mu` is the centre, the quantity that
+the set bounds, so it carries the full `pr.mu` with its `NaN` frame. A `nothing` scale and the
+radii pass through. The projection of an l1 ball onto the coordinates of the mask is the l1 ball of
+the same radius on those coordinates, so the view at the mask recovers the reduced fit
+(ADR 0189). `test/test_10_uncertainty_set.jl` checks the five l1 configurations on the prior route
+and on the returns route.

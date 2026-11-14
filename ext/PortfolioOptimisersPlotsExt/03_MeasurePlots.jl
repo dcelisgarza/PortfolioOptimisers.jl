@@ -72,9 +72,7 @@ function PortfolioOptimisers.plot_measures(res_vec::AbstractVector{<:Optimisatio
                 kwargs...)
     end
 end
-function PortfolioOptimisers.plot_measures(ppred::Union{<:PredictionResult,
-                                                        <:MultiPeriodPredictionResult,
-                                                        <:PopulationPredictionResult};
+function PortfolioOptimisers.plot_measures(ppred::PortfolioOptimisers.AbstractPredictionResult;
                                            x::PortfolioOptimisers.BaseRM_VecBaseRM = ConditionalValueatRisk(),
                                            y::PortfolioOptimisers.BaseRM_VecBaseRM = MeanReturn(),
                                            z::Option{<:PortfolioOptimisers.BaseRM_VecBaseRM} = nothing,
@@ -170,43 +168,80 @@ end
 ## Performance summary
 ## ────────────────────────────────────────────────────────────────────────────
 
-function PortfolioOptimisers.plot_performance_summary(ps::PerformanceSummaryResult;
-                                                      kwargs...)
+# The figures of a summary, scaled for the bars, with their labels. Each figure is a scalar
+# for a summary of one entry and a vector for a summary of many. Each extra measure follows
+# the released figures, unscaled, under its own name.
+function performance_summary_figures(ps::PerformanceSummaryResult)
     conf = round((1 - ps.alpha) * 100; digits = 1)
+    # The literal promotes the figures, as the plot does, and takes their element type (#1979).
     vals = [ps.ann_return * 100, ps.ann_volatility * 100, ps.sharpe, ps.sortino, ps.calmar,
             ps.max_drawdown * 100, ps.cvar * 100, ps.excess_ret * 100,
-            ps.tracking_error * 100, ps.information_ratio, ps.turnover * 100]
+            ps.tracking_error * 100, ps.information_ratio, ps.turnover * 100,
+            values(ps.risk)...]
     labels = ["Ann. Return %", "Ann. Vol %", "Sharpe", "Sortino", "Calmar", "Max DD %",
-              "$(conf)% CVaR %", "Excess Ret %", "Track. Err %", "Info Ratio", "Turnover %"]
-    colours = [v >= 0 ? :steelblue : :firebrick for v in vals]
-    return bar(vals; xticks = (1:length(labels), labels), xrotation = 30,
+              "$(conf)% CVaR %", "Excess Ret %", "Track. Err %", "Info Ratio", "Turnover %",
+              (string(k) for k in keys(ps.risk))...]
+    return vals, labels
+end
+# The label of each entry names the keys that are not `nothing`: the candidate, the path and
+# the member. An entry with no key takes its position.
+function performance_summary_entry_labels(ps::PerformanceSummaryResult)
+    return map(eachindex(ps.n_periods)) do k
+        parts = String[]
+        if !(isnothing(ps.names[k]))
+            push!(parts, string(ps.names[k]))
+        end
+        if !(isnothing(ps.paths[k]))
+            push!(parts, "path $(ps.paths[k])")
+        end
+        if !(isnothing(ps.members[k]))
+            push!(parts, "member $(ps.members[k])")
+        end
+        return isempty(parts) ? "Entry $(k)" : join(parts, ", ")
+    end
+end
+function performance_summary_bar_colours(v)
+    return [x >= 0 ? :steelblue : :firebrick for x in v]
+end
+# One entry draws one bar chart, with one bar for each figure.
+function performance_summary_plot(::Integer, ps::PerformanceSummaryResult; kwargs...)
+    vals, labels = performance_summary_figures(ps)
+    v = collect(promote(vals...))
+    return bar(v; xticks = (1:length(labels), labels), xrotation = 30,
                title = "Performance Summary", ylabel = "Value", legend = false,
-               color = colours, kwargs...)
+               color = performance_summary_bar_colours(v), kwargs...)
+end
+# Many entries draw one panel for each figure, with one bar for each entry.
+function performance_summary_plot(::AbstractVector, ps::PerformanceSummaryResult; kwargs...)
+    vals, labels = performance_summary_figures(ps)
+    names = performance_summary_entry_labels(ps)
+    K = length(names)
+    # An index, not a destructure of `zip`: JET reads the element type of `vals` now, and it
+    # refused the `getfield` of the destructure (#1979).
+    panels = [bar(1:K, vals[i]; xticks = (1:K, names), xrotation = 30, title = labels[i],
+                  legend = false, color = performance_summary_bar_colours(vals[i]))
+              for i in eachindex(vals, labels)]
+    return plot(panels...; layout = length(panels), kwargs...)
+end
+function PortfolioOptimisers.plot_performance_summary(ps::PerformanceSummaryResult;
+                                                      kwargs...)
+    return performance_summary_plot(ps.n_periods, ps; kwargs...)
 end
 # Every other arity computes the summary through `performance_summary`, whose own methods
-# validate it, and renders it through the method above; the four summary keywords go to the
-# summary and the rest to the bars.
-function PortfolioOptimisers.plot_performance_summary(x::Union{<:ArrNum,
-                                                               <:OptimisationResult},
-                                                      args...; ppy::Number = 1,
-                                                      alpha::Number = 0.05,
-                                                      compound::Bool = false,
-                                                      benchmark::Option{<:VecNum} = nothing,
-                                                      kwargs...)
-    ps = performance_summary(x, args...; ppy = ppy, alpha = alpha, compound = compound,
-                             benchmark = benchmark)
-    return PortfolioOptimisers.plot_performance_summary(ps; kwargs...)
-end
-# A prediction defaults its benchmark to the `B` of its rows, as its `performance_summary`
-# method does (#1664), so the plot and the summary of one prediction agree.
-function PortfolioOptimisers.plot_performance_summary(pred::PortfolioOptimisers.PredRes_MultiPredRes;
-                                                      ppy::Number = 1, alpha::Number = 0.05,
-                                                      compound::Bool = false,
-                                                      benchmark::Option{<:VecNum} = PortfolioOptimisers.regret_benchmark(pred),
-                                                      kwargs...)
-    ps = performance_summary(pred; ppy = ppy, alpha = alpha, compound = compound,
-                             benchmark = benchmark)
-    return PortfolioOptimisers.plot_performance_summary(ps; kwargs...)
+# validate it, and renders it through the method above. The keywords of the verb go to the
+# summary and the rest to the bars. A prediction reads the benchmark of its rows when the
+# caller gives none, as its `performance_summary` method does (#1664), because the keyword
+# goes to the verb only when the caller gives it.
+const PERFORMANCE_SUMMARY_KEYWORDS = (:ppy, :alpha, :compound, :rf, :measures, :benchmark,
+                                      :names)
+function PortfolioOptimisers.plot_performance_summary(x::Union{AbstractArray,
+                                                               OptimisationResult,
+                                                               PortfolioOptimisers.AbstractPredictionResult},
+                                                      args...; kwargs...)
+    skw = (; (p for p in pairs(kwargs) if first(p) in PERFORMANCE_SUMMARY_KEYWORDS)...)
+    pkw = (; (p for p in pairs(kwargs) if !(first(p) in PERFORMANCE_SUMMARY_KEYWORDS))...)
+    ps = performance_summary(x, args...; skw...)
+    return PortfolioOptimisers.plot_performance_summary(ps; pkw...)
 end
 ## ────────────────────────────────────────────────────────────────────────────
 ## Rolling measure base
@@ -223,7 +258,7 @@ end
 function PortfolioOptimisers.plot_rolling_measure(r::PortfolioOptimisers.BaseRM_VecBaseRM,
                                                   ret::VecNum; ts::AbstractVector,
                                                   rolling::Integer = 0,
-                                                  sca::Scalariser = SumScalariser(),
+                                                  sca::Option{<:Scalariser} = nothing,
                                                   kwargs...)
     if !(rolling >= 0)
         throw(DomainError(rolling, "rolling must be >= 0"))

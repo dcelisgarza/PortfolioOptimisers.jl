@@ -53,11 +53,11 @@ end
 const GRID_PE = EmpiricalPrior(; me = ExpWeightedExpectedReturns(),
                                ce = RegimeAdjustedExpWeightedCovariance(;
                                                                         centring = PreCentred(),
-                                                                        debias = RawStatistic(),
+                                                                        debias = nothing,
                                                                         regime_lohi_mult = (0.7,
                                                                                             1.6)))
 const GRID_VE = RegimeAdjustedExpWeightedVariance(; centring = PreCentred(),
-                                                  debias = RawStatistic(),
+                                                  debias = nothing,
                                                   regime_lohi_mult = (0.7, 1.6),
                                                   min_val = 1e-12)
 

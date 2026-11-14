@@ -3,7 +3,7 @@ $(DocStringExtensions.TYPEDSIGNATURES)
 
 Returns the prior result for a risk calculation from an optimisation result.
 
-A `pr` that the caller gives has priority. Else the function tests `hasproperty(res, :pr)`, which property forwarding answers for a nested result. For example, a JuMP result holds its prior at `res.jr.pa.pr`, and `res.pr` resolves to it.
+A `pr` that the caller gives has priority. Else the function tests `hasproperty(res, :pr)`, which property forwarding answers for a nested result. For example, a JuMP result holds its prior at `res.jr.jor.pr`, and `res.pr` resolves to it.
 
 The prior of a result is on the universe that the fit solved, and `res.w` is on the universe of the caller. So a consumer that reads the prior with `res.w` reads both through [`result_investable_view`](@ref), and not through this function alone.
 
@@ -202,8 +202,10 @@ function result_investable_view(imsk::BitVector, res::OptimisationResult,
            result_investable_fees(imsk, res, fees), nothing_scalar_array_view(nx, imsk)
 end
 """
-    expected_risk(r::BaseRM_VecBaseRM, res::OptimisationResult, X::MatNum, fees = nothing; kwargs...)
-    expected_risk(r::BaseRM_VecBaseRM, res::OptimisationResult, pr = nothing, fees = nothing; kwargs...)
+    expected_risk(r::BaseRM_VecBaseRM, res::OptimisationResult, X::MatNum, fees = nothing; sca = nothing, kwargs...)
+    expected_risk(r::BaseRM_VecBaseRM, res::OptimisationResult, pr = nothing, fees = nothing; sca = nothing, kwargs...)
+    expected_risk(sca::Option{<:Scalariser}, r::BaseRM_VecBaseRM, res::OptimisationResult, X::MatNum, fees = nothing; kwargs...)
+    expected_risk(sca::Option{<:Scalariser}, r::BaseRM_VecBaseRM, res::OptimisationResult, pr = nothing, fees = nothing; kwargs...)
 
 Computes the expected risk of the weights of an [`OptimisationResult`](@ref).
 
@@ -211,14 +213,14 @@ The function reads `w` from `res` and calls the [`expected_risk`](@ref) that tak
 
 The weights, the returns data and the fee meet on the investable universe of `res`, through [`result_investable_view`](@ref). The prior of the result is on the universe that the fit solved, and the entry of the fit reduced its fee. But `res.w` is expanded back to the universe of the caller. So the weights are viewed at the Investable Mask of the result, [`result_investable_mask`](@ref), and a result with no mask views nothing. A `pr`, an `X` and a `fees` of the caller are on the universe of `res.w`, and are viewed at the same mask.
 
-The argument `r` is one measure or a vector of measures. The keyword `sca` scalarises a vector, and its default is [`SumScalariser`](@ref). The function does not read the measure from `res`. So a result that holds its own `r` and `sca` gives the value that it optimised only when the caller passes them back, as `expected_risk(res.r, res; sca = res.sca)`.
+The argument `r` is one measure or a vector of measures. The scalariser `sca` scalarises a vector. The keyword form takes it as a keyword, with the default `nothing`, which gives the sum of [`SumScalariser`](@ref), and calls the positional form, which takes it first. The function does not read the measure from `res`. So a result that holds its own `r` and `sca` gives the value that it optimised only when the caller passes them back, as `expected_risk(res.r, res; sca = res.sca)`.
 
 The method that takes a prior gives the whole of `pr` to the kernel, so a measure of the caller resolves against it. A slot that the measure does not state takes the field of the prior, and a Deferred Quantity is fitted, as in `expected_risk(r, w, pr)`. Pass a matrix instead to state every slot yourself.
 
 # Algorithm
 
  1. View the weights, the returns data and the fee on the investable universe of `res` with [`result_investable_view`](@ref).
- 2. Return `expected_risk(r, w, X, fees; kwargs...)` or `expected_risk(r, w, pr, fees; kwargs...)` of the viewed values.
+ 2. Return `expected_risk(sca, r, w, X, fees; kwargs...)` or `expected_risk(sca, r, w, pr, fees; kwargs...)` of the viewed values.
 
 # Related
 
@@ -230,13 +232,24 @@ The method that takes a prior gives the whole of `pr` to the kernel, so a measur
   - [`result_investable_view`](@ref)
 """
 function expected_risk(r::BaseRM_VecBaseRM, res::OptimisationResult, X::MatNum,
-                       fees::Option{<:Fees} = nothing; kwargs...)
-    _, w, X, fees = result_investable_view(res, X, fees)
-    return expected_risk(r, w, X, fees; kwargs...)
+                       fees::Option{<:Fees} = nothing; sca::Option{<:Scalariser} = nothing,
+                       kwargs...)
+    return expected_risk(sca, r, res, X, fees; kwargs...)
 end
 function expected_risk(r::BaseRM_VecBaseRM, res::OptimisationResult,
                        pr::Option{<:Pr_RR} = nothing, fees::Option{<:Fees} = nothing;
+                       sca::Option{<:Scalariser} = nothing, kwargs...)
+    return expected_risk(sca, r, res, pr, fees; kwargs...)
+end
+function expected_risk(sca::Option{<:Scalariser}, r::BaseRM_VecBaseRM,
+                       res::OptimisationResult, X::MatNum, fees::Option{<:Fees} = nothing;
                        kwargs...)
+    _, w, X, fees = result_investable_view(res, X, fees)
+    return expected_risk(sca, r, w, X, fees; kwargs...)
+end
+function expected_risk(sca::Option{<:Scalariser}, r::BaseRM_VecBaseRM,
+                       res::OptimisationResult, pr::Option{<:Pr_RR} = nothing,
+                       fees::Option{<:Fees} = nothing; kwargs...)
     # `pr` is forwarded whole, never unwrapped to `pr.X`. `expected_risk`'s own `Pr_RR`
     # route resolves the measure through `resolve_risk_inputs`, which has an arm for each
     # type of `pr`: a prior result resolves the measure, a `ReturnsResult` only unwraps `X`.
@@ -246,7 +259,7 @@ function expected_risk(r::BaseRM_VecBaseRM, res::OptimisationResult,
     # expanded back to the caller's, so the three meet at the mask; a caller's `pr` and
     # `fees` are on the weights' own universe, and are viewed at the same mask.
     _, w, pr, fees = result_investable_view(res, pr, fees)
-    return expected_risk(r, w, pr, fees; kwargs...)
+    return expected_risk(sca, r, w, pr, fees; kwargs...)
 end
 """
 $(DocStringExtensions.TYPEDSIGNATURES)
@@ -259,7 +272,7 @@ A type whose value reads the weights of the previous fold adds a method that ret
 
   - [`needs_previous_weights`](@ref)
 """
-function needs_previous_weights(::Option{<:Union{<:AbstractEstimator, <:AbstractAlgorithm,
-                                                 <: AbstractResult}})
+function needs_previous_weights(::Option{<:Union{AbstractEstimator, AbstractAlgorithm,
+                                                 AbstractResult}})
     return false
 end

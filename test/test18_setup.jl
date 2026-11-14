@@ -375,17 +375,18 @@ function mr_block1(idx)
         # than the tolerance that passes locally, so each of them carries the largest
         # `find_tol` value of fifteen red `Test` runs on `dev` (2026-09-23). Sixteen columns
         # miss on every run. Of the other fourteen, one fixed subset misses on nine runs and
-        # the rest on six, so the host decides which subset misses.
+        # the rest on six, so the host decides which subset misses. 40 needs 5e-5 on the
+        # second host kind (runs 43520317481 and 43560900102).
         rtol = if i == 22 && Sys.islinux()
             1e-2
         elseif i in
-               (4, 16, 22, 52, 76, 86, 90, 91, 92, 93, 96, 97, 98, 99, 101, 103, 105, 133,
-                134, 135, 139, 141, 148, 154, 159, 166, 175, 177, 184, 252, 263, 276, 279,
-                280, 283, 284, 285, 108, 161, 176, 216, 264)
+               (4, 16, 22, 40, 52, 76, 86, 90, 91, 92, 93, 96, 97, 98, 99, 101, 103, 105,
+                133, 134, 135, 139, 141, 148, 154, 159, 166, 175, 177, 184, 252, 263, 276,
+                279, 280, 283, 284, 285, 108, 161, 176, 216, 264)
             5e-5
         elseif i in
-               (12, 28, 34, 38, 40, 42, 46, 102, 104, 126, 163, 165, 167, 179, 186, 192,
-                202, 204, 245, 254, 275, 277, 286)
+               (12, 28, 34, 38, 42, 46, 102, 104, 126, 163, 165, 167, 179, 186, 192, 202,
+                204, 245, 254, 275, 277, 286)
             5e-6
         elseif i in (10, 18, 36, 158, 174, 228, 270)
             5e-4
@@ -522,7 +523,11 @@ function mr_block2(idx)
         # figure differs by host, so each carries the tolerance the runner actually needs.
         #
         # 42 is not in that table at all. Its weights are not compared. See the block below.
-        rtol = if i in (12, 15)
+        #
+        # 18 and 28 joined them: 18 needs 0.1 on a developer machine under the CI flags, at
+        # 07e51899a0 and after it, and 28 needs 0.25 on the CI runner (runs 43500807458 to
+        # 43573334652).
+        rtol = if i in (12, 15, 28)
             0.25
         elseif i == 27
             5e-3
@@ -530,13 +535,13 @@ function mr_block2(idx)
             5e-6
         elseif i in (4, 14, 30)
             5e-4
-        elseif i in (13, 16, 18)
+        elseif i in (13, 16)
             0.05
-        elseif i in (17, 28, 41)
+        elseif i in (17, 18, 41)
             0.1
         elseif i == 29
             1e-5
-        elseif i in (18, 24, 43)
+        elseif i in (24, 43)
             5e-3
         elseif i == 22 && Sys.islinux()
             1e-2
@@ -753,6 +758,48 @@ function mr_block6()
         end
         @test success
     end
+    return nothing
+end
+
+function mr_block6_distribution_tails()
+    # #1821. A `DistributionValueatRisk` tail reads the weights, so `expected_risk` evaluates
+    # it on `w` for the loss and on `-w` for the gain. The value must equal what the model
+    # optimises, for the symmetric range, for a mixed range, and on either side.
+    vdist = ValueatRisk(; alg = DistributionValueatRisk())
+    opt = JuMPOptimiser(; pe = pr2, slv = slv)
+    rs = [GenericValueatRiskRange(; loss = vdist, gain = vdist),
+          GenericValueatRiskRange(; loss = vdist, gain = ConditionalValueatRisk()),
+          GenericValueatRiskRange(; loss = ConditionalValueatRisk(), gain = vdist)]
+    for (i, r) in enumerate(rs)
+        res = optimise(MeanRisk(; r = r, opt = opt), rd2)
+        @test isa(res.retcode, OptimisationSuccess)
+        rk = expected_risk(r, res.w, pr2)
+        success = isapprox(JuMP.objective_value(res.model), rk; rtol = 1e-6)
+        if !success
+            println("Counter: $i")
+            find_tol(JuMP.objective_value(res.model), rk)
+        end
+        @test success
+    end
+    @test isapprox(expected_risk(rs[1], w0, pr2),
+                   expected_risk(ValueatRiskRange(; alg = DistributionValueatRisk()), w0,
+                                 pr2))
+    # The bound of a `DistributionValueatRisk` gain tail bounds the value of that tail. It
+    # used to bound the negated value, so it never bound the portfolio.
+    r0 = GenericValueatRiskRange(; loss = ConditionalValueatRisk(), gain = vdist)
+    res0 = optimise(MeanRisk(; r = r0, obj = MaximumReturn(), opt = opt), rd2)
+    g0 = expected_risk(vdist, -res0.w, pr2)
+    ub = 0.8 * g0
+    r1 = GenericValueatRiskRange(; loss = ConditionalValueatRisk(),
+                                 gain = ValueatRisk(;
+                                                    settings = RiskMeasureSettings(;
+                                                                                   ub = ub),
+                                                    alg = DistributionValueatRisk()))
+    res1 = optimise(MeanRisk(; r = r1, obj = MaximumReturn(), opt = opt), rd2)
+    @test isa(res1.retcode, OptimisationSuccess)
+    g1 = expected_risk(vdist, -res1.w, pr2)
+    @test g1 <= ub * (1 + 1e-6)
+    @test isapprox(g1, ub; rtol = 1e-4)
     return nothing
 end
 

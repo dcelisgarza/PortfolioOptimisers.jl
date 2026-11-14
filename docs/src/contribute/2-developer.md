@@ -36,7 +36,7 @@ Install a plugin on your editor to use [EditorConfig](https://editorconfig.org).
 This will ensure that your editor is configured with important formatting settings.
 
 We use [https://pre-commit.com](https://pre-commit.com) to run the linters and formatters.
-In particular, the Julia code is formatted using [JuliaFormatter.jl](https://github.com/domluna/JuliaFormatter.jl), so please install it globally first:
+In particular, the Julia code is formatted using [JuliaFormatter.jl](https://docs.juliahub.com/General/JuliaFormatter/stable/), so please install it globally first:
 
 ```julia-repl
 julia> # Press ]
@@ -148,11 +148,19 @@ number the baseline records for it, so a file under 500 code lines is free to gr
 `docs/adr/0101-the-size-gate-counts-code-lines-and-binds-over-a-threshold.md`.
 
 When one turns red, the run names every offending file, the metric, the baseline number and the new
-one. Take one of three routes, in order.
+one. The design picks the route, not the number. Take one of three routes.
 
- 1. **Lower the number.** This is the route to take whenever you can. For a complexity number the
-    file's number is the maximum over its definitions, so only the worst definition moves it. For
-    the size ratchet, move code out of the file or delete it. A docstring costs nothing there.
+!!! warning "Never change a correct design to pass a ratchet"
+
+    Do not change a signature, a type bound or the home of a function only to pass a ratchet. The
+    gate then goes green, and the design gets worse. An argument removed for a read of a scoped
+    value hides a dependency, and a direct test of the function must then set the scope (#2060).
+    See [When the correct form raises a number](@ref code_health_correct_form).
+
+ 1. **Lower the number, when the lower form is also the better design.** For a complexity number
+    the file's number is the maximum over its definitions, so only the worst definition moves it.
+    For the size ratchet, move code to the file of its subject, or delete it. A docstring costs
+    nothing there.
 
  2. **Dismiss the report**, for `JET` alone. A Dismissal says that a class of report is not a real
     defect. It cites a **Rationale** by name, and the two halves have different owners: citing an
@@ -160,8 +168,10 @@ one. Take one of three routes, in order.
     claim that some code is correct. See
     [Dismissing a JET report](@ref code_health_dismissal).
 
- 3. **Record the rise.** A number may rise, but only through a diff that a person approved. Run the
-    refresh with the flag that names the act:
+ 3. **Record the rise, when the higher number comes from the correct form.**
+    [When the correct form raises a number](@ref code_health_correct_form) states what the correct
+    form is and the threshold that still binds. A number may rise, but only through a diff that a
+    person approved. Run the refresh with the flag that names the act:
 
     ```bash
     julia --project=code_health code_health/complexity.jl refresh --accept-rise
@@ -207,12 +217,7 @@ The maintenance loop that drives these numbers down, rather than merely holding 
 
 The [capability catalogue](@ref capability-catalogue) is the user-facing inventory of everything the package can do, grouped by the job each thing does. It is generated: `docs/capability_catalogue.jl` curates only the **grouping**, and every description is the first sentence of the corresponding docstring, so a description cannot drift from the type it describes.
 
-**Adding a new type or exported function means adding it here too.** This is enforced, not merely requested — `test/test_26_docs.jl` fails if any name on the Choice Surface is missing, and the docs build refuses to render an incomplete page. A concrete type the package declares is on the surface when it is a leaf subtype of `AbstractEstimator`, of `AbstractAlgorithm` or of `AbstractCovarianceEstimator`, or when it is an export under its own name; a Result and an error are subtracted, because a caller receives them and never chooses them. `choice_surface_names` in `docs/generate_capability_catalogue.jl` is the one statement of that rule, and both the test and the docs build call it.
-
-- Add a `Cap(:YourType)` to the group it belongs to, chosen by what it *does* rather than which file it lives in.
-- Do **not** write a description. It comes from the docstring. Pass `label` only where the docstring genuinely reads worse as a bullet — for instance when every sibling in a group would repeat the same prefix.
-- A function that is not a user-facing capability goes in `NOT_A_FEATURE` with a reason (`:alias`, `:base_overload`, `:trait`, `:internal`) instead. Removing an export means removing its entry there too; the check runs in both directions.
-- A type the library constructs for itself, and no caller ever writes, goes in `NOT_A_CHOICE` with a reason (`:internal`) instead. It keeps its docstring and its API page; it is simply not a choice. Like `NOT_A_FEATURE`, this list is checked in both directions, so an exemption cannot outlive its type.
+**A new type or a new export takes its place in the catalogue in the same change.** `test/test_26_docs.jl` fails if a name on the Choice Surface is missing, and the docs build refuses to render an incomplete page. The section *Capability Catalogue (required for every new public-facing addition)* of `.github/instructions/julia-source-code.instructions.md` owns the rule: which names are on the surface, the group a name takes, and the `NOT_A_FEATURE` and `NOT_A_CHOICE` lists.
 
 Because descriptions come from docstrings, a type's **first sentence** has to stand alone in a bullet list. See the summary-sentence rules in `.github/instructions/julia-docstrings.instructions.md`.
 
@@ -233,7 +238,7 @@ Here is how you do it:
 
 ### A preview of the documentation of a pull request
 
-The documentation of a pull request deploys as a preview only when the pull request carries the label `docs-preview`. Add the label to start the build. The preview is at `https://dcelisgarza.github.io/PortfolioOptimisers.jl/previews/PR<number>/`. Each preview is a full build, and GitHub Pages refuses a site above 10 GiB, so the `Doc preview cleanup` workflow deletes a preview when its pull request closes. Each week it also deletes the preview of a pull request without the label.
+The documentation of each pull request from a branch of this repository deploys as a preview. A pull request from a fork builds the documentation but deploys no preview. The preview is at `https://dcelisgarza.github.io/PortfolioOptimisers.jl/previews/PR<number>/`. Each preview is a full build, and GitHub Pages refuses a site above 10 GiB, so the `Doc preview cleanup` workflow deletes a preview when its pull request closes. Each week it also deletes a preview whose pull request is not open.
 
 The same workflow keeps the documentation of the five newest minor series online and deletes the older versions each week. A link into a deleted version stops resolving.
 

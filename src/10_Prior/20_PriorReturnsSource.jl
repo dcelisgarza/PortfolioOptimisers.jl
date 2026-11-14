@@ -100,14 +100,14 @@ The warning is logged once for each source.
 
   - [`returns_matrix_picker`](@ref)
 """
-function warn_source_fallback(x_src::Union{<:DataSource, <:ExcessSource})::Nothing
+function warn_source_fallback(x_src::Union{DataSource, ExcessSource})::Nothing
     msg = "a graph reader states `x_src = $(source_label(x_src))`, which reads the returns data, and the call gives no returns data, so the reader reads the `X` of the prior result. Pass the returns data as `rd` to read them, or state `x_src = nothing` to read the prior result with no warning."
-    @warn(msg, maxlog = 1, _id = hash(msg))
+    @warn(msg, maxlog = log_limit(:warn, 1), _id = hash(msg))
     return nothing
 end
 function warn_source_fallback(::PriorSource)::Nothing
     msg = "a graph reader states `x_src = PriorSource()`, which reads the prior result, and the call gives returns data and no prior result, so the reader reads the `X` of the returns data. Pass a prior result to read it, or state `x_src = nothing` to read the returns data with no warning."
-    @warn(msg, maxlog = 1, _id = hash(msg))
+    @warn(msg, maxlog = log_limit(:warn, 1), _id = hash(msg))
     return nothing
 end
 """
@@ -157,7 +157,7 @@ function returns_matrix_picker(pr::Pr_RR, rd::Option{<:ReturnsResult}, x_src::No
     return isnothing(data) ? pr.X : benchmark_relative_returns(data, x_src)
 end
 function returns_matrix_picker(pr::Pr_RR, rd::Option{<:ReturnsResult},
-                               x_src::Union{<:DataSource, <:ExcessSource})
+                               x_src::Union{DataSource, ExcessSource})
     data = picked_returns_data(pr, rd)
     if isnothing(data)
         warn_source_fallback(x_src)
@@ -207,22 +207,21 @@ The method that Julia selects is the algorithm.
 function plain_graph_reader(::Any)
     return false
 end
-function plain_graph_reader(xs::Union{<:Tuple, <:AbstractVector})
+function plain_graph_reader(xs::Union{Tuple, AbstractVector})
     return any(plain_graph_reader, xs)
 end
-function plain_graph_reader(x::Union{<:ClustersEstimator, <:NetworkEstimator})
+function plain_graph_reader(x::Union{ClustersEstimator, NetworkEstimator})
     return isfinite(gap_fill_value(x.ce))
 end
-function plain_graph_reader(::Union{<:ClustersEstimator{<:Any, <:FeatureDistance},
-                                    <:NetworkEstimator{<:Any, <:FeatureDistance}})
+function plain_graph_reader(::Union{ClustersEstimator{<:Any, <:FeatureDistance},
+                                    NetworkEstimator{<:Any, <:FeatureDistance}})
     return false
 end
 function plain_graph_reader(x::NetworkClustersEstimator)
     return plain_graph_reader(x.nte)
 end
-function plain_graph_reader(x::Union{<:CentralityEstimator,
-                                     <:SemiDefinitePhylogenyEstimator,
-                                     <:IntegerPhylogenyEstimator})
+function plain_graph_reader(x::Union{CentralityEstimator, SemiDefinitePhylogenyEstimator,
+                                     IntegerPhylogenyEstimator})
     return plain_graph_reader(x.pl)
 end
 function plain_graph_reader(x::CentralityConstraint)
@@ -278,7 +277,7 @@ function assert_graph_readable(x, X::MatNum)::Nothing
 end
 """
     graph_reader_gaps(x, pr::AbstractPriorResult, rd::ReturnsResult) -> Option{BitVector}
-    graph_reader_gaps(xs::Union{<:Tuple, <:AbstractVector}, pr::AbstractPriorResult,
+    graph_reader_gaps(xs::Union{Tuple, AbstractVector}, pr::AbstractPriorResult,
                       rd::ReturnsResult) -> Option{BitVector}
 
 Find the assets that hold a non-finite cell in the rows that the plain graph readers of a fit read.
@@ -318,7 +317,7 @@ function graph_reader_gaps(x, pr::AbstractPriorResult, rd::ReturnsResult)
     end
     return .!vec(all(isfinite, returns_matrix_picker(pr, rd, returns_source(x)); dims = 1))
 end
-function graph_reader_gaps(xs::Union{<:Tuple, <:AbstractVector}, pr::AbstractPriorResult,
+function graph_reader_gaps(xs::Union{Tuple, AbstractVector}, pr::AbstractPriorResult,
                            rd::ReturnsResult)
     gap = nothing
     for x in xs
@@ -389,11 +388,107 @@ function graph_reader_mask(x, imsk::Option{<:BitVector}, pr::AbstractPriorResult
     msg = "a graph reader of this optimiser reads the returns data with a plain moment estimator, and the rows that it reads hold a gap for $(count(gap)) asset(s) that the prior kept: $(assets). A plain moment estimator has no correct answer for a gapped sample"
     @argcheck(!strict,
               IsNonFiniteError("$(msg), and `strict = true` refuses the gap. $(graph_gap_remedy)"))
-    @warn("$(msg), so the fit leaves these assets out of the Investable Mask and gives each a zero weight. $(graph_gap_remedy) Pass `strict = true` to refuse the gap.")
+    @warn("$(msg), so the fit leaves these assets out of the Investable Mask and gives each a zero weight. $(graph_gap_remedy) Pass `strict = true` to refuse the gap.",
+          maxlog = log_limit(:warn), _id = @log_id())
     keep = isnothing(imsk) ? .!gap : imsk .& .!gap
     @argcheck(any(keep),
               IsEmptyError("every asset that the prior kept holds a gap in the rows that a plain graph reader of this optimiser reads, so the fit has no asset left. $(graph_gap_remedy)"))
     return keep
+end
+"""
+    distance_reader_refusal_mask(err::DistanceReaderRefusalError, imsk::Option{<:BitVector},
+                                 rd::ReturnsResult, strict::Bool) -> BitVector
+
+Compose the Investable Mask with the assets that a distance reader of a fit refused, after the fit caught the refusal.
+
+A distance reader can refuse an asset that the prior keeps, see [`DistanceReaderRefusalError`](@ref). The fit learns of the refusal only when the reader has estimated its distance matrix, after [`investable_reduction`](@ref). So the fit catches the error around the call of its own reader, takes the mask from this function, and fits again from the same prior result with that mask. A fit with no refusal does no extra work. The asset then departs as a non-investable asset: the reduction announces it, the fit gives it a zero weight, and it is listed on the Non-Investable Axis. This is the rule of [`graph_reader_mask`](@ref) for a plain reader that meets a gap.
+
+The fit warns once, and the warning names the assets and the two remedies. Under `strict = true` the fit refuses the assets instead.
+
+# Algorithm
+
+ 1. Take the indices `cols` of the full universe that the columns `err.idx` of the reduced universe name. The reduced universe is `findall(imsk)`, or every asset when `imsk` is `nothing`.
+ 2. Refuse under `strict`. Otherwise warn.
+ 3. Return `imsk` with `cols` set to `false`.
+
+# Arguments
+
+  - `err`: The refusal that the reader raised. Its `idx` indexes the reduced universe.
+  - `imsk`: The Investable Mask that the fit reduced to, or `nothing` when every asset was investable.
+  - $(arg_dict[:rd]) It is the returns data on the full universe, read for the asset names.
+  - `strict`: The `strict` field of the optimiser. `true` refuses the assets in place of the warning.
+
+# Validation
+
+  - Under `strict = true`, the reader refuses no asset. Raises an [`IsNonFiniteError`](@ref).
+  - At least one asset stays. Raises an [`IsEmptyError`](@ref).
+
+# Returns
+
+  - `keep::BitVector`: The composed mask.
+
+# Related
+
+  - [`DistanceReaderRefusalError`](@ref)
+  - [`assert_distance_reader_rows`](@ref)
+  - [`distance_reader_entry_mask`](@ref)
+  - [`graph_reader_mask`](@ref)
+  - [`investable_reduction`](@ref)
+"""
+function distance_reader_refusal_mask(err::DistanceReaderRefusalError,
+                                      imsk::Option{<:BitVector}, rd::ReturnsResult,
+                                      strict::Bool)
+    keep = isnothing(imsk) ? trues(size(rd.X, 2)) : copy(imsk)
+    cols = findall(keep)[err.idx]
+    keep[cols] .= false
+    assets = isnothing(rd.nx) ? cols : rd.nx[cols]
+    msg = "a distance reader of this optimiser cannot estimate the correlation of $(length(cols)) asset(s) that the prior kept: $(assets). An asset with zero variance gives such a row, and so does an asset that the `CoveragePolicy` of the `ce` of the reader refuses"
+    remedy = "To keep them, give the reader the `CoveragePolicy` of the prior, or state the prior as its source, `x_src = PriorSource()`."
+    @argcheck(!strict,
+              IsNonFiniteError("$(msg), and `strict = true` refuses them. $(remedy)"))
+    @warn("$(msg), so the fit leaves these assets out of the Investable Mask and gives each a zero weight. $(remedy) Pass `strict = true` to refuse them.",
+          maxlog = log_limit(:warn), _id = @log_id())
+    @argcheck(any(keep),
+              IsEmptyError("a distance reader of this optimiser refuses every asset that the prior kept, so the fit has no asset left. $(remedy)"))
+    return keep
+end
+"""
+    distance_reader_call(f, args...; kwargs...)
+
+Call the verb of a distance reader inside a fit, and return a refusal of the reader in place of its value.
+
+A fit calls the verb of each of its distance readers once, after [`investable_reduction`](@ref): a clustering, a phylogeny or a centrality. The verb raises a [`DistanceReaderRefusalError`](@ref) when the reader cannot estimate an asset that the prior kept. This function returns that error as a value, so the fit can test it with one `isa` and fit again with the mask of [`distance_reader_refusal_mask`](@ref). It takes the verb and its arguments, not a closure, so a variable of the fit that it reads is not boxed. Every other error propagates. A call with no refusal pays for the `try` block alone.
+
+# Algorithm
+
+ 1. Return `f(args...; kwargs...)`.
+ 2. Return the error when the call raises a [`DistanceReaderRefusalError`](@ref). Rethrow any other error.
+
+# Arguments
+
+  - `f`: The verb, such as [`clusterise`](@ref), [`phylogeny_constraints`](@ref) or [`centrality_constraints`](@ref).
+  - `args...`: The positional arguments of `f`.
+  - `kwargs...`: The keyword arguments of `f`.
+
+# Returns
+
+  - `val`: The value of `f`, or the [`DistanceReaderRefusalError`](@ref) that it raised.
+
+# Related
+
+  - [`DistanceReaderRefusalError`](@ref)
+  - [`distance_reader_refusal_mask`](@ref)
+  - [`assert_distance_reader_rows`](@ref)
+"""
+function distance_reader_call(f::F, args...; kwargs...) where {F}
+    try
+        return f(args...; kwargs...)
+    catch err
+        if err isa DistanceReaderRefusalError
+            return err
+        end
+        rethrow()
+    end
 end
 """
 $(DocStringExtensions.TYPEDSIGNATURES)
@@ -890,12 +985,12 @@ function centrality_constraints_from(ccs::CC_VecCC, pr::Pr_RR, rd::Option{<:Retu
                                   dims = 1)
 end
 """
-    returns_source(pe::Union{<:EmpiricalPrior, <:FactorPrior, <:HighOrderPriorEstimator,
-                             <:HighOrderFactorPriorEstimator, <:BlackLittermanPrior,
-                             <:BayesianBlackLittermanPrior, <:FactorBlackLittermanPrior,
-                             <:AugmentedBlackLittermanPrior, <:EntropyPoolingPrior,
-                             <:MeucciEntropyPoolingPrior, <:OpinionPoolingPrior,
-                             <:CrossSectionalFactorPrior, <:LowDimensionEnsemblePrior})
+    returns_source(pe::Union{EmpiricalPrior, FactorPrior, HighOrderPriorEstimator,
+                             HighOrderFactorPriorEstimator, BlackLittermanPrior,
+                             BayesianBlackLittermanPrior, FactorBlackLittermanPrior,
+                             AugmentedBlackLittermanPrior, EntropyPoolingPrior,
+                             MeucciEntropyPoolingPrior, OpinionPoolingPrior,
+                             CrossSectionalFactorPrior, LowDimensionEnsemblePrior})
         -> Option{<:AbstractReturnsSource}
 
 The prior estimators of the library method of [`returns_source`](@ref): the source that the prior states in its `x_src` field.
@@ -916,21 +1011,19 @@ The [`ReturnsResult`](@ref) method of [`prior`](@ref), [`partial_fit!`](@ref) an
   - [`prior`](@ref)
   - [`reader_frames`](@ref)
 """
-function returns_source(pe::Union{<:EmpiricalPrior, <:FactorPrior,
-                                  <:HighOrderPriorEstimator,
-                                  <:HighOrderFactorPriorEstimator, <:BlackLittermanPrior,
-                                  <:BayesianBlackLittermanPrior,
-                                  <:FactorBlackLittermanPrior,
-                                  <:AugmentedBlackLittermanPrior, <:EntropyPoolingPrior,
-                                  <:MeucciEntropyPoolingPrior, <:OpinionPoolingPrior,
-                                  <:CrossSectionalFactorPrior, <:LowDimensionEnsemblePrior})
+function returns_source(pe::Union{EmpiricalPrior, FactorPrior, HighOrderPriorEstimator,
+                                  HighOrderFactorPriorEstimator, BlackLittermanPrior,
+                                  BayesianBlackLittermanPrior, FactorBlackLittermanPrior,
+                                  AugmentedBlackLittermanPrior, EntropyPoolingPrior,
+                                  MeucciEntropyPoolingPrior, OpinionPoolingPrior,
+                                  CrossSectionalFactorPrior, LowDimensionEnsemblePrior})
     return pe.x_src
 end
 """
-    refits_regression(pe::Union{<:EmpiricalPrior, <:LowDimensionEnsemblePrior}) -> true
-    refits_regression(pe::Union{<:HighOrderPriorEstimator, <:BlackLittermanPrior,
-                                <:BayesianBlackLittermanPrior, <:EntropyPoolingPrior,
-                                <:MeucciEntropyPoolingPrior}) -> Bool
+    refits_regression(pe::Union{EmpiricalPrior, LowDimensionEnsemblePrior}) -> true
+    refits_regression(pe::Union{HighOrderPriorEstimator, BlackLittermanPrior,
+                                BayesianBlackLittermanPrior, EntropyPoolingPrior,
+                                MeucciEntropyPoolingPrior}) -> Bool
     refits_regression(pe::OpinionPoolingPrior) -> Bool
 
 The prior estimators of the library methods of [`refits_regression`](@ref): whether the prior gives no loadings, so that a regression reader at `x_src = nothing` fits its own regression on the raw returns data.
@@ -958,12 +1051,12 @@ Every other prior of the library gives loadings, and the fallback answers `false
   - [`refits_regression`](@ref)
   - [`reader_frames`](@ref)
 """
-function refits_regression(::Union{<:EmpiricalPrior, <:LowDimensionEnsemblePrior})
+function refits_regression(::Union{EmpiricalPrior, LowDimensionEnsemblePrior})
     return true
 end
-function refits_regression(pe::Union{<:HighOrderPriorEstimator, <:BlackLittermanPrior,
-                                     <:BayesianBlackLittermanPrior, <:EntropyPoolingPrior,
-                                     <:MeucciEntropyPoolingPrior})
+function refits_regression(pe::Union{HighOrderPriorEstimator, BlackLittermanPrior,
+                                     BayesianBlackLittermanPrior, EntropyPoolingPrior,
+                                     MeucciEntropyPoolingPrior})
     return refits_regression(pe.pe)
 end
 function refits_regression(pe::OpinionPoolingPrior)
@@ -1013,7 +1106,7 @@ function stamp_returns_source(pr::AbstractPriorResult, ::Any)
     return pr
 end
 """
-    prior_returns_source(pr::Union{<:LowOrderPrior, <:HighOrderPrior})
+    prior_returns_source(pr::Union{LowOrderPrior, HighOrderPrior})
         -> Option{<:AbstractReturnsSource}
     prior_returns_source(pr::AbstractPriorResult) -> Nothing
 
@@ -1034,7 +1127,7 @@ A Prior Result of a type that the library does not ship records no source, so th
   - [`stamp_returns_source`](@ref)
   - [`outer_returns_source`](@ref)
 """
-function prior_returns_source(pr::Union{<:LowOrderPrior, <:HighOrderPrior})
+function prior_returns_source(pr::Union{LowOrderPrior, HighOrderPrior})
     return pr.x_src
 end
 function prior_returns_source(::AbstractPriorResult)

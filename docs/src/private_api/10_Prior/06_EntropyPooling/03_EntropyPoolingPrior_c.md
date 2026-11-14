@@ -1,5 +1,5 @@
 ```@meta
-Description = "Entropy pooling Prior (c), private API of PortfolioOptimisers.jl: VecEP, show_fields, ep_prior, embedded_pin_weights, ep_wrapped_prior, scenario_factory, …"
+Description = "Entropy pooling Prior (c), private API of PortfolioOptimisers.jl: VecEP, show_fields, assert_ep_views_axis, ep_prior, embedded_pin_weights, …"
 ```
 
 # Entropy pooling Prior (c): private API
@@ -7,6 +7,7 @@ Description = "Entropy pooling Prior (c), private API of PortfolioOptimisers.jl:
 ```@docs
 VecEP
 PortfolioOptimisers.show_fields(::EntropyPoolingPrior)
+PortfolioOptimisers.assert_ep_views_axis
 ep_prior(alg::StagedEP, pe::EntropyPoolingPrior, X::MatNum, F::Option{<:MatNum}, pnl::Option{<:AssetPanel} = nothing; strict::Bool = false, kwargs...)
 ep_prior(alg::H0_EntropyPooling, pe::EntropyPoolingPrior, X::MatNum, F::Option{<:MatNum}, pnl::Option{<:AssetPanel} = nothing; strict::Bool = false, kwargs...)
 embedded_pin_weights
@@ -17,4 +18,13 @@ scenario_prior
 prior_probability_factory
 assert_scenario_model
 assert_scenario_refit
+ep_tail_views!
+ep_diagnose_tail_view!(::JuMP.Model, ::Any, ::Union{LinearConditionalValueatRiskViewConstraint, ConicEntropicValueatRiskViewConstraint, ConicRelativisticValueatRiskViewConstraint})
+```
+
+## References
+
+```@bibliography
+Pages = [@__FILE__]
+Canonical = false
 ```

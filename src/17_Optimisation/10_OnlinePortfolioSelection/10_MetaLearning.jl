@@ -67,7 +67,7 @@ SwitchingWeighting
 
 # References
 
-  - $(ref_dict[:singer1997])
+  - $(ref_dict[:singer1997]) Section 3, Equations 4 to 6 and Table 1.
   - $(ref_dict[:herbsterwarmuth1998])
 """
 @concrete struct SwitchingWeighting <: AbstractOnlinePortfolioSelectionAlgorithm
@@ -163,7 +163,7 @@ julia> length(sp.experts), sp.alg.gamma
 
 # References
 
-  - $(ref_dict[:singer1997])
+  - $(ref_dict[:singer1997]) Section 3, Equations 1 to 6.
 """
 function SwitchingPortfolio(; N::Integer, gamma::Real = 1 / 3,
                             eset::Option{<:BoundedAllocationSet} = nothing,
@@ -324,7 +324,7 @@ julia> [e.eta for e in mix.experts], mix.p0
 
 # References
 
-  - $(ref_dict[:zhang2018ader])
+  - $(ref_dict[:zhang2018ader]) Section 3.3, Equations 9 and 10, and Section 3.4, Equation 12, Algorithms 3 and 4 and Theorem 4.
 """
 function Ader(; eta_min::Real, K::Integer, eps::Real,
               obj::AbstractOnlineObjective = LogWealth(),
@@ -341,9 +341,9 @@ end
 
 Builds the small-loss Sword, an [`ExpertMixture`](@ref) of `K` [`GradientProjection`](@ref) experts on a geometric grid of rates, from the uniform start.
 
-It is the algorithm of Theorem 5 of [zhao2020sword](@cite). The experts, the [`BlendPoint`](@ref) and the [`ExponentiatedGradient`](@ref) weighting are those of [`Ader`](@ref). The two differ in the start over the experts, which is uniform here, and in the grid that [zhao2020sword](@citet) tune. The meta-algorithm of [zhao2020sword](@cite) is the exponentially weighted forecaster on the linearised loss, with no optimism.
+It follows Theorem 5 of [zhao2020sword](@cite) with one departure. In Equation 12 of [zhao2020sword](@cite) each expert steps on the gradient at its own iterate, and the gradient at the combined allocation enters only the linearised loss of the meta-algorithm, in Equation 13. Here every expert steps on the gradient at the allocation that the mixture played, the [`BlendPoint`](@ref), as the experts of [`Ader`](@ref) do. So the mixture is a variant of the original, and the bound of Theorem 5 is not shown for it. The [`ExponentiatedGradient`](@ref) weighting is that of [`Ader`](@ref). The two mixtures differ in the start over the experts, which is uniform here, and in the grid that [zhao2020sword](@citet) tune. The meta-algorithm of [zhao2020sword](@cite) is the exponentially weighted forecaster on the linearised loss, with no optimism.
 
-As for [`Ader`](@ref), the weighting sets the weights of the experts from their log wealth under every objective `obj`. So the mixture is the algorithm of [zhao2020sword](@cite) only under the default [`LogWealth`](@ref) objective. [zhao2020sword](@citet) tune the grid and the rate for a known horizon and a known cumulative loss. An online rule knows neither, so the three values are the caller's.
+As for [`Ader`](@ref), the weighting sets the weights of the experts from their log wealth under every objective `obj`. So the weights are those of [zhao2020sword](@cite) only under the default [`LogWealth`](@ref) objective. [zhao2020sword](@citet) tune the grid and the rate for a known horizon and a known cumulative loss. An online rule knows neither, so the three values are the caller's.
 
 The package builds neither of the two other forms of [zhao2020sword](@cite). In the gradient-variation form, the experts take the extra-gradient step and the weighting carries an optimistic hint. The best-of-both-worlds form runs a second meta-algorithm that learns the hint.
 
@@ -440,7 +440,7 @@ julia> [e.eta for e in mix.experts], mix.p0
 
 # References
 
-  - $(ref_dict[:zhao2020sword])
+  - $(ref_dict[:zhao2020sword]) Section 2.3, Equations 12, 13 and 15, and Theorem 5.
 """
 function Sword(; eta_min::Real, K::Integer, eps::Real,
                obj::AbstractOnlineObjective = LogWealth(),

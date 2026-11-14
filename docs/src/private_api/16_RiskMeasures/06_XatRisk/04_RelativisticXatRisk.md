@@ -1,5 +1,5 @@
 ```@meta
-Description = "Relativistic X at Risk, private API of PortfolioOptimisers.jl: resolve_deferred_quantities, RRM."
+Description = "Relativistic X at Risk, private API of PortfolioOptimisers.jl: resolve_deferred_quantities, RRM, RRM_worst_case, RRM_model."
 ```
 
 # Relativistic X at Risk: private API
@@ -10,4 +10,6 @@ resolve_deferred_quantities(x::RelativisticValueatRiskRange, pr::AbstractPriorRe
 resolve_deferred_quantities(x::RelativisticDrawdownatRisk, pr::AbstractPriorResult)
 resolve_deferred_quantities(x::RelativeRelativisticDrawdownatRisk, pr::AbstractPriorResult)
 RRM
+RRM_worst_case
+RRM_model
 ```

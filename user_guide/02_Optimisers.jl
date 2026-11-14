@@ -66,7 +66,7 @@ res_ew = optimise(EqualWeighted(), rd)
 
 A JuMP optimiser solves a mathematical program, and it accepts more constraints and objectives
 than the other families. It needs a [`JuMPOptimiser`](@ref) that holds the prior and a
-[`Solver`](@ref). [Clarabel](https://github.com/oxfordcontrol/Clarabel.jl) suits a problem with no
+[`Solver`](@ref). [Clarabel](https://clarabel.org/stable/) suits a problem with no
 integer variables. The most used JuMP optimiser is [`MeanRisk`](@ref), and its
 default objective is [`MinimumRisk`](@ref).
 =#

@@ -13,6 +13,10 @@ module CodeHealth
 
 using TOML
 
+# The machine-wide slot that a gate which loads the package (JET, the Expansion Bound) and the
+# doctest driver hold for their run.
+include("julia_slot.jl")
+
 export Definition, Reviewed, Finding, Rise, RefreshRefused, run_script
 
 # --- what one measurement says about one definition -------------------------
@@ -374,6 +378,176 @@ function declared_types(mod::Module)
     return declared
 end
 
+# --- the references to a name ------------------------------------------------
+#
+# **This is the one reference counter.** `test/test_70_trivial_unit_census.jl` finds a pure forward
+# with at most one caller with it, and `test/test_86_dead_abstract_type_census.jl` finds an abstract
+# type that nothing codes against with it, so the two censuses agree on what a use is.
+
+"""
+    signature_name(sig) -> Tuple{Union{Nothing, Symbol}, Bool}
+
+The name under a method signature, and whether it is module-qualified (`Base.show`). A functor
+`(r::T)(x)` has no name, so it gives `(nothing, false)`.
+"""
+function signature_name(sig)
+    while sig isa Expr && sig.head in (:where, :(::))
+        sig = sig.args[1]
+    end
+    if !(sig isa Expr && sig.head === :call)
+        return (nothing, false)
+    end
+    f = sig.args[1]
+    if f isa Symbol
+        return (f, false)
+    end
+    if f isa Expr && f.head === :. && f.args[end] isa QuoteNode
+        return (f.args[end].value, true)
+    end
+    if f isa Expr && f.head === :curly
+        return signature_name(Expr(:call, f.args[1]))
+    end
+    return (nothing, false)
+end
+
+"""
+    reference_counts(trees) -> Dict{Symbol, Int}
+
+Every `Symbol` in reference position in the parsed files `trees`, counted once per occurrence.
+
+These positions are not references: the prose of a docstring, an `export`, `public`, `import` or
+`using` line, the name and the argument names of a definition, the name of a keyword, the left side
+of an assignment, the name that `x::T` binds, the field names and the supertype of a struct, the
+name and the supertype of an abstract type, and the name of a function inside its own body.
+`Mod.name` counts `name`, and so does `x.field`, because the parser cannot tell the two apart. This
+errs on the side of a use. The bounds of the type parameters of a struct or of an abstract type
+count, because they are uses of the types that they name.
+"""
+function reference_counts(trees)
+    refs = Dict{Symbol, Int}()
+    for t in trees
+        count_refs!(refs, t, nothing)
+    end
+    return refs
+end
+
+count_ref!(refs, s::Symbol) = (refs[s] = get(refs, s, 0) + 1)
+
+function count_refs!(refs, e, self)
+    if e isa Symbol
+        if !(e === self)
+            count_ref!(refs, e)
+        end
+        return nothing
+    end
+    if !(e isa Expr)
+        return nothing
+    end
+    h = e.head
+    if h === :macrocall && isdocstring(e)
+        count_refs!(refs, e.args[end], self)
+    elseif h in (:export, :public, :import, :using, :inert)
+        nothing
+    elseif h === :abstract
+        count_head_bounds!(refs, e.args[1])
+    elseif h === :const
+        count_refs!(refs, e.args[1].args[end], self)
+    elseif h === :function || (h === :(=) && is_signature(e.args[1]))
+        name, _ = signature_name(e.args[1])
+        count_sig_refs!(refs, e.args[1], name)
+        length(e.args) >= 2 && count_refs!(refs, e.args[2], name)
+    elseif h === :struct
+        count_struct_refs!(refs, e)
+    elseif h === :kw
+        count_refs!(refs, e.args[2], self)
+    elseif h === :(=) &&
+           (e.args[1] isa Symbol || (e.args[1] isa Expr && e.args[1].head === :tuple))
+        count_refs!(refs, e.args[2], self)
+    elseif h === :(::) && length(e.args) == 2 && e.args[1] isa Symbol
+        count_refs!(refs, e.args[2], self)
+    elseif h === :.
+        count_refs!(refs, e.args[1], self)
+        if length(e.args) == 2
+            if e.args[2] isa QuoteNode
+                e.args[2].value isa Symbol && count_refs!(refs, e.args[2].value, self)
+            else
+                # A broadcast call `f.(args...)`: the tuple holds the arguments.
+                count_refs!(refs, e.args[2], self)
+            end
+        end
+    elseif h === :macrocall
+        foreach(a -> count_refs!(refs, a, self), e.args[2:end])
+    else
+        foreach(a -> count_refs!(refs, a, self), e.args)
+    end
+    return nothing
+end
+
+function count_sig_refs!(refs, sig, self)
+    while sig isa Expr && sig.head in (:where, :(::))
+        if sig.head === :(::)
+            count_refs!(refs, sig.args[end], self)
+        else
+            foreach(w -> count_refs!(refs, w, self), sig.args[2:end])
+        end
+        sig = sig.args[1]
+    end
+    if !(sig isa Expr && sig.head === :call)
+        return nothing
+    end
+    foreach(a -> count_arg_refs!(refs, a, self), sig.args[2:end])
+    return nothing
+end
+
+function count_arg_refs!(refs, a, self)
+    if a isa Symbol
+        nothing
+    elseif a isa Expr && a.head === :parameters
+        foreach(x -> count_arg_refs!(refs, x, self), a.args)
+    elseif a isa Expr && a.head === :kw
+        count_arg_refs!(refs, a.args[1], self)
+        count_refs!(refs, a.args[2], self)
+    elseif a isa Expr && a.head === :(...)
+        count_arg_refs!(refs, a.args[1], self)
+    elseif a isa Expr && a.head === :(::)
+        count_refs!(refs, a.args[end], self)
+    else
+        count_refs!(refs, a, self)
+    end
+    return nothing
+end
+
+# The bounds of the type parameters in the head `T{A <: B} <: S` of a struct or an abstract type.
+# The name `T` and the supertype `S` are not references.
+function count_head_bounds!(refs, head)
+    if head isa Expr && head.head === :<:
+        (head = head.args[1])
+    end
+    if head isa Expr && head.head === :curly
+        for a in head.args[2:end]
+            a isa Expr && a.head === :<: && count_refs!(refs, a.args[end], nothing)
+        end
+    end
+    return nothing
+end
+
+function count_struct_refs!(refs, e)
+    count_head_bounds!(refs, e.args[2])
+    for a in e.args[3].args
+        if !(a isa Expr)
+            continue
+        end
+        if a.head === :(::)
+            count_refs!(refs, a.args[end], nothing)
+        elseif a.head === :function ||
+               (a.head === :(=) && is_signature(a.args[1])) ||
+               a.head === :macrocall
+            count_refs!(refs, a, nothing)
+        end
+    end
+    return nothing
+end
+
 # --- the name a definition binds --------------------------------------------
 #
 # **This is the one resolver.** `code_health/coverage.jl` writes the `definition` key of a
@@ -496,6 +670,310 @@ function definition_name(e0)
     return ""
 end
 
+# --- the forward reader ------------------------------------------------------
+#
+# **This is the one reader of a forward.** The forward census of
+# `test/test_70_trivial_unit_census.jl` keys a forward method with it, and
+# `code_health/forward_survey.jl` gives each forward a verdict with it. So the census and the
+# survey cannot disagree about which method only forwards. Issues #2071 and #2086. The comment
+# of the forward census in `test_70` states the rule and its five exemptions.
+
+"""
+    MethodDef
+
+One method definition, as [`method_defs`](@ref) reads it: the name, the file and line of the
+definition (of its docstring, when it has one), the signature, the body, and whether the name is
+module-qualified (`Base.show`). A qualified name extends the function of another module, or of the
+package from an extension.
+"""
+struct MethodDef
+    name::Symbol
+    file::String
+    line::Int
+    sig::Any
+    body::Any
+    qualified::Bool
+end
+
+"""
+    method_defs(file, tree) -> Vector{MethodDef}
+
+Every named method that `tree`, the parse of `file`, defines at its top level, inside a `module`
+or a `begin` block, or under a macro such as `@inline`. A method inside a `struct` body, an inner
+constructor, is not read, and nor is a functor method `(r::T)(x)`, which has no name.
+"""
+function method_defs(file::AbstractString, tree)
+    out = MethodDef[]
+    collect_methods!(out, tree, String(file), 0)
+    return out
+end
+
+function collect_methods!(out, e, file, line)
+    if isdocstring(e)
+        if e.args[2] isa LineNumberNode
+            (line = e.args[2].line)
+        end
+        e = unwrap(e)
+    end
+    if !(e isa Expr)
+        return nothing
+    end
+    if e.head === :function || (e.head === :(=) && is_signature(e.args[1]))
+        if !(length(e.args) >= 2)
+            return nothing
+        end
+        name, qual = signature_name(e.args[1])
+        if name === nothing
+            return nothing
+        end
+        push!(out, MethodDef(name, file, line, e.args[1], e.args[2], qual))
+    elseif e.head === :macrocall
+        l = e.args[2] isa LineNumberNode ? e.args[2].line : line
+        collect_methods!(out, e.args[end], file, l)
+    elseif e.head === :module || e.head === :block || e.head === :toplevel
+        for a in (e.head === :module ? e.args[end].args : e.args)
+            if a isa LineNumberNode
+                (line = a.line; continue)
+            end
+            collect_methods!(out, a, file, line)
+        end
+    end
+    return nothing
+end
+
+"""
+    forward_leaf(e) -> Bool
+
+Whether a forward may pass `e` on: a name, a literal, `nothing`, a field chain on a name, a splat
+of one, a keyword forward, or a tuple of these.
+"""
+function forward_leaf(e)
+    if e isa Symbol
+        return true
+    end
+    if !(e isa Expr)
+        return true
+    end
+    if e.head === :. && length(e.args) == 2 && e.args[2] isa QuoteNode
+        return forward_leaf(e.args[1])
+    elseif e.head === :(...) || e.head === :kw
+        return forward_leaf(e.args[end])
+    elseif e.head === :parameters || e.head === :tuple
+        return all(forward_leaf, e.args)
+    end
+    return false
+end
+
+"""
+    is_operator_name(f) -> Bool
+
+Whether `f` is the name of an operator, such as `+` or `=>`. A call of an operator is logic that
+the method owns, never a forward.
+"""
+is_operator_name(f) = f isa Symbol && Base.isoperator(f)
+
+"""
+    single_call(body) -> Union{Nothing, Expr}
+
+The call of a body that is one call to a function named by a `Symbol`, with or without `return`,
+or `nothing`. The arguments of the call can be any expression.
+"""
+function single_call(body)
+    stmts = if body isa Expr && body.head === :block
+        filter(a -> !(a isa LineNumberNode), body.args)
+    else
+        Any[body]
+    end
+    if !(length(stmts) == 1)
+        return nothing
+    end
+    s = stmts[1]
+    if s isa Expr && s.head === :return
+        if isempty(s.args)
+            return nothing
+        end
+        s = s.args[1]
+    end
+    if !(s isa Expr && s.head === :call)
+        return nothing
+    end
+    f = s.args[1]
+    if !(f isa Symbol && !is_operator_name(f))
+        return nothing
+    end
+    return s
+end
+
+"""
+    forward_call(body) -> Union{Nothing, Expr}
+
+The call of a body that is one depth-one forward: a [`single_call`](@ref) whose arguments are each
+a [`forward_leaf`](@ref). `nothing` for any other body.
+"""
+function forward_call(body)
+    s = single_call(body)
+    if s === nothing
+        return nothing
+    end
+    if !(all(forward_leaf, s.args[2:end]))
+        return nothing
+    end
+    return s
+end
+
+"""
+    call_signature(sig) -> Any
+
+The `f(args...)` call of a signature, with `where` clauses and a return type removed.
+"""
+function call_signature(sig)
+    while sig isa Expr && (sig.head === :where || (sig.head === :(::) &&
+                                                   sig.args[1] isa Expr &&
+                                                   sig.args[1].head in (:call, :where)))
+        sig = sig.args[1]
+    end
+    return sig
+end
+
+"""
+    forward_signature(sig) -> Tuple{Set{Symbol}, Bool, Bool}
+
+The names that a signature binds, whether a positional argument is typed, and whether one is typed
+`Nothing`. A positional argument typed `Any` is untyped. A method with keywords alone, `f(; a, b)`,
+counts as typed, because it is no `Any` fallback.
+"""
+function forward_signature(sig)
+    sig = call_signature(sig)
+    names = Set{Symbol}()
+    typed = false
+    nothing_arm = false
+    if !(sig isa Expr && sig.head === :call)
+        return names, typed, nothing_arm
+    end
+    function bind!(a, positional)
+        if a isa Symbol
+            push!(names, a)
+        elseif a isa Expr && a.head === :parameters
+            foreach(x -> bind!(x, false), a.args)
+        elseif a isa Expr && a.head in (:kw, :(...))
+            bind!(a.args[1], positional)
+        elseif a isa Expr && a.head === :(::)
+            if length(a.args) == 2 && a.args[1] isa Symbol
+                push!(names, a.args[1])
+            end
+            if positional
+                if !(a.args[end] === :Any)
+                    (typed = true)
+                end
+                a.args[end] === :Nothing && (nothing_arm = true)
+            end
+        end
+        return nothing
+    end
+    foreach(a -> bind!(a, true), sig.args[2:end])
+    positional = filter(a -> !(a isa Expr && a.head === :parameters), sig.args[2:end])
+    if isempty(positional)
+        (typed = true)
+    end
+    return names, typed, nothing_arm
+end
+
+"""
+    keywords_alone(sig) -> Bool
+
+Whether a method takes keywords alone, `f(; a, b)`.
+"""
+function keywords_alone(sig)
+    sig = call_signature(sig)
+    if !(sig isa Expr && sig.head === :call)
+        return false
+    end
+    return all(a -> a isa Expr && a.head === :parameters, sig.args[2:end])
+end
+
+# The name at the root of a leaf: `x` of `x.a.b`, of `x...` and of `k = x`.
+function forward_root(e)
+    if e isa Symbol
+        return e
+    elseif e isa Expr && e.head === :.
+        return forward_root(e.args[1])
+    elseif e isa Expr && e.head in (:(...), :kw)
+        return forward_root(e.args[end])
+    end
+    return nothing
+end
+
+"""
+    forward_passes(e, names) -> Bool
+
+Whether the leaf `e` passes one of `names`, or a field of one.
+"""
+function forward_passes(e, names)
+    if e isa Expr && e.head in (:parameters, :tuple)
+        return any(a -> forward_passes(a, names), e.args)
+    end
+    r = forward_root(e)
+    return r !== nothing && r in names
+end
+
+"""
+    forward_has_field(e) -> Bool
+
+Whether the leaf `e` passes a field of a name.
+"""
+function forward_has_field(e)
+    return e isa Expr && (e.head === :. ||
+                          (e.head in (:(...), :kw, :parameters, :tuple) && any(forward_has_field, e.args)))
+end
+
+"""
+    forward_methods(defs; owned, structs, foreign = _ -> false)
+        -> Dict{Tuple{Symbol, Symbol}, Vector{Tuple{String, Int}}}
+
+Every forward method of `defs`, keyed by `(name, callee)`, with the file and line of each. A
+method is a forward when its body is a [`forward_call`](@ref) to a name in `owned` (a function
+that the package defines) or in `structs` (a type that it declares), and the call passes an
+argument of the method or a field of one. The five exemptions of the forward census apply: a
+method named after a type, a qualified method or a name for which `foreign` is true, a method with
+a positional argument typed `Nothing`, a method whose positional arguments are all untyped, and a
+self-call that passes a field or that a method with keywords alone makes.
+
+`foreign` is the one input that can need the loaded module. `test_70` passes the check against the
+loaded package. The survey passes the default: the package extends a function of another module
+only by a qualified name, and the qualified methods are exempt already.
+"""
+function forward_methods(defs; owned, structs, foreign = _ -> false)
+    out = Dict{Tuple{Symbol, Symbol}, Vector{Tuple{String, Int}}}()
+    for d in defs
+        if (d.qualified || d.name in structs || foreign(d.name))
+            continue
+        end
+        call = forward_call(d.body)
+        if call === nothing
+            continue
+        end
+        callee = call.args[1]
+        if !(callee in owned || callee in structs)
+            continue
+        end
+        names, typed, nothing_arm = forward_signature(d.sig)
+        if !(typed && !nothing_arm)
+            continue
+        end
+        if !(any(a -> forward_passes(a, names), call.args[2:end]))
+            continue
+        end
+        if callee === d.name && any(forward_has_field, call.args[2:end])
+            continue
+        end
+        if callee === d.name && keywords_alone(d.sig)
+            continue
+        end
+        push!(get!(out, (d.name, callee), Tuple{String, Int}[]), (d.file, d.line))
+    end
+    return out
+end
+
 # --- Declaration Macros ----------------------------------------------------
 #
 # Found by parsing alone, so `complexity.jl` stays a pure parser and loads no package.
@@ -529,7 +1007,7 @@ end
     macro_call_sites(file; root = REPO_ROOT) -> Vector{Tuple{String, Expr}}
 
 Every macro call a file makes outside a struct body, with the name and the call expression. The
-five field-prefix macros — `@fprop`, `@vprop`, `@pprop`, `@cprop` and `@wprop` — declare nothing of
+six field-prefix macros — `@fprop`, `@vprop`, `@pprop`, `@cprop`, `@wprop` and `@oprop` — declare nothing of
 their own and appear only inside a struct body, so this is what separates them from the seven
 Declaration Macros of ADR 0072.
 """
@@ -1053,7 +1531,11 @@ function provenance_message(bad)
         println(io, line)
     end
     print(io,
-          "Refresh the baseline in the SAME commit that moves code_health/Manifest.toml.")
+          "Refresh the baseline in the SAME commit that moves code_health/Manifest.toml. Keep ",
+          "the new Manifest: do not restore the old one. In a commit that changes nothing under ",
+          "src/ or ext/, run `julia -t 1 --project=code_health code_health/<gate>.jl refresh ",
+          "--accept-rise` for each gate named above. Each rise then belongs to the analyser, ",
+          "not to the code.")
     return String(take!(io))
 end
 
@@ -1173,11 +1655,13 @@ end
     annotate(path, message)
 
 One `::error` annotation per offending file, per ADR 0077. Outside CI the annotation syntax is
-dropped and the same text is printed plainly.
+dropped and the same text is printed plainly. The message repeats the path: GitHub moves `file=`
+into the metadata of the annotation, so the log of a failed run (`gh run view --log-failed`)
+would show the message with no file.
 """
 function annotate(path::AbstractString, message::AbstractString)
     if is_ci()
-        println("::error file=", path, "::", message)
+        println("::error file=", path, "::", path, ": ", message)
     else
         println("  ", path, ": ", message)
     end
@@ -1222,34 +1706,43 @@ end
 """
     routes(; dismissal) -> String
 
-ADR 0075's one message for everyone, in its three ordered routes. Route 2 is named in CI rather
-than left to the documentation, because a new Rationale needs the maintainer and that is the one
-route a contributor without write access cannot finish alone. The complexity message drops it,
-because a Dismissal is a JET-only instrument.
+ADR 0075's one message for everyone, in its three routes. Route 2 is named in CI rather than left
+to the documentation, because a new Rationale needs the maintainer and that is the one route a
+contributor without write access cannot finish alone. The complexity message drops it, because a
+Dismissal is a JET-only instrument.
+
+The design picks the route, not the number (ADR 0075, amendment of 2026-11-12, #2060). Route 1
+applies when the lower form is also the better design. The record of the rise applies when the
+higher number comes from the correct form. The last line forbids the change of a signature, a type
+bound or the home of a function only to pass a ratchet.
 """
 function routes(; dismissal::Bool)
     io = IOBuffer()
-    println(io, "A refresh is not the fix. Take one of these routes, in order.")
-    println(io, "  1. Lower the number.")
-    if dismissal
+    println(io,
+            "A refresh by reflex is not the fix. The design picks the route, not the number.")
+    println(io, "  1. Lower the number, when the lower form is also the better design.")
+    rise = if dismissal
         println(io,
                 "  2. Add a Dismissal to code_health/rulings.toml citing an approved Rationale.")
         println(io,
                 "     Say so in the pull request if the Rationale is new: a new one needs the maintainer.")
-        println(io,
-                "  3. Record the rise. Download the Refresh Artifact from this run, put the file at")
-        println(io,
-                "     its committed path under code_health/, and commit it. Locally the same act is")
-        println(io,
-                "     `julia --project=code_health code_health/<tool>.jl refresh --accept-rise`.")
+        3
     else
-        println(io,
-                "  2. Record the rise. Download the Refresh Artifact from this run, put the file at")
-        println(io,
-                "     its committed path under code_health/, and commit it. Locally the same act is")
-        println(io,
-                "     `julia --project=code_health code_health/<tool>.jl refresh --accept-rise`.")
+        2
     end
+    println(io,
+            "  $rise. Record the rise, when the higher number comes from the correct form: the precedent")
+    println(io,
+            "     of the library, a testable signature, the right file for the subject. The number must")
+    println(io,
+            "     stay within its threshold in code_health/rulings.toml. Name the rise and its reason in")
+    println(io,
+            "     the commit. Download the Refresh Artifact from this run, put the file at its committed")
+    println(io, "     path under code_health/, and commit it. Locally the same act is")
+    println(io,
+            "     `julia --project=code_health code_health/<tool>.jl refresh --accept-rise`.")
+    println(io,
+            "Never change a signature, a type bound or the home of a function only to pass a ratchet.")
     print(io, "See docs/src/contribute/3-code-health.md.")
     return String(take!(io))
 end

@@ -1,5 +1,5 @@
 ```@meta
-Description = "EW beta descriptors (a), private API of PortfolioOptimisers.jl: EWBlockState, ew_active_returns, ew_agg_series, ew_agg_vector, ew_beta_expand, Base.copy, …"
+Description = "EW beta descriptors (a), private API of PortfolioOptimisers.jl: EWBlockState, JoinedRows, EWBetaOutput, ew_active_returns, ew_agg_series, ew_agg_vector, …"
 ```
 
 # EW beta descriptors (a): private API
@@ -8,6 +8,8 @@ Description = "EW beta descriptors (a), private API of PortfolioOptimisers.jl: E
 
 ```@docs
 EWBlockState
+JoinedRows
+EWBetaOutput
 ```
 
 ## Functions

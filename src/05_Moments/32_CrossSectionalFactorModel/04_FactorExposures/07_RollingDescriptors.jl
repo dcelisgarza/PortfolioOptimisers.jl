@@ -30,29 +30,28 @@ function assert_rolling_sign(sign::Real)::Nothing
     return nothing
 end
 """
-    descriptor_returns(rd::ReturnsResult) -> Tuple{Matrix{<:Real}, AssetPanel}
+    descriptor_returns(rd::ReturnsResult) -> Tuple{AbstractMatrix{<:Real}, AssetPanel}
 
 Read the returns and the Asset Panel a rolling Descriptor works on.
 
-Returns are not a Panel Field, so a Descriptor that reads them reads `rd.X` and not the feature matrix. Every rolling Descriptor reads the pair through this function. The returns come back as a new matrix in `float_if_integer(eltype(rd.X))`. An integer panel is floated, so its Descriptor can hold the `NaN` of the warm-up. A `Rational` panel is kept, and it cannot hold that `NaN`.
+Returns are not a Panel Field, so a Descriptor that reads them reads `rd.X` and not the feature matrix. Every rolling Descriptor reads the pair through this function. The returns come back as `rd.X` itself, with no copy. The [`ReturnsResult`](@ref) holds floating-point returns, so a Descriptor can hold the `NaN` of the warm-up. A `Rational` panel cannot hold that `NaN`.
 
 A return that is missing is a `NaN`, and a Descriptor tests for it. A return that is infinite is refused, because a sum over a window is one difference of two cumulative sums. One infinite return makes every later cumulative sum infinite, and the difference of two of them is `NaN`, also in a window that does not hold the infinite return.
 
 # Arguments
 
-  - $(arg_dict[:rd]) It must carry returns in `rd.X` and an Asset Panel in `rd.pnl`.
+  - $(arg_dict[:rd]) It must carry returns in `rd.X`. With no Asset Panel in `rd.pnl`, the function reads the mask-only panel of [`returns_with_universe`](@ref).
 
 # Validation
 
   - `!isnothing(rd.X)`. Raises an [`IsNothingError`](@ref).
-  - `!isnothing(rd.pnl)`. Raises an [`IsNothingError`](@ref).
   - Every entry of `rd.X` that is not `NaN` is finite. Raises a `DomainError`.
 
 The two shapes need no check of their own. [`ReturnsResult`](@ref) binds the observation axis and the asset axis of the feature matrix to those of the returns, so an Asset Panel that reaches a `ReturnsResult` always matches the returns beside it.
 
 # Returns
 
-  - `X::Matrix{<:Real}`: The returns, `observations × assets`, in `float_if_integer(eltype(rd.X))`.
+  - `X::AbstractMatrix{<:Real}`: The returns `rd.X`, `observations × assets`.
   - `pnl::AssetPanel`: The Asset Panel of the `ReturnsResult`.
 
 # Related
@@ -65,17 +64,14 @@ The two shapes need no check of their own. [`ReturnsResult`](@ref) binds the obs
 """
 function descriptor_returns(rd::ReturnsResult)
     X = rd.X
-    pnl = rd.pnl
     @argcheck(!isnothing(X),
               IsNothingError("a rolling Descriptor reads returns, and rd.X is nothing. Build the ReturnsResult with the returns matrix the Asset Panel was drawn on."))
-    @argcheck(!isnothing(pnl),
-              IsNothingError("a rolling Descriptor reads the active mask of an Asset Panel, and rd.pnl is nothing. Build the ReturnsResult with the `pnl` that asset_panel returns."))
-    Xf = Matrix{float_if_integer(eltype(X))}(X)
-    k = findfirst(isinf, Xf)
+    pnl = returns_with_universe(rd).pnl
+    k = findfirst(isinf, X)
     @argcheck(isnothing(k),
-              DomainError(Xf[k],
-                          "a rolling Descriptor reads every return that is not missing as a finite number, and it is $(Xf[k]) at observation $(k[1]) for asset $(k[2]). An infinite return is a data error, so clean the input rather than pass it through."))
-    return Xf, pnl
+              DomainError(X[k],
+                          "a rolling Descriptor reads every return that is not missing as a finite number, and it is $(X[k]) at observation $(k[1]) for asset $(k[2]). An infinite return is a data error, so clean the input rather than pass it through."))
+    return X, pnl
 end
 """
     rolling_window_max(X::AbstractMatrix{<:Real}, amsk::AbstractMatrix{Bool},
@@ -343,7 +339,7 @@ Both methods read the returns of `rd.X` and the active mask of the Asset Panel, 
 
 # Algorithm
 
- 1. Read the returns and the Asset Panel through [`descriptor_returns`](@ref), which floats integer returns and refuses an infinite return.
+ 1. Read the returns and the Asset Panel through [`descriptor_returns`](@ref), which refuses an infinite return.
  2. For [`RollingLogReturn`](@ref), refuse a return at or below `-1` through [`assert_log_returns`](@ref). Then take the cumulative sums of `log1p` of the returns and of the active mask along the observations. A missing return adds zero. The window of observation `t` runs from `t - skip - window + 1` to `t - skip`, and its sum is one difference of the cumulative sums. Where the active count of the window equals `window`, write that sum multiplied by `sign`, or `expm1` of that product when `exponentiate` is set.
  3. For [`RollingMax`](@ref), scan the window of each observation through [`rolling_window_max`](@ref). It gives the largest return that is not missing where every observation of the window is active and one return exists.
  4. Write `NaN` into every inactive cell through [`descriptor_active_fill!`](@ref).
@@ -732,7 +728,7 @@ The Descriptor of an observation equals the one of the batch call [`descriptor`]
 
 # Returns
 
-  - `step::NamedTuple`: `de`, the estimator with the state after the observations in `cache`, and `D`, the Descriptor of each observation, `observations × assets`.
+  - `step::DescriptorStepResult`: `de`, the estimator with the state after the observations in `cache`, and `D`, the Descriptor of each observation, `observations × assets`.
 
 # Related
 
@@ -747,15 +743,14 @@ function descriptor_step(de::RollingLogReturn, rd::ReturnsResult)
     st = rolling_state_seed(de, X)
     D = rolling_state_fold!(st, de, X, pnl.amsk)
     descriptor_active_fill!(D, pnl)
-    return (; de = RollingLogReturn(de.window, de.skip, de.sign, de.exponentiate, st),
-            D = D)
+    return DescriptorStepResult(rebuild_struct(de, (; cache = st)), D)
 end
 """
     descriptor_step(::AbstractDescriptorEstimator, ::ReturnsResult)
 
 Answers `nothing`: a Descriptor carries no state unless it implements this verb.
 
-`descriptor_step` is the verb of a Descriptor that folds new observations from a carried state, and it is `public`. A subtype of [`AbstractDescriptorEstimator`](@ref) that folds implements it, with the contract of the methods of [`RollingLogReturn`](@ref), of the exponentially weighted mean Descriptors, of the lag Descriptors and of the exponentially weighted beta Descriptors: it takes the estimator with its state in a field, and the returns data of the new observations alone, and it answers `(; de, D)`, the estimator with the state after them and the Descriptor of each one, equal to the batch call [`descriptor`](@ref) over every observation from the first one. It also makes [`carry_lookback`](@ref) answer one. The carry fold of a [`CrossSectionalFactorPrior`](@ref) then reads the Descriptor off the state with [`descriptor_carry`](@ref), and keeps no panel row for it.
+`descriptor_step` is the verb of a Descriptor that folds new observations from a carried state, and it is `public`. A subtype of [`AbstractDescriptorEstimator`](@ref) that folds implements it, with the contract of the methods of [`RollingLogReturn`](@ref), of the exponentially weighted mean Descriptors, of the lag Descriptors and of the exponentially weighted beta Descriptors: it takes the estimator with its state in a field, and the returns data of the new observations alone, and it answers a [`DescriptorStepResult`](@ref) of the estimator with the state after them and of the Descriptor of each one, equal to the batch call [`descriptor`](@ref) over every observation from the first one. It also makes [`carry_lookback`](@ref) answer one. The carry fold of a [`CrossSectionalFactorPrior`](@ref) then reads the Descriptor off the state with [`descriptor_carry`](@ref), and keeps no panel row for it.
 
 # Arguments
 
@@ -768,6 +763,7 @@ Answers `nothing`: a Descriptor carries no state unless it implements this verb.
 
 # Related
 
+  - [`DescriptorStepResult`](@ref)
   - [`descriptor_carry`](@ref)
   - [`carry_lookback`](@ref)
 """
@@ -882,7 +878,7 @@ The generic method returns the estimator as it is twice: it carries no state. A 
 
 # Returns
 
-  - `carry::NamedTuple`: `xf`, the estimator with the state after the new observations, and `xv`, the estimator whose stateful Descriptors are [`CarriedDescriptor`](@ref) of the new observations, which the code of the batch fit computes the Factor Exposures with.
+  - `carry::CarriedEstimators`: `xf`, the estimator with the state after the new observations, and `xv`, the estimator whose stateful Descriptors are [`CarriedDescriptor`](@ref) of the new observations, which the code of the batch fit computes the Factor Exposures with.
 
 # Related
 
@@ -890,8 +886,8 @@ The generic method returns the estimator as it is twice: it carries no state. A 
   - [`CarriedDescriptor`](@ref)
   - [`descriptor_step`](@ref)
 """
-function descriptor_carry(xe, ::ReturnsResult, ::Any)
-    return (; xf = xe, xv = xe)
+function descriptor_carry(xe, ::ReturnsResult, ::Any)::CarriedEstimators
+    return CarriedEstimators(xe, xe)
 end
 function descriptor_carry(de::AbstractDescriptorEstimator, rd::ReturnsResult, m::Integer)
     T = size(rd.X, 1)
@@ -899,29 +895,30 @@ function descriptor_carry(de::AbstractDescriptorEstimator, rd::ReturnsResult, m:
 end
 """
     descriptor_carried(de::AbstractDescriptorEstimator, ::Nothing)
-    descriptor_carried(::AbstractDescriptorEstimator, step::NamedTuple)
+    descriptor_carried(::AbstractDescriptorEstimator, step::DescriptorStepResult)
 
 Returns the carry of a Descriptor from the answer of [`descriptor_step`](@ref), as [`descriptor_carry`](@ref) gives it: the Descriptor as it is twice for `nothing`, because it carries no state, or the Descriptor with its new state and the [`CarriedDescriptor`](@ref) of the new observations for a step.
 
 # Arguments
 
   - `de`: The Descriptor, as the carry folded it so far.
-  - `step`: The answer of [`descriptor_step`](@ref), `nothing` or a `NamedTuple` with the fields `de` and `D`.
+  - `step`: The answer of [`descriptor_step`](@ref), `nothing` or a [`DescriptorStepResult`](@ref).
 
 # Returns
 
-  - `carry::NamedTuple`: `xf` and `xv`, as [`descriptor_carry`](@ref) states them.
+  - `carry::CarriedEstimators`: `xf` and `xv`, as [`descriptor_carry`](@ref) states them.
 
 # Related
 
   - [`descriptor_carry`](@ref)
   - [`descriptor_step`](@ref)
 """
-function descriptor_carried(de::AbstractDescriptorEstimator, ::Nothing)
-    return (; xf = de, xv = de)
+function descriptor_carried(de::AbstractDescriptorEstimator, ::Nothing)::CarriedEstimators
+    return CarriedEstimators(de, de)
 end
-function descriptor_carried(::AbstractDescriptorEstimator, step::NamedTuple)
-    return (; xf = step.de, xv = CarriedDescriptor(step.D))
+function descriptor_carried(::AbstractDescriptorEstimator,
+                            step::DescriptorStepResult)::CarriedEstimators
+    return CarriedEstimators(step.de, CarriedDescriptor(step.D))
 end
 """
     carry_lookback(x)

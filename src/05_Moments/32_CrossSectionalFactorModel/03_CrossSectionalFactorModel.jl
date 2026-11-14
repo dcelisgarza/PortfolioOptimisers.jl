@@ -251,19 +251,19 @@ end
 
 Check the exposure history of a [`CrossSectionalFactorModel`](@ref) against the asset count `N` and the factor count `K`.
 
-The exposure history holds one slice per observation, and a slice has the shape of the loadings matrix, so its second and third axes are the asset axis and the factor axis.
+The exposure history holds one slice per observation, and a slice has the shape of the loadings matrix, so its first and second axes are the asset axis and the factor axis. The observation axis is the last axis, so the slice of one observation is contiguous.
 
 # Arguments
 
-  - `Ms`: An exposure history `observations × assets × factors`, or `nothing`.
+  - `Ms`: An exposure history `assets × factors × observations`, or `nothing`.
   - `N`: Number of assets the model carries.
   - `K`: Number of raw factors the model carries.
 
 # Validation
 
   - `!isempty(Ms)`.
-  - `size(Ms, 2) == N`.
-  - `size(Ms, 3) == K`.
+  - `size(Ms, 1) == N`.
+  - `size(Ms, 2) == K`.
 
 # Returns
 
@@ -278,10 +278,10 @@ function assert_exposure_history(::Nothing, ::Integer, ::Integer)::Nothing
 end
 function assert_exposure_history(Ms::Arr3Num, N::Integer, K::Integer)::Nothing
     @argcheck(!isempty(Ms), IsEmptyError("Ms cannot be empty"))
-    @argcheck(size(Ms, 2) == N,
-              DimensionMismatch("Ms ($(size(Ms, 2)) rows per slice) must match the asset count ($N)"))
-    @argcheck(size(Ms, 3) == K,
-              DimensionMismatch("Ms ($(size(Ms, 3)) columns per slice) must match the factor count ($K)"))
+    @argcheck(size(Ms, 1) == N,
+              DimensionMismatch("Ms ($(size(Ms, 1)) rows per slice) must match the asset count ($N)"))
+    @argcheck(size(Ms, 2) == K,
+              DimensionMismatch("Ms ($(size(Ms, 2)) columns per slice) must match the factor count ($K)"))
     return nothing
 end
 """
@@ -577,7 +577,7 @@ Keywords correspond to the struct's fields.
   - If provided, `!isempty(L)`, and `size(L, 1) == size(M, 1)`.
   - If provided, `!isempty(nf)`, `length(nf) == size(M, 2)`, and `nf` repeats no name.
   - If provided, `!isempty(fam)`, and `length(fam) == size(M, 2)`.
-  - If provided, `!isempty(Ms)`, `size(Ms, 2) == size(M, 1)`, and `size(Ms, 3) == size(M, 2)`.
+  - If provided, `!isempty(Ms)`, `size(Ms, 1) == size(M, 1)`, and `size(Ms, 2) == size(M, 2)`.
   - If provided, `size(csr.eps, 2) == size(M, 1)`.
   - If provided, `!isempty(vs)`, `!isempty(rw)`, `!isempty(bw)`, `!isempty(amr)`, `!isempty(hist)`, and each carries `size(M, 1)` columns.
   - Every two of `vs`, `rw`, `bw`, `amr` and `hist` that are present agree on the observation axis, so `size(rw) == size(bw) == size(vs)` when all three are present.
@@ -595,7 +595,7 @@ Keywords correspond to the struct's fields.
 
   - `M`, `L` and `b` are sliced on their **first** axis, which is the asset axis of a loadings result.
   - `csr` is viewed by its own [`port_opt_view`](@ref) method.
-  - `Ms` is sliced on its **second** axis, which is the asset axis of a slice.
+  - `Ms` is sliced on its **first** axis, which is the asset axis of a slice.
   - `vs`, `rw`, `bw`, `amr` and `hist` are sliced on their **second** axis, which is the asset axis of a per-asset history.
   - `esigma` is sliced by [`idiosyncratic_covariance_view`](@ref), on one axis or on both.
   - `edof` and `ediv` are sliced on their only axis, which is the asset axis.
@@ -662,7 +662,7 @@ CrossSectionalFactorModel
     """
     csr
     """
-    Exposure history `observations × assets × factors`. Its last slice is the loadings matrix `M`. The constructor checks the two axes it shares with `M` and never the entries, so a caller that builds both keeps them in step itself.
+    Exposure history `assets × factors × observations`. Its last slice is the loadings matrix `M`. The constructor checks the two axes it shares with `M` and never the entries, so a caller that builds both keeps them in step itself.
     """
     Ms
     """
@@ -1009,7 +1009,7 @@ Return a view of a [`CrossSectionalFactorModel`](@ref) result, selecting only th
  1. Read `L` with `getfield`, never through property access. The `swap(L, M)` rule of [`CrossSectionalFactorModel`](@ref) makes `csfm.L` return `csfm.M` when `L` is unset, so a property read would materialise `L` as a copy of `M` and lose the unset-ness.
  2. Take a row view of `M`, of `L` when step 1 found a matrix, and an element view of `b`, giving the loadings and the factor-orthogonal expected return of the selected assets.
  3. View the nested fit with its own [`port_opt_view`](@ref) method, which cuts its residuals on the asset axis.
- 4. Take a view of `Ms` on its second axis, and of `vs`, `rw`, `bw`, `amr` and `hist` on their second axis, giving the histories of the selected assets.
+ 4. Take a view of `Ms` on its first axis, and of `vs`, `rw`, `bw`, `amr` and `hist` on their second axis, giving the histories of the selected assets.
  5. View `esigma` with [`idiosyncratic_covariance_view`](@ref), which reads its shape, and view `edof` and `ediv` with [`nothing_scalar_array_view`](@ref).
  6. View the Return Forecast with its own [`port_opt_view`](@ref) method, which cuts `mu` and `hist` on the asset axis.
  7. Build a new [`CrossSectionalFactorModel`](@ref) from the views, passing `nf`, `fam`, `fcb`, `lag`, `fx`, `fr`, `lambda`, `c`, `idx` and `ts` through, which re-runs every guard of the constructor.
@@ -1065,7 +1065,7 @@ function port_opt_view(csfm::CrossSectionalFactorModel, i,
                                          nothing
                                      else
                                          port_opt_view(csr, i, args...)
-                                     end, Ms = isnothing(Ms) ? nothing : view(Ms, :, i, :),
+                                     end, Ms = isnothing(Ms) ? nothing : view(Ms, i, :, :),
                                      vs = isnothing(vs) ? nothing : view(vs, :, i),
                                      esigma = idiosyncratic_covariance_view(csfm.esigma, i),
                                      edof = nothing_scalar_array_view(csfm.edof, i),

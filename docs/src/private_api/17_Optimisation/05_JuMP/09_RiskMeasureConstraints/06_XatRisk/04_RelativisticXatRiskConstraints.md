@@ -7,3 +7,10 @@ Description = "Relativistic XatRisk Constraints, private API of PortfolioOptimis
 ```@docs
 set_relativistic_risk_constraints!
 ```
+
+## References
+
+```@bibliography
+Pages = [@__FILE__]
+Canonical = false
+```

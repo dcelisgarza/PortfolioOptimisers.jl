@@ -23,4 +23,5 @@ rebuild_returns_result
 sub_portfolio_predictions
 outer_returns_source
 predict_outer_returns
+assert_meta_scorer
 ```

@@ -87,7 +87,7 @@ method alone. The other fields of the measure stay the same.
 
 cvar_stated = ConditionalValueatRisk(; alpha = 0.05)
 
-cvar_rule = ConditionalValueatRisk(; alpha = ScenarioCount(; n = 25))
+cvar_rule = ConditionalValueatRisk(; alpha = CountOf(25))
 
 #=
 The slot stores the rule itself, so the field gives back what you wrote.
@@ -96,7 +96,7 @@ The slot stores the rule itself, so the field gives back what you wrote.
 cvar_rule.alpha
 
 #=
-[`ScenarioCount`](@ref) states the tail's population rather than its probability: `alpha = n / T`
+A [`CountOf`](@ref) in `alpha` states the tail's population rather than its probability: `alpha = n / T`
 leaves `n` observations in the tail whatever the sample length is.
 
 A rule needs a prior result, because it takes the sample size and the moments from one. The
@@ -205,13 +205,14 @@ The library has eleven rules over the five families. Five of them compute a sign
 a deformation parameter, and this section runs three of those five. Each answers a different
 question about the sample.
 
-  - [`ScenarioCount`](@ref) answers *how many observations must the tail hold*. It uses Kish's
+  - A [`CountOf`](@ref) answers *how many observations must the tail hold*. It uses Kish's
     effective sample size when observation weights are stated, because a weighted tail has
     fewer independent observations than its row count suggests.
   - [`RateSignificance`](@ref) answers *how fast may the tail move outwards*. `alpha = c / sqrt(T)`
     leaves `c * sqrt(T)` observations in the tail, which grows with the sample but more slowly
     than the sample does. That is the rate at which a sample mean's own error falls. It uses the
-    raw row count, because a rate is a statement about the length of the record.
+    same count as a [`CountOf`](@ref), because `c * sqrt(T)` counts the observations in the
+    tail only when `T` counts the observations that the measure prices.
   - [`EntropyBudget`](@ref) answers *what may the deformation cost*. Section 5 puts it on a
     ``\kappa`` slot.
 
@@ -224,7 +225,7 @@ measures a distance, so it returns one number for both ends. Both fit any ``\kap
 [`EntropyBudget`](@ref) does, and section 6 runs both.
 =#
 
-count_rule = ConditionalValueatRisk(; alpha = ScenarioCount(; n = 25))
+count_rule = ConditionalValueatRisk(; alpha = CountOf(25))
 rate_rule = ConditionalValueatRisk(; alpha = RateSignificance(; c = 1.5))
 
 rule_table = DataFrame(:fold => 1:length(iwf_res.train_idx),
@@ -241,10 +242,9 @@ pretty_table(rule_table; formatters = [numfmt])
 Under the scenario count the tail population `count_tail` is flat, and under the rate
 `rate_tail` grows with the square root of `T`.
 
-Observation weights separate the two rules a second time. A measure that has `w` passes those
-weights to the rule, and [`ScenarioCount`](@ref) divides by Kish's effective sample size rather
-than by the row count. The effective size is the smaller of the two, so the weighted level is the
-higher.
+Observation weights move both rules. A measure that has `w` passes those weights to the rule, and
+both rules divide by Kish's effective sample size rather than by the row count. The effective size
+is the smaller of the two, so each weighted level is the higher.
 =#
 
 obs_w = pweights(range(; start = 1, stop = 2, length = length(iwf_res.train_idx[1])))
@@ -252,7 +252,7 @@ count_weighted = ConditionalValueatRisk(; alpha = count_rule.alpha, w = obs_w)
 rate_weighted = ConditionalValueatRisk(; alpha = rate_rule.alpha, w = obs_w)
 
 first_idx = iwf_res.train_idx[1]
-weight_table = DataFrame(:rule => ["ScenarioCount", "RateSignificance"],
+weight_table = DataFrame(:rule => ["CountOf", "RateSignificance"],
                          :unweighted => [resolved(count_rule, first_idx, :alpha),
                                          resolved(rate_rule, first_idx, :alpha)],
                          :weighted => [resolved(count_weighted, first_idx, :alpha),
@@ -260,7 +260,8 @@ weight_table = DataFrame(:rule => ["ScenarioCount", "RateSignificance"],
 pretty_table(weight_table; formatters = [numfmt])
 
 #=
-The rate is unchanged, because it does not use the weights.
+Both levels rise, because a weighted tail holds fewer independent observations than its rows.
+The level of the count rises in inverse proportion to the effective count, and the rate rises with its square root.
 
 ## 5. The two slots that resolve together
 
@@ -273,7 +274,7 @@ The rule therefore needs the `alpha` of the same measure. `alpha` resolves first
 ``\kappa`` rule uses the number it produced, so both slots resolve in one pass over the measure.
 =#
 
-rlvar_rule = RelativisticValueatRisk(; alpha = ScenarioCount(; n = 25),
+rlvar_rule = RelativisticValueatRisk(; alpha = CountOf(25),
                                      kappa = EntropyBudget(; target = -6.0))
 rlvar_stated = RelativisticValueatRisk(; alpha = 0.05,
                                        kappa = EntropyBudget(; target = -6.0))
@@ -406,10 +407,15 @@ println("alpha = $(vrr_res.alpha), beta = $(vrr_res.beta)")
 #=
 Every Range measure that has a `beta` defaults it to `alpha`. The rule states the method and the
 slot states the end, so one rule serves both ends, and `beta` is the same object as `alpha`.
+
+An [`OrderedWeightsArrayRange`](@ref) has no `beta`. It mirrors its loss tail when you give no
+`w2`, so the gain tail is the reversal of the same builder and holds the same rule.
 =#
 
-owa_range = OrderedWeightsArrayConditionalValueatRiskRange(; alpha = count_rule.alpha)
-println("beta is a $(typeof(owa_range.beta).name.name), same rule = $(owa_range.beta === count_rule.alpha)")
+owa_range = OrderedWeightsArrayRange(;
+                                     w1 = OrderedWeightsArrayConditionalValueatRisk(;
+                                                                                    alpha = count_rule.alpha))
+println("w2 is a $(typeof(owa_range.w2).name.name), same rule = $(owa_range.w2.inner.alpha === count_rule.alpha)")
 
 #=
 ## 8. The slot bounds refuse a rule of the wrong family

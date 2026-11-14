@@ -486,7 +486,7 @@ julia> PortfolioOptimisers.ew_residual_returns([0.1 0.2; NaN 0.0], [0.1, -0.05],
 function ew_residual_returns(X::AbstractMatrix{<:Real}, rm::AbstractVector{<:Real},
                              B::AbstractMatrix{<:Real},
                              amsk::AbstractMatrix{Bool})::Matrix{<:Real}
-    Tf = float_if_integer(promote_type(eltype(X), eltype(rm), eltype(B)))
+    Tf = promote_type(eltype(X), eltype(rm), eltype(B))
     E = fill(Tf(NaN), size(X))
     for t in axes(X, 1), i in axes(X, 2)
         x = X[t, i]
@@ -700,7 +700,7 @@ end
     ew_volatility_parts(::Nothing)
     ew_volatility_parts(st::EWVolatilityState)
 
-Returns the two parts of the carried state of a volatility Descriptor, as the fields `ve` and `beta`: both `nothing` for no state, or the state itself.
+Returns the two parts of the carried state of a volatility Descriptor, `ve` and `beta`: both `nothing` for no state, or the two fields of the state.
 
 # Arguments
 
@@ -708,18 +708,18 @@ Returns the two parts of the carried state of a volatility Descriptor, as the fi
 
 # Returns
 
-  - `parts`: An object with the fields `ve` and `beta`.
+  - `(ve, beta)::Tuple`: The plain tuple of the state of the variance estimator and the beta state, each `nothing` when the state does not hold it.
 
 # Related
 
   - [`EWVolatilityState`](@ref)
   - [`ew_volatility_fold`](@ref)
 """
-function ew_volatility_parts(::Nothing)
-    return (; ve = nothing, beta = nothing)
+function ew_volatility_parts(::Nothing)::Tuple{Nothing, Nothing}
+    return nothing, nothing
 end
-function ew_volatility_parts(st::EWVolatilityState)::EWVolatilityState
-    return st
+function ew_volatility_parts(st::EWVolatilityState)::Tuple
+    return st.ve, st.beta
 end
 """
     ew_volatility_state(::Nothing, ::Option{<:EWBetaState})
@@ -771,7 +771,7 @@ A [`RegimeAdjustedExpWeightedVariance`](@ref) runs the forward pass of its [`var
 
 # Returns
 
-  - `fold::NamedTuple`: `V`, the variance of each observation, `observations × assets`, and `st`, the state of `ce` after the observations, or `nothing` for an estimator that does not fold.
+  - `(V, st)::Tuple`: The plain tuple of `V`, the variance of each observation, `observations × assets`, and `st`, the state of `ce` after the observations, or `nothing` for an estimator that does not fold.
 
 # Related
 
@@ -783,17 +783,17 @@ function ew_volatility_variance(ce::RegimeAdjustedExpWeightedVariance,
                                 Y::AbstractMatrix{<:Real}, pnl::AssetPanel,
                                 st::Option{<:RegimeAdjustedVarianceState})
     amsk, emsk = panel_moment_masks(pnl)
-    V = Matrix{float_if_integer(eltype(Y))}(undef, size(Y))
+    V = Matrix{eltype(Y)}(undef, size(Y))
     vs = regime_adjusted_variance_pass!(ce, Y, 1, emsk, amsk,
                                         isnothing(st) ? nothing : copy(st)) do i, cache
         V[i, :] = regime_adjusted_variance(cache, ce)
         return nothing
     end
-    return (; V = V, st = vs)
+    return V, vs
 end
 function ew_volatility_variance(ce::AbstractCovarianceEstimator, Y::AbstractMatrix{<:Real},
                                 pnl::AssetPanel, ::Any)
-    return (; V = variance_series(ce, Y, pnl; dims = 1), st = nothing)
+    return variance_series(ce, Y, pnl; dims = 1), nothing
 end
 """
     ew_volatility_fold(de::EWVolatility, rd::ReturnsResult,
@@ -825,7 +825,7 @@ The batch call [`descriptor`](@ref) is this function from no state, so a step eq
 
 # Returns
 
-  - `fold::NamedTuple`: `st`, the state after the observations, or `nothing` where `ce` does not fold, and `D`, the Descriptor of each observation, `observations × assets`.
+  - `fold::DescriptorFold`: `st`, the state after the observations, or `nothing` where `ce` does not fold, and `D`, the Descriptor of each observation, `observations × assets`.
 
 # Related
 
@@ -834,33 +834,33 @@ The batch call [`descriptor`](@ref) is this function from no state, so a step eq
 """
 function ew_volatility_fold(de::EWVolatility, rd::ReturnsResult,
                             cache::Option{<:EWVolatilityState})
-    c = ew_volatility_parts(cache)
-    @argcheck(isnothing(c.beta),
+    ve, beta = ew_volatility_parts(cache)
+    @argcheck(isnothing(beta),
               ArgumentError("the state of this EWVolatility holds a beta state, so it is the state of an EWResidualVolatility. An EWVolatility folds from its own state, or from no state."))
     pnl = descriptor_asset_panel(rd)
     Y = ew_volatility_input(de.alg, rd.X, de.mar)
-    vf = ew_volatility_variance(de.ce, Y, pnl, c.ve)
-    D = sqrt.(vf.V)
+    V, vst = ew_volatility_variance(de.ce, Y, pnl, ve)
+    D = sqrt.(V)
     descriptor_active_fill!(D, pnl)
-    return (; st = ew_volatility_state(vf.st, nothing), D = D)
+    return DescriptorFold(ew_volatility_state(vst, nothing), D)
 end
 function ew_volatility_fold(de::EWResidualVolatility, rd::ReturnsResult,
                             cache::Option{<:EWVolatilityState})
-    c = ew_volatility_parts(cache)
-    @argcheck(isnothing(cache) == isnothing(c.beta),
+    ve, beta = ew_volatility_parts(cache)
+    @argcheck(isnothing(cache) == isnothing(beta),
               ArgumentError("the state of this EWResidualVolatility holds no beta state, so it is the state of an EWVolatility. An EWResidualVolatility folds from its own state, or from no state."))
     pnl = descriptor_asset_panel(rd)
     rm = market_return_series(rd, de.mcap)
     X = rd.X
     amsk = pnl.amsk
-    bs = ew_beta_state(c.beta, X, rm, de.beta_decay)
-    bf = ew_beta_series!(bs, X, rm, de.beta_decay, 1, de.min_val, amsk)
-    E = ew_residual_returns(X, rm, bf.B, amsk)
+    bs = ew_beta_state(beta, X, rm, de.beta_decay)
+    B, _, bst = ew_beta_series!(bs, X, rm, de.beta_decay, 1, de.min_val, amsk)
+    E = ew_residual_returns(X, rm, B, amsk)
     Y = ew_volatility_input(de.alg, E, de.mar)
-    vf = ew_volatility_variance(de.ce, Y, pnl, c.ve)
-    D = sqrt.(vf.V)
+    V, vst = ew_volatility_variance(de.ce, Y, pnl, ve)
+    D = sqrt.(V)
     descriptor_active_fill!(D, pnl)
-    return (; st = ew_volatility_state(vf.st, bf.st), D = D)
+    return DescriptorFold(ew_volatility_state(vst, bst), D)
 end
 """
     descriptor_step(de::Union{EWVolatility{<:RegimeAdjustedExpWeightedVariance},
@@ -885,7 +885,7 @@ A volatility Descriptor with any other `ce` has no state to carry, so it takes t
 
 # Returns
 
-  - `step::NamedTuple`: `de`, the estimator with the state after the observations in `cache`, and `D`, the Descriptor of each observation, `observations × assets`.
+  - `step::DescriptorStepResult`: `de`, the estimator with the state after the observations in `cache`, and `D`, the Descriptor of each observation, `observations × assets`.
 
 # Related
 
@@ -898,7 +898,7 @@ function descriptor_step(de::Union{EWVolatility{<:RegimeAdjustedExpWeightedVaria
                                                         <:RegimeAdjustedExpWeightedVariance}},
                          rd::ReturnsResult)
     (; st, D) = ew_volatility_fold(de, rd, de.cache)
-    return (; de = Accessors.@set(de.cache = st), D = D)
+    return DescriptorStepResult(rebuild_struct(de, (; cache = st)), D)
 end
 """
     partial_fit!(de::Union{EWVolatility{<:RegimeAdjustedExpWeightedVariance},

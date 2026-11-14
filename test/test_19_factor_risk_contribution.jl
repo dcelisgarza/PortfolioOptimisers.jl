@@ -288,6 +288,23 @@ end
                                                                               p = 0.05)])
     @test !haskey(m, :sdp_plg_1) && haskey(m, :sdp_plg_2) && haskey(m, :sdp_plg_p_2)
 
+    # Under `MaximumRatio` a variance states its objective term on a lift of the objective.
+    # The lift holds the factor block of the same matrix, so the rows read it and the risk
+    # holds the penalty down (#1912). The rows keep the linked pair of factors from both
+    # carrying weight.
+    m = build(Variance(), MaximumRatio())
+    @test haskey(m, :lift_frc_W) && haskey(m, :frc_sdp_plg_1)
+    @test !haskey(m, :frc_sdp_plg_p_1)
+    w1 = JuMP.value.(m[:w1]) / k_of(m)
+    @test abs(w1[1] * w1[2]) < 1e-5
+    @test abs(w1[1]) > 0.5
+    # A relatedness matrix that links no pair binds nothing, so the tangency weights are
+    # those of the head with no phylogeny.
+    ratio_w(ple) = optimise(FactorRiskContribution(; r = Variance(), obj = MaximumRatio(),
+                                                   opt = opt, frc_ple = ple), rd).w
+    @test isapprox(ratio_w(SemiDefinitePhylogeny(; A = zeros(Int, 3, 3), p = 0.05)),
+                   ratio_w(nothing); atol = 1e-6)
+
     # An estimator resolves on the factor returns, and a keyword that the head does not read
     # does not reach it.
     res = optimise(FactorRiskContribution(; opt = opt,
@@ -315,6 +332,36 @@ end
     @test maximum(abs, Aa .* (w * transpose(w))) < 1e-8
     w = asset_w(1.0)
     @test maximum(abs, Aa .* (w * transpose(w))) > 0.01
+end
+@testset "The head refuses a semidefinite asset phylogeny in opt.ple (#2033)" begin
+    using Test, PortfolioOptimisers
+    PO = PortfolioOptimisers
+
+    # The head writes no lift of the asset weights. The phylogeny added no rows, and the
+    # weights equalled those with `ple = nothing`.
+    slv = Solver(; name = :placeholder, solver = nothing)
+    Aa = zeros(Int, 6, 6)
+    Aa[1, 2] = Aa[2, 1] = 1
+    sdp = SemiDefinitePhylogeny(; A = Aa, p = 0.05)
+    ipl = IntegerPhylogeny(; A = Aa, B = 1)
+    frc(ple) = FactorRiskContribution(; opt = JuMPOptimiser(; slv = slv, ple = ple))
+    msg = "the `opt.ple` of `FactorRiskContribution` cannot hold a semidefinite phylogeny"
+    # Each shape that `opt.ple` accepts: a result, an estimator, a vector entry, and the
+    # entries and the default of a schedule.
+    for ple in (sdp, SemiDefinitePhylogenyEstimator(), [ipl, sdp],
+                TimeDependent(; val = [nothing, sdp]),
+                TimeDependent(; val = _ -> nothing, default = sdp))
+        @test_throws msg frc(ple)
+    end
+    # A fold rebuilds the head with the value of a function schedule, so the rebuild refuses.
+    f = frc(TimeDependent(; val = _ -> sdp, default = nothing))
+    @test_throws msg PO.rebuild_struct(f, (; opt = JuMPOptimiser(; slv = slv, ple = sdp)))
+    # An integer phylogeny applies through the shared assembly, and a factor phylogeny goes
+    # in `frc_ple`.
+    @test frc(ipl) isa FactorRiskContribution
+    @test FactorRiskContribution(; opt = JuMPOptimiser(; slv = slv),
+                                 frc_ple = SemiDefinitePhylogenyEstimator()) isa
+          FactorRiskContribution
 end
 @testset "An integer factor phylogeny gates the factor weights" begin
     using Test, PortfolioOptimisers, StableRNGs, LinearAlgebra, Clarabel, HiGHS, Pajarito

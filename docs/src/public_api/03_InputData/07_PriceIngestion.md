@@ -19,10 +19,11 @@ whether an asset is listed before or after it.
 
 The result holds the listing span of each asset in its `span` field. [`PricesToReturns`](@ref)
 moves the spans onto the dates of the returns and gives the [`ReturnsResult`](@ref) an
-[`AssetPanel`](@ref) that states the universe. It does so even when no price is missing, so a
-`ReturnsResult` with `pnl === nothing` did not come from `PriceIngestion`. When no price is
-missing, both universe masks are a [`PortfolioOptimisers.AllTrueMask`](@ref), which stores no
-cells.
+[`AssetPanel`](@ref) that states the universe. When no price is missing and you give no Panel
+Field, every asset is listed and every return is finite. The universe masks then state nothing
+that the returns do not state, so the conversion gives `pnl === nothing`. When you give Panel
+Fields and no price is missing, both universe masks are a
+[`PortfolioOptimisers.AllTrueMask`](@ref), which stores no cells.
 
 `PriceIngestion` writes an absent price as `NaN`, the one value the library uses for a missing
 number. The conversion to returns keeps it as a `NaN` return, and deletes neither the observation
@@ -43,8 +44,9 @@ then takes the values of the last observation of each period, whatever timestamp
 of a week both come from its last day.
 
 The element type of the result comes from the input series. A `Float32` panel stays `Float32`,
-`Float32` next to `Float64` gives `Float64`, and an integer panel takes the floating-point type of
-its returns. A type that has no value for an absent number throws an error that names the type.
+`Float32` next to `Float64` gives `Float64`. The ingestion layer is an entry point of integer data,
+so an integer panel converts here, once, to its floating-point type, and every kernel downstream
+reads floating-point data. A type that has no value for an absent number throws an error that names the type.
 The error comes at a gap, before a join that can pad, and when `PriceIngestion` aligns the implied
 volatilities, even if the join or the alignment then pads nothing. An absent implied volatility
 is kept like an absent price, and [`ImpliedVolatility`](@ref) then fits only on the columns whose

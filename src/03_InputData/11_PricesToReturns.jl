@@ -261,7 +261,8 @@ function apply_gap_return(alg::AbstractGapReturnAlgorithm, R::DataFrames.DataFra
         r[w] .= out[w]
     end
     if !wrote
-        @info("`gap_return_alg` is a $(typeof(alg)) and no cell is writable, so the returns are the ones the default rule computed. A Gap Return writes only a return that reads a gapped price, inside an asset's Listing Span, after the first observed price of its column. The table that reaches the conversion holds no such return.")
+        @info("`gap_return_alg` is a $(typeof(alg)) and no cell is writable, so the returns are the ones the default rule computed. A Gap Return writes only a return that reads a gapped price, inside an asset's Listing Span, after the first observed price of its column. The table that reaches the conversion holds no such return.",
+              maxlog = log_limit(:info), _id = @log_id(typeof(alg)))
     end
     return R
 end
@@ -368,7 +369,7 @@ The conversion applies the same rule to a benchmark ``B``, and carries the bench
  6. Name the four blocks. Step 1 refused a name that two tables share and the name `timestamp`. So the asset names `nx`, the factor names `nf`, the benchmark names `nb` and the Exogenous Series names `ne` are the column names of the four tables, and `ts` is the `timestamp` column of the converted table.
  7. Write each absent implied volatility as `NaN` with [`unify_gaps`](@ref), and index `pr.iv` by `ts`. Then check the implied volatilities and `pr.ivpa` against the asset count. The returns clock is the price clock, less the first observation when `padding` is `false`. So the implied volatilities of a `PricesResult` that the ingestion layer built cover it. The conversion carries an absent implied volatility as `NaN`, and the estimator that reads it excludes it.
  8. View the [`AssetPanel`](@ref) on the returns clock. Find the panel rows of the returns timestamps with [`feature_row_indices`](@ref), and view the panel with [`port_opt_view`](@ref). Give it the asset names, so that it also cuts a square tensor Panel Field on its label axis. The conversion removes no column, so the view keeps every asset. A time-varying panel loses only the observations that the returns clock does not hold.
- 9. State the universe. Cut `pr.span` to the asset axis with [`listing_span_view`](@ref). Give it and the asset returns to [`returns_universe_masks`](@ref), which projects the span onto the returns clock and intersects it with finiteness. [`attach_universe_masks`](@ref) puts the two masks on the Asset Panel and keeps its Panel Fields. When the `PricesResult` holds no panel, it makes a panel with no Panel Field. A `PricesResult` with no span states no universe, so the function attaches no masks, and the panel is the one of step 8, or `nothing`.
+ 9. State the universe. Cut `pr.span` to the asset axis with [`listing_span_view`](@ref). Give it and the asset returns to [`returns_universe_masks`](@ref), which projects the span onto the returns clock and intersects it with finiteness. [`attach_universe_masks`](@ref) puts the two masks on the Asset Panel and keeps its Panel Fields. When the `PricesResult` holds no Panel Field, it makes a panel with `pf = nothing`, or gives `nothing` when both masks are all true, because those masks state nothing that the finiteness of the returns does not state. A `PricesResult` with no span states no universe, so the function attaches no masks, and the panel is the one of step 8, or `nothing`.
 10. Build the factor and benchmark matrices from the columns of each block. A block with no column gives `nothing`, and a benchmark block with one column gives a vector. The asset matrix is always present, because the conversion removes no column.
 11. Build the Exogenous Series from its columns, or `nothing` when `pr.E` is `nothing`. It is converted with the assets, so it takes the same `ret_method`, the same `padding` and the same Gap Return rule, and a gap in it stays `NaN`.
 12. Return the [`ReturnsResult`](@ref).
@@ -424,10 +425,7 @@ ReturnsResult
     ts ┼ Vector{Dates.Date}: [Dates.Date("2020-01-02"), Dates.Date("2020-01-03")]
     iv ┼ nothing
   ivpa ┼ nothing
-   pnl ┼ AssetPanel
-       │     pf ┼ Vector{PortfolioOptimisers.AbstractPanelField}: PortfolioOptimisers.AbstractPanelField[]
-       │   amsk ┼ 2×2 PortfolioOptimisers.AllTrueMask
-       │   emsk ┴ 2×2 PortfolioOptimisers.AllTrueMask
+   pnl ┴ nothing
 ```
 
 # Related
@@ -526,11 +524,13 @@ function prices_to_returns(pr::PricesResult; ret_method::Symbol = :simple,
     end
     #! The span is on the price clock and the masks are on the returns clock, and
     #! `universe_masks` does the crossing. Both padding conventions reach it, and it reads
-    #! which from the two row counts.
+    #! which from the two row counts. The splat passes the two masks as one pair, both
+    #! `nothing` or both matrices, and inference keeps the pair (#2090).
     RX = Matrix(X[!, nx])
-    amsk, emsk = returns_universe_masks(listing_span_view(pr.span, asset_ts, asset_ts,
-                                                          acols), RX)
-    pnl = attach_universe_masks(pnl, amsk, emsk)
+    pnl = attach_universe_masks(pnl,
+                                returns_universe_masks(listing_span_view(pr.span, asset_ts,
+                                                                         asset_ts, acols),
+                                                       RX)...)
     F = isempty(nf) ? nothing : Matrix(X[!, nf])
     B = if isempty(nb)
         nothing
@@ -586,11 +586,16 @@ and the local excess return plus the log return of the index is the base-currenc
 
 The index of the base currency itself is constant, so its return is zero, and a Currency Factor of it would have no variance. Give the base currency to the `base` of [`CurrencyExposure`](@ref) instead: it then takes no factor and needs no index, and an asset of the base currency carries a zero exposure on every Currency Factor.
 
+## A gap of a cash index
+
+A cash total-return index has a value at every observation from its first value to its last one, because a deposit accrues interest on every day, a holiday of its market included. A gap inside that span is a value that was not published, and the index holds its last value across it, by the walk of [`CarriedPrice`](@ref). So ``r_{t,\\,c} = 0`` inside the gap, and the observation that ends the gap carries the accrual of the whole gap. The compounded cash return across the gap is the ratio of the two published values, as it is without a gap. On a clock that joins two markets, the index of every currency then has a value on a holiday of the market of one cash index, and the observation keeps the exchange-rate return of that day. A gap before the first value or after the last value stays a gap. An exchange rate has no value between two quotes, so a gap of `fx` stays a gap, and the index is `NaN` there.
+
 # Algorithm
 
  1. Check that the three series state one clock, that `cash` holds a column for every currency of `fx`, and that `cash_base` holds one column.
  2. Write every absent value as `NaN` with [`unify_gaps`](@ref).
- 3. Read the cash index of each currency of `fx` by its name, and compute the index of each currency.
+ 3. Hold the last value of each cash index across each gap inside its span, see [`PortfolioOptimisers.carry_cash_index`](@ref). The exchange rates keep their gaps.
+ 4. Read the cash index of each currency of `fx` by its name, and compute the index of each currency.
 
 # Arguments
 
@@ -626,12 +631,31 @@ julia> values(currency_excess_index(fx, cash, base))
  2.5  0.5
 ```
 
+The cash index of the base currency has no value on a holiday of its market. It holds its last value there, and the index keeps the exchange-rate move of that day:
+
+```jldoctest
+julia> ts = Date(2020, 1, 1):Day(1):Date(2020, 1, 3);
+
+julia> fx = TimeArray(ts, [2.0; 2.5; 3.0;;], [\"EUR\"]);
+
+julia> cash = TimeArray(ts, [1.0; 1.0; 1.0;;], [\"EUR\"]);
+
+julia> base = TimeArray(ts, [1.0; NaN; 1.5;;], [\"USD\"]);
+
+julia> values(currency_excess_index(fx, cash, base))
+3×1 Matrix{Float64}:
+ 2.0
+ 2.5
+ 2.0
+```
+
 # Related
 
   - [`PricesResult`](@ref)
   - [`prices_to_returns`](@ref)
   - [`CurrencyExposure`](@ref)
   - [`CrossSectionalFactorPrior`](@ref)
+  - [`CarriedPrice`](@ref)
   - [`unify_gaps`](@ref)
 """
 function currency_excess_index(fx::TimeSeries.TimeArray, cash::TimeSeries.TimeArray,
@@ -656,9 +680,47 @@ function currency_excess_index(fx::TimeSeries.TimeArray, cash::TimeSeries.TimeAr
     @argcheck(length(TimeSeries.colnames(cash_base)) == 1,
               DimensionMismatch("`cash_base` is the cash index of the base currency, so it holds one column; got $(length(TimeSeries.colnames(cash_base)))"))
     S = values(unify_gaps(fx))
-    K = values(unify_gaps(cash))[:, j]
-    Kb = values(unify_gaps(cash_base))
+    K = carry_cash_index(values(unify_gaps(cash))[:, j])
+    Kb = carry_cash_index(values(unify_gaps(cash_base)))
     return TimeSeries.TimeArray(ts, S .* K ./ view(Kb, :, 1), nc)
+end
+"""
+    carry_cash_index(K::AbstractMatrix) -> AbstractMatrix
+
+Hold the last value of each cash total-return index of `K` across each gap inside its span.
+
+A deposit accrues interest on every day, so a cash index has a value at every observation from its first value to its last one, and a gap inside that span is a value that was not published. The function finds the first and the last value of each column, and writes onto each gap between them the value of the observation before it, which the walk has already filled. That is the rule of [`CarriedPrice`](@ref) on one listed run. A gap before the first value or after the last value stays a gap. The function changes a copy, so the caller's array does not change, also when [`unify_gaps`](@ref) returned it unchanged.
+
+# Arguments
+
+  - `K`: Cash total-return indices, `observations × currencies`, with every gap written as `NaN`.
+
+# Returns
+
+  - `K̃::AbstractMatrix`: A copy of `K`, with each gap inside the span of its column filled.
+
+# Related
+
+  - [`currency_excess_index`](@ref)
+  - [`CarriedPrice`](@ref)
+  - [`is_missing_value`](@ref)
+"""
+function carry_cash_index(K::AbstractMatrix)
+    K = copy(K)
+    for j in axes(K, 2)
+        k = view(K, :, j)
+        i1 = findfirst(!is_missing_value, k)
+        i2 = findlast(!is_missing_value, k)
+        if isnothing(i1) || isnothing(i2)
+            continue
+        end
+        for t in (i1 + 1):i2
+            if is_missing_value(k[t])
+                k[t] = k[t - 1]
+            end
+        end
+    end
+    return K
 end
 """
 $(DocStringExtensions.TYPEDEF)
