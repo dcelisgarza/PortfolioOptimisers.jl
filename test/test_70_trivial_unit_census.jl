@@ -269,7 +269,12 @@ end
                                                :matrix_processing_step! => "one method for each step of `mp.order`: each step calls the declared verb of its field, `posdef!`, `denoise!`, `detone!` or `matrix_processing_algorithm!` (rule 3, #2091)",
                                                # src/06_Distance (#2094).
                                                :collapse_rows => "a public verb with one method for each collapse rule: its `LastActiveRow` method calls `last_active_rows`, which `readable_window_rows` shares (rule 3, #2094)",
-                                               :readable_window_rows => "one method for each form of the mask of readable cells: the matrix form calls `last_active_rows`, which two functions share, and every other form calls `collapse_rows`, a public verb (rule 3, #2094)")
+                                               :readable_window_rows => "one method for each form of the mask of readable cells: the matrix form calls `last_active_rows`, which two functions share, and every other form calls `collapse_rows`, a public verb (rule 3, #2094)",
+                                               # src/08_Phylogeny (#2095).
+                                               :reader_frames => "the case that rule 3 names: one method for each reader, and each calls `source_frames`, a shared public verb, or `field_frames`, which two functions share (rule 3, #2095)",
+                                               :calc_distance_weighted_graph => "one method for each branch: the tree branch already weights its edges with the distance, so it calls `calc_weighted_adjacency_graph`, which 5 functions share (rule 3, #2095)",
+                                               :separation_graph => "one method for each separation: the `PathLength` form calls `calc_distance_weighted_graph`, which two functions share (rule 3, #2095)",
+                                               :centrality_graph => "one method for each polarity: the distance form calls `calc_distance_weighted_graph`, which two functions share, and the similarity form calls `calc_weighted_adjacency_graph`, which 5 functions share (rule 3, #2095)")
     # The debt that #2072 removes. Do not add a pair: fix the wrapper.
     pending_forwards = Set{Tuple{Symbol, Symbol}}([(:adopt_pinned_choice, :rebuild_struct),
                                                    (:apply_fitted_step,
@@ -304,8 +309,6 @@ end
                                                    (:blend_projection, :project),
                                                    (:bl_posteriors, :vanilla_posteriors),
                                                    (:buffer_column_view, :sample_buffer),
-                                                   (:calc_distance_weighted_graph,
-                                                    :calc_weighted_adjacency_graph),
                                                    (:calibration_series_matrix,
                                                     :absolute_drawdown_arr),
                                                    (:calibration_series_matrix,
@@ -315,10 +318,6 @@ end
                                                    (:calibration_series_vec,
                                                     :relative_drawdown_vec),
                                                    (:carry_lookback, :lookback_max),
-                                                   (:centrality_graph,
-                                                    :calc_distance_weighted_graph),
-                                                   (:centrality_graph,
-                                                    :calc_weighted_adjacency_graph),
                                                    (:cokurtosis, :coverage_cokurtosis),
                                                    (:comovement_finalise,
                                                     :comovement_ratio),
@@ -491,8 +490,6 @@ end
                                                     :investable_mask),
                                                    (:prior_probability_factory, :factory),
                                                    (:project, :projection_programme),
-                                                   (:reader_frames, :field_frames),
-                                                   (:reader_frames, :source_frames),
                                                    (:rebase_linear_constraints,
                                                     :project_linear_constraint),
                                                    (:regime_bias_table, :regime_bias_table),
@@ -528,8 +525,6 @@ end
                                                    (:scenario_factory, :factory),
                                                    (:sel, :solver_selector),
                                                    (:sel, :ucs_selector),
-                                                   (:separation_graph,
-                                                    :calc_distance_weighted_graph),
                                                    (:set_allocation_set_constraints!,
                                                     :set_allocation_set_constraints!),
                                                    (:set_retcode, :JuMPOptimisationResult),

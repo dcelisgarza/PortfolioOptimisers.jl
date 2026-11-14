@@ -1,14 +1,10 @@
 """
-    centrality_graph(pl::ClE_Cl, ct::AbstractCentralityAlgorithm, X::MatNum;
-                     dims::Int = 1, kwargs...)
-    centrality_graph(nte::AbstractNetworkEstimator, ct::AbstractCentralityAlgorithm,
+    centrality_graph(polarity::Option{<:AbstractCentralityPolarity}, pl::NwE_ClE_Cl,
                      X::MatNum; dims::Int = 1, kwargs...)
-    centrality_graph(polarity::Option{<:AbstractCentralityPolarity},
-                     nte::AbstractNetworkEstimator, X::MatNum; dims::Int = 1, kwargs...)
 
-Build the graph that [`calc_centrality`](@ref) scores, with the weights of the polarity that [`centrality_polarity`](@ref) returns for `ct`.
+Build the graph that [`calc_centrality`](@ref) scores, with the weights of the polarity that [`centrality_polarity`](@ref) returns for an algorithm `ct`.
 
-This function is the one place that holds both the source and the algorithm, so it is the one place that can match them. [`centrality_polarity`](@ref) states the quantity that `ct` needs, and the source states the quantities that it has.
+This function is the one place that holds both the source and the polarity of the algorithm, so it is the one place that can match them. [`centrality_polarity`](@ref) states the quantity that `ct` needs, and the source states the quantities that it has.
 
 # The routing
 
@@ -30,17 +26,15 @@ A clustering source can reach a distance estimator through its own `de`, and it 
 
 The unweighted route goes through [`phylogeny_matrix`](@ref), so it reads the [`AbstractSeparationAlgorithm`](@ref) of the estimator. A [`HopCount`](@ref) of `n = 2` gives the centrality on the closure at two hops. The weighted routes do not go through [`phylogeny_matrix`](@ref), and read the structure. A closure is a sum of matrix powers, and a power of a weighted matrix sums products of distances, which is not a separation. The weighted routes do not read the `sep` field. At the default `HopCount(; n = 1)` the two routes agree, because the closure of a graph at one hop is the graph.
 
-# Two entry points, because the function resolves the polarity one time
+# The caller resolves the polarity
 
-The methods that take `ct` resolve [`centrality_polarity`](@ref), and pass the polarity to the methods that take it. [`separation_matrix`](@ref) has the same shape. The algorithm that decides comes first, and the estimator only gives the graph.
+The caller passes `centrality_polarity(ct)` in the first slot, as [`centrality_vector`](@ref) does, so every method takes the polarity and the function resolves it one time. The polarity that decides comes first, and the source only gives the graph. A clustering source ignores the polarity.
 
 # Algorithm
 
- 1. Return the plain `Graphs.SimpleGraph` of [`phylogeny_matrix`](@ref) when the source is a clustering estimator or a [`Clusters`](@ref). A partition carries no edge weights, so the function reads no polarity.
+ 1. Return the plain `Graphs.SimpleGraph` of [`phylogeny_matrix`](@ref) when the source is a clustering estimator or a [`Clusters`](@ref). A partition carries no edge weights, so the function ignores the polarity.
 
- 2. Resolve the effective polarity of `ct` with [`centrality_polarity`](@ref). The methods that take the polarity receive it and start at step 3.
-
- 3. Build the graph, through the branch that the polarity and the source select together.
+ 2. Build the graph, through the branch that the polarity and the source select together.
 
       + `nothing`: the plain `Graphs.SimpleGraph` of [`phylogeny_matrix`](@ref). It is the one route that reads the `sep` of the estimator.
       + [`DistancePolarity`](@ref): the structure of [`calc_distance_weighted_graph`](@ref), with distances on either branch.
@@ -49,10 +43,8 @@ The methods that take `ct` resolve [`centrality_polarity`](@ref), and pass the p
 
 # Arguments
 
-  - `pl`: Clustering estimator or clustering result.
-  - $(arg_dict[:cta])
-  - `polarity`: Effective polarity of `ct`, from [`centrality_polarity`](@ref).
-  - $(arg_dict[:nte])
+  - `polarity`: Effective polarity of the algorithm `ct`, from [`centrality_polarity`](@ref).
+  - `pl`: Network estimator, clustering estimator, or clustering result.
   - $(arg_dict[:X])
   - $(arg_dict[:dims])
   - `kwargs...`: Additional keyword arguments.
@@ -72,13 +64,9 @@ The methods that take `ct` resolve [`centrality_polarity`](@ref), and pass the p
   - [`phylogeny_matrix`](@ref)
 """
 function centrality_graph end
-function centrality_graph(pl::ClE_Cl, ::AbstractCentralityAlgorithm, X::MatNum;
+function centrality_graph(::Option{<:AbstractCentralityPolarity}, pl::ClE_Cl, X::MatNum;
                           dims::Int = 1, kwargs...)
     return Graphs.SimpleGraph(phylogeny_matrix(pl, X; dims = dims, kwargs...).X)
-end
-function centrality_graph(nte::AbstractNetworkEstimator, ct::AbstractCentralityAlgorithm,
-                          X::MatNum; dims::Int = 1, kwargs...)
-    return centrality_graph(centrality_polarity(ct), nte, X; dims = dims, kwargs...)
 end
 function centrality_graph(::Nothing, nte::AbstractNetworkEstimator, X::MatNum;
                           dims::Int = 1, kwargs...)
@@ -149,8 +137,8 @@ function centrality_vector(pl::NwE_ClE_Cl, ct::AbstractCentralityAlgorithm, X::M
                            dims::Int = 1, kwargs...)
     return PhylogenyResult(;
                            X = calc_centrality(ct,
-                                               centrality_graph(pl, ct, X; dims = dims,
-                                                                kwargs...)))
+                                               centrality_graph(centrality_polarity(ct), pl,
+                                                                X; dims = dims, kwargs...)))
 end
 """
     centrality_vector(cte::CentralityEstimator, X::MatNum; dims::Int = 1, kwargs...)

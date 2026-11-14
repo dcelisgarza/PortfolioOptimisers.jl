@@ -269,7 +269,7 @@ const DVarInfo_DDVarInfo = Union{Distance{<:Any, <:VariationInfoDistance},
 
 Check that the asset axis of `X` has the size of `sigma`, for a distance estimator that reads `X`.
 
-The check runs for a [`VariationInfoDistance`](@ref) estimator alone, because the distance of that family reads the asset axis of `X`. Every other estimator of the library takes the fallback, which does nothing, so a mismatched `X` passes. The narrow signature selects the check. Its bound is [`DVarInfo_DDVarInfo`](@ref), so a [`Distance`](@ref) or a [`DistanceDistance`](@ref) whose algorithm is a [`VariationInfoDistance`](@ref) reaches it.
+The check runs for a [`VariationInfoDistance`](@ref) estimator alone, because the distance of that family reads the asset axis of `X`. Every other distance estimator takes the method on `AbstractDistanceEstimator`, which does nothing, so a mismatched `X` passes. The narrow signature selects the check. Its bound is [`DVarInfo_DDVarInfo`](@ref), so a [`Distance`](@ref) or a [`DistanceDistance`](@ref) whose algorithm is a [`VariationInfoDistance`](@ref) reaches it.
 
 # Arguments
 
@@ -296,20 +296,22 @@ function LoGo_dist_assert(::DVarInfo_DDVarInfo, sigma::MatNum, X::MatNum; dims::
     return nothing
 end
 """
-    LoGo_dist_assert(args...; kwargs...)
+    LoGo_dist_assert(de::AbstractDistanceEstimator, sigma::MatNum, X::MatNum; dims::Int = 1)
 
 Do nothing for a distance estimator that does not read the asset axis of `X`.
 
-A distance estimator of the library outside [`DVarInfo_DDVarInfo`](@ref) derives its distance from the correlation matrix, so [`logo!`](@ref) reads no axis of `X` for it. A [`FeatureDistance`](@ref) is the exception, and it raises an `IsNothingError` in [`logo!`](@ref), because matrix processing gives it no panel. This method is the default, and the narrow method holds the check for the one family that needs it.
+A distance estimator of the library outside [`DVarInfo_DDVarInfo`](@ref) derives its distance from the correlation matrix, so [`logo!`](@ref) reads no axis of `X` for it. A [`FeatureDistance`](@ref) is the exception, and it raises an `IsNothingError` in [`logo!`](@ref), because matrix processing gives it no panel. This method is the no-op of the value check on the set that reaches it, and the narrow method holds the check for the one family that needs it. Any other type or arity is a `MethodError`.
 
 # Algorithm
 
- 1. Return `nothing`. The method reads no size, and it ignores `args` and `kwargs`.
+ 1. Return `nothing`. The method reads no size.
 
 # Arguments
 
-  - `args...`: The distance estimator, the covariance matrix and the data matrix, which the method ignores.
-  - `kwargs...`: The keyword `dims`, which the method ignores.
+  - `de`: Distance estimator outside [`DVarInfo_DDVarInfo`](@ref), which the method ignores.
+  - `sigma`: `N × N` covariance matrix, which the method ignores.
+  - `X`: Data matrix, which the method ignores.
+  - $(arg_dict[:dims]) The method ignores it.
 
 # Returns
 
@@ -321,7 +323,7 @@ A distance estimator of the library outside [`DVarInfo_DDVarInfo`](@ref) derives
   - [`LoGo`](@ref)
   - [`logo!`](@ref)
 """
-function LoGo_dist_assert(args...; kwargs...)
+function LoGo_dist_assert(::AbstractDistanceEstimator, ::MatNum, ::MatNum; dims::Int = 1)
     return nothing
 end
 """
@@ -353,7 +355,7 @@ The method builds a Triangulated Maximally Filtered Graph (TMFG) on a similarity
 # Validation
 
   - `size(sigma, 1) == size(sigma, 2)`.
-  - The asset axis of `X` has `size(sigma, 1)` entries, when `je.de` reads `X`. [`LoGo_dist_assert`](@ref) holds this check, and it has a method for the variation-of-information estimators alone. Every other estimator takes the fallback, which does nothing. Thus a default `LoGo()` accepts a `20 × 20` `sigma` with a `400 × 10` `X` and raises no error, because [`CanonicalDistance`](@ref) derives the distance from the correlation matrix and does not read `X`.
+  - The asset axis of `X` has `size(sigma, 1)` entries, when `je.de` reads `X`. [`LoGo_dist_assert`](@ref) holds this check, and it has a method for the variation-of-information estimators alone. Every other distance estimator takes the method on `AbstractDistanceEstimator`, which does nothing. Thus a default `LoGo()` accepts a `20 × 20` `sigma` with a `400 × 10` `X` and raises no error, because [`CanonicalDistance`](@ref) derives the distance from the correlation matrix and does not read `X`.
 
 # Returns
 

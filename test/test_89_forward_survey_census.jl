@@ -25,7 +25,7 @@ using Test
     nt_hook_doc = join([q3, "    nt_hook(x)", "", "A hook.", "", "# Interfaces", "",
                         "## `nt_hook`", "", "A subtype implements it.", q3], '\n')
     source = """
-             export verb, verb2, verb3, pubf, pubk, mk, kwv, nt_pub, pubfill
+             export verb, verb2, verb3, pubf, pubk, mk, kwv, nt_pub, pubfill, pubkwfill
              struct A end
              struct B end
              struct R
@@ -180,6 +180,9 @@ using Test
              privfill(x::A) = privfill(1, x)
              # a trait before a passed argument keeps the old verdict
              traitfill(x::A) = traitfill(kind(x), x)
+             # a trailing slot that reads a keyword: no default holds it (#2095)
+             pubkwfill(x::A; d::Int = 1) = pubkwfill(x, graph_of(x; d = d); d = d)
+             privkwfill(x::A; d::Int = 1) = privkwfill(x, graph_of(x; d = d); d = d)
              walk(x::A) = walk(x.child)
              walk_getfield(x::A) = walk_getfield(getfield(x, 1))
              # The leaf of a walk down the composites converts its argument (#2116).
@@ -402,6 +405,11 @@ using Test
         @test of(:privfill) == [("self-forward", :privfill, "go")]
         @test occursin("converts its arguments", first_of(:privfill).why)
         @test occursin("defaulted positional", first_of(:traitfill).why)
+        # A trailing slot that reads a keyword takes no default, because the default of a
+        # positional slot cannot read a keyword: the call converts its arguments (#2095).
+        @test of(:pubkwfill) == [("self-forward", :pubkwfill, "keep (a)")]
+        @test of(:privkwfill) == [("self-forward", :privkwfill, "go")]
+        @test occursin("converts its arguments", first_of(:privkwfill).why)
         # A recursion on a field is a traversal, also through `getfield` (#2116).
         @test isempty(of(:walk))
         @test isempty(of(:walk_getfield))

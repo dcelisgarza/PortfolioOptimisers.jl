@@ -2306,11 +2306,14 @@ struct UndeclaredCentrality <: PortfolioOptimisers.AbstractCentralityAlgorithm e
                   SWG.SimpleWeightedGraph, G.SimpleGraph, G.SimpleGraph,
                   SWG.SimpleWeightedGraph, SWG.SimpleWeightedGraph]
         for (i, ct) in pairs(ces)
-            @test isa(PO.centrality_graph(nte_t, ct, X), want_t[i])
-            @test isa(PO.centrality_graph(nte_p, ct, X), want_p[i])
+            pol = PO.centrality_polarity(ct)
+            @test isa(PO.centrality_graph(pol, nte_t, X), want_t[i])
+            @test isa(PO.centrality_graph(pol, nte_p, X), want_p[i])
             # A clustering source is weightless whatever the algorithm declares.
-            @test isa(PO.centrality_graph(ClustersEstimator(), ct, X), G.SimpleGraph)
+            @test isa(PO.centrality_graph(pol, ClustersEstimator(), X), G.SimpleGraph)
         end
+        # The caller passes the polarity, so the form that took the algorithm is gone (#2095).
+        @test_throws MethodError PO.centrality_graph(nte_p, first(ces), X)
     end
 
     @testset "Weights re-rank, and equal weights do not" begin
@@ -2390,9 +2393,9 @@ struct UndeclaredCentrality <: PortfolioOptimisers.AbstractCentralityAlgorithm e
             @test shipped != PO.calc_centrality(ct, gS)
         end
         # Eigenvector is the one algorithm that wants the similarities, and gets them.
-        @test PO.centrality_graph(nte_p, EigenvectorCentrality(), X) === nothing ||
-              G.weights(PO.centrality_graph(nte_p, EigenvectorCentrality(), X)) ==
-              G.weights(gS)
+        pol_e = PO.centrality_polarity(EigenvectorCentrality())
+        @test PO.centrality_graph(pol_e, nte_p, X) === nothing ||
+              G.weights(PO.centrality_graph(pol_e, nte_p, X)) == G.weights(gS)
     end
 
     @testset "The five unweightable cases return the unweighted answer" begin
@@ -2603,7 +2606,8 @@ on every source, and nothing warns and nothing goes inert.
                 @test eq(ov, got, PO.calc_centrality(ov, plain_g))
                 # The routing, not merely the number: an overridden call builds a plain
                 # graph rather than a weighted one.
-                @test isa(PO.centrality_graph(nte, ov, X), G.SimpleGraph)
+                @test isa(PO.centrality_graph(PO.centrality_polarity(ov), nte, X),
+                          G.SimpleGraph)
                 # And it is not a no-op wherever the weights were reaching the answer.
                 was = centrality_vector(nte, plain, X).X
                 @test eq(ov, was, got) == !moves[i]
@@ -3899,12 +3903,16 @@ end
         @test_throws DimensionMismatch PO470.logo(LoGo(; de = ddv), sigma[1:5, 1:5], X470)
 
         # An estimator outside the union reads the correlation rather than `X`, so it takes
-        # the `args...` fallback and no shape is read.
+        # the no-op method on `AbstractDistanceEstimator` and no shape is read.
         dc = Distance(; alg = CanonicalDistance())
         @test !(dc isa PO470.DVarInfo_DDVarInfo)
         @test isnothing(PO470.LoGo_dist_assert(dc, sigma[1:5, 1:5], X470))
-        @test isnothing(PO470.LoGo_dist_assert())
-        @test isnothing(PO470.LoGo_dist_assert(1, 2, 3, 4))
+        @test isnothing(PO470.LoGo_dist_assert(dc, sigma[1:5, 1:5], X470; dims = 2))
+        # The value check closes on the set that reaches it: any other type or arity has no
+        # rule (#2108, #2095).
+        @test_throws MethodError PO470.LoGo_dist_assert()
+        @test_throws MethodError PO470.LoGo_dist_assert(1, 2, 3, 4)
+        @test_throws MethodError PO470.LoGo_dist_assert(nothing, sigma, X470)
 
         # Both variation-of-information estimators run to a finite answer at the right
         # shape, so the narrowing refuses a mismatch rather than the family.
@@ -4373,7 +4381,8 @@ Defined at top level because a `@testset` body becomes a function.
         holds, and the residual is pinned as a bound.
         =#
         ntepm = NetworkEstimator(; alg = MaximumDistanceSimilarity())
-        gpmw = PortfolioOptimisers.centrality_graph(ntepm, EigenvectorCentrality(), Xt)
+        gpmw = PortfolioOptimisers.centrality_graph(PortfolioOptimisers.centrality_polarity(EigenvectorCentrality()),
+                                                    ntepm, Xt)
         Aw = Matrix{Float64}(Gr472.adjacency_matrix(gpmw))
         @test Gr472.nv(gpmw) == 20
         @test Gr472.ne(gpmw) == 3 * 20 - 6
@@ -4388,10 +4397,9 @@ Defined at top level because a `@testset` body becomes a function.
         @test round(minimum(qw); digits = 5) == 0.07199
         @test round(maximum(qw); digits = 5) == 0.40756
         # `TopologyOnly` routes to the plain graph, which is `gpm` and its own `lambda_max`.
-        gpmu = PortfolioOptimisers.centrality_graph(ntepm,
-                                                    EigenvectorCentrality(;
-                                                                          ov = TopologyOnly()),
-                                                    Xt)
+        gpmu = PortfolioOptimisers.centrality_graph(PortfolioOptimisers.centrality_polarity(EigenvectorCentrality(;
+                                                                                                                  ov = TopologyOnly())),
+                                                    ntepm, Xt)
         @test Gr472.adjacency_matrix(gpmu) == Gr472.adjacency_matrix(gpm)
         qu = cc(EigenvectorCentrality(), gpmu)
         @test round(maximum(abs.(qw - qu)); digits = 5) == 0.02561
@@ -4777,8 +4785,8 @@ end
     rt = PortfolioOptimisers.calc_centrality(RadialityCentrality(), gt)
     @test maximum(rt) <= 1
     rw = PortfolioOptimisers.calc_centrality(RadialityCentrality(),
-                                             PortfolioOptimisers.centrality_graph(ntp,
-                                                                                  RadialityCentrality(),
+                                             PortfolioOptimisers.centrality_graph(PortfolioOptimisers.centrality_polarity(RadialityCentrality()),
+                                                                                  ntp,
                                                                                   X471))
     @test maximum(rw) > 1
     # The constructor message names a phylogeny matrix, and the validation renders.

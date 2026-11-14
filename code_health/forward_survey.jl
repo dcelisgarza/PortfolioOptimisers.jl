@@ -751,7 +751,8 @@ function self_verdict(t::Tree, d, call)
              "a private function moves a keyword to a slot: the callers pass the slot")
         end
     elseif positional_count(call) > length(positional_arguments(d.sig)) &&
-           fills_trailing(call, names)
+           fills_trailing(call, names) &&
+           !fills_from_keyword(d, call, names)
         return ("go",
                 "fills a slot: one method takes it as a defaulted positional argument (rule 5)")
     elseif converted
@@ -796,6 +797,16 @@ function fills_trailing(call, names)
     end
     inner = [a for a in pos[1:last_passed] if !passed(a)]
     return isempty(inner) || !all(CH.forward_leaf, inner)
+end
+
+# Whether a slot that `call` fills reads a keyword of the method `d`. The default of a positional
+# slot cannot read a keyword, so no default holds the slot, and the call converts to the canonical
+# form, as `resolve_separation(sep, nte, X; dims)` builds its graph from `dims` (#2095).
+function fills_from_keyword(d, call, names)
+    keywords = keyword_names(d.sig)
+    pos = [a for a in call.args[2:end] if !(a isa Expr && a.head in (:parameters, :kw))]
+    filled = [a for a in pos if !(CH.forward_leaf(a) && CH.forward_root(a) in names)]
+    return any(a -> !isdisjoint(names_in(a), keywords), filled)
 end
 
 # The names of the keyword arguments of a signature.
