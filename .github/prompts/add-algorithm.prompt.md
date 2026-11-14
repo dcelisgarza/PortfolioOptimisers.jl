@@ -10,14 +10,15 @@ Follow these steps to add a new algorithm to PortfolioOptimisers.jl. Read the fi
 This prompt carries the **order of the work**, and no rule of its own. Every rule it needs is in a standards file, and each step links to the section that owns it. Read these first:
 
 - [`CODING_STANDARDS.md`](../../CODING_STANDARDS.md) says which file owns each rule, and which check holds it.
-- [`.github/instructions/julia-source-code.instructions.md`](../instructions/julia-source-code.instructions.md) owns the type roles, the constructors, validation, dispatch and exports.
+- [`.github/instructions/julia-source-code.instructions.md`](../instructions/julia-source-code.instructions.md) owns the type roles, the constructors, validation, dispatch, wrappers, the kind of value a function returns and the declarations. Its § *A design is chosen by the standing test* decides between two forms of the code.
+- [`src/CLAUDE.md`](../../src/CLAUDE.md) lists the design rules for library code, each with a link to its owner. The code that this prompt adds meets every one.
 - [`.github/instructions/julia-docstrings.instructions.md`](../instructions/julia-docstrings.instructions.md) is the Authority for every docstring section that the steps below name.
 - [`.github/instructions/julia-return-types.instructions.md`](../instructions/julia-return-types.instructions.md) says when to annotate a return type.
 - Read a similar algorithm definition in `src/` as a reference.
 
 ## Key rule: algorithms are not user-facing
 
-An algorithm selects a dispatch branch inside the library. It must never appear as a required argument in the signature of a high-level, user-facing function. It is always a field of an estimator. [`.github/instructions/julia-source-code.instructions.md`](../instructions/julia-source-code.instructions.md) § *Estimator, Algorithm, and Result Roles* owns the three roles.
+An algorithm selects a dispatch branch inside the library, and the estimator that holds it is the entry point. [`.github/instructions/julia-source-code.instructions.md`](../instructions/julia-source-code.instructions.md) § *Estimator, Algorithm, and Result Roles* owns the three roles.
 
 ## Step 1. Identify the correct abstract supertype
 
@@ -31,7 +32,7 @@ Decide which abstract algorithm type this algorithm belongs to:
 
 If no suitable abstract type exists, define a new abstract algorithm type first. Its docstring follows [`.github/instructions/julia-docstrings.instructions.md`](../instructions/julia-docstrings.instructions.md) § *Abstract types*, which owns the section list and its order.
 
-An abstract type is **not exported** unless the maintainer says so. [`CLAUDE.md`](../../CLAUDE.md) § *Design rules* owns that rule, and `test/test_43_exported_abstract_type_census.jl` holds it.
+Declare a new abstract type `public`, not exported, as [`.github/instructions/julia-source-code.instructions.md`](../instructions/julia-source-code.instructions.md) § *A user-facing name is declared without approval* states. `test/test_43_exported_abstract_type_census.jl` holds it.
 
 Read `AbstractDenoiseAlgorithm` in [`src/04_MatrixProcessing/02_Denoise.jl`](../../src/04_MatrixProcessing/02_Denoise.jl) for a real abstract-type docstring. The § *Reference docstrings* table names it, and a Gate holds it.
 
@@ -39,7 +40,7 @@ Read `AbstractDenoiseAlgorithm` in [`src/04_MatrixProcessing/02_Denoise.jl`](../
 
 An algorithm is often a parameterless selector tag, and sometimes it carries parameters.
 
-- A **selector tag** is a bare `struct MyAlgorithm <: AbstractMyAlgorithm end`. Read `SpectralDenoise` in [`src/04_MatrixProcessing/02_Denoise.jl`](../../src/04_MatrixProcessing/02_Denoise.jl) for its docstring.
+- A **selector tag** is a bare `struct MyAlgorithm <: AbstractMyAlgorithm end`. It names a rule with content of its own. A skipped procedure or a trivial default is `nothing` in the field of the estimator, not a tag, as [ADR 0222](../../docs/adr/0222-a-type-is-kept-by-default-and-nothing-spells-a-skipped-procedure.md) states. Read `SpectralDenoise` in [`src/04_MatrixProcessing/02_Denoise.jl`](../../src/04_MatrixProcessing/02_Denoise.jl) for its docstring.
 - A **parameterised algorithm** is a `@concrete struct` with an inner constructor that validates and an outer keyword constructor that carries the defaults. [`.github/instructions/julia-source-code.instructions.md`](../instructions/julia-source-code.instructions.md) § *Constructor Pattern* owns the shape, and § *Input Validation* owns the checks. Read `ShrunkDenoise` in [`src/04_MatrixProcessing/02_Denoise.jl`](../../src/04_MatrixProcessing/02_Denoise.jl) for its docstring.
 
 Document both kinds as [`.github/instructions/julia-docstrings.instructions.md`](../instructions/julia-docstrings.instructions.md) § *Concrete struct types* states. Give each field an inline description, as § *Inline field docstrings* states.
@@ -58,9 +59,9 @@ Follow [`.github/instructions/julia-return-types.instructions.md`](../instructio
 
 Add any missing entries to the dictionaries in [`src/01_Base/01_DocstringDictionaries/`](../../src/01_Base/01_DocstringDictionaries/). [`.github/instructions/julia-docstrings.instructions.md`](../instructions/julia-docstrings.instructions.md) § *Documentation Dictionaries* states which text a dictionary owns and when prose is permitted instead.
 
-## Step 6. Export
+## Step 6. Declare the names
 
-Add the new algorithm type and any new public functions to the `export` statement at the bottom of the source file.
+Add each new name to the `export` line or the `public` line at the bottom of the source file, as [`.github/instructions/julia-source-code.instructions.md`](../instructions/julia-source-code.instructions.md) § *A user-facing name is declared without approval* states. Give each new type and each new export its place in the Capability Catalogue, as § *Capability Catalogue (required for every new public-facing addition)* states.
 
 ## Step 7. Add to API docs
 

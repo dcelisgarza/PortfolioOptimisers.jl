@@ -106,18 +106,8 @@ PortfolioOptimisers.jl is a Julia package for portfolio optimization and risk ma
 
 ## Examples
 
-- To implement a new covariance estimator:
-
-     1. Subtype `AbstractCovarianceEstimator`.
-     2. Provide a constructor with argument validation.
-     3. Add docstrings with usage and related types.
-     4. Add a test file in `test/`.
-
-- To add a new algorithm used by an estimator:
-
-     1. Subtype the appropriate subtype of `AbstractAlgorithm`.
-     2. Implement the required interface.
-     3. Document and test as above.
+- To add an estimator, an algorithm or a result type, follow [`add-estimator.prompt.md`](prompts/add-estimator.prompt.md), [`add-algorithm.prompt.md`](prompts/add-algorithm.prompt.md) or [`add-result.prompt.md`](prompts/add-result.prompt.md). Each step links to the section that owns its rule.
+- Before you design a change under `src/` or `ext/`, read [`julia-source-code.instructions.md`](instructions/julia-source-code.instructions.md) § *A design is chosen by the standing test*. [`src/CLAUDE.md`](../src/CLAUDE.md) lists the other design rules, each with a link to its owner.
 
 ## Notable Patterns
 
@@ -146,7 +136,7 @@ Before you finish a task or open a pull request:
  2. **Run the tests.** Run the tests for the area you changed, as `CLAUDE.md` § *Running Julia* states. All of them must pass.
  3. **Run the doctests.** `] test` does not run the doctests. The `run-doctests` skill owns the exact command.
  4. **Update the documentation.** When you add a feature, update the docstrings and the docs that it reaches.
- 5. **Update the Capability Catalogue.** Every new type on the Choice Surface, and every new exported function, must have a place in `docs/capability_catalogue.jl`. Instead, a function can go in `NOT_A_FEATURE`, and a type that the library constructs for itself can go in `NOT_A_CHOICE`, each with a reason. The Choice Surface is every concrete type the package declares that is a leaf `AbstractEstimator`, a leaf `AbstractAlgorithm`, a leaf `AbstractCovarianceEstimator`, or an export under its own name, less the Results and the errors. Do not write a description. The catalogue takes it from the first sentence of the docstring. `test/test_26_docs.jl` fails if you skip this step. See ADR 0040.
+ 5. **Update the Capability Catalogue.** Give each new type and each new export its place, as [`julia-source-code.instructions.md`](instructions/julia-source-code.instructions.md) § *Capability Catalogue (required for every new public-facing addition)* states. `test/test_26_docs.jl` fails if you skip this step.
  6. **Conform an addition to the sweep.** A file added or changed under `src/` or `ext/` owes the four steps of `CLAUDE.md` § *Functionality you add*. Run `julia --project=code_health code_health/sweep_check.jl --fetch`. It reports each of the four steps, and it prints the manifest line to paste. See ADR 0084.
 
 * * *

@@ -168,11 +168,10 @@ one. The design picks the route, not the number. Take one of three routes.
     claim that some code is correct. See
     [Dismissing a JET report](@ref code_health_dismissal).
 
- 3. **Record the rise, when the higher number comes from the correct form.** The correct form
-    follows the precedent of the library, keeps a signature that a test can call, and keeps the
-    code in the file of its subject. The number must stay within its threshold in
-    `code_health/rulings.toml`. Name the rise and its reason in the commit. A number may rise, but
-    only through a diff that a person approved. Run the refresh with the flag that names the act:
+ 3. **Record the rise, when the higher number comes from the correct form.**
+    [When the correct form raises a number](@ref code_health_correct_form) states what the correct
+    form is and the threshold that still binds. A number may rise, but only through a diff that a
+    person approved. Run the refresh with the flag that names the act:
 
     ```bash
     julia --project=code_health code_health/complexity.jl refresh --accept-rise
@@ -218,12 +217,7 @@ The maintenance loop that drives these numbers down, rather than merely holding 
 
 The [capability catalogue](@ref capability-catalogue) is the user-facing inventory of everything the package can do, grouped by the job each thing does. It is generated: `docs/capability_catalogue.jl` curates only the **grouping**, and every description is the first sentence of the corresponding docstring, so a description cannot drift from the type it describes.
 
-**Adding a new type or exported function means adding it here too.** This is enforced, not merely requested — `test/test_26_docs.jl` fails if any name on the Choice Surface is missing, and the docs build refuses to render an incomplete page. A concrete type the package declares is on the surface when it is a leaf subtype of `AbstractEstimator`, of `AbstractAlgorithm` or of `AbstractCovarianceEstimator`, or when it is an export under its own name; a Result and an error are subtracted, because a caller receives them and never chooses them. `choice_surface_names` in `docs/generate_capability_catalogue.jl` is the one statement of that rule, and both the test and the docs build call it.
-
-- Add a `Cap(:YourType)` to the group it belongs to, chosen by what it *does* rather than which file it lives in.
-- Do **not** write a description. It comes from the docstring. Pass `label` only where the docstring genuinely reads worse as a bullet — for instance when every sibling in a group would repeat the same prefix.
-- A function that is not a user-facing capability goes in `NOT_A_FEATURE` with a reason (`:alias`, `:base_overload`, `:trait`, `:internal`) instead. Removing an export means removing its entry there too; the check runs in both directions.
-- A type the library constructs for itself, and no caller ever writes, goes in `NOT_A_CHOICE` with a reason (`:internal`) instead. It keeps its docstring and its API page; it is simply not a choice. Like `NOT_A_FEATURE`, this list is checked in both directions, so an exemption cannot outlive its type.
+**A new type or a new export takes its place in the catalogue in the same change.** `test/test_26_docs.jl` fails if a name on the Choice Surface is missing, and the docs build refuses to render an incomplete page. The section *Capability Catalogue (required for every new public-facing addition)* of `.github/instructions/julia-source-code.instructions.md` owns the rule: which names are on the surface, the group a name takes, and the `NOT_A_FEATURE` and `NOT_A_CHOICE` lists.
 
 Because descriptions come from docstrings, a type's **first sentence** has to stand alone in a bullet list. See the summary-sentence rules in `.github/instructions/julia-docstrings.instructions.md`.
 

@@ -3,7 +3,7 @@ agent: agent
 description: Add docstrings to markdown files.
 ---
 
-List each docstring in a `@docs` codeblock of the `*.md` file that mirrors its source file. For example:
+List each docstring in a `@docs` codeblock of the `*.md` file that mirrors its source file. [`.github/instructions/julia-docstrings.instructions.md`](../instructions/julia-docstrings.instructions.md) § *`docs/src/public_api/` and `docs/src/private_api/` Markdown Files* owns the layout of that page, and [ADR 0128](../../docs/adr/0128-the-docs-split-into-mirrored-public-and-private-api-trees-and-a-census-gates-placement.md) owns the side that a name takes. For example:
 
 - If the documented item is in `src/folder/myfile.jl`, list it in `docs/src/public_api/folder/myfile.md` or in `docs/src/private_api/folder/myfile.md`, on the side that its classification gives it. A file at the top level of `src/` maps to a page at the top level of each tree.
 - If the `*.md` file does not exist, create it.

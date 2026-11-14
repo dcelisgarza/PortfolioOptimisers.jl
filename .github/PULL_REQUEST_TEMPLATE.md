@@ -21,4 +21,4 @@ There is no related issue.
 - [ ] The tests pass
 - [ ] The Lint workflow passes
 - [ ] I updated the docs, and the docs workflow passes
-- [ ] Every new estimator, algorithm or exported function has a place in the [Capability Catalogue](https://github.com/dcelisgarza/PortfolioOptimisers.jl/blob/main/docs/capability_catalogue.jl), or is listed in `NOT_A_FEATURE` with a reason. `test/test_26_docs.jl` enforces this.
+- [ ] Every new type and every new export has its place in the [Capability Catalogue](https://github.com/dcelisgarza/PortfolioOptimisers.jl/blob/main/docs/capability_catalogue.jl), as [the source-code standard](https://github.com/dcelisgarza/PortfolioOptimisers.jl/blob/main/.github/instructions/julia-source-code.instructions.md) states in its section on the catalogue. `test/test_26_docs.jl` enforces this.

@@ -10,21 +10,18 @@ Follow these steps to add a new result type to PortfolioOptimisers.jl. Read the 
 This prompt carries the **order of the work**, and no rule of its own. Every rule it needs is in a standards file, and each step links to the section that owns it. Read these first:
 
 - [`CODING_STANDARDS.md`](../../CODING_STANDARDS.md) says which file owns each rule, and which check holds it.
-- [`.github/instructions/julia-source-code.instructions.md`](../instructions/julia-source-code.instructions.md) owns the type roles, the constructors, validation, dispatch and exports.
+- [`.github/instructions/julia-source-code.instructions.md`](../instructions/julia-source-code.instructions.md) owns the type roles, the constructors, validation, dispatch, wrappers, the kind of value a function returns and the declarations. Its § *A design is chosen by the standing test* decides between two forms of the code.
+- [`src/CLAUDE.md`](../../src/CLAUDE.md) lists the design rules for library code, each with a link to its owner. The code that this prompt adds meets every one.
 - [`.github/instructions/julia-docstrings.instructions.md`](../instructions/julia-docstrings.instructions.md) is the Authority for every docstring section that the steps below name.
 - [`.github/instructions/julia-return-types.instructions.md`](../instructions/julia-return-types.instructions.md) says when to annotate a return type.
 - Read `LowOrderPrior` in [`src/10_Prior/01_Base_Prior.jl`](../../src/10_Prior/01_Base_Prior.jl) as a reference result type.
 
 ## Key rules for result types
 
-[`.github/instructions/julia-source-code.instructions.md`](../instructions/julia-source-code.instructions.md) § *Estimator, Algorithm, and Result Roles* owns the three roles. Four points decide whether a result type is the right choice:
+Two sections of [`.github/instructions/julia-source-code.instructions.md`](../instructions/julia-source-code.instructions.md) decide whether a result type is the right choice, and what it is called:
 
-- A function that consumes an estimator returns a result.
-- A result exists only when the returned data is complex and can itself be the input of a further computation.
-- A caller can pass a result back to the same function, which returns it unchanged, the passthrough or no-op pattern: `f(::AbstractXResult, args...) = result`.
-- A user-facing function must never require a result as an argument. A result is an optional shortcut.
-
-An estimator never holds a Result in a field. [`CLAUDE.md`](../../CLAUDE.md) § *Design rules* owns that rule, and the field's type bound enforces it.
+- § *Estimator, Algorithm, and Result Roles* owns the role of a result: the passthrough method, the rule that no user-facing function needs a result, and the rule that no estimator holds one in a field.
+- § *A function returns a defined type or a plain tuple, not a named tuple* owns when a function returns a defined type, and its name: a `…Result <: AbstractResult` for public data, a `…Fit <: AbstractResult` for the result of one private fit or solve, and never a `…State`.
 
 ## Step 1. Identify the correct abstract supertype
 
@@ -36,7 +33,7 @@ Decide which abstract result type this result belongs to:
 
 If no suitable abstract type exists, define a new one before defining the concrete result. Its docstring follows [`.github/instructions/julia-docstrings.instructions.md`](../instructions/julia-docstrings.instructions.md) § *Abstract types*.
 
-An abstract type is **not exported** unless the maintainer says so. [`CLAUDE.md`](../../CLAUDE.md) § *Design rules* owns that rule, and `test/test_43_exported_abstract_type_census.jl` holds it.
+Declare a new abstract type `public`, not exported, as [`.github/instructions/julia-source-code.instructions.md`](../instructions/julia-source-code.instructions.md) § *A user-facing name is declared without approval* states. `test/test_43_exported_abstract_type_census.jl` holds it.
 
 ## Step 2. Define the result struct
 
@@ -66,9 +63,9 @@ Follow [`.github/instructions/julia-return-types.instructions.md`](../instructio
 
 Add any missing entries to the dictionaries in [`src/01_Base/01_DocstringDictionaries/`](../../src/01_Base/01_DocstringDictionaries/). [`.github/instructions/julia-docstrings.instructions.md`](../instructions/julia-docstrings.instructions.md) § *Documentation Dictionaries* states which text a dictionary owns and when prose is permitted instead.
 
-## Step 6. Export
+## Step 6. Declare the names
 
-Add the new result type to the `export` statement at the bottom of the source file.
+Add each new name to the `export` line or the `public` line at the bottom of the source file, as [`.github/instructions/julia-source-code.instructions.md`](../instructions/julia-source-code.instructions.md) § *A user-facing name is declared without approval* states. A Result takes no place in the Capability Catalogue, as § *Capability Catalogue (required for every new public-facing addition)* states.
 
 ## Step 7. Add to API docs
 

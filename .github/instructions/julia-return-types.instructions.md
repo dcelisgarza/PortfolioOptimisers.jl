@@ -1,8 +1,10 @@
 ---
-applyTo: "src/**/*.jl"
+applyTo: "src/**/*.jl, ext/**/*.jl"
 ---
 
 # Julia Return Type Annotation Guidelines for PortfolioOptimisers.jl
+
+This file owns the annotation of a return type. [`julia-source-code.instructions.md`](julia-source-code.instructions.md) § *A function returns a defined type or a plain tuple, not a named tuple* owns the kind of value that a function returns, and the name of a new type for it.
 
 Julia infers return types well, so a function does not need a return type annotation (`::ReturnType`) everywhere. An annotation is most useful when it does one of these:
 

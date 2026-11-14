@@ -1,105 +1,41 @@
 # Design rules for library code
 
 These rules bind every file under `src/` and `ext/`. The root `CLAUDE.md` holds the rules for the
-whole repository.
+whole repository. This file owns no rule. Each line names one rule and links the section that owns
+its text, so read that section before you apply the rule. [`CODING_STANDARDS.md`](../CODING_STANDARDS.md)
+routes every subject that this list does not name.
 
-- **Correctness wins over convenience: the design that is mathematically and internally
-  consistent wins over the one that keeps an interface.** Give a fix the form that the mathematics
-  and the precedents of the library state, and change with it every site that the same mechanism
-  reaches. A breaking change to an interface, a public verb among them, is the cost of that form.
-  It is not a reason to take a weaker design, and it is not by itself the maintainer's decision.
-  Legacy and inertia are never a reason: a released spelling, a public name, the count of the
-  callers or the size of the break does not keep a design that a better one replaces. Make the
-  change, and name the break.
-  Name the break in the commit and in `docs/src/migration.md`, where a user reads it. A docstring
-  states the current behaviour alone. A released number that moves is the same cost. An ADR
-  binds by the reason that it states, so when that reason is a definition and not mathematics,
-  correct the ADR in the fix.
-  #1908 is the case: `RateRadius` and `RateSignificance` read the count of their siblings, against
-  an amendment of ADR 0138. Ask the maintainer only when the mathematics and the precedents leave
-  two designs open. #1900 is the case: both cross-sectional solve verbs return the residual count
-  of their fit.
-- **Estimators never hold Results internally.** Enforce it with the field's *type bound*, not a
-  runtime check. Put precomputed structure on the Result type. The rule has one exception, and
-  [ADR 0106](../docs/adr/0106-a-partial-fit-state-is-the-one-result-an-estimator-holds.md) states it.
-  A partial-fit state is a Result that no consumer reads, so an estimator may hold one in a field
-  bound to `Option{<:AbstractPartialFitState}`. That bound is the enforcement, and it still
-  refuses every other Result.
-- **A numeric type is derived, never coerced.** Read it off the arguments with `eltype`, `typeof`,
-  `real` and `promote_type`, or off the operation that widens it, and take an index with the
-  in-function conversion `ceil(Int, x)` rather than `Int(ceil(x))`. Never wrap a derived type in
-  `float`, and never read it off a division such as `typeof(one(T) / one(T))`. Both replace a
-  `Rational`, and every other type that needed no repair. Integer data are supported only where an
-  integer is the natural type: share counts, lot sizes, cardinalities, integer programming,
-  `ddof`, counts, indices, `Bool` masks, the codes of a `CategoricalPanelField`, the `Int` result
-  of `phylogeny_matrix` and the integer count of a metric such as `Hamming`. A continuous kernel (returns, prices, exposures,
-  weights, moments, regressions, distances and their diagnostics) takes the type of its data and
-  never repairs an integer. The carriers that a user builds convert integer data once, at
-  construction, through `float_if_integer` (#1972). The library must stay open to number types it
-  has never seen, such as an AD dual, a unit-carrying quantity, a `Rational`, or a number type
-  that another package defines. Every forced type closes the library to one of them. [`.github/instructions/julia-source-code.instructions.md`](../.github/instructions/julia-source-code.instructions.md)
-  § *Numeric types come from the data* owns the rule, and
-  `test/test_55_numeric_coercion_census.jl` gates it.
-- **A container takes the element type of its values, and `Any` is the last resort.** The rule
-  holds for every container, a `Dict`, a `Matrix`, a `Ref` or a `Tuple` as much as a `Vector`.
-  Let a comprehension, `map` or a broadcast take the type, promote a copy that takes two kinds
-  with `promote_type`, and build a container that is filled out of order in parts. Keep `Any`
-  only where no narrower type exists, such as the arguments of an `Expr`, with a comment that
-  states why. [`.github/instructions/julia-source-code.instructions.md`](../.github/instructions/julia-source-code.instructions.md)
-  § *A container takes the element type of its values* owns the rule, and
-  `test/test_87_any_container_census.jl` gates it.
-- **Spell a skipped procedure or a trivial default with `nothing`, never with a singleton.** No
-  data-less type for "no slack", "the raw statistic" or "no scaling", and no named alias of
-  `nothing`. The field takes `Option{<:AbstractX}`, and the method on `Nothing` holds the
-  behaviour. A data-less type stays only when it names a rule with content of its own, or when
-  `nothing` already means something else in the field. Keep every other type by default.
-  Dispatch and bound on the abstract type, not on a `Union` of all its members, because a caller
-  cannot add a member to a `Union`. A `Union` stays where the set mixes families (an estimator or
-  a result), where the abstract type has a fallback method of its own, or as a named alias.
-  A new covariance estimator takes no `mp` field: matrix processing on its output is the wrapper
-  `PortfolioOptimisersCovariance(ce, mp)`. An `mp` or `pdm` field stays only where the estimator
-  processes a matrix that it assembles itself, as a prior or a higher-order moment does.
-  [ADR 0222](../docs/adr/0222-a-type-is-kept-by-default-and-nothing-spells-a-skipped-procedure.md)
-  states the rule.
-- **A wrapper is for a call that a user writes, or for a dispatch problem.** A wrapper is a method
-  that only sends its arguments on to another function: it moves a keyword into a positional
-  slot, packs an argument into a tuple, reorders the arguments, or renames the call. It does no
-  work, and it gives one job a second name. Give each form of an input to the function that owns
-  the job, as a method of that function, and call that function, even when a short rule is then
-  written once per form. The two reasons are the whole list: a public name, a hub, a keyword
-  precedent of the target, or a sibling arm with logic is not a reason. The keyword case: keep a keyword
-  wrapper only on a keyword constructor, or on a verb of a workflow that a user calls in a
-  script, such as `optimise`, `prior` or `expected_risk`. Every other verb takes its slot as a
-  positional argument, as `oriented_score(sca, r, p)` and `sort_by_measure(sca, ppred, r)` do.
-  The reason is the size of the interface, not speed: #1997 measured a keyword form against a
-  positional form, and the time, the allocations and the runtime dispatches were equal. #2072
-  lists the wrappers that remain. [`.github/instructions/julia-source-code.instructions.md`](../.github/instructions/julia-source-code.instructions.md)
-  § *A wrapper is for convenience or for a dispatch problem* owns the rule, and
-  `test/test_70_trivial_unit_census.jl` flags each method that only forwards. The same section
-  holds the rulings of #2072: the standing test of every change (architecture, maintenance,
-  ergonomics and Julia idiom, with no loss of performance), which verb owns a default, the
-  interface method, the template hook, the self-forward and the rebuild by hand.
-- **Prefer a per-type method over a new dependency** for reflection-style work. Derive the field
-  list, write the constructor name once per type, and use the ordinary keyword constructor.
-- Keep docstring field text in `field_dict` / `arg_dict` in
-  `src/01_Base/01_DocstringDictionaries/`. Delete an entry that loses its last user.
-  [`.github/instructions/julia-docstrings.instructions.md`](../.github/instructions/julia-docstrings.instructions.md)
-  owns the rule for when a description must interpolate a key and when prose is permitted.
-- **A user-facing name is declared without approval (#1489).** A name that users are meant to
-  extend is `public`: an abstract type they subtype, and a verb that a subtype implements. A name
-  that users are meant to use directly is exported: a type they construct, a function they call.
-  When a name is unambiguously one of the two, declare it in the change that adds it. Ask the
-  maintainer only when it is ambiguous whether users extend or use the name at all.
-  - An `# Interfaces` section marks an extension point (ADR 0154), so its type and the verbs it
-    names are `public`. A family whose concrete members are exported is an extension point.
-  - A helper that the section tells an implementer to call is `public` too. Name a caller or a
-    check that the library runs in plain code, with no link. ADR 0154 states the rule, and
-    `test/test_66_public_declaration_census.jl` gates it.
-  - Users extend an abstract type and do not use it, so it is `public`, not exported. Export one
-    only when it is clear that users write it by name in their own code. Ask when it is not clear.
-  - Internal machinery stays undeclared. A name that only the library calls is neither.
+[sc]: ../.github/instructions/julia-source-code.instructions.md
 
-  `test/test_43_exported_abstract_type_census.jl` holds every exported and every `public` abstract
-  type on an allow-list, so a change that declares an abstract type also edits that list.
-  **Do not restate the count here or anywhere else.** The count changed four times, and each
-  written copy became out of date.
+- **The standing test picks a design, and correctness wins over convenience.** A break of an
+  interface is not a cost, and a name of the break goes in the commit and in
+  `docs/src/migration.md`. [`julia-source-code.instructions.md`][sc] § *A design is chosen by
+  the standing test*.
+- **An estimator never holds a Result**, except a Partial Fit State.
+  [`julia-source-code.instructions.md`][sc] § *Estimator, Algorithm, and Result Roles*, and
+  [ADR 0106](../docs/adr/0106-a-partial-fit-state-is-the-one-result-an-estimator-holds.md).
+- **A numeric type is derived, never coerced.** [`julia-source-code.instructions.md`][sc]
+  § *Numeric types come from the data*. `test/test_55_numeric_coercion_census.jl` gates it.
+- **A container takes the element type of its values, and `Any` is the last resort.**
+  [`julia-source-code.instructions.md`][sc] § *A container takes the element type of its
+  values*. `test/test_87_any_container_census.jl` gates it.
+- **`nothing` spells a skipped procedure or a trivial default, never a singleton. An abstract type,
+  not a `Union` of its members. A covariance estimator takes no `mp` field.**
+  [ADR 0222](../docs/adr/0222-a-type-is-kept-by-default-and-nothing-spells-a-skipped-procedure.md).
+- **A wrapper is for a convenience of the user or for a dispatch problem, and a keyword wrapper is
+  for a constructor or a user verb.** [`julia-source-code.instructions.md`][sc] § *A wrapper is
+  for convenience or for a dispatch problem*, with the rulings of #2072.
+  `test/test_70_trivial_unit_census.jl` and `code_health/forward_survey.jl` gate it.
+- **A function returns a defined type or a plain tuple, not a named tuple.**
+  [`julia-source-code.instructions.md`][sc] § *A function returns a defined type or a plain
+  tuple, not a named tuple*, with the name of a new type. `code_health/forward_survey.jl` reports
+  it.
+- **The simple form wins, and a method for each type wins over a new dependency.**
+  [`julia-source-code.instructions.md`][sc] § *The simple form wins*.
+- **The text of a field or an argument comes from the docstring dictionaries.**
+  [`julia-docstrings.instructions.md`](../.github/instructions/julia-docstrings.instructions.md)
+  § *Documentation Dictionaries*.
+- **A user-facing name is declared without approval: `public` when users extend it, exported when
+  users use it.** [`julia-source-code.instructions.md`][sc] § *A user-facing name is declared
+  without approval*. `test/test_43_exported_abstract_type_census.jl` and
+  `test/test_66_public_declaration_census.jl` gate it.

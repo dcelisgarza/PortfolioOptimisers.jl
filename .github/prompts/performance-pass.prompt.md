@@ -60,7 +60,8 @@ at the base, and the time of the other library when the issue compares with one.
 3. Write one **part** for each change. A part changes one mechanism: one stage stops copying, one
    loop takes its buffers once for each task, two histories share a backing, a block is computed
    once, or an array changes its layout. A layout change of an array that users build is a
-   breaking change, so `src/CLAUDE.md` decides how the part names it.
+   breaking change, so [`julia-source-code.instructions.md`](../instructions/julia-source-code.instructions.md)
+   § *A design is chosen by the standing test* decides how the part names it.
 
 Issue #1973 found its savings in this order, which is a fair prior for a similar fit. The times come
 from several sessions on a shared machine, so read the order and the size of each step, not the

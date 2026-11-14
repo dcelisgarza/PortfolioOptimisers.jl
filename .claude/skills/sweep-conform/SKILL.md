@@ -91,18 +91,16 @@ units.
 
 ## Two things the check reports as notes, and you must still do
 
-**A file whose row reads `swept = true` is held to the swept standard now.** Its addition owes a
-`# Algorithm` section where the docstring standard demands one, no `# Details` section, a `Where:`
-bullet that interpolates `math_dict` rather than copying it, `# Related` on a dispatch alias, and
-prose that passes `/unslop`.
-`test/test_26_docs.jl` holds the first four. No gate holds the pass, so review holds it. The
-test also holds the row's `algorithm` count as a floor. Raise
+**A file whose row reads `swept = true` is held to the swept standard now.** The header of
+`code_health/sweep_manifest.toml` owns the six conditions of a sweep, and
+`.github/instructions/julia-docstrings.instructions.md` owns each docstring rule that they arm.
+`test/test_26_docs.jl` holds the docstring sections. No gate holds the `/unslop` pass, so review
+holds it. The test also holds the row's `algorithm` count as a floor. Raise
 that count in the same commit when the new unit carries the section. The check measures the count
 with `CodeHealth.algorithm_sections`, the function the test calls, and every row it prints carries
 the measured count. Paste that row. Do not count the sections by hand.
-A swept file also carries no performance trap, the fifth condition of #404 (ADR 0175). Its
-methods meet the wrapper standard, the sixth condition (#2086): the survey of step 2 of *Land the
-branch* reports no candidate without a ruling for the file.
+The fifth condition (no performance trap, ADR 0175) and the sixth (the survey of step 2 of
+*Land the branch* reports no candidate without a ruling, #2086) hold for the file too.
 
 **A new file has no coverage row yet.** The gate ratchets `misses` per file, and a new file enters
 at zero misses. Write the tests, or write the Coverage Exemption with its rationale. Then add the
@@ -136,14 +134,11 @@ of cost, the fast ones first, and the slow ones once, on the tree you will push:
    test of that table, not for the maintainer.
    This is the sixth condition of #404. A finding that you did not add belongs to the build
    ticket of its directory under #2072, and you leave it.
-   **A gate that trips on your own row asks for a decision, not a smaller number.** Lower the
-   number only when the lower form is also the better design. When the correct form gives the
-   higher number, record the rise with `refresh --accept-rise --files <path>`. The correct form
-   is the precedent of the library, a signature that a test can call, or the file of the subject.
-   The number must stay within its threshold in `code_health/rulings.toml`. Name the rise and its
-   reason in the commit message and in your report. Never remove an argument, loosen a type bound
-   or move a function only to pass a ratchet (#2060). `docs/src/contribute/3-code-health.md`
-   § *When the correct form raises a number* states the rule.
+   **A gate that trips on your own row asks for a decision, not a smaller number.**
+   `docs/src/contribute/3-code-health.md` § *When the correct form raises a number* owns the
+   rule (#2060). When the correct form gives the higher number, record the rise with
+   `refresh --accept-rise --files <path>`, and name the rise and its reason in the commit message
+   and in your report.
 3. **A new file enters JET at 0** (`code_health/rulings.toml`), and the fix of a report edits
    `src/`. So run `julia --project=code_health code_health/jet.jl refresh --files <new file>` as
    soon as the new file compiles. Do not keep JET for the end when a file is new.
@@ -212,7 +207,9 @@ The check is a convenience, never an Authority. Another file owns each rule that
 | the row, the unit count, the child map | `CLAUDE.md` § *Functionality you add* | `test/test_45_sweep_census.jl` |
 | the coverage entry | ADR 0082 | `.github/workflows/ReusableTest.yml` |
 | the `include` line | `test/test_47_alias_and_module_census.jl` | the same file |
-| the swept standard | `.github/instructions/julia-docstrings.instructions.md` | `test/test_26_docs.jl` |
+| the six conditions of a sweep | the header of `code_health/sweep_manifest.toml` | `test/test_45_sweep_census.jl` for the row |
+| the swept standard of a docstring | `.github/instructions/julia-docstrings.instructions.md` | `test/test_26_docs.jl` |
+| the design of the code that a `review` finding asks about | `.github/instructions/julia-source-code.instructions.md` § *A design is chosen by the standing test* | review |
 | the reopened map and the sub-issue | ADR 0084 | `.github/workflows/Sweep.yml` |
 | a row in each gate baseline | ADR 0074 | `code_health/<gate>.jl check` |
 | the size ceiling | ADR 0101 | `code_health/size.jl check` |

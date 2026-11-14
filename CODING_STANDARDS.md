@@ -24,16 +24,16 @@ When two files disagree, the higher entry wins. Report the disagreement, and do 
 silence. A contradiction between two standards files is a defect.
 
  1. **`docs/adr/`.** A decision that reached `main` outranks every other file on the point that it
-    settles. An ADR that describes superseded behaviour is correct history, not a bug. An ADR whose
-    decision has **not** reached `main` does not hold this rank yet. It is a draft, you rewrite it
-    in place and do not amend it, and it loses to the files below it until its branch merges. A
-    draft ADR changes tier on the day its branch merges. Check where an ADR stands before you rely
-    on it.
+    settles. A draft ADR, whose decision has **not** reached `main`, does not hold this rank yet,
+    and it loses to the files below it until its branch merges. Check where an ADR stands before
+    you rely on it. [`docs/adr/README.md`](docs/adr/README.md) states when an ADR is amended and
+    when it is rewritten in place.
  2. **`GLOSSARY.md`.** The domain glossary. It fixes the words, and no other file may rename a
     concept.
  3. **`CLAUDE.md`.** The working agreements for this checkout, which include the rules that an
-    agent must not break. `src/CLAUDE.md` and `docs/paper/CLAUDE.md` hold the agreements for their
-    own directories, at the same rank.
+    agent must not break. `docs/paper/CLAUDE.md` holds the agreements for its own directory, at the
+    same rank. `src/CLAUDE.md` owns no rule: it lists the design rules for library code, and each
+    line links the file below that owns the rule.
  4. **`.github/instructions/*.instructions.md`.** The coding standards, one file for each scope.
  5. **`.github/copilot-instructions.md`** and **`.github/prompts/*.prompt.md`.** The orientation,
     and the step-by-step workflows.
@@ -91,7 +91,7 @@ silence. A contradiction between two standards files is a defect.
 | A citation or a bibliography entry | [`.github/instructions/julia-docstrings.instructions.md`](.github/instructions/julia-docstrings.instructions.md), `ref_dict` in [`src/01_Base/01_DocstringDictionaries/13_References.jl`](src/01_Base/01_DocstringDictionaries/13_References.jl) | `test/test_26_docs.jl` |
 | The source a formulation of a docstring is checked against, a citation of a secondary source, and the standard note for a formulation whose original source was not found | [`.github/instructions/julia-docstrings.instructions.md`](.github/instructions/julia-docstrings.instructions.md) § *The original source* and § *The `# References` Section* | `test/test_26_docs.jl` checks that the note `ref_dict[:no_original_source]` closes a `# References` bullet after a locator and appears nowhere else. The check of a formulation against its original source holds by review |
 | A new name for a concept | [`GLOSSARY.md`](GLOSSARY.md) | none — unenforced |
-| An `export` line | [`src/CLAUDE.md`](src/CLAUDE.md) | `test/test_43_exported_abstract_type_census.jl` |
+| An `export` line or a `public` line | [`.github/instructions/julia-source-code.instructions.md`](.github/instructions/julia-source-code.instructions.md) § *A user-facing name is declared without approval* | `test/test_43_exported_abstract_type_census.jl`, `test/test_66_public_declaration_census.jl` |
 | A constructor signature | [`.github/instructions/julia-source-code.instructions.md`](.github/instructions/julia-source-code.instructions.md) | `test/test_41_constructor_docstring_drift.jl` |
 | An optimiser fallback shortcut | `test/test_40_fallback_shortcut_census.jl`. The census comment is the only written statement of this Rule | the same file |
 | JuMP model state | ADR 0037, amending ADR 0004 | `test/test_28_model_state_lock.jl` |
@@ -102,15 +102,16 @@ silence. A contradiction between two standards files is a defect.
 | Adding a file, a type or a function under `src/` or `ext/` | [`CLAUDE.md`](CLAUDE.md) § Functionality you add, and [`code_health/sweep_manifest.toml`](code_health/sweep_manifest.toml) for the row it names | `test/test_45_sweep_census.jl`, and `.github/workflows/Sweep.yml` when the child map has already closed. `test/test_47_alias_and_module_census.jl` checks a new file, which `src/PortfolioOptimisers.jl` must `include`. `julia --project=code_health code_health/sweep_check.jl --fetch` reports all of it before the commit |
 | Filing the sweep sub-issue of an addition, by hand | [ADR 0084](docs/adr/0084-the-sweep-job-reopens-a-closed-child-map-and-files-the-addition.md), and the `sweep-file-issues` skill | `julia --project=code_health code_health/sweep_triage.jl --fetch --file <path>` for the plan, then `code_health/sweep_issues.sh apply` |
 | A combination weight on a meta-optimiser | ADR 0053 | `test/test_42_combination_weight_stacking.jl` |
-| A capability the package offers | [`docs/capability_catalogue.jl`](docs/capability_catalogue.jl), ADR 0040 | `test/test_26_docs.jl` |
+| A capability the package offers, and the place of a new type or a new export in the Capability Catalogue | [`.github/instructions/julia-source-code.instructions.md`](.github/instructions/julia-source-code.instructions.md) § *Capability Catalogue (required for every new public-facing addition)*, ADR 0040, and [`docs/capability_catalogue.jl`](docs/capability_catalogue.jl) for the groups | `test/test_26_docs.jl` |
 | A standards file, or a name or a path one cites | [`CODING_STANDARDS.md`](CODING_STANDARDS.md) § *Changing a standard* | `test/test_46_standards_citation_census.jl` |
 | A generated docs file | [`CLAUDE.md`](CLAUDE.md) § Editing, ADR 0151 | untracked. The Docs build writes it and checks its links |
 | A link from a docs page, hand-written or Literate, to another page | ADR 0151 § *Amendment (2026-09-26)* | `test/test_64_docs_page_metadata_census.jl` refuses a relative `.md` link. The target H1 carries an `(@id label)`, and the link reads `(@ref label)`, which the Docs build resolves |
 | A link from a page, a docstring or the README to an external package | [`CLAUDE.md`](CLAUDE.md) § *Repo etiquette* | `test/test_64_docs_page_metadata_census.jl` refuses a URL of a GitHub repository outside `dcelisgarza`'s. The link goes to the docs site of the package |
 | An `@docs` entry's placement in the mirrored public/private API trees ADR 0128 decides, or the classification a name earns | [ADR 0128](docs/adr/0128-the-docs-split-into-mirrored-public-and-private-api-trees-and-a-census-gates-placement.md), and [`docs/api_classification.jl`](docs/api_classification.jl) for the classifier | `test/test_65_docs_public_private_placement_census.jl` |
 | The `<title>` or the description of a docs page. The description is the `Description` line of the `@meta` block of a hand-written page, the derived line of a mirror page, the label of the landing page in `docs/make.jl`, or the site-wide fallback | [ADR 0128](docs/adr/0128-the-docs-split-into-mirrored-public-and-private-api-trees-and-a-census-gates-placement.md) § *Amendment (2026-09-17)*, and [`docs/page_metadata.jl`](docs/page_metadata.jl) for the derivation | `test/test_64_docs_page_metadata_census.jl` |
-| A choice between two designs of a change, or a change that breaks an interface | [`src/CLAUDE.md`](src/CLAUDE.md), by which the design that is mathematically and internally consistent wins over the one that keeps an interface | Review |
-| A private name's promotion to `public` | [`src/CLAUDE.md`](src/CLAUDE.md), by which a name that users extend is `public` without approval, and [ADR 0154](docs/adr/0154-a-private-abstract-type-earns-a-public-declaration-when-its-interfaces-section-names-the-seam.md) § *Amendment (2026-10-05)*, by which an `# Interfaces` section forces the declaration | `test/test_66_public_declaration_census.jl`, and `test/test_43_exported_abstract_type_census.jl` for an abstract type |
+| A choice between two designs of a change, or a change that breaks an interface | [`.github/instructions/julia-source-code.instructions.md`](.github/instructions/julia-source-code.instructions.md) § *A design is chosen by the standing test*: the form that improves the code most by architecture, maintenance, ergonomics and Julia idiom, with no loss of performance, and the design that is mathematically and internally consistent wins over the one that keeps an interface | Review |
+| A field of an estimator that holds a Result | [`.github/instructions/julia-source-code.instructions.md`](.github/instructions/julia-source-code.instructions.md) § *Estimator, Algorithm, and Result Roles*, and [ADR 0106](docs/adr/0106-a-partial-fit-state-is-the-one-result-an-estimator-holds.md) for the one exception | The type bound of the field. Review |
+| A private name's promotion to `public` | [`.github/instructions/julia-source-code.instructions.md`](.github/instructions/julia-source-code.instructions.md) § *A user-facing name is declared without approval*, by which a name that users extend is `public` without approval, and [ADR 0154](docs/adr/0154-a-private-abstract-type-earns-a-public-declaration-when-its-interfaces-section-names-the-seam.md) § *Amendment (2026-10-05)*, by which an `# Interfaces` section forces the declaration | `test/test_66_public_declaration_census.jl`, and `test/test_43_exported_abstract_type_census.jl` for an abstract type |
 | The paper's code listing | the recipe comment at the top of [`docs/paper/main.typ`](docs/paper/main.typ) | `.github/workflows/Paper.yml` |
 | A decision worth recording | [`docs/adr/README.md`](docs/adr/README.md) | none — unenforced |
 | A dependency | `Project.toml` | `.github/workflows/Aqua.yml` |
@@ -130,16 +131,17 @@ silence. A contradiction between two standards files is a defect.
 | `CODING_STANDARDS.md` | this map | the repository |
 | `GLOSSARY.md` | the domain glossary, with terms and one or two sentences for each | the repository |
 | `CLAUDE.md` | working agreements for an agent in this checkout | the repository |
-| `src/CLAUDE.md` | the design rules for library code: the consistent design over the convenient one, Results, numeric types, the element types of containers, docstring text, `public` and `export` | `src/` and `ext/` |
+| `src/CLAUDE.md` | no rule: a list of the design rules for library code, one line each, with a link to the section that owns each one | `src/` and `ext/` |
 | `docs/paper/CLAUDE.md` | who owns the prose of the paper | `docs/paper/` |
 | `docs/adr/` | decisions and their reasoning, one file per decision | named per ADR |
 | `.github/copilot-instructions.md` | architecture orientation and the before-you-commit checklist | the repository |
-| `.github/instructions/julia-source-code.instructions.md` | type roles, constructors, aliases, validation, dispatch, exports | `src/**/*.jl` |
+| `.github/instructions/julia-source-code.instructions.md` | the standing test of a design and the cost of a break, type roles, constructors, aliases, validation, dispatch, wrappers, the kind of value a function returns, the Capability Catalogue, `public` and `export` | `src/**/*.jl`, `ext/**/*.jl` |
 | `.github/instructions/julia-docstrings.instructions.md` | docstring sections, dictionaries, maths, the algorithm and JuMP formulation blocks, the sections an alias carries, `jldoctest`, the ASD-STE100 words and grammar of the prose, the `/unslop` pass over a docstring and over a dictionary value, and the pointers to the reference docstrings | `src/**/*.jl`, `ext/**/*.jl`, `docs/**/*.md` |
 | `.github/instructions/julia-prose.instructions.md` | the prose a user reads as a page: the `/unslop` pass, the dash, the voice, the vocabulary, a narrated check, the paragraph, the page's furniture, the printed strings and the code comments of a page, the derived text the rule does not read, and the census | `examples/**/*.jl`, `user_guide/*.jl`, `docs/src/**/*.md`, `README.md`, `docs/capability_catalogue.jl` |
-| `.github/instructions/julia-return-types.instructions.md` | when to annotate a return type | `src/**/*.jl` |
+| `.github/instructions/julia-return-types.instructions.md` | when to annotate a return type | `src/**/*.jl`, `ext/**/*.jl` |
 | `.github/instructions/julia-test-writing.instructions.md` | test file layout, the per-file module and its `init_code` preamble, the witness that a case named for a route asserts, validation tests | `test/` |
 | `.github/prompts/*.prompt.md` | the order of the work to add a type or to ship a change. Every step links to the Authority that owns its rule, and a prompt states no rule of its own | task-scoped |
+| the skills under `.claude/skills/` | the order of a procedure: conform an addition to the sweep, file its sweep issues, run the doctests. A skill links to the Authority of each rule that it applies, and states no rule of its own | task-scoped |
 | `docs/src/contribute/` | contributor and developer guides, release checklist | the repository |
 
 `GLOSSARY.md` is a glossary and nothing else. Reasoning and forensics belong in `docs/adr/`.
@@ -222,10 +224,5 @@ against the code.
 
 ## Before you finish a change
 
-From `.github/copilot-instructions.md`, which is the Authority for this list:
-
- 1. `pre-commit run -a` passes.
- 2. The tests for the area you changed pass.
- 3. The doctests pass.
- 4. New capabilities are in `docs/capability_catalogue.jl`.
- 5. Docstrings and documentation reflect the change.
+[`.github/copilot-instructions.md`](.github/copilot-instructions.md) § *Before Finalizing Work*
+owns the list of checks before you finish a change.

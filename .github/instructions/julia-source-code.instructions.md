@@ -1,8 +1,39 @@
 ---
-applyTo: "src/**/*.jl"
+applyTo: "src/**/*.jl, ext/**/*.jl"
 ---
 
 # Julia Source Code Guidelines for PortfolioOptimisers.jl
+
+This file owns the rules for the code under `src/` and `ext/`. [`src/CLAUDE.md`](../../src/CLAUDE.md)
+lists the main ones, one line each, with a link to the section here that owns it.
+
+## A design is chosen by the standing test
+
+**The standing test.** Pick the form that improves the code most by architecture, maintenance,
+ergonomics and Julia idiom, with no loss of performance. When the effect is not clear, a
+measurement decides. The maintainer ruled the test on 2026-11-13 (#2072), and it holds for every
+change and every addition. Each ruling of § *A wrapper is for convenience or for a dispatch
+problem* and of § *A function returns a defined type or a plain tuple, not a named tuple* applies
+it, and § *The simple form wins* applies it to a layer that a change adds.
+
+**Correctness wins over convenience.** The design that is mathematically and internally
+consistent wins over the design that keeps an interface. Give a fix the form that the mathematics
+and the precedents of the library state, and change with it every site that the same mechanism
+reaches.
+
+- **A break is not a cost.** A breaking change to an interface, a public verb among them, is the
+  cost of the better form. It is not a reason to take a weaker design, and it is not by itself the
+  maintainer's decision. Legacy and inertia are never a reason: a released spelling, a public
+  name, the count of the callers or the size of the break does not keep a design that a better one
+  replaces. A released number that moves is the same cost.
+- **Name the break.** State it in the commit and in `docs/src/migration.md`, where a user reads it.
+  A docstring states the current behaviour alone.
+- **An ADR binds by the reason that it states.** When that reason is a definition and not
+  mathematics, correct the ADR in the fix, as `docs/adr/README.md` states. #1908 is the case:
+  `RateRadius` and `RateSignificance` read the count of their siblings, against an amendment of
+  ADR 0138.
+- **Ask the maintainer only when the mathematics and the precedents leave two designs open.**
+  #1900 is the case: both cross-sectional solve verbs return the residual count of their fit.
 
 ## Estimator, Algorithm, and Result Roles
 
@@ -12,6 +43,7 @@ These three abstract hierarchies are the base of the library. A correct design k
   - An estimator faces the user. It holds algorithms, other estimators, or both, as fields.
   - An estimator is the entry point of a computation. Every high-level API function accepts an estimator.
   - An estimator can read data, such as a returns matrix, and give results or transformed data.
+  - **An estimator never holds a Result in a field.** The type bound of the field enforces the rule, not a check at run time. Put precomputed structure on the Result type. A Partial Fit State is the one exception: a Result that no consumer reads, held in a field bound to `Option{<:AbstractPartialFitState}`. That bound is the enforcement, and it still refuses every other Result ([ADR 0106](../../docs/adr/0106-a-partial-fit-state-is-the-one-result-an-estimator-holds.md)).
   - Example: `Covariance`, `EmpiricalPrior`, `Denoise`.
 
 - **Algorithms** (`<: AbstractAlgorithm`):
@@ -22,7 +54,9 @@ These three abstract hierarchies are the base of the library. A correct design k
 
 - **Results** (`<: AbstractResult`):
   - A function that reads an estimator returns a result when the output needs a type of its own, for example when it holds several arrays or metadata.
-  - A result can be the input of a later computation. Where this makes sense, a function must dispatch on both the estimator type and the result type.
+  - A result can be the input of a later computation. Where this makes sense, a function must dispatch on both the estimator type and the result type, and the method on the result returns it unchanged, as § *Multiple Dispatch* shows.
+  - A user-facing function never needs a result as an argument. A result is an optional shortcut in place of an estimator.
+  - § *A function returns a defined type or a plain tuple, not a named tuple* states when a function returns a result, and how the result type is named.
   - Example: `LowOrderPrior`, `Clusters`, `OptimisationResult`.
 
 ## Type Definitions
@@ -44,7 +78,7 @@ These three abstract hierarchies are the base of the library. A correct design k
   - Use `DocStringExtensions.TYPEDEF` in the docstring header for struct types.
   - Document every field with an inline `"$(field_dict[:key])"` string. The `# Fields` section shows the fields through `$(DocStringExtensions.FIELDS)`.
   - Call `@define_pretty_show(TypeName)` directly after any new struct that the REPL must show in a readable form. Every estimator, algorithm and result is such a struct.
-  - Every source file must end with an `export` statement that lists every public symbol that the file defines.
+  - Declare each new name as § *A user-facing name is declared without approval* states.
 
 ## Capability Catalogue (required for every new public-facing addition)
 
@@ -105,6 +139,8 @@ end
   ```julia
   function foo(x::Option{<:VecNum} = nothing) ...
   ```
+
+  `nothing` spells a skipped procedure or a trivial default, never a data-less singleton type. [ADR 0222](../../docs/adr/0222-a-type-is-kept-by-default-and-nothing-spells-a-skipped-procedure.md) owns that rule, and the rule that keeps every other type by default.
 
 - **Common type aliases.** `src/01_Base/08_TypeAliases.jl` defines them. Always prefer an alias to the full union or abstract type that it names:
 
@@ -327,7 +363,7 @@ const AbstractLowOrderPriorEstimator_A_AF = Union{AbstractLowOrderPriorEstimator
                                                   AbstractLowOrderPriorEstimator_AF}
 ```
 
-The alias saves a copy of each method definition. A union alias is a **dispatch alias**, and its docstring states what the alias groups and why the group exists. [`julia-docstrings.instructions.md`](julia-docstrings.instructions.md) § *Section Structure for Aliases* states which sections that docstring carries, and it is the Authority for that rule.
+The alias saves a copy of each method definition. Where the members are all the subtypes of one abstract type, dispatch on that abstract type instead, as [ADR 0222](../../docs/adr/0222-a-type-is-kept-by-default-and-nothing-spells-a-skipped-procedure.md) § *An abstract type, not a `Union` of its members* states. A union alias is a **dispatch alias**, and its docstring states what the alias groups and why the group exists. [`julia-docstrings.instructions.md`](julia-docstrings.instructions.md) § *Section Structure for Aliases* states which sections that docstring carries, and it is the Authority for that rule.
 
 ## Docstrings
 
@@ -375,7 +411,7 @@ An **alias** is the case to check first. Its docstring carries a different set o
 
 ## Input Validation
 
-- **Always use `@argcheck` for validation**, as in these examples:
+- **Validate with a shared `assert_*` helper where one fits, and with `@argcheck` otherwise.** § *Constructor Pattern* lists the helpers, and § *A `DomainError` carries the value and a message* routes a range guard through them. An inline check takes these forms:
 
     ```julia
     @argcheck !isempty(v) IsEmptyError("v cannot be empty")
@@ -389,8 +425,6 @@ An **alias** is the case to check first. Its docstring carries a different set o
   - Nothing checks: `@argcheck !isnothing(x) IsNothingError(...)`
   - Finite checks: `@argcheck all(isfinite, x) DomainError(x, ...)`
   - Dimension checks: `@argcheck size(A) == size(B) DimensionMismatch(...)`
-
-- **Prefer shared helpers over inline `@argcheck`.** See § *Constructor Pattern* above.
 
 ### A `DomainError` carries the value and a message
 
@@ -425,7 +459,7 @@ already carries the shape, and it names the symbol that the caller passed.
 
 - **Prefer multiple dispatch over conditionals** to select an algorithm or a method.
 - Define one method for each combination of types, and do not branch with if/else on a type.
-- Use abstract types and union aliases in method signatures, so that a method takes more types.
+- Use abstract types and union aliases in method signatures, so that a method takes more types. § *Union Type Aliases and Dispatch Groups* states when an alias is correct.
 - Functions that accept either an estimator or a result must dispatch on both:
 
   ```julia
@@ -558,8 +592,8 @@ keep it:
 - **The name is public, or a hub that callers reach through one name.** Give the hub the
   methods: each form of the input is a method of the public function. When the wrapper itself
   is the public name, remove it all the same. The break is the cost of the better form, and
-  `docs/src/migration.md` names it (`src/CLAUDE.md`, the first rule). A released spelling is
-  never a reason by itself.
+  `docs/src/migration.md` names it, as § *A design is chosen by the standing test* states. A
+  released spelling is never a reason by itself.
 - **The target takes the slot as a keyword, by the precedent of its family.** Give the target a
   method for the form, and keep the keyword in that method.
 - **Another arm of the function holds logic, or owns a fallback.** The arm that only forwards
@@ -580,9 +614,8 @@ held the reduction of `oriented_score` for a series and for a fitted result. It 
 **The rulings of #2072.** The maintainer ruled these on 2026-11-13. They hold for every change
 and every addition:
 
-1. **The standing test.** Pick the form that improves the code most by architecture,
-   maintenance, ergonomics and Julia idiom, with no loss of performance. When the effect is not
-   clear, a measurement decides. A break is not a cost.
+1. **The standing test.** § *A design is chosen by the standing test* owns it, and every ruling
+   below applies it.
 2. **A verb owns a default only when the default is a true answer for every caller.** A query
    trait owns `false`, as `needs_previous_weights` does. A structural traversal owns the
    identity on a leaf, as `copy_states(x) = x` and `factory(a, args...; kwargs...) = a` do,
@@ -681,9 +714,14 @@ and every addition:
    - **A Partial Fit State keeps the positional constructor**, by the exception of
      § *Immutability and `Accessors.jl`*.
 
-**A user verb is declared.** A keyword verb that is kept as a convenience for the user is
-exported or `public`. A verb that is neither is internal, and an internal keyword wrapper goes:
-its callers call the positional form.
+**A keyword wrapper is for a constructor or a user verb.** Keep a keyword wrapper only on a
+keyword constructor, or on a verb of a workflow that a user calls in a script, such as `optimise`,
+`prior` or `expected_risk`. Such a verb is a convenience for the user, so it is exported or
+`public`. Every other verb takes its slot as a positional argument, as `oriented_score(sca, r, p)`
+and `sort_by_measure(sca, ppred, r)` do. A verb that is neither exported nor `public` is internal,
+and an internal keyword wrapper goes: its callers call the positional form. The reason is the
+size of the interface, not speed. #1997 measured a keyword form against a positional form, and
+the time, the allocations and the dispatches at run time were equal.
 
 A wrapper that one of the two reasons keeps names that reason in the allow-list of
 `test/test_70_trivial_unit_census.jl`.
@@ -692,7 +730,8 @@ A wrapper that one of the two reasons keeps names that reason in the allow-list 
 
 A function that gives back more than one value returns a defined type or a plain tuple of the
 values. A named tuple stays only where the caller uses its keys as keys. The maintainer ruled the
-rule on 2026-11-13 and its cases on 2026-11-14 (#2113), by the standing test of #2072.
+rule on 2026-11-13 and its cases on 2026-11-14 (#2113), by § *A design is chosen by the standing
+test*.
 
 A defined type names the values once, in one place that a docstring, a `show` method and a test
 can reach. Its inner constructor checks the values, as § *Constructor Pattern* states, so a value
@@ -747,6 +786,11 @@ at least one of these gains:
 
 A form that buys none of them is needless complexity. Replace it with the simple form. When you
 review a complex form, name the gain that it buys. If you cannot name one, the simple form wins.
+When two forms each buy a gain, § *A design is chosen by the standing test* picks between them.
+
+**Prefer a method for each type over a new dependency** for work in the style of reflection.
+Derive the field list, write the constructor name once for each type, and use the ordinary
+keyword constructor.
 
 ### A function argument is passed only when the callee controls the call
 
@@ -896,8 +940,9 @@ reads them.
 
 ## Return Type Annotations
 
-- `.github/instructions/julia-return-types.instructions.md` holds the full guidelines.
-- The key rule is to annotate a function whose return type is always the same concrete type, for example `-> Nothing` for an assertion helper and `-> ConcreteEstimatorType` for a factory method.
+[`julia-return-types.instructions.md`](julia-return-types.instructions.md) owns the annotation of
+a return type. § *A function returns a defined type or a plain tuple, not a named tuple* owns the
+kind of value that a function returns.
 
 ## A problem is built in a fixed order
 
@@ -922,7 +967,31 @@ reads. The caller then sets it.
 - **Directories.** A family of files under one subject is a directory, numbered as one entry of its parent, and its files are numbered inside it. For example, `src/05_Moments/05_Gerber/` holds the three Gerber-family covariances, and `src/17_Optimisation/05_JuMP/` holds everything that builds the JuMP model. A file whose subject already has a directory goes into it. A family of two or more files at the top of a directory that reads as one subject takes a directory of its own (ADR 0150). `docs/src/public_api/` and `docs/src/private_api/` each carry one page per source file at the same path, so a directory in `src/` is a directory of pages on each mirror (ADR 0128).
 - **Module structure.** Each submodule covers one domain, such as moments, risk or priors.
 - **Type hierarchy.** Subtype the right abstract type: `AbstractEstimator`, `AbstractAlgorithm` or `AbstractResult`.
-- **Exports.** Every source file ends with an `export` line that lists every public symbol that the file defines. Do not export internal helpers.
+- **Declarations.** A source file ends with its `export` line and its `public` line, as the next section states. Do not declare internal helpers.
+
+### A user-facing name is declared without approval
+
+The maintainer ruled this in #1489. A name that users are meant to extend is `public`: an
+abstract type that they subtype, and a verb that a subtype implements. A name that users are meant
+to use directly is exported: a type that they construct, a function that they call. When a name is
+plainly one of the two, declare it in the change that adds it. Ask the maintainer only when it is
+not clear whether users extend or use the name at all.
+
+- An `# Interfaces` section marks an extension point (ADR 0154), so its type and the verbs it
+  names are `public`. A family whose concrete members are exported is an extension point.
+- A helper that the section tells an implementer to call is `public` too. Name a caller or a
+  check that the library runs in plain code, with no link. ADR 0154 states the rule, and
+  `test/test_66_public_declaration_census.jl` gates it.
+- Users extend an abstract type and do not use it, so it is `public`, not exported. Export one
+  only when it is clear that users write it by name in their own code. Ask when it is not clear.
+- Internal machinery stays undeclared. A name that only the library calls is neither.
+- A keyword verb that is kept as a convenience for the user is exported or `public`, as
+  § *A wrapper is for convenience or for a dispatch problem* states.
+
+`test/test_43_exported_abstract_type_census.jl` holds every exported and every `public` abstract
+type on an allow-list, so a change that declares an abstract type also edits that list. **Do not
+restate the count of that list in any file.** The count changed four times, and each written copy
+became out of date.
 
 ## Composability
 

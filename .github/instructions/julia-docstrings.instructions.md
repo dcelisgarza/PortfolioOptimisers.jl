@@ -128,7 +128,7 @@ Five dictionaries in `src/01_Base/01_DocstringDictionaries/` hold the standard d
 - `ret_dict` holds the descriptions of return values. Use it as `$(ret_dict[:key])` in `# Returns` sections.
 - `math_dict` holds the LaTeX notation. Use it as `$(math_dict[:key])` in the `Where:` list of a `# Mathematical definition` or `# JuMP formulation` section.
 
-If a needed key is missing, add it to the appropriate dictionary, in the file of `src/01_Base/01_DocstringDictionaries/` that holds its subject, before writing the docstring.
+If a needed key is missing, add it to the appropriate dictionary, in the file of `src/01_Base/01_DocstringDictionaries/` that holds its subject, before writing the docstring. Delete an entry that loses its last user.
 
 ### Inline field docstrings
 

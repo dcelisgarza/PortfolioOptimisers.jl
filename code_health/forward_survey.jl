@@ -49,8 +49,8 @@
 #                        rule 4). Its body moves into the verb.
 #   preset               a public method that builds one type (#2079). Reason (a).
 #   keyword form         a public method that passes its keywords as positional arguments.
-#                        `src/CLAUDE.md` keeps a keyword wrapper on a verb of a workflow that a
-#                        user calls. Reason (a).
+#                        § *A wrapper is for convenience or for a dispatch problem* keeps a
+#                        keyword wrapper on a verb of a workflow that a user calls. Reason (a).
 #   named tuple          a method that returns a named tuple at a `return` or at the tail of its
 #                        body: a literal, `(; a, b)` or `(a = x,)`, a `NamedTuple{…}(…)` call, a
 #                        `merge` with a literal, or a local variable that holds one (#2113). A
@@ -705,7 +705,7 @@ function self_verdict(t::Tree, d, call)
     end
     dropped = any(p -> p[1] === nothing || !(p[1] in passed), positional_arguments(d.sig))
     if slots_keywords(d, call) && !dropped
-        # `src/CLAUDE.md` keeps a keyword wrapper on a verb of a workflow that a user calls.
+        # The wrapper section keeps a keyword wrapper on a verb of a workflow that a user calls.
         return if d.name in t.public
             ("keep (a)", "a public verb takes a keyword and passes it as a slot (rule 5)")
         else
@@ -925,7 +925,7 @@ function forward_verdict(t::Tree, name, callee, d)
     others = setdiff(get(t.callers, callee, Set{Symbol}()), (name,))
     n_values = value_arm_count(t, name)
     if name in t.public && slots_keywords(d, CH.forward_call(d.body))
-        # `src/CLAUDE.md` keeps a keyword wrapper on a verb of a workflow that a user calls.
+        # The wrapper section keeps a keyword wrapper on a verb of a workflow that a user calls.
         return ("keyword form", "keep (a)",
                 "the keyword form of a public verb passes its keywords as slots")
     elseif has_nothing_arm(t, name) && n_values == 1

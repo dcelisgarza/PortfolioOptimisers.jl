@@ -111,8 +111,9 @@ Rebase before you merge, so that you lower the number that is current.
 
 ## Design rules
 
-The design rules for library code live in `src/CLAUDE.md`. Read them before you change or plan a
-change to a file under `src/` or `ext/`.
+`src/CLAUDE.md` lists the design rules for library code, one line each, with a link to the section
+that owns each rule. Read it, and the sections it links, before you change or plan a change to a
+file under `src/` or `ext/`.
 
 ## Defects you find
 
@@ -126,7 +127,8 @@ change to a file under `src/` or `ext/`.
 - **A name or an interface that a library precedent settles is not the maintainer's decision.**
   Follow the precedent. A case that the same mechanism reaches belongs to the fix in hand: list
   every such case in the plan, before the first test run. A breaking change is not the
-  maintainer's decision either, and `src/CLAUDE.md` states the rule.
+  maintainer's decision either, as `.github/instructions/julia-source-code.instructions.md`
+  § *A design is chosen by the standing test* states.
 - **Link the issue to the work that found it.** Name the issue in the pull request, the commit, or
   the report for that work, and name that work in the issue.
 
