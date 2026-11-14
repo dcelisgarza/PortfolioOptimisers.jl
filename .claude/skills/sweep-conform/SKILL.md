@@ -49,6 +49,9 @@ They are `CLAUDE.md` § *Functionality you add*, and ADR 0084 is the decision be
 
 Steps 3 and 4 write to the tracker. The `sweep-file-issues` skill does them.
 
+Defer a feature whose design is not settled. Leave its row at `swept = false`, record it in the
+child map's *Not yet specified* section, and take steps 3 and 4 when the design settles.
+
 ## What each failure means
 
 **`no row in code_health/sweep_manifest.toml`.** Paste the line the check printed, and choose `map` yourself.
@@ -110,6 +113,21 @@ with `N` from a `run_files.jl --coverage=<worktree>/src/<dir>` run of the tests 
 The job runs on a red suite too (ADR 0082, amendment of 2026-10-30).
 
 ## Land the branch
+
+**The shared files.** `CLAUDE.md` § *Parallel sessions* forbids an edit of a file at the same time
+as another session. Every sweep ticket changes three common files, and every ticket that adds an
+ADR changes a fourth. That rule matters most for these files:
+
+- `code_health/sweep_manifest.toml` holds one row per source file.
+- `src/01_Base/01_DocstringDictionaries/` holds `arg_dict`, `math_dict` and their siblings, one
+  subject to a file. Two sessions collide only when they add keys of one subject.
+- `test/test_26_docs.jl` holds the library-wide ratchets, `DETAILS_TOTAL`, `NO_RELATED_TOTAL` and
+  `MATH_COPY_TOTAL`.
+- `docs/adr/README.md` is the ADR index, with one row per ADR. Two new ADRs add adjacent rows.
+
+A ratchet is one number for the whole library. Two sessions that each lower it write two different
+numbers, and a merge keeps one of them. Lower a ratchet in the commit that does the work it counts.
+Rebase before you merge, so that you lower the number that is current.
 
 Sibling tickets land on `dev` while your gates run. A rebase makes a gate or a test stale only
 when the commits that it brings in change a file that the gate or the test reads. A fast gate that
