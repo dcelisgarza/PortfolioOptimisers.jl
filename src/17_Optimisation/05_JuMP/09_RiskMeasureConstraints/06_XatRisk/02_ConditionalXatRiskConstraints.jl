@@ -47,8 +47,8 @@ Where:
 # Keyword arguments
 
   - `loss::Bool`: If `true` (default), the measure is applied to the net portfolio returns;
-    if `false`, to their negation. [`set_range_risk_constraints!`](@ref) sets it to `false`
-    to build the gain tail of [`ConditionalValueatRiskRange`](@ref).
+    if `false`, to their negation. The method of `set_risk_constraints!` for a [`RangeRiskMeasure`](@ref)
+    sets it to `false` to build the gain tail of [`ConditionalValueatRiskRange`](@ref).
   - `prefix::Symbol`: Model State namespace (default: empty, i.e. the bare key).
 
 # Returns
@@ -192,38 +192,8 @@ function set_conditional_risk_constraints!(model::JuMP.Model, i::Any, r::RiskMea
                                     prefix = prefix)
     return risk
 end
-"""
-$(DocStringExtensions.TYPEDSIGNATURES)
-
-Add JuMP risk constraints for `ConditionalValueatRiskRange` to `model`.
-
-Delegates to [`set_range_risk_constraints!`](@ref), which builds the loss tail at `alpha` on
-the net portfolio returns and the gain tail at `beta` on their negation, then sums the two
-CVaR expressions.
-
-# Arguments
-
-  - $(arg_dict[:model])
-  - $(arg_dict[:ci])
-  - `r::ConditionalValueatRiskRange`: The CVaR range risk measure.
-  - $(arg_dict[:opt_rjumpe])
-  - $(arg_dict[:pr_X])
-
-# Returns
-
-  - `cvar_range_risk`: The combined `loss + gain` risk expression added to the model.
-
-# Related
-
-  - [`ConditionalValueatRiskRange`](@ref)
-  - [`range_tails`](@ref)
-  - [`set_range_risk_constraints!`](@ref)
-"""
-function set_risk_constraints!(model::JuMP.Model, i::Any, r::ConditionalValueatRiskRange,
-                               opt::RiskConstraintOwner, pr::AbstractPriorResult, args...;
-                               prefix::Symbol = Symbol(""), kwargs...)
-    return set_range_risk_constraints!(model, i, r, :cvar_range_risk_, opt, pr, args...;
-                                       prefix = prefix, kwargs...)
+function range_risk_key(::ConditionalValueatRiskRange)
+    return :cvar_range_risk_
 end
 """
 $(DocStringExtensions.TYPEDSIGNATURES)
@@ -250,8 +220,8 @@ a nested prefix rather than allowed to collide with those of the loss tail.
 # Keyword arguments
 
   - `loss::Bool`: If `true` (default), the measure is applied to the net portfolio returns;
-    if `false`, to their negation. [`set_range_risk_constraints!`](@ref) sets it to `false`
-    to build the gain tail of
+    if `false`, to their negation. The method of `set_risk_constraints!` for a [`RangeRiskMeasure`](@ref)
+    sets it to `false` to build the gain tail of
     [`DistributionallyRobustConditionalValueatRiskRange`](@ref).
   - `prefix::Symbol`: Model State namespace (default: empty, i.e. the bare key).
 
@@ -386,41 +356,8 @@ function set_dr_conditional_risk_constraints!(model::JuMP.Model, i::Any, r::Risk
                                     prefix = prefix)
     return risk
 end
-"""
-$(DocStringExtensions.TYPEDSIGNATURES)
-
-Add JuMP risk constraints for `DistributionallyRobustConditionalValueatRiskRange`
-(DR-CVaR range) to `model`.
-
-Delegates to [`set_range_risk_constraints!`](@ref), which builds the loss tail from `alpha`,
-`l_a` and `r_a` on the net portfolio returns, and the gain tail from `beta`, `l_b` and `r_b`
-on their negation, then sums the two robust CVaR expressions. Each tail brings its own
-Wasserstein ambiguity ball.
-
-# Arguments
-
-  - $(arg_dict[:model])
-  - $(arg_dict[:ci])
-  - `r::DistributionallyRobustConditionalValueatRiskRange`: The DR-CVaR range risk measure.
-  - $(arg_dict[:opt_rjumpe])
-  - $(arg_dict[:pr_X])
-
-# Returns
-
-  - `drcvar_risk_range`: The combined `loss + gain` risk expression added to the model.
-
-# Related
-
-  - [`DistributionallyRobustConditionalValueatRiskRange`](@ref)
-  - [`range_tails`](@ref)
-  - [`set_range_risk_constraints!`](@ref)
-"""
-function set_risk_constraints!(model::JuMP.Model, i::Any,
-                               r::DistributionallyRobustConditionalValueatRiskRange,
-                               opt::RiskConstraintOwner, pr::AbstractPriorResult, args...;
-                               prefix::Symbol = Symbol(""), kwargs...)
-    return set_range_risk_constraints!(model, i, r, :drcvar_risk_range_, opt, pr, args...;
-                                       prefix = prefix, kwargs...)
+function range_risk_key(::DistributionallyRobustConditionalValueatRiskRange)
+    return :drcvar_range_risk_
 end
 """
 $(DocStringExtensions.TYPEDSIGNATURES)

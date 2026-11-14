@@ -231,69 +231,8 @@ function set_relativistic_risk_constraints!(model::JuMP.Model, i::Any, r::RiskMe
                                     prefix = prefix)
     return risk
 end
-"""
-$(DocStringExtensions.TYPEDSIGNATURES)
-
-Adds the Relativistic Value-at-Risk range of the net portfolio returns to `model`, and returns its risk expression.
-
-[`range_tails`](@ref) pairs `alpha` with `kappa_a` for the loss tail, and `beta` with `kappa_b` for the gain tail. The RLVaR method of this function builds a pair of power cones for each tail. The tail keys carry `loss_` or `gain_` before `i`, for example `rlvar_risk_loss_1`.
-
-# Mathematical definition
-
-```math
-\\begin{align}
-\\mathrm{RVaRRange}_{\\alpha,\\kappa_a,\\beta,\\kappa_b}(\\boldsymbol{w}) &= \\mathrm{RLVaR}_{\\alpha,\\kappa_a}(\\hat{\\boldsymbol{r}}) + \\mathrm{RLVaR}_{\\beta,\\kappa_b}(-\\hat{\\boldsymbol{r}})\\,.
-\\end{align}
-```
-
-Where:
-
-  - ``\\mathrm{RVaRRange}_{\\alpha,\\kappa_a,\\beta,\\kappa_b}(\\boldsymbol{w})``: Relativistic VaR range of the portfolio.
-  - ``\\mathrm{RLVaR}_{\\alpha,\\kappa}(\\boldsymbol{s})``: The programme of the RLVaR method of this function, with the series ``\\boldsymbol{s}`` in place of the net portfolio returns.
-  - $(math_dict[:rhat_net_vec])
-  - $(math_dict[:rhat_t_net])
-  - ``\\alpha``, ``\\kappa_a``: Significance level and Kaniadakis deformation parameter of the loss tail.
-  - ``\\beta``, ``\\kappa_b``: Significance level and Kaniadakis deformation parameter of the gain tail.
-
-Section 7.2.3.5 of [cajas2025](@cite) defines this range. [`RelativisticValueatRiskRange`](@ref) states its sources.
-
-# Algorithm
-
- 1. Build the two tails and their sum with [`set_range_risk_constraints!`](@ref), under the key `rlvar_range_risk_`, giving `range_risk`.
-
-# Arguments
-
-  - $(arg_dict[:model])
-  - $(arg_dict[:ci])
-  - `r::RelativisticValueatRiskRange`: The RLVaR range risk measure.
-  - $(arg_dict[:opt_rjumpe])
-  - $(arg_dict[:pr_X])
-
-# Keyword arguments
-
-  - `prefix::Symbol`: Model State namespace (default: empty, i.e. the bare key).
-
-# Returns
-
-  - `range_risk`: The combined `loss + gain` risk expression added to the model, registered under the key `rlvar_range_risk_`.
-
-# Related
-
-  - [`RelativisticValueatRiskRange`](@ref)
-  - [`range_tails`](@ref)
-  - [`set_range_risk_constraints!`](@ref)
-
-# References
-
-  - $(ref_dict[:rlvar]) Section 4.1, Equations 12 and 15.
-  - $(ref_dict[:cajas2025]) Section 7.2.3.5, Equations 7.84 and 7.85. $(ref_dict[:no_original_source])
-  - $(ref_dict[:owa1])
-"""
-function set_risk_constraints!(model::JuMP.Model, i::Any, r::RelativisticValueatRiskRange,
-                               opt::RiskConstraintOwner, pr::AbstractPriorResult, args...;
-                               prefix::Symbol = Symbol(""), kwargs...)
-    return set_range_risk_constraints!(model, i, r, :rlvar_range_risk_, opt, pr, args...;
-                                       prefix = prefix, kwargs...)
+function range_risk_key(::RelativisticValueatRiskRange)
+    return :rlvar_range_risk_
 end
 """
 $(DocStringExtensions.TYPEDSIGNATURES)

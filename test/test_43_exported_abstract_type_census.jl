@@ -301,6 +301,7 @@
         :OptimisationModelResult,
         :OptimisationResult,
         :OptimisationReturnCode,
+        :RangeRiskMeasure,
         :RatioFormulation,
         :RegimeAdjustedMethod,
         :Scalariser,

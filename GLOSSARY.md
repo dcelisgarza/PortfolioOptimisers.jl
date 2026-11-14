@@ -1176,6 +1176,9 @@ The rule for the evaluation of a risk measure on a reduced net-return series tha
 **XatRisk**
 The naming convention in which "X" stands for "Value" or "Drawdown". It is the same family, applied to returns or to drawdowns. *Relative* variants are the hierarchical drawdown forms. *Range* variants penalise the gap between the two tails. *Distributionally Robust (DR)* variants optimise against worst-case scenario distributions.
 
+**Range variant**
+A risk measure that is the sum of a measure of the losses and a measure of the gains. Every Range variant subtypes `RangeRiskMeasure`, `Range` among them. A formulation of a range either **decomposes** into its Range Tails, which the single-tail builders build, or **fuses** the two tails into one programme. A formulation that decomposes declares `range_tails` and `range_risk_key`, and the method of `set_risk_constraints!` for a `RangeRiskMeasure` builds it (ADR 0057, #2120).
+
 **Range Tails**
 The two point measures whose sum is a Range variant: the **loss** tail on the net portfolio returns, and the **gain** tail on their negation at the second level of the range. `range_tails` returns them as a `RangeTails`, whose constructor refuses a tail that adds to the risk expression, because the range registers it once (#2113).
 

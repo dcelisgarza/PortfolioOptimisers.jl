@@ -201,42 +201,6 @@ function risk_input_kind(r::AbstractBaseRiskMeasure)
     return throw(ArgumentError("`risk_input_kind` is not defined for `$(typeof(r))`. Every concrete `AbstractBaseRiskMeasure` must declare its input kind beside its definition by adding a method returning one of `NetReturnsInput()`, `WeightsReturnsFeesInput()`, or `WeightsInput()`."))
 end
 """
-    range_tails(r::RiskMeasure) -> RangeTails
-
-Decompose a *range* risk measure into the two point measures it is the sum of.
-
-A range measure is its base measure applied twice: once to the losses at level `alpha`, and once to the gains at the second level the range carries (`beta`, `w2`, …). The two point measures are the whole content of that statement, so a range declares them here once and both of its consumers read them from this one place:
-
-  - [`set_range_risk_constraints!`](@ref) builds the model by calling [`set_risk_constraints!`](@ref) on `loss` with `loss = true` and on `gain` with `loss = false`, then sums the two expressions.
-  - The measure's own `r(x::VecNum)` functor is the value-level twin of the same sum, `loss(x) + gain(-x)`.
-
-The tails carry `RiskMeasureSettings(; rke = false)`: an upper bound and a risk-expression contribution belong to the range as a whole, which registers them once from the composite expression. A range that *fuses* its two tails into a shared formulation rather than duplicating one ([`OrderedWeightsArrayRange`](@ref) under [`ExactOrderedWeightsArray`](@ref), [`ValueatRiskRange`](@ref) under [`DistributionValueatRisk`](@ref)) declares no tails, because there are no two sub-models to build.
-
-There is no default. A measure that is not a range, or one that fuses, throws rather than returning a decomposition that does not describe it.
-
-# Arguments
-
-  - `r`: Range risk measure.
-
-# Validation
-
-  - Throws an `ArgumentError` when `r` declares no method of its own. A measure that is not a range, and one that fuses its two tails into a single formulation, both take that arm.
-
-# Returns
-
-  - `tails::RangeTails`: The loss-tail and gain-tail point measures. A method of a range of your own builds it, and its constructor refuses a tail that adds to the risk expression.
-
-# Related
-
-  - [`RangeTails`](@ref)
-  - [`set_range_risk_constraints!`](@ref)
-  - [`GenericValueatRiskRange`](@ref)
-  - [`RiskMeasureSettings`](@ref)
-"""
-function range_tails(r::AbstractBaseRiskMeasure)
-    return throw(ArgumentError("`range_tails` is not defined for `$(typeof(r))`. Only a range risk measure that is the sum of two point measures decomposes; a measure that fuses its two tails into one formulation declares none."))
-end
-"""
     (r::AbstractBaseRiskMeasure)(::VecNum)
 
 Backstop for the single-argument *precomputed-returns* functor contract `r(x::VecNum)`.
@@ -689,19 +653,89 @@ Each has a fallback on [`AbstractBaseRiskMeasure`](@ref):
 
   - `needs_previous_weights(r::MyRiskMeasure) -> Bool`: `true` for a measure that reads the previous weights; the fallback answers `false`.
   - `bigger_is_better(r::MyRiskMeasure) -> Bool`: `true` for a measure a caller maximises; the fallback answers `false`.
-  - `range_tails(r::MyRiskMeasure) -> NamedTuple`: The two point measures `(; loss, gain)` that a range measure is the sum of; the fallback throws.
   - [`factory`](@ref): rebuild the measure against a prior result before it is evaluated, for a measure whose slots are filled from the prior.
+
+A Range variant subtypes [`RangeRiskMeasure`](@ref), whose `# Interfaces` section states two more methods.
 
 # Related
 
   - [`OptimisationRiskMeasure`](@ref)
   - [`HierarchicalRiskMeasure`](@ref)
+  - [`RangeRiskMeasure`](@ref)
   - [`RiskMeasureSettings`](@ref)
   - [`risk_input_kind`](@ref)
   - [`expected_risk`](@ref)
   - [`set_risk_constraints!`](@ref)
 """
 abstract type RiskMeasure <: OptimisationRiskMeasure end
+"""
+$(DocStringExtensions.TYPEDEF)
+
+Abstract supertype for the **Range** variants: the risk measures that are the sum of a measure of the losses and a measure of the gains.
+
+A range penalises the spread between the two tails of the net portfolio returns. Its value is ``\\mathcal{R}_{\\mathrm{loss}}(\\hat{\\boldsymbol{r}}) + \\mathcal{R}_{\\mathrm{gain}}(-\\hat{\\boldsymbol{r}})``, so the gain tail reads the negated returns and the two tails add. A formulation of a range either *decomposes* into two point measures, which the single-tail builders build, or *fuses* the two tails into one programme.
+
+# Interfaces
+
+A range is a [`RiskMeasure`](@ref), so it implements the methods of that `# Interfaces` section. Its `set_risk_constraints!` comes from one of two forms.
+
+## A formulation that decomposes
+
+Implement the two methods below. The method of [`set_risk_constraints!`](@ref) for a `RangeRiskMeasure` then builds the range: it builds `loss` with `loss = true` and `gain` with `loss = false`, and it registers their sum once.
+
+  - `range_tails(r::MyRange) -> RangeTails`: The two point measures of the range, the **Range Tails**. Each tail carries `rke = false`.
+  - `range_risk_key(r::MyRange) -> Symbol`: The Model State key of the sum, by the convention `<base>_range_risk_`.
+
+## A formulation that fuses
+
+Implement a method of [`set_risk_constraints!`](@ref) for the formulation, and declare no `range_tails`. Its method is more specific than the method for a `RangeRiskMeasure`. `range_tails` then throws an `ArgumentError` that names the type.
+
+# Related
+
+  - [`RiskMeasure`](@ref)
+  - [`range_tails`](@ref)
+  - [`RangeTails`](@ref)
+  - [`range_risk_key`](@ref)
+  - [`set_risk_constraints!`](@ref)
+"""
+abstract type RangeRiskMeasure <: RiskMeasure end
+"""
+    range_tails(r::RangeRiskMeasure) -> RangeTails
+
+Decompose a range risk measure into the two point measures it is the sum of.
+
+A range measure is its base measure applied twice: once to the losses at level `alpha`, and once to the gains at the second level the range carries (`beta`, `w2`, …). The two point measures are the whole content of that statement, so a range declares them here once and both of its consumers read them from this one place:
+
+  - The method of [`set_risk_constraints!`](@ref) for a [`RangeRiskMeasure`](@ref) builds `loss` with `loss = true` and `gain` with `loss = false`, then sums the two expressions.
+  - The measure's own `r(x::VecNum)` functor is the value-level twin of the same sum, `loss(x) + gain(-x)`.
+
+The tails carry `RiskMeasureSettings(; rke = false)`: an upper bound and a risk-expression contribution belong to the range as a whole, which registers them once from the composite expression. A range that *fuses* its two tails into a shared formulation rather than duplicating one ([`OrderedWeightsArrayRange`](@ref) under [`ExactOrderedWeightsArray`](@ref), [`ValueatRiskRange`](@ref) under [`DistributionValueatRisk`](@ref)) declares no tails, because there are no two sub-models to build.
+
+There is no default. A range that fuses throws rather than returning a decomposition that does not describe it. A measure that is not a range has no method.
+
+# Arguments
+
+  - `r`: Range risk measure.
+
+# Validation
+
+  - Throws an `ArgumentError` when the range `r` declares no method of its own, which a range that fuses its two tails into a single formulation does.
+
+# Returns
+
+  - `tails::RangeTails`: The loss-tail and gain-tail point measures. A method of a range of your own builds it, and its constructor refuses a tail that adds to the risk expression.
+
+# Related
+
+  - [`RangeRiskMeasure`](@ref)
+  - [`RangeTails`](@ref)
+  - [`range_risk_key`](@ref)
+  - [`GenericValueatRiskRange`](@ref)
+  - [`RiskMeasureSettings`](@ref)
+"""
+function range_tails(r::RangeRiskMeasure)
+    return throw(ArgumentError("`range_tails` is not defined for `$(typeof(r))`. Only a range risk measure that is the sum of two point measures decomposes; a measure that fuses its two tails into one formulation declares none."))
+end
 """
 $(DocStringExtensions.TYPEDEF)
 
@@ -2692,7 +2726,7 @@ export Frontier, RiskMeasureSettings, HierarchicalRiskMeasureSettings, SumScalar
 # (ADR 0154, #1775). Public, not exported: they are only ever extended, and an extension must
 # qualify them as `PortfolioOptimisers.risk_input_kind` and so on anyway.
 public risk_input_kind, supports_precomputed_returns, bigger_is_better, range_tails,
-       RangeTails
+       RangeTails, RangeRiskMeasure
 # The `# Interfaces`-marked types and verbs of #1137 (ADR 0154): AbstractRiskMeasureSettings
 # names required fields only; FrontierBoundEstimator and Scalariser each name the verb(s) an
 # extension must implement.

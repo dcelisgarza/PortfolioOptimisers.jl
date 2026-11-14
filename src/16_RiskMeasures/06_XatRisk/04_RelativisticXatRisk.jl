@@ -609,7 +609,7 @@ RelativisticValueatRiskRange
   - $(ref_dict[:cajas2025]) Section 7.2.3.5, Equations 7.84 and 7.85. $(ref_dict[:no_original_source])
   - $(ref_dict[:owa1])
 """
-@propagatable @concrete struct RelativisticValueatRiskRange <: RiskMeasure
+@propagatable @concrete struct RelativisticValueatRiskRange <: RangeRiskMeasure
     """
     $(field_dict[:settings_rm])
     """

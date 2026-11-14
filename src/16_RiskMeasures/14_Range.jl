@@ -75,7 +75,7 @@ julia> Range()([-0.1])
 
   - $(ref_dict[:cajas2025]) Section 7.2.3.1, Equation 7.73. $(ref_dict[:no_original_source])
 """
-@concrete struct Range <: RiskMeasure
+@concrete struct Range <: RangeRiskMeasure
     """
     $(field_dict[:settings_rm])
     """

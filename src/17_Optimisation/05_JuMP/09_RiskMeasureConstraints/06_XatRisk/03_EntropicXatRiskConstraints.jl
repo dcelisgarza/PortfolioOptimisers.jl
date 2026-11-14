@@ -137,38 +137,8 @@ function set_entropic_risk_constraints!(model::JuMP.Model, i::Any, r::RiskMeasur
                                     prefix = prefix)
     return risk
 end
-"""
-$(DocStringExtensions.TYPEDSIGNATURES)
-
-Add JuMP risk constraints for `EntropicValueatRiskRange` (EVaR range) to `model`.
-
-Delegates to [`set_range_risk_constraints!`](@ref), which builds the loss tail at `alpha` on
-the net portfolio returns and the gain tail at `beta` on their negation, then sums the two
-EVaR expressions. Each tail brings its own exponential cone block.
-
-# Arguments
-
-  - $(arg_dict[:model])
-  - $(arg_dict[:ci])
-  - `r::EntropicValueatRiskRange`: The EVaR range risk measure.
-  - $(arg_dict[:opt_rjumpe])
-  - $(arg_dict[:pr_X])
-
-# Returns
-
-  - `evar_risk_range`: The combined `loss + gain` risk expression added to the model.
-
-# Related
-
-  - [`EntropicValueatRiskRange`](@ref)
-  - [`range_tails`](@ref)
-  - [`set_range_risk_constraints!`](@ref)
-"""
-function set_risk_constraints!(model::JuMP.Model, i::Any, r::EntropicValueatRiskRange,
-                               opt::RiskConstraintOwner, pr::AbstractPriorResult, args...;
-                               prefix::Symbol = Symbol(""), kwargs...)
-    return set_range_risk_constraints!(model, i, r, :evar_risk_range_, opt, pr, args...;
-                                       prefix = prefix, kwargs...)
+function range_risk_key(::EntropicValueatRiskRange)
+    return :evar_range_risk_
 end
 """
 $(DocStringExtensions.TYPEDSIGNATURES)

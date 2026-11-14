@@ -743,7 +743,7 @@ true
   - $(ref_dict[:owa1])
   - $(ref_dict[:cajas2025]) Section 7.2.3.
 """
-@concrete struct OrderedWeightsArrayRange <: RiskMeasure
+@concrete struct OrderedWeightsArrayRange <: RangeRiskMeasure
     """
     $(field_dict[:settings_rm])
     """

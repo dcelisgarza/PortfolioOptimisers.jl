@@ -1082,3 +1082,43 @@ end
     f = factory(rt, ucs, slv)
     @test f.ucs === ucs && f.mu === rt.mu && f.settings === rt.settings
 end
+
+# A range of a user's own: two CVaR tails at the levels that it carries. It declares its tails and
+# its key, and it writes no builder.
+struct UserCVaRRange{T1, T2, T3} <: PortfolioOptimisers.RangeRiskMeasure
+    settings::T1
+    alpha::T2
+    beta::T3
+end
+PortfolioOptimisers.risk_input_kind(::UserCVaRRange) = NetReturnsInput()
+function PortfolioOptimisers.range_tails(r::UserCVaRRange)
+    off = RiskMeasureSettings(; rke = false)
+    return PortfolioOptimisers.RangeTails(ConditionalValueatRisk(; settings = off,
+                                                                 alpha = r.alpha),
+                                          ConditionalValueatRisk(; settings = off,
+                                                                 alpha = r.beta))
+end
+PortfolioOptimisers.range_risk_key(::UserCVaRRange) = :user_cvar_range_risk_
+
+@testset "A range of a user's own builds through the method for a RangeRiskMeasure" begin
+    opt = JuMPOptimiser(; pe = pr, slv = slv)
+    mine = optimise(MeanRisk(; r = [UserCVaRRange(RiskMeasureSettings(), 0.05, 0.1)],
+                             obj = MinimumRisk(), opt = opt))
+    lib = optimise(MeanRisk(; r = [ConditionalValueatRiskRange(; alpha = 0.05, beta = 0.1)],
+                            obj = MinimumRisk(), opt = opt))
+    @test isa(mine.retcode, OptimisationSuccess)
+    # The sum takes the key of the range, and each tail the nested key of its side.
+    @test haskey(mine.model, :user_cvar_range_risk_1)
+    @test haskey(mine.model, :cvar_risk_loss_1)
+    @test haskey(mine.model, :cvar_risk_gain_1)
+    @test isapprox(JuMP.value(mine.model[:user_cvar_range_risk_1]),
+                   JuMP.value(lib.model[:cvar_range_risk_1]); rtol = 1e-6)
+    @test isapprox(mine.w, lib.w; rtol = 1e-5, atol = 1e-7)
+    # The bound of the range binds on the sum of the two tails.
+    ub = 1.5 * JuMP.value(lib.model[:cvar_range_risk_1])
+    bounded = optimise(MeanRisk(;
+                                r = [UserCVaRRange(RiskMeasureSettings(; ub = ub), 0.05,
+                                                   0.1)], obj = MaximumReturn(), opt = opt))
+    @test isa(bounded.retcode, OptimisationSuccess)
+    @test JuMP.value(bounded.model[:user_cvar_range_risk_1]) <= ub * (1 + 1e-6)
+end

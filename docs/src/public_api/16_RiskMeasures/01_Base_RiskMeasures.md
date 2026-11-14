@@ -1,5 +1,5 @@
 ```@meta
-Description = "Base Risk Measures, public API of PortfolioOptimisers.jl: RiskMeasure, HierarchicalRiskMeasure, Frontier, AbstractRiskMeasureSettings, RiskMeasureSettings, …"
+Description = "Base Risk Measures, public API of PortfolioOptimisers.jl: RiskMeasure, RangeRiskMeasure, HierarchicalRiskMeasure, Frontier, AbstractRiskMeasureSettings, …"
 ```
 
 # [Base Risk Measures](@id api-base-risk-measures)
@@ -120,6 +120,7 @@ The last column names the solver that the library recommends.
 
 ```@docs
 RiskMeasure
+RangeRiskMeasure
 HierarchicalRiskMeasure
 Frontier
 AbstractRiskMeasureSettings

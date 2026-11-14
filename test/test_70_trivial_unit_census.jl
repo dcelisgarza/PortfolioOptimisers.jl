@@ -476,8 +476,6 @@ end
                                                    (:set_retcode, :NestedClusteredResult),
                                                    (:set_retcode, :StackingResult),
                                                    (:set_retcode, :SubsetResamplingResult),
-                                                   (:set_risk_constraints!,
-                                                    :set_range_risk_constraints!),
                                                    (:sparse_portfolio_iterate,
                                                     :largest_forecast_split),
                                                    (:step_fallback, :partial_fit!),

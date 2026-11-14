@@ -917,7 +917,7 @@ ValueatRiskRange
   - $(ref_dict[:cajas2025]) Section 7.2.3. $(ref_dict[:no_original_source])
   - $(ref_dict[:owa1])
 """
-@propagatable @concrete struct ValueatRiskRange <: RiskMeasure
+@propagatable @concrete struct ValueatRiskRange <: RangeRiskMeasure
     """
     $(field_dict[:settings_rm])
     """

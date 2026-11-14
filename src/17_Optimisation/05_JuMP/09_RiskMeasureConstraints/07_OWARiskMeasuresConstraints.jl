@@ -322,8 +322,8 @@ $(val_dict[:relax])
 # Keyword arguments
 
   - `loss::Bool`: If `true` (default), the measure is applied to the net portfolio returns;
-    if `false`, to their negation. [`set_range_risk_constraints!`](@ref) sets it to `false`
-    to build the gain tail of [`OrderedWeightsArrayRange`](@ref).
+    if `false`, to their negation. The method of `set_risk_constraints!` for
+    [`OrderedWeightsArrayRange`](@ref) sets it to `false` to build its gain tail.
   - `prefix::Symbol`: Model State namespace (default: empty, i.e. the bare key).
 
 # Returns
@@ -411,9 +411,12 @@ $(DocStringExtensions.TYPEDSIGNATURES)
 Add JuMP risk constraints for `OrderedWeightsArrayRange` using the approximate OWA
 formulation to `model`.
 
-Delegates to [`set_range_risk_constraints!`](@ref), which builds the loss tail from `w1` on
-the net portfolio returns and the gain tail from `w2` on their negation, then sums the two
-OWA expressions. Each tail brings its own power cone block.
+[`range_tails`](@ref) gives the loss tail from `w1` on the net portfolio returns and the gain tail from `w2` on their negation. Each tail brings its own power cone block.
+
+# Algorithm
+
+ 1. Check `w1` and `w2` with [`owa_weights`](@ref), under their own names. Each tail checks its weights again, but under the name `w` of the tail.
+ 2. Build the two tails, register their sum under `aowa_range_risk_` and bound it, as steps 1 to 5 of the method of `set_risk_constraints!` for a [`RangeRiskMeasure`](@ref) do. This copy of the steps agrees with that method.
 
 # Arguments
 
@@ -437,7 +440,8 @@ OWA expressions. Each tail brings its own power cone block.
   - [`OrderedWeightsArrayRange`](@ref)
   - [`ApproxOrderedWeightsArray`](@ref)
   - [`range_tails`](@ref)
-  - [`set_range_risk_constraints!`](@ref)
+  - [`range_risk_key`](@ref)
+  - [`RangeRiskMeasure`](@ref)
 """
 function set_risk_constraints!(model::JuMP.Model, i::Any,
                                r::OrderedWeightsArrayRange{<:Any, <:Any, <:Any,
@@ -449,8 +453,21 @@ function set_risk_constraints!(model::JuMP.Model, i::Any,
     T = get_T(model)
     owa_weights(r.w1, T, :w1)
     owa_weights(r.w2, T, :w2)
-    return set_range_risk_constraints!(model, i, r, :aowa_range_risk_, opt, pr, args...;
-                                       prefix = prefix, kwargs...)
+    (; loss, gain) = range_tails(r)
+    name = range_risk_key(r)
+    loss_risk = set_risk_constraints!(model, nested_index(:loss_, i), loss, opt, pr,
+                                      args...; loss = true, prefix = prefix, kwargs...)
+    gain_risk = set_risk_constraints!(model, nested_index(:gain_, i), gain, opt, pr,
+                                      args...; loss = false, prefix = prefix, kwargs...)
+    range_risk = state_set!(model, prefix, name, i,
+                            JuMP.@expression(model, loss_risk + gain_risk))
+    set_risk_bounds_and_expression!(model, opt, range_risk, r.settings, name, i;
+                                    prefix = prefix)
+    return range_risk
+end
+function range_risk_key(::OrderedWeightsArrayRange{<:Any, <:Any, <:Any,
+                                                   <:ApproxOrderedWeightsArray})
+    return :aowa_range_risk_
 end
 """
 $(DocStringExtensions.TYPEDEF)

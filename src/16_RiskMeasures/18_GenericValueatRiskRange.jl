@@ -145,7 +145,7 @@ GenericValueatRiskRange
   - [`factory`](@ref)
   - [`port_opt_view`](@ref)
 """
-@propagatable @concrete struct GenericValueatRiskRange <: RiskMeasure
+@propagatable @concrete struct GenericValueatRiskRange <: RangeRiskMeasure
     """
     $(field_dict[:settings_rm])
     """

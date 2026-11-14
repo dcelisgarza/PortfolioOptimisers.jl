@@ -578,7 +578,7 @@ PowerNormValueatRiskRange
 
   - $(ref_dict[:pnvar]) Equation 4.
 """
-@propagatable @concrete struct PowerNormValueatRiskRange <: RiskMeasure
+@propagatable @concrete struct PowerNormValueatRiskRange <: RangeRiskMeasure
     """
     $(field_dict[:settings_rm])
     """

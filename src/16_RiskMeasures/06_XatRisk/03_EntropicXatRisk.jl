@@ -518,7 +518,7 @@ EntropicValueatRiskRange
   - $(ref_dict[:cajas2025]) Section 7.2.3.4, Equations 7.81 to 7.83. $(ref_dict[:no_original_source])
   - $(ref_dict[:owa1])
 """
-@propagatable @concrete struct EntropicValueatRiskRange <: RiskMeasure
+@propagatable @concrete struct EntropicValueatRiskRange <: RangeRiskMeasure
     """
     $(field_dict[:settings_rm])
     """

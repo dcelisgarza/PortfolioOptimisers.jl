@@ -143,39 +143,8 @@ function set_power_norm_risk_constraints!(model::JuMP.Model, i::Any, r::RiskMeas
                                     prefix = prefix)
     return risk
 end
-"""
-$(DocStringExtensions.TYPEDSIGNATURES)
-
-Add JuMP risk constraints for `PowerNormValueatRiskRange` (PNVaR range) to `model`.
-
-Delegates to [`set_range_risk_constraints!`](@ref), which builds the loss tail from `alpha`
-and `pa` on the net portfolio returns, and the gain tail from `beta` and `pb` on their
-negation, then sums the two PNVaR expressions. Each tail brings its own power cone, shaped
-by *its own* norm order.
-
-# Arguments
-
-  - $(arg_dict[:model])
-  - $(arg_dict[:ci])
-  - `r::PowerNormValueatRiskRange`: The power-norm VaR range risk measure.
-  - $(arg_dict[:opt_rjumpe])
-  - $(arg_dict[:pr_X])
-
-# Returns
-
-  - `pvar_range_risk`: The combined `loss + gain` risk expression added to the model.
-
-# Related
-
-  - [`PowerNormValueatRiskRange`](@ref)
-  - [`range_tails`](@ref)
-  - [`set_range_risk_constraints!`](@ref)
-"""
-function set_risk_constraints!(model::JuMP.Model, i::Any, r::PowerNormValueatRiskRange,
-                               opt::RiskConstraintOwner, pr::AbstractPriorResult, args...;
-                               prefix::Symbol = Symbol(""), kwargs...)
-    return set_range_risk_constraints!(model, i, r, :pvar_range_risk_, opt, pr, args...;
-                                       prefix = prefix, kwargs...)
+function range_risk_key(::PowerNormValueatRiskRange)
+    return :pvar_range_risk_
 end
 """
 $(DocStringExtensions.TYPEDSIGNATURES)

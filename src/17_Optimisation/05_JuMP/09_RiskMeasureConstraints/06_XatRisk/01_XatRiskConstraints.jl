@@ -146,43 +146,8 @@ function set_mip_quantile_risk_constraints!(model::JuMP.Model, i::Any, r::RiskMe
                                     prefix = prefix)
     return risk
 end
-"""
-$(DocStringExtensions.TYPEDSIGNATURES)
-
-Add JuMP risk constraints for `ValueatRiskRange` using a MIP (big-M) formulation to
-`model`.
-
-Delegates to [`set_range_risk_constraints!`](@ref), which builds the loss tail at `alpha` on
-the net portfolio returns and the gain tail at `beta` on their negation, then sums the two
-VaR expressions. Each tail brings its own binary indicator set and big-M block.
-
-# Arguments
-
-  - $(arg_dict[:model])
-  - $(arg_dict[:ci])
-  - `r::ValueatRiskRange{<:Any, <:Any, <:Any, <:Any, <:MIPValueatRisk}`: The VaR range risk
-    measure with MIP formulation.
-  - $(arg_dict[:opt_rjumpe])
-  - $(arg_dict[:pr])
-
-# Returns
-
-  - `var_range_risk`: The combined `loss + gain` risk expression added to the model.
-
-# Related
-
-  - [`ValueatRiskRange`](@ref)
-  - [`MIPValueatRisk`](@ref)
-  - [`range_tails`](@ref)
-  - [`set_range_risk_constraints!`](@ref)
-"""
-function set_risk_constraints!(model::JuMP.Model, i::Any,
-                               r::ValueatRiskRange{<:Any, <:Any, <:Any, <:Any,
-                                                   <:MIPValueatRisk},
-                               opt::RiskConstraintOwner, pr::AbstractPriorResult, args...;
-                               prefix::Symbol = Symbol(""), kwargs...)
-    return set_range_risk_constraints!(model, i, r, :var_range_risk_, opt, pr, args...;
-                                       prefix = prefix, kwargs...)
+function range_risk_key(::ValueatRiskRange{<:Any, <:Any, <:Any, <:Any, <:MIPValueatRisk})
+    return :var_range_risk_
 end
 """
 $(DocStringExtensions.TYPEDSIGNATURES)
@@ -211,8 +176,9 @@ sides.
 # Keyword arguments
 
   - `loss::Bool`: If `true` (default), the measure is applied to the portfolio `w`; if
-    `false`, to the negated portfolio `-w`. [`set_range_risk_constraints!`](@ref) sets it to
-    `false` to build the gain tail of [`GenericValueatRiskRange`](@ref).
+    `false`, to the negated portfolio `-w`. The method of `set_risk_constraints!` for a
+    [`RangeRiskMeasure`](@ref) sets it to `false` to build the gain tail of
+    [`GenericValueatRiskRange`](@ref).
   - `prefix::Symbol`: Model State namespace (default: empty, i.e. the bare key).
   - `g_var::Option{<:JuMP.AbstractVariableRef}`: The standard deviation variable of a cone
     that the two tails of a [`GenericValueatRiskRange`](@ref) share, or `nothing` (default)

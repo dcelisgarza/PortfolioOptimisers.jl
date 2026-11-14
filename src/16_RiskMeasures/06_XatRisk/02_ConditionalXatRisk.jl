@@ -555,7 +555,7 @@ ConditionalValueatRiskRange
   - $(ref_dict[:cajas2025]) Section 7.2.3.2, Equations 7.75 and 7.77. $(ref_dict[:no_original_source])
   - $(ref_dict[:owa1])
 """
-@propagatable @concrete struct ConditionalValueatRiskRange <: RiskMeasure
+@propagatable @concrete struct ConditionalValueatRiskRange <: RangeRiskMeasure
     """
     $(field_dict[:settings_rm])
     """
@@ -708,7 +708,7 @@ DistributionallyRobustConditionalValueatRiskRange
   - $(ref_dict[:drcvar]) Section 7.1, Equation 27.
 """
 @propagatable @concrete struct DistributionallyRobustConditionalValueatRiskRange <:
-                               RiskMeasure
+                               RangeRiskMeasure
     """
     $(field_dict[:settings_rm])
     """

@@ -8,6 +8,5 @@ The methods below are public. The other names of this topic are private, and the
 
 ```@docs
 set_risk_constraints!(model::JuMP.Model, i::Any, r::PowerNormValueatRisk, opt::RiskConstraintOwner, pr::AbstractPriorResult, args...; kwargs...)
-set_risk_constraints!(model::JuMP.Model, i::Any, r::PowerNormValueatRiskRange, opt::RiskConstraintOwner, pr::AbstractPriorResult, args...; kwargs...)
 set_risk_constraints!(model::JuMP.Model, i::Any, r::PowerNormDrawdownatRisk, opt::RiskConstraintOwner, pr::AbstractPriorResult, args...; kwargs...)
 ```
