@@ -21,4 +21,5 @@ factor_summary_exposure_variance
 factor_summary_constant_exposures
 factor_summary_stability
 factor_summary_exposure
+assert_factor_summary_columns
 ```

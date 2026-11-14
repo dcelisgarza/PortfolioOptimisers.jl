@@ -852,10 +852,84 @@ function idio_nan_median(v::VecNum)
     return isempty(f) ? Tf(NaN) : Tf(Statistics.median(f))
 end
 """
+$(DocStringExtensions.TYPEDEF)
+
+The five time-aggregated numbers of the calibration of a cross-sectional fit.
+
+[`idio_calibration_summary`](@ref) returns it. Each number aggregates one of the calibration series over the observations that had enough assets to answer, and it is `NaN` when no observation did. A caller reads the fields by name, as `s.mean_cs_std` or `(; mean_kurtosis) = s`.
+
+# Fields
+
+$(DocStringExtensions.FIELDS)
+
+# Constructors
+
+    IdioCalibrationSummaryResult(mean_cs_std::Real, median_cs_std::Real,
+                                 mean_kurtosis::Real, mean_skewness::Real,
+                                 mean_tail_rate::Real)
+    IdioCalibrationSummaryResult(; mean_cs_std::Real, median_cs_std::Real,
+                                 mean_kurtosis::Real, mean_skewness::Real,
+                                 mean_tail_rate::Real)
+
+The positional constructor checks the values. The keyword constructor takes each field by name, with no default, and calls it.
+
+## Validation
+
+  - `mean_cs_std` and `median_cs_std` are each `NaN` or not negative. Otherwise, the constructor raises a `DomainError`.
+  - `mean_tail_rate` is `NaN` or in ``[0, 1]``. Otherwise, the constructor raises a `DomainError`.
+
+# Related
+
+  - [`idio_calibration_summary`](@ref)
+  - [`idio_calibration`](@ref)
+  - [`idio_tail_rate`](@ref)
+"""
+@concrete struct IdioCalibrationSummaryResult <: AbstractResult
+    """
+    Mean of the calibration series of [`idio_calibration`](@ref). Its reference under the normal law is `1`.
+    """
+    mean_cs_std
+    """
+    Median of the calibration series. Its reference under the normal law is `1`.
+    """
+    median_cs_std
+    """
+    Mean of the excess kurtosis series of [`idio_kurtosis`](@ref). Its reference under the normal law is `0`.
+    """
+    mean_kurtosis
+    """
+    Mean of the skewness series of [`idio_skewness`](@ref). Its reference under the normal law is `0`.
+    """
+    mean_skewness
+    """
+    Mean of the tail rate series of [`idio_tail_rate`](@ref). Its reference under the normal law is ``2 \\Phi(-c)`` at the threshold ``c``.
+    """
+    mean_tail_rate
+    function IdioCalibrationSummaryResult(mean_cs_std::Real, median_cs_std::Real,
+                                          mean_kurtosis::Real, mean_skewness::Real,
+                                          mean_tail_rate::Real)
+        assert_nan_or_nonneg(mean_cs_std, :mean_cs_std)
+        assert_nan_or_nonneg(median_cs_std, :median_cs_std)
+        assert_nan_or_closed_unit_interval(mean_tail_rate, :mean_tail_rate)
+        return new{typeof(mean_cs_std), typeof(median_cs_std), typeof(mean_kurtosis),
+                   typeof(mean_skewness), typeof(mean_tail_rate)}(mean_cs_std,
+                                                                  median_cs_std,
+                                                                  mean_kurtosis,
+                                                                  mean_skewness,
+                                                                  mean_tail_rate)
+    end
+end
+function IdioCalibrationSummaryResult(; mean_cs_std::Real, median_cs_std::Real,
+                                      mean_kurtosis::Real, mean_skewness::Real,
+                                      mean_tail_rate::Real)::IdioCalibrationSummaryResult
+    return IdioCalibrationSummaryResult(mean_cs_std, median_cs_std, mean_kurtosis,
+                                        mean_skewness, mean_tail_rate)
+end
+"""
     idio_calibration_summary(eps::MatNum, vs::MatNum; threshold::Real = 3,
-                             ahead::Bool = true)
+                             ahead::Bool = true) -> IdioCalibrationSummaryResult
     idio_calibration_summary(csfm::CrossSectionalFactorModel; threshold::Real = 3,
-                             ahead::Bool = true)
+                             ahead::Bool = true) -> IdioCalibrationSummaryResult
 
 Return the five time-aggregated numbers of the calibration of a cross-sectional fit.
 
@@ -886,14 +960,17 @@ Under the normal law the expected values are `1`, `1`, `0`, `0` and ``2 \\Phi(-c
 
 # Returns
 
-  - `mean_cs_std::Real`: Mean of the calibration series.
-  - `median_cs_std::Real`: Median of the calibration series.
-  - `mean_kurtosis::Real`: Mean of the excess kurtosis series.
-  - `mean_skewness::Real`: Mean of the skewness series.
-  - `mean_tail_rate::Real`: Mean of the tail rate series.
+  - `s::IdioCalibrationSummaryResult`: The five numbers below. Earlier releases returned a `NamedTuple` of the same fields.
+
+      + `mean_cs_std::Real`: Mean of the calibration series.
+      + `median_cs_std::Real`: Median of the calibration series.
+      + `mean_kurtosis::Real`: Mean of the excess kurtosis series.
+      + `mean_skewness::Real`: Mean of the skewness series.
+      + `mean_tail_rate::Real`: Mean of the tail rate series.
 
 # Related
 
+  - [`IdioCalibrationSummaryResult`](@ref)
   - [`idio_calibration`](@ref)
   - [`idio_kurtosis`](@ref)
   - [`idio_skewness`](@ref)
@@ -901,16 +978,17 @@ Under the normal law the expected values are `1`, `1`, `0`, `0` and ``2 \\Phi(-c
   - [`CrossSectionalFactorModel`](@ref)
 """
 function idio_calibration_summary(eps::MatNum, vs::MatNum; threshold::Real = 3,
-                                  ahead::Bool = true)
+                                  ahead::Bool = true)::IdioCalibrationSummaryResult
     z = standardised_idio_returns(eps, vs; ahead = ahead)
     cs = idio_calibration(z)
-    return (; mean_cs_std = idio_nan_mean(cs), median_cs_std = idio_nan_median(cs),
-            mean_kurtosis = idio_nan_mean(idio_kurtosis(z)),
-            mean_skewness = idio_nan_mean(idio_skewness(z)),
-            mean_tail_rate = idio_nan_mean(idio_tail_rate(z; threshold = threshold)))
+    return IdioCalibrationSummaryResult(idio_nan_mean(cs), idio_nan_median(cs),
+                                        idio_nan_mean(idio_kurtosis(z)),
+                                        idio_nan_mean(idio_skewness(z)),
+                                        idio_nan_mean(idio_tail_rate(z;
+                                                                     threshold = threshold)))
 end
 function idio_calibration_summary(csfm::CrossSectionalFactorModel; threshold::Real = 3,
-                                  ahead::Bool = true)
+                                  ahead::Bool = true)::IdioCalibrationSummaryResult
     ep, vh = idio_diagnostic_data(csfm)
     return idio_calibration_summary(ep, vh; threshold = threshold, ahead = ahead)
 end
@@ -964,4 +1042,5 @@ function idio_diagnostic_data(csr::CrossSectionalRegression, vs::MatNum)
 end
 
 export standardised_idio_returns, idio_calibration, idio_tail_rate, idio_kurtosis,
-       idio_skewness, idio_vol_ic, idio_vol_residual_dependence, idio_calibration_summary
+       idio_skewness, idio_vol_ic, idio_vol_residual_dependence, idio_calibration_summary,
+       IdioCalibrationSummaryResult

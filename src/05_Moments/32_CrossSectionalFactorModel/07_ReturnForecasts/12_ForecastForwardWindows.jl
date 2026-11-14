@@ -240,10 +240,284 @@ function forecast_window_row(fp::ForecastEvaluationResult, w::Option{<:MatNum},
             mean_coverage = isempty(fc) ? Tf(NaN) : Tf(sum(fc) / length(fc)))
 end
 """
+$(DocStringExtensions.TYPEDEF)
+
+The score of one Return Forecast against a grid of forward windows, one entry per period, on one common date set.
+
+[`forecast_holding_period`](@ref) and [`forecast_decay`](@ref) return it, and they differ only in the grid of windows. Each column but `dates` holds one entry per period, so a caller reads the shape of a column down the periods. `dates` holds the common evaluation dates that every period was scored on. `DataFrames.DataFrame(t)` writes the table with one row per period.
+
+# Fields
+
+$(DocStringExtensions.FIELDS)
+
+# Constructors
+
+    ForecastWindowResult(period::VecInt, horizon::VecInt, lag::VecInt, dates::VecInt,
+                         spearman_mean_ic::VecNum, spearman_ic_ir::VecNum,
+                         spearman_t_stat::VecNum, spearman_p_value::VecNum,
+                         spearman_mean_ci_lower::VecNum, spearman_mean_ci_upper::VecNum,
+                         pearson_mean_ic::VecNum, pearson_ic_ir::VecNum,
+                         pearson_t_stat::VecNum, pearson_p_value::VecNum,
+                         pearson_mean_ci_lower::VecNum, pearson_mean_ci_upper::VecNum,
+                         rank_ann_return::VecNum, rank_sharpe::VecNum,
+                         zscore_ann_return::VecNum, zscore_sharpe::VecNum,
+                         mean_coverage::VecNum)
+    ForecastWindowResult(; period::VecInt, horizon::VecInt, lag::VecInt, dates::VecInt,
+                         spearman_mean_ic::VecNum, spearman_ic_ir::VecNum,
+                         spearman_t_stat::VecNum, spearman_p_value::VecNum,
+                         spearman_mean_ci_lower::VecNum, spearman_mean_ci_upper::VecNum,
+                         pearson_mean_ic::VecNum, pearson_ic_ir::VecNum,
+                         pearson_t_stat::VecNum, pearson_p_value::VecNum,
+                         pearson_mean_ci_lower::VecNum, pearson_mean_ci_upper::VecNum,
+                         rank_ann_return::VecNum, rank_sharpe::VecNum,
+                         zscore_ann_return::VecNum, zscore_sharpe::VecNum,
+                         mean_coverage::VecNum)
+
+The positional constructor checks the values. The keyword constructor takes each field by name, with no default, and calls it.
+
+## Validation
+
+  - Each column but `dates` holds one entry per period, as many as `period`. Otherwise, the constructor raises a `DimensionMismatch`.
+  - The two p-values and `mean_coverage` are `NaN` or in ``[0, 1]``. Otherwise, the constructor raises a `DomainError`.
+  - No lower bound of an interval is above its upper bound. A `NaN` bound passes. Otherwise, the constructor raises a `DomainError`.
+
+# Related
+
+  - [`forecast_holding_period`](@ref)
+  - [`forecast_decay`](@ref)
+  - [`DataFrames.DataFrame(t::ForecastWindowResult)`](@ref)
+  - [`ForecastICSummaryResult`](@ref)
+  - [`ForecastPortfolioResult`](@ref)
+"""
+@concrete struct ForecastWindowResult <: AbstractResult
+    """
+    The period, `1` to `n`.
+    """
+    period
+    """
+    The horizon of the window of each period.
+    """
+    horizon
+    """
+    The lag of the window of each period.
+    """
+    lag
+    """
+    The common evaluation dates that every period was scored on.
+    """
+    dates
+    """
+    Mean of the rank information coefficient, one entry per period.
+    """
+    spearman_mean_ic
+    """
+    Information ratio of the rank information coefficient, one entry per period.
+    """
+    spearman_ic_ir
+    """
+    T-statistic of the mean rank information coefficient, from the Mean Test, one entry per period.
+    """
+    spearman_t_stat
+    """
+    Two-sided p-value of the null hypothesis that the mean rank information coefficient is zero, one entry per period.
+    """
+    spearman_p_value
+    """
+    Lower bound of the confidence interval of the mean rank information coefficient, one entry per period.
+    """
+    spearman_mean_ci_lower
+    """
+    Upper bound of the confidence interval of the mean rank information coefficient, one entry per period.
+    """
+    spearman_mean_ci_upper
+    """
+    Mean of the weighted Pearson information coefficient, one entry per period.
+    """
+    pearson_mean_ic
+    """
+    Information ratio of the weighted Pearson information coefficient, one entry per period.
+    """
+    pearson_ic_ir
+    """
+    T-statistic of the mean weighted Pearson information coefficient, from the Mean Test, one entry per period.
+    """
+    pearson_t_stat
+    """
+    Two-sided p-value of the null hypothesis that the mean weighted Pearson information coefficient is zero, one entry per period.
+    """
+    pearson_p_value
+    """
+    Lower bound of the confidence interval of the mean weighted Pearson information coefficient, one entry per period.
+    """
+    pearson_mean_ci_lower
+    """
+    Upper bound of the confidence interval of the mean weighted Pearson information coefficient, one entry per period.
+    """
+    pearson_mean_ci_upper
+    """
+    Annualised return of the `:rank` book of [`forecast_portfolio`](@ref), one entry per period.
+    """
+    rank_ann_return
+    """
+    Sharpe ratio of the `:rank` book, one entry per period.
+    """
+    rank_sharpe
+    """
+    Annualised return of the `:zscore` book of [`forecast_portfolio`](@ref), one entry per period.
+    """
+    zscore_ann_return
+    """
+    Sharpe ratio of the `:zscore` book, one entry per period.
+    """
+    zscore_sharpe
+    """
+    Mean of the finite entries of [`forecast_coverage`](@ref), one entry per period.
+    """
+    mean_coverage
+    function ForecastWindowResult(period::VecInt, horizon::VecInt, lag::VecInt,
+                                  dates::VecInt, spearman_mean_ic::VecNum,
+                                  spearman_ic_ir::VecNum, spearman_t_stat::VecNum,
+                                  spearman_p_value::VecNum, spearman_mean_ci_lower::VecNum,
+                                  spearman_mean_ci_upper::VecNum, pearson_mean_ic::VecNum,
+                                  pearson_ic_ir::VecNum, pearson_t_stat::VecNum,
+                                  pearson_p_value::VecNum, pearson_mean_ci_lower::VecNum,
+                                  pearson_mean_ci_upper::VecNum, rank_ann_return::VecNum,
+                                  rank_sharpe::VecNum, zscore_ann_return::VecNum,
+                                  zscore_sharpe::VecNum, mean_coverage::VecNum)
+        t = new{typeof(period), typeof(horizon), typeof(lag), typeof(dates),
+                typeof(spearman_mean_ic), typeof(spearman_ic_ir), typeof(spearman_t_stat),
+                typeof(spearman_p_value), typeof(spearman_mean_ci_lower),
+                typeof(spearman_mean_ci_upper), typeof(pearson_mean_ic),
+                typeof(pearson_ic_ir), typeof(pearson_t_stat), typeof(pearson_p_value),
+                typeof(pearson_mean_ci_lower), typeof(pearson_mean_ci_upper),
+                typeof(rank_ann_return), typeof(rank_sharpe), typeof(zscore_ann_return),
+                typeof(zscore_sharpe), typeof(mean_coverage)}(period, horizon, lag, dates,
+                                                              spearman_mean_ic,
+                                                              spearman_ic_ir,
+                                                              spearman_t_stat,
+                                                              spearman_p_value,
+                                                              spearman_mean_ci_lower,
+                                                              spearman_mean_ci_upper,
+                                                              pearson_mean_ic,
+                                                              pearson_ic_ir, pearson_t_stat,
+                                                              pearson_p_value,
+                                                              pearson_mean_ci_lower,
+                                                              pearson_mean_ci_upper,
+                                                              rank_ann_return, rank_sharpe,
+                                                              zscore_ann_return,
+                                                              zscore_sharpe, mean_coverage)
+        assert_forecast_window_columns(t)
+        return t
+    end
+end
+function ForecastWindowResult(; period::VecInt, horizon::VecInt, lag::VecInt, dates::VecInt,
+                              spearman_mean_ic::VecNum, spearman_ic_ir::VecNum,
+                              spearman_t_stat::VecNum, spearman_p_value::VecNum,
+                              spearman_mean_ci_lower::VecNum,
+                              spearman_mean_ci_upper::VecNum, pearson_mean_ic::VecNum,
+                              pearson_ic_ir::VecNum, pearson_t_stat::VecNum,
+                              pearson_p_value::VecNum, pearson_mean_ci_lower::VecNum,
+                              pearson_mean_ci_upper::VecNum, rank_ann_return::VecNum,
+                              rank_sharpe::VecNum, zscore_ann_return::VecNum,
+                              zscore_sharpe::VecNum,
+                              mean_coverage::VecNum)::ForecastWindowResult
+    return ForecastWindowResult(period, horizon, lag, dates, spearman_mean_ic,
+                                spearman_ic_ir, spearman_t_stat, spearman_p_value,
+                                spearman_mean_ci_lower, spearman_mean_ci_upper,
+                                pearson_mean_ic, pearson_ic_ir, pearson_t_stat,
+                                pearson_p_value, pearson_mean_ci_lower,
+                                pearson_mean_ci_upper, rank_ann_return, rank_sharpe,
+                                zscore_ann_return, zscore_sharpe, mean_coverage)
+end
+"""
+    assert_forecast_window_columns(t::ForecastWindowResult)
+
+Check the columns of a [`ForecastWindowResult`](@ref) that its constructor built.
+
+The constructor builds the Result first and checks it here, so the check reads each column by its name and not by its position among twenty-one arguments.
+
+# Arguments
+
+  - `t`: The table to check.
+
+# Validation
+
+  - Each column but `dates` holds as many entries as `period`. Raises a `DimensionMismatch`.
+  - The rules of [`assert_nan_or_closed_unit_interval`](@ref) on the two p-values and on `mean_coverage`, and of [`assert_ordered_bounds`](@ref) on the two intervals.
+
+# Returns
+
+  - `nothing`.
+
+# Related
+
+  - [`ForecastWindowResult`](@ref)
+"""
+function assert_forecast_window_columns(t::ForecastWindowResult)::Nothing
+    P = length(t.period)
+    @argcheck(all(f -> f === :dates || length(getfield(t, f)) == P,
+                  fieldnames(ForecastWindowResult)),
+              DimensionMismatch("every column of the table but dates must hold one entry per period, $P entries like period"))
+    assert_nan_or_closed_unit_interval(t.spearman_p_value, :spearman_p_value)
+    assert_nan_or_closed_unit_interval(t.pearson_p_value, :pearson_p_value)
+    assert_nan_or_closed_unit_interval(t.mean_coverage, :mean_coverage)
+    assert_ordered_bounds(t.spearman_mean_ci_lower, t.spearman_mean_ci_upper,
+                          :spearman_mean_ci_lower, :spearman_mean_ci_upper)
+    assert_ordered_bounds(t.pearson_mean_ci_lower, t.pearson_mean_ci_upper,
+                          :pearson_mean_ci_lower, :pearson_mean_ci_upper)
+    return nothing
+end
+"""
+    DataFrames.DataFrame(t::ForecastWindowResult) -> DataFrame
+
+Write a [`ForecastWindowResult`](@ref) as a table, with one row per period.
+
+The columns are the fields of the Result in the order of the struct, less `dates`. `dates` is the common date set of every row, one value for the whole table, so it is table-level metadata, and `DataFrames.metadata(df, "dates")` reads it.
+
+# Arguments
+
+  - `t`: The table of [`forecast_holding_period`](@ref) or [`forecast_decay`](@ref).
+
+# Returns
+
+  - `df::DataFrame`: The table, one row per period.
+
+# Examples
+
+```jldoctest
+julia> using DataFrames
+
+julia> alpha = [1.0 2.0 3.0; 3.0 1.0 2.0; 2.0 3.0 1.0; 1.0 3.0 2.0; 2.0 1.0 3.0];
+
+julia> fe = forecast_evaluation(alpha, PortfolioOptimisers.forward_mean_returns(alpha, 1, 1));
+
+julia> df = DataFrame(forecast_holding_period(fe, alpha; n = 2));
+
+julia> (size(df), names(df)[1:3], metadata(df, \"dates\"))
+((2, 20), ["period", "horizon", "lag"], [1, 2, 3])
+```
+
+# Related
+
+  - [`ForecastWindowResult`](@ref)
+  - [`forecast_holding_period`](@ref)
+  - [`forecast_decay`](@ref)
+"""
+function DataFrames.DataFrame(t::ForecastWindowResult)
+    df = DataFrames.DataFrame()
+    for f in fieldnames(ForecastWindowResult)
+        if f !== :dates
+            df[!, f] = collect(getfield(t, f))
+        end
+    end
+    DataFrames.metadata!(df, "dates", t.dates; style = :note)
+    return df
+end
+"""
     forecast_window_table(fe::ForecastEvaluationResult, X::MatNum, w::Option{<:MatNum},
                           grid::AbstractVector{<:Tuple{Integer, Integer}},
                           min_count::Integer, ppy::Number,
-                          mt::AbstractMeanTestEstimator) -> NamedTuple
+                          mt::AbstractMeanTestEstimator) -> ForecastWindowResult
 
 Score one Return Forecast against a grid of forward windows, on one common date set.
 
@@ -255,7 +529,7 @@ Score one Return Forecast against a grid of forward windows, on one common date 
  2. Build the forward target of each window from `X` with [`forward_mean_returns`](@ref).
  3. Intersect the dates of the base evaluation across the whole grid with [`forecast_common_dates`](@ref).
  4. For each window, build a [`ForecastEvaluationResult`](@ref) that carries `fe.alpha` and `fe.umsk`, the window's target, the common dates, the window's own `horizon` and `lag`, `min_count` and `ppy`, and read its row with [`forecast_window_row`](@ref) at `mt`.
- 5. Transpose the rows into columns, one entry per period.
+ 5. Transpose the rows into columns, one entry per period, and build a [`ForecastWindowResult`](@ref).
 
 # Arguments
 
@@ -278,10 +552,11 @@ Score one Return Forecast against a grid of forward windows, on one common date 
 
 # Returns
 
-  - `table::NamedTuple`: The columns [`forecast_holding_period`](@ref) documents.
+  - `t::ForecastWindowResult`: The columns [`forecast_holding_period`](@ref) documents.
 
 # Related
 
+  - [`ForecastWindowResult`](@ref)
   - [`forecast_holding_period`](@ref)
   - [`forecast_decay`](@ref)
   - [`forecast_window_grid`](@ref)
@@ -291,7 +566,7 @@ Score one Return Forecast against a grid of forward windows, on one common date 
 function forecast_window_table(fe::ForecastEvaluationResult, X::MatNum, w::Option{<:MatNum},
                                grid::AbstractVector{<:Tuple{Integer, Integer}},
                                min_count::Integer, ppy::Number,
-                               mt::AbstractMeanTestEstimator)
+                               mt::AbstractMeanTestEstimator)::ForecastWindowResult
     @argcheck(ppy > zero(ppy), DomainError(ppy, "ppy must be positive"))
     alpha::MatNum = fe.alpha
     @argcheck(size(X, 1) == size(alpha, 1) && size(X, 2) == size(alpha, 2),
@@ -305,38 +580,38 @@ function forecast_window_table(fe::ForecastEvaluationResult, X::MatNum, w::Optio
                                                 horizon = grid[p][1], lag = grid[p][2],
                                                 min_count = min_count, ppy = ppy)), w,
                                 min_count, mt) for p in eachindex(grid)]
-    return (; period = collect(eachindex(grid)), horizon = [g[1] for g in grid],
-            lag = [g[2] for g in grid], dates = common,
-            spearman_mean_ic = [r.spearman_mean_ic for r in rows],
-            spearman_ic_ir = [r.spearman_ic_ir for r in rows],
-            spearman_t_stat = [r.spearman_t_stat for r in rows],
-            spearman_p_value = [r.spearman_p_value for r in rows],
-            spearman_mean_ci_lower = [r.spearman_mean_ci_lower for r in rows],
-            spearman_mean_ci_upper = [r.spearman_mean_ci_upper for r in rows],
-            pearson_mean_ic = [r.pearson_mean_ic for r in rows],
-            pearson_ic_ir = [r.pearson_ic_ir for r in rows],
-            pearson_t_stat = [r.pearson_t_stat for r in rows],
-            pearson_p_value = [r.pearson_p_value for r in rows],
-            pearson_mean_ci_lower = [r.pearson_mean_ci_lower for r in rows],
-            pearson_mean_ci_upper = [r.pearson_mean_ci_upper for r in rows],
-            rank_ann_return = [r.rank_ann_return for r in rows],
-            rank_sharpe = [r.rank_sharpe for r in rows],
-            zscore_ann_return = [r.zscore_ann_return for r in rows],
-            zscore_sharpe = [r.zscore_sharpe for r in rows],
-            mean_coverage = [r.mean_coverage for r in rows])
+    return ForecastWindowResult(collect(eachindex(grid)), [g[1] for g in grid],
+                                [g[2] for g in grid], common,
+                                [r.spearman_mean_ic for r in rows],
+                                [r.spearman_ic_ir for r in rows],
+                                [r.spearman_t_stat for r in rows],
+                                [r.spearman_p_value for r in rows],
+                                [r.spearman_mean_ci_lower for r in rows],
+                                [r.spearman_mean_ci_upper for r in rows],
+                                [r.pearson_mean_ic for r in rows],
+                                [r.pearson_ic_ir for r in rows],
+                                [r.pearson_t_stat for r in rows],
+                                [r.pearson_p_value for r in rows],
+                                [r.pearson_mean_ci_lower for r in rows],
+                                [r.pearson_mean_ci_upper for r in rows],
+                                [r.rank_ann_return for r in rows],
+                                [r.rank_sharpe for r in rows],
+                                [r.zscore_ann_return for r in rows],
+                                [r.zscore_sharpe for r in rows],
+                                [r.mean_coverage for r in rows])
 end
 """
     forecast_holding_period(fe::ForecastEvaluationResult, X::MatNum,
                             w::Option{<:MatNum} = nothing; n::Integer = 10,
                             mt::AbstractMeanTestEstimator = WildBootstrapMeanTest(),
                             min_count::Integer = fe.min_count,
-                            ppy::Number = fe.ppy) -> NamedTuple
+                            ppy::Number = fe.ppy) -> ForecastWindowResult
     forecast_holding_period(fe::ForecastEvaluationResult, rd::ReturnsResult,
                             csfm::CrossSectionalFactorModel;
                             weighting::Option{<:AbstractOrthogonalityMetric} = nothing,
                             n::Integer = 10, min_count::Integer = fe.min_count,
                             mt::AbstractMeanTestEstimator = WildBootstrapMeanTest(),
-                            ppy::Number = fe.ppy) -> NamedTuple
+                            ppy::Number = fe.ppy) -> ForecastWindowResult
 
 Score a Return Forecast against cumulative forward windows, one row per holding period.
 
@@ -378,7 +653,7 @@ The stride between two dates is the base evaluation's, and it does not grow with
 
 # Returns
 
-  - `table::NamedTuple`: Twenty-one columns. `dates` holds the common dates, and each of the other twenty holds one entry per period.
+  - `t::ForecastWindowResult`: Twenty-one columns. `dates` holds the common dates, and each of the other twenty holds one entry per period. `DataFrames.DataFrame(t)` writes the twenty with one row per period. Earlier releases returned a `NamedTuple` of the same columns.
 
       + `period::Vector{Int}`: `1` to `n`.
       + `horizon::Vector{Int}`: The window's horizon, `p` times `fe.horizon`.
@@ -413,6 +688,7 @@ julia> t.dates
 
 # Related
 
+  - [`ForecastWindowResult`](@ref)
   - [`forecast_decay`](@ref)
   - [`forecast_window_grid`](@ref)
   - [`forecast_window_table`](@ref)
@@ -442,13 +718,13 @@ end
     forecast_decay(fe::ForecastEvaluationResult, X::MatNum,
                    w::Option{<:MatNum} = nothing; n::Integer = 10,
                    mt::AbstractMeanTestEstimator = WildBootstrapMeanTest(),
-                   min_count::Integer = fe.min_count, ppy::Number = fe.ppy) -> NamedTuple
+                   min_count::Integer = fe.min_count, ppy::Number = fe.ppy) -> ForecastWindowResult
     forecast_decay(fe::ForecastEvaluationResult, rd::ReturnsResult,
                    csfm::CrossSectionalFactorModel;
                    weighting::Option{<:AbstractOrthogonalityMetric} = nothing,
                    n::Integer = 10, min_count::Integer = fe.min_count,
                    mt::AbstractMeanTestEstimator = WildBootstrapMeanTest(),
-                   ppy::Number = fe.ppy) -> NamedTuple
+                   ppy::Number = fe.ppy) -> ForecastWindowResult
 
 Score a Return Forecast against disjoint forward windows, one row per period out.
 
@@ -480,7 +756,7 @@ The two tables agree at `p = 1`, which is the base evaluation's own window, and 
 
 # Returns
 
-  - `table::NamedTuple`: The columns [`forecast_holding_period`](@ref) documents. `horizon` is `fe.horizon` at every period and `lag` is `fe.lag + (p - 1) * fe.horizon`.
+  - `t::ForecastWindowResult`: The columns [`forecast_holding_period`](@ref) documents. `horizon` is `fe.horizon` at every period and `lag` is `fe.lag + (p - 1) * fe.horizon`.
 
 # Examples
 
@@ -505,6 +781,7 @@ and the second scores what is left of it one horizon later.
 
 # Related
 
+  - [`ForecastWindowResult`](@ref)
   - [`forecast_holding_period`](@ref)
   - [`forecast_window_grid`](@ref)
   - [`forecast_window_table`](@ref)
@@ -530,4 +807,4 @@ function forecast_decay(fe::ForecastEvaluationResult, rd::ReturnsResult,
                           min_count = min_count, ppy = ppy, mt = mt)
 end
 
-export forecast_holding_period, forecast_decay
+export ForecastWindowResult, forecast_holding_period, forecast_decay

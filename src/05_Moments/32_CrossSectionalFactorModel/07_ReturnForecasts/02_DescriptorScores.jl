@@ -407,8 +407,55 @@ function neutralise_scores!(S::AbstractArray{<:Real, 3},
     return nothing
 end
 """
+$(DocStringExtensions.TYPEDEF)
+
+The cross-sectional scores of the Descriptors of a [`DescriptorScores`](@ref) recipe, with the rows of the factor-model block.
+
+[`descriptor_scores`](@ref) returns it. The scores cover every observation of the returns data, so a Descriptor with a warm-up warms up once, on the whole panel. `rows` names the observations that the block covers, and a member cuts the scores to them once. A caller reads the fields by name, as `r.S` or `(; S, rows) = r`.
+
+# Fields
+
+$(DocStringExtensions.FIELDS)
+
+# Constructors
+
+    DescriptorScoresResult(S::Arr3Num, rows::AbstractUnitRange{<:Integer})
+    DescriptorScoresResult(; S::Arr3Num, rows::AbstractUnitRange{<:Integer})
+
+The positional constructor checks the values. The keyword constructor takes each field by name, with no default, and calls it.
+
+## Validation
+
+  - `rows` is a range of observations of `S`, inside `1:size(S, 3)`. Otherwise, the constructor raises a `DimensionMismatch`.
+
+# Related
+
+  - [`descriptor_scores`](@ref)
+  - [`DescriptorScores`](@ref)
+  - [`return_forecast_rows`](@ref)
+"""
+@concrete struct DescriptorScoresResult <: AbstractResult
+    """
+    The Descriptor scores, `assets × descriptors × observations`, on the observation axis of the returns data.
+    """
+    S
+    """
+    The rows of the returns data that the factor-model block covers.
+    """
+    rows
+    function DescriptorScoresResult(S::Arr3Num, rows::AbstractUnitRange{<:Integer})
+        @argcheck(isempty(rows) || (first(rows) >= 1 && last(rows) <= size(S, 3)),
+                  DimensionMismatch("rows ($rows) must be observations of S, which carries $(size(S, 3))"))
+        return new{typeof(S), typeof(rows)}(S, rows)
+    end
+end
+function DescriptorScoresResult(; S::Arr3Num,
+                                rows::AbstractUnitRange{<:Integer})::DescriptorScoresResult
+    return DescriptorScoresResult(S, rows)
+end
+"""
     descriptor_scores(ds::DescriptorScores, rd::ReturnsResult,
-                      csfm::CrossSectionalFactorModel) -> NamedTuple
+                      csfm::CrossSectionalFactorModel) -> DescriptorScoresResult
 
 Compute the cross-sectional scores of the Descriptors of a [`DescriptorScores`](@ref).
 
@@ -434,8 +481,10 @@ The function computes the Descriptors over all the returns data. A Descriptor wi
 
 # Returns
 
-  - `S::Array{<:Real, 3}`: The Descriptor scores, `assets × descriptors × observations`, on the observation axis of the returns data.
-  - `rows::AbstractUnitRange`: The rows of the returns data that the block covers.
+  - `r::DescriptorScoresResult`: The two fields below. Earlier releases returned a `NamedTuple` of the same fields.
+
+      + `S::Array{<:Real, 3}`: The Descriptor scores, `assets × descriptors × observations`, on the observation axis of the returns data.
+      + `rows::AbstractUnitRange`: The rows of the returns data that the block covers.
 
 # Examples
 
@@ -466,6 +515,7 @@ julia> descriptor_scores(ds, rd, csfm).S
 
 # Related
 
+  - [`DescriptorScoresResult`](@ref)
   - [`DescriptorScores`](@ref)
   - [`descriptor`](@ref)
   - [`composite_score`](@ref)
@@ -476,10 +526,10 @@ julia> descriptor_scores(ds, rd, csfm).S
   - [`descriptor_neutralised_scores`](@ref)
 """
 function descriptor_scores(ds::DescriptorScores, rd::ReturnsResult,
-                           csfm::CrossSectionalFactorModel)
+                           csfm::CrossSectionalFactorModel)::DescriptorScoresResult
     P = descriptor_panel_scores(ds, rd)
     rows = return_forecast_rows(rd, csfm)
-    return (; S = descriptor_neutralised_scores(ds, P, csfm, rows), rows = rows)
+    return DescriptorScoresResult(descriptor_neutralised_scores(ds, P, csfm, rows), rows)
 end
 """
 $(DocStringExtensions.TYPEDSIGNATURES)
@@ -588,5 +638,6 @@ function descriptor_carry(ds::DescriptorScores, rd::ReturnsResult, m::Integer)
                              rebuild_struct(ds, (; descriptors = map(c -> c.xv, cs))))
 end
 
-export DescriptorScores, descriptor_scores, EstimationMaskWeights, BlockRegressionWeights
+export DescriptorScores, DescriptorScoresResult, descriptor_scores, EstimationMaskWeights,
+       BlockRegressionWeights
 public AbstractNeutralisationWeights, neutralisation_base_weights

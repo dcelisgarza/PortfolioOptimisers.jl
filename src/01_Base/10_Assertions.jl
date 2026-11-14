@@ -458,6 +458,118 @@ function assert_closed_unit_interval(::Option{<:UnresolvedValue}, ::Sym_Str = :v
     return nothing
 end
 """
+    assert_nan_or_closed_unit_interval(val::Num_ArrNum,
+                                       sym::Union{Symbol,AbstractString} = :val)
+    assert_nan_or_closed_unit_interval(::Nothing, ::Union{Symbol,AbstractString} = :val)
+
+Assert that each entry of `val` is `NaN` or lies inside the closed unit interval (`0 <= x <= 1`).
+
+A Result holds `NaN` in a field that it cannot compute, such as the p-value of a series with too few entries, or the hit rate of a series with no finite entry. So the constructor of a Result checks a share or a probability with this function, and not with [`assert_closed_unit_interval`](@ref), which refuses `NaN`. A number is one entry. A `nothing` is a column that the Result does not hold, so the second method checks nothing.
+
+# Arguments
+
+  - `val`: The number or the array to check.
+  - $(arg_dict[:sym_msg])
+
+# Validation
+
+  - Each entry of `val` is `NaN` or in `[0, 1]`. A breach raises a `DomainError` that names `sym` and the count of the entries that break the rule.
+
+# Returns
+
+  - `nothing`.
+
+# Related
+
+  - [`assert_closed_unit_interval`](@ref)
+  - [`assert_nan_or_nonneg`](@ref)
+  - [`assert_ordered_bounds`](@ref)
+"""
+function assert_nan_or_closed_unit_interval(val::Num_ArrNum, sym::Sym_Str = :val)::Nothing
+    @argcheck(all(x -> isnan(x) || zero(x) <= x <= one(x), val),
+              DomainError(val,
+                          "every entry of $sym must be NaN or in [0, 1]. Got\ncount(x -> !(isnan(x) || 0 <= x <= 1), $sym) => $(count(x -> !(isnan(x) || zero(x) <= x <= one(x)), val))"))
+    return nothing
+end
+function assert_nan_or_closed_unit_interval(::Nothing, ::Sym_Str = :val)::Nothing
+    return nothing
+end
+"""
+    assert_nan_or_nonneg(val::Num_ArrNum, sym::Union{Symbol,AbstractString} = :val)
+    assert_nan_or_nonneg(::Nothing, ::Union{Symbol,AbstractString} = :val)
+
+Assert that no entry of `val` is negative. A `NaN` entry passes.
+
+A Result holds `NaN` in a field that it cannot compute, such as the standard deviation of a series with fewer than two entries. So the constructor of a Result checks a deviation, a volatility or a turnover with this function, and not with [`assert_nonneg`](@ref), which refuses `NaN`. A number is one entry. A `nothing` is a column that the Result does not hold, so the second method checks nothing.
+
+# Arguments
+
+  - `val`: The number or the array to check.
+  - $(arg_dict[:sym_msg])
+
+# Validation
+
+  - No entry of `val` is below zero. A breach raises a `DomainError` that names `sym` and the count of the negative entries.
+
+# Returns
+
+  - `nothing`.
+
+# Related
+
+  - [`assert_nonneg`](@ref)
+  - [`assert_nan_or_closed_unit_interval`](@ref)
+  - [`assert_ordered_bounds`](@ref)
+"""
+function assert_nan_or_nonneg(val::Num_ArrNum, sym::Sym_Str = :val)::Nothing
+    @argcheck(!any(x -> x < zero(x), val),
+              DomainError(val,
+                          "no entry of $sym can be negative. Got\ncount(x -> x < 0, $sym) => $(count(x -> x < zero(x), val))"))
+    return nothing
+end
+function assert_nan_or_nonneg(::Nothing, ::Sym_Str = :val)::Nothing
+    return nothing
+end
+"""
+    assert_ordered_bounds(lo::Num_ArrNum, hi::Num_ArrNum,
+                          lo_sym::Union{Symbol,AbstractString} = :lo,
+                          hi_sym::Union{Symbol,AbstractString} = :hi)
+
+Assert that no lower bound lies above its upper bound, entry by entry. A pair with a `NaN` bound passes.
+
+The two bounds of a confidence interval are the case. A test that cannot compute an interval gives `NaN` for both bounds, so the pair states no order to check.
+
+# Arguments
+
+  - `lo`: The lower bounds, a number or an array.
+  - `hi`: The upper bounds, of the shape of `lo`.
+  - `lo_sym`: The name of `lo` in the message.
+  - `hi_sym`: The name of `hi` in the message.
+
+# Validation
+
+  - `size(lo) == size(hi)`. Otherwise, the function raises a `DimensionMismatch`.
+  - No entry of `lo` is above the same entry of `hi`. A breach raises a `DomainError` that names both bounds.
+
+# Returns
+
+  - `nothing`.
+
+# Related
+
+  - [`assert_nan_or_closed_unit_interval`](@ref)
+  - [`assert_nan_or_nonneg`](@ref)
+"""
+function assert_ordered_bounds(lo::Num_ArrNum, hi::Num_ArrNum, lo_sym::Sym_Str = :lo,
+                               hi_sym::Sym_Str = :hi)::Nothing
+    @argcheck(size(lo) == size(hi),
+              DimensionMismatch("$lo_sym ($(size(lo))) and $hi_sym ($(size(hi))) must have one size"))
+    @argcheck(!any(splat(>), zip(lo, hi)),
+              DomainError(lo,
+                          "$lo_sym <= $hi_sym must hold for every entry. Got\n$lo_sym => $lo\n$hi_sym => $hi"))
+    return nothing
+end
+"""
     assert_nonempty_nonneg_finite_val(
         val::Union{AbstractDict, VecPair, ArrNum, Pair, Number},
         val_sym::Union{Symbol,AbstractString} = :val

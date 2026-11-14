@@ -1,5 +1,5 @@
 ```@meta
-Description = "Forecast Forward Windows, private API of PortfolioOptimisers.jl: forecast_window_grid, forecast_common_dates, forecast_window_row, forecast_window_table."
+Description = "Forecast Forward Windows, private API of PortfolioOptimisers.jl: forecast_window_grid, forecast_common_dates, forecast_window_row, forecast_window_table, …"
 ```
 
 # Forecast Forward Windows: private API
@@ -11,4 +11,5 @@ forecast_window_grid
 forecast_common_dates
 forecast_window_row
 forecast_window_table
+assert_forecast_window_columns
 ```

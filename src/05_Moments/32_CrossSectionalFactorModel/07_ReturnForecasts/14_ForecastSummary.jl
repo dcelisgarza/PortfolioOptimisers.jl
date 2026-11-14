@@ -594,25 +594,67 @@ $(DocStringExtensions.FIELDS)
 
 # Constructors
 
-    ForecastSummaryResult(
-        names,
-        spearman_mean_ic, spearman_std_ic, spearman_ic_ir, spearman_t_stat,
-        spearman_p_value, spearman_mean_ci_lower, spearman_mean_ci_upper,
-        spearman_hit_rate, pearson_mean_ic, pearson_std_ic, pearson_ic_ir,
-        pearson_t_stat, pearson_p_value, pearson_mean_ci_lower, pearson_mean_ci_upper,
-        pearson_hit_rate,
-        rank_ann_return, rank_ann_volatility, rank_sharpe, rank_hit_rate,
-        rank_mean_turnover, zscore_ann_return, zscore_ann_volatility, zscore_sharpe,
-        zscore_hit_rate, zscore_mean_turnover,
-        calibration_slope, mean_alpha, std_alpha, mean_y, std_y, n_bins,
-        mean_coverage, min_coverage, mean_n_scored, min_n_scored,
-        n_silenced, mean_coverage_scored, min_coverage_scored, quantiles, spread_ann_return, spread_ann_volatility, spread_sharpe,
-        spread_hit_rate, ppy
-    ) -> ForecastSummaryResult
+    ForecastSummaryResult(names::Union{AbstractString, VecStr},
+                          spearman_mean_ic::Num_VecNum, spearman_std_ic::Num_VecNum,
+                          spearman_ic_ir::Num_VecNum, spearman_t_stat::Num_VecNum,
+                          spearman_p_value::Num_VecNum, spearman_mean_ci_lower::Num_VecNum,
+                          spearman_mean_ci_upper::Num_VecNum,
+                          spearman_hit_rate::Num_VecNum, pearson_mean_ic::Num_VecNum,
+                          pearson_std_ic::Num_VecNum, pearson_ic_ir::Num_VecNum,
+                          pearson_t_stat::Num_VecNum, pearson_p_value::Num_VecNum,
+                          pearson_mean_ci_lower::Num_VecNum,
+                          pearson_mean_ci_upper::Num_VecNum, pearson_hit_rate::Num_VecNum,
+                          rank_ann_return::Num_VecNum, rank_ann_volatility::Num_VecNum,
+                          rank_sharpe::Num_VecNum, rank_hit_rate::Num_VecNum,
+                          rank_mean_turnover::Num_VecNum, zscore_ann_return::Num_VecNum,
+                          zscore_ann_volatility::Num_VecNum, zscore_sharpe::Num_VecNum,
+                          zscore_hit_rate::Num_VecNum, zscore_mean_turnover::Num_VecNum,
+                          calibration_slope::Num_VecNum, mean_alpha::Num_VecNum,
+                          std_alpha::Num_VecNum, mean_y::Num_VecNum, std_y::Num_VecNum,
+                          n_bins::Num_VecNum, mean_coverage::Num_VecNum,
+                          min_coverage::Num_VecNum, mean_n_scored::Num_VecNum,
+                          min_n_scored::Num_VecNum, n_silenced::Num_VecNum,
+                          mean_coverage_scored::Num_VecNum,
+                          min_coverage_scored::Num_VecNum, quantiles::Option{<:VecNum},
+                          spread_ann_return::Option{<:ArrNum},
+                          spread_ann_volatility::Option{<:ArrNum},
+                          spread_sharpe::Option{<:ArrNum},
+                          spread_hit_rate::Option{<:ArrNum}, ppy::Num_VecNum)
+    ForecastSummaryResult(; names::Union{AbstractString, VecStr},
+                            spearman_mean_ic::Num_VecNum, spearman_std_ic::Num_VecNum,
+                            spearman_ic_ir::Num_VecNum, spearman_t_stat::Num_VecNum,
+                            spearman_p_value::Num_VecNum,
+                            spearman_mean_ci_lower::Num_VecNum,
+                            spearman_mean_ci_upper::Num_VecNum,
+                            spearman_hit_rate::Num_VecNum, pearson_mean_ic::Num_VecNum,
+                            pearson_std_ic::Num_VecNum, pearson_ic_ir::Num_VecNum,
+                            pearson_t_stat::Num_VecNum, pearson_p_value::Num_VecNum,
+                            pearson_mean_ci_lower::Num_VecNum,
+                            pearson_mean_ci_upper::Num_VecNum,
+                            pearson_hit_rate::Num_VecNum, rank_ann_return::Num_VecNum,
+                            rank_ann_volatility::Num_VecNum, rank_sharpe::Num_VecNum,
+                            rank_hit_rate::Num_VecNum, rank_mean_turnover::Num_VecNum,
+                            zscore_ann_return::Num_VecNum,
+                            zscore_ann_volatility::Num_VecNum, zscore_sharpe::Num_VecNum,
+                            zscore_hit_rate::Num_VecNum, zscore_mean_turnover::Num_VecNum,
+                            calibration_slope::Num_VecNum, mean_alpha::Num_VecNum,
+                            std_alpha::Num_VecNum, mean_y::Num_VecNum, std_y::Num_VecNum,
+                            n_bins::Num_VecNum, mean_coverage::Num_VecNum,
+                            min_coverage::Num_VecNum, mean_n_scored::Num_VecNum,
+                            min_n_scored::Num_VecNum, n_silenced::Num_VecNum,
+                            mean_coverage_scored::Num_VecNum,
+                            min_coverage_scored::Num_VecNum,
+                            quantiles::Option{<:VecNum} = nothing,
+                            spread_ann_return::Option{<:ArrNum} = nothing,
+                            spread_ann_volatility::Option{<:ArrNum} = nothing,
+                            spread_sharpe::Option{<:ArrNum} = nothing,
+                            spread_hit_rate::Option{<:ArrNum} = nothing, ppy::Num_VecNum)
 
-Arguments correspond to the struct's fields, in the order they are declared. The type is a
-Result, so [`forecast_evaluation_summary`](@ref) builds it and a caller reads it. It has no
-keyword constructor, and it validates nothing of its own.
+Arguments correspond to the struct's fields, in the order they are declared. Each column of the forecast axis is a `Num_VecNum`. The type is a Result, so [`forecast_evaluation_summary`](@ref) builds it and a caller reads it. The positional constructor checks the values with [`assert_forecast_summary_columns`](@ref). The keyword constructor takes each field by name, with no default but `nothing` for the five spread fields, and calls it.
+
+## Validation
+
+  - The rules of [`assert_forecast_summary_columns`](@ref): one entry per forecast in each column, the five spread fields all present or all absent, the shares and the p-values `NaN` or in ``[0, 1]``, no negative deviation or count, and ordered intervals. A breach raises a `DimensionMismatch`, an `ArgumentError` or a `DomainError`.
 
 # Related
 
@@ -806,6 +848,206 @@ keyword constructor, and it validates nothing of its own.
     $(field_dict[:ps_ppy]) In a comparison it is the `ppy` that every evaluation of the summary carries. In a listing under `paired = false` it holds one entry per forecast.
     """
     ppy
+    function ForecastSummaryResult(names::Union{AbstractString, VecStr},
+                                   spearman_mean_ic::Num_VecNum,
+                                   spearman_std_ic::Num_VecNum, spearman_ic_ir::Num_VecNum,
+                                   spearman_t_stat::Num_VecNum,
+                                   spearman_p_value::Num_VecNum,
+                                   spearman_mean_ci_lower::Num_VecNum,
+                                   spearman_mean_ci_upper::Num_VecNum,
+                                   spearman_hit_rate::Num_VecNum,
+                                   pearson_mean_ic::Num_VecNum, pearson_std_ic::Num_VecNum,
+                                   pearson_ic_ir::Num_VecNum, pearson_t_stat::Num_VecNum,
+                                   pearson_p_value::Num_VecNum,
+                                   pearson_mean_ci_lower::Num_VecNum,
+                                   pearson_mean_ci_upper::Num_VecNum,
+                                   pearson_hit_rate::Num_VecNum,
+                                   rank_ann_return::Num_VecNum,
+                                   rank_ann_volatility::Num_VecNum, rank_sharpe::Num_VecNum,
+                                   rank_hit_rate::Num_VecNum,
+                                   rank_mean_turnover::Num_VecNum,
+                                   zscore_ann_return::Num_VecNum,
+                                   zscore_ann_volatility::Num_VecNum,
+                                   zscore_sharpe::Num_VecNum, zscore_hit_rate::Num_VecNum,
+                                   zscore_mean_turnover::Num_VecNum,
+                                   calibration_slope::Num_VecNum, mean_alpha::Num_VecNum,
+                                   std_alpha::Num_VecNum, mean_y::Num_VecNum,
+                                   std_y::Num_VecNum, n_bins::Num_VecNum,
+                                   mean_coverage::Num_VecNum, min_coverage::Num_VecNum,
+                                   mean_n_scored::Num_VecNum, min_n_scored::Num_VecNum,
+                                   n_silenced::Num_VecNum, mean_coverage_scored::Num_VecNum,
+                                   min_coverage_scored::Num_VecNum,
+                                   quantiles::Option{<:VecNum},
+                                   spread_ann_return::Option{<:ArrNum},
+                                   spread_ann_volatility::Option{<:ArrNum},
+                                   spread_sharpe::Option{<:ArrNum},
+                                   spread_hit_rate::Option{<:ArrNum}, ppy::Num_VecNum)
+        fs = new{typeof(names), typeof(spearman_mean_ic), typeof(spearman_std_ic),
+                 typeof(spearman_ic_ir), typeof(spearman_t_stat), typeof(spearman_p_value),
+                 typeof(spearman_mean_ci_lower), typeof(spearman_mean_ci_upper),
+                 typeof(spearman_hit_rate), typeof(pearson_mean_ic), typeof(pearson_std_ic),
+                 typeof(pearson_ic_ir), typeof(pearson_t_stat), typeof(pearson_p_value),
+                 typeof(pearson_mean_ci_lower), typeof(pearson_mean_ci_upper),
+                 typeof(pearson_hit_rate), typeof(rank_ann_return),
+                 typeof(rank_ann_volatility), typeof(rank_sharpe), typeof(rank_hit_rate),
+                 typeof(rank_mean_turnover), typeof(zscore_ann_return),
+                 typeof(zscore_ann_volatility), typeof(zscore_sharpe),
+                 typeof(zscore_hit_rate), typeof(zscore_mean_turnover),
+                 typeof(calibration_slope), typeof(mean_alpha), typeof(std_alpha),
+                 typeof(mean_y), typeof(std_y), typeof(n_bins), typeof(mean_coverage),
+                 typeof(min_coverage), typeof(mean_n_scored), typeof(min_n_scored),
+                 typeof(n_silenced), typeof(mean_coverage_scored),
+                 typeof(min_coverage_scored), typeof(quantiles), typeof(spread_ann_return),
+                 typeof(spread_ann_volatility), typeof(spread_sharpe),
+                 typeof(spread_hit_rate), typeof(ppy)}(names, spearman_mean_ic,
+                                                       spearman_std_ic, spearman_ic_ir,
+                                                       spearman_t_stat, spearman_p_value,
+                                                       spearman_mean_ci_lower,
+                                                       spearman_mean_ci_upper,
+                                                       spearman_hit_rate, pearson_mean_ic,
+                                                       pearson_std_ic, pearson_ic_ir,
+                                                       pearson_t_stat, pearson_p_value,
+                                                       pearson_mean_ci_lower,
+                                                       pearson_mean_ci_upper,
+                                                       pearson_hit_rate, rank_ann_return,
+                                                       rank_ann_volatility, rank_sharpe,
+                                                       rank_hit_rate, rank_mean_turnover,
+                                                       zscore_ann_return,
+                                                       zscore_ann_volatility, zscore_sharpe,
+                                                       zscore_hit_rate,
+                                                       zscore_mean_turnover,
+                                                       calibration_slope, mean_alpha,
+                                                       std_alpha, mean_y, std_y, n_bins,
+                                                       mean_coverage, min_coverage,
+                                                       mean_n_scored, min_n_scored,
+                                                       n_silenced, mean_coverage_scored,
+                                                       min_coverage_scored, quantiles,
+                                                       spread_ann_return,
+                                                       spread_ann_volatility, spread_sharpe,
+                                                       spread_hit_rate, ppy)
+        assert_forecast_summary_columns(fs)
+        return fs
+    end
+end
+function ForecastSummaryResult(; names::Union{AbstractString, VecStr},
+                               spearman_mean_ic::Num_VecNum, spearman_std_ic::Num_VecNum,
+                               spearman_ic_ir::Num_VecNum, spearman_t_stat::Num_VecNum,
+                               spearman_p_value::Num_VecNum,
+                               spearman_mean_ci_lower::Num_VecNum,
+                               spearman_mean_ci_upper::Num_VecNum,
+                               spearman_hit_rate::Num_VecNum, pearson_mean_ic::Num_VecNum,
+                               pearson_std_ic::Num_VecNum, pearson_ic_ir::Num_VecNum,
+                               pearson_t_stat::Num_VecNum, pearson_p_value::Num_VecNum,
+                               pearson_mean_ci_lower::Num_VecNum,
+                               pearson_mean_ci_upper::Num_VecNum,
+                               pearson_hit_rate::Num_VecNum, rank_ann_return::Num_VecNum,
+                               rank_ann_volatility::Num_VecNum, rank_sharpe::Num_VecNum,
+                               rank_hit_rate::Num_VecNum, rank_mean_turnover::Num_VecNum,
+                               zscore_ann_return::Num_VecNum,
+                               zscore_ann_volatility::Num_VecNum, zscore_sharpe::Num_VecNum,
+                               zscore_hit_rate::Num_VecNum,
+                               zscore_mean_turnover::Num_VecNum,
+                               calibration_slope::Num_VecNum, mean_alpha::Num_VecNum,
+                               std_alpha::Num_VecNum, mean_y::Num_VecNum, std_y::Num_VecNum,
+                               n_bins::Num_VecNum, mean_coverage::Num_VecNum,
+                               min_coverage::Num_VecNum, mean_n_scored::Num_VecNum,
+                               min_n_scored::Num_VecNum, n_silenced::Num_VecNum,
+                               mean_coverage_scored::Num_VecNum,
+                               min_coverage_scored::Num_VecNum,
+                               quantiles::Option{<:VecNum} = nothing,
+                               spread_ann_return::Option{<:ArrNum} = nothing,
+                               spread_ann_volatility::Option{<:ArrNum} = nothing,
+                               spread_sharpe::Option{<:ArrNum} = nothing,
+                               spread_hit_rate::Option{<:ArrNum} = nothing,
+                               ppy::Num_VecNum)::ForecastSummaryResult
+    return ForecastSummaryResult(names, spearman_mean_ic, spearman_std_ic, spearman_ic_ir,
+                                 spearman_t_stat, spearman_p_value, spearman_mean_ci_lower,
+                                 spearman_mean_ci_upper, spearman_hit_rate, pearson_mean_ic,
+                                 pearson_std_ic, pearson_ic_ir, pearson_t_stat,
+                                 pearson_p_value, pearson_mean_ci_lower,
+                                 pearson_mean_ci_upper, pearson_hit_rate, rank_ann_return,
+                                 rank_ann_volatility, rank_sharpe, rank_hit_rate,
+                                 rank_mean_turnover, zscore_ann_return,
+                                 zscore_ann_volatility, zscore_sharpe, zscore_hit_rate,
+                                 zscore_mean_turnover, calibration_slope, mean_alpha,
+                                 std_alpha, mean_y, std_y, n_bins, mean_coverage,
+                                 min_coverage, mean_n_scored, min_n_scored, n_silenced,
+                                 mean_coverage_scored, min_coverage_scored, quantiles,
+                                 spread_ann_return, spread_ann_volatility, spread_sharpe,
+                                 spread_hit_rate, ppy)
+end
+"""
+    assert_forecast_summary_columns(fs::ForecastSummaryResult)
+
+Check the columns of a [`ForecastSummaryResult`](@ref) that its constructor built.
+
+The constructor builds the Result first and checks it here, so the check reads each column by its name and not by its position among forty-six arguments. A summary of one forecast holds a string in `names` and a number in each column, and a summary of many holds one entry per forecast in each.
+
+# Arguments
+
+  - `fs`: The summary to check.
+
+# Validation
+
+  - Each column of the forecast axis holds one entry per forecast, as many as `names`. `ppy` holds one value, or one entry per forecast. Raises a `DimensionMismatch`.
+  - `quantiles` and the four spreads are all `nothing`, or none is. A spread is `forecasts × quantiles`, or a vector over the quantiles in a summary of one forecast. Raises an `ArgumentError` or a `DimensionMismatch`.
+  - The two p-values, the five hit rates and the four coverage shares are `NaN` or in ``[0, 1]``. Raises a `DomainError`.
+  - No deviation, volatility, turnover or count is negative, and no lower bound of an interval is above its upper bound. A `NaN` passes. Every `ppy` is positive. Raises a `DomainError`.
+
+# Returns
+
+  - `nothing`.
+
+# Related
+
+  - [`ForecastSummaryResult`](@ref)
+  - [`forecast_summary_spreads`](@ref)
+"""
+function assert_forecast_summary_columns(fs::ForecastSummaryResult)::Nothing
+    one_entry = isa(fs.names, AbstractString)
+    n = one_entry ? 1 : length(fs.names)
+    free = (:names, :quantiles, :spread_ann_return, :spread_ann_volatility, :spread_sharpe,
+            :spread_hit_rate, :ppy)
+    @argcheck(all(f -> f in free || length(getfield(fs, f)) == n,
+                  fieldnames(ForecastSummaryResult)) &&
+              (isa(fs.ppy, Number) || length(fs.ppy) == n),
+              DimensionMismatch("every column of the forecast axis must hold one entry per forecast, $n entries like names"))
+    @argcheck(all(>(0), fs.ppy), DomainError(fs.ppy, "ppy must be positive"))
+    spreads = (fs.spread_ann_return, fs.spread_ann_volatility, fs.spread_sharpe,
+               fs.spread_hit_rate)
+    @argcheck(all(s -> isnothing(s) == isnothing(fs.quantiles), spreads),
+              ArgumentError("quantiles and the four spreads must all be nothing, or none of them"))
+    if !isnothing(fs.quantiles)
+        shape = one_entry ? (length(fs.quantiles),) : (n, length(fs.quantiles))
+        @argcheck(all(s -> size(s) == shape, spreads),
+                  DimensionMismatch("each spread must have the size $shape, forecasts × quantiles"))
+    end
+    for (k, v) in
+        ((:spearman_p_value, fs.spearman_p_value), (:pearson_p_value, fs.pearson_p_value),
+         (:spearman_hit_rate, fs.spearman_hit_rate),
+         (:pearson_hit_rate, fs.pearson_hit_rate), (:rank_hit_rate, fs.rank_hit_rate),
+         (:zscore_hit_rate, fs.zscore_hit_rate), (:spread_hit_rate, fs.spread_hit_rate),
+         (:mean_coverage, fs.mean_coverage), (:min_coverage, fs.min_coverage),
+         (:mean_coverage_scored, fs.mean_coverage_scored),
+         (:min_coverage_scored, fs.min_coverage_scored))
+        assert_nan_or_closed_unit_interval(v, k)
+    end
+    for (k, v) in
+        ((:spearman_std_ic, fs.spearman_std_ic), (:pearson_std_ic, fs.pearson_std_ic),
+         (:rank_ann_volatility, fs.rank_ann_volatility),
+         (:zscore_ann_volatility, fs.zscore_ann_volatility),
+         (:spread_ann_volatility, fs.spread_ann_volatility),
+         (:rank_mean_turnover, fs.rank_mean_turnover),
+         (:zscore_mean_turnover, fs.zscore_mean_turnover), (:std_alpha, fs.std_alpha),
+         (:std_y, fs.std_y), (:n_bins, fs.n_bins), (:mean_n_scored, fs.mean_n_scored),
+         (:min_n_scored, fs.min_n_scored), (:n_silenced, fs.n_silenced))
+        assert_nan_or_nonneg(v, k)
+    end
+    assert_ordered_bounds(fs.spearman_mean_ci_lower, fs.spearman_mean_ci_upper,
+                          :spearman_mean_ci_lower, :spearman_mean_ci_upper)
+    assert_ordered_bounds(fs.pearson_mean_ci_lower, fs.pearson_mean_ci_upper,
+                          :pearson_mean_ci_lower, :pearson_mean_ci_upper)
+    return nothing
 end
 """
     forecast_evaluation_summary(fes::AbstractVector{<:ForecastEvaluationResult},

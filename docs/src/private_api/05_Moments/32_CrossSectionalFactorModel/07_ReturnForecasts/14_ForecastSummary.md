@@ -17,4 +17,5 @@ forecast_summary_row
 forecast_summary_spreads
 first_summary_entry
 forecast_summary_entry
+assert_forecast_summary_columns
 ```

@@ -806,12 +806,27 @@ $(DocStringExtensions.FIELDS)
 
 # Constructors
 
-    FactorSummaryResult(
-        ann_return, ann_volatility, sharpe, autocorr,
-        mean_abs_t, t_rate, mean_vif, stability, coverage, ppy, nf, fam
-    ) -> FactorSummaryResult
+    FactorSummaryResult(ann_return::VecNum, ann_volatility::VecNum, sharpe::VecNum,
+                        autocorr::VecNum, mean_abs_t::Option{<:VecNum},
+                        t_rate::Option{<:VecNum}, mean_vif::Option{<:VecNum},
+                        stability::Option{<:VecNum}, coverage::Option{<:VecNum},
+                        ppy::Number, nf::Option{<:VecStr}, fam::Option{<:VecStr})
+    FactorSummaryResult(; ann_return::VecNum, ann_volatility::VecNum, sharpe::VecNum,
+                        autocorr::VecNum, mean_abs_t::Option{<:VecNum} = nothing,
+                        t_rate::Option{<:VecNum} = nothing,
+                        mean_vif::Option{<:VecNum} = nothing,
+                        stability::Option{<:VecNum} = nothing,
+                        coverage::Option{<:VecNum} = nothing, ppy::Number = 1,
+                        nf::Option{<:VecStr} = nothing, fam::Option{<:VecStr} = nothing)
 
-The arguments are the fields, in the order of their declaration. The type is a Result, so [`factor_model_summary`](@ref) builds it and a caller reads it. It has no keyword constructor, and it checks none of its values.
+The type is a Result, so [`factor_model_summary`](@ref) builds it and a caller reads it. The positional constructor checks the values. The keyword constructor takes each field by name and calls it. Its defaults are `nothing` for the five columns that can be absent and for the two labels, and `1` for `ppy`.
+
+## Validation
+
+  - Each column that is not `nothing`, and each label that is not `nothing`, holds one entry per factor, as many as `ann_return`. Otherwise, the constructor raises a `DimensionMismatch`.
+  - `ppy > 0`. Otherwise, the constructor raises a `DomainError`.
+  - No entry of `ann_volatility` or of `mean_abs_t` is negative. A `NaN` passes. Otherwise, the constructor raises a `DomainError`.
+  - Each entry of `t_rate` and of `coverage` is `NaN` or in ``[0, 1]``. Otherwise, the constructor raises a `DomainError`.
 
 # Related
 
@@ -868,6 +883,77 @@ The arguments are the fields, in the order of their declaration. The type is a R
     $(field_dict[:fd_fam])
     """
     fam
+    function FactorSummaryResult(ann_return::VecNum, ann_volatility::VecNum, sharpe::VecNum,
+                                 autocorr::VecNum, mean_abs_t::Option{<:VecNum},
+                                 t_rate::Option{<:VecNum}, mean_vif::Option{<:VecNum},
+                                 stability::Option{<:VecNum}, coverage::Option{<:VecNum},
+                                 ppy::Number, nf::Option{<:VecStr}, fam::Option{<:VecStr})
+        fs = new{typeof(ann_return), typeof(ann_volatility), typeof(sharpe),
+                 typeof(autocorr), typeof(mean_abs_t), typeof(t_rate), typeof(mean_vif),
+                 typeof(stability), typeof(coverage), typeof(ppy), typeof(nf), typeof(fam)}(ann_return,
+                                                                                            ann_volatility,
+                                                                                            sharpe,
+                                                                                            autocorr,
+                                                                                            mean_abs_t,
+                                                                                            t_rate,
+                                                                                            mean_vif,
+                                                                                            stability,
+                                                                                            coverage,
+                                                                                            ppy,
+                                                                                            nf,
+                                                                                            fam)
+        assert_factor_summary_columns(fs)
+        return fs
+    end
+end
+function FactorSummaryResult(; ann_return::VecNum, ann_volatility::VecNum, sharpe::VecNum,
+                             autocorr::VecNum, mean_abs_t::Option{<:VecNum} = nothing,
+                             t_rate::Option{<:VecNum} = nothing,
+                             mean_vif::Option{<:VecNum} = nothing,
+                             stability::Option{<:VecNum} = nothing,
+                             coverage::Option{<:VecNum} = nothing, ppy::Number = 1,
+                             nf::Option{<:VecStr} = nothing,
+                             fam::Option{<:VecStr} = nothing)::FactorSummaryResult
+    return FactorSummaryResult(ann_return, ann_volatility, sharpe, autocorr, mean_abs_t,
+                               t_rate, mean_vif, stability, coverage, ppy, nf, fam)
+end
+"""
+    assert_factor_summary_columns(fs::FactorSummaryResult)
+
+Check the columns of a [`FactorSummaryResult`](@ref) that its constructor built.
+
+The constructor builds the Result first and checks it here, so the check reads each column by its name and not by its position among twelve arguments.
+
+# Arguments
+
+  - `fs`: The summary to check.
+
+# Validation
+
+  - Each field but `ppy` is `nothing` or holds as many entries as `ann_return`. Raises a `DimensionMismatch`.
+  - `ppy > 0`. Raises a `DomainError`.
+  - The rules of [`assert_nan_or_nonneg`](@ref) on `ann_volatility` and `mean_abs_t`, and of [`assert_nan_or_closed_unit_interval`](@ref) on `t_rate` and `coverage`. An absent column is `nothing`, and those rules check nothing on it.
+
+# Returns
+
+  - `nothing`.
+
+# Related
+
+  - [`FactorSummaryResult`](@ref)
+"""
+function assert_factor_summary_columns(fs::FactorSummaryResult)::Nothing
+    K = length(fs.ann_return)
+    @argcheck(all(f -> f === :ppy ||
+                       isnothing(getfield(fs, f)) ||
+                       length(getfield(fs, f)) == K, fieldnames(FactorSummaryResult)),
+              DimensionMismatch("every column and label of the summary must be nothing or hold one entry per factor, $K entries like ann_return"))
+    @argcheck(fs.ppy > zero(fs.ppy), DomainError(fs.ppy, "ppy must be positive"))
+    assert_nan_or_nonneg(fs.ann_volatility, :ann_volatility)
+    assert_nan_or_nonneg(fs.mean_abs_t, :mean_abs_t)
+    assert_nan_or_closed_unit_interval(fs.t_rate, :t_rate)
+    assert_nan_or_closed_unit_interval(fs.coverage, :coverage)
+    return nothing
 end
 """
     port_opt_view(fs::FactorSummaryResult, i, args...)

@@ -172,7 +172,7 @@ $(DocStringExtensions.TYPEDEF)
 
 Holds the summary of an information coefficient series per factor, with the names and the families of the factors.
 
-[`exposure_ic_summary`](@ref) returns it when it reads a [`FactorDiagnosticResult`](@ref) or a block. The method over a bare matrix returns a `NamedTuple` of the same eight vectors, and a caller reads a field of either by the same name. [`port_opt_view`](@ref) selects the factors of the summary by position, by name, or by family with a [`LabelGroup`](@ref).
+[`exposure_ic_summary`](@ref) returns it. The method over a [`FactorDiagnosticResult`](@ref) or a block keeps the names and the families of the factor axis. The method over a bare matrix has no labels, so `nf` and `fam` are `nothing`, and a factor is selected by its position. [`port_opt_view`](@ref) selects the factors of the summary by position, by name, or by family with a [`LabelGroup`](@ref). The eight figures of one factor are those of an [`ICSummaryResult`](@ref), as vectors.
 
 # Fields
 
@@ -180,18 +180,43 @@ $(DocStringExtensions.FIELDS)
 
 # Constructors
 
-    ExposureICSummaryResult(
-        mean_ic, std_ic, ic_ir, t_stat, p_value, mean_ci_lower, mean_ci_upper,
-        hit_rate, nf, fam
-    ) -> ExposureICSummaryResult
+    ExposureICSummaryResult(mean_ic::VecNum, std_ic::VecNum, ic_ir::VecNum,
+                            t_stat::VecNum, p_value::VecNum, mean_ci_lower::VecNum,
+                            mean_ci_upper::VecNum, hit_rate::VecNum,
+                            nf::Option{<:VecStr}, fam::Option{<:VecStr})
+    ExposureICSummaryResult(; mean_ic::VecNum, std_ic::VecNum, ic_ir::VecNum,
+                            t_stat::VecNum, p_value::VecNum, mean_ci_lower::VecNum,
+                            mean_ci_upper::VecNum, hit_rate::VecNum,
+                            nf::Option{<:VecStr} = nothing,
+                            fam::Option{<:VecStr} = nothing)
 
-The arguments are the fields, in the order of their declaration. The type is a Result, so [`exposure_ic_summary`](@ref) builds it and a caller reads it. It has no keyword constructor, and it checks none of its values.
+The positional constructor checks the values. The keyword constructor takes each field by name, with no default but for the two labels, and calls it.
+
+## Validation
+
+  - The eight figures have one length, the number of factors. Otherwise, the constructor raises a `DimensionMismatch`.
+  - `nf` and `fam` are each `nothing` or of that length. Otherwise, the constructor raises a `DimensionMismatch`.
+  - The rules of [`ICSummaryResult`](@ref), entry by entry: `std_ic` is `NaN` or not negative, `p_value` and `hit_rate` are `NaN` or in ``[0, 1]``, and no lower bound of the interval is above its upper bound. A breach raises a `DomainError`.
+
+# Examples
+
+```jldoctest
+julia> s = exposure_ic_summary([0.1 -0.2; 0.3 0.1; 0.2 0.0]; mt = OverlapMeanTest());
+
+julia> (s.mean_ic, s.hit_rate, s.nf)
+([0.20000000000000004, -0.03333333333333333], [1.0, 0.3333333333333333], nothing)
+```
 
 # Related
 
+  - [`ICSummaryResult`](@ref)
+
   - [`exposure_ic_summary`](@ref)
+
   - [`exposure_ic`](@ref)
+
   - [`FactorDiagnosticResult`](@ref)
+
   - [`port_opt_view`](@ref)
 """
 @concrete struct ExposureICSummaryResult <: AbstractResult
@@ -235,6 +260,33 @@ The arguments are the fields, in the order of their declaration. The type is a R
     $(field_dict[:fd_fam])
     """
     fam
+    function ExposureICSummaryResult(mean_ic::VecNum, std_ic::VecNum, ic_ir::VecNum,
+                                     t_stat::VecNum, p_value::VecNum, mean_ci_lower::VecNum,
+                                     mean_ci_upper::VecNum, hit_rate::VecNum,
+                                     nf::Option{<:VecStr}, fam::Option{<:VecStr})
+        K = length(mean_ic)
+        @argcheck(all(v -> length(v) == K,
+                      (std_ic, ic_ir, t_stat, p_value, mean_ci_lower, mean_ci_upper,
+                       hit_rate)),
+                  DimensionMismatch("the eight figures must each hold one entry per factor, $K entries like mean_ic"))
+        @argcheck(all(v -> isnothing(v) || length(v) == K, (nf, fam)),
+                  DimensionMismatch("nf and fam must each be nothing or hold one entry per factor, $K entries like mean_ic"))
+        assert_ic_summary_values(std_ic, p_value, mean_ci_lower, mean_ci_upper, hit_rate)
+        return new{typeof(mean_ic), typeof(std_ic), typeof(ic_ir), typeof(t_stat),
+                   typeof(p_value), typeof(mean_ci_lower), typeof(mean_ci_upper),
+                   typeof(hit_rate), typeof(nf), typeof(fam)}(mean_ic, std_ic, ic_ir,
+                                                              t_stat, p_value,
+                                                              mean_ci_lower, mean_ci_upper,
+                                                              hit_rate, nf, fam)
+    end
+end
+function ExposureICSummaryResult(; mean_ic::VecNum, std_ic::VecNum, ic_ir::VecNum,
+                                 t_stat::VecNum, p_value::VecNum, mean_ci_lower::VecNum,
+                                 mean_ci_upper::VecNum, hit_rate::VecNum,
+                                 nf::Option{<:VecStr} = nothing,
+                                 fam::Option{<:VecStr} = nothing)::ExposureICSummaryResult
+    return ExposureICSummaryResult(mean_ic, std_ic, ic_ir, t_stat, p_value, mean_ci_lower,
+                                   mean_ci_upper, hit_rate, nf, fam)
 end
 """
     port_opt_view(s::ExposureICSummaryResult, i, args...)
@@ -271,7 +323,7 @@ function port_opt_view(s::ExposureICSummaryResult, i, args...)::ExposureICSummar
 end
 """
     exposure_ic_summary(ic::MatNum; lags::Integer = 0, window::Real = lags + 1,
-                        mt::AbstractMeanTestEstimator = WildBootstrapMeanTest()) -> NamedTuple
+                        mt::AbstractMeanTestEstimator = WildBootstrapMeanTest()) -> ExposureICSummaryResult
     exposure_ic_summary(ic::FactorDiagnosticResult; lags::Integer = 0,
                         window::Real = lags + 1,
                         mt::AbstractMeanTestEstimator = WildBootstrapMeanTest()) -> ExposureICSummaryResult
@@ -331,11 +383,11 @@ Where:
 
 # Returns
 
-  - `summary::NamedTuple`: `(; mean_ic, std_ic, ic_ir, t_stat, p_value, mean_ci_lower, mean_ci_upper, hit_rate)`, each one entry per factor, on the method over a matrix.
-  - `s::ExposureICSummaryResult`: On the other two methods, the same eight vectors, with the names and the family labels of the factor axis of the series. The block method returned the `NamedTuple` in earlier releases, and a field of the Result has the name of the field of the `NamedTuple`.
+  - `s::ExposureICSummaryResult`: The eight figures, each one entry per factor. The method over a matrix gives `nothing` for `nf` and `fam`, and the other two methods give the names and the family labels of the factor axis of the series. The method over a matrix returned a `NamedTuple` of the eight vectors in earlier releases, and a field of the Result has the name of the field of the `NamedTuple`.
 
 # Related
 
+  - [`ExposureICSummaryResult`](@ref)
   - [`exposure_ic`](@ref)
   - [`exposure_ic_factor_summary`](@ref)
   - [`forecast_factor_correlation`](@ref)
@@ -343,7 +395,7 @@ Where:
   - [`WildBootstrapMeanTest`](@ref)
 """
 function exposure_ic_summary(ic::MatNum; lags::Integer = 0, window::Real = lags + 1,
-                             mt::AbstractMeanTestEstimator = WildBootstrapMeanTest())
+                             mt::AbstractMeanTestEstimator = WildBootstrapMeanTest())::ExposureICSummaryResult
     @argcheck(!isempty(ic), IsEmptyError("ic cannot be empty"))
     resolve_mean_test_window(lags, window)
     P, K = size(ic)
@@ -370,15 +422,14 @@ function exposure_ic_summary(ic::MatNum; lags::Integer = 0, window::Real = lags 
         mean_ci_upper[k] = m.mean_ci_upper
         hit_rate[k] = m.hit_rate
     end
-    return (; mean_ic = mean_ic, std_ic = std_ic, ic_ir = ic_ir, t_stat = t_stat,
-            p_value = p_value, mean_ci_lower = mean_ci_lower, mean_ci_upper = mean_ci_upper,
-            hit_rate = hit_rate)
+    return ExposureICSummaryResult(mean_ic, std_ic, ic_ir, t_stat, p_value, mean_ci_lower,
+                                   mean_ci_upper, hit_rate, nothing, nothing)
 end
 """
     exposure_ic_factor_summary(ic::MatNum, k::Integer; lags::Integer = 0,
                                window::Real = lags + 1,
                                mt::AbstractMeanTestEstimator = WildBootstrapMeanTest(),
-                               rng = mean_test_rng(mt))
+                               rng = mean_test_rng(mt)) -> ICSummaryResult
 
 Return the eight summary numbers of one factor's information coefficient series.
 
@@ -409,10 +460,11 @@ The test reads the rows at their positions in `ic`. A row whose coefficient is `
 
 # Returns
 
-  - `m::NamedTuple`: `(; mean_ic, std_ic, ic_ir, t_stat, p_value, mean_ci_lower, mean_ci_upper, hit_rate)`, eight numbers.
+  - `m::ICSummaryResult`: The eight numbers.
 
 # Related
 
+  - [`ICSummaryResult`](@ref)
   - [`exposure_ic_summary`](@ref)
   - [`forecast_ic_summary`](@ref)
   - [`forecast_ic_lags`](@ref)
@@ -421,7 +473,7 @@ The test reads the rows at their positions in `ic`. A row whose coefficient is `
 function exposure_ic_factor_summary(ic::MatNum, k::Integer; lags::Integer = 0,
                                     window::Real = lags + 1,
                                     mt::AbstractMeanTestEstimator = WildBootstrapMeanTest(),
-                                    rng = mean_test_rng(mt))
+                                    rng = mean_test_rng(mt))::ICSummaryResult
     w = resolve_mean_test_window(lags, window)
     P = size(ic, 1)
     Tm = real(eltype(ic))
@@ -449,25 +501,22 @@ function exposure_ic_factor_summary(ic::MatNum, k::Integer; lags::Integer = 0,
     sd = n > 1 ? sqrt(q / (n - 1)) : Ts(NaN)
     ir = isfinite(m) && isfinite(sd) && sd > zero(Ts) ? m / sd : Ts(NaN)
     res = mean_test(mt, view(ic, :, k), w, rng)
-    return (; mean_ic = m, std_ic = sd, ic_ir = ir, t_stat = res.t_stat,
-            p_value = res.p_value, mean_ci_lower = res.mean_ci_lower,
-            mean_ci_upper = res.mean_ci_upper, hit_rate = n > 0 ? Tm(h) / Tm(n) : Tm(NaN))
+    return ICSummaryResult(m, sd, ir, res.t_stat, res.p_value, res.mean_ci_lower,
+                           res.mean_ci_upper, n > 0 ? Tm(h) / Tm(n) : Tm(NaN))
 end
 function exposure_ic_summary(ic::FactorDiagnosticResult; lags::Integer = 0,
                              window::Real = lags + 1,
-                             mt::AbstractMeanTestEstimator = WildBootstrapMeanTest())
+                             mt::AbstractMeanTestEstimator = WildBootstrapMeanTest())::ExposureICSummaryResult
     @argcheck(ndims(ic.X) == 2 && ic.dims == (2,),
               ArgumentError("exposure_ic_summary reads a series `pairs × factors`, whose factor axis is its second dimension. Got size(ic.X) => $(size(ic.X)) and ic.dims => $(ic.dims)"))
-    s = exposure_ic_summary(ic.X; lags = lags, window = window, mt = mt)
-    return ExposureICSummaryResult(s.mean_ic, s.std_ic, s.ic_ir, s.t_stat, s.p_value,
-                                   s.mean_ci_lower, s.mean_ci_upper, s.hit_rate, ic.nf,
-                                   ic.fam)
+    return rebuild_struct(exposure_ic_summary(ic.X; lags = lags, window = window, mt = mt),
+                          (; nf = ic.nf, fam = ic.fam))
 end
 function exposure_ic_summary(csfm::CrossSectionalFactorModel,
                              rd::Option{<:ReturnsResult} = nothing; horizon::Integer = 1,
                              rank::Bool = true, reduced::Bool = false,
                              ties::Symbol = :average,
-                             mt::AbstractMeanTestEstimator = WildBootstrapMeanTest())
+                             mt::AbstractMeanTestEstimator = WildBootstrapMeanTest())::ExposureICSummaryResult
     return exposure_ic_summary(exposure_ic(csfm, rd; horizon = horizon, rank = rank,
                                            reduced = reduced, ties = ties);
                                lags = horizon - 1, mt = mt)

@@ -532,10 +532,6 @@ const RULED_REBUILDS = Dict{Tuple{Symbol, Symbol}, Tuple{String, String}}(#
                                                                            :ElasticNetFit) =>
                                                                               (NO_REBUILD,
                                                                                "`cnt` is the `ElasticNetCounts` of `elastic_net_counts` (#2110, #2092)"),
-                                                                          (:exposure_ic_summary,
-                                                                           :ExposureICSummaryResult) =>
-                                                                              (NO_REBUILD,
-                                                                               "`s` is the `NamedTuple` of the matrix method (#2110)"),
                                                                           (:cross_sectional_benchmark_returns,
                                                                            :AssetPanel) =>
                                                                               ("go",

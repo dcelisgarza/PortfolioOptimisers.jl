@@ -172,8 +172,114 @@ function forecast_calibration_edges(a::AbstractVector{<:Real}, bins::Integer)
     return unique(e)
 end
 """
+$(DocStringExtensions.TYPEDEF)
+
+The curve of a **Forecast Calibration**: the mean forecast and the mean realised target of each non-empty quantile bin of the pooled forecast.
+
+[`forecast_calibration_curve`](@ref) builds it, and [`forecast_calibration`](@ref) holds it in the `curve` field of its [`ForecastCalibrationResult`](@ref). The four columns hold one entry per non-empty bin, in increasing order of the forecast. An empty pooling gives four empty columns. `DataFrames.DataFrame(c)` writes the curve with one row per bin.
+
+# Fields
+
+$(DocStringExtensions.FIELDS)
+
+# Constructors
+
+    ForecastCalibrationCurveResult(bin::VecInt, mean_alpha::VecNum, mean_y::VecNum,
+                                   count::VecInt)
+    ForecastCalibrationCurveResult(; bin::VecInt, mean_alpha::VecNum, mean_y::VecNum,
+                                   count::VecInt)
+
+The positional constructor checks the values. The keyword constructor takes each field by name, with no default, and calls it.
+
+## Validation
+
+  - The four columns have one length. Otherwise, the constructor raises a `DimensionMismatch`.
+  - `bin` increases strictly and starts at `1` or above, and each entry of `count` is at least `1`. Otherwise, the constructor raises a `DomainError`.
+
+# Related
+
+  - [`forecast_calibration_curve`](@ref)
+  - [`ForecastCalibrationResult`](@ref)
+  - [`DataFrames.DataFrame(c::ForecastCalibrationCurveResult)`](@ref)
+"""
+@concrete struct ForecastCalibrationCurveResult <: AbstractResult
+    """
+    Index of each bin among the edges.
+    """
+    bin
+    """
+    Mean forecast of each bin.
+    """
+    mean_alpha
+    """
+    Mean realised target of each bin.
+    """
+    mean_y
+    """
+    Number of pairs in each bin.
+    """
+    count
+    function ForecastCalibrationCurveResult(bin::VecInt, mean_alpha::VecNum, mean_y::VecNum,
+                                            count::VecInt)
+        n = length(bin)
+        @argcheck(length(mean_alpha) == length(mean_y) == length(count) == n,
+                  DimensionMismatch("bin ($n), mean_alpha ($(length(mean_alpha))), mean_y ($(length(mean_y))) and count ($(length(count))) must hold one entry per bin"))
+        @argcheck((isempty(bin) || first(bin) >= 1) && all(>(0), diff(bin)),
+                  DomainError(bin, "bin must increase strictly from 1 or above"))
+        @argcheck(all(>=(1), count),
+                  DomainError(count, "every bin must hold at least one pair"))
+        return new{typeof(bin), typeof(mean_alpha), typeof(mean_y), typeof(count)}(bin,
+                                                                                   mean_alpha,
+                                                                                   mean_y,
+                                                                                   count)
+    end
+end
+function ForecastCalibrationCurveResult(; bin::VecInt, mean_alpha::VecNum, mean_y::VecNum,
+                                        count::VecInt)::ForecastCalibrationCurveResult
+    return ForecastCalibrationCurveResult(bin, mean_alpha, mean_y, count)
+end
+"""
+    DataFrames.DataFrame(c::ForecastCalibrationCurveResult) -> DataFrame
+
+Write the curve of a Forecast Calibration as a table, with one row per non-empty bin.
+
+The columns are `:bin`, `:mean_alpha`, `:mean_y` and `:count`, in the order of the struct.
+
+# Arguments
+
+  - `c`: The curve, the `curve` field of a [`ForecastCalibrationResult`](@ref).
+
+# Returns
+
+  - `df::DataFrame`: The table, one row per bin.
+
+# Examples
+
+```jldoctest
+julia> using DataFrames
+
+julia> alpha = [1.0 2.0 3.0 4.0; 2.0 4.0 6.0 8.0; 4.0 3.0 2.0 1.0];
+
+julia> y = PortfolioOptimisers.forward_mean_returns(alpha, 1, 1);
+
+julia> df = DataFrame(forecast_calibration(forecast_evaluation(alpha, y); bins = 2).curve);
+
+julia> (size(df), names(df), df.count)
+((2, 4), ["bin", "mean_alpha", "mean_y", "count"], [4, 4])
+```
+
+# Related
+
+  - [`ForecastCalibrationCurveResult`](@ref)
+  - [`forecast_calibration`](@ref)
+"""
+function DataFrames.DataFrame(c::ForecastCalibrationCurveResult)
+    return DataFrames.DataFrame(; bin = collect(c.bin), mean_alpha = collect(c.mean_alpha),
+                                mean_y = collect(c.mean_y), count = collect(c.count))
+end
+"""
     forecast_calibration_curve(a::AbstractVector{<:Real}, b::AbstractVector{<:Real},
-                               bins::Integer) -> NamedTuple
+                               bins::Integer) -> ForecastCalibrationCurveResult
 
 Return the mean forecast and the mean realised target of each quantile bin of a pooling.
 
@@ -199,7 +305,7 @@ The bins are quantile bins of the pooled forecast. Each bin holds about the same
 
 # Returns
 
-  - `curve::NamedTuple`: `(; bin, mean_alpha, mean_y, count)`, four vectors of the same length. There is one entry per non-empty bin, in increasing order of the forecast. An empty pooling gives four empty vectors.
+  - `curve::ForecastCalibrationCurveResult`: Four vectors of the same length. There is one entry per non-empty bin, in increasing order of the forecast. An empty pooling gives four empty vectors.
 
       + `bin::Vector{Int}`: Index of the bin among the edges.
       + `mean_alpha::VecNum`: Mean forecast of the bin.
@@ -208,18 +314,19 @@ The bins are quantile bins of the pooled forecast. Each bin holds about the same
 
 # Related
 
+  - [`ForecastCalibrationCurveResult`](@ref)
   - [`forecast_calibration`](@ref)
   - [`forecast_calibration_edges`](@ref)
   - [`forecast_calibration_pairs`](@ref)
   - [`forecast_calibration_slope`](@ref)
 """
 function forecast_calibration_curve(a::AbstractVector{<:Real}, b::AbstractVector{<:Real},
-                                    bins::Integer)
+                                    bins::Integer)::ForecastCalibrationCurveResult
     @argcheck(bins >= one(bins), DomainError(bins, "bins must be >= 1"))
     Tf = promote_type(real(eltype(a)), real(eltype(b)))
     if isempty(a)
-        return (; bin = Vector{Int}(undef, 0), mean_alpha = Vector{Tf}(undef, 0),
-                mean_y = Vector{Tf}(undef, 0), count = Vector{Int}(undef, 0))
+        return ForecastCalibrationCurveResult(Vector{Int}(undef, 0), Vector{Tf}(undef, 0),
+                                              Vector{Tf}(undef, 0), Vector{Int}(undef, 0))
     end
     edges = forecast_calibration_edges(a, bins)
     nb = max(length(edges) - 1, 1)
@@ -236,8 +343,8 @@ function forecast_calibration_curve(a::AbstractVector{<:Real}, b::AbstractVector
         n[j] += 1
     end
     keep = findall(x -> !iszero(x), n)
-    return (; bin = keep, mean_alpha = sa[keep] ./ n[keep], mean_y = sy[keep] ./ n[keep],
-            count = n[keep])
+    return ForecastCalibrationCurveResult(keep, sa[keep] ./ n[keep], sy[keep] ./ n[keep],
+                                          n[keep])
 end
 """
     forecast_pooled_moments(x::AbstractVector{<:Real}) -> NamedTuple
@@ -284,11 +391,92 @@ function forecast_pooled_moments(x::AbstractVector{<:Real})
     return (; mean = m, std = v)
 end
 """
+$(DocStringExtensions.TYPEDEF)
+
+The **Forecast Calibration** of a Return Forecast: its out-of-sample scale, the curve of that scale over the quantile bins of the forecast, and the pooled moments that put the scale in context.
+
+[`forecast_calibration`](@ref) returns it. A caller reads the fields by name, as `c.slope` or `c.curve.mean_y`.
+
+# Fields
+
+$(DocStringExtensions.FIELDS)
+
+# Constructors
+
+    ForecastCalibrationResult(slope::Real, curve::ForecastCalibrationCurveResult,
+                              mean_alpha::Real, std_alpha::Real, mean_y::Real,
+                              std_y::Real, n_bins::Integer)
+    ForecastCalibrationResult(; slope::Real, curve::ForecastCalibrationCurveResult,
+                              mean_alpha::Real, std_alpha::Real, mean_y::Real,
+                              std_y::Real, n_bins::Integer)
+
+The positional constructor checks the values. The keyword constructor takes each field by name, with no default, and calls it.
+
+## Validation
+
+  - `n_bins` is the number of bins of `curve`. Otherwise, the constructor raises a `DimensionMismatch`.
+  - `std_alpha` and `std_y` are each `NaN` or not negative. Otherwise, the constructor raises a `DomainError`.
+
+# Related
+
+  - [`forecast_calibration`](@ref)
+  - [`ForecastCalibrationCurveResult`](@ref)
+  - [`forecast_calibration_slope`](@ref)
+"""
+@concrete struct ForecastCalibrationResult <: AbstractResult
+    """
+    The scale multiplier, from [`forecast_calibration_slope`](@ref).
+    """
+    slope
+    """
+    The [`ForecastCalibrationCurveResult`](@ref) of the quantile bins of the forecast.
+    """
+    curve
+    """
+    Mean forecast over the pooled pairs.
+    """
+    mean_alpha
+    """
+    Standard deviation of the forecast over the pooled pairs.
+    """
+    std_alpha
+    """
+    Mean realised target over the same pairs.
+    """
+    mean_y
+    """
+    Standard deviation of the target over the same pairs.
+    """
+    std_y
+    """
+    Number of non-empty bins in the curve.
+    """
+    n_bins
+    function ForecastCalibrationResult(slope::Real, curve::ForecastCalibrationCurveResult,
+                                       mean_alpha::Real, std_alpha::Real, mean_y::Real,
+                                       std_y::Real, n_bins::Integer)
+        @argcheck(n_bins == length(curve.bin),
+                  DimensionMismatch("n_bins ($n_bins) must be the number of bins of the curve ($(length(curve.bin)))"))
+        assert_nan_or_nonneg(std_alpha, :std_alpha)
+        assert_nan_or_nonneg(std_y, :std_y)
+        return new{typeof(slope), typeof(curve), typeof(mean_alpha), typeof(std_alpha),
+                   typeof(mean_y), typeof(std_y), typeof(n_bins)}(slope, curve, mean_alpha,
+                                                                  std_alpha, mean_y, std_y,
+                                                                  n_bins)
+    end
+end
+function ForecastCalibrationResult(; slope::Real, curve::ForecastCalibrationCurveResult,
+                                   mean_alpha::Real, std_alpha::Real, mean_y::Real,
+                                   std_y::Real, n_bins::Integer)::ForecastCalibrationResult
+    return ForecastCalibrationResult(slope, curve, mean_alpha, std_alpha, mean_y, std_y,
+                                     n_bins)
+end
+"""
     forecast_calibration(fe::ForecastEvaluationResult, w::Option{<:MatNum} = nothing;
-                         bins::Integer = 10) -> NamedTuple
+                         bins::Integer = 10) -> ForecastCalibrationResult
     forecast_calibration(fe::ForecastEvaluationResult, csfm::CrossSectionalFactorModel;
                          weighting::Option{<:AbstractOrthogonalityMetric} = nothing,
-                         bins::Integer = 10) -> NamedTuple
+                         bins::Integer = 10) -> ForecastCalibrationResult
 
 Score whether the magnitude of a Return Forecast is right, and not only its order.
 
@@ -327,10 +515,10 @@ Every other statistic of an evaluation is a statistic of a cross-section. Each o
 
 # Returns
 
-  - `calibration::NamedTuple`: `(; slope, curve, mean_alpha, std_alpha, mean_y, std_y, n_bins)`.
+  - `c::ForecastCalibrationResult`: The seven fields below. Earlier releases returned a `NamedTuple` of the same fields, with the curve as a `NamedTuple` too.
 
       + `slope::Real`: The scale multiplier, from [`forecast_calibration_slope`](@ref).
-      + `curve::NamedTuple`: `(; bin, mean_alpha, mean_y, count)`, from [`forecast_calibration_curve`](@ref).
+      + `curve::ForecastCalibrationCurveResult`: `bin`, `mean_alpha`, `mean_y` and `count`, from [`forecast_calibration_curve`](@ref).
       + `mean_alpha::Real`: Mean forecast over the pooled pairs.
       + `std_alpha::Real`: Standard deviation of the forecast over the pooled pairs.
       + `mean_y::Real`: Mean realised target over the same pairs.
@@ -352,6 +540,7 @@ julia> (c.slope, c.n_bins, c.curve.count)
 
 # Related
 
+  - [`ForecastCalibrationResult`](@ref)
   - [`forecast_calibration_pairs`](@ref)
   - [`forecast_calibration_slope`](@ref)
   - [`forecast_calibration_edges`](@ref)
@@ -364,7 +553,7 @@ julia> (c.slope, c.n_bins, c.curve.count)
   - [`idio_calibration`](@ref)
 """
 function forecast_calibration(fe::ForecastEvaluationResult, w::Option{<:MatNum} = nothing;
-                              bins::Integer = 10)
+                              bins::Integer = 10)::ForecastCalibrationResult
     alpha::MatNum = fe.alpha
     y::MatNum = fe.y
     dates::AbstractVector{<:Integer} = fe.dates
@@ -372,14 +561,13 @@ function forecast_calibration(fe::ForecastEvaluationResult, w::Option{<:MatNum} 
     curve = forecast_calibration_curve(a, b, bins)
     ma = forecast_pooled_moments(a)
     my = forecast_pooled_moments(b)
-    return (; slope = forecast_calibration_slope(a, b, q), curve = curve,
-            mean_alpha = ma.mean, std_alpha = ma.std, mean_y = my.mean, std_y = my.std,
-            n_bins = length(curve.bin))
+    return ForecastCalibrationResult(forecast_calibration_slope(a, b, q), curve, ma.mean,
+                                     ma.std, my.mean, my.std, length(curve.bin))
 end
 function forecast_calibration(fe::ForecastEvaluationResult, csfm::CrossSectionalFactorModel;
                               weighting::Option{<:AbstractOrthogonalityMetric} = nothing,
-                              bins::Integer = 10)
+                              bins::Integer = 10)::ForecastCalibrationResult
     return forecast_calibration(fe, cs_diagnostic_weights(weighting, csfm); bins = bins)
 end
 
-export forecast_calibration
+export ForecastCalibrationResult, ForecastCalibrationCurveResult, forecast_calibration

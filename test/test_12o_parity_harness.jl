@@ -535,6 +535,9 @@ include(joinpath(@__DIR__, "parity_grid.jl"))
     loadv(c, o) = vec(load(c, o))
     pc(a, b, name; rtol = 1e-12, scale = :cell) = parity_compare(a, b; rtol = rtol,
                                                                  scale = scale, name = name).ok
+    # The five numbers of an `IdioCalibrationSummaryResult`, in the order of the oracle.
+    summary_values(s) = [s.mean_cs_std, s.median_cs_std, s.mean_kurtosis, s.mean_skewness,
+                         s.mean_tail_rate]
     fxs = parity_small_panel()
     fxl = parity_large_panel()
     rds = grid_fixture(fxs)
@@ -828,8 +831,9 @@ include(joinpath(@__DIR__, "parity_grid.jl"))
                               idio_kurtosis(ek, vk; ahead = ahead))
                 @test isequal(idio_skewness(csfm; ahead = ahead),
                               idio_skewness(ek, vk; ahead = ahead))
-                @test isequal(idio_calibration_summary(csfm; ahead = ahead),
-                              idio_calibration_summary(ek, vk; ahead = ahead))
+                @test isequal(summary_values(idio_calibration_summary(csfm; ahead = ahead)),
+                              summary_values(idio_calibration_summary(ek, vk;
+                                                                      ahead = ahead)))
             end
             @test isequal(idio_vol_ic(csfm), idio_vol_ic(ek, vk))
             continue
@@ -845,7 +849,7 @@ include(joinpath(@__DIR__, "parity_grid.jl"))
         @test pc(idio_kurtosis(csfm; ahead = false), I[:, 4], "$(n) kurtosis";
                  scale = :array)
         @test pc(idio_skewness(csfm; ahead = false), I[:, 5], "$(n) skewness")
-        @test pc(collect(values(idio_calibration_summary(csfm; ahead = false))),
+        @test pc(summary_values(idio_calibration_summary(csfm; ahead = false)),
                  loadv(n, "IdioSummary"), "$(n) summary")
         Dp = load(n, "IdioDependence")
         @test pc(idio_vol_ic(csfm; ties = :ordinal), Dp[:, 1], "$(n) vol ic")
@@ -861,7 +865,7 @@ include(joinpath(@__DIR__, "parity_grid.jl"))
         # maxrel 2.4e-11 and maxscaled 2.6e-15, so the check is `:array`.
         @test pc(idio_kurtosis(csfm), A[:, 3], "$(n) ahead kurtosis"; scale = :array)
         @test pc(idio_skewness(csfm), A[:, 4], "$(n) ahead skewness")
-        @test pc(collect(values(idio_calibration_summary(csfm))),
+        @test pc(summary_values(idio_calibration_summary(csfm)),
                  loadv(n, "AheadIdioSummary"), "$(n) ahead summary")
     end
 

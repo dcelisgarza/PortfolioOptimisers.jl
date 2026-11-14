@@ -1802,6 +1802,10 @@ using Statistics
     function idio_agrees(a, b, label = ""; rtol = 1e-14)
         return parity_compare(a, b; rtol = rtol, name = label).ok
     end
+    # The five numbers of an `IdioCalibrationSummaryResult`. The library defines `==` on no
+    # struct, so two summaries compare by their fields.
+    summary_values(s) = (s.mean_cs_std, s.median_cs_std, s.mean_kurtosis, s.mean_skewness,
+                         s.mean_tail_rate)
 
     @testset "the stored oracle" begin
         ref_cal = [0.6576024139953216, 0.9566856355619364, 3.5819946565338796,
@@ -1909,8 +1913,9 @@ using Statistics
         @test idio_agrees(idio_tail_rate(za), idio_tail_rate(eps, vs))
         @test idio_agrees(idio_kurtosis(za), idio_kurtosis(eps, vs))
         @test idio_agrees(idio_skewness(za), idio_skewness(eps, vs))
-        @test idio_calibration_summary(eps, vs) ==
-              idio_calibration_summary(eps[2:end, :], vs[1:(end - 1), :]; ahead = false)
+        @test summary_values(idio_calibration_summary(eps, vs)) ==
+              summary_values(idio_calibration_summary(eps[2:end, :], vs[1:(end - 1), :];
+                                                      ahead = false))
     end
 
     @testset "a variance that has read its own return bounds the standardised return" begin
@@ -1944,14 +1949,17 @@ using Statistics
         @test idio_agrees(idio_vol_ic(csfm), idio_vol_ic(eps, vs))
         @test idio_agrees(idio_vol_residual_dependence(csfm),
                           idio_vol_residual_dependence(eps, vs))
-        @test idio_calibration_summary(csfm) == idio_calibration_summary(eps, vs)
-        @test idio_calibration_summary(csfm; threshold = 2) ==
-              idio_calibration_summary(eps, vs; threshold = 2)
+        @test idio_calibration_summary(csfm) isa IdioCalibrationSummaryResult
+        @test summary_values(idio_calibration_summary(csfm)) ==
+              summary_values(idio_calibration_summary(eps, vs))
+        @test summary_values(idio_calibration_summary(csfm; threshold = 2)) ==
+              summary_values(idio_calibration_summary(eps, vs; threshold = 2))
         for f in (idio_calibration, idio_kurtosis, idio_skewness, idio_tail_rate)
             @test idio_agrees(f(csfm; ahead = false), f(eps, vs; ahead = false))
         end
-        @test idio_calibration_summary(csfm; threshold = 2, ahead = false) ==
-              idio_calibration_summary(eps, vs; threshold = 2, ahead = false)
+        @test summary_values(idio_calibration_summary(csfm; threshold = 2, ahead = false)) ==
+              summary_values(idio_calibration_summary(eps, vs; threshold = 2,
+                                                      ahead = false))
     end
 
     @testset "the analytic cases" begin

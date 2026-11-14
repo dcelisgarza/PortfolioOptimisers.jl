@@ -328,6 +328,27 @@ definition = "ResolvedConstraintBlock"
 metric = "arg"
 rationale = "keyword-constructor-arity"
 
+# The columnar Results of the forecast evaluation and of the factor model summary check their
+# values in their constructors (#2093), so each constructor takes one argument for each column:
+# 46 for `ForecastSummaryResult`, 21 for `ForecastWindowResult`, 12 for `FactorSummaryResult`.
+[[exemption]]
+path = "src/05_Moments/32_CrossSectionalFactorModel/07_ReturnForecasts/14_ForecastSummary.jl"
+definition = "ForecastSummaryResult"
+metric = "arg"
+rationale = "keyword-constructor-arity"
+
+[[exemption]]
+path = "src/05_Moments/32_CrossSectionalFactorModel/07_ReturnForecasts/12_ForecastForwardWindows.jl"
+definition = "ForecastWindowResult"
+metric = "arg"
+rationale = "keyword-constructor-arity"
+
+[[exemption]]
+path = "src/05_Moments/32_CrossSectionalFactorModel/10_FactorModelSummary.jl"
+definition = "FactorSummaryResult"
+metric = "arg"
+rationale = "keyword-constructor-arity"
+
 # The split of `03_Preprocessing.jl` into the price-to-returns run. Each of these three definitions
 # moved byte-for-byte, and each now drives the maximum of a smaller file rather than sitting under
 # the row that grandfathered it. ADR 0074's entry test reads the new file as an addition, so the
