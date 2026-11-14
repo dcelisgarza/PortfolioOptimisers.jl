@@ -350,9 +350,7 @@ julia> PortfolioOptimisers.factor_basis_slice(fcb, 2:3).ratios
 """
 function factor_basis_slice(fcb::FactorFamilyBasis, i)::FactorFamilyBasis
     R = fcb.ratios[i, :]
-    return FactorFamilyBasis(; fnm = fcb.fnm, fi = fcb.fi, di = fcb.di,
-                             ratios = isa(R, AbstractMatrix) ? R : reshape(R, 1, :),
-                             K = fcb.K)
+    return rebuild_struct(fcb, (; ratios = isa(R, AbstractMatrix) ? R : reshape(R, 1, :)))
 end
 """
     append_passthrough_factors(fcb::Nothing, n::Integer) -> nothing
@@ -412,8 +410,7 @@ function append_passthrough_factors(fcb::FactorFamilyBasis, n::Integer)::FactorF
     if iszero(n)
         return fcb
     end
-    return FactorFamilyBasis(; fnm = fcb.fnm, fi = fcb.fi, di = fcb.di, ratios = fcb.ratios,
-                             K = fcb.K + n)
+    return rebuild_struct(fcb, (; K = fcb.K + n))
 end
 """
 $(DocStringExtensions.TYPEDSIGNATURES)

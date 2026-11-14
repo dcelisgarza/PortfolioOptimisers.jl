@@ -194,40 +194,6 @@ function exposure_weight_fill!(W::AbstractMatrix{<:Real},
     return blank
 end
 """
-    exposure_group_labels(rd::ReturnsResult, group::Nothing) -> nothing
-    exposure_group_labels(rd::ReturnsResult, group::AbstractString) -> Matrix{Int}
-
-Return the group labels the cross-sectional transforms of an exposure partition each observation by.
-
-A member that names no grouping field transforms each observation as one cross-section, and a member that names one transforms each group of the observation on its own.
-
-# Arguments
-
-  - $(arg_dict[:rd]) It must carry an Asset Panel in `rd.pnl`.
-  - `group`: Name of the categorical Panel Field to group by, or `nothing`.
-
-# Validation
-
-  - The rules of [`cross_sectional_groups`](@ref).
-
-# Returns
-
-  - `groups::Option{<:Matrix{Int}}`: The group labels, `observations × assets`, or `nothing`.
-
-# Related
-
-  - [`CompositeExposure`](@ref)
-  - [`DerivedExposure`](@ref)
-  - [`cross_sectional_groups`](@ref)
-  - [`CS_MISSING_GROUP`](@ref)
-"""
-function exposure_group_labels(::ReturnsResult, ::Nothing)::Nothing
-    return nothing
-end
-function exposure_group_labels(rd::ReturnsResult, group::AbstractString)::Matrix{Int}
-    return cross_sectional_groups(rd.pnl, group)
-end
-"""
     exposure_active_fill!(L::AbstractMatrix{<:Number}, pnl::AssetPanel) -> nothing
     exposure_active_fill!(L::AbstractArray{<:Number, 3}, pnl::AssetPanel) -> nothing
 

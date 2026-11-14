@@ -14,6 +14,6 @@ ew_forecast_accumulate!
 ew_forecast_solve
 ew_forecast_state
 ew_forecast_history
-return_forecast_step(rfe::ExpWeightedReturnForecast, P::NamedTuple, csfm::CrossSectionalFactorModel, fs::Option{<:NamedTuple})
+return_forecast_step(rfe::ExpWeightedReturnForecast, P::NamedTuple, csfm::CrossSectionalFactorModel, fs::Option{<:NamedTuple}, cre::Nothing = nothing)
 return_forecast_result(rfe::ExpWeightedReturnForecast, hist::MatNum, fs::NamedTuple)
 ```

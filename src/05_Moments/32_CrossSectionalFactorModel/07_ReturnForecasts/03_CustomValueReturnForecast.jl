@@ -101,7 +101,8 @@ function CustomValueReturnForecastResult(; mu::VecNum)::CustomValueReturnForecas
 end
 """
     return_forecast(rfe::CustomValueReturnForecast, rd::ReturnsResult,
-                    csfm::CrossSectionalFactorModel) -> CustomValueReturnForecastResult
+                    csfm::CrossSectionalFactorModel,
+                    cre::Nothing = nothing) -> CustomValueReturnForecastResult
 
 Return the Return Forecast a caller stated.
 
@@ -117,6 +118,7 @@ The member reads no Panel Field and fits nothing, so it does not read `rd`.
   - `rfe`: Stated Return Forecast Estimator.
   - $(arg_dict[:rd])
   - `csfm`: The fitted factor-model block. The member reads its asset count and nothing else.
+  - `cre`: No regression. The member fits nothing, so it reads none, as [`return_forecast`](@ref) states.
 
 # Validation
 
@@ -149,7 +151,8 @@ julia> rf.mu
   - [`CrossSectionalFactorModel`](@ref)
 """
 function return_forecast(rfe::CustomValueReturnForecast, ::ReturnsResult,
-                         csfm::CrossSectionalFactorModel)::CustomValueReturnForecastResult
+                         csfm::CrossSectionalFactorModel,
+                         ::Nothing = nothing)::CustomValueReturnForecastResult
     N = size(csfm.M, 1)
     @argcheck(length(rfe.mu) == N,
               DimensionMismatch("mu ($(length(rfe.mu))) states one Return Forecast per asset of the coverage universe, so it must match the asset count of the factor model block ($N)"))

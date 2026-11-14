@@ -1007,9 +1007,11 @@ function cs_regression_t_stat_exceedance_rate(t::MatNum; threshold::Number = 2)
 end
 function cs_regression_t_stat_exceedance_rate(t::FactorDiagnosticResult;
                                               threshold::Number = 2)
-    return FactorDiagnosticResult(cs_regression_t_stat_exceedance_rate(t.X;
-                                                                       threshold = threshold),
-                                  t.nf, t.fam, (1,))
+    return rebuild_struct(t,
+                          (;
+                           X = cs_regression_t_stat_exceedance_rate(t.X;
+                                                                    threshold = threshold),
+                           dims = (1,)))
 end
 function cs_regression_t_stat_exceedance_rate(csfm::CrossSectionalFactorModel;
                                               threshold::Number = 2)

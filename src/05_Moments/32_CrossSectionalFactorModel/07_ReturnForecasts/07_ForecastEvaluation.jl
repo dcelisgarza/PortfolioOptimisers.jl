@@ -328,10 +328,16 @@ $(DocStringExtensions.FIELDS)
     ForecastEvaluationResult(
         alpha, y, umsk, dates, target, horizon, lag, step, min_count, ties, ppy
     ) -> ForecastEvaluationResult
+    ForecastEvaluationResult(; alpha::MatNum, y::MatNum, umsk::AbstractMatrix{Bool},
+                             dates::AbstractVector{<:Integer},
+                             target::AbstractForecastTarget, horizon::Integer,
+                             lag::Integer, step::Integer, min_count::Integer,
+                             ties::Symbol, ppy::Number) -> ForecastEvaluationResult
 
 Arguments correspond to the struct's fields, in the order they are declared. The type is a
-Result, so [`forecast_evaluation`](@ref) builds it and a caller reads it. The type has no
-keyword constructor, and it validates nothing of its own.
+Result, so [`forecast_evaluation`](@ref) builds it and a caller reads it. It validates nothing
+of its own. The keyword constructor takes every field by its name, so a verb that changes one
+field of an evaluation rebuilds it through [`rebuild_struct`](@ref).
 
 # Related
 
@@ -385,6 +391,14 @@ keyword constructor, and it validates nothing of its own.
     $(field_dict[:ps_ppy]) It defaults to `1`, which reports the statistics per period.
     """
     ppy
+end
+function ForecastEvaluationResult(; alpha::MatNum, y::MatNum, umsk::AbstractMatrix{Bool},
+                                  dates::AbstractVector{<:Integer},
+                                  target::AbstractForecastTarget, horizon::Integer,
+                                  lag::Integer, step::Integer, min_count::Integer,
+                                  ties::Symbol, ppy::Number)::ForecastEvaluationResult
+    return ForecastEvaluationResult(alpha, y, umsk, dates, target, horizon, lag, step,
+                                    min_count, ties, ppy)
 end
 """
     forecast_evaluation_assert_parameters(; horizon::Integer, lag::Integer, step::Integer,

@@ -19,7 +19,7 @@ Each verb returns the factor returns and the residual count of the fit that it m
 
 ## `cross_sectional_solve`
 
-  - [`cross_sectional_solve(alg::AbstractCrossSectionalSolveAlgorithm, A::MatNum, y::VecNum, t::Integer)`](@ref): Returns the factor returns and the residual count of one observation of a [`CrossSectionalLinearRegression`](@ref).
+  - [`cross_sectional_solve(alg::AbstractCrossSectionalSolveAlgorithm, A::MatNum, y::VecNum, t::Integer, F = nothing, ws::NamedTuple = (;))`](@ref cross_sectional_solve): Returns the factor returns and the residual count of one observation of a [`CrossSectionalLinearRegression`](@ref). State the six arguments in one method. A member that reads no factorisation and no workspace ignores `F` and `ws`, as `cross_sectional_solve(::MySolve, A, y, t, F = nothing, ws::NamedTuple = (;))`.
 
 ### Arguments
 
@@ -27,6 +27,8 @@ Each verb returns the factor returns and the residual count of the fit that it m
   - `A`: Weighted design of one observation, `eligible assets × factors`.
   - `y`: Weighted target of one observation, of length `eligible assets`.
   - `t`: Index of the observation, for the message of a refusal.
+  - `F`: Column-pivoted `QR` of `A` that the regression took, or `nothing`.
+  - `ws`: Workspace of the task, as [`cross_sectional_solve`](@ref) states it.
 
 ### Returns
 
@@ -580,10 +582,9 @@ CrossSectionalRegression
   - [`port_opt_view`](@ref)
 """
 function port_opt_view(csr::CrossSectionalRegression, i, args...)::CrossSectionalRegression
-    return CrossSectionalRegression(; f = csr.f, eps = view(csr.eps, :, i), n = csr.n,
-                                    edof = csr.edof, b = csr.b,
-                                    h1 = nothing_scalar_array_view_odd_order(csr.h1, :, i),
-                                    dc = csr.dc, lv = csr.lv)
+    return rebuild_struct(csr,
+                          (; eps = view(csr.eps, :, i),
+                           h1 = nothing_scalar_array_view_odd_order(csr.h1, :, i)))
 end
 """
     cross_sectional_residual_dof(edof::Nothing, n::AbstractVector{<:Integer}, neff::VecNum)
@@ -924,17 +925,13 @@ function cross_sectional_rank(A::MatNum;
 end
 """
     cross_sectional_solve(alg::AbstractCrossSectionalSolveAlgorithm, A::MatNum, y::VecNum,
-                          t::Integer) -> NamedTuple
-    cross_sectional_solve(alg::AbstractCrossSectionalSolveAlgorithm, A::MatNum, y::VecNum,
-                          t::Integer, F) -> NamedTuple
-    cross_sectional_solve(alg::AbstractCrossSectionalSolveAlgorithm, A::MatNum, y::VecNum,
-                          t::Integer, F, ws::NamedTuple) -> NamedTuple
+                          t::Integer, F = nothing, ws::NamedTuple = (;)) -> NamedTuple
 
 Solve the weighted design `A` against the weighted target `y` through the branch `alg` selects, and count the residual degrees of freedom of the fit.
 
 Every answer is a least-squares fit, so its fitted values are the projection of `y` onto the span of the columns that it solves. The projection spends the rank `r` of those columns, read by [`cross_sectional_rank`](@ref), and the count is `size(A, 1) - r`. The t-statistics of [`cs_regression_t_stats`](@ref) read the same rank.
 
-The fifth argument is the column-pivoted `QR` of `A` that [`cross_sectional_regression`](@ref) took, or `nothing`. A member of the library that reads a `QR` reads `F`, so the fit factorises the design once. The sixth argument is the workspace of the task, a `NamedTuple` whose optional fields a member reads with `get`: the work vector `b` of a solve through `F`, which [`cross_sectional_full_solve`](@ref) solves in, and the Gram matrix `gram` and the right side `v` of the normal equations, which [`cross_sectional_gram_factor`](@ref) and [`cross_sectional_normal_solve`](@ref) fill. Each gives the bits of the allocating form. The methods of the root drop `F` and `ws` and call the method of four arguments, so a member of a caller implements only that one.
+The fifth argument is the column-pivoted `QR` of `A` that [`cross_sectional_regression`](@ref) took, or `nothing`. A member of the library that reads a `QR` reads `F`, so the fit factorises the design once. The sixth argument is the workspace of the task, a `NamedTuple` whose optional fields a member reads with `get`: the work vector `b` of a solve through `F`, which [`cross_sectional_full_solve`](@ref) solves in, and the Gram matrix `gram` and the right side `v` of the normal equations, which [`cross_sectional_gram_factor`](@ref) and [`cross_sectional_normal_solve`](@ref) fill. Each gives the bits of the allocating form. Every member takes the six arguments in one method, with `F = nothing` and `ws = (;)` as defaults, and a member that reads neither ignores them.
 
 # Algorithm
 
@@ -972,14 +969,6 @@ The fifth argument is the column-pivoted `QR` of `A` that [`cross_sectional_regr
   - [`cross_sectional_target_solve`](@ref)
   - [`cross_sectional_regression`](@ref)
 """
-function cross_sectional_solve(alg::AbstractCrossSectionalSolveAlgorithm, A::MatNum,
-                               y::VecNum, t::Integer, ::Any)
-    return cross_sectional_solve(alg, A, y, t)
-end
-function cross_sectional_solve(alg::AbstractCrossSectionalSolveAlgorithm, A::MatNum,
-                               y::VecNum, t::Integer, ::Any, ::Any)
-    return cross_sectional_solve(alg, A, y, t)
-end
 function cross_sectional_solve(::UncheckedSolve, A::MatNum, y::VecNum, ::Integer,
                                F = nothing, ws::NamedTuple = (;))
     if size(A, 1) == size(A, 2)
@@ -1598,20 +1587,20 @@ function cross_sectional_loop_buffers(::Val{true}, Z::Arr3Num, X::MatNum, W::Mat
             gram = Matrix{Td}(undef, K, K), v = Vector{Td}(undef, K))
 end
 """
-    cross_sectional_foreach(f, ex::FLoops.Transducers.Executor, idx::AbstractVector) -> nothing
     cross_sectional_foreach(f, ex::FLoops.Transducers.Executor, idx::AbstractVector,
-                            init) -> nothing
-    cross_sectional_foreach(f, ex::FLoops.SequentialEx, idx::AbstractVector, init) -> nothing
+                            init = Returns(nothing)) -> nothing
+    cross_sectional_foreach(f, ex::FLoops.SequentialEx, idx::AbstractVector,
+                            init = Returns(nothing)) -> nothing
 
 Call `f` on every entry of `idx` under the executor `ex`, and raise the error of the first entry that fails.
 
 The calls must be independent, and each must write a slice of its own. A threaded executor wraps an error in a `TaskFailedException`, and the entry that fails first in time depends on the schedule. So each call records its own error, and after the loop the function raises the recorded error of the lowest position, unchanged. Every executor therefore raises the error that a serial loop raises. Under `SequentialEx` the function runs the serial loop itself, so the error keeps the backtrace of the call that raised it.
 
-With `init`, each task of the executor calls `init()` once, and every call of `f` that the task runs receives that state. The state holds the buffers of the calls, so a loop over many entries allocates them once per task. A call must not keep a buffer of the state after it returns, because the next call of the task writes it. The method with no `init` gives `f` no state.
+Each task of the executor calls `init()` once, and every call of `f` that the task runs receives that state. The state holds the buffers of the calls, so a loop over many entries allocates them once per task. A call must not keep a buffer of the state after it returns, because the next call of the task writes it. The default `init` gives the state `nothing`, and a call that needs no buffer ignores it.
 
 # Arguments
 
-  - `f`: Function of one entry of `idx`, and of the state of the task when `init` is given. Its return value is discarded.
+  - `f`: Function of one entry of `idx` and of the state of the task. Its return value is discarded.
   - $(arg_dict[:ex])
   - `idx`: The entries, in the order of the serial loop.
   - `init`: Function of no argument that returns the state of one task.
@@ -1626,12 +1615,8 @@ With `init`, each task of the executor calls `init()` once, and every call of `f
   - [`cross_sectional_exposure_history`](@ref)
   - [`descriptor_scores`](@ref)
 """
-function cross_sectional_foreach(f, ex::FLoops.Transducers.Executor,
-                                 idx::AbstractVector)::Nothing
-    return cross_sectional_foreach((i, _) -> f(i), ex, idx, Returns(nothing))
-end
 function cross_sectional_foreach(f, ex::FLoops.Transducers.Executor, idx::AbstractVector,
-                                 init)::Nothing
+                                 init = Returns(nothing))::Nothing
     # `Any` is the last resort (#1979): `throw` takes a value of any type, so a slot that holds
     # the caught value must hold any type.
     err = Vector{Any}(nothing, length(idx))
@@ -1650,7 +1635,7 @@ function cross_sectional_foreach(f, ex::FLoops.Transducers.Executor, idx::Abstra
     return nothing
 end
 function cross_sectional_foreach(f, ::FLoops.SequentialEx, idx::AbstractVector,
-                                 init)::Nothing
+                                 init = Returns(nothing))::Nothing
     st = init()
     for i in idx
         f(i, st)

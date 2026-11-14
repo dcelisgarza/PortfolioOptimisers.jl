@@ -104,6 +104,10 @@ using Test
              step_td(x) = false
              step_td(x::A) = owner_td(x)
              owner_td(x::A) = true
+             query_td(x) = false
+             query_td(x::A) = owner_qtd(x)
+             query_td(x::B) = true
+             owner_qtd(x::A) = true
 
              # step functions in front of an owner (#2109)
              walk_path(x::A) = walk_path(x.a)
@@ -311,6 +315,9 @@ using Test
         @test of(:noop) == [("default", nothing, "keep (default)")]
         # A step function in front of an owner: the owner takes `false`.
         @test ("default", :owner_td, "go") in of(:step_td)
+        # A query trait with a method that answers by itself owns its `false`, as
+        # `folds_forecast_rows` does (#2093).
+        @test ("default", nothing, "keep (default)") in of(:query_td)
     end
 
     @testset "step functions in front of an owner (#2109)" begin

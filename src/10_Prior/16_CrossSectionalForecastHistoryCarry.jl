@@ -483,7 +483,7 @@ A Return Forecast that computes its history one observation at a time, as [`fold
  1. Return `st` unchanged when the forecast does not fold. The fold calls this function after a fit, so `st` always holds a regression.
  2. Keep the carried rows and the fold state when `stepped` is `true`, and none otherwise. Take the fitted observations after the kept rows, and the last `forecast_target_gap(pe.rfe)` kept rows before them, or every kept row when there are fewer.
  3. Build the block of those observations from the state, with [`cross_sectional_carry_append`](@ref). Take the member of the Orthogonal Forecast Fit `pe.ofit` with [`orthogonal_forecast_member`](@ref).
- 4. Compute the rows of those observations and the new fold state with [`orthogonal_forecast_step`](@ref), from a copy of the scores that the state carries at the rows of [`cross_sectional_forecast_rows`](@ref) and from the kept fold state. A member that trains on the rows before the block reads them too.
+ 4. Compute the rows of those observations and the new fold state with [`return_forecast_step`](@ref), with the regression that [`orthogonal_forecast_regression`](@ref) gives, as the batch fit gives it to [`return_forecast`](@ref). Read them from a copy of the scores that the state carries at the rows of [`cross_sectional_forecast_rows`](@ref) and from the kept fold state. A member that trains on the rows before the block reads them too.
  5. Append the rows of the new observations to the kept rows, and keep the new fold state.
 
 # Arguments
@@ -547,9 +547,9 @@ function cross_sectional_carry_forecast(pe::CrossSectionalFactorPrior,
     # before the first row of the histories.
     fsc::NamedTuple = st.fsc
     i = cross_sectional_forecast_rows(rfo, r, k, g, size(fsc.S, 3) - size(st.Ms, 3))
-    (; hist, fs) = orthogonal_forecast_step(pe.ofit, rfo,
-                                            map(A -> return_forecast_cut(A, i), fsc), csfm,
-                                            fs0, pe.cre)
+    (; hist, fs) = return_forecast_step(rfo, map(A -> return_forecast_cut(A, i), fsc), csfm,
+                                        fs0,
+                                        orthogonal_forecast_regression(pe.ofit, pe.cre))
     # The new rows are the last rows of the history of the step.
     H = view(hist, (size(hist, 1) - length(r) + k + 1):size(hist, 1), :)
     return cross_sectional_carry_with(st,
@@ -635,51 +635,6 @@ function cross_sectional_forecast_lead(rfe::TargetReturnForecast, lag::Integer)
     return rfe.whole_history ? max(forecast_target_gap(rfe) - lag, 0) : 0
 end
 """
-    orthogonal_forecast_step(ofit::AbstractOrthogonalForecastFit, rfe, P::NamedTuple,
-                             csfm::CrossSectionalFactorModel, fs,
-                             cre::AbstractCrossSectionalRegressionEstimator)
-    orthogonal_forecast_step(ofit::OrthogonalPartCalibration, rfe, P::NamedTuple,
-                             csfm::CrossSectionalFactorModel, fs,
-                             cre::AbstractCrossSectionalRegressionEstimator)
-
-Runs a step of the Return Forecast of the carry fold of a Cross-Sectional Factor Prior under its Orthogonal Forecast Fit, as [`orthogonal_forecast_result`](@ref) fits it in the batch fit.
-
-# Algorithm
-
-The method that Julia selects is the algorithm.
-
- 1. [`OrthogonalPartCalibration`](@ref): call [`return_forecast_step`](@ref) with `cre`, so the fold state also carries the regression of `κ⊥`. The batch fit calls [`orthogonal_forecast_result`](@ref) with `cre` for every member under this rule, and the prior refuses a member that answers `false` to [`calibrates_orthogonal_part`](@ref), so the step does the same for every member that it accepts.
- 2. Any other rule: call [`return_forecast_step`](@ref) with no `cre`.
-
-# Arguments
-
-  - `ofit`: The Orthogonal Forecast Fit of the prior.
-  - `rfe`: The Return Forecast Estimator that the step fits.
-  - `P`: The scores, the weights and the group labels of the rows of the step.
-  - `csfm`: The factor-model block of the rows of the step.
-  - `fs`: The fold state that the state carries, or `nothing`.
-  - `cre`: Cross-Sectional Regression Estimator of the prior.
-
-# Returns
-
-  - `(; hist, fs)::NamedTuple`: The answer of [`return_forecast_step`](@ref).
-
-# Related
-
-  - [`cross_sectional_carry_forecast`](@ref)
-  - [`orthogonal_forecast_result`](@ref)
-"""
-function orthogonal_forecast_step(::AbstractOrthogonalForecastFit, rfe, P::NamedTuple,
-                                  csfm::CrossSectionalFactorModel, fs,
-                                  ::AbstractCrossSectionalRegressionEstimator)
-    return return_forecast_step(rfe, P, csfm, fs)
-end
-function orthogonal_forecast_step(::OrthogonalPartCalibration, rfe, P::NamedTuple,
-                                  csfm::CrossSectionalFactorModel, fs,
-                                  cre::AbstractCrossSectionalRegressionEstimator)
-    return return_forecast_step(rfe, P, csfm, fs, cre)
-end
-"""
 $(DocStringExtensions.TYPEDSIGNATURES)
 
 Brings the outputs of the carry fold of a Cross-Sectional Factor Prior that read the fit up to its fitted observations.
@@ -739,5 +694,3 @@ function cross_sectional_carry_forecast_returns(pe::CrossSectionalFactorPrior,
     end
     return cross_sectional_forecast_window(pe, st.win, st.der)
 end
-
-public orthogonal_forecast_step

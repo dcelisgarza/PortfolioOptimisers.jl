@@ -300,10 +300,11 @@ function forecast_window_table(fe::ForecastEvaluationResult, X::MatNum, w::Optio
     forecast_ic_weights(alpha, w)
     ys = [forward_mean_returns(X, h, l) for (h, l) in grid]
     common = forecast_common_dates(alpha, ys, fe.dates, min_count)
-    rows = [forecast_window_row(ForecastEvaluationResult(alpha, ys[p], fe.umsk, common,
-                                                         fe.target, grid[p][1], grid[p][2],
-                                                         fe.step, min_count, fe.ties, ppy),
-                                w, min_count, mt) for p in eachindex(grid)]
+    rows = [forecast_window_row(rebuild_struct(fe,
+                                               (; y = ys[p], dates = common,
+                                                horizon = grid[p][1], lag = grid[p][2],
+                                                min_count = min_count, ppy = ppy)), w,
+                                min_count, mt) for p in eachindex(grid)]
     return (; period = collect(eachindex(grid)), horizon = [g[1] for g in grid],
             lag = [g[2] for g in grid], dates = common,
             spearman_mean_ic = [r.spearman_mean_ic for r in rows],

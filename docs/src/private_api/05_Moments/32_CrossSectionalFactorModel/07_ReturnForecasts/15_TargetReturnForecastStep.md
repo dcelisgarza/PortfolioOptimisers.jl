@@ -15,6 +15,6 @@ target_forecast_calibrated
 target_forecast_state
 target_forecast_latest_row
 target_forecast_matured!
-return_forecast_step(rfe::TargetReturnForecast, P::NamedTuple, csfm::CrossSectionalFactorModel, fs::Option{<:NamedTuple}, cre::Option{<:AbstractCrossSectionalRegressionEstimator})
+return_forecast_step(rfe::TargetReturnForecast, P::NamedTuple, csfm::CrossSectionalFactorModel, fs::Option{<:NamedTuple}, cre::Option{<:AbstractCrossSectionalRegressionEstimator} = nothing)
 return_forecast_result(rfe::TargetReturnForecast, hist::MatNum, fs::NamedTuple)
 ```

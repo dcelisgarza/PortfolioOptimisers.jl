@@ -1,6 +1,7 @@
 """
     return_forecast(rfe::AbstractReturnForecastEstimator, rd::ReturnsResult,
-                    csfm::CrossSectionalFactorModel) -> AbstractReturnForecastResult
+                    csfm::CrossSectionalFactorModel,
+                    cre::Option{<:AbstractCrossSectionalRegressionEstimator} = nothing) -> AbstractReturnForecastResult
 
 Compute the Return Forecast of the returns data `rd` and a fitted factor-model block.
 
@@ -8,11 +9,14 @@ This is the verb every Return Forecast Estimator answers. The block carries the 
 
 Every member follows two conventions. The value at an observation uses information up to and including that observation. And `mu` is in return units, whatever the Forecast Unit that the member scores in.
 
+Every member takes the last argument `cre`, the regression that the Orthogonal Forecast Fit of a [`CrossSectionalFactorPrior`](@ref) gives it, as [`orthogonal_forecast_regression`](@ref) answers. A member that reads no regression takes `nothing` alone, so a regression given to it raises a `MethodError`. [`TargetReturnForecast`](@ref) reads it to fit `κ⊥`.
+
 # Arguments
 
   - `rfe`: Return Forecast Estimator.
   - $(arg_dict[:rd]) It must carry an Asset Panel in `rd.pnl`.
   - `csfm`: The fitted factor-model block.
+  - `cre`: The Cross-Sectional Regression Estimator that the member reads, or `nothing`.
 
 # Returns
 
@@ -789,7 +793,7 @@ The Orthogonal Forecast Fit is not the Orthogonal Forecast Scale `c`. The fit re
 
 # Interfaces
 
-In order to implement a new Orthogonal Forecast Fit which will work seamlessly with the library, subtype `AbstractOrthogonalForecastFit`. A rule is a marker for dispatch, and it holds no data. The prior holds it in its `ofit` field. The batch fit dispatches on it at three steps, and the carry fold dispatches on it at a fourth. Each step has a method for this abstract type that leaves the forecast as it stands, so a new rule adds a method only for the step that it changes.
+In order to implement a new Orthogonal Forecast Fit which will work seamlessly with the library, subtype `AbstractOrthogonalForecastFit`. A rule is a marker for dispatch, and it holds no data. The prior holds it in its `ofit` field. The prior dispatches on it at three steps, and the batch fit and the carry fold read the same three. Each step has a method for this abstract type that leaves the forecast as it stands, so a new rule adds a method only for the step that it changes. A rule that changes the fit of the member returns its own Return Forecast Estimator from the first step.
 
 ## The member that the prior fits
 
@@ -805,40 +809,20 @@ In order to implement a new Orthogonal Forecast Fit which will work seamlessly w
 
   - `rfe`: The member that the prior fits.
 
-## The fit of the member
+## The regression that the member reads
 
-  - `orthogonal_forecast_result(ofit::MyRule, rfe, rd::ReturnsResult, csfm::CrossSectionalFactorModel, cre::AbstractCrossSectionalRegressionEstimator) -> AbstractReturnForecastResult`: Fits the member in the batch fit.
+  - `orthogonal_forecast_regression(ofit::MyRule, cre::AbstractCrossSectionalRegressionEstimator) -> Option{<:AbstractCrossSectionalRegressionEstimator}`: Returns the regression that the member reads, or `nothing`.
+
+The batch fit gives the answer to the last argument of [`return_forecast`](@ref), and the carry fold gives it to the last argument of the step of a member that folds. So the two paths fit the member in the same way.
 
 ### Arguments
 
   - `ofit`: The rule.
-  - `rfe`: The member, as `orthogonal_forecast_member` returns it.
-  - `rd`: The returns data. It carries an Asset Panel in `rd.pnl`.
-  - `csfm`: The fitted factor-model block.
   - `cre`: The Cross-Sectional Regression Estimator of the prior, which splits each row.
 
 ### Returns
 
-  - `rf::AbstractReturnForecastResult`: The Result of the member.
-
-## The step of the carry fold
-
-  - `orthogonal_forecast_step(ofit::MyRule, rfe, P::NamedTuple, csfm::CrossSectionalFactorModel, fs, cre::AbstractCrossSectionalRegressionEstimator) -> NamedTuple`: Folds the rows of a step into a member that folds.
-
-A rule that adds a method of `orthogonal_forecast_result` adds the same change to this step, or the carry fold differs from the batch fit.
-
-### Arguments
-
-  - `ofit`: The rule.
-  - `rfe`: The member that the step fits.
-  - `P`: The scores, the weights and the group labels of the rows of the step.
-  - `csfm`: The factor-model block of the rows of the step.
-  - `fs`: The fold state that the state carries, or `nothing`.
-  - `cre`: The Cross-Sectional Regression Estimator of the prior.
-
-### Returns
-
-  - `(; hist, fs)::NamedTuple`: `hist`, the Return Forecast history of the rows of the step, `observations × assets`, and `fs`, the fold state of the member after those rows.
+  - `cre::Option{<:AbstractCrossSectionalRegressionEstimator}`: The regression that the member reads, or `nothing`.
 
 ## The scale of the orthogonal part
 
@@ -861,8 +845,7 @@ A rule that adds a method of `orthogonal_forecast_result` adds the same change t
   - [`OrthogonalPartCalibration`](@ref)
   - [`UnadjustedForecast`](@ref)
   - [`orthogonal_forecast_member`](@ref)
-  - [`orthogonal_forecast_result`](@ref)
-  - [`orthogonal_forecast_step`](@ref)
+  - [`orthogonal_forecast_regression`](@ref)
   - [`orthogonal_forecast_rescale`](@ref)
   - [`CrossSectionalFactorPrior`](@ref)
   - [`AbstractAlgorithm`](@ref)
@@ -971,48 +954,57 @@ function orthogonal_forecast_member(::ScoreNeutralisation, rfe,
                                                             nw = BlockRegressionWeights()))))
 end
 """
-    orthogonal_forecast_result(ofit::AbstractOrthogonalForecastFit, rfe, rd::ReturnsResult,
-                               csfm::CrossSectionalFactorModel,
-                               cre::AbstractCrossSectionalRegressionEstimator)
-    orthogonal_forecast_result(ofit::OrthogonalPartCalibration, rfe, rd::ReturnsResult,
-                               csfm::CrossSectionalFactorModel,
-                               cre::AbstractCrossSectionalRegressionEstimator)
+    orthogonal_forecast_regression(ofit::AbstractOrthogonalForecastFit,
+                                   cre::AbstractCrossSectionalRegressionEstimator) -> Nothing
+    orthogonal_forecast_regression(ofit::OrthogonalPartCalibration,
+                                   cre::AbstractCrossSectionalRegressionEstimator) -> AbstractCrossSectionalRegressionEstimator
 
-Fit the Return Forecast of a [`CrossSectionalFactorPrior`](@ref) under its Orthogonal Forecast Fit.
+Return the regression that the member of a [`CrossSectionalFactorPrior`](@ref) reads under its Orthogonal Forecast Fit.
+
+The batch fit calls `return_forecast(rfe, rd, csfm, orthogonal_forecast_regression(ofit, cre))`, and a step of the carry fold calls [`return_forecast_step`](@ref) with the same last argument. So the rule decides once, for both paths, whether the member fits `κ⊥`.
 
 # Algorithm
 
 The method that Julia selects is the algorithm.
 
- 1. [`OrthogonalPartCalibration`](@ref): call the four-argument method of [`return_forecast`](@ref) with `cre`, so the Result also carries `κ⊥` in `ocalib`.
- 2. Any other rule: call the three-argument method.
+ 1. [`OrthogonalPartCalibration`](@ref): return `cre`, so the Result of the member also carries `κ⊥` in `ocalib`.
+ 2. Any other rule: return `nothing`. The answer is "no regression", which is true for every rule that does not read `κ⊥`.
 
 # Arguments
 
   - `ofit`: The Orthogonal Forecast Fit of the prior.
-  - `rfe`: Return Forecast Estimator, as [`orthogonal_forecast_member`](@ref) returns it.
-  - $(arg_dict[:rd]) It must carry an Asset Panel in `rd.pnl`.
-  - `csfm`: The fitted factor-model block.
   - `cre`: Cross-Sectional Regression Estimator of the prior, which splits each row.
 
 # Returns
 
-  - `rf::AbstractReturnForecastResult`: The Result of the member.
+  - `cre::Option{<:AbstractCrossSectionalRegressionEstimator}`: The regression that the member reads, or `nothing`.
+
+# Examples
+
+```jldoctest
+julia> cre = CrossSectionalLinearRegression();
+
+julia> PortfolioOptimisers.orthogonal_forecast_regression(ScoreNeutralisation(), cre) === nothing
+true
+
+julia> PortfolioOptimisers.orthogonal_forecast_regression(OrthogonalPartCalibration(), cre) === cre
+true
+```
 
 # Related
 
   - [`AbstractOrthogonalForecastFit`](@ref)
+  - [`return_forecast`](@ref)
+  - [`return_forecast_step`](@ref)
   - [`cross_sectional_return_forecast`](@ref)
 """
-function orthogonal_forecast_result(::AbstractOrthogonalForecastFit, rfe, rd::ReturnsResult,
-                                    csfm::CrossSectionalFactorModel,
-                                    ::AbstractCrossSectionalRegressionEstimator)
-    return return_forecast(rfe, rd, csfm)
+function orthogonal_forecast_regression(::AbstractOrthogonalForecastFit,
+                                        ::AbstractCrossSectionalRegressionEstimator)::Nothing
+    return nothing
 end
-function orthogonal_forecast_result(::OrthogonalPartCalibration, rfe, rd::ReturnsResult,
-                                    csfm::CrossSectionalFactorModel,
-                                    cre::AbstractCrossSectionalRegressionEstimator)
-    return return_forecast(rfe, rd, csfm, cre)
+function orthogonal_forecast_regression(::OrthogonalPartCalibration,
+                                        cre::AbstractCrossSectionalRegressionEstimator)::AbstractCrossSectionalRegressionEstimator
+    return cre
 end
 """
     orthogonal_forecast_rescale(ofit::AbstractOrthogonalForecastFit,
@@ -1071,4 +1063,4 @@ end
 export return_forecast, IdiosyncraticReturnUnit, IdiosyncraticSharpeUnit,
        ScoreNeutralisation, OrthogonalPartCalibration, UnadjustedForecast
 public AbstractOrthogonalForecastFit, orthogonal_forecast_member,
-       orthogonal_forecast_result, orthogonal_forecast_rescale
+       orthogonal_forecast_regression, orthogonal_forecast_rescale

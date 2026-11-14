@@ -1501,7 +1501,7 @@ end
               [(2, 1), (1, 2)]
     end
     @testset "A member that names no grouping field partitions nothing" begin
-        @test isnothing(PortfolioOptimisers.exposure_group_labels(rd, nothing))
+        @test isnothing(PortfolioOptimisers.cross_sectional_groups(rd.pnl, nothing))
     end
     @testset "A nothing transform slot is the identity" begin
         X = [1.0 2.0; 3.0 4.0]

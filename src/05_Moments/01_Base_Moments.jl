@@ -596,13 +596,14 @@ To implement a new concrete type, subtype `AbstractReturnForecastEstimator` and 
 
 ## `return_forecast`
 
-  - [`return_forecast(rfe::AbstractReturnForecastEstimator, rd::ReturnsResult, csfm::CrossSectionalFactorModel)`](@ref): Computes the Return Forecast from `rd` and the fitted factor model.
+  - [`return_forecast(rfe::AbstractReturnForecastEstimator, rd::ReturnsResult, csfm::CrossSectionalFactorModel, cre = nothing)`](@ref return_forecast): Computes the Return Forecast from `rd` and the fitted factor model.
 
 ### Arguments
 
   - `rfe`: The concrete subtype instance.
   - `rd`: The returns result that carries the Asset Panel.
   - `csfm`: The fitted factor-model block.
+  - `cre`: The regression that the Orthogonal Forecast Fit gives the member, as [`orthogonal_forecast_regression`](@ref) answers, or `nothing`. A member that reads no regression takes `cre::Nothing = nothing`.
 
 ### Returns
 

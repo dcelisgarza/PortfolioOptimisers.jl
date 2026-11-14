@@ -277,9 +277,7 @@ function forecast_evaluation_align(fes::AbstractVector{<:ForecastEvaluationResul
     @argcheck(lo <= hi,
               IsEmptyError("the evaluations share no date: the latest first date is $(lo) and the earliest last date is $(hi)"))
     dates = collect(lo:(first(fes).step):hi)
-    return [ForecastEvaluationResult(fe.alpha, fe.y, fe.umsk, dates, fe.target, fe.horizon,
-                                     fe.lag, fe.step, fe.min_count, fe.ties, fe.ppy)
-            for fe in fes]
+    return [rebuild_struct(fe, (; dates = dates)) for fe in fes]
 end
 """
     forecast_summary_scored(fe::ForecastEvaluationResult, u::MatNum) -> Vector{<:Real}

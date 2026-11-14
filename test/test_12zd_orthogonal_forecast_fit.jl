@@ -35,11 +35,6 @@ function (::OfitHistoryProbe)(key, pr, w, slv, ctx)
     return 1.0
 end
 
-# A caller's member that folds. Its step answers whether the carry fold gave it `cre`.
-struct OfitStepProbe <: PortfolioOptimisers.AbstractReturnForecastEstimator end
-PortfolioOptimisers.return_forecast_step(::OfitStepProbe, P, csfm, fs) = :without_cre
-PortfolioOptimisers.return_forecast_step(::OfitStepProbe, P, csfm, fs, cre) = :with_cre
-
 @testset "The Orthogonal Forecast Fit of the Cross-Sectional Factor Prior (#1486)" begin
     po = PortfolioOptimisers
     function ofit_panel(; N = 300, T = 800, beta = 1.0, seed = 1486, r = nothing,
@@ -270,12 +265,19 @@ PortfolioOptimisers.return_forecast_step(::OfitStepProbe, P, csfm, fs, cre) = :w
         end
         @test !po.calibrates_orthogonal_part(nothing)
         @test po.calibrates_orthogonal_part(members.Target)
-        # The carry step gives `cre` to every member under OrthogonalPartCalibration, as the
-        # batch fit gives it to `orthogonal_forecast_result`, and to none under another rule.
-        @test po.orthogonal_forecast_step(OrthogonalPartCalibration(), OfitStepProbe(), (;),
-                                          p.csfm, nothing, cre) === :with_cre
-        @test po.orthogonal_forecast_step(ScoreNeutralisation(), OfitStepProbe(), (;),
-                                          p.csfm, nothing, cre) === :without_cre
+        # The rule gives the member `cre` under OrthogonalPartCalibration alone, and the batch
+        # fit and the carry step both read the answer (#2076).
+        @test po.orthogonal_forecast_regression(OrthogonalPartCalibration(), cre) === cre
+        for ofit in (ScoreNeutralisation(), UnadjustedForecast())
+            @test isnothing(po.orthogonal_forecast_regression(ofit, cre))
+        end
+        # A member that reads no regression takes `nothing` alone, so a regression that a
+        # rule gives it fails loudly.
+        cv = CustomValueReturnForecast(; mu = zeros(size(p.L, 1)))
+        @test return_forecast(cv, p.rd, p.csfm, nothing).mu == cv.mu
+        @test_throws MethodError return_forecast(cv, p.rd, p.csfm, cre)
+        @test_throws MethodError po.return_forecast_step(members.EW, (;), p.csfm, nothing,
+                                                         cre)
     end
 
     @testset "The rule holds on the batch fit, the history, the refit and the carry fold" begin

@@ -912,7 +912,7 @@ The split is unscaled by `c`. The Orthogonal Forecast Scale `c` can be a rule th
 # Algorithm
 
  1. Take the member that the prior fits with [`orthogonal_forecast_member`](@ref), giving `rfo`. Under [`ScoreNeutralisation`](@ref) a fitted member neutralises its scores against the estimated factors of `csfm`.
- 2. Take `rf0` as `rf` when the carry fold gives it. Otherwise fit `rfo` on the coverage universe with [`orthogonal_forecast_result`](@ref), giving `rf`. `rd` holds every observation, so the Descriptors of the forecast warm up over every observation of the panel. [`return_forecast_rows`](@ref) finds the block as a suffix of `rd` by its size.
+ 2. Take `rf0` as `rf` when the carry fold gives it. Otherwise fit `rfo` on the coverage universe with [`return_forecast`](@ref), with the regression that [`orthogonal_forecast_regression`](@ref) gives, giving `rf`. `rd` holds every observation, so the Descriptors of the forecast warm up over every observation of the panel. [`return_forecast_rows`](@ref) finds the block as a suffix of `rd` by its size.
  3. Split `rf.mu` against the latest exposures of the estimated factors with [`cross_sectional_forecast_split`](@ref), giving `g` and `ap`. The observed factors are the trailing columns of `L`, and the split leaves them out, so `g` has one entry per column of `csr.f`. The split scales `ap` with [`orthogonal_forecast_rescale`](@ref), which changes it under [`OrthogonalPartCalibration`](@ref) alone.
  4. When `reads` is `true`, take the Return Forecast history of `rfo` once with [`cross_sectional_forecast_history`](@ref) from `rf`, giving `hist`. Otherwise `hist` is `nothing`.
 
@@ -962,7 +962,11 @@ function cross_sectional_return_forecast(ofit::AbstractOrthogonalForecastFit,
                                          reads::Bool, H::Option{<:MatNum},
                                          rf0::Option{<:AbstractReturnForecastResult} = nothing)
     rfo = orthogonal_forecast_member(ofit, rfe, csfm)
-    rf = isnothing(rf0) ? orthogonal_forecast_result(ofit, rfo, rd, csfm, cre) : rf0
+    rf = if isnothing(rf0)
+        return_forecast(rfo, rd, csfm, orthogonal_forecast_regression(ofit, cre))
+    else
+        rf0
+    end
     (; g, ap) = cross_sectional_forecast_split(ofit, rf, csfm, cre)
     hist = reads ? cross_sectional_forecast_history(rf, rfo, rd, csfm, H) : nothing
     return (; rf = rf, g = g, ap = ap, hist = hist)

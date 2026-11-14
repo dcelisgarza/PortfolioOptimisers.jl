@@ -427,7 +427,7 @@ function cross_sectional_exposure_history(factors::AbstractVector{<:Pair},
     Tf = real(eltype(X))
     (; Ms, Zo) = cross_sectional_history_backing(Tf, m, size(X, 2), length(nf), Zo)
     for cur in lay
-        cross_sectional_foreach(ex, cur) do i
+        cross_sectional_foreach(ex, cur) do i, _
             nm = String(first(factors[i]))
             xe = last(factors[i])
             (; rdi, k) = cross_sectional_exposure_rows(xe, rd, m)

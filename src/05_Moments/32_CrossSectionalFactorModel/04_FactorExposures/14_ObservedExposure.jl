@@ -175,8 +175,8 @@ function carry_lookback(xe::ObservedExposure)::Option{<:Integer}
 end
 function descriptor_carry(xe::ObservedExposure, rd::ReturnsResult, m::Integer)
     c = descriptor_carry(xe.xe, rd, m)
-    return (; xf = ObservedExposure(c.xf, xe.series, xe.family),
-            xv = ObservedExposure(c.xv, xe.series, xe.family))
+    return (; xf = rebuild_struct(xe, (; xe = c.xf)),
+            xv = rebuild_struct(xe, (; xe = c.xv)))
 end
 """
 $(DocStringExtensions.TYPEDEF)
@@ -591,9 +591,7 @@ function cross_sectional_observed(obs::AbstractVector{<:Pair}, rd::ReturnsResult
     if !isempty(i1) && !isempty(i2)
         Xn = cross_sectional_local_returns(nothing, cross_sectional_observed_stack(m1, rd),
                                            rd.X, rd, lag, kx.Xn, g0)
-        rdn = ReturnsResult(; nx = rd.nx, X = Xn, nf = rd.nf, F = rd.F, nb = rd.nb,
-                            B = rd.B, ne = rd.ne, E = rd.E, ts = rd.ts, iv = rd.iv,
-                            ivpa = rd.ivpa, pnl = rd.pnl)
+        rdn = rebuild_struct(rd, (; X = Xn))
     end
     m2 = [member(k, rdn) for k in i2]
     # The two stages put the members back in the order of `ob`. An empty stage takes an inferred

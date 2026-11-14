@@ -566,10 +566,6 @@ const RULED_REBUILDS = Dict{Tuple{Symbol, Symbol}, Tuple{String, String}}(#
                                                                            :JuMPReturnsSettings) =>
                                                                               ("go",
                                                                                "`settings` is the `JuMPReturnsSettings` of `r`: `rebuild_struct(settings, (; rte = false))` (rule 6, #2110)"),
-                                                                          (:forecast_evaluation_align,
-                                                                           :ForecastEvaluationResult) =>
-                                                                              ("go",
-                                                                               "each `fe` is a `ForecastEvaluationResult`, which has no keyword constructor: add the outer keyword constructor of § *Constructor Pattern*, then `rebuild_struct(fe, (; dates = dates))` (rule 6, #2110)"),
                                                                           (:fit_data_step_from_state,
                                                                            :PriceGapFillResult) =>
                                                                               ("go",
@@ -930,10 +926,14 @@ const RULED_NOTHING_PAIRS = Dict{Tuple{Symbol, Symbol}, Tuple{String, String}}(#
                                                                                 :cross_sectional_prior_pairs) =>
                                                                                    ("go",
                                                                                     "$CASE_2. The keyword `factors::Dict_VecPair` refuses `nothing` before the call"),
-                                                                               (:exposure_group_labels,
-                                                                                :cross_sectional_groups) =>
-                                                                                   ("go",
-                                                                                    "$CASE_2. The callers pass `rd.pnl`"),
+                                                                               (:cross_sectional_shared_qr,
+                                                                                :cross_sectional_qr) =>
+                                                                                   ("keep (b)",
+                                                                                    "$POLICY: the `Nothing` arm answers that no reader needs a factorisation, from the two masks and the solve algorithm, which the callee does not take, and `cross_sectional_qr(D, nothing)` takes the factorisation, another answer (#2093)"),
+                                                                               (:cross_sectional_local_returns,
+                                                                                :descriptor_field_values) =>
+                                                                                   ("keep (b)",
+                                                                                    "$POLICY: the `Nothing` arm derives the net returns from `cc`, `X`, `lag`, `kept` and `g0`, which the callee does not take, and `descriptor_field_values(rd, nothing)` gives `abs.(rd.X)`, another answer (#2093)"),
                                                                                (:scale_rows,
                                                                                 :window_rows) =>
                                                                                    ("go",
@@ -1218,6 +1218,13 @@ function fallback_verdict(t::Tree, d, kind, args)
             "a fallback of $(length(args)) slots returns `nothing`: a typed method on the set that reaches it (#2108)")
 end
 
+# Whether every method of the function of `d` other than `d` only forwards. A query trait with
+# a method that answers by itself is no step function in front of an owner (#2093).
+function all_forward(t::Tree, d)
+    return all(m -> m === d || CH.forward_call(m.body) !== nothing,
+               get(t.by_name, d.name, CH.MethodDef[]))
+end
+
 # Whether another method of the function of `d` names the function: the function is a walk, and
 # `d` is its leaf.
 function is_walk(t::Tree, d)
@@ -1296,7 +1303,10 @@ function default_findings!(out, t::Tree, rulings)
             continue
         end
         owners = unique(c for (n, c) in keys(t.forwards) if n === d.name && c !== d.name)
-        if !isempty(owners)
+        # A query trait with a typed method that answers by itself owns its question, so its
+        # `false` is no step in front of the callee of another method: `folds_forecast_rows`
+        # answers `true` for two members and forwards for a third (#2093).
+        if !isempty(owners) && (kind != "`false`" || all_forward(t, d))
             owner = sort!(owners)[1]
             verdict, why = step_verdict(t, d, kind, owner)
             push!(out,

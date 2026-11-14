@@ -21,6 +21,6 @@ UnadjustedForecast
 ```@docs
 return_forecast
 orthogonal_forecast_member
-orthogonal_forecast_result
+orthogonal_forecast_regression
 orthogonal_forecast_rescale
 ```

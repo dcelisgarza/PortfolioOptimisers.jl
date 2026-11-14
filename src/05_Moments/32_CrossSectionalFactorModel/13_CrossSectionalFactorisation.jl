@@ -395,8 +395,9 @@ function cross_sectional_qr(D::MatNum, ::Nothing, Q::MatNum)
     return LinearAlgebra.qr!(Q, LinearAlgebra.ColumnNorm())
 end
 """
-    cross_sectional_gram_factor(D::MatNum) -> Option{<:LinearAlgebra.CholeskyPivoted}
-    cross_sectional_gram_factor(D::MatNum, gram) -> Option{<:LinearAlgebra.CholeskyPivoted}
+    cross_sectional_gram_factor(D::MatNum, gram = nothing) -> Option{<:LinearAlgebra.CholeskyPivoted}
+    cross_sectional_gram_factor(D::StridedMatrix{T}, gram::Matrix{T}) where {T <: LinearAlgebra.BlasFloat}
+        -> Option{<:LinearAlgebra.CholeskyPivoted}
 
 Return the pivoted Cholesky factorisation of the Gram matrix of a weighted design, or `nothing` when [`NormalEquationsSolve`](@ref) must not solve the normal equations of the design.
 
@@ -426,7 +427,7 @@ The verb passes the factorisation when it has full rank and [`cross_sectional_gr
   - [`cross_sectional_solve`](@ref)
   - [`cross_sectional_target_solve`](@ref)
 """
-function cross_sectional_gram_factor(D::MatNum)
+function cross_sectional_gram_factor(D::MatNum, ::Any = nothing)
     if iszero(size(D, 1)) || iszero(size(D, 2))
         return nothing
     end
@@ -434,9 +435,6 @@ function cross_sectional_gram_factor(D::MatNum)
     tol = sqrt(eps(real(eltype(G)))) * maximum(real, LinearAlgebra.diag(G))
     C = LinearAlgebra.cholesky(G, LinearAlgebra.RowMaximum(); tol = tol, check = false)
     return cross_sectional_gram_conditioned(C, size(D, 2)) ? C : nothing
-end
-function cross_sectional_gram_factor(D::MatNum, ::Any)
-    return cross_sectional_gram_factor(D)
 end
 function cross_sectional_gram_factor(D::StridedMatrix{T},
                                      gram::Matrix{T}) where {T <: LinearAlgebra.BlasFloat}
@@ -525,8 +523,11 @@ function cross_sectional_normal_solve(C::LinearAlgebra.CholeskyPivoted{T},
     return copy(v)
 end
 """
-    cross_sectional_full_solve(F, A::MatNum, y::VecNum) -> VecNum
-    cross_sectional_full_solve(F, A::MatNum, y::VecNum, b::Option{<:AbstractVector}) -> VecNum
+    cross_sectional_full_solve(F, A::MatNum, y::VecNum,
+                               b::Option{<:AbstractVector} = nothing) -> VecNum
+    cross_sectional_full_solve(F::LinearAlgebra.QRPivoted{T, <:StridedMatrix}, A::MatNum,
+                               y::AbstractVector{T}, b::Vector{T}) where {T <: LinearAlgebra.BlasFloat}
+        -> VecNum
 
 Return the least-squares answer of a weighted design of full rank, through the column-pivoted `QR` that the caller already took.
 
@@ -558,12 +559,9 @@ The method that Julia selects is the algorithm.
   - [`cross_sectional_rank`](@ref)
   - [`cross_sectional_loop_buffers`](@ref)
 """
-function cross_sectional_full_solve(F, A::MatNum, y::VecNum)::VecNum
-    return size(A, 1) == size(A, 2) ? A \ y : F \ y
-end
 function cross_sectional_full_solve(F, A::MatNum, y::VecNum,
-                                    ::Option{<:AbstractVector})::VecNum
-    return cross_sectional_full_solve(F, A, y)
+                                    ::Option{<:AbstractVector} = nothing)::VecNum
+    return size(A, 1) == size(A, 2) ? A \ y : F \ y
 end
 function cross_sectional_full_solve(F::LinearAlgebra.QRPivoted{T, <:StridedMatrix},
                                     A::MatNum, y::AbstractVector{T},
@@ -629,7 +627,7 @@ end
 
 Return the column-pivoted `QR` that every reader of one observation shares, or `nothing` when no reader of the regression needs it.
 
-The leverage check writes `h1`, and the mark of the dropped columns of [`DependentColumnDrop`](@ref) writes `dc`. Both read a `QR` of the weighted design, so the regression takes it once and hands it to the solve as well. With neither mask, the regression takes it for a member of the library whose solve reads a `QR`, so that it factorises into the buffer of its task. [`NormalEquationsSolve`](@ref) reads none, and a member of a caller drops it, so both receive `nothing`.
+The leverage check writes `h1`, and the mark of the dropped columns of [`DependentColumnDrop`](@ref) writes `dc`. Both read a `QR` of the weighted design, so the regression takes it once and hands it to the solve as well. With neither mask, the regression takes it for a member of the library whose solve reads a `QR`, so that it factorises into the buffer of its task. [`NormalEquationsSolve`](@ref) reads none, and a member of a caller ignores it, so both receive `nothing`.
 
 # Algorithm
 

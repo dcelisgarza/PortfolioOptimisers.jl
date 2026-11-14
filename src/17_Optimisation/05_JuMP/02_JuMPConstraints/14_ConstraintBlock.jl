@@ -628,9 +628,26 @@ $(DocStringExtensions.FIELDS)
 
 # Constructors
 
-    ResolvedConstraintBlock(; pr, rd, wb, lt, st, lcsr, ctr, gcardr, sgcardr, smtx, sgmtx, slt,
-                            sst, sglt, sgst, tn, plr, l2c, lpc, linfc, l1, l2, lp, linf, card,
-                            scard, ss, xbgt, sbgt, gbgt, ccnt, cobj) -> ResolvedConstraintBlock
+    ResolvedConstraintBlock(; pr::Option{<:AbstractPriorResult},
+                            rd::Option{<:ReturnsResult}, wb::Option{<:WeightBounds},
+                            lt::Option{<:Threshold}, st::Option{<:Threshold},
+                            lcsr::Option{<:Lc_VecLc}, ctr::Option{<:Lc_CC_VecCC},
+                            gcardr::Option{<:LinearConstraint},
+                            sgcardr::Option{<:Lc_VecLc},
+                            smtx::Option{<:MatNum_VecMatNum},
+                            sgmtx::Option{<:MatNum_VecMatNum},
+                            slt::Option{<:Bt_VecOptBt}, sst::Option{<:Bt_VecOptBt},
+                            sglt::Option{<:Bt_VecOptBt}, sgst::Option{<:Bt_VecOptBt},
+                            tn::Option{<:Tn_VecTn}, plr::Option{<:PlC_VecPlC},
+                            l2c::Option{<:Number}, lpc::Option{<:LpReg_VecLpReg},
+                            linfc::Option{<:Number}, l1::Option{<:Number},
+                            l2::Option{<:L2Reg_VecL2Reg}, lp::Option{<:LpReg_VecLpReg},
+                            linf::Option{<:Number}, card::Option{<:Integer},
+                            scard::Option{<:Int_VecInt}, ss::Option{<:Number},
+                            xbgt::Bool, sbgt::Option{<:Num_BgtRg},
+                            gbgt::Option{<:Num_BgtRg},
+                            ccnt::Option{<:JuMPConstr_VecJuMPConstr},
+                            cobj::Option{<:JuMPObj_VecJuMPObj}) -> ResolvedConstraintBlock
 
 Keywords correspond to the struct's fields, and each keyword has no default. Make the Result with [`resolve_constraint_block`](@ref). The constructor checks the type of each field, so a slot that holds an estimator raises a `TypeError`. It checks no value, because the resolution checked the values.
 

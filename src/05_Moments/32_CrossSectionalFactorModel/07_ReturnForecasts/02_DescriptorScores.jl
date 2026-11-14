@@ -429,7 +429,7 @@ The function computes the Descriptors over all the returns data. A Descriptor wi
 
 # Validation
 
-  - The rules of [`return_forecast_weights`](@ref), of [`return_forecast_rows`](@ref), of [`exposure_group_labels`](@ref) and of [`cross_sectional_transform`](@ref).
+  - The rules of [`return_forecast_weights`](@ref), of [`return_forecast_rows`](@ref), of [`cross_sectional_groups`](@ref) and of [`cross_sectional_transform`](@ref).
   - The rules of [`neutralise_scores!`](@ref) and of [`neutralisation_base_weights`](@ref) when the recipe names Neutralisation targets.
 
 # Returns
@@ -490,7 +490,7 @@ A score of an observation reads the last [`lookback`](@ref) rows of the panel, a
 
 # Algorithm
 
- 1. Read the cross-sectional weights off the estimation mask of the Asset Panel with [`return_forecast_weights`](@ref), and the group labels off the named categorical Panel Field with [`exposure_group_labels`](@ref).
+ 1. Read the cross-sectional weights off the estimation mask of the Asset Panel with [`return_forecast_weights`](@ref), and the group labels off the named categorical Panel Field with [`cross_sectional_groups`](@ref).
  2. Compute each Descriptor over all the returns data under `ds.ex`, through [`cross_sectional_foreach`](@ref), and apply the outlier slot and then the scoring slot to it with [`composite_score`](@ref).
  3. Stack the scores on the second axis, in the order of the Descriptors, with the observations on the last axis.
 
@@ -501,7 +501,7 @@ A score of an observation reads the last [`lookback`](@ref) rows of the panel, a
 
 # Validation
 
-  - The rules of [`return_forecast_weights`](@ref), of [`exposure_group_labels`](@ref) and of [`cross_sectional_transform`](@ref).
+  - The rules of [`return_forecast_weights`](@ref), of [`cross_sectional_groups`](@ref) and of [`cross_sectional_transform`](@ref).
 
 # Returns
 
@@ -516,7 +516,7 @@ A score of an observation reads the last [`lookback`](@ref) rows of the panel, a
 """
 function descriptor_panel_scores(ds::DescriptorScores, rd::ReturnsResult)
     w = return_forecast_weights(rd)
-    groups = exposure_group_labels(rd, ds.group)
+    groups = cross_sectional_groups(rd.pnl, ds.group)
     # Each Descriptor writes its own entry of `sc`, in parallel, so `sc` is filled out of
     # order. `composite_score` returns a `MatNum`, and the Descriptors vary across the family,
     # so `MatNum` is the element type (#1979). `stack` promotes the number types of the
@@ -526,7 +526,7 @@ function descriptor_panel_scores(ds::DescriptorScores, rd::ReturnsResult)
     # inference, where a `stack` over an abstract Descriptor vector reads as `Any`. A score
     # is `observations × assets`, and the stack puts the observations last.
     sc = Vector{MatNum}(undef, length(ds.descriptors))
-    cross_sectional_foreach(ds.ex, eachindex(ds.descriptors)) do k
+    cross_sectional_foreach(ds.ex, eachindex(ds.descriptors)) do k, _
         return sc[k] = composite_score(ds.descriptors[k], rd, ds.outlier, ds.scoring, w,
                                        groups)
     end

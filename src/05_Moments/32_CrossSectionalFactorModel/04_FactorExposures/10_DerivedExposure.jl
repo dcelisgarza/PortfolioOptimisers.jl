@@ -168,7 +168,7 @@ function factor_exposure(xe::DerivedExposure, rd::ReturnsResult, xs::MatNum;
     w = exposure_benchmark_weights(rd, xe.bw; strict = strict)
     @argcheck(size(xs) == size(w),
               DimensionMismatch("the source Factor Exposure is observations × assets, like the Asset Panel it was computed on, got size(xs) = $(size(xs)) and $(size(w))"))
-    groups = exposure_group_labels(rd, xe.group)
+    groups = cross_sectional_groups(rd.pnl, xe.group)
     D0 = xe.f(xs)
     @argcheck(size(D0) == size(xs),
               DimensionMismatch("f maps one Factor Exposure to another, so it must return a matrix of the size it was given, got $(size(D0)) from size(xs) = $(size(xs))"))

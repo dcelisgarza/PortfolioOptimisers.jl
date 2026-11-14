@@ -383,7 +383,7 @@ julia> factor_exposure(xe, rd)
 function factor_exposure(xe::CompositeExposure, rd::ReturnsResult;
                          strict::Bool = false)::Matrix{<:Real}
     w = exposure_benchmark_weights(rd, xe.bw; strict = strict)
-    groups = exposure_group_labels(rd, xe.group)
+    groups = cross_sectional_groups(rd.pnl, xe.group)
     des = xe.descriptors
     wv = composite_weights(xe.weights, length(des))
     S = composite_score(des[1], rd, xe.outlier, xe.scoring, w, groups)

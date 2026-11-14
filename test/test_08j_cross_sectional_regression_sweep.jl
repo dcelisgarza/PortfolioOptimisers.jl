@@ -31,9 +31,15 @@ function csrs_normal_equations(Z, X, W, t; intercept)
     return intercept ? (beta[1], beta[2:end]) : (0.0, beta)
 end
 
-# A member of a caller that states only the solve of four arguments.
+# A member of a caller that reads no factorisation and no workspace, and ignores both slots.
 struct CsrsUserSolve <: PortfolioOptimisers.AbstractCrossSectionalSolveAlgorithm end
-function PortfolioOptimisers.cross_sectional_solve(::CsrsUserSolve, A, y, ::Integer)
+function PortfolioOptimisers.cross_sectional_solve(::CsrsUserSolve, A, y, ::Integer,
+                                                   F = nothing, ws::NamedTuple = (;))
+    return (; f = A \ y, edof = size(A, 1) - size(A, 2))
+end
+# A member of a caller that states the four arguments of v0.33 alone.
+struct CsrsFourArgSolve <: PortfolioOptimisers.AbstractCrossSectionalSolveAlgorithm end
+function PortfolioOptimisers.cross_sectional_solve(::CsrsFourArgSolve, A, y, ::Integer)
     return (; f = A \ y, edof = size(A, 1) - size(A, 2))
 end
 # A design of `m` rows and `k` columns whose condition number is `c`.
@@ -343,7 +349,8 @@ end
             Dd = hcat(D[:, 1:3], D[:, 1])
             @test PO.cross_sectional_solve(nes, Dd, y, 1, qr(Dd, ColumnNorm()), ws) ==
                   PO.cross_sectional_solve(pif, Dd, y, 1)
-            # The root drops `F` and `ws`, so a member of a caller implements four arguments.
+            # A member of a caller takes the six arguments in one method and ignores `F`
+            # and `ws` (#2093).
             @test PO.cross_sectional_solve(CsrsUserSolve(), D, y, 1, F1, ws) ==
                   PO.cross_sectional_solve(CsrsUserSolve(), D, y, 1)
         end
@@ -449,11 +456,14 @@ end
 
     @testset "A member of a caller reads no factorisation (#1971)" begin
         # The regression hands the QR of its leverage check as a fifth argument, and the
-        # method of the root drops it for a member that states four.
+        # member ignores it. A member that states four arguments alone has no method for
+        # the call of the regression (#2093).
         A = CSRS_Z[:, :, 1]
         y = CSRS_X[1, :]
         @test PO.cross_sectional_solve(CsrsUserSolve(), A, y, 1, qr(A, ColumnNorm())) ==
               PO.cross_sectional_solve(CsrsUserSolve(), A, y, 1)
+        @test_throws MethodError PO.cross_sectional_solve(CsrsFourArgSolve(), A, y, 1,
+                                                          qr(A, ColumnNorm()), (;))
         csr = cross_sectional_regression(CrossSectionalLinearRegression(;
                                                                         alg = CsrsUserSolve()),
                                          Z, X, W)

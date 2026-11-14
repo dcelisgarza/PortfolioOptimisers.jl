@@ -184,8 +184,9 @@ function neutralise_exposures!(Ms::AbstractArray{<:Real, 3},
         for k in kidx
             # The response of the fit is one exposure, `observations × assets` as the returns
             # of a fit are, so the fit reads the transpose of its slice.
-            W = neutralisation_weights(Ms, X, bw, k)
-            csr = cross_sectional_regression(cre, X, transpose(view(Ms, :, k, :)), W)
+            y = transpose(view(Ms, :, k, :))
+            W = neutralisation_weights(y, X, bw)
+            csr = cross_sectional_regression(cre, X, y, W)
             Ms[:, k, :] = transpose(cross_sectional_transform(ct, csr.eps; w = W))
         end
     end
@@ -218,22 +219,18 @@ function neutralisation_names(targets::AbstractVector{<:Union{AbstractString, Sy
 end
 """
     neutralisation_weights(y::MatNum, X::AbstractArray{<:Real, 3}, bw::MatNum)
-    neutralisation_weights(Ms::AbstractArray{<:Real, 3}, X::AbstractArray{<:Real, 3},
-                           bw::MatNum, k::Integer)
 
 Return the regression weights of one Neutralisation.
 
 The weight of an asset is zero where its response or one of its target exposures is not finite, because a cross-sectional fit refuses a non-finite entry at a positive weight. The weight is also zero where the base weight is not finite or not positive.
 
-The response is one Factor Exposure in [`neutralise_exposures!`](@ref), and one Descriptor score in [`neutralise_scores!`](@ref). The four-argument method takes the exposure by its raw factor index and calls the three-argument method, so the two Neutralisations use one rule.
+The response is one Factor Exposure in [`neutralise_exposures!`](@ref), which passes the exposure of one factor as `transpose(view(Ms, :, k, :))`, and one Descriptor score in [`neutralise_scores!`](@ref). So the two Neutralisations use one rule.
 
 # Arguments
 
   - `y::MatNum`: The response that the Neutralisation fits, `observations × assets`.
-  - `Ms::AbstractArray{<:Real, 3}`: Exposure history, `assets × factors × observations`.
   - `X::AbstractArray{<:Real, 3}`: Target exposures, `assets × targets × observations`.
   - `bw::MatNum`: Base weight history, `observations × assets`. It holds the benchmark weights in a Neutralisation of Factor Exposures, and the estimation mask in a Neutralisation of Descriptor scores.
-  - `k::Integer`: Raw index of the factor that the Neutralisation fits.
 
 # Returns
 
@@ -266,8 +263,4 @@ function neutralisation_weights(y::MatNum, X::AbstractArray{<:Real, 3}, bw::MatN
         end
     end
     return W
-end
-function neutralisation_weights(Ms::AbstractArray{<:Real, 3}, X::AbstractArray{<:Real, 3},
-                                bw::MatNum, k::Integer)
-    return neutralisation_weights(transpose(view(Ms, :, k, :)), X, bw)
 end

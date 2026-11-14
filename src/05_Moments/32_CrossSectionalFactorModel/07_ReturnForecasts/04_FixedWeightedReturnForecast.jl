@@ -304,7 +304,8 @@ function FixedWeightedReturnForecastResult(; mu::VecNum, hist::MatNum,
 end
 """
     return_forecast(rfe::FixedWeightedReturnForecast, rd::ReturnsResult,
-                    csfm::CrossSectionalFactorModel) -> FixedWeightedReturnForecastResult
+                    csfm::CrossSectionalFactorModel,
+                    cre::Nothing = nothing) -> FixedWeightedReturnForecastResult
 
 Compute the Return Forecast of a fixed signed combination of Descriptor scores.
 
@@ -319,6 +320,7 @@ Compute the Return Forecast of a fixed signed combination of Descriptor scores.
   - `rfe`: Fixed weighted Return Forecast Estimator.
   - $(arg_dict[:rd]) It must carry an Asset Panel in `rd.pnl`.
   - `csfm`: The fitted factor-model block. Its histories set the rows of the block. The member reads its exposure history only under a Neutralisation, and its idiosyncratic variance history only under [`IdiosyncraticSharpeUnit`](@ref).
+  - `cre`: No regression. The member fits no calibration, so it reads none, as [`return_forecast`](@ref) states.
 
 # Validation
 
@@ -364,7 +366,8 @@ julia> rf.hist
   - [`forecast_return_units`](@ref)
 """
 function return_forecast(rfe::FixedWeightedReturnForecast, rd::ReturnsResult,
-                         csfm::CrossSectionalFactorModel)::FixedWeightedReturnForecastResult
+                         csfm::CrossSectionalFactorModel,
+                         ::Nothing = nothing)::FixedWeightedReturnForecastResult
     rows = return_forecast_rows(rd, csfm)
     P = map(A -> return_forecast_cut(A, rows), descriptor_panel_scores(rfe.scores, rd))
     (; hist, fs) = return_forecast_step(rfe, P, csfm, nothing)
@@ -372,7 +375,8 @@ function return_forecast(rfe::FixedWeightedReturnForecast, rd::ReturnsResult,
 end
 """
     return_forecast_step(rfe::FixedWeightedReturnForecast, P::NamedTuple,
-                         csfm::CrossSectionalFactorModel, fs::Nothing) -> NamedTuple
+                         csfm::CrossSectionalFactorModel, fs::Nothing,
+                         cre::Nothing = nothing) -> NamedTuple
 
 Compute the Return Forecast history of a fixed signed combination of Descriptor scores, on the rows of a block.
 
@@ -393,6 +397,7 @@ A row of the history reads the scores, the exposures, the regression weights and
   - `P`: The scores, the weights and the group labels of the rows of the block, `(; S, w, g)`, as [`descriptor_panel_scores`](@ref) states them. The function can change `P.S` in place.
   - `csfm`: The factor-model block of the rows of `P`. The member reads its exposure history only under a Neutralisation, and its idiosyncratic variance history only under [`IdiosyncraticSharpeUnit`](@ref).
   - `fs`: The fold state, always `nothing`.
+  - `cre`: No regression, as for [`return_forecast`](@ref).
 
 # Validation
 
@@ -412,7 +417,8 @@ A row of the history reads the scores, the exposures, the regression weights and
   - [`composite_finalise!`](@ref)
 """
 function return_forecast_step(rfe::FixedWeightedReturnForecast, P::NamedTuple,
-                              csfm::CrossSectionalFactorModel, ::Nothing)::NamedTuple
+                              csfm::CrossSectionalFactorModel, ::Nothing,
+                              ::Nothing = nothing)::NamedTuple
     ds = rfe.scores
     Sb = descriptor_neutralised_scores(ds, P, csfm, axes(P.S, 3))
     K = size(Sb, 2)

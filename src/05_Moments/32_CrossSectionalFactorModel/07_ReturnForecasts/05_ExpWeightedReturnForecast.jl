@@ -520,7 +520,8 @@ function ExpWeightedReturnForecastResult(; mu::VecNum, hist::MatNum, coef::VecNu
 end
 """
     return_forecast(rfe::ExpWeightedReturnForecast, rd::ReturnsResult,
-                    csfm::CrossSectionalFactorModel) -> ExpWeightedReturnForecastResult
+                    csfm::CrossSectionalFactorModel,
+                    cre::Nothing = nothing) -> ExpWeightedReturnForecastResult
 
 Fit a Return Forecast by exponentially weighted least squares on the forward idiosyncratic return.
 
@@ -535,6 +536,7 @@ Fit a Return Forecast by exponentially weighted least squares on the forward idi
   - `rfe`: Exponentially weighted Return Forecast Estimator.
   - $(arg_dict[:rd]) It must carry an Asset Panel in `rd.pnl`.
   - `csfm`: The fitted factor-model block. It must carry the cross-sectional fit and the idiosyncratic variance history, its histories state the block's rows, and the member reads its exposure history under a Neutralisation.
+  - `cre`: No regression. The member fits no calibration, so it reads none, as [`return_forecast`](@ref) states.
 
 # Validation
 
@@ -553,7 +555,8 @@ Fit a Return Forecast by exponentially weighted least squares on the forward idi
   - [`return_forecast_cut`](@ref)
 """
 function return_forecast(rfe::ExpWeightedReturnForecast, rd::ReturnsResult,
-                         csfm::CrossSectionalFactorModel)::ExpWeightedReturnForecastResult
+                         csfm::CrossSectionalFactorModel,
+                         ::Nothing = nothing)::ExpWeightedReturnForecastResult
     rows = return_forecast_rows(rd, csfm)
     P = map(A -> return_forecast_cut(A, rows), descriptor_panel_scores(rfe.scores, rd))
     (; hist, fs) = return_forecast_step(rfe, P, csfm, nothing)
@@ -561,8 +564,8 @@ function return_forecast(rfe::ExpWeightedReturnForecast, rd::ReturnsResult,
 end
 """
     return_forecast_step(rfe::ExpWeightedReturnForecast, P::NamedTuple,
-                         csfm::CrossSectionalFactorModel,
-                         fs::Option{<:NamedTuple}) -> NamedTuple
+                         csfm::CrossSectionalFactorModel, fs::Option{<:NamedTuple},
+                         cre::Nothing = nothing) -> NamedTuple
 
 Advance the recursion of an exponentially weighted Return Forecast over the rows of a block, and compute the Return Forecast history of those rows.
 
@@ -583,6 +586,7 @@ The fold state `fs` holds the normal equations `A` and `c`, the count `n` of the
   - `P`: The scores, the weights and the group labels of the rows of the block, `(; S, w, g)`, as [`descriptor_panel_scores`](@ref) states them. The function can change `P.S` in place.
   - `csfm`: The factor-model block of the rows of `P`. It must carry the cross-sectional fit and the idiosyncratic variance history, and the member reads its exposure history under a Neutralisation.
   - `fs`: The fold state `(; A, c, n, coef)` after the rows before the block, or `nothing` for an empty state.
+  - `cre`: No regression, as for [`return_forecast`](@ref).
 
 # Validation
 
@@ -603,8 +607,8 @@ The fold state `fs` holds the normal equations `A` and `c`, the count `n` of the
   - [`ew_forecast_history`](@ref)
 """
 function return_forecast_step(rfe::ExpWeightedReturnForecast, P::NamedTuple,
-                              csfm::CrossSectionalFactorModel,
-                              fs::Option{<:NamedTuple})::NamedTuple
+                              csfm::CrossSectionalFactorModel, fs::Option{<:NamedTuple},
+                              ::Nothing = nothing)::NamedTuple
     Sb = descriptor_neutralised_scores(rfe.scores, P, csfm, axes(P.S, 3))
     emsk::MatNum = P.w
     vs = forecast_idiosyncratic_variances(csfm)

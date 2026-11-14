@@ -326,7 +326,7 @@ end
 """
     return_forecast_step(rfe::TargetReturnForecast, P::NamedTuple,
                          csfm::CrossSectionalFactorModel, fs::Option{<:NamedTuple},
-                         cre::Option{<:AbstractCrossSectionalRegressionEstimator}) -> NamedTuple
+                         cre::Option{<:AbstractCrossSectionalRegressionEstimator} = nothing) -> NamedTuple
 
 Fold the observations of `P` into the fit of a [`TargetReturnForecast`](@ref) under [`PrequentialCalibration`](@ref) and a [`LinearModel`](@ref) with no keyword argument, as [`target_forecast_folds`](@ref) answers.
 
@@ -372,7 +372,7 @@ The rule of [`PrequentialCalibration`](@ref) is a fold over the observations in 
 """
 function return_forecast_step(rfe::TargetReturnForecast, P::NamedTuple,
                               csfm::CrossSectionalFactorModel, fs::Option{<:NamedTuple},
-                              cre::Option{<:AbstractCrossSectionalRegressionEstimator})::NamedTuple
+                              cre::Option{<:AbstractCrossSectionalRegressionEstimator} = nothing)::NamedTuple
     d = target_forecast_design(rfe, P, csfm, return_forecast_rows(size(P.S, 3), csfm))
     Sa = d.Sa
     N, K, T = size(Sa)
@@ -420,11 +420,6 @@ function return_forecast_step(rfe::TargetReturnForecast, P::NamedTuple,
     return (; hist = hist,
             fs = (; XtX = XtX, Xty = Xty, n = n, model = model,
                   B = B[max(T - g + 1, 1):T, :], cs = cs, ocs = ocs))
-end
-function return_forecast_step(rfe::TargetReturnForecast, P::NamedTuple,
-                              csfm::CrossSectionalFactorModel,
-                              fs::Option{<:NamedTuple})::NamedTuple
-    return return_forecast_step(rfe, P, csfm, fs, nothing)
 end
 """
     return_forecast_result(rfe::TargetReturnForecast, hist::MatNum,

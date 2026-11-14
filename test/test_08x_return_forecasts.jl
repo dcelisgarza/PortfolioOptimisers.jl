@@ -2039,7 +2039,8 @@ THREE MORE CONVENTIONS SHAPE THESE PROBES.
         S = descriptor_scores(ds, rd, csfm).S
         w = PO.return_forecast_weights(rd)
         al = PO.target_forecast_alignment(true, S, eps, nothing, w,
-                                          PO.exposure_group_labels(rd, "industry"), rows)
+                                          PO.cross_sectional_groups(rd.pnl, "industry"),
+                                          rows)
         @test size(al.eps) == (T, N)
         @test all(isnan, view(al.eps, 1:(first(rows) - 1), :))
         fwd = PO.forward_mean_returns(al.eps, 2, 1)

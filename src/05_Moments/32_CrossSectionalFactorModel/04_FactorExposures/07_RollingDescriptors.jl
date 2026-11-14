@@ -743,8 +743,7 @@ function descriptor_step(de::RollingLogReturn, rd::ReturnsResult)
     st = rolling_state_seed(de, X)
     D = rolling_state_fold!(st, de, X, pnl.amsk)
     descriptor_active_fill!(D, pnl)
-    return (; de = RollingLogReturn(de.window, de.skip, de.sign, de.exponentiate, st),
-            D = D)
+    return (; de = rebuild_struct(de, (; cache = st)), D = D)
 end
 """
     descriptor_step(::AbstractDescriptorEstimator, ::ReturnsResult)
