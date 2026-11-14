@@ -166,14 +166,14 @@ julia> function PortfolioOptimisers.get_observation_weights(w::MyWeights,
                                                             X::PortfolioOptimisers.VecNum;
                                                             kwargs...)
            lambda = 2^(-inv(w.half_life))
-           return eweights(1:length(X), lambda; scale = true)
+           return eweights(length(X), lambda; scale = true)
        end
 
 julia> function PortfolioOptimisers.get_observation_weights(w::MyWeights,
                                                             X::PortfolioOptimisers.MatNum;
                                                             dims::Int = 1, kwargs...)
            lambda = 2^(-inv(w.half_life))
-           return eweights(1:size(X, dims), lambda; scale = true)
+           return eweights(size(X, dims), lambda; scale = true)
        end
 
 julia> PortfolioOptimisers.get_observation_weights(MyWeights(), 1:10)
@@ -205,6 +205,8 @@ julia> PortfolioOptimisers.get_observation_weights(MyWeights(), ones(3, 10); dim
 
 Both methods must dispatch on the concrete subtype, as above. A method on `DynamicAbstractWeights` itself catches every other subtype too.
 
+A method must return one concrete weight type. The example passes the count of observations, `eweights(n, lambda)`. The form `eweights(1:n, lambda)` returns integer weights for an empty range, so Julia infers a `Union` for every call, and a risk measure that resolves the weights then infers no concrete type.
+
 An implementation must give both methods. A call on a shape that has no method does not compute an unweighted result. It raises [`ObservationWeightsError`](@ref), and the message names the methods to write.
 
 ```jldoctest
@@ -213,7 +215,7 @@ julia> struct PartialWeights <: PortfolioOptimisers.DynamicAbstractWeights end
 julia> function PortfolioOptimisers.get_observation_weights(w::PartialWeights,
                                                             X::PortfolioOptimisers.VecNum;
                                                             kwargs...)
-           return eweights(1:length(X), 0.5; scale = true)
+           return eweights(length(X), 0.5; scale = true)
        end
 
 julia> PortfolioOptimisers.get_observation_weights(PartialWeights(), 1:3)

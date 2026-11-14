@@ -1,6 +1,6 @@
 function no_bounds_risk_measure(r::RiskMeasure, ::Any = nothing)
     settings = r.settings
-    s = RiskMeasureSettings(; rke = settings.rke, scale = settings.scale)
+    s = rebuild_struct(settings, (; ub = nothing))
     return s === settings ? r : rebuild_struct(r, (; settings = s))
 end
 function no_bounds_no_risk_expr_risk_measure(r::RiskMeasure, ::Any = nothing)
@@ -10,7 +10,7 @@ function no_bounds_no_risk_expr_risk_measure(r::RiskMeasure, ::Any = nothing)
 end
 function no_risk_expr_risk_measure(r::RiskMeasure)
     settings = r.settings
-    s = RiskMeasureSettings(; rke = false, ub = settings.ub, scale = settings.scale)
+    s = rebuild_struct(settings, (; rke = false))
     return s === settings ? r : rebuild_struct(r, (; settings = s))
 end
 function unit_scale_risk_measure(r::RiskMeasure)
@@ -19,12 +19,12 @@ function unit_scale_risk_measure(r::RiskMeasure)
     if isone(scale)
         return r
     end
-    s = RiskMeasureSettings(; scale = one(scale), ub = settings.ub, rke = settings.rke)
+    s = rebuild_struct(settings, (; scale = one(scale)))
     return rebuild_struct(r, (; settings = s))
 end
 function bounds_risk_measure(r::RiskMeasure, ub::Number)
     settings = r.settings
-    s = RiskMeasureSettings(; ub = ub, rke = settings.rke, scale = settings.scale)
+    s = rebuild_struct(settings, (; ub = ub))
     return s === settings ? r : rebuild_struct(r, (; settings = s))
 end
 function no_bounds_risk_measure(r::Union{HierarchicalRiskMeasure,
@@ -368,7 +368,7 @@ A member that holds a `StatsBase.AbstractWeights` returns unchanged, after [`che
 # Algorithm
 
  1. Resolve `r.w` against `X` with [`checked_observation_weights`](@ref), giving `w`. This also checks that `w` has one entry for each observation.
- 2. Rebuild `r` with its keyword constructor, with `w` in place of `r.w`. Every other field keeps its value. Stored weights need no rebuild, so this step applies to a [`DynamicAbstractWeights`](@ref) only.
+ 2. Rebuild `r` with `w` in place of `r.w`, with [`rebuild_struct`](@ref), which calls the keyword constructor. Every other field keeps its value. Stored weights need no rebuild, so this step applies to a [`DynamicAbstractWeights`](@ref) only.
 
 # Validation
 
@@ -400,18 +400,15 @@ function resolve_observation_weights(r::MomentRiskMeasures{<:StatsBase.AbstractW
 end
 function resolve_observation_weights(r::LowOrderMoment{<:Any, <:DynamicAbstractWeights},
                                      X::VecNum_MatNum)
-    return LowOrderMoment(; settings = r.settings, w = checked_observation_weights(r.w, X),
-                          mu = r.mu, alg = r.alg)
+    return rebuild_struct(r, (; w = checked_observation_weights(r.w, X)))
 end
 function resolve_observation_weights(r::HighOrderMoment{<:Any, <:DynamicAbstractWeights},
                                      X::VecNum_MatNum)
-    return HighOrderMoment(; settings = r.settings, w = checked_observation_weights(r.w, X),
-                           mu = r.mu, alg = r.alg, ve = r.ve)
+    return rebuild_struct(r, (; w = checked_observation_weights(r.w, X)))
 end
 function resolve_observation_weights(r::ThirdCentralMoment{<:Any, <:DynamicAbstractWeights},
                                      X::VecNum_MatNum)
-    return ThirdCentralMoment(; settings = r.settings,
-                              w = checked_observation_weights(r.w, X), mu = r.mu, ve = r.ve)
+    return rebuild_struct(r, (; w = checked_observation_weights(r.w, X)))
 end
 function (r::MomentRiskMeasures)(w::VecNum, X::MatNum, fees::Option{<:Fees} = nothing)
     resolved = resolve_observation_weights(r, X)

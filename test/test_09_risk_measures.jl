@@ -1076,15 +1076,58 @@ end
 end
 
 @testset "the base-file selectors refuse a both-`nothing` call" begin
-    # #595. `solver_selector` documented "Returns `nothing` if neither is available", and
-    # the both-`nothing` method throws instead. The docstring now states the refusal, and
-    # these two assertions hold it there. `sel` never reaches the solver refusal: a
-    # both-`nothing` call routes on the operand types to `nothing_scalar_array_selector`.
-    @test_throws ArgumentError PO.solver_selector(nothing, nothing)
+    # #595. A both-`nothing` view throws. `sel` holds the selection of a solver since #2100:
+    # the solver of the measure wins, and a measure with none takes the solver of the
+    # optimiser. A both-`nothing` call routes on the operand types to
+    # `nothing_scalar_array_selector`.
     @test_throws ArgumentError PO.risk_measure_nothing_scalar_array_view(nothing, nothing,
                                                                          1)
+    slv_r = Solver(; name = :risk, solver = Clarabel.Optimizer)
+    slv_o = Solver(; name = :opt, solver = Clarabel.Optimizer)
+    @test PO.sel(slv_r, slv_o) === slv_r
+    @test PO.sel(slv_r, nothing) === slv_r
+    @test PO.sel(nothing, slv_o) === slv_o
     @test isnothing(PO.sel(nothing, nothing))
     @test isnothing(PO.nothing_scalar_array_selector(nothing, nothing))
+end
+
+@testset "the wrapper standard of src/16_RiskMeasures (#2100)" begin
+    # A value check closes on the set that reaches it (#2108): an Unresolved Value or
+    # `nothing` passes, and any other type is a `MethodError`.
+    @test isnothing(PO.assert_observation_weights(nothing))
+    @test isnothing(PO.assert_half_open_unit_interval(nothing, :alpha))
+    @test_throws MethodError PO.assert_observation_weights(:w)
+    @test_throws MethodError PO.assert_half_open_unit_interval("0.5")
+    @test isnothing(PO.degree_difference(nothing, 2))
+    @test isnothing(PO.degree_difference(1, nothing))
+    @test PO.degree_difference(3, 1) == 2
+    @test_throws MethodError PO.degree_difference(1.0, 2)
+    @test isnothing(PO.worst_case_pair(nothing, [0.5, 0.5]))
+    @test_throws MethodError PO.worst_case_pair(1.0, [0.5])
+    # The kind of the measure is a trailing slot with the default `risk_input_kind(r)`.
+    @test PO.supports_precomputed_returns(Variance(), PO.NetReturnsInput())
+    @test !PO.supports_precomputed_returns(ConditionalValueatRisk(), PO.WeightsInput())
+    let X = [0.01 -0.02; 0.03 0.01; -0.01 0.02],
+        w = [0.6, 0.4],
+        wd = [0.1, -0.1],
+        fees = Fees(; l = 0.001),
+        r = ConditionalValueatRisk()
+
+        @test PO.difference_risk(r, wd, w, X, fees) ==
+              PO.difference_risk(r, wd, w, X, fees, PO.NetReturnsInput())
+        @test PO.difference_risk(Variance(; sigma = [1.0 0.0; 0.0 1.0]), wd, w, X, fees) ≈
+              0.02
+    end
+    # The five-slot `factory` of a turnover and a tracking measure holds the rule of the
+    # two-slot form, and the two give one measure.
+    let w = [0.25, 0.75],
+        tn = TurnoverRiskMeasure(; w = [0.5, 0.5]),
+        tr = TrackingRiskMeasure(; tr = WeightsTracking(; w = [0.5, 0.5]))
+
+        @test factory(tn, nothing, nothing, nothing, w).w == factory(tn, w).w == w
+        @test factory(tn, nothing, nothing, nothing) === tn
+        @test factory(tr, nothing, nothing, nothing, w).tr.w == factory(tr, w).tr.w == w
+    end
 end
 
 # ── #773: the weight path is the picker for a scorer ──────────────────────────────────────
@@ -1665,12 +1708,11 @@ end
         vsk = factory(VarianceSkewKurtosis(), prior(HighOrderPriorEstimator(), X))
         @test track(vsk)(w, X, fees) == vsk(wd, X)
         # Any other measure that reads weights and returns reads the series, or refuses.
-        @test isapprox(PortfolioOptimisers.difference_risk(PortfolioOptimisers.WeightsReturnsFeesInput(),
-                                                           LowOrderMoment(), wd, w, X,
-                                                           fees), LowOrderMoment()(x);
-                       rtol = 1e-12)
-        @test_throws ArgumentError PortfolioOptimisers.difference_risk(PortfolioOptimisers.WeightsReturnsFeesInput(),
-                                                                       te, wd, w, X, fees)
+        @test isapprox(PortfolioOptimisers.difference_risk(LowOrderMoment(), wd, w, X, fees,
+                                                           PortfolioOptimisers.WeightsReturnsFeesInput()),
+                       LowOrderMoment()(x); rtol = 1e-12)
+        @test_throws ArgumentError PortfolioOptimisers.difference_risk(te, wd, w, X, fees,
+                                                                       PortfolioOptimisers.WeightsReturnsFeesInput())
         # In an optimisation the functor reads back the value of the model.
         for ri in (lom, te, track(cvar; b = wb2))
             r = track(ri)

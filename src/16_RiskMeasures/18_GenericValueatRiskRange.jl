@@ -188,8 +188,7 @@ range_tails(r::GenericValueatRiskRange) = (; loss = r.loss, gain = r.gain)
 # `scale`, as `no_bounds_risk_measure` states.
 function no_bounds_risk_measure(r::GenericValueatRiskRange, flag::Any = nothing)
     return GenericValueatRiskRange(;
-                                   settings = RiskMeasureSettings(; rke = r.settings.rke,
-                                                                  scale = r.settings.scale),
+                                   settings = rebuild_struct(r.settings, (; ub = nothing)),
                                    loss = no_bounds_risk_measure(r.loss, flag),
                                    gain = no_bounds_risk_measure(r.gain, flag))
 end

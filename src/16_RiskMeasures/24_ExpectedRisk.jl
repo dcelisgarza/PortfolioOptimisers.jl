@@ -778,21 +778,20 @@ function difference_risk(r::AbstractBaseRiskMeasure, wd::VecNum, ::VecNum, X::Ma
                          ::Nothing; kwargs...)
     return expected_risk(r, wd, X; kwargs...)
 end
+# The kind of the measure is the last slot, and its default is `risk_input_kind(r)`. A measure
+# with a method of its own on the five slots wins over the default, as the methods below do.
 function difference_risk(r::AbstractBaseRiskMeasure, wd::VecNum, w::VecNum, X::MatNum,
-                         fees::Fees; kwargs...)
-    return difference_risk(risk_input_kind(r), r, wd, w, X, fees)
+                         fees::Fees, ::WeightsReturnsFeesInput = risk_input_kind(r);
+                         kwargs...)
+    return expected_risk_from_returns(r, charge_fees(X * wd, w, fees))
 end
-function difference_risk(::NetReturnsInput, r::AbstractBaseRiskMeasure, wd::VecNum,
-                         w::VecNum, X::MatNum, fees::Fees)
+function difference_risk(r::AbstractBaseRiskMeasure, wd::VecNum, w::VecNum, X::MatNum,
+                         fees::Fees, ::NetReturnsInput; kwargs...)
     return r(charge_fees(X * wd, w, fees))
 end
-function difference_risk(::WeightsInput, r::AbstractBaseRiskMeasure, wd::VecNum, ::VecNum,
-                         ::MatNum, ::Fees)
+function difference_risk(r::AbstractBaseRiskMeasure, wd::VecNum, ::VecNum, ::MatNum, ::Fees,
+                         ::WeightsInput; kwargs...)
     return r(wd)
-end
-function difference_risk(::WeightsReturnsFeesInput, r::AbstractBaseRiskMeasure, wd::VecNum,
-                         w::VecNum, X::MatNum, fees::Fees)
-    return expected_risk_from_returns(r, charge_fees(X * wd, w, fees))
 end
 function difference_risk(r::Union{LoHiOrderMoment, ThirdCentralMoment,
                                   MedianAbsoluteDeviation}, wd::VecNum, w::VecNum,

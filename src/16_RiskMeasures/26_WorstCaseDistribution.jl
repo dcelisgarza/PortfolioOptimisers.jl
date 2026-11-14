@@ -231,11 +231,11 @@ function worst_case_distribution(::NetReturnsInput, r::AbstractBaseRiskMeasure, 
 end
 """
     worst_case_pair(q_loss::VecNum, q_gain::VecNum) -> Tuple
-    worst_case_pair(q_loss, q_gain) -> Nothing
+    worst_case_pair(q_loss::Option{<:VecNum}, q_gain::Option{<:VecNum}) -> Nothing
 
 Pair the Worst-Case Distributions of the loss tail and the gain tail of a range measure.
 
-A range measure is the sum of a measure of the losses and a measure of the gains. When the programme of either tail gives no distribution, the pair is `nothing`, so that [`linearised_risk`](@ref) evaluates the measure itself.
+A range measure is the sum of a measure of the losses and a measure of the gains. When the programme of either tail gives no distribution, the pair is `nothing`, so that [`linearised_risk`](@ref) evaluates the measure itself. A tail gives a vector or `nothing`, so the second method takes `Option{<:VecNum}` on each slot, and any other type is a `MethodError`.
 
 # Arguments
 
@@ -254,7 +254,7 @@ A range measure is the sum of a measure of the losses and a measure of the gains
 function worst_case_pair(q_loss::VecNum, q_gain::VecNum)
     return (q_loss, q_gain)
 end
-function worst_case_pair(::Any, ::Any)
+function worst_case_pair(::Option{<:VecNum}, ::Option{<:VecNum})
     return nothing
 end
 """

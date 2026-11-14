@@ -202,7 +202,7 @@ Create an instance of [`Kurtosis`](@ref) that holds its cokurtosis matrix, from 
 
  1. Resolve a **Deferred Quantity** in `kt` with [`resolve_deferred_quantities`](@ref), giving `r`.
  2. Select `kt` with [`nothing_scalar_array_selector`](@ref). A measure that states a matrix keeps it, and a measure whose `kt` is `nothing` takes `pr.kt`.
- 3. Build a new `Kurtosis` from `kt` and from the `settings`, `N`, `alg` and `mtx_sqrt` of `r`.
+ 3. Rebuild `r` with `kt`, with [`rebuild_struct`](@ref). The `settings`, `N`, `alg` and `mtx_sqrt` of `r` do not change.
 
 # Related
 
@@ -210,12 +210,12 @@ Create an instance of [`Kurtosis`](@ref) that holds its cokurtosis matrix, from 
   - [`HighOrderPrior`](@ref)
   - [`factory`](@ref)
   - [`nothing_scalar_array_selector`](@ref)
+  - [`rebuild_struct`](@ref)
 """
 function factory(r::Kurtosis, pr::HighOrderPrior, args...; kwargs...)::Kurtosis
     r = resolve_deferred_quantities(r, pr)
     kt = nothing_scalar_array_selector(r.kt, pr.kt)
-    return Kurtosis(; settings = r.settings, kt = kt, N = r.N, alg = r.alg,
-                    mtx_sqrt = r.mtx_sqrt)
+    return rebuild_struct(r, (; kt = kt))
 end
 """
 $(DocStringExtensions.TYPEDSIGNATURES)
@@ -245,7 +245,7 @@ The view of a stated matrix agrees with the cokurtosis that a refit on the asset
 
  1. Return `r` unchanged when `kt` is not a matrix.
  2. Compute `idx`, the rows and columns of `kt` that belong to the pairs of assets in `i`, with [`fourth_moment_index_generator`](@ref). The number of assets is the square root of the size of `kt`.
- 3. Build a new `Kurtosis` from the view of `kt` at `idx` and from the other fields of `r`.
+ 3. Rebuild `r` with the view of `kt` at `idx`, with [`rebuild_struct`](@ref). The other fields of `r` do not change.
 
 # Related
 
@@ -253,6 +253,7 @@ The view of a stated matrix agrees with the cokurtosis that a refit on the asset
   - [`port_opt_view`](@ref)
   - [`nothing_scalar_array_view`](@ref)
   - [`fourth_moment_index_generator`](@ref)
+  - [`rebuild_struct`](@ref)
 """
 function port_opt_view(r::Kurtosis, i, args...)::Kurtosis
     kt = r.kt
@@ -260,8 +261,7 @@ function port_opt_view(r::Kurtosis, i, args...)::Kurtosis
         return r
     end
     idx = fourth_moment_index_generator(isqrt(size(kt, 1)), i)
-    return Kurtosis(; settings = r.settings, kt = nothing_scalar_array_view(kt, idx),
-                    N = r.N, alg = r.alg, mtx_sqrt = r.mtx_sqrt)
+    return rebuild_struct(r, (; kt = nothing_scalar_array_view(kt, idx)))
 end
 
 # Expected-risk input kind — see `risk_input_kind`.

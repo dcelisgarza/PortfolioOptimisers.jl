@@ -755,7 +755,7 @@ The two measures are not [`@propagatable`](@ref), so they need these methods of 
 
  1. Index `r.w` with [`obs_weights_index`](@ref).
  2. Cut `r.alg` with [`obs_weights_view`](@ref), and `r.ve` for a [`HighOrderMoment`](@ref).
- 3. Build the measure again with its keyword constructor. `settings` and `mu` keep their values.
+ 3. Rebuild the measure with [`rebuild_struct`](@ref), which calls its keyword constructor. `settings` and `mu` keep their values.
 
 # Arguments
 
@@ -777,13 +777,15 @@ The two measures are not [`@propagatable`](@ref), so they need these methods of 
   - [`obs_weights_view`](@ref)
 """
 function obs_weights_view(r::LowOrderMoment, i)::LowOrderMoment
-    return LowOrderMoment(; settings = r.settings, w = obs_weights_index(r.w, i), mu = r.mu,
-                          alg = obs_weights_view(r.alg, i))
+    return rebuild_struct(r,
+                          (; w = obs_weights_index(r.w, i),
+                           alg = obs_weights_view(r.alg, i)))
 end
 function obs_weights_view(r::HighOrderMoment, i)::HighOrderMoment
-    return HighOrderMoment(; settings = r.settings, w = obs_weights_index(r.w, i),
-                           mu = r.mu, alg = obs_weights_view(r.alg, i),
-                           ve = obs_weights_view(r.ve, i))
+    return rebuild_struct(r,
+                          (; w = obs_weights_index(r.w, i),
+                           alg = obs_weights_view(r.alg, i),
+                           ve = obs_weights_view(r.ve, i)))
 end
 """
     calc_moment_target(::LoHiOrderMoment{<:Any, Nothing, Nothing, <:Any},
@@ -1181,7 +1183,7 @@ The method slices a per-asset `mu` to the assets `i` with [`nothing_scalar_array
 """
 function port_opt_view(r::LowOrderMoment, i, args...)
     mu = nothing_scalar_array_view(r.mu, i)
-    return LowOrderMoment(; settings = r.settings, alg = r.alg, w = r.w, mu = mu)
+    return rebuild_struct(r, (; mu = mu))
 end
 """
 $(DocStringExtensions.TYPEDSIGNATURES)
@@ -1195,7 +1197,7 @@ A measure whose `mu` is `nothing` takes `pr.mu`, so after this method its Moment
  1. Resolve a **Deferred Quantity** in `mu` with [`resolve_deferred_quantities`](@ref), giving `r`.
  2. Select `w`, the weights of `r` or else `pr.w`, with [`nothing_scalar_array_selector`](@ref).
  3. Select `mu`, the target of `r` or else `pr.mu`, with [`nothing_scalar_array_selector`](@ref).
- 4. Build a new `HighOrderMoment` from `r.settings`, `w`, `mu`, `r.alg` and `r.ve` with the keyword constructor, which passes `w` to `ve` with [`factory`](@ref).
+ 4. Rebuild `r` with `w` and `mu`, with [`rebuild_struct`](@ref). It calls the keyword constructor, which passes `w` to `ve` with [`factory`](@ref). `r.settings`, `r.alg` and `r.ve` do not change.
 
 # Related
 
@@ -1203,12 +1205,13 @@ A measure whose `mu` is `nothing` takes `pr.mu`, so after this method its Moment
   - [`AbstractPriorResult`](@ref)
   - [`factory`](@ref)
   - [`nothing_scalar_array_selector`](@ref)
+  - [`rebuild_struct`](@ref)
 """
 function factory(r::HighOrderMoment, pr::AbstractPriorResult, args...; kwargs...)
     r = resolve_deferred_quantities(r, pr)
     w = nothing_scalar_array_selector(r.w, pr.w)
     mu = nothing_scalar_array_selector(r.mu, pr.mu)
-    return HighOrderMoment(; settings = r.settings, alg = r.alg, w = w, mu = mu, ve = r.ve)
+    return rebuild_struct(r, (; w = w, mu = mu))
 end
 """
 $(DocStringExtensions.TYPEDSIGNATURES)
@@ -1248,8 +1251,7 @@ The method slices a per-asset `mu` to the assets `i` with [`nothing_scalar_array
 """
 function port_opt_view(r::HighOrderMoment, i, args...)
     mu = nothing_scalar_array_view(r.mu, i)
-    return HighOrderMoment(; settings = r.settings, alg = r.alg, w = r.w, mu = mu,
-                           ve = r.ve)
+    return rebuild_struct(r, (; mu = mu))
 end
 
 # Expected-risk input kind — see `risk_input_kind`.

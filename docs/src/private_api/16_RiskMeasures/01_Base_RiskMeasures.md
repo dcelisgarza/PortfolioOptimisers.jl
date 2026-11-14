@@ -52,7 +52,6 @@ assert_resolved_slots
 sigma_chol_selector
 assert_derived_slot_has_source
 risk_measure_nothing_scalar_array_view
-solver_selector
 assert_observation_weights
 checked_observation_weights
 assert_half_open_unit_interval

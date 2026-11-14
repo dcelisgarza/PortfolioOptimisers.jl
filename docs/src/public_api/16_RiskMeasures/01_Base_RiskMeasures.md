@@ -143,9 +143,8 @@ bigger_is_better
 range_tails
 supports_precomputed_returns(r::AbstractBaseRiskMeasure)
 supports_precomputed_returns(rs::VecBaseRM)
-supports_precomputed_returns(::NetReturnsInput, ::Any)
-supports_precomputed_returns(::WeightsInput, ::Any)
-supports_precomputed_returns(::WeightsReturnsFeesInput, r::AbstractBaseRiskMeasure)
+supports_precomputed_returns(::Any, ::NetReturnsInput)
+supports_precomputed_returns(::Any, ::WeightsInput)
 ```
 
 ## References

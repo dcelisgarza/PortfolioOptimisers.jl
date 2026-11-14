@@ -674,7 +674,7 @@ end
 
 Return `true` when the OWA weights `w` sum to zero. The second form tests `w1 - w2`. A `nothing` stands for weights whose sum is not known, from [`resolve_owa_weights`](@ref), and returns `false`.
 
-The vector test is `isapprox(s + sum(w), s)` with `s = sum(abs, w)`, so it takes the default tolerance of the element type. A floating point vector passes at a sum near the rounding error of `s`, and an exact type, such as a `Rational`, passes only at an exact zero.
+The vector test is `isapprox(s + sum(w), s)` with `s = sum(abs, w)`, so it takes the default tolerance of the element type. The two vector methods each hold the test, the second on `w = w1 - w2`, and the two copies agree. A floating point vector passes at a sum near the rounding error of `s`, and an exact type, such as a `Rational`, passes only at an exact zero.
 
 # Arguments
 
@@ -698,7 +698,9 @@ function sums_to_zero(::Nothing)
     return false
 end
 function sums_to_zero(w1::VecNum, w2::VecNum)
-    return sums_to_zero(w1 - w2)
+    w = w1 - w2
+    s = sum(abs, w)
+    return isapprox(s + sum(w), s)
 end
 function sums_to_zero(::Option{<:VecNum}, ::Option{<:VecNum})
     return false
@@ -841,11 +843,11 @@ function scalarised_degree(rs::VecBaseRM, ::Option{<:Scalariser},
     return all(r -> homogeneity_degree(r, fees, T) == d, rs) ? d : nothing
 end
 """
-    degree_difference(d1, d2) -> Option{<:Integer}
+    degree_difference(d1::Option{<:Integer}, d2::Option{<:Integer}) -> Option{<:Integer}
 
 Return the degree of homogeneity of a ratio from the degrees `d1` of its numerator and `d2` of its denominator.
 
-The ratio has degree `d1 - d2` when both sides have a degree, and no degree when either side has none.
+The ratio has degree `d1 - d2` when both sides have a degree, and no degree when either side has none. A degree is an integer or `nothing`, so any other type is a `MethodError`.
 
 # Arguments
 
@@ -864,7 +866,7 @@ The ratio has degree `d1 - d2` when both sides have a degree, and no degree when
 function degree_difference(d1::Integer, d2::Integer)
     return d1 - d2
 end
-function degree_difference(::Any, ::Any)
+function degree_difference(::Option{<:Integer}, ::Option{<:Integer})
     return nothing
 end
 """

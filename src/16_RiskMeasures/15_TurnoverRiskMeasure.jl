@@ -140,7 +140,7 @@ $(DocStringExtensions.TYPEDSIGNATURES)
 
 Return a [`TurnoverRiskMeasure`](@ref) whose reference weights are `w`.
 
-When `r.fixed` is `true`, the function returns `r` and does not read `w`. Otherwise it builds a new measure with `w` as the reference weights, and `r.settings` and `r.fixed` pass through unchanged.
+When `r.fixed` is `true`, the function returns `r` and does not read `w`. Otherwise it rebuilds `r` with `w` as the reference weights, with [`rebuild_struct`](@ref), and `r.settings` and `r.fixed` pass through unchanged.
 
 # Validation
 
@@ -150,29 +150,31 @@ When `r.fixed` is `true`, the function returns `r` and does not read `w`. Otherw
 
   - [`TurnoverRiskMeasure`](@ref)
   - [`factory`](@ref)
+  - [`rebuild_struct`](@ref)
 """
 function factory(r::TurnoverRiskMeasure, w::VecNum)::TurnoverRiskMeasure
-    return if r.fixed
-        r
-    else
-        TurnoverRiskMeasure(; settings = r.settings, w = w, fixed = r.fixed)
-    end
+    return r.fixed ? r : rebuild_struct(r, (; w = w))
 end
 """
 $(DocStringExtensions.TYPEDSIGNATURES)
 
-Return `factory(r, w)`, the [`TurnoverRiskMeasure`](@ref) whose reference weights are `w`.
+Return the [`TurnoverRiskMeasure`](@ref) whose reference weights are `w`, as `factory(r, w)` does.
 
-The measure reads no moment, so the prior result, the solver and the uncertainty set in the second to fourth positions are not read. When `w` is `nothing`, the function returns `r` unchanged.
+The measure reads no moment, so the prior result, the solver and the uncertainty set in the second to fourth positions are not read. When `w` is `nothing`, the method on `::Nothing` returns `r` unchanged. The method on a vector holds the rule of `factory(r, w)`, and the two give one measure.
 
 # Related
 
   - [`TurnoverRiskMeasure`](@ref)
   - [`factory`](@ref)
+  - [`rebuild_struct`](@ref)
 """
-function factory(r::TurnoverRiskMeasure, ::Any, ::Any, ::Any, w::Option{<:VecNum} = nothing,
-                 args...; kwargs...)::TurnoverRiskMeasure
-    return factory(r, w)
+function factory(r::TurnoverRiskMeasure, ::Any, ::Any, ::Any, w::VecNum, args...;
+                 kwargs...)::TurnoverRiskMeasure
+    return r.fixed ? r : rebuild_struct(r, (; w = w))
+end
+function factory(r::TurnoverRiskMeasure, ::Any, ::Any, ::Any, ::Nothing = nothing, args...;
+                 kwargs...)::TurnoverRiskMeasure
+    return r
 end
 
 # Expected-risk input kind — see `risk_input_kind`.

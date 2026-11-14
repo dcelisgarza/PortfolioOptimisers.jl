@@ -336,9 +336,7 @@ The copy keeps `lb` and `scale`. The constructor of [`VarianceSkewKurtosis`](@re
   - [`no_risk_expr_risk_measure`](@ref)
 """
 function no_risk_expr_risk_measure(r::Skewness)
-    return Skewness(;
-                    settings = MaxRiskMeasureSettings(; rke = false, lb = r.settings.lb,
-                                                      scale = r.settings.scale), sk = r.sk)
+    return rebuild_struct(r, (; settings = rebuild_struct(r.settings, (; rke = false))))
 end
 """
 $(DocStringExtensions.TYPEDSIGNATURES)
@@ -354,10 +352,9 @@ This is the copy that a measure takes when it only measures a distance, as the m
   - [`no_bounds_no_risk_expr_risk_measure`](@ref)
 """
 function no_bounds_no_risk_expr_risk_measure(r::Skewness, ::Any = nothing)
-    return Skewness(;
-                    settings = MaxRiskMeasureSettings(; rke = false, lb = nothing,
-                                                      scale = one(r.settings.scale)),
-                    sk = r.sk)
+    settings = MaxRiskMeasureSettings(; rke = false, lb = nothing,
+                                      scale = one(r.settings.scale))
+    return rebuild_struct(r, (; settings = settings))
 end
 """
 $(DocStringExtensions.TYPEDSIGNATURES)
@@ -373,9 +370,7 @@ Return a copy of [`Skewness`](@ref) `r` with the floor `lb` set to `ub`.
   - [`bounds_risk_measure`](@ref)
 """
 function bounds_risk_measure(r::Skewness, ub::Number)
-    return Skewness(;
-                    settings = MaxRiskMeasureSettings(; rke = r.settings.rke, lb = ub,
-                                                      scale = r.settings.scale), sk = r.sk)
+    return rebuild_struct(r, (; settings = rebuild_struct(r.settings, (; lb = ub))))
 end
 """
 $(DocStringExtensions.TYPEDSIGNATURES)
@@ -391,9 +386,7 @@ Return a copy of [`Skewness`](@ref) `r` with `lb = nothing`, and keep `rke` and 
   - [`no_bounds_risk_measure`](@ref)
 """
 function no_bounds_risk_measure(r::Skewness, ::Any = nothing)
-    return Skewness(;
-                    settings = MaxRiskMeasureSettings(; rke = r.settings.rke, lb = nothing,
-                                                      scale = r.settings.scale), sk = r.sk)
+    return rebuild_struct(r, (; settings = rebuild_struct(r.settings, (; lb = nothing))))
 end
 """
 $(DocStringExtensions.TYPEDSIGNATURES)
@@ -414,10 +407,8 @@ function unit_scale_risk_measure(r::Skewness)
     if isone(scale)
         return r
     end
-    return Skewness(;
-                    settings = MaxRiskMeasureSettings(; rke = settings.rke,
-                                                      lb = settings.lb, scale = one(scale)),
-                    sk = r.sk)
+    return rebuild_struct(r,
+                          (; settings = rebuild_struct(settings, (; scale = one(scale)))))
 end
 """
 $(DocStringExtensions.TYPEDEF)

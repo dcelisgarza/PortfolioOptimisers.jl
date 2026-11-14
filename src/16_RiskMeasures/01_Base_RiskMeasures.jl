@@ -269,11 +269,11 @@ function (r::AbstractBaseRiskMeasure)(::VecNum)
 end
 """
     assert_observation_weights(w::VecNum, w_sym::Sym_Str = :w)
-    assert_observation_weights(args...)
+    assert_observation_weights(::Option{<:UnresolvedValue}, ::Sym_Str = :w)
 
 Validate the observation weights of a risk measure.
 
-A risk measure divides by the sum of its observation weights, so a weight vector that sums to zero has no value to give. This assertion refuses it with the rules of [`assert_nonempty_nonneg_finite_val`](@ref) and one rule more. A [`DynamicAbstractWeights`](@ref) has no values until it resolves against the data, so it selects the `args...` method, and [`checked_observation_weights`](@ref) validates its values after it resolves.
+A risk measure divides by the sum of its observation weights, so a weight vector that sums to zero has no value to give. This assertion refuses it with the rules of [`assert_nonempty_nonneg_finite_val`](@ref) and one rule more. A [`DynamicAbstractWeights`](@ref) is an [`UnresolvedValue`](@ref): it has no values until it resolves against the data, so it selects the second method, and [`checked_observation_weights`](@ref) validates its values after it resolves. `nothing` selects the second method too. Each other type is a `MethodError`, so a form that a slot admits with no rule fails at construction.
 
 # Arguments
 
@@ -284,7 +284,7 @@ A risk measure divides by the sum of its observation weights, so a weight vector
 
   - `w` is not empty, finite and nonnegative, through [`assert_nonempty_nonneg_finite_val`](@ref).
   - `sum(w) > 0`, so at least one observation carries weight. Otherwise a `DomainError` is raised.
-  - Any other type, `nothing` and a [`DynamicAbstractWeights`](@ref) among them, passes.
+  - `::Option{<:UnresolvedValue}`: No rule, so the call always passes.
 
 # Returns
 
@@ -304,7 +304,7 @@ function assert_observation_weights(w::VecNum, w_sym::Sym_Str = :w)::Nothing
                           "0 < sum($w_sym) must hold, so that at least one observation carries weight. Got\nsum($w_sym) => $sw"))
     return nothing
 end
-function assert_observation_weights(args...)::Nothing
+function assert_observation_weights(::Option{<:UnresolvedValue}, ::Sym_Str = :w)::Nothing
     return nothing
 end
 """
@@ -354,11 +354,11 @@ function checked_observation_weights(w::Option{<:Union{ObsWeights, VecNum}},
 end
 """
     assert_half_open_unit_interval(val::Number, sym::Sym_Str = :val)
-    assert_half_open_unit_interval(args...)
+    assert_half_open_unit_interval(::Option{<:UnresolvedValue}, ::Sym_Str = :val)
 
 Validate that `0 <= val < 1`.
 
-The significance level of a tail measure whose limit at zero is defined takes this interval. At `val = 0` the tail holds only the worst observation with positive weight, which [`worst_positive_weight_loss`](@ref) gives. A level of one would hold the whole sample, so it stays open. A Calibration Rule has no value until it resolves, so it selects the `args...` method, and the rebuild after the resolution checks the number.
+The significance level of a tail measure whose limit at zero is defined takes this interval. At `val = 0` the tail holds only the worst observation with positive weight, which [`worst_positive_weight_loss`](@ref) gives. A level of one would hold the whole sample, so it stays open. A Calibration Rule is an [`UnresolvedValue`](@ref): it has no value until it resolves, so it selects the second method, and the rebuild after the resolution checks the number. Each other type is a `MethodError`, so a form that a slot admits with no rule fails at construction.
 
 # Arguments
 
@@ -368,7 +368,7 @@ The significance level of a tail measure whose limit at zero is defined takes th
 # Validation
 
   - `0 <= val < 1`. Otherwise a `DomainError` is raised.
-  - Any other type passes.
+  - `::Option{<:UnresolvedValue}`: No rule, so the call always passes.
 
 # Returns
 
@@ -385,7 +385,8 @@ function assert_half_open_unit_interval(val::Number, sym::Sym_Str = :val)::Nothi
               DomainError(val, "0 <= $sym < 1 must hold. Got\n$sym => $val"))
     return nothing
 end
-function assert_half_open_unit_interval(args...)::Nothing
+function assert_half_open_unit_interval(::Option{<:UnresolvedValue},
+                                        ::Sym_Str = :val)::Nothing
     return nothing
 end
 """
@@ -445,8 +446,8 @@ function positive_weight_rows(w::VecNum, ::Integer)
     return findall(v -> zero(v) < v, w)::Vector{Int}
 end
 """
-    supports_precomputed_returns(r::AbstractBaseRiskMeasure) -> Bool
-    supports_precomputed_returns(rk::RiskInputKind, r::AbstractBaseRiskMeasure) -> Bool
+    supports_precomputed_returns(r::AbstractBaseRiskMeasure,
+                                 rk::RiskInputKind = risk_input_kind(r)) -> Bool
 
 Return whether risk measure `r` has a *precomputed-returns* form, that is, whether the
 functor `r(x::VecNum)` can evaluate its expected risk on a net-return series `x` alone.
@@ -472,14 +473,32 @@ cannot tell weights from returns. [`expected_risk_from_returns`](@ref) reads thi
 and it throws an error that explains the refusal for an ineligible measure. It never reads
 the series as weights.
 
+The kind of the measure is the second slot, and its default is [`risk_input_kind`](@ref) of
+the measure. A measure that declares its own one-argument method answers for itself. Every
+other call dispatches on the kind: `(::Any, ::NetReturnsInput)` answers `true` and
+`(::Any, ::WeightsInput)` answers `false`. This method takes a [`WeightsReturnsFeesInput`](@ref)
+measure that declares no method of its own. Every such measure declares it beside its
+definition. A moment measure declares
+`supports_precomputed_returns(r::T) = weight_independent_target(r.mu)`, and a measure that
+reads the weights, such as a tracking measure or a composite that carries a variance, declares
+`supports_precomputed_returns(::T) = false`. The completeness test in `test_09_risk_measures.jl`
+makes the omission fail in CI.
+
+# Validation
+
+  - A [`WeightsReturnsFeesInput`](@ref) measure that reaches this method declared no method of its own. It throws an `ArgumentError` that states the declaration to write.
+
 # Related
 
   - [`expected_risk_from_returns`](@ref)
   - [`risk_input_kind`](@ref)
   - [`RiskInputKind`](@ref)
+  - [`WeightsReturnsFeesInput`](@ref)
+  - [`weight_independent_target`](@ref)
 """
-function supports_precomputed_returns(r::AbstractBaseRiskMeasure)
-    return supports_precomputed_returns(risk_input_kind(r), r)
+function supports_precomputed_returns(r::AbstractBaseRiskMeasure,
+                                      ::WeightsReturnsFeesInput = risk_input_kind(r))
+    return throw(ArgumentError("`$(typeof(r))` is a `WeightsReturnsFeesInput` risk measure that does not declare `supports_precomputed_returns`. Declare it at the measure's definition site: a moment measure as `supports_precomputed_returns(r::$(typeof(r))) = weight_independent_target(r.mu)`; a weights-dependent measure (tracking, variance-carrying composite) as `supports_precomputed_returns(::$(typeof(r))) = false`."))
 end
 """
 $(DocStringExtensions.TYPEDSIGNATURES)
@@ -492,7 +511,7 @@ because its functor is the net-returns functor.
   - [`supports_precomputed_returns`](@ref)
   - [`NetReturnsInput`](@ref)
 """
-supports_precomputed_returns(::NetReturnsInput, ::Any)::Bool = true
+supports_precomputed_returns(::Any, ::NetReturnsInput)::Bool = true
 """
 $(DocStringExtensions.TYPEDSIGNATURES)
 
@@ -504,35 +523,7 @@ because its functor reads portfolio weights, not a return series.
   - [`supports_precomputed_returns`](@ref)
   - [`WeightsInput`](@ref)
 """
-supports_precomputed_returns(::WeightsInput, ::Any)::Bool = false
-"""
-$(DocStringExtensions.TYPEDSIGNATURES)
-
-Refuse a [`WeightsReturnsFeesInput`](@ref) measure that declares no
-[`supports_precomputed_returns`](@ref) method beside its definition. Every such measure
-declares it there. A moment measure declares `supports_precomputed_returns(r::T) = weight_independent_target(r.mu)`, and a measure that reads the weights, such as a
-tracking measure or a composite that carries a variance, declares
-`supports_precomputed_returns(::T) = false`. A call reaches this method only when a measure
-lacks the declaration, and it throws an `ArgumentError` that states the declaration to write.
-The completeness test in `test_09_risk_measures.jl` makes the omission fail in CI.
-
-# Validation
-
-  - Throws an `ArgumentError` on every call. Reaching this leaf means the measure declared no `supports_precomputed_returns` method of its own, and the message states the declaration to write.
-
-# Returns
-
-  - Nothing is returned. The method always raises.
-
-# Related
-
-  - [`supports_precomputed_returns`](@ref)
-  - [`WeightsReturnsFeesInput`](@ref)
-  - [`weight_independent_target`](@ref)
-"""
-function supports_precomputed_returns(::WeightsReturnsFeesInput, r::AbstractBaseRiskMeasure)
-    return throw(ArgumentError("`$(typeof(r))` is a `WeightsReturnsFeesInput` risk measure that does not declare `supports_precomputed_returns`. Declare it at the measure's definition site: a moment measure as `supports_precomputed_returns(r::$(typeof(r))) = weight_independent_target(r.mu)`; a weights-dependent measure (tracking, variance-carrying composite) as `supports_precomputed_returns(::$(typeof(r))) = false`."))
-end
+supports_precomputed_returns(::Any, ::WeightsInput)::Bool = false
 """
 $(DocStringExtensions.TYPEDSIGNATURES)
 
@@ -1735,41 +1726,6 @@ function risk_measure_nothing_scalar_array_view(::Nothing, prior_variable::ArrNu
     return nothing_scalar_array_view(prior_variable, i)
 end
 """
-    solver_selector(risk_solvers, slv)
-
-Select the appropriate solver for a risk measure computation.
-
-Returns the risk-measure-specific solver if provided, otherwise falls back to the optimiser-level solver. Neither is refused rather than answered with `nothing`: a `JuMP` model that carries no solver cannot be solved, and the refusal names that where the caller can act on it. [`sel`](@ref) never reaches the refusal, because a both-`nothing` call routes to [`nothing_scalar_array_selector`](@ref) on the operand types instead.
-
-# Arguments
-
-  - `risk_solvers`: Risk-measure-specific solver(s) or `nothing`.
-  - `slv`: Optimiser-level solver(s) or `nothing`.
-
-# Validation
-
-  - Throws an `ArgumentError` when `risk_solvers` and `slv` are both `nothing`.
-
-# Returns
-
-  - `Slv_VecSlv`: The selected solver or solvers.
-
-# Related
-
-  - [`Slv_VecSlv`](@ref)
-  - [`ERM`](@ref)
-  - [`RRM`](@ref)
-"""
-function solver_selector(risk_solvers::Slv_VecSlv, ::Any)
-    return risk_solvers
-end
-function solver_selector(::Nothing, slv::Slv_VecSlv)
-    return slv
-end
-function solver_selector(::Nothing, ::Nothing)
-    return throw(ArgumentError("Both risk_solver and prior_solver are `nothing`, cannot solve JuMP model."))
-end
-"""
     const DeferredQuantity = Union{...}
 
 The dynamic half of a **Deferred Quantity**: an Estimator standing in a risk-measure slot where a prior-derived value goes. `isa(x, DeferredQuantity)` answers the question "is this slot deferred?". The union holds the four moment-estimator families, each of which computes one of the four deferrable quantities, and [`AbstractPriorEstimator`](@ref), which computes all four at once.
@@ -2494,7 +2450,7 @@ Otherwise the call falls back to `source_variable`, which is a moment of the pri
 `@pprop` and a value that the optimiser threads for `@cprop`. The types of the operands
 select the selector:
 
-  - A solver, `Slv_VecSlv`, goes to [`solver_selector`](@ref).
+  - A solver, [`Slv_VecSlv`](@ref), is selected here. The solver of the measure wins, and a measure with no solver takes the solver of the optimiser.
   - An uncertainty set, `UcSE_UcS`, goes to [`ucs_selector`](@ref).
   - A **Deferred Quantity** or a **Calibration Rule** is kept, because a slot that the caller filled with the method that computes the value is a stated slot.
   - Every other value, such as a moment, goes to [`nothing_scalar_array_selector`](@ref).
@@ -2502,24 +2458,21 @@ select the selector:
 The Deferred-Quantity method exists because [`@propagatable`](@ref) runs the selection **before** [`resolve_deferred_quantities`](@ref), so a `@pprop` slot that admits a Deferred Quantity still holds one here. The prior must not fill such a slot. The caller stated the method, and the resolution that follows replaces it with the value that the method gives. The same holds for a Calibration Rule.
 
 A call with two `nothing` operands goes to [`nothing_scalar_array_selector`](@ref) and returns
-`nothing`, so it never reaches the refusal of [`solver_selector`](@ref). A `JuMPOptimiser`
-always carries a solver, so the pipeline never meets that case.
+`nothing`. A `JuMPOptimiser` always carries a solver, so the pipeline never meets a slot of a
+solver with two `nothing` operands.
 
 # Related
 
   - [`@pprop`](@ref)
   - [`@cprop`](@ref)
   - [`nothing_scalar_array_selector`](@ref)
-  - [`solver_selector`](@ref)
   - [`ucs_selector`](@ref)
 """
 function sel(risk_variable, source_variable)
     return nothing_scalar_array_selector(risk_variable, source_variable)
 end
-function sel(risk_variable::Slv_VecSlv, source_variable)
-    return solver_selector(risk_variable, source_variable)
-end
-sel(::Nothing, source_variable::Slv_VecSlv) = solver_selector(nothing, source_variable)
+sel(risk_variable::Slv_VecSlv, ::Any) = risk_variable
+sel(::Nothing, source_variable::Slv_VecSlv) = source_variable
 sel(risk_variable::UcSE_UcS, source_variable) = ucs_selector(risk_variable, source_variable)
 sel(::Nothing, source_variable::UcSE_UcS) = ucs_selector(nothing, source_variable)
 sel(risk_variable::DeferredQuantity, ::Any) = risk_variable

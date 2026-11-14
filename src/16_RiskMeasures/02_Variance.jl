@@ -562,29 +562,26 @@ The method selects `sigma` and `chol` as one pair, not field by field. A stated 
 
  1. Resolve a **Deferred Quantity** in `sigma` with [`resolve_deferred_quantities`](@ref), giving `r`.
  2. Select the pair `sigma`, `chol` with [`sigma_chol_selector`](@ref). A measure that states neither takes `pr.sigma` and `pr.chol`, and every other measure keeps its own pair.
- 3. Build a new `Variance` from the pair and from the `settings`, `rc`, `alg`, `mtx_sqrt`, `ratio_alg` and `corner` of `r`.
+ 3. Rebuild `r` with the pair, with [`rebuild_struct`](@ref). The `settings`, `rc`, `alg`, `mtx_sqrt`, `ratio_alg` and `corner` of `r` do not change.
 
 # Related
 
   - [`Variance`](@ref)
   - [`resolve_deferred_quantities`](@ref)
   - [`sigma_chol_selector`](@ref)
+  - [`rebuild_struct`](@ref)
 """
 function factory(r::Variance, pr::AbstractPriorResult, args...; kwargs...)
     r = resolve_deferred_quantities(r, pr)
     sigma, chol = sigma_chol_selector(r.sigma, r.chol, pr)
-    return Variance(; settings = r.settings, sigma = sigma, chol = chol, rc = r.rc,
-                    alg = r.alg, mtx_sqrt = r.mtx_sqrt, ratio_alg = r.ratio_alg,
-                    corner = r.corner)
+    return rebuild_struct(r, (; sigma = sigma, chol = chol))
 end
 function port_opt_view(r::Variance, i, args...)
     sigma = nothing_scalar_array_view(r.sigma, i)
     chol = isnothing(r.chol) ? nothing : view(r.chol, :, i)
     @argcheck(!isa(r.rc, LinearConstraint),
               "`rc` cannot be a `LinearConstraint` because there is no way to only consider items from a specific group and because this would break factor risk contribution")
-    return Variance(; settings = r.settings, sigma = sigma, chol = chol, rc = r.rc,
-                    alg = r.alg, mtx_sqrt = r.mtx_sqrt, ratio_alg = r.ratio_alg,
-                    corner = r.corner)
+    return rebuild_struct(r, (; sigma = sigma, chol = chol))
 end
 """
 $(DocStringExtensions.TYPEDEF)
@@ -762,25 +759,24 @@ The method selects `sigma` and `chol` as one pair, as [`factory(r::Variance, pr:
 
  1. Resolve a **Deferred Quantity** in `sigma` with [`resolve_deferred_quantities`](@ref), giving `r`.
  2. Select the pair `sigma`, `chol` with [`sigma_chol_selector`](@ref). A measure that states neither takes `pr.sigma` and `pr.chol`, and every other measure keeps its own pair.
- 3. Build a new `StandardDeviation` from the pair and from the `settings` and `mtx_sqrt` of `r`.
+ 3. Rebuild `r` with the pair, with [`rebuild_struct`](@ref). The `settings` and `mtx_sqrt` of `r` do not change.
 
 # Related
 
   - [`StandardDeviation`](@ref)
   - [`resolve_deferred_quantities`](@ref)
   - [`sigma_chol_selector`](@ref)
+  - [`rebuild_struct`](@ref)
 """
 function factory(r::StandardDeviation, pr::AbstractPriorResult, args...; kwargs...)
     r = resolve_deferred_quantities(r, pr)
     sigma, chol = sigma_chol_selector(r.sigma, r.chol, pr)
-    return StandardDeviation(; settings = r.settings, sigma = sigma, chol = chol,
-                             mtx_sqrt = r.mtx_sqrt)
+    return rebuild_struct(r, (; sigma = sigma, chol = chol))
 end
 function port_opt_view(r::StandardDeviation, i, args...)
     sigma = nothing_scalar_array_view(r.sigma, i)
     chol = isnothing(r.chol) ? nothing : view(r.chol, :, i)
-    return StandardDeviation(; settings = r.settings, sigma = sigma, chol = chol,
-                             mtx_sqrt = r.mtx_sqrt)
+    return rebuild_struct(r, (; sigma = sigma, chol = chol))
 end
 """
 $(DocStringExtensions.TYPEDEF)
@@ -1214,11 +1210,8 @@ A measure that only measures a distance, such as the tracked measure of a [`Risk
 """
 function no_bounds_no_risk_expr_risk_measure(r::UncertaintySetVariance,
                                              ::Union{Val{true}, Nothing} = nothing)
-    return UncertaintySetVariance(;
-                                  settings = RiskMeasureSettings(; rke = false,
-                                                                 scale = one(r.settings.scale)),
-                                  r.ucs, sigma = r.sigma, mtx_sqrt = r.mtx_sqrt,
-                                  ratio_alg = r.ratio_alg, corner = r.corner)
+    settings = RiskMeasureSettings(; rke = false, scale = one(r.settings.scale))
+    return rebuild_struct(r, (; settings = settings))
 end
 function no_bounds_no_risk_expr_risk_measure(r::UncertaintySetVariance, ::Val{false})
     return Variance(;
@@ -1241,7 +1234,7 @@ A slot that the measure states keeps its value. So `ucs` fills `r.ucs` only when
  1. Resolve a **Deferred Quantity** in `sigma` with [`resolve_deferred_quantities`](@ref), giving `r`.
  2. Select the set with [`ucs_selector`](@ref), giving `r.ucs` when it is not `nothing` and `ucs` otherwise.
  3. Select the matrix with [`nothing_scalar_array_selector`](@ref), giving `r.sigma` when it is not `nothing` and `pr.sigma` otherwise.
- 4. Build a new `UncertaintySetVariance` from the set, the matrix and the `settings` of `r`.
+ 4. Rebuild `r` with the set and the matrix, with [`rebuild_struct`](@ref). The `settings`, `mtx_sqrt`, `ratio_alg` and `corner` of `r` do not change.
 
 # Arguments
 
@@ -1262,15 +1255,14 @@ A slot that the measure states keeps its value. So `ucs` fills `r.ucs` only when
   - [`AbstractUncertaintySetEstimator`](@ref)
   - [`ucs_selector`](@ref)
   - [`nothing_scalar_array_selector`](@ref)
+  - [`rebuild_struct`](@ref)
 """
 function factory(r::UncertaintySetVariance, pr::AbstractPriorResult, ::Any,
                  ucs::Option{<:UcSE_UcS} = nothing, args...; kwargs...)
     r = resolve_deferred_quantities(r, pr)
     ucs = ucs_selector(r.ucs, ucs)
     sigma = nothing_scalar_array_selector(r.sigma, pr.sigma)
-    return UncertaintySetVariance(; settings = r.settings, ucs = ucs, sigma = sigma,
-                                  mtx_sqrt = r.mtx_sqrt, ratio_alg = r.ratio_alg,
-                                  corner = r.corner)
+    return rebuild_struct(r, (; ucs = ucs, sigma = sigma))
 end
 """
 $(DocStringExtensions.TYPEDSIGNATURES)
@@ -1291,9 +1283,7 @@ function factory(r::UncertaintySetVariance, pr::AbstractPriorResult,
     r = resolve_deferred_quantities(r, pr)
     ucs = ucs_selector(r.ucs, ucs)
     sigma = nothing_scalar_array_selector(r.sigma, pr.sigma)
-    return UncertaintySetVariance(; settings = r.settings, ucs = ucs, sigma = sigma,
-                                  mtx_sqrt = r.mtx_sqrt, ratio_alg = r.ratio_alg,
-                                  corner = r.corner)
+    return rebuild_struct(r, (; ucs = ucs, sigma = sigma))
 end
 """
 $(DocStringExtensions.TYPEDSIGNATURES)
@@ -1317,9 +1307,7 @@ function factory(r::UncertaintySetVariance, ucs::UcSE_UcS,
     else
         nothing_scalar_array_selector(resolve_deferred_quantities(r, pr).sigma, pr.sigma)
     end
-    return UncertaintySetVariance(; settings = r.settings, ucs = ucs, sigma = sigma,
-                                  mtx_sqrt = r.mtx_sqrt, ratio_alg = r.ratio_alg,
-                                  corner = r.corner)
+    return rebuild_struct(r, (; ucs = ucs, sigma = sigma))
 end
 """
     ucs_risk_measure(r, rd::ReturnsResult)
@@ -1347,9 +1335,7 @@ function ucs_risk_measure(r::UncertaintySetVariance, rd::ReturnsResult)
     return if reads_prior_result(r.ucs)
         r
     else
-        UncertaintySetVariance(; settings = r.settings, ucs = sigma_ucs(r.ucs, rd),
-                               sigma = r.sigma, mtx_sqrt = r.mtx_sqrt,
-                               ratio_alg = r.ratio_alg, corner = r.corner)
+        rebuild_struct(r, (; ucs = sigma_ucs(r.ucs, rd)))
     end
 end
 function ucs_risk_measure(r::Any, ::ReturnsResult)
@@ -1387,9 +1373,7 @@ end
 function port_opt_view(r::UncertaintySetVariance, i, args...)
     ucs = port_opt_view(r.ucs, i)
     sigma = nothing_scalar_array_view(r.sigma, i)
-    return UncertaintySetVariance(; settings = r.settings, ucs = ucs, sigma = sigma,
-                                  mtx_sqrt = r.mtx_sqrt, ratio_alg = r.ratio_alg,
-                                  corner = r.corner)
+    return rebuild_struct(r, (; ucs = ucs, sigma = sigma))
 end
 
 # Expected-risk input kind — see `risk_input_kind`.

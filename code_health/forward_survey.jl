@@ -544,22 +544,6 @@ const RULED_REBUILDS = Dict{Tuple{Symbol, Symbol}, Tuple{String, String}}(#
                                                                            :AssetPanel) =>
                                                                               ("go",
                                                                                "`pnl` is the `AssetPanel` of `rd`, and the call changes `pf`: `rebuild_struct(pnl, (; pf = pf))` (rule 6, #2110)"),
-                                                                          (:unit_scale_risk_measure,
-                                                                           :MaxRiskMeasureSettings) =>
-                                                                              ("go",
-                                                                               "`settings` is the `MaxRiskMeasureSettings` of `r`: `rebuild_struct(settings, (; scale = one(scale)))`, and `r` takes `rebuild_struct` too (rule 6, #2110)"),
-                                                                          (:unit_scale_risk_measure,
-                                                                           :RiskMeasureSettings) =>
-                                                                              ("go",
-                                                                               "`settings` is the `RiskMeasureSettings` of `r`: `rebuild_struct(settings, (; scale = one(scale)))` (rule 6, #2110)"),
-                                                                          (:no_risk_expr_risk_measure,
-                                                                           :RiskMeasureSettings) =>
-                                                                              ("go",
-                                                                               "`settings` is the `RiskMeasureSettings` of `r`: `rebuild_struct(settings, (; rke = false))` (rule 6, #2110)"),
-                                                                          (:bounds_risk_measure,
-                                                                           :RiskMeasureSettings) =>
-                                                                              ("go",
-                                                                               "`settings` is the `RiskMeasureSettings` of `r`: `rebuild_struct(settings, (; ub = ub))` (rule 6, #2110)"),
                                                                           (:unit_scale_returns_estimator,
                                                                            :JuMPReturnsSettings) =>
                                                                               ("go",

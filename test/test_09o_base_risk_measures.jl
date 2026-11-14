@@ -196,8 +196,8 @@ end
         @test PO.weight_independent_target(0.01)
         @test PO.weight_independent_target(PO.MeanCentering())
         @test !PO.weight_independent_target([0.01, 0.02])
-        @test PO.supports_precomputed_returns(PO.NetReturnsInput(), nothing)
-        @test !PO.supports_precomputed_returns(PO.WeightsInput(), nothing)
+        @test PO.supports_precomputed_returns(nothing, PO.NetReturnsInput())
+        @test !PO.supports_precomputed_returns(nothing, PO.WeightsInput())
     end
 
     @testset "The selectors pass a stated value through and view an array" begin

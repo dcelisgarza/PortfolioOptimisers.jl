@@ -243,7 +243,7 @@ The method selects the two field by field and not as a pair, because the constru
 
  1. Resolve a **Deferred Quantity** in `sk` with [`resolve_deferred_quantities`](@ref), giving `r`.
  2. Select `sk` and `V` with [`nothing_scalar_array_selector`](@ref), from `r` or else from `pr.sk` and `pr.V`.
- 3. Build a new `NegativeSkewness` from `sk`, `V` and the `settings`, `mp`, `alg`, `window` and `mtx_sqrt` of `r`.
+ 3. Rebuild `r` with `sk` and `V`, with [`rebuild_struct`](@ref). The `settings`, `mp`, `alg`, `window` and `mtx_sqrt` of `r` do not change.
 
 # Related
 
@@ -252,14 +252,14 @@ The method selects the two field by field and not as a pair, because the constru
   - [`factory`](@ref)
   - [`resolve_deferred_quantities`](@ref)
   - [`nothing_scalar_array_selector`](@ref)
+  - [`rebuild_struct`](@ref)
 """
 function factory(r::NegativeSkewness, pr::HighOrderPrior, args...;
                  kwargs...)::NegativeSkewness
     r = resolve_deferred_quantities(r, pr)
     sk = nothing_scalar_array_selector(r.sk, pr.sk)
     V = nothing_scalar_array_selector(r.V, pr.V)
-    return NegativeSkewness(; settings = r.settings, mp = r.mp, sk = sk, V = V, alg = r.alg,
-                            window = r.window, mtx_sqrt = r.mtx_sqrt)
+    return rebuild_struct(r, (; sk = sk, V = V))
 end
 """
 $(DocStringExtensions.TYPEDSIGNATURES)
@@ -290,8 +290,7 @@ function port_opt_view(r::NegativeSkewness{<:Any, <:Any, <:MatNum, <:MatNum}, i,
     sk = nothing_scalar_array_view_odd_order(r.sk, i, idx)
     window = get_window(r.window, X)
     V = negative_spectral_coskewness(sk, view(X, window, i), r.mp)
-    return NegativeSkewness(; settings = r.settings, alg = r.alg, mp = r.mp, sk = sk, V = V,
-                            window = r.window, mtx_sqrt = r.mtx_sqrt)
+    return rebuild_struct(r, (; sk = sk, V = V))
 end
 
 # Expected-risk input kind — see `risk_input_kind`.

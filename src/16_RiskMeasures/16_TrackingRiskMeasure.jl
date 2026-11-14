@@ -141,16 +141,17 @@ A hierarchical or clustering optimiser calls it to build the constraint of one c
 
  1. Slice the benchmark with `port_opt_view(tr.tr, i)`.
  2. Slice the tracked measure with `port_opt_view(tr.r, i, X)`.
- 3. Build a new [`RiskTrackingError`](@ref) from the two slices, `tr.err` and `tr.alg`.
+ 3. Rebuild `tr` with the two slices, with [`rebuild_struct`](@ref). `tr.err` and `tr.alg` do not change.
 
 # Related
 
   - [`RiskTrackingError`](@ref)
   - [`port_opt_view`](@ref)
+  - [`rebuild_struct`](@ref)
 """
 function port_opt_view(tr::RiskTrackingError, i, X::MatNum, args...)
-    return RiskTrackingError(; tr = port_opt_view(tr.tr, i), r = port_opt_view(tr.r, i, X),
-                             err = tr.err, alg = tr.alg)
+    return rebuild_struct(tr,
+                          (; tr = port_opt_view(tr.tr, i), r = port_opt_view(tr.r, i, X)))
 end
 """
 $(DocStringExtensions.TYPEDSIGNATURES)
@@ -161,19 +162,20 @@ Return a [`RiskTrackingError`](@ref) whose tracked measure is resolved against a
 
  1. Advance the benchmark with `factory(tr.tr, w)`. The benchmark stays as it is when `w` is `nothing`, or when its `fixed` flag is `true`.
  2. Resolve the tracked measure with `factory(tr.r, pr, slv, ucs, w, args...; kwargs...)`, which fills the moments that it reads from `pr`.
- 3. Build a new [`RiskTrackingError`](@ref) from the two results, `tr.err` and `tr.alg`.
+ 3. Rebuild `tr` with the two results, with [`rebuild_struct`](@ref). `tr.err` and `tr.alg` do not change.
 
 # Related
 
   - [`RiskTrackingError`](@ref)
   - [`AbstractPriorResult`](@ref)
   - [`factory`](@ref)
+  - [`rebuild_struct`](@ref)
 """
 function factory(tr::RiskTrackingError, pr::AbstractPriorResult, slv::Any, ucs::Any,
                  w::Option{<:VecNum} = nothing, args...; kwargs...)::RiskTrackingError
-    return RiskTrackingError(; tr = factory(tr.tr, w),
-                             r = factory(tr.r, pr, slv, ucs, w, args...; kwargs...),
-                             err = tr.err, alg = tr.alg)
+    return rebuild_struct(tr,
+                          (; tr = factory(tr.tr, w),
+                           r = factory(tr.r, pr, slv, ucs, w, args...; kwargs...)))
 end
 """
 $(DocStringExtensions.TYPEDSIGNATURES)
@@ -199,16 +201,16 @@ Return a [`RiskTrackingError`](@ref) whose benchmark and tracked measure take th
 
  1. Advance the benchmark with `factory(tr.tr, w)`. A [`WeightsTracking`](@ref) whose `fixed` flag is `true` stays as it is.
  2. Advance the tracked measure with `factory(tr.r, w)`.
- 3. Build a new [`RiskTrackingError`](@ref) from the two results, `tr.err` and `tr.alg`.
+ 3. Rebuild `tr` with the two results, with [`rebuild_struct`](@ref). `tr.err` and `tr.alg` do not change.
 
 # Related
 
   - [`RiskTrackingError`](@ref)
   - [`factory`](@ref)
+  - [`rebuild_struct`](@ref)
 """
 function factory(tr::RiskTrackingError, w::VecNum)::RiskTrackingError
-    return RiskTrackingError(; tr = factory(tr.tr, w), r = factory(tr.r, w), err = tr.err,
-                             alg = tr.alg)
+    return rebuild_struct(tr, (; tr = factory(tr.tr, w), r = factory(tr.r, w)))
 end
 """
 $(DocStringExtensions.TYPEDEF)
@@ -394,30 +396,32 @@ $(DocStringExtensions.TYPEDSIGNATURES)
 
 Return a [`TrackingRiskMeasure`](@ref) whose benchmark takes the portfolio weights `w`.
 
-`factory(r.tr, w)` advances the benchmark. A [`WeightsTracking`](@ref) whose `fixed` flag is `false` takes `w` as its new benchmark weights, and any other benchmark stays as it is. `r.settings` and `r.alg` pass through unchanged.
+`factory(r.tr, w)` advances the benchmark. A [`WeightsTracking`](@ref) whose `fixed` flag is `false` takes `w` as its new benchmark weights, and any other benchmark stays as it is. [`rebuild_struct`](@ref) rebuilds `r` with the benchmark, and `r.settings` and `r.alg` pass through unchanged.
 
 # Related
 
   - [`TrackingRiskMeasure`](@ref)
   - [`factory`](@ref)
+  - [`rebuild_struct`](@ref)
 """
 function factory(r::TrackingRiskMeasure, w::VecNum)
-    return TrackingRiskMeasure(; settings = r.settings, tr = factory(r.tr, w), alg = r.alg)
+    return rebuild_struct(r, (; tr = factory(r.tr, w)))
 end
 """
 $(DocStringExtensions.TYPEDSIGNATURES)
 
-Return `factory(r, w)`, the [`TrackingRiskMeasure`](@ref) whose benchmark takes the portfolio weights `w`.
+Return the [`TrackingRiskMeasure`](@ref) whose benchmark takes the portfolio weights `w`, as `factory(r, w)` does.
 
-The measure reads no moment, so the prior result, the solver and the uncertainty set in the second to fourth positions are not read.
+The measure reads no moment, so the prior result, the solver and the uncertainty set in the second to fourth positions are not read. The method holds the one-line body of `factory(r, w)`, and the two give one measure.
 
 # Related
 
   - [`TrackingRiskMeasure`](@ref)
   - [`factory`](@ref)
+  - [`rebuild_struct`](@ref)
 """
 function factory(r::TrackingRiskMeasure, ::Any, ::Any, ::Any, w::VecNum, args...; kwargs...)
-    return factory(r, w)
+    return rebuild_struct(r, (; tr = factory(r.tr, w)))
 end
 """
 $(DocStringExtensions.TYPEDEF)
@@ -611,17 +615,16 @@ A hierarchical or clustering optimiser calls it to build the measure of one clus
 
  1. Slice the benchmark with `port_opt_view(r.tr, i)`.
  2. Slice the tracked measure with `port_opt_view(r.r, i, X)`.
- 3. Build a new [`RiskTrackingRiskMeasure`](@ref) from the two slices, `r.settings` and `r.alg`.
+ 3. Rebuild `r` with the two slices, with [`rebuild_struct`](@ref). `r.settings` and `r.alg` do not change.
 
 # Related
 
   - [`RiskTrackingRiskMeasure`](@ref)
   - [`port_opt_view`](@ref)
+  - [`rebuild_struct`](@ref)
 """
 function port_opt_view(r::RiskTrackingRiskMeasure, i, X::MatNum, args...)
-    tr = port_opt_view(r.tr, i)
-    return RiskTrackingRiskMeasure(; settings = r.settings, tr = tr,
-                                   r = port_opt_view(r.r, i, X), alg = r.alg)
+    return rebuild_struct(r, (; tr = port_opt_view(r.tr, i), r = port_opt_view(r.r, i, X)))
 end
 """
 $(DocStringExtensions.TYPEDSIGNATURES)
@@ -637,8 +640,7 @@ Return a [`RiskTrackingRiskMeasure`](@ref) whose tracked measure is resolved aga
   - [`factory`](@ref)
 """
 function factory(r::RiskTrackingRiskMeasure, pr::AbstractPriorResult, args...; kwargs...)
-    return RiskTrackingRiskMeasure(; settings = r.settings, tr = r.tr,
-                                   r = factory(r.r, pr, args...; kwargs...), alg = r.alg)
+    return rebuild_struct(r, (; r = factory(r.r, pr, args...; kwargs...)))
 end
 """
 $(DocStringExtensions.TYPEDSIGNATURES)
@@ -664,16 +666,16 @@ Return a [`RiskTrackingRiskMeasure`](@ref) whose benchmark and tracked measure t
 
  1. Advance the benchmark with `factory(r.tr, w)`. A [`WeightsTracking`](@ref) whose `fixed` flag is `true` stays as it is.
  2. Advance the tracked measure with `factory(r.r, w)`.
- 3. Build a new [`RiskTrackingRiskMeasure`](@ref) from the two results, `r.settings` and `r.alg`.
+ 3. Rebuild `r` with the two results, with [`rebuild_struct`](@ref). `r.settings` and `r.alg` do not change.
 
 # Related
 
   - [`RiskTrackingRiskMeasure`](@ref)
   - [`factory`](@ref)
+  - [`rebuild_struct`](@ref)
 """
 function factory(r::RiskTrackingRiskMeasure, w::VecNum)
-    return RiskTrackingRiskMeasure(; settings = r.settings, tr = factory(r.tr, w),
-                                   r = factory(r.r, w), alg = r.alg)
+    return rebuild_struct(r, (; tr = factory(r.tr, w), r = factory(r.r, w)))
 end
 
 # Expected-risk input kind — see `risk_input_kind`.

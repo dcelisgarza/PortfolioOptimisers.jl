@@ -262,7 +262,19 @@ end
                                                         # src/11_UncertaintySets (#2098).
                                                         (:ucs_prior, :prior) => "(b) the `Nothing` arm throws a refusal of the uncertainty sets, and `prior(pe)` in `21_Pipeline/06_OnlinePipeline.jl` and the calls of a user keep the `MethodError` of `prior(nothing, X)` (case 3, #2111)",
                                                         # The portfolio quantities, src/13_Fees.jl to src/15_Tracking.jl (#2099).
-                                                        (:override_fee_amortisation, :rebuild_struct) => "(b) a constructor owns no default, so the `Nothing` arms stay in front of `Fees` (#2109, #2111). The value arm copies every field but `fa`, so it calls `rebuild_struct` (rule 6), and the `Nothing` arms hold the policy of the fold: no fees, or no amortisation to override (#2111, #2099)")
+                                                        (:override_fee_amortisation, :rebuild_struct) => "(b) a constructor owns no default, so the `Nothing` arms stay in front of `Fees` (#2109, #2111). The value arm copies every field but `fa`, so it calls `rebuild_struct` (rule 6), and the `Nothing` arms hold the policy of the fold: no fees, or no amortisation to override (#2111, #2099)",
+                                                        # src/16_RiskMeasures (#2100).
+                                                        (:risk_measure_nothing_scalar_array_view, :nothing_scalar_array_view) => "(b) a `Nothing` arm throws when both variables are `nothing`, and the other selects the prior variable: a policy of the risk measure (#2111)",
+                                                        (:tail_worst_case_risk, :worst_case_risk) => "(b) case 3: `linearised_risk` and `difference_linearised_risk` reject `nothing`, because `worst_case_risk` reads the series alone and a measure of kind `WeightsInput` reads the weights (#2111)",
+                                                        (:factory, :resolve_deferred_quantities) => "(interface) 3 functions share the callee `resolve_deferred_quantities` (rule 3, #2100). The pair, not the name, is kept, because other pairs of `factory` are still pending",
+                                                        (:worst_case_distribution, :ERM_worst_case) => "(interface) four methods of `worst_case_distribution` share the kernel: the point measure, the two tails of the range and the two drawdown measures. It is the worst-case twin of `ERM`, which the functors share (rule 3, ruled by the maintainer in #2100)",
+                                                        (:worst_case_distribution, :RRM_worst_case) => "(interface) four methods of `worst_case_distribution` share the kernel: the point measure, the two tails of the range and the two drawdown measures. It is the worst-case twin of `RRM`, which the functors share (rule 3, ruled by the maintainer in #2100)",
+                                                        (:worst_case_distribution, :PRM_worst_case) => "(interface) four methods of `worst_case_distribution` share the kernel: the point measure, the two tails of the range and the two drawdown measures. It is the worst-case twin of `PRM`, which the functors share (rule 3, ruled by the maintainer in #2100)",
+                                                        (:expected_risk, :expected_risk) => "public: (a) the keyword form of a workflow verb passes `sca` as a slot (rule 5). (b) a dispatch problem: the slot of a composite holds a measure or a vector, `BaseRM_VecBaseRM`, so the method that takes the scalariser sends a single measure to the measure-first method, where the method of each type wins. No caller can pass the canonical form, and a copy of the body would skip the methods of each type (#2100)",
+                                                        (:expected_risk_from_returns, :expected_risk_from_returns) => "public: (a) the keyword form of a workflow verb passes `sca` as a slot (rule 5). (b) the method that takes the scalariser sends a single measure to the measure-first method, as `expected_risk` does (#2100)",
+                                                        (:difference_risk, :difference_risk) => "(b) a dispatch problem: the slot of a composite holds a measure or a vector, `BaseRM_VecBaseRM`, so the method that takes the scalariser sends a single measure to the measure-first method, where the method of each type wins, as `expected_risk` does (#2100)",
+                                                        (:linearised_risk, :linearised_risk) => "(b) a dispatch problem: the slot of a composite holds a measure or a vector, `BaseRM_VecBaseRM`, so the method that takes the scalariser sends a single measure to the measure-first method, where the method of each type wins, as `expected_risk` does (#2100)",
+                                                        (:difference_linearised_risk, :difference_linearised_risk) => "(b) a dispatch problem: the slot of a composite holds a measure or a vector, `BaseRM_VecBaseRM`, so the method that takes the scalariser sends a single measure to the measure-first method, where the method of each type wins, as `expected_risk` does (#2100)")
     # The functions whose forward methods are interface methods, with the check that shows
     # it. #2072 adds a name after a check of each one.
     interface_functions = Dict{Symbol, String}(#
@@ -327,7 +339,13 @@ end
                                                :calibration_series_matrix => "one method for each series marker: the drawdown forms call `absolute_drawdown_arr`, which 3 functions share, and `relative_drawdown_arr`, which 2 functions share (rule 3, #2098)",
                                                # The portfolio quantities, src/13_Fees.jl to src/15_Tracking.jl (#2099).
                                                :lift_fee_rate => "one method for each form of a fee rate: the vector form calls `expand_investable_weights`, which 13 functions share (rule 3, #2099)",
-                                               :tracking_benchmark => "one method for each tracking target: the `WeightsTracking` form calls `calc_net_returns`, a shared public verb, and no other method of `tracking_benchmark` calls it, so no driver gives the same answer (rule 3, #2089, #2099)")
+                                               :tracking_benchmark => "one method for each tracking target: the `WeightsTracking` form calls `calc_net_returns`, a shared public verb, and no other method of `tracking_benchmark` calls it, so no driver gives the same answer (rule 3, #2089, #2099)",
+                                               # src/16_RiskMeasures (#2100).
+                                               :resolve_deferred_child => "3 functions share its callee `resolve_deferred_quantities` (rule 3, #2100)",
+                                               :sel => "one method for each form of a slot: the uncertainty-set forms call `ucs_selector`, which 2 functions share, and the other forms call `nothing_scalar_array_selector` (rule 3, #2100)",
+                                               :owa_l_moment_crm => "2 functions share its callee `ncrra_weights` (rule 3, #2100)",
+                                               :scalarised_degree => "2 functions share its callee `homogeneity_degree` (rule 3, #2100)",
+                                               :supports_precomputed_returns => "a moment measure answers through `weight_independent_target`, which 2 functions share (rule 3, #2100)")
     # The debt that #2072 removes. Do not add a pair: fix the wrapper.
     pending_forwards = Set{Tuple{Symbol, Symbol}}([(:apply_fitted_step,
                                                     :apply_fitted_steps),
@@ -373,19 +391,13 @@ end
                                                    (:cross_val_predict, :fit_and_predict),
                                                    (:cross_val_predict,
                                                     :pipeline_cross_val_predict),
-                                                   (:difference_linearised_risk,
-                                                    :difference_linearised_risk),
-                                                   (:difference_risk, :difference_risk),
                                                    (:difference_risk,
                                                     :resolved_expected_return),
                                                    (:dup_elim_sum_view,
                                                     :dup_elim_sum_matrices),
                                                    (:expected_risk, :expected_ratio),
                                                    (:expected_risk, :expected_return),
-                                                   (:expected_risk, :expected_risk),
                                                    (:expected_risk,
-                                                    :expected_risk_from_returns),
-                                                   (:expected_risk_from_returns,
                                                     :expected_risk_from_returns),
                                                    (:expert_allocation_set,
                                                     :resolve_allocation_set),
@@ -398,8 +410,6 @@ end
                                                    (:factor_attribution,
                                                     :factor_attribution),
                                                    (:factory, :BudgetedHindsightPathResult),
-                                                   (:factory, :factory),
-                                                   (:factory, :resolve_deferred_quantities),
                                                    (:factory, :SubsetResamplingResult),
                                                    (:fitted_step_keeps_observations,
                                                     :keeps_observations),
@@ -427,7 +437,6 @@ end
                                                     :pipeline_step_is_time_dependent),
                                                    (:leverage_one_residuals,
                                                     :leverage_one_nan),
-                                                   (:linearised_risk, :linearised_risk),
                                                    (:maybe_inject_step, :inject_context),
                                                    (:member_regret, :series_regret),
                                                    (:merge_held_data, :partial_fit!),
@@ -443,7 +452,6 @@ end
                                                    (:opinion_pooling_inner, :forward_prior),
                                                    (:opinion_pooling_kept, :forward_prior),
                                                    (:optimise, :_optimise),
-                                                   (:owa_l_moment_crm, :ncrra_weights),
                                                    (:partial_fit!, :fold_pipeline),
                                                    (:pipeline_lens, :parse_lens),
                                                    (:pipeline_step_factory, :factory),
@@ -467,23 +475,15 @@ end
                                                     :reset_time_dependent_estimator),
                                                    (:resolved_constraint_block,
                                                     :ResolvedConstraintBlock),
-                                                   (:resolve_deferred_child,
-                                                    :resolve_deferred_quantities),
                                                    (:rewrap_step, :PipelineStep),
-                                                   (:risk_measure_nothing_scalar_array_view,
-                                                    :nothing_scalar_array_view),
                                                    (:rule_state_seed, :forecaster_seed),
                                                    (:rule_state_seed, :rule_state_seed),
                                                    (:rule_state_view, :port_opt_view),
                                                    (:run_step, :run_constraint_step),
                                                    (:run_step, :run_step),
                                                    (:run_step, :run_uncertainty_step),
-                                                   (:scalarised_degree,
-                                                    :homogeneity_degree),
                                                    (:scale_rows, :window_rows),
                                                    (:scenario_factory, :factory),
-                                                   (:sel, :solver_selector),
-                                                   (:sel, :ucs_selector),
                                                    (:set_allocation_set_constraints!,
                                                     :set_allocation_set_constraints!),
                                                    (:set_retcode, :JuMPOptimisationResult),
@@ -502,12 +502,8 @@ end
                                                    (:step_online_member,
                                                     :pipeline_online_member),
                                                    (:summarise_entries, :summarise_returns),
-                                                   (:supports_precomputed_returns,
-                                                    :weight_independent_target),
                                                    (:systematic_processing!,
                                                     :sample_matrix_processing!),
-                                                   (:tail_worst_case_risk,
-                                                    :worst_case_risk),
                                                    (:universe_axis_visit!,
                                                     :universe_axis_children!),
                                                    (:update_online_member,
@@ -525,13 +521,7 @@ end
                                                     :bigger_is_better),
                                                    (:window_values, :asset_scores),
                                                    (:with_position_id,
-                                                    :MultiPeriodPredictionResult),
-                                                   (:worst_case_distribution,
-                                                    :ERM_worst_case),
-                                                   (:worst_case_distribution,
-                                                    :PRM_worst_case),
-                                                   (:worst_case_distribution,
-                                                    :RRM_worst_case)])
+                                                    :MultiPeriodPredictionResult)])
 
     # ------------------------------------------------------------- the type census
 
