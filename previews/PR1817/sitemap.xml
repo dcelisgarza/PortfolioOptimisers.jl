@@ -577,6 +577,9 @@
     <loc>https://dcelisgarza.github.io/PortfolioOptimisers.jl/stable/private_api/05_Moments/30_RegimeAdjusted/09_MahalanobisLevelClosure/</loc>
   </url>
   <url>
+    <loc>https://dcelisgarza.github.io/PortfolioOptimisers.jl/stable/private_api/05_Moments/30_RegimeAdjusted/10_HacLogDeterminant/</loc>
+  </url>
+  <url>
     <loc>https://dcelisgarza.github.io/PortfolioOptimisers.jl/stable/private_api/05_Moments/31_HigherMomentPartialFit/</loc>
   </url>
   <url>
@@ -2165,9 +2168,6 @@
   </url>
   <url>
     <loc>https://dcelisgarza.github.io/PortfolioOptimisers.jl/stable/public_api/10_Prior/15_CrossSectionalPriorFold/</loc>
-  </url>
-  <url>
-    <loc>https://dcelisgarza.github.io/PortfolioOptimisers.jl/stable/public_api/10_Prior/16_CrossSectionalForecastHistoryCarry/</loc>
   </url>
   <url>
     <loc>https://dcelisgarza.github.io/PortfolioOptimisers.jl/stable/public_api/10_Prior/17_CrossSectionalCalibrationRules/</loc>
