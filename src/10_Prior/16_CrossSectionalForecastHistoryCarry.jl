@@ -145,7 +145,7 @@ function cross_sectional_carry_history(pe::CrossSectionalFactorPrior,
     (; r, ca) = cross_sectional_carry_append(pe, st)
     # The observed factor returns fill the reduced factor axis, so the model carries the
     # reduced loadings and the basis, as the batch fit does.
-    fnow = cross_sectional_basis_now(ca.fcb, r)
+    fnow = factor_basis_slice(ca.fcb, r)
     csfm = CrossSectionalFactorModel(; M = view(ca.Ms, :, :, size(ca.Ms, 3)),
                                      L = cross_sectional_reduced_loadings(fnow, ca.L),
                                      b = zeros(real(eltype(st.vs)), size(st.X, 2)),
@@ -516,7 +516,7 @@ function cross_sectional_carry_forecast(pe::CrossSectionalFactorPrior,
     j = (k + 1 - min(k, g)):size(st.vs, 1)
     (; r, ca) = cross_sectional_carry_append(pe, st)
     csr = st.csr
-    fnow = cross_sectional_basis_now(ca.fcb, r[j])
+    fnow = factor_basis_slice(ca.fcb, r[j])
     csfm = CrossSectionalFactorModel(; M = view(ca.Ms, :, :, size(ca.Ms, 3)),
                                      L = cross_sectional_reduced_loadings(fnow, ca.L),
                                      b = zeros(real(eltype(st.vs)), size(st.X, 2)),

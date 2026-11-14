@@ -280,7 +280,7 @@ function replace_prior_views(res::ParsingResult, pr::AbstractPriorResult,
             if m.captures[1] ∈ other
                 vars = copy(variables)
                 vars[i] = m.captures[1]
-                return ParsingResult(vars, copy(coeffs), res.op, res.rhs, res.eqn)
+                return rebuild_struct(res, (; vars = vars, coef = copy(coeffs)))
             end
             msg = unknown_variable_msg(m.captures[1], nx, sets.xkey)
             strict_diagnostic(msg, strict; id = @log_id(m.captures[1], sets.xkey))

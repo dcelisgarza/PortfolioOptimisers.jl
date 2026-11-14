@@ -21,7 +21,6 @@ A step that moves the dropped member of a family of factors under a [`BatchChoic
 PortfolioOptimisers.cross_sectional_fold_move
 PortfolioOptimisers.cross_sectional_move_basis
 PortfolioOptimisers.cross_sectional_rebase_state
-PortfolioOptimisers.cross_sectional_rebase
 PortfolioOptimisers.cross_sectional_rebase_family
 PortfolioOptimisers.cross_sectional_move_marks
 PortfolioOptimisers.cross_sectional_move_row_marks

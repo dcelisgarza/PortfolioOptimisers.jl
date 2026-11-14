@@ -28,14 +28,15 @@ Alias for an abstract vector of [`AbstractEntropyPoolingTailView`](@ref) element
 """
 const VecEPTV = AbstractVector{<:AbstractEntropyPoolingTailView}
 """
-    entropy_pooling(w::VecNum, epc::AbstractDict, tvs::VecEPTV,
-                    opt::AbstractEntropyPoolingOptimiser)
+    entropy_pooling(w::VecNum, epc::AbstractDict, opt::OptimEntropyPooling, tvs::VecEPTV)
+    entropy_pooling(w::VecNum, epc::AbstractDict, opt::JuMPEntropyPooling,
+                    tvs::VecEPTV = AbstractEntropyPoolingTailView[])
 
 Solve an entropy pooling problem that has tail view constraints.
 
-This form of `entropy_pooling` adds two kinds of views to the three-argument form. They are the conditional and entropic value-at-risk views of [EPTail](@cite), and the relativistic value-at-risk views of [EPRLVaR](@cite). A tail view needs auxiliary variables, so [`add_ep_tail_view!`](@ref) builds it into the model, and it does not become rows of `epc`.
+This form of `entropy_pooling` adds two kinds of views to the three-argument form of [`OptimEntropyPooling`](@ref). They are the conditional and entropic value-at-risk views of [EPTail](@cite), and the relativistic value-at-risk views of [EPRLVaR](@cite). A tail view needs auxiliary variables, so [`add_ep_tail_view!`](@ref) builds it into the model, and it does not become rows of `epc`.
 
-These methods hold the body of the [`JuMPEntropyPooling`](@ref) optimiser. The [`OptimEntropyPooling`](@ref) method solves the dual problem, which cannot hold an auxiliary variable. So it accepts only an empty `tvs`, and calls the three-argument form.
+These methods hold the body of the [`JuMPEntropyPooling`](@ref) optimiser. Its method takes `tvs` as a defaulted slot, so a problem that states no tail view passes three arguments, and the slot holds an empty vector. The [`OptimEntropyPooling`](@ref) method solves the dual problem, which cannot hold an auxiliary variable. So it accepts only an empty `tvs`, and calls the three-argument form.
 
 # Mathematical definition
 
@@ -85,12 +86,16 @@ A stop on tight rows means that the sequence reached a fixed point, not that the
 
   - `epc`: Dictionary of entropy pooling constraints, which maps each key to an `(lhs, rhs)` pair.
 
-  - `tvs`: Tail view constraints.
-
   - `opt`: Entropy pooling optimiser.
 
       + `::JuMPEntropyPooling`: Build every tail view into the model.
+
+          * `::JuMPEntropyPooling{<:Any, <:Any, <:Any, <:Any, <:ExpEntropyPooling}`: Write the divergence with the prior probabilities as the reference.
+          * `::JuMPEntropyPooling{<:Any, <:Any, <:Any, <:Any, <:LogEntropyPooling}`: Write the divergence with a unit reference, and subtract the logarithms of the prior probabilities in the objective.
+
       + `::OptimEntropyPooling`: Solve the dual problem, which cannot hold an auxiliary variable, so accept only an empty `tvs`.
+
+  - `tvs`: Tail view constraints. The [`JuMPEntropyPooling`](@ref) method defaults it to an empty vector.
 
 # Validation
 
@@ -117,14 +122,14 @@ A stop on tight rows means that the sequence reached a fixed point, not that the
   - $(ref_dict[:EPTail]) Section 2.1, Equation 1, and Sections 2.2 and 2.3.
   - $(ref_dict[:EPRLVaR]) Section 3.2.
 """
-function entropy_pooling(w::VecNum, epc::AbstractDict, tvs::VecEPTV,
-                         opt::OptimEntropyPooling)
+function entropy_pooling(w::VecNum, epc::AbstractDict, opt::OptimEntropyPooling,
+                         tvs::VecEPTV)
     @argcheck(isempty(tvs),
               ArgumentError("$(join(unique(nameof.(typeof.(tvs))), ", ", " and ")) can only be expressed with auxiliary variables, which the dual formulation `OptimEntropyPooling` solves has no room for. Use `JuMPEntropyPooling` in `opt`."))
     return entropy_pooling(w, epc, opt)
 end
-function entropy_pooling(w::VecNum, epc::AbstractDict, tvs::VecEPTV,
-                         opt::JuMPEntropyPooling)
+function entropy_pooling(w::VecNum, epc::AbstractDict, opt::JuMPEntropyPooling,
+                         tvs::VecEPTV = AbstractEntropyPoolingTailView[])
     #! See the twin note in the `OptimEntropyPooling` methods: an empty view set states
     #! nothing, so the posterior is the prior. Issue #852.
     if isempty(epc) && isempty(tvs)

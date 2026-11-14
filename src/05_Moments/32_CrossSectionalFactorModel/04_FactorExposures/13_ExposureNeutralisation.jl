@@ -77,10 +77,15 @@ end
                           cre::AbstractCrossSectionalRegressionEstimator, bw::MatNum,
                           nf::VecStr, fam::VecStr,
                           ct::AbstractCrossSectionalTransform = CrossSectionalStandardiser())
+    neutralise_exposures!(Ms::AbstractArray{<:Real, 3}, neutralise::Nothing,
+                          cre::AbstractCrossSectionalRegressionEstimator, bw::MatNum,
+                          nf::VecStr, fam::VecStr,
+                          ct::AbstractCrossSectionalTransform = CrossSectionalStandardiser())
+        -> nothing
 
 Neutralise Factor Exposures against other Factor Exposures, in place.
 
-Each entry of `neutralise` replaces the exposures of its key with the scored residual of a cross-sectional fit on the exposures of its targets. A later entry reads the exposures that an earlier entry wrote, so the order of the entries changes the result.
+Each entry of `neutralise` replaces the exposures of its key with the scored residual of a cross-sectional fit on the exposures of its targets. A later entry reads the exposures that an earlier entry wrote, so the order of the entries changes the result. A Cross-Sectional Factor Prior that states no Neutralisation passes `nothing`, and the method on `Nothing` runs none and leaves `Ms` as it is.
 
 # Mathematical definition
 
@@ -123,7 +128,7 @@ The normal equations of the least squares give ``\\sum_{i} \\omega_{tik} e_{tik}
 # Arguments
 
   - `Ms::AbstractArray{<:Real, 3}`: Exposure history, `assets × factors × observations`. The function changes it in place.
-  - `neutralise`: Pairs of `key => targets`. The key and each target is a factor name or a Factor Family label, as a `String` or a `Symbol`, and the targets are one name or a vector of names. A family key neutralises each of its members independently against the same targets.
+  - `neutralise`: Pairs of `key => targets`, or `nothing` for no Neutralisation. The key and each target is a factor name or a Factor Family label, as a `String` or a `Symbol`, and the targets are one name or a vector of names. A family key neutralises each of its members independently against the same targets.
   - `cre`: Cross-sectional regression estimator of the fit.
   - `bw::MatNum`: Benchmark weight history, `observations × assets`.
   - `nf::VecStr`: Names of the raw factor axis, of length `size(Ms, 2)`.
@@ -152,6 +157,12 @@ The normal equations of the least squares give ``\\sum_{i} \\omega_{tik} e_{tik}
   - [`CrossSectionalStandardiser`](@ref)
   - [`neutralisation_indices`](@ref)
 """
+function neutralise_exposures!(::AbstractArray{<:Real, 3}, ::Nothing,
+                               ::AbstractCrossSectionalRegressionEstimator, ::MatNum,
+                               ::VecStr, ::VecStr,
+                               ::AbstractCrossSectionalTransform = CrossSectionalStandardiser())::Nothing
+    return nothing
+end
 function neutralise_exposures!(Ms::AbstractArray{<:Real, 3},
                                neutralise::AbstractVector{<:Pair},
                                cre::AbstractCrossSectionalRegressionEstimator, bw::MatNum,

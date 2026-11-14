@@ -40,11 +40,12 @@ function reduce_factor_names(fcb::FactorFamilyBasis, nf::VecStr)::Vector{String}
     return [String(nf[i]) for i in retained_factor_indices(fcb)]
 end
 """
+    reduce_exposures(fcb::Nothing, Ms::Arr3Num) -> Ms
     reduce_exposures(fcb::FactorFamilyBasis, Ms::Arr3Num)
 
 Map an exposure history onto the reduced factor axis.
 
-The function applies the ratios of each observation to the exposures of that observation.
+The function applies the ratios of each observation to the exposures of that observation. A fit that constrains no Factor Family has no basis, and its raw axis is the reduced one. So the method on `Nothing` gives `Ms` unchanged, as [`cross_sectional_transform`](@ref) gives its input unchanged under no transform.
 
 # Mathematical definition
 
@@ -68,22 +69,25 @@ Where:
 
 # Arguments
 
-  - `fcb`: A Factor Family Basis.
+  - `fcb`: A Factor Family Basis, or `nothing`.
   - `Ms::Arr3Num`: Exposure history on the raw axis, `assets × factors × observations`.
 
 # Validation
 
-  - `size(Ms, 2) == fcb.K`, and `size(Ms, 3)` matches the observation axis of the basis.
+  - `size(Ms, 2) == fcb.K`, and `size(Ms, 3)` matches the observation axis of the basis, when `fcb` is a Factor Family Basis.
 
 # Returns
 
-  - `Ms::Array{<:Real, 3}`: The exposure history on the reduced axis, `assets × reduced factors × observations`.
+  - `Ms::Arr3Num`: The exposure history on the reduced axis, `assets × reduced factors × observations`. It is a new `Array` under a basis, and `Ms` itself under `nothing`.
 
 # Related
 
   - [`FactorFamilyBasis`](@ref)
   - [`reduce_loadings`](@ref)
 """
+function reduce_exposures(::Nothing, Ms::Arr3Num)
+    return Ms
+end
 function reduce_exposures(fcb::FactorFamilyBasis, Ms::Arr3Num)
     assert_factor_axis_length(size(Ms, 2), fcb.K, :Ms)
     assert_factor_basis_obs(size(Ms, 3), fcb, :Ms)

@@ -540,10 +540,6 @@ const RULED_REBUILDS = Dict{Tuple{Symbol, Symbol}, Tuple{String, String}}(#
                                                                            :ObservedStack) =>
                                                                               (NO_REBUILD,
                                                                                "`cc` is the `ObservedFactors` of `cross_sectional_exposure_series`, another type, cut to the kept rows (#2093)"),
-                                                                          (:cross_sectional_benchmark_returns,
-                                                                           :AssetPanel) =>
-                                                                              ("go",
-                                                                               "`pnl` is the `AssetPanel` of `rd`, and the call changes `pf`: `rebuild_struct(pnl, (; pf = pf))` (rule 6, #2110)"),
                                                                           (:unit_scale_returns_estimator,
                                                                            :JuMPReturnsSettings) =>
                                                                               ("go",
@@ -883,20 +879,8 @@ const RULED_NOTHING_PAIRS = Dict{Tuple{Symbol, Symbol}, Tuple{String, String}}(#
                                                                                 :resolve_allocation_set) =>
                                                                                    ("go",
                                                                                     "$CASE_2. A contract verb takes a `::Nothing` method on the empty slot (#2108): no set is the bare simplex, and the callers pass `strict = false`"),
-                                                                               (:cross_sectional_neutralise!,
-                                                                                :neutralise_exposures!) =>
-                                                                                   ("go",
-                                                                                    CASE_2),
-                                                                               (:cross_sectional_basis_now,
-                                                                                :factor_basis_slice) =>
-                                                                                   ("go",
-                                                                                    CASE_2),
                                                                                (:attribution_window_basis,
                                                                                 :factor_basis_slice) =>
-                                                                                   ("go",
-                                                                                    CASE_2),
-                                                                               (:cross_sectional_reduced_history,
-                                                                                :reduce_exposures) =>
                                                                                    ("go",
                                                                                     CASE_2),
                                                                                (:attribution_expand_errors,
@@ -915,10 +899,6 @@ const RULED_NOTHING_PAIRS = Dict{Tuple{Symbol, Symbol}, Tuple{String, String}}(#
                                                                                 :panel_active_cells) =>
                                                                                    ("go",
                                                                                     CASE_2),
-                                                                               (:cross_sectional_prior_option,
-                                                                                :cross_sectional_prior_pairs) =>
-                                                                                   ("go",
-                                                                                    "$CASE_2. The keyword `factors::Dict_VecPair` refuses `nothing` before the call"),
                                                                                (:cross_sectional_shared_qr,
                                                                                 :cross_sectional_qr) =>
                                                                                    ("keep (b)",

@@ -49,9 +49,7 @@ function cross_sectional_window_trim(P::PanelScores, n::Option{<:Integer})::Pane
                        cross_sectional_window_trim(P.g, n))
 end
 function cross_sectional_fold_append(a::FactorFamilyBasis, b::FactorFamilyBasis)
-    return FactorFamilyBasis(; fnm = a.fnm, fi = a.fi, di = a.di,
-                             ratios = cross_sectional_fold_append(a.ratios, b.ratios),
-                             K = a.K)
+    return rebuild_struct(a, (; ratios = cross_sectional_fold_append(a.ratios, b.ratios)))
 end
 function cross_sectional_fold_append(a::CrossSectionalRegression,
                                      b::CrossSectionalRegression)
@@ -237,64 +235,14 @@ end
     cross_sectional_move_basis(unseen::AbstractUnseenMemberRule,
                                cre::AbstractCrossSectionalRegressionEstimator, st, families)
         -> nothing
+    cross_sectional_move_basis(fcb::FactorFamilyBasis, families::AbstractVector{<:Pair},
+                               nf::VecStr) -> Option{<:FactorFamilyBasis}
 
 Returns the basis of the fitted observations under the dropped members that moved, when the move folds on the carry fold of a Cross-Sectional Factor Prior, and `nothing` otherwise.
 
 The zero-sum condition of a family is the same set of factor returns for every dropped member. So a regression that minimises the weighted squared residuals gives the same raw factor returns in every basis, on each observation whose design has full rank. [`ZeroUnseenMember`](@ref) makes every observation with an Unseen Member identified, so its answer does not depend on the dropped member. [`SolvedUnseenMember`](@ref) keeps such an observation rank-deficient, and a dependent factor set makes an observation rank-deficient under every rule. The answer of a rank-deficient observation depends on the dropped member under every [`AbstractCrossSectionalSolveAlgorithm`](@ref) that answers it: the answer of least norm reads the coordinates of the basis, and so does the pivot of [`DependentColumnDrop`](@ref). So [`cross_sectional_move_solve`](@ref) solves it again in the new basis. A [`CrossSectionalTargetRegression`](@ref) fits a target, and a target can penalise its coefficients, so its answer can depend on the basis. [`is_basis_invariant`](@ref) answers for the target. A target that answers `true`, such as [`LinearModel`](@ref), gives the same raw factor returns in every basis on an observation of full rank, as a least-squares fit does. [`GeneralisedLinearModel`](@ref) answers `true`: its iterative fit takes the same iterates in every basis, so it gives the same raw factor returns to rounding. On a rank-deficient observation the answer of a target depends on the basis too, under each solve algorithm of the target, and [`cross_sectional_move_solve`](@ref) solves such an observation again through the target. So a move folds under [`CrossSectionalLinearRegression`](@ref), and under a target that answers `true`, with the two Unseen Member rules of the library. Every other pair fits every observation again.
 
-# Algorithm
-
-The method that Julia selects is the algorithm.
-
- 1. Under [`ZeroUnseenMember`](@ref) or [`SolvedUnseenMember`](@ref), with [`CrossSectionalLinearRegression`](@ref), rewrite the basis with [`cross_sectional_rebase`](@ref).
- 2. Under the same rules, with [`CrossSectionalTargetRegression`](@ref), rewrite the basis as step 1 does when [`is_basis_invariant`](@ref) answers `true` for `cre.tgt`, and answer `nothing` otherwise.
- 3. Under any other pair, answer `nothing`.
-
-# Arguments
-
-  - `unseen`: The Unseen Member rule of the prior.
-  - `cre`: The cross-sectional regression estimator of the prior.
-  - `st`: The state, whose `fcb` is the basis of the last fit.
-  - `families`: The families with their dropped members named.
-
-# Returns
-
-  - `fcb::Option{<:FactorFamilyBasis}`: The basis under `families`, or `nothing` when the move does not fold.
-
-# Related
-
-  - [`cross_sectional_fold_move`](@ref)
-  - [`cross_sectional_rebase`](@ref)
-  - [`cross_sectional_move_solve`](@ref)
-  - [`AbstractUnseenMemberRule`](@ref)
-  - [`is_basis_invariant`](@ref)
-"""
-function cross_sectional_move_basis(::Union{ZeroUnseenMember, SolvedUnseenMember},
-                                    ::CrossSectionalLinearRegression,
-                                    st::CrossSectionalCarryState,
-                                    families::AbstractVector{<:Pair})
-    return cross_sectional_rebase(st.fcb, families, st.nf)
-end
-function cross_sectional_move_basis(::Union{ZeroUnseenMember, SolvedUnseenMember},
-                                    cre::CrossSectionalTargetRegression,
-                                    st::CrossSectionalCarryState,
-                                    families::AbstractVector{<:Pair})
-    if !is_basis_invariant(cre.tgt)
-        return nothing
-    end
-    return cross_sectional_rebase(st.fcb, families, st.nf)
-end
-function cross_sectional_move_basis(::AbstractUnseenMemberRule,
-                                    ::AbstractCrossSectionalRegressionEstimator, ::Any,
-                                    ::Any)
-    return nothing
-end
-"""
-$(DocStringExtensions.TYPEDSIGNATURES)
-
-Rewrites a Factor Family Basis with new dropped members, from its own ratios.
-
-The ratio of a member is its benchmark-weighted exposure over the exposure of the dropped member. So the ratios under a new dropped member ``k^{\\prime}`` are the old ratios over the old ratio of ``k^{\\prime}``, and the ratio of the old dropped member ``k`` is the inverse of that ratio. The function reads no exposure, and its ratios equal the ratios of [`factor_family_basis`](@ref) to rounding.
+The method on a [`FactorFamilyBasis`](@ref) rewrites the basis from its own ratios. The ratio of a member is its benchmark-weighted exposure over the exposure of the dropped member. So the ratios under a new dropped member ``k^{\\prime}`` are the old ratios over the old ratio of ``k^{\\prime}``, and the ratio of the old dropped member ``k`` is the inverse of that ratio. The method reads no exposure, and its ratios equal the ratios of [`factor_family_basis`](@ref) to rounding.
 
 # Mathematical definition
 
@@ -311,37 +259,71 @@ Where:
   - $(math_dict[:r_tj_fcb])
   - ``r^{\\prime}_{t}(j)``: Ratio of member ``j`` at observation ``t`` under the new dropped member ``k^{\\prime}``.
 
+# Algorithm
+
+The method that Julia selects is the algorithm.
+
+ 1. Under [`ZeroUnseenMember`](@ref) or [`SolvedUnseenMember`](@ref), with [`CrossSectionalLinearRegression`](@ref), rewrite the basis `st.fcb` with the method on a [`FactorFamilyBasis`](@ref).
+ 2. Under the same rules, with [`CrossSectionalTargetRegression`](@ref), rewrite the basis as step 1 does when [`is_basis_invariant`](@ref) answers `true` for `cre.tgt`, and answer `nothing` otherwise.
+ 3. Under any other pair, answer `nothing`.
+ 4. On a [`FactorFamilyBasis`](@ref), find the position of each new dropped member in its family, and rewrite the ratios of each family with [`cross_sectional_rebase_family`](@ref). Answer `nothing` when a family answers `nothing`.
+
 # Arguments
 
+  - `unseen`: The Unseen Member rule of the prior.
+  - `cre`: The cross-sectional regression estimator of the prior.
+  - `st`: The state, whose `fcb` is the basis of the last fit.
+  - `families`: Pairs of `family label => dropped member`, in the order of the families of the basis, each member named.
   - `fcb`: The Factor Family Basis.
-  - `families`: Pairs of `family label => dropped member`, in the order of `fcb.fnm`, each member named.
   - `nf`: Names of the raw factor axis.
 
 # Returns
 
-  - `fcb::Option{<:FactorFamilyBasis}`: The basis with the new dropped members, or `nothing` when a new dropped member has a zero benchmark-weighted exposure at an observation, where [`factor_family_basis`](@ref) refuses it.
+  - `fcb::Option{<:FactorFamilyBasis}`: The basis under `families`, or `nothing` when the move does not fold, or when a new dropped member has a zero benchmark-weighted exposure at an observation, where [`factor_family_basis`](@ref) refuses it.
 
 # Related
 
-  - [`cross_sectional_rebase_family`](@ref)
   - [`cross_sectional_fold_move`](@ref)
+  - [`cross_sectional_rebase_family`](@ref)
+  - [`cross_sectional_move_solve`](@ref)
+  - [`AbstractUnseenMemberRule`](@ref)
+  - [`is_basis_invariant`](@ref)
   - [`FactorFamilyBasis`](@ref)
 """
-function cross_sectional_rebase(fcb::FactorFamilyBasis, families::AbstractVector{<:Pair},
-                                nf::VecStr)
+function cross_sectional_move_basis(::Union{ZeroUnseenMember, SolvedUnseenMember},
+                                    ::CrossSectionalLinearRegression,
+                                    st::CrossSectionalCarryState,
+                                    families::AbstractVector{<:Pair})
+    return cross_sectional_move_basis(st.fcb, families, st.nf)
+end
+function cross_sectional_move_basis(::Union{ZeroUnseenMember, SolvedUnseenMember},
+                                    cre::CrossSectionalTargetRegression,
+                                    st::CrossSectionalCarryState,
+                                    families::AbstractVector{<:Pair})
+    if !is_basis_invariant(cre.tgt)
+        return nothing
+    end
+    return cross_sectional_move_basis(st.fcb, families, st.nf)
+end
+function cross_sectional_move_basis(::AbstractUnseenMemberRule,
+                                    ::AbstractCrossSectionalRegressionEstimator, ::Any,
+                                    ::Any)
+    return nothing
+end
+function cross_sectional_move_basis(fcb::FactorFamilyBasis,
+                                    families::AbstractVector{<:Pair}, nf::VecStr)
     di = map(j -> findfirst(isequal(last(families[j])), view(nf, fcb.fi[j])),
              eachindex(fcb.fi))
     blocks = map(j -> cross_sectional_rebase_family(fcb, j, di[j]), eachindex(fcb.fi))
     if any(isnothing, blocks)
         return nothing
     end
-    return FactorFamilyBasis(; fnm = fcb.fnm, fi = fcb.fi, di = di,
-                             ratios = reduce(hcat, blocks), K = fcb.K)
+    return rebuild_struct(fcb, (; di = di, ratios = reduce(hcat, blocks)))
 end
 """
 $(DocStringExtensions.TYPEDSIGNATURES)
 
-Returns the block of the ratios of one Factor Family under a new dropped member, as [`cross_sectional_rebase`](@ref) states it.
+Returns the block of the ratios of one Factor Family under a new dropped member, as [`cross_sectional_move_basis`](@ref) states it.
 
 # Algorithm
 
@@ -361,7 +343,7 @@ Returns the block of the ratios of one Factor Family under a new dropped member,
 
 # Related
 
-  - [`cross_sectional_rebase`](@ref)
+  - [`cross_sectional_move_basis`](@ref)
 """
 function cross_sectional_rebase_family(fcb::FactorFamilyBasis, j::Integer, d::Integer)
     col = family_retained_indices(fcb, j)[3]

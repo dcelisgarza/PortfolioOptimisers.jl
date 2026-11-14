@@ -654,12 +654,11 @@ function exposure_ic_returns(idx::VecInt, X::MatNum, T::Integer)
     return view(X, idx, :)
 end
 """
-    exposure_ic_exposures(fcb::Nothing, Ms::Arr3Num, reduced::Bool)
-    exposure_ic_exposures(fcb::FactorFamilyBasis, Ms::Arr3Num, reduced::Bool)
+    exposure_ic_exposures(fcb::Option{<:FactorFamilyBasis}, Ms::Arr3Num, reduced::Bool)
 
 Return the exposure history the information coefficient scores, on the raw axis or on the reduced one.
 
-A block that carries no family re-basis has one axis, so that case returns the history unchanged whatever `reduced` states.
+A block that carries no family re-basis has one axis, so that case returns the history unchanged whatever `reduced` states, as [`reduce_exposures`](@ref) does on `nothing`.
 
 # Arguments
 
@@ -677,10 +676,7 @@ A block that carries no family re-basis has one axis, so that case returns the h
   - [`reduce_exposures`](@ref)
   - [`exposure_ic_data`](@ref)
 """
-function exposure_ic_exposures(::Nothing, Ms::Arr3Num, ::Bool)
-    return Ms
-end
-function exposure_ic_exposures(fcb::FactorFamilyBasis, Ms::Arr3Num, reduced::Bool)
+function exposure_ic_exposures(fcb::Option{<:FactorFamilyBasis}, Ms::Arr3Num, reduced::Bool)
     return reduced ? reduce_exposures(fcb, Ms) : Ms
 end
 

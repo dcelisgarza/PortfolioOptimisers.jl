@@ -336,8 +336,10 @@ $(DocStringExtensions.FIELDS)
         rhs::Number,
         eqn::AbstractString
     ) -> ParsingResult
+    ParsingResult(; vars::VecStr, coef::VecNum, op::AbstractString, rhs::Number,
+                  eqn::AbstractString) -> ParsingResult
 
-Positional arguments correspond to the struct's fields. There is no keyword constructor, because [`parse_equation`](@ref) is the producer of this type.
+Arguments correspond to the struct's fields. [`parse_equation`](@ref) is the producer of this type. The keyword constructor takes every field by its name, so a function that changes some fields of a parsed equation rebuilds it through [`rebuild_struct`](@ref).
 
 ## Validation
 
@@ -393,6 +395,10 @@ ParsingResult
                                                                                      rhs,
                                                                                      eqn)
     end
+end
+function ParsingResult(; vars::VecStr, coef::VecNum, op::AbstractString, rhs::Number,
+                       eqn::AbstractString)::ParsingResult
+    return ParsingResult(vars, coef, op, rhs, eqn)
 end
 """
     const VecPR = AbstractVector{<:ParsingResult}

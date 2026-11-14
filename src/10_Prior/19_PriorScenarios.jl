@@ -566,7 +566,7 @@ function cross_sectional_regression_stage(pe::CrossSectionalFactorPrior, X::MatN
     Xlw = Xl[rw, :]
     bww = BW[rw, :]
     mcw = cross_sectional_rows(mcap, rw)
-    cross_sectional_neutralise!(pe.neutralise, Msw, pe.cre, bww, nf, fam)
+    neutralise_exposures!(Msw, pe.neutralise, pe.cre, bww, nf, fam)
     fb = cross_sectional_family_basis(pe.families, Msw, bww, nf, fam)
     assert_cross_sectional_lag_rows(length(rw), pe.lag)
     r = (pe.lag + 1):length(rw)
@@ -583,7 +583,7 @@ function cross_sectional_regression_stage(pe::CrossSectionalFactorPrior, X::MatN
     # The Unseen Member rule states the return of a member of a constrained family that no
     # asset of an observation loads on (#1606).
     Bl = view(Msw, :, :, r .- pe.lag)
-    fbl = cross_sectional_basis_now(fb.fcb, r .- pe.lag)
+    fbl = factor_basis_slice(fb.fcb, r .- pe.lag)
     ud = unseen_member_design(pe.unseen, fbl, Bl, Zl, W)
     (; csr, lv) = cross_sectional_live_regression(pe.cre, ud.Z, Xr, W)
     csr = unseen_member_returns(csr, ud.P)

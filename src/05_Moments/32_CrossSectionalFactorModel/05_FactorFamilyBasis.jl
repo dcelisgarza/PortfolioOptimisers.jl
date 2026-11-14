@@ -317,20 +317,21 @@ function family_retained_indices(fcb::FactorFamilyBasis, j::Integer)
     return raw, red, col
 end
 """
-$(DocStringExtensions.TYPEDSIGNATURES)
+    factor_basis_slice(fcb::Nothing, i) -> nothing
+    factor_basis_slice(fcb::FactorFamilyBasis, i) -> FactorFamilyBasis
 
 Return the basis restricted to a selection of observations.
 
-The ratios keep the rows that `i` selects, and every other field is copied. So a caller reads the basis on a window of observations without building it again.
+The ratios keep the rows that `i` selects, and every other field is copied. So a caller reads the basis on a window of observations without building it again. A fit that constrains no Factor Family has no basis, and the method on `Nothing` gives no basis for every selection.
 
 # Arguments
 
-  - `fcb`: A Factor Family Basis.
+  - `fcb`: A Factor Family Basis, or `nothing`.
   - `i`: Indices of the observations to select.
 
 # Returns
 
-  - `fcb::FactorFamilyBasis`: A new basis whose `ratios` hold only the selected observations.
+  - `fcb::Option{<:FactorFamilyBasis}`: A new basis whose `ratios` hold only the selected observations, or `nothing`.
 
 # Examples
 
@@ -348,6 +349,9 @@ julia> PortfolioOptimisers.factor_basis_slice(fcb, 2:3).ratios
 
   - [`FactorFamilyBasis`](@ref)
 """
+function factor_basis_slice(::Nothing, ::Any)
+    return nothing
+end
 function factor_basis_slice(fcb::FactorFamilyBasis, i)::FactorFamilyBasis
     R = fcb.ratios[i, :]
     return rebuild_struct(fcb, (; ratios = isa(R, AbstractMatrix) ? R : reshape(R, 1, :)))

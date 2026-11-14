@@ -1,13 +1,16 @@
 """
-$(DocStringExtensions.TYPEDSIGNATURES)
+    cross_sectional_prior_pairs(x::Nothing, sym::Sym_Str) -> nothing
+    cross_sectional_prior_pairs(x::Dict_VecPair, sym::Sym_Str) -> AbstractVector{<:Pair{String}}
 
 Collect one list-valued argument of a [`CrossSectionalFactorPrior`](@ref) into a vector of Pairs.
 
 The factors, the Neutralisation and the constrained Factor Families of the prior take the same form. Each takes Pairs in the order the caller writes them, or any `AbstractDict`. A dictionary states no order, so the collected order is its order of iteration. A caller who needs a stated order writes Pairs. A vector of Pairs with `String` keys is held as it is, not copied, as [`string_key_pairs`](@ref) states.
 
+The Neutralisation and the constrained Factor Families are each absent or a list, so the absent case is the method on `Nothing`, which needs no repair and gives `nothing`. The factors are never absent: the keyword `factors::Dict_VecPair` of the prior refuses `nothing` before the call.
+
 # Arguments
 
-  - `x`: The Pairs or the dictionary.
+  - `x`: The Pairs, the dictionary, or `nothing`.
   - `sym`: Name of the field, for the messages.
 
 # Validation
@@ -17,7 +20,7 @@ The factors, the Neutralisation and the constrained Factor Families of the prior
 
 # Returns
 
-  - `pr::AbstractVector{<:Pair{String}}`: The collected Pairs, each with a `String` key.
+  - `pr::Option{<:AbstractVector{<:Pair{String}}}`: The collected Pairs, each with a `String` key, or `nothing`.
 
 # Examples
 
@@ -33,6 +36,9 @@ julia> PortfolioOptimisers.cross_sectional_prior_pairs([\"style\" => \"industry\
   - [`string_key_pairs`](@ref)
   - [`Dict_VecPair`](@ref)
 """
+function cross_sectional_prior_pairs(::Nothing, ::Sym_Str)
+    return nothing
+end
 function cross_sectional_prior_pairs(x::Dict_VecPair, sym::Sym_Str)
     pr = string_key_pairs(x)
     @argcheck(!isempty(pr), IsEmptyError("$sym cannot be empty"))
@@ -78,9 +84,7 @@ function cross_sectional_benchmark_returns(rd::ReturnsResult, name::AbstractStri
               ArgumentError("a Cross-Sectional Factor Prior writes its benchmark weights onto the Panel Field \"$name\", and the Asset Panel already holds a field of that name. Rename the field of the panel, or set the bw of the prior to a name the panel does not use."))
     # The fields take the element type of their values (#1979).
     pf = [each_panel_field(pnl)..., NumericPanelField(; name = name, vals = W)]
-    return ReturnsResult(; nx = rd.nx, X = rd.X, nf = rd.nf, F = rd.F, nb = rd.nb, B = rd.B,
-                         ne = rd.ne, E = rd.E, ts = rd.ts, iv = rd.iv, ivpa = rd.ivpa,
-                         pnl = AssetPanel(; pf = pf, amsk = pnl.amsk, emsk = pnl.emsk))
+    return rebuild_struct(rd, (; pnl = rebuild_struct(pnl, (; pf = pf))))
 end
 """
     assert_cross_sectional_benchmark_field(key::AbstractString,
@@ -1387,46 +1391,6 @@ function cross_sectional_reduced_loadings(::FactorFamilyBasis, L::MatNum)
     return L
 end
 """
-    cross_sectional_neutralise!(neutralise::Nothing, args...) -> nothing
-    cross_sectional_neutralise!(neutralise::AbstractVector{<:Pair}, Ms, cre, bw, nf, fam)
-        -> nothing
-
-Run the Neutralisation of a Cross-Sectional Factor Prior, in place.
-
-A prior that states no Neutralisation runs none, which is the `nothing` method.
-
-# Arguments
-
-  - `neutralise`: Pairs of `key => targets`, or `nothing`.
-  - `Ms`: The exposure history, `assets × factors × observations`, changed in place.
-  - `cre`: The prior's own Cross-Sectional Regression Estimator.
-  - `bw`: The benchmark weights, `observations × assets`.
-  - `nf`: Name of each factor.
-  - `fam`: Family label of each factor.
-
-# Validation
-
-  - The rules of [`neutralise_exposures!`](@ref).
-
-# Returns
-
-  - `nothing`. `Ms` carries the neutralised exposures.
-
-# Related
-
-  - [`neutralise_exposures!`](@ref)
-  - [`CrossSectionalFactorPrior`](@ref)
-"""
-function cross_sectional_neutralise!(::Nothing, args...)::Nothing
-    return nothing
-end
-function cross_sectional_neutralise!(neutralise::AbstractVector{<:Pair},
-                                     Ms::AbstractArray{<:Real, 3},
-                                     cre::AbstractCrossSectionalRegressionEstimator,
-                                     bw::MatNum, nf::VecStr, fam::VecStr)::Nothing
-    return neutralise_exposures!(Ms, neutralise, cre, bw, nf, fam)
-end
-"""
     cross_sectional_family_basis(families::Nothing, Ms, bw, nf, fam) -> NamedTuple
     cross_sectional_family_basis(families::AbstractVector{<:Pair}, Ms, bw, nf, fam)
         -> NamedTuple
@@ -1471,35 +1435,6 @@ function cross_sectional_family_basis(families::AbstractVector{<:Pair}, Ms::Arr3
             fam = reduce_factor_names(fcb, fam))
 end
 """
-    cross_sectional_basis_now(fcb::Nothing, r) -> nothing
-    cross_sectional_basis_now(fcb::FactorFamilyBasis, r) -> FactorFamilyBasis
-
-Slice a Factor Family Basis onto the observations a fit ran on.
-
-The prior builds the basis over the whole post-warm-up history, and the exposure lag then shortens the fit. The block stores the slice over the fitted observations, so the basis has the observation axis of every other history on the block.
-
-# Arguments
-
-  - `fcb`: The Factor Family Basis, or `nothing`.
-  - `r`: The fitted observations, as an index into the post-warm-up axis.
-
-# Returns
-
-  - `fcb::Option{<:FactorFamilyBasis}`: The basis of the fitted observations, or `nothing`.
-
-# Related
-
-  - [`factor_basis_slice`](@ref)
-  - [`cross_sectional_expand`](@ref)
-  - [`CrossSectionalFactorPrior`](@ref)
-"""
-function cross_sectional_basis_now(::Nothing, r)
-    return nothing
-end
-function cross_sectional_basis_now(fcb::FactorFamilyBasis, r)
-    return factor_basis_slice(fcb, r)
-end
-"""
     cross_sectional_expand(fcb::Nothing, r, lag::Integer, f) -> Nothing
     cross_sectional_expand(fcb::FactorFamilyBasis, r, lag::Integer, f) -> MatNum
     cross_sectional_expand(fcb::Nothing, r, mu, sigma) -> NamedTuple
@@ -1532,7 +1467,7 @@ The fit of observation `t` regresses the returns of `t` on the exposures of `t -
 
 # Related
 
-  - [`cross_sectional_basis_now`](@ref)
+  - [`factor_basis_slice`](@ref)
   - [`expand_factor_returns`](@ref)
   - [`expand_factor_returns`](@ref)
   - [`expand_factor_covariance`](@ref)

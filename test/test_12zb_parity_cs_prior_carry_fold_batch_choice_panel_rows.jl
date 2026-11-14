@@ -328,10 +328,10 @@ end
         # refuses the member as the batch fit does.
         fcb = FactorFamilyBasis(; fnm = ["ind"], fi = [[1, 2, 3]], di = [1],
                                 ratios = [0.5 0.0; 0.25 2.0], K = 3)
-        @test isnothing(po.cross_sectional_rebase(fcb, ["ind" => "c"], ["a", "b", "c"]))
-        rb = po.cross_sectional_rebase(fcb, ["ind" => "b"], ["a", "b", "c"])
+        @test isnothing(po.cross_sectional_move_basis(fcb, ["ind" => "c"], ["a", "b", "c"]))
+        rb = po.cross_sectional_move_basis(fcb, ["ind" => "b"], ["a", "b", "c"])
         @test rb.di == [2] && rb.ratios ≈ [2.0 0.0; 4.0 8.0]
-        @test po.cross_sectional_rebase(fcb, ["ind" => "a"], ["a", "b", "c"]).ratios ==
+        @test po.cross_sectional_move_basis(fcb, ["ind" => "a"], ["a", "b", "c"]).ratios ==
               fcb.ratios
     end
 end

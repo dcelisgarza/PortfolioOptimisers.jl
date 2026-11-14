@@ -192,11 +192,11 @@ function assert_forecast_history_rule(::Any, ::AbstractReturnForecastEstimator, 
 end
 """
     assert_spanned_shrinkage(lambda::Number)
-    assert_spanned_shrinkage(lambda)
+    assert_spanned_shrinkage(lambda::UnresolvedValue)
 
 Refuse a Spanned Shrinkage outside `[0, 1]`.
 
-The constructor of [`CrossSectionalFactorPrior`](@ref) calls it on the occupant of `lambda`, and [`cross_sectional_calibration`](@ref) calls it on the number a rule returns. A rule is checked once it is resolved, so the method for an occupant that is not a number returns at once.
+The constructor of [`CrossSectionalFactorPrior`](@ref) calls it on the occupant of `lambda`, and [`cross_sectional_calibration`](@ref) calls it on the number a rule returns. A rule is checked once it is resolved, so the method for an [`UnresolvedValue`](@ref), a calibration rule or a function, returns at once. Any other type is a `MethodError`.
 
 # Arguments
 
@@ -220,16 +220,16 @@ function assert_spanned_shrinkage(lambda::Number)
     assert_closed_unit_interval(lambda, :lambda)
     return nothing
 end
-function assert_spanned_shrinkage(::Any)
+function assert_spanned_shrinkage(::UnresolvedValue)
     return nothing
 end
 """
     assert_orthogonal_forecast_scale(c::Number)
-    assert_orthogonal_forecast_scale(c)
+    assert_orthogonal_forecast_scale(c::UnresolvedValue)
 
 Refuse an Orthogonal Forecast Scale that is negative or not finite.
 
-The scale multiplies the part of the Return Forecast that the factors do not span, so it lies in `[0, ∞)`, and a value above one is a valid scale. The constructor of [`CrossSectionalFactorPrior`](@ref) calls it on the occupant of `c`, and [`cross_sectional_calibration`](@ref) calls it on the number a rule returns. A rule is checked once it is resolved, so the method for an occupant that is not a number returns at once.
+The scale multiplies the part of the Return Forecast that the factors do not span, so it lies in `[0, ∞)`, and a value above one is a valid scale. The constructor of [`CrossSectionalFactorPrior`](@ref) calls it on the occupant of `c`, and [`cross_sectional_calibration`](@ref) calls it on the number a rule returns. A rule is checked once it is resolved, so the method for an [`UnresolvedValue`](@ref), a calibration rule or a function, returns at once. Any other type is a `MethodError`.
 
 # Arguments
 
@@ -255,7 +255,7 @@ function assert_orthogonal_forecast_scale(c::Number)
     assert_nonneg(c, :c)
     return nothing
 end
-function assert_orthogonal_forecast_scale(::Any)
+function assert_orthogonal_forecast_scale(::UnresolvedValue)
     return nothing
 end
 """
@@ -659,8 +659,8 @@ function CrossSectionalFactorPrior(; factors::Dict_VecPair,
                                    cache::Option{<:AbstractPartialFitState} = nothing,
                                    x_src::Option{<:AbstractReturnsSource} = nothing)::CrossSectionalFactorPrior
     return CrossSectionalFactorPrior(cross_sectional_prior_pairs(factors, :factors),
-                                     cross_sectional_prior_option(neutralise, :neutralise),
-                                     cross_sectional_prior_option(families, :families),
+                                     cross_sectional_prior_pairs(neutralise, :neutralise),
+                                     cross_sectional_prior_pairs(families, :families),
                                      unseen, cre, wa, pe, ve, ce, pdm, f_mp, mp, srep, th,
                                      bp, mcap, bw, lag, minra, rfe, lambda, c, ofit, l1mask,
                                      lx, mtx_sqrt, ex, choice, carry, cache, x_src)
@@ -669,38 +669,6 @@ end
 # inside `cross_sectional_assemble`, so the declaration serves the two `assert_` walks alone.
 function calibration_slots(pe::CrossSectionalFactorPrior)
     return (; lambda = pe.lambda, c = pe.c)
-end
-"""
-    cross_sectional_prior_option(x::Nothing, sym::Sym_Str) -> nothing
-    cross_sectional_prior_option(x::Dict_VecPair, sym::Sym_Str) -> AbstractVector{<:Pair{String}}
-
-Collect an optional list-valued argument of a [`CrossSectionalFactorPrior`](@ref).
-
-The Neutralisation and the constrained Factor Families are each absent or a list, so the absent case is a method rather than a test.
-
-# Arguments
-
-  - `x`: The Pairs, the dictionary, or `nothing`.
-  - `sym`: Name of the field, for the messages.
-
-# Validation
-
-  - The rules of [`cross_sectional_prior_pairs`](@ref).
-
-# Returns
-
-  - `pr::Option{<:AbstractVector{<:Pair{String}}}`: The collected Pairs, or `nothing`.
-
-# Related
-
-  - [`cross_sectional_prior_pairs`](@ref)
-  - [`CrossSectionalFactorPrior`](@ref)
-"""
-function cross_sectional_prior_option(::Nothing, ::Sym_Str)
-    return nothing
-end
-function cross_sectional_prior_option(x::Dict_VecPair, sym::Sym_Str)
-    return cross_sectional_prior_pairs(x, sym)
 end
 """
     string_key_pairs(x::AbstractVector{<:Pair{String}}) -> x
@@ -798,7 +766,7 @@ The prior states an entry exactly when the model determines it. An asset of ``\\
  2. Build the benchmark weights `BW` with [`cross_sectional_cap_weights`](@ref), over the assets of the estimation universe whose return and market capitalisation are finite, and write them onto a copy of the Asset Panel with [`cross_sectional_benchmark_returns`](@ref). The universe and the warm-up read `X`, or the named net returns under `lx`, so a gap in an observed series does not move them. A benchmark power of zero reads no market capitalisation.
  3. Read the observed factors from the copy with [`cross_sectional_observed`](@ref), so an observed member that wraps a [`CompositeExposure`](@ref) reads the benchmark weights. Take the returns the regression reads, `Xl`, with [`cross_sectional_local_returns`](@ref). Build every estimated Factor Exposure with [`cross_sectional_exposure_history`](@ref), one dependency layer after another and the members of a layer under `ex`, giving `Ms`, `nf` and `fam`. Under observed factors the estimated members read `Xl` in place of `X`, so a Descriptor of the returns measures the returns the regression explains. The first `pe.lag` rows of the derived `Xl` have no lagged exposure, so the derivation takes the exposure of the same observation there. An observed member cannot read `Xl`, because `Xl` is derived from its exposures. So the observed members that can read returns read `X` net of the observed members that read none, as [`cross_sectional_observed`](@ref) states.
  4. Drop the leading observations the Descriptors warm up over, with [`cross_sectional_warmup`](@ref) on the estimated and the observed exposures together, giving the rows `rw`. [`cross_sectional_exposure_stage`](@ref) runs steps 1 to 4.
- 5. Neutralise the exposures with [`cross_sectional_neutralise!`](@ref), under the benchmark weights and the prior's own regression estimator.
+ 5. Neutralise the exposures with [`neutralise_exposures!`](@ref), under the benchmark weights and the prior's own regression estimator.
  6. Build the Factor Family Basis `fb` with [`cross_sectional_family_basis`](@ref), and reduce the exposures through it.
  7. Lag the reduced exposures and the market capitalisation by `pe.lag`, giving `Zl` and `mcl`. Trim the observed factors to the fitted observations with [`cross_sectional_observed_block`](@ref), which refuses an infinite observed return among them and keeps a `NaN` as a gap. Take the eligibility mask `msk` of the fit with [`cross_sectional_eligible`](@ref) on `Xl`, and drop from it every pair whose lagged market capitalisation is not finite.
  8. Take the design of the regression under the Unseen Member rule `unseen` with [`unseen_member_design`](@ref). Regress each observation's `Xl` on the design it gives with [`cross_sectional_live_regression`](@ref), and map the coefficients back with [`unseen_member_returns`](@ref), giving `csr` and the mask `lv` of the factors that are not empty, under the weights `W` of [`cs_weights_initial`](@ref). Refuse a `csr` that carries an intercept with [`assert_cross_sectional_no_intercept`](@ref). When [`needs_second_pass`](@ref) answers `true`, refine the weights with [`cs_weights_refine`](@ref) and regress again. The refinement reads the idiosyncratic variance under the two universe masks, as step 9 does.
@@ -960,7 +928,7 @@ function cross_sectional_assemble(pe::CrossSectionalFactorPrior, f_pr::NamedTupl
     end
     esigma = cross_sectional_idiosyncratic_covariance(pe.th, something(fit.ce, pe.ce),
                                                       pe.pdm, Sc, vs[end, :], amr)
-    fnow = cross_sectional_basis_now(ca.fcb, r)
+    fnow = factor_basis_slice(ca.fcb, r)
     # The block's `fcb` covers its own rows alone, and the factor return of row `t` is stated
     # in the basis of row `t - lag`, so the raw-axis history is expanded here, where the basis
     # of the rows before the first fitted row still exists (#1422).
@@ -1282,8 +1250,7 @@ function cross_sectional_exposure_series(pe::CrossSectionalFactorPrior, X::MatNu
     rde = if isnothing(cc)
         rdb
     else
-        ReturnsResult(; nx = rdb.nx, X = Xl, nf = rdb.nf, F = rdb.F, ne = rdb.ne, E = rdb.E,
-                      iv = rdb.iv, ivpa = rdb.ivpa, pnl = rdb.pnl)
+        rebuild_struct(rdb, (; X = Xl))
     end
     dc = cross_sectional_descriptor_carry(est, rde, n)
     # The batch fit joins the observed exposures to the history after its regression, so the
@@ -1559,7 +1526,7 @@ This is the step of a [`PinnedChoice`](@ref). It runs the steps of the fit that 
  2. Answer `nothing` when every observation of the buffer has a Shared Series gap, because the fit keeps none, which [`buffer_fits_none`](@ref) answers. Otherwise drop the observations with a gap from the buffer and from a copy of `pe` with [`shared_series_buffer_fit`](@ref), as the call with no data drops them. A fixed weight vector of the copy loses the weights of the dropped observations. The later steps read the copy, and `pe` keeps its weights.
  3. Answer `nothing` when the buffer records no Asset Panel. The call with no data refuses that buffer, so no fit is made.
  4. Run [`cross_sectional_exposure_stage`](@ref) over the rows of the buffer, with the Exogenous Series that the buffer records. Answer `nothing` when fewer than `pe.lag + 2` rows remain after the Descriptor warm-up, because the fit refuses them, so no first fit is made yet.
- 5. Neutralise the exposures after the warm-up with [`cross_sectional_neutralise!`](@ref), and build the Factor Family Basis with [`factor_family_basis`](@ref).
+ 5. Neutralise the exposures after the warm-up with [`neutralise_exposures!`](@ref), and build the Factor Family Basis with [`factor_family_basis`](@ref).
  6. Name the dropped member of each family in the order of `pe.families`.
 
 # Arguments
@@ -1606,7 +1573,7 @@ function cross_sectional_pinned_families(pe::CrossSectionalFactorPrior)
     # The choice reads `Ms` through `Msw` alone, so the Neutralisation can write into it (#1973).
     Msw = view(Ms, :, :, rw)
     bww = BW[rw, :]
-    cross_sectional_neutralise!(cut.neutralise, Msw, cut.cre, bww, nf, fam)
+    neutralise_exposures!(Msw, cut.neutralise, cut.cre, bww, nf, fam)
     return cross_sectional_dropped_names(pe.families,
                                          factor_family_basis(pe.families, Msw, bww, nf,
                                                              fam), nf)

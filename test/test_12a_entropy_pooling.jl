@@ -581,6 +581,16 @@ end
     @test_throws ArgumentError rpv(pe("AAPL - prior(NOPE) == 0.001"), pr0, sets, :mu;
                                    strict = true)
 
+    # A `prior(...)` reference to an asset on the Non-Investable Axis is rewritten to the
+    # bare name, so the counterpart rule of `get_linear_constraints` drops the row. The
+    # rebuild keeps every other field of the parsed view, and copies the coefficients.
+    sni = PortfolioOptimisers.non_investable_sets(sets, ["ZZNI"])
+    v = pe("AAPL - prior(ZZNI) == 0.001")
+    rn = rpv(v, pr0, sni, :mu)
+    @test rn.vars == ["AAPL", "ZZNI"]
+    @test rn.coef == v.coef && rn.coef !== v.coef
+    @test (rn.op, rn.rhs, rn.eqn) == (v.op, v.rhs, v.eqn)
+
     with_logger(SimpleLogger(stderr, Logging.Error)) do
         # The plain `(a, b)` branch, with the unknown name in either position.
         r1 = rcv(pe("(NOPE, BAC) + (AAPL, BBY) == 0.0001"), pr0, sets, :cov; strict = false)
@@ -1702,9 +1712,8 @@ end
                 JuMPEntropyPooling(; slv = slv))
         @test collect(PortfolioOptimisers.entropy_pooling(w, e, opt)) == collect(w)
     end
-    @test collect(PortfolioOptimisers.entropy_pooling(w, e,
-                                                      PortfolioOptimisers.AbstractEntropyPoolingTailView[],
-                                                      JuMPEntropyPooling(; slv = slv))) ==
+    @test collect(PortfolioOptimisers.entropy_pooling(w, e, JuMPEntropyPooling(; slv = slv),
+                                                      PortfolioOptimisers.AbstractEntropyPoolingTailView[])) ==
           collect(w)
 end
 
@@ -2875,8 +2884,8 @@ end
     b[:eq] = eq
     @test collect(keys(a)) != collect(keys(b))
     for opt in (OptimEntropyPooling(), OptimEntropyPooling(; alg = LogEntropyPooling()))
-        @test PO.entropy_pooling(w, a, PO.AbstractEntropyPoolingTailView[], opt) ==
-              PO.entropy_pooling(w, b, PO.AbstractEntropyPoolingTailView[], opt)
+        @test PO.entropy_pooling(w, a, opt, PO.AbstractEntropyPoolingTailView[]) ==
+              PO.entropy_pooling(w, b, opt, PO.AbstractEntropyPoolingTailView[])
     end
 end
 @testset "A view of an opinion pool views each opinion (#1957)" begin

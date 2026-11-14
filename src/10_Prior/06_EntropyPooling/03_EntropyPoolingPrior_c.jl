@@ -768,7 +768,7 @@ function ep_prior(alg::StagedEP, pe::EntropyPoolingPrior, X::MatNum, F::Option{<
         # refit: `scenario_prior` gives them to no entropy pooling prior (#1649).
         ep_diagnose_views(pe.diagnose, w0, epc, tvs, pe,
                           (:mu_views, :var_views, :cvar_views, :evar_views, :rlvar_views))
-        w1 = LinearAlgebra.normalize!(entropy_pooling(w0, epc, tvs, pe.opt), 1)
+        w1 = LinearAlgebra.normalize!(entropy_pooling(w0, epc, pe.opt, tvs), 1)
         pr = scenario_prior(pe.pe, w1, pr0, X, F, pnl; strict = strict, kwargs...,
                             cache_reg = true)
         vpr = investable_prior(imsk, pr)
@@ -794,7 +794,7 @@ function ep_prior(alg::StagedEP, pe::EntropyPoolingPrior, X::MatNum, F::Option{<
             ep_diagnose_views(pe.diagnose, ws, epc, tvs, pe,
                               (:mu_views, :var_views, :cvar_views, :evar_views,
                                :rlvar_views, :sigma_views, :cov_views))
-            w1 = LinearAlgebra.normalize!(entropy_pooling(ws, epc, tvs, pe.opt), 1)
+            w1 = LinearAlgebra.normalize!(entropy_pooling(ws, epc, pe.opt, tvs), 1)
             pr = scenario_prior(pe.pe, w1, pr0, X, F, pnl; strict = strict, kwargs...,
                                 cache_reg = true)
             vpr = investable_prior(imsk, pr)
@@ -829,7 +829,7 @@ function ep_prior(alg::StagedEP, pe::EntropyPoolingPrior, X::MatNum, F::Option{<
                               (:mu_views, :var_views, :cvar_views, :evar_views,
                                :rlvar_views, :sigma_views, :cov_views, :sk_views, :kt_views,
                                :rho_views))
-            w1 = LinearAlgebra.normalize!(entropy_pooling(ws, epc, tvs, pe.opt), 1)
+            w1 = LinearAlgebra.normalize!(entropy_pooling(ws, epc, pe.opt, tvs), 1)
             pr = scenario_prior(pe.pe, w1, pr0, X, F, pnl; strict = strict, kwargs...,
                                 cache_reg = true)
         end
@@ -939,7 +939,7 @@ function ep_prior(alg::H0_EntropyPooling, pe::EntropyPoolingPrior, X::MatNum,
         ep_diagnose_views(pe.diagnose, w0, epc, tvs, pe,
                           (:mu_views, :var_views, :cvar_views, :evar_views, :rlvar_views,
                            :sigma_views, :cov_views, :sk_views, :kt_views, :rho_views))
-        w1 = LinearAlgebra.normalize!(entropy_pooling(w0, epc, tvs, pe.opt), 1)
+        w1 = LinearAlgebra.normalize!(entropy_pooling(w0, epc, pe.opt, tvs), 1)
         pr = scenario_prior(pe.pe, w1, pr0, X, F, pnl; strict = strict, kwargs...,
                             cache_reg = true)
     end

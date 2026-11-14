@@ -930,7 +930,7 @@ The exposures of an observation read the last [`lookback`](@ref) rows of the pan
 
  1. Run [`cross_sectional_exposure_series`](@ref) over the rows, with the derived series of the carried rows that the state holds. It gives the benchmark weights, the observed factors, the returns net of them and the exposures of the estimated factors. It derives the rows of the step alone, and it computes the exposures of the `n` rows of the step alone, each from the last [`lookback`](@ref) rows that the member reads.
  2. Take the last `n` rows, of the observed exposures with [`cross_sectional_observed_carry`](@ref) too. Before the warm-up ends, drop the rows before the first one with an eligible asset on the estimated and the observed exposures together, as [`cross_sectional_warmup`](@ref) does.
- 3. Neutralise the exposures of the rows that remain with [`cross_sectional_neutralise!`](@ref).
+ 3. Neutralise the exposures of the rows that remain with [`neutralise_exposures!`](@ref).
 
 # Arguments
 
@@ -980,7 +980,7 @@ function cross_sectional_fold_rows(pe::CrossSectionalFactorPrior,
     Msn = Ms[:, :, p]
     bwn = BW[q, :]
     if !isempty(q)
-        cross_sectional_neutralise!(pe.neutralise, Msn, pe.cre, bwn, nf, fam)
+        neutralise_exposures!(Msn, pe.neutralise, pe.cre, bwn, nf, fam)
     end
     obs = if isnothing(cc)
         nothing
@@ -1034,7 +1034,7 @@ function cross_sectional_fold_refit(pe::CrossSectionalFactorPrior,
     cb = cross_sectional_observed_block(st.obs, 1:Tf, d, buffer_fit_count(st.buf) - Tf)
     blk = (; Zl = fb.Ms[:, :, 1:D], Xr = something(st.Xl, st.X)[d, :], em = st.emsk[d, :],
            am = st.amsk[d, :], mcl = cross_sectional_rows(st.mcap, 1:D), cb = cb,
-           fcb = cross_sectional_basis_now(fb.fcb, 1:D), B = st.Ms[:, :, 1:D], t0 = 0)
+           fcb = factor_basis_slice(fb.fcb, 1:D), B = st.Ms[:, :, 1:D], t0 = 0)
     reg = cross_sectional_fold_regression(pe, blk,
                                           (; lv1 = nothing, lv = nothing, ve1 = nothing,
                                            seed = seed))
@@ -1093,7 +1093,7 @@ function cross_sectional_fold_step(pe::CrossSectionalFactorPrior,
     cb = cross_sectional_observed_block(st.obs, 1:Tf, q, buffer_fit_count(st.buf) - Tf)
     blk = (; Zl = Zc[:, :, 1:m], Xr = something(st.Xl, st.X)[q, :], em = st.emsk[q, :],
            am = st.amsk[q, :], mcl = cross_sectional_rows(st.mcap, q .- pe.lag), cb = cb,
-           fcb = cross_sectional_basis_now(fcb, q .- pe.lag), B = st.Ms[:, :, q .- pe.lag],
+           fcb = factor_basis_slice(fcb, q .- pe.lag), B = st.Ms[:, :, q .- pe.lag],
            t0 = Tf - m - pe.lag)
     reg = cross_sectional_fold_regression(pe, blk,
                                           (; lv1 = st.lv1, lv = st.lv, ve1 = st.ve1,

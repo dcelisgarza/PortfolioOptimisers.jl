@@ -125,39 +125,6 @@ function spanned_forecast_sample(::ForecastHistoryError, cs::NamedTuple)
     return G[:, cols]
 end
 """
-    cross_sectional_reduced_history(fcb::Nothing, Ms::Arr3Num) -> Arr3Num
-    cross_sectional_reduced_history(fcb::FactorFamilyBasis, Ms::Arr3Num) -> Arr3Num
-
-Return the exposure history of the block of a [`CrossSectionalFactorPrior`](@ref) on the reduced factor axis.
-
-The block carries the raw exposure history `Ms` and the Factor Family Basis `fcb` of the same rows. The latest loadings `L` are the reduced exposures of the last row, so a split of a past row reads the reduced exposures of that row, and a split of the last row gives the coefficients that the prior blends. A prior that constrains no Factor Family carries no basis, and its raw history is the reduced one.
-
-# Arguments
-
-  - `fcb`: The Factor Family Basis of the block, or `nothing`.
-  - `Ms`: The exposure history of the block on the raw axis, `assets × factors × observations`.
-
-# Validation
-
-  - The rules of [`reduce_exposures`](@ref), when `fcb` is a [`FactorFamilyBasis`](@ref).
-
-# Returns
-
-  - `Ms::Arr3Num`: The exposure history on the reduced axis, `assets × reduced factors × observations`.
-
-# Related
-
-  - [`cross_sectional_split_history`](@ref)
-  - [`reduce_exposures`](@ref)
-  - [`CrossSectionalFactorModel`](@ref)
-"""
-function cross_sectional_reduced_history(::Nothing, Ms::Arr3Num)
-    return Ms
-end
-function cross_sectional_reduced_history(fcb::FactorFamilyBasis, Ms::Arr3Num)
-    return reduce_exposures(fcb, Ms)
-end
-"""
 $(DocStringExtensions.TYPEDEF)
 
 Holds the split of each row of the Return Forecast history of a [`CrossSectionalFactorPrior`](@ref): the spanned coefficients and the orthogonal part of each row.
@@ -192,7 +159,7 @@ The prior splits the latest forecast against the latest exposures, under the reg
 
 # Algorithm
 
- 1. Read the reduced exposure history with [`cross_sectional_reduced_history`](@ref), and keep the columns of the estimated factors, the columns of `cs.csfm.csr.f`.
+ 1. Read the reduced exposure history with [`reduce_exposures`](@ref), and keep the columns of the estimated factors, the columns of `cs.csfm.csr.f`.
  2. Fill `g`, `estimated factors × rows`, and `ap`, `rows × assets`, with `NaN`.
  3. At each row of `cs.hist` that holds a finite forecast, split the row with [`cross_sectional_alpha_split`](@ref) under `cs.cre`, against the exposures of that row and the regression weights `cs.csfm.rw` of that row, and write the two parts.
 
@@ -214,7 +181,6 @@ The prior splits the latest forecast against the latest exposures, under the reg
 
   - [`ForecastSplitHistory`](@ref)
   - [`cross_sectional_alpha_split`](@ref)
-  - [`cross_sectional_reduced_history`](@ref)
   - [`spanned_forecast_sample`](@ref)
   - [`orthogonal_forecast_pairs`](@ref)
   - [`forecast_history`](@ref)
@@ -226,7 +192,7 @@ function cross_sectional_split_history(cs::NamedTuple)
     H::MatNum = hist
     csfm = cs.csfm
     Ke = size(csfm.csr.f, 2)
-    Lh::Arr3Num = cross_sectional_reduced_history(csfm.fcb, csfm.Ms)
+    Lh::Arr3Num = reduce_exposures(csfm.fcb, csfm.Ms)
     rw::MatNum = csfm.rw
     Tb, N = size(H)
     @argcheck(size(Lh, 3) == Tb == size(rw, 1),
