@@ -701,7 +701,14 @@ and every addition:
    wrapper.
 5. **A self-forward that drops an ignored argument** becomes one method with an ignored or
    defaulted positional slot. A conversion to the canonical form is reason (a) on a public
-   verb. On a private function, the conversion goes.
+   verb. On a private function, the conversion goes. #2116 rules the exception: **the leaf of
+   a walk keeps its conversion.** When another method of the function recurses on a field,
+   the function walks the composites. A composite passes an inner value, a leaf or another
+   composite, so it cannot pass the canonical form. The leaf
+   `observation_count(est) = observation_count(partial_fit_cache(est))` stays, as a walk owns
+   its leaf answer (#2109), and `partial_fit_cache`, a callee of the walk, is not its owner. A
+   step on a field, `x.f` or `getfield(x, k)`, is not a self-forward. A dropped or a filled
+   slot still becomes one method in a walk.
 6. **A rebuild by hand that copies every field but one** goes to
    `rebuild_struct(x, (; f = v))`. A site stays by hand only on a measured loss of
    performance. #2110 rules the edges of the rule:

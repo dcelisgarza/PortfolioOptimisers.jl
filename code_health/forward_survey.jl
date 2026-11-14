@@ -43,7 +43,11 @@
 #                        with no keyword constructor takes one first. `RULED_REBUILDS` holds the
 #                        verdicts that the parse cannot read.
 #   self-forward         a method that calls its own function with fewer arguments, or with
-#                        converted ones (#2081, rule 5).
+#                        converted ones (#2081, rule 5). A step that passes a field walks the
+#                        composites, and the survey does not report it. A private function with
+#                        such a step that converts its arguments keeps its method as
+#                        `keep (default)`, a walk that owns its leaf (#2116), which
+#                        `self_verdict` states.
 #   worker               a method of a public verb that sends one form to a private function
 #                        with one caller, which is not a hook that `# Interfaces` names (#2080,
 #                        rule 4). Its body moves into the verb.
@@ -676,6 +680,8 @@ end
 
 # --- self-forward (#2081, rule 5) ----------------------------------------------
 
+# Whether `e` reads a field: `x.f`, or `getfield(x, k)`, which a step uses when the name of the
+# field differs between the types of a family (#2116).
 function mentions_field(e)
     if !(e isa Expr)
         return false
@@ -683,10 +689,42 @@ function mentions_field(e)
     if e.head === :. && length(e.args) == 2 && e.args[2] isa QuoteNode
         return true
     end
+    if e.head === :call && e.args[1] === :getfield
+        return true
+    end
     return any(mentions_field, e.args)
 end
 
-# `go` or `keep (a)` for a self-call, and the reason.
+# Whether `e` holds a call to `name` that passes a field.
+function calls_on_field(e, name)
+    if !(e isa Expr)
+        return false
+    end
+    if e.head === :call && e.args[1] === name && any(mentions_field, e.args[2:end])
+        return true
+    end
+    return any(a -> calls_on_field(a, name), e.args)
+end
+
+# Whether another method of the function of `d` calls the function on a field: the function walks
+# the composites by their fields, and `d` is a leaf of the walk (#2116).
+function recurses_on_field(t::Tree, d)
+    return any(m -> m !== d && calls_on_field(m.body, d.name),
+               get(t.by_name, d.name, CH.MethodDef[]))
+end
+
+"""
+    self_verdict(t::Tree, d, call) -> Tuple{String, String}
+
+The verdict and the reason for the self-call `call` of the method `d`, by the rulings of #2081
+and #2116. A private function that converts its arguments goes, and its callers pass the
+canonical form. The exception is a function that recurses on a field: it walks the composites,
+and `d` reads the leaf. A composite passes an inner value, a leaf or another composite, so it
+cannot pass the canonical form, and the method stays as `keep (default)`. A function that the
+walk calls, such as `partial_fit_cache`, is not its owner, as a walk owns its leaf answer
+(#2109). The verdicts that change the arity of the method, a dropped or a filled slot, hold in a
+walk too.
+"""
 function self_verdict(t::Tree, d, call)
     names = CH.forward_signature(d.sig)[1]
     passed = Set{Symbol}()
@@ -720,6 +758,9 @@ function self_verdict(t::Tree, d, call)
         return if d.name in t.public
             ("keep (a)",
              "a public verb converts its arguments to the canonical form (rule 5)")
+        elseif recurses_on_field(t, d)
+            ("keep (default)",
+             "a walk owns its leaf: another method of `$(d.name)` recurses on a field, so a composite passes an inner value, a leaf or another composite, and cannot pass the canonical form. A callee of the walk is not its owner (#2109, #2116)")
         else
             ("go",
              "a private function converts its arguments: the caller passes the canonical form (rule 5)")

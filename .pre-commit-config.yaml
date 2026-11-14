@@ -95,7 +95,7 @@ repos:
         files: ^docs/paper/.*\.typ$
         args: [--force-exclude]
   - repo: https://github.com/domluna/JuliaFormatter.jl
-    rev: v2.14.2
+    rev: v2.14.12
     hooks:
       - id: julia-formatter
         exclude: ^\.github/

@@ -181,6 +181,13 @@ using Test
              # a trait before a passed argument keeps the old verdict
              traitfill(x::A) = traitfill(kind(x), x)
              walk(x::A) = walk(x.child)
+             walk_getfield(x::A) = walk_getfield(getfield(x, 1))
+             # The leaf of a walk down the composites converts its argument (#2116).
+             leaf_count(x::A) = leaf_count(state_of(x))
+             leaf_count(x::B) = leaf_count(x.inner)
+             # A walk keeps the verdict of a dropped slot.
+             leaf_drop(x::A, ::B) = leaf_drop(x)
+             leaf_drop(x::B) = leaf_drop(x.inner)
 
              # worker: a private worker with one caller, and a method around a driver.
              verb(x::A) = verb_worker(x)
@@ -395,8 +402,16 @@ using Test
         @test of(:privfill) == [("self-forward", :privfill, "go")]
         @test occursin("converts its arguments", first_of(:privfill).why)
         @test occursin("defaulted positional", first_of(:traitfill).why)
-        # A recursion on a field is a traversal.
+        # A recursion on a field is a traversal, also through `getfield` (#2116).
         @test isempty(of(:walk))
+        @test isempty(of(:walk_getfield))
+        # The leaf of a walk down the composites owns its conversion: a composite passes an
+        # inner value, a leaf or another composite, and cannot pass the canonical form (#2116).
+        @test of(:leaf_count) == [("self-forward", :leaf_count, "keep (default)")]
+        @test occursin("a walk owns its leaf", first_of(:leaf_count).why)
+        # A dropped slot holds in a walk too: one method takes it.
+        @test of(:leaf_drop) == [("self-forward", :leaf_drop, "go")]
+        @test occursin("drops an argument", first_of(:leaf_drop).why)
     end
 
     @testset "worker and preset (#2080, #2079)" begin
