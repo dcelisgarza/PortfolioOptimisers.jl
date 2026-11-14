@@ -532,6 +532,14 @@ const RULED_REBUILDS = Dict{Tuple{Symbol, Symbol}, Tuple{String, String}}(#
                                                                            :ElasticNetFit) =>
                                                                               (NO_REBUILD,
                                                                                "`cnt` is the `ElasticNetCounts` of `elastic_net_counts` (#2110, #2092)"),
+                                                                          (:cross_sectional_observed,
+                                                                           :ObservedFactors) =>
+                                                                              (NO_REBUILD,
+                                                                               "`sk` is the `ObservedStack` of `cross_sectional_observed_stack`, another type (#2093)"),
+                                                                          (:cross_sectional_fold_rows,
+                                                                           :ObservedStack) =>
+                                                                              (NO_REBUILD,
+                                                                               "`cc` is the `ObservedFactors` of `cross_sectional_exposure_series`, another type, cut to the kept rows (#2093)"),
                                                                           (:cross_sectional_benchmark_returns,
                                                                            :AssetPanel) =>
                                                                               ("go",
@@ -931,6 +939,10 @@ const RULED_NOTHING_PAIRS = Dict{Tuple{Symbol, Symbol}, Tuple{String, String}}(#
                                                                                 :cross_sectional_qr) =>
                                                                                    ("keep (b)",
                                                                                     "$POLICY: the `Nothing` arm answers that no reader needs a factorisation, from the two masks and the solve algorithm, which the callee does not take, and `cross_sectional_qr(D, nothing)` takes the factorisation, another answer (#2093)"),
+                                                                               (:cross_sectional_observed_rebacked,
+                                                                                :rebuild_struct) =>
+                                                                                   ("keep (b)",
+                                                                                    "$POLICY: the `Nothing` arm answers that no observed exposure replaces `Z`, so `cc` stands. `rebuild_struct` is the generic rebuild of rule 6, whose every other caller replaces a field, and `nothing` names no replacement there (#2093)"),
                                                                                (:cross_sectional_local_returns,
                                                                                 :descriptor_field_values) =>
                                                                                    ("keep (b)",
@@ -1612,9 +1624,6 @@ const RULED_NAMED_TUPLES = Dict{Symbol, Tuple{String, String}}(#
                                                                :cross_sectional_residual_block =>
                                                                    ("go",
                                                                     "every caller takes it apart at once: a plain tuple, unless two values have one type, which takes a private type (#2113)"),
-                                                               :descriptor_panel_scores =>
-                                                                   ("go",
-                                                                    "the value travels: an argument to a call: a private defined type (#2113)"),
                                                                :ep_evar => ("go",
                                                                             "`evar` and `z` are numbers of one type, so a positional swap is silent: a private defined type (#2113)"),
                                                                :ep_evar_anchor => ("go",
@@ -1628,15 +1637,9 @@ const RULED_NAMED_TUPLES = Dict{Symbol, Tuple{String, String}}(#
                                                                :factor_residual_config =>
                                                                    ("go",
                                                                     "the value travels: returned whole by seven priors: a private defined type (#2113)"),
-                                                               :factor_summary_returns =>
-                                                                   ("go",
-                                                                    "the value travels: returned whole: a private defined type (#2113)"),
                                                                :fit_deferred_quantity =>
                                                                    ("go",
                                                                     "the value travels: an argument to a call, and a later use of `fitted`: a private defined type (#2113)"),
-                                                               :forecast_pooled_moments =>
-                                                                   ("go",
-                                                                    "`mean` and `std` are numbers of one type, so a positional swap is silent: a private defined type (#2113)"),
                                                                :opinion_pooling_scenarios =>
                                                                    ("go",
                                                                     "every caller takes it apart at once: a plain tuple, unless two values have one type, which takes a private type (#2113)"),
@@ -1645,9 +1648,6 @@ const RULED_NAMED_TUPLES = Dict{Symbol, Tuple{String, String}}(#
                                                                :resolve_sigma_chol =>
                                                                    ("go",
                                                                     "the value travels: an argument to a call: a private defined type (#2113)"),
-                                                               :return_forecast_step =>
-                                                                   ("go",
-                                                                    "the value travels: returned whole: a private defined type (#2113)"),
                                                                :split_weight_record =>
                                                                    ("go",
                                                                     "the value travels: collected in a generator: a private defined type (#2113)"),

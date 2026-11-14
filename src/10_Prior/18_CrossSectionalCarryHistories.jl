@@ -7,7 +7,7 @@ The rows lie on the observation axis that [`observation_axis`](@ref) names: the 
 
 # Arguments
 
-  - `a`: The history, or `nothing`.
+  - `a`: The history, or `nothing`. A history of Descriptor scores is a [`PanelScores`](@ref), and it appends field by field.
   - `b`: The rows of the block.
 
 # Returns
@@ -37,6 +37,17 @@ function cross_sectional_fold_append(a::AbstractArray{<:Any, D},
     selectdim(P, d, (n + 1):k) .= b
     return selectdim(P, d, Base.OneTo(k))
 end
+# The Descriptor scores that the carry holds append and trim field by field.
+function cross_sectional_fold_append(a::PanelScores, b::PanelScores)::PanelScores
+    return PanelScores(cross_sectional_fold_append(a.S, b.S),
+                       cross_sectional_fold_append(a.w, b.w),
+                       cross_sectional_fold_append(a.g, b.g))
+end
+function cross_sectional_window_trim(P::PanelScores, n::Option{<:Integer})::PanelScores
+    return PanelScores(cross_sectional_window_trim(P.S, n),
+                       cross_sectional_window_trim(P.w, n),
+                       cross_sectional_window_trim(P.g, n))
+end
 function cross_sectional_fold_append(a::FactorFamilyBasis, b::FactorFamilyBasis)
     return FactorFamilyBasis(; fnm = a.fnm, fi = a.fi, di = a.di,
                              ratios = cross_sectional_fold_append(a.ratios, b.ratios),
@@ -55,9 +66,9 @@ end
 """
     cross_sectional_fold_join(Ms, obs, b::AbstractArray, bo::Nothing) -> NamedTuple
     cross_sectional_fold_join(Ms::Nothing, obs::Nothing, b::AbstractArray{<:Any, 3},
-                              bo::NamedTuple) -> NamedTuple
-    cross_sectional_fold_join(Ms::AbstractArray{<:Any, 3}, obs::NamedTuple,
-                              b::AbstractArray{<:Any, 3}, bo::NamedTuple) -> NamedTuple
+                              bo::ObservedStack) -> NamedTuple
+    cross_sectional_fold_join(Ms::AbstractArray{<:Any, 3}, obs::ObservedStack,
+                              b::AbstractArray{<:Any, 3}, bo::ObservedStack) -> NamedTuple
 
 Appends the rows of a block to the exposure history and to the observed factors that the carry fold of a Cross-Sectional Factor Prior carries.
 
@@ -66,9 +77,9 @@ The call with no data reads the exposure history with the observed exposures aft
 # Arguments
 
   - `Ms`: The exposure history of the estimated factors, or `nothing` before the first block.
-  - `obs`: The observed factors `(; Z, R, lv, nf, fam)` of the history, or `nothing`.
+  - `obs`: The observed factors of the history, an [`ObservedStack`](@ref), or `nothing`.
   - `b`: The exposures of the estimated factors of the block.
-  - `bo`: The observed factors of the block, or `nothing` without an observed factor, when the method over `Nothing` appends `b` alone.
+  - `bo`: The observed factors of the block, an [`ObservedStack`](@ref), or `nothing` without an observed factor, when the method over `Nothing` appends `b` alone.
 
 # Returns
 
@@ -84,11 +95,11 @@ function cross_sectional_fold_join(Ms, obs, b::AbstractArray, ::Nothing)
     return (; Ms = cross_sectional_fold_append(Ms, b), obs = obs)
 end
 function cross_sectional_fold_join(::Nothing, ::Nothing, b::AbstractArray{<:Any, 3},
-                                   bo::NamedTuple)
+                                   bo::ObservedStack)
     return cross_sectional_fold_split(cat(b, bo.Z; dims = 2), size(b, 2), bo.R, bo)
 end
-function cross_sectional_fold_join(Ms::AbstractArray{<:Any, 3}, obs::NamedTuple,
-                                   b::AbstractArray{<:Any, 3}, bo::NamedTuple)
+function cross_sectional_fold_join(Ms::AbstractArray{<:Any, 3}, obs::ObservedStack,
+                                   b::AbstractArray{<:Any, 3}, bo::ObservedStack)
     J = cross_sectional_fold_append(cross_sectional_joined_exposures(Ms, obs.Z),
                                     cat(b, bo.Z; dims = 2))
     return cross_sectional_fold_split(J, size(b, 2),
@@ -106,7 +117,7 @@ Both histories are views of the backing of `J` with a `Base.OneTo` index on the 
   - `J`: The joined exposure history, `assets × factors × observations`, the estimated factors first.
   - `K`: The number of estimated factors.
   - `R`: The observed returns of the history.
-  - `o`: The observed factors whose names and family labels the history keeps.
+  - `o`: The observed factors, an [`ObservedStack`](@ref), whose names and family labels the history keeps.
 
 # Returns
 
@@ -117,12 +128,11 @@ Both histories are views of the backing of `J` with a `Base.OneTo` index on the 
   - [`cross_sectional_fold_join`](@ref)
 """
 function cross_sectional_fold_split(J::AbstractArray{<:Any, 3}, K::Integer,
-                                    R::AbstractMatrix, o::NamedTuple)
+                                    R::AbstractMatrix, o::ObservedStack)
     P = parent(J)
     k = Base.OneTo(size(J, 3))
     return (; Ms = view(P, :, 1:K, k),
-            obs = (; Z = view(P, :, (K + 1):size(P, 2), k), R = R, lv = o.lv, nf = o.nf,
-                   fam = o.fam))
+            obs = rebuild_struct(o, (; Z = view(P, :, (K + 1):size(P, 2), k), R = R)))
 end
 """
     cross_sectional_spare_backing(a::AbstractArray, T::Type, k::Integer)
@@ -810,7 +820,7 @@ Appends the observed factors to the fitted factors of the carry fold of a Cross-
 # Returns
 
   - `r::UnitRange`: The fitted observations among the observations after the warm-up.
-  - `ca::NamedTuple`: The answer of [`cross_sectional_observed_append`](@ref).
+  - `ca::AppendedFactorModel`: The answer of [`cross_sectional_observed_append`](@ref).
 
 # Related
 

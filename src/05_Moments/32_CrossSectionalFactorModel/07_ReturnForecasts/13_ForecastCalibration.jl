@@ -347,7 +347,33 @@ function forecast_calibration_curve(a::AbstractVector{<:Real}, b::AbstractVector
                                           n[keep])
 end
 """
-    forecast_pooled_moments(x::AbstractVector{<:Real}) -> NamedTuple
+$(DocStringExtensions.TYPEDEF)
+
+Holds the mean and the standard deviation of one pooled vector.
+
+This type is an implementation detail and is not intended for direct use. [`forecast_pooled_moments`](@ref) makes it, and [`forecast_calibration`](@ref) reads it. The two values have one type, so a record names them where a plain tuple would let a swap pass silently.
+
+# Fields
+
+$(DocStringExtensions.FIELDS)
+
+# Related
+
+  - [`forecast_pooled_moments`](@ref)
+  - [`forecast_calibration`](@ref)
+"""
+@concrete struct PooledMoments
+    """
+    `mean`: The mean of the pooled vector.
+    """
+    mean
+    """
+    `std`: The standard deviation of the pooled vector, with one degree of freedom removed.
+    """
+    std
+end
+"""
+    forecast_pooled_moments(x::AbstractVector{<:Real}) -> PooledMoments
 
 Return the mean and the standard deviation of a pooled vector.
 
@@ -375,10 +401,11 @@ Where:
 
 # Returns
 
-  - `moments::NamedTuple`: `(; mean, std)`. The mean is `NaN` for an empty vector. The standard deviation divides by ``n - 1``, and it is `NaN` for a vector with fewer than two entries.
+  - `moments::PooledMoments`: The fields `mean` and `std` of a [`PooledMoments`](@ref). The mean is `NaN` for an empty vector. The standard deviation divides by ``n - 1``, and it is `NaN` for a vector with fewer than two entries.
 
 # Related
 
+  - [`PooledMoments`](@ref)
   - [`forecast_calibration`](@ref)
   - [`forecast_calibration_pairs`](@ref)
   - [`forecast_series_summary`](@ref)
@@ -388,7 +415,7 @@ function forecast_pooled_moments(x::AbstractVector{<:Real})
     n = length(x)
     m = iszero(n) ? Tf(NaN) : sum(x) / n
     v = n > 1 ? Statistics.std(x; mean = m, corrected = true) : Tf(NaN)
-    return (; mean = m, std = v)
+    return PooledMoments(m, v)
 end
 """
 $(DocStringExtensions.TYPEDEF)

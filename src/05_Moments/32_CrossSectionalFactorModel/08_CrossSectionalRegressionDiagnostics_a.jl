@@ -419,7 +419,49 @@ function cs_design_slice(B::Arr3Num, u::MatNum, t::Integer, ::Type{T}) where {T}
     return Dt
 end
 """
-    cs_regression_data(csfm::CrossSectionalFactorModel)
+$(DocStringExtensions.TYPEDEF)
+
+The lag-aligned history that a cross-sectional diagnostic reads off a factor model block.
+
+This type is an implementation detail and is not intended for direct use. [`cs_regression_data`](@ref) makes it. The block methods of the regression and exposure diagnostics read it.
+
+# Fields
+
+$(DocStringExtensions.FIELDS)
+
+# Related
+
+  - [`cs_regression_data`](@ref)
+  - [`ChangedDesign`](@ref)
+"""
+@concrete struct RegressionHistory
+    """
+    `B`: The lag-aligned exposures `assets × factors × observations`, on the design of the regression.
+    """
+    B
+    """
+    `f`: The lag-aligned factor returns `observations × factors`.
+    """
+    f
+    """
+    `eps`: The lag-aligned residuals `observations × assets`.
+    """
+    eps
+    """
+    `w`: The lag-aligned regression weights `observations × assets`, or `nothing` when the block carries no weight history.
+    """
+    w
+    """
+    `P`: The `t => P_t` pairs of [`unseen_member_design`](@ref) on the rows of the history.
+    """
+    P
+    """
+    `dc`: The lag-aligned dropped-column mask of the fit `observations × factors`, or `nothing` when the fit states no mask.
+    """
+    dc
+end
+"""
+    cs_regression_data(csfm::CrossSectionalFactorModel) -> RegressionHistory
 
 Return the lag-aligned regression history a cross-sectional diagnostic reads off a factor model block.
 
@@ -442,7 +484,7 @@ Every block method of this file starts here. The verb trims the exposures at the
 
 # Returns
 
-  - `data::NamedTuple`: `(; B, f, eps, w, P, dc)`, the lag-aligned exposures, factor returns, residuals and regression weights, on the design of the regression, the `t => P_t` pairs of [`unseen_member_design`](@ref) on the rows of the answer, and the lag-aligned dropped-column mask of the fit. `w` is `nothing` when the block carries no regression weight history, and `dc` is `nothing` when the fit states no mask. [`cs_dropped_design`](@ref) composes the mask with the pairs.
+  - `data::RegressionHistory`: The lag-aligned exposures, factor returns, residuals and regression weights, on the design of the regression, the `t => P_t` pairs of [`unseen_member_design`](@ref) on the rows of the answer, and the lag-aligned dropped-column mask of the fit. `w` is `nothing` when the block carries no regression weight history, and `dc` is `nothing` when the fit states no mask. [`cs_dropped_design`](@ref) composes the mask with the pairs.
 
 # Validation
 
@@ -450,6 +492,7 @@ Every block method of this file starts here. The verb trims the exposures at the
 
 # Related
 
+  - [`RegressionHistory`](@ref)
   - [`CrossSectionalFactorModel`](@ref)
   - [`reduce_exposures`](@ref)
   - [`cs_regression_design`](@ref)
@@ -480,8 +523,8 @@ function cs_regression_data(csfm::CrossSectionalFactorModel, Ms::Arr3Num,
                               isnothing(csfm.fx) ? 0 : size(csfm.fx, 2))
     @argcheck(size(rd.B, 2) == size(f, 2),
               DimensionMismatch("the regression of the block ran on $(size(rd.B, 2)) factors, the reduced axis less the observed ones, and csr.f carries $(size(f, 2)). A block states csr.f on the axis the fit estimated, which is the reduced axis under a family re-basis"))
-    return (; B = rd.B, f = f, eps = eps, w = w, P = rd.P,
-            dc = nothing_scalar_array_getindex_odd_order(csr.dc, rows, :))
+    return RegressionHistory(rd.B, f, eps, w, rd.P,
+                             nothing_scalar_array_getindex_odd_order(csr.dc, rows, :))
 end
 """
     cs_regression_lag(lag::Nothing)
@@ -537,9 +580,9 @@ function cs_lagged_rows(A::MatNum, rows)
 end
 """
     cs_regression_design(fcb::Nothing, rule::AbstractUnseenMemberRule, B::Arr3Num,
-                         w::Option{<:MatNum}, no::Integer)
+                         w::Option{<:MatNum}, no::Integer) -> ChangedDesign
     cs_regression_design(fcb::FactorFamilyBasis, rule::AbstractUnseenMemberRule, B::Arr3Num,
-                         w::Option{<:MatNum}, no::Integer)
+                         w::Option{<:MatNum}, no::Integer) -> ChangedDesign
 
 Map a lag-aligned exposure history onto the design the cross-sectional regression ran on.
 
@@ -557,11 +600,11 @@ At an observation with an Unseen Member, the fit regressed on the reduced exposu
 
 # Returns
 
-  - `B::Arr3Num`: The exposure history of the factors the regression estimated, changed at each observation with an Unseen Member.
-  - `P`: The `t => P_t` pairs of [`unseen_member_design`](@ref) on the estimated factors, empty or `()` when the rule changes no observation.
+  - `rd::ChangedDesign`: In `B`, the exposure history of the factors the regression estimated, changed at each observation with an Unseen Member. In `P`, the `t => P_t` pairs of [`unseen_member_design`](@ref) on the estimated factors, empty or `()` when the rule changes no observation.
 
 # Related
 
+  - [`ChangedDesign`](@ref)
   - [`FactorFamilyBasis`](@ref)
   - [`reduce_exposures`](@ref)
   - [`unseen_member_design`](@ref)
@@ -570,7 +613,7 @@ At an observation with an Unseen Member, the fit regressed on the reduced exposu
 """
 function cs_regression_design(::Nothing, ::AbstractUnseenMemberRule, B::Arr3Num,
                               ::Option{<:MatNum}, no::Integer)
-    return (; B = B[:, 1:(size(B, 2) - no), :], P = ())
+    return ChangedDesign(B[:, 1:(size(B, 2) - no), :], ())
 end
 function cs_regression_design(fcb::FactorFamilyBasis, rule::AbstractUnseenMemberRule,
                               B::Arr3Num, w::Option{<:MatNum}, no::Integer)
@@ -578,7 +621,7 @@ function cs_regression_design(fcb::FactorFamilyBasis, rule::AbstractUnseenMember
     u = cs_estimation_weights_only(w, size(B, 3), size(B, 1), real(eltype(B)))
     ud = unseen_member_design(rule, fb, B, reduce_exposures(fb, B), u)
     ke = 1:(size(ud.Z, 2) - no)
-    return (; B = ud.Z[:, ke, :], P = map(p -> first(p) => last(p)[ke, ke], ud.P))
+    return ChangedDesign(ud.Z[:, ke, :], map(p -> first(p) => last(p)[ke, ke], ud.P))
 end
 """
     cs_diagnostic_mask_weights(B::Arr3Num, eps::MatNum, w::Option{<:MatNum})
@@ -1608,149 +1651,6 @@ function cs_regression_bic(csfm::CrossSectionalFactorModel; k::Option{<:Integer}
     data = cs_regression_data(csfm)
     return cs_regression_bic(data.B, data.f, data.eps, data.w; k = k)
 end
-"""
-    cross_sectional_r2(csr::CrossSectionalRegression, Z::Arr3Num, X::MatNum,
-                       W::MatNum) -> VecNum
-
-Return the weighted coefficient of determination of every observation.
-
-An observation whose weighted total sum of squares is zero has no defined ratio, and its entry is `NaN`. [`mean_cross_sectional_r2`](@ref) is the scalar summary that skips those entries.
-
-# Mathematical definition
-
-```math
-\\begin{align}
-R^{2}_{t} &= 1 - \\frac{\\sum_{i} w_{t,i} \\left(x_{t,i} - \\hat{x}_{t,i}\\right)^{2}}{\\sum_{i} w_{t,i} \\left(x_{t,i} - \\bar{x}_{t}\\right)^{2}} \\\\
-\\bar{x}_{t} &= \\frac{\\sum_{i} w_{t,i} x_{t,i}}{\\sum_{i} w_{t,i}}\\,.
-\\end{align}
-```
-
-Where:
-
-  - ``R^{2}_{t}``: Weighted coefficient of determination of observation ``t``.
-  - ``x_{t,i}``: Return of asset ``i`` at observation ``t``.
-  - ``\\hat{x}_{t,i}``: Systematic return of asset ``i`` at observation ``t``.
-  - ``\\bar{x}_{t}``: Weighted mean return of observation ``t``.
-  - ``w_{t,i} \\geq 0``: Cross-sectional weight of asset ``i`` at observation ``t``. Both sums run over the eligible assets alone.
-
-# Algorithm
-
- 1. Take the eligibility mask through [`cross_sectional_design_mask`](@ref).
- 2. Take the systematic returns through [`StatsAPI.predict(csr::CrossSectionalRegression, Z::Arr3Num)`](@ref).
- 3. For each observation, sum the weighted squared residuals and the weighted squared deviations from the weighted mean, over the eligible assets alone.
- 4. Return `1 - rss / tss` per observation, and `NaN` where `tss` is not positive.
-
-# Arguments
-
-  - `csr`: A cross-sectional regression result.
-  - `Z::Arr3Num`: Exposure tensor `assets × factors × observations`.
-  - `X::MatNum`: Asset returns matrix `observations × assets`.
-  - `W::MatNum`: Cross-sectional weights matrix `observations × assets`.
-
-# Validation
-
-  - The rules of [`cross_sectional_design_mask`](@ref).
-
-# Returns
-
-  - `r2::VecNum`: Coefficient of determination of every observation, of length `observations`, in the type a division of the inputs lands in.
-
-# Examples
-
-```jldoctest
-julia> Z = reshape([1.0, 0.0, 0.5, 0.0, 1.0, 0.5], 3, 2, 1);
-
-julia> csr = cross_sectional_regression(CrossSectionalLinearRegression(), Z, [1.0 2.0 1.5],
-                                        ones(1, 3));
-
-julia> cross_sectional_r2(csr, Z, [1.0 2.0 1.5], ones(1, 3))
-1-element Vector{Float64}:
- 1.0
-```
-
-# Related
-
-  - [`CrossSectionalRegression`](@ref)
-  - [`mean_cross_sectional_r2`](@ref)
-  - [`cross_sectional_regression`](@ref)
-"""
-function cross_sectional_r2(csr::CrossSectionalRegression, Z::Arr3Num, X::MatNum,
-                            W::MatNum)::VecNum
-    act = cross_sectional_design_mask(Z, X, W)
-    Xh = StatsAPI.predict(csr, Z)
-    # The ratio keeps the type of the inputs, so a `Float32` fit answers a `Float32` ratio
-    # rather than one widened by a `Float64` `NaN`.
-    Tf = promote_type(real(eltype(Xh)), real(eltype(X)), real(eltype(W)))
-    r2 = fill(convert(Tf, NaN), size(X, 1))
-    for t in axes(X, 1)
-        idx = findall(view(act, t, :))
-        w = view(W, t, idx)
-        y = view(X, t, idx)
-        sw = sum(w)
-        if sw <= zero(sw)
-            continue
-        end
-        ybar = LinearAlgebra.dot(w, y) / sw
-        rss = sum(w[k] * abs2(y[k] - Xh[t, idx[k]]) for k in eachindex(idx))
-        tss = sum(w[k] * abs2(y[k] - ybar) for k in eachindex(idx))
-        if tss > zero(tss)
-            r2[t] = 1 - rss / tss
-        end
-    end
-    return r2
-end
-"""
-    mean_cross_sectional_r2(csr::CrossSectionalRegression, Z::Arr3Num, X::MatNum,
-                            W::MatNum) -> Number
-
-Return the mean weighted coefficient of determination across the observations.
-
-The mean skips every observation whose ratio is undefined, and it is `NaN` when no observation defines one.
-
-# Algorithm
-
- 1. Take the per-observation vector through [`cross_sectional_r2`](@ref).
- 2. Return the mean of its finite entries, and `NaN` when it holds none.
-
-# Arguments
-
-  - `csr`: A cross-sectional regression result.
-  - `Z::Arr3Num`: Exposure tensor `assets × factors × observations`.
-  - `X::MatNum`: Asset returns matrix `observations × assets`.
-  - `W::MatNum`: Cross-sectional weights matrix `observations × assets`.
-
-# Validation
-
-  - The rules of [`cross_sectional_design_mask`](@ref).
-
-# Returns
-
-  - `r2::Number`: Mean coefficient of determination across the observations.
-
-# Examples
-
-```jldoctest
-julia> Z = reshape([1.0, 0.0, 0.5, 0.0, 1.0, 0.5], 3, 2, 1);
-
-julia> csr = cross_sectional_regression(CrossSectionalLinearRegression(), Z, [1.0 2.0 1.5],
-                                        ones(1, 3));
-
-julia> mean_cross_sectional_r2(csr, Z, [1.0 2.0 1.5], ones(1, 3))
-1.0
-```
-
-# Related
-
-  - [`CrossSectionalRegression`](@ref)
-  - [`cross_sectional_r2`](@ref)
-"""
-function mean_cross_sectional_r2(csr::CrossSectionalRegression, Z::Arr3Num, X::MatNum,
-                                 W::MatNum)::Number
-    r2 = cross_sectional_r2(csr, Z, X, W)
-    keep = filter(isfinite, r2)
-    return isempty(keep) ? convert(eltype(r2), NaN) : sum(keep) / length(keep)
-end
 
 export cs_gram, cs_regression_t_stats, cs_regression_t_stat_exceedance_rate,
-       cs_regression_r2, cs_regression_adjusted_r2, cs_regression_aic, cs_regression_bic,
-       cross_sectional_r2, mean_cross_sectional_r2
+       cs_regression_r2, cs_regression_adjusted_r2, cs_regression_aic, cs_regression_bic

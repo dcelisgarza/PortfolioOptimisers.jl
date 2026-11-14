@@ -889,9 +889,9 @@ function prior(pe::CrossSectionalFactorPrior, X::MatNum, F::Option{<:MatNum} = n
                                     kwargs...)
 end
 """
-    cross_sectional_assemble(pe::CrossSectionalFactorPrior, f_pr::NamedTuple, ca::NamedTuple,
-                             fit::NamedTuple, rde::ReturnsResult; cache_reg::Bool = false,
-                             kwargs...) -> LowOrderPrior
+    cross_sectional_assemble(pe::CrossSectionalFactorPrior, f_pr::NamedTuple,
+                             ca::AppendedFactorModel, fit::NamedTuple, rde::ReturnsResult;
+                             cache_reg::Bool = false, kwargs...) -> LowOrderPrior
 
 Builds the Prior Result of a [`CrossSectionalFactorPrior`](@ref) from its fitted regression, its idiosyncratic variance history and its factor moments.
 
@@ -910,7 +910,7 @@ The returns-matrix method of [`prior`](@ref) calls it after the variance history
 
   - `pe`: Cross-Sectional Factor Prior estimator.
   - `f_pr`: The factor moments that [`cross_sectional_factor_moments`](@ref) states over the combined reduced factor returns.
-  - `ca`: The estimated factors with the observed factors appended, from [`cross_sectional_observed_append`](@ref).
+  - `ca`: The estimated factors with the observed factors appended, an [`AppendedFactorModel`](@ref) from [`cross_sectional_observed_append`](@ref).
   - `fit`: The fitted observations: `csr`, the regression; `W`, its weights; `vs`, the idiosyncratic variance history; `cnt`, the answer of [`variance_count`](@ref) on the residuals; `amr`, the active mask; `bwr`, the benchmark weights; `Xo`, the base-currency returns; `r`, the fitted rows among the rows after the Descriptor warm-up; `hist`, the rows of the Return Forecast history that the carry fold carries, or `nothing`; `S` and `Sc`, the standardised idiosyncratic returns with and with no fill that the carry fold carries, or `nothing`; `ce`, the covariance estimator `ce` of the prior that the carry fold folded over `Sc`, or `nothing`; `idx`, the position of each fitted row in the returns data; `ts`, the timestamp of each fitted row, or `nothing`; and `rf`, the Return Forecast Result that the carry fold of a forecast that folds carries, or `nothing`.
   - `rde`: The returns data that the estimated members read, which the Return Forecast reads.
   - `cache_reg`: If `true`, the block stores the cache that the refit of [`scenario_prior`](@ref) reads: the active mask and, when a slot reads it, the Return Forecast history.
@@ -932,8 +932,8 @@ The returns-matrix method of [`prior`](@ref) calls it after the variance history
   - [`cross_sectional_moment_prior`](@ref)
 """
 function cross_sectional_assemble(pe::CrossSectionalFactorPrior, f_pr::NamedTuple,
-                                  ca::NamedTuple, fit::NamedTuple, rde::ReturnsResult;
-                                  cache_reg::Bool = false, kwargs...)
+                                  ca::AppendedFactorModel, fit::NamedTuple,
+                                  rde::ReturnsResult; cache_reg::Bool = false, kwargs...)
     (; csr, W, vs, cnt, amr, bwr, Xo, r) = fit
     (; edof, ediv) = cross_sectional_variance_counts(cnt, csr)
     # The carry fold keeps the standardised rows, because a row reads its own observation
@@ -1298,8 +1298,8 @@ function cross_sectional_exposure_series(pe::CrossSectionalFactorPrior, X::MatNu
 end
 """
     cross_sectional_history_observed(cc::Nothing, n) -> nothing
-    cross_sectional_history_observed(cc::NamedTuple, n::Nothing) -> AbstractArray
-    cross_sectional_history_observed(cc::NamedTuple, n::Integer) -> nothing
+    cross_sectional_history_observed(cc::ObservedFactors, n::Nothing) -> AbstractArray
+    cross_sectional_history_observed(cc::ObservedFactors, n::Integer) -> nothing
 
 Return the observed exposures that the exposure history of [`cross_sectional_exposure_series`](@ref) shares a backing with, or `nothing`.
 
@@ -1330,15 +1330,16 @@ The method that Julia selects is the algorithm.
 function cross_sectional_history_observed(::Nothing, ::Any)
     return nothing
 end
-function cross_sectional_history_observed(cc::NamedTuple, ::Nothing)
+function cross_sectional_history_observed(cc::ObservedFactors, ::Nothing)
     return cc.Z
 end
-function cross_sectional_history_observed(::NamedTuple, ::Integer)
+function cross_sectional_history_observed(::ObservedFactors, ::Integer)
     return nothing
 end
 """
-    cross_sectional_observed_rebacked(cc, Zo::Nothing) -> Option{<:NamedTuple}
-    cross_sectional_observed_rebacked(cc::NamedTuple, Zo::AbstractArray{<:Any, 3}) -> NamedTuple
+    cross_sectional_observed_rebacked(cc, Zo::Nothing) -> Option{<:ObservedFactors}
+    cross_sectional_observed_rebacked(cc::ObservedFactors, Zo::AbstractArray{<:Any, 3})
+        -> ObservedFactors
 
 Put the observed exposures that the exposure history returns into the observed factors `cc`.
 
@@ -1358,7 +1359,7 @@ The method that Julia selects is the algorithm.
 
 # Returns
 
-  - `cc::Option{<:NamedTuple}`: The observed factors.
+  - `cc::Option{<:ObservedFactors}`: The observed factors, an [`ObservedFactors`](@ref).
 
 # Related
 
@@ -1368,8 +1369,8 @@ The method that Julia selects is the algorithm.
 function cross_sectional_observed_rebacked(cc, ::Nothing)
     return cc
 end
-function cross_sectional_observed_rebacked(cc::NamedTuple, Zo::AbstractArray{<:Any, 3})
-    return merge(cc, (; Z = Zo))
+function cross_sectional_observed_rebacked(cc::ObservedFactors, Zo::AbstractArray{<:Any, 3})
+    return rebuild_struct(cc, (; Z = Zo))
 end
 """
     cross_sectional_benchmark_stage(pe::CrossSectionalFactorPrior, X::MatNum,

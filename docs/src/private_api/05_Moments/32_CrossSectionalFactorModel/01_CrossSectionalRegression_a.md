@@ -1,8 +1,14 @@
 ```@meta
-Description = "Cross-Sectional Regression, private API of PortfolioOptimisers.jl: cross_sectional_design_mask, cross_sectional_residual_dof, …"
+Description = "Cross-Sectional Regression (a), private API of PortfolioOptimisers.jl: CrossSectionalLoopBuffers, cross_sectional_design_mask, cross_sectional_residual_dof, …"
 ```
 
-# Cross-Sectional Regression: private API
+# Cross-Sectional Regression (a): private API
+
+## Types
+
+```@docs
+CrossSectionalLoopBuffers
+```
 
 ## Functions
 
@@ -19,8 +25,6 @@ cross_sectional_bit_mask
 cross_sectional_mark_dropped!
 cross_sectional_row_space
 cross_sectional_target_coef
-cross_sectional_systematic
-cross_sectional_residuals
 cross_sectional_loop_buffers
 cross_sectional_foreach
 ```

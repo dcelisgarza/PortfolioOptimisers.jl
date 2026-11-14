@@ -134,7 +134,7 @@ end
                        (10, EXPR),
                    ("src/05_Moments/01_Base_Moments.jl", "windowed_type_doc") => (3, EXPR),
                    ("src/05_Moments/01_Base_Moments.jl", "windowed_estimator") => (1, EXPR),
-                   ("src/05_Moments/32_CrossSectionalFactorModel/01_CrossSectionalRegression.jl",
+                   ("src/05_Moments/32_CrossSectionalFactorModel/01_CrossSectionalRegression_a.jl",
                     "cross_sectional_foreach") => (1,
                                                    "`throw` takes a value of any type, so the slot of a caught value holds any type"),
                    ("src/09_ConstraintGeneration/02_LinearConstraintGeneration_a.jl",

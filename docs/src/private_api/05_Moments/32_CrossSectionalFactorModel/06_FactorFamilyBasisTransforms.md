@@ -1,8 +1,14 @@
 ```@meta
-Description = "Factor Family Basis Transforms, private API of PortfolioOptimisers.jl: assert_factor_basis_index, unseen_member_change, unseen_member_family!, …"
+Description = "Factor Family Basis Transforms, private API of PortfolioOptimisers.jl: ChangedDesign, assert_factor_basis_index, unseen_member_change, …"
 ```
 
 # Factor Family Basis Transforms: private API
+
+## Types
+
+```@docs
+ChangedDesign
+```
 
 ## Functions
 

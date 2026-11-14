@@ -532,6 +532,40 @@ function descriptor_scores(ds::DescriptorScores, rd::ReturnsResult,
     return DescriptorScoresResult(descriptor_neutralised_scores(ds, P, csfm, rows), rows)
 end
 """
+$(DocStringExtensions.TYPEDEF)
+
+Holds the Descriptor scores of an Asset Panel, with the cross-sectional weights and the group labels that go with them.
+
+This type is an implementation detail and is not intended for direct use. [`descriptor_panel_scores`](@ref) makes it, and [`descriptor_neutralised_scores`](@ref) and [`return_forecast_step`](@ref) read it. A cut to the rows of a block builds it again from its three fields.
+
+# Fields
+
+$(DocStringExtensions.FIELDS)
+
+# Related
+
+  - [`descriptor_panel_scores`](@ref)
+  - [`descriptor_neutralised_scores`](@ref)
+"""
+@concrete struct PanelScores
+    """
+    `S`: The scores before the Neutralisation, `assets × descriptors × observations`.
+    """
+    S
+    """
+    `w`: The cross-sectional weights, `observations × assets`.
+    """
+    w
+    """
+    `g`: The group labels, `observations × assets`, or `nothing`.
+    """
+    g
+end
+function return_forecast_cut(P::PanelScores, rows::AbstractUnitRange)::PanelScores
+    return PanelScores(return_forecast_cut(P.S, rows), return_forecast_cut(P.w, rows),
+                       return_forecast_cut(P.g, rows))
+end
+"""
 $(DocStringExtensions.TYPEDSIGNATURES)
 
 Compute the part of the scores of a [`DescriptorScores`](@ref) that reads the Asset Panel alone.
@@ -555,16 +589,19 @@ A score of an observation reads the last [`lookback`](@ref) rows of the panel, a
 
 # Returns
 
-  - `S::Array{<:Real, 3}`: The scores before the Neutralisation, `assets × descriptors × observations`.
-  - `w::MatNum`: The cross-sectional weights, `observations × assets`.
-  - `g::Option{<:AbstractMatrix{<:Integer}}`: The group labels, `observations × assets`, or `nothing`.
+  - `P::PanelScores`: The scores `S`, the cross-sectional weights `w` and the group labels `g`.
+
+      + `S::Array{<:Real, 3}`: The scores before the Neutralisation, `assets × descriptors × observations`.
+      + `w::MatNum`: The cross-sectional weights, `observations × assets`.
+      + `g::Option{<:AbstractMatrix{<:Integer}}`: The group labels, `observations × assets`, or `nothing`.
 
 # Related
 
+  - [`PanelScores`](@ref)
   - [`descriptor_scores`](@ref)
   - [`descriptor_neutralised_scores`](@ref)
 """
-function descriptor_panel_scores(ds::DescriptorScores, rd::ReturnsResult)
+function descriptor_panel_scores(ds::DescriptorScores, rd::ReturnsResult)::PanelScores
     w = return_forecast_weights(rd)
     groups = cross_sectional_groups(rd.pnl, ds.group)
     # Each Descriptor writes its own entry of `sc`, in parallel, so `sc` is filled out of
@@ -581,7 +618,7 @@ function descriptor_panel_scores(ds::DescriptorScores, rd::ReturnsResult)
                                        groups)
     end
     S::Arr3Num = stack((transpose(s) for s in sc); dims = 2)
-    return (; S = S, w = w, g = groups)
+    return PanelScores(S, w, groups)
 end
 """
 $(DocStringExtensions.TYPEDSIGNATURES)
@@ -596,7 +633,7 @@ Neutralise the scores of a [`DescriptorScores`](@ref) against the Factor Exposur
 # Arguments
 
   - `ds`: The Descriptor Scores recipe.
-  - `P`: The scores, the weights and the group labels, `(; S, w, g)`, as [`descriptor_panel_scores`](@ref) states them. The function changes `P.S` in place when no promotion copies it.
+  - `P`: The scores, the weights and the group labels, as [`descriptor_panel_scores`](@ref) makes the [`PanelScores`](@ref). The function changes `P.S` in place when no promotion copies it.
   - `csfm`: The fitted factor-model block. The function reads its exposure history only when the recipe names Neutralisation targets.
   - `rows`: The rows of `P` that the block covers.
 
@@ -610,14 +647,15 @@ Neutralise the scores of a [`DescriptorScores`](@ref) against the Factor Exposur
 
 # Related
 
+  - [`PanelScores`](@ref)
   - [`descriptor_scores`](@ref)
   - [`descriptor_panel_scores`](@ref)
 """
-function descriptor_neutralised_scores(ds::DescriptorScores, P::NamedTuple,
+function descriptor_neutralised_scores(ds::DescriptorScores, P::PanelScores,
                                        csfm::CrossSectionalFactorModel,
                                        rows::AbstractUnitRange)
     # The bounds keep the `Nothing` methods of `return_forecast_cut` out of the inference of a
-    # caller whose `P` is a `NamedTuple` of open field types.
+    # caller whose `P` has open field types.
     S::Arr3Num = P.S
     w::MatNum = P.w
     # The base weights are read only under a Neutralisation, so a recipe that names none never

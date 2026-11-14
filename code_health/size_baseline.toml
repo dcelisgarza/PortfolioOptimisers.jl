@@ -6,7 +6,7 @@
 [provenance]
 julia = "1.13.4"
 julia_syntax = "1.0.2"
-commit = "4004115c7a"
+commit = "6198d8b31d"
 
 [file]
 "ext/PortfolioOptimisersPlotsExt/01_CumulativeReturnsPlots.jl" = { code = 287, doc = 0, comment = 12, blank = 2, total = 301 }
@@ -144,7 +144,8 @@ commit = "4004115c7a"
 "src/05_Moments/30_RegimeAdjusted/09_MahalanobisLevelClosure.jl" = { code = 302, doc = 346, comment = 4, blank = 139, total = 791 }
 "src/05_Moments/30_RegimeAdjusted/10_HacLogDeterminant.jl" = { code = 105, doc = 109, comment = 0, blank = 43, total = 257 }
 "src/05_Moments/31_HigherMomentPartialFit.jl" = { code = 190, doc = 628, comment = 4, blank = 329, total = 1151 }
-"src/05_Moments/32_CrossSectionalFactorModel/01_CrossSectionalRegression.jl" = { code = 500, doc = 1041, comment = 26, blank = 440, total = 2007 }
+"src/05_Moments/32_CrossSectionalFactorModel/01_CrossSectionalRegression_a.jl" = { code = 490, doc = 1036, comment = 23, blank = 413, total = 1962 }
+"src/05_Moments/32_CrossSectionalFactorModel/01_CrossSectionalRegression_b.jl" = { code = 24, doc = 76, comment = 3, blank = 41, total = 144 }
 "src/05_Moments/32_CrossSectionalFactorModel/02_CrossSectionalWeights.jl" = { code = 167, doc = 424, comment = 5, blank = 202, total = 798 }
 "src/05_Moments/32_CrossSectionalFactorModel/03_CrossSectionalFactorModel.jl" = { code = 416, doc = 746, comment = 8, blank = 293, total = 1463 }
 "src/05_Moments/32_CrossSectionalFactorModel/04_FactorExposures/01_Base_Descriptor.jl" = { code = 232, doc = 508, comment = 0, blank = 222, total = 962 }
@@ -179,7 +180,8 @@ commit = "4004115c7a"
 "src/05_Moments/32_CrossSectionalFactorModel/07_ReturnForecasts/13_ForecastCalibration.jl" = { code = 92, doc = 202, comment = 0, blank = 91, total = 385 }
 "src/05_Moments/32_CrossSectionalFactorModel/07_ReturnForecasts/14_ForecastSummary.jl" = { code = 309, doc = 529, comment = 9, blank = 173, total = 1020 }
 "src/05_Moments/32_CrossSectionalFactorModel/07_ReturnForecasts/15_TargetReturnForecastStep.jl" = { code = 172, doc = 198, comment = 5, blank = 90, total = 465 }
-"src/05_Moments/32_CrossSectionalFactorModel/08_CrossSectionalRegressionDiagnostics.jl" = { code = 494, doc = 857, comment = 17, blank = 386, total = 1754 }
+"src/05_Moments/32_CrossSectionalFactorModel/08_CrossSectionalRegressionDiagnostics_a.jl" = { code = 474, doc = 811, comment = 15, blank = 356, total = 1656 }
+"src/05_Moments/32_CrossSectionalFactorModel/08_CrossSectionalRegressionDiagnostics_b.jl" = { code = 30, doc = 75, comment = 2, blank = 37, total = 144 }
 "src/05_Moments/32_CrossSectionalFactorModel/09_CrossSectionalExposureDiagnostics.jl" = { code = 373, doc = 555, comment = 9, blank = 255, total = 1192 }
 "src/05_Moments/32_CrossSectionalFactorModel/10_FactorModelSummary.jl" = { code = 243, doc = 505, comment = 8, blank = 215, total = 971 }
 "src/05_Moments/32_CrossSectionalFactorModel/11_CrossSectionalIdiosyncraticDiagnostics.jl" = { code = 242, doc = 506, comment = 1, blank = 218, total = 967 }

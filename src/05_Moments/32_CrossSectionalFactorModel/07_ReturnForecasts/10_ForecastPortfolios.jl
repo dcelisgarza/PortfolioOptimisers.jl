@@ -47,7 +47,41 @@ function forecast_hit_rate(x::AbstractVector{<:Real})
     return iszero(n) ? Tf(NaN) : Tf(h) / Tf(n)
 end
 """
-    forecast_series_summary(x::AbstractVector{<:Real}, ppy::Real)
+$(DocStringExtensions.TYPEDEF)
+
+Holds the four figures of one series: its annualised mean, its annualised volatility, its information ratio and its hit rate.
+
+This type is an implementation detail and is not intended for direct use. [`forecast_series_summary`](@ref) makes it, and [`forecast_quantile_spread`](@ref) reads it. The four values travel together out of the function, so a record names them where a plain tuple would let a swap pass silently.
+
+# Fields
+
+$(DocStringExtensions.FIELDS)
+
+# Related
+
+  - [`forecast_series_summary`](@ref)
+  - [`forecast_quantile_spread`](@ref)
+"""
+@concrete struct SeriesFigures
+    """
+    `ann_mean`: The annualised mean of the finite entries.
+    """
+    ann_mean
+    """
+    `ann_vol`: The annualised standard deviation of the finite entries.
+    """
+    ann_vol
+    """
+    `ann_ir`: The ratio of `ann_mean` to `ann_vol`.
+    """
+    ann_ir
+    """
+    `hit_rate`: The fraction of the finite entries that are positive.
+    """
+    hit_rate
+end
+"""
+    forecast_series_summary(x::AbstractVector{<:Real}, ppy::Real) -> SeriesFigures
 
 Return the annualised mean, volatility and information ratio of a series, and its hit rate.
 
@@ -83,10 +117,11 @@ Where:
 
 # Returns
 
-  - `summary::NamedTuple`: `(; ann_mean, ann_vol, ann_ir, hit_rate)`.
+  - `summary::SeriesFigures`: The four figures, as the fields `ann_mean`, `ann_vol`, `ann_ir` and `hit_rate` of a [`SeriesFigures`](@ref).
 
 # Related
 
+  - [`SeriesFigures`](@ref)
   - [`forecast_quantile_spread`](@ref)
   - [`forecast_hit_rate`](@ref)
   - [`performance_summary`](@ref)
@@ -99,8 +134,7 @@ function forecast_series_summary(x::AbstractVector{<:Real}, ppy::Real)
     ann_mean = m * ppy
     ann_vol = v * sqrt(Tf(ppy))
     ann_ir = ann_vol > zero(Tf) ? ann_mean / ann_vol : Tf(NaN)
-    return (; ann_mean = ann_mean, ann_vol = ann_vol, ann_ir = ann_ir,
-            hit_rate = forecast_hit_rate(x))
+    return SeriesFigures(ann_mean, ann_vol, ann_ir, forecast_hit_rate(x))
 end
 """
     forecast_cross_section!(valid::AbstractVector{Bool}, key::AbstractVector{<:Real},

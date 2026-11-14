@@ -1163,10 +1163,48 @@ function target_forecast_latest_variances(vs::MatNum)::MatNum
     return vs[size(vs, 1):size(vs, 1), :]
 end
 """
+$(DocStringExtensions.TYPEDEF)
+
+Holds the scores of a [`TargetReturnForecast`](@ref) and the histories that it fits, on one observation axis.
+
+This type is an implementation detail and is not intended for direct use. [`target_forecast_alignment`](@ref) makes it, and [`target_forecast_design`](@ref) reads it.
+
+# Fields
+
+$(DocStringExtensions.FIELDS)
+
+# Related
+
+  - [`target_forecast_alignment`](@ref)
+  - [`target_forecast_design`](@ref)
+"""
+@concrete struct AlignedScores
+    """
+    `S`: The Descriptor scores, `assets × descriptors × observations`.
+    """
+    S
+    """
+    `eps`: The idiosyncratic returns, `observations × assets`.
+    """
+    eps
+    """
+    `vs`: The idiosyncratic variances, `observations × assets`, or `nothing`.
+    """
+    vs
+    """
+    `w`: The cross-sectional weights, `observations × assets`.
+    """
+    w
+    """
+    `groups`: The group labels, `observations × assets`, or `nothing`.
+    """
+    groups
+end
+"""
     target_forecast_alignment(whole_history::Bool, S::Arr3Num, eps::MatNum,
                               vs::Option{<:MatNum}, w::MatNum,
                               groups::Option{<:AbstractMatrix{<:Integer}},
-                              rows::AbstractUnitRange) -> NamedTuple
+                              rows::AbstractUnitRange) -> AlignedScores
 
 Put the scores of a [`TargetReturnForecast`](@ref) and the histories it fits on one observation axis.
 
@@ -1187,10 +1225,11 @@ Put the scores of a [`TargetReturnForecast`](@ref) and the histories it fits on 
 
 # Returns
 
-  - `(S, eps, vs, w, groups)::NamedTuple`: The same five, on one observation axis.
+  - `al::AlignedScores`: The same five, `S`, `eps`, `vs`, `w` and `groups`, on one observation axis.
 
 # Related
 
+  - [`AlignedScores`](@ref)
   - [`TargetReturnForecast`](@ref)
   - [`return_forecast_pad`](@ref)
   - [`return_forecast_cut`](@ref)
@@ -1199,14 +1238,14 @@ Put the scores of a [`TargetReturnForecast`](@ref) and the histories it fits on 
 function target_forecast_alignment(whole_history::Bool, S::Arr3Num, eps::MatNum,
                                    vs::Option{<:MatNum}, w::MatNum,
                                    groups::Option{<:AbstractMatrix{<:Integer}},
-                                   rows::AbstractUnitRange)
+                                   rows::AbstractUnitRange)::AlignedScores
     if whole_history
         T = size(S, 3)
-        return (; S = S, eps = return_forecast_pad(eps, rows, T),
-                vs = return_forecast_pad(vs, rows, T), w = w, groups = groups)
+        return AlignedScores(S, return_forecast_pad(eps, rows, T),
+                             return_forecast_pad(vs, rows, T), w, groups)
     end
-    return (; S = return_forecast_cut(S, rows), eps = eps, vs = vs,
-            w = return_forecast_cut(w, rows), groups = return_forecast_cut(groups, rows))
+    return AlignedScores(return_forecast_cut(S, rows), eps, vs,
+                         return_forecast_cut(w, rows), return_forecast_cut(groups, rows))
 end
 """
     return_forecast(rfe::TargetReturnForecast, rd::ReturnsResult,
@@ -1307,7 +1346,7 @@ end
 """
     target_forecast_coefficient(rfe::TargetReturnForecast, model, Sf::MatNum, yf::VecNum,
                                 ok::AbstractVector{Bool}, fwd::MatNum,
-                                vs::Option{<:MatNum}, w::MatNum, nt::Integer) -> NamedTuple
+                                vs::Option{<:MatNum}, w::MatNum, nt::Integer) -> Tuple
 
 Return the calibration coefficient of a [`TargetReturnForecast`](@ref), or `NaN`, and the uncalibrated prediction it was fitted on.
 

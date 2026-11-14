@@ -369,14 +369,40 @@ function return_forecast(rfe::FixedWeightedReturnForecast, rd::ReturnsResult,
                          csfm::CrossSectionalFactorModel,
                          ::Nothing = nothing)::FixedWeightedReturnForecastResult
     rows = return_forecast_rows(rd, csfm)
-    P = map(A -> return_forecast_cut(A, rows), descriptor_panel_scores(rfe.scores, rd))
-    (; hist, fs) = return_forecast_step(rfe, P, csfm, nothing)
+    P0 = descriptor_panel_scores(rfe.scores, rd)
+    (; hist, fs) = return_forecast_step(rfe, return_forecast_cut(P0, rows), csfm, nothing)
     return return_forecast_result(rfe, hist, fs)
 end
 """
-    return_forecast_step(rfe::FixedWeightedReturnForecast, P::NamedTuple,
+$(DocStringExtensions.TYPEDEF)
+
+Holds the Return Forecast history of a step of a Return Forecast, with the fold state that the step ends in.
+
+This type is an implementation detail and is not intended for direct use. Each method of [`return_forecast_step`](@ref) makes it. The batch fit and the carry fold of a [`CrossSectionalFactorPrior`](@ref) read it, and pass `fs` to [`return_forecast_result`](@ref).
+
+# Fields
+
+$(DocStringExtensions.FIELDS)
+
+# Related
+
+  - [`return_forecast_step`](@ref)
+  - [`return_forecast_result`](@ref)
+"""
+@concrete struct ForecastStepHistory
+    """
+    `hist`: The Return Forecast history, `observations × assets`, on the rows of the step.
+    """
+    hist
+    """
+    `fs`: The fold state after the step, an [`EWNormalEquations`](@ref) or a [`TargetRecursion`](@ref), or `nothing` for a member that carries none.
+    """
+    fs
+end
+"""
+    return_forecast_step(rfe::FixedWeightedReturnForecast, P::PanelScores,
                          csfm::CrossSectionalFactorModel, fs::Nothing,
-                         cre::Nothing = nothing) -> NamedTuple
+                         cre::Nothing = nothing) -> ForecastStepHistory
 
 Compute the Return Forecast history of a fixed signed combination of Descriptor scores, on the rows of a block.
 
@@ -394,7 +420,7 @@ A row of the history reads the scores, the exposures, the regression weights and
 # Arguments
 
   - `rfe`: Fixed weighted Return Forecast Estimator.
-  - `P`: The scores, the weights and the group labels of the rows of the block, `(; S, w, g)`, as [`descriptor_panel_scores`](@ref) states them. The function can change `P.S` in place.
+  - `P`: The scores, the weights and the group labels of the rows of the block, as [`descriptor_panel_scores`](@ref) makes the [`PanelScores`](@ref). The function can change `P.S` in place.
   - `csfm`: The factor-model block of the rows of `P`. The member reads its exposure history only under a Neutralisation, and its idiosyncratic variance history only under [`IdiosyncraticSharpeUnit`](@ref).
   - `fs`: The fold state, always `nothing`.
   - `cre`: No regression, as for [`return_forecast`](@ref).
@@ -405,20 +431,24 @@ A row of the history reads the scores, the exposures, the regression weights and
 
 # Returns
 
-  - `hist::MatNum`: The Return Forecast history, `observations × assets`, on the rows of `P`.
-  - `fs::Nothing`: The fold state, `nothing`.
+  - `r::ForecastStepHistory`: The history and the fold state.
+
+      + `hist::MatNum`: The Return Forecast history, `observations × assets`, on the rows of `P`.
+      + `fs::Nothing`: The fold state, `nothing`.
 
 # Related
 
+  - [`ForecastStepHistory`](@ref)
+  - [`PanelScores`](@ref)
   - [`return_forecast`](@ref)
   - [`return_forecast_result`](@ref)
   - [`folds_forecast_rows`](@ref)
   - [`signed_composite_accumulate!`](@ref)
   - [`composite_finalise!`](@ref)
 """
-function return_forecast_step(rfe::FixedWeightedReturnForecast, P::NamedTuple,
+function return_forecast_step(rfe::FixedWeightedReturnForecast, P::PanelScores,
                               csfm::CrossSectionalFactorModel, ::Nothing,
-                              ::Nothing = nothing)::NamedTuple
+                              ::Nothing = nothing)::ForecastStepHistory
     ds = rfe.scores
     Sb = descriptor_neutralised_scores(ds, P, csfm, axes(P.S, 3))
     K = size(Sb, 2)
@@ -429,7 +459,8 @@ function return_forecast_step(rfe::FixedWeightedReturnForecast, P::NamedTuple,
     signed_composite_accumulate!(num, den, Sb, wv)
     composite_finalise!(num, den, rfe.min_coverage)
     Z = K > 1 ? cross_sectional_transform(ds.scoring, num; w = P.w, groups = P.g) : num
-    return (; hist = forecast_return_units(rfe.unit, rfe.scale * Z, csfm.vs), fs = nothing)
+    return ForecastStepHistory(forecast_return_units(rfe.unit, rfe.scale * Z, csfm.vs),
+                               nothing)
 end
 """
     return_forecast_result(rfe::FixedWeightedReturnForecast, hist::MatNum,

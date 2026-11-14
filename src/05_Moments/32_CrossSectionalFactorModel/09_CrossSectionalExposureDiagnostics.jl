@@ -512,7 +512,53 @@ function exposure_pair_observation(B::Arr3Num, u::MatNum, t::Integer, k::Integer
     return den > epsv ? (m.C - m.Sk * m.Sl / m.W) / den : Tf(NaN), false
 end
 """
-    exposure_pair_sums(B::Arr3Num, u::MatNum, t::Integer, k::Integer, l::Integer)
+$(DocStringExtensions.TYPEDEF)
+
+The weighted sums of one pair of factor exposures over the assets that they share at one observation.
+
+This type is an implementation detail and is not intended for direct use. [`exposure_pair_sums`](@ref) makes it. [`exposure_pair_observation`](@ref) reads it.
+
+# Fields
+
+$(DocStringExtensions.FIELDS)
+
+# Related
+
+  - [`exposure_pair_sums`](@ref)
+  - [`exposure_pair_observation`](@ref)
+"""
+@concrete struct ExposurePairSums
+    """
+    `nv`: The count of the shared assets.
+    """
+    nv
+    """
+    `W`: The sum of the weights.
+    """
+    W
+    """
+    `Sk`: The weighted sum of the first exposure.
+    """
+    Sk
+    """
+    `Sl`: The weighted sum of the second exposure.
+    """
+    Sl
+    """
+    `Qk`: The weighted sum of the squares of the first exposure.
+    """
+    Qk
+    """
+    `Ql`: The weighted sum of the squares of the second exposure.
+    """
+    Ql
+    """
+    `C`: The weighted sum of the products of the two exposures.
+    """
+    C
+end
+"""
+    exposure_pair_sums(B::Arr3Num, u::MatNum, t::Integer, k::Integer, l::Integer) -> ExposurePairSums
 
 Return the weighted sums of one pair of factor exposures over the assets they share at one observation.
 
@@ -527,10 +573,11 @@ An asset enters when both of its exposures are finite and its weight is finite a
 
 # Returns
 
-  - `m::NamedTuple`: `(; nv, W, Sk, Sl, Qk, Ql, C)`, the count of the shared assets, the weight sum, the two weighted sums, the two weighted square sums and the weighted cross sum.
+  - `m::ExposurePairSums`: The count of the shared assets, the weight sum, the two weighted sums, the two weighted square sums and the weighted cross sum.
 
 # Related
 
+  - [`ExposurePairSums`](@ref)
   - [`exposure_pair_observation`](@ref)
 """
 function exposure_pair_sums(B::Arr3Num, u::MatNum, t::Integer, k::Integer, l::Integer)
@@ -560,7 +607,7 @@ function exposure_pair_sums(B::Arr3Num, u::MatNum, t::Integer, k::Integer, l::In
             C += wi * xk * xl
         end
     end
-    return (; nv = nv, W = W, Sk = Sk, Sl = Sl, Qk = Qk, Ql = Ql, C = C)
+    return ExposurePairSums(nv, W, Sk, Sl, Qk, Ql, C)
 end
 """
     exposure_stability(B::Arr3Num, w::Option{<:MatNum} = nothing;

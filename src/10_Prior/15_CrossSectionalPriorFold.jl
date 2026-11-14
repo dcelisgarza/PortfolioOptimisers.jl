@@ -74,7 +74,7 @@ Keywords correspond to the struct's fields, and every field but `buf` and `tip` 
     """
     Xl
     """
-    Observed factors of every observation after the warm-up, `(; Z, R, lv, nf, fam)` as [`cross_sectional_observed`](@ref) states them, or `nothing` without an observed factor. The factor prior reads the observed returns `R` beside the factor returns of the regression. The observed exposures `Z` and the exposure history `Ms` are views of one backing, as [`cross_sectional_fold_join`](@ref) appends them, so the call with no data reads the joined history with no copy.
+    Observed factors of every observation after the warm-up, an [`ObservedStack`](@ref) that [`cross_sectional_observed_stack`](@ref) states, or `nothing` without an observed factor. The factor prior reads the observed returns `R` beside the factor returns of the regression. The observed exposures `Z` and the exposure history `Ms` are views of one backing, as [`cross_sectional_fold_join`](@ref) appends them, so the call with no data reads the joined history with no copy.
     """
     obs
     """
@@ -162,7 +162,7 @@ Keywords correspond to the struct's fields, and every field but `buf` and `tip` 
     """
     ce
     """
-    The Descriptor scores of the Return Forecast at every observation after the warm-up, `(; S, w, g)` as [`descriptor_panel_scores`](@ref) states them, or `nothing` when the forecast does not compute its history one observation at a time, as [`folds_forecast_rows`](@ref) answers. The scores of the last rows of the warm-up that [`cross_sectional_forecast_lead`](@ref) counts come first. A step appends the scores of its new observations, with [`cross_sectional_carry_scores`](@ref).
+    The Descriptor scores of the Return Forecast at every observation after the warm-up, a [`PanelScores`](@ref) as [`descriptor_panel_scores`](@ref) states them, or `nothing` when the forecast does not compute its history one observation at a time, as [`folds_forecast_rows`](@ref) answers. The scores of the last rows of the warm-up that [`cross_sectional_forecast_lead`](@ref) counts come first. A step appends the scores of its new observations, with [`cross_sectional_carry_scores`](@ref).
     """
     fsc
     """
@@ -417,7 +417,7 @@ Keeps the last `n` rows of the panel rows of a step, of their derived series, or
 
 # Arguments
 
-  - `rd`: The panel rows, an array whose observation axis, as [`observation_axis`](@ref) names it, holds the rows, the derived series `(; Xn, Xl, Zo)` of the rows, the scores `(; S, w, g)`, or `nothing`. The carry keeps more rows than `lag`, so the cut keeps every row of `Zo`.
+  - `rd`: The panel rows, an array whose observation axis, as [`observation_axis`](@ref) names it, holds the rows, the derived series `(; Xn, Xl, Zo)` of the rows, the Descriptor scores as a [`PanelScores`](@ref), or `nothing`. The carry keeps more rows than `lag`, so the cut keeps every row of `Zo`.
   - `n`: The number of rows to keep, or `nothing`.
 
 # Returns
@@ -786,7 +786,7 @@ end
 """
     cross_sectional_fold_factor_returns(f::MatNum, lv::AbstractVector{Bool}, cb::Nothing)
     cross_sectional_fold_factor_returns(f::MatNum, lv::AbstractVector{Bool},
-                                        cb::NamedTuple)
+                                        cb::ObservedBlock)
 
 Returns the factor returns of a block that the factor prior of the carry fold folds: the factor returns of the regression on the factors that are not empty, and the observed returns after them.
 
@@ -796,7 +796,7 @@ The batch fit appends the observed factors after the estimated ones with [`cross
 
   - `f`: The factor returns of the regression of the block, on the reduced axis.
   - `lv`: The mark of the factors that are not empty.
-  - `cb`: The observed factors of the block from [`cross_sectional_observed_block`](@ref), or `nothing`.
+  - `cb`: The observed factors of the block, an [`ObservedBlock`](@ref) from [`cross_sectional_observed_block`](@ref), or `nothing`.
 
 # Returns
 
@@ -811,7 +811,7 @@ function cross_sectional_fold_factor_returns(f::MatNum, lv::AbstractVector{Bool}
     return f[:, lv]
 end
 function cross_sectional_fold_factor_returns(f::MatNum, lv::AbstractVector{Bool},
-                                             cb::NamedTuple)
+                                             cb::ObservedBlock)
     return hcat(f[:, lv], cb.R)
 end
 """
@@ -985,7 +985,7 @@ function cross_sectional_fold_rows(pe::CrossSectionalFactorPrior,
     obs = if isnothing(cc)
         nothing
     else
-        (; Z = Zn[:, :, p], R = cc.R[q, :], lv = cc.lv, nf = cc.nf, fam = cc.fam)
+        ObservedStack(Zn[:, :, p], cc.R[q, :], cc.lv, cc.nf, cc.fam)
     end
     return (; nf = nf, fam = fam, Ms = Msn, X = win.X[q, :],
             Xl = isnothing(cc) ? nothing : Xl[q, :], obs = obs, bw = bwn,

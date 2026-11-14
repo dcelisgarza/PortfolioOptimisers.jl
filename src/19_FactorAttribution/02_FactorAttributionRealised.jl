@@ -1190,11 +1190,11 @@ end
 """
     attribution_dropped_observation(dc::Nothing, Bt::MatNum, Pt::Option{<:AbstractMatrix},
                                     keep::AbstractVector{<:Integer}, nr::Integer,
-                                    t::Integer) -> NamedTuple
+                                    t::Integer) -> ChangedDesign
     attribution_dropped_observation(dc::AbstractMatrix{Bool}, Bt::MatNum,
                                     Pt::Option{<:AbstractMatrix},
                                     keep::AbstractVector{<:Integer}, nr::Integer,
-                                    t::Integer) -> NamedTuple
+                                    t::Integer) -> ChangedDesign
 
 Return the exposures and the change of one observation after the columns that its fit dropped.
 
@@ -1211,10 +1211,11 @@ Under [`DependentColumnDrop`](@ref) the fit solved the kept columns and gave eac
 
 # Returns
 
-  - `(; B, P)`: The exposures and the change, `Bt` and `Pt` themselves when the observation drops nothing.
+  - `ob::ChangedDesign`: The exposures and the change, `Bt` and `Pt` themselves when the observation drops nothing.
 
 # Related
 
+  - [`ChangedDesign`](@ref)
   - [`attribution_error_pass`](@ref)
   - [`cs_dropped_design`](@ref)
   - [`attribution_changed_covariance`](@ref)
@@ -1222,7 +1223,7 @@ Under [`DependentColumnDrop`](@ref) the fit solved the kept columns and gave eac
 function attribution_dropped_observation(::Nothing, Bt::MatNum,
                                          Pt::Option{<:AbstractMatrix},
                                          ::AbstractVector{<:Integer}, ::Integer, ::Integer)
-    return (; B = Bt, P = Pt)
+    return ChangedDesign(Bt, Pt)
 end
 function attribution_dropped_observation(dc::AbstractMatrix{Bool}, Bt::MatNum,
                                          Pt::Option{<:AbstractMatrix},
@@ -1230,13 +1231,13 @@ function attribution_dropped_observation(dc::AbstractMatrix{Bool}, Bt::MatNum,
                                          t::Integer)
     d = view(dc, t, :)
     if !any(d)
-        return (; B = Bt, P = Pt)
+        return ChangedDesign(Bt, Pt)
     end
     Bd = copy(Bt)
     Bd[:, view(keep, d)] .= zero(eltype(Bd))
     # A decomposition leaves a `Rational` type, as a square root does.
     Tp = typeof(sqrt(one(real(eltype(Bt)))))
-    return (; B = Bd, P = cs_dropped_change(Pt, d, keep, nr, Tp))
+    return ChangedDesign(Bd, cs_dropped_change(Pt, d, keep, nr, Tp))
 end
 function attribution_changed_covariance(Pt::AbstractMatrix, V::MatNum,
                                         keep::AbstractVector{<:Integer})

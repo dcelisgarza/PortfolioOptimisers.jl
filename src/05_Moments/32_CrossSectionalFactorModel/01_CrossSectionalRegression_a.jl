@@ -1579,10 +1579,72 @@ function cross_sectional_coefficients(cre::CrossSectionalTargetRegression, A::Ma
     return cross_sectional_target_solve(cre.alg, tgt, (; A = A, y = y, D = D, t = t, F = F))
 end
 """
+$(DocStringExtensions.TYPEDEF)
+
+Holds the buffers that one task of the loop of [`cross_sectional_regression`](@ref) gathers each observation into.
+
+This type is an implementation detail and is not intended for direct use. [`cross_sectional_loop_buffers`](@ref) makes it, and the loop of [`cross_sectional_block_regression`](@ref) reads it. Each buffer holds every asset, and an observation reads its first rows. The loop gives the solve the fields `b`, `gram` and `v` as the workspace that [`cross_sectional_solve`](@ref) reads.
+
+# Fields
+
+$(DocStringExtensions.FIELDS)
+
+# Related
+
+  - [`cross_sectional_loop_buffers`](@ref)
+  - [`cross_sectional_foreach`](@ref)
+"""
+@concrete struct CrossSectionalLoopBuffers
+    """
+    `w`: The gathered weights of the observation.
+    """
+    w
+    """
+    `A`: The gathered exposures of the observation, `assets × factors`.
+    """
+    A
+    """
+    `y`: The gathered returns of the observation.
+    """
+    y
+    """
+    `Ac`: The centred exposures of an intercept, `assets × factors`. It has no row without an intercept.
+    """
+    Ac
+    """
+    `yc`: The centred returns of an intercept. It has no entry without an intercept.
+    """
+    yc
+    """
+    `D`: The weighted design, `assets × factors`.
+    """
+    D
+    """
+    `Q`: The factors of the column-pivoted `QR` of the weighted design, `assets × factors`.
+    """
+    Q
+    """
+    `G`: The pivoted columns that the leverage check divides, `assets × factors`.
+    """
+    G
+    """
+    `b`: The work vector of a solve through the `QR`, of length `max(assets, factors)`.
+    """
+    b
+    """
+    `gram`: The Gram matrix of a solve of the normal equations, `factors × factors`.
+    """
+    gram
+    """
+    `v`: The right side of a solve of the normal equations, of length `factors`.
+    """
+    v
+end
+"""
     cross_sectional_loop_buffers(intercept::Val{false}, Z::Arr3Num, X::MatNum, W::MatNum,
-                                 Tf::Type) -> NamedTuple
+                                 Tf::Type) -> CrossSectionalLoopBuffers
     cross_sectional_loop_buffers(intercept::Val{true}, Z::Arr3Num, X::MatNum, W::MatNum,
-                                 Tf::Type) -> NamedTuple
+                                 Tf::Type) -> CrossSectionalLoopBuffers
 
 Allocate the buffers that one task of the loop of [`cross_sectional_regression`](@ref) gathers each observation into.
 
@@ -1605,34 +1667,37 @@ The method that Julia selects is the algorithm.
 
 # Returns
 
-  - `buf::NamedTuple`: `(; w, A, y, Ac, yc, D, Q, G, b, gram, v)`: the gathered weights, exposures and returns, the centred exposures and returns, the weighted design, the factors of its column-pivoted `QR`, the pivoted columns that the leverage check divides, the work vector of a solve through the `QR`, of length `max(assets, factors)`, and the Gram matrix and the right side of a solve of the normal equations. The tuple is also the workspace that [`cross_sectional_solve`](@ref) reads.
+  - `buf::CrossSectionalLoopBuffers`: The gathered weights, exposures and returns, the centred exposures and returns, the weighted design, the factors of its column-pivoted `QR`, the pivoted columns that the leverage check divides, the work vector of a solve through the `QR`, and the Gram matrix and the right side of a solve of the normal equations, as [`CrossSectionalLoopBuffers`](@ref) states them.
 
 # Related
 
+  - [`CrossSectionalLoopBuffers`](@ref)
   - [`cross_sectional_regression`](@ref)
   - [`cross_sectional_foreach`](@ref)
 """
 function cross_sectional_loop_buffers(::Val{false}, Z::Arr3Num, X::MatNum, W::MatNum,
-                                      ::Type{T}) where {T}
+                                      ::Type{T})::CrossSectionalLoopBuffers where {T}
     N, K = size(Z, 1), size(Z, 2)
     # A gather in the type of each input solved a `Float32` design against `Float64` returns
     # at the precision of `Float32`, and gave `GLM` vectors of two types (R37 of #1817).
     Td = promote_type(T, typeof(sqrt(oneunit(T))))
-    return (; w = similar(W, T, N), A = similar(Z, T, N, K), y = similar(X, T, N),
-            Ac = Matrix{T}(undef, 0, K), yc = Vector{T}(undef, 0),
-            D = Matrix{Td}(undef, N, K), Q = Matrix{Td}(undef, N, K),
-            G = Matrix{Td}(undef, N, K), b = Vector{Td}(undef, max(N, K)),
-            gram = Matrix{Td}(undef, K, K), v = Vector{Td}(undef, K))
+    return CrossSectionalLoopBuffers(similar(W, T, N), similar(Z, T, N, K),
+                                     similar(X, T, N), Matrix{T}(undef, 0, K),
+                                     Vector{T}(undef, 0), Matrix{Td}(undef, N, K),
+                                     Matrix{Td}(undef, N, K), Matrix{Td}(undef, N, K),
+                                     Vector{Td}(undef, max(N, K)), Matrix{Td}(undef, K, K),
+                                     Vector{Td}(undef, K))
 end
 function cross_sectional_loop_buffers(::Val{true}, Z::Arr3Num, X::MatNum, W::MatNum,
-                                      ::Type{T}) where {T}
+                                      ::Type{T})::CrossSectionalLoopBuffers where {T}
     N, K = size(Z, 1), size(Z, 2)
     Td = promote_type(T, typeof(sqrt(oneunit(T))))
-    return (; w = similar(W, T, N), A = similar(Z, T, N, K), y = similar(X, T, N),
-            Ac = Matrix{T}(undef, N, K), yc = Vector{T}(undef, N),
-            D = Matrix{Td}(undef, N, K), Q = Matrix{Td}(undef, N, K),
-            G = Matrix{Td}(undef, N, K), b = Vector{Td}(undef, max(N, K)),
-            gram = Matrix{Td}(undef, K, K), v = Vector{Td}(undef, K))
+    return CrossSectionalLoopBuffers(similar(W, T, N), similar(Z, T, N, K),
+                                     similar(X, T, N), Matrix{T}(undef, N, K),
+                                     Vector{T}(undef, N), Matrix{Td}(undef, N, K),
+                                     Matrix{Td}(undef, N, K), Matrix{Td}(undef, N, K),
+                                     Vector{Td}(undef, max(N, K)), Matrix{Td}(undef, K, K),
+                                     Vector{Td}(undef, K))
 end
 """
     cross_sectional_foreach(f, ex::FLoops.Transducers.Executor, idx::AbstractVector,
@@ -1869,7 +1934,8 @@ function cross_sectional_block_regression(cre::Union{CrossSectionalLinearRegress
         F = cross_sectional_shared_qr(h1, dc, cre.alg, D, view(buf.Q, 1:n[t], :))
         cross_sectional_mark_leverage!(h1, A, w, cre.intercept, t, idx; D = D, F = F,
                                        G = view(buf.G, 1:n[t], :))
-        fi = cross_sectional_coefficients(cre, A, y, w, t0 + t; D = D, F = F, ws = buf)
+        fi = cross_sectional_coefficients(cre, A, y, w, t0 + t; D = D, F = F,
+                                          ws = (; b = buf.b, gram = buf.gram, v = buf.v))
         f[t, :] = fi.f
         cross_sectional_mark_dropped!(dc, A, w, t; D = D, F = F)
         if cre.intercept
@@ -1883,150 +1949,6 @@ function cross_sectional_block_regression(cre::Union{CrossSectionalLinearRegress
     return CrossSectionalRegression(; f = f, eps = eps, n = n, edof = edof, b = b,
                                     h1 = cross_sectional_bit_mask(h1),
                                     dc = cross_sectional_bit_mask(dc))
-end
-"""
-    cross_sectional_systematic(f::MatNum, b::Option{<:VecNum}, Z::Arr3Num) -> MatNum
-
-Return the systematic part of a cross-sectional regression, `observations × assets`.
-
-# Mathematical definition
-
-```math
-\\begin{align}
-\\hat{x}_{t,i} &= b_{t} + \\boldsymbol{z}_{t,i}^{\\intercal} \\boldsymbol{f}_{t}\\,.
-\\end{align}
-```
-
-Where:
-
-  - ``\\hat{x}_{t,i}``: Systematic return of asset ``i`` at observation ``t``.
-  - ``\\boldsymbol{z}_{t,i}``: Exposures of asset ``i`` at observation ``t``.
-  - ``\\boldsymbol{f}_{t}``: Factor returns of observation ``t``.
-  - ``b_{t}``: Intercept of observation ``t``. The term is zero when no intercept was fitted.
-
-# Arguments
-
-  - `f::MatNum`: Factor returns matrix `observations × factors`.
-  - `b::Option{<:VecNum}`: Intercept vector, or `nothing` when none was fitted.
-  - `Z::Arr3Num`: Exposure tensor `assets × factors × observations`. The asset axis may differ from the one the fit saw. The observation axis and the factor axis must match `f`.
-
-# Validation
-
-  - `size(Z, 3) == size(f, 1)` and `size(Z, 2) == size(f, 2)`.
-
-# Returns
-
-  - `Xh::MatNum`: Systematic returns, `observations × assets`.
-
-# Related
-
-  - [`CrossSectionalRegression`](@ref)
-  - [`StatsAPI.predict(csr::CrossSectionalRegression, Z::Arr3Num)`](@ref)
-  - [`cross_sectional_regression`](@ref)
-"""
-function cross_sectional_systematic(f::MatNum, b::Option{<:VecNum}, Z::Arr3Num)::MatNum
-    @argcheck(size(Z, 3) == size(f, 1) && size(Z, 2) == size(f, 2),
-              DimensionMismatch("Z ($(size(Z, 1))×$(size(Z, 2))×$(size(Z, 3))) must match f ($(size(f, 1))×$(size(f, 2))) on the factor and observation axes"))
-    Xh = similar(f, size(Z, 3), size(Z, 1))
-    for t in axes(Z, 3), i in axes(Z, 1)
-        Xh[t, i] = LinearAlgebra.dot(view(Z, i, :, t), view(f, t, :))
-    end
-    return isnothing(b) ? Xh : Xh .+ b
-end
-"""
-    cross_sectional_residuals(X::MatNum, f::MatNum, b::Option{<:VecNum}, Z::Arr3Num) -> MatNum
-
-Return the residuals of a cross-sectional regression, `observations × assets`: the returns `X` less the systematic part of [`cross_sectional_systematic`](@ref), in one pass.
-
-Each element takes the roundings of `X - cross_sectional_systematic(f, b, Z)` in the same order, so the two give the same bits. The pass allocates the residuals alone, where the two-step form also allocates the systematic part and, with an intercept, its shifted copy.
-
-# Algorithm
-
- 1. For each observation `t` and asset `i`, take the dot product of the exposures `Z[i, :, t]` and the factor returns `f[t, :]`, in the element type of `f`.
- 2. Add the intercept `b[t]` when one was fitted.
- 3. Subtract the sum from `X[t, i]`.
-
-# Arguments
-
-  - `X::MatNum`: Returns matrix `observations × assets`.
-  - `f::MatNum`: Factor returns matrix `observations × factors`.
-  - `b::Option{<:VecNum}`: Intercept vector, or `nothing` when none was fitted.
-  - `Z::Arr3Num`: Exposure tensor `assets × factors × observations`.
-
-# Validation
-
-  - The rules of [`cross_sectional_systematic`](@ref), and `size(X) == (size(Z, 3), size(Z, 1))`.
-
-# Returns
-
-  - `eps::MatNum`: Residuals, `observations × assets`.
-
-# Related
-
-  - [`cross_sectional_systematic`](@ref)
-  - [`cross_sectional_regression`](@ref)
-"""
-function cross_sectional_residuals(X::MatNum, f::MatNum, b::Option{<:VecNum},
-                                   Z::Arr3Num)::MatNum
-    # `f` is `observations × factors` and `X` is `observations × assets`.
-    @argcheck((size(f), size(X)) == ((size(Z, 3), size(Z, 2)), (size(Z, 3), size(Z, 1))),
-              DimensionMismatch("X ($(size(X, 1))×$(size(X, 2))), f ($(size(f, 1))×$(size(f, 2))) and Z ($(size(Z, 1))×$(size(Z, 2))×$(size(Z, 3))) must agree on the asset, factor and observation axes"))
-    # The element types of the two-step form: the systematic part is stored in the type of
-    # `f`, the intercept promotes it, and the difference promotes again.
-    Ts = isnothing(b) ? eltype(f) : Base.promote_op(+, eltype(f), eltype(b))
-    eps = similar(X, Base.promote_op(-, eltype(X), Ts))
-    for t in axes(Z, 3), i in axes(Z, 1)
-        s = convert(eltype(f), LinearAlgebra.dot(view(Z, i, :, t), view(f, t, :)))
-        eps[t, i] = X[t, i] - (isnothing(b) ? s : s + b[t])
-    end
-    return eps
-end
-"""
-    StatsAPI.predict(csr::CrossSectionalRegression, Z::Arr3Num) -> MatNum
-
-Return the systematic part of a fitted cross-sectional regression, `observations × assets`.
-
-For the `X` that the fit saw, the residuals of the result are `X - predict(csr, Z)` already. The method gives the systematic part on an exposure tensor that the fit did not see.
-
-# Algorithm
-
- 1. Call [`cross_sectional_systematic`](@ref) with `csr.f`, `csr.b` and `Z`.
-
-# Arguments
-
-  - `csr`: A cross-sectional regression result.
-  - `Z::Arr3Num`: Exposure tensor `assets × factors × observations`. The asset axis may differ from the one the fit saw. The observation axis and the factor axis must match `csr.f`.
-
-# Validation
-
-  - The rules of [`cross_sectional_systematic`](@ref).
-
-# Returns
-
-  - `Xh::MatNum`: Systematic returns, `observations × assets`.
-
-# Examples
-
-```jldoctest
-julia> Z = reshape([1.0, 0.0, 0.5, 0.0, 1.0, 0.5], 3, 2, 1);
-
-julia> csr = cross_sectional_regression(CrossSectionalLinearRegression(), Z, [1.0 2.0 1.5],
-                                        ones(1, 3));
-
-julia> predict(csr, Z)
-1×3 Matrix{Float64}:
- 1.0  2.0  1.5
-```
-
-# Related
-
-  - [`CrossSectionalRegression`](@ref)
-  - [`cross_sectional_systematic`](@ref)
-  - [`cross_sectional_regression`](@ref)
-  - [`cross_sectional_r2`](@ref)
-"""
-function StatsAPI.predict(csr::CrossSectionalRegression, Z::Arr3Num)::MatNum
-    return cross_sectional_systematic(csr.f, csr.b, Z)
 end
 
 export CrossSectionalRegression, CrossSectionalLinearRegression,

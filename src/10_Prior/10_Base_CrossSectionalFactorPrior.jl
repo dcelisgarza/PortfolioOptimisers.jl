@@ -613,7 +613,7 @@ A cross-sectional fit of `K` factors needs more assets than factors, and a fit w
   - [`CrossSectionalFactorPrior`](@ref)
 """
 function assert_cross_sectional_coverage(msk::AbstractMatrix{Bool}, minra::Integer,
-                                         cb::Option{<:NamedTuple} = nothing)::Nothing
+                                         cb::Option{<:ObservedBlock} = nothing)::Nothing
     n = vec(sum(msk; dims = 2))
     bad = findall(x -> x < minra, n)
     @argcheck(isempty(bad),

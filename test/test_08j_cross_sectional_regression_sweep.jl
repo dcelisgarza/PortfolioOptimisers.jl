@@ -1,6 +1,6 @@
 const PO = PortfolioOptimisers
 
-# The sweep of `src/05_Moments/32_CrossSectionalFactorModel/01_CrossSectionalRegression.jl`.
+# The sweep of `src/05_Moments/32_CrossSectionalFactorModel/01_CrossSectionalRegression_a.jl` and `_b.jl`.
 # Each testset states one formula of the file with an oracle that the library does not share:
 # the normal equations of the weighted least squares with an explicit column of ones, the
 # diagonal of the hat matrix, the weighted Gram matrix of the change of basis, the rank of

@@ -4315,9 +4315,24 @@ end
               a.sharpe ≈ b.sharpe
         @test a.sortino ≈ b.sortino && a.cvar ≈ b.cvar && a.sharpe_stderr ≈ b.sharpe_stderr
         @test !(a.max_drawdown ≈ b.max_drawdown)
-        @test length(PO.forecast_summary_row(fe, nothing, 10, OverlapMeanTest())) == 39
-        @test collect(keys(PO.forecast_summary_row(fe, nothing, 10, OverlapMeanTest()))) ==
-              collect(fieldnames(ForecastSummaryResult)[2:40])
+        row = PO.forecast_summary_row(fe, nothing, 10, OverlapMeanTest())
+        @test row isa PO.SummaryRowParts
+        @test fieldnames(typeof(row)) == (:ic, :rank, :zscore, :calibration, :coverage)
+        @test row.ic isa PO.ForecastICSummaryResult
+        @test row.rank isa ForecastPortfolioResult && row.zscore isa ForecastPortfolioResult
+        @test row.calibration isa ForecastCalibrationResult
+        @test row.coverage isa PO.CoverageFigures
+        cv0 = PO.forecast_summary_coverage(fe, nothing)
+        @test all(f -> isequal(getfield(row.coverage, f), getfield(cv0, f)),
+                  fieldnames(PO.CoverageFigures))
+        @test fs.spearman_mean_ic == row.ic.spearman.mean_ic
+        @test fs.pearson_hit_rate == row.ic.pearson.hit_rate
+        @test fs.rank_ann_return == row.rank.summary.ann_return
+        @test fs.zscore_mean_turnover == row.zscore.mean_turnover
+        @test fs.calibration_slope == row.calibration.slope
+        @test fs.n_bins == row.calibration.n_bins
+        @test fs.mean_coverage == row.coverage.mean_coverage
+        @test fs.n_silenced == row.coverage.n_silenced
     end
 
     @testset "The aligned grid is the set the definition states, on the later phase" begin
@@ -4676,7 +4691,9 @@ end
             @test iszero(sm.ann_vol)
             @test isnan(sm.ann_ir)
         end
-        @test all(isnan, values(PO.forecast_series_summary(Float64[], 12)))
+        se = PO.forecast_series_summary(Float64[], 12)
+        @test se isa PO.SeriesFigures
+        @test all(isnan, (se.ann_mean, se.ann_vol, se.ann_ir, se.hit_rate))
         sm = PO.forecast_series_summary([NaN, 0.2], 12)
         @test sm.ann_mean ≈ 2.4
         @test isnan(sm.ann_vol) && isnan(sm.ann_ir)
@@ -4724,7 +4741,7 @@ end
         for j in 1:2
             sm = PO.forecast_series_summary(q.spread[:, j], 4)
             @test isequal((q.ann_mean[j], q.ann_vol[j], q.ann_ir[j], q.hit_rate[j]),
-                          values(sm))
+                          (sm.ann_mean, sm.ann_vol, sm.ann_ir, sm.hit_rate))
         end
         @test isequal(forecast_quantile_spread(fe; quantiles = 0.25).spread,
                       q.spread[:, 1:1])

@@ -324,12 +324,38 @@ function factor_summary_autocorrelation(f::MatNum)
     return ac
 end
 """
-    factor_summary_returns(csfm::CrossSectionalFactorModel)
+$(DocStringExtensions.TYPEDEF)
+
+Holds the factor return history that a summary reads off a factor model block, and the position of each raw factor on the axis of that history.
+
+This type is an implementation detail and is not intended for direct use. [`factor_summary_returns`](@ref) makes it, and [`factor_model_summary`](@ref) and the factor diagnostics plots read it.
+
+# Fields
+
+$(DocStringExtensions.FIELDS)
+
+# Related
+
+  - [`factor_summary_returns`](@ref)
+  - [`factor_summary_positions`](@ref)
+"""
+@concrete struct FactorReturnHistory
+    """
+    `f`: Factor return history `observations × factors`.
+    """
+    f
+    """
+    `pos`: One entry per raw factor. Entry `k` is the column of `f` that holds raw factor `k`, or `0` when `f` holds none.
+    """
+    pos
+end
+"""
+    factor_summary_returns(csfm::CrossSectionalFactorModel) -> FactorReturnHistory
     factor_summary_returns(csfm::CrossSectionalFactorModel, csr::Nothing, fr)
     factor_summary_returns(csfm::CrossSectionalFactorModel, csr::CrossSectionalRegression,
-                           fr::Nothing)
+                           fr::Nothing) -> FactorReturnHistory
     factor_summary_returns(csfm::CrossSectionalFactorModel, csr::CrossSectionalRegression,
-                           fr::MatNum)
+                           fr::MatNum) -> FactorReturnHistory
 
 Return the factor return history that a summary reads off a factor model block, and the position of each raw factor on the axis of that history.
 
@@ -348,11 +374,11 @@ A block that carries `fr` states its factor returns on the raw axis, so the hist
 
 # Returns
 
-  - `f::MatNum`: Factor return history `observations × factors`.
-  - `pos::Vector{Int}`: One entry per raw factor. Entry `k` is the column of `f` that holds raw factor `k`, or `0` when `f` holds none.
+  - `h::FactorReturnHistory`: The history `f::MatNum`, `observations × factors`, and the positions `pos::Vector{Int}`, as [`FactorReturnHistory`](@ref) states them.
 
 # Related
 
+  - [`FactorReturnHistory`](@ref)
   - [`CrossSectionalFactorModel`](@ref)
   - [`factor_model_summary`](@ref)
   - [`factor_summary_positions`](@ref)
@@ -364,13 +390,13 @@ function factor_summary_returns(::CrossSectionalFactorModel, ::Nothing, ::Any)
     return throw(IsNothingError("csr cannot be nothing: a factor model summary reads the factor return history of the block"))
 end
 function factor_summary_returns(csfm::CrossSectionalFactorModel, ::CrossSectionalRegression,
-                                ::Nothing)
-    return (; f = cross_sectional_factor_returns(csfm),
-            pos = factor_summary_positions(csfm))
+                                ::Nothing)::FactorReturnHistory
+    return FactorReturnHistory(cross_sectional_factor_returns(csfm),
+                               factor_summary_positions(csfm))
 end
 function factor_summary_returns(::CrossSectionalFactorModel, ::CrossSectionalRegression,
-                                fr::MatNum)
-    return (; f = fr, pos = collect(axes(fr, 2)))
+                                fr::MatNum)::FactorReturnHistory
+    return FactorReturnHistory(fr, collect(axes(fr, 2)))
 end
 """
     factor_summary_positions(csfm::CrossSectionalFactorModel)

@@ -1,8 +1,14 @@
 ```@meta
-Description = "Target Return Forecast, private API of PortfolioOptimisers.jl: target_forecast_variances, target_forecast_alignment, target_forecast_samples, …"
+Description = "Target Return Forecast, private API of PortfolioOptimisers.jl: AlignedScores, target_forecast_variances, target_forecast_alignment, target_forecast_samples, …"
 ```
 
 # Target Return Forecast: private API
+
+## Types
+
+```@docs
+AlignedScores
+```
 
 ## Functions
 

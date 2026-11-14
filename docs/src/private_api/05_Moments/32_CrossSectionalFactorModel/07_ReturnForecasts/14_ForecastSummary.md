@@ -1,8 +1,15 @@
 ```@meta
-Description = "Forecast Summary, private API of PortfolioOptimisers.jl: forecast_summary_names, same_configuration, forecast_summary_assert_same_question, …"
+Description = "Forecast Summary, private API of PortfolioOptimisers.jl: CoverageFigures, SummaryRowParts, forecast_summary_names, same_configuration, …"
 ```
 
 # Forecast Summary: private API
+
+## Types
+
+```@docs
+CoverageFigures
+SummaryRowParts
+```
 
 ## Functions
 

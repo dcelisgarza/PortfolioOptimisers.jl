@@ -311,14 +311,15 @@ end
     return_forecast_cut(A::Nothing, rows::AbstractUnitRange) -> Nothing
     return_forecast_cut(A::MatNum, rows::AbstractUnitRange) -> MatNum
     return_forecast_cut(A::Arr3Num, rows::AbstractUnitRange) -> Arr3Num
+    return_forecast_cut(A::PanelScores, rows::AbstractUnitRange) -> PanelScores
 
 Cut a history that lives on the observation axis of the returns data down to the block's rows.
 
-The Return Forecast family computes its Descriptor scores over all the returns data and answers on the block's rows. So this verb cuts each whole-axis history that the family carries beside the scores, once. The cut is a copy and not a view, because a view of an array whose element type is open names no numeric array.
+The Return Forecast family computes its Descriptor scores over all the returns data and answers on the block's rows. So this verb cuts each whole-axis history that the family carries beside the scores, once. The cut is a copy and not a view, because a view of an array whose element type is open names no numeric array. A [`PanelScores`](@ref) is cut field by field.
 
 # Arguments
 
-  - `A`: A history on the observation axis of the returns data, or `nothing`.
+  - `A`: A history on the observation axis of the returns data, a [`PanelScores`](@ref), or `nothing`.
   - `rows`: The rows of the returns data the block lives on.
 
 # Returns

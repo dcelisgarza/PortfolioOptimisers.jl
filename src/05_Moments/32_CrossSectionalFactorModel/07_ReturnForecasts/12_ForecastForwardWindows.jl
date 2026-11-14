@@ -161,8 +161,94 @@ function forecast_common_dates(alpha::MatNum, ys::AbstractVector{<:MatNum},
     return common
 end
 """
+$(DocStringExtensions.TYPEDEF)
+
+Holds the seventeen figures that one forward window adds to a table.
+
+This type is an implementation detail and is not intended for direct use. [`forecast_window_row`](@ref) makes it, and [`forecast_window_table`](@ref) reads it field by field into the columns of a [`ForecastWindowResult`](@ref).
+
+# Fields
+
+$(DocStringExtensions.FIELDS)
+
+# Related
+
+  - [`forecast_window_row`](@ref)
+  - [`forecast_window_table`](@ref)
+"""
+@concrete struct WindowFigures
+    """
+    `spearman_mean_ic`: The mean rank information coefficient.
+    """
+    spearman_mean_ic
+    """
+    `spearman_ic_ir`: The information ratio of the rank coefficients.
+    """
+    spearman_ic_ir
+    """
+    `spearman_t_stat`: The t-statistic of the rank coefficients.
+    """
+    spearman_t_stat
+    """
+    `spearman_p_value`: The p-value of the rank coefficients.
+    """
+    spearman_p_value
+    """
+    `spearman_mean_ci_lower`: The lower end of the interval of the mean rank coefficient.
+    """
+    spearman_mean_ci_lower
+    """
+    `spearman_mean_ci_upper`: The upper end of the interval of the mean rank coefficient.
+    """
+    spearman_mean_ci_upper
+    """
+    `pearson_mean_ic`: The mean linear information coefficient.
+    """
+    pearson_mean_ic
+    """
+    `pearson_ic_ir`: The information ratio of the linear coefficients.
+    """
+    pearson_ic_ir
+    """
+    `pearson_t_stat`: The t-statistic of the linear coefficients.
+    """
+    pearson_t_stat
+    """
+    `pearson_p_value`: The p-value of the linear coefficients.
+    """
+    pearson_p_value
+    """
+    `pearson_mean_ci_lower`: The lower end of the interval of the mean linear coefficient.
+    """
+    pearson_mean_ci_lower
+    """
+    `pearson_mean_ci_upper`: The upper end of the interval of the mean linear coefficient.
+    """
+    pearson_mean_ci_upper
+    """
+    `rank_ann_return`: The annualised return of the rank book.
+    """
+    rank_ann_return
+    """
+    `rank_sharpe`: The Sharpe ratio of the rank book.
+    """
+    rank_sharpe
+    """
+    `zscore_ann_return`: The annualised return of the z-score book.
+    """
+    zscore_ann_return
+    """
+    `zscore_sharpe`: The Sharpe ratio of the z-score book.
+    """
+    zscore_sharpe
+    """
+    `mean_coverage`: The mean share of the universe that the window scored.
+    """
+    mean_coverage
+end
+"""
     forecast_window_row(fp::ForecastEvaluationResult, w::Option{<:MatNum},
-                        min_count::Integer, mt::AbstractMeanTestEstimator) -> NamedTuple
+                        min_count::Integer, mt::AbstractMeanTestEstimator) -> WindowFigures
 
 Return the seventeen figures that one forward window adds to a table.
 
@@ -191,10 +277,11 @@ In [`forecast_window_table`](@ref) the portfolio series of a row has no gap. [`f
 
 # Returns
 
-  - `row::NamedTuple`: `(; spearman_mean_ic, spearman_ic_ir, spearman_t_stat, spearman_p_value, spearman_mean_ci_lower, spearman_mean_ci_upper, pearson_mean_ic, pearson_ic_ir, pearson_t_stat, pearson_p_value, pearson_mean_ci_lower, pearson_mean_ci_upper, rank_ann_return, rank_sharpe, zscore_ann_return, zscore_sharpe, mean_coverage)`. Every figure has the element type that `fp.alpha` and `fp.y` promote to, whatever the element type of `w`.
+  - `row::WindowFigures`: The seventeen figures, as the fields `spearman_mean_ic`, `spearman_ic_ir`, `spearman_t_stat`, `spearman_p_value`, `spearman_mean_ci_lower`, `spearman_mean_ci_upper`, `pearson_mean_ic`, `pearson_ic_ir`, `pearson_t_stat`, `pearson_p_value`, `pearson_mean_ci_lower`, `pearson_mean_ci_upper`, `rank_ann_return`, `rank_sharpe`, `zscore_ann_return`, `zscore_sharpe` and `mean_coverage` of a [`WindowFigures`](@ref). Every figure has the element type that `fp.alpha` and `fp.y` promote to, whatever the element type of `w`.
 
 # Related
 
+  - [`WindowFigures`](@ref)
   - [`forecast_holding_period`](@ref)
   - [`forecast_decay`](@ref)
   - [`forecast_ic_summary`](@ref)
@@ -208,12 +295,8 @@ function forecast_window_row(fp::ForecastEvaluationResult, w::Option{<:MatNum},
     Tf = promote_type(real(eltype(alpha)), real(eltype(y)))
     if isempty(fp.dates)
         nan = Tf(NaN)
-        return (; spearman_mean_ic = nan, spearman_ic_ir = nan, spearman_t_stat = nan,
-                spearman_p_value = nan, spearman_mean_ci_lower = nan,
-                spearman_mean_ci_upper = nan, pearson_mean_ic = nan, pearson_ic_ir = nan,
-                pearson_t_stat = nan, pearson_p_value = nan, pearson_mean_ci_lower = nan,
-                pearson_mean_ci_upper = nan, rank_ann_return = nan, rank_sharpe = nan,
-                zscore_ann_return = nan, zscore_sharpe = nan, mean_coverage = nan)
+        return WindowFigures(nan, nan, nan, nan, nan, nan, nan, nan, nan, nan, nan, nan,
+                             nan, nan, nan, nan, nan)
     end
     ic = forecast_ic_summary(forecast_ic(fp, w; min_count = min_count);
                              lags = forecast_ic_lags(fp), window = forecast_ic_window(fp),
@@ -222,22 +305,15 @@ function forecast_window_row(fp::ForecastEvaluationResult, w::Option{<:MatNum},
     zs = forecast_portfolio(fp; kind = :zscore)
     c = forecast_coverage(fp, w)
     fc = c[isfinite.(c)]
-    return (; spearman_mean_ic = Tf(ic.spearman.mean_ic),
-            spearman_ic_ir = Tf(ic.spearman.ic_ir),
-            spearman_t_stat = Tf(ic.spearman.t_stat),
-            spearman_p_value = Tf(ic.spearman.p_value),
-            spearman_mean_ci_lower = Tf(ic.spearman.mean_ci_lower),
-            spearman_mean_ci_upper = Tf(ic.spearman.mean_ci_upper),
-            pearson_mean_ic = Tf(ic.pearson.mean_ic), pearson_ic_ir = Tf(ic.pearson.ic_ir),
-            pearson_t_stat = Tf(ic.pearson.t_stat),
-            pearson_p_value = Tf(ic.pearson.p_value),
-            pearson_mean_ci_lower = Tf(ic.pearson.mean_ci_lower),
-            pearson_mean_ci_upper = Tf(ic.pearson.mean_ci_upper),
-            rank_ann_return = Tf(rk.summary.ann_return),
-            rank_sharpe = Tf(rk.summary.sharpe),
-            zscore_ann_return = Tf(zs.summary.ann_return),
-            zscore_sharpe = Tf(zs.summary.sharpe),
-            mean_coverage = isempty(fc) ? Tf(NaN) : Tf(sum(fc) / length(fc)))
+    return WindowFigures(Tf(ic.spearman.mean_ic), Tf(ic.spearman.ic_ir),
+                         Tf(ic.spearman.t_stat), Tf(ic.spearman.p_value),
+                         Tf(ic.spearman.mean_ci_lower), Tf(ic.spearman.mean_ci_upper),
+                         Tf(ic.pearson.mean_ic), Tf(ic.pearson.ic_ir),
+                         Tf(ic.pearson.t_stat), Tf(ic.pearson.p_value),
+                         Tf(ic.pearson.mean_ci_lower), Tf(ic.pearson.mean_ci_upper),
+                         Tf(rk.summary.ann_return), Tf(rk.summary.sharpe),
+                         Tf(zs.summary.ann_return), Tf(zs.summary.sharpe),
+                         isempty(fc) ? Tf(NaN) : Tf(sum(fc) / length(fc)))
 end
 """
 $(DocStringExtensions.TYPEDEF)

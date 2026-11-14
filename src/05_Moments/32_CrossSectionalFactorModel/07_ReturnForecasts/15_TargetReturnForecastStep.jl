@@ -37,9 +37,52 @@ function lookback(rfe::TargetReturnForecast)::Option{<:Integer}
     return lookback(rfe.scores.descriptors)
 end
 """
-    target_forecast_design(rfe::TargetReturnForecast, P::NamedTuple,
+$(DocStringExtensions.TYPEDEF)
+
+Holds the scores and the target that a [`TargetReturnForecast`](@ref) fits, on one observation axis.
+
+This type is an implementation detail and is not intended for direct use. [`target_forecast_design`](@ref) makes it, and [`return_forecast_step`](@ref) and [`return_forecast`](@ref) read it.
+
+# Fields
+
+$(DocStringExtensions.FIELDS)
+
+# Related
+
+  - [`target_forecast_design`](@ref)
+  - [`return_forecast_step`](@ref)
+  - [`AlignedScores`](@ref)
+"""
+@concrete struct TargetDesign
+    """
+    `Sa`: The scores, with a slice of ones under `intercept`, `assets × descriptors × observations`.
+    """
+    Sa
+    """
+    `fwd`: The forward mean idiosyncratic return, `observations × assets`.
+    """
+    fwd
+    """
+    `y`: The target of the fit, `observations × assets`.
+    """
+    y
+    """
+    `vs`: The idiosyncratic variances, `observations × assets`, or `nothing`.
+    """
+    vs
+    """
+    `w`: The cross-sectional weights, `observations × assets`.
+    """
+    w
+    """
+    `off`: The number of rows of the observation axis before the first row of the block.
+    """
+    off
+end
+"""
+    target_forecast_design(rfe::TargetReturnForecast, P::PanelScores,
                            csfm::CrossSectionalFactorModel,
-                           rows::AbstractUnitRange) -> NamedTuple
+                           rows::AbstractUnitRange) -> TargetDesign
 
 Build the scores and the target that a [`TargetReturnForecast`](@ref) fits, on one observation axis.
 
@@ -52,7 +95,7 @@ Build the scores and the target that a [`TargetReturnForecast`](@ref) fits, on o
 # Arguments
 
   - `rfe`: Target Return Forecast Estimator.
-  - `P`: The scores, the weights and the group labels, `(; S, w, g)`, as [`descriptor_panel_scores`](@ref) states them. The function can change `P.S` in place.
+  - `P`: The scores, the weights and the group labels, as [`descriptor_panel_scores`](@ref) makes the [`PanelScores`](@ref). The function can change `P.S` in place.
   - `csfm`: The factor-model block. It must carry the cross-sectional fit, and the idiosyncratic variance history under a calibration or under [`IdiosyncraticSharpeUnit`](@ref).
   - `rows`: The rows of `P` that the block covers.
 
@@ -62,16 +105,19 @@ Build the scores and the target that a [`TargetReturnForecast`](@ref) fits, on o
 
 # Returns
 
-  - `(Sa, fwd, y, vs, w, off)::NamedTuple`: The scores, the forward mean target, the target of the fit, the idiosyncratic variances or `nothing`, and the weights, on one observation axis. `off` is the number of rows of that axis before the first row of the block.
+  - `d::TargetDesign`: The scores `Sa`, the forward mean target `fwd`, the target of the fit `y`, the idiosyncratic variances `vs` or `nothing`, and the weights `w`, on one observation axis. `off` is the number of rows of that axis before the first row of the block.
 
 # Related
 
+  - [`TargetDesign`](@ref)
+  - [`PanelScores`](@ref)
   - [`return_forecast`](@ref)
   - [`return_forecast_step`](@ref)
   - [`target_forecast_alignment`](@ref)
 """
-function target_forecast_design(rfe::TargetReturnForecast, P::NamedTuple,
-                                csfm::CrossSectionalFactorModel, rows::AbstractUnitRange)
+function target_forecast_design(rfe::TargetReturnForecast, P::PanelScores,
+                                csfm::CrossSectionalFactorModel,
+                                rows::AbstractUnitRange)::TargetDesign
     S = descriptor_neutralised_scores(rfe.scores, P, csfm, rows)
     al = target_forecast_alignment(rfe.whole_history, S,
                                    forecast_idiosyncratic_returns(csfm),
@@ -87,11 +133,46 @@ function target_forecast_design(rfe::TargetReturnForecast, P::NamedTuple,
                                    forecast_unit_target(rfe.unit, fwd, al.vs); w = al.w,
                                    groups = al.groups)
     y = cross_sectional_transform(rfe.target_scoring, yo; w = al.w, groups = al.groups)
-    return (; Sa = Sa, fwd = fwd, y = y, vs = al.vs, w = al.w,
-            off = rfe.whole_history ? first(rows) - 1 : 0)
+    return TargetDesign(Sa, fwd, y, al.vs, al.w, rfe.whole_history ? first(rows) - 1 : 0)
 end
 """
-    target_forecast_calibration_state(Tf::Type) -> NamedTuple
+$(DocStringExtensions.TYPEDEF)
+
+Holds the running state of the calibration regression of a [`TargetReturnForecast`](@ref).
+
+This type is an implementation detail and is not intended for direct use. [`target_forecast_calibration_state`](@ref) makes the empty record, and [`target_forecast_calibration_step`](@ref) advances it. [`target_forecast_calibrated`](@ref) reads it.
+
+# Fields
+
+$(DocStringExtensions.FIELDS)
+
+# Related
+
+  - [`target_forecast_calibration_state`](@ref)
+  - [`target_forecast_calibration_step`](@ref)
+  - [`target_forecast_calibrated`](@ref)
+  - [`TargetRecursion`](@ref)
+"""
+@concrete struct CalibrationSums
+    """
+    `an`: The decayed sum of the squared predictions.
+    """
+    an
+    """
+    `ac`: The decayed sum of the products of prediction and target.
+    """
+    ac
+    """
+    `n`: The number of observations that advanced the regression.
+    """
+    n
+    """
+    `calib`: The calibration coefficient, or `NaN` before the first observation.
+    """
+    calib
+end
+"""
+    target_forecast_calibration_state(Tf::Type) -> CalibrationSums
 
 Return the empty state of the calibration regression of a [`TargetReturnForecast`](@ref).
 
@@ -101,25 +182,27 @@ Return the empty state of the calibration regression of a [`TargetReturnForecast
 
 # Returns
 
-  - `(an, ac, n, calib)::NamedTuple`: The two accumulators at zero, no observation, and a `NaN` coefficient.
+  - `cs::CalibrationSums`: The two accumulators at zero, no observation, and a `NaN` coefficient.
 
 # Related
 
+  - [`CalibrationSums`](@ref)
   - [`target_forecast_calibration_step`](@ref)
   - [`target_forecast_calibration`](@ref)
 """
-function target_forecast_calibration_state(Tf::Type)::NamedTuple
-    return (; an = zero(Tf), ac = zero(Tf), n = 0, calib = Tf(NaN))
+function target_forecast_calibration_state(Tf::Type)::CalibrationSums
+    return CalibrationSums(zero(Tf), zero(Tf), 0, Tf(NaN))
 end
 """
-    target_forecast_calibration_step(cs::NamedTuple, P::MatNum, fwd::MatNum, vs::MatNum,
-                                     w::MatNum, decay::Real, t::Integer) -> NamedTuple
+    target_forecast_calibration_step(cs::CalibrationSums, P::MatNum, fwd::MatNum,
+                                     vs::MatNum, w::MatNum, decay::Real,
+                                     t::Integer) -> CalibrationSums
 
 Advance the calibration regression of a [`TargetReturnForecast`](@ref) by one observation. [`target_forecast_calibration`](@ref) states the steps.
 
 # Arguments
 
-  - `cs`: The state `(; an, ac, n, calib)` before the observation.
+  - `cs`: The [`CalibrationSums`](@ref) before the observation.
   - `P`: The uncalibrated prediction, `observations × assets`.
   - `fwd`: Forward mean idiosyncratic returns, `observations × assets`.
   - `vs`: Idiosyncratic variance history, `observations × assets`.
@@ -129,16 +212,17 @@ Advance the calibration regression of a [`TargetReturnForecast`](@ref) by one ob
 
 # Returns
 
-  - `cs::NamedTuple`: The state after the observation. An observation that states no slope returns `cs` as it is.
+  - `cs::CalibrationSums`: The state after the observation. An observation that states no slope returns `cs` as it is.
 
 # Related
 
+  - [`CalibrationSums`](@ref)
   - [`target_forecast_calibration`](@ref)
   - [`target_forecast_calibration_design`](@ref)
 """
-function target_forecast_calibration_step(cs::NamedTuple, P::MatNum, fwd::MatNum,
+function target_forecast_calibration_step(cs::CalibrationSums, P::MatNum, fwd::MatNum,
                                           vs::MatNum, w::MatNum, decay::Real,
-                                          t::Integer)::NamedTuple
+                                          t::Integer)::CalibrationSums
     Tf = promote_type(real(eltype(P)), real(eltype(fwd)))
     a, y, wv = target_forecast_calibration_design(P, fwd, vs, w, t)
     s = length(wv) < 2 ? zero(Tf) : sum(wv) / length(wv)
@@ -153,11 +237,10 @@ function target_forecast_calibration_step(cs::NamedTuple, P::MatNum, fwd::MatNum
     end
     an = decay * cs.an + (one(Tf) - decay) * on
     ac = decay * cs.ac + (one(Tf) - decay) * oc
-    return (; an = an, ac = ac, n = cs.n + 1,
-            calib = ac / (an + Tf(1e-6) * max(abs(an), eps(Tf))))
+    return CalibrationSums(an, ac, cs.n + 1, ac / (an + Tf(1e-6) * max(abs(an), eps(Tf))))
 end
 """
-    target_forecast_calibrated(calibrate::Bool, model, cs::NamedTuple,
+    target_forecast_calibrated(calibrate::Bool, model, cs::CalibrationSums,
                                min_obs::Integer) -> Real
 
 Return a calibration coefficient of a [`TargetReturnForecast`](@ref) from the state of its regression, or `NaN`.
@@ -168,7 +251,7 @@ A member that does not calibrate, and a member that fits no model, have no coeff
 
   - `calibrate`: Whether the member calibrates.
   - `model`: The fitted model, or `nothing`.
-  - `cs`: The state `(; an, ac, n, calib)` of the regression.
+  - `cs`: The [`CalibrationSums`](@ref) of the regression.
   - `min_obs`: The warm-up, in observations that advanced the regression.
 
 # Returns
@@ -180,7 +263,7 @@ A member that does not calibrate, and a member that fits no model, have no coeff
   - [`target_forecast_calibration_step`](@ref)
   - [`return_forecast_result`](@ref)
 """
-function target_forecast_calibrated(calibrate::Bool, model, cs::NamedTuple,
+function target_forecast_calibrated(calibrate::Bool, model, cs::CalibrationSums,
                                     min_obs::Integer)::Real
     return if calibrate && !isnothing(model) && cs.n >= min_obs
         cs.calib
@@ -189,8 +272,56 @@ function target_forecast_calibrated(calibrate::Bool, model, cs::NamedTuple,
     end
 end
 """
-    target_forecast_state(fs::Nothing, Tf::Type, K::Integer, ortho::Bool) -> NamedTuple
-    target_forecast_state(fs::NamedTuple, Tf::Type, K::Integer, ortho::Bool) -> NamedTuple
+$(DocStringExtensions.TYPEDEF)
+
+Holds the fold state of a [`TargetReturnForecast`](@ref): the normal equations of the matured samples, the model they give, and the states of the calibration regressions.
+
+This type is an implementation detail and is not intended for direct use. [`target_forecast_state`](@ref) makes the empty record and a copy of a carried record, and [`return_forecast_step`](@ref) advances it and returns it as the fold state. [`return_forecast_result`](@ref) reads it.
+
+# Fields
+
+$(DocStringExtensions.FIELDS)
+
+# Related
+
+  - [`target_forecast_state`](@ref)
+  - [`return_forecast_step`](@ref)
+  - [`CalibrationSums`](@ref)
+  - [`ForecastStepHistory`](@ref)
+"""
+@concrete struct TargetRecursion
+    """
+    `XtX`: The normal matrix of the matured samples, `columns × columns`.
+    """
+    XtX
+    """
+    `Xty`: The cross product of the matured samples, of length `columns`.
+    """
+    Xty
+    """
+    `n`: The number of matured samples.
+    """
+    n
+    """
+    `model`: The model that the normal equations give, or `nothing`.
+    """
+    model
+    """
+    `B`: The coefficients that predicted the observations whose target has not matured, one row each.
+    """
+    B
+    """
+    `cs`: The [`CalibrationSums`](@ref) of the calibration regression.
+    """
+    cs
+    """
+    `ocs`: The [`CalibrationSums`](@ref) of the regression of the orthogonal part, or `nothing` when the caller asks for no `κ⊥`.
+    """
+    ocs
+end
+"""
+    target_forecast_state(fs::Nothing, Tf::Type, K::Integer, ortho::Bool) -> TargetRecursion
+    target_forecast_state(fs::TargetRecursion, Tf::Type, K::Integer, ortho::Bool) -> TargetRecursion
 
 Return the fold state that a step of a [`TargetReturnForecast`](@ref) starts from.
 
@@ -201,33 +332,36 @@ The state holds the normal equations `XtX` and `Xty` of the matured samples, the
 The method that Julia selects is the algorithm.
 
  1. `Nothing`: the empty state, in the number type `Tf`.
- 2. `NamedTuple`: a copy of the arrays of the carried state, so the state of an earlier step stays as it is. The number type is `Tf` promoted with the number type of the carried state.
+ 2. `TargetRecursion`: a copy of the arrays of the carried state, so the state of an earlier step stays as it is. The number type is `Tf` promoted with the number type of the carried state.
 
 # Arguments
 
-  - `fs`: The carried fold state, or `nothing`.
+  - `fs`: The carried fold state, a [`TargetRecursion`](@ref), or `nothing`.
   - `Tf`: The number type of the design of the step.
   - `K`: Number of columns of the design.
   - `ortho`: Whether the caller asks for `κ⊥`. The empty state reads it.
 
 # Returns
 
-  - `fs::NamedTuple`: The state `(; XtX, Xty, n, model, B, cs, ocs)` that the step advances.
+  - `fs::TargetRecursion`: The state that the step advances.
 
 # Related
 
+  - [`TargetRecursion`](@ref)
   - [`return_forecast_step`](@ref)
   - [`NormalEquationsFit`](@ref)
 """
-function target_forecast_state(::Nothing, Tf::Type, K::Integer, ortho::Bool)::NamedTuple
-    return (; XtX = zeros(Tf, K, K), Xty = zeros(Tf, K), n = 0, model = nothing,
-            B = Matrix{Tf}(undef, 0, K), cs = target_forecast_calibration_state(Tf),
-            ocs = ortho ? target_forecast_calibration_state(Tf) : nothing)
+function target_forecast_state(::Nothing, Tf::Type, K::Integer,
+                               ortho::Bool)::TargetRecursion
+    return TargetRecursion(zeros(Tf, K, K), zeros(Tf, K), 0, nothing,
+                           Matrix{Tf}(undef, 0, K), target_forecast_calibration_state(Tf),
+                           ortho ? target_forecast_calibration_state(Tf) : nothing)
 end
-function target_forecast_state(fs::NamedTuple, Tf::Type, ::Integer, ::Bool)::NamedTuple
+function target_forecast_state(fs::TargetRecursion, Tf::Type, ::Integer,
+                               ::Bool)::TargetRecursion
     Tp = promote_type(Tf, eltype(fs.XtX))
-    return (; XtX = Matrix{Tp}(fs.XtX), Xty = Vector{Tp}(fs.Xty), n = fs.n,
-            model = fs.model, B = Matrix{Tp}(fs.B), cs = fs.cs, ocs = fs.ocs)
+    return TargetRecursion(Matrix{Tp}(fs.XtX), Vector{Tp}(fs.Xty), fs.n, fs.model,
+                           Matrix{Tp}(fs.B), fs.cs, fs.ocs)
 end
 """
     target_forecast_latest_row(vs::Nothing, t::Integer, N::Integer) -> Nothing
@@ -263,12 +397,12 @@ function target_forecast_latest_row(vs::MatNum, t::Integer, N::Integer)::MatNum
     end
 end
 """
-    target_forecast_matured!(Pm::MatNum, p::VecNum, cs::NamedTuple, Sf::MatNum,
+    target_forecast_matured!(Pm::MatNum, p::VecNum, cs::CalibrationSums, Sf::MatNum,
                              ok::AbstractVector{Bool}, B::MatNum, fwd::MatNum, w::MatNum,
-                             vs::Nothing, rfe::TargetReturnForecast, s::Integer) -> NamedTuple
-    target_forecast_matured!(Pm::MatNum, p::VecNum, cs::NamedTuple, Sf::MatNum,
+                             vs::Nothing, rfe::TargetReturnForecast, s::Integer) -> CalibrationSums
+    target_forecast_matured!(Pm::MatNum, p::VecNum, cs::CalibrationSums, Sf::MatNum,
                              ok::AbstractVector{Bool}, B::MatNum, fwd::MatNum, w::MatNum,
-                             vs::MatNum, rfe::TargetReturnForecast, s::Integer) -> NamedTuple
+                             vs::MatNum, rfe::TargetReturnForecast, s::Integer) -> CalibrationSums
 
 Advance the calibration regression of a [`TargetReturnForecast`](@ref) by the observation `s`, whose target matures at the step.
 
@@ -295,22 +429,24 @@ The method that Julia selects is the algorithm.
 
 # Returns
 
-  - `cs::NamedTuple`: The state of the calibration regression after the observation.
+  - `cs::CalibrationSums`: The state of the calibration regression after the observation.
 
 # Related
 
+  - [`CalibrationSums`](@ref)
   - [`return_forecast_step`](@ref)
   - [`target_forecast_prequential`](@ref)
 """
-function target_forecast_matured!(::MatNum, ::VecNum, cs::NamedTuple, ::MatNum,
+function target_forecast_matured!(::MatNum, ::VecNum, cs::CalibrationSums, ::MatNum,
                                   ::AbstractVector{Bool}, ::MatNum, ::MatNum, ::MatNum,
-                                  ::Nothing, ::TargetReturnForecast, ::Integer)::NamedTuple
+                                  ::Nothing, ::TargetReturnForecast,
+                                  ::Integer)::CalibrationSums
     return cs
 end
-function target_forecast_matured!(Pm::MatNum, p::VecNum, cs::NamedTuple, Sf::MatNum,
+function target_forecast_matured!(Pm::MatNum, p::VecNum, cs::CalibrationSums, Sf::MatNum,
                                   ok::AbstractVector{Bool}, B::MatNum, fwd::MatNum,
                                   w::MatNum, vs::MatNum, rfe::TargetReturnForecast,
-                                  s::Integer)::NamedTuple
+                                  s::Integer)::CalibrationSums
     if !rfe.calibrate
         return cs
     end
@@ -324,9 +460,9 @@ function target_forecast_matured!(Pm::MatNum, p::VecNum, cs::NamedTuple, Sf::Mat
     return target_forecast_calibration_step(cs, Pm, fwd, vs, w, rfe.decay, s)
 end
 """
-    return_forecast_step(rfe::TargetReturnForecast, P::NamedTuple,
-                         csfm::CrossSectionalFactorModel, fs::Option{<:NamedTuple},
-                         cre::Option{<:AbstractCrossSectionalRegressionEstimator} = nothing) -> NamedTuple
+    return_forecast_step(rfe::TargetReturnForecast, P::PanelScores,
+                         csfm::CrossSectionalFactorModel, fs::Option{<:TargetRecursion},
+                         cre::Option{<:AbstractCrossSectionalRegressionEstimator} = nothing) -> ForecastStepHistory
 
 Fold the observations of `P` into the fit of a [`TargetReturnForecast`](@ref) under [`PrequentialCalibration`](@ref) and a [`LinearModel`](@ref) with no keyword argument, as [`target_forecast_folds`](@ref) answers.
 
@@ -347,9 +483,9 @@ The rule of [`PrequentialCalibration`](@ref) is a fold over the observations in 
 # Arguments
 
   - `rfe`: Target Return Forecast Estimator.
-  - `P`: The scores, the weights and the group labels, `(; S, w, g)`, as [`descriptor_panel_scores`](@ref) states them. Its first rows are the observations that `fs` predicted and whose target has not matured, and the rest are new. The function can change `P.S` in place.
+  - `P`: The scores, the weights and the group labels, as [`descriptor_panel_scores`](@ref) makes the [`PanelScores`](@ref). Its first rows are the observations that `fs` predicted and whose target has not matured, and the rest are new. The function can change `P.S` in place.
   - `csfm`: The factor-model block of the last rows of `P`. It must carry the cross-sectional fit, and the idiosyncratic variance history under a calibration or under [`IdiosyncraticSharpeUnit`](@ref). Under `cre` it must carry the exposure history and the regression weight history.
-  - `fs`: The fold state after the observations before the new ones, as this function returns it, or `nothing` for an empty state.
+  - `fs`: The fold state after the observations before the new ones, as this function returns it in a [`TargetRecursion`](@ref), or `nothing` for an empty state.
   - `cre`: Cross-Sectional Regression Estimator that splits each matured prediction for `κ⊥`, or `nothing` to fit no `κ⊥`.
 
 # Validation
@@ -359,20 +495,26 @@ The rule of [`PrequentialCalibration`](@ref) is a fold over the observations in 
 
 # Returns
 
-  - `hist::MatNum`: The forecast that the member publishes at each new observation, `observations × assets`, on the rows of `P`. A row that `fs` predicted reads `NaN`.
-  - `fs::NamedTuple`: The fold state after the new observations.
+  - `r::ForecastStepHistory`: The history and the fold state.
+
+      + `hist::MatNum`: The forecast that the member publishes at each new observation, `observations × assets`, on the rows of `P`. A row that `fs` predicted reads `NaN`.
+      + `fs::TargetRecursion`: The fold state after the new observations.
 
 # Related
 
+  - [`ForecastStepHistory`](@ref)
+  - [`TargetRecursion`](@ref)
+  - [`PanelScores`](@ref)
   - [`return_forecast`](@ref)
   - [`return_forecast_result`](@ref)
   - [`folds_forecast_rows`](@ref)
   - [`target_forecast_prequential`](@ref)
   - [`target_forecast_calibration`](@ref)
 """
-function return_forecast_step(rfe::TargetReturnForecast, P::NamedTuple,
-                              csfm::CrossSectionalFactorModel, fs::Option{<:NamedTuple},
-                              cre::Option{<:AbstractCrossSectionalRegressionEstimator} = nothing)::NamedTuple
+function return_forecast_step(rfe::TargetReturnForecast, P::PanelScores,
+                              csfm::CrossSectionalFactorModel,
+                              fs::Option{<:TargetRecursion},
+                              cre::Option{<:AbstractCrossSectionalRegressionEstimator} = nothing)::ForecastStepHistory
     d = target_forecast_design(rfe, P, csfm, return_forecast_rows(size(P.S, 3), csfm))
     Sa = d.Sa
     N, K, T = size(Sa)
@@ -417,13 +559,13 @@ function return_forecast_step(rfe::TargetReturnForecast, P::NamedTuple,
     end
     H = reduce(vcat, permutedims.(rows))
     hist = vcat(fill(eltype(H)(NaN), p0, N), H)
-    return (; hist = hist,
-            fs = (; XtX = XtX, Xty = Xty, n = n, model = model,
-                  B = B[max(T - g + 1, 1):T, :], cs = cs, ocs = ocs))
+    return ForecastStepHistory(hist,
+                               TargetRecursion(XtX, Xty, n, model,
+                                               B[max(T - g + 1, 1):T, :], cs, ocs))
 end
 """
     return_forecast_result(rfe::TargetReturnForecast, hist::MatNum,
-                           fs::NamedTuple) -> TargetReturnForecastResult
+                           fs::TargetRecursion) -> TargetReturnForecastResult
 
 Build the Result of a [`TargetReturnForecast`](@ref) from the history and the fold state of [`return_forecast_step`](@ref).
 
@@ -445,7 +587,7 @@ The forecast is the last row of the history. The model is the model of the state
   - [`TargetReturnForecastResult`](@ref)
 """
 function return_forecast_result(rfe::TargetReturnForecast, hist::MatNum,
-                                fs::NamedTuple)::TargetReturnForecastResult
+                                fs::TargetRecursion)::TargetReturnForecastResult
     model = fs.model
     ocalib = if isnothing(fs.ocs)
         nothing

@@ -1,5 +1,5 @@
 ```@meta
-Description = "Observed Exposure, private API of PortfolioOptimisers.jl: FactorPartition, currency_level_columns, observed_reads_returns, cross_sectional_factor_partition, …"
+Description = "Observed Exposure, private API of PortfolioOptimisers.jl: FactorPartition, ObservedFactors, ObservedMember, ObservedStack, ObservedBlock, …"
 ```
 
 # Observed Exposure: private API
@@ -8,6 +8,11 @@ Description = "Observed Exposure, private API of PortfolioOptimisers.jl: FactorP
 
 ```@docs
 FactorPartition
+ObservedFactors
+ObservedMember
+ObservedStack
+ObservedBlock
+AppendedFactorModel
 ```
 
 ## Functions

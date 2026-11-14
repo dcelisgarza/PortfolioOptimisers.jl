@@ -167,7 +167,40 @@ function idio_predicted_volatility(vs::MatNum)
     return s
 end
 """
-    idio_row_moments(z::MatNum, t::Integer)
+$(DocStringExtensions.TYPEDEF)
+
+Holds the count and the three central moments of one cross-section of standardised idiosyncratic returns.
+
+This type is an implementation detail and is not intended for direct use. [`idio_row_moments`](@ref) makes it, and [`idio_calibration`](@ref), [`idio_kurtosis`](@ref) and [`idio_skewness`](@ref) read it. The three moments are numbers of one type, so a record names them where a plain tuple would let a swap pass silently.
+
+# Fields
+
+$(DocStringExtensions.FIELDS)
+
+# Related
+
+  - [`idio_row_moments`](@ref)
+"""
+@concrete struct RowMoments
+    """
+    `n`: Number of assets at which the standardised return is finite.
+    """
+    n
+    """
+    `m2`: Second central moment, or `NaN` when `n` is zero.
+    """
+    m2
+    """
+    `m3`: Third central moment, or `NaN` when `n` is zero.
+    """
+    m3
+    """
+    `m4`: Fourth central moment, or `NaN` when `n` is zero.
+    """
+    m4
+end
+"""
+    idio_row_moments(z::MatNum, t::Integer) -> RowMoments
 
 Return the count and the three central moments of one cross-section of standardised idiosyncratic returns.
 
@@ -206,18 +239,16 @@ A cross-section whose finite entries are all equal has ``m_{pt} = 0`` for every 
 
 # Returns
 
-  - `n::Int`: Number of assets at which the standardised return is finite.
-  - `m2::Real`: Second central moment, or `NaN` when `n` is zero.
-  - `m3::Real`: Third central moment, or `NaN` when `n` is zero.
-  - `m4::Real`: Fourth central moment, or `NaN` when `n` is zero.
+  - `m::RowMoments`: The count `n` and the moments `m2`, `m3` and `m4`, as [`RowMoments`](@ref) states them. `n` is an `Int`, and each moment is `NaN` when `n` is zero.
 
 # Related
 
+  - [`RowMoments`](@ref)
   - [`idio_calibration`](@ref)
   - [`idio_kurtosis`](@ref)
   - [`idio_skewness`](@ref)
 """
-function idio_row_moments(z::MatNum, t::Integer)
+function idio_row_moments(z::MatNum, t::Integer)::RowMoments
     Tf = real(eltype(z))
     N = size(z, 2)
     n = 0
@@ -235,7 +266,7 @@ function idio_row_moments(z::MatNum, t::Integer)
         end
     end
     if n == 0
-        return (; n = n, m2 = Tf(NaN), m3 = Tf(NaN), m4 = Tf(NaN))
+        return RowMoments(n, Tf(NaN), Tf(NaN), Tf(NaN))
     end
     m = clamp(s / n, lo, hi)
     m2 = zero(Tf)
@@ -251,7 +282,7 @@ function idio_row_moments(z::MatNum, t::Integer)
             m4 += d2 * d2
         end
     end
-    return (; n = n, m2 = m2 / n, m3 = m3 / n, m4 = m4 / n)
+    return RowMoments(n, m2 / n, m3 / n, m4 / n)
 end
 """
     idio_calibration(z::MatNum) -> Vector{<:Real}

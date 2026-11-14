@@ -340,8 +340,54 @@ function forecast_summary_scored(fe::ForecastEvaluationResult, u::MatNum)
     return n
 end
 """
+$(DocStringExtensions.TYPEDEF)
+
+Holds the seven coverage figures of one evaluation in a summary.
+
+This type is an implementation detail and is not intended for direct use. [`forecast_summary_coverage`](@ref) makes it, and [`forecast_evaluation_summary`](@ref) reads it through [`forecast_summary_row`](@ref).
+
+# Fields
+
+$(DocStringExtensions.FIELDS)
+
+# Related
+
+  - [`forecast_summary_coverage`](@ref)
+  - [`forecast_summary_row`](@ref)
+"""
+@concrete struct CoverageFigures
+    """
+    `mean_coverage`: The mean share of the universe that the evaluation scored, over the dates with a finite coverage.
+    """
+    mean_coverage
+    """
+    `min_coverage`: The least share over the same dates.
+    """
+    min_coverage
+    """
+    `mean_n_scored`: The mean count of scored assets over the evaluation dates.
+    """
+    mean_n_scored
+    """
+    `min_n_scored`: The least count of scored assets over the evaluation dates.
+    """
+    min_n_scored
+    """
+    `n_silenced`: The number of silenced dates.
+    """
+    n_silenced
+    """
+    `mean_coverage_scored`: The mean share over the scored dates.
+    """
+    mean_coverage_scored
+    """
+    `min_coverage_scored`: The least share over the scored dates.
+    """
+    min_coverage_scored
+end
+"""
     forecast_summary_coverage(fe::ForecastEvaluationResult,
-                              w::Option{<:MatNum}) -> NamedTuple
+                              w::Option{<:MatNum}) -> CoverageFigures
 
 Return the seven coverage figures of one evaluation in a summary.
 
@@ -386,10 +432,11 @@ Where:
 
 # Returns
 
-  - `cov::NamedTuple`: `(; mean_coverage, min_coverage, mean_n_scored, min_n_scored, n_silenced, mean_coverage_scored, min_coverage_scored)`, which are ``\\bar{c}``, ``c_{\\min}``, ``\\bar{n}``, ``n_{\\min}``, ``J_{0}``, ``\\bar{c}_{s}`` and ``c_{s, \\min}``. The four shares are `NaN` when no date has a finite coverage, the two shares over the scored dates are `NaN` when no date scored an asset, and the two counts of scored assets are `NaN` when the evaluation carries no date, while `n_silenced` is then `0`.
+  - `cov::CoverageFigures`: The fields `mean_coverage`, `min_coverage`, `mean_n_scored`, `min_n_scored`, `n_silenced`, `mean_coverage_scored` and `min_coverage_scored` of a [`CoverageFigures`](@ref), which are ``\\bar{c}``, ``c_{\\min}``, ``\\bar{n}``, ``n_{\\min}``, ``J_{0}``, ``\\bar{c}_{s}`` and ``c_{s, \\min}``. The four shares are `NaN` when no date has a finite coverage, the two shares over the scored dates are `NaN` when no date scored an asset, and the two counts of scored assets are `NaN` when the evaluation carries no date, while `n_silenced` is then `0`.
 
 # Related
 
+  - [`CoverageFigures`](@ref)
   - [`forecast_evaluation_summary`](@ref)
   - [`forecast_summary_scored`](@ref)
   - [`forecast_coverage`](@ref)
@@ -401,21 +448,59 @@ function forecast_summary_coverage(fe::ForecastEvaluationResult, w::Option{<:Mat
     Tf = eltype(n)
     fc = c[isfinite.(c)]
     sc = fc[fc .> zero(Tf)]
-    return (; mean_coverage = isempty(fc) ? Tf(NaN) : Tf(sum(fc) / length(fc)),
-            min_coverage = isempty(fc) ? Tf(NaN) : Tf(minimum(fc)),
-            mean_n_scored = isempty(n) ? Tf(NaN) : sum(n) / length(n),
-            min_n_scored = isempty(n) ? Tf(NaN) : minimum(n),
-            n_silenced = length(fc) - length(sc),
-            mean_coverage_scored = isempty(sc) ? Tf(NaN) : Tf(sum(sc) / length(sc)),
-            min_coverage_scored = isempty(sc) ? Tf(NaN) : Tf(minimum(sc)))
+    return CoverageFigures(isempty(fc) ? Tf(NaN) : Tf(sum(fc) / length(fc)),
+                           isempty(fc) ? Tf(NaN) : Tf(minimum(fc)),
+                           isempty(n) ? Tf(NaN) : sum(n) / length(n),
+                           isempty(n) ? Tf(NaN) : minimum(n), length(fc) - length(sc),
+                           isempty(sc) ? Tf(NaN) : Tf(sum(sc) / length(sc)),
+                           isempty(sc) ? Tf(NaN) : Tf(minimum(sc)))
+end
+"""
+$(DocStringExtensions.TYPEDEF)
+
+Holds the five parts that one evaluation contributes to a summary.
+
+This type is an implementation detail and is not intended for direct use. [`forecast_summary_row`](@ref) makes it, and [`forecast_evaluation_summary`](@ref) reads the thirty-nine columns of a [`ForecastSummaryResult`](@ref) from it. The two books have one type, so a record names them where a plain tuple would let a swap pass silently.
+
+# Fields
+
+$(DocStringExtensions.FIELDS)
+
+# Related
+
+  - [`forecast_summary_row`](@ref)
+  - [`forecast_evaluation_summary`](@ref)
+  - [`CoverageFigures`](@ref)
+"""
+@concrete struct SummaryRowParts
+    """
+    `ic`: The [`ForecastICSummaryResult`](@ref) of the evaluation.
+    """
+    ic
+    """
+    `rank`: The [`ForecastPortfolioResult`](@ref) of the rank book.
+    """
+    rank
+    """
+    `zscore`: The [`ForecastPortfolioResult`](@ref) of the z-score book.
+    """
+    zscore
+    """
+    `calibration`: The [`ForecastCalibrationResult`](@ref) of the evaluation.
+    """
+    calibration
+    """
+    `coverage`: The [`CoverageFigures`](@ref) of the evaluation.
+    """
+    coverage
 end
 """
     forecast_summary_row(fe::ForecastEvaluationResult, w::Option{<:MatNum},
-                         bins::Integer) -> NamedTuple
+                         bins::Integer, mt::AbstractMeanTestEstimator) -> SummaryRowParts
 
-Return the thirty-nine figures of one evaluation in a summary.
+Return the five parts of one evaluation in a summary.
 
-The row computes no statistic of its own. It reads the sixteen information-coefficient figures from [`forecast_ic_summary`](@ref), five figures of each of the two books from [`forecast_portfolio`](@ref), six calibration figures from [`forecast_calibration`](@ref), and the seven figures of the sample from [`forecast_summary_coverage`](@ref).
+The row computes no statistic of its own. It holds the [`ForecastICSummaryResult`](@ref) of [`forecast_ic_summary`](@ref), the two [`ForecastPortfolioResult`](@ref)s of [`forecast_portfolio`](@ref), the [`ForecastCalibrationResult`](@ref) of [`forecast_calibration`](@ref), and the [`CoverageFigures`](@ref) of [`forecast_summary_coverage`](@ref). [`forecast_evaluation_summary`](@ref) reads the thirty-nine columns of the summary from these parts: sixteen information-coefficient figures, five figures of each of the two books, six calibration figures and seven figures of the sample.
 
 Each book reports `ann_return`, `ann_volatility` and `sharpe` from the [`PerformanceSummaryResult`](@ref) it carries, with its hit rate and its mean turnover beside them. None of the three reads the order of the returns. The row leaves out the other figures of that summary, and a caller reads them from `forecast_portfolio(fe; kind = …).summary`. Two of them, `max_drawdown` and `calmar`, read the path, and [`forecast_portfolio`](@ref) summarises the compressed path, which joins the date before a gap to the date after it. When the gaps of two forecasts fall on different dates, their drawdowns are of two different paths.
 
@@ -427,7 +512,7 @@ The threshold is the one that the evaluation carries, and the row takes no keywo
  2. Score the rank book and the z-score book with [`forecast_portfolio`](@ref), giving `rk` and `zs`.
  3. Read the calibration at `bins` bins with [`forecast_calibration`](@ref), giving `cb`.
  4. Read the seven coverage figures with [`forecast_summary_coverage`](@ref), giving `cv`.
- 5. Collect the thirty-nine figures into one named tuple.
+ 5. Collect `ic`, `rk`, `zs`, `cb` and `cv` into a [`SummaryRowParts`](@ref).
 
 # Arguments
 
@@ -442,10 +527,11 @@ The threshold is the one that the evaluation carries, and the row takes no keywo
 
 # Returns
 
-  - `row::NamedTuple`: The thirty-nine columns that [`ForecastSummaryResult`](@ref) documents, as scalars.
+  - `row::SummaryRowParts`: The fields `ic`, `rank`, `zscore`, `calibration` and `coverage` of a [`SummaryRowParts`](@ref). Together they hold the thirty-nine columns that [`ForecastSummaryResult`](@ref) documents.
 
 # Related
 
+  - [`SummaryRowParts`](@ref)
   - [`forecast_evaluation_summary`](@ref)
   - [`ForecastSummaryResult`](@ref)
   - [`forecast_ic_summary`](@ref)
@@ -461,30 +547,7 @@ function forecast_summary_row(fe::ForecastEvaluationResult, w::Option{<:MatNum},
     zs = forecast_portfolio(fe; kind = :zscore)
     cb = forecast_calibration(fe, w; bins = bins)
     cv = forecast_summary_coverage(fe, w)
-    return (; spearman_mean_ic = ic.spearman.mean_ic, spearman_std_ic = ic.spearman.std_ic,
-            spearman_ic_ir = ic.spearman.ic_ir, spearman_t_stat = ic.spearman.t_stat,
-            spearman_p_value = ic.spearman.p_value,
-            spearman_mean_ci_lower = ic.spearman.mean_ci_lower,
-            spearman_mean_ci_upper = ic.spearman.mean_ci_upper,
-            spearman_hit_rate = ic.spearman.hit_rate, pearson_mean_ic = ic.pearson.mean_ic,
-            pearson_std_ic = ic.pearson.std_ic, pearson_ic_ir = ic.pearson.ic_ir,
-            pearson_t_stat = ic.pearson.t_stat, pearson_p_value = ic.pearson.p_value,
-            pearson_mean_ci_lower = ic.pearson.mean_ci_lower,
-            pearson_mean_ci_upper = ic.pearson.mean_ci_upper,
-            pearson_hit_rate = ic.pearson.hit_rate, rank_ann_return = rk.summary.ann_return,
-            rank_ann_volatility = rk.summary.ann_volatility,
-            rank_sharpe = rk.summary.sharpe, rank_hit_rate = rk.hit_rate,
-            rank_mean_turnover = rk.mean_turnover,
-            zscore_ann_return = zs.summary.ann_return,
-            zscore_ann_volatility = zs.summary.ann_volatility,
-            zscore_sharpe = zs.summary.sharpe, zscore_hit_rate = zs.hit_rate,
-            zscore_mean_turnover = zs.mean_turnover, calibration_slope = cb.slope,
-            mean_alpha = cb.mean_alpha, std_alpha = cb.std_alpha, mean_y = cb.mean_y,
-            std_y = cb.std_y, n_bins = cb.n_bins, mean_coverage = cv.mean_coverage,
-            min_coverage = cv.min_coverage, mean_n_scored = cv.mean_n_scored,
-            min_n_scored = cv.min_n_scored, n_silenced = cv.n_silenced,
-            mean_coverage_scored = cv.mean_coverage_scored,
-            min_coverage_scored = cv.min_coverage_scored)
+    return SummaryRowParts(ic, rk, zs, cb, cv)
 end
 """
     forecast_summary_spreads(fes::AbstractVector{<:ForecastEvaluationResult},
@@ -1083,9 +1146,9 @@ A weighting reaches the summary in one of two forms, as it reaches every other b
  1. Under `align = true`, put the evaluations on the grid they share with [`forecast_evaluation_align`](@ref).
  2. Under `paired = true`, refuse a set of evaluations that are not comparable, with [`forecast_summary_assert_comparable`](@ref).
  3. Resolve the names axis with [`forecast_summary_names`](@ref).
- 4. Read the thirty-nine core figures of each evaluation with [`forecast_summary_row`](@ref).
+ 4. Read the parts of each evaluation with [`forecast_summary_row`](@ref).
  5. Read the quantile-spread block with [`forecast_summary_spreads`](@ref), which returns `nothing` when the caller asks for no quantile.
- 6. Collect the rows into columns and build a [`ForecastSummaryResult`](@ref), with the `ppy` that the evaluations agree on, or the `ppy` of each evaluation under `paired = false`.
+ 6. Read the thirty-nine core columns from the parts of the rows, and build a [`ForecastSummaryResult`](@ref), with the `ppy` that the evaluations agree on, or the `ppy` of each evaluation under `paired = false`.
 
 # Arguments
 
@@ -1142,43 +1205,46 @@ function forecast_evaluation_summary(fes::AbstractVector{<:ForecastEvaluationRes
     rows = [forecast_summary_row(afes[i]::ForecastEvaluationResult, w, bins, mt)
             for i in eachindex(afes)]
     q, sm, sv, si, sh = forecast_summary_spreads(afes, quantiles)
-    return ForecastSummaryResult(nm, [r.spearman_mean_ic for r in rows],
-                                 [r.spearman_std_ic for r in rows],
-                                 [r.spearman_ic_ir for r in rows],
-                                 [r.spearman_t_stat for r in rows],
-                                 [r.spearman_p_value for r in rows],
-                                 [r.spearman_mean_ci_lower for r in rows],
-                                 [r.spearman_mean_ci_upper for r in rows],
-                                 [r.spearman_hit_rate for r in rows],
-                                 [r.pearson_mean_ic for r in rows],
-                                 [r.pearson_std_ic for r in rows],
-                                 [r.pearson_ic_ir for r in rows],
-                                 [r.pearson_t_stat for r in rows],
-                                 [r.pearson_p_value for r in rows],
-                                 [r.pearson_mean_ci_lower for r in rows],
-                                 [r.pearson_mean_ci_upper for r in rows],
-                                 [r.pearson_hit_rate for r in rows],
-                                 [r.rank_ann_return for r in rows],
-                                 [r.rank_ann_volatility for r in rows],
-                                 [r.rank_sharpe for r in rows],
-                                 [r.rank_hit_rate for r in rows],
-                                 [r.rank_mean_turnover for r in rows],
-                                 [r.zscore_ann_return for r in rows],
-                                 [r.zscore_ann_volatility for r in rows],
-                                 [r.zscore_sharpe for r in rows],
-                                 [r.zscore_hit_rate for r in rows],
-                                 [r.zscore_mean_turnover for r in rows],
-                                 [r.calibration_slope for r in rows],
-                                 [r.mean_alpha for r in rows], [r.std_alpha for r in rows],
-                                 [r.mean_y for r in rows], [r.std_y for r in rows],
-                                 [r.n_bins for r in rows], [r.mean_coverage for r in rows],
-                                 [r.min_coverage for r in rows],
-                                 [r.mean_n_scored for r in rows],
-                                 [r.min_n_scored for r in rows],
-                                 [r.n_silenced for r in rows],
-                                 [r.mean_coverage_scored for r in rows],
-                                 [r.min_coverage_scored for r in rows], q, sm, sv, si, sh,
-                                 paired ? first(afes).ppy : [fe.ppy for fe in afes])
+    return ForecastSummaryResult(nm, [r.ic.spearman.mean_ic for r in rows],
+                                 [r.ic.spearman.std_ic for r in rows],
+                                 [r.ic.spearman.ic_ir for r in rows],
+                                 [r.ic.spearman.t_stat for r in rows],
+                                 [r.ic.spearman.p_value for r in rows],
+                                 [r.ic.spearman.mean_ci_lower for r in rows],
+                                 [r.ic.spearman.mean_ci_upper for r in rows],
+                                 [r.ic.spearman.hit_rate for r in rows],
+                                 [r.ic.pearson.mean_ic for r in rows],
+                                 [r.ic.pearson.std_ic for r in rows],
+                                 [r.ic.pearson.ic_ir for r in rows],
+                                 [r.ic.pearson.t_stat for r in rows],
+                                 [r.ic.pearson.p_value for r in rows],
+                                 [r.ic.pearson.mean_ci_lower for r in rows],
+                                 [r.ic.pearson.mean_ci_upper for r in rows],
+                                 [r.ic.pearson.hit_rate for r in rows],
+                                 [r.rank.summary.ann_return for r in rows],
+                                 [r.rank.summary.ann_volatility for r in rows],
+                                 [r.rank.summary.sharpe for r in rows],
+                                 [r.rank.hit_rate for r in rows],
+                                 [r.rank.mean_turnover for r in rows],
+                                 [r.zscore.summary.ann_return for r in rows],
+                                 [r.zscore.summary.ann_volatility for r in rows],
+                                 [r.zscore.summary.sharpe for r in rows],
+                                 [r.zscore.hit_rate for r in rows],
+                                 [r.zscore.mean_turnover for r in rows],
+                                 [r.calibration.slope for r in rows],
+                                 [r.calibration.mean_alpha for r in rows],
+                                 [r.calibration.std_alpha for r in rows],
+                                 [r.calibration.mean_y for r in rows],
+                                 [r.calibration.std_y for r in rows],
+                                 [r.calibration.n_bins for r in rows],
+                                 [r.coverage.mean_coverage for r in rows],
+                                 [r.coverage.min_coverage for r in rows],
+                                 [r.coverage.mean_n_scored for r in rows],
+                                 [r.coverage.min_n_scored for r in rows],
+                                 [r.coverage.n_silenced for r in rows],
+                                 [r.coverage.mean_coverage_scored for r in rows],
+                                 [r.coverage.min_coverage_scored for r in rows], q, sm, sv,
+                                 si, sh, paired ? first(afes).ppy : [fe.ppy for fe in afes])
 end
 function forecast_evaluation_summary(fes::AbstractVector{<:ForecastEvaluationResult},
                                      csfm::CrossSectionalFactorModel;

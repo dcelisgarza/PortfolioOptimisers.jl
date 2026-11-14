@@ -1,8 +1,14 @@
 ```@meta
-Description = "Cross-Sectional Regression Diagnostics, private API of PortfolioOptimisers.jl: cs_estimation_mask_weights, cs_gram_from_weights, cs_gram_inverse_diagonal, …"
+Description = "Cross-Sectional Regression Diagnostics (a), private API of PortfolioOptimisers.jl: RegressionHistory, cs_estimation_mask_weights, cs_gram_from_weights, …"
 ```
 
-# Cross-Sectional Regression Diagnostics: private API
+# Cross-Sectional Regression Diagnostics (a): private API
+
+## Types
+
+```@docs
+RegressionHistory
+```
 
 ## Functions
 

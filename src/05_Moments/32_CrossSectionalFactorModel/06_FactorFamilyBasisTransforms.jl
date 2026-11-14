@@ -1046,8 +1046,36 @@ function unseen_member_change_at(P, t::Integer)
     return nothing
 end
 """
-    cs_dropped_design(B::Arr3Num, P, dc::Nothing)
-    cs_dropped_design(B::Arr3Num, P, dc::AbstractMatrix{Bool})
+$(DocStringExtensions.TYPEDEF)
+
+The exposures of a design and the changes that go with them, after the rules that change the design.
+
+This type is an implementation detail and is not intended for direct use. [`cs_dropped_design`](@ref) and [`cs_regression_design`](@ref) make it for the exposure history of a regression. [`attribution_dropped_observation`](@ref) makes it for one observation. [`cs_regression_t_stats`](@ref) reads it.
+
+# Fields
+
+$(DocStringExtensions.FIELDS)
+
+# Related
+
+  - [`cs_dropped_design`](@ref)
+  - [`cs_regression_design`](@ref)
+  - [`attribution_dropped_observation`](@ref)
+  - [`unseen_member_design`](@ref)
+"""
+@concrete struct ChangedDesign
+    """
+    `B`: The exposures of the design. An exposure history `assets × factors × observations`, or the exposures of one observation `assets × factors`.
+    """
+    B
+    """
+    `P`: The changes of the design. The `t => P_t` pairs of [`unseen_member_design`](@ref), or the change `P_t` of one observation, or `nothing` or `()` when there is none.
+    """
+    P
+end
+"""
+    cs_dropped_design(B::Arr3Num, P, dc::Nothing) -> ChangedDesign
+    cs_dropped_design(B::Arr3Num, P, dc::AbstractMatrix{Bool}) -> ChangedDesign
 
 Return the design and the changes that a diagnostic of the factor returns reads, after the columns that the fit dropped.
 
@@ -1061,21 +1089,22 @@ Under [`DependentColumnDrop`](@ref) the fit of an observation solves the columns
 
 # Returns
 
-  - `(; B, P)`: The design with a zero column at each dropped factor, and the composed changes. `B` and `P` themselves when the mask drops nothing.
+  - `dd::ChangedDesign`: The design with a zero column at each dropped factor, and the composed changes. `B` and `P` themselves when the mask drops nothing.
 
 # Related
 
+  - [`ChangedDesign`](@ref)
   - [`cs_regression_data`](@ref)
   - [`cs_dropped_change`](@ref)
   - [`cs_regression_t_stats`](@ref)
   - [`CrossSectionalRegression`](@ref)
 """
 function cs_dropped_design(B::Arr3Num, P, ::Nothing)
-    return (; B = B, P = P)
+    return ChangedDesign(B, P)
 end
 function cs_dropped_design(B::Arr3Num, P, dc::AbstractMatrix{Bool})
     if !any(dc)
-        return (; B = B, P = P)
+        return ChangedDesign(B, P)
     end
     K = size(B, 2)
     # A decomposition leaves a `Rational` type, as a square root does.
@@ -1092,7 +1121,7 @@ function cs_dropped_design(B::Arr3Num, P, dc::AbstractMatrix{Bool})
             push!(Pd, t => Pt)
         end
     end
-    return (; B = Bd, P = Pd)
+    return ChangedDesign(Bd, Pd)
 end
 """
     cs_dropped_change(Pt::Option{<:AbstractMatrix}, d::AbstractVector{Bool},

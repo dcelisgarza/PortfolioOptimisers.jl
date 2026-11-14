@@ -534,7 +534,7 @@ The returns-matrix method of [`prior`](@ref) fits `pe.pe` on the factor returns 
 
 # Returns
 
-  - `ca::NamedTuple`: The output of [`cross_sectional_observed_append`](@ref). `ca.f` holds the factor returns, one row per fitted observation.
+  - `ca::AppendedFactorModel`: The output of [`cross_sectional_observed_append`](@ref). `ca.f` holds the factor returns, one row per fitted observation.
   - `lv::BitVector`: `true` at each factor of `ca.f` that is not empty.
   - `fit::NamedTuple`: The regression, the weights, the variance history and the rows that [`cross_sectional_assemble`](@ref) reads.
   - `rde::ReturnsResult`: The returns data that the estimated members read.

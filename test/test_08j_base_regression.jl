@@ -1293,7 +1293,7 @@ end
 end
 
 #=
-Check `src/05_Moments/32_CrossSectionalFactorModel/01_CrossSectionalRegression.jl` against the mathematics its docstrings
+Check `src/05_Moments/32_CrossSectionalFactorModel/01_CrossSectionalRegression_a.jl` and `_b.jl` against the mathematics their docstrings
 state, and against the stored oracle of map #643. Issue #679.
 
 THREE FACTS SHAPE THE PROBES.

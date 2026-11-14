@@ -141,7 +141,8 @@ commit = "391be5e"
 "src/05_Moments/30_RegimeAdjusted/08_SeparatePortfolioBias.jl" = { lines = 84, misses = 0 }
 "src/05_Moments/30_RegimeAdjusted/09_MahalanobisLevelClosure.jl" = { lines = 244, misses = 0 }
 "src/05_Moments/31_HigherMomentPartialFit.jl" = { lines = 113, misses = 0 }
-"src/05_Moments/32_CrossSectionalFactorModel/01_CrossSectionalRegression.jl" = { lines = 271, misses = 0 }
+"src/05_Moments/32_CrossSectionalFactorModel/01_CrossSectionalRegression_a.jl" = { lines = 262, misses = 0 }
+"src/05_Moments/32_CrossSectionalFactorModel/01_CrossSectionalRegression_b.jl" = { lines = 18, misses = 0 }
 "src/05_Moments/32_CrossSectionalFactorModel/02_CrossSectionalWeights.jl" = { lines = 103, misses = 0 }
 "src/05_Moments/32_CrossSectionalFactorModel/03_CrossSectionalFactorModel.jl" = { lines = 184, misses = 0 }
 "src/05_Moments/32_CrossSectionalFactorModel/04_FactorExposures/01_Base_Descriptor.jl" = { lines = 150, misses = 0 }
@@ -176,7 +177,8 @@ commit = "391be5e"
 "src/05_Moments/32_CrossSectionalFactorModel/07_ReturnForecasts/13_ForecastCalibration.jl" = { lines = 72, misses = 0 }
 "src/05_Moments/32_CrossSectionalFactorModel/07_ReturnForecasts/14_ForecastSummary.jl" = { lines = 128, misses = 0 }
 "src/05_Moments/32_CrossSectionalFactorModel/07_ReturnForecasts/15_TargetReturnForecastStep.jl" = { lines = 102, misses = 2 }
-"src/05_Moments/32_CrossSectionalFactorModel/08_CrossSectionalRegressionDiagnostics.jl" = { lines = 358, misses = 0 }
+"src/05_Moments/32_CrossSectionalFactorModel/08_CrossSectionalRegressionDiagnostics_a.jl" = { lines = 335, misses = 0 }
+"src/05_Moments/32_CrossSectionalFactorModel/08_CrossSectionalRegressionDiagnostics_b.jl" = { lines = 23, misses = 0 }
 "src/05_Moments/32_CrossSectionalFactorModel/09_CrossSectionalExposureDiagnostics.jl" = { lines = 302, misses = 0 }
 "src/05_Moments/32_CrossSectionalFactorModel/10_FactorModelSummary.jl" = { lines = 175, misses = 0 }
 "src/05_Moments/32_CrossSectionalFactorModel/11_CrossSectionalIdiosyncraticDiagnostics.jl" = { lines = 189, misses = 0 }

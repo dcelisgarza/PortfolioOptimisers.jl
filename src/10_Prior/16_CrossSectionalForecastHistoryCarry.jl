@@ -456,10 +456,9 @@ function cross_sectional_carry_scores(pe::CrossSectionalFactorPrior,
         return cross_sectional_carry_with(st, (; fds = dc.xf))
     end
     P = descriptor_panel_scores(dc.xv, rdk)
-    Pn = map(A -> return_forecast_cut(A, (k - c + 1):k), P)
-    # The bound stops JET from pairing an untyped `st.fsc` with the `map` method of another
-    # package.
-    fsc = isnothing(st.fsc) ? Pn : map(cross_sectional_fold_append, st.fsc::NamedTuple, Pn)
+    # The bound keeps JET from pairing an untyped `st.fsc` with another append method.
+    fsc = cross_sectional_fold_append(st.fsc::Option{<:PanelScores},
+                                      return_forecast_cut(P, (k - c + 1):k))
     # The scores hold the rows of the histories and at most `a` rows before them, so the cut
     # drops rows of the warm-up alone, until the histories hold a row before the step.
     h = size(something(st.Ms, rows.Ms), 3) + a
@@ -545,10 +544,9 @@ function cross_sectional_carry_forecast(pe::CrossSectionalFactorPrior,
     H0, fs0 = iszero(k) ? (nothing, nothing) : (st.fh, st.fst)
     # The scores also hold the rows of the warm-up that `cross_sectional_forecast_lead` counts,
     # before the first row of the histories.
-    fsc::NamedTuple = st.fsc
+    fsc::PanelScores = st.fsc
     i = cross_sectional_forecast_rows(rfo, r, k, g, size(fsc.S, 3) - size(st.Ms, 3))
-    (; hist, fs) = return_forecast_step(rfo, map(A -> return_forecast_cut(A, i), fsc), csfm,
-                                        fs0,
+    (; hist, fs) = return_forecast_step(rfo, return_forecast_cut(fsc, i), csfm, fs0,
                                         orthogonal_forecast_regression(pe.ofit, pe.cre))
     # The new rows are the last rows of the history of the step.
     H = view(hist, (size(hist, 1) - length(r) + k + 1):size(hist, 1), :)

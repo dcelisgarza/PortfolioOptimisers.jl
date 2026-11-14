@@ -2516,7 +2516,7 @@ end
 
 @testset "the coverage error names an observed factor only where its return is NaN" begin
     PO = PortfolioOptimisers
-    cb = (; nf = ["mkt", "fx"], R = [0.1 NaN; 0.2 0.3])
+    cb = PO.ObservedBlock([0.1 NaN; 0.2 0.3], nothing, nothing, ["mkt", "fx"], nothing)
     @test PO.cross_sectional_observed_gap(cb, 2) == ""
     @test occursin("[\"fx\"]", PO.cross_sectional_observed_gap(cb, 1))
     @test PO.cross_sectional_observed_gap(nothing, 1) == ""
