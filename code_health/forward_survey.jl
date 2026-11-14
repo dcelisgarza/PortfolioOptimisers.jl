@@ -536,10 +536,6 @@ const RULED_REBUILDS = Dict{Tuple{Symbol, Symbol}, Tuple{String, String}}(#
                                                                            :ExposureICSummaryResult) =>
                                                                               (NO_REBUILD,
                                                                                "`s` is the `NamedTuple` of the matrix method (#2110)"),
-                                                                          (:cross_sectional_factor_sets,
-                                                                           :UniverseSets) =>
-                                                                              ("go",
-                                                                               "`us` is a `UniverseSets`, and the call changes `dict`: `rebuild_struct(us, (; dict = dict))` (rule 6, #2110)"),
                                                                           (:cross_sectional_benchmark_returns,
                                                                            :AssetPanel) =>
                                                                               ("go",

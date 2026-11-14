@@ -3,13 +3,13 @@
     validate_bounds(lb::VecNum, ub::Number) -> Nothing
     validate_bounds(lb::Number, ub::VecNum) -> Nothing
     validate_bounds(lb::VecNum, ub::VecNum) -> Nothing
-    validate_bounds(lb::VecNum, ::Any) -> Nothing
-    validate_bounds(::Any, ub::VecNum) -> Nothing
-    validate_bounds(args...) -> Nothing
+    validate_bounds(lb::VecNum, ::Nothing) -> Nothing
+    validate_bounds(::Nothing, ub::VecNum) -> Nothing
+    validate_bounds(lb::Option{<:Num_VecNum}, ub::Option{<:Num_VecNum}) -> Nothing
 
 Check that a lower bound does not exceed the corresponding upper bound.
 
-The pair of argument types selects one of seven methods, and that method alone decides which preconditions run. Two of the seven take a `nothing` on one side. They check that the vector side is not empty, and they do not compare the two sides. The last method takes every other pair and checks nothing. It accepts `(nothing, nothing)`, `(::Number, nothing)` and `(nothing, ::Number)` with no comparison.
+The pair of argument types selects one of seven methods, and that method alone decides which preconditions run. Two of the seven take a `nothing` on one side. They check that the vector side is not empty, and they do not compare the two sides. The last method is the no-op of the value check on the set that reaches it, and it checks nothing. It accepts `(nothing, nothing)`, `(::Number, nothing)` and `(nothing, ::Number)` with no comparison. Any other type or arity is a `MethodError`.
 
 # Arguments
 
@@ -24,9 +24,9 @@ Each bullet names the method that does the check, the condition that the method 
   - `(VecNum, Number)`: `!isempty(lb)`, `IsEmptyError` otherwise. Every entry of `lb` is at most `ub`, `DomainError` otherwise.
   - `(Number, VecNum)`: `!isempty(ub)`, `IsEmptyError` otherwise. Every entry of `ub` is at least `lb`, `DomainError` otherwise.
   - `(VecNum, VecNum)`: `!isempty(lb)` and `!isempty(ub)`, `IsEmptyError` otherwise. `length(lb) == length(ub)`, `DimensionMismatch` otherwise. Entry by entry, `lb` is at most `ub`, `DomainError` otherwise. The length check runs first, so the entry-by-entry comparison never reads a truncated pair.
-  - `(VecNum, Any)`: `!isempty(lb)`, `IsEmptyError` otherwise. This method takes the `(vector, nothing)` pair, so it does not compare the two sides.
-  - `(Any, VecNum)`: `!isempty(ub)`, `IsEmptyError` otherwise. This method takes the `(nothing, vector)` pair, so it does not compare the two sides.
-  - `(args...)`: no precondition and no raise. This method takes every other pair. The two bound types reach it with `(nothing, nothing)`, `(::Number, nothing)` and `(nothing, ::Number)`.
+  - `(VecNum, Nothing)`: `!isempty(lb)`, `IsEmptyError` otherwise. This method takes the `(vector, nothing)` pair, so it does not compare the two sides.
+  - `(Nothing, VecNum)`: `!isempty(ub)`, `IsEmptyError` otherwise. This method takes the `(nothing, vector)` pair, so it does not compare the two sides.
+  - `(Option{<:Num_VecNum}, Option{<:Num_VecNum})`: no precondition and no raise. This method takes every other pair of the two bound types: `(nothing, nothing)`, `(::Number, nothing)` and `(nothing, ::Number)`.
 
 # Returns
 
@@ -77,15 +77,15 @@ function validate_bounds(lb::VecNum, ub::VecNum)::Nothing
                           "`lb` and `ub` disagree at $(count(map((x, y) -> !(x <= y), lb, ub))) entries. A lower bound is at most its upper bound, so `lb[i] <= ub[i]` must hold at every `i`."))
     return nothing
 end
-function validate_bounds(lb::VecNum, ::Any)::Nothing
+function validate_bounds(lb::VecNum, ::Nothing)::Nothing
     @argcheck(!isempty(lb), IsEmptyError("lb cannot be empty"))
     return nothing
 end
-function validate_bounds(::Any, ub::VecNum)::Nothing
+function validate_bounds(::Nothing, ub::VecNum)::Nothing
     @argcheck(!isempty(ub), IsEmptyError("ub cannot be empty"))
     return nothing
 end
-function validate_bounds(args...)::Nothing
+function validate_bounds(::Option{<:Num_VecNum}, ::Option{<:Num_VecNum})::Nothing
     return nothing
 end
 """

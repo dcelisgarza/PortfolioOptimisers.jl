@@ -4607,8 +4607,9 @@ end
     #=
     `validate_length_integer_phylogeny_constraint_B` has four methods across two names,
     and only the `ClustersEstimator` one does anything. A `NetworkEstimator` reaches the
-    fallback and passes at any length, and so does the DEFAULT `OptimalNumberClusters()`,
-    whose `max_k` is `nothing` and whose `alg` is a `SecondOrderDifference` rather than an
+    no-op method on `NwE_ClE` and passes at any length, and so does the DEFAULT
+    `OptimalNumberClusters()`, whose `max_k` is `nothing` and whose `alg` is a
+    `SecondOrderDifference` rather than an
     integer. Measured under issue #516.
     =#
     V = PortfolioOptimisers.validate_length_integer_phylogeny_constraint_B
@@ -4630,7 +4631,13 @@ end
     @test isnothing(V(dflt, collect(1:50)))
     # Every guard is a no-op for a network source, the commonest one.
     @test isnothing(V(NetworkEstimator(), collect(1:99)))
-    @test isnothing(_V(nothing, collect(1:99)))
+    @test isnothing(_V(SecondOrderDifference(), collect(1:99)))
+    # The value checks close on the set that reaches them: any other type or arity has no
+    # rule (#2108, #2096).
+    @test_throws MethodError _V(nothing, collect(1:99))
+    @test_throws MethodError _V(4)
+    @test_throws MethodError V(nothing, collect(1:99))
+    @test_throws MethodError V(NetworkEstimator())
 end
 @testset "`phylogeny_constraints` passes a result through and keeps a vector in order" begin
     using PortfolioOptimisers, Test, StableRNGs

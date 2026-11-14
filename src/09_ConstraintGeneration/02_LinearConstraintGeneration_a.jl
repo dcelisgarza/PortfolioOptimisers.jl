@@ -813,7 +813,7 @@ An empty `ni` returns `sets` unchanged. No asset left the universe, and an empty
 # Algorithm
 
  1. Return `sets` unchanged when `ni` is empty.
- 2. Otherwise copy `sets.dict`, write `ni` under `sets.nikey`, and rebuild the [`UniverseSets`](@ref) from it and the seven unchanged key prefixes, which revalidates uniqueness and disjointness over the minted axis.
+ 2. Otherwise copy `sets.dict`, write `ni` under `sets.nikey`, and rebuild the [`UniverseSets`](@ref) from it and the seven unchanged key prefixes with [`rebuild_struct`](@ref). The keyword constructor revalidates uniqueness and disjointness over the minted axis.
 
 # Arguments
 
@@ -841,9 +841,7 @@ function non_investable_sets(sets::UniverseSets, ni::VecStr)::UniverseSets
     end
     dict = copy(sets.dict)
     dict[sets.nikey] = ni
-    return UniverseSets(; xkey = sets.xkey, uxkey = sets.uxkey, tfkey = sets.tfkey,
-                        utfkey = sets.utfkey, cfkey = sets.cfkey, ucfkey = sets.ucfkey,
-                        nikey = sets.nikey, dict = dict)
+    return rebuild_struct(sets, (; dict = dict))
 end
 """
     non_investable_names(nx::Nothing, imsk::BitVector) -> VecStr

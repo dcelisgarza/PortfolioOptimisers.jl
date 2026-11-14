@@ -3393,8 +3393,8 @@ end
 
     #=
     Seven methods, and the pair of argument types alone decides which one runs. Two of the
-    seven exist to catch a `nothing` on one side, and the catch-all closes the family with no
-    check at all. Each block below selects one method and drives its raises.
+    seven exist to catch a `nothing` on one side, and a no-op on the two bound types closes
+    the family with no check at all. Each block below selects one method and drives its raises.
     =#
     vb = PortfolioOptimisers.validate_bounds
 
@@ -3424,17 +3424,24 @@ end
         @test_throws DomainError vb([0.1, 0.9], [0.3, 0.5])
     end
 
-    @testset "(VecNum, Any) and (Any, VecNum)" begin
+    @testset "(VecNum, Nothing) and (Nothing, VecNum)" begin
         @test isnothing(vb([0.1, 0.2], nothing))
         @test isnothing(vb(nothing, [0.1, 0.2]))
         @test_throws PortfolioOptimisers.IsEmptyError vb(Float64[], nothing)
         @test_throws PortfolioOptimisers.IsEmptyError vb(nothing, Float64[])
     end
 
-    @testset "the catch-all checks nothing" begin
+    @testset "the no-op on the two bound types checks nothing" begin
         @test isnothing(vb(nothing, nothing))
         @test isnothing(vb(0.9, nothing))
         @test isnothing(vb(nothing, 0.1))
+        # The value check closes on the set that reaches it: any other type or arity has no
+        # rule (#2108, #2096).
+        @test_throws MethodError vb()
+        @test_throws MethodError vb(0.1)
+        @test_throws MethodError vb(0.1, 0.2, 0.3)
+        @test_throws MethodError vb("a", nothing)
+        @test_throws MethodError vb([0.1], "b")
     end
 
     @testset "the estimator route validates the resolved pair" begin

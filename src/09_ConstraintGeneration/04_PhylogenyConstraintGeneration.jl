@@ -338,18 +338,18 @@ function SemiDefinitePhylogeny(; A::MatNum_PhRMatNum,
 end
 """
     _validate_length_integer_phylogeny_constraint_B(alg::Integer, B::VecNum)
-    _validate_length_integer_phylogeny_constraint_B(args...)
+    _validate_length_integer_phylogeny_constraint_B(alg::Int_ONC, B::VecNum)
 
 Check the length of `B` against an integer cluster count `alg`.
 
-The fallback method takes every other argument list and checks nothing, so a clustering algorithm that is not an integer count puts no bound on `B`. The default [`OptimalNumberClusters`](@ref) holds a [`SecondOrderDifference`](@ref), so this check does nothing for it.
+The method on [`Int_ONC`](@ref) is the no-op of the value check on the set that reaches it. An algorithm that chooses the number of clusters fixes no count to check, so it puts no bound on `B`. The default [`OptimalNumberClusters`](@ref) holds a [`SecondOrderDifference`](@ref), so this check does nothing for it. Any other type or arity is a `MethodError`.
 
 # Arguments
 
   - `alg`: The number of clusters that the source returns.
 
       + `Integer`: Bounds `length(B)`.
-      + Any other type: The function checks nothing.
+      + `AbstractOptimalNumberClustersAlgorithm`: The function checks nothing.
 
   - `B`: The vector of bounds, one per row.
 
@@ -372,22 +372,21 @@ function _validate_length_integer_phylogeny_constraint_B(alg::Integer, B::VecNum
                           "`B` holds $(length(B)) entries, and `alg` fixes $alg clusters. Each entry of `B` bounds one cluster, so `length(B) <= alg` must hold."))
     return nothing
 end
-function _validate_length_integer_phylogeny_constraint_B(args...)::Nothing
+function _validate_length_integer_phylogeny_constraint_B(::Int_ONC, ::VecNum)::Nothing
     return nothing
 end
 """
     validate_length_integer_phylogeny_constraint_B(cle::ClustersEstimator, B::VecNum)
-    validate_length_integer_phylogeny_constraint_B(args...)
+    validate_length_integer_phylogeny_constraint_B(cle::NwE_ClE, B::VecNum)
 
 Check the length of `B` against the number of clusters that the estimator `cle` can return.
 
-Only the [`ClustersEstimator`](@ref) method checks `B`. Every other argument list goes to the fallback, which checks nothing. A [`NetworkEstimator`](@ref) goes there too, so this function does not check the default source of an [`IntegerPhylogenyEstimator`](@ref). The row count of a network is known only after [`phylogeny_matrix`](@ref) runs, and the constructor of [`IntegerPhylogeny`](@ref) checks the length then.
+Only the [`ClustersEstimator`](@ref) method checks `B`. The method on [`NwE_ClE`](@ref) is the no-op of the value check on the set that reaches it, and it checks nothing. A [`NetworkEstimator`](@ref) goes there, so this function does not check the default source of an [`IntegerPhylogenyEstimator`](@ref). A network estimator fixes no count of clusters. The row count of a network is known only after [`phylogeny_matrix`](@ref) runs, and the constructor of [`IntegerPhylogeny`](@ref) checks the length then. Any other type or arity is a `MethodError`.
 
 # Arguments
 
-  - `cle`: The clustering estimator whose `onc` field states the number of clusters.
+  - `cle`: The source of the relatedness matrix. The [`ClustersEstimator`](@ref) method reads its `onc` field, which states the number of clusters. The method on [`NwE_ClE`](@ref) ignores it.
   - `B`: The vector of bounds, one per row.
-  - `args...`: Any other arguments. The fallback checks nothing.
 
 # Validation
 
@@ -413,7 +412,7 @@ function validate_length_integer_phylogeny_constraint_B(cle::ClustersEstimator, 
     _validate_length_integer_phylogeny_constraint_B(cle.onc.alg, B)
     return nothing
 end
-function validate_length_integer_phylogeny_constraint_B(args...)
+function validate_length_integer_phylogeny_constraint_B(::NwE_ClE, ::VecNum)
     return nothing
 end
 """

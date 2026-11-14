@@ -255,7 +255,9 @@ end
                                                         (:factory, :rebuild_struct) => "(interface) the weights methods of `GeneralisedLinearModel` and `ElasticNet` rebuild the estimator, and 70 functions share the callee `rebuild_struct` (rule 3, rule 6, #2092). The pair, not the name, is kept, because other pairs of `factory` are still pending",
                                                         (:variance_series, :variance_series) => "(default) a walk owns its leaf: the windowed methods recurse on the inner estimator, so the 2-argument fallback converts its call to the expanding window, which no caller can pass (#2116, #2092)",
                                                         (:effective_observation_count, :observation_count) => "(interface) `observation_count` walks the composites by their fields, so its composites call it: it is a function of its own, not a worker of `effective_observation_count` (#2116, #2092)",
-                                                        (:partial_fit, :partial_fit!) => "(b) a measured loss (rule 4): the overrides of `Coskewness` and `Cokurtosis` fold one row in 0.29 ms and 2.53 MiB, and 38.19 ms and 151.3 MiB, where the driver `partial_fit!(copy_states(est), x)` takes 0.34 ms and 2.75 MiB, and 38.20 ms and 157.7 MiB, at 30 assets (#2092)")
+                                                        (:partial_fit, :partial_fit!) => "(b) a measured loss (rule 4): the overrides of `Coskewness` and `Cokurtosis` fold one row in 0.29 ms and 2.53 MiB, and 38.19 ms and 151.3 MiB, where the driver `partial_fit!(copy_states(est), x)` takes 0.34 ms and 2.75 MiB, and 38.20 ms and 157.7 MiB, at 30 assets (#2092)",
+                                                        # src/09_ConstraintGeneration (#2096).
+                                                        (:rebase_linear_constraints, :project_linear_constraint) => "(interface) `project_linear_constraint` walks a `LinearConstraint` by its fields `ineq` and `eq`, so its composite method calls it: it is a function of its own, and its body does not move into `rebase_linear_constraints` (#2116, #2096)")
     # The functions whose forward methods are interface methods, with the check that shows
     # it. #2072 adds a name after a check of each one.
     interface_functions = Dict{Symbol, String}(#
@@ -458,8 +460,6 @@ end
                                                     :investable_mask),
                                                    (:prior_probability_factory, :factory),
                                                    (:project, :projection_programme),
-                                                   (:rebase_linear_constraints,
-                                                    :project_linear_constraint),
                                                    (:regression_factor_names,
                                                     :cs_diagnostic_factor_names),
                                                    (:report_risk_contribution,

@@ -992,7 +992,7 @@ The factor universe that a time-series regression is written on. A Universe Sets
 *Avoid*: "the factor axis" alone, which no longer names one list.
 
 **Cross-Sectional Factor Axis**
-The factor universe that a cross-sectional regression is written on. A Universe Sets declares it under `cfkey`. Its names are the Factor Exposures that the fit read. These names exist only inside the fitted block, so no returns result carries them. A consumer never picks between the two axes by hand. `factor_axis_key` reads the key from the loadings result that the consumer already holds.
+The factor universe that a cross-sectional regression is written on. A Universe Sets declares it under `cfkey`. Its names are the Factor Exposures that the fit read. These names exist only inside the fitted block, so no returns result carries them. `cross_sectional_factor_axis` gives the axis before any fit, as a `CrossSectionalFactorAxisResult` of the names and the Factor Family label of each name. A consumer never picks between the two axes by hand. `factor_axis_key` reads the key from the loadings result that the consumer already holds.
 *Avoid*: "the factor axis" alone, which no longer names one list.
 
 **Constraint Space**

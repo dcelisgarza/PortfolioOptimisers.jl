@@ -415,6 +415,24 @@ include(joinpath(@__DIR__, "test06c_setup.jl"))
         @test two.fam == ["style"]
     end
 
+    @testset "The axis is a Result that checks its two lists (#2113, #2096)" begin
+        ax = PO.cross_sectional_factor_axis(factors, rd)
+        @test ax isa CrossSectionalFactorAxisResult
+        @test ax isa PO.AbstractResult
+        @test :CrossSectionalFactorAxisResult in names(PortfolioOptimisers)
+        # A caller that destructures by name reads the same two lists.
+        (; nf, fam) = ax
+        @test (nf, fam) == (ax.nf, ax.fam)
+        # The migration page states that the named tuple's `keys` is gone.
+        @test_throws MethodError keys(ax)
+        kw = CrossSectionalFactorAxisResult(; nf = ["a", "b"], fam = ["s", "s"])
+        @test (kw.nf, kw.fam) == (["a", "b"], ["s", "s"])
+        @test_throws DimensionMismatch CrossSectionalFactorAxisResult(["a", "b"], ["s"])
+        @test_throws ArgumentError CrossSectionalFactorAxisResult(["a", "a"], ["s", "s"])
+        @test occursin("CrossSectionalFactorAxisResult",
+                       sprint(show, MIME("text/plain"), ax))
+    end
+
     @testset "The axis refuses an empty list and a repeated name" begin
         @test_throws PortfolioOptimisers.IsEmptyError PO.cross_sectional_factor_axis(Pair[],
                                                                                      rd)
@@ -516,7 +534,8 @@ include(joinpath(@__DIR__, "test06c_setup.jl"))
         @test :cross_sectional_factor_axis in names(PortfolioOptimisers)
         @test :cross_sectional_factor_sets in names(PortfolioOptimisers)
         ax = cross_sectional_factor_axis(pe, rd)
-        @test ax == PO.cross_sectional_factor_axis(factors, rd)
+        ref_ax = PO.cross_sectional_factor_axis(factors, rd)
+        @test (ax.nf, ax.fam) == (ref_ax.nf, ref_ax.fam)
         @test ax.nf == ["market", "size", "industry=Real Estate", "industry=Software",
                         "industry=Banks"]
         sets = cross_sectional_factor_sets(pe, rd)
@@ -549,9 +568,10 @@ include(joinpath(@__DIR__, "test06c_setup.jl"))
         @test length(ax.nf) == 2 + length(lv) == 5
         # The levels are the ones the Panel Field declares, so a fold over fewer
         # observations and fewer assets reads the same axis.
-        @test PO.cross_sectional_factor_axis(factors, PO.port_opt_view(rd, 1:10, :)) == ax
-        @test PO.cross_sectional_factor_axis(factors, PO.port_opt_view(rd, 11:30, 1:4)) ==
-              ax
+        for rdv in (PO.port_opt_view(rd, 1:10, :), PO.port_opt_view(rd, 11:30, 1:4))
+            axv = PO.cross_sectional_factor_axis(factors, rdv)
+            @test (axv.nf, axv.fam) == (ax.nf, ax.fam)
+        end
         # `cross_sectional_factor_sets`: a new sets takes the default key prefixes of
         # `UniverseSets`, and it equals the widening of the bare default universe.
         dflt = UniverseSets(; dict = Dict{String, Any}("nx" => rd.nx))

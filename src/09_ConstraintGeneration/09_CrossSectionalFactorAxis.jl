@@ -37,6 +37,70 @@ function exposure_axis_names(::AbstractString, xe::CurrencyExposure, rd::Returns
     return nf, fill(String(xe.family), length(nf))
 end
 """
+$(DocStringExtensions.TYPEDEF)
+
+The Cross-Sectional Factor Axis that a set of Factor Exposures produces, before any fit.
+
+[`cross_sectional_factor_axis`](@ref) returns it. It holds the name of each factor and the Factor Family label of each name, in the column order of the exposures. The fitted [`CrossSectionalFactorModel`](@ref) stores the same two lists in its `nf` and `fam`.
+
+# Fields
+
+$(DocStringExtensions.FIELDS)
+
+# Constructors
+
+    CrossSectionalFactorAxisResult(nf::VecStr, fam::VecStr) -> CrossSectionalFactorAxisResult
+    CrossSectionalFactorAxisResult(; nf::VecStr, fam::VecStr) -> CrossSectionalFactorAxisResult
+
+Keywords correspond to the struct's fields. The keyword form calls the positional form, so the two forms run the same checks.
+
+## Validation
+
+  - `length(nf) == length(fam)`. Raises a `DimensionMismatch` otherwise.
+  - `nf` repeats no name. Raises an `ArgumentError` otherwise.
+
+# Examples
+
+```jldoctest
+julia> ax = CrossSectionalFactorAxisResult(; nf = [\"market\", \"value\", \"size\"],
+                                           fam = [\"market\", \"style\", \"style\"]);
+
+julia> ax.fam
+3-element Vector{String}:
+ "market"
+ "style"
+ "style"
+```
+
+# Related
+
+  - [`cross_sectional_factor_axis`](@ref)
+  - [`cross_sectional_factor_sets`](@ref)
+  - [`CrossSectionalFactorModel`](@ref)
+"""
+@concrete struct CrossSectionalFactorAxisResult <: AbstractResult
+    """
+    The raw name of each factor, in the column order of the exposures. A one-hot member gives one name for each level of its Panel Field.
+    """
+    nf
+    """
+    The Factor Family label of each name in `nf`, in the same order.
+    """
+    fam
+    function CrossSectionalFactorAxisResult(nf::VecStr,
+                                            fam::VecStr)::CrossSectionalFactorAxisResult
+        @argcheck(length(nf) == length(fam),
+                  DimensionMismatch("fam ($(length(fam))) must have one label for each factor name in nf ($(length(nf)))"))
+        @argcheck(allunique(nf),
+                  ArgumentError("the cross-sectional factor axis repeats a name. Got $nf"))
+        return new{typeof(nf), typeof(fam)}(nf, fam)
+    end
+end
+function CrossSectionalFactorAxisResult(; nf::VecStr,
+                                        fam::VecStr)::CrossSectionalFactorAxisResult
+    return CrossSectionalFactorAxisResult(nf, fam)
+end
+"""
 $(DocStringExtensions.TYPEDSIGNATURES)
 
 Return the cross-sectional factor axis that a set of Factor Exposures produces, before any fit.
@@ -47,7 +111,7 @@ The axis holds one name for each member that is not one-hot, and one name for ea
 
  1. Take the Pairs in the order the caller wrote them, which is the column order of the exposures.
  2. Expand each Pair through [`exposure_axis_names`](@ref), so a one-hot member contributes one name per level.
- 3. Refuse a repeated factor name.
+ 3. Build the [`CrossSectionalFactorAxisResult`](@ref) of the names and the labels. Its constructor refuses a repeated factor name.
 
 # Arguments
 
@@ -61,16 +125,17 @@ The axis holds one name for each member that is not one-hot, and one name for ea
 
 # Returns
 
-  - `nf::Vector{String}`: The raw factor names, in column order.
-  - `fam::Vector{String}`: The Factor Family label of each name.
+  - `ax::CrossSectionalFactorAxisResult`: The raw factor names in column order, in `ax.nf`, and the Factor Family label of each name, in `ax.fam`.
 
 # Related
 
+  - [`CrossSectionalFactorAxisResult`](@ref)
   - [`cross_sectional_factor_sets`](@ref)
   - [`CrossSectionalFactorModel`](@ref)
   - [`exposure_axis_names`](@ref)
 """
-function cross_sectional_factor_axis(factors::AbstractVector{<:Pair}, rd::ReturnsResult)
+function cross_sectional_factor_axis(factors::AbstractVector{<:Pair},
+                                     rd::ReturnsResult)::CrossSectionalFactorAxisResult
     @argcheck(!isempty(factors), IsEmptyError("factors cannot be empty"))
     nf = String[]
     fam = String[]
@@ -79,9 +144,7 @@ function cross_sectional_factor_axis(factors::AbstractVector{<:Pair}, rd::Return
         append!(nf, n)
         append!(fam, f)
     end
-    @argcheck(allunique(nf),
-              ArgumentError("the cross-sectional factor axis repeats a name. Got $nf"))
-    return (; nf = nf, fam = fam)
+    return CrossSectionalFactorAxisResult(nf, fam)
 end
 """
     cross_sectional_factor_sets(factors::AbstractVector{<:Pair}, rd::ReturnsResult,
@@ -95,7 +158,7 @@ Declare the cross-sectional factor axis and its Factor Family groups on a [`Univ
  2. Take the universe to widen. When `sets` is `nothing`, build a new one over `rd.nx` with the default key prefixes.
  3. Copy the dictionary of that universe with [`cross_sectional_sets_dict`](@ref), and write the names under its `cfkey`, so [`factor_axis_key`](@ref) finds them from a [`CrossSectionalFactorModel`](@ref).
  4. Write one plain group per Factor Family label, which holds the names of the members of that family. A plain group carries no key prefix, so a constraint generator reads it as a group of names and not as a partition of an axis.
- 5. Build the widened [`UniverseSets`](@ref) with the key prefixes of step 2. The constructor runs every one of its guards again.
+ 5. Build the widened [`UniverseSets`](@ref) with the key prefixes of step 2, through [`rebuild_struct`](@ref). The keyword constructor runs every one of its guards again.
 
 # Arguments
 
@@ -143,9 +206,7 @@ function cross_sectional_factor_sets(factors::AbstractVector{<:Pair}, rd::Return
                   ArgumentError("the Factor Family $nm has the name of a factor, and it holds $mem. A label may name a factor only when the family is that one factor"))
         cross_sectional_sets_write!(dict, nm, mem)
     end
-    return UniverseSets(; xkey = us.xkey, uxkey = us.uxkey, tfkey = us.tfkey,
-                        utfkey = us.utfkey, cfkey = us.cfkey, ucfkey = us.ucfkey,
-                        nikey = us.nikey, dict = dict)
+    return rebuild_struct(us, (; dict = dict))
 end
 """
 $(DocStringExtensions.TYPEDSIGNATURES)
@@ -231,4 +292,5 @@ function cross_sectional_sets_dict(::ReturnsResult, sets::UniverseSets)::Dict{St
     return Dict{String, typejoin(valtype(sets.dict), Vector{String})}(sets.dict)
 end
 
-export cross_sectional_factor_axis, cross_sectional_factor_sets
+export CrossSectionalFactorAxisResult, cross_sectional_factor_axis,
+       cross_sectional_factor_sets

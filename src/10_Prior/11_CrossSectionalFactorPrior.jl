@@ -1628,16 +1628,17 @@ The method forwards `pe.factors` to the Pairs method of [`cross_sectional_factor
 
 # Returns
 
-  - `nf::Vector{String}`: The raw factor names, in column order.
-  - `fam::Vector{String}`: The Factor Family label of each name.
+  - `ax::CrossSectionalFactorAxisResult`: The raw factor names in column order, in `ax.nf`, and the Factor Family label of each name, in `ax.fam`.
 
 # Related
 
   - [`CrossSectionalFactorPrior`](@ref)
+  - [`CrossSectionalFactorAxisResult`](@ref)
   - [`cross_sectional_factor_axis`](@ref)
   - [`cross_sectional_factor_sets`](@ref)
 """
-function cross_sectional_factor_axis(pe::CrossSectionalFactorPrior, rd::ReturnsResult)
+function cross_sectional_factor_axis(pe::CrossSectionalFactorPrior,
+                                     rd::ReturnsResult)::CrossSectionalFactorAxisResult
     return cross_sectional_factor_axis(cross_sectional_axis_pairs(pe.factors), rd)
 end
 """
