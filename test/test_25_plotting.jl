@@ -207,7 +207,9 @@
                          for (a, b) in zip(p.series_list, q.series_list))
         @test same(plot_histogram(ret_nan), plot_histogram(ret_nan[isfinite.(ret_nan)]))
         @test !same(plot_histogram(ret_nan), plot_histogram(ret))
-        @test_throws DomainError plot_histogram([NaN, Inf, -Inf])
+        # A series with no finite return, such as a path whose every fold failed, draws the
+        # axes alone.
+        @test isempty(plot_histogram([NaN, Inf, -Inf]).series_list)
     end
 
     @testset "plot_network" begin
@@ -392,6 +394,37 @@
         @test is_plot(plot_weight_stability(mpred))
         @test is_plot(plot_turnover(mpred))
         @test is_plot(plot_cv_dashboard(mpred))
+
+        # A failed fold has `NaN` weights and `NaN` returns, and every figure still draws. No
+        # allocation meets a lower bound of 0.6 on every asset, so every fold fails.
+        bad = cross_val_predict(MeanRisk(;
+                                         opt = JuMPOptimiser(; slv = slv,
+                                                             wb = WeightBounds(; lb = 0.6,
+                                                                               ub = 1.0))),
+                                rd, IndexWalkForward(80, 40))
+        @test all(f -> isa(f.res.retcode, OptimisationFailure), bad.pred)
+        @test isempty(plot_histogram(bad).series_list)
+        @test isempty(plot_weight_stability(bad).series_list)
+        @test is_plot(plot_cv_dashboard(bad))
+        # A failed fold holds no weight, so the boxes of a path with one equal the boxes of the
+        # path without it.
+        mixed = MultiPeriodPredictionResult(;
+                                            pred = [mpred.pred[1]; bad.pred[2];
+                                                    mpred.pred[3:end]])
+        kept = MultiPeriodPredictionResult(; pred = [mpred.pred[1]; mpred.pred[3:end]])
+        ys(p) = [s[:y] for s in p.series_list]
+        @test isequal(ys(plot_weight_stability(mixed)), ys(plot_weight_stability(kept)))
+        # A population draws one curve for each member, under the key of the member.
+        pop = PopulationPredictionResult(; pred = [mpred, bad])
+        pc = plot_portfolio_cumulative_returns(pop)
+        @test length(pc.series_list) == 2
+        @test isequal(pc.series_list[1][:y],
+                      plot_portfolio_cumulative_returns(mpred).series_list[1][:y])
+        @test all(isnan, pc.series_list[2][:y])
+        @test [s[:label] for s in pc.series_list] ==
+              [string(PortfolioOptimisers.population_path_key(p, k))
+               for (k, p) in enumerate(pop.pred)]
+        @test isempty(plot_weight_stability(PopulationPredictionResult(; pred = [bad])).series_list)
     end
 
     @testset "plot_efficient_frontier" begin

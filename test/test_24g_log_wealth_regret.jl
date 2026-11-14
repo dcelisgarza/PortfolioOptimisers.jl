@@ -536,6 +536,48 @@ and be-the-leader collapses onto the static comparator.
                   (:fold_target, :fold_held, :prediction_weights))
     end
 
+    @testset "A failed fold is NaN at every name of the path" begin
+        # Asset D lists late, so the second fold holds only A, B and C. A failed fold holds no
+        # book, so its row is NaN at D too, and not zero, which would read as no position in D.
+        rng = StableRNG(1953)
+        X = 0.01 .* randn(rng, 300, 4)
+        X[1:100, 4] .= NaN
+        ts = collect(Date(2024, 1, 1):Day(1):Date(2024, 10, 26))
+        rd = ReturnsResult(; nx = ["A", "B", "C", "D"], X = X, ts = ts)
+        slv = Solver(; name = :clarabel, solver = Clarabel.Optimizer,
+                     settings = Dict("verbose" => false))
+        good = cross_val_predict(HierarchicalRiskParity(), rd, KFold(; n = 3))
+        # No allocation meets a lower bound of 0.6 on four assets, so every fold fails.
+        bad = cross_val_predict(MeanRisk(;
+                                         opt = JuMPOptimiser(; slv = slv,
+                                                             wb = WeightBounds(; lb = 0.6,
+                                                                               ub = 1.0))),
+                                rd, KFold(; n = 3))
+        @test isa(bad.pred[2].res.retcode, OptimisationFailure)
+        @test bad.pred[2].rd.nx == ["A", "B", "C"]
+        path = MultiPeriodPredictionResult(;
+                                           pred = [good.pred[1], bad.pred[2], good.pred[3]])
+        nms, W, _ = prediction_weights(path)
+        @test nms == ["A", "B", "C", "D"]
+        @test all(isnan, W[2, :])
+        @test W[1, :] == fold_target(good.pred[1])
+        @test W[3, 1:3] == fold_target(good.pred[3]) && iszero(W[3, 4])
+        # A path that holds a failed fold has no mean target, so its population row is NaN at
+        # every name of the population.
+        pop = PopulationPredictionResult(;
+                                         pred = [path,
+                                                 MultiPeriodPredictionResult(;
+                                                                             pred = good.pred[2:3])])
+        _, Wp, _ = prediction_weights(pop)
+        @test all(isnan, Wp[1, :])
+        @test all(isfinite, Wp[2, :]) && iszero(Wp[2, 4])
+        # A vector with some finite weights, and a vector with no weight, are not failed.
+        _, We = po.weights_by_name([[NaN, 0.5], Float32[]], [["A", "B"], String[]])
+        @test isnan(We[1, 1]) && We[1, 2] == 0.5 && iszero(We[2, :])
+        _, Wf = po.weights_by_name([Float32[NaN32], Float32[1]], [["A"], ["B"]])
+        @test eltype(Wf) == Float32 && all(isnan, Wf[1, :])
+    end
+
     @testset "A prediction with many members gives one regret for each member (#1936)" begin
         rng = StableRNG(1936)
         T, N = 60, 4

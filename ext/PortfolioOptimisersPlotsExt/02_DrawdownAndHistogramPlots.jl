@@ -172,9 +172,12 @@ function PortfolioOptimisers.plot_histogram(ret::VecNum;
     end
     # A return that is not finite, such as the return of a fold that failed to solve, is
     # absent for the figure: the bins, the moments and every line read the finite returns.
+    # A series with no finite return, such as a path whose every fold failed, draws the axes
+    # alone, as every other figure of the path does.
     fin = filter(isfinite, ret)
     if isempty(fin)
-        throw(DomainError(ret, "the return series must hold at least one finite return"))
+        return plot(; ylabel = "Probability Density", xlabel = "Returns", legend = false,
+                    kwargs...)
     end
     ret = fin
     T = length(ret)

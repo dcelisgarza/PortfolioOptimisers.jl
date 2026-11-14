@@ -261,11 +261,13 @@ Embed weight vectors that sit on different asset names on the union of their nam
 
 Each vector `ws[i]` holds one weight for each name of `nxs[i]`. The union axis holds every name once, in the order of first appearance. A vector puts each weight in the column of its name, and every other entry of its row is zero. [`stacked_fold_weights`](@ref) embeds the folds of a path with this function, and [`prediction_weights`](@ref) embeds the paths of a population.
 
+A vector whose every weight is `NaN` is a failed portfolio. A fold that failed to solve holds such a vector, and so does a path or a population mean that reads one. Its row is `NaN` at every name of the union. A zero at a name that the vector does not hold would read as a book with no position in that asset, and the failed portfolio holds no book. A vector with no weight is not a failed portfolio.
+
 # Algorithm
 
  1. Take the union of the names of `nxs` in order of first appearance, giving `names`, and map each name to its column, giving `pos`.
  2. Promote the element types of `ws`, giving `Tf`, and allocate `W`, a `vectors × assets` matrix of zeros of type `Tf`.
- 3. For each vector `i`, check the length of `ws[i]` against `nxs[i]`, and write each weight into row `i` of `W`, at the column that `pos` gives its name.
+ 3. For each vector `i`, check the length of `ws[i]` against `nxs[i]`. When `ws[i]` is not empty and every weight is `NaN`, fill row `i` of `W` with `NaN`. Otherwise write each weight into row `i` of `W`, at the column that `pos` gives its name.
 
 # Arguments
 
@@ -295,6 +297,10 @@ function weights_by_name(ws::AbstractVector, nxs::AbstractVector)
         nx = nxs[i]
         @argcheck(length(ws[i]) == length(nx),
                   DimensionMismatch("weight vector $i carries $(length(ws[i])) weights over $(length(nx)) asset names, so its weights cannot be embedded by name"))
+        if !isempty(ws[i]) && all(isnan, ws[i])
+            fill!(view(W, i, :), Tf(NaN))
+            continue
+        end
         # `enumerate`, not `zip(nx, ws[i])`: the zip of two untyped values gives JET a false
         # report inside `Base.Iterators` (issue #1341).
         for (j, wn) in enumerate(ws[i])

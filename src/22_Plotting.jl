@@ -690,7 +690,7 @@ Plot the histogram of the returns of a portfolio, with a vertical line for each 
 
 The histogram is normalised to a density. Vertical lines mark, in this order: the mean ``\\bar{r}``, and ``\\bar{r}`` less the standard deviation, less the mean absolute deviation, and less the Gini mean difference; the negated value at risk, conditional value at risk and tail Gini; with `slv`, the negated entropic and relativistic values at risk; and the worst return. A population draws the mean of the return series of its members. The package extension `PortfolioOptimisersPlotsExt` implements the methods, and it loads after `using GraphRecipes, StatsPlots`.
 
-The figure reads only the finite returns, as [`plot_exposure_distribution`](@ref) does. A return that is `NaN` or infinite is absent: the bins, the mean, the moments, every vertical line and the fitted Normal law read the finite returns, and ``T`` counts them. A walk-forward fold that failed to solve has `NaN` weights, so its returns are absent, and the figure of a [`portfolio_report`](@ref) still draws.
+The figure reads only the finite returns, as [`plot_exposure_distribution`](@ref) does. A return that is `NaN` or infinite is absent: the bins, the mean, the moments, every vertical line and the fitted Normal law read the finite returns, and ``T`` counts them. A walk-forward fold that failed to solve has `NaN` weights, so its returns are absent, and the figure of a [`portfolio_report`](@ref) still draws. A series with no finite return, such as a path whose every fold failed, draws the axes alone, with no bin and no line.
 
 A gapped panel reaches this figure only through the returns that the caller gives it. A prediction arity is finite at a gap, because the fold set the Held Gap to zero once in [`predict`](@ref). A `w, X` or `w, rd` arity computes on the matrix that the caller holds, and `X * w` is `NaN` at a gap even where the weight is zero, so the figure drops each such row. Score a gapped panel through `predict(res, rd)` and plot the prediction.
 
@@ -732,11 +732,10 @@ Where:
   - `0 < alpha < 1`, else a `DomainError` is raised.
   - `0 < kappa < 1`, else a `DomainError` is raised.
   - `points >= 0`, else a `DomainError` is raised.
-  - The return series holds at least one finite return, else a `DomainError` is raised.
 
 # Returns
 
-  - `plt::Plots.Plot`: A density histogram with its vertical lines, and the Normal density when `reference` is `true`.
+  - `plt::Plots.Plot`: A density histogram with its vertical lines, and the Normal density when `reference` is `true`. A series with no finite return gives the axes alone.
 
 # Related
 
@@ -1216,7 +1215,7 @@ function plot_rolling_measure end
 
 Plot the distribution of the weight of each asset over the folds of a path or the members of a population, as one box per asset.
 
-The weights are the target weights of each fold, or of each member. A member that is a walk-forward path gives one weight vector, the mean of its fold weights. [`relevant_assets`](@ref) ranks the assets by their mean absolute weight and chooses how many boxes to draw, in the order of the asset axis. The package extension `PortfolioOptimisersPlotsExt` implements the methods, and it loads after `using GraphRecipes, StatsPlots`.
+The weights are the rows of [`prediction_weights`](@ref): the target of each fold, or of each member, on the union of the asset names. A member that is a walk-forward path gives one weight vector, the mean of its fold targets. A fold that failed to solve, and a path that holds one, gives a row that is `NaN` at every name. That row holds no weight, so it is absent from every box, and ``K`` does not count it. When no row is left, the figure draws the axes alone. [`relevant_assets`](@ref) ranks the assets by their mean absolute weight and chooses how many boxes to draw, in the order of the asset axis. The package extension `PortfolioOptimisersPlotsExt` implements the methods, and it loads after `using GraphRecipes, StatsPlots`.
 
 # Mathematical definition
 
@@ -1246,6 +1245,7 @@ Where:
 
   - [`MultiPeriodPredictionResult`](@ref)
   - [`PopulationPredictionResult`](@ref)
+  - [`prediction_weights`](@ref)
 """
 function plot_weight_stability end
 
