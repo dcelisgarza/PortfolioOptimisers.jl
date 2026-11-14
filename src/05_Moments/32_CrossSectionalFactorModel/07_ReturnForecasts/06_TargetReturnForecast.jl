@@ -1267,8 +1267,8 @@ function return_forecast(rfe::TargetReturnForecast, rd::ReturnsResult,
     nt = max(size(d.Sa, 3) - forecast_target_gap(rfe), 0)
     Sf, yf, ok = target_forecast_samples(d.Sa, d.y, d.w, nt)
     model = target_forecast_fit(rfe, Sf, yf, ok)
-    cf = target_forecast_coefficient(rfe, model, Sf, yf, ok, d.fwd, d.vs, d.w, nt)
-    ocalib = target_forecast_orthogonal_coefficient(cre, cf.P, d.fwd, d.vs, d.w, rfe, csfm,
+    calib, Pm = target_forecast_coefficient(rfe, model, Sf, yf, ok, d.fwd, d.vs, d.w, nt)
+    ocalib = target_forecast_orthogonal_coefficient(cre, Pm, d.fwd, d.vs, d.w, rfe, csfm,
                                                     d.off)
     # The fit reads `NaN` at a pair of leverage one, and the forecast converts with the
     # variance the block holds there. The last row of the block is the last row of `vs`.
@@ -1277,8 +1277,8 @@ function return_forecast(rfe::TargetReturnForecast, rd::ReturnsResult,
     return TargetReturnForecastResult(;
                                       mu = vec(rfe.scale .*
                                                target_forecast_multiplier(rfe.calibrate,
-                                                                          cf.calib) .* P),
-                                      model = model, calib = cf.calib, ocalib = ocalib)
+                                                                          calib) .* P),
+                                      model = model, calib = calib, ocalib = ocalib)
 end
 """
     target_forecast_multiplier(calibrate::Bool, calib::Number) -> Number
@@ -1327,6 +1327,8 @@ This function alone decides whether the calibration runs. A member that does not
 
 # Returns
 
+The plain tuple `(calib, P)`:
+
   - `calib::Real`: The calibration coefficient, or `NaN`.
   - `P::Option{<:MatNum}`: The uncalibrated prediction in return units, `matured observations × assets`, or `nothing` when the calibration does not run.
 
@@ -1341,14 +1343,12 @@ function target_forecast_coefficient(rfe::TargetReturnForecast, model, Sf::MatNu
                                      yf::VecNum, ok::AbstractVector{Bool}, fwd::MatNum,
                                      vs::Option{<:MatNum}, w::MatNum, nt::Integer)
     if !rfe.calibrate || isnothing(model) || isnothing(vs)
-        return (; calib = promote_type(real(eltype(Sf)), real(eltype(fwd)))(NaN),
-                P = nothing)
+        return promote_type(real(eltype(Sf)), real(eltype(fwd)))(NaN), nothing
     end
     p = target_forecast_uncalibrated(rfe.cv, rfe, model, Sf, yf, ok, size(w, 2))
     P = forecast_return_units(rfe.unit, target_forecast_scatter(p, nt, size(w, 2)),
                               view(vs, 1:nt, :))
-    return (; calib = target_forecast_calibration(P, fwd, vs, w, rfe.decay, rfe.min_obs),
-            P = P)
+    return target_forecast_calibration(P, fwd, vs, w, rfe.decay, rfe.min_obs), P
 end
 """
     target_forecast_orthogonal_coefficient(cre::Nothing, P::Option{<:MatNum}, fwd::MatNum,

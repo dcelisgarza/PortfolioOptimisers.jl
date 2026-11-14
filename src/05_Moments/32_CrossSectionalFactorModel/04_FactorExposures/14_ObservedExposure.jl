@@ -175,8 +175,8 @@ function carry_lookback(xe::ObservedExposure)::Option{<:Integer}
 end
 function descriptor_carry(xe::ObservedExposure, rd::ReturnsResult, m::Integer)
     c = descriptor_carry(xe.xe, rd, m)
-    return (; xf = rebuild_struct(xe, (; xe = c.xf)),
-            xv = rebuild_struct(xe, (; xe = c.xv)))
+    return CarriedEstimators(rebuild_struct(xe, (; xe = c.xf)),
+                             rebuild_struct(xe, (; xe = c.xv)))
 end
 """
 $(DocStringExtensions.TYPEDEF)
@@ -408,7 +408,33 @@ function observed_reads_returns(::CurrencyExposure)
 end
 
 """
-    cross_sectional_factor_partition(factors::AbstractVector{<:Pair}) -> NamedTuple
+$(DocStringExtensions.TYPEDEF)
+
+Holds the two parts of the factor list of a [`CrossSectionalFactorPrior`](@ref): the factors that the fit estimates, and the factors that it observes.
+
+This type is an implementation detail and is not intended for direct use. [`cross_sectional_factor_partition`](@ref) makes it, and the prior reads it. The two parts are vectors of one type, so a record names them where a plain tuple would let a swap pass silently.
+
+# Fields
+
+$(DocStringExtensions.FIELDS)
+
+# Related
+
+  - [`cross_sectional_factor_partition`](@ref)
+  - [`AbstractObservedExposureEstimator`](@ref)
+"""
+@concrete struct FactorPartition
+    """
+    `est`: The Pairs of the estimated factors, in the order of the list.
+    """
+    est
+    """
+    `obs`: The Pairs of the observed factors, in the order of the list.
+    """
+    obs
+end
+"""
+    cross_sectional_factor_partition(factors::AbstractVector{<:Pair}) -> FactorPartition
 
 Split the factor list of a [`CrossSectionalFactorPrior`](@ref) into the factors the fit estimates and the factors it observes.
 
@@ -420,18 +446,18 @@ A member of [`AbstractObservedExposureEstimator`](@ref) declares that its factor
 
 # Returns
 
-  - `est::Vector{<:Pair}`: The Pairs of the estimated factors, in the order of `factors`.
-  - `obs::Vector{<:Pair}`: The Pairs of the observed factors, in the order of `factors`.
+  - `parts::FactorPartition`: `est`, the Pairs of the estimated factors, and `obs`, the Pairs of the observed factors, each in the order of `factors`.
 
 # Related
 
   - [`CrossSectionalFactorPrior`](@ref)
   - [`AbstractObservedExposureEstimator`](@ref)
   - [`cross_sectional_observed`](@ref)
+  - [`FactorPartition`](@ref)
 """
-function cross_sectional_factor_partition(factors::AbstractVector{<:Pair})
+function cross_sectional_factor_partition(factors::AbstractVector{<:Pair})::FactorPartition
     isobs = [isa(last(p), AbstractObservedExposureEstimator) for p in factors]
-    return (; est = factors[.!isobs], obs = factors[isobs])
+    return FactorPartition(factors[.!isobs], factors[isobs])
 end
 """
 $(DocStringExtensions.TYPEDSIGNATURES)
@@ -723,9 +749,9 @@ function cross_sectional_observed_rows(xe::AbstractObservedExposureEstimator,
     return k == n ? A : A[:, :, (k - n + 1):k]
 end
 """
-    cross_sectional_observed_carry(cc::Nothing, Xl, n::Integer, lag::Integer) -> NamedTuple
+    cross_sectional_observed_carry(cc::Nothing, Xl, n::Integer, lag::Integer) -> Tuple
     cross_sectional_observed_carry(cc::NamedTuple, Xl::MatNum, n::Integer, lag::Integer)
-        -> NamedTuple
+        -> Tuple
 
 Split the observed factors of a step of the carry fold of a [`CrossSectionalFactorPrior`](@ref) into the exposures of the rows of the step and the derived series that the state carries.
 
@@ -740,7 +766,7 @@ On the carry fold, [`cross_sectional_observed`](@ref) gives the exposures of the
 
 # Returns
 
-  - `carry::NamedTuple`: `Zn`, the observed exposures of the `n` rows of the step, and `der`, the derived series `(; Xn, Xl, Zo)` that the field `der` of a [`CrossSectionalCarryState`](@ref) holds. Both are `nothing` without an observed factor.
+  - `(Zn, der)::Tuple`: The plain tuple of `Zn`, the observed exposures of the `n` rows of the step, and `der`, the derived series `(; Xn, Xl, Zo)` that the field `der` of a [`CrossSectionalCarryState`](@ref) holds. Both are `nothing` without an observed factor.
 
 # Related
 
@@ -749,13 +775,13 @@ On the carry fold, [`cross_sectional_observed`](@ref) gives the exposures of the
   - [`CrossSectionalCarryState`](@ref)
 """
 function cross_sectional_observed_carry(::Nothing, ::Any, ::Integer, ::Integer)
-    return (; Zn = nothing, der = nothing)
+    return nothing, nothing
 end
 function cross_sectional_observed_carry(cc::NamedTuple, Xl::MatNum, n::Integer,
                                         lag::Integer)
     T = size(cc.Z, 3)
-    return (; Zn = cc.Z[:, :, (T - n + 1):T],
-            der = (; Xn = cc.Xn, Xl = Xl, Zo = cc.Z[:, :, (T - min(lag, T) + 1):T]))
+    return cc.Z[:, :, (T - n + 1):T],
+           (; Xn = cc.Xn, Xl = Xl, Zo = cc.Z[:, :, (T - min(lag, T) + 1):T])
 end
 """
     cross_sectional_observed_stack(ms::AbstractVector, rd::ReturnsResult) -> NamedTuple

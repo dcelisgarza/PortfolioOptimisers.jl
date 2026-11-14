@@ -411,8 +411,8 @@ function carry_lookback(xe::CompositeExposure)::Option{<:Integer}
 end
 function descriptor_carry(xe::CompositeExposure, rd::ReturnsResult, m::Integer)
     cs = map(de -> descriptor_carry(de, rd, m), xe.descriptors)
-    return (; xf = rebuild_struct(xe, (; descriptors = map(c -> c.xf, cs))),
-            xv = rebuild_struct(xe, (; descriptors = map(c -> c.xv, cs))))
+    return CarriedEstimators(rebuild_struct(xe, (; descriptors = map(c -> c.xf, cs))),
+                             rebuild_struct(xe, (; descriptors = map(c -> c.xv, cs))))
 end
 
 export CompositeExposure

@@ -1595,9 +1595,6 @@ const RULED_NAMED_TUPLES = Dict{Symbol, Tuple{String, String}}(#
                                                                :cross_sectional_exposure_rows =>
                                                                    ("go",
                                                                     "every caller takes it apart at once: a plain tuple, unless two values have one type, which takes a private type (#2113)"),
-                                                               :cross_sectional_factor_partition =>
-                                                                   ("go",
-                                                                    "every caller takes it apart at once: a plain tuple, unless two values have one type, which takes a private type (#2113)"),
                                                                :cross_sectional_factor_scenarios =>
                                                                    ("go",
                                                                     "every caller takes it apart at once: a plain tuple, unless two values have one type, which takes a private type (#2113)"),
@@ -1608,9 +1605,6 @@ const RULED_NAMED_TUPLES = Dict{Symbol, Tuple{String, String}}(#
                                                                    ("go",
                                                                     "every caller takes it apart at once: a plain tuple, unless two values have one type, which takes a private type (#2113)"),
                                                                :cross_sectional_lift =>
-                                                                   ("go",
-                                                                    "every caller takes it apart at once: a plain tuple, unless two values have one type, which takes a private type (#2113)"),
-                                                               :cross_sectional_observed_carry =>
                                                                    ("go",
                                                                     "every caller takes it apart at once: a plain tuple, unless two values have one type, which takes a private type (#2113)"),
                                                                :cross_sectional_residual_block =>
@@ -1629,19 +1623,6 @@ const RULED_NAMED_TUPLES = Dict{Symbol, Tuple{String, String}}(#
                                                                                     "the value travels: the tail value of a method: a private defined type (#2113)"),
                                                                :ep_rlvar_shift => ("go",
                                                                                    "`risk` and `t` are numbers of one type, so a positional swap is silent: a private defined type (#2113)"),
-                                                               :ew_beta_output => ("go",
-                                                                                   "every caller takes it apart at once: a plain tuple, unless two values have one type, which takes a private type (#2113)"),
-                                                               Symbol("ew_beta_series!") =>
-                                                                   ("go",
-                                                                    "every caller takes it apart at once: a plain tuple, unless two values have one type, which takes a private type (#2113)"),
-                                                               :ew_block_rows => ("go",
-                                                                                  "every caller takes it apart at once: a plain tuple, unless two values have one type, which takes a private type (#2113)"),
-                                                               :ew_volatility_parts =>
-                                                                   ("go",
-                                                                    "every caller takes it apart at once: a plain tuple, unless two values have one type, which takes a private type (#2113)"),
-                                                               :ew_volatility_variance =>
-                                                                   ("go",
-                                                                    "every caller takes it apart at once: a plain tuple, unless two values have one type, which takes a private type (#2113)"),
                                                                :factor_residual_config =>
                                                                    ("go",
                                                                     "the value travels: returned whole by seven priors: a private defined type (#2113)"),
@@ -1654,17 +1635,12 @@ const RULED_NAMED_TUPLES = Dict{Symbol, Tuple{String, String}}(#
                                                                :forecast_pooled_moments =>
                                                                    ("go",
                                                                     "`mean` and `std` are numbers of one type, so a positional swap is silent: a private defined type (#2113)"),
-                                                               :lag_descriptor_inputs =>
-                                                                   ("go",
-                                                                    "every caller takes it apart at once: a plain tuple, unless two values have one type, which takes a private type (#2113)"),
                                                                :level_closure_maps =>
                                                                    ("go",
                                                                     "the value travels: an argument to a call: a private defined type (#2113)"),
                                                                Symbol("mahalanobis_cut!") =>
                                                                    ("go",
                                                                     "the value travels: a later use of `cut`: a private defined type (#2113)"),
-                                                               :one_hot_inputs => ("go",
-                                                                                   "every caller takes it apart at once: a plain tuple, unless two values have one type, which takes a private type (#2113)"),
                                                                :opinion_pooling_scenarios =>
                                                                    ("go",
                                                                     "every caller takes it apart at once: a plain tuple, unless two values have one type, which takes a private type (#2113)"),
@@ -1685,9 +1661,6 @@ const RULED_NAMED_TUPLES = Dict{Symbol, Tuple{String, String}}(#
                                                                :split_weight_record =>
                                                                    ("go",
                                                                     "the value travels: collected in a generator: a private defined type (#2113)"),
-                                                               :target_forecast_coefficient =>
-                                                                   ("go",
-                                                                    "every caller takes it apart at once: a plain tuple, unless two values have one type, which takes a private type (#2113)"),
                                                                :window_statistic => ("go",
                                                                                      "the value travels: collected in a generator: a private defined type (#2113)"))
 

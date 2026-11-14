@@ -295,7 +295,8 @@ end
                                                :target_forecast_variances => "two functions share its callee `forecast_idiosyncratic_variances` (rule 3, #2093)",
                                                :forecast_target_history => "four functions share its callee `forecast_idiosyncratic_returns` (rule 3, #2093)",
                                                :folds_forecast_rows => "the query trait of a member: its method on `TargetReturnForecast` reads `target_forecast_folds` of its fields, which two functions share (rule 3, #2093)",
-                                               :exposure_coverage_weights => "its callee `cs_diagnostic_weights` is a shared public verb (rule 3, #2093)")
+                                               :exposure_coverage_weights => "its callee `cs_diagnostic_weights` is a shared public verb (rule 3, #2093)",
+                                               :descriptor_carry => "the generic method, for an estimator that carries no state, calls the constructor of `CarriedEstimators`, and the other methods walk the Descriptors (rule 3, #2093)")
     # The debt that #2072 removes. Do not add a pair: fix the wrapper.
     pending_forwards = Set{Tuple{Symbol, Symbol}}([(:adopt_pinned_choice, :rebuild_struct),
                                                    (:apply_fitted_step,

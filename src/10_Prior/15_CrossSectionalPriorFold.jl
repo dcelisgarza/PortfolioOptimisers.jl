@@ -354,7 +354,7 @@ Each member folds with [`descriptor_carry`](@ref). The batch fit gives `n = noth
 
 # Returns
 
-  - `carry::NamedTuple`: `xf`, the members with the state after the new observations, and `xv`, the members whose stateful Descriptors are [`CarriedDescriptor`](@ref) of the new observations.
+  - `carry::CarriedEstimators`: `xf`, the members with the state after the new observations, and `xv`, the members whose stateful Descriptors are [`CarriedDescriptor`](@ref) of the new observations.
 
 # Related
 
@@ -362,13 +362,13 @@ Each member folds with [`descriptor_carry`](@ref). The batch fit gives `n = noth
   - [`cross_sectional_exposure_series`](@ref)
 """
 function cross_sectional_descriptor_carry(est::AbstractVector, ::ReturnsResult, ::Nothing)
-    return (; xf = est, xv = est)
+    return CarriedEstimators(est, est)
 end
 function cross_sectional_descriptor_carry(est::AbstractVector, rd::ReturnsResult,
                                           n::Integer)
     cs = map(p -> descriptor_carry(last(p), rd, n), est)
-    return (; xf = map((p, c) -> first(p) => c.xf, est, cs),
-            xv = map((p, c) -> first(p) => c.xv, est, cs))
+    return CarriedEstimators(map((p, c) -> first(p) => c.xf, est, cs),
+                             map((p, c) -> first(p) => c.xv, est, cs))
 end
 """
 $(DocStringExtensions.TYPEDSIGNATURES)
@@ -969,7 +969,7 @@ function cross_sectional_fold_rows(pe::CrossSectionalFactorPrior,
     T = size(win.X, 1)
     q = (T - n + 1):T
     p = 1:n
-    (; Zn, der) = cross_sectional_observed_carry(cc, Xl, n, pe.lag)
+    Zn, der = cross_sectional_observed_carry(cc, Xl, n, pe.lag)
     if isnothing(st.Ms)
         Zo = isnothing(cc) ? nothing : view(Zn, :, :, p)
         elig = cross_sectional_eligible(Xu[q, :], Ms, emsk[q, :], Zo)

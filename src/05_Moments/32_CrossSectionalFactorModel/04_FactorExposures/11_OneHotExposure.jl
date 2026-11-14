@@ -233,7 +233,7 @@ julia> factor_exposure(OneHotExposure(; field = \"sector\", family = \"sector\")
   - [`exposure_active_fill!`](@ref)
 """
 function factor_exposure(xe::OneHotExposure, rd::ReturnsResult)::Array{<:Real, 3}
-    (; codes, live, nl) = one_hot_inputs(xe, rd)
+    codes, live, nl = one_hot_inputs(xe, rd)
     Tf = real(eltype(rd.X))
     B = Array{Tf}(undef, size(codes, 2), nl, size(codes, 1))
     one_hot_fill!(B, codes, live)
@@ -258,6 +258,8 @@ Return what [`one_hot_fill!`](@ref) reads to expand a [`OneHotExposure`](@ref): 
 
 # Returns
 
+The plain tuple `(codes, live, nl)`:
+
   - `codes::AbstractMatrix{<:Integer}`: The codes of the Panel Field, `observations × assets`.
   - `live::AbstractMatrix{Bool}`: `true` where the Panel Field observes the cell and the active mask activates it.
   - `nl::Int`: The number of levels, one factor each.
@@ -275,7 +277,7 @@ function one_hot_inputs(xe::OneHotExposure, rd::ReturnsResult)
     @argcheck(size(amsk) == size(codes),
               DimensionMismatch("the codes of a one-hot Factor Exposure must match the active mask of the Asset Panel, got size(codes) = $(size(codes)) and size(pnl.amsk) = $(size(amsk))"))
     live = isnothing(f.omsk) ? amsk : f.omsk .& amsk
-    return (; codes = codes, live = live, nl = length(f.levels))
+    return codes, live, length(f.levels)
 end
 function lookback(::OneHotExposure)::Integer
     return 1

@@ -155,9 +155,35 @@ function ew_macro_sensitivity_state(X::AbstractMatrix{<:Real}, rm::AbstractVecto
                                    0, 0)
 end
 """
+$(DocStringExtensions.TYPEDEF)
+
+Holds the betas that the recursion of an [`EWMacroSensitivity`](@ref) or of an [`EWDownsideBeta`](@ref) computes, and the state of the recursion after them.
+
+This type is an implementation detail and is not intended for direct use. [`ew_macro_sensitivity_series!`](@ref) and [`ew_downside_beta_series!`](@ref) make it, and [`ew_beta_fold`](@ref) reads it. One shape is shared by the two recursions, so it is one type.
+
+# Fields
+
+$(DocStringExtensions.FIELDS)
+
+# Related
+
+  - [`ew_macro_sensitivity_series!`](@ref)
+  - [`ew_downside_beta_series!`](@ref)
+"""
+@concrete struct BetaSeries
+    """
+    `B`: The betas, `observations × assets`, before any mask is applied.
+    """
+    B
+    """
+    `st`: The state of the recursion after the observations.
+    """
+    st
+end
+"""
     ew_macro_sensitivity_series!(st::EWMacroSensitivityState, X::AbstractMatrix{<:Real},
                                  rm::AbstractVector{<:Real}, rf::AbstractVector{<:Real},
-                                 decay::Real, min_obs::Integer, min_val::Real) -> NamedTuple
+                                 decay::Real, min_obs::Integer, min_val::Real) -> BetaSeries
 
 Run the exponentially weighted partial beta of the returns on a reference series from a state, and return the partial betas and the state after them.
 
@@ -185,7 +211,7 @@ This recursion computes the closed form that [`EWMacroSensitivity`](@ref) states
 
 # Returns
 
-  - `fold::NamedTuple`: `B`, the partial betas, `observations × assets`, before any mask is applied, and `st`, the state after the observations.
+  - `fold::BetaSeries`: `B`, the partial betas, `observations × assets`, before any mask is applied, and `st`, the state after the observations.
 
 # Related
 
@@ -237,9 +263,10 @@ function ew_macro_sensitivity_series!(st::EWMacroSensitivityState,
         end
         B[t, :] = b
     end
-    return (; B = B,
-            st = EWMacroSensitivityState(b, mu, cam, caf, n,
-                                         (; mu_m, mu_f, var_m, var_f, cov_mf), c, st.t + T))
+    return BetaSeries(B,
+                      EWMacroSensitivityState(b, mu, cam, caf, n,
+                                              (; mu_m, mu_f, var_m, var_f, cov_mf), c,
+                                              st.t + T))
 end
 """
 $(DocStringExtensions.TYPEDEF)
@@ -373,12 +400,46 @@ function EWMacroSensitivity(; mcap::AbstractString = "market_cap",
     return EWMacroSensitivity(mcap, series, decay, min_obs, agg_obs, min_val, cache)
 end
 """
+$(DocStringExtensions.TYPEDEF)
+
+Holds the values that a step of an [`EWMacroSensitivity`](@ref) reads off its carried state to select its reference return.
+
+This type is an implementation detail and is not intended for direct use. [`ew_macro_carried`](@ref) makes it, all at zero for the batch call, and [`ew_macro_reference`](@ref) and [`ew_beta_fold`](@ref) read it. `c`, `t0` and `n0` are integers of one type, so a record names them where a plain tuple would let a swap pass silently.
+
+# Fields
+
+$(DocStringExtensions.FIELDS)
+
+# Related
+
+  - [`ew_macro_carried`](@ref)
+  - [`ew_macro_reference`](@ref)
+"""
+@concrete struct CarriedReference
+    """
+    `c`: The count of the windows of the recursion that held a finite value.
+    """
+    c
+    """
+    `f`: The carried reference return of the open window, or `nothing` for no state.
+    """
+    f
+    """
+    `t0`: The number of observations before the first observation of the carried window.
+    """
+    t0
+    """
+    `n0`: The number of observations before the first observation of the step.
+    """
+    n0
+end
+"""
     ew_macro_reference(series::Nothing, de::EWMacroSensitivity, rd::ReturnsResult,
                        ref::Option{<:AbstractVector{<:Real}},
-                       ::NamedTuple) -> AbstractVector{<:Real}
+                       ::CarriedReference) -> AbstractVector{<:Real}
     ew_macro_reference(series::AbstractString, de::EWMacroSensitivity, rd::ReturnsResult,
                        ref::Option{<:AbstractVector{<:Real}},
-                       carried::NamedTuple) -> AbstractVector{<:Real}
+                       carried::CarriedReference) -> AbstractVector{<:Real}
 
 Select the reference return of an [`EWMacroSensitivity`](@ref), from the keyword `ref` or from the column of the Exogenous Series that the field `series` names.
 
@@ -421,7 +482,7 @@ The field and the keyword are two sources for one series, so a call that gives b
 """
 function ew_macro_reference(::Nothing, ::EWMacroSensitivity, rd::ReturnsResult,
                             ref::Option{<:AbstractVector{<:Real}},
-                            ::NamedTuple)::AbstractVector{<:Real}
+                            ::CarriedReference)::AbstractVector{<:Real}
     @argcheck(!isnothing(ref),
               IsNothingError("a macro sensitivity is measured against a reference return series, and the estimator names no column of the Exogenous Series in `series`, and the call passes no keyword `ref`. Set `series` to the name of a column of rd.E, or pass the series as `ref`, one entry per observation."))
     @argcheck(length(ref) == size(rd.X, 1),
@@ -430,7 +491,7 @@ function ew_macro_reference(::Nothing, ::EWMacroSensitivity, rd::ReturnsResult,
 end
 function ew_macro_reference(series::AbstractString, de::EWMacroSensitivity,
                             rd::ReturnsResult, ref::Option{<:AbstractVector{<:Real}},
-                            carried::NamedTuple)::AbstractVector{<:Real}
+                            carried::CarriedReference)::AbstractVector{<:Real}
     @argcheck(isnothing(ref),
               ArgumentError("the estimator reads its reference return from the column \"$series\" of the Exogenous Series, and the call also passes the keyword `ref`. Give the series in one place: set `series = nothing` to pass `ref`, or do not pass `ref`."))
     @argcheck(!isnothing(rd.E),
@@ -667,7 +728,7 @@ end
 """
     ew_downside_beta_series!(st::EWDownsideBetaState, X::AbstractMatrix{<:Real},
                              rm::AbstractVector{<:Real}, decay::Real, min_obs::Integer,
-                             mar::Real, min_val::Real) -> NamedTuple
+                             mar::Real, min_val::Real) -> BetaSeries
 
 Run the exponentially weighted lower partial co-moment of the returns against the market from a state, and return the downside betas and the state after them.
 
@@ -693,7 +754,7 @@ This recursion computes the closed form that [`EWDownsideBeta`](@ref) states. It
 
 # Returns
 
-  - `fold::NamedTuple`: `B`, the downside betas, `observations × assets`, before any mask is applied, and `st`, the state after the observations.
+  - `fold::BetaSeries`: `B`, the downside betas, `observations × assets`, before any mask is applied, and `st`, the state after the observations.
 
 # Related
 
@@ -726,7 +787,7 @@ function ew_downside_beta_series!(st::EWDownsideBetaState, X::AbstractMatrix{<:R
             end
         end
     end
-    return (; B = B, st = EWDownsideBetaState(cd, n, vd, st.t + T))
+    return BetaSeries(B, EWDownsideBetaState(cd, n, vd, st.t + T))
 end
 """
 $(DocStringExtensions.TYPEDEF)
@@ -981,21 +1042,21 @@ Returns what the refusals of an [`EWMacroSensitivity`](@ref) read off its carrie
 
 # Returns
 
-  - `carried::NamedTuple`: `c`, `f`, `t0` and `n0`. `f` is `nothing` for no state.
+  - `carried::CarriedReference`: `c`, `f`, `t0` and `n0`. `f` is `nothing` for no state.
 
 # Related
 
   - [`ew_macro_reference`](@ref)
   - [`EWBlockState`](@ref)
 """
-function ew_macro_carried(::Nothing, ::Integer)
-    return (; c = 0, f = nothing, t0 = 0, n0 = 0)
+function ew_macro_carried(::Nothing, ::Integer)::CarriedReference
+    return CarriedReference(0, nothing, 0, 0)
 end
 function ew_macro_carried(st::EWBlockState, agg_obs::Integer)
     @argcheck(isa(st.st, EWMacroSensitivityState),
               ArgumentError("the state of this EWMacroSensitivity holds no reference return, so it belongs to another Descriptor. A Descriptor folds from its own state, or from no state."))
     t0 = st.st.t * agg_obs
-    return (; c = st.st.c, f = st.f, t0 = t0, n0 = t0 + length(st.f))
+    return CarriedReference(st.st.c, st.f, t0, t0 + length(st.f))
 end
 """
     ew_beta_fold(de::EWBeta, rd::ReturnsResult, cache::Option{<:EWBlockState})
@@ -1030,7 +1091,7 @@ The batch call [`descriptor`](@ref) is this function from no state, so a step eq
 
 # Returns
 
-  - `fold::NamedTuple`: `st`, the state after the observations, and `D`, the Descriptor of each observation, `observations × assets`.
+  - `fold::DescriptorFold`: `st`, the state after the observations, and `D`, the Descriptor of each observation, `observations × assets`.
 
 # Related
 
@@ -1049,10 +1110,10 @@ function ew_beta_fold(de::EWBeta, rd::ReturnsResult, cache::Option{<:EWBlockStat
     Xa = isone(a) ? xs.A : ew_agg_series(xs.A, a)
     rma = isone(a) ? ms.A : ew_agg_vector(ms.A, a)
     b0 = copy(st.st.b)
-    fold = ew_beta_series!(st.st, Xa, rma, de.decay, de.min_obs, de.min_val, nothing)
-    out = ew_beta_output(de.group, de, rd, fold.B, fold.Vm, Xa, rma, b0, st)
+    B, Vm, bst = ew_beta_series!(st.st, Xa, rma, de.decay, de.min_obs, de.min_val, nothing)
+    out = ew_beta_output(de.group, de, rd, B, Vm, Xa, rma, b0, st)
     descriptor_active_fill!(out.D, pnl)
-    return (; st = EWBlockState(fold.st, xs.P, ms.P, nothing, out.v, out.s), D = out.D)
+    return DescriptorFold(EWBlockState(bst, xs.P, ms.P, nothing, out.v, out.s), out.D)
 end
 function ew_beta_fold(de::EWMacroSensitivity, rd::ReturnsResult,
                       cache::Option{<:EWBlockState};
@@ -1078,7 +1139,7 @@ function ew_beta_fold(de::EWMacroSensitivity, rd::ReturnsResult,
                                         de.min_val)
     D = ew_beta_expand(fold.B, size(X, 1), a, b0, size(st.X, 1))
     descriptor_active_fill!(D, pnl)
-    return (; st = EWBlockState(fold.st, xs.P, ms.P, fs.P, nothing, nothing), D = D)
+    return DescriptorFold(EWBlockState(fold.st, xs.P, ms.P, fs.P, nothing, nothing), D)
 end
 function ew_beta_fold(de::EWDownsideBeta, rd::ReturnsResult,
                       cache::Option{<:EWDownsideBetaState})
@@ -1088,7 +1149,7 @@ function ew_beta_fold(de::EWDownsideBeta, rd::ReturnsResult,
     (; B, st) = ew_downside_beta_series!(ew_downside_beta_state(cache, X, rm, de.decay), X,
                                          rm, de.decay, de.min_obs, de.mar, de.min_val)
     descriptor_active_fill!(B, pnl)
-    return (; st = st, D = B)
+    return DescriptorFold(st, B)
 end
 """
     descriptor_step(de::Union{EWBeta, EWMacroSensitivity, EWDownsideBeta}, rd::ReturnsResult)

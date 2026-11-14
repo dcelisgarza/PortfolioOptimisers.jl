@@ -330,7 +330,7 @@ end
 function cross_sectional_exposure_fill!(Ms::AbstractArray{<:Number, 3}, xe::OneHotExposure,
                                         rd::ReturnsResult, k::Integer, c::Integer,
                                         w::Integer, nm::AbstractString)::Nothing
-    (; codes, live, nl) = one_hot_inputs(xe, rd)
+    codes, live, nl = one_hot_inputs(xe, rd)
     m = size(Ms, 3)
     @argcheck(size(codes, 2) == size(Ms, 1) && nl == w,
               DimensionMismatch("the Factor Exposure $nm is assets × factors × observations, got $((size(codes, 2), nl, m)) against $((size(Ms, 1), w, m))"))

@@ -1906,10 +1906,11 @@ end
 
     @testset "The early coefficient takes the type of its inputs" begin
         rfe = TargetReturnForecast(; scores = ds, calibrate = false)
-        c = PO.target_forecast_coefficient(rfe, nothing, zeros(Float32, 2, 2),
-                                           zeros(Float32, 2), trues(2),
-                                           zeros(Float32, 2, 2), nothing,
-                                           ones(Float32, 2, 2), 1).calib
+        c, P = PO.target_forecast_coefficient(rfe, nothing, zeros(Float32, 2, 2),
+                                              zeros(Float32, 2), trues(2),
+                                              zeros(Float32, 2, 2), nothing,
+                                              ones(Float32, 2, 2), 1)
+        @test isnothing(P)
         @test isa(c, Float32)
         @test isnan(c)
         @test isa(PO.target_forecast_multiplier(false, c), Float32)

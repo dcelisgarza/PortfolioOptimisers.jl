@@ -445,15 +445,17 @@ end
         # batch call, also where `min_obs` counts observations across the cut.
         rm = po.market_return_series(syn, "market_cap")
         B, Vm = po.ew_beta_series(syn.X, rm, 0.8, 7, 1e-12, syn.pnl.amsk)
-        b1 = po.ew_beta_series!(po.ew_beta_state(nothing, syn.X, rm, 0.8), syn.X[1:4, :],
-                                rm[1:4], 0.8, 7, 1e-12, syn.pnl.amsk[1:4, :])
-        b2 = po.ew_beta_series!(po.ew_beta_state(b1.st, syn.X, rm, 0.8), syn.X[5:160, :],
-                                rm[5:160], 0.8, 7, 1e-12, syn.pnl.amsk[5:160, :])
-        @test same([b1.B; b2.B], B) && same([b1.Vm; b2.Vm], Vm) && b2.st.t == 160
+        B1, Vm1, st1 = po.ew_beta_series!(po.ew_beta_state(nothing, syn.X, rm, 0.8),
+                                          syn.X[1:4, :], rm[1:4], 0.8, 7, 1e-12,
+                                          syn.pnl.amsk[1:4, :])
+        B2, Vm2, st2 = po.ew_beta_series!(po.ew_beta_state(st1, syn.X, rm, 0.8),
+                                          syn.X[5:160, :], rm[5:160], 0.8, 7, 1e-12,
+                                          syn.pnl.amsk[5:160, :])
+        @test same([B1; B2], B) && same([Vm1; Vm2], Vm) && st2.t == 160
         @test occursin("cannot merge two states fitted on disjoint blocks",
-                       message(() -> po.merge_states(b1.st, b2.st)))
+                       message(() -> po.merge_states(st1, st2)))
         @test occursin("the beta state carries 60 assets, and the step brings 5",
-                       message(() -> po.ew_beta_state(b1.st, syn.X[:, 1:5], rm, 0.8)))
+                       message(() -> po.ew_beta_state(st1, syn.X[:, 1:5], rm, 0.8)))
         @test occursin("hold one entry per asset",
                        message(() -> po.EWBetaState(; b = [0.0], mu = [0.0, 0.0],
                                                     cv = [0.0], n = [0], act = trues(1),

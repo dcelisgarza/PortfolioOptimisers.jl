@@ -884,7 +884,7 @@ The batch call [`descriptor`](@ref) of an [`EWVolumeRatio`](@ref) and of a [`Day
 
 # Returns
 
-  - `fold::NamedTuple`: `st`, the state after the observations, and `D`, the Descriptor of each observation, `observations × assets`.
+  - `fold::DescriptorFold`: `st`, the state after the observations, and `D`, the Descriptor of each observation, `observations × assets`.
 
 # Related
 
@@ -899,7 +899,7 @@ function ew_mean_fold(de::EWMean, rd::ReturnsResult, cache::Option{<:EWMeanState
     S = ew_mean_series!(st.s, st.n, ew_mean_delayed!(st.buf, X), de.decay, de.min_obs)
     D = de.exponentiate ? expm1.(S) : S
     descriptor_active_fill!(D, pnl)
-    return (; st = st, D = D)
+    return DescriptorFold(st, D)
 end
 function ew_mean_fold(de::EWVolumeRatio, rd::ReturnsResult, cache::Option{<:EWMeanState})
     pnl = descriptor_asset_panel(rd)
@@ -910,7 +910,7 @@ function ew_mean_fold(de::EWVolumeRatio, rd::ReturnsResult, cache::Option{<:EWMe
     st = ew_mean_state(cache, Q, de.decay, nothing)
     D = ew_mean_series!(st.s, st.n, Q, de.decay, de.min_obs)
     descriptor_active_fill!(D, pnl)
-    return (; st = st, D = D)
+    return DescriptorFold(st, D)
 end
 function ew_mean_fold(de::DaysToCover, rd::ReturnsResult, cache::Option{<:EWMeanState})
     pnl = descriptor_asset_panel(rd)
@@ -922,7 +922,7 @@ function ew_mean_fold(de::DaysToCover, rd::ReturnsResult, cache::Option{<:EWMean
     st = ew_mean_state(cache, V, de.decay, nothing)
     D = positive_divide.(A, ew_mean_series!(st.s, st.n, V, de.decay, de.min_obs))
     descriptor_active_fill!(D, pnl)
-    return (; st = st, D = D)
+    return DescriptorFold(st, D)
 end
 """
     descriptor_step(de::Union{EWMean, EWVolumeRatio, DaysToCover}, rd::ReturnsResult)

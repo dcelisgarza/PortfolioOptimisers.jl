@@ -204,6 +204,58 @@ function descriptor_field_values(rd::ReturnsResult,
     return descriptor(de, rd)
 end
 """
+$(DocStringExtensions.TYPEDEF)
+
+Holds the state of a Descriptor after the observations that it folded, and the Descriptor of each of those observations.
+
+This type is an implementation detail and is not intended for direct use. The fold of each Descriptor that carries a state makes it: [`lag_descriptor_fold`](@ref), [`ew_mean_fold`](@ref), [`ew_volatility_fold`](@ref) and [`ew_beta_fold`](@ref). The batch call of [`descriptor`](@ref) reads `D`, and [`descriptor_step`](@ref) reads both. One shape is shared by the four folds, so it is one type.
+
+# Fields
+
+$(DocStringExtensions.FIELDS)
+
+# Related
+
+  - [`descriptor_step`](@ref)
+  - [`AbstractPartialFitState`](@ref)
+"""
+@concrete struct DescriptorFold
+    """
+    `st`: The state after the observations, or `nothing` where the estimator does not fold.
+    """
+    st
+    """
+    `D`: The Descriptor of each observation, `observations × assets`.
+    """
+    D
+end
+"""
+$(DocStringExtensions.TYPEDEF)
+
+Holds the two forms of an Exposure Estimator after a step of the carry fold of a [`CrossSectionalFactorPrior`](@ref): the form that folds the next step, and the form that the code of the batch fit reads.
+
+This type is an implementation detail and is not intended for direct use. [`descriptor_carry`](@ref), [`descriptor_carried`](@ref) and [`cross_sectional_descriptor_carry`](@ref) make it, and the carry fold reads both fields. The two forms are estimators of one family, so a record names them where a plain tuple would let a swap pass silently.
+
+# Fields
+
+$(DocStringExtensions.FIELDS)
+
+# Related
+
+  - [`descriptor_carry`](@ref)
+  - [`CarriedDescriptor`](@ref)
+"""
+@concrete struct CarriedEstimators
+    """
+    `xf`: The estimator with the state after the new observations.
+    """
+    xf
+    """
+    `xv`: The estimator whose stateful Descriptors are [`CarriedDescriptor`](@ref)s of the new observations.
+    """
+    xv
+end
+"""
     descriptor_asset_panel(rd::ReturnsResult) -> AssetPanel
 
 Read the Asset Panel a Descriptor needs out of a [`ReturnsResult`](@ref).
@@ -583,8 +635,8 @@ julia> B
 function ew_beta_series(X::AbstractMatrix{<:Real}, rm::AbstractVector{<:Real}, decay::Real,
                         min_obs::Integer, min_val::Real,
                         amsk::Option{<:AbstractMatrix{Bool}} = nothing)
-    (; B, Vm) = ew_beta_series!(ew_beta_state(nothing, X, rm, decay), X, rm, decay, min_obs,
-                                min_val, amsk)
+    B, Vm, _ = ew_beta_series!(ew_beta_state(nothing, X, rm, decay), X, rm, decay, min_obs,
+                               min_val, amsk)
     return B, Vm
 end
 """
@@ -767,7 +819,7 @@ The batch call [`ew_beta_series`](@ref) is this function from a new state at zer
 
 # Returns
 
-  - `fold::NamedTuple`: `B` and `Vm`, as [`ew_beta_series`](@ref) states them, and `st`, the state after the observations.
+  - `(B, Vm, st)::Tuple`: the plain tuple of `B` and `Vm`, as [`ew_beta_series`](@ref) states them, and `st`, the state after the observations.
 
 # Related
 
@@ -808,7 +860,7 @@ function ew_beta_series!(st::EWBetaState, X::AbstractMatrix{<:Real},
             B[t, i] = b[i]
         end
     end
-    return (; B = B, Vm = Vm, st = EWBetaState(b, mu, cv, n, act, mu_m, var_m, st.t + T))
+    return B, Vm, EWBetaState(b, mu, cv, n, act, mu_m, var_m, st.t + T)
 end
 """
     ew_beta_reset!(amsk::Nothing, mu::AbstractVector{<:Number},

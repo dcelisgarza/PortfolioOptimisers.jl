@@ -877,7 +877,7 @@ The generic method returns the estimator as it is twice: it carries no state. A 
 
 # Returns
 
-  - `carry::NamedTuple`: `xf`, the estimator with the state after the new observations, and `xv`, the estimator whose stateful Descriptors are [`CarriedDescriptor`](@ref) of the new observations, which the code of the batch fit computes the Factor Exposures with.
+  - `carry::CarriedEstimators`: `xf`, the estimator with the state after the new observations, and `xv`, the estimator whose stateful Descriptors are [`CarriedDescriptor`](@ref) of the new observations, which the code of the batch fit computes the Factor Exposures with.
 
 # Related
 
@@ -885,8 +885,8 @@ The generic method returns the estimator as it is twice: it carries no state. A 
   - [`CarriedDescriptor`](@ref)
   - [`descriptor_step`](@ref)
 """
-function descriptor_carry(xe, ::ReturnsResult, ::Any)
-    return (; xf = xe, xv = xe)
+function descriptor_carry(xe, ::ReturnsResult, ::Any)::CarriedEstimators
+    return CarriedEstimators(xe, xe)
 end
 function descriptor_carry(de::AbstractDescriptorEstimator, rd::ReturnsResult, m::Integer)
     T = size(rd.X, 1)
@@ -905,18 +905,19 @@ Returns the carry of a Descriptor from the answer of [`descriptor_step`](@ref), 
 
 # Returns
 
-  - `carry::NamedTuple`: `xf` and `xv`, as [`descriptor_carry`](@ref) states them.
+  - `carry::CarriedEstimators`: `xf` and `xv`, as [`descriptor_carry`](@ref) states them.
 
 # Related
 
   - [`descriptor_carry`](@ref)
   - [`descriptor_step`](@ref)
 """
-function descriptor_carried(de::AbstractDescriptorEstimator, ::Nothing)
-    return (; xf = de, xv = de)
+function descriptor_carried(de::AbstractDescriptorEstimator, ::Nothing)::CarriedEstimators
+    return CarriedEstimators(de, de)
 end
-function descriptor_carried(::AbstractDescriptorEstimator, step::NamedTuple)
-    return (; xf = step.de, xv = CarriedDescriptor(step.D))
+function descriptor_carried(::AbstractDescriptorEstimator,
+                            step::NamedTuple)::CarriedEstimators
+    return CarriedEstimators(step.de, CarriedDescriptor(step.D))
 end
 """
     carry_lookback(x)

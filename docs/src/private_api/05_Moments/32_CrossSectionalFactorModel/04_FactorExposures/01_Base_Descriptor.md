@@ -1,5 +1,5 @@
 ```@meta
-Description = "Base descriptor, private API of PortfolioOptimisers.jl: EWBetaState, descriptor_field_values, descriptor_asset_panel, assert_log_returns, …"
+Description = "Base descriptor, private API of PortfolioOptimisers.jl: EWBetaState, DescriptorFold, CarriedEstimators, descriptor_field_values, descriptor_asset_panel, …"
 ```
 
 # Base descriptor: private API
@@ -8,6 +8,8 @@ Description = "Base descriptor, private API of PortfolioOptimisers.jl: EWBetaSta
 
 ```@docs
 EWBetaState
+DescriptorFold
+CarriedEstimators
 ```
 
 ## Functions

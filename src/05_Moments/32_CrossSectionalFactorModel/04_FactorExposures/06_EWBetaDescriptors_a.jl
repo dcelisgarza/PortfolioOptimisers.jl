@@ -320,8 +320,34 @@ function merge_states(::EWBlockState, ::EWBlockState)
     return throw(ArgumentError("an EWBlockState cannot merge two states fitted on disjoint blocks: the recursion of the second block starts from the state after the first one. Fold the second block into the state of the first with partial_fit!."))
 end
 """
+$(DocStringExtensions.TYPEDEF)
+
+Holds the observations of a step of an [`EWBlockState`](@ref) joined to the carried ones, and the observations after the last complete window.
+
+This type is an implementation detail and is not intended for direct use. [`ew_block_rows`](@ref) makes it, and [`ew_beta_fold`](@ref) reads it. The two values are arrays of one element type, so a record names them where a plain tuple would let a swap pass silently.
+
+# Fields
+
+$(DocStringExtensions.FIELDS)
+
+# Related
+
+  - [`ew_block_rows`](@ref)
+  - [`EWBlockState`](@ref)
+"""
+@concrete struct JoinedRows
+    """
+    `A`: The joined observations.
+    """
+    A
+    """
+    `P`: A copy of the observations after the last complete window, which the state carries.
+    """
+    P
+end
+"""
     ew_block_rows(P::AbstractVecOrMat{<:Real}, Y::AbstractVecOrMat{<:Real},
-                  agg_obs::Integer) -> NamedTuple
+                  agg_obs::Integer) -> JoinedRows
 
 Joins the observations that an [`EWBlockState`](@ref) carries to the observations of a step, and splits the result at the end of the last complete window.
 
@@ -335,18 +361,19 @@ Joins the observations that an [`EWBlockState`](@ref) carries to the observation
 
 # Returns
 
-  - `rows::NamedTuple`: `A`, the joined observations, and `P`, a copy of the observations after the last complete window.
+  - `rows::JoinedRows`: `A`, the joined observations, and `P`, a copy of the observations after the last complete window.
 
 # Related
 
   - [`EWBlockState`](@ref)
   - [`ew_beta_fold`](@ref)
+  - [`JoinedRows`](@ref)
 """
 function ew_block_rows(P::AbstractVecOrMat{<:Real}, Y::AbstractVecOrMat{<:Real},
-                       agg_obs::Integer)
+                       agg_obs::Integer)::JoinedRows
     A = isempty(P) ? Y : vcat(P, Y)
     n = div(size(A, 1), agg_obs) * agg_obs
-    return (; A = A, P = collect(selectdim(A, 1, (n + 1):size(A, 1))))
+    return JoinedRows(A, collect(selectdim(A, 1, (n + 1):size(A, 1))))
 end
 """
     ew_beta_residual_variance(X::AbstractMatrix{<:Real}, rm::AbstractVector{<:Real},
@@ -872,14 +899,44 @@ function EWBeta(; mcap::AbstractString = "market_cap", decay::Real, min_obs::Int
                   cache)
 end
 """
+$(DocStringExtensions.TYPEDEF)
+
+Holds the Descriptor of an [`EWBeta`](@ref) and the two cross-sections of the shrinkage that its state carries after the last window.
+
+This type is an implementation detail and is not intended for direct use. [`ew_beta_output`](@ref) makes it, and [`ew_beta_fold`](@ref) reads it. `v` and `s` are vectors of one type, so a record names them where a plain tuple would let a swap pass silently.
+
+# Fields
+
+$(DocStringExtensions.FIELDS)
+
+# Related
+
+  - [`ew_beta_output`](@ref)
+  - [`EWBlockState`](@ref)
+"""
+@concrete struct EWBetaOutput
+    """
+    `D`: The Descriptor before the active mask is applied, `observations × assets`.
+    """
+    D
+    """
+    `v`: The residual variance after the last window, or `nothing` with no group.
+    """
+    v
+    """
+    `s`: The shrunk beta after the last window, or `nothing` with no group.
+    """
+    s
+end
+"""
     ew_beta_output(group::Nothing, de::EWBeta, rd::ReturnsResult,
                    Ba::AbstractMatrix{<:Real}, Vm::AbstractVector{<:Real},
                    Xa::AbstractMatrix{<:Real}, rma::AbstractVector{<:Real},
-                   b0::AbstractVector{<:Real}, st::EWBlockState) -> NamedTuple
+                   b0::AbstractVector{<:Real}, st::EWBlockState) -> EWBetaOutput
     ew_beta_output(group::AbstractString, de::EWBeta, rd::ReturnsResult,
                    Ba::AbstractMatrix{<:Real}, Vm::AbstractVector{<:Real},
                    Xa::AbstractMatrix{<:Real}, rma::AbstractVector{<:Real},
-                   b0::AbstractVector{<:Real}, st::EWBlockState) -> NamedTuple
+                   b0::AbstractVector{<:Real}, st::EWBlockState) -> EWBetaOutput
 
 Turn the raw betas of the recursion into the Descriptor of an [`EWBeta`](@ref).
 
@@ -911,7 +968,7 @@ The windows of `Ba` follow the windows that the state `st` folded, and the obser
 
 # Returns
 
-  - `out::NamedTuple`: `D`, the Descriptor before the active mask is applied, `observations × assets`, and `v` and `s`, the residual variance and the shrunk beta after the last window, or `nothing` with no group.
+  - `out::EWBetaOutput`: `D`, the Descriptor before the active mask is applied, `observations × assets`, and `v` and `s`, the residual variance and the shrunk beta after the last window, or `nothing` with no group.
 
 # Related
 
@@ -925,8 +982,8 @@ function ew_beta_output(::Nothing, de::EWBeta, rd::ReturnsResult,
                         Ba::AbstractMatrix{<:Real}, ::AbstractVector{<:Real},
                         ::AbstractMatrix{<:Real}, ::AbstractVector{<:Real},
                         b0::AbstractVector{<:Real}, st::EWBlockState)
-    return (; D = ew_beta_expand(Ba, size(rd.X, 1), de.agg_obs, b0, size(st.X, 1)),
-            v = nothing, s = nothing)
+    return EWBetaOutput(ew_beta_expand(Ba, size(rd.X, 1), de.agg_obs, b0, size(st.X, 1)),
+                        nothing, nothing)
 end
 function ew_beta_output(group::AbstractString, de::EWBeta, rd::ReturnsResult,
                         Ba::AbstractMatrix{<:Real}, Vm::AbstractVector{<:Real},
@@ -957,7 +1014,7 @@ function ew_beta_output(group::AbstractString, de::EWBeta, rd::ReturnsResult,
             B[t, :] = s
         end
     end
-    return (; D = B, v = isempty(Vr) ? v0 : Vr[end, :], s = s)
+    return EWBetaOutput(B, isempty(Vr) ? v0 : Vr[end, :], s)
 end
 """
     descriptor(de::EWBeta, rd::ReturnsResult) -> Matrix{<:Real}
