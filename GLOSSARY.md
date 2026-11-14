@@ -1177,7 +1177,7 @@ The rule for the evaluation of a risk measure on a reduced net-return series tha
 The naming convention in which "X" stands for "Value" or "Drawdown". It is the same family, applied to returns or to drawdowns. *Relative* variants are the hierarchical drawdown forms. *Range* variants penalise the gap between the two tails. *Distributionally Robust (DR)* variants optimise against worst-case scenario distributions.
 
 **Range Tails**
-The two point measures whose sum is a Range variant: the **loss** tail on the net portfolio returns, and the **gain** tail on their negation at the second level of the range.
+The two point measures whose sum is a Range variant: the **loss** tail on the net portfolio returns, and the **gain** tail on their negation at the second level of the range. `range_tails` returns them as a `RangeTails`, whose constructor refuses a tail that adds to the risk expression, because the range registers it once (#2113).
 
 **Negated Upper Tail**
 The sign convention that lets a Range be a sum. The gain tail is the base measure applied to the *negated* returns, so it is reported on the same sign convention as the loss tail and the two add rather than subtract.

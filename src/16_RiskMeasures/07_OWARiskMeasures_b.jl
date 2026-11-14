@@ -849,8 +849,8 @@ calibration_slots(x::OWA_RevFunc) = (; inner = x.inner)
 function range_tails(r::OrderedWeightsArrayRange{<:Any, <:Any, <:Any,
                                                  <:ApproxOrderedWeightsArray})
     settings = RiskMeasureSettings(; rke = false)
-    return (; loss = OrderedWeightsArray(; settings = settings, w = r.w1, alg = r.alg),
-            gain = OrderedWeightsArray(; settings = settings, w = r.w2, alg = r.alg))
+    return RangeTails(OrderedWeightsArray(; settings = settings, w = r.w1, alg = r.alg),
+                      OrderedWeightsArray(; settings = settings, w = r.w2, alg = r.alg))
 end
 function (r::OrderedWeightsArrayRange)(x::VecNum)
     w1 = owa_weights(r.w1, length(x), :w1)

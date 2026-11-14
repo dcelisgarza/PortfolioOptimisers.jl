@@ -345,7 +345,8 @@ end
                                                :sel => "one method for each form of a slot: the uncertainty-set forms call `ucs_selector`, which 2 functions share, and the other forms call `nothing_scalar_array_selector` (rule 3, #2100)",
                                                :owa_l_moment_crm => "2 functions share its callee `ncrra_weights` (rule 3, #2100)",
                                                :scalarised_degree => "2 functions share its callee `homogeneity_degree` (rule 3, #2100)",
-                                               :supports_precomputed_returns => "a moment measure answers through `weight_independent_target`, which 2 functions share (rule 3, #2100)")
+                                               :supports_precomputed_returns => "a moment measure answers through `weight_independent_target`, which 2 functions share (rule 3, #2100)",
+                                               :range_tails => "an interface verb: each method builds `RangeTails`, the public type of its contract, and the method of `GenericValueatRiskRange` passes the two tails that the caller stated (rule 3, #2113, #2100)")
     # The debt that #2072 removes. Do not add a pair: fix the wrapper.
     pending_forwards = Set{Tuple{Symbol, Symbol}}([(:apply_fitted_step,
                                                     :apply_fitted_steps),

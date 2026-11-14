@@ -1002,10 +1002,10 @@ deferred_slots(r::ValueatRiskRange) = (; alg = r.alg)
 # rather than duplicating, and has no two sub-models to build.
 function range_tails(r::ValueatRiskRange{<:Any, <:Any, <:Any, <:Any, <:MIPValueatRisk})
     settings = RiskMeasureSettings(; rke = false)
-    return (;
-            loss = ValueatRisk(; settings = settings, alpha = r.alpha, w = r.w,
-                               alg = r.alg),
-            gain = ValueatRisk(; settings = settings, alpha = r.beta, w = r.w, alg = r.alg))
+    return RangeTails(ValueatRisk(; settings = settings, alpha = r.alpha, w = r.w,
+                                  alg = r.alg),
+                      ValueatRisk(; settings = settings, alpha = r.beta, w = r.w,
+                                  alg = r.alg))
 end
 # The empirical order statistic is the `MIPValueatRisk` estimand, so the functor below names
 # that formulation. Leaving `alg` free makes it overlap the parametric method further down,

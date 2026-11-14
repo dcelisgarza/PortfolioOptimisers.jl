@@ -201,7 +201,7 @@ function risk_input_kind(r::AbstractBaseRiskMeasure)
     return throw(ArgumentError("`risk_input_kind` is not defined for `$(typeof(r))`. Every concrete `AbstractBaseRiskMeasure` must declare its input kind beside its definition by adding a method returning one of `NetReturnsInput()`, `WeightsReturnsFeesInput()`, or `WeightsInput()`."))
 end
 """
-    range_tails(r::RiskMeasure) -> @NamedTuple{loss, gain}
+    range_tails(r::RiskMeasure) -> RangeTails
 
 Decompose a *range* risk measure into the two point measures it is the sum of.
 
@@ -224,10 +224,11 @@ There is no default. A measure that is not a range, or one that fuses, throws ra
 
 # Returns
 
-  - `(; loss, gain)`: The loss-tail and gain-tail point measures.
+  - `tails::RangeTails`: The loss-tail and gain-tail point measures. A method of a range of your own builds it, and its constructor refuses a tail that adds to the risk expression.
 
 # Related
 
+  - [`RangeTails`](@ref)
   - [`set_range_risk_constraints!`](@ref)
   - [`GenericValueatRiskRange`](@ref)
   - [`RiskMeasureSettings`](@ref)
@@ -701,6 +702,74 @@ Each has a fallback on [`AbstractBaseRiskMeasure`](@ref):
   - [`set_risk_constraints!`](@ref)
 """
 abstract type RiskMeasure <: OptimisationRiskMeasure end
+"""
+$(DocStringExtensions.TYPEDEF)
+
+Holds the **Range Tails** of a range risk measure: the two point measures whose sum is the range.
+
+[`range_tails`](@ref) returns it, and a range of your own builds it in its method of that verb. The `loss` tail reads the net portfolio returns, and the `gain` tail reads their negation at the second level of the range. An upper bound and a risk-expression contribution belong to the range as a whole, which registers them once from the composite expression. So each tail carries `rke = false`, and the constructor refuses a tail that does not.
+
+# Fields
+
+$(DocStringExtensions.FIELDS)
+
+# Constructors
+
+    RangeTails(loss::RiskMeasure, gain::RiskMeasure) -> RangeTails
+    RangeTails(; loss::RiskMeasure, gain::RiskMeasure) -> RangeTails
+
+# Validation
+
+  - `loss.settings.rke` and `gain.settings.rke` are `false`. Otherwise an `ArgumentError` is raised.
+
+# Examples
+
+```jldoctest
+julia> off = RiskMeasureSettings(; rke = false);
+
+julia> tails = PortfolioOptimisers.RangeTails(;
+                                              loss = ConditionalValueatRisk(; settings = off,
+                                                                            alpha = 0.05),
+                                              gain = ConditionalValueatRisk(; settings = off,
+                                                                            alpha = 0.1));
+
+julia> (tails.loss.alpha, tails.gain.alpha)
+(0.05, 0.1)
+
+julia> PortfolioOptimisers.RangeTails(; loss = ConditionalValueatRisk(),
+                                      gain = ConditionalValueatRisk())
+ERROR: ArgumentError: Each tail of a range carries `rke = false`, because the range registers its risk expression once. Got
+loss.settings.rke => true
+gain.settings.rke => true
+Stacktrace:
+[...]
+```
+
+# Related
+
+  - [`range_tails`](@ref)
+  - [`RiskMeasure`](@ref)
+  - [`RiskMeasureSettings`](@ref)
+  - [`GenericValueatRiskRange`](@ref)
+"""
+@concrete struct RangeTails
+    """
+    The point measure of the losses, at the first level of the range.
+    """
+    loss
+    """
+    The point measure of the gains, read on the negated returns at the second level of the range.
+    """
+    gain
+    function RangeTails(loss::RiskMeasure, gain::RiskMeasure)
+        @argcheck(!loss.settings.rke && !gain.settings.rke,
+                  ArgumentError("Each tail of a range carries `rke = false`, because the range registers its risk expression once. Got\nloss.settings.rke => $(loss.settings.rke)\ngain.settings.rke => $(gain.settings.rke)"))
+        return new{typeof(loss), typeof(gain)}(loss, gain)
+    end
+end
+function RangeTails(; loss::RiskMeasure, gain::RiskMeasure)::RangeTails
+    return RangeTails(loss, gain)
+end
 """
     const VecRM = AbstractVector{<:RiskMeasure}
 
@@ -1802,6 +1871,39 @@ function deferred_factors(pr::AbstractPriorResult)
     return isnothing(pr.fpr) ? nothing : pr.fpr.X
 end
 """
+$(DocStringExtensions.TYPEDEF)
+
+Holds the fit of a [`CoskewnessEstimator`](@ref) in a **Deferred Quantity**: the coskewness matrix, its negative spectral part and the processor that built that part.
+
+`sk` and `V` come out of one call of [`coskewness`](@ref), and `V` never travels without `sk`. [`fit_deferred_quantity`](@ref) returns it, and [`deferred_quantity`](@ref) and [`deferred_derived_quantity`](@ref) read its fields by the name of the slot.
+
+# Fields
+
+$(DocStringExtensions.FIELDS)
+
+# Related
+
+  - [`fit_deferred_quantity`](@ref)
+  - [`deferred_quantity`](@ref)
+  - [`deferred_derived_quantity`](@ref)
+  - [`coskewness_processor`](@ref)
+  - [`NegativeSkewness`](@ref)
+"""
+@concrete struct CoskewnessFit <: AbstractResult
+    """
+    The coskewness matrix of the fit.
+    """
+    sk
+    """
+    The negative spectral coskewness that the same call gave.
+    """
+    V
+    """
+    The matrix-processing estimator that built `V`, from [`coskewness_processor`](@ref), or `nothing`.
+    """
+    skmp
+end
+"""
     fit_deferred_quantity(dq::DeferredQuantity, pr::AbstractPriorResult)
 
 Run a **Deferred Quantity** against the optimisation's own prior result and return what it produces: a moment estimator gives its quantity, an [`AbstractPriorEstimator`](@ref) gives a whole [`AbstractPriorResult`](@ref).
@@ -1810,17 +1912,17 @@ The estimator sees `pr.original_X`, the returns that the **caller** supplied, sl
 
 `pr.original_X` rather than `pr.X`, because the two differ on a factor route. [`FactorPrior`](@ref), [`FactorBlackLittermanPrior`](@ref) and [`AugmentedBlackLittermanPrior`](@ref) all overwrite `X` with the reconstruction `F * transpose(M) .+ transpose(b)`, which spans only the factors: it has rank `size(F, 2)`, and it carries no residual. Fitting a covariance estimator on it returns a **singular** matrix whenever there are more assets than factors, and a prior estimator in a slot could not regress it against those same factors. Off a factor route `original_X === X`, so nothing moves.
 
-A [`CokurtosisEstimator`](@ref) gives its tensor. A [`CoskewnessEstimator`](@ref) gives the **pair** `(sk, V)` and the matrix-processing estimator that built `V`, as a named tuple. `V` is derived from `sk` and never travels on its own. See [`coskewness_processor`](@ref). A co-moment estimator takes its tensor about the centre of its own `me`.
+A [`CokurtosisEstimator`](@ref) gives its tensor. A [`CoskewnessEstimator`](@ref) gives the **pair** `(sk, V)` and the matrix-processing estimator that built `V`, as a [`CoskewnessFit`](@ref). `V` is derived from `sk` and never travels on its own. See [`coskewness_processor`](@ref). A co-moment estimator takes its tensor about the centre of its own `me`.
 
 # Algorithm
 
  1. Rebuild `dq` against the prior's observation weights with `factory(dq, pr.w)`. The two co-moment arms bind the rebuilt estimator as `kte` and `ske`.
  2. Run the rebuilt estimator on `pr.original_X`, through the verb of its own family: `Statistics.mean` for an expected-returns estimator, `Statistics.cov` for a covariance estimator, [`cokurtosis`](@ref) for a cokurtosis estimator, [`coskewness`](@ref) for a coskewness estimator, and [`prior`](@ref) for a prior estimator, which also takes `deferred_factors(pr)`.
- 3. Return the quantity the verb gave. The coskewness arm returns the named tuple `(; sk, V, skmp)` instead, because `V` comes out of the same call and [`coskewness_processor`](@ref) names the estimator that built it.
+ 3. Return the quantity the verb gave. The coskewness arm returns a [`CoskewnessFit`](@ref) instead, because `V` comes out of the same call and [`coskewness_processor`](@ref) names the estimator that built it.
 
 # Returns
 
-  - The deferred quantity: a vector for an expected-returns estimator, a matrix for a covariance or a cokurtosis estimator, an [`AbstractPriorResult`](@ref) for a prior estimator, and the named tuple `(; sk, V, skmp)` for a coskewness estimator.
+  - The deferred quantity: a vector for an expected-returns estimator, a matrix for a covariance or a cokurtosis estimator, an [`AbstractPriorResult`](@ref) for a prior estimator, and a [`CoskewnessFit`](@ref) for a coskewness estimator.
 
 # Related
 
@@ -1829,6 +1931,7 @@ A [`CokurtosisEstimator`](@ref) gives its tensor. A [`CoskewnessEstimator`](@ref
   - [`deferred_factors`](@ref)
   - [`LowOrderPrior`](@ref)
   - [`_wprop`](@ref)
+  - [`CoskewnessFit`](@ref)
 """
 function fit_deferred_quantity(dq::AbstractExpectedReturnsEstimator,
                                pr::AbstractPriorResult)
@@ -1847,7 +1950,7 @@ end
 function fit_deferred_quantity(dq::CoskewnessEstimator, pr::AbstractPriorResult)
     ske = factory(dq, pr.w)
     sk, V = coskewness(ske, pr.original_X)
-    return (; sk = sk, V = V, skmp = coskewness_processor(ske))
+    return CoskewnessFit(sk, V, coskewness_processor(ske))
 end
 """
     coskewness_processor(ske::CoskewnessEstimator)
@@ -1884,11 +1987,11 @@ end
 
 Read the quantity named by `key` off what [`fit_deferred_quantity`](@ref) produced.
 
-A moment estimator produced the quantity itself, so it is returned and `key` is inert. A [`CoskewnessEstimator`](@ref) produced a named tuple, because `sk` and `V` come out of one call. An [`AbstractPriorEstimator`](@ref) produced a prior result, so `key` picks the one wanted from the several it computed.
+A moment estimator produced the quantity itself, so it is returned and `key` is inert. A [`CoskewnessEstimator`](@ref) produced a [`CoskewnessFit`](@ref), because `sk` and `V` come out of one call. An [`AbstractPriorEstimator`](@ref) produced a prior result, so `key` picks the one wanted from the several it computed.
 
 # Validation
 
-  - Throws an `ArgumentError` when `fitted` is a `NamedTuple` carrying no `key`, and when `fitted` is an [`AbstractPriorResult`](@ref) carrying no property `key`. The slot named an estimator that computes something else, and a silent `nothing` would reach the model builders as though the caller had stated none. This is the difference from [`deferred_derived_quantity`](@ref), which answers `nothing` for a key its fit does not carry.
+  - Throws an `ArgumentError` when `fitted` is a [`CoskewnessFit`](@ref) carrying no field `key`, and when `fitted` is an [`AbstractPriorResult`](@ref) carrying no property `key`. The slot named an estimator that computes something else, and a silent `nothing` would reach the model builders as though the caller had stated none. This is the difference from [`deferred_derived_quantity`](@ref), which answers `nothing` for a key its fit does not carry.
 
 # Returns
 
@@ -1903,10 +2006,10 @@ A moment estimator produced the quantity itself, so it is returned and `key` is 
 function deferred_quantity(fitted, ::Symbol)
     return fitted
 end
-function deferred_quantity(fitted::NamedTuple, key::Symbol)
-    @argcheck(haskey(fitted, key),
+function deferred_quantity(fitted::CoskewnessFit, key::Symbol)
+    @argcheck(hasfield(CoskewnessFit, key),
               ArgumentError("The fit in this slot produced no `$key`, so it cannot supply it. Name an estimator that computes `$key`."))
-    return fitted[key]
+    return getfield(fitted, key)
 end
 function deferred_quantity(fitted::AbstractPriorResult, key::Symbol)
     @argcheck(hasproperty(fitted, key),
@@ -1991,7 +2094,7 @@ end
 
 Read a **derived** quantity named by `key` off what [`fit_deferred_quantity`](@ref) produced. The three derived quantities are `chol`, the factorisation that comes with `sigma`, `V`, the negative spectral part that comes with `sk`, and `skmp`, the processor that built `V`.
 
-A prior result carries all three. A coskewness estimator produced a named tuple carrying `V` and `skmp`. Anything else produced only its own quantity, so the answer is `nothing` and the consumer keeps whatever fallback it already had. This is the difference from [`deferred_quantity`](@ref), which refuses a `key` the fit does not carry.
+A prior result carries all three. A coskewness estimator produced a [`CoskewnessFit`](@ref) carrying `V` and `skmp`. Anything else produced only its own quantity, so the answer is `nothing` and the consumer keeps whatever fallback it already had. This is the difference from [`deferred_quantity`](@ref), which refuses a `key` the fit does not carry.
 
 # Related
 
@@ -2002,8 +2105,8 @@ A prior result carries all three. A coskewness estimator produced a named tuple 
 function deferred_derived_quantity(::Any, ::Symbol)
     return nothing
 end
-function deferred_derived_quantity(fitted::NamedTuple, key::Symbol)
-    return haskey(fitted, key) ? fitted[key] : nothing
+function deferred_derived_quantity(fitted::CoskewnessFit, key::Symbol)
+    return hasfield(CoskewnessFit, key) ? getfield(fitted, key) : nothing
 end
 function deferred_derived_quantity(fitted::AbstractPriorResult, key::Symbol)
     return hasproperty(fitted, key) ? getproperty(fitted, key) : nothing
@@ -2588,7 +2691,8 @@ export Frontier, RiskMeasureSettings, HierarchicalRiskMeasureSettings, SumScalar
 # The verbs the `# Interfaces` sections of `RiskMeasure` and `HierarchicalRiskMeasure` name
 # (ADR 0154, #1775). Public, not exported: they are only ever extended, and an extension must
 # qualify them as `PortfolioOptimisers.risk_input_kind` and so on anyway.
-public risk_input_kind, supports_precomputed_returns, bigger_is_better, range_tails
+public risk_input_kind, supports_precomputed_returns, bigger_is_better, range_tails,
+       RangeTails
 # The `# Interfaces`-marked types and verbs of #1137 (ADR 0154): AbstractRiskMeasureSettings
 # names required fields only; FrontierBoundEstimator and Scalariser each name the verb(s) an
 # extension must implement.

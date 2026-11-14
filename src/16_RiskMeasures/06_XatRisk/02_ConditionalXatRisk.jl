@@ -592,9 +592,10 @@ calibration_slots(x::ConditionalValueatRiskRange) = (; alpha = x.alpha, beta = x
 # Tail decomposition — see `range_tails`.
 function range_tails(r::ConditionalValueatRiskRange)
     settings = RiskMeasureSettings(; rke = false)
-    return (;
-            loss = ConditionalValueatRisk(; settings = settings, alpha = r.alpha, w = r.w),
-            gain = ConditionalValueatRisk(; settings = settings, alpha = r.beta, w = r.w))
+    return RangeTails(ConditionalValueatRisk(; settings = settings, alpha = r.alpha,
+                                             w = r.w),
+                      ConditionalValueatRisk(; settings = settings, alpha = r.beta,
+                                             w = r.w))
 end
 """
 $(DocStringExtensions.TYPEDEF)
@@ -838,13 +839,14 @@ end
 # `l_a`/`r_a` describe the loss-side Wasserstein ball, `l_b`/`r_b` the gain-side one.
 function range_tails(r::DistributionallyRobustConditionalValueatRiskRange)
     settings = RiskMeasureSettings(; rke = false)
-    return (;
-            loss = DistributionallyRobustConditionalValueatRisk(; settings = settings,
-                                                                alpha = r.alpha, l = r.l_a,
-                                                                r = r.r_a, w = r.w),
-            gain = DistributionallyRobustConditionalValueatRisk(; settings = settings,
-                                                                alpha = r.beta, l = r.l_b,
-                                                                r = r.r_b, w = r.w))
+    return RangeTails(DistributionallyRobustConditionalValueatRisk(; settings = settings,
+                                                                   alpha = r.alpha,
+                                                                   l = r.l_a, r = r.r_a,
+                                                                   w = r.w),
+                      DistributionallyRobustConditionalValueatRisk(; settings = settings,
+                                                                   alpha = r.beta,
+                                                                   l = r.l_b, r = r.r_b,
+                                                                   w = r.w))
 end
 """
     const RMCVaRRg{T} = Union{...}

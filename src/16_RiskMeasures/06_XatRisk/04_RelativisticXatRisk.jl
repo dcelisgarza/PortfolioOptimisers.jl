@@ -49,11 +49,11 @@ function RRM(x::VecNum, slv::Slv_VecSlv, alpha::Number = 0.05, kappa::Number = 0
         @argcheck(!isempty(slv), IsEmptyError("slv cannot be empty"))
     end
     sol = RRM_model(x, slv, alpha, kappa, w)
-    return if isnothing(sol)
-        NaN
-    else
-        JuMP.objective_value(sol.model)
+    if isnothing(sol)
+        return NaN
     end
+    model, _ = sol
+    return JuMP.objective_value(model)
 end
 """
     RRM_worst_case(x::VecNum, slv::Slv_VecSlv, alpha::Number = 0.05, kappa::Number = 0.3,
@@ -104,19 +104,16 @@ function RRM_worst_case(x::VecNum, slv::Slv_VecSlv, alpha::Number = 0.05,
         @argcheck(!isempty(slv), IsEmptyError("slv cannot be empty"))
     end
     sol = RRM_model(x, slv, alpha, kappa, w)
-    if isnothing(sol) || sol.primal && !JuMP.has_duals(sol.model)
+    if isnothing(sol) || last(sol) && !JuMP.has_duals(first(sol))
         return nothing
     end
-    qr = if sol.primal
-        .-JuMP.dual.(sol.model[:rrm_loss])
-    else
-        JuMP.value.(sol.model[:z])
-    end
+    model, primal = sol
+    qr = primal ? .-JuMP.dual.(model[:rrm_loss]) : JuMP.value.(model[:z])
     return expand_positive_weight_rows(qr, positive_weight_rows(w, length(x)), length(x))
 end
 """
     RRM_model(x::VecNum, slv::Slv_VecSlv, alpha::Number, kappa::Number,
-              w::Option{<:VecNum}) -> Option{<:NamedTuple}
+              w::Option{<:VecNum}) -> Option{<:Tuple{JuMP.Model, Bool}}
 
 Build the primal programme below in a new model and solve it, and build and solve the dual programme when no solver solves the primal one.
 
@@ -199,7 +196,7 @@ Where:
 
 # Returns
 
-  - `(; model, primal)`: The solved model, and whether it holds the primal programme.
+  - `(model, primal)`: The solved model, and whether it holds the primal programme, as a plain tuple that each caller takes apart at once.
   - `nothing`: When no solver of `slv` solves either programme.
 
 # Related
@@ -244,7 +241,7 @@ function RRM_model(x::VecNum, slv::Slv_VecSlv, alpha::Number, kappa::Number,
     JuMP.@constraint(model, rrm_loss, (epsilon + omega - xr) .- t <= 0)
     JuMP.@objective(model, Min, risk)
     return if optimise_JuMP_model!(model, slv).success
-        (; model = model, primal = true)
+        (model, true)
     else
         model = JuMP.Model()
         JuMP.set_string_names_on_creation(model, false)
@@ -265,7 +262,7 @@ function RRM_model(x::VecNum, slv::Slv_VecSlv, alpha::Number, kappa::Number,
         end
         JuMP.@objective(model, Max, risk)
         if optimise_JuMP_model!(model, slv).success
-            (; model = model, primal = false)
+            (model, false)
         else
             nothing
         end
@@ -719,11 +716,10 @@ end
 # value-level twin, and it is what pins that pairing.
 function range_tails(r::RelativisticValueatRiskRange)
     settings = RiskMeasureSettings(; rke = false)
-    return (;
-            loss = RelativisticValueatRisk(; settings = settings, slv = r.slv,
-                                           alpha = r.alpha, kappa = r.kappa_a, w = r.w),
-            gain = RelativisticValueatRisk(; settings = settings, slv = r.slv,
-                                           alpha = r.beta, kappa = r.kappa_b, w = r.w))
+    return RangeTails(RelativisticValueatRisk(; settings = settings, slv = r.slv,
+                                              alpha = r.alpha, kappa = r.kappa_a, w = r.w),
+                      RelativisticValueatRisk(; settings = settings, slv = r.slv,
+                                              alpha = r.beta, kappa = r.kappa_b, w = r.w))
 end
 function (r::RelativisticValueatRiskRange)(x::VecNum)
     return RRM(x, r.slv, r.alpha, r.kappa_a, r.w) + RRM(-x, r.slv, r.beta, r.kappa_b, r.w)

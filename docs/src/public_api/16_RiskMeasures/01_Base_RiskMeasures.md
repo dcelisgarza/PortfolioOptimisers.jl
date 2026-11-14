@@ -141,7 +141,8 @@ port_opt_view(rs::AbstractBaseRiskMeasure, ::Any, ::Any, args...)
 needs_previous_weights(::AbstractBaseRiskMeasure)
 bigger_is_better
 range_tails
-supports_precomputed_returns(r::AbstractBaseRiskMeasure)
+RangeTails
+supports_precomputed_returns(r::AbstractBaseRiskMeasure, ::WeightsReturnsFeesInput = risk_input_kind(r))
 supports_precomputed_returns(rs::VecBaseRM)
 supports_precomputed_returns(::Any, ::NetReturnsInput)
 supports_precomputed_returns(::Any, ::WeightsInput)

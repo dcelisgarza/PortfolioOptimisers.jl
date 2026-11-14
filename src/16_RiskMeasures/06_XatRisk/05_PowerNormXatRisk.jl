@@ -637,11 +637,10 @@ calibration_slots(x::PowerNormValueatRiskRange) = (; alpha = x.alpha, beta = x.b
 # what pins that pairing.
 function range_tails(r::PowerNormValueatRiskRange)
     settings = RiskMeasureSettings(; rke = false)
-    return (;
-            loss = PowerNormValueatRisk(; settings = settings, slv = r.slv, alpha = r.alpha,
-                                        p = r.pa, w = r.w),
-            gain = PowerNormValueatRisk(; settings = settings, slv = r.slv, alpha = r.beta,
-                                        p = r.pb, w = r.w))
+    return RangeTails(PowerNormValueatRisk(; settings = settings, slv = r.slv,
+                                           alpha = r.alpha, p = r.pa, w = r.w),
+                      PowerNormValueatRisk(; settings = settings, slv = r.slv,
+                                           alpha = r.beta, p = r.pb, w = r.w))
 end
 function (r::PowerNormValueatRiskRange)(x::VecNum)
     return PRM(x, r.slv, r.alpha, r.pa, r.w) + PRM(-x, r.slv, r.beta, r.pb, r.w)

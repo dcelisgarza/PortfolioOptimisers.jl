@@ -28,8 +28,8 @@
     # ------------------------------------------------------------------ the two lists
 
     #=
-    Each entry decomposes: `range_tails` answers a `(; loss, gain)` pair of point measures,
-    and `set_range_risk_constraints!` sums them.
+    Each entry decomposes: `range_tails` answers a `RangeTails` pair of point measures, and
+    `set_range_risk_constraints!` sums them.
     =#
     declaring = ["ConditionalValueatRiskRange" => ConditionalValueatRiskRange(),
                  "DistributionallyRobustConditionalValueatRiskRange" =>
@@ -99,11 +99,11 @@
     for (name, r) in declaring
         tails = PortfolioOptimisers.range_tails(r)
 
-        # The shape the consumer destructures.
-        @test isa(tails, NamedTuple)
+        # The shape the consumer destructures: the public type of the contract (#2113).
+        @test isa(tails, PortfolioOptimisers.RangeTails)
         @test issetequal(propertynames(tails), (:loss, :gain))
 
-        for (side, tail) in pairs(tails)
+        for tail in (tails.loss, tails.gain)
             #=
             "The sum of TWO POINT measures". A tail that were itself a range would nest a
             decomposition inside a decomposition, and `nested_index` would be carrying a
@@ -213,4 +213,25 @@
     =#
     @test_throws ArgumentError PortfolioOptimisers.range_tails(ConditionalValueatRisk())
     @test_throws ArgumentError PortfolioOptimisers.range_tails(Variance())
+
+    #=
+    `RangeTails` is the contract that a range of your own builds (#2113). Its constructor
+    holds the invariant of the census above, so a tail that would add to the risk
+    expression fails where it is made. A tail of either side is enough to refuse.
+    =#
+    let off = RiskMeasureSettings(; rke = false),
+        RangeTails = PortfolioOptimisers.RangeTails
+
+        tails = RangeTails(; loss = ConditionalValueatRisk(; settings = off, alpha = 0.05),
+                           gain = ConditionalValueatRisk(; settings = off, alpha = 0.1))
+        # The consumer in `set_range_risk_constraints!` destructures it by name.
+        (; loss, gain) = tails
+        @test (loss.alpha, gain.alpha) == (0.05, 0.1)
+        @test RangeTails(loss, gain).gain === gain
+        @test_throws ArgumentError RangeTails(ConditionalValueatRisk(), gain)
+        @test_throws ArgumentError RangeTails(loss, ConditionalValueatRisk())
+        # The typed keyword constructor is the door that refuses another type. `@concrete`
+        # appends a generic positional constructor, so the positional route does not.
+        @test_throws TypeError RangeTails(; loss = loss, gain = nothing)
+    end
 end

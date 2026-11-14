@@ -567,11 +567,10 @@ calibration_slots(x::EntropicValueatRiskRange) = (; alpha = x.alpha, beta = x.be
 # the same two tails, evaluated instead of built.
 function range_tails(r::EntropicValueatRiskRange)
     settings = RiskMeasureSettings(; rke = false)
-    return (;
-            loss = EntropicValueatRisk(; settings = settings, slv = r.slv, alpha = r.alpha,
-                                       w = r.w),
-            gain = EntropicValueatRisk(; settings = settings, slv = r.slv, alpha = r.beta,
-                                       w = r.w))
+    return RangeTails(EntropicValueatRisk(; settings = settings, slv = r.slv,
+                                          alpha = r.alpha, w = r.w),
+                      EntropicValueatRisk(; settings = settings, slv = r.slv,
+                                          alpha = r.beta, w = r.w))
 end
 function (r::EntropicValueatRiskRange)(x::VecNum)
     return ERM(x, r.slv, r.alpha, r.w) + ERM(-x, r.slv, r.beta, r.w)

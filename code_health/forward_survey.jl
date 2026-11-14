@@ -1544,8 +1544,6 @@ const RULED_NAMED_TUPLES = Dict{Symbol, Tuple{String, String}}(#
                                                                     "the mean of the records of `weight_statistics`: it returns the private type of that record (#2113)"),
                                                                # The transient test of the private helpers, which needs the callers
                                                                # and the types of the values (#2113).
-                                                               :RRM_model => ("go",
-                                                                              "its callers check `isnothing`, then take `(model, primal)` apart at once, and the two values have different types: a plain tuple (#2113)"),
                                                                :attribution_family_index =>
                                                                    ("go",
                                                                     "every caller takes it apart at once: a plain tuple, unless two values have one type, which takes a private type (#2113)"),
@@ -1621,17 +1619,14 @@ const RULED_NAMED_TUPLES = Dict{Symbol, Tuple{String, String}}(#
                                                                :factor_residual_config =>
                                                                    ("go",
                                                                     "the value travels: returned whole by seven priors: a private defined type (#2113)"),
-                                                               :fit_deferred_quantity =>
-                                                                   ("go",
-                                                                    "the value travels: an argument to a call, and a later use of `fitted`: a private defined type (#2113)"),
                                                                :opinion_pooling_scenarios =>
                                                                    ("go",
                                                                     "every caller takes it apart at once: a plain tuple, unless two values have one type, which takes a private type (#2113)"),
                                                                :report_cell => ("go",
                                                                                 "a cell that its callers read by field and pass on: a private record (#2113)"),
                                                                :resolve_sigma_chol =>
-                                                                   ("go",
-                                                                    "the value travels: an argument to a call: a private defined type (#2113)"),
+                                                                   ("keep (keys)",
+                                                                    "the call is `rebuild_with_slots`, which merges it into the fields of the measure by key, so a struct would need a conversion back at each call (#2113, #2100)"),
                                                                :split_weight_record =>
                                                                    ("go",
                                                                     "the value travels: collected in a generator: a private defined type (#2113)"),

@@ -101,6 +101,7 @@ end
     # derived from `sk` and never travels on its own.
     @test PO.fit_deferred_quantity(Cokurtosis(), pr) ≈ cokurtosis(Cokurtosis(), pr.X)
     fitted = PO.fit_deferred_quantity(Coskewness(), pr)
+    @test fitted isa PO.CoskewnessFit
     sk, V = coskewness(Coskewness(), pr.X)
     @test PO.deferred_quantity(fitted, :sk) ≈ sk
     @test PO.deferred_derived_quantity(fitted, :V) ≈ V

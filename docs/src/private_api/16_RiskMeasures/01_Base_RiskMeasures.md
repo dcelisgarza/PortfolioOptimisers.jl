@@ -34,6 +34,7 @@ scalarise_logsumexp
 Sca_VecToScaM
 nothing_scalar_array_selector
 deferred_factors
+CoskewnessFit
 fit_deferred_quantity
 deferred_quantity
 fan_out_slot
