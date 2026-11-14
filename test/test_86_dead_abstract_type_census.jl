@@ -88,13 +88,13 @@ end
         :OptimisationModelResult => "public, the family of the model results of an optimisation",
         :TimeDependentConstraintCallable => "public, the family of the time-dependent constraint callables (ADR 0030)",
         # Private types that an ADR names deliberate: check 4 of the keep rule (ADR 0222).
-        :AbstractCentralityPolarity => "ADR 0048 keeps the fields unbounded by it on purpose",
         :AbstractCrossSectionalRegressionResult => "ADR 0103, a second cross-sectional regression result, a robust or a constrained fit",
         :AbstractRegressionEstimator => "ADR 0103, the umbrella of the regression estimators",
         :AbstractRegressionResult => "ADR 0103, the umbrella of the regression results",
         :BaseJuMPOptimisationResult => "ADR 0011, a second JuMP optimisation result beside `JuMPOptimisationResult`",
         :HierarchicalScalariser => "ADR 0052, the max and sum scalarisers beside `MinScalariser`",
         :NonOptimisationCrossValidationEstimator => "ADR 0143, the family of the cross-validation estimators that are not optimisers",
+        :MomentMeasureAlgorithm => "ADR 0222, the umbrella of the low- and high-order moment algorithms, kept by default after #2089 removed its one dispatch, a `factory` leaf",
         # Private types that a verdict of the map #1852 kept (ADR 0222).
         :AbstractCrossValidationScorer => "#1875, the family of the cross-validation scorers, with `CrossValidationSearchScorer` under it (#1876)",
         :AbstractEntropyPoolingViewEstimator => "#1875, the view groups that carry their own significance level",

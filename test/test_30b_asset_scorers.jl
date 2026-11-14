@@ -204,8 +204,11 @@ struct NoOrientationScorer <: PortfolioOptimisers.AbstractAssetScorer end
               sort(partialsortperm(PO.asset_scores(sv, rd), 1:2; rev = true))
         # A member that gives a non-finite value on a covered column is a defect, and the
         # scorer throws, as one measure does. A constant series has a zero standard deviation.
+        # The constant is a power of two, so every sum of it is exact and so is the zero. A
+        # constant of 0.01 gives a standard deviation of about 1e-18 over 120 rows, and its value
+        # on a fold depends on the summation order of the host.
         Xc = copy(X)
-        Xc[:, 3] .= 0.01
+        Xc[:, 3] .= 0.5
         rdc = ReturnsResult(; nx = nx, X = Xc)
         tcm = ThirdCentralMoment(; ve = SimpleVariance())
         @test_throws DomainError PO.asset_scores(FoldRiskScorer(; r = [SCM(), tcm],

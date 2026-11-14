@@ -89,7 +89,7 @@ commit = "391be5e"
 "src/04_MatrixProcessing/03_Detone.jl" = { lines = 32, misses = 0 }
 "src/04_MatrixProcessing/04_MatrixProcessing.jl" = { lines = 114, misses = 0 }
 "src/04_MatrixProcessing/05_MatrixSquareRoot.jl" = { lines = 43, misses = 0 }
-"src/05_Moments/01_Base_Moments.jl" = { lines = 245, misses = 0 }
+"src/05_Moments/01_Base_Moments.jl" = { lines = 245, misses = 1 }
 "src/05_Moments/02_SimpleExpectedReturns.jl" = { lines = 110, misses = 0 }
 "src/05_Moments/03_Covariance.jl" = { lines = 272, misses = 0 }
 "src/05_Moments/04_SimpleVariance.jl" = { lines = 159, misses = 0 }

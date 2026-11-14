@@ -43,8 +43,9 @@ include(joinpath(@__DIR__, "test16_setup.jl"))
         # The pins were generated again after `k` gained its bound (#1844, #1845). They hold
         # at 1e-6 on the host that made them. Each rtol is the largest `find_tol` over 20
         # red CI runs of both host kinds (40536176678 to 40988847855) and over a local run
-        # under the CI flags (R14 of #1817).
-        rtol = if i ∈ (11, 18, 19, 22)
+        # under the CI flags (R14 of #1817). 20 needs 5e-4 on the second host kind since run
+        # 43500807458 (runs 43520317481 and 43560900102).
+        rtol = if i ∈ (11, 18, 19, 20, 22)
             5e-4
         elseif i ∈ (10, 21)
             1e-3
@@ -108,12 +109,14 @@ include(joinpath(@__DIR__, "test16_setup.jl"))
         # at 1e-6 on the host that made them. Each rtol is the largest `find_tol` over 20
         # red CI runs of both host kinds (40536176678 to 40988847855) and over a local run
         # under the CI flags (R14 of #1817). Before, cases 12 and 18 drifted between hosts
-        # at the same commit (#518).
-        rtol = if i ∈ (6, 10, 11, 20, 21, 22)
+        # at the same commit (#518). Since run 43500807458, 1 needs 5e-4 on the second host
+        # kind, and 27 needs 5e-4 there and 5e-3 on the first (runs 43520317481, 43560900102
+        # and 43573334652).
+        rtol = if i ∈ (1, 6, 10, 11, 20, 21, 22)
             5e-4
         elseif i == 18
             1e-3
-        elseif i == 19
+        elseif i ∈ (19, 27)
             5e-3
         elseif i == 17
             5e-2

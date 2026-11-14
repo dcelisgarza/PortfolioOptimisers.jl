@@ -133,11 +133,10 @@ function risk_reads_rows(rs::VecRM)
 end
 """
     allocation_set_prior(set::ProgrammeAllocationSet, X::Option{<:ReturnsResult})
-    allocation_set_prior(set::BoundedAllocationSet, X::Option{<:ReturnsResult})
 
 Fits the prior result that a programme set's row-reading slots are built on.
 
-The set fits its `pe` on the rows that the head holds, the same way a batch head fits a prior on any returns data. The prior reads its own source, whatever the source of the head's step is. When it states `x_src = ExcessSource()` the fit reads `X - B`, which [`benchmark_relative_returns`](@ref) gives. The fit reads the Asset Panel beside the rows, so the result answers `NaN` at an asset outside the prior's Coverage Universe. A set that reads no rows fits nothing, and a bounded set never fits anything.
+The set fits its `pe` on the rows that the head holds, the same way a batch head fits a prior on any returns data. The prior reads its own source, whatever the source of the head's step is. When it states `x_src = ExcessSource()` the fit reads `X - B`, which [`benchmark_relative_returns`](@ref) gives. The fit reads the Asset Panel beside the rows, so the result answers `NaN` at an asset outside the prior's Coverage Universe. A set that reads no rows fits nothing. A [`BoundedAllocationSet`](@ref) reads no rows, so no caller asks it for a prior.
 
 # Algorithm
 
@@ -172,9 +171,6 @@ function allocation_set_prior(set::ProgrammeAllocationSet, X::Option{<:ReturnsRe
                   ArgumentError("a ProgrammeAllocationSet with a slot that reads the head's rows — weight bounds that read the returns, a ceiling built on its prior, a tracking error, a centrality or phylogeny estimator, an exposure row, a return floor or a Calibration Rule — reads them inside an Online Update alone; `project` was called with none."))
         return prior(set.pe, X)
     end
-    return nothing
-end
-function allocation_set_prior(::BoundedAllocationSet, ::Option{<:ReturnsResult})
     return nothing
 end
 """

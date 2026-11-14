@@ -1027,8 +1027,11 @@ end
         exm = ReturnsResult(; nx = nx, X = R - Bm, ts = ts)
         u = [0.1, 0.2, 0.3, 0.4]
         grad(src, r) = po.loss_gradient(loss(src), u, ones(N), r)
+        # The two gradients differ in the last bit on a CI host since Julia 1.13.4 (run
+        # 43514736851), so they compare at 1e-12.
         for (b, e) in ((rdb, exv), (rdm, exm)), t in (2, 8, 30)
-            @test grad(xs, rows(b, 1:t)) == grad(nothing, rows(e, 1:t))
+            @test isapprox(grad(xs, rows(b, 1:t)), grad(nothing, rows(e, 1:t));
+                           rtol = 1e-12)
             @test !isapprox(grad(xs, rows(b, 1:t)), grad(nothing, rows(b, 1:t)))
         end
         # The head: the loss's prior and the step in the Excess Frame together equal the

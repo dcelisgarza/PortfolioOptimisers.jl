@@ -881,6 +881,16 @@ definition = "weight_mass_grid"
 misses = 1
 rationale = "a-signature-line-counter-on-a-method-whose-body-is-reached"
 
+# Run 43573334652 (570ddf393f): the `function` line of `undefined_correlation_diagonal!` reads 0
+# while its body runs 22752 times on its `findall` line and 2709 times in its loop, through
+# `cov2cor_nan!` and the correlation of `Covariance`. The line has read 0 on every run since
+# dc3d282e50 (#2028) added the method.
+[[coverage_exemption]]
+path = "src/05_Moments/01_Base_Moments.jl"
+definition = "undefined_correlation_diagonal!"
+misses = 1
+rationale = "a-signature-line-counter-on-a-method-whose-body-is-reached"
+
 # --- JET dismissals --------------------------------------------------------
 #
 # Keyed (file, kind, message), ADR 0071. A Dismissal matches every report of its fingerprint in

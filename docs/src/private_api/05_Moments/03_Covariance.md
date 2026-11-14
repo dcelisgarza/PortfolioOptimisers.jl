@@ -50,9 +50,9 @@ With a [`CoveragePolicy`](@ref) in its `cvg` field, the estimator computes the c
 ```@docs
 PortfolioOptimisers.coverage_covariance
 PortfolioOptimisers.coverage_covariance(f, ce::Covariance{<:Any, <:Any, <:FullMoment}, ::Nothing, X::MatNum)
-PortfolioOptimisers.coverage_covariance(f, ce::Covariance{<:Any, <:Any, <:FullMoment}, cvg::CoveragePolicy, X::MatNum)
+PortfolioOptimisers.coverage_covariance(f, ce::Covariance{<:Any, <:Any, <:FullMoment, Nothing}, cvg::CoveragePolicy, X::MatNum)
 PortfolioOptimisers.coverage_covariance(f, ce::Covariance{<:Any, <:Any, <:SemiMoment}, ::Nothing, X::MatNum)
-PortfolioOptimisers.coverage_covariance(f, ce::Covariance{<:Any, <:Any, <:SemiMoment}, cvg::CoveragePolicy, X::MatNum)
+PortfolioOptimisers.coverage_covariance(f, ce::Covariance{<:Any, <:Any, <:SemiMoment, Nothing}, cvg::CoveragePolicy, X::MatNum)
 PortfolioOptimisers.coverage_covariance(ce::Union{GeneralCovariance, Covariance{<:Any, <:Any, <:FullMoment}}, ::Nothing, state::CovarianceState)
 PortfolioOptimisers.coverage_covariance(ce::Covariance{<:Any, <:Any, <:FullMoment}, cvg::CoveragePolicy, state::CovarianceState)
 PortfolioOptimisers.coverage_correlation

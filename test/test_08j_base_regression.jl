@@ -2192,10 +2192,12 @@ struct BareTestRegression <: PortfolioOptimisers.AbstractCrossSectionalRegressio
             @test eltype(csrr.f) == Rational{Int}
             @test csrr.f[1] ≈ 13 / 14
         end
-        # Inputs of mixed types fit in their promotion, bit for bit as the promoted data do.
-        # Gathers in the type of each input solved a `Float32` design against `Float64`
-        # returns, gave `GLM` vectors of two types, and overflowed `Rational` weights in the
-        # weighted mean of an intercept (R37 of #1817).
+        # Inputs of mixed types fit in their promotion, as the promoted data do. Gathers in the
+        # type of each input solved a `Float32` design against `Float64` returns, gave `GLM`
+        # vectors of two types, and overflowed `Rational` weights in the weighted mean of an
+        # intercept (R37 of #1817). A `Float32` solve misses by about 1e-7. The residuals of
+        # the two calls differ in the last bit on a CI host and not on a local one, in 43 of
+        # the 62 red runs after 2ee4e9dfc8 (run 43573334652), so they compare at 1e-12.
         rng = StableRNG(181737)
         Zm, Xm, Wm = randn(rng, 30, 3, 4), randn(rng, 4, 30), 0.5 .+ rand(rng, 4, 30)
         mixes = ((Float32.(Zm), Xm, Float32.(Wm)), (Zm, Float32.(Xm), Wm),
@@ -2208,8 +2210,8 @@ struct BareTestRegression <: PortfolioOptimisers.AbstractCrossSectionalRegressio
             a = cross_sectional_regression(cre, Z, X, W)
             b = cross_sectional_regression(cre, T.(Z), T.(X), T.(W))
             @test eltype(a.f) == T
-            @test a.f == b.f
-            @test a.eps == b.eps
+            @test isapprox(a.f, b.f; rtol = 1e-12)
+            @test isapprox(a.eps, b.eps; rtol = 1e-12)
             @test isequal(a.b, b.b)
         end
     end

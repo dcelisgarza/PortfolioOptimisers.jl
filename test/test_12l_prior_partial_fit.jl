@@ -876,11 +876,13 @@ end
         @test isequal(prior(partial_fit!(online(PanelFieldProbe()), rd(full))).mu,
                       prior(p).mu)
         # A cap windows the Panel Fields with the rows, so the read-out is the batch fit over
-        # the last rows.
+        # the last rows. The two means differ in the last bit on a CI host since Julia 1.13.4
+        # (run 43514736851), so they compare at 1e-12.
         w = 15
         pc = steps(online(PanelFieldProbe(); max_history = w), rd(full))
-        @test isequal(prior(pc).mu,
-                      prior(PanelFieldProbe(), rows(rd(full), (T - w + 1):T)).mu)
+        @test isapprox(prior(pc).mu,
+                       prior(PanelFieldProbe(), rows(rd(full), (T - w + 1):T)).mu;
+                       rtol = 1e-12, nans = true)
     end
     @testset "The carry refuses what its exact folds cannot honour, by name" begin
         m = message(() -> partial_fit!(EmpiricalPrior(), rd(masks)))

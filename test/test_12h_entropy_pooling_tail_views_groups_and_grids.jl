@@ -1071,7 +1071,11 @@ end
         pm = prior(EntropyPoolingPrior(; sets = sets, opt = opt, w = ws, mu_views = mv),
                    ep_srd)
         @test all(iszero, pm.w[.!sup])
-        @test isapprox(pm.w, po.w; rtol = 1e-5)
+        # `isapprox(pm.w, po.w; rtol)`, in a form whose failure prints both norms. The JuMP
+        # posterior misses the `Optim` one by a relative norm of 1.6e-5 on a developer machine
+        # under the CI flags, at 07e51899a0 and after it, and by about 2.9e-5 on the first CI
+        # host kind (runs 43500807458 to 43573334652), so the bound is 1e-4.
+        @test PO.LinearAlgebra.norm(pm.w - po.w) <= 1e-4 * PO.LinearAlgebra.norm(po.w)
         @test isapprox(pm.kld, po.kld; rtol = 1e-4)
     end
 end

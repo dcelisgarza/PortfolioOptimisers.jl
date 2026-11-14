@@ -591,7 +591,9 @@ using Test, PortfolioOptimisers, StableRNGs, LinearAlgebra, Statistics, Dates, C
                                                                    wb = WeightBounds(;
                                                                                      lb = 0.05,
                                                                                      ub = 0.4)),
-                                              3), q, wh); atol = 1e-6)
+                                              3), q, wh); atol = 5e-6)
+            # The bounded programme misses the closed form by a norm of 1.08e-6 on the
+            # second CI host kind (runs 43520317481 and 43560900102), so it compares at 5e-6.
             # A zero raw entry is pinned at zero in the programme too.
             z = po.project(proj, pset, [0.5, 0.0, 0.5], wh)
             @test abs(z[2]) < 1e-9 && isapprox(sum(z), 1; atol = 1e-8)

@@ -1705,6 +1705,11 @@ end
         @test PO.needs_previous_weights(pwf)
         @test PO.needs_previous_weights(TimeDependent(pwf))
         @test !PO.needs_previous_weights(TimeDependent(c -> 1))
+        # A bare function and a symbol take the fallback, which answers `false`. The entries
+        # of an `Any` vector dispatch at run time, so the fallback runs.
+        @test !PO.needs_previous_weights(c -> 1)
+        @test !PO.needs_previous_weights(Any[c -> 1, :a])
+        @test PO.needs_previous_weights(Any[c -> 1, pwf])
         @test_throws DomainError TimeDependentContext(; i = 4, n = 3, rd = rd,
                                                       train_idx = [], test_idx = [])
         # The constructor refuses the stated values.

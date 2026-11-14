@@ -517,7 +517,8 @@ end
         # A solve that stops at ALMOST_OPTIMAL holds the ceiling to 1 %. On a CI host the
         # 75 % level broke it by 0.44 % (runs 41047211489 and 41050705423, G1 of #1817).
         almost = PO.JuMP.termination_status(res.model) == PO.JuMP.MOI.ALMOST_OPTIMAL
-        @test expected_risk(rk, res.w, pr) <= ub * (1 + (almost ? 1e-2 : 1e-5))
+        # The form prints the relative overshoot when it fails, and its bound shows the status.
+        @test expected_risk(rk, res.w, pr) / ub - 1 <= (almost ? 1e-2 : 1e-5)
     end
 end
 
