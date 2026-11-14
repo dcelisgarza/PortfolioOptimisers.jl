@@ -263,7 +263,10 @@ end
                                                :online_state_seed => "each form seeds a buffer through the constructor of its state type, `SampleBufferState`, `ReturnsBufferState` or `PipelineBufferState` (rule 3, #2088)",
                                                :seed_window_path => "its vector method walks the elements through `element_path`, which four walks share (rule 3, #2088)",
                                                :online_entry_state => "its vector method walks the elements through `element_path`, which four walks share (rule 3, #2088)",
-                                               :count_or_fraction => "its `Integer` method calls the constructor of `CountOf` (rule 3, #2088)")
+                                               :count_or_fraction => "its `Integer` method calls the constructor of `CountOf` (rule 3, #2088)",
+                                               # src/04_MatrixProcessing (#2091).
+                                               :sample_matrix_processing! => "its method on every estimator other than `MatrixProcessing` calls `matrix_processing!`, an exported verb (rule 3, #2091)",
+                                               :matrix_processing_step! => "one method for each step of `mp.order`: each step calls the declared verb of its field, `posdef!`, `denoise!`, `detone!` or `matrix_processing_algorithm!` (rule 3, #2091)")
     # The debt that #2072 removes. Do not add a pair: fix the wrapper.
     pending_forwards = Set{Tuple{Symbol, Symbol}}([(:active_weights,
                                                     :nothing_scalar_array_getindex),
@@ -449,10 +452,6 @@ end
                                                    (:lookback, :lookback_max),
                                                    (:mahalanobis_level_bias,
                                                     :mahalanobis_level_bias),
-                                                   (:matrix_processing_step!, :detone!),
-                                                   (:matrix_processing_step!,
-                                                    :matrix_processing_algorithm!),
-                                                   (:matrix_processing_step!, :posdef!),
                                                    (:maybe_inject_step, :inject_context),
                                                    (:member_regret, :series_regret),
                                                    (:merge_held_data, :partial_fit!),
@@ -526,8 +525,6 @@ end
                                                    (:run_step, :run_constraint_step),
                                                    (:run_step, :run_step),
                                                    (:run_step, :run_uncertainty_step),
-                                                   (:sample_matrix_processing!,
-                                                    :matrix_processing!),
                                                    (:scalarised_degree,
                                                     :homogeneity_degree),
                                                    (:scale_rows, :window_rows),
