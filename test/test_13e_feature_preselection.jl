@@ -623,6 +623,8 @@ hand_distance(de, rd) = distance(de, nothing, rd.X; rd = rd)
         @test PO.feature_asset_names(nothing, rd) == rd.nx
         @test PO.feature_asset_names(rd, nothing) == rd.nx
         @test isnothing(PO.feature_asset_names(nothing, nothing))
+        # Only `rd = nothing` reaches the `nothing` answer: another `rd` has no rule (#2094).
+        @test_throws MethodError PO.feature_asset_names(nothing, rd.X)
         @test isnothing(PO.feature_readable_mask(FeatureDistance(; ape = PhylogenyPanel()),
                                                  nothing, rd))
         # No asset left refuses.

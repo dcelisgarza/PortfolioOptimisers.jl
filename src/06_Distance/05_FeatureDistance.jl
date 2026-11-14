@@ -1564,7 +1564,7 @@ end
 """
     feature_asset_names(pr, rd)
 
-Give the asset names that a refusal of a [`FeatureDistance`](@ref) quotes. These are the names of the returns data `rd`, or the names of `pr` when `pr` is a `ReturnsResult` and `rd` is `nothing`. Otherwise, the function returns `nothing`, and the refusal quotes positions.
+Give the asset names that a refusal of a [`FeatureDistance`](@ref) quotes. These are the names of the returns data `rd`, or the names of `pr` when `pr` is a `ReturnsResult` and `rd` is `nothing`. When `rd` is `nothing` and `pr` is not a `ReturnsResult`, the function returns `nothing`, and the refusal quotes positions. Any other `rd` is a `MethodError`.
 
 # Related
 
@@ -1577,7 +1577,7 @@ end
 function feature_asset_names(pr::ReturnsResult, ::Nothing)
     return pr.nx
 end
-function feature_asset_names(::Any, ::Any)
+function feature_asset_names(::Any, ::Nothing)
     return nothing
 end
 """

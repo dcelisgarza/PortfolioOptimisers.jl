@@ -266,11 +266,12 @@ end
                                                :count_or_fraction => "its `Integer` method calls the constructor of `CountOf` (rule 3, #2088)",
                                                # src/04_MatrixProcessing (#2091).
                                                :sample_matrix_processing! => "its method on every estimator other than `MatrixProcessing` calls `matrix_processing!`, an exported verb (rule 3, #2091)",
-                                               :matrix_processing_step! => "one method for each step of `mp.order`: each step calls the declared verb of its field, `posdef!`, `denoise!`, `detone!` or `matrix_processing_algorithm!` (rule 3, #2091)")
+                                               :matrix_processing_step! => "one method for each step of `mp.order`: each step calls the declared verb of its field, `posdef!`, `denoise!`, `detone!` or `matrix_processing_algorithm!` (rule 3, #2091)",
+                                               # src/06_Distance (#2094).
+                                               :collapse_rows => "a public verb with one method for each collapse rule: its `LastActiveRow` method calls `last_active_rows`, which `readable_window_rows` shares (rule 3, #2094)",
+                                               :readable_window_rows => "one method for each form of the mask of readable cells: the matrix form calls `last_active_rows`, which two functions share, and every other form calls `collapse_rows`, a public verb (rule 3, #2094)")
     # The debt that #2072 removes. Do not add a pair: fix the wrapper.
-    pending_forwards = Set{Tuple{Symbol, Symbol}}([(:active_weights,
-                                                    :nothing_scalar_array_getindex),
-                                                   (:adopt_pinned_choice, :rebuild_struct),
+    pending_forwards = Set{Tuple{Symbol, Symbol}}([(:adopt_pinned_choice, :rebuild_struct),
                                                    (:apply_fitted_step,
                                                     :apply_fitted_steps),
                                                    (:apply_fitted_step,
@@ -319,7 +320,6 @@ end
                                                    (:centrality_graph,
                                                     :calc_weighted_adjacency_graph),
                                                    (:cokurtosis, :coverage_cokurtosis),
-                                                   (:collapse_rows, :last_active_rows),
                                                    (:comovement_finalise,
                                                     :comovement_ratio),
                                                    (:copy_step_states, :copy_states),
@@ -491,9 +491,6 @@ end
                                                     :investable_mask),
                                                    (:prior_probability_factory, :factory),
                                                    (:project, :projection_programme),
-                                                   (:readable_window_rows, :collapse_rows),
-                                                   (:readable_window_rows,
-                                                    :last_active_rows),
                                                    (:reader_frames, :field_frames),
                                                    (:reader_frames, :source_frames),
                                                    (:rebase_linear_constraints,

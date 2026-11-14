@@ -278,7 +278,7 @@ Where:
 
  1. Find the active rows of each asset, giving `rows`.
  2. If `w` is not `nothing`, check that the weights of the active rows of each asset sum to more than zero.
- 3. Collapse each asset over its active rows with [`collapse_features`](@ref), under the weights of those rows from [`active_weights`](@ref), giving `zs`.
+ 3. Collapse each asset over its active rows with [`collapse_features`](@ref), under the weights of those rows from [`nothing_scalar_array_getindex`](@ref), giving `zs`. That function keeps the kind of the weights, and `nothing` weights stay `nothing`.
  4. Stack `zs` by asset, `assets × features`.
 
 # Arguments
@@ -305,44 +305,14 @@ Where:
 """
 function active_collapse(alg::AbstractCollapseAlgorithm, Zd::Arr3Num, w, A, nx)
     rows = [findall(view(A, :, i)) for i in axes(A, 2)]
-    i = findall(r -> !(isnothing(w) || sum(active_weights(w, r)) > zero(eltype(w))), rows)
+    i = findall(r -> !(isnothing(w) ||
+                       sum(nothing_scalar_array_getindex(w, r)) > zero(eltype(w))), rows)
     @argcheck(isempty(i),
               ArgumentError("FeatureDistance collapses each asset over its active rows, and the observation weights of those rows sum to zero for $(feature_asset_labels(nx, i)), so the collapse has no value to read. Give a positive weight to one active row of each asset."))
-    zs = [vec(collapse_features(alg, view(Zd, i:i, :, rows[i]), active_weights(w, rows[i])))
+    zs = [vec(collapse_features(alg, view(Zd, i:i, :, rows[i]),
+                                nothing_scalar_array_getindex(w, rows[i])))
           for i in axes(A, 2)]
     return permutedims(reduce(hcat, zs))
-end
-"""
-    active_weights(w, r::AbstractVector{<:Integer})
-
-Restrict the resolved observation weights of a window to the rows `r` at which an asset is active. [`nothing_scalar_array_getindex`](@ref) keeps the kind of the weights. No weights stay `nothing`.
-
-# Algorithm
-
-The method that Julia selects is the algorithm.
-
- 1. If `w` is `nothing`, return `nothing`.
- 2. Otherwise, return the entries of `w` at `r` with [`nothing_scalar_array_getindex`](@ref).
-
-# Arguments
-
-  - `w`: The resolved observation weights of the window, or `nothing`.
-  - `r`: The active rows of one asset.
-
-# Returns
-
-  - `wr::Option{<:VecNum}`: The weights of the rows `r`, or `nothing`.
-
-# Related
-
-  - [`active_collapse`](@ref)
-  - [`nothing_scalar_array_getindex`](@ref)
-"""
-function active_weights(::Nothing, ::AbstractVector)
-    return nothing
-end
-function active_weights(w::AbstractVector, r::AbstractVector)
-    return nothing_scalar_array_getindex(w, r)
 end
 """
     pair_distance(metric::Distances.SemiMetric, a::AbstractVector, b::AbstractVector)
