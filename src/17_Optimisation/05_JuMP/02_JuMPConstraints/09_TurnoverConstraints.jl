@@ -1,9 +1,10 @@
 """
-$(DocStringExtensions.TYPEDSIGNATURES)
+    set_turnover_constraints!(model::JuMP.Model, ::Nothing; prefix::Symbol = Symbol(""))
+    set_turnover_constraints!(model::JuMP.Model, tns::Tn_VecTn; prefix::Symbol = Symbol(""))
 
 Add turnover constraints to the JuMP optimisation model.
 
-The fall-through method does nothing. The concrete method iterates over the collection of [`Turnover`](@ref) objects `tns` and delegates each to [`_set_turnover_constraints!`](@ref).
+The method on `nothing` adds no row. Any other type or arity is a `MethodError`. The method on a [`Tn_VecTn`](@ref) iterates over the collection of [`Turnover`](@ref) objects `tns` and delegates each to [`_set_turnover_constraints!`](@ref).
 
 # Arguments
 
@@ -21,7 +22,7 @@ The fall-through method does nothing. The concrete method iterates over the coll
   - [`Turnover`](@ref)
   - [`set_turnover_fees!`](@ref)
 """
-function set_turnover_constraints!(args...; prefix::Symbol = Symbol(""))
+function set_turnover_constraints!(::JuMP.Model, ::Nothing; prefix::Symbol = Symbol(""))
     return nothing
 end
 """

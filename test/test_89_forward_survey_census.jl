@@ -361,9 +361,12 @@ using Test
         @test of(:assert_rc_pl) == [("default", nothing, "keep (default)")]
         @test first_of(:assert_rc_pl).why == FS.RULED_DEFAULTS[:assert_rc_pl][2]
         @test occursin("refusal check", first_of(:assert_rc_pl).why)
-        # A query whose only reader is a value check takes the set that reaches it.
-        @test of(:net_budget_floor) == [("default", nothing, "go")]
-        @test first_of(:net_budget_floor).why == FS.RULED_DEFAULTS[:net_budget_floor][2]
+        # A query whose only reader is a value check takes the set that reaches it, but the
+        # parse cannot tell it from another query, so `RULED_DEFAULTS` names each one. With no
+        # entry, a query owns `nothing`, the answer "none". #2101 typed the last one that the
+        # list named, `net_budget_floor`, so its entry went.
+        @test of(:net_budget_floor) == [("default", nothing, "keep (default)")]
+        @test !haskey(FS.RULED_DEFAULTS, :net_budget_floor)
         # A verb that does a job owns no default.
         @test of(:fill_slot!) == [("default", nothing, "go")]
         # Two slots that return `nothing`: a typed method on the set that reaches it.

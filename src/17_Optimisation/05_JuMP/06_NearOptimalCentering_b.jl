@@ -50,9 +50,8 @@ function solve_noc!(noc::NearOptimalCentering{<:Any, <:Any, <:Any, <:Any, <:Any,
     p_rk, p_rt, rk_units, rt_units = set_noc_anchor_parameters!(model, noc, attrs, rk_opts,
                                                                 rt_opts, s_rk, s_rt)
     return frontier_sweep!(model, noc, eltype(opt.pe.X),
-                           frontier_sweep_axes(nothing, risk_axis)) do i
-        return set_noc_anchor!(p_rk, p_rt, rk_units, rt_units, i)
-    end
+                           frontier_sweep_axes(nothing, risk_axis),
+                           i -> set_noc_anchor!(p_rk, p_rt, rk_units, rt_units, i))
 end
 function solve_noc!(noc::NearOptimalCentering{<:Any, <:Any, <:Any, <:Any, <:Any, <:Any,
                                               <:Any, <:Any, <:Any, <:Any, <:Any,
@@ -68,9 +67,8 @@ function solve_noc!(noc::NearOptimalCentering{<:Any, <:Any, <:Any, <:Any, <:Any,
     p_rk, p_rt, rk_units, rt_units = set_noc_anchor_parameters!(model, noc, attrs, rk_opts,
                                                                 rt_opts, s_rk, s_rt)
     return frontier_sweep!(model, noc, eltype(opt.pe.X),
-                           frontier_sweep_axes(ret_axis, risk_axis)) do i
-        return set_noc_anchor!(p_rk, p_rt, rk_units, rt_units, i)
-    end
+                           frontier_sweep_axes(ret_axis, risk_axis),
+                           i -> set_noc_anchor!(p_rk, p_rt, rk_units, rt_units, i))
 end
 """
     get_overall_retcode(w_min_retcode, w_opt_retcode, w_max_retcode, noc_retcode)

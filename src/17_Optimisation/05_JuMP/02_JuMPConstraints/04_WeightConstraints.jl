@@ -60,9 +60,11 @@ $(DocStringExtensions.TYPEDSIGNATURES)
 
 Add weight bound constraints to the JuMP optimisation model.
 
-The fall-through method does nothing. The concrete method adds lower-bound and upper-bound constraints on the portfolio weight vector `w`, handles long-short decomposition when negative bounds are present via `lw`/`sw` variables, and delegates budget constraints to [`set_budget_constraints!`](@ref).
+The method on a [`WeightBounds`](@ref) adds lower-bound and upper-bound constraints on the portfolio weight vector `w`, handles long-short decomposition when negative bounds are present via `lw`/`sw` variables, and delegates budget constraints to [`set_budget_constraints!`](@ref).
 
 This is the first step of the block builder, [`set_block_constraints!`](@ref), so each [`ConstraintBlock`](@ref) of a model adds its own bounds. The rows go under `prefix`, the namespace of the block, and the builder reads the weights registered under it. The long and short parts belong to the weights. The first block that admits a short position makes them, with their rows `w_lw` and `w_sw`, and a later block reads them. A later block makes parts of its own under its prefix only when the weights already have a long part and no short part, because a block before it is long-only. Its short and gross budgets then read its own parts, as they read the anonymous parts of the set before this change.
+
+The method on `wb = nothing` adds no row, with the same arguments and keywords. Any other type or arity is a `MethodError`.
 
 # Mathematical definition
 
@@ -108,9 +110,6 @@ Where:
   - [`set_gross_budget_constraints!`](@ref)
   - [`JuMPOptimiser`](@ref)
 """
-function set_weight_constraints!(args...; kwargs...)
-    return nothing
-end
 function set_weight_constraints!(model::JuMP.Model, wb::WeightBounds,
                                  bgt::Option{<:Num_BgtCE}, sbgt::Option{<:Num_BgtRg};
                                  gbgt::Option{<:Num_BgtRg} = nothing,
@@ -137,6 +136,11 @@ function set_weight_constraints!(model::JuMP.Model, wb::WeightBounds,
     elseif !shared_has(model, :lw)
         JuMP.@expression(model, lw, w)
     end
+    return nothing
+end
+function set_weight_constraints!(::JuMP.Model, ::Nothing, ::Option{<:Num_BgtCE},
+                                 ::Option{<:Num_BgtRg}; gbgt::Option{<:Num_BgtRg} = nothing,
+                                 prefix::Symbol = Symbol(""))
     return nothing
 end
 """
@@ -433,7 +437,7 @@ $(DocStringExtensions.TYPEDSIGNATURES)
 
 Add linear inequality and equality weight constraints to the JuMP optimisation model.
 
-The fall-through method does nothing. The concrete method iterates over the collection of [`LinearConstraint`](@ref) objects `lcms` and adds `A * w ≤ k * B` (inequality) and `A * w = k * B` (equality) constraints for each entry.
+The method on `lcms = nothing` adds no row. Any other type or arity is a `MethodError`. The method on a [`Lc_VecLc`](@ref) iterates over the collection of [`LinearConstraint`](@ref) objects `lcms` and adds `A * w ≤ k * B` (inequality) and `A * w = k * B` (equality) constraints for each entry.
 
 # Mathematical definition
 
@@ -471,9 +475,6 @@ Where:
   - [`LinearConstraint`](@ref)
   - [`set_weight_constraints!`](@ref)
 """
-function set_linear_weight_constraints!(args...; prefix::Symbol = Symbol(""))
-    return nothing
-end
 function set_linear_weight_constraints!(model::JuMP.Model, lcms::Lc_VecLc,
                                         name_ineq::Symbol, name_eq::Symbol;
                                         prefix::Symbol = Symbol(""))
@@ -494,5 +495,9 @@ function set_linear_weight_constraints!(model::JuMP.Model, lcms::Lc_VecLc,
                        JuMP.@constraint(model, sc * (A * w - k * B) == 0))
         end
     end
+    return nothing
+end
+function set_linear_weight_constraints!(::JuMP.Model, ::Nothing, ::Symbol, ::Symbol;
+                                        prefix::Symbol = Symbol(""))
     return nothing
 end

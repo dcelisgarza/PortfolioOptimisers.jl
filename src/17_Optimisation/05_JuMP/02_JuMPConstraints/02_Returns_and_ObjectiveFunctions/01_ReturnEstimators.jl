@@ -357,28 +357,27 @@ end
 function factory(rt::ArithmeticReturn, pr::AbstractPriorResult, ::Any,
                  ucs::Option{<:UcSE_UcS} = nothing, args...; kwargs...)
     rt = resolve_deferred_quantities(rt, pr)
-    return ArithmeticReturn(; settings = rt.settings, ucs = ucs_selector(rt.ucs, ucs),
-                            mu = nothing_scalar_array_selector(rt.mu, pr.mu),
-                            mtx_sqrt = rt.mtx_sqrt)
+    return rebuild_struct(rt,
+                          (; ucs = ucs_selector(rt.ucs, ucs),
+                           mu = nothing_scalar_array_selector(rt.mu, pr.mu)))
 end
 function factory(rt::ArithmeticReturn, pr::AbstractPriorResult,
                  ucs::Option{<:UcSE_UcS} = nothing; kwargs...)
     rt = resolve_deferred_quantities(rt, pr)
-    return ArithmeticReturn(; settings = rt.settings, ucs = ucs_selector(rt.ucs, ucs),
-                            mu = nothing_scalar_array_selector(rt.mu, pr.mu),
-                            mtx_sqrt = rt.mtx_sqrt)
+    return rebuild_struct(rt,
+                          (; ucs = ucs_selector(rt.ucs, ucs),
+                           mu = nothing_scalar_array_selector(rt.mu, pr.mu)))
 end
 function factory(rt::ArithmeticReturn, ucs::UcSE_UcS, pr::AbstractPriorResult; kwargs...)
     rt = resolve_deferred_quantities(rt, pr)
-    return ArithmeticReturn(; settings = rt.settings, ucs = ucs_selector(rt.ucs, ucs),
-                            mu = nothing_scalar_array_selector(rt.mu, pr.mu),
-                            mtx_sqrt = rt.mtx_sqrt)
+    return rebuild_struct(rt,
+                          (; ucs = ucs_selector(rt.ucs, ucs),
+                           mu = nothing_scalar_array_selector(rt.mu, pr.mu)))
 end
 function factory(rt::ArithmeticReturn, ucs::UcSE_UcS, args...; kwargs...)
     # No prior in hand, so a Deferred Quantity cannot resolve here. It travels on unchanged
     # and the prior-carrying `factory` the sub-problem runs resolves it.
-    return ArithmeticReturn(; settings = rt.settings, ucs = ucs_selector(rt.ucs, ucs),
-                            mu = rt.mu, mtx_sqrt = rt.mtx_sqrt)
+    return rebuild_struct(rt, (; ucs = ucs_selector(rt.ucs, ucs)))
 end
 function port_opt_view(r::ArithmeticReturn, i, args...)
     uset = port_opt_view(r.ucs, i)
@@ -386,8 +385,7 @@ function port_opt_view(r::ArithmeticReturn, i, args...)
     # identity on an Estimator. It then computes on the subset, which is the whole
     # fold-stability argument for the feature.
     mu = nothing_scalar_array_view(r.mu, i)
-    return ArithmeticReturn(; settings = r.settings, ucs = uset, mu = mu,
-                            mtx_sqrt = r.mtx_sqrt)
+    return rebuild_struct(r, (; ucs = uset, mu = mu))
 end
 """
     no_bounds_returns_estimator(r, args...)
@@ -418,26 +416,9 @@ Also, with several terms, each term then gives the same corner.
   - [`no_bounds_optimiser`](@ref)
 """
 function no_bounds_returns_estimator(r::ArithmeticReturn, flag::Bool = true)
-    return ArithmeticReturn(; settings = no_bounds_returns_settings(r.settings),
-                            ucs = ifelse(flag, r.ucs, nothing), mu = r.mu,
-                            mtx_sqrt = r.mtx_sqrt)
-end
-"""
-$(DocStringExtensions.TYPEDSIGNATURES)
-
-Return a copy of `settings` with its lower bound cleared.
-
-`scale`, `rte`, `fee` and `mic` are not bounds, so the copy keeps them. A corner solve must
-charge the same fees and weigh the same terms as the sweep that it starts.
-
-# Related
-
-  - [`no_bounds_returns_estimator`](@ref)
-  - [`JuMPReturnsSettings`](@ref)
-"""
-function no_bounds_returns_settings(settings::JuMPReturnsSettings)
-    return JuMPReturnsSettings(; scale = settings.scale, lb = nothing, rte = settings.rte,
-                               fee = settings.fee, mic = settings.mic)
+    return rebuild_struct(r,
+                          (; settings = rebuild_struct(r.settings, (; lb = nothing)),
+                           ucs = ifelse(flag, r.ucs, nothing)))
 end
 """
 $(DocStringExtensions.TYPEDSIGNATURES)
@@ -453,7 +434,7 @@ own expression, and the term still charges the same fees. This is the return-sid
 # Algorithm
 
  1. When `isone(r.settings.scale)`, return `r` unchanged, which allocates nothing.
- 2. Otherwise build a [`JuMPReturnsSettings`](@ref) with `scale = one(scale)` and the other four fields of `r.settings`.
+ 2. Otherwise rebuild `r.settings` with `scale = one(scale)`, and keep its other four fields.
  3. Return a copy of `r` that holds the new settings.
 
 # Arguments
@@ -467,7 +448,6 @@ own expression, and the term still charges the same fees. This is the return-sid
 # Related
 
   - [`unit_scale_risk_measure`](@ref)
-  - [`no_bounds_returns_settings`](@ref)
   - [`set_return_constraints!`](@ref)
 """
 function unit_scale_returns_estimator(r::JuMPReturnsEstimator)
@@ -476,8 +456,7 @@ function unit_scale_returns_estimator(r::JuMPReturnsEstimator)
     if isone(scale)
         return r
     end
-    s = JuMPReturnsSettings(; scale = one(scale), lb = settings.lb, rte = settings.rte,
-                            fee = settings.fee, mic = settings.mic)
+    s = rebuild_struct(settings, (; scale = one(scale)))
     return rebuild_struct(r, (; settings = s))
 end
 """
@@ -506,8 +485,7 @@ function no_return_expr_returns_estimator(r::JuMPReturnsEstimator)
     if !settings.rte
         return r
     end
-    s = JuMPReturnsSettings(; scale = settings.scale, lb = settings.lb, rte = false,
-                            fee = settings.fee, mic = settings.mic)
+    s = rebuild_struct(settings, (; rte = false))
     return rebuild_struct(r, (; settings = s))
 end
 """
@@ -600,7 +578,7 @@ function factory(rt::LogarithmicReturn, pr::AbstractPriorResult, args...; kwargs
                              w = nothing_scalar_array_selector(rt.w, pr.w))
 end
 function no_bounds_returns_estimator(r::LogarithmicReturn, args...)
-    return LogarithmicReturn(; settings = no_bounds_returns_settings(r.settings), w = r.w)
+    return rebuild_struct(r, (; settings = rebuild_struct(r.settings, (; lb = nothing))))
 end
 """
     obs_weights_view(rt::LogarithmicReturn, i) -> LogarithmicReturn
@@ -701,7 +679,7 @@ function NoReturn(; settings::JuMPReturnsSettings = JuMPReturnsSettings())::NoRe
     return NoReturn(settings)
 end
 function no_bounds_returns_estimator(r::NoReturn, args...)
-    return NoReturn(; settings = no_bounds_returns_settings(r.settings))
+    return NoReturn(; settings = rebuild_struct(r.settings, (; lb = nothing)))
 end
 function no_bounds_returns_estimator(r::VecJRE, args...)
     return [no_bounds_returns_estimator(ri, args...) for ri in r]

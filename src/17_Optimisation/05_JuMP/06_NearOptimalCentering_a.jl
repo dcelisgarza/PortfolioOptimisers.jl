@@ -174,9 +174,7 @@ Rebuild a [`NearOptimalCenteringResult`](@ref) with a different return code.
   - [`NearOptimalCenteringResult`](@ref)
 """
 function set_retcode(res::NearOptimalCenteringResult, retcode::OptRetCode_VecOptRetCode)
-    return NearOptimalCenteringResult(set_retcode(res.jr, retcode), res.r,
-                                      res.w_min_retcode, res.w_opt_retcode,
-                                      res.w_max_retcode, res.noc_retcode, res.fb)
+    return rebuild_struct(res, (; jr = set_retcode(res.jr, retcode)))
 end
 """
 $(DocStringExtensions.TYPEDSIGNATURES)
@@ -1147,9 +1145,8 @@ function solve_noc!(noc::NearOptimalCentering{<:Any, <:Any, <:Any, <:Any, <:Any,
                     attrs::ResolvedJuMPOptimiser, args...)
     p_rk, p_rt, rk_units, rt_units = set_noc_anchor_parameters!(model, noc, attrs, rk_opts,
                                                                 rt_opts, s_rk, s_rt)
-    return frontier_sweep!(model, noc, eltype(opt.pe.X), length(rk_opts)) do i
-        return set_noc_anchor!(p_rk, p_rt, rk_units, rt_units, i)
-    end
+    return frontier_sweep!(model, noc, eltype(opt.pe.X), length(rk_opts),
+                           i -> set_noc_anchor!(p_rk, p_rt, rk_units, rt_units, i))
 end
 """
     set_noc_anchor_parameters!(model, noc, attrs, rk_opts, rt_opts, s_rk, s_rt)
@@ -1330,9 +1327,8 @@ function solve_noc!(noc::NearOptimalCentering{<:Any, <:Any, <:Any, <:Any, <:Any,
     p_rk, p_rt, rk_units, rt_units = set_noc_anchor_parameters!(model, noc, attrs, rk_opts,
                                                                 rt_opts, s_rk, s_rt)
     return frontier_sweep!(model, noc, eltype(opt.pe.X),
-                           frontier_sweep_axes(ret_axis, nothing)) do i
-        return set_noc_anchor!(p_rk, p_rt, rk_units, rt_units, i)
-    end
+                           frontier_sweep_axes(ret_axis, nothing),
+                           i -> set_noc_anchor!(p_rk, p_rt, rk_units, rt_units, i))
 end
 function rebuild_risk_frontier(noc::NearOptimalCentering{<:Any, <:Any, <:Any, <:Any, <:Any,
                                                          <:Any, <:Any, <:Any, <:Any, <:Any,

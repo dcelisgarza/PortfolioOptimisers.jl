@@ -1,10 +1,10 @@
 """
     set_l1_regularisation!(model::JuMP.Model, l1_val::Number; prefix::Symbol = Symbol(""))
-    set_l1_regularisation!(args...; prefix::Symbol = Symbol(""))
+    set_l1_regularisation!(model::JuMP.Model, ::Nothing; prefix::Symbol = Symbol(""))
 
 Add an L1 penalty on the portfolio weights to the objective penalty.
 
-The objective takes the penalty in its own units, so `l1_val` is a price in those units. With no short positions and a budget of one, ``\\lVert \\boldsymbol{w} \\rVert_1 = 1`` at every feasible point, so the penalty is a constant and moves no weight. It acts on the gross exposure of a portfolio that can hold short positions. Under [`MaximumRatio`](@ref) the model's `w` is the homogenised vector ``k \\boldsymbol{w}``, so the penalty acts on ``k \\boldsymbol{w}``. The method on `args...` does nothing, and it runs when no L1 coefficient is set.
+The objective takes the penalty in its own units, so `l1_val` is a price in those units. With no short positions and a budget of one, ``\\lVert \\boldsymbol{w} \\rVert_1 = 1`` at every feasible point, so the penalty is a constant and moves no weight. It acts on the gross exposure of a portfolio that can hold short positions. Under [`MaximumRatio`](@ref) the model's `w` is the homogenised vector ``k \\boldsymbol{w}``, so the penalty acts on ``k \\boldsymbol{w}``. The method on `nothing` does nothing, and it runs when no L1 coefficient is set. Any other type or arity is a `MethodError`.
 
 # Mathematical definition
 
@@ -58,16 +58,16 @@ Where:
   - [`set_linf_regularisation!`](@ref)
   - [`add_to_objective_penalty!`](@ref)
 """
-function set_l1_regularisation!(args...; prefix::Symbol = Symbol(""))
+function set_l1_regularisation!(::JuMP.Model, ::Nothing; prefix::Symbol = Symbol(""))
     return nothing
 end
 """
     set_l2_regularisation!(model::JuMP.Model, l2s::L2Reg_VecL2Reg; prefix::Symbol = Symbol(""))
-    set_l2_regularisation!(args...; prefix::Symbol = Symbol(""))
+    set_l2_regularisation!(model::JuMP.Model, ::Nothing; prefix::Symbol = Symbol(""))
 
 Add the penalty of each L2 term to the objective penalty.
 
-Each [`L2Regularisation`](@ref) carries its own coefficient and formulation, and the penalties of several terms add. The objective takes each penalty in its own units, and the formulation sets the power of the norm, so one `val` gives a different penalty under each formulation. The method on `args...` does nothing, and it runs when no L2 term is set.
+Each [`L2Regularisation`](@ref) carries its own coefficient and formulation, and the penalties of several terms add. The objective takes each penalty in its own units, and the formulation sets the power of the norm, so one `val` gives a different penalty under each formulation. The method on `nothing` does nothing, and it runs when no L2 term is set. Any other type or arity is a `MethodError`.
 
 # Mathematical definition
 
@@ -108,16 +108,16 @@ Where:
   - [`set_l1_regularisation!`](@ref)
   - [`add_to_objective_penalty!`](@ref)
 """
-function set_l2_regularisation!(args...; prefix::Symbol = Symbol(""))
+function set_l2_regularisation!(::JuMP.Model, ::Nothing; prefix::Symbol = Symbol(""))
     return nothing
 end
 """
     set_lp_regularisation!(model::JuMP.Model, lps::LpReg_VecLpReg; prefix::Symbol = Symbol(""))
-    set_lp_regularisation!(args...; prefix::Symbol = Symbol(""))
+    set_lp_regularisation!(model::JuMP.Model, ::Nothing; prefix::Symbol = Symbol(""))
 
 Add the penalty of each Lp term to the objective penalty.
 
-Each [`LpRegularisation`](@ref) carries its own norm order and coefficient, and the penalties of several terms add. The objective takes each penalty in its own units. Under [`MaximumRatio`](@ref) the model's `w` is the homogenised vector ``k \\boldsymbol{w}``, so the penalty acts on ``k \\boldsymbol{w}``. The method on `args...` does nothing, and it runs when no Lp term is set.
+Each [`LpRegularisation`](@ref) carries its own norm order and coefficient, and the penalties of several terms add. The objective takes each penalty in its own units. Under [`MaximumRatio`](@ref) the model's `w` is the homogenised vector ``k \\boldsymbol{w}``, so the penalty acts on ``k \\boldsymbol{w}``. The method on `nothing` does nothing, and it runs when no Lp term is set. Any other type or arity is a `MethodError`.
 
 The same estimator in the `lpc` field of [`JuMPOptimiser`](@ref) is a norm constraint, and [`set_weight_norm_p_constraints!`](@ref) reads its `val` as a ceiling on the norm.
 
@@ -186,16 +186,16 @@ Where:
   - [`set_l1_regularisation!`](@ref)
   - [`add_to_objective_penalty!`](@ref)
 """
-function set_lp_regularisation!(args...; prefix::Symbol = Symbol(""))
+function set_lp_regularisation!(::JuMP.Model, ::Nothing; prefix::Symbol = Symbol(""))
     return nothing
 end
 """
     set_linf_regularisation!(model::JuMP.Model, linf::Number; prefix::Symbol = Symbol(""))
-    set_linf_regularisation!(args...; prefix::Symbol = Symbol(""))
+    set_linf_regularisation!(model::JuMP.Model, ::Nothing; prefix::Symbol = Symbol(""))
 
 Add an L∞ penalty on the portfolio weights to the objective penalty.
 
-The penalty prices the largest absolute weight, so it moves weight away from the largest position. The objective takes the penalty in its own units, so `linf` is a price in those units. Under [`MaximumRatio`](@ref) the model's `w` is the homogenised vector ``k \\boldsymbol{w}``, so the penalty acts on ``k \\boldsymbol{w}``. The method on `args...` does nothing, and it runs when no L∞ coefficient is set.
+The penalty prices the largest absolute weight, so it moves weight away from the largest position. The objective takes the penalty in its own units, so `linf` is a price in those units. Under [`MaximumRatio`](@ref) the model's `w` is the homogenised vector ``k \\boldsymbol{w}``, so the penalty acts on ``k \\boldsymbol{w}``. The method on `nothing` does nothing, and it runs when no L∞ coefficient is set. Any other type or arity is a `MethodError`.
 
 # Mathematical definition
 
@@ -250,7 +250,7 @@ Where:
   - [`set_weight_norm_inf_constraints!`](@ref)
   - [`add_to_objective_penalty!`](@ref)
 """
-function set_linf_regularisation!(args...; prefix::Symbol = Symbol(""))
+function set_linf_regularisation!(::JuMP.Model, ::Nothing; prefix::Symbol = Symbol(""))
     return nothing
 end
 function set_l1_regularisation!(model::JuMP.Model, l1_val::Number;

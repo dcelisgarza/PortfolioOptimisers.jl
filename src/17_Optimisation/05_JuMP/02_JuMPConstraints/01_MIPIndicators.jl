@@ -602,7 +602,7 @@ $(DocStringExtensions.TYPEDSIGNATURES)
 
 Add MIP-compatible weight bound constraints using binary selection variables.
 
-The fall-through method does nothing when `wb` is `nothing`. The concrete method adds `wx ≥ is ⊙ lb` and `wx ≤ il ⊙ ub` constraints when the respective finite bounds are present, where `wx` and the bounds live in the space selected by `sp` ([`mip_wx!`](@ref), [`mip_bounds`](@ref)).
+The method reads the upper gate `il` and the lower gate `is` of the bundle `ind` with [`ub_gate`](@ref) and [`lb_gate`](@ref). It adds `wx ≥ is ⊙ lb` and `wx ≤ il ⊙ ub` constraints when the respective finite bounds are present, where `wx` and the bounds live in the space selected by `sp` ([`mip_wx!`](@ref), [`mip_bounds`](@ref)).
 
 # Mathematical definition
 
@@ -624,8 +624,7 @@ Where:
   - `sp::AbstractMIPSpace`: Weight space the constraints act on.
   - $(arg_dict[:wb_arg])
   - `wx::VecNum`: Weight expression from [`mip_wx!`](@ref).
-  - $(arg_dict[:il_arg])
-  - $(arg_dict[:is_arg])
+  - `ind::AbstractMIPIndicators`: Indicator bundle that holds the gates.
 
 # Returns
 
@@ -639,7 +638,9 @@ Where:
   - [`WeightBounds`](@ref)
 """
 function mip_wb(model::JuMP.Model, sp::AbstractMIPSpace, wb::WeightBounds, wx::VecNum,
-                il::VecNum, is::VecNum)
+                ind::AbstractMIPIndicators)
+    il = ub_gate(ind)
+    is = lb_gate(ind)
     sc = get_constraint_scale(model)
     lb = wb.lb
     if !isnothing(lb) && w_finite_flag(lb)
@@ -656,10 +657,6 @@ function mip_wb(model::JuMP.Model, sp::AbstractMIPSpace, wb::WeightBounds, wx::V
                                                          0)
     end
     return nothing
-end
-function mip_wb(model::JuMP.Model, sp::AbstractMIPSpace, wb::WeightBounds, wx::VecNum,
-                ind::AbstractMIPIndicators)
-    return mip_wb(model, sp, wb, wx, ub_gate(ind), lb_gate(ind))
 end
 """
 $(DocStringExtensions.TYPEDSIGNATURES)
@@ -886,7 +883,7 @@ function short_mip_threshold_constraints(model::JuMP.Model, sp::AbstractMIPSpace
     ind = mip_indicators!(model, sp, LongShortIndicators, wb, wx, ss)
     mip_wb(model, sp, wb, wx, ind)
     ss = set_mip_ss_expr!(model, ss, wb)
-    set_threshold_constraints!(model, sp, ind, wx, lt, st, ss, lt_flag, st_flag)
+    set_threshold_constraints!(model, sp, ind, wx, lt, lt_flag, st, st_flag, ss)
     set_fixed_fees!(model, sp, ind, ffl, ffs, ffl_flag, ffs_flag)
     if xbgt_flag
         pin_decomposition!(model, sp, ind, wx, ss)

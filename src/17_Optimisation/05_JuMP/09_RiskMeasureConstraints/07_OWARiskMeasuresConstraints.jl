@@ -453,6 +453,44 @@ function set_risk_constraints!(model::JuMP.Model, i::Any,
                                        prefix = prefix, kwargs...)
 end
 """
+$(DocStringExtensions.TYPEDEF)
+
+The parts of a relaxed sorting network in a JuMP model: the network variable, its three blocks of rows and the OWA risk expression.
+
+This type is an implementation detail and is not intended for direct use. [`set_sorting_network_owa!`](@ref) makes it, and the two sorting-network methods of [`set_risk_constraints!`](@ref) register each part in the Model State under the keys of their measure.
+
+# Fields
+
+$(DocStringExtensions.FIELDS)
+
+# Related
+
+  - [`set_sorting_network_owa!`](@ref)
+  - [`SortingNetworkOrderedWeightsArray`](@ref)
+"""
+@concrete struct SortingNetworkParts
+    """
+    `z`: Vector variable of length `2K`, the two values that each of the `K` comparators writes.
+    """
+    z
+    """
+    `c_eq`: The `K` equality rows, one for each comparator.
+    """
+    c_eq
+    """
+    `c_a`: The `K` rows that put the larger value of a comparator at or above its first input.
+    """
+    c_a
+    """
+    `c_b`: The `K` rows that put the larger value of a comparator at or above its second input.
+    """
+    c_b
+    """
+    `risk`: The OWA risk expression of the network.
+    """
+    risk
+end
+"""
 $(DocStringExtensions.TYPEDSIGNATURES)
 
 Add the relaxed sorting network of a [`SortingNetworkOrderedWeightsArray`](@ref) to `model`, and return the OWA risk expression of the weight vector `owa_w`.
@@ -483,11 +521,12 @@ The network reads the `owa` variable of [`set_owa_constraints!`](@ref), so the f
 
 # Returns
 
-  - `(; z, c_eq, c_a, c_b, risk)`: The network variable, the three blocks of rows and the risk expression, which the caller registers.
+  - `net::SortingNetworkParts`: The network variable, the three blocks of rows and the risk expression, which the caller registers.
 
 # Related
 
   - [`SortingNetworkOrderedWeightsArray`](@ref)
+  - [`SortingNetworkParts`](@ref)
   - [`sorting_network`](@ref)
   - [`sorting_network_columns`](@ref)
   - [`set_owa_constraints!`](@ref)
@@ -526,7 +565,7 @@ function set_sorting_network_owa!(model::JuMP.Model, alg::SortingNetworkOrderedW
     c_a = JuMP.@constraint(model, sc * (x[h] - x[a]) in JuMP.Nonnegatives())
     c_b = JuMP.@constraint(model, sc * (x[h] - x[b]) in JuMP.Nonnegatives())
     risk = JuMP.@expression(model, s * LinearAlgebra.dot(owa_w, x[wire]))
-    return (; z, c_eq, c_a, c_b, risk)
+    return SortingNetworkParts(z, c_eq, c_a, c_b, risk)
 end
 """
 $(DocStringExtensions.TYPEDSIGNATURES)

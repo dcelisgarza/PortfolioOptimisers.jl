@@ -19,7 +19,6 @@ shared_pair_resolution
 resolve_constraint_block
 rows_datatype
 assert_rows_constraint_width
-resolved_constraint_block
 constraint_block_from_resolved
 set_block_constraints!
 set_block_weight_constraints!

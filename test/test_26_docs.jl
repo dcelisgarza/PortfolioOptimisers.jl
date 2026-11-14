@@ -841,17 +841,19 @@ A docstring does not always sit on the method that registers the row. Two shapes
 the tree and the attribution must read both.
 
   - `src/17_Optimisation/05_JuMP/02_JuMPConstraints/04_WeightConstraints.jl` documents
-    `set_weight_constraints!(args...)`, a dispatch-error stub that registers nothing. The
-    methods that register `w_lb` and `w_ub` follow it and carry no docstring of their own.
+    `set_weight_constraints!` on a `WeightBounds`, the method that registers `w_lb` and
+    `w_ub`. The method on `wb::Nothing` follows it, registers nothing, and carries no
+    docstring of its own. Before #2101 the docstring sat on an `args...` stub that
+    registered nothing, and the methods that register the rows followed it.
   - `src/17_Optimisation/05_JuMP/09_RiskMeasureConstraints/06_XatRisk/01_XatRiskConstraints.jl` documents five
     separate methods of `set_risk_constraints!`, each immediately above the method it
     describes, and each of the five registers its own rows.
 
 So a docstring speaks for its own definition AND for every later definition of the same name
 until the next docstring of that name -- which is how the file reads. Attributing per name
-rather than per definition is what makes the first shape visible: read per definition, four
-of the thirteen files under `09_JuMPConstraints/` register rows under no documented
-definition at all, `04_WeightConstraints.jl` among them.
+rather than per definition is what makes the first shape visible: read per definition, a
+file under `02_JuMPConstraints/` can register rows under no documented definition at all, as
+`04_WeightConstraints.jl` did before #2101.
 
 A function this file documents nowhere is skipped rather than reported, because the docstring
 the rule addresses is in another file and that file has a `swept` flag of its own. No such

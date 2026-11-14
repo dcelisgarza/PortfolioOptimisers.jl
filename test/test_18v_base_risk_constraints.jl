@@ -993,3 +993,92 @@ end
     @test isa(res.retcode, OptimisationSuccess)
     @test WorstRealisation()(X_ui * res.w) <= ub * (1 + 1e-6)
 end
+
+@testset "An empty slot of a JuMP verb takes nothing, and no other type" begin
+    # #2101: each `args...` or `::Any` fallback became a method on the empty slot, with the
+    # arity of the typed methods. Any other type or arity is a `MethodError`.
+    model = JuMP.Model()
+    PO.set_model_scales!(model, 1.0, 1.0)
+    JuMP.@variable(model, w[1:3])
+    JuMP.@expression(model, k, 1)
+    @test isnothing(PO.set_solver_attributes(model, nothing))
+    @test_throws MethodError PO.set_solver_attributes(model, 1)
+    @test_throws MethodError PO.set_solver_attributes()
+    @test isnothing(PO.set_initial_w!(w, nothing))
+    @test isnothing(PO.set_initial_w!(w, [fill(inv(3), 3), fill(inv(3), 3)]))
+    @test_throws MethodError PO.set_initial_w!(w, 1.0)
+    @test isnothing(PO.set_budget_constraints!(model, nothing, w))
+    @test_throws MethodError PO.set_budget_constraints!(model, "1", w)
+    @test isnothing(PO.set_long_short_budget_constraints!(model, nothing, nothing))
+    @test isnothing(PO.set_long_short_budget_constraints!(model,
+                                                          BudgetCosts(;
+                                                                      w = fill(inv(3), 3)),
+                                                          nothing))
+    @test_throws MethodError PO.set_long_short_budget_constraints!(model, "1", nothing)
+    @test isnothing(PO.set_gross_budget_constraints!(model, nothing))
+    @test_throws MethodError PO.set_gross_budget_constraints!(model, "1")
+    @test isnothing(PO.set_linear_weight_constraints!(model, nothing, :a_, :b_))
+    @test_throws MethodError PO.set_linear_weight_constraints!(model, 1, :a_, :b_)
+    @test isnothing(PO.set_turnover_constraints!(model, nothing))
+    @test_throws MethodError PO.set_turnover_constraints!(model, 1)
+    for f in (PO.set_turnover_fees!, PO.set_non_fixed_fees!, PO.set_long_non_fixed_fees!,
+              PO.set_short_non_fixed_fees!, PO.set_l1_regularisation!, PO.set_l2_regularisation!,
+              PO.set_lp_regularisation!, PO.set_linf_regularisation!)
+        @test isnothing(f(model, nothing))
+        @test_throws MethodError f(model, "1")
+        @test_throws MethodError f(model)
+    end
+    @test isnothing(PO.set_tracking_error_constraints!(model, pr, nothing))
+    @test isnothing(PO.set_tracking_error_constraints!(model, nothing, nothing))
+    @test_throws MethodError PO.set_tracking_error_constraints!(model, 1, pr, "1")
+    @test isnothing(PO.rc_variance_constraints!(model, 1, nothing, nothing))
+    @test_throws MethodError PO.rc_variance_constraints!(model, 1, "1", nothing)
+    # A slot that holds no value yet holds an Unresolved Value, and the value checks of the
+    # budget and of the sub-grouped width pass it.
+    for x in (nothing, BudgetCosts(; w = fill(inv(3), 3)))
+        @test isnothing(PO.net_budget_floor(x))
+        @test isnothing(PO.gross_budget_ceiling(x))
+    end
+    @test_throws MethodError PO.net_budget_floor("1")
+    @test_throws MethodError PO.gross_budget_ceiling("1")
+    @test isnothing(PO.assert_subgrouped_constraint_width(LinearConstraintEstimator(;
+                                                                                    val = ["a <= 1"]),
+                                                          [1 0; 0 1]))
+    @test_throws MethodError PO.assert_subgrouped_constraint_width(1, [1 0; 0 1])
+    @test isempty(JuMP.all_constraints(model; include_variable_in_set_constraints = true))
+    # The block of the online head reaches the method on `nothing` of the weight bounds in
+    # the keyword form of the block builder.
+    @test isnothing(PO.set_weight_constraints!(model, nothing, nothing, nothing;
+                                               gbgt = nothing, prefix = :b_))
+    @test_throws MethodError PO.set_weight_constraints!(model, 1, nothing, nothing)
+end
+
+@testset "A resolved block is built from the block and the values of stage 2" begin
+    # #2101: `ResolvedConstraintBlock(cbe; pr, rd, ...)` took the place of the private
+    # `resolved_constraint_block`, and each keyword is required.
+    cbe = ConstraintBlock(; wb = nothing, card = 3, xbgt = true)
+    cbr = PO.resolve_constraint_block(cbe, nothing, nothing)
+    @test isa(cbr, PO.ResolvedConstraintBlock)
+    @test (cbr.card, cbr.xbgt, cbr.wb) == (3, true, nothing)
+    @test !isdefined(PO, :resolved_constraint_block)
+    @test_throws UndefKeywordError PO.ResolvedConstraintBlock(cbe; pr = nothing)
+end
+
+@testset "A rebuild keeps every field that it does not change" begin
+    # #2101: these methods rebuild through `rebuild_struct`, which keeps every other field.
+    res = optimise(RelaxedRiskBudgeting(; opt = JuMPOptimiser(; pe = pr, slv = slv)))
+    res_rc = PO.set_retcode(res, OptimisationFailure())
+    @test isa(res_rc, PO.RelaxedRiskBudgetingResult)
+    @test isa(res_rc.retcode, OptimisationFailure)
+    @test res_rc.w == res.w && res_rc.rbr === res.rbr && res_rc.fb === res.fb
+    # The forms of `factory` on an `ArithmeticReturn` set the set and the centre, and keep
+    # the settings and the root of the matrix.
+    ucs = NormalUncertaintySet()
+    rt = ArithmeticReturn(; settings = JuMPReturnsSettings(; lb = 0.1, scale = 2.0))
+    for f in (factory(rt, pr, slv, ucs), factory(rt, ucs, pr))
+        @test f.ucs === ucs && f.mu === pr.mu
+        @test f.settings === rt.settings && f.mtx_sqrt === rt.mtx_sqrt
+    end
+    f = factory(rt, ucs, slv)
+    @test f.ucs === ucs && f.mu === rt.mu && f.settings === rt.settings
+end

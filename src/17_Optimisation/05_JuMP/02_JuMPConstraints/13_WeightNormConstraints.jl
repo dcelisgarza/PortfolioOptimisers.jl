@@ -1,10 +1,10 @@
 """
     set_weight_norm_2_constraints!(model::JuMP.Model, val::Number; prefix::Symbol = Symbol(""))
-    set_weight_norm_2_constraints!(args...; prefix::Symbol = Symbol(""))
+    set_weight_norm_2_constraints!(model::JuMP.Model, ::Nothing; prefix::Symbol = Symbol(""))
 
 Bound the 2-norm of the weights above by `val`, a ceiling that spreads the portfolio over more assets as it falls.
 
-The row multiplies `val` by the homogenisation variable `k`, so the ceiling holds on the weights the result reports: on ``\\boldsymbol{w} / k`` under [`MaximumRatio`](@ref), on the renormalised weights under [`RiskBudgeting`](@ref), and on ``\\boldsymbol{w}`` itself under every other objective, where ``k = 1``. The budget does not scale the ceiling. The builder takes a number. The caller-facing slot also takes an [`AbstractNormCeilingCalibrationAlgorithm`](@ref), which computes the ceiling from the universe the prior result carries, and [`assemble_jump_model!`](@ref) resolves it before it calls here. Any other argument, `nothing` included, adds nothing to the model.
+The row multiplies `val` by the homogenisation variable `k`, so the ceiling holds on the weights the result reports: on ``\\boldsymbol{w} / k`` under [`MaximumRatio`](@ref), on the renormalised weights under [`RiskBudgeting`](@ref), and on ``\\boldsymbol{w}`` itself under every other objective, where ``k = 1``. The budget does not scale the ceiling. The builder takes a number. The caller-facing slot also takes an [`AbstractNormCeilingCalibrationAlgorithm`](@ref), which computes the ceiling from the universe the prior result carries, and [`assemble_jump_model!`](@ref) resolves it before it calls here. `nothing` adds nothing to the model. Any other type or arity is a `MethodError`.
 
 # Mathematical definition
 
@@ -74,7 +74,8 @@ Where:
 
   - $(ref_dict[:lobo1998]) Section 1.1.
 """
-function set_weight_norm_2_constraints!(args...; prefix::Symbol = Symbol(""))
+function set_weight_norm_2_constraints!(::JuMP.Model, ::Nothing;
+                                        prefix::Symbol = Symbol(""))
     return nothing
 end
 function set_weight_norm_2_constraints!(model::JuMP.Model, val::Number;
@@ -90,11 +91,11 @@ function set_weight_norm_2_constraints!(model::JuMP.Model, val::Number;
 end
 """
     set_weight_norm_p_constraints!(model::JuMP.Model, lps::LpReg_VecLpReg; prefix::Symbol = Symbol(""))
-    set_weight_norm_p_constraints!(args...; prefix::Symbol = Symbol(""))
+    set_weight_norm_p_constraints!(model::JuMP.Model, ::Nothing; prefix::Symbol = Symbol(""))
 
 Bound the ``p``-norm of the weights above, once for each term of `lps`.
 
-Each term is an [`LpRegularisation`](@ref) that serves as a ceiling: its `p` field is the norm order, and its `val` field is the ceiling. The row multiplies `val` by the homogenisation variable `k`, so the ceiling holds on the weights the result reports, as in [`set_weight_norm_2_constraints!`](@ref). [`norm_ceiling_factory`](@ref) refuses an [`AbstractAmbiguityRadiusCalibrationAlgorithm`](@ref) in `val`, resolves an [`AbstractNormCeilingCalibrationAlgorithm`](@ref) against the prior result with the term's own norm order, and rebuilds the term. Every `val` this builder sees is therefore a number that the constructor of [`LpRegularisation`](@ref) checked. The entries carry names apart from those of [`set_lp_regularisation!`](@ref), so a model can carry an Lp penalty and a ``p``-norm ceiling at once. Any other argument, `nothing` included, adds nothing to the model.
+Each term is an [`LpRegularisation`](@ref) that serves as a ceiling: its `p` field is the norm order, and its `val` field is the ceiling. The row multiplies `val` by the homogenisation variable `k`, so the ceiling holds on the weights the result reports, as in [`set_weight_norm_2_constraints!`](@ref). [`norm_ceiling_factory`](@ref) refuses an [`AbstractAmbiguityRadiusCalibrationAlgorithm`](@ref) in `val`, resolves an [`AbstractNormCeilingCalibrationAlgorithm`](@ref) against the prior result with the term's own norm order, and rebuilds the term. Every `val` this builder sees is therefore a number that the constructor of [`LpRegularisation`](@ref) checked. The entries carry names apart from those of [`set_lp_regularisation!`](@ref), so a model can carry an Lp penalty and a ``p``-norm ceiling at once. `nothing` adds nothing to the model. Any other type or arity is a `MethodError`.
 
 # Mathematical definition
 
@@ -171,7 +172,8 @@ Where:
 
   - $(ref_dict[:chares2009]) Section 4.1.2, Equations 4.4 and 4.5.
 """
-function set_weight_norm_p_constraints!(args...; prefix::Symbol = Symbol(""))
+function set_weight_norm_p_constraints!(::JuMP.Model, ::Nothing;
+                                        prefix::Symbol = Symbol(""))
     return nothing
 end
 function set_weight_norm_p_constraints!(model::JuMP.Model, lps::LpReg_VecLpReg;
@@ -198,11 +200,11 @@ function set_weight_norm_p_constraints!(model::JuMP.Model, lps::LpReg_VecLpReg;
 end
 """
     set_weight_norm_inf_constraints!(model::JuMP.Model, val::Number; prefix::Symbol = Symbol(""))
-    set_weight_norm_inf_constraints!(args...; prefix::Symbol = Symbol(""))
+    set_weight_norm_inf_constraints!(model::JuMP.Model, ::Nothing; prefix::Symbol = Symbol(""))
 
 Bound the largest absolute weight above by `val`, the ∞-norm ceiling of the weights.
 
-The row multiplies `val` by the homogenisation variable `k`, so the ceiling holds on the weights the result reports, as in [`set_weight_norm_2_constraints!`](@ref). So `val = 0.2` keeps each reported weight within 20% of a portfolio that sums to one. The builder takes a number. The caller-facing slot also takes an [`AbstractNormCeilingCalibrationAlgorithm`](@ref), which computes the ceiling from the universe the prior result carries, and [`assemble_jump_model!`](@ref) resolves it before it calls here. Any other argument, `nothing` included, adds nothing to the model.
+The row multiplies `val` by the homogenisation variable `k`, so the ceiling holds on the weights the result reports, as in [`set_weight_norm_2_constraints!`](@ref). So `val = 0.2` keeps each reported weight within 20% of a portfolio that sums to one. The builder takes a number. The caller-facing slot also takes an [`AbstractNormCeilingCalibrationAlgorithm`](@ref), which computes the ceiling from the universe the prior result carries, and [`assemble_jump_model!`](@ref) resolves it before it calls here. `nothing` adds nothing to the model. Any other type or arity is a `MethodError`.
 
 # Mathematical definition
 
@@ -269,7 +271,8 @@ Where:
   - [`set_linf_regularisation!`](@ref): the ∞-norm penalty on the weights.
   - [`JuMPOptimiser`](@ref)
 """
-function set_weight_norm_inf_constraints!(args...; prefix::Symbol = Symbol(""))
+function set_weight_norm_inf_constraints!(::JuMP.Model, ::Nothing;
+                                          prefix::Symbol = Symbol(""))
     return nothing
 end
 function set_weight_norm_inf_constraints!(model::JuMP.Model, val::Number;

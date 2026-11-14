@@ -1,15 +1,15 @@
 """
-    set_initial_w!(args...)
     set_initial_w!(w::VecNum, wi::VecNum)
+    set_initial_w!(w::VecNum, ::Option{<:VecVecNum})
 
 Set the start values of the weight variables of the JuMP model.
 
-The method for two vectors sets the start value of each weight variable to the matching entry of `wi`. Every other argument, `nothing` or a vector of weight vectors among them, reaches the method that does nothing.
+The method for two vectors sets the start value of each weight variable to the matching entry of `wi`. `nothing` sets no start value. A vector of weight vectors, the anchors of a [`NearOptimalCentering`](@ref) sweep, sets no start value either. Any other type or arity is a `MethodError`.
 
 # Arguments
 
   - `w::VecNum`: Vector of JuMP weight variables.
-  - `wi::VecNum`: Vector of start values.
+  - `wi`: Vector of start values, `nothing`, or a vector of weight vectors.
 
 # Validation
 
@@ -24,7 +24,7 @@ The method for two vectors sets the start value of each weight variable to the m
   - [`set_w!`](@ref)
   - [`JuMPOptimiser`](@ref)
 """
-function set_initial_w!(args...)
+function set_initial_w!(::VecNum, ::Option{<:VecVecNum})
     return nothing
 end
 function set_initial_w!(w::VecNum, wi::VecNum)

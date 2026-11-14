@@ -280,6 +280,8 @@ The rebuild calls the positional constructor, not the keyword constructor. The k
   - [`JuMPOptimisationResult`](@ref)
 """
 function set_retcode(res::JuMPOptimisationResult, retcode::OptRetCode_VecOptRetCode)
+    # The positional constructor, by hand: the keyword constructor expands `sol` through the
+    # investable mask, so a rebuild through it would expand the weights a second time.
     return JuMPOptimisationResult(res.jor, retcode, res.sol, res.model)
 end
 # Virtual property `:w` extracts portfolio weights from `sol` (a single solution or a vector

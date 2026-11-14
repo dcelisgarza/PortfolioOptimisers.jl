@@ -13,7 +13,6 @@ set_risk!(model::JuMP.Model, i::Any, r::StandardDeviation, opt::RiskConstraintOw
 sdp_rc_variance_flag!
 sdp_variance_flag!
 set_variance_risk!
-set_sdp_variance_risk!
 variance_risk_bounds_expr
 rc_variance_constraints!
 set_ucs_variance_risk!

@@ -68,7 +68,7 @@ Rebuild a [`MeanRiskResult`](@ref) with a different return code.
   - [`MeanRiskResult`](@ref)
 """
 function set_retcode(res::MeanRiskResult, retcode::OptRetCode_VecOptRetCode)
-    return MeanRiskResult(set_retcode(res.jr, retcode), res.r, res.fb)
+    return rebuild_struct(res, (; jr = set_retcode(res.jr, retcode)))
 end
 """
 $(DocStringExtensions.TYPEDSIGNATURES)

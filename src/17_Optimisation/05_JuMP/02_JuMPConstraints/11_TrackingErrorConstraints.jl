@@ -1,9 +1,11 @@
 """
-$(DocStringExtensions.TYPEDSIGNATURES)
+    set_tracking_error_constraints!(model::JuMP.Model, pr::Option{<:AbstractPriorResult}, ::Nothing, args...; kwargs...)
+    set_tracking_error_constraints!(model::JuMP.Model, pr::AbstractPriorResult, tres::Tr_VecTr, args...; kwargs...)
+    set_tracking_error_constraints!(model::JuMP.Model, i::Integer, pr::AbstractPriorResult, tr, args...; prefix::Symbol = Symbol(""), kwargs...)
 
 Add tracking error constraints to the JuMP optimisation model.
 
-The fall-through method does nothing. Concrete methods dispatch on the tracking algorithm type:
+The method on `tres = nothing` adds no row. A tracking error whose type or norm has no method is a `MethodError`. The methods on one tracking error dispatch on the tracking algorithm type:
 
   - [`L1Norm`](@ref): Enforces `‖net_X - wb * k‖₁ ≤ err * (T - ddof)` via NormOneCone.
   - [`L2Norm`](@ref): Enforces a scaled L2 norm via SecondOrderCone.
@@ -41,6 +43,7 @@ Where:
   - `i::Integer`: Constraint index for generating unique variable and constraint names.
   - `pr::AbstractPriorResult`: Prior result providing the return matrix `X`.
   - `tr`: Tracking error specification.
+  - `tres`: One tracking error, a vector of them, or `nothing`.
   - `opt`: The [`RiskConstraintOwner`](@ref) whose programme the constraint joins, read by the risk-based variants for the solver a Deferred Quantity is resolved against ([`risk_constraint_solver`](@ref)).
   - $(arg_dict[:pl_opt])
   - $(arg_dict[:fees_opt])
@@ -59,7 +62,8 @@ Where:
   - [`LpNorm`](@ref)
   - [`LInfNorm`](@ref)
 """
-function set_tracking_error_constraints!(args...; kwargs...)
+function set_tracking_error_constraints!(::JuMP.Model, ::Option{<:AbstractPriorResult},
+                                         ::Nothing, args...; kwargs...)
     return nothing
 end
 function set_tracking_error_constraints!(model::JuMP.Model, i::Integer,

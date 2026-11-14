@@ -55,6 +55,11 @@
     @test rkc[2] >= -0.07
     @test rkc[5] <= 0.74 + 1e-4
     @test isapprox(rkc[1], 0.09, rtol = 2e-4)
+    # `set_retcode` changes the return code and keeps the rest of the Result (#2101).
+    res_rc = PortfolioOptimisers.set_retcode(res, OptimisationFailure())
+    @test isa(res_rc, FactorRiskContributionResult)
+    @test isa(res_rc.retcode, OptimisationFailure)
+    @test res_rc.w == res.w && res_rc.rr === res.rr && res_rc.fb === res.fb
 
     # The rows sit on the semidefinite relaxation of formulation 16 of Cajas (2025, SSRN
     # 5097869). They bind the lifted matrix `frc_W`, and they bind the portfolio only where

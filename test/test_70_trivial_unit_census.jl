@@ -278,7 +278,8 @@ end
                                                         # src/10_Prior (#2097).
                                                         (:assert_scenario_refit, :assert_scenario_model) => "(interface) `assert_scenario_model` walks the composites by their fields `pe`, `a_pe` and `f_pe`, so its composites call it: it is a function of its own, and its body does not move into `assert_scenario_refit` (#2109, #2116, #2097)",
                                                         (:bl_posteriors, :vanilla_posteriors) => "(b) the `Nothing` arm holds a policy: the callers hold an `Option` of the view system, and `vanilla_posteriors` takes its fields (#2111, #2097)",
-                                                        (:opinion_pooling_cache, :forward_prior) => "(b) a keyword does not dispatch, and `forward_prior` must throw on a field that the type does not have: the `LowOrderPrior` arm of the writer is the one result type with a field `pc` (#2075, #2097)")
+                                                        (:opinion_pooling_cache, :forward_prior) => "(b) a keyword does not dispatch, and `forward_prior` must throw on a field that the type does not have: the `LowOrderPrior` arm of the writer is the one result type with a field `pc` (#2075, #2097)",
+                                                        (:variance_risk_bounds_val, :Frontier) => "(a) its callee is the public constructor `Frontier`: the frontier method rebuilds the sweep in the units of the formulation, as the other methods convert a number or a vector (#2079, #2101)")
     # The functions whose forward methods are interface methods, with the check that shows
     # it. #2072 adds a name after a check of each one.
     interface_functions = Dict{Symbol, String}(#
@@ -358,7 +359,12 @@ end
                                                :regression_factor_names => "its callee `cs_diagnostic_factor_names` is a shared public verb (rule 3, #2097)",
                                                :leverage_one_residuals => "4 functions share its callee `leverage_one_nan` (rule 3, #2097)",
                                                :forget_row_positions => "3 functions share its callee `set_row_key` (rule 3, #2097)",
-                                               :systematic_processing! => "a public contract verb: its `::Nothing` arm on the empty slot has a body of its own, and its `SystematicRepair` method calls `sample_matrix_processing!`, which other functions share (rule 3, #2108, #2111, #2097)")
+                                               :systematic_processing! => "a public contract verb: its `::Nothing` arm on the empty slot has a body of its own, and its `SystematicRepair` method calls `sample_matrix_processing!`, which other functions share (rule 3, #2108, #2111, #2097)",
+                                               # src/17_Optimisation/05_JuMP (#2101).
+                                               :mip_key => "one method for each MIP space: 13 functions share its callee `state_key` (rule 3, #2101)",
+                                               :mip_bit_space => "its callee is the constructor of a type, `AssetMIPSpace` (rule 3, #2101)",
+                                               :mip_wx! => "one method for each MIP space: the asset form calls `get_w`, a shared public verb, and the factor form calls `shared_get`, which 45 functions share (rule 3, #2101)",
+                                               :set_retcode => "one method for each Result type: each calls `rebuild_struct`, which 88 functions share, or the constructor of `JuMPOptimisationResult`, whose keyword form would expand the weights twice (rule 3, #2101)")
     # The debt that #2072 removes. Do not add a pair: fix the wrapper.
     pending_forwards = Set{Tuple{Symbol, Symbol}}([(:apply_fitted_step,
                                                     :apply_fitted_steps),
@@ -435,12 +441,6 @@ end
                                                    (:maybe_inject_step, :inject_context),
                                                    (:member_regret, :series_regret),
                                                    (:merge_held_data, :partial_fit!),
-                                                   (:mip_bit_space, :AssetMIPSpace),
-                                                   (:mip_key, :state_key),
-                                                   (:mip_wx!, :get_w),
-                                                   (:mip_wx!, :shared_get),
-                                                   (:no_bounds_returns_settings,
-                                                    :JuMPReturnsSettings),
                                                    (:n_splits, :n_splits),
                                                    (:online_step_fold, :partial_fit!),
                                                    (:online_update!, :online_update!),
@@ -463,8 +463,6 @@ end
                                                     :reset_time_dependent_fields),
                                                    (:reset_time_dependent_step,
                                                     :reset_time_dependent_estimator),
-                                                   (:resolved_constraint_block,
-                                                    :ResolvedConstraintBlock),
                                                    (:rewrap_step, :PipelineStep),
                                                    (:rule_state_seed, :forecaster_seed),
                                                    (:rule_state_seed, :rule_state_seed),
@@ -475,16 +473,11 @@ end
                                                    (:scale_rows, :window_rows),
                                                    (:set_allocation_set_constraints!,
                                                     :set_allocation_set_constraints!),
-                                                   (:set_retcode, :JuMPOptimisationResult),
                                                    (:set_retcode, :NestedClusteredResult),
                                                    (:set_retcode, :StackingResult),
                                                    (:set_retcode, :SubsetResamplingResult),
                                                    (:set_risk_constraints!,
                                                     :set_range_risk_constraints!),
-                                                   (:set_variance_risk!,
-                                                    :set_sdp_variance_risk!),
-                                                   (:set_variance_risk!,
-                                                    :set_variance_risk!),
                                                    (:sparse_portfolio_iterate,
                                                     :largest_forecast_split),
                                                    (:step_fallback, :partial_fit!),
@@ -501,7 +494,6 @@ end
                                                     :update_time_dependent_fields),
                                                    (:update_time_dependent_step,
                                                     :update_time_dependent_estimator),
-                                                   (:variance_risk_bounds_val, :Frontier),
                                                    (:weight_mass_grid,
                                                     :pipeline_lens_val_grid),
                                                    (:window_bigger_is_better,

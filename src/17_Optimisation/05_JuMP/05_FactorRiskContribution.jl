@@ -82,8 +82,7 @@ Rebuild a [`FactorRiskContributionResult`](@ref) with a different return code.
   - [`FactorRiskContributionResult`](@ref)
 """
 function set_retcode(res::FactorRiskContributionResult, retcode::OptRetCode_VecOptRetCode)
-    return FactorRiskContributionResult(set_retcode(res.jr, retcode), res.r, res.rr,
-                                        res.frc_plr, res.fb)
+    return rebuild_struct(res, (; jr = set_retcode(res.jr, retcode)))
 end
 # Unique fields resolve directly; unknown properties forward into `rr` first, then into the
 # embedded [`JuMPOptimisationResult`](@ref) `jr` (the virtual `:w` and `jor` fall-through).

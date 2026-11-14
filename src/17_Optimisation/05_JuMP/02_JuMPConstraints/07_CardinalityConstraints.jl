@@ -519,11 +519,12 @@ function assert_subgroup_mip_fields(scard, smtx, slt, sst)::Nothing
     return nothing
 end
 """
-    assert_subgrouped_constraint_width(sgc, smt)
+    assert_subgrouped_constraint_width(sgc::LinearConstraint, smt::MatNum)
+    assert_subgrouped_constraint_width(sgc::LcE_Lc, smt::MatNum_ASetMatE)
 
 Refuses a precomputed sub-grouped cardinality constraint whose width is not the number of sub-groups in its selection matrix.
 
-[`set_gcard_constraints!`](@ref) multiplies the matrix `A` of each half of `sgc` by the held binary of the sub-groups, which has one entry for each row of `smt`. So every half needs one column for each row of `smt`, and it can have any number of rows. The other method accepts every other pair, such as an estimator, because the width of an estimator is not known until the optimiser resolves it.
+[`set_gcard_constraints!`](@ref) multiplies the matrix `A` of each half of `sgc` by the held binary of the sub-groups, which has one entry for each row of `smt`. So every half needs one column for each row of `smt`, and it can have any number of rows. The other method accepts a pair with an estimator in either slot, because the width of an estimator is not known until the optimiser resolves it. Any other type is a `MethodError`.
 
 # Validation
 
@@ -545,7 +546,7 @@ function assert_subgrouped_constraint_width(sgc::LinearConstraint, smt::MatNum):
     end
     return nothing
 end
-function assert_subgrouped_constraint_width(::Any, ::Any)::Nothing
+function assert_subgrouped_constraint_width(::LcE_Lc, ::MatNum_ASetMatE)::Nothing
     return nothing
 end
 """

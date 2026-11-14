@@ -43,12 +43,12 @@ Where:
   - `ind::AbstractMIPIndicators`: Indicator bundle the thresholds gate on.
   - `wx`: Weight expression in the space of `sp`.
   - `lt::Option{<:Threshold}`: Long-side minimum-holding threshold.
-  - `st::Option{<:Threshold}`: Short-side minimum-holding threshold (long-short method only).
-  - `ss`: Big-M expression (long-short method only), as registered by [`set_mip_ss_expr!`](@ref).
   - `lt_flag::Bool`: Whether to add the long threshold.
-  - `st_flag::Bool`: Whether to add the short threshold (long-short method only).
+  - `st::Option{<:Threshold}`: Short-side minimum-holding threshold (long-short method only). It defaults to `nothing`.
+  - `st_flag::Bool`: Whether to add the short threshold (long-short method only). It defaults to `false`.
+  - `ss`: Big-M expression (long-short method only), as registered by [`set_mip_ss_expr!`](@ref). It defaults to the registered expression, `shared_get(model, :ss)`.
 
-The long-short method with no `st`, `ss` and `st_flag` serves a long-only call that reads a long-short bundle of the weights, which an earlier call declared ([`mip_indicators!`](@ref)). It adds the long threshold alone, with the registered big-M expression `ss`.
+The long-short method called with the six arguments of the held method serves a long-only call that reads a long-short bundle of the weights, which an earlier call declared ([`mip_indicators!`](@ref)). It adds the long threshold alone, with the registered big-M expression `ss`.
 
 # Returns
 
@@ -74,14 +74,8 @@ function set_threshold_constraints!(model::JuMP.Model, sp::AbstractMIPSpace,
 end
 function set_threshold_constraints!(model::JuMP.Model, sp::AbstractMIPSpace,
                                     ind::LongShortIndicators, wx, lt::Option{<:Threshold},
-                                    lt_flag::Bool)
-    return set_threshold_constraints!(model, sp, ind, wx, lt, nothing,
-                                      shared_get(model, :ss), lt_flag, false)
-end
-function set_threshold_constraints!(model::JuMP.Model, sp::AbstractMIPSpace,
-                                    ind::LongShortIndicators, wx, lt::Option{<:Threshold},
-                                    st::Option{<:Threshold}, ss, lt_flag::Bool,
-                                    st_flag::Bool)
+                                    lt_flag::Bool, st::Option{<:Threshold} = nothing,
+                                    st_flag::Bool = false, ss = shared_get(model, :ss))
     sc = get_constraint_scale(model)
     if lt_flag
         model[mip_key(sp, :w_mip_lt)] = JuMP.@constraint(model,

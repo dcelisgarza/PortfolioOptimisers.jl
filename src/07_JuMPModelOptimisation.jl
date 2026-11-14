@@ -246,15 +246,16 @@ function JuMPResult(; trials::AbstractDict, success::Bool)::JuMPResult
     return JuMPResult(trials, success)
 end
 """
-    set_solver_attributes(args...)
+    set_solver_attributes(model::JuMP.Model, ::Nothing)
 
 Set no solver attribute.
 
-[`optimise_JuMP_model!`](@ref) calls `set_solver_attributes(model, nothing)` for a [`Solver`](@ref) whose `settings` is `nothing`, and this method takes that call.
+[`optimise_JuMP_model!`](@ref) calls `set_solver_attributes(model, nothing)` for a [`Solver`](@ref) whose `settings` is `nothing`, and this method takes that call. A `settings` of any other type, or another arity, is a `MethodError`.
 
 # Arguments
 
-  - `args...`: Ignored.
+  - `model`: The JuMP model. It is not changed.
+  - `::Nothing`: No solver attribute.
 
 # Returns
 
@@ -263,7 +264,7 @@ Set no solver attribute.
 # Examples
 
 ```jldoctest
-julia> PortfolioOptimisers.set_solver_attributes()
+julia> PortfolioOptimisers.set_solver_attributes(PortfolioOptimisers.JuMP.Model(), nothing)
 
 ```
 
@@ -272,7 +273,7 @@ julia> PortfolioOptimisers.set_solver_attributes()
   - [`set_solver_attributes`](@ref)
   - [`Solver`](@ref)
 """
-function set_solver_attributes(args...)::Nothing
+function set_solver_attributes(::JuMP.Model, ::Nothing)::Nothing
     return nothing
 end
 """

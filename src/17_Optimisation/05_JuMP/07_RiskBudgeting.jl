@@ -169,7 +169,7 @@ Rebuild a [`RiskBudgetingResult`](@ref) with a different return code.
   - [`RiskBudgetingResult`](@ref)
 """
 function set_retcode(res::RiskBudgetingResult, retcode::OptRetCode_VecOptRetCode)
-    return RiskBudgetingResult(set_retcode(res.jr, retcode), res.r, res.rbr, res.fb)
+    return rebuild_struct(res, (; jr = set_retcode(res.jr, retcode)))
 end
 # Unique field `rbr` resolves directly; unknown properties forward into `rbr` first, then
 # into the embedded [`JuMPOptimisationResult`](@ref) `jr` (the virtual `:w` and `jor` fall-through).

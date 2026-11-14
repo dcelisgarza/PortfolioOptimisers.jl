@@ -116,7 +116,7 @@ Matches either a plain number (fixed budget, e.g. `1.0`) or a [`BudgetEstimator`
 """
 const Num_BgtRg = Union{Number, BudgetEstimator}
 """
-    set_budget_constraints!(args...; kwargs...)
+    set_budget_constraints!(model::JuMP.Model, ::Nothing, w::VecNum; prefix::Symbol = Symbol(""))
     set_budget_constraints!(model::JuMP.Model, val::Number, w::VecNum; prefix::Symbol = Symbol(""))
     set_budget_constraints!(model::JuMP.Model, bgt::BudgetRange, w::VecNum; prefix::Symbol = Symbol(""))
     set_budget_constraints!(model::JuMP.Model, bgt::BudgetCosts, w::VecNum; prefix::Symbol = Symbol(""))
@@ -124,7 +124,7 @@ const Num_BgtRg = Union{Number, BudgetEstimator}
 
 Add budget constraints to the JuMP optimisation model.
 
-The fall-through method does nothing. The concrete methods add the appropriate portfolio budget constraint based on the type of budget specification provided.
+The method on `nothing` adds no row. The other methods add the portfolio budget constraint that the type of the budget states. Any other type or arity is a `MethodError`.
 
 A number and a [`BudgetRange`](@ref) register their rows under `prefix`, the namespace of the block whose owner states the budget. A budget that pays costs registers its trade variables, its cost expression and its rows in the shared Model State, because they measure the trade of the one weight vector. The rows are `wp_ub` and `wn_ub`, the bounds of the trades, `cost_bgt_trade`, the trade of the weights from the reference, and for [`BudgetMarketImpact`](@ref) the power cones `wip_pcone` and `win_pcone`. So it goes on the first block of a model, the block of its owner, and refuses a non-empty `prefix`.
 
@@ -184,7 +184,7 @@ model stays convex. [`BudgetMarketImpact`](@ref) states the full system.
 
   - $(arg_dict[:model])
   - `val::Number`: Fixed budget scalar.
-  - `bgt`: Budget constraint specification ([`BudgetRange`](@ref), [`BudgetCosts`](@ref), or [`BudgetMarketImpact`](@ref)).
+  - `bgt`: Budget constraint specification ([`BudgetRange`](@ref), [`BudgetCosts`](@ref), or [`BudgetMarketImpact`](@ref)), or `nothing` for no budget.
   - `w`: Portfolio weight vector.
   - $(arg_dict[:prefix_kw])
 
@@ -203,7 +203,8 @@ model stays convex. [`BudgetMarketImpact`](@ref) states the full system.
   - [`BudgetMarketImpact`](@ref)
   - [`set_weight_constraints!`](@ref)
 """
-function set_budget_constraints!(args...; kwargs...)
+function set_budget_constraints!(::JuMP.Model, ::Nothing, ::VecNum;
+                                 prefix::Symbol = Symbol(""))
     return nothing
 end
 """
@@ -702,15 +703,20 @@ function assert_cost_budget_prefix(bgt::BudgetCostEstimator, prefix::Symbol)::No
     return nothing
 end
 """
-    set_long_short_budget_constraints!(args...; kwargs...)
+    set_long_short_budget_constraints!(model::JuMP.Model, bgt::Option{<:Num_BgtRg}, sbgt::Option{<:Num_BgtRg}; prefix::Symbol = Symbol(""))
+    set_long_short_budget_constraints!(model::JuMP.Model, bgt::Option{<:BudgetCostEstimator}, ::Nothing; prefix::Symbol = Symbol(""))
 
 Set budget constraints for long and short portfolio positions in the JuMP model.
 
-Various overloads handle different budget types (fixed, range), dispatching on the presence or absence of long/short budget configurations. The rows go under `prefix`, the namespace of the block, and they read the parts that [`weight_parts!`](@ref) gives the block. The net budget is the budget of the owner of the block, so the block of a set passes `nothing`.
+One method for each pair of a net budget `bgt` and a short budget `sbgt`, a number or a [`BudgetRange`](@ref), with `nothing` in at most one slot. The rows go under `prefix`, the namespace of the block, and they read the parts that [`weight_parts!`](@ref) gives the block. The net budget is the budget of the owner of the block, so the block of a set passes `nothing`.
+
+The method with no short budget and no net budget, or with a [`BudgetCostEstimator`](@ref) net budget, adds no row. A cost budget forbids a short budget, so it never meets one here. Any other type or arity is a `MethodError`.
 
 # Arguments
 
-  - `args...`: JuMP model and budget parameters.
+  - $(arg_dict[:model])
+  - `bgt`: The net budget, or `nothing`.
+  - `sbgt`: The short budget, or `nothing`.
   - $(arg_dict[:prefix_kw])
 
 # Returns
@@ -723,7 +729,8 @@ Various overloads handle different budget types (fixed, range), dispatching on t
   - [`set_cost_budget_constraints!`](@ref)
   - [`weight_parts!`](@ref)
 """
-function set_long_short_budget_constraints!(args...; kwargs...)
+function set_long_short_budget_constraints!(::JuMP.Model, ::Option{<:BudgetCostEstimator},
+                                            ::Nothing; prefix::Symbol = Symbol(""))
     return nothing
 end
 """
@@ -805,11 +812,11 @@ end
 """
     net_budget_floor(bgt::Number)
     net_budget_floor(bgt::BudgetRange)
-    net_budget_floor(bgt)
+    net_budget_floor(bgt::Option{<:UnresolvedValue})
 
 Returns the least magnitude `abs(sum(w))` that the net budget `bgt` admits, or `nothing` when it states no positive floor.
 
-A number admits its own magnitude. A [`BudgetRange`](@ref) admits the distance from zero to its interval: its lower bound when that is positive, the negative of its upper bound when that is negative, and no floor when the interval holds zero. Every other value, `nothing`, a [`BudgetCostEstimator`](@ref) and a [`TimeDependent`](@ref) schedule among them, states no floor.
+A number admits its own magnitude. A [`BudgetRange`](@ref) admits the distance from zero to its interval: its lower bound when that is positive, the negative of its upper bound when that is negative, and no floor when the interval holds zero. `nothing`, a [`BudgetCostEstimator`](@ref) and a [`TimeDependent`](@ref) schedule are the other values that reach it, and they state no floor. Any other type is a `MethodError`.
 
 # Related
 
@@ -829,17 +836,17 @@ function net_budget_floor(bgt::BudgetRange)
         nothing
     end
 end
-function net_budget_floor(::Any)
+function net_budget_floor(::Option{<:UnresolvedValue})
     return nothing
 end
 """
     gross_budget_ceiling(gbgt::Number)
     gross_budget_ceiling(gbgt::BudgetRange)
-    gross_budget_ceiling(gbgt)
+    gross_budget_ceiling(gbgt::Option{<:UnresolvedValue})
 
 Returns the upper end of the gross budget `gbgt`, or `nothing` when it states none.
 
-A number is its own upper end, and a [`BudgetRange`](@ref) has its `ub`. Every other value, `nothing` and a [`TimeDependent`](@ref) schedule among them, states none.
+A number is its own upper end, and a [`BudgetRange`](@ref) has its `ub`. `nothing`, a [`BudgetCostEstimator`](@ref) and a [`TimeDependent`](@ref) schedule are the other values that reach it, and they state none. Any other type is a `MethodError`.
 
 # Related
 
@@ -851,7 +858,7 @@ end
 function gross_budget_ceiling(gbgt::BudgetRange)
     return gbgt.ub
 end
-function gross_budget_ceiling(::Any)
+function gross_budget_ceiling(::Option{<:UnresolvedValue})
     return nothing
 end
 # No gross budget, or a schedule that `assert_time_dependent_substitution` reaches, has
@@ -865,7 +872,7 @@ end
 
 Constrain the gross exposure (leverage) `sum(lw) + sum(sw)`, independently of the net exposure.
 
-A number pins it; a [`BudgetRange`](@ref) bounds it on either side. Whether the constraint pins the *realised* gross exposure `norm(w, 1)` or merely bounds it depends on `xbgt` — see [`short_mip_threshold_constraints`](@ref). The rows go under `prefix`, the namespace of the block, and they read the parts that [`weight_parts!`](@ref) gives the block.
+A number pins it; a [`BudgetRange`](@ref) bounds it on either side, and `nothing` adds no row. Any other type or arity is a `MethodError`. Whether the constraint pins the *realised* gross exposure `norm(w, 1)` or merely bounds it depends on `xbgt` — see [`short_mip_threshold_constraints`](@ref). The rows go under `prefix`, the namespace of the block, and they read the parts that [`weight_parts!`](@ref) gives the block.
 
 # Arguments
 
@@ -883,7 +890,7 @@ A number pins it; a [`BudgetRange`](@ref) bounds it on either side. Whether the 
   - [`assert_gross_budget_admissible`](@ref)
   - [`set_long_short_budget_constraints!`](@ref)
 """
-function set_gross_budget_constraints!(args...; kwargs...)
+function set_gross_budget_constraints!(::JuMP.Model, ::Nothing; prefix::Symbol = Symbol(""))
     return nothing
 end
 function set_gross_budget_constraints!(model::JuMP.Model, gbgt::Number;
@@ -1211,9 +1218,11 @@ not emitted: `w = lw - sw` is an identity, so `sw_i = 0` already leaves `lw_i ==
 A [`HeldIndicators`](@ref) bundle takes the [`WeightsFromParts`](@ref) method alone. The held
 builder pins the decomposition only for that head, because [`run_mip_builder!`](@ref) gives an
 explicit `xbgt` on a model with a short side to the sign or the long-short builder. A held bundle
-under any other contract is a `TypeError`. So the [`PartsBoundWeights`](@ref) method, and the
-method that reads the contract off the model, take the two bundles that carry binaries:
-[`LongShortIndicators`](@ref) and [`SignIndicators`](@ref).
+under any other contract is a `MethodError`. So the [`PartsBoundWeights`](@ref) method takes the
+two bundles that carry binaries: [`LongShortIndicators`](@ref) and [`SignIndicators`](@ref).
+
+The contract `dc` defaults to [`decomposition_contract`](@ref) of `model`, so a call with five
+arguments reads the contract off the model.
 
 # Arguments
 
@@ -1237,7 +1246,7 @@ method that reads the contract off the model, take the two bundles that carry bi
 """
 function set_exact_budget_constraints!(model::JuMP.Model, sp::AbstractMIPSpace,
                                        ind::AbstractMIPIndicators, wx::VecNum, ss,
-                                       ::WeightsFromParts)
+                                       ::WeightsFromParts = decomposition_contract(model))
     lw = shared_get(model, :lw)
     sw = shared_get(model, :sw)
     sc = get_constraint_scale(model)
@@ -1268,20 +1277,6 @@ function set_exact_budget_constraints!(model::JuMP.Model, sp::AbstractMIPSpace,
                                                              ss * (1 .- short_bin(ind))) <=
                                                        0)
     return nothing
-end
-function set_exact_budget_constraints!(model::JuMP.Model, sp::AbstractMIPSpace,
-                                       ind::Union{LongShortIndicators, SignIndicators},
-                                       wx::VecNum, ss)
-    return set_exact_budget_constraints!(model, sp, ind, wx, ss,
-                                         decomposition_contract(model))
-end
-function set_exact_budget_constraints!(model::JuMP.Model, sp::AbstractMIPSpace,
-                                       ind::HeldIndicators, wx::VecNum, ss)
-    # The held builder pins the decomposition only for a `WeightsFromParts` head: an
-    # explicit `xbgt` on a model with a short side runs the sign or the long-short builder
-    # (`run_mip_builder!`). So the held bundle never meets the slack-closing rows.
-    return set_exact_budget_constraints!(model, sp, ind, wx, ss,
-                                         decomposition_contract(model)::WeightsFromParts)
 end
 
 export BudgetRange, BudgetCosts, BudgetMarketImpact

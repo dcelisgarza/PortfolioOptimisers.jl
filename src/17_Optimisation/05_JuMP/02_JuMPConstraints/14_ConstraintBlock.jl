@@ -651,6 +651,11 @@ $(DocStringExtensions.FIELDS)
 
 Keywords correspond to the struct's fields, and each keyword has no default. Make the Result with [`resolve_constraint_block`](@ref). The constructor checks the type of each field, so a slot that holds an estimator raises a `TypeError`. It checks no value, because the resolution checked the values.
 
+    ResolvedConstraintBlock(cbe::ConstraintBlock; pr, rd, wb, lcsr, gcardr, ctr, plr, l2c,
+                            lpc, linfc, l1, l2, lp, linf) -> ResolvedConstraintBlock
+
+Builds the Result from the values of stage 2 and the slots of the block that stage 2 does not resolve. The keywords are the prior result, the rows and the twelve values of stage 2, and each keyword is required. The method takes the other slots and settings from `cbe`, with `cbe.sgcarde` as `sgcardr`. Both methods of [`resolve_constraint_block`](@ref) call it, so the list of the stage 1 slots and of the settings is written once.
+
 # Related
 
   - [`ConstraintBlock`](@ref)
@@ -845,6 +850,20 @@ function ResolvedConstraintBlock(; pr::Option{<:AbstractPriorResult},
                                    sgmtx, slt, sst, sglt, sgst, tn, plr, l2c, lpc, linfc,
                                    l1, l2, lp, linf, card, scard, ss, xbgt, sbgt, gbgt,
                                    ccnt, cobj)
+end
+function ResolvedConstraintBlock(cbe::ConstraintBlock; pr, rd, wb, lcsr, gcardr, ctr, plr,
+                                 l2c, lpc, linfc, l1, l2, lp, linf)::ResolvedConstraintBlock
+    # The keyword constructor types each slot. `@concrete` also appends an untyped
+    # positional constructor, so a positional call would let an estimator through.
+    return ResolvedConstraintBlock(; pr = pr, rd = rd, wb = wb, lt = cbe.lt, st = cbe.st,
+                                   lcsr = lcsr, ctr = ctr, gcardr = gcardr,
+                                   sgcardr = cbe.sgcarde, smtx = cbe.smtx,
+                                   sgmtx = cbe.sgmtx, slt = cbe.slt, sst = cbe.sst,
+                                   sglt = cbe.sglt, sgst = cbe.sgst, tn = cbe.tn, plr = plr,
+                                   l2c = l2c, lpc = lpc, linfc = linfc, l1 = l1, l2 = l2,
+                                   lp = lp, linf = linf, card = cbe.card, scard = cbe.scard,
+                                   ss = cbe.ss, xbgt = cbe.xbgt, sbgt = cbe.sbgt,
+                                   gbgt = cbe.gbgt, ccnt = cbe.ccnt, cobj = cbe.cobj)
 end
 """
     const VecRcb = AbstractVector{<:ResolvedConstraintBlock}
@@ -1077,7 +1096,7 @@ function resolve_constraint_block(cbe::ConstraintBlock, pr::AbstractPriorResult,
                                         kwargs...), l2c,
             lpc = norm_ceiling_factory(cbe.lpc, pr, slv), linfc, l1,
             l2 = factory(cbe.l2, pr, slv), lp = factory(cbe.lp, pr, slv), linf)
-    return resolved_constraint_block(cbe, pr, rd, vals)
+    return ResolvedConstraintBlock(cbe; pr = pr, rd = rd, vals...)
 end
 function resolve_constraint_block(::ConstraintBlock, ::AbstractPriorResult, ::Nothing;
                                   kwargs...)
@@ -1093,7 +1112,7 @@ function resolve_constraint_block(cbe::ConstraintBlock, ::Nothing,
     vals = (; wb = cbe.wb, lcsr, gcardr, ctr = cbe.cte, plr = cbe.ple, l2c = cbe.l2c,
             lpc = cbe.lpc, linfc = cbe.linfc, l1 = cbe.l1, l2 = cbe.l2, lp = cbe.lp,
             linf = cbe.linf)
-    return resolved_constraint_block(cbe, nothing, nothing, vals)
+    return ResolvedConstraintBlock(cbe; pr = nothing, rd = nothing, vals...)
 end
 """
     rows_datatype(rd::Nothing)
@@ -1145,38 +1164,6 @@ function assert_rows_constraint_width(lcsr, gcardr, rd::ReturnsResult)::Nothing
     assert_investable_constraint_width(lcsr, N, "lcse")
     assert_investable_constraint_width(gcardr, N, "gcarde")
     return nothing
-end
-"""
-$(DocStringExtensions.TYPEDSIGNATURES)
-
-Builds the [`ResolvedConstraintBlock`](@ref) from the values of stage 2 and the slots of the block that stage 2 does not resolve.
-
-Both methods of [`resolve_constraint_block`](@ref) call it, so the list of the stage 1 slots and of the settings is written once.
-
-# Arguments
-
-  - `cbe`: The block, after stage 1 and the view at the mask.
-  - `pr`: The prior result of the block, or `nothing`.
-  - `rd`: The rows of the block, or `nothing`.
-  - `vals`: The values of stage 2: `wb`, `lcsr`, `gcardr`, `ctr`, `plr`, `l2c`, `lpc`, `linfc`, `l1`, `l2`, `lp` and `linf`.
-
-# Returns
-
-  - `cbr::ResolvedConstraintBlock`: The Result of the block.
-
-# Related
-
-  - [`resolve_constraint_block`](@ref)
-"""
-function resolved_constraint_block(cbe::ConstraintBlock, pr, rd,
-                                   vals::NamedTuple)::ResolvedConstraintBlock
-    return ResolvedConstraintBlock(; pr = pr, rd = rd, vals..., lt = cbe.lt, st = cbe.st,
-                                   sgcardr = cbe.sgcarde, smtx = cbe.smtx,
-                                   sgmtx = cbe.sgmtx, slt = cbe.slt, sst = cbe.sst,
-                                   sglt = cbe.sglt, sgst = cbe.sgst, tn = cbe.tn,
-                                   card = cbe.card, scard = cbe.scard, ss = cbe.ss,
-                                   xbgt = cbe.xbgt, sbgt = cbe.sbgt, gbgt = cbe.gbgt,
-                                   ccnt = cbe.ccnt, cobj = cbe.cobj)
 end
 """
 $(DocStringExtensions.TYPEDSIGNATURES)

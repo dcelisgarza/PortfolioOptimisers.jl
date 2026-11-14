@@ -389,9 +389,8 @@ function set_frontier_point!(model::JuMP.Model, point::Tuple)
     return nothing
 end
 """
-    frontier_sweep!(point!, model, opt, ::Type{T}, points)
-    frontier_sweep!(point!, model, opt, ::Type{T}, n::Integer)
-    frontier_sweep!(model, opt, ::Type{T}, points)
+    frontier_sweep!(model, opt, ::Type{T}, points, point! = Returns(nothing))
+    frontier_sweep!(model, opt, ::Type{T}, n::Integer, point!)
 
 Solve the model once for each sweep point and collect the outcomes.
 
@@ -409,11 +408,11 @@ The method with `n::Integer` sweeps `n` points that write no bound. It is the [`
 
 # Arguments
 
-  - `point!`: Hook with one argument, the flat index of the sweep point. The method without it passes a hook that does nothing.
   - $(arg_dict[:model])
   - `opt::JuMPOptimisationEstimator`: The optimiser, for [`optimise_JuMP_model!`](@ref).
   - `::Type{T}`: Element type of the returns matrix.
   - `points`: A [`frontier_sweep_axes`](@ref) iterator, or the point count `n`.
+  - `point!`: Hook with one argument, the flat index of the sweep point. It defaults to a hook that does nothing.
 
 # Returns
 
@@ -426,8 +425,8 @@ The method with `n::Integer` sweeps `n` points that write no bound. It is the [`
   - [`solve_mean_risk!`](@ref)
   - [`solve_noc!`](@ref)
 """
-function frontier_sweep!(point!, model::JuMP.Model, opt::JuMPOptimisationEstimator,
-                         ::Type{T}, points) where {T}
+function frontier_sweep!(model::JuMP.Model, opt::JuMPOptimisationEstimator, ::Type{T},
+                         points, point! = Returns(nothing)) where {T}
     n = length(points)
     retcodes = sizehint!(OptimisationReturnCode[], n)
     sols = sizehint!(JuMPOptimisationSolution[], n)
@@ -440,11 +439,7 @@ function frontier_sweep!(point!, model::JuMP.Model, opt::JuMPOptimisationEstimat
     end
     return retcodes, sols
 end
-function frontier_sweep!(point!, model::JuMP.Model, opt::JuMPOptimisationEstimator,
-                         ::Type{T}, n::Integer) where {T}
-    return frontier_sweep!(point!, model, opt, T, Iterators.repeated((), n))
-end
 function frontier_sweep!(model::JuMP.Model, opt::JuMPOptimisationEstimator, ::Type{T},
-                         points) where {T}
-    return frontier_sweep!(Returns(nothing), model, opt, T, points)
+                         n::Integer, point!) where {T}
+    return frontier_sweep!(model, opt, T, Iterators.repeated((), n), point!)
 end

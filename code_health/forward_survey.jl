@@ -540,18 +540,14 @@ const RULED_REBUILDS = Dict{Tuple{Symbol, Symbol}, Tuple{String, String}}(#
                                                                            :ObservedStack) =>
                                                                               (NO_REBUILD,
                                                                                "`cc` is the `ObservedFactors` of `cross_sectional_exposure_series`, another type, cut to the kept rows (#2093)"),
-                                                                          (:unit_scale_returns_estimator,
-                                                                           :JuMPReturnsSettings) =>
-                                                                              ("go",
-                                                                               "`settings` is the `JuMPReturnsSettings` of `r`: `rebuild_struct(settings, (; scale = one(scale)))` (rule 6, #2110)"),
-                                                                          (:no_return_expr_returns_estimator,
-                                                                           :JuMPReturnsSettings) =>
-                                                                              ("go",
-                                                                               "`settings` is the `JuMPReturnsSettings` of `r`: `rebuild_struct(settings, (; rte = false))` (rule 6, #2110)"),
                                                                           (:fit_data_step_from_state,
                                                                            :PriceGapFillResult) =>
                                                                               ("go",
                                                                                "`res` is the `PriceGapFillResult` of `fit_preprocessing`, which has no keyword constructor: add the outer keyword constructor of § *Constructor Pattern*, then `rebuild_struct(res, (; nx = res.nx[keep], v = res.v[keep]))` (rule 6, #2110)"),
+                                                                          (:set_retcode,
+                                                                           :JuMPOptimisationResult) =>
+                                                                              ("keep (b)",
+                                                                               "the keyword constructor of `JuMPOptimisationResult` expands `sol` through the investable mask, so a rebuild through it expands the weights twice: the positional constructor keeps them (#2101)"),
                                                                           (:schedule_update!,
                                                                            :WindowedBestRateState) =>
                                                                               ("keep (b)",
@@ -1109,10 +1105,6 @@ const RULED_DEFAULTS = Dict{Symbol, Tuple{String, String}}(#
                                                                refusal_check("a norm ceiling or a count of effective assets in a penalty slot"),
                                                            :assert_norm_ceiling_role =>
                                                                refusal_check("an ambiguity radius in a norm-ceiling slot"),
-                                                           :net_budget_floor => ("go",
-                                                                                 "a query whose only reader is a value check: only `nothing`, a `BudgetCostEstimator` and a `TimeDependent` reach it, so it takes `Option{<:UnresolvedValue}` (#2108, amended)"),
-                                                           :gross_budget_ceiling => ("go",
-                                                                                     "a query whose only reader is a value check: only `nothing`, a `BudgetCostEstimator` and a `TimeDependent` reach it, so it takes `Option{<:UnresolvedValue}` (#2108, amended)"),
                                                            :_wprop => ("keep (default)",
                                                                        "one step of the `factory` traversal: a field that no threaded argument replaces keeps its value (#2108)"),
                                                            :bind_data_benchmark =>
