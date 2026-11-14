@@ -363,10 +363,7 @@ The recursion never reads them, so the method carries `alg`, `set`, `w0`, `x_src
   - [`factory`](@ref)
 """
 function factory(opt::OnlinePortfolioSelection, w::VecNum)
-    return OnlinePortfolioSelection(; alg = opt.alg, set = opt.set, w0 = opt.w0,
-                                    fees = factory(opt.fees, w), fb = factory(opt.fb, w),
-                                    x_src = opt.x_src, strict = opt.strict,
-                                    cache = opt.cache)
+    return rebuild_struct(opt, (; fees = factory(opt.fees, w), fb = factory(opt.fb, w)))
 end
 """
     port_opt_view(opt::OnlinePortfolioSelection, i, args...)
@@ -1156,21 +1153,6 @@ function update_online_estimator(opt::Union{OnlinePortfolioSelection{<:Any, <:An
                                             PreviousWeights{<:Any, <:Any,
                                                             <:OptimisationEstimator}})
     return rebuild_struct(opt, (; fb = update_online_estimator(opt.fb)))
-end
-"""
-    online_unreached_path(opt::Union{OnlinePortfolioSelection, PreviousWeights})
-
-Names the first [`Online`](@ref) wrapper in the head that the warm-up leaves unresolved, or answers `nothing`.
-
-The method runs the warm-up of [`update_online_estimator`](@ref) on the head, and names the wrapper that is left, such as one in an inner optimiser of a meta-optimiser that is the fallback. It serves an [`OnlinePortfolioSelection`](@ref) head and a [`PreviousWeights`](@ref), the two heads that step their fallback.
-
-# Related
-
-  - [`online_unreached_path`](@ref)
-  - [`assert_online_entry`](@ref)
-"""
-function online_unreached_path(opt::Union{OnlinePortfolioSelection, PreviousWeights})
-    return online_wrapper_path(update_online_estimator(opt))
 end
 """
     Online(::OnlinePortfolioSelection, args...; kwargs...)

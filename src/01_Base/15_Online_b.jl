@@ -236,7 +236,7 @@ Resolves the [`Online`](@ref) declarations of an estimator, seeding the sample b
 
 The warm-up calls it once, before the first fold. It replaces each wrapper with the estimator that the wrapper holds, rebuilt through its keyword constructor with the state of [`online_state_seed`](@ref) in `cache`. That state is an empty [`SampleBufferState`](@ref) with the cap of the wrapper, unless the family has a seed of its own. The function then rebuilds the outer estimator through its keyword constructor, so each construction check runs again. The result holds no `Online`, and each estimator that was wrapped carries the state that its refit or its carry reads.
 
-The function finds a wrapper in the fields of the estimator that it receives, and in the fields of an estimator inside a wrapper. An outer estimator that passes estimators across a boundary of its own, such as a meta-optimiser or a pipeline, has a method of its own that recurses, as it has for [`update_time_dependent_estimator`](@ref).
+The function is a structural traversal, so it owns the identity on a leaf. A value that is not an estimator, such as `nothing`, a prior result or a schedule, holds no wrapper to resolve, and it passes unchanged. The function finds a wrapper in the fields of the estimator that it receives, and in the fields of an estimator inside a wrapper. An outer estimator that passes estimators across a boundary of its own, such as a meta-optimiser or a pipeline, has a method of its own that recurses, as it has for [`update_time_dependent_estimator`](@ref).
 
 The function takes no fold context, unlike [`update_time_dependent_estimator`](@ref). The seed reads nothing from a fold, because the wrapper resolves once and not at each fold.
 
@@ -246,10 +246,11 @@ The function takes no fold context, unlike [`update_time_dependent_estimator`](@
  2. Find the fields of the estimator that hold a wrapper, with [`online_fields`](@ref). Return the estimator when there is none.
  3. Resolve the value of each of these fields with this function.
  4. Rebuild the estimator with the resolved values through [`rebuild_struct`](@ref).
+ 5. Return any value that is not an estimator unchanged.
 
 # Arguments
 
-  - `est`: Estimator, wrapper, or `nothing`.
+  - `est`: Estimator, wrapper, or any other value, which the function returns unchanged.
 
 # Returns
 
@@ -271,8 +272,8 @@ function update_online_estimator(est::Union{AbstractEstimator,
     repl = NamedTuple{fns}(map(f -> update_online_estimator(getfield(est, f)), fns))
     return rebuild_struct(est, repl)
 end
-function update_online_estimator(::Nothing)
-    return nothing
+function update_online_estimator(x::Any)
+    return x
 end
 """
     estimator_fields(x)
@@ -820,7 +821,7 @@ The head is [`OnlinePortfolioSelection`](@ref), and it holds the set in its `set
 
 In order to implement a new set kind, subtype `AbstractAllocationSet` with its constraint objects as part of the struct, and implement:
 
-  - `resolve_allocation_set(set::AbstractAllocationSet, N::Integer, strict::Bool, datatype::DataType) -> AbstractAllocationSet`: The set with every estimator resolved to a value over the `N` assets, which the projection then reads.
+  - `resolve_allocation_set(set::AbstractAllocationSet, N::Integer, strict::Bool, datatype::DataType) -> AbstractAllocationSet`: The set with every estimator resolved to a value over the `N` assets, which the projection then reads. The library implements the method on `nothing`, the empty slot, which resolves to the bare simplex, a default [`BoundedAllocationSet`](@ref).
   - `project(proj::AbstractProjectionGeometry, set::AbstractAllocationSet, q::AbstractVector, w::AbstractVector) -> AbstractVector`: The projection onto the resolved set, for every geometry the set admits.
   - `rows_needed(set::AbstractAllocationSet) -> Union{Nothing, Integer}`: The number of rows the set's constraints read at a step, `0` for a set that reads none.
 

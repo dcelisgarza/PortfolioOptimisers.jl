@@ -90,6 +90,10 @@ of the ADRs; the papers' defaults are asserted where they decide the shape of th
         @test po.supports_partial_fit(me) &&
               !po.supports_partial_fit(PriceLevelExpectedReturns())
         @test po.rows_needed(me) == 1 && isnothing(po.window_rows(me.alg))
+        # No statistic reads no row, as `rows_needed` gives 0 for no row (#2111). A
+        # `ForecastReversion` with no `scale` reads the rows of its forecaster alone.
+        @test po.window_rows(nothing) == 0
+        @test po.rows_needed(ForecastReversion(; me = me)) == po.rows_needed(me)
         @test_throws ArgumentError po.partial_fit!(PriceLevelExpectedReturns(), R[1, :])
         @test_throws ArgumentError mean(me)
         # The reweighted relative: seeded at the first relative, so the forecast after the

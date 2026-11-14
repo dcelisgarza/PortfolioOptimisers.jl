@@ -375,6 +375,11 @@ end
         @test_throws ArgumentError ftl(; bgt = nothing, gbgt = TimeDependent([1.2, 0.8]),
                                        wb = ls)
         @test_throws "over-determined" ftl(; bgt = nothing, sbgt = 0.1, gbgt = 1.5, wb = ls)
+        # The net budget check is a value check: its no-op method takes the set that reaches
+        # it, `nothing` and an Unresolved Value, and any other type is a `MethodError` (#2108).
+        @test isnothing(po.assert_net_budget_admits_one(nothing))
+        @test isnothing(po.assert_net_budget_admits_one(TimeDependent([1.0, 1.0])))
+        @test_throws MethodError po.assert_net_budget_admits_one("one")
         # A budget that holds one, a function schedule and the solver-free leader pass.
         for kw in
             ((; bgt = 1), (; bgt = nothing), (; bgt = BudgetRange(; lb = 0.8, ub = 1.2)),

@@ -2356,8 +2356,7 @@ end
             imskr, _, cbrs = PO.resolve_block_entry(PO.no_head_block, (), imsk,
                                                     ((set, rd, pr),), rd, false)
             setr, _, _ = PO.programme_investable_reduction(imskr, set, rd, nothing)
-            return PO.projection_programme(EuclideanProjection(), (imskr, setr, only(cbrs)),
-                                           q, wq, rd)
+            return PO.project(EuclideanProjection(), (imskr, setr, only(cbrs)), q, wq, rd)
         end
         wn = @test_logs min_level = Base.CoreLogging.Warn proj_at(setn)
         @test iszero(wn[k]) && isapprox(sum(wn), 1; atol = 1e-6)

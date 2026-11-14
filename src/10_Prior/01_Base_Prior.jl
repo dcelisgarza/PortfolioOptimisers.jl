@@ -1299,13 +1299,16 @@ function port_opt_view(pr::LowOrderPrior, i, args...)::LowOrderPrior
                          ss_gaps = pr.ss_gaps)
 end
 """
-$(DocStringExtensions.TYPEDSIGNATURES)
+    investable_mask(pr::AbstractPriorResult)::Option{BitVector}
+    investable_mask(pr::Nothing)
 
 Derive the Investable Mask of a prior result, which is `true` at every asset whose moments are finite.
 
 A Prior Estimator fits on the coverage universe and returns a result on the full asset universe. An asset that it could not estimate carries `NaN` in `mu` and on the diagonal of `sigma`. This function derives the mask, and no prior result stores it in a field. A caller that needs the mask calls this function. A caller that reduces a result keeps the mask that it received. A reduced result cannot give the mask again, because its `mu` is finite at every asset.
 
 When every asset is investable, the function returns `nothing`, and not a mask of `true` values. With `nothing`, a universe with no asset to exclude takes the same path as before the mask existed. That path has no reduction, no expansion and no allocation.
+
+The function is a query, so it owns `nothing`, the answer "none". No prior result, such as the prior of an Allocation Set that reads no rows, gives no mask, and a `nothing` mask already means every asset.
 
 The function does not read the entries of `sigma` outside the diagonal. A non-investable asset can carry `NaN` in all of its row and its column. The diagonal alone decides, so the mask costs one pass over two vectors.
 
@@ -1315,6 +1318,7 @@ The function does not read the entries of `sigma` outside the diagonal. A non-in
  2. Raise an `IsEmptyError` when the conjunction holds no `true`. An optimisation over no asset has no answer. A problem with no asset that goes further fails at a point far from its cause.
  3. Return `nothing` when the conjunction holds no `false`.
  4. Otherwise, return the conjunction.
+ 5. On `nothing` in place of a prior result, return `nothing`.
 
 # Arguments
 
@@ -1326,7 +1330,7 @@ The function does not read the entries of `sigma` outside the diagonal. A non-in
 
 # Returns
 
-  - `imsk::Option{BitVector}`: `true` at every investable asset, or `nothing` when every asset is investable.
+  - `imsk::Option{BitVector}`: `true` at every investable asset, or `nothing` when every asset is investable or there is no prior result.
 
 # Examples
 
@@ -1349,6 +1353,9 @@ function investable_mask(pr::AbstractPriorResult)::Option{BitVector}
     @argcheck(any(imsk),
               IsEmptyError("no asset of the prior result is investable: every asset carries a NaN in `mu` or on the diagonal of `sigma`. Check that the prior estimator received enough observations, and that the universe holds at least one active asset."))
     return all(imsk) ? nothing : imsk
+end
+function investable_mask(::Nothing)
+    return nothing
 end
 """
     investable_views(pr::AbstractPriorResult, sets::Nothing) -> Tuple

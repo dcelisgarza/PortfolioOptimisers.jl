@@ -503,13 +503,15 @@ function ConfidenceWeightedMeanReversion(; eps::Real = 0.5, phi::Real = 2,
                                          proj::EuclideanProjection = EuclideanProjection())::ConfidenceWeightedMeanReversion
     return ConfidenceWeightedMeanReversion(eps, phi, formulation, proj)
 end
-function rule_state_seed(::ConfidenceWeightedMeanReversion, w::AbstractVector)
+function rule_state_seed(::ConfidenceWeightedMeanReversion, w::AbstractVector,
+                         ::Option{<:AbstractAllocationSet} = nothing)
     N = length(w)
     return ConfidenceWeightedMeanReversionState(0, fill(one(eltype(w)) / N^2, N))
 end
 function online_update!(alg::ConfidenceWeightedMeanReversion,
                         st::ConfidenceWeightedMeanReversionState, w::AbstractVector,
-                        x::AbstractVector, ::Any, set::AbstractAllocationSet)
+                        x::AbstractVector, ::Any, set::AbstractAllocationSet,
+                        ::Option{<:AbstractVector} = nothing)
     sigma = st.sigma
     M = LinearAlgebra.dot(w, x)
     V = LinearAlgebra.dot(sigma, x .^ 2)
@@ -744,7 +746,8 @@ function wealth_transfer(w::AbstractVector, claim::AbstractMatrix)
     return q
 end
 function online_update!(alg::AntiCorrelation, st, w::AbstractVector, x::AbstractVector,
-                        rows::Option{<:ReturnsResult}, set::AbstractAllocationSet)
+                        rows::Option{<:ReturnsResult}, set::AbstractAllocationSet,
+                        ::Option{<:AbstractVector} = nothing)
     wn = alg.window
     # The transfers move the wealth held at the end of the period, the paper's `b̂_t`.
     wh = price_adjusted_allocation(w, x)
@@ -923,7 +926,8 @@ function ExpectationMaximisation(; eta::Union{Real, AbstractLearningRateSchedule
                                  proj::EuclideanProjection = EuclideanProjection())::ExpectationMaximisation
     return ExpectationMaximisation(eta, proj)
 end
-function rule_state_seed(alg::ExpectationMaximisation, w::AbstractVector)
+function rule_state_seed(alg::ExpectationMaximisation, w::AbstractVector,
+                         ::Option{<:AbstractAllocationSet} = nothing)
     return ExpectationMaximisationState(0, copy(w), schedule_state_seed(alg.eta, w))
 end
 """
@@ -954,7 +958,7 @@ function correction_ratio_cap(::Union{Real, AbstractLearningRateSchedule}, ::Int
 end
 function online_update!(alg::ExpectationMaximisation, st::ExpectationMaximisationState,
                         w::AbstractVector, x::AbstractVector, ::Any,
-                        set::AbstractAllocationSet)
+                        set::AbstractAllocationSet, ::Option{<:AbstractVector} = nothing)
     t = st.n + 1
     if restart(alg.eta, t)
         # The period count survives the restart: the schedule's stages are cumulative.
@@ -1059,7 +1063,8 @@ function AggregatingAlgorithm(; eta::Real = 1,
     return AggregatingAlgorithm(eta, proj)
 end
 function online_update!(alg::AggregatingAlgorithm, st, w::AbstractVector, x::AbstractVector,
-                        ::Any, set::AbstractAllocationSet)
+                        ::Any, set::AbstractAllocationSet,
+                        ::Option{<:AbstractVector} = nothing)
     q = w .* x .^ alg.eta
     return st, project(alg.proj, set, q, price_adjusted_allocation(w, x))
 end
@@ -1187,14 +1192,16 @@ end
 function TopK(; k::Integer = 5, proj::EuclideanProjection = EuclideanProjection())::TopK
     return TopK(k, proj)
 end
-function rule_state_seed(alg::TopK, w::AbstractVector)
+function rule_state_seed(alg::TopK, w::AbstractVector,
+                         ::Option{<:AbstractAllocationSet} = nothing)
     @argcheck(alg.k <= length(w),
               DomainError(alg.k,
                           "k must be at most the number of assets or experts, $(length(w))"))
     return CumulativeWealthState(0, zeros(eltype(w), length(w)), copy(w))
 end
 function online_update!(alg::TopK, st::CumulativeWealthState, w::AbstractVector,
-                        x::AbstractVector, ::Any, set::AbstractAllocationSet)
+                        x::AbstractVector, ::Any, set::AbstractAllocationSet,
+                        ::Option{<:AbstractVector} = nothing)
     st.G .+= log.(x)
     order = sortperm(st.G; rev = true, alg = Base.Sort.DEFAULT_STABLE)
     top = view(order, 1:(alg.k))
@@ -1281,12 +1288,13 @@ function WeakAggregatingAlgorithm(;
                                   proj::EntropicProjection = EntropicProjection())::WeakAggregatingAlgorithm
     return WeakAggregatingAlgorithm(proj)
 end
-function rule_state_seed(::WeakAggregatingAlgorithm, w::AbstractVector)
+function rule_state_seed(::WeakAggregatingAlgorithm, w::AbstractVector,
+                         ::Option{<:AbstractAllocationSet} = nothing)
     return CumulativeWealthState(0, zeros(eltype(w), length(w)), copy(w))
 end
 function online_update!(alg::WeakAggregatingAlgorithm, st::CumulativeWealthState,
                         w::AbstractVector, x::AbstractVector, ::Any,
-                        set::AbstractAllocationSet)
+                        set::AbstractAllocationSet, ::Option{<:AbstractVector} = nothing)
     st.G .+= log.(x)
     n = st.n + 1
     # The exponent is shifted by its maximum, which the normalisation undoes, so a long run

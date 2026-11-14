@@ -90,7 +90,8 @@ function SwitchingWeighting(; gamma::Real = 1 / 3,
     return SwitchingWeighting(gamma, proj)
 end
 function online_update!(alg::SwitchingWeighting, st, w::AbstractVector, x::AbstractVector,
-                        ::Any, set::AbstractAllocationSet)
+                        ::Any, set::AbstractAllocationSet,
+                        ::Option{<:AbstractVector} = nothing)
     q = price_adjusted_allocation(w, x)
     K = length(q)
     # Over one expert there is nothing to switch to, and the share's denominator is zero.

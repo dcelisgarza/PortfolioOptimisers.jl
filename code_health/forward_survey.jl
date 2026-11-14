@@ -548,6 +548,10 @@ const RULED_REBUILDS = Dict{Tuple{Symbol, Symbol}, Tuple{String, String}}(#
                                                                            :JuMPOptimisationResult) =>
                                                                               ("keep (b)",
                                                                                "the keyword constructor of `JuMPOptimisationResult` expands `sol` through the investable mask, so a rebuild through it expands the weights twice: the positional constructor keeps them (#2101)"),
+                                                                          (:set_result_prior,
+                                                                           :JuMPOptimisationResult) =>
+                                                                              ("keep (b)",
+                                                                               "the keyword constructor of `JuMPOptimisationResult` expands `sol` through the investable mask, so a rebuild through it expands the weights twice: the positional constructor keeps them, as `set_retcode` does (#2101, #2102)"),
                                                                           (:schedule_update!,
                                                                            :WindowedBestRateState) =>
                                                                               ("keep (b)",
@@ -871,10 +875,6 @@ finding is stale, and `test/test_89_forward_survey_census.jl` fails on it, so th
 removes the pair deletes the entry.
 """
 const RULED_NOTHING_PAIRS = Dict{Tuple{Symbol, Symbol}, Tuple{String, String}}(#
-                                                                               (:expert_allocation_set,
-                                                                                :resolve_allocation_set) =>
-                                                                                   ("go",
-                                                                                    "$CASE_2. A contract verb takes a `::Nothing` method on the empty slot (#2108): no set is the bare simplex, and the callers pass `strict = false`"),
                                                                                (:attribution_window_basis,
                                                                                 :factor_basis_slice) =>
                                                                                    ("go",
@@ -885,10 +885,6 @@ const RULED_NOTHING_PAIRS = Dict{Tuple{Symbol, Symbol}, Tuple{String, String}}(#
                                                                                     CASE_2),
                                                                                (:attribution_finite_rows,
                                                                                 :attribution_finite) =>
-                                                                                   ("go",
-                                                                                    CASE_2),
-                                                                               (:prior_investable_mask,
-                                                                                :investable_mask) =>
                                                                                    ("go",
                                                                                     CASE_2),
                                                                                (:attribution_active_mask,
@@ -907,10 +903,6 @@ const RULED_NOTHING_PAIRS = Dict{Tuple{Symbol, Symbol}, Tuple{String, String}}(#
                                                                                 :descriptor_field_values) =>
                                                                                    ("keep (b)",
                                                                                     "$POLICY: the `Nothing` arm derives the net returns from `cc`, `X`, `lag`, `kept` and `g0`, which the callee does not take, and `descriptor_field_values(rd, nothing)` gives `abs.(rd.X)`, another answer (#2093)"),
-                                                                               (:scale_rows,
-                                                                                :window_rows) =>
-                                                                                   ("go",
-                                                                                    "$CASE_2: `window_rows(::Nothing) = 0`, as `rows_needed` gives 0 for no row and `nothing` for every row"),
                                                                                (:bl_posteriors,
                                                                                 :vanilla_posteriors) =>
                                                                                    ("keep (b)",
@@ -1093,7 +1085,7 @@ const RULED_DEFAULTS = Dict{Symbol, Tuple{String, String}}(#
                                                                refusal_check("a `LinearConstraint` risk contribution on a `Variance` in a nested optimiser"),
                                                            :assert_rc_pl =>
                                                                refusal_check("a precomputed phylogeny result in a nested `FactorRiskContribution`"),
-                                                           :assert_stateless_prior =>
+                                                           :assert_stateless_schedule =>
                                                                refusal_check("a `TimeDependent` prior on the online arm"),
                                                            :assert_online_fee_source =>
                                                                refusal_check("an `OnlinePortfolioSelection` whose turnover fees have no Previous-Weights Source"),
@@ -1110,16 +1102,12 @@ const RULED_DEFAULTS = Dict{Symbol, Tuple{String, String}}(#
                                                            :bind_data_benchmark =>
                                                                ("keep (default)",
                                                                 "a traversal owns the identity on a leaf and ignores its context slot, as `adapt(to, x) = x` does in Adapt.jl (#2108)"),
-                                                           :online_unreached_path => ("go",
-                                                                                      "the typed methods share one body that answers every estimator: one untyped method replaces them and the fallback (#2108)"),
                                                            :timestamp_positions =>
                                                                ("keep (default)",
                                                                 "an index that is not a timestamp or a name passes to `view`, which is the gate of the index (#2108)"),
                                                            :regression_factor_names =>
                                                                ("keep (default)",
                                                                 "a query of the names of the loadings axis owns `nothing`, the answer \"none\". Its callee reads fields of the input, so it owns no default for the input (#2109)"),
-                                                           :update_online_member => ("go",
-                                                                                     "`update_online_estimator` owns the identity on a leaf (#2074), so it replaces this function (#2109)"),
                                                            :update_online_step => ("go",
                                                                                    "`update_online_estimator` takes the identity and a `PipelineStep` method (#2074)"),
                                                            :copy_step_states => ("go",

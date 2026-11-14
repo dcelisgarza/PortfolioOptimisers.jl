@@ -91,22 +91,6 @@ function data_timestamps(pr::PricesResult)
     return TimeSeries.timestamp(pr.X)
 end
 """
-    context_timestamps(cache::ReturnsBufferState)
-    context_timestamps(::Nothing)
-
-Returns the timestamps that a Fold Context holds, or `nothing` before the first step.
-
-# Related
-
-  - [`held_timestamps`](@ref)
-"""
-function context_timestamps(cache::ReturnsBufferState)
-    return cache.ts
-end
-function context_timestamps(::Nothing)
-    return nothing
-end
-"""
 $(DocStringExtensions.TYPEDEF)
 
 Continues an online walk-forward from the folds that its Result holds, over a longer history.

@@ -688,10 +688,11 @@ end
     window_rows(alg::TrendSwitch)
     window_rows(alg::CompositeTrend)
     window_rows(alg::KernelTrendPattern)
+    window_rows(::Nothing)
 
 Returns the number of return rows the batch form of a statistic reads, or `nothing` for one that reads every row it gets.
 
-A statistic over `window` levels reads `window - 1` rows, which is the default, and so does a trend test. The lagged price reads `lag` rows. A folding statistic reads every row, because its batch form is the recursion from the first level. The Gaussian double estimate reads the number of levels in its Gaussian window. A trend switch reads the largest number of its test and its branches, and a composite trend reads `window - 1` rows more than its widest trend. Either of them reads every row when one of its members does.
+No statistic reads no row, so `nothing` gives `0`, as [`rows_needed`](@ref) gives `0` for no row and `nothing` for every row. A statistic over `window` levels reads `window - 1` rows, which is the default, and so does a trend test. The lagged price reads `lag` rows. A folding statistic reads every row, because its batch form is the recursion from the first level. The Gaussian double estimate reads the number of levels in its Gaussian window. A trend switch reads the largest number of its test and its branches, and a composite trend reads `window - 1` rows more than its widest trend. Either of them reads every row when one of its members does.
 
 # Related
 
@@ -709,6 +710,9 @@ function window_rows(alg::LaggedPrice)
 end
 function window_rows(::ReweightedPriceRelative)
     return nothing
+end
+function window_rows(::Nothing)
+    return 0
 end
 """
     folds(alg::AbstractPriceLevelStatistic)

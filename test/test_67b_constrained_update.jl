@@ -574,8 +574,9 @@ end
             e
         end
         @test occursin("\"A\"", err.msg) && occursin("CoveragePolicy", err.msg)
-        @test isnothing(po.prior_investable_mask(nothing))
-        @test po.prior_investable_mask(prn) == [false, true, true]
+        # A set that fitted no prior has no mask: `investable_mask` owns `nothing` (#2111).
+        @test isnothing(po.investable_mask(nothing))
+        @test po.investable_mask(prn) == [false, true, true]
         @test_throws po.IsNothingError po.programme_investable_reduction(trues(3), bset,
                                                                          nothing, prn)
         # A set that reads no rows has no prior beside the mask of a JuMP head, and the

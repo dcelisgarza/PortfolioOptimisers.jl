@@ -184,7 +184,6 @@ ProgrammeAllocationSet
   - [`BoundedAllocationSet`](@ref): the set of weight bounds alone, with a scalar root for every geometry but the Gram one.
   - [`JuMPOptimiser`](@ref)
   - [`project`](@ref)
-  - [`projection_programme`](@ref)
   - [`set_allocation_set_constraints!`](@ref)
   - [`set_projection_objective!`](@ref)
   - [`resolve_allocation_set`](@ref)
@@ -947,7 +946,7 @@ end
 
 Refuses a resolved bound with a negative floor under a geometry whose potential is undefined below zero.
 
-[`assert_geometry_admits_set`](@ref) calls it at the construction of the head, on a bound that is a value. [`projection_programme`](@ref) calls it at each step, on the bound that the step resolves, before the solve. The entropic, Tsallis and log-barrier geometries refuse a negative floor, and every other geometry admits it.
+[`assert_geometry_admits_set`](@ref) calls it at the construction of the head, on a bound that is a value. The projection programme of [`project`](@ref) calls it at each step, on the bound that the step resolves, before the solve. The entropic, Tsallis and log-barrier geometries refuse a negative floor, and every other geometry admits it.
 
 # Validation
 
@@ -960,7 +959,7 @@ Refuses a resolved bound with a negative floor under a geometry whose potential 
 # Related
 
   - [`assert_geometry_admits_set`](@ref)
-  - [`projection_programme`](@ref)
+  - [`project`](@ref)
   - [`EntropicProjection`](@ref)
   - [`TsallisProjection`](@ref)
   - [`LogBarrierProjection`](@ref)

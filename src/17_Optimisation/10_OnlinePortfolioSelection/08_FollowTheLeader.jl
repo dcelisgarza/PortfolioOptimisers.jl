@@ -1014,8 +1014,7 @@ function FollowTheLeader(; sel::AbstractSampleSelector = Prefix(),
     return FollowTheLeader(sel, opt, gamma, proj)
 end
 function port_opt_view(alg::FollowTheLeader, i, args...)
-    return FollowTheLeader(; sel = alg.sel, opt = port_opt_view(alg.opt, i, args...),
-                           gamma = alg.gamma, proj = alg.proj)
+    return rebuild_struct(alg, (; opt = port_opt_view(alg.opt, i, args...)))
 end
 function rows_needed(alg::FollowTheLeader)
     return rows_needed(alg.sel)
@@ -1104,7 +1103,7 @@ end
     assert_net_budget_admits_one(bgt::Number)
     assert_net_budget_admits_one(bgt::BudgetRange)
     assert_net_budget_admits_one(bgt::BudgetCostEstimator)
-    assert_net_budget_admits_one(bgt)
+    assert_net_budget_admits_one(bgt::Option{<:UnresolvedValue})
 
 Assert that the net budget `bgt` of the held optimiser of a [`FollowTheLeader`](@ref) rule admits the budget of one.
 
@@ -1112,7 +1111,7 @@ The re-solve sets `bgt` to one, so the leader's model holds the head's row `Σw 
 
 A [`BudgetCostEstimator`](@ref) is refused in every form. It charges its cost against the budget, `Σw + c(w) ∈ k · [lb, ub]`, with `c(w) ≥ 0` the cost of the move from its reference `w`. The head's row `Σw = k` turns this into `c(w) ∈ k · [lb − 1, ub − 1]`, a band on the cost that the wealth recursion of the head never pays, and the replacement of `bgt` with one would drop the cost with no message. [`factory`](@ref factory(bgt::BudgetCosts, w::VecNum)) sets the reference to the Price-Adjusted Allocation of the step, or keeps the caller's vector when `fixed` is `true`. A budget of one pins the leader to that reference, so the leader never trades, a budget below one leaves no feasible weights, and a budget above one bounds the cost of the move from the reference. None of these is a cost charged against the budget. A cost that the series pays is the `fees` of the head. A cost that the leader weighs is the `fees` of the held [`JuMPOptimiser`](@ref), which `factory` measures from the Price-Adjusted Allocation of the step, and a ceiling on the trade is a [`Turnover`](@ref) on `tn`.
 
-`nothing`, a [`TimeDependent`](@ref) schedule and any other [`BudgetEstimator`](@ref) pass. [`assert_leader_budget`](@ref) checks the entries of a schedule.
+`nothing`, a [`TimeDependent`](@ref) schedule and any other [`BudgetEstimator`](@ref) pass: each is `nothing` or an Unresolved Value. [`assert_leader_budget`](@ref) checks the entries of a schedule. Any other type is a `MethodError`, because the check has no rule for it.
 
 # Arguments
 
@@ -1123,6 +1122,7 @@ A [`BudgetCostEstimator`](@ref) is refused in every form. It charges its cost ag
   - A number is one. A `DomainError` is thrown otherwise.
   - The interval of a `BudgetRange` holds one. A `DomainError` is thrown otherwise.
   - `bgt` is not a `BudgetCostEstimator`. An `ArgumentError` is thrown otherwise.
+  - `bgt` is a number, `nothing` or an Unresolved Value. A `MethodError` is thrown otherwise.
 
 # Returns
 
@@ -1151,7 +1151,7 @@ end
 function assert_net_budget_admits_one(::BudgetCostEstimator)::Nothing
     return throw(ArgumentError("the held optimiser of a `FollowTheLeader` has a `BudgetCostEstimator` in `bgt`. It charges its cost against the budget, `sum(w) + c(w)` in `k * [lb, ub]`, but the online head owns the budget of one: the re-solve sets the net budget of the held optimiser to one, so the leader's model holds the row `sum(w) == k`, and the cost would have no effect. With that row, the cost would leave `c(w)` in `k * [lb - 1, ub - 1]`, a band on the cost of the move from the estimator's reference `w`, which the head's wealth recursion never pays. The reference is the step's Price-Adjusted Allocation, or the caller's vector when `fixed` is `true`. A budget of one pins the leader to that reference, and a budget below one leaves no feasible weights. A cost that the series pays is the `fees` of the head. A cost that the leader weighs is the `fees` of the held `JuMPOptimiser`, measured from the step's Price-Adjusted Allocation, and a ceiling on the trade is a `Turnover` on `tn`."))
 end
-function assert_net_budget_admits_one(::Any)::Nothing
+function assert_net_budget_admits_one(::Option{<:UnresolvedValue})::Nothing
     return nothing
 end
 """
@@ -1366,7 +1366,8 @@ function leader_allocation(opt::JuMPOptimisationEstimator, rd::ReturnsResult,
     return nothing
 end
 function online_update!(alg::FollowTheLeader, st, w::AbstractVector, x::AbstractVector,
-                        rows::ReturnsResult, set::AbstractAllocationSet)
+                        rows::ReturnsResult, set::AbstractAllocationSet,
+                        ::Option{<:AbstractVector} = nothing)
     wh = price_adjusted_allocation(w, x)
     idx = select_rows(alg.sel, price_relative.(head_frame_returns(rows)))
     wstar = if length(idx) < leader_min_rows(alg.opt)
@@ -1847,9 +1848,7 @@ function FollowTheLeadingHistory(;
     return FollowTheLeadingHistory(alg, alpha, prune, eset, proj)
 end
 function port_opt_view(alg::FollowTheLeadingHistory, i, args...)
-    return FollowTheLeadingHistory(; alg = port_opt_view(alg.alg, i, args...),
-                                   alpha = alg.alpha, prune = alg.prune, eset = alg.eset,
-                                   proj = alg.proj)
+    return rebuild_struct(alg, (; alg = port_opt_view(alg.alg, i, args...)))
 end
 function rows_needed(alg::FollowTheLeadingHistory)
     return rows_needed(alg.alg)
@@ -1916,7 +1915,7 @@ function expert_alive(born::Integer, t::Integer)
 end
 function online_update!(alg::FollowTheLeadingHistory, st::FollowTheLeadingHistoryState,
                         w::AbstractVector, x::AbstractVector, rows,
-                        set::AbstractAllocationSet)
+                        set::AbstractAllocationSet, ::Option{<:AbstractVector} = nothing)
     t = st.n + 1
     K = length(st.h)
     r = map(h -> LinearAlgebra.dot(h, x), st.h)
@@ -1941,8 +1940,8 @@ function online_update!(alg::FollowTheLeadingHistory, st::FollowTheLeadingHistor
         keepat!(st.born, keep)
         p = p[keep]
     end
-    p = project(EntropicProjection(), expert_allocation_set(alg.eset, length(p), eltype(w)),
-                p, p)
+    p = project(EntropicProjection(),
+                resolve_allocation_set(alg.eset, length(p), false, eltype(w)), p, p)
     q = zeros(eltype(w), length(w))
     for (k, h) in enumerate(st.h)
         q .+= p[k] .* h

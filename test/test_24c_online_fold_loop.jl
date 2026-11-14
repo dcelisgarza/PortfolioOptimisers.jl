@@ -328,6 +328,12 @@ assets is what keeps the JuMP families cheap.
         @test isnothing(po.online_unreached_path(InverseVolatility(;
                                                                    pe = po.Online(EmpiricalPrior()))))
         @test isnothing(po.online_unreached_path(EqualWeighted()))
+        # One untyped method answers every value (#2108). A pipeline runs its own warm-up and
+        # leaves no wrapper. A value that is not an estimator holds no wrapper, and the
+        # warm-up passes it unchanged, as the traversal owns the identity on a leaf (#2109).
+        @test isnothing(po.online_unreached_path(Pipeline(; steps = (PricesToReturns(),))))
+        @test isnothing(po.online_unreached_path(1.5))
+        @test po.update_online_estimator(1.5) === 1.5
     end
 
     @testset "A schedule reaches stateless fields only" begin

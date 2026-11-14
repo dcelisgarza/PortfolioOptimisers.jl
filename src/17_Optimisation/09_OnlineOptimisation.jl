@@ -92,9 +92,7 @@ function prior_step_returns(rd::ReturnsResult, ::DataSource)
     return rd
 end
 function prior_step_returns(rd::ReturnsResult, x_src::AbstractReturnsSource)
-    return ReturnsResult(; nx = rd.nx, X = benchmark_relative_returns(rd, x_src),
-                         nf = rd.nf, F = rd.F, nb = rd.nb, B = rd.B, ne = rd.ne, E = rd.E,
-                         ts = rd.ts, iv = rd.iv, ivpa = rd.ivpa, pnl = rd.pnl)
+    return rebuild_struct(rd, (; X = benchmark_relative_returns(rd, x_src)))
 end
 """
     fold_prior(pe::AbstractPriorEstimator, rd::ReturnsResult,
@@ -644,10 +642,11 @@ end
 function set_result_prior(res::ResolvedJuMPOptimiser, f::Function)
     # The block Result of the head holds the prior of the bundle, so both take the one prior.
     pr = f(res.pr)
-    return ResolvedJuMPOptimiser(pr, res.fees, res.ret, res.sca, res.imsk,
-                                 set_result_prior(res.cbr, _ -> pr))
+    return rebuild_struct(res, (; pr = pr, cbr = set_result_prior(res.cbr, _ -> pr)))
 end
 function set_result_prior(res::JuMPOptimisationResult, f::Function)
+    # The keyword constructor expands `sol` through the investable mask, so the positional
+    # constructor keeps the weights that the result already expanded.
     return JuMPOptimisationResult(set_result_prior(getfield(res, :jor), f), res.retcode,
                                   res.sol, res.model)
 end
@@ -792,34 +791,13 @@ function online_state_seed(opt::Union{JuMPOptimiser, BaseClusteringOptimisationE
     return throw(ArgumentError("`Online` wraps the prior, not the `$(typeof(opt).name.name)` that holds it: the optimiser's window is its prior's, so declare the step as `pe = Online(prior; max_history = …)` and the fold context follows the prior's buffer."))
 end
 """
-    update_online_member(pe::AbstractPriorEstimator)
-    update_online_member(pe::Online)
-    update_online_member(pe)
-
-Resolves the [`Online`](@ref) wrappers in the `pe` slot of an optimiser, and returns any other value unchanged.
-
-The slot takes a prior estimator, a prior result or a schedule. This function resolves a wrapper, and it searches a prior estimator for wrappers in its own fields. A prior result and a schedule hold no wrapper to resolve, so they pass unchanged, and the step refuses them later with the reason.
-
-# Related
-
-  - [`update_online_estimator`](@ref)
-  - [`Online`](@ref)
-  - [`fold_prior`](@ref): refuses a prior result and a schedule at the step.
-"""
-function update_online_member(pe::Union{AbstractPriorEstimator, Online})
-    return update_online_estimator(pe)
-end
-function update_online_member(pe)
-    return pe
-end
-"""
     update_online_estimator(opt::JuMPOptimisationEstimator)
     update_online_estimator(opt::Union{HierarchicalRiskParity, HierarchicalEqualRiskContribution, SchurComplementHierarchicalRiskParity})
     update_online_estimator(opt::Union{JuMPOptimiser, BaseClusteringOptimisationEstimator, InverseVolatility, NestedClustered, BaseStackingOptimisationEstimator, BaseSubsetResamplingOptimisationEstimator})
 
 Resolves the [`Online`](@ref) wrappers in the prior of an optimiser, at the warm-up.
 
-The JuMP and hierarchical heads resolve the bundle they hold, and the bundle, the meta-optimisers and [`InverseVolatility`](@ref) resolve their `pe`. The step forwards observations to that prior alone, so this function resolves no other wrapper. A wrapper in an inner optimiser of a meta-optimiser, in a fallback, or in any other field stays unresolved, and the entry of the online arm of the fold loop refuses it with an error that names the field.
+The JuMP and hierarchical heads resolve the bundle they hold, and the bundle, the meta-optimisers and [`InverseVolatility`](@ref) resolve their `pe`. The slot takes a prior estimator, a prior result or a schedule. A prior result and a schedule hold no wrapper to resolve, so they pass unchanged, and [`fold_prior`](@ref) refuses them later at the step with the reason. The step forwards observations to that prior alone, so this function resolves no other wrapper. A wrapper in an inner optimiser of a meta-optimiser, in a fallback, or in any other field stays unresolved, and the entry of the online arm of the fold loop refuses it with an error that names the field.
 
 # Arguments
 
@@ -836,7 +814,7 @@ The JuMP and hierarchical heads resolve the bundle they hold, and the bundle, th
 # Related
 
   - [`Online`](@ref)
-  - [`update_online_member`](@ref)
+  - [`fold_prior`](@ref)
   - [`online_unreached_path`](@ref)
   - [`partial_fit!`](@ref)
 """
@@ -853,15 +831,14 @@ function update_online_estimator(opt::Union{JuMPOptimiser,
                                             InverseVolatility, NestedClustered,
                                             BaseStackingOptimisationEstimator,
                                             BaseSubsetResamplingOptimisationEstimator})
-    return rebuild_struct(opt, (; pe = update_online_member(opt.pe)))
+    return rebuild_struct(opt, (; pe = update_online_estimator(opt.pe)))
 end
 """
-    online_unreached_path(opt::Union{JuMPOptimisationEstimator, HierarchicalRiskParity, HierarchicalEqualRiskContribution, SchurComplementHierarchicalRiskParity, JuMPOptimiser, BaseClusteringOptimisationEstimator, InverseVolatility, NestedClustered, BaseStackingOptimisationEstimator, BaseSubsetResamplingOptimisationEstimator})
     online_unreached_path(opt)
 
 Names the first [`Online`](@ref) wrapper in an optimiser that the warm-up leaves unresolved, or answers `nothing`.
 
-The warm-up of an optimiser resolves the wrappers in its prior alone, through [`update_online_estimator`](@ref). A wrapper in any other field, such as an inner optimiser of a meta-optimiser or a fallback, never gets a seeded buffer, and the batch fit of `optimise(opt)` with no returns refuses it. This function runs the warm-up and names the wrapper that is left, so the entry of the online arm can refuse it before the first fold. Any other estimator answers `nothing`.
+The warm-up of an optimiser resolves the wrappers in its prior alone, through [`update_online_estimator`](@ref). A wrapper in any other field, such as an inner optimiser of a meta-optimiser or a fallback, never gets a seeded buffer, and the batch fit of `optimise(opt)` with no returns refuses it. This function runs the warm-up and names the wrapper that is left, so the entry of the online arm can refuse it before the first fold. One method answers every estimator. An estimator with no wrapper outside the route of the warm-up answers `nothing`, so a user optimiser that holds an `Online` outside its prior gets its path too. An [`OnlinePortfolioSelection`](@ref) head and a [`PreviousWeights`](@ref) step their fallback, so their warm-up resolves the fallback, and the function names a wrapper that is left there, such as one in an inner optimiser of a meta-optimiser that is the fallback.
 
 # Algorithm
 
@@ -887,36 +864,38 @@ The warm-up of an optimiser resolves the wrappers in its prior alone, through [`
   - [`online_wrapper_path`](@ref)
   - [`assert_batch_entry`](@ref): the refusal that `optimise(opt)` with no returns would reach later.
 """
-function online_unreached_path(opt::Union{JuMPOptimisationEstimator, HierarchicalRiskParity,
-                                          HierarchicalEqualRiskContribution,
-                                          SchurComplementHierarchicalRiskParity,
-                                          JuMPOptimiser,
-                                          BaseClusteringOptimisationEstimator,
-                                          InverseVolatility, NestedClustered,
-                                          BaseStackingOptimisationEstimator,
-                                          BaseSubsetResamplingOptimisationEstimator})
+function online_unreached_path(opt)
     return online_wrapper_path(update_online_estimator(opt))
-end
-function online_unreached_path(::Any)
-    return nothing
 end
 """
     assert_stateless_schedule(opt::JuMPOptimisationEstimator)
     assert_stateless_schedule(opt::Union{HierarchicalRiskParity, HierarchicalEqualRiskContribution, SchurComplementHierarchicalRiskParity})
     assert_stateless_schedule(opt::Union{JuMPOptimiser, BaseClusteringOptimisationEstimator, InverseVolatility, NestedClustered, BaseStackingOptimisationEstimator, BaseSubsetResamplingOptimisationEstimator})
     assert_stateless_schedule(opt)
+    assert_stateless_schedule(pe::TimeDependent, opt)
+    assert_stateless_schedule(pe, opt)
 
 Refuses a [`TimeDependent`](@ref) schedule on a field that carries a state, with an error that names the field.
 
 A schedule replaces the value of its field at every fold, and the loop threads the state through that value. The replacement drops the state, so the value that a fold receives never saw the rows folded before it. The one such field that a schedule can reach is the `pe` of an optimiser, whose type bound admits a schedule. The `opt` field of a JuMP head or of a hierarchical head holds the bundle, and its bound refuses a schedule at construction, so the heads only recurse. This function walks the route of [`update_online_estimator`](@ref). A schedule on any other field passes, the inner optimisers of a meta-optimiser included. The loop resolves such a schedule on the copy it fits at each fold, and the state stays on the estimator it threads. No schedule carries a state across a swap.
 
+# Algorithm
+
+The method that Julia selects is the algorithm.
+
+ 1. A JuMP head or a hierarchical head: recurse on the bundle in `opt.opt`.
+ 2. An optimiser that holds a prior: check its prior with the two-argument method, `assert_stateless_schedule(opt.pe, opt)`. The optimiser is the second argument, so that the message names it.
+ 3. A `TimeDependent` prior: throw. Any other prior passes.
+ 4. Any other estimator passes.
+
 # Arguments
 
-  - `opt`: The estimator that enters the online arm of the fold loop.
+  - `opt`: The estimator that enters the online arm of the fold loop, or the optimiser that holds `pe`.
+  - `pe`: The prior of `opt`.
 
 # Validation
 
-  - Everything [`assert_stateless_prior`](@ref) refuses.
+  - No `pe` on the route of the step is a [`TimeDependent`](@ref). An `ArgumentError` that names the optimiser is thrown otherwise.
 
 # Related
 
@@ -937,33 +916,15 @@ function assert_stateless_schedule(opt::Union{JuMPOptimiser,
                                               InverseVolatility, NestedClustered,
                                               BaseStackingOptimisationEstimator,
                                               BaseSubsetResamplingOptimisationEstimator})
-    return assert_stateless_prior(opt.pe, opt)
+    return assert_stateless_schedule(opt.pe, opt)
 end
 function assert_stateless_schedule(::Any)
     return nothing
 end
-"""
-$(DocStringExtensions.TYPEDSIGNATURES)
-
-Refuses the prior of an optimiser when it is a [`TimeDependent`](@ref) schedule, and passes any other value.
-
-# Arguments
-
-  - `pe`: The prior of `opt`.
-  - `opt`: The optimiser that holds `pe`, which the message names.
-
-# Validation
-
-  - `pe` is not a [`TimeDependent`](@ref). An `ArgumentError` is thrown otherwise.
-
-# Related
-
-  - [`assert_stateless_schedule`](@ref)
-"""
-function assert_stateless_prior(::TimeDependent, opt)
+function assert_stateless_schedule(::TimeDependent, opt)
     return throw(ArgumentError("`$(typeof(opt).name.name).pe` holds a `TimeDependent` schedule, and the online arm of the fold loop cannot step it: `pe` carries the partial-fit state the loop threads from fold to fold, and a schedule replaces that value every fold, so the prior a fold is handed never saw the rows folded before it. A schedule reaches stateless fields only. Hold one prior in `pe`, and schedule a field that carries no state, or refit every fold with `ff = nothing`."))
 end
-function assert_stateless_prior(::Any, ::Any)
+function assert_stateless_schedule(::Any, ::Any)
     return nothing
 end
 function online_entry_state(::TimeDependent)
@@ -1091,10 +1052,12 @@ end
     held_timestamps(opt::JuMPOptimisationEstimator)
     held_timestamps(opt::Union{HierarchicalRiskParity, HierarchicalEqualRiskContribution, SchurComplementHierarchicalRiskParity})
     held_timestamps(::PreviousWeights)
+    held_timestamps(cache::ReturnsBufferState)
+    held_timestamps(::Nothing)
 
 Reads the timestamps that the fold context of an optimiser holds, or answers `nothing` when it holds none.
 
-The alignment check of [`Resume`](@ref) reads this accessor. The [`ReturnsBufferState`](@ref) keeps the timestamps of the folded observations and drops the oldest under a cap, so under `Online(pe; max_history = w)` it holds the last `w`. A head forwards to the bundle it holds, and an optimiser that holds the context reads it, as in [`returns_result`](@ref). An optimiser that has taken no step answers `nothing`. [`PreviousWeights`](@ref) reads no observation and keeps no context, so it answers `nothing`, and a resume refuses it.
+The alignment check of [`Resume`](@ref) reads this accessor. The [`ReturnsBufferState`](@ref) keeps the timestamps of the folded observations and drops the oldest under a cap, so under `Online(pe; max_history = w)` it holds the last `w`. A head forwards to the bundle it holds, and an optimiser that holds the context reads its `cache`, as in [`returns_result`](@ref). A Fold Context answers its timestamps. An optimiser that has taken no step holds no context, so it answers `nothing`. [`PreviousWeights`](@ref) reads no observation and keeps no context, so it answers `nothing`, and a resume refuses it.
 
 # Arguments
 
@@ -1118,7 +1081,13 @@ function held_timestamps(opt::Union{JuMPOptimiser, BaseClusteringOptimisationEst
                                     BaseSubsetResamplingOptimisationEstimator,
                                     EqualWeighted, RandomWeighted,
                                     BestConstantRebalancedPortfolio})
-    return context_timestamps(opt.cache)
+    return held_timestamps(opt.cache)
+end
+function held_timestamps(cache::ReturnsBufferState)
+    return cache.ts
+end
+function held_timestamps(::Nothing)
+    return nothing
 end
 function held_timestamps(opt::JuMPOptimisationEstimator)
     return held_timestamps(opt.opt)

@@ -1114,7 +1114,7 @@ Return a [`RiskLoss`](@ref) whose measure takes the Price-Adjusted Allocation `w
   - [`factory`](@ref)
 """
 function factory(obj::RiskLoss, w::VecNum)::RiskLoss
-    return RiskLoss(factory(obj.r, w), obj.window, obj.sca, obj.pe)
+    return rebuild_struct(obj, (; r = factory(obj.r, w)))
 end
 """
     rows_needed(obj::LogWealth)
@@ -1312,7 +1312,7 @@ The mix lies in the Allocation Set when the uniform allocation does. Otherwise [
 
 A schedule can name a restart. The update of that period then returns the Start Allocation, re-entered onto the set from the book the fund holds by [`reprojection`](@ref). The update puts the statistic of the schedule back at its seed, and the averages of the Gradient Transform restart with it. The period count stays, because the stages are cumulative.
 
-The rule can also serve inside a mixture. As the weighting of an [`ExpertMixture`](@ref), it moves the weight over the experts on their period returns. As an expert of a mixture under [`BlendPoint`](@ref), the rule reads its gradient at the blend that the mixture played, and steps from its own iterate. The seven-argument [`online_update!`](@ref) hands it that Gradient Point. This is the shared gradient of Algorithm 4 of [zhang2018ader](@cite). The meta-algorithm of [zhao2020sword](@cite) also reads the gradient at the blend, as the linearised loss of its Equation 13. Each of its experts reads the gradient at its own iterate. On the head, and under [`OwnPoint`](@ref), the point is the iterate.
+The rule can also serve inside a mixture. As the weighting of an [`ExpertMixture`](@ref), it moves the weight over the experts on their period returns. As an expert of a mixture under [`BlendPoint`](@ref), the rule reads its gradient at the blend that the mixture played, and steps from its own iterate. The last slot of [`online_update!`](@ref) hands it that Gradient Point. This is the shared gradient of Algorithm 4 of [zhang2018ader](@cite). The meta-algorithm of [zhao2020sword](@cite) also reads the gradient at the blend, as the linearised loss of its Equation 13. Each of its experts reads the gradient at its own iterate. On the head, and under [`OwnPoint`](@ref), the point is the iterate.
 
 `obj` is the loss. [`LogWealth`](@ref) is the loss of every rule above. A [`RiskLoss`](@ref) is a risk measure over the last `window` rows the head holds. The rule reads as many rows as its objective. Only the log-wealth gradient reads the mixed price relatives, because a risk measure reads returns and not price relatives. The mix of the played allocation applies under both.
 
@@ -1373,7 +1373,7 @@ For a fixed rate ``\\eta`` and a comparator ``\\boldsymbol{w}^*`` with ``D_\\Psi
 
 # Algorithm
 
-The seven-argument [`online_update!`](@ref) runs these steps at the period's row `x`. The six-argument form calls it with the iterate as the Gradient Point `point`. `st` is the state of the rule, the [`MirrorDescentState`](@ref) that the rule keeps from one update to the next.
+[`online_update!`](@ref) runs these steps at the period's row `x`. The Gradient Point `point` is the iterate when it is `nothing`, the default. `st` is the state of the rule, the [`MirrorDescentState`](@ref) that the rule keeps from one update to the next.
 
  1. Set the period `t = st.n + 1`, and the Price-Adjusted Allocation `wh` of the book `w` after the row.
  2. When the schedule names a restart at `t`, re-enter the Start Allocation `st.w0` onto the set from `wh` with [`reprojection`](@ref). Put the statistic of the schedule and the state of the Gradient Transform back at their seeds, keep `t`, and return that allocation. Stop.
@@ -1388,7 +1388,7 @@ The seven-argument [`online_update!`](@ref) runs these steps at the period's row
 11. Form the played allocation from `u` with [`played_allocation`](@ref). When `alpha` is positive, project it with [`reprojection`](@ref).
 12. Return the new state and the played allocation.
 
-With a `predictor`, the seven-argument form runs these steps instead. The six-argument form calls it with the unmixed played iterate `st.u` as the Gradient Point `point`. `st` is then an [`OptimisticMirrorDescentState`](@ref).
+With a `predictor`, the update runs these steps instead. The Gradient Point `point` is the unmixed played iterate `st.u` when it is `nothing`, the default. `st` is then an [`OptimisticMirrorDescentState`](@ref).
 
  1. Set the period `t = st.n + 1`, and form the Price-Adjusted Allocation `wh` of the book `w` after the row.
  2. When the schedule of `eta` names a restart at `t`, re-enter the Start Allocation `st.w0` onto the set from `wh` with [`reprojection`](@ref). Put both iterates at that allocation, and the states of the schedule and the predictor at their seeds, keep `t`, and return that allocation. Stop.
@@ -1528,11 +1528,10 @@ function MirrorDescent(; eta::Union{Real, AbstractLearningRateSchedule} = 0.05,
     return MirrorDescent(eta, proj, alpha, obj, grad, predictor)
 end
 function port_opt_view(alg::MirrorDescent, i, args...)
-    return MirrorDescent(; eta = alg.eta, proj = alg.proj, alpha = alg.alpha, obj = alg.obj,
-                         grad = alg.grad,
-                         predictor = port_opt_view(alg.predictor, i, args...))
+    return rebuild_struct(alg, (; predictor = port_opt_view(alg.predictor, i, args...)))
 end
-function rule_state_seed(alg::MirrorDescent, w::AbstractVector)
+function rule_state_seed(alg::MirrorDescent, w::AbstractVector,
+                         ::Option{<:AbstractAllocationSet} = nothing)
     return MirrorDescentState(0, copy(w), copy(w), schedule_state_seed(alg.eta, w),
                               gradient_state_seed(alg.grad, w))
 end
@@ -1618,15 +1617,11 @@ end
 function rows_needed(alg::MirrorDescent)
     return rows_needed(alg.obj)
 end
-function online_update!(alg::MirrorDescent, st::MirrorDescentState, w::AbstractVector,
-                        x::AbstractVector, rows, set::AbstractAllocationSet)
-    return online_update!(alg, st, w, x, rows, set, st.u)
-end
-# The seven-argument form is the primitive: the gradient is read at `point`, the rule's own
-# unmixed iterate on the head and the mixture's played blend under `BlendPoint`.
+# The gradient is read at `point`: the rule's own unmixed iterate when it is `nothing`, on the
+# head and under `OwnPoint`, and the mixture's played blend under `BlendPoint`.
 function online_update!(alg::MirrorDescent, st::MirrorDescentState, w::AbstractVector,
                         x::AbstractVector, rows, set::AbstractAllocationSet,
-                        point::AbstractVector)
+                        point::Option{<:AbstractVector} = nothing)
     t = st.n + 1
     wh = price_adjusted_allocation(w, x)
     if restart(alg.eta, t)
@@ -1643,7 +1638,7 @@ function online_update!(alg::MirrorDescent, st::MirrorDescentState, w::AbstractV
     eta = learning_rate(alg.eta, t, st)
     alpha = mixing_share(alg.eta, t, alg.alpha)
     xm = mixed_relatives(x, alpha)
-    g = loss_gradient(factory(alg.obj, wh), point, xm, rows)
+    g = loss_gradient(factory(alg.obj, wh), something(point, st.u), xm, rows)
     q = mirror_step(alg.proj, st.u, eta .* transform_gradient!(alg.grad, st.gs, g))
     u = project(alg.proj, set, q, wh)
     s = statistic_after_step(alg.eta, st.s, w, x)

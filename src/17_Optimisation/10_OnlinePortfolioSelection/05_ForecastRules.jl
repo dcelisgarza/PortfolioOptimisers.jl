@@ -311,23 +311,6 @@ function scale_relative(scale::AbstractPriceLevelStatistic, x::AbstractVector,
                                 vec(Statistics.mean(me, X, pnl; dims = 1, vols...)))
 end
 """
-    scale_rows(scale::Nothing)
-    scale_rows(scale::AbstractPriceLevelStatistic)
-
-Returns the number of rows that a `scale` statistic reads at a step, and `0` when there is no statistic.
-
-# Related
-
-  - [`ForecastReversion`](@ref)
-  - [`rows_needed`](@ref)
-"""
-function scale_rows(::Nothing)
-    return 0
-end
-function scale_rows(scale::AbstractPriceLevelStatistic)
-    return window_rows(scale)
-end
-"""
 $(DocStringExtensions.TYPEDEF)
 
 Moves the allocation by the least amount that gives a forecast return of at least `eps`, then projects.
@@ -468,17 +451,18 @@ function ForecastReversion(;
     return ForecastReversion(me, eps, scale, proj)
 end
 function port_opt_view(alg::ForecastReversion, i, args...)
-    return ForecastReversion(; me = port_opt_view(alg.me, i, args...), eps = alg.eps,
-                             scale = alg.scale, proj = alg.proj)
+    return rebuild_struct(alg, (; me = port_opt_view(alg.me, i, args...)))
 end
 function rows_needed(alg::ForecastReversion)
-    return rows_needed_max(rows_needed(alg.me), scale_rows(alg.scale))
+    return rows_needed_max(rows_needed(alg.me), window_rows(alg.scale))
 end
-function rule_state_seed(alg::ForecastReversion, ::AbstractVector)
+function rule_state_seed(alg::ForecastReversion, ::AbstractVector,
+                         ::Option{<:AbstractAllocationSet} = nothing)
     return forecaster_seed(alg.me)
 end
 function online_update!(alg::ForecastReversion, st, w::AbstractVector, x::AbstractVector,
-                        rows, set::AbstractAllocationSet)
+                        rows, set::AbstractAllocationSet,
+                        ::Option{<:AbstractVector} = nothing)
     st, xhat = forecast_relative(alg.me, st, x, rows)
     dev = xhat .- Statistics.mean(xhat)
     denom = sum(abs2, dev)
@@ -876,17 +860,18 @@ function ForecastTracking(;
     return ForecastTracking(me, eps, proj)
 end
 function port_opt_view(alg::ForecastTracking, i, args...)
-    return ForecastTracking(; me = port_opt_view(alg.me, i, args...), eps = alg.eps,
-                            proj = alg.proj)
+    return rebuild_struct(alg, (; me = port_opt_view(alg.me, i, args...)))
 end
 function rows_needed(alg::ForecastTracking)
     return rows_needed(alg.me)
 end
-function rule_state_seed(alg::ForecastTracking, ::AbstractVector)
+function rule_state_seed(alg::ForecastTracking, ::AbstractVector,
+                         ::Option{<:AbstractAllocationSet} = nothing)
     return forecaster_seed(alg.me)
 end
 function online_update!(alg::ForecastTracking, st, w::AbstractVector, x::AbstractVector,
-                        rows, set::AbstractAllocationSet)
+                        rows, set::AbstractAllocationSet,
+                        ::Option{<:AbstractVector} = nothing)
     st, xhat = forecast_relative(alg.me, st, x, rows)
     dev = xhat .- Statistics.mean(xhat)
     nrm = LinearAlgebra.norm(dev)
@@ -1164,17 +1149,18 @@ function KernelTrendTracking(;
     return KernelTrendTracking(me, eta, q, proj)
 end
 function port_opt_view(alg::KernelTrendTracking, i, args...)
-    return KernelTrendTracking(; me = port_opt_view(alg.me, i, args...), eta = alg.eta,
-                               q = alg.q, proj = alg.proj)
+    return rebuild_struct(alg, (; me = port_opt_view(alg.me, i, args...)))
 end
 function rows_needed(alg::KernelTrendTracking)
     return rows_needed(alg.me)
 end
-function rule_state_seed(alg::KernelTrendTracking, ::AbstractVector)
+function rule_state_seed(alg::KernelTrendTracking, ::AbstractVector,
+                         ::Option{<:AbstractAllocationSet} = nothing)
     return forecaster_seed(alg.me)
 end
 function online_update!(alg::KernelTrendTracking, st, w::AbstractVector, x::AbstractVector,
-                        rows, set::AbstractAllocationSet)
+                        rows, set::AbstractAllocationSet,
+                        ::Option{<:AbstractVector} = nothing)
     st, xhat = forecast_relative(alg.me, st, x, rows)
     dev = xhat .- Statistics.mean(xhat)
     q = if all(iszero, dev)
@@ -1373,17 +1359,18 @@ function TransactionCostOptimisation(;
     return TransactionCostOptimisation(me, eta, gamma, proj)
 end
 function port_opt_view(alg::TransactionCostOptimisation, i, args...)
-    return TransactionCostOptimisation(; me = port_opt_view(alg.me, i, args...),
-                                       eta = alg.eta, gamma = alg.gamma, proj = alg.proj)
+    return rebuild_struct(alg, (; me = port_opt_view(alg.me, i, args...)))
 end
 function rows_needed(alg::TransactionCostOptimisation)
     return rows_needed(alg.me)
 end
-function rule_state_seed(alg::TransactionCostOptimisation, ::AbstractVector)
+function rule_state_seed(alg::TransactionCostOptimisation, ::AbstractVector,
+                         ::Option{<:AbstractAllocationSet} = nothing)
     return forecaster_seed(alg.me)
 end
 function online_update!(alg::TransactionCostOptimisation, st, w::AbstractVector,
-                        x::AbstractVector, rows, set::AbstractAllocationSet)
+                        x::AbstractVector, rows, set::AbstractAllocationSet,
+                        ::Option{<:AbstractVector} = nothing)
     st, xhat = forecast_relative(alg.me, st, x, rows)
     what = price_adjusted_allocation(w, x)
     g = xhat ./ LinearAlgebra.dot(what, xhat)
@@ -1557,17 +1544,18 @@ function ShortTermSparsePortfolio(;
     return ShortTermSparsePortfolio(me, alg, zeta, proj)
 end
 function port_opt_view(alg::ShortTermSparsePortfolio, i, args...)
-    return ShortTermSparsePortfolio(; me = port_opt_view(alg.me, i, args...), alg = alg.alg,
-                                    zeta = alg.zeta, proj = alg.proj)
+    return rebuild_struct(alg, (; me = port_opt_view(alg.me, i, args...)))
 end
 function rows_needed(alg::ShortTermSparsePortfolio)
     return rows_needed(alg.me)
 end
-function rule_state_seed(alg::ShortTermSparsePortfolio, ::AbstractVector)
+function rule_state_seed(alg::ShortTermSparsePortfolio, ::AbstractVector,
+                         ::Option{<:AbstractAllocationSet} = nothing)
     return forecaster_seed(alg.me)
 end
 function online_update!(alg::ShortTermSparsePortfolio, st, w::AbstractVector,
-                        x::AbstractVector, rows, set::AbstractAllocationSet)
+                        x::AbstractVector, rows, set::AbstractAllocationSet,
+                        ::Option{<:AbstractVector} = nothing)
     st, xhat = forecast_relative(alg.me, st, x, rows)
     @argcheck(all(v -> v > zero(v), xhat),
               DomainError(xhat,

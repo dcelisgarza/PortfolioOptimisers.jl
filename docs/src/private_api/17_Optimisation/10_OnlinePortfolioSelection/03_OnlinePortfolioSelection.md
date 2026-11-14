@@ -19,7 +19,6 @@ PortfolioOptimisers.online_selection_result
 PortfolioOptimisers.batch_from_state(::OnlinePortfolioSelection)
 PortfolioOptimisers.held_timestamps(opt::OnlinePortfolioSelection)
 PortfolioOptimisers.update_online_estimator(opt::Union{OnlinePortfolioSelection, PreviousWeights})
-PortfolioOptimisers.online_unreached_path(opt::Union{OnlinePortfolioSelection, PreviousWeights})
 PortfolioOptimisers.fees_carry_turnover
 PortfolioOptimisers.assert_online_fee_source(opt::OnlinePortfolioSelection, pws)
 PortfolioOptimisers.online_portfolio_selection_td_defaults

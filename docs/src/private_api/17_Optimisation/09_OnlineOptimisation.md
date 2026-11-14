@@ -12,11 +12,9 @@ PortfolioOptimisers.fold_context
 PortfolioOptimisers.fold_returns
 PortfolioOptimisers.fold_optimiser
 PortfolioOptimisers.online_state_seed(::Union{EqualWeighted, RandomWeighted, BestConstantRebalancedPortfolio}, max_history::PortfolioOptimisers.Option{<:Integer})
-PortfolioOptimisers.update_online_member
 PortfolioOptimisers.update_online_estimator(opt::PortfolioOptimisers.JuMPOptimisationEstimator)
 PortfolioOptimisers.online_unreached_path
 PortfolioOptimisers.assert_stateless_schedule
-PortfolioOptimisers.assert_stateless_prior
 PortfolioOptimisers.assert_online_entry(::TimeDependent)
 PortfolioOptimisers.assert_online_fee_source(::Any, ::Any)
 PortfolioOptimisers.assert_step_tracks_no_series

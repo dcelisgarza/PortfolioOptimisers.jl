@@ -1376,7 +1376,7 @@ A term of a block gets the objective `obj` of the model, the owner of its block 
 
   - [`add_custom_objective_term!`](@ref)
   - [`set_block_constraints!`](@ref)
-  - [`projection_programme`](@ref)
+  - [`project`](@ref)
 """
 function set_block_objective_terms!(::JuMP.Model, ::Nothing, ::Any, ::Any)::Nothing
     return nothing

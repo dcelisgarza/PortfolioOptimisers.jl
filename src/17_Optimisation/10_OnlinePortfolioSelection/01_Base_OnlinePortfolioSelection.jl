@@ -9,8 +9,8 @@ The rule is the only part of the online portfolio selection family that changes 
 
 To implement a new rule, subtype `AbstractOnlinePortfolioSelectionAlgorithm` with the parameters that the rule needs and a `proj` field, and implement the following methods:
 
-  - `online_update!(alg::AbstractOnlinePortfolioSelectionAlgorithm, st, w::AbstractVector, x::AbstractVector, rows, set::AbstractAllocationSet) -> Tuple`: The Online Update. It reads the state `st` of the rule, the allocation `w` held during the period, the finite price relative `x` of the period and the rows that the head holds through the period. It returns `(st', w')`, the state of the rule and the allocation for the next period. It may write `st` in place, and it always returns a new vector for `w'`. A first-order rule also implements the seven-argument form, whose last argument is the Gradient Point that an [`ExpertMixture`](@ref) gives it. The generic method of that form drops the point.
-  - `rule_state_seed(alg::AbstractOnlinePortfolioSelectionAlgorithm, w::AbstractVector)`: The state of the rule before the first update, or `nothing` for a rule that keeps no state. `w` is the Start Allocation, and the state takes its length and its element type. The head calls the three-argument form, `rule_state_seed(alg, w, set)`, with its Allocation Set, and the default method of that form drops `set`. A rule that holds allocations of its own over the assets, as the experts of an [`ExpertMixture`](@ref) are, implements the three-argument form and projects them onto `set`.
+  - `online_update!(alg::AbstractOnlinePortfolioSelectionAlgorithm, st, w::AbstractVector, x::AbstractVector, rows, set::AbstractAllocationSet, point::Option{<:AbstractVector} = nothing) -> Tuple`: The Online Update. It reads the state `st` of the rule, the allocation `w` held during the period, the finite price relative `x` of the period and the rows that the head holds through the period. It returns `(st', w')`, the state of the rule and the allocation for the next period. It may write `st` in place, and it always returns a new vector for `w'`. The last slot is the Gradient Point that an [`ExpertMixture`](@ref) gives its experts. A first-order rule evaluates its gradient there, and reads `nothing` as its own point. Every other rule ignores the slot, and it still takes it, because the mixture passes it to every expert.
+  - `rule_state_seed(alg::AbstractOnlinePortfolioSelectionAlgorithm, w::AbstractVector, set::Option{<:AbstractAllocationSet} = nothing)`: The state of the rule before the first update, or `nothing` for a rule that keeps no state. `w` is the Start Allocation, and the state takes its length and its element type. The head calls the method with its Allocation Set. A rule whose state reads only `w` ignores the slot. A rule that holds allocations of its own over the assets, as the experts of an [`ExpertMixture`](@ref) are, projects them onto `set`.
   - `rows_needed(alg::AbstractOnlinePortfolioSelectionAlgorithm) -> Union{Nothing, Integer}`: The number of rows that the rule reads at a step. It is `0` for a rule that reads none, and `nothing` for a rule that reads every row folded so far.
   - `projection_geometry(alg::AbstractOnlinePortfolioSelectionAlgorithm) -> AbstractProjectionGeometry`: The geometry in which the head projects the Start Allocation. It is the rule's `proj` field by default.
 
@@ -41,7 +41,8 @@ julia> struct FixedTarget{T1, T2} <: PortfolioOptimisers.AbstractOnlinePortfolio
 
 julia> function PortfolioOptimisers.online_update!(alg::FixedTarget, st, w::AbstractVector,
                                                    x::AbstractVector, rows,
-                                                   set::PortfolioOptimisers.AbstractAllocationSet)
+                                                   set::PortfolioOptimisers.AbstractAllocationSet,
+                                                   ::PortfolioOptimisers.Option{<:AbstractVector} = nothing)
            wh = PortfolioOptimisers.price_adjusted_allocation(w, x)
            return st, PortfolioOptimisers.project(alg.proj, set, alg.q, wh)
        end
@@ -439,11 +440,14 @@ function BoundedAllocationSet(; wb::Option{<:NameWbE_Wb} = WeightBounds(),
     return BoundedAllocationSet(wb, sets)
 end
 """
-$(DocStringExtensions.TYPEDSIGNATURES)
+    resolve_allocation_set(set::BoundedAllocationSet, N::Integer, strict::Bool, datatype::DataType)
+    resolve_allocation_set(set::Nothing, N::Integer, strict::Bool, datatype::DataType)
 
 Resolves the weight bounds of a [`BoundedAllocationSet`](@ref) to vectors over `N` assets.
 
 [`weight_bounds_constraints`](@ref) does the work, with the set's `sets` for a bound that names assets. A [`WeightBoundsEstimator`](@ref) resolves a side that it states as a scalar to that scalar, and the projections read a bound at each asset. So a second call expands the resolved pair to `N` entries. The set that comes back keeps its `sets`.
+
+The empty slot, `nothing`, resolves to the bare simplex over `N` assets, the resolved default `BoundedAllocationSet()`. An [`ExpertMixture`](@ref) that holds no Expert Set reads it.
 
 # Related
 
@@ -456,6 +460,9 @@ function resolve_allocation_set(set::BoundedAllocationSet, N::Integer, strict::B
                                    datatype = datatype)
     wb = weight_bounds_constraints(wb; N = N, datatype = datatype)
     return BoundedAllocationSet(; wb = wb, sets = set.sets)
+end
+function resolve_allocation_set(::Nothing, N::Integer, strict::Bool, datatype::DataType)
+    return resolve_allocation_set(BoundedAllocationSet(), N, strict, datatype)
 end
 function rows_needed(::BoundedAllocationSet)
     return 0
@@ -632,7 +639,7 @@ A root found from the kinks is exact on every input whose kinks floating point c
 
  1. When `isapprox(sum(wn), 1)` holds, return `wn`. The default tolerance of `isapprox` is a relative error of `sqrt(eps)` of the element type, `1.49e-8` for `Float64`.
  2. Otherwise, record a Held Step on the current [`ProjectionStep`](@ref) with [`record_held_step!`](@ref). Its reason names the set, the geometry and the sum, and it has no solver trials.
- 3. Return a copy of `w`, as a failed [`projection_programme`](@ref) does.
+ 3. Return a copy of `w`, as a failed projection programme of [`project`](@ref) does.
 
 # Arguments
 
@@ -1071,8 +1078,7 @@ function budget_rounding(::Type{T}, n::Integer) where {T}
     return (n + 1) * eps(T)
 end
 """
-    online_update!(alg::AbstractOnlinePortfolioSelectionAlgorithm, st, w::AbstractVector, x::AbstractVector, rows, set::AbstractAllocationSet)
-    online_update!(alg::AbstractOnlinePortfolioSelectionAlgorithm, st, w::AbstractVector, x::AbstractVector, rows, set::AbstractAllocationSet, point::Option{<:AbstractVector})
+    online_update!(alg::AbstractOnlinePortfolioSelectionAlgorithm, st, w::AbstractVector, x::AbstractVector, rows, set::AbstractAllocationSet, point::Option{<:AbstractVector} = nothing)
 
 Runs the Online Update, one row of the online portfolio selection recursion, which each rule writes once.
 
@@ -1080,7 +1086,7 @@ The function reads the rule, the state `st` of the rule, the allocation `w` held
 
 Every rule makes the same two steps. It takes an unconstrained step to a raw vector, and it then calls [`project`](@ref) onto the set in its geometry. A rule that reads `w` continues from the allocation it gets, which is the Start Allocation on the first row.
 
-The seven-argument form names the **Gradient Point**. An [`ExpertMixture`](@ref) under [`BlendPoint`](@ref) gives every expert its played blend as `point`. A first-order rule then evaluates its gradient at that point and steps from its own iterate, so every expert reads the one gradient on which the dynamic-regret mixtures state their bounds. The generic method drops the point and runs the six-argument update. So a rule with no gradient ignores the point, and a `nothing` point, which the mixture gives under [`OwnPoint`](@ref), runs the six-argument update for every rule. [`MirrorDescent`](@ref), with or without a predictor, and [`AdaptiveSubgradient`](@ref) read a given point.
+The last slot is the **Gradient Point**, and each method takes it as a defaulted positional slot, `point::Option{<:AbstractVector} = nothing`. An [`ExpertMixture`](@ref) under [`BlendPoint`](@ref) gives every expert its played blend as `point`. A first-order rule then evaluates its gradient at that point and steps from its own iterate, so every expert reads the one gradient on which the dynamic-regret mixtures state their bounds. A rule with no gradient ignores the slot. A `nothing` point, which the head and the mixture under [`OwnPoint`](@ref) give, is the rule's own point. [`MirrorDescent`](@ref), with or without a predictor, and [`AdaptiveSubgradient`](@ref) read a given point.
 
 # Mathematical definition
 
@@ -1123,11 +1129,6 @@ Where:
   - [`ExpertMixture`](@ref)
 """
 function online_update! end
-function online_update!(alg::AbstractOnlinePortfolioSelectionAlgorithm, st,
-                        w::AbstractVector, x::AbstractVector, rows,
-                        set::AbstractAllocationSet, ::Option{<:AbstractVector})
-    return online_update!(alg, st, w, x, rows, set)
-end
 """
     price_relative(r::Number)
 
@@ -1157,13 +1158,12 @@ function price_relative(r::Number)
     return isfinite(r) ? one(r) + r : one(r)
 end
 """
-    rule_state_seed(::AbstractOnlinePortfolioSelectionAlgorithm, ::AbstractVector)
-    rule_state_seed(alg::AbstractOnlinePortfolioSelectionAlgorithm, w::AbstractVector,
-                    set::Option{<:AbstractAllocationSet})
+    rule_state_seed(::AbstractOnlinePortfolioSelectionAlgorithm, ::AbstractVector,
+                    ::Option{<:AbstractAllocationSet} = nothing)
 
 Returns the state that a rule holds before its first update. The default is `nothing`, for a rule that keeps no state.
 
-The head calls the three-argument form with its Allocation Set, and the default method of that form drops `set`. So a rule whose state reads only the Start Allocation implements the two-argument form. A rule that holds allocations of its own over the assets, as an [`ExpertMixture`](@ref) and a [`FollowTheLeadingHistory`](@ref) hold their experts, implements the three-argument form. It projects each allocation onto `set`, as the head projects its `w0`. When `set` is `nothing`, the method projects nothing.
+The head calls the three-argument form with its Allocation Set, and each method takes `set` as a defaulted positional slot, `set::Option{<:AbstractAllocationSet} = nothing`. A rule whose state reads only the Start Allocation ignores the slot. A rule that holds allocations of its own over the assets, as an [`ExpertMixture`](@ref) and a [`FollowTheLeadingHistory`](@ref) hold their experts, reads it. It projects each allocation onto `set`, as the head projects its `w0`. When `set` is `nothing`, the method projects nothing.
 
 # Related
 
@@ -1171,12 +1171,9 @@ The head calls the three-argument form with its Allocation Set, and the default 
   - [`OnlinePortfolioSelectionState`](@ref)
   - [`project_start`](@ref)
 """
-function rule_state_seed(::AbstractOnlinePortfolioSelectionAlgorithm, ::AbstractVector)
+function rule_state_seed(::AbstractOnlinePortfolioSelectionAlgorithm, ::AbstractVector,
+                         ::Option{<:AbstractAllocationSet} = nothing)
     return nothing
-end
-function rule_state_seed(alg::AbstractOnlinePortfolioSelectionAlgorithm, w::AbstractVector,
-                         ::Option{<:AbstractAllocationSet})
-    return rule_state_seed(alg, w)
 end
 """
 $(DocStringExtensions.TYPEDSIGNATURES)

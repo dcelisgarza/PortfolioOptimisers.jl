@@ -75,9 +75,8 @@ PortfolioOptimisers.DiagonalProjection
 end
 """
     project(proj::DiagonalProjection, set::BoundedAllocationSet, q::AbstractVector, w::AbstractVector)
-    project(proj::DiagonalProjection, set::ProgrammeAllocationSet, q::AbstractVector, w::AbstractVector)
 
-Projects the raw step `q` onto the Allocation Set `set` in the norm of `diag(proj.h)`. These are the diagonal arms of the Constrained Update, and `w` is the Price-Adjusted Allocation.
+Projects the raw step `q` onto the Allocation Set `set` in the norm of `diag(proj.h)`. This is the diagonal arm of the Constrained Update on a bounded set, and `w` is the Price-Adjusted Allocation. On a [`ProgrammeAllocationSet`](@ref) the programme arm of [`project`](@ref) solves the projection, with the objective of [`set_projection_objective!`](@ref).
 
 On a bounded set the weights of the norm break the sort that projects onto the simplex in the Euclidean geometry. So the bounded arm finds the scalar root on every bound, the simplex included.
 
@@ -91,7 +90,7 @@ On a [`BoundedAllocationSet`](@ref):
 
 On a [`ProgrammeAllocationSet`](@ref):
 
- 1. Solve the programme of [`projection_programme`](@ref), whose objective [`set_projection_objective!`](@ref) writes, and return its allocation. When `proj.h` has a zero entry, [`solve_projection_programme!`](@ref) solves a second stage that picks the limit of [`DiagonalProjection`](@ref). When the second stage fails, it keeps the minimiser of the first.
+ 1. Solve the programme of the programme arm of [`project`](@ref), whose objective [`set_projection_objective!`](@ref) writes, and return its allocation. When `proj.h` has a zero entry, [`solve_projection_programme!`](@ref) solves a second stage that picks the limit of [`DiagonalProjection`](@ref). When the second stage fails, it keeps the minimiser of the first.
 
 # Related
 
@@ -99,7 +98,6 @@ On a [`ProgrammeAllocationSet`](@ref):
   - [`DiagonalProjection`](@ref)
   - [`bounded_quadratic_projection`](@ref)
   - [`budget_or_held_step`](@ref)
-  - [`projection_programme`](@ref)
   - [`solve_projection_programme!`](@ref)
 """
 function project(proj::DiagonalProjection, set::BoundedAllocationSet, q::AbstractVector,
@@ -110,10 +108,6 @@ function project(proj::DiagonalProjection, set::BoundedAllocationSet, q::Abstrac
     end
     return budget_or_held_step(bounded_quadratic_projection(q, set.wb, proj.h), w, proj,
                                set)
-end
-function project(proj::DiagonalProjection, set::ProgrammeAllocationSet, q::AbstractVector,
-                 w::AbstractVector)
-    return projection_programme(proj, set, q, w)
 end
 function set_projection_objective!(model::JuMP.Model, proj::DiagonalProjection,
                                    q::AbstractVector)::Nothing
@@ -237,7 +231,7 @@ The full-matrix variant, Algorithm 2 of [duchi2011](@cite), uses ``H_t = \\delta
 
 # Algorithm
 
-The seven-argument [`online_update!`](@ref) runs these steps at the period's row `x`. The six-argument form calls it with the book `w` as the Gradient Point `point`.
+[`online_update!`](@ref) runs these steps at the period's row `x`. The Gradient Point `point` is the book `w` when it is `nothing`, the default.
 
  1. Form the Price-Adjusted Allocation `wh` of the book `w` after the row.
  2. Resolve `obj` against `wh` with [`factory`](@ref), so that a benchmark or a turnover reference of a [`RiskLoss`](@ref) that is not fixed takes `wh`. Take the gradient `g` of that objective at `point`, from `x` and the head's `rows`, with [`loss_gradient`](@ref).
@@ -320,21 +314,18 @@ function projection_geometry(::AdaptiveSubgradient)
     # The Start Allocation is projected before any gradient, where no mass has accrued.
     return EuclideanProjection()
 end
-function rule_state_seed(::AdaptiveSubgradient, w::AbstractVector)
+function rule_state_seed(::AdaptiveSubgradient, w::AbstractVector,
+                         ::Option{<:AbstractAllocationSet} = nothing)
     return AdaptiveSubgradientState(0, zeros(eltype(w), length(w)))
 end
+# The gradient is read at `point`: the played allocation when it is `nothing`, on the head and
+# under `OwnPoint`, and the mixture's played blend under `BlendPoint`.
 function online_update!(alg::AdaptiveSubgradient, st::AdaptiveSubgradientState,
                         w::AbstractVector, x::AbstractVector, rows,
-                        set::AbstractAllocationSet)
-    return online_update!(alg, st, w, x, rows, set, w)
-end
-# The seven-argument form is the primitive: the gradient is read at `point`, the played
-# allocation on the head and the mixture's played blend under `BlendPoint`.
-function online_update!(alg::AdaptiveSubgradient, st::AdaptiveSubgradientState,
-                        w::AbstractVector, x::AbstractVector, rows,
-                        set::AbstractAllocationSet, point::AbstractVector)
+                        set::AbstractAllocationSet,
+                        point::Option{<:AbstractVector} = nothing)
     wh = price_adjusted_allocation(w, x)
-    g = loss_gradient(factory(alg.obj, wh), point, x, rows)
+    g = loss_gradient(factory(alg.obj, wh), something(point, w), x, rows)
     st.s .= hypot.(st.s, g)
     h = alg.delta .+ st.s
     # The pseudo-inverse of `H`: an entry of `h` is zero only where every gradient so far is
@@ -836,7 +827,8 @@ function rows_needed(alg::MirrorDescent{<:Any, <:Any, <:Any, <:Any, <:Any,
     return rows_needed_max(rows_needed(alg.predictor), rows_needed(alg.obj))
 end
 function rule_state_seed(alg::MirrorDescent{<:Any, <:Any, <:Any, <:Any, <:Any,
-                                            <:AbstractGradientPredictor}, w::AbstractVector)
+                                            <:AbstractGradientPredictor}, w::AbstractVector,
+                         ::Option{<:AbstractAllocationSet} = nothing)
     return OptimisticMirrorDescentState(0, copy(w), copy(w), copy(w),
                                         schedule_state_seed(alg.eta, w),
                                         zeros(eltype(w), 2), zeros(eltype(w), length(w)),
@@ -858,19 +850,15 @@ function half_step(alg::MirrorDescent, set::AbstractAllocationSet, u::AbstractVe
                    s::AbstractVector, w::AbstractVector)
     return project(alg.proj, set, mirror_step(alg.proj, u, s), w)
 end
-function online_update!(alg::MirrorDescent, st::OptimisticMirrorDescentState,
-                        w::AbstractVector, x::AbstractVector, rows,
-                        set::AbstractAllocationSet)
-    return online_update!(alg, st, w, x, rows, set, st.u)
-end
-# The seven-argument form is the primitive: the gradient is read at `point`, the unmixed
-# played iterate on the head and the mixture's played blend under `BlendPoint`; the hint is
+# The gradient is read at `point`: the unmixed played iterate when it is `nothing`, on the
+# head and under `OwnPoint`, and the mixture's played blend under `BlendPoint`; the hint is
 # the predictor's and reads the secondary iterate as before. The predictor is handed both the
 # traded relative and the mixed one: a forecaster folds the path that traded, and a
 # re-evaluated loss reads the vector the gradient was read on (#1210).
 function online_update!(alg::MirrorDescent, st::OptimisticMirrorDescentState,
                         w::AbstractVector, x::AbstractVector, rows,
-                        set::AbstractAllocationSet, point::AbstractVector)
+                        set::AbstractAllocationSet,
+                        point::Option{<:AbstractVector} = nothing)
     t = st.n + 1
     wh = price_adjusted_allocation(w, x)
     if restart(alg.eta, t)
@@ -891,7 +879,7 @@ function online_update!(alg::MirrorDescent, st::OptimisticMirrorDescentState,
     alpha = mixing_share(alg.eta, t, alg.alpha)
     xm = mixed_relatives(x, alpha)
     obj = factory(alg.obj, wh)
-    g = loss_gradient(obj, point, xm, rows)
+    g = loss_gradient(obj, something(point, st.u), xm, rows)
     v = half_step(alg, set, st.v, eta .* g, wh)
     ps, m = predict_gradient!(alg.predictor, st.ps, obj, g, v, x, xm, rows, t)
     r = hint_residual(alg.proj, g .- st.m)

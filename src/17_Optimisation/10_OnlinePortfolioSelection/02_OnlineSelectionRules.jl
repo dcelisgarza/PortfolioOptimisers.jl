@@ -77,7 +77,7 @@ function BuyAndHold(; proj::EuclideanProjection = EuclideanProjection())::BuyAnd
     return BuyAndHold(proj)
 end
 function online_update!(alg::BuyAndHold, st, w::AbstractVector, x::AbstractVector, ::Any,
-                        set::AbstractAllocationSet)
+                        set::AbstractAllocationSet, ::Option{<:AbstractVector} = nothing)
     wh = price_adjusted_allocation(w, x)
     return st, project(alg.proj, set, wh, wh)
 end
@@ -189,7 +189,8 @@ function port_opt_view(alg::ConstantRebalancedPortfolio, i, args...)
     return ConstantRebalancedPortfolio(; w = renormalised_view(alg.w, i), proj = alg.proj)
 end
 function online_update!(alg::ConstantRebalancedPortfolio, st, w::AbstractVector,
-                        x::AbstractVector, ::Any, set::AbstractAllocationSet)
+                        x::AbstractVector, ::Any, set::AbstractAllocationSet,
+                        ::Option{<:AbstractVector} = nothing)
     q = isnothing(alg.w) ? fill(one(eltype(w)) / length(w), length(w)) : alg.w
     return st, project(alg.proj, set, q, price_adjusted_allocation(w, x))
 end
@@ -361,12 +362,14 @@ function projection_geometry(::NewtonStep)
     # The Start Allocation is projected at `A_0 = I`, where the Gram norm is the Euclidean.
     return EuclideanProjection()
 end
-function rule_state_seed(::NewtonStep, w::AbstractVector)
+function rule_state_seed(::NewtonStep, w::AbstractVector,
+                         ::Option{<:AbstractAllocationSet} = nothing)
     N = length(w)
     return NewtonStepState(0, Matrix{eltype(w)}(LinearAlgebra.I, N, N), zeros(eltype(w), N))
 end
 function online_update!(alg::NewtonStep, st::NewtonStepState, w::AbstractVector,
-                        x::AbstractVector, ::Any, set::AbstractAllocationSet)
+                        x::AbstractVector, ::Any, set::AbstractAllocationSet,
+                        ::Option{<:AbstractVector} = nothing)
     g = x ./ LinearAlgebra.dot(w, x)
     st.A .+= g * transpose(g)
     st.b .+= (1 + inv(alg.beta)) .* g
@@ -753,7 +756,8 @@ function PassiveAggressiveMeanReversion(; eps::Real = 0.5,
     return PassiveAggressiveMeanReversion(eps, slack, proj)
 end
 function online_update!(alg::PassiveAggressiveMeanReversion, st, w::AbstractVector,
-                        x::AbstractVector, ::Any, set::AbstractAllocationSet)
+                        x::AbstractVector, ::Any, set::AbstractAllocationSet,
+                        ::Option{<:AbstractVector} = nothing)
     dev = x .- Statistics.mean(x)
     denom = sum(abs2, dev)
     loss = max(zero(eltype(w)), LinearAlgebra.dot(w, x) - alg.eps)
@@ -851,7 +855,7 @@ $(DocStringExtensions.TYPEDEF)
 
 Makes every first-order expert of a mixture read its gradient at the blend that the mixture played, while it steps from its own iterate.
 
-This is the shared gradient of the improved Ader of Section 3.4 of [zhang2018ader](@cite): the meta-algorithm sends the gradient at the blend to every expert (Algorithm 3, Step 9, and Algorithm 4, Step 4). The experts of [zhao2020sword](@citet) read the gradient at their own iterates (Algorithms 2 and 4), and that work reads the gradient at the blend only for the linearised loss of its meta-algorithm (Equations 10 and 13). So the choice of this point for [`Sword`](@ref) is a choice of the library. [`Ader`](@ref) and [`Sword`](@ref) build the mixture on it. The mixture passes the blend through the seven-argument [`online_update!`](@ref). [`MirrorDescent`](@ref) and [`AdaptiveSubgradient`](@ref) read it. The hint of a [`MirrorDescent`](@ref) rule with a `predictor` stays the hint of its predictor. A rule with no gradient takes its six-argument update and ignores the point.
+This is the shared gradient of the improved Ader of Section 3.4 of [zhang2018ader](@cite): the meta-algorithm sends the gradient at the blend to every expert (Algorithm 3, Step 9, and Algorithm 4, Step 4). The experts of [zhao2020sword](@citet) read the gradient at their own iterates (Algorithms 2 and 4), and that work reads the gradient at the blend only for the linearised loss of its meta-algorithm (Equations 10 and 13). So the choice of this point for [`Sword`](@ref) is a choice of the library. [`Ader`](@ref) and [`Sword`](@ref) build the mixture on it. The mixture passes the blend through the last slot of [`online_update!`](@ref). [`MirrorDescent`](@ref) and [`AdaptiveSubgradient`](@ref) read it. The hint of a [`MirrorDescent`](@ref) rule with a `predictor` stays the hint of its predictor. A rule with no gradient ignores the point.
 
 # Mathematical definition
 
@@ -943,7 +947,7 @@ Under [`BlendPoint`](@ref) with [`ExponentiatedGradient`](@ref) as the weighting
  1. Compute `r`, the expert-return vector, from the held allocations `st.h`. `st` is the state of the rule: what the rule keeps from one update to the next, here an [`ExpertMixtureState`](@ref).
  2. Compute `point`, the Gradient Point, with [`gradient_point`](@ref).
  3. Take the Online Update of every expert from its own state and allocation, with `point`. Store the new state and allocation in `st.st` and `st.h`.
- 4. Resolve the Expert Set with [`expert_allocation_set`](@ref). Take the Online Update of the weighting from `st.pst` and `st.p`, on `r`, over that set, giving `pst` and `p`.
+ 4. Resolve the Expert Set with [`resolve_allocation_set`](@ref). Take the Online Update of the weighting from `st.pst` and `st.p`, on `r`, over that set, giving `pst` and `p`.
  5. Compute the blend `q`, the sum of `p[k] .* h` over the experts.
  6. Project `q` onto `set` with [`blend_projection`](@ref) in `alg.proj`, from the Price-Adjusted Allocation of `w` over `x`, giving `wn`.
  7. Return a new state of the rule with the count raised by one, which holds the new `pst` and `p`, and `wn`.
@@ -1075,9 +1079,8 @@ function ExpertMixture(;
     return ExpertMixture(experts, alg, eset, proj, grad, p0)
 end
 function port_opt_view(alg::ExpertMixture, i, args...)
-    return ExpertMixture(; experts = [port_opt_view(e, i, args...) for e in alg.experts],
-                         alg = alg.alg, eset = alg.eset, proj = alg.proj, grad = alg.grad,
-                         p0 = alg.p0)
+    return rebuild_struct(alg,
+                          (; experts = [port_opt_view(e, i, args...) for e in alg.experts]))
 end
 function assert_rule_admits_set(alg::ExpertMixture, set::AbstractAllocationSet)::Nothing
     for e in alg.experts
@@ -1115,7 +1118,7 @@ The start is `p0`, or the uniform weights when `p0` is `nothing`. The projection
 
  1. Set `p0` to `alg.p0`, or to the uniform vector of length `K` in `datatype` when `alg.p0` is `nothing`.
  2. When `alg.p0` and `alg.eset` are both `nothing`, return `p0`.
- 3. Otherwise, resolve the Expert Set with [`expert_allocation_set`](@ref). Project `p0` onto it in the geometry of `alg.alg`, from `p0`, and return the projection.
+ 3. Otherwise, resolve the Expert Set with [`resolve_allocation_set`](@ref). Project `p0` onto it in the geometry of `alg.alg`, from `p0`, and return the projection.
 
 # Arguments
 
@@ -1130,13 +1133,13 @@ The start is `p0`, or the uniform weights when `p0` is `nothing`. The projection
 # Related
 
   - [`ExpertMixture`](@ref)
-  - [`expert_allocation_set`](@ref)
+  - [`resolve_allocation_set`](@ref)
   - [`project`](@ref)
 """
 function expert_start_weights(alg::ExpertMixture, K::Integer, datatype::DataType)
     p0 = something(alg.p0, fill(one(datatype) / K, K))
     return project(projection_geometry(alg.alg),
-                   expert_allocation_set(alg.eset, K, datatype), p0, p0)
+                   resolve_allocation_set(alg.eset, K, false, datatype), p0, p0)
 end
 # No start and no set: the uniform start needs no projection.
 function expert_start_weights(::ExpertMixture{<:Any, <:Any, Nothing, <:Any, <:Any, Nothing},
@@ -1180,7 +1183,8 @@ function expert_start_allocation(alg::ConstantRebalancedPortfolio, w::AbstractVe
     return promote_type(eltype(w), eltype(alg.w)).(alg.w)
 end
 function online_update!(alg::ExpertMixture, st::ExpertMixtureState, w::AbstractVector,
-                        x::AbstractVector, rows, set::AbstractAllocationSet)
+                        x::AbstractVector, rows, set::AbstractAllocationSet,
+                        ::Option{<:AbstractVector} = nothing)
     r = [LinearAlgebra.dot(h, x) for h in st.h]
     point = gradient_point(alg.grad, w)
     for (k, e) in enumerate(alg.experts)
@@ -1188,7 +1192,7 @@ function online_update!(alg::ExpertMixture, st::ExpertMixtureState, w::AbstractV
     end
     # The weighting moves on the Expert Set, the bare simplex over the experts by default.
     pst, p = online_update!(alg.alg, st.pst, st.p, r, nothing,
-                            expert_allocation_set(alg.eset, length(r), eltype(w)))
+                            resolve_allocation_set(alg.eset, length(r), false, eltype(w)))
     q = zeros(eltype(w), length(w))
     for (k, h) in enumerate(st.h)
         q .+= p[k] .* h
@@ -1201,9 +1205,9 @@ end
     gradient_point(grad::OwnPoint, w::AbstractVector)
     gradient_point(grad::BlendPoint, w::AbstractVector)
 
-Returns the Gradient Point that an [`ExpertMixture`](@ref) passes to its experts through the seven-argument [`online_update!`](@ref).
+Returns the Gradient Point that an [`ExpertMixture`](@ref) passes to its experts through the last slot of [`online_update!`](@ref).
 
-Under [`OwnPoint`](@ref) the point is `nothing`, so every expert takes its own six-argument update. Under [`BlendPoint`](@ref) it is the blend `w` that the mixture played.
+Under [`OwnPoint`](@ref) the point is `nothing`, so every expert reads its gradient at its own point. Under [`BlendPoint`](@ref) it is the blend `w` that the mixture played.
 
 # Arguments
 
@@ -1224,36 +1228,6 @@ function gradient_point(::OwnPoint, ::AbstractVector)
 end
 function gradient_point(::BlendPoint, w::AbstractVector)
     return w
-end
-"""
-    expert_allocation_set(eset::Nothing, K::Integer, datatype::DataType)
-    expert_allocation_set(eset::BoundedAllocationSet, K::Integer, datatype::DataType)
-
-Resolves the Expert Set over `K` experts.
-
-A mixture that holds no Expert Set gets the bare simplex over the experts. A mixture that holds one gets its bounds, a scalar bound broadcast over the experts and a vector bound read with one entry per expert.
-
-# Arguments
-
-  - `eset`: The Expert Set of the mixture, or `nothing`.
-  - `K`: The number of experts.
-  - `datatype`: The numeric type of the bounds.
-
-# Returns
-
-  - `set::BoundedAllocationSet`: The resolved Expert Set.
-
-# Related
-
-  - [`ExpertMixture`](@ref)
-  - [`BoundedAllocationSet`](@ref)
-  - [`resolve_allocation_set`](@ref)
-"""
-function expert_allocation_set(::Nothing, K::Integer, datatype::DataType)
-    return resolve_allocation_set(BoundedAllocationSet(), K, false, datatype)
-end
-function expert_allocation_set(eset::BoundedAllocationSet, K::Integer, datatype::DataType)
-    return resolve_allocation_set(eset, K, false, datatype)
 end
 """
     UniversalPortfolio(;

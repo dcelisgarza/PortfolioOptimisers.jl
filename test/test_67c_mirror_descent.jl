@@ -1279,6 +1279,24 @@ using Test, PortfolioOptimisers, StableRNGs, LinearAlgebra, Statistics, Dates
         @test po.rule_state_seed(mix, u).h[1] == [1, 0, 0]
         @test po.rule_state_seed(mix, u, nothing).h[1] == [1, 0, 0]
         @test isnothing(po.rule_state_seed(BuyAndHold(), u, capr))
+        # A rule whose state reads only `w` takes the set as an ignored slot (#2102).
+        @test po.rule_state_seed(MirrorDescent(), u, capr).u ==
+              po.rule_state_seed(MirrorDescent(), u).u
+        # The Expert Set of a mixture: the empty slot resolves to the bare simplex (#2111).
+        @test po.resolve_allocation_set(nothing, N, false, Float64).wb ==
+              po.resolve_allocation_set(BoundedAllocationSet(), N, false, Float64).wb
+        # The Gradient Point is the last slot of the Online Update. `nothing` is the rule's
+        # own point, and a rule with no gradient ignores a given point (#2102).
+        x = [1.1, 0.9, 1.0]
+        md = MirrorDescent()
+        s1, w1 = po.online_update!(md, po.rule_state_seed(md, u), u, x, nothing, capr)
+        s2, w2 = po.online_update!(md, po.rule_state_seed(md, u), u, x, nothing, capr,
+                                   nothing)
+        s3, w3 = po.online_update!(md, po.rule_state_seed(md, u), u, x, nothing, capr,
+                                   po.rule_state_seed(md, u).u)
+        @test w1 == w2 == w3 && s1.u == s2.u == s3.u
+        @test po.online_update!(BuyAndHold(), nothing, u, x, nothing, capr, u)[2] ==
+              po.online_update!(BuyAndHold(), nothing, u, x, nothing, capr)[2]
         # The oracle: a mixture whose experts already hold the projected allocations. The
         # head seeds on its set, so the expert weighting reads the same returns from the
         # first row, and the two mixtures agree row for row.
