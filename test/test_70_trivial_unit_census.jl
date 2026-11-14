@@ -259,7 +259,9 @@ end
                                                         # src/09_ConstraintGeneration (#2096).
                                                         (:rebase_linear_constraints, :project_linear_constraint) => "(interface) `project_linear_constraint` walks a `LinearConstraint` by its fields `ineq` and `eq`, so its composite method calls it: it is a function of its own, and its body does not move into `rebase_linear_constraints` (#2116, #2096)",
                                                         # src/11_UncertaintySets (#2098).
-                                                        (:ucs_prior, :prior) => "(b) the `Nothing` arm throws a refusal of the uncertainty sets, and `prior(pe)` in `21_Pipeline/06_OnlinePipeline.jl` and the calls of a user keep the `MethodError` of `prior(nothing, X)` (case 3, #2111)")
+                                                        (:ucs_prior, :prior) => "(b) the `Nothing` arm throws a refusal of the uncertainty sets, and `prior(pe)` in `21_Pipeline/06_OnlinePipeline.jl` and the calls of a user keep the `MethodError` of `prior(nothing, X)` (case 3, #2111)",
+                                                        # The portfolio quantities, src/13_Fees.jl to src/15_Tracking.jl (#2099).
+                                                        (:override_fee_amortisation, :rebuild_struct) => "(b) a constructor owns no default, so the `Nothing` arms stay in front of `Fees` (#2109, #2111). The value arm copies every field but `fa`, so it calls `rebuild_struct` (rule 6), and the `Nothing` arms hold the policy of the fold: no fees, or no amortisation to override (#2111, #2099)")
     # The functions whose forward methods are interface methods, with the check that shows
     # it. #2072 adds a name after a check of each one.
     interface_functions = Dict{Symbol, String}(#
@@ -321,7 +323,10 @@ end
                                                :supports_partial_fit => "its callee `folds` is a shared public verb, and a driver of the hook must call it (rule 3, #2089, #2092)",
                                                # src/11_UncertaintySets (#2098).
                                                :calibration_series_vec => "one method for each series marker: the drawdown forms call `absolute_drawdown_vec` and `relative_drawdown_vec`, which 3 functions share each (rule 3, #2098)",
-                                               :calibration_series_matrix => "one method for each series marker: the drawdown forms call `absolute_drawdown_arr`, which 3 functions share, and `relative_drawdown_arr`, which 2 functions share (rule 3, #2098)")
+                                               :calibration_series_matrix => "one method for each series marker: the drawdown forms call `absolute_drawdown_arr`, which 3 functions share, and `relative_drawdown_arr`, which 2 functions share (rule 3, #2098)",
+                                               # The portfolio quantities, src/13_Fees.jl to src/15_Tracking.jl (#2099).
+                                               :lift_fee_rate => "one method for each form of a fee rate: the vector form calls `expand_investable_weights`, which 13 functions share (rule 3, #2099)",
+                                               :tracking_benchmark => "one method for each tracking target: the `WeightsTracking` form calls `calc_net_returns`, a shared public verb, and no other method of `tracking_benchmark` calls it, so no driver gives the same answer (rule 3, #2089, #2099)")
     # The debt that #2072 removes. Do not add a pair: fix the wrapper.
     pending_forwards = Set{Tuple{Symbol, Symbol}}([(:apply_fitted_step,
                                                     :apply_fitted_steps),
@@ -421,8 +426,6 @@ end
                                                     :pipeline_step_is_time_dependent),
                                                    (:leverage_one_residuals,
                                                     :leverage_one_nan),
-                                                   (:lift_fee_rate,
-                                                    :expand_investable_weights),
                                                    (:linearised_risk, :linearised_risk),
                                                    (:maybe_inject_step, :inject_context),
                                                    (:member_regret, :series_regret),
@@ -439,7 +442,6 @@ end
                                                    (:opinion_pooling_inner, :forward_prior),
                                                    (:opinion_pooling_kept, :forward_prior),
                                                    (:optimise, :_optimise),
-                                                   (:override_fee_amortisation, :Fees),
                                                    (:owa_l_moment_crm, :ncrra_weights),
                                                    (:partial_fit!, :fold_pipeline),
                                                    (:pipeline_lens, :parse_lens),
@@ -505,7 +507,6 @@ end
                                                     :sample_matrix_processing!),
                                                    (:tail_worst_case_risk,
                                                     :worst_case_risk),
-                                                   (:tracking_benchmark, :calc_net_returns),
                                                    (:universe_axis_visit!,
                                                     :universe_axis_children!),
                                                    (:update_online_member,
@@ -519,7 +520,6 @@ end
                                                    (:variance_risk_bounds_val, :Frontier),
                                                    (:weight_mass_grid,
                                                     :pipeline_lens_val_grid),
-                                                   (:weight_path, :rebuild_weight_path),
                                                    (:window_bigger_is_better,
                                                     :bigger_is_better),
                                                    (:window_values, :asset_scores),

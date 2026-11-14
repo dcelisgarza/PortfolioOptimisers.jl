@@ -676,7 +676,7 @@ A `nothing` `fa` on the scheme inherits the fee's clock, so the verb returns the
 
  1. On a `nothing` `fa`, return `fees` unchanged, whether it is a [`Fees`](@ref) or `nothing`.
  2. On a stated `fa` and a `nothing` `fees`, return `nothing`. There is no fee to charge, so there is no clock to state.
- 3. On a stated `fa` and a [`Fees`](@ref), rebuild the fee with that `fa`. The five fee fields, the two liquidation charges `lq` and `flq`, `kwargs` and the mark `imsk` stay the same.
+ 3. On a stated `fa` and a [`Fees`](@ref), rebuild the fee with that `fa` with [`rebuild_struct`](@ref). The five fee fields, the two liquidation charges `lq` and `flq`, `kwargs` and the mark `imsk` stay the same.
 
 # Arguments
 
@@ -703,9 +703,7 @@ function override_fee_amortisation(::Nothing, ::AbstractFeeAmortisation)
     return nothing
 end
 function override_fee_amortisation(fees::Fees, fa::AbstractFeeAmortisation)
-    return Fees(; tn = fees.tn, l = fees.l, s = fees.s, fl = fees.fl, fs = fees.fs,
-                lq = fees.lq, flq = fees.flq, fa = fa, kwargs = fees.kwargs,
-                imsk = fees.imsk)
+    return rebuild_struct(fees, (; fa = fa))
 end
 """
     const FeesE_Fees = Union{Fees, FeesEstimator}

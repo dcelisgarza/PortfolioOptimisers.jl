@@ -951,6 +951,10 @@ const RULED_NOTHING_PAIRS = Dict{Tuple{Symbol, Symbol}, Tuple{String, String}}(#
                                                                                 :rebuild_struct) =>
                                                                                    ("keep (b)",
                                                                                     "$POLICY: `nothing` means that the fill wrote no placeholder, so the arm keeps the Panel Field as it was built, and `rebuild_struct(f, (; pmsk = nothing))` would replace its mask (#2090)"),
+                                                                               (:override_fee_amortisation,
+                                                                                :rebuild_struct) =>
+                                                                                   ("keep (b)",
+                                                                                    "$POLICY: the `Nothing` arms hold the policy of the fold: no fees, or no amortisation to override (#2111, #2099)"),
                                                                                (:coverage_mask_source,
                                                                                 :dims_oriented) =>
                                                                                    ("keep (b)",
@@ -1138,8 +1142,6 @@ const RULED_DEFAULTS = Dict{Symbol, Tuple{String, String}}(#
                                                            :bind_data_benchmark =>
                                                                ("keep (default)",
                                                                 "a traversal owns the identity on a leaf and ignores its context slot, as `adapt(to, x) = x` does in Adapt.jl (#2108)"),
-                                                           :drift_observations => ("go",
-                                                                                   "only a `VecDate` reaches the fallback, so the slot takes that type (#2108)"),
                                                            :online_unreached_path => ("go",
                                                                                       "the typed methods share one body that answers every estimator: one untyped method replaces them and the fallback (#2108)"),
                                                            :timestamp_positions =>

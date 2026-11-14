@@ -214,7 +214,7 @@ reads. Each such array is a distinct output of its iteration, and it has its own
 buffer before the loop would alias every stored copy to the last one. The ADR names this case and \
 says that it takes a Dismissal. Found by issue #1312 at twelve sites: the bisection frontier of \
 the hierarchical optimisers, the test-index lists of the combinatorial split, the family lists of \
-the cross-sectional factor axis, the NaN weight matrices of `rebuild_weight_path`, the copies that \
+the cross-sectional factor axis, the NaN weight matrices of `weight_path` on a record, the copies that \
 `replace_prior_views` returns, and the index lists `replace_coprior_views` records per row."""
 
 [rationale.a-slice-the-result-keeps]
@@ -1151,7 +1151,7 @@ rationale = "an-allocation-the-loop-keeps"
 [[perf_dismissal]]
 file = "src/14_NetReturnsDrawdowns.jl"
 rule = "loop_allocation"
-definition = "rebuild_weight_path"
+definition = "weight_path"
 rationale = "an-allocation-the-loop-keeps"
 
 [[perf_dismissal]]

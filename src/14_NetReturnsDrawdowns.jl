@@ -289,9 +289,8 @@ end
 """
     investable_reduction(X::MatNum, w, fees::Option{<:Fees}, strict::Bool)
     investable_reduction(rd::AbstractReturnsResult, w, fees::Option{<:Fees}, strict::Bool)
-    investable_reduction(pr::AbstractPriorResult, w, fees::Option{<:Fees}, strict::Bool)
-    investable_reduction(imsk::Nothing, pr::AbstractPriorResult, w, fees::Option{<:Fees}, strict::Bool)
-    investable_reduction(imsk::BitVector, pr::AbstractPriorResult, w, fees::Option{<:Fees}, strict::Bool)
+    investable_reduction(pr::AbstractPriorResult, w, fees::Option{<:Fees}, strict::Bool,
+                         imsk::Option{BitVector} = investable_mask(pr))
 
 Reduce a prior result, the weights scored against it and the fees charged on them to the Investable Mask.
 
@@ -308,8 +307,8 @@ A bare returns matrix and a [`ReturnsResult`](@ref) carry no moments, so no mask
 # Algorithm
 
  1. Return `nothing`, `pr` and the weights unchanged, and the fee through [`investable_fees_view`](@ref) under a `nothing` mask, when `pr` is a matrix or a returns result.
- 2. Derive the Investable Mask once with [`investable_mask`](@ref).
- 3. Return the same when every asset is investable.
+ 2. Take the Investable Mask `imsk`. By default, [`investable_mask`](@ref) derives it once from the prior.
+ 3. Return the same when the mask is `nothing`, which means that every asset is investable.
  4. Otherwise report the held non-investable assets through [`strict_diagnostic`](@ref).
  5. Return the mask, a [`port_opt_view`](@ref) of the prior at `findall(imsk)`, the view of the weights at the mask, and the fee through [`investable_fees_view`](@ref) at the mask and the prior's unreduced `pr.X`.
 
@@ -319,6 +318,7 @@ A bare returns matrix and a [`ReturnsResult`](@ref) carry no moments, so no mask
   - `w`: Portfolio weights, a population of them, or a weight path (observations × assets).
   - `fees`: [`Fees`](@ref) the figure is charged against, or `nothing`.
   - `strict`: Whether a held non-investable asset raises rather than warns.
+  - `imsk`: The Investable Mask of `pr`, or `nothing` when every asset is investable. Only a prior result takes it.
 
 # Validation
 
@@ -348,17 +348,11 @@ function investable_reduction(rd::AbstractReturnsResult,
     return nothing, rd, w, investable_fees_view(fees, nothing, rd.X)
 end
 function investable_reduction(pr::AbstractPriorResult, w::Union{VecNum, VecVecNum, MatNum},
-                              fees::Option{<:Fees}, strict::Bool)
-    return investable_reduction(investable_mask(pr), pr, w, fees, strict)
-end
-function investable_reduction(::Nothing, pr::AbstractPriorResult,
-                              w::Union{VecNum, VecVecNum, MatNum}, fees::Option{<:Fees},
-                              ::Bool)
-    return nothing, pr, w, investable_fees_view(fees, nothing, pr.X)
-end
-function investable_reduction(imsk::BitVector, pr::AbstractPriorResult,
-                              w::Union{VecNum, VecVecNum, MatNum}, fees::Option{<:Fees},
-                              strict::Bool)
+                              fees::Option{<:Fees}, strict::Bool,
+                              imsk::Option{BitVector} = investable_mask(pr))
+    if isnothing(imsk)
+        return nothing, pr, w, investable_fees_view(fees, nothing, pr.X)
+    end
     held = held_non_investable(imsk, w)
     if !isempty(held)
         strict_diagnostic("a value-level verb cannot score a holding the prior could not estimate. Assets $(held) are not investable, and the weights hold them. Their weights are dropped, so the figure describes the portfolio without them. Pass `strict = true` to refuse instead, reduce the weights to the investable universe, or refit the prior over a history that covers these assets.",
@@ -2022,16 +2016,22 @@ end
 """
     weight_path(hw::Nothing, w::VecNum, X::MatNum)
     weight_path(hw::Nothing, w::VecVecNum, X::MatNum)
-    weight_path(hw::HeldWeightsResult, w::VecNum_VecVecNum, args...)
+    weight_path(hw::HeldWeightsResult{<:Any, <:MatNum_VecMatNum}, w::VecNum_VecVecNum, args...)
+    weight_path(hw::HeldWeightsResult{<:Any, Nothing, <:VecNum}, w::VecNum_VecVecNum, args...)
+    weight_path(hw::HeldWeightsResult{<:Any, Nothing, <:VecVecNum}, w::VecNum_VecVecNum, args...)
 
 Read the weight path of a fold, from the record the fold carries.
 
 A fold that carries no record held its target weights on every one of its observations, so its path is the constant path of `w`. A fold that carries one gives the stored path when `store_weight_path` asked for it, and rebuilds the path from the record's own start weights, asset returns and Weight Drift when it did not. The rebuild is bit-identical to the store, because the record carries the form that ran and the weights it started from.
 
+Dispatch on the type of the stored path `U` of the record, and on the type of its start weights `w0`, selects the method, so no method tests a field.
+
 # Algorithm
 
  1. On `nothing`, repeat `w` over the rows of `X`.
- 2. On a record, read [`rebuild_weight_path`](@ref), which gives the stored path or rebuilds it.
+ 2. On a record that stores its path `U`, return it.
+ 3. On a record that stores no path, under a single weight vector, run the drift of the record over its asset returns from `w0`, and give its path. A non-finite start vector, which is a failed fold with nothing to hold, gives a `NaN` path, as the store would.
+ 4. On a record that stores no path, under a population, run the drift member by member, and fill a member whose wealth is not positive, or whose start vector is not finite, with `NaN`. That is what the store holds for such a member, so the rebuild stays bit-identical to it. [`held_weights_result`](@ref) already raised on a population every member of which is ruined, so no record that reaches this verb holds one.
 
 # Arguments
 
@@ -2046,7 +2046,6 @@ A fold that carries no record held its target weights on every one of its observ
 # Related
 
   - [`HeldWeightsResult`](@ref)
-  - [`rebuild_weight_path`](@ref)
   - [`weight_path(wd::AbstractWeightDrift, w::VecNum, X::MatNum, obs)`](@ref)
   - [`PredictionResult`](@ref)
 """
@@ -2056,51 +2055,23 @@ end
 function weight_path(::Nothing, w::VecVecNum, X::MatNum)
     return [repeat(transpose(wi), size(X, 1)) for wi in w]
 end
-function weight_path(hw::HeldWeightsResult, ::VecNum_VecVecNum, args...)
-    return rebuild_weight_path(hw.U, hw.wd, hw.w0, hw.X)
+function weight_path(hw::HeldWeightsResult{<:Any, <:MatNum_VecMatNum}, ::VecNum_VecVecNum,
+                     args...)
+    return hw.U
 end
-"""
-    rebuild_weight_path(U::MatNum_VecMatNum, wd::AbstractWeightDrift, w::VecNum_VecVecNum, X::MatNum)
-    rebuild_weight_path(U::Nothing, wd::AbstractWeightDrift, w::VecNum, X::MatNum)
-    rebuild_weight_path(U::Nothing, wd::AbstractWeightDrift, w::VecVecNum, X::MatNum)
-
-Give a stored weight path, or rebuild one that was not stored.
-
-The stored path is read by dispatch on `U`, so [`weight_path`](@ref) tests nothing. A rebuild reruns the drift that made the record over the record's own asset returns, which is what makes it bit-identical to the store.
-
-# Algorithm
-
- 1. On a stored `U`, return it.
- 2. On `nothing` under a single weight vector, run the drift over `X` and give its path. A non-finite start vector, which is a failed fold with nothing to hold, gives a `NaN` path, as the store would.
- 3. On `nothing` under a population, run the drift member by member, and fill a member whose wealth is not positive, or whose start vector is not finite, with `NaN`. That is what the store holds for such a member, so the rebuild stays bit-identical to it. [`held_weights_result`](@ref) already raised on a population every member of which is ruined, so no record reaching this verb holds one.
-
-# Arguments
-
-  - `U`: Stored weight path, or `nothing`.
-  - `wd`: Weight drift that made the record.
-  - `w`: Weights the drift started from, `w0` of the record.
-  - `X`: Asset returns of the fold.
-
-# Returns
-
-  - `MatNum_VecMatNum`: The weight path.
-
-# Related
-
-  - [`weight_path`](@ref)
-  - [`HeldWeightsResult`](@ref)
-"""
-function rebuild_weight_path(U::MatNum_VecMatNum, ::AbstractWeightDrift, ::VecNum_VecVecNum,
-                             ::MatNum)
-    return U
-end
-function rebuild_weight_path(::Nothing, wd::AbstractWeightDrift, w::VecNum, X::MatNum)
+function weight_path(hw::HeldWeightsResult{<:Any, Nothing, <:VecNum}, ::VecNum_VecVecNum,
+                     args...)
+    w = hw.w0
+    X = hw.X
     if !all(isfinite, w)
         return fill(convert(promote_type(eltype(X), eltype(w)), NaN), size(X))
     end
-    return weight_path(wd, w, X)
+    return weight_path(hw.wd, w, X)
 end
-function rebuild_weight_path(::Nothing, wd::AbstractWeightDrift, w::VecVecNum, X::MatNum)
+function weight_path(hw::HeldWeightsResult{<:Any, Nothing, <:VecVecNum}, ::VecNum_VecVecNum,
+                     args...)
+    (; X, wd) = hw
+    w = hw.w0
     Tw = promote_type(eltype(X), eltype(first(w)))
     Us = Vector{Matrix{Tw}}(undef, length(w))
     for (i, wi) in pairs(w)
@@ -2305,7 +2276,7 @@ function held_weights_result(wd::AbstractWeightDrift, w::VecVecNum, X::MatNum,
 end
 """
     drift_observations(ts::Nothing, test_idx)
-    drift_observations(ts::Any, test_idx)
+    drift_observations(ts::VecDate, test_idx)
 
 Name the observations of a fold, for the message a non-positive wealth raises.
 
@@ -2318,7 +2289,7 @@ A fold that carries timestamps names its observations by their labels. A fold th
 
 # Arguments
 
-  - `ts`: Timestamps of the fold, or `nothing`.
+  - `ts`: Timestamps of the fold, or `nothing`. Any other type is a `MethodError`.
   - `test_idx`: Absolute panel rows of the fold.
 
 # Returns
@@ -2333,7 +2304,7 @@ A fold that carries timestamps names its observations by their labels. A fold th
 function drift_observations(::Nothing, test_idx)
     return test_idx
 end
-function drift_observations(ts, ::Any)
+function drift_observations(ts::VecDate, ::Any)
     return ts
 end
 """

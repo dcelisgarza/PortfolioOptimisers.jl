@@ -1062,7 +1062,7 @@ end
         @test out[2] == calc_net_returns(pop[2], X, nothing, wd)
     end
     @testset "a rebuilt population path matches the stored one, ruined members and all (#769)" begin
-        # `rebuild_weight_path`'s own docstring promises a rebuild that is bit-identical to
+        # The docstring of `weight_path` on a record promises a rebuild that is bit-identical to
         # the store. It was not, for a population carrying a ruined member: the store fills
         # such a member with `NaN`, and the rebuild ran the drift again and raised on it.
         X = [0.01 0.02; -0.6 0.03; 0.02 -0.01]
@@ -1079,6 +1079,15 @@ end
         @test all(isnan, Ul[2])
         @test Ul[1] == PO.weight_path(wd, pop[1], X)
         @test Ul[3] == PO.weight_path(wd, pop[3], X)
+    end
+    @testset "a fold names its observations by timestamps or by rows alone (#2099)" begin
+        # The fallback takes the timestamps a `ReturnsResult` holds, `Option{<:VecDate}`, so
+        # any other type is a `MethodError`, and does not pass as a label.
+        idx = [4, 5, 6]
+        ts = Date(2020, 1, 1):Day(1):Date(2020, 1, 3)
+        @test PO.drift_observations(nothing, idx) === idx
+        @test PO.drift_observations(ts, idx) === ts
+        @test_throws MethodError PO.drift_observations([1.0, 2.0, 3.0], idx)
     end
 end
 
