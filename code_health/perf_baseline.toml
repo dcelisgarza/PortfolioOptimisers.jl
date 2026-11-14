@@ -3,9 +3,9 @@
 # covers, and binds. `raw` counts before the Dismissals and is context. ADR 0175.
 
 [provenance]
-julia = "1.13.3"
+julia = "1.13.4"
 rules = 2
-commit = "519d0bc548"
+commit = "c8adf16988"
 
 [file]
 "ext/PortfolioOptimisersPlotsExt/01_CumulativeReturnsPlots.jl" = { slice_copy = 0, reduce_temporary = 0, unfused_broadcast = 0, search_temporary = 0, linalg_temporary = 0, repeated_call = 0, loop_allocation = 0, raw = 0 }
@@ -263,7 +263,7 @@ commit = "519d0bc548"
 "src/10_Prior/15_CrossSectionalPriorFold.jl" = { slice_copy = 0, reduce_temporary = 0, unfused_broadcast = 0, search_temporary = 0, linalg_temporary = 0, repeated_call = 0, loop_allocation = 0, raw = 0 }
 "src/10_Prior/16_CrossSectionalForecastHistoryCarry.jl" = { slice_copy = 0, reduce_temporary = 0, unfused_broadcast = 0, search_temporary = 0, linalg_temporary = 0, repeated_call = 0, loop_allocation = 0, raw = 0 }
 "src/10_Prior/17_CrossSectionalCalibrationRules.jl" = { slice_copy = 0, reduce_temporary = 0, unfused_broadcast = 0, search_temporary = 0, linalg_temporary = 0, repeated_call = 0, loop_allocation = 0, raw = 0 }
-"src/10_Prior/18_CrossSectionalCarryHistories.jl" = { slice_copy = 0, reduce_temporary = 0, unfused_broadcast = 0, search_temporary = 0, linalg_temporary = 0, repeated_call = 0, loop_allocation = 0, raw = 1 }
+"src/10_Prior/18_CrossSectionalCarryHistories.jl" = { slice_copy = 0, reduce_temporary = 0, unfused_broadcast = 0, search_temporary = 0, linalg_temporary = 0, repeated_call = 0, loop_allocation = 0, raw = 0 }
 "src/10_Prior/19_PriorScenarios.jl" = { slice_copy = 0, reduce_temporary = 0, unfused_broadcast = 0, search_temporary = 0, linalg_temporary = 0, repeated_call = 0, loop_allocation = 0, raw = 0 }
 "src/10_Prior/20_PriorReturnsSource.jl" = { slice_copy = 0, reduce_temporary = 0, unfused_broadcast = 0, search_temporary = 0, linalg_temporary = 0, repeated_call = 0, loop_allocation = 0, raw = 0 }
 "src/11_UncertaintySets/01_Base_UncertaintySets.jl" = { slice_copy = 0, reduce_temporary = 0, unfused_broadcast = 0, search_temporary = 0, linalg_temporary = 0, repeated_call = 0, loop_allocation = 0, raw = 0 }

@@ -3,7 +3,7 @@
 # A file with no lcov record has no executable line and records zero of both.
 
 [provenance]
-julia = "1.13.3"
+julia = "1.13.4"
 commit = "391be5e"
 
 [file]

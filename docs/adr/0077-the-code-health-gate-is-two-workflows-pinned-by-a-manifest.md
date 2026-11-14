@@ -213,3 +213,21 @@ The `build` job of each workflow carries the event in its name, `JET - push` or
 `Complexity - push`.
 [ADR 0220](0220-a-pull-request-from-a-pushed-branch-skips-the-jobs-its-push-runs.md) records the
 ruleset and the names.
+
+## Amendment (2026-11-14)
+
+The pin is **Julia 1.13.4**. The juliaup `release` channel moved from 1.13.3 to 1.13.4, so every
+gate run on it refused to check against provenance that named 1.13.3. The maintainer asked to move
+the pin and to remove the 1.13.3 binary. `code_health/Manifest.toml` took `Pkg.update()` under
+1.13.4, with Pkg loaded from the default environment. Only `julia_version`, five dependencies of
+the package (DiffRules, FillArrays, ForwardDiff, LogExpFunctions, StaticArrays) and three stdlib
+jlls (`MozillaCACerts_jll`, `OpenBLAS_jll`, `p7zip_jll`) moved. JET stays at 0.13.1, and
+CodeComplexity and JuliaSyntax keep their versions.
+
+The size, complexity, expansion, performance, prose and JET baselines were refreshed under 1.13.4
+in the commit that moved the Manifest. That commit changes no file under `src/` or `ext/`. No
+binding number rose, so no row needed `--accept-rise`. JET fell in four rows by 13 reports each:
+`20_Base_Regression.jl` and `02_DimensionReductionRegression.jl`, in the `main` run and in the
+`plots_ext` run. These are the rows that rose under 1.13.3. The binding complexity numbers fell in
+31 files, because `dev` carried drift under the thresholds, and a refresh imports it. The coverage
+baseline's provenance line was moved by hand, for the reason the first amendment gives.
