@@ -288,6 +288,20 @@ end
             @test tg.df.gross[k] ≈ sum(abs, w)
             @test tg.df.gross_1[k] ≈ w[1] + w[2] && tg.df.portfolio_1[k] ≈ w[3]
         end
+        # The suffix skips a name that a group already holds: the group `gross` beside the
+        # group `gross_1` takes `gross_2`, and the group `gross_1` keeps its name.
+        st = UniverseSets(;
+                          dict = Dict("nx" => ["A", "B", "C", "D"],
+                                      "nx_s" => ["gross", "gross_1", "portfolio", "v"]))
+        tt = only(rp_exposure(portfolio_report(RP_PATH; sets = st, taxonomy = ["nx_s"]).entries[1],
+                              "nx_s").blocks)
+        @test names(tt.df) ==
+              ["portfolio", "gross_2", "gross_1", "portfolio_1", "v", "gross"]
+        for (k, f) in enumerate(RP_PATH.pred)
+            w = PO.fold_target(f)
+            @test tt.df.gross_2[k] ≈ w[1] && tt.df.gross_1[k] ≈ w[2]
+            @test tt.df.portfolio_1[k] ≈ w[3] && tt.df.gross[k] ≈ sum(abs, w)
+        end
     end
     @testset "a population gives one row for each path" begin
         t = only(rp_exposure(portfolio_report(RP_POP; sets = RP_SETS,

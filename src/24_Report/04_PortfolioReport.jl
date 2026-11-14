@@ -35,7 +35,7 @@ The overview holds the table of [`DataFrames.DataFrame(ps::PerformanceSummaryRes
 A taxonomy column is a key of `sets.dict`, such as `"nx_sector"`, that holds one group label for each asset of `sets.dict[sets.xkey]`, in that order. [`asset_sets_matrix`](@ref) reads the same column. Each name of `taxonomy` gives one subsection, and each member of the prediction gives one table in it. The section reads the rows of [`prediction_weights`](@ref), and it maps an asset to its label by name, so a fold that holds a part of the universe is correct. An asset that the universe does not name, or whose label is `missing`, counts in the group `(none)`, so the groups of a row sum to its weights. The section computes no statistic other than the sums.
 
   - **One row of weights**, a single fold: one row for each group, with the columns `long`, the sum of the positive weights, `short`, the sum of the negative weights, and `net`, their sum. The rows are sorted by the absolute value of `net`, and the caption gives the gross exposure. With a finite allocation, the columns `alloc_long`, `alloc_short` and `alloc_net` sum the realised weights of the allocation in the same way.
-  - **Many rows of weights**, a path or a population: one row for each fold of the path or each path of the population, with the column `portfolio` that holds the label of the row, one column of net exposure for each group, and the column `gross`. A group whose label is `portfolio` or `gross` takes the column name of its label with the suffix `_1`. With a finite allocation of a path, the last row `allocation` sums the realised weights of the allocation.
+  - **Many rows of weights**, a path or a population: one row for each fold of the path or each path of the population, with the column `portfolio` that holds the label of the row, one column of net exposure for each group, and the column `gross`. A group whose label is `portfolio` or `gross` takes the column name of its label with the first suffix `_k`, from `_1` up, that no other column name holds. With a finite allocation of a path, the last row `allocation` sums the realised weights of the allocation.
 
 The allocation is the allocation of the first member, as in the Allocation section. A `NaN` weight gives a `NaN` sum for its group, on both sides.
 
@@ -766,7 +766,7 @@ end
 
 The Exposure table of many rows of weights: one row for each portfolio of the prediction, with the column `portfolio`, one column of net exposure for each group, and the column `gross`.
 
-With an allocation, the last row `allocation` sums its realised weights. A group whose label is `portfolio` or `gross` takes the column name of its label with the suffix `_1`, so the two fixed columns keep their names.
+With an allocation, the last row `allocation` sums its realised weights. A group whose label is `portfolio` or `gross` takes the column name of its label with the first suffix `_k`, from `_1` up, that no other column name holds. So the two fixed columns keep their names, and a group `gross_1` beside a group `gross` makes the renamed column `gross_2`.
 
 # Arguments
 
