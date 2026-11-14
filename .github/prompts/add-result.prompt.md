@@ -42,7 +42,7 @@ An abstract type is **not exported** unless the maintainer says so. [`CLAUDE.md`
 
 Write `@concrete struct MyResult <: AbstractMyResult` and document it as [`.github/instructions/julia-docstrings.instructions.md`](../instructions/julia-docstrings.instructions.md) § *Concrete struct types* states. Each field carries an inline description, as § *Inline field docstrings* states.
 
-A result type usually needs no inner constructor with validation. The producing estimator or function validates instead. Write one only when a caller can construct the struct outside the producing function. [`.github/instructions/julia-source-code.instructions.md`](../instructions/julia-source-code.instructions.md) § *Constructor Pattern* owns the shape when you do.
+The inner constructor checks the values of the fields, so a Result that a user builds by hand fails where it is made. [`.github/instructions/julia-source-code.instructions.md`](../instructions/julia-source-code.instructions.md) § *Constructor Pattern* owns the shape, and § *A function returns a defined type or a plain tuple, not a named tuple* owns the name of the type and when a function returns one (#2113).
 
 ## Step 3. Implement passthrough and interface methods
 

@@ -22,8 +22,10 @@ using Test
     q3 = "\"\"\""
     hook_doc = join([q3, "    hook_fn(x)", "", "A hook.", "", "# Interfaces", "",
                      "## `hook_fn`", "", "A subtype implements it.", q3], '\n')
+    nt_hook_doc = join([q3, "    nt_hook(x)", "", "A hook.", "", "# Interfaces", "",
+                        "## `nt_hook`", "", "A subtype implements it.", q3], '\n')
     source = """
-             export verb, verb2, pubf, pubk, mk, kwv
+             export verb, verb2, pubf, pubk, mk, kwv, nt_pub
              struct A end
              struct B end
              struct R
@@ -215,6 +217,24 @@ using Test
              end
              nt_arg(x::A) = nt_take((; a = x))
              Mod.nt_q(x::A) = (; x.a)
+             # the verdicts of #2113
+             fold_step_kwargs(x::A) = (; e = x)
+             summary_options(x::A) = (; ppy = x)
+             nt_pub(x::A) = (; e = x, f = 1)
+             $nt_hook_doc
+             nt_hook(x::A) = (; e = x, g = 1)
+             nt_acc(acc, x::A) = (; acc..., h = x)
+             nt_sh1(x::A) = (; p = x, q = 1)
+             nt_sh2(x::B) = (; q = 2, p = x)
+             nt_four(x::A) = (; r1 = 1, r2 = 2, r3 = 3, r4 = 4)
+             function nt_var(x::A)
+                 v = (; m = x)
+                 return v
+             end
+             nt_curly(x::A) = NamedTuple{(:u,)}((x,))
+             nt_curly4(x::A) = NamedTuple{(:k1, :k2, :k3, :k4)}((x, 2, 3, 4))
+             nt_merge(x::A) = merge(x, (; w = 1))
+             nt_dict(x::A, y) = merge(x, y)
              """
     census = """
              kept = Dict{Symbol, String}(:mk => "public preset")
@@ -397,6 +417,51 @@ using Test
         # A qualified method, as an extension writes one, is read too.
         @test nt(:nt_q) == ["review"]
         @test occursin("`(; a)`", nt_of(:nt_q).why)
+        # A private method of at most three values: the transient test needs its callers.
+        @test occursin("plain tuple if every caller takes it apart at once",
+                       nt_of(:nt_short).why)
+    end
+
+    @testset "named tuple: the verdicts of #2113" begin
+        nt(name) = [x.verdict for x in found if x.name === name && x.shape == "named tuple"]
+        nt_of(name) = only(x for x in found if x.name === name && x.shape == "named tuple")
+        # A bundle of keywords, by its name, keeps the named tuple, and asks for no work.
+        @test nt(:fold_step_kwargs) == ["keep (keys)"]
+        @test !FS.is_candidate(nt_of(:fold_step_kwargs))
+        # `RULED_NAMED_TUPLES` gives the verdict that the parse cannot read.
+        @test nt(:summary_options) == ["go"]
+        @test nt_of(:summary_options).why ==
+              "returns the named tuple `(; ppy)`: " *
+              FS.RULED_NAMED_TUPLES[:summary_options][2]
+        # A public name takes a `…Result`, and an interface name takes a `public` type.
+        @test nt(:nt_pub) == ["go"]
+        @test occursin("`…Result <: AbstractResult`", nt_of(:nt_pub).why)
+        @test nt(:nt_hook) == ["go"]
+        @test occursin("an interface method", nt_of(:nt_hook).why)
+        # An accumulator that splats itself is rebuilt by `rebuild_struct`.
+        @test nt(:nt_acc) == ["go"]
+        @test occursin("`rebuild_struct`", nt_of(:nt_acc).why)
+        # Two functions that return one shape, in any order of the fields, share one type.
+        @test nt(:nt_sh1) == ["go"]
+        @test occursin("also returned by `nt_sh2`", nt_of(:nt_sh1).why)
+        @test occursin("also returned by `nt_sh1`", nt_of(:nt_sh2).why)
+        # More than three values take a private type.
+        @test nt(:nt_four) == ["go"]
+        @test occursin("more than three values", nt_of(:nt_four).why)
+        # A local variable, a `NamedTuple{…}(…)` call and a `merge` with a literal return a
+        # named tuple. A `merge` of two variables can merge two `Dict`s, so it is no finding.
+        @test nt(:nt_var) == ["review"]
+        @test occursin("`(; m)`", nt_of(:nt_var).why)
+        @test nt(:nt_curly) == ["review"]
+        @test occursin("`NamedTuple{(:u,)}(…)`", nt_of(:nt_curly).why)
+        # A `merge` with a literal adds a field to a record or replaces one.
+        @test nt(:nt_merge) == ["go"]
+        @test occursin("`merge(…)`", nt_of(:nt_merge).why)
+        @test occursin("`rebuild_struct`", nt_of(:nt_merge).why)
+        @test isempty(nt(:nt_dict))
+        # `NamedTuple{K}(…)` with a literal tuple of names has a count.
+        @test nt(:nt_curly4) == ["go"]
+        @test occursin("more than three values", nt_of(:nt_curly4).why)
     end
 
     @testset "the rulings of the census" begin
@@ -454,5 +519,11 @@ using Test
         @test ("stale entries of RULED_REBUILDS",
                sort!([p for p in keys(FS.RULED_REBUILDS) if !(p in shapes)])) ==
               ("stale entries of RULED_REBUILDS", Tuple{Symbol, Symbol}[])
+        # An entry of `RULED_NAMED_TUPLES` whose name no longer returns a named tuple is stale:
+        # the build ticket that changed the return deletes it (#2113).
+        nts = Set(x.name for x in found_real if x.shape == "named tuple")
+        @test ("stale entries of RULED_NAMED_TUPLES",
+               sort!([n for n in keys(FS.RULED_NAMED_TUPLES) if !(n in nts)])) ==
+              ("stale entries of RULED_NAMED_TUPLES", Symbol[])
     end
 end

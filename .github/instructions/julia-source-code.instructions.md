@@ -691,22 +691,46 @@ A wrapper that one of the two reasons keeps names that reason in the allow-list 
 ### A function returns a defined type or a plain tuple, not a named tuple
 
 A function that gives back more than one value returns a defined type or a plain tuple of the
-values. It does not return a named tuple. The maintainer ruled this on 2026-11-13 (#2113).
+values. A named tuple stays only where the caller uses its keys as keys. The maintainer ruled the
+rule on 2026-11-13 and its cases on 2026-11-14 (#2113), by the standing test of #2072.
 
-- **A defined type** names the values once, in one place that a docstring, a `show` method and a
-  test can reach. A public result is a `…Result <: AbstractResult`, as `ForecastSummaryResult`
-  and `PerformanceSummaryResult` are, and `GLOSSARY.md` names it.
-- **A plain tuple** suits values that the caller takes apart by position at once, as
-  `a, b = f(x)` does.
-- **A named tuple stays only where #2113 rules it the true answer**, for example a bundle of
-  keywords that a caller splats or merges by field name. #2113 rules each group, and its ruling
-  goes into this section.
+A defined type names the values once, in one place that a docstring, a `show` method and a test
+can reach. Its inner constructor checks the values, as § *Constructor Pattern* states, so a value
+that is wrong fails where it is made. This matters most for a type that a user builds by hand or
+reads directly. `(; a, b) = x` also works on a struct, so a caller that destructures by name does
+not change. A struct of the same fields has the layout of the named tuple, so the type costs no
+performance.
 
-`code_health/forward_survey.jl <file>` reports each method that returns a named tuple literal, at a
-`return` or at the tail of its body, as a `review` finding of the shape `named tuple`. This is part
-of the sixth condition of #404. A `named tuple` finding that your change adds asks for a defined
-type or a plain tuple. A finding that you did not add belongs to the build ticket of its directory
-under map #2072.
+| Case | Form |
+| --- | --- |
+| The caller uses the keys as keys: it splats the bundle as keywords, merges it, walks it with `pairs` or `map` by key, or compares key sets. Or the keys are data, such as the names that a user gives | The named tuple stays. Julia keyword arguments are a named tuple, and a struct needs a conversion back at each splat |
+| A bundle whose callers read fixed fields by name, as a record (`summary_options`) | A private defined type |
+| A public verb that returns data | One `…Result <: AbstractResult` for each return shape, as `ForecastSummaryResult` is. A table also takes a `DataFrames.DataFrame` method, as `PerformanceSummaryResult` has |
+| A public transform that also gives a count or an index | A plain tuple, as `findmax` returns: `pnl, n = panel_align_active(pnl, fields)` |
+| An interface method that an extension implements | One `public` type for each return shape. The implementer builds it, so the type is the contract that the constructor checks |
+| A private function with the shape of a public type | That public type |
+| A private helper that is transient: every caller takes it apart at once, it has at most three values, and no two values have one type | A plain tuple, as `a, b = f(x)` takes it |
+| Every other private helper: the value travels (it is returned whole, passed to a call, stored or collected), it has more than three values, two values have one type, or its shape is shared | A private defined type, one for each shape. A positional swap of two values of one type is silent |
+| An accumulator that each step rebuilds by field (`(; acc..., pos = …)`), or a `merge` that adds or replaces a field of a record | The private type of the record. A replaced field goes through `rebuild_struct` (rule 6 of #2072). A hot loop is measured, and a measured loss keeps the named tuple |
+
+**The name of a new type.**
+
+| Kind | Name |
+| --- | --- |
+| Data, public or from an interface method | `…Result <: AbstractResult`, in `GLOSSARY.md` |
+| Parts of a configuration, public | A noun with no `Result` and no supertype, as the type that `range_tails` returns holds two risk measures |
+| A private record | A noun that names what it holds, with no supertype, as `CoverageCounts` |
+| The result of one private fit or solve | `…Fit <: AbstractResult`, as `ElasticNetFit` |
+
+A new type is never a `…State`, because that name belongs to a Partial Fit State (ADR 0106).
+
+`code_health/forward_survey.jl <file>` reports each method that returns a named tuple, as a
+finding of the shape `named tuple`, with the verdict of this table: `keep (keys)`, or `go` with
+the form in its reason. `RULED_NAMED_TUPLES` holds the verdicts that the parse cannot read. A
+`review` finding asks for the transient test, which needs the callers and the types of the values.
+This is part of the sixth condition of #404. A finding that your change adds takes the form of
+the table. A finding that you did not add belongs to the build ticket of its directory under
+map #2072.
 
 ## The simple form wins
 

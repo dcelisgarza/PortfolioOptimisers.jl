@@ -51,17 +51,22 @@
 #   keyword form         a public method that passes its keywords as positional arguments.
 #                        `src/CLAUDE.md` keeps a keyword wrapper on a verb of a workflow that a
 #                        user calls. Reason (a).
-#   named tuple          a method that returns a named tuple literal, `(; a, b)` or `(a = x,)`,
-#                        at a `return` or at the tail of its body (#2113). A function returns a
-#                        defined type or a plain tuple of values. Until #2113 rules the groups
-#                        that keep the named tuple, each finding is `review`. This detector reads
-#                        every method, also one that another detector reports. It does not read a
-#                        functor method, a named tuple that a variable carries to the `return`, a
-#                        `NamedTuple{…}(…)` call or a `merge`.
+#   named tuple          a method that returns a named tuple at a `return` or at the tail of its
+#                        body: a literal, `(; a, b)` or `(a = x,)`, a `NamedTuple{…}(…)` call, a
+#                        `merge` with a literal, or a local variable that holds one (#2113). A
+#                        function returns a defined type or a plain tuple of values.
+#                        `named_tuple_verdict` states the verdicts of #2113: a bundle of keywords
+#                        keeps the named tuple, a public or an interface name takes a public
+#                        type, and a private method takes a private type or, when the parse
+#                        cannot apply the transient test, `review`. `RULED_NAMED_TUPLES` holds the
+#                        verdicts that the parse cannot read. This detector reads every method,
+#                        also one that another detector reports. It does not read a functor
+#                        method.
 #
-# THE VERDICTS. `go`: the rulings remove the method. `keep (a)` and `keep (b)`: the two reasons of
-# the standard. `keep (interface)`: the method is not a wrapper, by rule 3 or rule 4.
-# `keep (default)`: a query trait owns `false`, and a traversal owns the identity (rule 2).
+# THE VERDICTS. `go`: the rulings remove the method, or change its return. `keep (a)` and
+# `keep (b)`: the two reasons of the standard. `keep (interface)`: the method is not a wrapper, by
+# rule 3 or rule 4. `keep (default)`: a query trait owns `false`, and a traversal owns the
+# identity (rule 2). `keep (keys)`: the caller uses the keys of the named tuple as keys (#2113).
 # `review`: the rulings do not settle the finding alone, and a person checks it.
 #
 # THE RULINGS. A finding that `kept`, `kept_forwards` or `interface_functions` of
@@ -1275,10 +1280,89 @@ function nt_field(a::Expr)
 end
 nt_field(a) = string(a)
 
+# The entries of a named tuple literal, with or without the `;`.
+function nt_entries(e)
+    return e.args[1] isa Expr && e.args[1].head === :parameters ? e.args[1].args : e.args
+end
+
+# Whether an entry of a named tuple literal splats another value: `acc...`.
+is_splat(a) = a isa Expr && a.head === :...
+
 # The fields of a named tuple literal, as the source spells the shape: `(; a, b)`.
-function nt_fields(e)
-    entries = e.args[1] isa Expr && e.args[1].head === :parameters ? e.args[1].args : e.args
-    return "(; " * join((nt_field(a) for a in entries), ", ") * ")"
+nt_fields(e) = "(; " * join((nt_field(a) for a in nt_entries(e)), ", ") * ")"
+
+# Whether `e` is a call that builds a named tuple: `NamedTuple{…}(…)`, or a `merge` that has a
+# named tuple literal among its arguments. A `merge` of two variables can merge two `Dict`s, so
+# the parse does not read it.
+function is_named_tuple_call(e)
+    if !(e isa Expr && e.head === :call && !isempty(e.args))
+        return false
+    end
+    f = e.args[1]
+    if f isa Expr && f.head === :curly && f.args[1] === :NamedTuple
+        return true
+    end
+    return f === :merge && any(is_named_tuple, e.args[2:end])
+end
+
+is_named_tuple_value(e) = is_named_tuple(e) || is_named_tuple_call(e)
+
+# The shape of a named tuple value, as the reason of a finding spells it.
+function nt_shape(e)
+    if is_named_tuple(e)
+        return nt_fields(e)
+    elseif e.args[1] === :merge
+        return "merge(…)"
+    end
+    return string(e.args[1]) * "(…)"
+end
+
+# The count of the values of a named tuple value, or `nothing` when the parse cannot count them:
+# a splat, a `NamedTuple{K}(…)` call whose names `K` are not a literal tuple, or a `merge`.
+function nt_count(e)
+    if is_named_tuple(e)
+        return any(is_splat, nt_entries(e)) ? nothing : length(nt_entries(e))
+    elseif e.args[1] isa Expr && e.args[1].head === :curly
+        k = e.args[1].args[2]
+        return if k isa Expr && k.head === :tuple && all(a -> a isa QuoteNode, k.args)
+            length(k.args)
+        else
+            nothing
+        end
+    end
+    return nothing
+end
+
+is_merge(e) = e isa Expr && e.head === :call && e.args[1] === :merge
+
+# The named tuple values that the local variables of `e` hold, outside an inner function:
+# `nt = (; a, b)` maps `nt` to the literal. A `return nt` then returns a named tuple.
+function named_tuple_locals!(out, e)
+    if !(e isa Expr)
+        return out
+    end
+    if e.head === :(=) && e.args[1] isa Symbol
+        if is_named_tuple_value(e.args[2])
+            out[e.args[1]] = e.args[2]
+        end
+    elseif is_inner_function(e)
+        return out
+    end
+    foreach(a -> named_tuple_locals!(out, a), e.args)
+    return out
+end
+
+# The named tuple values that a method returns: a literal, a call that builds one, or a local
+# variable that holds one, at a `return` or at the tail of the body.
+function returned_named_tuples(d)
+    locals = named_tuple_locals!(Dict{Symbol, Any}(), d.body)
+    values = returned_values!(tail_values!(Any[], d.body), d.body)
+    out = Any[]
+    for v in values
+        v = v isa Symbol ? get(locals, v, v) : v
+        is_named_tuple_value(v) && push!(out, v)
+    end
+    return out
 end
 
 # The values that `e` gives back when it is the tail of a body: through a `begin` block, an `if`,
@@ -1331,23 +1415,313 @@ function returned_values!(out, e)
 end
 
 """
+The name endings of a bundle of keywords or of field names: the caller splats it as keywords,
+merges it, or walks it by key, so the named tuple stays (#2113).
+"""
+const KEYWORD_BUNDLE_SUFFIXES = ("_kwargs", "_keywords", "_slots", "_td_defaults",
+                                 "_field_defaults")
+
+"""
+The names of a bundle of keywords that `KEYWORD_BUNDLE_SUFFIXES` does not reach.
+"""
+const KEYWORD_BUNDLE_NAMES = (:rows_datatype,)
+
+function is_keyword_bundle(name::Symbol)
+    return name in KEYWORD_BUNDLE_NAMES ||
+           any(s -> endswith(string(name), s), KEYWORD_BUNDLE_SUFFIXES)
+end
+
+"""
+The verdicts of #2113 that the parse cannot read: a name whose callers use the keys as keys, a
+record whose name looks like a bundle of keywords, and a public function that the ruling sends to
+a form other than a `…Result`. Each entry is a name, with its verdict and its reason. An entry whose
+name no longer returns a named tuple is stale, and `test/test_89_forward_survey_census.jl` fails on
+it, so the build ticket that changes the return deletes the entry.
+"""
+const RULED_NAMED_TUPLES = Dict{Symbol, Tuple{String, String}}(#
+                                                               :summary_measures =>
+                                                                   ("keep (keys)",
+                                                                    "the keys are the names that the user gives the measures (#2113)"),
+                                                               :performance_summary_columns =>
+                                                                   ("keep (keys)",
+                                                                    "`DataFrame(ps)` walks it with `pairs` and `keys` (#2113)"),
+                                                               :panel_level_coverage =>
+                                                                   ("keep (keys)",
+                                                                    "the caller splats it into a row `(; field, level, …)` (#2113)"),
+                                                               :cross_sectional_carry_correlation =>
+                                                                   ("keep (keys)",
+                                                                    "the caller splats it into the field set that `cross_sectional_carry_with` rebuilds (#2113)"),
+                                                               :default_report_figures =>
+                                                                   ("go",
+                                                                    "its fields take the names of the keywords of `portfolio_report`, `overview_figures` and `entry_figures`, so that a caller splats it; the entry then turns to `keep (keys)` (#2113)"),
+                                                               :summary_options => ("go",
+                                                                                    "its callers read it as a record (`opts.ppy`), not by key: a private defined type (#2113)"),
+                                                               :attribution_array_keywords =>
+                                                                   ("go",
+                                                                    "two keyword bundles of one type: a private defined type, because a positional swap is silent (#2113)"),
+                                                               :panel_align_active =>
+                                                                   ("go",
+                                                                    "a transform and a count: the plain tuple `(pnl, n)`, as `findmax` (#2113)"),
+                                                               :prior_field_values =>
+                                                                   ("keep (keys)",
+                                                                    "the keys are the field names of the prior (#2113)"),
+                                                               :mean_weight_statistics =>
+                                                                   ("go",
+                                                                    "the mean of the records of `weight_statistics`: it returns the private type of that record (#2113)"),
+                                                               :regime_bias_store => ("go",
+                                                                                      "one store for each target, kept for the later steps: one private type for each shape (#2113)"),
+                                                               # The transient test of the private helpers, which needs the callers
+                                                               # and the types of the values (#2113).
+                                                               :RRM_model => ("go",
+                                                                              "its callers check `isnothing`, then take `(model, primal)` apart at once, and the two values have different types: a plain tuple (#2113)"),
+                                                               :_regression => ("go",
+                                                                                "the value travels: a generator and a later use: a private defined type (#2113)"),
+                                                               :attribution_family_index =>
+                                                                   ("go",
+                                                                    "every caller takes it apart at once: a plain tuple, unless two values have one type, which takes a private type (#2113)"),
+                                                               :attribution_key_pair =>
+                                                                   ("go",
+                                                                    "the value travels: returned inside an `if`: a private defined type (#2113)"),
+                                                               :attribution_match_rows =>
+                                                                   ("go",
+                                                                    "every caller takes it apart at once: a plain tuple, unless two values have one type, which takes a private type (#2113)"),
+                                                               :attribution_predicted_total =>
+                                                                   ("go",
+                                                                    "`total` and `gap` are numbers of one type, so a positional swap is silent: a private defined type (#2113)"),
+                                                               :attribution_prior_block =>
+                                                                   ("go",
+                                                                    "every caller takes it apart at once: a plain tuple, unless two values have one type, which takes a private type (#2113)"),
+                                                               :attribution_scale => ("go",
+                                                                                      "the value travels: a later use of `sc`, and its two values have one type: a private defined type (#2113)"),
+                                                               :attribution_unknown_kinds =>
+                                                                   ("go",
+                                                                    "every caller takes it apart at once: a plain tuple, unless two values have one type, which takes a private type (#2113)"),
+                                                               :attribution_weight_moments =>
+                                                                   ("go",
+                                                                    "the value travels: an argument to a call: a private defined type (#2113)"),
+                                                               :attribution_zero_inactive =>
+                                                                   ("go",
+                                                                    "every caller takes it apart at once: a plain tuple, unless two values have one type, which takes a private type (#2113)"),
+                                                               :centring_lag_record =>
+                                                                   ("go",
+                                                                    "the value travels: an argument to a call: a private defined type (#2113)"),
+                                                               :covariance_plot_windows =>
+                                                                   ("go",
+                                                                    "the value travels: `rw` goes to `covariance_plot_entry`: a private defined type (#2113)"),
+                                                               :cross_sectional_cached_scenarios =>
+                                                                   ("go",
+                                                                    "every caller takes it apart at once: a plain tuple, unless two values have one type, which takes a private type (#2113)"),
+                                                               :cross_sectional_calibration =>
+                                                                   ("go",
+                                                                    "every caller takes it apart at once: a plain tuple, unless two values have one type, which takes a private type (#2113)"),
+                                                               :cross_sectional_carry_append =>
+                                                                   ("go",
+                                                                    "every caller takes it apart at once: a plain tuple, unless two values have one type, which takes a private type (#2113)"),
+                                                               :cross_sectional_correlation_rows =>
+                                                                   ("go",
+                                                                    "every caller takes it apart at once: a plain tuple, unless two values have one type, which takes a private type (#2113)"),
+                                                               :cross_sectional_expand =>
+                                                                   ("go",
+                                                                    "the value travels: a later use of `fr`: a private defined type (#2113)"),
+                                                               :cross_sectional_exposure_rows =>
+                                                                   ("go",
+                                                                    "every caller takes it apart at once: a plain tuple, unless two values have one type, which takes a private type (#2113)"),
+                                                               :cross_sectional_factor_partition =>
+                                                                   ("go",
+                                                                    "every caller takes it apart at once: a plain tuple, unless two values have one type, which takes a private type (#2113)"),
+                                                               :cross_sectional_factor_scenarios =>
+                                                                   ("go",
+                                                                    "every caller takes it apart at once: a plain tuple, unless two values have one type, which takes a private type (#2113)"),
+                                                               :cross_sectional_fold_variance =>
+                                                                   ("go",
+                                                                    "every caller takes it apart at once: a plain tuple, unless two values have one type, which takes a private type (#2113)"),
+                                                               :cross_sectional_history_backing =>
+                                                                   ("go",
+                                                                    "every caller takes it apart at once: a plain tuple, unless two values have one type, which takes a private type (#2113)"),
+                                                               :cross_sectional_lift =>
+                                                                   ("go",
+                                                                    "every caller takes it apart at once: a plain tuple, unless two values have one type, which takes a private type (#2113)"),
+                                                               :cross_sectional_observed_carry =>
+                                                                   ("go",
+                                                                    "every caller takes it apart at once: a plain tuple, unless two values have one type, which takes a private type (#2113)"),
+                                                               :cross_sectional_residual_block =>
+                                                                   ("go",
+                                                                    "every caller takes it apart at once: a plain tuple, unless two values have one type, which takes a private type (#2113)"),
+                                                               :descriptor_panel_scores =>
+                                                                   ("go",
+                                                                    "the value travels: an argument to a call: a private defined type (#2113)"),
+                                                               :ep_evar => ("go",
+                                                                            "`evar` and `z` are numbers of one type, so a positional swap is silent: a private defined type (#2113)"),
+                                                               :ep_evar_anchor => ("go",
+                                                                                   "the value travels: the tail value of a method: a private defined type (#2113)"),
+                                                               :ep_rlvar => ("go",
+                                                                             "`rlvar`, `t` and `z` are numbers of one type, so a positional swap is silent: a private defined type (#2113)"),
+                                                               :ep_rlvar_anchor => ("go",
+                                                                                    "the value travels: the tail value of a method: a private defined type (#2113)"),
+                                                               :ep_rlvar_shift => ("go",
+                                                                                   "`risk` and `t` are numbers of one type, so a positional swap is silent: a private defined type (#2113)"),
+                                                               :ew_beta_output => ("go",
+                                                                                   "every caller takes it apart at once: a plain tuple, unless two values have one type, which takes a private type (#2113)"),
+                                                               Symbol("ew_beta_series!") =>
+                                                                   ("go",
+                                                                    "every caller takes it apart at once: a plain tuple, unless two values have one type, which takes a private type (#2113)"),
+                                                               :ew_block_rows => ("go",
+                                                                                  "every caller takes it apart at once: a plain tuple, unless two values have one type, which takes a private type (#2113)"),
+                                                               :ew_volatility_parts =>
+                                                                   ("go",
+                                                                    "every caller takes it apart at once: a plain tuple, unless two values have one type, which takes a private type (#2113)"),
+                                                               :ew_volatility_variance =>
+                                                                   ("go",
+                                                                    "every caller takes it apart at once: a plain tuple, unless two values have one type, which takes a private type (#2113)"),
+                                                               :factor_residual_config =>
+                                                                   ("go",
+                                                                    "the value travels: returned whole by seven priors: a private defined type (#2113)"),
+                                                               :factor_summary_returns =>
+                                                                   ("go",
+                                                                    "the value travels: returned whole: a private defined type (#2113)"),
+                                                               :fit_deferred_quantity =>
+                                                                   ("go",
+                                                                    "the value travels: an argument to a call, and a later use of `fitted`: a private defined type (#2113)"),
+                                                               :forecast_pooled_moments =>
+                                                                   ("go",
+                                                                    "`mean` and `std` are numbers of one type, so a positional swap is silent: a private defined type (#2113)"),
+                                                               :lag_descriptor_inputs =>
+                                                                   ("go",
+                                                                    "every caller takes it apart at once: a plain tuple, unless two values have one type, which takes a private type (#2113)"),
+                                                               :level_closure_maps =>
+                                                                   ("go",
+                                                                    "the value travels: an argument to a call: a private defined type (#2113)"),
+                                                               Symbol("mahalanobis_cut!") =>
+                                                                   ("go",
+                                                                    "the value travels: a later use of `cut`: a private defined type (#2113)"),
+                                                               :one_hot_inputs => ("go",
+                                                                                   "every caller takes it apart at once: a plain tuple, unless two values have one type, which takes a private type (#2113)"),
+                                                               :opinion_pooling_scenarios =>
+                                                                   ("go",
+                                                                    "every caller takes it apart at once: a plain tuple, unless two values have one type, which takes a private type (#2113)"),
+                                                               :panel_manifest_axes =>
+                                                                   ("go",
+                                                                    "the value travels: `ax` goes to `panel_table_cells`: a private defined type (#2113)"),
+                                                               :panel_spread => ("go",
+                                                                                 "the value travels: a keyword of a call: a private defined type (#2113)"),
+                                                               :regression_polarity =>
+                                                                   ("go",
+                                                                    "`best` and `worst` are numbers of one type, so a positional swap is silent: a private defined type (#2113)"),
+                                                               :report_cell => ("go",
+                                                                                "a cell that its callers read by field and pass on: a private record (#2113)"),
+                                                               :resolve_sigma_chol =>
+                                                                   ("go",
+                                                                    "the value travels: an argument to a call: a private defined type (#2113)"),
+                                                               :return_forecast_step =>
+                                                                   ("go",
+                                                                    "the value travels: returned whole: a private defined type (#2113)"),
+                                                               Symbol("separate_path_sums!") =>
+                                                                   ("go",
+                                                                    "the value travels: a later use of `sums`: a private defined type (#2113)"),
+                                                               :split_weight_record =>
+                                                                   ("go",
+                                                                    "the value travels: collected in a generator: a private defined type (#2113)"),
+                                                               :target_forecast_coefficient =>
+                                                                   ("go",
+                                                                    "every caller takes it apart at once: a plain tuple, unless two values have one type, which takes a private type (#2113)"),
+                                                               :window_statistic => ("go",
+                                                                                     "the value travels: collected in a generator: a private defined type (#2113)"))
+
+# The shape of a literal as a key that does not depend on the order of the fields, or `nothing`
+# for a literal that splats or has no field.
+function shape_key(e)
+    if !(is_named_tuple(e)) || any(is_splat, nt_entries(e)) || isempty(nt_entries(e))
+        return nothing
+    end
+    return Tuple(sort!([nt_field(a) for a in nt_entries(e)]))
+end
+
+"""
+    named_tuple_verdict(t::Tree, d, values, shared) -> (verdict, reason)
+
+The verdict of #2113 for the method `d`, which returns the named tuple `values`. `shared` maps the
+shape of a literal to the names of the functions that return it.
+
+ 1. A name of [`RULED_NAMED_TUPLES`](@ref) takes its ruled verdict.
+ 2. A bundle of keywords, by its name, keeps the named tuple.
+ 3. A name that an `# Interfaces` section names takes one `public` type for each shape.
+ 4. A public name takes one `…Result <: AbstractResult` for each shape.
+ 5. An accumulator that splats itself takes a private type that `rebuild_struct` updates.
+ 6. A `merge` that adds a field to a record or replaces one takes the private type of the
+    record, and a replaced field goes through `rebuild_struct`.
+ 7. A shape that another function returns takes one type for all of them.
+ 8. More than three values take a private type.
+ 9. Every other method is `review`: the transient test needs its callers and the types of its
+    values.
+"""
+function named_tuple_verdict(t::Tree, d, values, shared)
+    if haskey(RULED_NAMED_TUPLES, d.name)
+        return RULED_NAMED_TUPLES[d.name]
+    elseif is_keyword_bundle(d.name)
+        return ("keep (keys)",
+                "a bundle of keywords or of field names: the caller splats it, merges it or walks it by key (#2113)")
+    elseif d.name in t.hooks
+        return ("go",
+                "an interface method that an extension implements: one `public` type for each return shape, that checks its invariants in its constructor (#2113)")
+    elseif d.name in t.public
+        return ("go",
+                "a public result: one `…Result <: AbstractResult` for each return shape, named in the glossary, that checks its invariants in its constructor (#2113)")
+    elseif any(v -> is_named_tuple(v) && any(is_splat, nt_entries(v)), values)
+        return ("go",
+                "an accumulator that each step rebuilds by field: a private type that `rebuild_struct` updates (#2082). In a hot loop, measure: a measured loss keeps the named tuple (#2113)")
+    elseif any(is_merge, values)
+        return ("go",
+                "a `merge` that adds a field to a record or replaces one: the record is a private type, and a replaced field goes through `rebuild_struct` (#2082, #2113)")
+    end
+    others = Set{Symbol}()
+    for v in values
+        k = shape_key(v)
+        k === nothing || union!(others, get(shared, k, Set{Symbol}()))
+    end
+    delete!(others, d.name)
+    if !isempty(others)
+        return ("go",
+                "the shape is also returned by " *
+                join(("`$n`" for n in sort!(collect(others))), ", ") *
+                ": one type for all of them, the public type when one of them is public (#2113)")
+    end
+    counts = [nt_count(v) for v in values]
+    if any(c -> c !== nothing && c > 3, counts)
+        return ("go", "more than three values: a private defined type (#2113)")
+    end
+    return ("review",
+            "a plain tuple if every caller takes it apart at once and no two values have one type, and a private defined type if the value travels: returned whole, passed to a call, stored or collected (#2113)")
+end
+
+"""
     named_tuple_findings!(out, t::Tree) -> out
 
-One `review` finding for each method that returns a named tuple literal, at a `return` or at the
-tail of its body (#2113). The reason names the shape of each named tuple that the method returns.
+One finding for each method that returns a named tuple, at a `return` or at the tail of its body:
+a literal, `NamedTuple{…}(…)`, a `merge` with a literal, or a local variable that holds one
+(#2113). [`named_tuple_verdict`](@ref) gives the verdict, and the reason names the shape of each
+named tuple that the method returns.
 """
 function named_tuple_findings!(out, t::Tree)
-    for d in t.defs
-        values = returned_values!(tail_values!(Any[], d.body), d.body)
-        shapes = unique!([nt_fields(v) for v in values if is_named_tuple(v)])
-        if isempty(shapes)
+    found = [(d, returned_named_tuples(d)) for d in t.defs]
+    shared = Dict{Tuple, Set{Symbol}}()
+    for (d, values) in found, v in values
+        k = shape_key(v)
+        if k !== nothing && !is_keyword_bundle(d.name)
+            push!(get!(shared, k, Set{Symbol}()), d.name)
+        end
+    end
+    for (d, values) in found
+        if isempty(values)
             continue
         end
+        verdict, rule = named_tuple_verdict(t, d, values, shared)
+        shapes = unique!([nt_shape(v) for v in values])
         why = "returns the named tuple " *
               join(("`$s`" for s in shapes), ", ") *
-              ": a function returns a defined type or a plain tuple of values. Rule it on #2113, which rules the groups that keep the named tuple"
+              ": " *
+              rule
         push!(out,
-              SurveyFinding(d.file, d.line, "named tuple", d.name, nothing, "review", why,
+              SurveyFinding(d.file, d.line, "named tuple", d.name, nothing, verdict, why,
                             ""))
     end
     return out
