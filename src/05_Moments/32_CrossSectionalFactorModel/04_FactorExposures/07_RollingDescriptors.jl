@@ -728,7 +728,7 @@ The Descriptor of an observation equals the one of the batch call [`descriptor`]
 
 # Returns
 
-  - `step::NamedTuple`: `de`, the estimator with the state after the observations in `cache`, and `D`, the Descriptor of each observation, `observations × assets`.
+  - `step::DescriptorStepResult`: `de`, the estimator with the state after the observations in `cache`, and `D`, the Descriptor of each observation, `observations × assets`.
 
 # Related
 
@@ -743,14 +743,14 @@ function descriptor_step(de::RollingLogReturn, rd::ReturnsResult)
     st = rolling_state_seed(de, X)
     D = rolling_state_fold!(st, de, X, pnl.amsk)
     descriptor_active_fill!(D, pnl)
-    return (; de = rebuild_struct(de, (; cache = st)), D = D)
+    return DescriptorStepResult(rebuild_struct(de, (; cache = st)), D)
 end
 """
     descriptor_step(::AbstractDescriptorEstimator, ::ReturnsResult)
 
 Answers `nothing`: a Descriptor carries no state unless it implements this verb.
 
-`descriptor_step` is the verb of a Descriptor that folds new observations from a carried state, and it is `public`. A subtype of [`AbstractDescriptorEstimator`](@ref) that folds implements it, with the contract of the methods of [`RollingLogReturn`](@ref), of the exponentially weighted mean Descriptors, of the lag Descriptors and of the exponentially weighted beta Descriptors: it takes the estimator with its state in a field, and the returns data of the new observations alone, and it answers `(; de, D)`, the estimator with the state after them and the Descriptor of each one, equal to the batch call [`descriptor`](@ref) over every observation from the first one. It also makes [`carry_lookback`](@ref) answer one. The carry fold of a [`CrossSectionalFactorPrior`](@ref) then reads the Descriptor off the state with [`descriptor_carry`](@ref), and keeps no panel row for it.
+`descriptor_step` is the verb of a Descriptor that folds new observations from a carried state, and it is `public`. A subtype of [`AbstractDescriptorEstimator`](@ref) that folds implements it, with the contract of the methods of [`RollingLogReturn`](@ref), of the exponentially weighted mean Descriptors, of the lag Descriptors and of the exponentially weighted beta Descriptors: it takes the estimator with its state in a field, and the returns data of the new observations alone, and it answers a [`DescriptorStepResult`](@ref) of the estimator with the state after them and of the Descriptor of each one, equal to the batch call [`descriptor`](@ref) over every observation from the first one. It also makes [`carry_lookback`](@ref) answer one. The carry fold of a [`CrossSectionalFactorPrior`](@ref) then reads the Descriptor off the state with [`descriptor_carry`](@ref), and keeps no panel row for it.
 
 # Arguments
 
@@ -763,6 +763,7 @@ Answers `nothing`: a Descriptor carries no state unless it implements this verb.
 
 # Related
 
+  - [`DescriptorStepResult`](@ref)
   - [`descriptor_carry`](@ref)
   - [`carry_lookback`](@ref)
 """
@@ -894,14 +895,14 @@ function descriptor_carry(de::AbstractDescriptorEstimator, rd::ReturnsResult, m:
 end
 """
     descriptor_carried(de::AbstractDescriptorEstimator, ::Nothing)
-    descriptor_carried(::AbstractDescriptorEstimator, step::NamedTuple)
+    descriptor_carried(::AbstractDescriptorEstimator, step::DescriptorStepResult)
 
 Returns the carry of a Descriptor from the answer of [`descriptor_step`](@ref), as [`descriptor_carry`](@ref) gives it: the Descriptor as it is twice for `nothing`, because it carries no state, or the Descriptor with its new state and the [`CarriedDescriptor`](@ref) of the new observations for a step.
 
 # Arguments
 
   - `de`: The Descriptor, as the carry folded it so far.
-  - `step`: The answer of [`descriptor_step`](@ref), `nothing` or a `NamedTuple` with the fields `de` and `D`.
+  - `step`: The answer of [`descriptor_step`](@ref), `nothing` or a [`DescriptorStepResult`](@ref).
 
 # Returns
 
@@ -916,7 +917,7 @@ function descriptor_carried(de::AbstractDescriptorEstimator, ::Nothing)::Carried
     return CarriedEstimators(de, de)
 end
 function descriptor_carried(::AbstractDescriptorEstimator,
-                            step::NamedTuple)::CarriedEstimators
+                            step::DescriptorStepResult)::CarriedEstimators
     return CarriedEstimators(step.de, CarriedDescriptor(step.D))
 end
 """

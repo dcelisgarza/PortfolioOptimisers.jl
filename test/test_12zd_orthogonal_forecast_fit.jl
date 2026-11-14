@@ -240,6 +240,16 @@ end
         @test iszero(z.g) && iszero(z.ap)
         @test po.orthogonal_forecast_rescale(OrthogonalPartCalibration(), warm, [1.0],
                                              [0.0, 0.0]).g == [1.0]
+        # Every rule answers a ForecastSplitResult, which refuses one part without the other
+        # (#2093).
+        @test z isa po.ForecastSplitResult
+        u = po.orthogonal_forecast_rescale(UnadjustedForecast(), warm, [1.0], [1.0, 2.0])
+        @test u isa po.ForecastSplitResult && u.g == [1.0] && u.ap == [1.0, 2.0]
+        @test po.ForecastSplitResult(; g = [1.0], ap = [2.0]).ap == [2.0]
+        n = po.ForecastSplitResult(nothing, nothing)
+        @test isnothing(n.g) && isnothing(n.ap)
+        @test_throws ArgumentError po.ForecastSplitResult([1.0], nothing)
+        @test_throws ArgumentError po.ForecastSplitResult(; g = nothing, ap = [1.0])
     end
 
     @testset "The constructor refuses OrthogonalPartCalibration without a calibrated slope" begin

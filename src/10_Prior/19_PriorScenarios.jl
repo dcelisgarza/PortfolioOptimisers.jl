@@ -756,10 +756,12 @@ end
     cross_sectional_forecast_split(ofit::AbstractOrthogonalForecastFit, rf::Nothing,
                                    csfm::CrossSectionalFactorModel,
                                    cre::AbstractCrossSectionalRegressionEstimator)
+        -> ForecastSplitResult
     cross_sectional_forecast_split(ofit::AbstractOrthogonalForecastFit,
                                    rf::AbstractReturnForecastResult,
                                    csfm::CrossSectionalFactorModel,
                                    cre::AbstractCrossSectionalRegressionEstimator)
+        -> ForecastSplitResult
 
 Split a Return Forecast Result against the latest Factor Exposures of the estimated factors of a [`CrossSectionalFactorModel`](@ref), giving its spanned coefficients and its orthogonal part before the Orthogonal Forecast Scale.
 
@@ -784,24 +786,24 @@ Split a Return Forecast Result against the latest Factor Exposures of the estima
 
 # Returns
 
-  - `g::Option{<:VecNum}`: The spanned coefficients, or `nothing`.
-  - `ap::Option{<:VecNum}`: The orthogonal part before the Orthogonal Forecast Scale, one entry per asset, or `nothing`.
+  - `res::ForecastSplitResult`: `g`, the spanned coefficients, and `ap`, the orthogonal part before the Orthogonal Forecast Scale, one entry per asset. Both are `nothing` with no Return Forecast Result.
 
 # Related
 
+  - [`ForecastSplitResult`](@ref)
   - [`cross_sectional_return_forecast`](@ref)
   - [`cross_sectional_alpha_split`](@ref)
   - [`orthogonal_forecast_rescale`](@ref)
 """
 function cross_sectional_forecast_split(::AbstractOrthogonalForecastFit, ::Nothing,
                                         ::CrossSectionalFactorModel,
-                                        ::AbstractCrossSectionalRegressionEstimator)
-    return (; g = nothing, ap = nothing)
+                                        ::AbstractCrossSectionalRegressionEstimator)::ForecastSplitResult
+    return ForecastSplitResult(nothing, nothing)
 end
 function cross_sectional_forecast_split(ofit::AbstractOrthogonalForecastFit,
                                         rf::AbstractReturnForecastResult,
                                         csfm::CrossSectionalFactorModel,
-                                        cre::AbstractCrossSectionalRegressionEstimator)
+                                        cre::AbstractCrossSectionalRegressionEstimator)::ForecastSplitResult
     rw = csfm.rw
     #! The observed factors are the trailing columns of `L`, and the fit observes their
     #! returns, so the forecast splits against the loadings the regression estimated.
@@ -811,7 +813,7 @@ function cross_sectional_forecast_split(ofit::AbstractOrthogonalForecastFit,
 end
 """
     cross_sectional_alpha_split(cre::AbstractCrossSectionalRegressionEstimator, mu::VecNum,
-                                L::MatNum, w::VecNum) -> NamedTuple
+                                L::MatNum, w::VecNum) -> ForecastSplitResult
 
 Split a Return Forecast into the part the latest Factor Exposures span and the part they do not.
 
@@ -860,11 +862,11 @@ The orthogonal part is ``\\boldsymbol{\\alpha} - \\mathbf{B}_{T} \\boldsymbol{g}
 
 # Returns
 
-  - `g::VecNum`: The spanned coefficients, one per factor of `L`.
-  - `ap::VecNum`: The orthogonal part of the forecast, one entry per asset.
+  - `res::ForecastSplitResult`: `g`, the spanned coefficients, one per factor of `L`, and `ap`, the orthogonal part of the forecast, one entry per asset.
 
 # Related
 
+  - [`ForecastSplitResult`](@ref)
   - [`CrossSectionalFactorPrior`](@ref)
   - [`cross_sectional_return_forecast`](@ref)
   - [`cross_sectional_regression`](@ref)
@@ -876,7 +878,7 @@ function cross_sectional_alpha_split(cre::AbstractCrossSectionalRegressionEstima
     K = size(L, 2)
     Tf = promote_type(real(eltype(mu)), real(eltype(L)), real(eltype(w)))
     if all(iszero, mu)
-        return (; g = zeros(Tf, K), ap = zeros(Tf, N))
+        return ForecastSplitResult(zeros(Tf, K), zeros(Tf, N))
     end
     wv = zeros(Tf, N)
     for i in 1:N
@@ -885,12 +887,12 @@ function cross_sectional_alpha_split(cre::AbstractCrossSectionalRegressionEstima
         end
     end
     if !any(x -> x > zero(x), wv)
-        return (; g = zeros(Tf, K), ap = zeros(Tf, N))
+        return ForecastSplitResult(zeros(Tf, K), zeros(Tf, N))
     end
     csr = cross_sectional_regression(cre, reshape(L, N, K, 1), reshape(mu, 1, N),
                                      reshape(wv, 1, N))
     g = csr.f[1, :]
-    return (; g = g, ap = mu - L * g)
+    return ForecastSplitResult(g, mu - L * g)
 end
 """
     cross_sectional_return_forecast(ofit::AbstractOrthogonalForecastFit, rfe::Nothing,
@@ -1331,8 +1333,8 @@ function scenario_prior(pe::CrossSectionalFactorPrior, w, pr::Option{<:AbstractP
     f_pr = cross_sectional_kept_cache(cross_sectional_factor_moments(fpe, pe.f_mp, fa, lv;
                                                                      strict = strict,
                                                                      kw...), pf)
-    sp = (; rf = rr.rf, cross_sectional_forecast_split(pe.ofit, rr.rf, rr, pe.cre)...,
-          hist = rr.hist)
+    (; g, ap) = cross_sectional_forecast_split(pe.ofit, rr.rf, rr, pe.cre)
+    sp = (; rf = rr.rf, g = g, ap = ap, hist = rr.hist)
     am = view(rr.amr, size(rr.amr, 1), :)
     return cross_sectional_moment_prior(pe, f_pr, rr, sp, rr.L, am, pr.X, pr.o_X; kw...)
 end

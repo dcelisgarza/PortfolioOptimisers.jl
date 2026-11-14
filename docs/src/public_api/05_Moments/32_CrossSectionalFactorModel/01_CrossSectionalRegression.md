@@ -14,6 +14,7 @@ UncheckedSolve
 MinimumNormSolve
 DependentColumnDrop
 NormalEquationsSolve
+CrossSectionalSolveResult
 AbstractUnseenMemberRule
 ZeroUnseenMember
 SolvedUnseenMember

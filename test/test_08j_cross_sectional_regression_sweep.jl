@@ -35,13 +35,21 @@ end
 struct CsrsUserSolve <: PortfolioOptimisers.AbstractCrossSectionalSolveAlgorithm end
 function PortfolioOptimisers.cross_sectional_solve(::CsrsUserSolve, A, y, ::Integer,
                                                    F = nothing, ws::NamedTuple = (;))
-    return (; f = A \ y, edof = size(A, 1) - size(A, 2))
+    return PortfolioOptimisers.CrossSectionalSolveResult(A \ y, size(A, 1) - size(A, 2))
 end
 # A member of a caller that states the four arguments of v0.33 alone.
 struct CsrsFourArgSolve <: PortfolioOptimisers.AbstractCrossSectionalSolveAlgorithm end
 function PortfolioOptimisers.cross_sectional_solve(::CsrsFourArgSolve, A, y, ::Integer)
+    return PortfolioOptimisers.CrossSectionalSolveResult(A \ y, size(A, 1) - size(A, 2))
+end
+# A member of a caller that returns the named tuple of v0.33 (#2093).
+struct CsrsNamedTupleSolve <: PortfolioOptimisers.AbstractCrossSectionalSolveAlgorithm end
+function PortfolioOptimisers.cross_sectional_solve(::CsrsNamedTupleSolve, A, y, ::Integer,
+                                                   F = nothing, ws::NamedTuple = (;))
     return (; f = A \ y, edof = size(A, 1) - size(A, 2))
 end
+# The two fields of an answer of a solve, which a test compares as a whole.
+csrs_parts(r::PortfolioOptimisers.CrossSectionalSolveResult) = (r.f, r.edof)
 # A design of `m` rows and `k` columns whose condition number is `c`.
 function csrs_conditioned(rng, m, k, c)
     U = Matrix(qr(randn(rng, m, k)).Q)[:, 1:k]
@@ -326,8 +334,8 @@ end
             b = fill(T(NaN), 12)
             ws = (; b = b, gram = fill(T(NaN), 4, 4), v = fill(T(NaN), 4))
             @test PO.cross_sectional_full_solve(F1, D, y, b) == F0 \ y
-            @test PO.cross_sectional_solve(pif, D, y, 1, F1, ws) ==
-                  PO.cross_sectional_solve(pif, D, y, 1)
+            @test csrs_parts(PO.cross_sectional_solve(pif, D, y, 1, F1, ws)) ==
+                  csrs_parts(PO.cross_sectional_solve(pif, D, y, 1))
             Dw, yw = randn(rng, T, 3, 4), randn(rng, T, 3)
             Fw = qr(Dw, ColumnNorm())
             @test PO.cross_sectional_full_solve(Fw, Dw, yw, b) == Fw \ yw
@@ -343,16 +351,17 @@ end
             @test isnothing(PO.cross_sectional_gram_factor(zeros(T, 0, 4), ws.gram))
             @test PO.cross_sectional_normal_solve(C1, D, y, ws.v) == C0 \ (D' * y)
             nes = NormalEquationsSolve()
-            @test PO.cross_sectional_solve(nes, D, y, 1, F1, ws) ==
-                  PO.cross_sectional_solve(nes, D, y, 1)
+            @test csrs_parts(PO.cross_sectional_solve(nes, D, y, 1, F1, ws)) ==
+                  csrs_parts(PO.cross_sectional_solve(nes, D, y, 1))
             # A rank-deficient design falls back to the pseudo-inverse with the same `QR`.
             Dd = hcat(D[:, 1:3], D[:, 1])
-            @test PO.cross_sectional_solve(nes, Dd, y, 1, qr(Dd, ColumnNorm()), ws) ==
-                  PO.cross_sectional_solve(pif, Dd, y, 1)
+            @test csrs_parts(PO.cross_sectional_solve(nes, Dd, y, 1, qr(Dd, ColumnNorm()),
+                                                      ws)) ==
+                  csrs_parts(PO.cross_sectional_solve(pif, Dd, y, 1))
             # A member of a caller takes the six arguments in one method and ignores `F`
             # and `ws` (#2093).
-            @test PO.cross_sectional_solve(CsrsUserSolve(), D, y, 1, F1, ws) ==
-                  PO.cross_sectional_solve(CsrsUserSolve(), D, y, 1)
+            @test csrs_parts(PO.cross_sectional_solve(CsrsUserSolve(), D, y, 1, F1, ws)) ==
+                  csrs_parts(PO.cross_sectional_solve(CsrsUserSolve(), D, y, 1))
         end
     end
 
@@ -396,7 +405,8 @@ end
         @test fit.edof == 35
         @test !isnothing(PO.cross_sectional_gram_factor(A))
         # A member that reads no QR drops the fifth argument.
-        @test PO.cross_sectional_solve(NE, A, y, 1, qr(A, ColumnNorm())) == fit
+        @test csrs_parts(PO.cross_sectional_solve(NE, A, y, 1, qr(A, ColumnNorm()))) ==
+              csrs_parts(fit)
         # A design whose condition number is above eps^(-1/4), a rank-deficient design and an
         # empty design take the answer of the default.
         Ad = copy(A)
@@ -404,8 +414,8 @@ end
         for B in (csrs_conditioned(rng, 40, 5, 1e6), Ad, zeros(0, 5), zeros(40, 0))
             yB = randn(rng, size(B, 1))
             @test isnothing(PO.cross_sectional_gram_factor(B))
-            @test PO.cross_sectional_solve(NE, B, yB, 1) ==
-                  PO.cross_sectional_solve(PIF, B, yB, 1)
+            @test csrs_parts(PO.cross_sectional_solve(NE, B, yB, 1)) ==
+                  csrs_parts(PO.cross_sectional_solve(PIF, B, yB, 1))
         end
         # The test reads the condition number of the design: 1e3 passes and 1e5 fails.
         @test !isnothing(PO.cross_sectional_gram_factor(csrs_conditioned(rng, 40, 5, 1e3)))
@@ -425,8 +435,8 @@ end
         @test isnothing(PO.cross_sectional_gram_factor(Dk))
         @test isnothing(PO.cross_sectional_gram_factor(Dk, zeros(K, K)))
         @test !isnothing(PO.cross_sectional_gram_factor(big.(Dk)))
-        @test PO.cross_sectional_solve(NE, Dk, yk, 1) ==
-              PO.cross_sectional_solve(PIF, Dk, yk, 1)
+        @test csrs_parts(PO.cross_sectional_solve(NE, Dk, yk, 1)) ==
+              csrs_parts(PO.cross_sectional_solve(PIF, Dk, yk, 1))
         # A rank below the column count is refused before the estimate reads the factor.
         Gd = Hermitian(Ad' * Ad)
         Cd = cholesky(Gd, RowMaximum(); tol = sqrt(eps()) * maximum(diag(Gd)),
@@ -460,8 +470,9 @@ end
         # the call of the regression (#2093).
         A = CSRS_Z[:, :, 1]
         y = CSRS_X[1, :]
-        @test PO.cross_sectional_solve(CsrsUserSolve(), A, y, 1, qr(A, ColumnNorm())) ==
-              PO.cross_sectional_solve(CsrsUserSolve(), A, y, 1)
+        @test csrs_parts(PO.cross_sectional_solve(CsrsUserSolve(), A, y, 1,
+                                                  qr(A, ColumnNorm()))) ==
+              csrs_parts(PO.cross_sectional_solve(CsrsUserSolve(), A, y, 1))
         @test_throws MethodError PO.cross_sectional_solve(CsrsFourArgSolve(), A, y, 1,
                                                           qr(A, ColumnNorm()), (;))
         csr = cross_sectional_regression(CrossSectionalLinearRegression(;
@@ -470,6 +481,37 @@ end
         @test csr.f ≈ cross_sectional_regression(CrossSectionalLinearRegression(;
                                                                     alg = UncheckedSolve()),
                                      Z, X, W).f
+    end
+
+    @testset "A solve answers a CrossSectionalSolveResult that checks its count (#2093)" begin
+        rng = StableRNG(20931)
+        A = randn(rng, 12, 3)
+        A[:, 3] = A[:, 1] .+ A[:, 2]
+        y = randn(rng, 12)
+        w = fill(1.0, 12)
+        tgt = PO.factory(LinearModel(), PO.StatsBase.aweights(w))
+        obs = (; A = A, y = y, D = A, t = 1, F = nothing)
+        for alg in (UncheckedSolve(), MinimumNormSolve(), PseudoInverseFallback(),
+                    DependentColumnDrop(), NormalEquationsSolve())
+            @test PO.cross_sectional_solve(alg, A, y, 1) isa PO.CrossSectionalSolveResult
+        end
+        for alg in (UncheckedSolve(), PseudoInverseFallback(), DependentColumnDrop(),
+                    NormalEquationsSolve())
+            @test PO.cross_sectional_target_solve(alg, tgt, obs) isa
+                  PO.CrossSectionalSolveResult
+        end
+        @test PO.cross_sectional_target_coef(tgt, A[:, 1:2], y, A[:, 1:2]) isa
+              PO.CrossSectionalSolveResult
+        r = PO.CrossSectionalSolveResult(; f = [0.5, -0.25], edof = 3)
+        @test csrs_parts(r) == ([0.5, -0.25], 3)
+        @test (; f = r.f, edof = r.edof) == (; f = [0.5, -0.25], edof = 3)
+        # A fit of more columns than rows spends more parameters than it has rows.
+        @test PO.CrossSectionalSolveResult([1.0, 2.0, 3.0], -1).edof == -1
+        @test_throws DomainError PO.CrossSectionalSolveResult([0.5], NaN)
+        @test_throws DomainError PO.CrossSectionalSolveResult(; f = [0.5], edof = Inf)
+        # The regression refuses the named tuple of a member that predates the type.
+        old = CrossSectionalLinearRegression(; alg = CsrsNamedTupleSolve())
+        @test_throws MethodError PO.cross_sectional_coefficients(old, A[:, 1:2], y, w, 1)
     end
 
     @testset "The coefficient of determination is the weighted formula" begin

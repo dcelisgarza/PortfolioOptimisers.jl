@@ -256,6 +256,63 @@ $(DocStringExtensions.FIELDS)
     xv
 end
 """
+$(DocStringExtensions.TYPEDEF)
+
+The answer of a step of a **Descriptor Estimator** that folds new observations from a carried state: the estimator with the state after them, and the Descriptor of each of them.
+
+[`descriptor_step`](@ref) returns it, and a Descriptor of a caller that folds builds it in its own method of that verb. So the type is the contract of the verb, and its constructor checks the two values. `partial_fit!` keeps `de`, and the carry fold of a [`CrossSectionalFactorPrior`](@ref) reads both fields through [`descriptor_carried`](@ref). A caller reads the fields by name, as `res.D` or `(; de, D) = res`.
+
+# Fields
+
+$(DocStringExtensions.FIELDS)
+
+# Constructors
+
+    DescriptorStepResult(de::AbstractDescriptorEstimator, D::MatNum)
+    DescriptorStepResult(; de::AbstractDescriptorEstimator, D::MatNum)
+
+The keyword constructor takes each field by name, with no default, and calls the positional constructor.
+
+## Validation
+
+  - `de` is an [`AbstractDescriptorEstimator`](@ref), and `D` is a matrix of numbers. Otherwise, the keyword constructor raises a `TypeError`.
+
+# Examples
+
+```jldoctest
+julia> res = PortfolioOptimisers.DescriptorStepResult(; de = RollingLogReturn(; window = 2),
+                                                      D = [0.1 0.2; 0.3 NaN]);
+
+julia> res.D
+2×2 Matrix{Float64}:
+ 0.1    0.2
+ 0.3  NaN
+```
+
+# Related
+
+  - [`descriptor_step`](@ref)
+  - [`descriptor_carried`](@ref)
+  - [`AbstractDescriptorEstimator`](@ref)
+"""
+@concrete struct DescriptorStepResult <: AbstractResult
+    """
+    The estimator with the state after the new observations in its state field.
+    """
+    de
+    """
+    The Descriptor of each new observation, `observations × assets`, equal to the batch call over every observation from the first one.
+    """
+    D
+    function DescriptorStepResult(de::AbstractDescriptorEstimator, D::MatNum)
+        return new{typeof(de), typeof(D)}(de, D)
+    end
+end
+function DescriptorStepResult(; de::AbstractDescriptorEstimator,
+                              D::MatNum)::DescriptorStepResult
+    return DescriptorStepResult(de, D)
+end
+"""
     descriptor_asset_panel(rd::ReturnsResult) -> AssetPanel
 
 Read the Asset Panel a Descriptor needs out of a [`ReturnsResult`](@ref).
@@ -1011,4 +1068,4 @@ function lookback_max(f, ests::AbstractVector)::Option{<:Integer}
 end
 
 export descriptor
-public AbstractDescriptorEstimator, lookback
+public AbstractDescriptorEstimator, DescriptorStepResult, lookback

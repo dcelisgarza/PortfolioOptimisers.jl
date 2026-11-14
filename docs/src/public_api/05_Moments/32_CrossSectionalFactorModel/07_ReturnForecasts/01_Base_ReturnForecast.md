@@ -14,6 +14,7 @@ AbstractOrthogonalForecastFit
 ScoreNeutralisation
 OrthogonalPartCalibration
 UnadjustedForecast
+ForecastSplitResult
 ```
 
 ## Functions

@@ -158,7 +158,33 @@ function cross_sectional_reduced_history(fcb::FactorFamilyBasis, Ms::Arr3Num)
     return reduce_exposures(fcb, Ms)
 end
 """
-    cross_sectional_split_history(cs::NamedTuple) -> NamedTuple
+$(DocStringExtensions.TYPEDEF)
+
+Holds the split of each row of the Return Forecast history of a [`CrossSectionalFactorPrior`](@ref): the spanned coefficients and the orthogonal part of each row.
+
+This type is an implementation detail and is not intended for direct use. [`cross_sectional_split_history`](@ref) makes it. [`spanned_forecast_sample`](@ref) reads `g` for the Spanned Shrinkage, and [`orthogonal_forecast_pairs`](@ref) reads `ap` for the Orthogonal Forecast Scale. A [`ForecastSplitResult`](@ref) holds the split of one row, and this type holds a matrix of each part, so a record names them where a plain tuple would let a swap of two matrices pass silently.
+
+# Fields
+
+$(DocStringExtensions.FIELDS)
+
+# Related
+
+  - [`cross_sectional_split_history`](@ref)
+  - [`ForecastSplitResult`](@ref)
+"""
+@concrete struct ForecastSplitHistory
+    """
+    `g`: The spanned coefficients of each row, `estimated factors × rows`.
+    """
+    g
+    """
+    `ap`: The orthogonal part of each row, `rows × assets`.
+    """
+    ap
+end
+"""
+    cross_sectional_split_history(cs::NamedTuple) -> ForecastSplitHistory
 
 Split each row of the Return Forecast history of a [`CrossSectionalFactorPrior`](@ref) against the Factor Exposures of that row.
 
@@ -182,11 +208,11 @@ The prior splits the latest forecast against the latest exposures, under the reg
 
 # Returns
 
-  - `g::MatNum`: The spanned coefficients of each row, `estimated factors × rows`. A row with no finite forecast carries `NaN`.
-  - `ap::MatNum`: The orthogonal part of each row, `rows × assets`. A row with no finite forecast carries `NaN`.
+  - `split::ForecastSplitHistory`: `g`, the spanned coefficients of each row, `estimated factors × rows`, and `ap`, the orthogonal part of each row, `rows × assets`. A row with no finite forecast carries `NaN` in both.
 
 # Related
 
+  - [`ForecastSplitHistory`](@ref)
   - [`cross_sectional_alpha_split`](@ref)
   - [`cross_sectional_reduced_history`](@ref)
   - [`spanned_forecast_sample`](@ref)
@@ -217,7 +243,7 @@ function cross_sectional_split_history(cs::NamedTuple)
         g[:, t] = sp.g
         ap[t, :] = sp.ap
     end
-    return (; g = g, ap = ap)
+    return ForecastSplitHistory(g, ap)
 end
 """
     cross_sectional_context(ctx) -> NamedTuple

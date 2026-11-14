@@ -304,6 +304,8 @@ end
                                                :folds_forecast_rows => "the query trait of a member: its method on `TargetReturnForecast` reads `target_forecast_folds` of its fields, which two functions share (rule 3, #2093)",
                                                :exposure_coverage_weights => "its callee `cs_diagnostic_weights` is a shared public verb (rule 3, #2093)",
                                                :descriptor_carry => "the generic method, for an estimator that carries no state, calls the constructor of `CarriedEstimators`, and the other methods walk the Descriptors (rule 3, #2093)",
+                                               :orthogonal_forecast_rescale => "an interface verb: its default, for a rule that keeps the orthogonal part, calls the constructor of `ForecastSplitResult`, the public type of its contract, and the method of `OrthogonalPartCalibration` scales the part (rule 3, #2093)",
+                                               :unseen_member_design => "an interface verb: its methods that change no observation call the constructor of `UnseenMemberDesignResult`, the public type of its contract, and the method of `ZeroUnseenMember` builds each change (rule 3, #2093)",
                                                # src/05_Moments (#2092).
                                                :weighted_comoment_guard => "4 functions share its callee `weighted_moment_guard` (rule 3, #2092)",
                                                :library_covariance_estimator => "its callee is the constructor of `GeneralCovariance` (rule 3, #2092)",

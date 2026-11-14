@@ -1208,6 +1208,26 @@ end
         @test isempty(PO.unseen_member_design(ZeroUnseenMember(), fz, B,
                                               PO.reduce_exposures(fz, B), W).P)
     end
+    @testset "A rule answers an UnseenMemberDesignResult that checks each change (#2093)" begin
+        @test A.ud isa PO.UnseenMemberDesignResult
+        @test PO.unseen_member_design(SolvedUnseenMember(), nothing, B, B, W) isa
+              PO.UnseenMemberDesignResult
+        Zr = A.ud.Z
+        K = size(Zr, 2)
+        Pt = Matrix{Float64}(LinearAlgebra.I, K, K)
+        r = PO.UnseenMemberDesignResult(; Z = Zr)
+        @test r.Z === Zr && r.P == ()
+        @test first.(PO.UnseenMemberDesignResult(Zr, [2 => Pt]).P) == [2]
+        # The observation of a change lies on the observation axis of the design.
+        @test_throws DomainError PO.UnseenMemberDesignResult(Zr, [size(Zr, 3) + 1 => Pt])
+        @test_throws DomainError PO.UnseenMemberDesignResult(Zr, [0 => Pt])
+        # A change is square on the factor axis of the design.
+        @test_throws DimensionMismatch PO.UnseenMemberDesignResult(Zr,
+                                                                   [1 => Pt[:, 1:(K - 1)]])
+        @test_throws DimensionMismatch PO.UnseenMemberDesignResult(; Z = Zr,
+                                                                   P = [1 => ones(K + 1,
+                                                                                  K + 1)])
+    end
     @testset "The number type of the ratios is kept" begin
         fq = FactorFamilyBasis(; fnm = ["ind"], fi = [[2, 3, 4]], di = [3],
                                ratios = [3//2 2//1; 3//2 2//1], K = 4)

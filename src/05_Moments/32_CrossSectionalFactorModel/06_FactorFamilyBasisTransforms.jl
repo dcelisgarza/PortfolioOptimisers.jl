@@ -720,12 +720,89 @@ function project_factor_coordinates(fcb::FactorFamilyBasis, x::VecNum)
     return y
 end
 """
+$(DocStringExtensions.TYPEDEF)
+
+The answer of an Unseen Member rule: the design that the regression of a [`CrossSectionalFactorPrior`](@ref) solves, and the change of each observation that maps its coefficients back to the reduced factor returns.
+
+[`unseen_member_design`](@ref) returns it, and an Unseen Member rule of a caller builds it in its own method of that verb, as the `# Interfaces` section of [`AbstractUnseenMemberRule`](@ref) states. So the type is the contract of the interface, and its constructor checks each change against the design. The fit regresses on `Z`, and [`unseen_member_returns`](@ref) maps the coefficients of each observation in `P` back. A caller reads the fields by name, as `res.Z` or `(; Z, P) = res`.
+
+# Fields
+
+$(DocStringExtensions.FIELDS)
+
+# Constructors
+
+    UnseenMemberDesignResult(Z::Arr3Num,
+                             P::Union{Tuple{}, AbstractVector{<:Pair{<:Integer, <:AbstractMatrix}}})
+    UnseenMemberDesignResult(; Z::Arr3Num,
+                             P::Union{Tuple{}, AbstractVector{<:Pair{<:Integer, <:AbstractMatrix}}} = ())
+
+The positional constructor checks the values. The keyword constructor takes `Z` by name, and `P` with the default `()`, a rule that changes no observation, and calls it.
+
+## Validation
+
+  - The observation `t` of each pair of `P` is an observation of `Z`, in `axes(Z, 3)`. Otherwise, the constructor raises a `DomainError`.
+  - The change `P_t` of each pair of `P` is square on the factor axis of `Z`, `size(Z, 2) × size(Z, 2)`. Otherwise, the constructor raises a `DimensionMismatch`.
+
+# Examples
+
+```jldoctest
+julia> res = PortfolioOptimisers.UnseenMemberDesignResult(; Z = ones(2, 2, 3),
+                                                          P = [2 => [1.0 0.0; 0.0 0.0]]);
+
+julia> (size(res.Z), first.(res.P))
+((2, 2, 3), [2])
+
+julia> PortfolioOptimisers.UnseenMemberDesignResult(ones(2, 2, 3), [4 => [1.0 0.0; 0.0 0.0]])
+ERROR: DomainError with 4:
+the observation of each change must be an observation of Z, in 1:3
+[...]
+```
+
+# Related
+
+  - [`unseen_member_design`](@ref)
+  - [`AbstractUnseenMemberRule`](@ref)
+  - [`ZeroUnseenMember`](@ref)
+  - [`unseen_member_returns`](@ref)
+"""
+@concrete struct UnseenMemberDesignResult <: AbstractResult
+    """
+    The design to regress on, `assets × reduced factors × observations`.
+    """
+    Z
+    """
+    One `t => P_t` pair per observation that the rule changes, where `P_t` is `reduced factors × reduced factors`, and the factor returns of `t` are `P_t` times the coefficients of `t`. It is empty or `()` when the rule changes no observation.
+    """
+    P
+    function UnseenMemberDesignResult(Z::Arr3Num,
+                                      P::Union{Tuple{},
+                                               AbstractVector{<:Pair{<:Integer,
+                                                                     <:AbstractMatrix}}})
+        K = size(Z, 2)
+        for (t, Pt) in P
+            @argcheck(t in axes(Z, 3),
+                      DomainError(t,
+                                  "the observation of each change must be an observation of Z, in 1:$(size(Z, 3))"))
+            @argcheck(size(Pt) == (K, K),
+                      DimensionMismatch("the change of observation $t is $(size(Pt, 1))×$(size(Pt, 2)), and it must be $K×$K, square on the factor axis of Z"))
+        end
+        return new{typeof(Z), typeof(P)}(Z, P)
+    end
+end
+function UnseenMemberDesignResult(; Z::Arr3Num,
+                                  P::Union{Tuple{},
+                                           AbstractVector{<:Pair{<:Integer,
+                                                                 <:AbstractMatrix}}} = ())::UnseenMemberDesignResult
+    return UnseenMemberDesignResult(Z, P)
+end
+"""
     unseen_member_design(rule::AbstractUnseenMemberRule, fcb::Nothing, B::Arr3Num, Zl::Arr3Num,
-                         W::MatNum)
+                         W::MatNum) -> UnseenMemberDesignResult
     unseen_member_design(rule::SolvedUnseenMember, fcb::FactorFamilyBasis, B::Arr3Num,
-                         Zl::Arr3Num, W::MatNum)
+                         Zl::Arr3Num, W::MatNum) -> UnseenMemberDesignResult
     unseen_member_design(rule::ZeroUnseenMember, fcb::FactorFamilyBasis, B::Arr3Num,
-                         Zl::Arr3Num, W::MatNum)
+                         Zl::Arr3Num, W::MatNum) -> UnseenMemberDesignResult
 
 Return the design that the regression of a [`CrossSectionalFactorPrior`](@ref) solves under an Unseen Member rule, and the change of each observation that maps its coefficients back.
 
@@ -777,11 +854,11 @@ Where:
 
 # Returns
 
-  - `Z::Arr3Num`: The design to regress on: `Zl`, with `Zl[:, :, t] * P` at each observation in `P`.
-  - `P`: One `t => P_t` pair per observation that the function changes. It is empty when the function changes none, and `()` without a basis or under [`SolvedUnseenMember`](@ref).
+  - `res::UnseenMemberDesignResult`: `Z`, the design to regress on, `Zl` with `Zl[:, :, t] * P_t` at each observation in `P`, and `P`, one `t => P_t` pair per observation that the function changes. `P` is empty when the function changes none, and `()` without a basis or under [`SolvedUnseenMember`](@ref).
 
 # Related
 
+  - [`UnseenMemberDesignResult`](@ref)
   - [`AbstractUnseenMemberRule`](@ref)
   - [`ZeroUnseenMember`](@ref)
   - [`SolvedUnseenMember`](@ref)
@@ -790,15 +867,15 @@ Where:
   - [`cross_sectional_live_regression`](@ref)
 """
 function unseen_member_design(::AbstractUnseenMemberRule, ::Nothing, ::Arr3Num, Zl::Arr3Num,
-                              ::MatNum)
-    return (; Z = Zl, P = ())
+                              ::MatNum)::UnseenMemberDesignResult
+    return UnseenMemberDesignResult(Zl, ())
 end
 function unseen_member_design(::SolvedUnseenMember, ::FactorFamilyBasis, ::Arr3Num,
-                              Zl::Arr3Num, ::MatNum)
-    return (; Z = Zl, P = ())
+                              Zl::Arr3Num, ::MatNum)::UnseenMemberDesignResult
+    return UnseenMemberDesignResult(Zl, ())
 end
 function unseen_member_design(::ZeroUnseenMember, fcb::FactorFamilyBasis, B::Arr3Num,
-                              Zl::Arr3Num, W::MatNum)
+                              Zl::Arr3Num, W::MatNum)::UnseenMemberDesignResult
     assert_factor_axis_length(size(B, 2), fcb.K, :B)
     assert_factor_basis_obs(size(B, 3), fcb, :B)
     @argcheck(size(W) == (size(B, 3), size(B, 1)),
@@ -813,7 +890,7 @@ function unseen_member_design(::ZeroUnseenMember, fcb::FactorFamilyBasis, B::Arr
         end
     end
     if isempty(P)
-        return (; Z = Zl, P = P)
+        return UnseenMemberDesignResult(Zl, P)
     end
     Z = similar(Zl, promote_type(eltype(Zl), Tp))
     copyto!(Z, Zl)
@@ -822,7 +899,7 @@ function unseen_member_design(::ZeroUnseenMember, fcb::FactorFamilyBasis, B::Arr
     for (t, Pt) in P, k in axes(Pt, 2), i in axes(Z, 1)
         Z[i, k, t] = sum(j -> Zl[i, j, t] * Pt[j, k], axes(Pt, 1))
     end
-    return (; Z = Z, P = P)
+    return UnseenMemberDesignResult(Z, P)
 end
 """
 $(DocStringExtensions.TYPEDSIGNATURES)
@@ -1054,4 +1131,4 @@ end
 public reduce_factor_names, reduce_exposures, reduce_loadings, reduce_factor_returns,
        reduce_factor_mu, reduce_factor_covariance, dropped_factor_weights,
        expand_factor_returns, expand_factor_covariance, project_factor_coordinates,
-       unseen_member_design
+       UnseenMemberDesignResult, unseen_member_design

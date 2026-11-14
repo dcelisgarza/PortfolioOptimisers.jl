@@ -167,6 +167,7 @@ end
             st = de
             for (a, b) in blocks
                 r = po.descriptor_step(st, rows(syn, a:b))
+                @test r isa po.DescriptorStepResult
                 @test same(r.D, full[a:b, :])
                 @test same(po.descriptor_step(st, rows(syn, a:b)).D, r.D)
                 @test same(partial_fit!(st, rows(syn, a:b)).cache.cs[end],
@@ -238,6 +239,7 @@ end
             st = de
             for (a, b) in blocks
                 r = po.descriptor_step(st, rows(syn, a:b))
+                @test r isa po.DescriptorStepResult
                 @test same(r.D, full[a:b, :])
                 @test same(po.descriptor_step(st, rows(syn, a:b)).D, r.D)
                 @test same(partial_fit!(st, rows(syn, a:b)).cache.s, r.de.cache.s)
@@ -320,6 +322,7 @@ end
             st = de
             for (a, b) in blocks
                 r = po.descriptor_step(st, rows(syn, a:b))
+                @test r isa po.DescriptorStepResult
                 @test same(r.D, full[a:b, :])
                 @test same(po.descriptor_step(st, rows(syn, a:b)).D, r.D)
                 @test same(partial_fit!(st, rows(syn, a:b)).cache.q[end], r.de.cache.q[end])
@@ -422,6 +425,7 @@ end
             st = de
             for (a, b) in blocks
                 r = po.descriptor_step(st, rows(syn, a:b))
+                @test r isa po.DescriptorStepResult
                 @test same(r.D, full[a:b, :])
                 @test same(po.descriptor_step(st, rows(syn, a:b)).D, r.D)
                 @test same(partial_fit!(st, rows(syn, a:b)).cache.ve.variance,
@@ -478,6 +482,13 @@ end
         wv = EWVolatility(; ce = WindowedVariance(; window = 20))
         @test isnothing(po.descriptor_step(wv, rows(syn, 1:5)))
         @test isnothing(po.carry_lookback(wv))
+        # The answer of a step names its two values, and its keyword constructor refuses a
+        # value that is not an estimator and a matrix (#2093).
+        sr = po.DescriptorStepResult(; de = wv, D = [0.1 NaN])
+        @test sr.de === wv && isequal(sr.D, [0.1 NaN])
+        @test po.DescriptorStepResult(wv, [0.1 0.2]).D == [0.1 0.2]
+        @test_throws TypeError po.DescriptorStepResult(; de = 1.0, D = [0.1 0.2])
+        @test_throws TypeError po.DescriptorStepResult(; de = wv, D = [0.1, 0.2])
         @test isnothing(po.ew_volatility_fold(wv, syn, nothing).st)
         # On the carry fold each Descriptor counts as one row, so the carry keeps the rows of
         # the lag alone, and every step equals the batch fit.
@@ -573,6 +584,7 @@ end
             st = de
             for (a, b) in blocks
                 r = po.descriptor_step(st, rows(rd, a:b))
+                @test r isa po.DescriptorStepResult
                 @test same(r.D, full[a:b, :])
                 @test same(po.descriptor_step(st, rows(rd, a:b)).D, r.D)
                 @test copied(partial_fit!(st, rows(rd, a:b)).cache, r.de.cache)

@@ -826,7 +826,7 @@ The batch fit gives the answer to the last argument of [`return_forecast`](@ref)
 
 ## The scale of the orthogonal part
 
-  - `orthogonal_forecast_rescale(ofit::MyRule, rf::AbstractReturnForecastResult, g::VecNum, ap::VecNum) -> NamedTuple`: Scales the orthogonal part of the split of the Return Forecast.
+  - `orthogonal_forecast_rescale(ofit::MyRule, rf::AbstractReturnForecastResult, g::VecNum, ap::VecNum) -> ForecastSplitResult`: Scales the orthogonal part of the split of the Return Forecast.
 
 ### Arguments
 
@@ -837,10 +837,11 @@ The batch fit gives the answer to the last argument of [`return_forecast`](@ref)
 
 ### Returns
 
-  - `(; g, ap)::NamedTuple`: The spanned coefficients, and the orthogonal part that the Orthogonal Forecast Scale multiplies.
+  - `res::ForecastSplitResult`: The spanned coefficients, and the orthogonal part that the Orthogonal Forecast Scale multiplies. The method builds it with the constructor of [`ForecastSplitResult`](@ref), which checks the two parts.
 
 # Related
 
+  - [`ForecastSplitResult`](@ref)
   - [`ScoreNeutralisation`](@ref)
   - [`OrthogonalPartCalibration`](@ref)
   - [`UnadjustedForecast`](@ref)
@@ -1007,10 +1008,75 @@ function orthogonal_forecast_regression(::OrthogonalPartCalibration,
     return cre
 end
 """
+$(DocStringExtensions.TYPEDEF)
+
+The split of a **Return Forecast** against the latest Factor Exposures: the spanned coefficients, which the exposures span, and the orthogonal part, which they do not.
+
+[`orthogonal_forecast_rescale`](@ref) returns it, and an Orthogonal Forecast Fit of a caller builds it in its own method of that verb, as the `# Interfaces` section of [`AbstractOrthogonalForecastFit`](@ref) states. So the type is the contract of the interface, and its constructor checks the two parts. The split of the prior returns it too, with `nothing` for both parts when the prior has no Return Forecast. The prior blends `g` into its factor mean under the Spanned Shrinkage, and adds `ap` to its mean vector under the Orthogonal Forecast Scale. A caller reads the fields by name, as `res.ap` or `(; g, ap) = res`.
+
+# Fields
+
+$(DocStringExtensions.FIELDS)
+
+# Constructors
+
+    ForecastSplitResult(g::Option{<:VecNum}, ap::Option{<:VecNum})
+    ForecastSplitResult(; g::Option{<:VecNum}, ap::Option{<:VecNum})
+
+The positional constructor checks the values. The keyword constructor takes each field by name, with no default, and calls it.
+
+## Validation
+
+  - `g` and `ap` are both vectors, or both `nothing`. Otherwise, the constructor raises an `ArgumentError`.
+
+# Examples
+
+```jldoctest
+julia> res = PortfolioOptimisers.ForecastSplitResult(; g = [0.01], ap = [0.002, -0.002]);
+
+julia> (res.g, res.ap)
+([0.01], [0.002, -0.002])
+
+julia> PortfolioOptimisers.ForecastSplitResult([0.01], nothing)
+ERROR: ArgumentError: g and ap must both be vectors, or both be nothing. Got
+g => [0.01]
+ap => nothing
+[...]
+```
+
+# Related
+
+  - [`orthogonal_forecast_rescale`](@ref)
+  - [`AbstractOrthogonalForecastFit`](@ref)
+  - [`cross_sectional_alpha_split`](@ref)
+  - [`CrossSectionalFactorPrior`](@ref)
+"""
+@concrete struct ForecastSplitResult <: AbstractResult
+    """
+    The spanned coefficients, one per estimated factor, or `nothing` with no Return Forecast.
+    """
+    g
+    """
+    The orthogonal part, one entry per asset, or `nothing` with no Return Forecast.
+    """
+    ap
+    function ForecastSplitResult(g::Option{<:VecNum}, ap::Option{<:VecNum})
+        @argcheck(isnothing(g) == isnothing(ap),
+                  ArgumentError("g and ap must both be vectors, or both be nothing. Got\ng => $g\nap => $ap"))
+        return new{typeof(g), typeof(ap)}(g, ap)
+    end
+end
+function ForecastSplitResult(; g::Option{<:VecNum},
+                             ap::Option{<:VecNum})::ForecastSplitResult
+    return ForecastSplitResult(g, ap)
+end
+"""
     orthogonal_forecast_rescale(ofit::AbstractOrthogonalForecastFit,
                                 rf::AbstractReturnForecastResult, g::VecNum, ap::VecNum)
+        -> ForecastSplitResult
     orthogonal_forecast_rescale(ofit::OrthogonalPartCalibration,
                                 rf::TargetReturnForecastResult, g::VecNum, ap::VecNum)
+        -> ForecastSplitResult
 
 Scale the orthogonal part of the split of a Return Forecast under the Orthogonal Forecast Fit.
 
@@ -1046,21 +1112,22 @@ The method that Julia selects is the algorithm.
 
 # Returns
 
-  - `g::VecNum`: The spanned coefficients.
-  - `ap::VecNum`: The orthogonal part that the Orthogonal Forecast Scale multiplies.
+  - `res::ForecastSplitResult`: `g`, the spanned coefficients, and `ap`, the orthogonal part that the Orthogonal Forecast Scale multiplies.
 
 # Related
 
+  - [`ForecastSplitResult`](@ref)
   - [`OrthogonalPartCalibration`](@ref)
   - [`cross_sectional_return_forecast`](@ref)
   - [`cross_sectional_alpha_split`](@ref)
 """
 function orthogonal_forecast_rescale(::AbstractOrthogonalForecastFit,
-                                     ::AbstractReturnForecastResult, g::VecNum, ap::VecNum)
-    return (; g = g, ap = ap)
+                                     ::AbstractReturnForecastResult, g::VecNum,
+                                     ap::VecNum)::ForecastSplitResult
+    return ForecastSplitResult(g, ap)
 end
 
 export return_forecast, IdiosyncraticReturnUnit, IdiosyncraticSharpeUnit,
        ScoreNeutralisation, OrthogonalPartCalibration, UnadjustedForecast
-public AbstractOrthogonalForecastFit, orthogonal_forecast_member,
+public AbstractOrthogonalForecastFit, ForecastSplitResult, orthogonal_forecast_member,
        orthogonal_forecast_regression, orthogonal_forecast_rescale

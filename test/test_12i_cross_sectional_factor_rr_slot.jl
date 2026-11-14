@@ -978,6 +978,7 @@ end
                                              rr.rw[end, :]).g, ap = nothing)
     # The history splits each row on the reduced axis, so its last row is the latest split.
     sh = PO.cross_sectional_split_history(cs)
+    @test sh isa PO.ForecastSplitHistory
     @test size(sh.g, 1) == size(rr.csr.f, 2)
     @test isapprox(sh.g[:, end], cs.g; rtol = 1e-12)
     @test isapprox(sh.ap[end, :], rr.rf.mu - view(rr.L, :, 1:size(rr.csr.f, 2)) * cs.g;

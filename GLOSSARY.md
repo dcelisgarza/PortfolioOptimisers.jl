@@ -285,6 +285,7 @@ A folding statistic can carry a memory beside its vector, the last `memory_rows`
 
 **Return Forecast**
 A per-asset prediction of the idiosyncratic return of the next period. The caller supplies it, or an estimator fits it from Descriptor Scores. A Prior splits it against its latest Factor Exposures into two parts. The spanned part blends into the factor mean, and the orthogonal part enters the mean vector of the Prior under a scale.
+The split is a `ForecastSplitResult` of the spanned coefficients `g` and the orthogonal part `ap`, both `nothing` with no Return Forecast. An Orthogonal Forecast Fit builds it in its `orthogonal_forecast_rescale` method, so the type is the contract of that verb (#2093).
 *Avoid*: `alpha` (§5), which is the Significance Level of a tail. Also Expected Returns (above), which is a moment estimated from the sample.
 
 **Prequential Calibration**
@@ -415,6 +416,7 @@ A Penalty Strength that reads the data spends a little more, the Strength Diverg
 **Cross-Sectional Regression**
 A regression of one observation's asset returns on the lagged Factor Exposures across the assets, one fit per observation.
 Its **solve algorithm** decides what an observation with a rank-deficient design gets. It means the same thing whether the fit is closed-form or runs an external target. The answer is the answer of least norm by default, a return of zero for each dependent factor, a refusal, or the answer of the solver unchecked. A target reaches the answer of least norm by a fit on the factors that the rank test keeps, projected onto the row space of the design (#1625).
+The answer of the solve of one observation is a `CrossSectionalSolveResult`: the factor returns and the residual count of the fit. A new solve algorithm builds it in its methods, so the type is the contract of the interface, and its constructor refuses a count that is not finite (#2093).
 The **rank test** of an observation reads its weighted design, never the Gram matrix of the design, because the Gram matrix squares the condition number. The fit, a basis-invariant target, the diagnostics and the attribution standard errors all keep the columns that the fit keeps (#1719). A basis-invariant target is fitted on the design whose weighted Gram matrix is the identity.
 A **Dropped Column** is a factor whose column the solve algorithm `DependentColumnDrop` left out of the fit of one observation. So its return is zero by the rule, not from the data. The fit marks it in `dc`, and a diagnostic or a standard error gives it no estimation error, as it gives an Unseen Member none (#1719).
 A **Leverage-One Pair** is an asset whose exposures give it a direction of the design of its own at one observation, such as the only member of a level of a one-hot factor. The fit reproduces its return, so its idiosyncratic return is zero by construction and states nothing about its specific risk. The fit marks it in `h1`, a least-squares fit writes an exact zero residual there, and the idiosyncratic diagnostics leave it out (#1423).
@@ -430,6 +432,7 @@ Its **look-back** is the number of trailing observations that its value reads. I
 
 **Descriptor Estimator**
 A producer of one Descriptor.
+One that folds new observations from a carried state answers a step with a `DescriptorStepResult`: the estimator with its new state, and the Descriptor of each new observation. A new Descriptor that folds builds it in its `descriptor_step` method, so the type is the contract of that verb (#2093).
 
 **Cross-Sectional Transform**
 A rescaling of a Descriptor within one observation, across the assets. Examples are a winsorisation, a standardisation against a benchmark-weighted centre, a Gaussian or percentile rank, and a tanh shrink. It reads the benchmark weights and an optional group label at the call. It keeps no fitted state, and it returns a value of the same shape.
@@ -462,6 +465,7 @@ An estimated factor of a Cross-Sectional Factor Prior whose exposure is zero at 
 **Unseen Member**
 A member of a constrained Factor Family that no asset of positive regression weight loads on at one observation of a Cross-Sectional Factor Prior. The exposures lag the returns, so the zero-sum condition of the observation reads earlier benchmark weights, which can still weight the member after its last asset delists. The data state nothing about its return there. The Unseen Member rule of the prior states the return. By default it is a return of zero at that observation, with the zero-sum condition held over the other members. So the observation is identified, and its factor returns do not depend on the dropped member (#1606).
 The Cross-Sectional Factor Model block stores the rule, so the regression diagnostics and the standard errors of a factor attribution read the design that the fit regressed on, and they do not depend on the dropped member either (#1609).
+A rule answers an `UnseenMemberDesignResult`: the design to regress on, and the change of each observation that maps its coefficients back. A new rule builds it, and its constructor refuses a change that is not square on the factor axis of the design, or that names no observation of it (#2093).
 *Avoid*: an Empty Factor, which no asset loads on at any observation of the fit.
 
 **Currency Excess Index**

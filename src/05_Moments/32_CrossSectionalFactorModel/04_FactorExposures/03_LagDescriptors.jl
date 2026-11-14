@@ -713,7 +713,7 @@ The Descriptor of an observation equals the one of the batch call [`descriptor`]
 
 # Returns
 
-  - `step::NamedTuple`: `de`, the estimator with the state after the observations in `cache`, and `D`, the Descriptor of each observation, `observations × assets`.
+  - `step::DescriptorStepResult`: `de`, the estimator with the state after the observations in `cache`, and `D`, the Descriptor of each observation, `observations × assets`.
 
 # Related
 
@@ -724,7 +724,7 @@ The Descriptor of an observation equals the one of the batch call [`descriptor`]
 function descriptor_step(de::Union{GrowthRate, ChangeToScale, ChangeInIntensity},
                          rd::ReturnsResult)
     (; st, D) = lag_descriptor_fold(de, rd, de.cache)
-    return (; de = rebuild_struct(de, (; cache = st)), D = D)
+    return DescriptorStepResult(rebuild_struct(de, (; cache = st)), D)
 end
 """
     partial_fit!(de::Union{GrowthRate, ChangeToScale, ChangeInIntensity}, rd::ReturnsResult)

@@ -885,7 +885,7 @@ A volatility Descriptor with any other `ce` has no state to carry, so it takes t
 
 # Returns
 
-  - `step::NamedTuple`: `de`, the estimator with the state after the observations in `cache`, and `D`, the Descriptor of each observation, `observations × assets`.
+  - `step::DescriptorStepResult`: `de`, the estimator with the state after the observations in `cache`, and `D`, the Descriptor of each observation, `observations × assets`.
 
 # Related
 
@@ -898,7 +898,7 @@ function descriptor_step(de::Union{EWVolatility{<:RegimeAdjustedExpWeightedVaria
                                                         <:RegimeAdjustedExpWeightedVariance}},
                          rd::ReturnsResult)
     (; st, D) = ew_volatility_fold(de, rd, de.cache)
-    return (; de = rebuild_struct(de, (; cache = st)), D = D)
+    return DescriptorStepResult(rebuild_struct(de, (; cache = st)), D)
 end
 """
     partial_fit!(de::Union{EWVolatility{<:RegimeAdjustedExpWeightedVariance},
