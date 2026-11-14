@@ -2343,25 +2343,26 @@ end
     end
 
     @testset "sb_pair_scores selects by prefix and comovement_ratio by digit" begin
-        acc = (pos = 7.0, neg = 3.0, nn = 2.0, cpos = 5, cneg = 4, cnn = 6)
+        # The accumulator with every field at zero, and the fields of `kw` replaced.
+        sums(; kw...) = PO.ComovementSums(; pos = 0.0, neg = 0.0, nn = 0.0, cpos = 0,
+                                          cneg = 0, cnn = 0, di = 0.0, dj = 0.0, kw...)
+        acc = sums(; pos = 7.0, neg = 3.0, nn = 2.0, cpos = 5, cneg = 4, cnn = 6)
         @test PO.sb_pair_scores(SmythBroby1(), acc) == (7.0, 3.0, 2.0)
         @test PO.sb_pair_scores(SmythBrobyGerber1(), acc) == (35.0, 12.0, 12.0)
         @test PO.sb_pair_scores(SmythBrobyCount1(), acc) == (5, 4, 6)
 
         # `sb_add_*` fills exactly the slot its name says, and mutates nothing.
-        zero_acc = (pos = 0.0, neg = 0.0, nn = 0.0, cpos = 0, cneg = 0, cnn = 0)
+        zero_acc = sums()
         d = PO.sb_delta(1.5, 0.5, 2)
-        @test PO.sb_add_pos(SmythBroby1(), zero_acc, 1.5, 0.5, 2) ==
-              (pos = d, neg = 0.0, nn = 0.0, cpos = 0, cneg = 0, cnn = 0)
+        @test PO.sb_add_pos(SmythBroby1(), zero_acc, 1.5, 0.5, 2) == sums(; pos = d)
         @test PO.sb_add_pos(SmythBrobyGerber1(), zero_acc, 1.5, 0.5, 2) ==
-              (pos = d, neg = 0.0, nn = 0.0, cpos = 1, cneg = 0, cnn = 0)
-        @test PO.sb_add_pos(SmythBrobyCount1(), zero_acc, 1.5, 0.5, 2) ==
-              (pos = 0.0, neg = 0.0, nn = 0.0, cpos = 1, cneg = 0, cnn = 0)
+              sums(; pos = d, cpos = 1)
+        @test PO.sb_add_pos(SmythBrobyCount1(), zero_acc, 1.5, 0.5, 2) == sums(; cpos = 1)
         @test PO.sb_add_neg(SmythBrobyGerber1(), zero_acc, 1.5, 0.5, 2) ==
-              (pos = 0.0, neg = d, nn = 0.0, cpos = 0, cneg = 1, cnn = 0)
+              sums(; neg = d, cneg = 1)
         @test PO.sb_add_neutral(SmythBrobyGerber1(), zero_acc, 1.5, 0.5, 2) ==
-              (pos = 0.0, neg = 0.0, nn = d, cpos = 0, cneg = 0, cnn = 1)
-        @test zero_acc == (pos = 0.0, neg = 0.0, nn = 0.0, cpos = 0, cneg = 0, cnn = 0)
+              sums(; nn = d, cnn = 1)
+        @test zero_acc == sums()
 
         # Only a trailing `1` marker tracks a neutral observation. Every other marker takes
         # the fall-through, so its neutral score stays at zero and no reduction reads it.

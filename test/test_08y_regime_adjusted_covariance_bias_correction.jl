@@ -350,7 +350,7 @@ end
             @test isapprox(Y[K], sum(abs2, c); rtol = 1e-12)
         end
     end
-    sums = (; mix = 0.006, spread = 0.0056, shift = -0.014)
+    sums = PO.SeparatePathSums(0.006, 0.0056, -0.014)
     # At one asset, and at a correlation of one, the direction reads the variance alone: the
     # table at `decay`, and no shift of the mean.
     @test all(PO.separate_direction_moments(fill(4.0, 1, 1), [1.0], 1e-12, sums) .≈
@@ -366,8 +366,7 @@ end
     @test PO.separate_direction_moments(zeros(2, 2), [0.5, 0.5], 1e-12, sums) == (0.0, 0.0)
     # Equal decays give no spread between the tables, so the weight is zero.
     @test PO.separate_direction_moments([1.0 0.5; 0.5 1.0], [0.5, 0.5], 1e-12,
-                                        (; mix = 0.0, spread = 0.0, shift = 0.0)) ==
-          (0.0, 0.0)
+                                        PO.SeparatePathSums(0.0, 0.0, 0.0)) == (0.0, 0.0)
     # The shift against a direct sum: under HAC a lag adds 2 k² to each squared convolution
     # weight whose older observation is in the window, and without HAC it adds nothing.
     a, b = 2.0^(-1 / 10), 2.0^(-1 / 20)

@@ -338,7 +338,7 @@ The function reduces the block of the tensor alone. This is the rule that [`matr
 
 The function finds the block from the per-asset diagonal of the tensor, `cskew[i, (i - 1) * N + i]`. That entry is the third central moment of asset `i`. It is finite if and only if the fit gives a value for that asset. A non-finite cell inside the block is a triple of assets that the fit estimated, but that share no observation. [`assert_finite_block`](@ref) refuses that cell with an error that names it, so the cell never reaches `eigen`. The spectral step and `mp` run on the block alone. The function then writes the result into a `NaN` frame of the full width, so the row and the column of each asset that the policy refused hold `NaN`.
 
-Every site of the library that reduces a coskewness tensor to `V` calls this function, so the block rule has one definition. The callers include [`_coskewness`](@ref), the available-case arm of [`coverage_coskewness`](@ref), [`port_opt_view`](@ref) of a [`HighOrderPrior`](@ref), the high order factor prior and [`NegativeSkewness`](@ref).
+Every site of the library that reduces a coskewness tensor to `V` calls this function, so the block rule has one definition. The callers include [`_coskewness`](@ref), the available-case arm of [`coskewness`](@ref), [`port_opt_view`](@ref) of a [`HighOrderPrior`](@ref), the high order factor prior and [`NegativeSkewness`](@ref).
 
 # Mathematical definition
 
@@ -437,7 +437,7 @@ function negative_spectral_coskewness(cskew::MatNum, X::MatNum,
     if !frame
         return V
     end
-    Vf = coverage_nan_frame(V, (N0, N0))
+    Vf = coverage_nan_frame(similar(V, (N0, N0)))
     Vf[blk, blk] = V
     return Vf
 end
@@ -547,13 +547,29 @@ The two returned matrices are different objects. The first is the coskewness ten
 
 # Algorithm
 
-The method passes its arguments to [`coverage_coskewness`](@ref), which selects an arm by dispatch on `ske.cvg`. When `ske.cvg` is `nothing`, the arm does these steps.
+The type of `ske.cvg` selects the method, so no branch reads the value of the policy. [`coverage_covariance`](@ref) selects the arm of a covariance in the same way.
+
+When `ske.cvg` is `nothing`, the method takes the Coverage Universe arm. It centres the whole window on one vector. The [`FullMoment`](@ref) and the [`SemiMoment`](@ref) methods differ only in step 5.
 
  1. Orient `X` to observations × assets with [`dims_oriented`](@ref), which validates `dims`.
- 2. Resolve the observation weights `w` from `ske.w` with [`get_observation_weights`](@ref).
- 3. Resolve the centre `mu` from `ske.me` and `ske.w` with [`weighted_centre`](@ref), which reads `mean` when the caller gave one.
- 4. Form the deviation matrix `Y`. [`FullMoment`](@ref) takes `X .- mu`, and [`SemiMoment`](@ref) takes `min.(X .- mu, 0)`.
- 5. Delegate to [`_coskewness`](@ref) with `Y`, `X`, `ske.mp` and `w`, and return the pair it returns.
+ 2. Refuse an inactive cell of `active_mask` with [`assert_finite_sample`](@ref), because a plain estimator reads that cell as a non-finite return.
+ 3. Resolve the observation weights `w` from `ske.w` with [`get_observation_weights`](@ref).
+ 4. Resolve the centre `mu` from `ske.me` and `ske.w` with [`weighted_centre`](@ref), which reads `mean` when the caller gave one.
+ 5. Form the deviation matrix `Y`. [`FullMoment`](@ref) takes `X .- mu`, and [`SemiMoment`](@ref) takes `min.(X .- mu, 0)`.
+ 6. Delegate to [`_coskewness`](@ref) with `Y`, `X`, `ske.mp` and `w`, and return the pair it returns.
+
+When `ske.cvg` is a [`CoveragePolicy`](@ref), the method takes the available-case arm. It fits each triple on the observations at which its three assets are all finite and active, so each cell has its own denominator. The centre of each asset is the available-case mean of that asset, over its own finite and active observations. It is not a mean over the observations of the triple, because a centre for each triple needs `assets³` running means. The [`SemiMoment`](@ref) arm of [`coverage_covariance`](@ref) centres each asset on its own mean for the same reason. So the arm refuses an external `mean`, as that arm does. The [`FullMoment`](@ref) and [`SemiMoment`](@ref) cases differ only in the clip, so they share one method through [`coverage_comoment_block`](@ref). Neither case folds. An exact recursion for each cell at this order needs the pairwise second comoments over the observations of each triple. So the online form of an available-case coskewness refits a buffer through [`Online`](@ref).
+
+ 1. Get the valid entries, the deviations from the available-case centre of each asset, and the mask of the admitted assets with [`coverage_comoment_block`](@ref).
+ 2. Take the numerator as `transpose(Y) * z` and the denominator as `transpose(Mi) * zc`, where `z` and `zc` are the pairwise expansions of the zeroed deviations and of the valid mask.
+ 3. Divide with [`coverage_divide`](@ref), and frame the refused assets down the asset axis and the pair axis with [`coverage_refuse_comoment!`](@ref).
+ 4. Reduce the frame with [`negative_spectral_coskewness`](@ref), which keeps the block rule.
+
+When `ske.w` holds observation weights as well, the available-case arm makes one weighted pass, because the weights describe the whole sample.
+
+ 1. Read the deviations, the valid entries and the admitted assets with [`weighted_comoment_block`](@ref).
+ 2. Build the third co-moment with [`weighted_comoment`](@ref), and reshape it to `N × N²`.
+ 3. Frame the refused assets with [`coverage_refuse_comoment!`](@ref), and take the negative spectral coskewness with [`negative_spectral_coskewness`](@ref).
 
 # Arguments
 
@@ -569,9 +585,9 @@ The method passes its arguments to [`coverage_coskewness`](@ref), which selects 
 
   - `mean`: The optional mean vector. When it is `nothing`, the method computes the centre with `ske.me` and `ske.w`. The available-case arm refuses a mean vector.
 
-  - `active_mask`: The active mask of the Asset Panel over the window, or `nothing`. [`coverage_coskewness`](@ref) states how each arm reads it.
+  - `active_mask`: The active mask of the Asset Panel over the window, or `nothing`. The Coverage Universe arm refuses an inactive cell, as it refuses a non-finite return. The available-case arm leaves the cell out of each comoment of its asset.
 
-  - `kwargs...`: More keyword arguments. When `ske.cvg` is `nothing`, the method passes them to [`get_observation_weights`](@ref) and to [`weighted_centre`](@ref).
+  - `kwargs...`: More keyword arguments. When `ske.cvg` is `nothing`, the method passes them to [`get_observation_weights`](@ref) and to [`weighted_centre`](@ref). The available-case arm ignores them.
 
 # Validation
 
@@ -609,62 +625,16 @@ julia> V
 # Related
 
   - [`Coskewness`](@ref)
+  - [`CoveragePolicy`](@ref)
   - [`_coskewness`](@ref)
   - [`weighted_centre`](@ref)
   - [`negative_spectral_coskewness`](@ref)
-"""
-function coskewness(ske::Coskewness, X::MatNum; dims::Int = 1, mean = nothing,
-                    active_mask::Option{<:AbstractMatrix{<:Bool}} = nothing, kwargs...)
-    return coverage_coskewness(ske, ske.cvg, X; dims = dims, mean = mean,
-                               active_mask = active_mask, kwargs...)
-end
-"""
-    coverage_coskewness(ske, cvg, X; dims::Int = 1, mean = nothing,
-                        active_mask = nothing, kwargs...) -> (MatNum, MatNum)
-
-Computes the coskewness tensor and its negative spectral skewness matrix with the arm that the coverage policy of the estimator selects.
-
-The caller passes the `cvg` field of the estimator as the second argument. So dispatch on the policy selects the arm, and no branch reads the value of the policy. [`coverage_covariance`](@ref) selects the arm of a covariance in the same way. The moment algorithm of `ske` sets the deviations from the mean of each asset. [`FullMoment`](@ref) keeps them whole, and [`SemiMoment`](@ref) sets each positive deviation to zero.
-
-# Arguments
-
-  - `ske`: The coskewness estimator.
-  - `cvg`: The coverage policy of the estimator, which selects the arm.
-  - `X`: The data matrix (observations × assets).
-  - $(arg_dict[:dims])
-  - `mean`: The optional mean vector. The available-case arm refuses one.
-  - `active_mask`: The active mask of the Asset Panel over the window, or `nothing`. The Coverage Universe arm refuses an inactive cell, as it refuses a non-finite return. The available-case arm leaves the cell out of each comoment of its asset.
-  - `kwargs...`: More keyword arguments. The Coverage Universe arm passes them to [`get_observation_weights`](@ref) and to [`weighted_centre`](@ref).
-
-# Returns
-
-  - $(ret_dict[:cskew])
-  - $(ret_dict[:cskewV])
-
-# Related
-
-  - [`Coskewness`](@ref)
-  - [`CoveragePolicy`](@ref)
-  - [`coverage_covariance`](@ref)
   - [`coverage_comoment_block`](@ref)
+  - [`weighted_comoment`](@ref)
 """
-function coverage_coskewness end
-"""
-$(DocStringExtensions.TYPEDSIGNATURES)
-
-Computes the [`FullMoment`](@ref) arm of [`coverage_coskewness`](@ref) for an estimator with no coverage policy.
-
-This is the Coverage Universe arm. It centres the whole window on one vector and delegates to [`_coskewness`](@ref). It refuses an inactive cell of `active_mask` with [`assert_finite_sample`](@ref), because a plain estimator reads that cell as a non-finite return.
-
-# Related
-
-  - [`coverage_coskewness`](@ref)
-  - [`_coskewness`](@ref)
-"""
-function coverage_coskewness(ske::Coskewness{<:Any, <:Any, <:FullMoment}, ::Nothing,
-                             X::MatNum; dims::Int = 1, mean = nothing,
-                             active_mask::Option{<:AbstractMatrix{<:Bool}} = nothing,
-                             kwargs...)
+function coskewness(ske::Coskewness{<:Any, <:Any, <:FullMoment, <:Any, Nothing}, X::MatNum;
+                    dims::Int = 1, mean = nothing,
+                    active_mask::Option{<:AbstractMatrix{<:Bool}} = nothing, kwargs...)
     X = dims_oriented(dims, X)
     assert_finite_sample(X, dims_oriented(dims, active_mask))
     w = get_observation_weights(ske.w, X; dims = 1, kwargs...)
@@ -672,22 +642,9 @@ function coverage_coskewness(ske::Coskewness{<:Any, <:Any, <:FullMoment}, ::Noth
     Y = X .- mu
     return _coskewness(Y, X, ske.mp, w)
 end
-"""
-$(DocStringExtensions.TYPEDSIGNATURES)
-
-Computes the [`SemiMoment`](@ref) arm of [`coverage_coskewness`](@ref) for an estimator with no coverage policy.
-
-This is the Coverage Universe arm. It centres the whole window on one vector, sets each positive deviation to zero, and delegates to [`_coskewness`](@ref). It refuses an inactive cell of `active_mask` with [`assert_finite_sample`](@ref), because a plain estimator reads that cell as a non-finite return.
-
-# Related
-
-  - [`coverage_coskewness`](@ref)
-  - [`_coskewness`](@ref)
-"""
-function coverage_coskewness(ske::Coskewness{<:Any, <:Any, <:SemiMoment}, ::Nothing,
-                             X::MatNum; dims::Int = 1, mean = nothing,
-                             active_mask::Option{<:AbstractMatrix{<:Bool}} = nothing,
-                             kwargs...)
+function coskewness(ske::Coskewness{<:Any, <:Any, <:SemiMoment, <:Any, Nothing}, X::MatNum;
+                    dims::Int = 1, mean = nothing,
+                    active_mask::Option{<:AbstractMatrix{<:Bool}} = nothing, kwargs...)
     X = dims_oriented(dims, X)
     assert_finite_sample(X, dims_oriented(dims, active_mask))
     w = get_observation_weights(ske.w, X; dims = 1, kwargs...)
@@ -695,40 +652,15 @@ function coverage_coskewness(ske::Coskewness{<:Any, <:Any, <:SemiMoment}, ::Noth
     Y = min.(X .- mu, zero(eltype(X)))
     return _coskewness(Y, X, ske.mp, w)
 end
-"""
-$(DocStringExtensions.TYPEDSIGNATURES)
-
-Computes the available-case arm of [`coverage_coskewness`](@ref) for an estimator with a [`CoveragePolicy`](@ref).
-
-The method fits each triple on the observations at which its three assets are all finite and active. Each cell has its own denominator.
-
-The centre of each asset is the available-case mean of that asset, over its own finite and active observations. It is not a mean over the observations of the triple, because a centre for each triple needs `assets³` running means. The [`SemiMoment`](@ref) arm of [`coverage_covariance`](@ref) centres each asset on its own mean for the same reason. So the method refuses an external `mean`, as that arm does.
-
-The [`FullMoment`](@ref) and [`SemiMoment`](@ref) cases differ only in the clip, so they share this method through [`coverage_comoment_block`](@ref). Neither case folds. An exact recursion for each cell at this order needs the pairwise second comoments over the observations of each triple. So the online form of an available-case coskewness refits a buffer through [`Online`](@ref).
-
-# Algorithm
-
- 1. Get the valid entries, the deviations from the available-case centre of each asset, and the mask of the admitted assets with [`coverage_comoment_block`](@ref).
- 2. Take the numerator as `transpose(Y) * z` and the denominator as `transpose(Mi) * zc`, where `z` and `zc` are the pairwise expansions of the zeroed deviations and of the valid mask.
- 3. Divide with [`coverage_divide`](@ref), and frame the refused assets down the asset axis and the pair axis with [`coverage_refuse_comoment!`](@ref).
- 4. Reduce the frame with [`negative_spectral_coskewness`](@ref), which keeps the block rule.
-
-# Related
-
-  - [`coverage_coskewness`](@ref)
-  - [`coverage_comoment_block`](@ref)
-  - [`coverage_divide`](@ref)
-  - [`negative_spectral_coskewness`](@ref)
-"""
-function coverage_coskewness(ske::Coskewness, cvg::CoveragePolicy, X::MatNum; dims::Int = 1,
-                             mean = nothing,
-                             active_mask::Option{<:AbstractMatrix{<:Bool}} = nothing,
-                             kwargs...)
+# The available-case arm. The weighted method of this arm is in `39_WeightedAvailableCase.jl`.
+function coskewness(ske::Coskewness{<:Any, <:Any, <:Any, <:Any, <:CoveragePolicy},
+                    X::MatNum; dims::Int = 1, mean = nothing,
+                    active_mask::Option{<:AbstractMatrix{<:Bool}} = nothing, kwargs...)
     assert_dims(dims)
     assert_partial_fittable(ske.me, ske.w, "Coskewness")
     @argcheck(isnothing(mean),
               ArgumentError("an available-case coskewness centres each asset on that asset's own observations, so it cannot take a centre fitted over the whole window. Pass `mean = nothing`, or clear `cvg`."))
-    Xo, Y, Mi, z, zc, cmsk = coverage_comoment_block(ske.alg, cvg, X, active_mask, dims)
+    Xo, Y, Mi, z, zc, cmsk = coverage_comoment_block(ske.alg, ske.cvg, X, active_mask, dims)
     cskew = coverage_divide(transpose(Y) * z, transpose(Mi) * zc, false, nothing)
     coverage_refuse_comoment!(cskew, cmsk, Val(:sk))
     return cskew, negative_spectral_coskewness(cskew, Xo, ske.mp)

@@ -196,40 +196,16 @@ function weighted_correlation_estimator(ce::StatsBase.SimpleCovariance,
     end
 end
 """
-    coverage_inner_corrected(ce::GeneralCovariance) -> Bool
-    coverage_inner_corrected(ce::StatsBase.CovarianceEstimator) -> Bool
-
-Returns the bias correction of the inner estimator of a weighted available-case [`Covariance`](@ref).
-
-The weights of the `Covariance` replace the weights of a [`GeneralCovariance`](@ref), as [`covariance_inner_estimator`](@ref) states, so the function passes through a `GeneralCovariance` without reading its weights. Then [`partial_fit_corrected`](@ref) reads the flag of the `StatsBase.SimpleCovariance`, and it refuses every other estimator.
-
-# Arguments
-
-  - $(arg_dict[:ce])
-
-# Returns
-
-  - `corrected::Bool`: The bias correction of the innermost `StatsBase.SimpleCovariance`.
-
-# Related
-
-  - [`partial_fit_corrected`](@ref)
-  - [`assert_coverage_fittable`](@ref)
-"""
-function coverage_inner_corrected(ce::GeneralCovariance)
-    return partial_fit_corrected(ce.ce)
-end
-function coverage_inner_corrected(ce::StatsBase.CovarianceEstimator)
-    return partial_fit_corrected(ce)
-end
-"""
-    coverage_fittable_estimator(w::Nothing, ce::StatsBase.CovarianceEstimator) -> Bool
-    coverage_fittable_estimator(w::Nothing, ce::GeneralCovariance) -> Bool
-    coverage_fittable_estimator(w::ObsWeights, ce::StatsBase.CovarianceEstimator) -> Bool
+    coverage_inner_corrected(w::Nothing, ce::StatsBase.CovarianceEstimator) -> Bool
+    coverage_inner_corrected(w::Nothing, ce::GeneralCovariance) -> Bool
+    coverage_inner_corrected(w::ObsWeights, ce::GeneralCovariance) -> Bool
+    coverage_inner_corrected(w::ObsWeights, ce::StatsBase.CovarianceEstimator) -> Bool
 
 Refuses the inner estimator of a [`Covariance`](@ref) that its available-case arm cannot fit, and returns its bias correction.
 
-The type of the weights of the `Covariance` selects the arm. With no weights the arm folds, through [`partial_fit_corrected`](@ref). The available-case arm reads the weights of the `Covariance` alone, so an inner [`GeneralCovariance`](@ref) with weights of its own is refused, and the message tells the caller to set the weights on the `Covariance`. With weights the arm makes one pass, and [`coverage_inner_corrected`](@ref) passes through the weights of the inner estimator, which the weights of the `Covariance` replace.
+The type of the weights of the `Covariance` selects the arm. With no weights the arm folds, through [`partial_fit_corrected`](@ref). The available-case arm reads the weights of the `Covariance` alone, so an inner [`GeneralCovariance`](@ref) with weights of its own is refused, and the message tells the caller to set the weights on the `Covariance`. With weights the arm makes one pass. The weights of the `Covariance` replace the weights of a `GeneralCovariance`, as [`covariance_inner_estimator`](@ref) states, so the function passes through a `GeneralCovariance` without reading its weights. In each arm, [`partial_fit_corrected`](@ref) reads the flag of the `StatsBase.SimpleCovariance`, and it refuses every other estimator.
+
+[`assert_coverage_fittable`](@ref) calls the function at construction, and the weighted available-case arm of [`coverage_covariance`](@ref) calls it for the correction of its pairs.
 
 # Arguments
 
@@ -244,18 +220,20 @@ The type of the weights of the `Covariance` selects the arm. With no weights the
 
   - [`assert_coverage_fittable`](@ref)
   - [`partial_fit_corrected`](@ref)
-  - [`coverage_inner_corrected`](@ref)
 """
-function coverage_fittable_estimator(::Nothing, ce::StatsBase.CovarianceEstimator)
+function coverage_inner_corrected(::Nothing, ce::StatsBase.CovarianceEstimator)
     return partial_fit_corrected(ce)
 end
-function coverage_fittable_estimator(::Nothing, ce::GeneralCovariance)
+function coverage_inner_corrected(::Nothing, ce::GeneralCovariance)
     @argcheck(isnothing(ce.w),
               ArgumentError("a `Covariance` with a `CoveragePolicy` reads the observation weights of its own `w`, and not the weights of its inner `GeneralCovariance`. Set the weights on the `Covariance`, as `Covariance(; w = w, cvg = cvg)`, or clear `cvg`."))
     return partial_fit_corrected(ce.ce)
 end
-function coverage_fittable_estimator(::ObsWeights, ce::StatsBase.CovarianceEstimator)
-    return coverage_inner_corrected(ce)
+function coverage_inner_corrected(::ObsWeights, ce::GeneralCovariance)
+    return partial_fit_corrected(ce.ce)
+end
+function coverage_inner_corrected(::ObsWeights, ce::StatsBase.CovarianceEstimator)
+    return partial_fit_corrected(ce)
 end
 """
     weighted_pair_sample(alg::FullMoment, Xo::MatNum, msk::AbstractMatrix{Bool},
@@ -379,7 +357,7 @@ function coverage_covariance(f::F,
     assert_dims(dims)
     @argcheck(isnothing(mean),
               ArgumentError("an available-case covariance centres each asset on that asset's own observations, so it cannot take a centre fitted over the whole window. Pass `mean = nothing`, or clear `cvg`."))
-    corrected = coverage_inner_corrected(ce.ce)
+    corrected = coverage_inner_corrected(ce.w, ce.ce)
     Xo, msk, _, active, stale = coverage_valid_block(X, active_mask, cvg.alg; dims = dims)
     D, m = weighted_pair_sample(ce.alg, Xo, msk, ce.w)
     N = size(Xo, 2)
@@ -459,8 +437,8 @@ A cell reads the rows of its own assets, and a dynamic weight resolves on each c
 # Related
 
   - [`weighted_comoment_cell`](@ref)
-  - [`coverage_coskewness`](@ref)
-  - [`coverage_cokurtosis`](@ref)
+  - [`coskewness`](@ref)
+  - [`cokurtosis`](@ref)
 """
 function weighted_comoment(Y::MatNum, Xo::MatNum, msk::AbstractMatrix{Bool}, w::ObsWeights,
                            ::Val{K}) where {K}
@@ -510,61 +488,31 @@ function weighted_comoment_block(alg::AbstractMomentAlgorithm, cvg::CoveragePoli
     counts = CoverageCounts(vec(count(msk; dims = 1)), nothing, active, stale)
     return Xo, Y, msk, coverage_admission(cvg, counts, size(Xo, 1))
 end
-"""
-$(DocStringExtensions.TYPEDSIGNATURES)
-
-The weighted method of the available-case arm of [`coverage_coskewness`](@ref). A [`Coskewness`](@ref) with observation weights and a [`CoveragePolicy`](@ref) calls it.
-
-# Algorithm
-
- 1. Refuse a `mean` from the caller.
- 2. Read the deviations, the valid entries and the admitted assets with [`weighted_comoment_block`](@ref).
- 3. Build the third co-moment with [`weighted_comoment`](@ref), and reshape it to `N × N²`.
- 4. Frame the refused assets with [`coverage_refuse_comoment!`](@ref), and take the negative spectral coskewness with [`negative_spectral_coskewness`](@ref).
-
-# Related
-
-  - [`coverage_coskewness`](@ref)
-  - [`weighted_comoment`](@ref)
-"""
-function coverage_coskewness(ske::Coskewness{<:Any, <:Any, <:Any, <:ObsWeights},
-                             cvg::CoveragePolicy, X::MatNum; dims::Int = 1, mean = nothing,
-                             active_mask::Option{<:AbstractMatrix{<:Bool}} = nothing,
-                             kwargs...)
+# The weighted method of the available-case arm of `coskewness`, whose docstring states its
+# steps.
+function coskewness(ske::Coskewness{<:Any, <:Any, <:Any, <:ObsWeights, <:CoveragePolicy},
+                    X::MatNum; dims::Int = 1, mean = nothing,
+                    active_mask::Option{<:AbstractMatrix{<:Bool}} = nothing, kwargs...)
     assert_dims(dims)
     @argcheck(isnothing(mean),
               ArgumentError("an available-case coskewness centres each asset on that asset's own observations, so it cannot take a centre fitted over the whole window. Pass `mean = nothing`, or clear `cvg`."))
-    Xo, Y, msk, cmsk = weighted_comoment_block(ske.alg, cvg, X, active_mask, ske.w, dims)
+    Xo, Y, msk, cmsk = weighted_comoment_block(ske.alg, ske.cvg, X, active_mask, ske.w,
+                                               dims)
     N = size(Xo, 2)
     cskew = reshape(weighted_comoment(Y, Xo, msk, ske.w, Val(3)), N, N^2)
     coverage_refuse_comoment!(cskew, cmsk, Val(:sk))
     return cskew, negative_spectral_coskewness(cskew, Xo, ske.mp)
 end
-"""
-$(DocStringExtensions.TYPEDSIGNATURES)
-
-The weighted method of the available-case arm of [`coverage_cokurtosis`](@ref). A [`Cokurtosis`](@ref) with observation weights and a [`CoveragePolicy`](@ref) calls it.
-
-# Algorithm
-
- 1. Refuse a `mean` from the caller.
- 2. Read the deviations, the valid entries and the admitted assets with [`weighted_comoment_block`](@ref).
- 3. Build the fourth co-moment with [`weighted_comoment`](@ref), and reshape it to `N² × N²`.
- 4. Frame the refused assets with [`coverage_refuse_comoment!`](@ref), and repair the block with [`matrix_processing_block!`](@ref).
-
-# Related
-
-  - [`coverage_cokurtosis`](@ref)
-  - [`weighted_comoment`](@ref)
-"""
-function coverage_cokurtosis(kte::Cokurtosis{<:Any, <:Any, <:Any, <:ObsWeights},
-                             cvg::CoveragePolicy, X::MatNum; dims::Int = 1, mean = nothing,
-                             active_mask::Option{<:AbstractMatrix{<:Bool}} = nothing,
-                             kwargs...)
+# The weighted method of the available-case arm of `cokurtosis`, whose docstring states its
+# steps.
+function cokurtosis(kte::Cokurtosis{<:Any, <:Any, <:Any, <:ObsWeights, <:CoveragePolicy},
+                    X::MatNum; dims::Int = 1, mean = nothing,
+                    active_mask::Option{<:AbstractMatrix{<:Bool}} = nothing, kwargs...)
     assert_dims(dims)
     @argcheck(isnothing(mean),
               ArgumentError("an available-case cokurtosis centres each asset on that asset's own observations, so it cannot take a centre fitted over the whole window. Pass `mean = nothing`, or clear `cvg`."))
-    Xo, Y, msk, cmsk = weighted_comoment_block(kte.alg, cvg, X, active_mask, kte.w, dims)
+    Xo, Y, msk, cmsk = weighted_comoment_block(kte.alg, kte.cvg, X, active_mask, kte.w,
+                                               dims)
     N = size(Xo, 2)
     ckurt = reshape(weighted_comoment(Y, Xo, msk, kte.w, Val(4)), N^2, N^2)
     coverage_refuse_comoment!(ckurt, cmsk, Val(:kt))

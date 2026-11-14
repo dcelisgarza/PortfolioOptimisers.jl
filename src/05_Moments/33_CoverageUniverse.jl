@@ -236,12 +236,11 @@ function coverage_mask_source(::Option{<:AssetPanel}, active_mask::AbstractMatri
     return dims_oriented(dims, active_mask)
 end
 """
-    coverage_sentinel(cmsk::BitVector) -> Option{BitVector}
-    coverage_sentinel(cmsk::BitVector, msg::AbstractString) -> Option{BitVector}
+    coverage_sentinel(cmsk::BitVector, msg::AbstractString = "…") -> Option{BitVector}
 
 Refuse an empty Coverage Universe, and collapse a complete one onto the `nothing` sentinel.
 
-Every [`coverage_mask`](@ref) method ends with this call, so the file holds one copy of the refusal and of the sentinel. A method that reads one more input passes its own `msg`, because this function cannot know why an asset left the Coverage Universe. The implied volatility method of [`coverage_mask`](@ref) reads a surface too, and a message that names only the returns and the Asset Panel sends its caller to the wrong input.
+Every [`coverage_mask`](@ref) method ends with this call, so the file holds one copy of the refusal and of the sentinel. The default `msg` names the returns and the Asset Panel. A method that reads one more input passes its own `msg`, because this function cannot know why an asset left the Coverage Universe. The implied volatility method of [`coverage_mask`](@ref) reads a surface too, and a message that names only the returns and the Asset Panel sends its caller to the wrong input.
 
 # Algorithm
 
@@ -252,7 +251,7 @@ Every [`coverage_mask`](@ref) method ends with this call, so the file holds one 
 # Arguments
 
   - `cmsk`: The raw coverage mask, one entry per asset.
-  - `msg`: The refusal message, which names every input that the caller read to derive the mask.
+  - `msg`: The refusal message, which names every input that the caller read to derive the mask. The default names the returns and the Asset Panel.
 
 # Validation
 
@@ -267,11 +266,8 @@ Every [`coverage_mask`](@ref) method ends with this call, so the file holds one 
   - [`coverage_mask`](@ref)
   - [`IsEmptyError`](@ref)
 """
-function coverage_sentinel(cmsk::BitVector)::Option{BitVector}
-    return coverage_sentinel(cmsk,
-                             "no asset is in the Coverage Universe of this window: every asset carries a non-finite return, or an inactive row of the Asset Panel, at some observation. Check that the window holds at least one asset that is listed and quoted throughout it.")
-end
-function coverage_sentinel(cmsk::BitVector, msg::AbstractString)::Option{BitVector}
+function coverage_sentinel(cmsk::BitVector,
+                           msg::AbstractString = "no asset is in the Coverage Universe of this window: every asset carries a non-finite return, or an inactive row of the Asset Panel, at some observation. Check that the window holds at least one asset that is listed and quoted throughout it.")::Option{BitVector}
     @argcheck(any(cmsk), IsEmptyError(msg))
     return all(cmsk) ? nothing : cmsk
 end
@@ -486,27 +482,23 @@ function coverage_columns(A::MatNum, cmsk::BitVector, dims::Int)
     return isone(dims) ? A[:, cmsk] : A[cmsk, :]
 end
 """
-    coverage_nan_frame(A::AbstractArray, sz::Dims) -> AbstractArray
     coverage_nan_frame(frame::AbstractArray) -> AbstractArray
 
-Allocate the `NaN` frame that a moment expands into.
+Fill the `NaN` frame that a moment expands into.
 
-The one-argument method fills a frame that the caller allocated, after the same refusal. [`coverage_series_frame`](@ref) calls it, because the frame of a variance series takes the element type of a variance, not the element type of the sample.
+The caller allocates the frame. A moment of a block allocates it as `similar(A, sz)`, where `A` is the block that the caller writes into the frame and `sz` is the size of the frame. [`coverage_series_frame`](@ref) allocates it with the element type of a variance, because the frame of a variance series takes the element type of a variance, not the element type of the sample.
 
-The frame takes its element type from the block through `similar`, not from `eltype(A)`. [`MatNum`](@ref) admits a `JuMP` scalar as well as a number, so at inference `eltype` of a `MatNum` splits into two branches, and a moment only takes the numeric one. `similar` keeps the frame in the element type of the block and leaves no branch that no call reaches.
+The frame of a moment takes its element type from the block through `similar`, not from `eltype(A)`. [`MatNum`](@ref) admits a `JuMP` scalar as well as a number, so at inference `eltype` of a `MatNum` splits into two branches, and a moment only takes the numeric one. `similar` keeps the frame in the element type of the block and leaves no branch that no call reaches.
 
-The element type of the block must hold `NaN`. An `Integer` and a `Rational` have no `NaN`, and a moment of a `Rational` sample stays `Rational`, so the function refuses both before it writes the frame. The function does not widen the type, because a sentinel is not an arithmetic operation, and the data sets the type. A caller with a `Rational` sample and a gap converts the sample to a floating-point type, or fills the gap so that every asset is in the Coverage Universe.
+The element type of the frame must hold `NaN`. An `Integer` and a `Rational` have no `NaN`, and a moment of a `Rational` sample stays `Rational`, so the function refuses both before it writes the frame. The function does not widen the type, because a sentinel is not an arithmetic operation, and the data sets the type. A caller with a `Rational` sample and a gap converts the sample to a floating-point type, or fills the gap so that every asset is in the Coverage Universe.
 
 # Algorithm
 
- 1. Allocate `frame`, an array of `sz`, of the same kind and element type as `A`. The one-argument method takes `frame` from the caller.
- 2. Refuse the frame when its element type is an `Integer` or a `Rational`.
- 3. Fill it with `NaN`, and return it.
+ 1. Refuse the frame when its element type is an `Integer` or a `Rational`.
+ 2. Fill it with `NaN`, and return it.
 
 # Arguments
 
-  - `A`: The block that the caller writes into the frame.
-  - `sz`: Size of the frame.
   - `frame`: A frame that the caller allocated.
 
 # Validation
@@ -515,15 +507,12 @@ The element type of the block must hold `NaN`. An `Integer` and a `Rational` hav
 
 # Returns
 
-  - `frame::AbstractArray`: An array of size `sz`, filled with `NaN`.
+  - `frame::AbstractArray`: `frame`, filled with `NaN`.
 
 # Related
 
   - [`expand_moment`](@ref)
 """
-function coverage_nan_frame(A::AbstractArray, sz::Dims)
-    return coverage_nan_frame(similar(A, sz))
-end
 function coverage_nan_frame(frame::AbstractArray)
     @argcheck(!(eltype(frame) <: Union{Integer, Rational}),
               ArgumentError("a moment on the full asset universe carries NaN outside the Coverage Universe, and its element type $(eltype(frame)) cannot hold NaN. Convert the sample to a floating-point type, or fill its gaps so that every asset is in the Coverage Universe."))
@@ -602,7 +591,7 @@ function expand_columns(A::MatNum, ::Nothing)
     return A
 end
 function expand_columns(A::MatNum, cmsk::BitVector)
-    frame = coverage_nan_frame(A, (size(A, 1), length(cmsk)))
+    frame = coverage_nan_frame(similar(A, (size(A, 1), length(cmsk))))
     frame[:, cmsk] = A
     return frame
 end
@@ -666,7 +655,7 @@ function expand_rows(A::MatNum, ::Nothing)
     return A
 end
 function expand_rows(A::MatNum, cmsk::BitVector)
-    frame = coverage_nan_frame(A, (length(cmsk), size(A, 2)))
+    frame = coverage_nan_frame(similar(A, (length(cmsk), size(A, 2))))
     frame[cmsk, :] = A
     return frame
 end
@@ -828,7 +817,7 @@ function expand_moment(m, ::Nothing, ::Val{:kt})
 end
 function expand_moment(sigma::MatNum, cmsk::BitVector)
     N = length(cmsk)
-    frame = coverage_nan_frame(sigma, (N, N))
+    frame = coverage_nan_frame(similar(sigma, (N, N)))
     frame[cmsk, cmsk] = sigma
     return frame
 end
@@ -836,18 +825,18 @@ function expand_moment(::Nothing, ::BitVector)
     return nothing
 end
 function expand_moment(v::VecNum, cmsk::BitVector, ::Int = 1)
-    frame = coverage_nan_frame(v, (length(cmsk),))
+    frame = coverage_nan_frame(similar(v, (length(cmsk),)))
     frame[cmsk] = v
     return frame
 end
 function expand_moment(mu::MatNum, cmsk::BitVector, dims::Int)
     N = length(cmsk)
     return if isone(dims)
-        frame = coverage_nan_frame(mu, (1, N))
+        frame = coverage_nan_frame(similar(mu, (1, N)))
         frame[1, cmsk] = mu
         frame
     else
-        frame = coverage_nan_frame(mu, (N, 1))
+        frame = coverage_nan_frame(similar(mu, (N, 1)))
         frame[cmsk, 1] = mu
         frame
     end
@@ -855,14 +844,14 @@ end
 function expand_moment(skV::Tuple{MatNum, MatNum}, cmsk::BitVector)
     sk, V = skV
     N = length(cmsk)
-    frame = coverage_nan_frame(sk, (N, N^2))
+    frame = coverage_nan_frame(similar(sk, (N, N^2)))
     frame[cmsk, coverage_pair_index(cmsk)] = sk
     return frame, expand_moment(V, cmsk)
 end
 function expand_moment(kt::MatNum, cmsk::BitVector, ::Val{:kt})
     N = length(cmsk)
     idx = coverage_pair_index(cmsk)
-    frame = coverage_nan_frame(kt, (N^2, N^2))
+    frame = coverage_nan_frame(similar(kt, (N^2, N^2)))
     frame[idx, idx] = kt
     return frame
 end
@@ -1034,7 +1023,7 @@ A variance divides, so the frame takes the element type of `X`. A `Float32` samp
 
 # Related
 
-  - [`coverage_variance_series`](@ref)
+  - [`variance_series`](@ref)
   - [`panel_moment_masks`](@ref)
 """
 function coverage_series_frame(X::MatNum, pnl::Option{<:AssetPanel})
@@ -1211,7 +1200,17 @@ Fit a point-in-time variance series on the Coverage Universe of each expanding w
 
 [`variance_series`](@ref) refits its estimator once per observation, so each window meets the refusal of [`assert_finite_sample`](@ref) on its own. Each window is reduced to its own Coverage Universe, not to the Coverage Universe of the whole sample. Every window starts at the first row, so an asset that lists after the first row is outside the Coverage Universe of every window, and its column is `NaN` throughout.
 
-The method calls [`coverage_variance_series`](@ref) with no policy, and its `Nothing` method runs the steps. A mask-aware estimator overrides this method and takes the whole window, as it overrides [`Statistics.cov(ce::AbstractCovarianceEstimator, X::MatNum, pnl::Option{<:AssetPanel}; dims::Int = 1, kwargs...)`](@ref).
+A mask-aware estimator overrides this method and takes the whole window, as it overrides [`Statistics.cov(ce::AbstractCovarianceEstimator, X::MatNum, pnl::Option{<:AssetPanel}; dims::Int = 1, kwargs...)`](@ref). A [`Covariance`](@ref) or a [`SimpleVariance`](@ref) with a [`CoveragePolicy`](@ref) takes the available-case method of `variance_series`, which follows this method in the source. Either of them with no policy takes this method. The series refits the estimator at each observation and writes the frame one row at a time, so it does not go through [`coverage_panel_moment`](@ref), which writes the frame once at the end.
+
+# Algorithm
+
+ 1. Orient `X` to `observations × assets` with [`dims_oriented`](@ref).
+ 2. Allocate `val`, the `NaN` frame, and read `amsk`, the active mask, with [`coverage_series_frame`](@ref).
+ 3. For each observation `t`, take `Xt`, rows `1` to `t` of `X`.
+ 4. Set `cmsk` to the assets whose returns are finite at every row of `Xt` and, when `amsk` is not `nothing`, whose entries of `amsk` are `true` at every one of those rows.
+ 5. Skip row `t` when `cmsk` holds no asset, so the whole row keeps its `NaN`.
+ 6. Otherwise fit the variance of the estimator on the columns `cmsk` of `Xt`, and write it into the entries `cmsk` of row `t` of `val`. The fit reads the observation weights of the estimator at rows `1` to `t`, cut with [`obs_weights_view`](@ref).
+ 7. Return `val`, transposed when `dims == 2`.
 
 # Mathematical definition
 
@@ -1249,14 +1248,27 @@ Where:
 # Related
 
   - [`variance_series(ce::AbstractCovarianceEstimator, X::MatNum; dims::Int = 1, kwargs...)`](@ref)
-  - [`coverage_variance_series`](@ref)
   - [`coverage_series_frame`](@ref)
   - [`Statistics.cov(ce::AbstractCovarianceEstimator, X::MatNum, pnl::Option{<:AssetPanel}; dims::Int = 1, kwargs...)`](@ref)
   - [`AssetPanel`](@ref)
 """
 function variance_series(ce::AbstractCovarianceEstimator, X::MatNum,
                          pnl::Option{<:AssetPanel}; dims::Int = 1, kwargs...)
-    return coverage_variance_series(ce, nothing, X, pnl; dims = dims, kwargs...)
+    X = dims_oriented(dims, X)
+    val, amsk = coverage_series_frame(X, pnl)
+    for t in axes(X, 1)
+        Xt = view(X, 1:t, :)
+        cmsk = vec(all(isfinite, Xt; dims = 1))
+        if !isnothing(amsk)
+            cmsk .&= vec(all(view(amsk, 1:t, :); dims = 1))
+        end
+        if !any(cmsk)
+            continue
+        end
+        val[t, cmsk] = vec(Statistics.var(obs_weights_view(ce, 1:t), Xt[:, cmsk]; dims = 1,
+                                          kwargs...))
+    end
+    return isone(dims) ? val : permutedims(val)
 end
 """
     coverage_panel_moment(f, est, cvg, X, pnl, expand; dims::Int = 1, kwargs...)
@@ -1476,16 +1488,22 @@ function cokurtosis(kte::Cokurtosis, X::MatNum, pnl::Option{<:AssetPanel}; dims:
                                  kwargs...)
 end
 """
-    coverage_variance_series(ce, cvg, X, pnl; dims::Int = 1, kwargs...) -> MatNum
+$(DocStringExtensions.TYPEDSIGNATURES)
 
-Choose the Coverage Universe route or the available-case route for a point-in-time variance series.
+Asset Panel method of [`variance_series`](@ref) for a [`Covariance`](@ref) or a [`SimpleVariance`](@ref) with a [`CoveragePolicy`](@ref), the available-case route.
 
-This is the series counterpart of [`coverage_panel_moment`](@ref). It is a separate function because the series refits the estimator at each observation and writes the frame one row at a time, not once at the end.
+It fits each window over the whole universe, and does not reduce it to its own Coverage Universe. An asset that lists after the first row therefore carries a number once the estimator admits it, where the Coverage Universe route of [`variance_series(ce::AbstractCovarianceEstimator, X::MatNum, pnl::Option{<:AssetPanel}; dims::Int = 1, kwargs...)`](@ref) leaves its column at `NaN`. The type of the `cvg` field selects the route, so no branch reads the value of the policy.
+
+# Algorithm
+
+ 1. Orient `X` to `observations × assets` with [`dims_oriented`](@ref).
+ 2. Allocate `val`, the `NaN` frame, and read `amsk`, the active mask, with [`coverage_series_frame`](@ref). The active mask of an Asset Panel is `observations × assets` already.
+ 3. For each observation `t`, fit the variance of the estimator on rows `1` to `t` of `X`, with rows `1` to `t` of `amsk` as its active mask, and write it into row `t` of `val`. The fit reads the observation weights of the estimator at the same rows, cut with [`obs_weights_view`](@ref).
+ 4. Return `val`, transposed when `dims == 2`.
 
 # Arguments
 
   - $(arg_dict[:ce])
-  - `cvg`: The policy the estimator carries, which selects the route.
   - $(arg_dict[:X])
   - $(arg_dict[:pnl_moment])
   - $(arg_dict[:dims])
@@ -1502,75 +1520,14 @@ This is the series counterpart of [`coverage_panel_moment`](@ref). It is a separ
 
 # Related
 
-  - [`coverage_panel_moment`](@ref)
-  - [`variance_series`](@ref)
-  - [`CoveragePolicy`](@ref)
-"""
-function coverage_variance_series end
-"""
-$(DocStringExtensions.TYPEDSIGNATURES)
-
-`Nothing` method of [`coverage_variance_series`](@ref), the Coverage Universe route.
-
-It reduces each window to its own Coverage Universe, and fits the estimator on that block. [`variance_series(ce::AbstractCovarianceEstimator, X::MatNum, pnl::Option{<:AssetPanel}; dims::Int = 1, kwargs...)`](@ref) states the rule and its mathematics.
-
-# Algorithm
-
- 1. Orient `X` to `observations × assets` with [`dims_oriented`](@ref).
- 2. Allocate `val`, the `NaN` frame, and read `amsk`, the active mask, with [`coverage_series_frame`](@ref).
- 3. For each observation `t`, take `Xt`, rows `1` to `t` of `X`.
- 4. Set `cmsk` to the assets whose returns are finite at every row of `Xt` and, when `amsk` is not `nothing`, whose entries of `amsk` are `true` at every one of those rows.
- 5. Skip row `t` when `cmsk` holds no asset, so the whole row keeps its `NaN`.
- 6. Otherwise fit the variance of the estimator on the columns `cmsk` of `Xt`, and write it into the entries `cmsk` of row `t` of `val`. The fit reads the observation weights of the estimator at rows `1` to `t`, cut with [`obs_weights_view`](@ref).
- 7. Return `val`, transposed when `dims == 2`.
-
-# Related
-
-  - [`coverage_variance_series`](@ref)
-  - [`coverage_series_frame`](@ref)
-  - [`variance_series`](@ref)
-"""
-function coverage_variance_series(ce::AbstractCovarianceEstimator, ::Nothing, X::MatNum,
-                                  pnl::Option{<:AssetPanel}; dims::Int = 1, kwargs...)
-    X = dims_oriented(dims, X)
-    val, amsk = coverage_series_frame(X, pnl)
-    for t in axes(X, 1)
-        Xt = view(X, 1:t, :)
-        cmsk = vec(all(isfinite, Xt; dims = 1))
-        if !isnothing(amsk)
-            cmsk .&= vec(all(view(amsk, 1:t, :); dims = 1))
-        end
-        if !any(cmsk)
-            continue
-        end
-        val[t, cmsk] = vec(Statistics.var(obs_weights_view(ce, 1:t), Xt[:, cmsk]; dims = 1,
-                                          kwargs...))
-    end
-    return isone(dims) ? val : permutedims(val)
-end
-"""
-$(DocStringExtensions.TYPEDSIGNATURES)
-
-[`CoveragePolicy`](@ref) method of [`coverage_variance_series`](@ref), the available-case route.
-
-It fits each window over the whole universe, and does not reduce it to its own Coverage Universe. An asset that lists after the first row therefore carries a number once the estimator admits it, where the Coverage Universe route leaves its column at `NaN`.
-
-# Algorithm
-
- 1. Orient `X` to `observations × assets` with [`dims_oriented`](@ref).
- 2. Allocate `val`, the `NaN` frame, and read `amsk`, the active mask, with [`coverage_series_frame`](@ref). The active mask of an Asset Panel is `observations × assets` already.
- 3. For each observation `t`, fit the variance of the estimator on rows `1` to `t` of `X`, with rows `1` to `t` of `amsk` as its active mask, and write it into row `t` of `val`. The fit reads the observation weights of the estimator at the same rows, cut with [`obs_weights_view`](@ref).
- 4. Return `val`, transposed when `dims == 2`.
-
-# Related
-
-  - [`coverage_variance_series`](@ref)
   - [`coverage_series_frame`](@ref)
   - [`CoveragePolicy`](@ref)
+  - [`Covariance`](@ref)
+  - [`SimpleVariance`](@ref)
 """
-function coverage_variance_series(ce::AbstractCovarianceEstimator, ::CoveragePolicy,
-                                  X::MatNum, pnl::Option{<:AssetPanel}; dims::Int = 1,
-                                  kwargs...)
+function variance_series(ce::Union{Covariance{<:Any, <:Any, <:Any, <:Any, <:CoveragePolicy},
+                                   SimpleVariance{<:Any, <:Any, <:Any, <:CoveragePolicy}},
+                         X::MatNum, pnl::Option{<:AssetPanel}; dims::Int = 1, kwargs...)
     X = dims_oriented(dims, X)
     val, amsk = coverage_series_frame(X, pnl)
     for t in axes(X, 1)
@@ -1582,36 +1539,6 @@ function coverage_variance_series(ce::AbstractCovarianceEstimator, ::CoveragePol
                                        end, kwargs...))
     end
     return isone(dims) ? val : permutedims(val)
-end
-"""
-$(DocStringExtensions.TYPEDSIGNATURES)
-
-Asset Panel method of [`variance_series`](@ref) for a [`Covariance`](@ref), which routes on its `cvg` field with [`coverage_variance_series`](@ref).
-
-# Related
-
-  - [`coverage_variance_series`](@ref)
-  - [`Covariance`](@ref)
-  - [`CoveragePolicy`](@ref)
-"""
-function variance_series(ce::Covariance, X::MatNum, pnl::Option{<:AssetPanel};
-                         dims::Int = 1, kwargs...)
-    return coverage_variance_series(ce, ce.cvg, X, pnl; dims = dims, kwargs...)
-end
-"""
-$(DocStringExtensions.TYPEDSIGNATURES)
-
-Asset Panel method of [`variance_series`](@ref) for a [`SimpleVariance`](@ref), which routes on its `cvg` field with [`coverage_variance_series`](@ref).
-
-# Related
-
-  - [`coverage_variance_series`](@ref)
-  - [`SimpleVariance`](@ref)
-  - [`CoveragePolicy`](@ref)
-"""
-function variance_series(ve::SimpleVariance, X::MatNum, pnl::Option{<:AssetPanel};
-                         dims::Int = 1, kwargs...)
-    return coverage_variance_series(ve, ve.cvg, X, pnl; dims = dims, kwargs...)
 end
 """
     coverage_floor(cvg::Nothing)

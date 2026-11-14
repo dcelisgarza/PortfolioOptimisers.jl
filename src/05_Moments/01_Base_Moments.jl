@@ -810,7 +810,7 @@ $(DocStringExtensions.TYPEDSIGNATURES)
 
 Builds the pairwise expansions and the admission mask a higher-order available-case fit reads.
 
-[`coverage_coskewness`](@ref) and [`coverage_cokurtosis`](@ref) both call this function. The third and the fourth co-moment differ only in the pair of expansions that they multiply. This function returns both expansions, and each order takes its own product. Neither order folds, so the function reads the whole block and keeps no state.
+The available-case arms of [`coskewness`](@ref) and of [`cokurtosis`](@ref) both call this function. The third and the fourth co-moment differ only in the pair of expansions that they multiply. This function returns both expansions, and each order takes its own product. Neither order folds, so the function reads the whole block and keeps no state.
 
 The function centres the deviations on the available-case mean of each asset, and then sets the invalid entries to zero. After this step, an observation at which an asset has no quote adds nothing to the numerator or to the denominator of a cell of that asset. The mask expansion `zc` is the same product over the mask, so the denominator of a cell is the number of observations at which every asset of that cell is valid.
 
@@ -839,8 +839,8 @@ The function centres the deviations on the available-case mean of each asset, an
   - [`coverage_comoment_deviations`](@ref)
   - [`coverage_valid_block`](@ref)
   - [`coverage_admission`](@ref)
-  - [`coverage_coskewness`](@ref)
-  - [`coverage_cokurtosis`](@ref)
+  - [`coskewness`](@ref)
+  - [`cokurtosis`](@ref)
 """
 function coverage_comoment_block(alg::AbstractMomentAlgorithm, cvg::CoveragePolicy,
                                  X::MatNum, active_mask::Option{<:AbstractMatrix{<:Bool}},

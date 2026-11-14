@@ -837,7 +837,7 @@ function cross_sectional_factor_moments(pr::LowOrderPrior,
 end
 """
     cross_sectional_variance_counts(cnt::Nothing, csr::CrossSectionalRegression)
-    cross_sectional_variance_counts(cnt::NamedTuple, csr::CrossSectionalRegression)
+    cross_sectional_variance_counts(cnt::VarianceCount, csr::CrossSectionalRegression)
 
 Degrees of freedom and divisor of each idiosyncratic variance of a Cross-Sectional Factor Prior.
 
@@ -864,13 +864,14 @@ The method that Julia selects is the algorithm.
   - [`CrossSectionalFactorPrior`](@ref)
   - [`CrossSectionalFactorModel`](@ref)
   - [`variance_count`](@ref)
+  - [`VarianceCount`](@ref)
   - [`cross_sectional_residual_dof`](@ref)
   - [`ResidualInflation`](@ref)
 """
 function cross_sectional_variance_counts(::Nothing, ::CrossSectionalRegression)
     return (; edof = nothing, ediv = nothing)
 end
-function cross_sectional_variance_counts(cnt::NamedTuple, csr::CrossSectionalRegression)
+function cross_sectional_variance_counts(cnt::VarianceCount, csr::CrossSectionalRegression)
     return (; edof = cross_sectional_residual_dof(csr.edof, csr.n, cnt.n), ediv = cnt.m)
 end
 """

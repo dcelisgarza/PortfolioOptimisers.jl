@@ -510,25 +510,6 @@ end
     @test isequal(mean(one_at_a_time), mean(me, Xg))
 end
 
-@testset "Exponentially weighted moments: the pass without a callback" begin
-    X = oracle_returns()
-    amsk = oracle_active_mask()
-    Xg = gapped(X, amsk)
-
-    # Issue #877. The callback of `exp_weighted_pass!` is what makes a point-in-time series one
-    # forward pass, and every other caller wants the last cache alone. The method that takes no
-    # callback runs the same recursion, so the two caches read the same moment.
-    for est in (ExpWeightedExpectedReturns(; decay = EW_DECAY),
-                ExpWeightedVariance(; decay = EW_DECAY),
-                ExpWeightedCovariance(; decay = EW_DECAY))
-        with_f = PortfolioOptimisers.exp_weighted_pass!((args...) -> nothing, est, Xg, 1,
-                                                        amsk)
-        without_f = PortfolioOptimisers.exp_weighted_pass!(est, Xg, 1, amsk)
-        @test isequal(PortfolioOptimisers.exp_weighted_moment(with_f, est),
-                      PortfolioOptimisers.exp_weighted_moment(without_f, est))
-    end
-end
-
 @testset "The gap fill value is keyed by the estimator" begin
     # Issue #925. A consumer that holds a gapped sample and an arbitrary covariance estimator
     # asks the estimator what a gapped cell is worth to it. A plain moment estimator takes the
@@ -996,7 +977,7 @@ end
     @test cnt.m == cnt.n
     @test cne.n == cne.m .+ 1
     λ = exp2(-inv(40.0))
-    @test PortfolioOptimisers.exp_weighted_variance_count(λ, ones(10_000, 1), PreCentred()).n[1] ≈
+    @test PortfolioOptimisers.variance_count(λ, ones(10_000, 1), PreCentred()).n[1] ≈
           (1 + λ) / (1 - λ)
     @test round((1 + λ) / (1 - λ)) == 115
 end

@@ -50,8 +50,10 @@
 #                        `self_verdict` states.
 #   worker               a method of a public verb that sends one form to a private function
 #                        with one caller, which is not a hook that `# Interfaces` names (#2080,
-#                        rule 4). Its body moves into the verb.
-#   preset               a public method that builds one type (#2079). Reason (a).
+#                        rule 4). Its body moves into the verb. A function that walks the
+#                        composites by their fields is no worker: its composites call it, and
+#                        the method keeps it as `keep (interface)` (#2116).
+#   preset              a public method that builds one type (#2079). Reason (a).
 #   keyword form         a public method that passes its keywords as positional arguments.
 #                        § *A wrapper is for convenience or for a dispatch problem* keeps a
 #                        keyword wrapper on a verb of a workflow that a user calls. Reason (a).
@@ -529,7 +531,7 @@ const RULED_REBUILDS = Dict{Tuple{Symbol, Symbol}, Tuple{String, String}}(#
                                                                           (:fit,
                                                                            :ElasticNetFit) =>
                                                                               (NO_REBUILD,
-                                                                               "`cnt` is the `NamedTuple` of `elastic_net_counts` (#2110)"),
+                                                                               "`cnt` is the `ElasticNetCounts` of `elastic_net_counts` (#2110, #2092)"),
                                                                           (:exposure_ic_summary,
                                                                            :ExposureICSummaryResult) =>
                                                                               (NO_REBUILD,
@@ -709,6 +711,18 @@ function recurses_on_field(t::Tree, d)
                get(t.by_name, d.name, CH.MethodDef[]))
 end
 
+# Whether a method of `name` calls `name` on a field: the function walks the composites, so its
+# composites call it, and it is no private worker of another function (#2116).
+function walks_on_field(t::Tree, name)
+    return any(m -> calls_on_field(m.body, name), get(t.by_name, name, CH.MethodDef[]))
+end
+
+# The reason of the verdict that keeps a walk where the body of a callee would move into its one
+# caller (#2116).
+function walk_reason(callee, name)
+    return "`$callee` walks the composites by their fields, so its composites call it: it is a function of its own, and its body does not move into `$name`. A walk owns its leaf answer (#2109, #2116)"
+end
+
 """
     self_verdict(t::Tree, d, call) -> Tuple{String, String}
 
@@ -868,7 +882,6 @@ function value_arm_count(t::Tree, name)
 end
 
 const CASE_2 = "case 2: no other caller of the callee can pass `nothing`, so none must reject it, and the callee takes a `::Nothing` method with the leaf answer of its kind (#2077, #2111)"
-const SLOT_TAKEN = "the callee takes the slot: the answer of the `Nothing` arm needs only arguments that the callee can take (#2111)"
 const POLICY = "the `Nothing` arm holds a policy that the callee cannot own (#2111)"
 
 """
@@ -882,10 +895,6 @@ finding is stale, and `test/test_89_forward_survey_census.jl` fails on it, so th
 removes the pair deletes the entry.
 """
 const RULED_NOTHING_PAIRS = Dict{Tuple{Symbol, Symbol}, Tuple{String, String}}(#
-                                                                               (:coverage_fittable_estimator,
-                                                                                :coverage_inner_corrected) =>
-                                                                                   ("go",
-                                                                                    "$SLOT_TAKEN: `coverage_inner_corrected(w, ce)` answers both arms, and both of its callers can pass `w`"),
                                                                                (:expert_allocation_set,
                                                                                 :resolve_allocation_set) =>
                                                                                    ("go",
@@ -1017,8 +1026,12 @@ function forward_verdict(t::Tree, name, callee, d)
            !(callee in t.public) &&
            !(callee in t.hooks) &&
            isempty(others)
-        return ("worker", "go",
-                "only `$name` calls the private worker `$callee`: its body moves into `$name` (rule 4)")
+        return if walks_on_field(t, callee)
+            ("worker", "keep (interface)", walk_reason(callee, name))
+        else
+            ("worker", "go",
+             "only `$name` calls the private worker `$callee`: its body moves into `$name` (rule 4)")
+        end
     end
     shape = if length(unique(c for (n, c) in keys(t.forwards) if n === name)) >= 2
         "per-form"
@@ -1031,7 +1044,9 @@ function forward_verdict(t::Tree, name, callee, d)
         return (shape, "keep (interface)",
                 "`$callee` is a seam that `# Interfaces` names (rule 3)")
     elseif n_values >= 2 || name in t.hooks
-        return if isempty(others)
+        return if isempty(others) && walks_on_field(t, callee)
+            (shape, "keep (interface)", walk_reason(callee, name))
+        elseif isempty(others)
             (shape, "go",
              "only `$name` calls `$callee`: its body moves into `$name` as a method (rule 3)")
         else
@@ -1537,14 +1552,10 @@ const RULED_NAMED_TUPLES = Dict{Symbol, Tuple{String, String}}(#
                                                                :mean_weight_statistics =>
                                                                    ("go",
                                                                     "the mean of the records of `weight_statistics`: it returns the private type of that record (#2113)"),
-                                                               :regime_bias_store => ("go",
-                                                                                      "one store for each target, kept for the later steps: one private type for each shape (#2113)"),
                                                                # The transient test of the private helpers, which needs the callers
                                                                # and the types of the values (#2113).
                                                                :RRM_model => ("go",
                                                                               "its callers check `isnothing`, then take `(model, primal)` apart at once, and the two values have different types: a plain tuple (#2113)"),
-                                                               :_regression => ("go",
-                                                                                "the value travels: a generator and a later use: a private defined type (#2113)"),
                                                                :attribution_family_index =>
                                                                    ("go",
                                                                     "every caller takes it apart at once: a plain tuple, unless two values have one type, which takes a private type (#2113)"),
@@ -1571,9 +1582,6 @@ const RULED_NAMED_TUPLES = Dict{Symbol, Tuple{String, String}}(#
                                                                :attribution_zero_inactive =>
                                                                    ("go",
                                                                     "every caller takes it apart at once: a plain tuple, unless two values have one type, which takes a private type (#2113)"),
-                                                               :centring_lag_record =>
-                                                                   ("go",
-                                                                    "the value travels: an argument to a call: a private defined type (#2113)"),
                                                                :covariance_plot_windows =>
                                                                    ("go",
                                                                     "the value travels: `rw` goes to `covariance_plot_entry`: a private defined type (#2113)"),
@@ -1635,18 +1643,9 @@ const RULED_NAMED_TUPLES = Dict{Symbol, Tuple{String, String}}(#
                                                                :forecast_pooled_moments =>
                                                                    ("go",
                                                                     "`mean` and `std` are numbers of one type, so a positional swap is silent: a private defined type (#2113)"),
-                                                               :level_closure_maps =>
-                                                                   ("go",
-                                                                    "the value travels: an argument to a call: a private defined type (#2113)"),
-                                                               Symbol("mahalanobis_cut!") =>
-                                                                   ("go",
-                                                                    "the value travels: a later use of `cut`: a private defined type (#2113)"),
                                                                :opinion_pooling_scenarios =>
                                                                    ("go",
                                                                     "every caller takes it apart at once: a plain tuple, unless two values have one type, which takes a private type (#2113)"),
-                                                               :regression_polarity =>
-                                                                   ("go",
-                                                                    "`best` and `worst` are numbers of one type, so a positional swap is silent: a private defined type (#2113)"),
                                                                :report_cell => ("go",
                                                                                 "a cell that its callers read by field and pass on: a private record (#2113)"),
                                                                :resolve_sigma_chol =>
@@ -1655,9 +1654,6 @@ const RULED_NAMED_TUPLES = Dict{Symbol, Tuple{String, String}}(#
                                                                :return_forecast_step =>
                                                                    ("go",
                                                                     "the value travels: returned whole: a private defined type (#2113)"),
-                                                               Symbol("separate_path_sums!") =>
-                                                                   ("go",
-                                                                    "the value travels: a later use of `sums`: a private defined type (#2113)"),
                                                                :split_weight_record =>
                                                                    ("go",
                                                                     "the value travels: collected in a generator: a private defined type (#2113)"),

@@ -13,6 +13,8 @@ SmythBrobyDeltaAlg
 SmythBrobyGerberAlg
 SmythBrobyCountAlg
 SmythBrobyKernel
+SmythBrobyPairTerms
+ComovementSums
 sb_delta
 smythbroby
 gerber_comovement!

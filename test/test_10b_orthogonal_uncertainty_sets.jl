@@ -1106,11 +1106,14 @@ struct ProbeMatrixProcessing1955 <: PortfolioOptimisers.AbstractMatrixProcessing
                           SimpleVariance())]
             Xg1955 = copy(X1334)
             Xg1955[1:5, 2] .= NaN
+            # A `VarianceCount` holds two vectors, so the test compares its fields.
+            count_fields1955(ve, X) = Tuple(getfield(PO.variance_count(ve, X), k)
+                                            for k in (:n, :m))
             for (c, v) in pairs1955
                 @test vec(var(c, X1334)) ≈ vec(var(v, X1334))
-                @test PO.variance_count(c, X1334) == PO.variance_count(v, X1334)
+                @test count_fields1955(c, X1334) == count_fields1955(v, X1334)
                 # A column reads its finite rows alone, as the sibling reads them.
-                @test PO.variance_count(c, Xg1955) == PO.variance_count(v, Xg1955)
+                @test count_fields1955(c, Xg1955) == count_fields1955(v, Xg1955)
             end
             # The regime multiplier of the covariance differs from the one of the variance on
             # this sample, so the two diagonals differ. Both weight the squares at `decay`, and
@@ -1119,8 +1122,8 @@ struct ProbeMatrixProcessing1955 <: PortfolioOptimisers.AbstractMatrixProcessing
             for c in (RegimeAdjustedExpWeightedCovariance(),
                       RegimeAdjustedExpWeightedCovariance(; cor_decay = 0.8))
                 v = RegimeAdjustedExpWeightedVariance()
-                @test PO.variance_count(c, X1334) == PO.variance_count(v, X1334)
-                @test PO.variance_count(c, Xg1955) == PO.variance_count(v, Xg1955)
+                @test count_fields1955(c, X1334) == count_fields1955(v, X1334)
+                @test count_fields1955(c, Xg1955) == count_fields1955(v, Xg1955)
             end
             # An inner estimator with no count of its own gives no count, and a custom
             # processing step can change the diagonal.
@@ -1176,7 +1179,7 @@ struct ProbeMatrixProcessing1955 <: PortfolioOptimisers.AbstractMatrixProcessing
         end
 
         @testset "The counts combine by case" begin
-            cnt = (; n = [4.0, 4.0], m = [3.0, 3.0])
+            cnt = PO.VarianceCount([4.0, 4.0], [3.0, 3.0])
             @test PO.residual_variance_counts(nothing, [1, 2], 5) ==
                   (; edof = nothing, ediv = nothing)
             @test PO.residual_variance_counts(cnt, nothing, 5) ==

@@ -1008,6 +1008,60 @@ function comovement_unit_diagonal!(rho::AbstractMatrix)
     return nothing
 end
 """
+$(DocStringExtensions.TYPEDEF)
+
+Holds the sums and the counts that the pairwise loop of [`gerber_comovement!`](@ref) adds for one pair of assets.
+
+This type is an implementation detail and is not intended for direct use. [`gerber_comovement!`](@ref) opens it for each pair. [`comovement_step`](@ref), [`sb_add_pos`](@ref), [`sb_add_neg`](@ref), [`sb_add_neutral`](@ref), [`iq_add_neutral`](@ref) and [`iq_add_diagonal`](@ref) return a new one with the fields of their step replaced through [`rebuild_struct`](@ref), and [`comovement_finalise`](@ref) reduces it. A policy reads the fields that its marker needs, and the other fields stay at zero.
+
+# Fields
+
+$(DocStringExtensions.FIELDS)
+
+# Related
+
+  - [`gerber_comovement!`](@ref)
+  - [`comovement_step`](@ref)
+  - [`comovement_finalise`](@ref)
+"""
+@concrete struct ComovementSums
+    """
+    `pos`: The score of the concordant observations.
+    """
+    pos
+    """
+    `neg`: The score of the discordant observations.
+    """
+    neg
+    """
+    `nn`: The score of the neutral observations.
+    """
+    nn
+    """
+    `cpos`: The count of the concordant observations.
+    """
+    cpos
+    """
+    `cneg`: The count of the discordant observations.
+    """
+    cneg
+    """
+    `cnn`: The count of the neutral observations.
+    """
+    cnn
+    """
+    `di`: The diagonal projection of asset `i`, which only the Gerber IQ `2` marker divides by.
+    """
+    di
+    """
+    `dj`: The diagonal projection of asset `j`, which only the Gerber IQ `2` marker divides by.
+    """
+    dj
+end
+function ComovementSums(; pos, neg, nn, cpos, cneg, cnn, di, dj)
+    return ComovementSums(pos, neg, nn, cpos, cneg, cnn, di, dj)
+end
+"""
 $(DocStringExtensions.TYPEDSIGNATURES)
 
 Fill the symmetric co-movement matrix `rho` with the pairwise loop that the Gerber-family policies share.
@@ -1019,7 +1073,7 @@ The policy object `pol` is a [`SmythBrobyKernel`](@ref) or a [`GerberIQKernel`](
  1. Read the observation count `T` from the first dimension of `X`.
  2. For every asset pair `(i, j)` with `i` at most `j`, run steps 3 to 6. The executor `ex` runs the outer index in parallel.
  3. Build the pair state `st` with [`comovement_pair_state`](@ref).
- 4. Open the accumulator `acc` as the named tuple `(pos, neg, nn, cpos, cneg, cnn, di, dj)`. The five scores start at zero of `eltype(X)`, and the three counts start at integer zero. A policy reads the slots that its marker needs, and the other slots stay at zero. `di` and `dj` hold the two diagonal projections that the Gerber IQ `2` marker divides by. Only [`iq_add_diagonal`](@ref) writes them.
+ 4. Open the accumulator `acc`, a [`ComovementSums`](@ref). The five scores start at zero of `eltype(X)`, and the three counts start at integer zero. A policy reads the fields that its marker needs, and the other fields stay at zero. Only [`iq_add_diagonal`](@ref) writes the two diagonal projections `di` and `dj`.
  5. Add each observation `k` of the pair into `acc` with [`comovement_step`](@ref).
  6. Reduce `acc` with [`comovement_finalise`](@ref), and write the result into `rho[i, j]` and `rho[j, i]`.
 
@@ -1036,6 +1090,7 @@ The policy object `pol` is a [`SmythBrobyKernel`](@ref) or a [`GerberIQKernel`](
 
 # Related
 
+  - [`ComovementSums`](@ref)
   - [`comovement_pair_state`](@ref)
   - [`comovement_step`](@ref)
   - [`comovement_finalise`](@ref)
@@ -1047,8 +1102,8 @@ function gerber_comovement!(rho::AbstractMatrix, ex::FLoops.Transducers.Executor
     FLoops.@floop ex for j in axes(X, 2)
         for i in 1:j
             st = comovement_pair_state(pol, i, j)
-            acc = (pos = zero(eltype(X)), neg = zero(eltype(X)), nn = zero(eltype(X)),
-                   cpos = 0, cneg = 0, cnn = 0, di = zero(eltype(X)), dj = zero(eltype(X)))
+            acc = ComovementSums(zero(eltype(X)), zero(eltype(X)), zero(eltype(X)), 0, 0, 0,
+                                 zero(eltype(X)), zero(eltype(X)))
             for k in 1:T
                 acc = comovement_step(pol, acc, st, X[k, i], X[k, j], T, k)
             end
@@ -1113,11 +1168,54 @@ Section 3 of the source uses ``c_1 = c_2 = 0.5``, and these values are the defau
     end
 end
 """
+$(DocStringExtensions.TYPEDEF)
+
+Holds the quantities of one pair of assets that the Smyth-Broby step of [`comovement_step`](@ref) reads, and that do not depend on the observation.
+
+This type is an implementation detail and is not intended for direct use. [`comovement_pair_state`](@ref) makes it once for each pair, so the inner loop does not compute these quantities again.
+
+# Fields
+
+$(DocStringExtensions.FIELDS)
+
+# Related
+
+  - [`comovement_pair_state`](@ref)
+  - [`SmythBrobyKernel`](@ref)
+  - [`GerberIQPairTerms`](@ref)
+"""
+@concrete struct SmythBrobyPairTerms
+    """
+    `mui`: The mean of asset `i`.
+    """
+    mui
+    """
+    `muj`: The mean of asset `j`.
+    """
+    muj
+    """
+    `sigmai`: The standard deviation of asset `i`.
+    """
+    sigmai
+    """
+    `sigmaj`: The standard deviation of asset `j`.
+    """
+    sigmaj
+    """
+    `c1i`: The confusion-zone threshold of asset `i`, `c1 * sigmai`.
+    """
+    c1i
+    """
+    `c1j`: The confusion-zone threshold of asset `j`, `c1 * sigmaj`.
+    """
+    c1j
+end
+"""
 $(DocStringExtensions.TYPEDSIGNATURES)
 
 Build the state of a pair that [`comovement_step`](@ref) reads.
 
-The state holds each quantity that depends on the pair but not on the observation, so the inner loop does not compute it again. The Gerber IQ method returns the threshold scale factors and the scaled thresholds of the pair instead.
+The state holds each quantity that depends on the pair but not on the observation, so the inner loop does not compute it again. The Smyth-Broby method returns a [`SmythBrobyPairTerms`](@ref). The Gerber IQ method returns a [`GerberIQPairTerms`](@ref), with the threshold scale factors and the scaled thresholds of the pair.
 
 # Algorithm
 
@@ -1125,7 +1223,7 @@ The Smyth-Broby method runs these steps.
 
  1. Read the two standard deviations `pol.sd[i]` and `pol.sd[j]` as `sigmai` and `sigmaj`.
  2. Multiply each by `pol.c1`. The products are the two confusion-zone thresholds `c1i` and `c1j`.
- 3. Return the named tuple `(mui, muj, sigmai, sigmaj, c1i, c1j)`, with the two means read from `pol.mu`.
+ 3. Return the [`SmythBrobyPairTerms`](@ref) of the two means read from `pol.mu`, the two standard deviations and the two thresholds.
 
 # Arguments
 
@@ -1134,19 +1232,21 @@ The Smyth-Broby method runs these steps.
 
 # Returns
 
-  - The per-pair state, as a named tuple.
+  - `st::Union{SmythBrobyPairTerms, GerberIQPairTerms}`: The per-pair state.
 
 # Related
 
   - [`gerber_comovement!`](@ref)
   - [`comovement_step`](@ref): the function that reads this state.
   - [`SmythBrobyKernel`](@ref)
+  - [`SmythBrobyPairTerms`](@ref)
+  - [`GerberIQPairTerms`](@ref)
 """
 @inline function comovement_pair_state(pol::SmythBrobyKernel, i::Integer, j::Integer)
     sigmai = pol.sd[i]
     sigmaj = pol.sd[j]
-    return (mui = pol.mu[i], muj = pol.mu[j], sigmai = sigmai, sigmaj = sigmaj,
-            c1i = pol.c1 * sigmai, c1j = pol.c1 * sigmaj)
+    return SmythBrobyPairTerms(pol.mu[i], pol.mu[j], sigmai, sigmaj, pol.c1 * sigmai,
+                               pol.c1 * sigmaj)
 end
 """
 $(DocStringExtensions.TYPEDEF)
@@ -1208,7 +1308,7 @@ $(DocStringExtensions.TYPEDSIGNATURES)
 
 Add a concordant observation to the pair accumulator, as the prefix of `alg` selects.
 
-The accumulator is a named tuple. Each method returns a new accumulator and changes no argument.
+The accumulator is a [`ComovementSums`](@ref). Each method returns a new accumulator through [`rebuild_struct`](@ref) and changes no argument.
 
 # Algorithm
 
@@ -1221,7 +1321,7 @@ The marker prefix selects one of three branches.
 # Arguments
 
   - `alg`: Smyth-Broby algorithm marker.
-  - `acc`: Pair accumulator `(pos, neg, nn, cpos, cneg, cnn, di, dj)`. This family does not read `di` and `dj`.
+  - `acc`: Pair accumulator, a [`ComovementSums`](@ref). This family does not read `di` and `dj`.
   - `ari`, `arj`: Absolute centred standardised returns of the two assets at the observation.
   - $(arg_dict[:sbn])
 
@@ -1236,14 +1336,18 @@ The marker prefix selects one of three branches.
   - [`comovement_step`](@ref)
   - [`sb_delta`](@ref)
 """
-@inline function sb_add_pos(::SmythBrobyDeltaAlg, acc, ari::Number, arj::Number, n::Number)
-    return (; acc..., pos = acc.pos + sb_delta(ari, arj, n))
+@inline function sb_add_pos(::SmythBrobyDeltaAlg, acc::ComovementSums, ari::Number,
+                            arj::Number, n::Number)
+    return rebuild_struct(acc, (; pos = acc.pos + sb_delta(ari, arj, n)))
 end
-@inline function sb_add_pos(::SmythBrobyGerberAlg, acc, ari::Number, arj::Number, n::Number)
-    return (; acc..., pos = acc.pos + sb_delta(ari, arj, n), cpos = acc.cpos + 1)
+@inline function sb_add_pos(::SmythBrobyGerberAlg, acc::ComovementSums, ari::Number,
+                            arj::Number, n::Number)
+    return rebuild_struct(acc,
+                          (; pos = acc.pos + sb_delta(ari, arj, n), cpos = acc.cpos + 1))
 end
-@inline function sb_add_pos(::SmythBrobyCountAlg, acc, ari::Number, arj::Number, n::Number)
-    return (; acc..., cpos = acc.cpos + 1)
+@inline function sb_add_pos(::SmythBrobyCountAlg, acc::ComovementSums, ari::Number,
+                            arj::Number, n::Number)
+    return rebuild_struct(acc, (; cpos = acc.cpos + 1))
 end
 """
 $(DocStringExtensions.TYPEDSIGNATURES)
@@ -1263,7 +1367,7 @@ The marker prefix selects one of three branches.
 # Arguments
 
   - `alg`: Smyth-Broby algorithm marker.
-  - `acc`: Pair accumulator `(pos, neg, nn, cpos, cneg, cnn, di, dj)`. This family does not read `di` and `dj`.
+  - `acc`: Pair accumulator, a [`ComovementSums`](@ref). This family does not read `di` and `dj`.
   - `ari`, `arj`: Absolute centred standardised returns of the two assets at the observation.
   - $(arg_dict[:sbn])
 
@@ -1278,14 +1382,18 @@ The marker prefix selects one of three branches.
   - [`comovement_step`](@ref)
   - [`sb_delta`](@ref)
 """
-@inline function sb_add_neg(::SmythBrobyDeltaAlg, acc, ari::Number, arj::Number, n::Number)
-    return (; acc..., neg = acc.neg + sb_delta(ari, arj, n))
+@inline function sb_add_neg(::SmythBrobyDeltaAlg, acc::ComovementSums, ari::Number,
+                            arj::Number, n::Number)
+    return rebuild_struct(acc, (; neg = acc.neg + sb_delta(ari, arj, n)))
 end
-@inline function sb_add_neg(::SmythBrobyGerberAlg, acc, ari::Number, arj::Number, n::Number)
-    return (; acc..., neg = acc.neg + sb_delta(ari, arj, n), cneg = acc.cneg + 1)
+@inline function sb_add_neg(::SmythBrobyGerberAlg, acc::ComovementSums, ari::Number,
+                            arj::Number, n::Number)
+    return rebuild_struct(acc,
+                          (; neg = acc.neg + sb_delta(ari, arj, n), cneg = acc.cneg + 1))
 end
-@inline function sb_add_neg(::SmythBrobyCountAlg, acc, ari::Number, arj::Number, n::Number)
-    return (; acc..., cneg = acc.cneg + 1)
+@inline function sb_add_neg(::SmythBrobyCountAlg, acc::ComovementSums, ari::Number,
+                            arj::Number, n::Number)
+    return rebuild_struct(acc, (; cneg = acc.cneg + 1))
 end
 """
 $(DocStringExtensions.TYPEDSIGNATURES)
@@ -1306,7 +1414,7 @@ The marker selects one of four branches.
 # Arguments
 
   - `alg`: Smyth-Broby algorithm marker.
-  - `acc`: Pair accumulator `(pos, neg, nn, cpos, cneg, cnn, di, dj)`. This family does not read `di` and `dj`.
+  - `acc`: Pair accumulator, a [`ComovementSums`](@ref). This family does not read `di` and `dj`.
   - `ari`, `arj`: Absolute centred standardised returns of the two assets at the observation. The fall-through method reads neither.
   - $(arg_dict[:sbn])
 
@@ -1322,19 +1430,20 @@ The marker selects one of four branches.
   - [`GerberComovementOne`](@ref)
   - [`sb_delta`](@ref)
 """
-@inline function sb_add_neutral(::SmythBroby1, acc, ari::Number, arj::Number, n::Number)
-    return (; acc..., nn = acc.nn + sb_delta(ari, arj, n))
+@inline function sb_add_neutral(::SmythBroby1, acc::ComovementSums, ari::Number,
+                                arj::Number, n::Number)
+    return rebuild_struct(acc, (; nn = acc.nn + sb_delta(ari, arj, n)))
 end
-@inline function sb_add_neutral(::SmythBrobyGerber1, acc, ari::Number, arj::Number,
-                                n::Number)
-    return (; acc..., nn = acc.nn + sb_delta(ari, arj, n), cnn = acc.cnn + 1)
+@inline function sb_add_neutral(::SmythBrobyGerber1, acc::ComovementSums, ari::Number,
+                                arj::Number, n::Number)
+    return rebuild_struct(acc, (; nn = acc.nn + sb_delta(ari, arj, n), cnn = acc.cnn + 1))
 end
-@inline function sb_add_neutral(::SmythBrobyCount1, acc, ari::Number, arj::Number,
-                                n::Number)
-    return (; acc..., cnn = acc.cnn + 1)
+@inline function sb_add_neutral(::SmythBrobyCount1, acc::ComovementSums, ari::Number,
+                                arj::Number, n::Number)
+    return rebuild_struct(acc, (; cnn = acc.cnn + 1))
 end
-@inline function sb_add_neutral(::SmythBrobyCovarianceAlgorithm, acc, ::Number, ::Number,
-                                ::Number)
+@inline function sb_add_neutral(::SmythBrobyCovarianceAlgorithm, acc::ComovementSums,
+                                ::Number, ::Number, ::Number)
     return acc
 end
 """
@@ -1389,7 +1498,7 @@ The Smyth-Broby method runs these steps. It does not read `T` or `k`, because th
 # Arguments
 
   - `pol`: Co-movement policy object.
-  - `acc`: Pair accumulator `(pos, neg, nn, cpos, cneg, cnn, di, dj)`. This family does not read `di` and `dj`.
+  - `acc`: Pair accumulator, a [`ComovementSums`](@ref). This family does not read `di` and `dj`.
   - `st`: Pair state from [`comovement_pair_state`](@ref).
   - `xi`, `xj`: Returns of assets `i` and `j` at observation `k`.
   - `T`: Number of observations.
@@ -1405,8 +1514,9 @@ The Smyth-Broby method runs these steps. It does not read `T` or `k`, because th
   - [`comovement_finalise`](@ref)
   - [`sb_crossed`](@ref)
 """
-@inline function comovement_step(pol::SmythBrobyKernel, acc, st, xi::Number, xj::Number,
-                                 ::Integer, ::Integer)
+@inline function comovement_step(pol::SmythBrobyKernel, acc::ComovementSums,
+                                 st::SmythBrobyPairTerms, xi::Number, xj::Number, ::Integer,
+                                 ::Integer)
     if abs(xi) < st.c1i && abs(xj) < st.c1j
         return acc
     end
@@ -1446,7 +1556,7 @@ The marker prefix selects one of three branches.
 # Arguments
 
   - `alg`: Smyth-Broby algorithm marker.
-  - `acc`: Pair accumulator `(pos, neg, nn, cpos, cneg, cnn, di, dj)`. This family does not read `di` and `dj`.
+  - `acc`: Pair accumulator, a [`ComovementSums`](@ref). This family does not read `di` and `dj`.
 
 # Returns
 
@@ -1460,13 +1570,13 @@ The marker prefix selects one of three branches.
   - [`SmythBrobyGerberAlg`](@ref)
   - [`SmythBrobyCountAlg`](@ref)
 """
-@inline function sb_pair_scores(::SmythBrobyDeltaAlg, acc)
+@inline function sb_pair_scores(::SmythBrobyDeltaAlg, acc::ComovementSums)
     return (acc.pos, acc.neg, acc.nn)
 end
-@inline function sb_pair_scores(::SmythBrobyGerberAlg, acc)
+@inline function sb_pair_scores(::SmythBrobyGerberAlg, acc::ComovementSums)
     return (acc.pos * acc.cpos, acc.neg * acc.cneg, acc.nn * acc.cnn)
 end
-@inline function sb_pair_scores(::SmythBrobyCountAlg, acc)
+@inline function sb_pair_scores(::SmythBrobyCountAlg, acc::ComovementSums)
     return (acc.cpos, acc.cneg, acc.cnn)
 end
 """
@@ -1484,7 +1594,7 @@ It applies both parts of the marker. The prefix selects the scores, and the trai
 # Arguments
 
   - `pol`: Co-movement policy object.
-  - `acc`: Pair accumulator `(pos, neg, nn, cpos, cneg, cnn, di, dj)`. This family does not read `di` and `dj`.
+  - `acc`: Pair accumulator, a [`ComovementSums`](@ref). This family does not read `di` and `dj`.
   - `T`: Element type of the zero that a zero denominator gives.
 
 # Returns
@@ -1498,7 +1608,8 @@ It applies both parts of the marker. The prefix selects the scores, and the trai
   - [`sb_pair_scores`](@ref)
   - [`comovement_ratio`](@ref)
 """
-@inline function comovement_finalise(pol::SmythBrobyKernel, acc, ::Type{T}) where {T}
+@inline function comovement_finalise(pol::SmythBrobyKernel, acc::ComovementSums,
+                                     ::Type{T}) where {T}
     p, n, nn = sb_pair_scores(pol.alg, acc)
     return comovement_ratio(pol.alg, p, n, nn, T)
 end

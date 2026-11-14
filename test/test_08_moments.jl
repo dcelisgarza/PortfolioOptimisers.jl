@@ -1025,7 +1025,7 @@
                                                   [1.0, 1.0])
         stq = PortfolioOptimisers.comovement_pair_state(polq, 1, 2)
         @test stq.ci == stq.cj == 0.0
-        accq = (pos = 0.0, neg = 0.0, nn = 0.0, cpos = 0, cneg = 0, cnn = 0)
+        accq = PortfolioOptimisers.ComovementSums(0.0, 0.0, 0.0, 0, 0, 0, 0.0, 0.0)
         # Neither asset crosses, so the observation leaves the pair entirely.
         @test PortfolioOptimisers.comovement_step(polq, accq, stq, 0.0, 0.0, 4, 1) == accq
         # Exactly one asset crosses, so the observation is neutral.
@@ -1225,7 +1225,7 @@
         sts = PortfolioOptimisers.comovement_pair_state(pols, 1, 2)
         @test sts.c1i == sts.c1j == 0.0
         @test sts.mui == sts.muj == 0.0
-        accs = (pos = 0.0, neg = 0.0, nn = 0.0, cpos = 0, cneg = 0, cnn = 0)
+        accs = PortfolioOptimisers.ComovementSums(0.0, 0.0, 0.0, 0, 0, 0, 0.0, 0.0)
         # Neither asset crosses, so the observation leaves the pair entirely.
         @test PortfolioOptimisers.comovement_step(pols, accs, sts, 0.0, 0.0, 4, 1) == accs
         # Exactly one asset crosses, so the observation is neutral.

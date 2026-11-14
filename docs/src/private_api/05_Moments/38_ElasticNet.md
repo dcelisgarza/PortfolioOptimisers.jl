@@ -13,6 +13,7 @@ PortfolioOptimisers.StatsAPI.dof(m::PortfolioOptimisers.ElasticNetFit)
 PortfolioOptimisers.elastic_net_design
 PortfolioOptimisers.elastic_net_sweeps
 PortfolioOptimisers.elastic_net_polish
+PortfolioOptimisers.ElasticNetCounts
 PortfolioOptimisers.elastic_net_counts
 ```
 

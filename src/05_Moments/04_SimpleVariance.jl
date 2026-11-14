@@ -1325,29 +1325,30 @@ Where:
 
 # Returns
 
-  - `(; n, m)::NamedTuple`: The effective count and the divisor.
+  - `cnt::VarianceCount`: The effective count and the divisor, two numbers.
 
 # Related
 
+  - [`VarianceCount`](@ref)
   - [`variance_count`](@ref)
   - [`SimpleVariance`](@ref)
 """
 function simple_variance_count(::Nothing, corrected::Bool, f::AbstractVector{Bool})
     n = count(f)
-    return (; n = n, m = n - corrected)
+    return VarianceCount(n, n - corrected)
 end
 function simple_variance_count(w::StatsBase.FrequencyWeights, corrected::Bool,
                                f::AbstractVector{Bool})
     wf = all(f) ? w : w[f]
     n = sum(wf)
-    return (; n = n, m = inv(StatsBase.varcorrection(wf, corrected)))
+    return VarianceCount(n, inv(StatsBase.varcorrection(wf, corrected)))
 end
 function simple_variance_count(w::StatsBase.AbstractWeights, corrected::Bool,
                                f::AbstractVector{Bool})
     wf = all(f) ? w : w[f]
     s = sum(wf)
     n = s^2 / sum(abs2, wf)
-    return (; n = n, m = n / (s * StatsBase.varcorrection(wf, corrected)))
+    return VarianceCount(n, n / (s * StatsBase.varcorrection(wf, corrected)))
 end
 # Each column reads its finite rows with their weights, through `observed_sample`, so a dynamic
 # weight resolves on the rows that the column reads, as the weighted available-case fit does.
@@ -1356,6 +1357,6 @@ function variance_count(ve::SimpleVariance, X::MatNum)
         x, w = observed_sample(view(X, :, i), ve.w)
         return simple_variance_count(w, ve.corrected, trues(length(x)))
     end
-    return (; n = getindex.(cnt, :n), m = getindex.(cnt, :m))
+    return VarianceCount(getproperty.(cnt, :n), getproperty.(cnt, :m))
 end
 export SimpleVariance, var, std

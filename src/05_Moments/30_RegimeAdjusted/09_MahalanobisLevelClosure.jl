@@ -159,6 +159,34 @@ function mahalanobis_recursion_ratio(::GaussianLevelRecursion, method::RegimeAdj
     end
 end
 """
+$(DocStringExtensions.TYPEDEF)
+
+Holds the linear maps of the level closure on the grid of [`mahalanobis_bias_grid`](@ref).
+
+This type is an implementation detail and is not intended for direct use.
+[`level_closure_maps`](@ref) makes it, and [`level_closure_factors`](@ref) reads it into the
+context of the closure.
+
+# Fields
+
+$(DocStringExtensions.FIELDS)
+
+# Related
+
+  - [`level_closure_maps`](@ref)
+  - [`level_closure_factors`](@ref)
+"""
+@concrete struct LevelClosureMaps
+    """
+    `By`: The map from the values of the removed part on the nodes to ``y = (v; e)``.
+    """
+    By
+    """
+    `NV`: The length of `v`.
+    """
+    NV
+end
+"""
 $(DocStringExtensions.TYPEDSIGNATURES)
 
 Makes the linear maps of the closure on the grid of [`mahalanobis_bias_grid`](@ref).
@@ -171,17 +199,18 @@ through one vector ``y = (v; e)``.
 
 # Arguments
 
-  - `grid::NamedTuple`: Grids of [`mahalanobis_bias_grid`](@ref).
+  - `grid::MahalanobisBiasGrid`: Grids of [`mahalanobis_bias_grid`](@ref).
 
 # Returns
 
-  - `maps::NamedTuple`: `By`, the map from the nodes to ``y``; and `NV`, the length of `v`.
+  - `maps::LevelClosureMaps`: The map from the nodes to ``y``, and the length of `v`.
 
 # Related
 
+  - [`LevelClosureMaps`](@ref)
   - [`level_closure_factors`](@ref)
 """
-function level_closure_maps(grid::NamedTuple)
+function level_closure_maps(grid::MahalanobisBiasGrid)
     NN = length(grid.nodes)
     NV = 8 + grid.NG
     T = eltype(grid.nodes)
@@ -204,7 +233,7 @@ function level_closure_maps(grid::NamedTuple)
         mahalanobis_q_integral!(e, v, grid)
         J[:, k] .= e
     end
-    return (; By = vcat(P, J * P), NV)
+    return LevelClosureMaps(vcat(P, J * P), NV)
 end
 """
 $(DocStringExtensions.TYPEDSIGNATURES)
@@ -489,6 +518,60 @@ function level_closure_form(Y::MatNum, i0::Integer, w::NTuple{8, <:Number})
     return acc
 end
 """
+$(DocStringExtensions.TYPEDEF)
+
+Holds the stencils of the removed part ``q`` and of its integral ``Q`` at one node of the level
+closure, with their products with the covariance of ``y = (v; e)``.
+
+This type is an implementation detail and is not intended for direct use.
+[`level_closure_node`](@ref) makes it, and [`level_closure_step`](@ref) and
+[`level_closure_pair`](@ref) read it.
+
+# Fields
+
+$(DocStringExtensions.FIELDS)
+
+# Related
+
+  - [`level_closure_node`](@ref)
+  - [`level_closure_step`](@ref)
+  - [`level_closure_pair`](@ref)
+"""
+@concrete struct LevelClosureNode
+    """
+    `qi`: The indices of ``y`` that the stencil of ``q`` reads.
+    """
+    qi
+    """
+    `qw`: The weights of the stencil of ``q``.
+    """
+    qw
+    """
+    `Qi`: The indices of ``y`` that the stencil of ``Q`` reads.
+    """
+    Qi
+    """
+    `Qw`: The weights of the stencil of ``Q``.
+    """
+    Qw
+    """
+    `Yq`: The product ``Y q`` of the covariance of ``y`` with the stencil of ``q``.
+    """
+    Yq
+    """
+    `YQ`: The product ``Y Q`` of the covariance of ``y`` with the stencil of ``Q``.
+    """
+    YQ
+    """
+    `vQ`: The variance ``\\operatorname{Var}[Q]`` at the node.
+    """
+    vQ
+    """
+    `cQq`: The covariance ``\\operatorname{Cov}(Q, q)`` at the node.
+    """
+    cQq
+end
+"""
 $(DocStringExtensions.TYPEDSIGNATURES)
 
 Returns the stencils of the removed part ``q`` and of its integral ``Q`` at one node, with their
@@ -499,23 +582,22 @@ grid node reads `v` and `e` at its own index.
 
 # Arguments
 
-  - `grid::NamedTuple`: Grids of [`mahalanobis_bias_grid`](@ref).
+  - `grid::MahalanobisBiasGrid`: Grids of [`mahalanobis_bias_grid`](@ref).
   - `NV::Integer`: The length of `v`.
   - `a::Integer`: The node.
   - `Y::MatNum`: The covariance of ``y = (v; e)``.
 
 # Returns
 
-  - `node::NamedTuple`: The indices `qi`, `Qi` and weights `qw`, `Qw` of the two stencils,
-    `Yq = Y q` and `YQ = Y Q`, ``\\operatorname{Var}[Q]`` as `vQ` and ``\\operatorname{Cov}(Q, q)`` as
-    `cQq`.
+  - `node::LevelClosureNode`: The two stencils and their products with the covariance.
 
 # Related
 
+  - [`LevelClosureNode`](@ref)
   - [`level_closure_step`](@ref)
   - [`level_closure_pair`](@ref)
 """
-function level_closure_node(grid::NamedTuple, NV::Integer, a::Integer, Y::MatNum)
+function level_closure_node(grid::MahalanobisBiasGrid, NV::Integer, a::Integer, Y::MatNum)
     T = eltype(Y)
     qi, qw, Qi, Qw = if a <= 8
         [a], [one(T)], collect(1:8), collect(T, grid.Qcheb[a])
@@ -524,8 +606,8 @@ function level_closure_node(grid::NamedTuple, NV::Integer, a::Integer, Y::MatNum
     end
     Yq = view(Y, :, qi) * qw
     YQ = view(Y, :, Qi) * Qw
-    return (; qi, qw, Qi, Qw, Yq, YQ, vQ = LinearAlgebra.dot(Qw, view(YQ, Qi)),
-            cQq = LinearAlgebra.dot(Qw, view(Yq, Qi)))
+    return LevelClosureNode(qi, qw, Qi, Qw, Yq, YQ, LinearAlgebra.dot(Qw, view(YQ, Qi)),
+                            LinearAlgebra.dot(Qw, view(Yq, Qi)))
 end
 """
 $(DocStringExtensions.TYPEDSIGNATURES)
@@ -538,7 +620,7 @@ differences between ``s + u`` and the node.
 
   - `Y::MatNum`: The covariance of ``y = (v; e)``.
   - `y::VecNum`: The mean of ``y``.
-  - `node::NamedTuple`: The node, from [`level_closure_node`](@ref).
+  - `node::LevelClosureNode`: The node, from [`level_closure_node`](@ref).
   - `qs::Tuple`, `Qs::Tuple`: The stencils of the point on `v` and on `e`, from the pairs of
     [`mahalanobis_bias_grid`](@ref).
   - `NV::Integer`: The length of `v`.
@@ -552,8 +634,8 @@ differences between ``s + u`` and the node.
 
   - [`level_closure_step`](@ref)
 """
-function level_closure_pair(Y::MatNum, y::VecNum, node::NamedTuple, qs::Tuple, Qs::Tuple,
-                            NV::Integer)
+function level_closure_pair(Y::MatNum, y::VecNum, node::LevelClosureNode, qs::Tuple,
+                            Qs::Tuple, NV::Integer)
     iq, wq = qs
     iQ, wQ = NV + Qs[1], Qs[2]
     T = eltype(Y)
@@ -777,7 +859,8 @@ function level_closure_factors(methods::Tuple, decay::Number, K::Integer, n::Int
     dg = zeros(eltype(G), NN, length(grid.su))
     dr = similar(dg)
     mahalanobis_pair_differences!(dg, dr, grid, gh, rh, (m, ct))
-    ctx = merge((; grid, gh, rh, m, ct, cut, dg, dr), level_closure_maps(grid))
+    (; By, NV) = level_closure_maps(grid)
+    ctx = (; grid, gh, rh, m, ct, cut, dg, dr, By, NV)
     nq = zeros(eltype(G), NN)
     Kq = zeros(eltype(G), NN, NN)
     for _ in 1:(n - 1)

@@ -1764,7 +1764,7 @@ it states the recursion once.
 # Arguments
 
   - `f`: Called as `f(i, cache)` after observation `i`. A caller that wants the final cache
-    alone reads the method that takes no `f`.
+    alone passes `Returns(nothing)`, as `cov` and `partial_fit!` do.
   - `ce::RegimeAdjustedExpWeightedCovariance`: Covariance estimator configuration.
   - `X::MatNum`: Observation matrix.
   - `dims::Int`: Dimension along which the observations lie.
@@ -1848,46 +1848,6 @@ function regime_adjusted_covariance_pass!(f, ce::RegimeAdjustedExpWeightedCovari
     end
 
     return cache
-end
-"""
-$(DocStringExtensions.TYPEDSIGNATURES)
-
-Runs one forward pass of the online covariance update over the observations of `X`, and reads no
-intermediate cache.
-
-This is the callback method with a callback that does nothing, so a verb that wants the last
-cache alone states no callback of its own. `cov` and `partial_fit!` read the pass this way, and
-`variance_series` reads the callback method.
-
-# Arguments
-
-  - `ce::RegimeAdjustedExpWeightedCovariance`: Covariance estimator configuration.
-  - `X::MatNum`: Observation matrix.
-  - `dims::Int`: Dimension along which the observations lie.
-  - `estimation_mask::Option{<:AbstractMatrix{<:Bool}}`: Optional mask restricting which assets
-    contribute to the regime state update.
-  - `active_mask::Option{<:AbstractMatrix{<:Bool}}`: Optional mask of active assets.
-  - `state::Option{<:RegimeAdjustedCovarianceState}`: Optional state to continue. A `nothing`
-    starts a cold cache, which is what a fit over a whole sample needs. [`partial_fit!`](@ref)
-    passes the estimator's own state.
-
-# Returns
-
-  - `cache::RegimeAdjustedCovarianceState`: The cache after the last observation.
-
-# Related
-
-  - [`RegimeAdjustedCovarianceState`](@ref)
-  - [`regime_adjusted_covariance_pass!`](@ref)
-  - [`RegimeAdjustedExpWeightedCovariance`](@ref)
-"""
-function regime_adjusted_covariance_pass!(ce::RegimeAdjustedExpWeightedCovariance,
-                                          X::MatNum, dims::Int,
-                                          estimation_mask::Option{<:AbstractMatrix{<:Bool}},
-                                          active_mask::Option{<:AbstractMatrix{<:Bool}},
-                                          state::Option{<:RegimeAdjustedCovarianceState} = nothing)
-    return regime_adjusted_covariance_pass!((args...) -> nothing, ce, X, dims,
-                                            estimation_mask, active_mask, state)
 end
 """
 $(DocStringExtensions.TYPEDSIGNATURES)

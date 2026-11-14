@@ -5,7 +5,7 @@
 julia = "1.13.4"
 code_complexity = "0.2.0"
 julia_syntax = "1.0.2"
-commit = "c8adf16988"
+commit = "4004115c7a"
 
 [file]
 "ext/PortfolioOptimisersPlotsExt/01_CumulativeReturnsPlots.jl" = { cyc = 5, cog = 7, arg = 8, cyc_sum = 53, cog_sum = 57, arg_sum = 99, macros = [] }
@@ -141,6 +141,7 @@ commit = "c8adf16988"
 "src/05_Moments/30_RegimeAdjusted/07_EstimatedMahalanobisBias.jl" = { cyc = 6, cog = 9, arg = 8, cyc_sum = 40, cog_sum = 49, arg_sum = 84, macros = [] }
 "src/05_Moments/30_RegimeAdjusted/08_SeparatePortfolioBias.jl" = { cyc = 5, cog = 6, arg = 6, cyc_sum = 22, cog_sum = 17, arg_sum = 31, macros = [] }
 "src/05_Moments/30_RegimeAdjusted/09_MahalanobisLevelClosure.jl" = { cyc = 6, cog = 7, arg = 8, cyc_sum = 45, cog_sum = 43, arg_sum = 63, macros = [] }
+"src/05_Moments/30_RegimeAdjusted/10_HacLogDeterminant.jl" = { cyc = 5, cog = 6, arg = 6, cyc_sum = 20, cog_sum = 23, arg_sum = 25, macros = [] }
 "src/05_Moments/31_HigherMomentPartialFit.jl" = { cyc = 3, cog = 2, arg = 5, cyc_sum = 37, cog_sum = 16, arg_sum = 73, macros = [] }
 "src/05_Moments/32_CrossSectionalFactorModel/01_CrossSectionalRegression.jl" = { cyc = 5, cog = 9, arg = 8, cyc_sum = 88, cog_sum = 60, arg_sum = 121, macros = [] }
 "src/05_Moments/32_CrossSectionalFactorModel/02_CrossSectionalWeights.jl" = { cyc = 5, cog = 6, arg = 4, cyc_sum = 27, cog_sum = 22, arg_sum = 5, macros = [] }

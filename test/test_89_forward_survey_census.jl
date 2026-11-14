@@ -25,7 +25,7 @@ using Test
     nt_hook_doc = join([q3, "    nt_hook(x)", "", "A hook.", "", "# Interfaces", "",
                         "## `nt_hook`", "", "A subtype implements it.", q3], '\n')
     source = """
-             export verb, verb2, verb3, pubf, pubk, mk, kwv, nt_pub, pubfill, pubkwfill
+             export verb, verb2, verb3, verb4, pubf, pubk, mk, kwv, nt_pub, pubfill, pubkwfill
              struct A end
              struct B end
              struct R
@@ -210,6 +210,11 @@ using Test
              # is an interface method, as `mean_test_rng` is (#2089).
              verb3(x::B) = 0
              verb3(x::A) = hook_fn(x)
+             # A callee that walks the composites by their fields is no private worker: its
+             # composites call it (#2116, #2092).
+             verb4(x::A) = walk_count(x)
+             walk_count(x::A) = walk_count(x.inner)
+             walk_count(x::B) = 1
 
              # preset
              mk(x::A) = T2(x)
@@ -435,6 +440,9 @@ using Test
         @test occursin("around the driver", first_of(:verb2).why)
         # A method of the verb that does not call the hook is no driver of it (#2089).
         @test of(:verb3) == [("interface", :hook_fn, "keep (interface)")]
+        # A callee that walks the composites is a function of its own (#2116, #2092).
+        @test of(:verb4) == [("worker", :walk_count, "keep (interface)")]
+        @test occursin("walks the composites", first_of(:verb4).why)
         @test of(:mk) == [("preset", :T2, "keep (a)")]
         # One private method that builds a type is a second name for the constructor: its
         # form goes to the constructor as a method (#2112).

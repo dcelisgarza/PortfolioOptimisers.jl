@@ -677,19 +677,22 @@ end
         @test po.rows_needed(OPS(; alg = NewtonStep())) == 0
         # The spatial median is the coordinatewise median of a symmetric cloud, and the
         # modified iteration stays defined on a data point.
+        function spatial_median(P, iters, tol)
+            return po.price_level_statistic(SpatialMedian(; iters = iters, tol = tol), P)
+        end
         P = [1.0 0.0; -1.0 0.0; 0.0 1.0; 0.0 -1.0]
-        @test isapprox(po.spatial_median(P, 100, 1e-10), [0.0, 0.0]; atol = 1e-8)
+        @test isapprox(spatial_median(P, 100, 1e-10), [0.0, 0.0]; atol = 1e-8)
         P2 = [0.0 0.0; 1.0 0.0; 0.0 1.0]
-        y = po.spatial_median(P2, 200, 1e-12)
+        y = spatial_median(P2, 200, 1e-12)
         @test all(isfinite, y) &&
               sum(norm(P2[i, :] .- y) for i in 1:3) <=
               sum(norm(P2[i, :]) for i in 1:3) + 1e-12
         @test_throws IsEmptyError mean(PriceLevelExpectedReturns(), zeros(0, 3))
         # Every row on the iterate is the median; a data point with balanced directions
         # holds the iterate.
-        @test po.spatial_median(ones(4, 2), 10, 1e-8) == [1.0, 1.0]
+        @test spatial_median(ones(4, 2), 10, 1e-8) == [1.0, 1.0]
         P3 = [0.0 0.0; 1.0 0.0; -1.0 0.0; 0.0 1.0; 0.0 -1.0]
-        @test po.spatial_median(P3, 10, 1e-8) == [0.0, 0.0]
+        @test spatial_median(P3, 10, 1e-8) == [0.0, 0.0]
         # A forecast that is the same at every asset moves nothing.
         flat = ReturnsResult(; nx = ["A", "B"], X = [0.01 0.01; 0.02 0.02; -0.01 -0.01])
         @test optimise(OPS(; alg = MovingAverageReversion(; window = 3)), flat).w ==

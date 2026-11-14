@@ -124,14 +124,16 @@ is `x_t² ≥ 0`, and the rule after the update stays (#1440).
                                                             centring = PreCentred(),
                                                             min_obs = 1, extra...)
     states = map((true, false)) do b
-        return PO.regime_adjusted_covariance_pass!(rule(b), X, 1, nothing, nothing)
+        return PO.regime_adjusted_covariance_pass!(Returns(nothing), rule(b), X, 1, nothing,
+                                                   nothing)
     end
     for (b, st) in zip((true, false), states)
         v, Q = by_hand(X, 0.8, 0.9, b)
         @test st.variance ≈ v rtol = 1e-14
         @test st.cor_state ≈ Q rtol = 1e-14
         # The oracle's rule reads the raw variance state.
-        raw = PO.regime_adjusted_covariance_pass!(rule(b; cor_vol = nothing), X, 1, nothing,
+        raw = PO.regime_adjusted_covariance_pass!(Returns(nothing),
+                                                  rule(b; cor_vol = nothing), X, 1, nothing,
                                                   nothing)
         @test raw.cor_state ≈ by_hand(X, 0.8, 0.9, b, false)[2] rtol = 1e-14
     end
@@ -381,8 +383,8 @@ struct ProbeRegimeDebias <: PO.AbstractRegimeDebias end
     function estimated_form(lam, L, K)
         ce = RegimeAdjustedExpWeightedVariance(; decay = lam, hac_lags = L,
                                                regime_method = nothing, min_obs = 1)
-        state(x) = PO.regime_adjusted_variance_pass!(ce, reshape(x, :, 1), 1, nothing,
-                                                     nothing)
+        state(x) = PO.regime_adjusted_variance_pass!(Returns(nothing), ce, reshape(x, :, 1),
+                                                     1, nothing, nothing)
         E = Matrix(1.0I, K + 1, K + 1)
         R(x) = state(x).variance[1] / (1 - lam)
         r = [R(E[:, i]) for i in 1:(K + 1)]
@@ -476,7 +478,8 @@ struct ProbeRegimeDebias <: PO.AbstractRegimeDebias end
           PO.regime_bias_table(PO.RootMeanSquaredAdjusted(), lam, 64, 2,
                                EstimatedCentring())[30]
     ce = RegimeAdjustedExpWeightedVariance(; decay = lam, hac_lags = 2, min_obs = 1)
-    st = PO.regime_adjusted_variance_pass!(ce, randn(StableRNG(1548), 40, 2), 1, nothing,
+    st = PO.regime_adjusted_variance_pass!(Returns(nothing), ce,
+                                           randn(StableRNG(1548), 40, 2), 1, nothing,
                                            nothing)
     @test st.bias == PO.regime_bias_table(ce.regime_method, lam, length(st.bias), 2,
                                           EstimatedCentring())
@@ -552,7 +555,8 @@ struct ProbeRegimeDebias <: PO.AbstractRegimeDebias end
     # The state of an estimator holds the table of its rule.
     ce = RegimeAdjustedExpWeightedVariance(; decay = lam, hac_lags = 2, min_obs = 1,
                                            debias = LawDebias())
-    st = PO.regime_adjusted_variance_pass!(ce, randn(StableRNG(1549), 40, 2), 1, nothing,
+    st = PO.regime_adjusted_variance_pass!(Returns(nothing), ce,
+                                           randn(StableRNG(1549), 40, 2), 1, nothing,
                                            nothing)
     @test st.bias == PO.regime_bias_table(ce.regime_method, lam, length(st.bias), 2,
                                           EstimatedCentring(), LawDebias())

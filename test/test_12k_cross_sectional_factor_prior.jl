@@ -2007,7 +2007,7 @@ small random arrays, so each check reads one helper alone.
         rng = StableRNG(828_103)
         nT, nN, nK = 12, 7, 3
         n = rand(rng, 5:7, nT)
-        cnt = (; n = 10 .* rand(rng, nN), m = rand(rng, nN))
+        cnt = PO.VarianceCount(10 .* rand(rng, nN), rand(rng, nN))
         # The fraction reads the residual count that the fit of each period records, a real
         # count for a penalised fit (#1900).
         nu = n .- nK .+ rand(rng, nT)

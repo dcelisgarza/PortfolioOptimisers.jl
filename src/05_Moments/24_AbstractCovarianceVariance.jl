@@ -224,7 +224,7 @@ This method is the fallback that gives a series to each [`AbstractCovarianceEsti
 
 Each fit reads only the observations `1` to `t`, so every input with one entry for each observation is cut to those rows with the returns. These inputs are the observation weights that `ce` holds, the implied volatility `iv`, the active mask and the estimation mask. Row `t` under observation weights is the weighted variance of the first `t` observations. The weights of these observations keep the values that the full sample gives them. A moment estimator of the library normalises its weights over the rows that it fits, so each row is a weighted variance with weights that sum to one over its window.
 
-The expanding window is the windowed series with no window and no weights of its own. So this method calls [`windowed_variance_series`](@ref), and the two series share one definition of row `t`.
+The expanding window is the windowed series with no window and no weights of its own. So this method calls the windowed method [`variance_series(est, w::Option{<:ObsWeights}, window::Option{<:Int_VecInt}, X::MatNum, pnl::Option{<:AssetPanel})`](@ref), and the two series share one definition of row `t`.
 
 # Mathematical definition
 
@@ -244,8 +244,8 @@ Where:
 
 # Algorithm
 
- 1. Call [`windowed_variance_series`](@ref) with no window and no wrapper weights. For each observation `t`, it cuts `X`, the observation weights of `ce`, `iv` and the two universe masks to the rows `1` to `t`, and it writes the variance of that fit into row `t`.
- 2. Return the series of [`windowed_variance_series`](@ref), which it transposes when `dims == 2`.
+ 1. Call the windowed method with no window and no wrapper weights. For each observation `t`, it cuts `X`, the observation weights of `ce`, `iv` and the two universe masks to the rows `1` to `t`, and it writes the variance of that fit into row `t`.
+ 2. Return the series of the windowed method, which it transposes when `dims == 2`.
 
 # Arguments
 
@@ -280,13 +280,38 @@ Row `1` is a fit on one observation. An estimator that needs two observations re
 
   - [`AbstractCovarianceEstimator`](@ref)
   - [`var(ce::AbstractCovarianceEstimator, X::MatNum; dims::Int = 1, kwargs...)`](@ref)
-  - [`windowed_variance_series`](@ref)
+  - [`variance_series(est, w::Option{<:ObsWeights}, window::Option{<:Int_VecInt}, X::MatNum, pnl::Option{<:AssetPanel})`](@ref)
   - [`windowed_inner`](@ref)
 """
 function variance_series(ce::AbstractCovarianceEstimator, X::MatNum; dims::Int = 1,
                          kwargs...)
-    return windowed_variance_series(ce, nothing, nothing, X, nothing; dims = dims,
-                                    kwargs...)
+    return variance_series(ce, nothing, nothing, X, nothing; dims = dims, kwargs...)
+end
+"""
+$(DocStringExtensions.TYPEDEF)
+
+Holds the effective count and the divisor of a variance, for one column or for each column of the data.
+
+This type is an implementation detail and is not intended for direct use. [`variance_count`](@ref) and [`simple_variance_count`](@ref) make it. [`residual_variance_counts`](@ref) and [`cross_sectional_variance_counts`](@ref) read it.
+
+# Fields
+
+$(DocStringExtensions.FIELDS)
+
+# Related
+
+  - [`variance_count`](@ref)
+  - [`simple_variance_count`](@ref)
+"""
+@concrete struct VarianceCount
+    """
+    `n`: The effective count of the observations, a number for one column or a vector with one entry for each column.
+    """
+    n
+    """
+    `m`: The divisor of the variance for that count, of the shape of `n`.
+    """
+    m
 end
 """
     variance_count(ve::AbstractCovarianceEstimator, X::MatNum)
@@ -335,7 +360,7 @@ On an unweighted sample of ``T`` observations, ``n_{i} = T``. Then ``m_{i}`` is 
 
  1. On [`AbstractCovarianceEstimator`](@ref), return `nothing`.
  2. On [`SimpleVariance`](@ref), take the finite rows of each column with their weights, through [`observed_sample`](@ref), and read the count from those weights with [`simple_variance_count`](@ref). A dynamic weight resolves on the rows of the column.
- 3. On [`ExpWeightedVariance`](@ref) and [`RegimeAdjustedExpWeightedVariance`](@ref), take the Kish count of the exponential weights over the finite rows of each column with [`exp_weighted_variance_count`](@ref). The weights sum to one after the correction of the cold start, so the divisor equals the count. The count ignores the regime multiplier and the lags of a Heteroskedasticity and Autocorrelation Consistent (HAC) adjustment.
+ 3. On [`ExpWeightedVariance`](@ref) and [`RegimeAdjustedExpWeightedVariance`](@ref), take the Kish count of the exponential weights over the finite rows of each column with [`variance_count(decay::Number, X::MatNum, centring::AbstractCentring)`](@ref). The weights sum to one after the correction of the cold start, so the divisor equals the count. The count ignores the regime multiplier and the lags of a Heteroskedasticity and Autocorrelation Consistent (HAC) adjustment.
  4. On [`WindowedVariance`](@ref) and [`WindowedCovariance`](@ref), apply the window and the weights of the wrapper with [`windowed_preamble`](@ref). Then return the count of the inner estimator.
  5. On a [`GeneralCovariance`](@ref) over a `StatsBase.SimpleCovariance`, return the count of a [`SimpleVariance`](@ref) with the weights of the estimator and the `corrected` flag of `StatsBase.SimpleCovariance`. The diagonal of the covariance is that variance.
  6. On a [`Covariance`](@ref) with [`FullMoment`](@ref), return the count of its inner estimator, with the weights of `ve`, from [`covariance_inner_estimator`](@ref). An inner estimator with no count of its own, such as a shrinkage estimator, gives `nothing`. A [`SemiMoment`](@ref) variance is not a sum of squares of every residual, so it states no count.
@@ -349,10 +374,11 @@ On an unweighted sample of ``T`` observations, ``n_{i} = T``. Then ``m_{i}`` is 
 
 # Returns
 
-  - `cnt::Option{<:NamedTuple}`: The named tuple `(; n, m)` of two vectors, with one entry for each column of `X`. `n` is the effective count and `m` is the divisor. The value is `nothing` if the estimator states no count.
+  - `cnt::Option{<:VarianceCount}`: The count of two vectors, with one entry for each column of `X`. `n` is the effective count and `m` is the divisor. The value is `nothing` if the estimator states no count.
 
 # Related
 
+  - [`VarianceCount`](@ref)
   - [`AbstractCovarianceEstimator`](@ref)
   - [`AbstractVarianceEstimator`](@ref)
   - [`factor_lift`](@ref)
@@ -376,8 +402,8 @@ end
 """
     effective_observation_count(ce::StatsBase.CovarianceEstimator, X::MatNum; kwargs...) -> Real
     effective_observation_count(me::AbstractExpectedReturnsEstimator, X::MatNum; kwargs...) -> Real
-    effective_observation_count(ce; kwargs...) -> Real
-    effective_observation_count(ce, state::AbstractPartialFitState; kwargs...) -> Real
+    effective_observation_count(ce, state::AbstractPartialFitState = partial_fit_cache(ce);
+                                kwargs...) -> Real
     effective_observation_count(ce, state::SampleBufferState; kwargs...) -> Real
 
 Return the number of observations that the covariance of `ce`, or the mean of `me`, is worth, as one number for the whole moment.
@@ -415,7 +441,7 @@ The method that Julia selects is the algorithm.
 
  1. On a covariance estimator or a mean estimator with no method of its own, return `size(X, 1)`.
  2. On [`Covariance`](@ref), [`GeneralCovariance`](@ref) and [`DistanceCovariance`](@ref), return the count of the observation weights with [`observation_weight_count`](@ref). A [`Covariance`](@ref) with no weights reads the count of its inner estimator, because the inner estimator can hold weights of its own. [`SimpleExpectedReturns`](@ref) and [`MedianExpectedReturns`](@ref) do the same with their weights. [`ExpWeightedExpectedReturns`](@ref) returns the Kish count of its weights over the rows of `X`, from [`exp_weighted_kish_count`](@ref).
- 3. On [`GerberIQCovariance`](@ref), return the count that the rule `ce.oc` states for the temporal weights of the decay, through [`gerber_iq_observation_count`](@ref). The keywords go to the centring, so a `mean` of the caller centres the returns that a rule of the decay reads. `ce.oc = nothing` gives `size(X, 1)`.
+ 3. On [`GerberIQCovariance`](@ref), return the count that the rule `ce.oc` states for the temporal weights of the decay, with one method for each form of `ce.oc`. The keywords go to the centring, so a `mean` of the caller centres the returns that a rule of the decay reads. `ce.oc = nothing` gives `size(X, 1)`.
  4. On [`ExpWeightedCovariance`](@ref), return the count of [`exp_weighted_covariance_count`](@ref) over the rows of `X`. On [`RegimeAdjustedExpWeightedCovariance`](@ref), do the same with the decay and the centring of its correlation. The denoising step processes the correlation, so it reads the count of the correlation.
  5. On [`WindowedCovariance`](@ref) and [`WindowedExpectedReturns`](@ref), apply the window and the weights of the wrapper with [`windowed_preamble`](@ref). Then return the count of the inner estimator over the rows that the window keeps.
  6. On [`PortfolioOptimisersCovariance`](@ref), [`CorrelationCovariance`](@ref), [`GeodesicShrinkageCovariance`](@ref) and [`ImpliedVolatility`](@ref), return the count of the inner estimator, because these estimators pass `X` to it without change. [`ExcessExpectedReturns`](@ref) and [`ShrunkExpectedReturns`](@ref) return the count of their mean estimator `me.me`, and [`EquilibriumExpectedReturns`](@ref) returns the count of its covariance estimator `me.ce`. [`PriorExpectedReturns`](@ref) fits its prior, and returns the count of the mean of the prior result from [`moment_observation_count`](@ref). The form with no data reads the folded prior.
@@ -451,13 +477,12 @@ function effective_observation_count(::AbstractExpectedReturnsEstimator, X::MatN
                                      kwargs...)
     return size(X, 1)
 end
+# The form with no data reads the state of `ce`, and the method that the type of the state
+# selects returns its count.
 function effective_observation_count(ce::Union{AbstractEstimator,
-                                               StatsBase.CovarianceEstimator}; kwargs...)
-    return effective_observation_count(ce, partial_fit_cache(ce); kwargs...)
-end
-function effective_observation_count(::Union{AbstractEstimator,
-                                             StatsBase.CovarianceEstimator},
-                                     state::AbstractPartialFitState; kwargs...)
+                                               StatsBase.CovarianceEstimator},
+                                     state::AbstractPartialFitState = partial_fit_cache(ce);
+                                     kwargs...)
     return observation_count(state)
 end
 # The read of a buffer refits over its rows with the masks and the implied volatilities that it

@@ -15,7 +15,6 @@ ExpWeightedCovarianceState
 ```@docs
 process_observation!(cache::ExpWeightedCovarianceState, ce::ExpWeightedCovariance, X::VecNum, active_mask::Option{<:AbstractVector{<:Bool}})
 exp_weighted_pass!(f, est::ExpWeightedCovariance, X::MatNum, dims::Int, active_mask::Option{<:AbstractMatrix{<:Bool}}, state::Option{<:ExpWeightedCovarianceState} = nothing)
-exp_weighted_pass!(est::ExpWeightedCovariance, X::MatNum, dims::Int, active_mask::Option{<:AbstractMatrix{<:Bool}}, state::Option{<:ExpWeightedCovarianceState} = nothing)
 exp_weighted_moment(cache::ExpWeightedCovarianceState, est::ExpWeightedCovariance)
 pair_weighted_block
 restore_psd!

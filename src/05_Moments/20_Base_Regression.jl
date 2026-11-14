@@ -1097,7 +1097,7 @@ Return a new [`GeneralisedLinearModel`](@ref) regression target with observation
 # Algorithm
 
  1. Merge `w` into `re.kwargs` under the key `weights`. The merge replaces an entry that is already there. The result is the keyword arguments of the new target.
- 2. Build a new [`GeneralisedLinearModel`](@ref) from them, with `re.args` and `re.variant` unchanged.
+ 2. Rebuild `re` with the new keyword arguments through [`rebuild_struct`](@ref), with `re.args` and `re.variant` unchanged.
 
 # Arguments
 
@@ -1114,8 +1114,7 @@ Return a new [`GeneralisedLinearModel`](@ref) regression target with observation
   - [`factory`](@ref)
 """
 function factory(re::GeneralisedLinearModel, w::ObsWeights)::GeneralisedLinearModel
-    return GeneralisedLinearModel(; args = re.args, kwargs = (; re.kwargs..., weights = w),
-                                  variant = re.variant)
+    return rebuild_struct(re, (; kwargs = (; re.kwargs..., weights = w)))
 end
 """
     StatsAPI.fit(tgt::GeneralisedLinearModel, X::MatNum, y::VecNum)
@@ -1624,7 +1623,38 @@ function regression_criterion_func(crit::Val{:adjr2}, tgt::GeneralisedLinearMode
     return model -> StatsAPI.adjr2(model, variant)
 end
 """
-    regression_polarity(crit::MinMaxValStepwiseRegressionCriterion)
+$(DocStringExtensions.TYPEDEF)
+
+Holds the three functions that state which direction of a stepwise criterion is better.
+
+This type is an implementation detail and is not intended for direct use. [`regression_polarity`](@ref) makes it, and [`regression_threshold`](@ref), [`get_forward_reg_incl_excl!`](@ref), [`get_backward_reg_incl!`](@ref) and the two `_regression` methods that fill a score vector read it. The fields `best` and `worst` are functions of the same kind, so a positional swap of them is silent, and the type names them.
+
+# Fields
+
+$(DocStringExtensions.FIELDS)
+
+# Related
+
+  - [`regression_polarity`](@ref)
+  - [`MinValStepwiseRegressionCriterion`](@ref)
+  - [`MaxValStepwiseRegressionCriterion`](@ref)
+"""
+@concrete struct RegressionPolarity
+    """
+    `best`: `findmin` under a minimised criterion, `findmax` under a maximised one. Returns the best entry of a score vector and its index.
+    """
+    best
+    """
+    `improves`: `<` under a minimised criterion, `>` under a maximised one. Returns whether the first score is better than the second.
+    """
+    improves
+    """
+    `worst`: `typemax` under a minimised criterion, `typemin` under a maximised one. Returns the worst score of the type it is given.
+    """
+    worst
+end
+"""
+    regression_polarity(crit::MinMaxValStepwiseRegressionCriterion) -> RegressionPolarity
 
 Return the three functions that state which direction of a stepwise criterion is better.
 
@@ -1636,14 +1666,11 @@ A stepwise search asks the same three questions of every criterion: which entry 
 
 # Returns
 
-  - `polarity::NamedTuple`: Three functions.
-
-      + `best`: `findmin` under a minimised criterion, `findmax` under a maximised one. Returns the best entry of a score vector and its index.
-      + `improves`: `<` under a minimised criterion, `>` under a maximised one. Returns whether the first score is better than the second.
-      + `worst`: `typemax` under a minimised criterion, `typemin` under a maximised one. Returns the worst score of the type it is given.
+  - `polarity::RegressionPolarity`: The three functions `best`, `improves` and `worst`.
 
 # Related
 
+  - [`RegressionPolarity`](@ref)
   - [`MinValStepwiseRegressionCriterion`](@ref)
   - [`MaxValStepwiseRegressionCriterion`](@ref)
   - [`STEPWISE_REGRESSION_CRITERIA`](@ref)
@@ -1652,10 +1679,10 @@ A stepwise search asks the same three questions of every criterion: which entry 
   - [`get_backward_reg_incl!`](@ref)
 """
 function regression_polarity(::MinValStepwiseRegressionCriterion)
-    return (; best = findmin, improves = <, worst = typemax)
+    return RegressionPolarity(findmin, <, typemax)
 end
 function regression_polarity(::MaxValStepwiseRegressionCriterion)
-    return (; best = findmax, improves = >, worst = typemin)
+    return RegressionPolarity(findmax, >, typemin)
 end
 """
     regression_threshold(crit::MinMaxValStepwiseRegressionCriterion)

@@ -442,9 +442,9 @@ end
     end
     @test occursin("Rational{Int64} cannot hold NaN", err.msg)
     @test occursin("floating-point type", err.msg)
-    @test_throws ArgumentError PO.coverage_nan_frame([1 2; 3 4], (2, 2))
+    @test_throws ArgumentError PO.coverage_nan_frame(similar([1 2; 3 4], (2, 2)))
     # A type that holds `NaN` keeps its own type in the frame.
-    @test eltype(PO.coverage_nan_frame(Float32[1 2], (2, 2))) === Float32
+    @test eltype(PO.coverage_nan_frame(similar(Float32[1 2], (2, 2)))) === Float32
     # The float sample of the same data expands as before.
     sig = Statistics.cov(Covariance(), Float64.(Xrg), nothing)
     @test all(isnan, sig[3, :]) && all(isnan, sig[:, 3])

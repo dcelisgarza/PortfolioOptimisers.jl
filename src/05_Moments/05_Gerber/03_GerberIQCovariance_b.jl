@@ -121,9 +121,44 @@ The policy compares each return with the noise threshold of its asset, scaled by
         return new{T1, T2, T3, T4, T5, T6}(alg, kind, decay, sc, c, sd)
     end
 end
+"""
+$(DocStringExtensions.TYPEDEF)
+
+Holds the quantities of one pair of assets that the Gerber IQ step of [`comovement_step`](@ref) reads, and that do not depend on the observation.
+
+This type is an implementation detail and is not intended for direct use. [`comovement_pair_state`](@ref) makes it once for each pair, from the scale factors of [`gerber_iq_scaling`](@ref).
+
+# Fields
+
+$(DocStringExtensions.FIELDS)
+
+# Related
+
+  - [`comovement_pair_state`](@ref)
+  - [`GerberIQKernel`](@ref)
+  - [`SmythBrobyPairTerms`](@ref)
+"""
+@concrete struct GerberIQPairTerms
+    """
+    `sci`: The scale factor of asset `i` in this pair.
+    """
+    sci
+    """
+    `scj`: The scale factor of asset `j` in this pair.
+    """
+    scj
+    """
+    `ci`: The scaled noise threshold of asset `i`, `sci * c`.
+    """
+    ci
+    """
+    `cj`: The scaled noise threshold of asset `j`, `scj * c`.
+    """
+    cj
+end
 @inline function comovement_pair_state(pol::GerberIQKernel, i::Integer, j::Integer)
     sci, scj = gerber_iq_scaling(pol.sc, pol.sd[i], pol.sd[j])
-    return (sci = sci, scj = scj, ci = sci * pol.c, cj = scj * pol.c)
+    return GerberIQPairTerms(sci, scj, sci * pol.c, scj * pol.c)
 end
 """
 $(DocStringExtensions.TYPEDSIGNATURES)
@@ -135,7 +170,7 @@ A neutral observation is one on which exactly one of the two assets leaves the n
 # Arguments
 
   - `pol`: The [`GerberIQKernel`](@ref) policy.
-  - `acc`: Pair accumulator `(pos, neg, nn, cpos, cneg, cnn, di, dj)`. This method changes `nn` alone.
+  - `acc`: Pair accumulator, a [`ComovementSums`](@ref). This method changes `nn` alone.
   - `st`: Pair state from [`comovement_pair_state`](@ref).
   - `xi`, `xj`: Returns of assets `i` and `j` at observation `k`.
   - `axi`, `axj`: Absolute returns of assets `i` and `j`.
@@ -154,15 +189,16 @@ A neutral observation is one on which exactly one of the two assets leaves the n
   - [`GerberIQKernel`](@ref)
   - [`Gerber1`](@ref)
 """
-@inline function iq_add_neutral(pol::GerberIQKernel{<:Gerber1}, acc, st, xi::Number,
-                                xj::Number, axi::Number, axj::Number, T::Integer,
-                                k::Integer)
-    return (; acc...,
-            nn = acc.nn +
-                 gerber_IQ_delta(xi, xj, axi, axj, pol.decay, T, k, st.sci, st.scj,
-                                 pol.kind))
+@inline function iq_add_neutral(pol::GerberIQKernel{<:Gerber1}, acc::ComovementSums,
+                                st::GerberIQPairTerms, xi::Number, xj::Number, axi::Number,
+                                axj::Number, T::Integer, k::Integer)
+    return rebuild_struct(acc,
+                          (;
+                           nn = acc.nn +
+                                gerber_IQ_delta(xi, xj, axi, axj, pol.decay, T, k, st.sci,
+                                                st.scj, pol.kind)))
 end
-@inline function iq_add_neutral(::GerberIQKernel, acc, args...)
+@inline function iq_add_neutral(::GerberIQKernel, acc::ComovementSums, args...)
     return acc
 end
 """
@@ -179,7 +215,7 @@ The projection keeps the statistic inside `[-1, 1]`. When `sc` is not pair-separ
 # Arguments
 
   - `pol`: The [`GerberIQKernel`](@ref) policy.
-  - `acc`: Pair accumulator `(pos, neg, nn, cpos, cneg, cnn, di, dj)`. This method changes `di` and `dj` alone.
+  - `acc`: Pair accumulator, a [`ComovementSums`](@ref). This method changes `di` and `dj` alone.
   - `st`: Pair state from [`comovement_pair_state`](@ref).
   - `xi`, `xj`: Returns of assets `i` and `j` at observation `k`.
   - `axi`, `axj`: Absolute returns of assets `i` and `j`.
@@ -200,9 +236,10 @@ The projection keeps the statistic inside `[-1, 1]`. When `sc` is not pair-separ
   - [`GerberIQKernel`](@ref)
   - [`Gerber2`](@ref)
 """
-@inline function iq_add_diagonal(pol::GerberIQKernel{<:Gerber2}, acc, st, xi::Number,
-                                 xj::Number, axi::Number, axj::Number, crossi::Bool,
-                                 crossj::Bool, T::Integer, k::Integer)
+@inline function iq_add_diagonal(pol::GerberIQKernel{<:Gerber2}, acc::ComovementSums,
+                                 st::GerberIQPairTerms, xi::Number, xj::Number, axi::Number,
+                                 axj::Number, crossi::Bool, crossj::Bool, T::Integer,
+                                 k::Integer)
     di = if crossi
         acc.di +
         gerber_IQ_delta(xi, xi, axi, axi, pol.decay, T, k, st.sci, st.sci, pol.kind)
@@ -215,9 +252,9 @@ The projection keeps the statistic inside `[-1, 1]`. When `sc` is not pair-separ
     else
         acc.dj
     end
-    return (; acc..., di = di, dj = dj)
+    return rebuild_struct(acc, (; di = di, dj = dj))
 end
-@inline function iq_add_diagonal(::GerberIQKernel, acc, args...)
+@inline function iq_add_diagonal(::GerberIQKernel, acc::ComovementSums, args...)
     return acc
 end
 """
@@ -248,8 +285,9 @@ The rule keeps the diagonal of the statistic at one. The pair `(i, i)` crosses o
 @inline function iq_crossed(x::Number, ax::Number, c::Number)
     return ax >= c && !iszero(x)
 end
-@inline function comovement_step(pol::GerberIQKernel, acc, st, xi::Number, xj::Number,
-                                 T::Integer, k::Integer)
+@inline function comovement_step(pol::GerberIQKernel, acc::ComovementSums,
+                                 st::GerberIQPairTerms, xi::Number, xj::Number, T::Integer,
+                                 k::Integer)
     axi = abs(xi)
     axj = abs(xj)
     crossi = iq_crossed(xi, axi, st.ci)
@@ -259,21 +297,27 @@ end
     end
     acc = iq_add_diagonal(pol, acc, st, xi, xj, axi, axj, crossi, crossj, T, k)
     return if crossi && crossj && xi * xj > zero(xi)
-        (; acc...,
-         pos = acc.pos +
-               gerber_IQ_delta(xi, xj, axi, axj, pol.decay, T, k, st.sci, st.scj, pol.kind))
+        rebuild_struct(acc,
+                       (;
+                        pos = acc.pos +
+                              gerber_IQ_delta(xi, xj, axi, axj, pol.decay, T, k, st.sci,
+                                              st.scj, pol.kind)))
     elseif crossi && crossj && xi * xj < zero(xi)
-        (; acc...,
-         neg = acc.neg +
-               gerber_IQ_delta(xi, xj, axi, axj, pol.decay, T, k, st.sci, st.scj, pol.kind))
+        rebuild_struct(acc,
+                       (;
+                        neg = acc.neg +
+                              gerber_IQ_delta(xi, xj, axi, axj, pol.decay, T, k, st.sci,
+                                              st.scj, pol.kind)))
     else
         iq_add_neutral(pol, acc, st, xi, xj, axi, axj, T, k)
     end
 end
-@inline function comovement_finalise(pol::GerberIQKernel, acc, ::Type{T}) where {T}
+@inline function comovement_finalise(pol::GerberIQKernel, acc::ComovementSums,
+                                     ::Type{T}) where {T}
     return comovement_ratio(pol.alg, acc.pos, acc.neg, acc.nn, T)
 end
-@inline function comovement_finalise(::GerberIQKernel{<:Gerber2}, acc, ::Type{T}) where {T}
+@inline function comovement_finalise(::GerberIQKernel{<:Gerber2}, acc::ComovementSums,
+                                     ::Type{T}) where {T}
     den = sqrt(acc.di * acc.dj)
     return !iszero(den) ? (acc.pos - acc.neg) / den : zero(T)
 end
@@ -513,51 +557,18 @@ function Statistics.cov(ce::GerberIQCovariance, X::MatNum; dims::Int = 1, kwargs
     sigma = gerber_IQ(ce, X, sd)
     return StatsBase.cor2cov!(sigma, sd)
 end
-function effective_observation_count(ce::GerberIQCovariance, X::MatNum; kwargs...)
-    return gerber_iq_observation_count(ce.oc, ce, X; kwargs...)
-end
-"""
-    gerber_iq_observation_count(oc::Nothing, ce::GerberIQCovariance, X::MatNum;
-                                kwargs...) -> Integer
-    gerber_iq_observation_count(oc::AbstractObservationCountAlgorithm,
-                                ce::GerberIQCovariance, X::MatNum; kwargs...) -> Real
-
-Return the effective number of observations of a [`GerberIQCovariance`](@ref) over `X`, under the rule `oc` of its field.
-
-[`effective_observation_count`](@ref) calls this function, and the denoising step of a [`PortfolioOptimisersCovariance`](@ref) reads the count. The decay gives the observation of index `k` the weight `decay(T, k)`. A rule counts that vector of weights.
-
-# Algorithm
-
- 1. With `oc = nothing`, return `size(X, 1)`. The function then reads no data.
- 2. Otherwise, centre `X` with `ce.me` and `kwargs` through [`demean_returns`](@ref), as the batch verbs do. A `mean` of the caller is then the centre of the count and of the fit.
- 3. Resolve the decay against the centred returns with [`regenerate_decay`](@ref), as [`gerber_IQ`](@ref) does. A rule in the delay or the rate then reads the same matrix as in the fit.
- 4. Return [`weight_observation_count`](@ref) of `oc` over the weights `decay(T, k)`, ``k = 1, \\ldots, T``.
-
-# Arguments
-
-  - `oc`: The rule of the count, from `ce.oc`.
-  - `ce`: Gerber IQ covariance estimator.
-  - `X`: Returns matrix, `observations × assets`.
-  - `kwargs...`: The keywords of the fit, for [`demean_returns`](@ref).
-
-# Returns
-
-  - `T_e::Real`: The effective number of observations of the matrix.
-
-# Related
-
-  - [`GerberIQCovariance`](@ref)
-  - [`effective_observation_count`](@ref)
-  - [`AbstractObservationCountAlgorithm`](@ref)
-  - [`regenerate_decay`](@ref)
-"""
-function gerber_iq_observation_count(::Nothing, ::GerberIQCovariance, X::MatNum; kwargs...)
-    return size(X, 1)
-end
-function gerber_iq_observation_count(oc::AbstractObservationCountAlgorithm,
-                                     ce::GerberIQCovariance, X::MatNum; kwargs...)
+# A rule in `ce.oc` counts the temporal weights `decay(T, k)` of the decay. The count centres
+# `X` with `ce.me` and the keywords through `demean_returns`, as the batch verbs do, so a `mean`
+# of the caller is the centre of the count and of the fit. It resolves the decay against the
+# centred returns with `regenerate_decay`, as `gerber_IQ` does, so a rule in the delay or the
+# rate reads the same matrix as in the fit. `ce.oc = nothing` takes the default of
+# `effective_observation_count` on a covariance estimator, `size(X, 1)`.
+function effective_observation_count(ce::GerberIQCovariance{<:Any, <:Any, <:Any, <:Any,
+                                                            <:Any,
+                                                            <:AbstractObservationCountAlgorithm},
+                                     X::MatNum; kwargs...)
     X = demean_returns(X, ce.me; dims = 1, kwargs...)
     T = size(X, 1)
     decay = regenerate_decay(ce.decay, X)
-    return weight_observation_count(oc, decay.(T, 1:T))
+    return weight_observation_count(ce.oc, decay.(T, 1:T))
 end

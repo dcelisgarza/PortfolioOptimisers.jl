@@ -164,7 +164,17 @@ weights, and `mahalanobis_regime_bias!` interpolates it over the count of observ
                                    R[1:60, :]).cache
     st = fit()
     @test st.bias.nodes isa AbstractDict && collect(keys(st.bias.nodes)) == [na]
-    @test copy(st).bias !== st.bias && copy(st).bias == st.bias
+    # The store and its node records are structs that hold arrays, and `==` on a struct is `===`,
+    # so the test compares the copy field by field.
+    same_fields1431(a, b) = all(k -> isequal(getfield(a, k), getfield(b, k)),
+                                fieldnames(typeof(a)))
+    cb = copy(st).bias
+    @test cb !== st.bias && cb.nodes !== st.bias.nodes
+    @test isequal(cb.kappa, st.bias.kappa) &&
+          isequal(cb.spread, st.bias.spread) &&
+          isequal(cb.kernel, st.bias.kernel)
+    @test collect(keys(cb.nodes)) == collect(keys(st.bias.nodes))
+    @test all(k -> same_fields1431(cb.nodes[k], st.bias.nodes[k]), keys(st.bias.nodes))
     @test isnothing(fit(; debias = nothing).bias)
 end
 
@@ -551,8 +561,8 @@ below zero was floored the same way. The statistic now scores only a built asset
     mask = trues(6, na)
     mask[:, 8] .= false
     for target in (eqw, PO.DiagonalTarget())
-        masked = PO.regime_adjusted_covariance_pass!(sep(target), X[1:6, :], 1, mask,
-                                                     nothing)
+        masked = PO.regime_adjusted_covariance_pass!(Returns(nothing), sep(target),
+                                                     X[1:6, :], 1, mask, nothing)
         @test isequal(state(target, X[1:6, :]), masked.regime_state)
         @test 0 < state(target, X) < 10
     end

@@ -160,7 +160,15 @@ end
             a = getfield(state, name)
             b = getfield(twin, name)
             if isa(a, AbstractArray)
-                @test isequal(a, b)
+                if eltype(a) <: PO.CentringLagRecord
+                    # A lagged record is a struct of arrays, and `isequal` on a struct is
+                    # `===`, so the buffer is compared record by record, field by field.
+                    @test length(a) == length(b)
+                    @test all(((r, s),) -> all(k -> isequal(getfield(r, k), getfield(s, k)),
+                                               fieldnames(PO.CentringLagRecord)), zip(a, b))
+                else
+                    @test isequal(a, b)
+                end
                 @test a !== b
             end
         end
@@ -191,19 +199,4 @@ end
 
     # No slice of a state exists on the observation axis, so the root drops it.
     @test isnothing(PO.obs_weights_view(warm.cache, 1:10))
-end
-
-@testset "the pass without a callback runs the same recursion" begin
-    X = ra_sample()
-
-    # Issue #877. The callback of `regime_adjusted_variance_pass!` is what makes `variance_series`
-    # one forward pass. `var` and `partial_fit!` want the last cache alone, so they read the
-    # method that takes no callback, and the two caches read the same variance.
-    for ce in RA_CONFIGS
-        with_f = PO.regime_adjusted_variance_pass!((args...) -> nothing, ce, X, 1, nothing,
-                                                   nothing)
-        without_f = PO.regime_adjusted_variance_pass!(ce, X, 1, nothing, nothing)
-        @test isequal(PO.regime_adjusted_variance(with_f, ce),
-                      PO.regime_adjusted_variance(without_f, ce))
-    end
 end

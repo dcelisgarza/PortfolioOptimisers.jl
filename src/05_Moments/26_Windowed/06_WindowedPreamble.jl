@@ -282,7 +282,7 @@ The method that Julia selects is the algorithm.
 
 # Related
 
-  - [`windowed_variance_series`](@ref)
+  - [`variance_series(est, w::Option{<:ObsWeights}, window::Option{<:Int_VecInt}, X::MatNum, pnl::Option{<:AssetPanel})`](@ref)
   - [`get_window`](@ref)
 """
 function windowed_series_rows(::Nothing, t::Integer)
@@ -324,7 +324,7 @@ Step 2 passes `iv = ivt` also when `ivt` is `nothing`, as the generated `var` me
 
 # Related
 
-  - [`windowed_variance_series`](@ref)
+  - [`variance_series(est, w::Option{<:ObsWeights}, window::Option{<:Int_VecInt}, X::MatNum, pnl::Option{<:AssetPanel})`](@ref)
   - [`windowed_preamble`](@ref)
 """
 function windowed_series_row(est, w::Option{<:ObsWeights}, rows::VecInt, X::MatNum,
@@ -344,6 +344,8 @@ $(DocStringExtensions.TYPEDSIGNATURES)
 Compute the point-in-time variance series of a windowed estimator.
 
 Row `t` of a variance series is the estimate of the estimator on the observations `1` to `t`. A windowed estimator keeps the last observations of its window, so row `t` is a fit on the window that ends at `t`. The window moves with `t`. Row `t` reads no observation after `t`, and the last row equals the batch fit of the estimator on the whole sample.
+
+The method takes the parts of the windowed estimator as positional arguments. [`WindowedCovariance`](@ref) and [`WindowedVariance`](@ref) pass their inner estimator, their weights and their window. The expanding series of an [`AbstractCovarianceEstimator`](@ref) passes the estimator with no weights and no window, so the two series share one definition of row `t`.
 
 # Mathematical definition
 
@@ -405,9 +407,8 @@ Where:
   - [`WindowedCovariance`](@ref)
   - [`variance_series(ce::AbstractCovarianceEstimator, X::MatNum; dims::Int = 1, kwargs...)`](@ref)
 """
-function windowed_variance_series(est, w::Option{<:ObsWeights},
-                                  window::Option{<:Int_VecInt}, X::MatNum,
-                                  pnl::Option{<:AssetPanel}; dims::Int = 1, kwargs...)
+function variance_series(est, w::Option{<:ObsWeights}, window::Option{<:Int_VecInt},
+                         X::MatNum, pnl::Option{<:AssetPanel}; dims::Int = 1, kwargs...)
     assert_dims(dims)
     T = size(X, dims)
     vT = windowed_series_row(est, w, windowed_series_rows(window, T), X, pnl; dims = dims,

@@ -767,7 +767,11 @@ of the ADRs; the papers' defaults are asserted where they decide the shape of th
         # #1172: the numbers `SpatialMedian` states, over every five-level window of the
         # fixture. The authors' code rebases each asset to one on the first day; the paper
         # reads raw prices, here one asset quoted a hundred times higher.
-        tight(P) = po.spatial_median(P, 100_000, 1e-15)
+        # The `SpatialMedian` method of `price_level_statistic` finds the median.
+        function spatial_median(P, iters, tol)
+            return po.price_level_statistic(SpatialMedian(; iters = iters, tol = tol), P)
+        end
+        tight(P) = spatial_median(P, 100_000, 1e-15)
         wins = [levels(X[s:(s + 3), :]) for s in 1:(T - 4)]
         rebased(s, S) = wins[s] .* (vec(prod(X[1:(s + 3), :]; dims = 1)) .* S)'
         gap(S) = maximum(maxerr(tight(rebased(s, S)) ./ rebased(s, S)[end, :],
@@ -791,28 +795,27 @@ of the ADRs; the papers' defaults are asserted where they decide the shape of th
             end
             return y
         end
-        @test maximum(maxerr(po.spatial_median(P, 100, 1e-8), tight(P)) for P in wins) <
-              3e-8
+        @test maximum(maxerr(spatial_median(P, 100, 1e-8), tight(P)) for P in wins) < 3e-8
         @test maximum(maxerr(code_median(P), tight(P)) for P in wins) < 3e-8
         # A median on a level is found exactly by the optimality test at the levels; the third
         # window's median is its second level, which the iteration alone approaches from 4e-7.
-        m3 = po.spatial_median(wins[3], 100, 1e-8)
+        m3 = spatial_median(wins[3], 100, 1e-8)
         @test any(k -> m3 == wins[3][k, :], 1:5)
         # A seed on a level that is not the median takes the modified step off the level.
         Pv = [0.0 0.0; 1.0 0.0; 0.0 1.0; 5.0 5.0; 0.2 0.1]
         @test vec(median(Pv; dims = 1)) == Pv[5, :]
-        mv = po.spatial_median(Pv, 1000, 1e-14)
+        mv = spatial_median(Pv, 1000, 1e-14)
         @test po.weiszfeld_sums(Pv, mv)[3] < 1e-8 && mv != Pv[5, :]
         # A median very near a level but not on it converges slowly: the cap of 100 stops the
         # forecast about 1e-4 away while the sum of distances is within 1e-6 of its minimum.
         Ps = levels((1 .+ 0.02 .* randn(StableRNG(15), 40, 4))[6:9, :])
         cost(y) = sum(norm(Ps[i, :] .- y) for i in axes(Ps, 1))
-        ms = po.spatial_median(Ps, 100, 1e-8)
+        ms = spatial_median(Ps, 100, 1e-8)
         @test 1e-4 < maxerr(ms, tight(Ps)) < 2e-4
         @test cost(ms) - cost(tight(Ps)) < 1e-6
         # A step below `tol = 1e-8` stops it too, so a larger cap alone does not help.
-        @test maxerr(po.spatial_median(Ps, 100_000, 1e-8), tight(Ps)) > 1e-6
-        @test maxerr(po.spatial_median(Ps, 10_000, 1e-15), tight(Ps)) < 1e-8
+        @test maxerr(spatial_median(Ps, 100_000, 1e-8), tight(Ps)) > 1e-6
+        @test maxerr(spatial_median(Ps, 10_000, 1e-15), tight(Ps)) < 1e-8
         # The moving-average reversion admits the two-level window and a threshold at or
         # below one, which the paper's algorithm excludes and the step is defined for.
         @test MovingAverageReversion(; window = 2, eps = 1).me.alg.window == 2

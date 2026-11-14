@@ -158,7 +158,7 @@ function assert_coverage_fittable(cvg::CoveragePolicy,
                                   w::Option{<:ObsWeights}, name::AbstractString,
                                   ce::StatsBase.CovarianceEstimator)
     assert_coverage_fittable(cvg, me, w, name)
-    coverage_fittable_estimator(w, ce)
+    coverage_inner_corrected(w, ce)
     return nothing
 end
 """

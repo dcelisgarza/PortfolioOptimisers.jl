@@ -8,7 +8,7 @@ jet = "0.13.1"
 filter = "AnyFrameModule"
 attribution = "deepest_repository_frame"
 load_set = ["GraphRecipes", "StatsPlots"]
-commit = "c8adf16988"
+commit = "4004115c7a"
 
 [run.main]
 load_set = ["GraphRecipes", "StatsPlots"]
@@ -147,6 +147,7 @@ load_set = ["GraphRecipes", "StatsPlots"]
 "src/05_Moments/30_RegimeAdjusted/07_EstimatedMahalanobisBias.jl" = { raw = 0, reviewed = 0 }
 "src/05_Moments/30_RegimeAdjusted/08_SeparatePortfolioBias.jl" = { raw = 0, reviewed = 0 }
 "src/05_Moments/30_RegimeAdjusted/09_MahalanobisLevelClosure.jl" = { raw = 0, reviewed = 0 }
+"src/05_Moments/30_RegimeAdjusted/10_HacLogDeterminant.jl" = { raw = 0, reviewed = 0 }
 "src/05_Moments/31_HigherMomentPartialFit.jl" = { raw = 0, reviewed = 0 }
 "src/05_Moments/32_CrossSectionalFactorModel/01_CrossSectionalRegression.jl" = { raw = 2, reviewed = 2 }
 "src/05_Moments/32_CrossSectionalFactorModel/02_CrossSectionalWeights.jl" = { raw = 0, reviewed = 0 }
@@ -581,6 +582,7 @@ load_set = ["GraphRecipes", "StatsPlots"]
 "src/05_Moments/30_RegimeAdjusted/07_EstimatedMahalanobisBias.jl" = { raw = 0, reviewed = 0 }
 "src/05_Moments/30_RegimeAdjusted/08_SeparatePortfolioBias.jl" = { raw = 0, reviewed = 0 }
 "src/05_Moments/30_RegimeAdjusted/09_MahalanobisLevelClosure.jl" = { raw = 0, reviewed = 0 }
+"src/05_Moments/30_RegimeAdjusted/10_HacLogDeterminant.jl" = { raw = 0, reviewed = 0 }
 "src/05_Moments/31_HigherMomentPartialFit.jl" = { raw = 0, reviewed = 0 }
 "src/05_Moments/32_CrossSectionalFactorModel/01_CrossSectionalRegression.jl" = { raw = 1, reviewed = 1 }
 "src/05_Moments/32_CrossSectionalFactorModel/02_CrossSectionalWeights.jl" = { raw = 0, reviewed = 0 }

@@ -256,7 +256,7 @@ end
 """
 $(DocStringExtensions.TYPEDSIGNATURES)
 
-Covariance method of [`exp_weighted_pass!`](@ref). Runs one forward pass of the covariance recursion over the observations of `X`, and calls `f` after each observation.
+Covariance method of [`exp_weighted_pass!`](@ref). Runs one forward pass of the covariance recursion over the observations of `X`, and calls `f` after each observation. A verb that needs only the last state passes `Returns(nothing)` as `f`.
 
 # Algorithm
 
@@ -323,40 +323,6 @@ function exp_weighted_pass!(f, est::ExpWeightedCovariance, X::MatNum, dims::Int,
     end
 
     return cache
-end
-"""
-$(DocStringExtensions.TYPEDSIGNATURES)
-
-Covariance method of [`exp_weighted_pass!`](@ref). Runs one forward pass of the covariance recursion over the observations of `X`, and reads no intermediate state.
-
-It calls the method that takes a callback, with a callback that does nothing.
-
-# Arguments
-
-  - `est::ExpWeightedCovariance`: Exponentially weighted covariance estimator.
-  - $(arg_dict[:X])
-  - $(arg_dict[:dims])
-  - `active_mask::Option{<:AbstractMatrix{<:Bool}}`: Mask of the active assets, with the size of `X`. With `nothing` every asset is active.
-  - `state::Option{<:ExpWeightedCovarianceState}`: State to continue. With `nothing` the pass starts from the zero state.
-
-# Validation
-
-  - The checks of the method that takes a callback.
-
-# Returns
-
-  - `cache::ExpWeightedCovarianceState`: The state after the last observation.
-
-# Related
-
-  - [`ExpWeightedCovariance`](@ref)
-  - [`ExpWeightedCovarianceState`](@ref)
-  - [`exp_weighted_pass!`](@ref)
-"""
-function exp_weighted_pass!(est::ExpWeightedCovariance, X::MatNum, dims::Int,
-                            active_mask::Option{<:AbstractMatrix{<:Bool}},
-                            state::Option{<:ExpWeightedCovarianceState} = nothing)
-    return exp_weighted_pass!((args...) -> nothing, est, X, dims, active_mask, state)
 end
 """
 $(DocStringExtensions.TYPEDSIGNATURES)
@@ -551,7 +517,7 @@ julia> size(cov(ce, X))
 """
 function Statistics.cov(ce::ExpWeightedCovariance, X::MatNum; dims::Int = 1,
                         active_mask::Option{<:AbstractMatrix{<:Bool}} = nothing, kwargs...)
-    cache = exp_weighted_pass!(ce, X, dims, active_mask)
+    cache = exp_weighted_pass!(Returns(nothing), ce, X, dims, active_mask)
     return exp_weighted_moment(cache, ce)
 end
 """
@@ -939,7 +905,7 @@ function partial_fit!(ce::ExpWeightedCovariance{<:Any, <:Any, <:Any,
                                                 <:Option{<:ExpWeightedCovarianceState}},
                       X::MatNum; dims::Int = 1,
                       active_mask::Option{<:AbstractMatrix{<:Bool}} = nothing, kwargs...)
-    cache = exp_weighted_pass!(ce, X, dims, active_mask, ce.cache)
+    cache = exp_weighted_pass!(Returns(nothing), ce, X, dims, active_mask, ce.cache)
     return cache === ce.cache ? ce : rebuild_struct(ce, (; cache = cache))
 end
 """
@@ -1199,7 +1165,7 @@ $(DocStringExtensions.TYPEDSIGNATURES)
 
 Return the effective number of observations of an exponentially weighted covariance over `n` rows.
 
-It is the count of [`exp_weighted_variance_count`](@ref) for one column of `n` finite rows. The covariance reads every row with the weight of its age, so the count reads all `n` rows, the rows with a `NaN` too, as `size(X, 1)` counts them. The count tends to ``(1 + \\lambda) / (1 - \\lambda)`` as `n` grows. Under equal weights it is `n`.
+It is the count of [`variance_count(decay::Number, X::MatNum, centring::AbstractCentring)`](@ref) for one column of `n` finite rows. The covariance reads every row with the weight of its age, so the count reads all `n` rows, the rows with a `NaN` too, as `size(X, 1)` counts them. The count tends to ``(1 + \\lambda) / (1 - \\lambda)`` as `n` grows. Under equal weights it is `n`.
 
 # Mathematical definition
 
@@ -1245,7 +1211,7 @@ end
 # The diagonal of the covariance is the variance of `ExpWeightedVariance` at the same decay and
 # centring, so the two read one count.
 function variance_count(ce::ExpWeightedCovariance, X::MatNum)
-    return exp_weighted_variance_count(ce.decay, X, ce.centring)
+    return variance_count(ce.decay, X, ce.centring)
 end
 function effective_observation_count(ce::ExpWeightedCovariance,
                                      state::ExpWeightedCovarianceState; kwargs...)

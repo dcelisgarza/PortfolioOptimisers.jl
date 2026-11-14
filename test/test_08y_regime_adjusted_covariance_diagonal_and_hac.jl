@@ -258,6 +258,13 @@ every term carries the same noise (ADR 0190).
     @test all(isapprox.(tfm, (f, qf / f, f / qf - 1); rtol = 1e-10))
     @test all(isapprox.(tlg, (f, ql / f, SF.trigamma(K / 2)); rtol = 1e-10))
     @test isapprox(trm[1], f; rtol = 1e-11) && trm[2:3] == (1.0, 0.0)
+    # Under an estimated centring, the triple of the root mean square is its factor, with the
+    # scale one and no variance.
+    RM = PO.RootMeanSquaredAdjusted()
+    tre = PO.regime_bias_table(PO.RegimeTermMoments(RM), 0.9, 10, nothing,
+                               EstimatedCentring())
+    fre = PO.regime_bias_table(RM, 0.9, 10, nothing, EstimatedCentring())
+    @test all(t -> t[2:3] == (1.0, 0.0), tre) && first.(tre) == fre
     # A diagonal state holds the triples, and grows them as a table of factors grows.
     bias = NTuple{3, Float64}[]
     @test PO.regime_bias!(bias, PO.RegimeTermMoments(FM), 0.9, 10) == bias[10]

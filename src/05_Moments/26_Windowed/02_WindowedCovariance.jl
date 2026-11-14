@@ -33,7 +33,7 @@ $(DocStringExtensions.TYPEDSIGNATURES)
 
 Compute the point-in-time variance series of a windowed covariance estimator.
 
-Row `t` is the fit of the estimator on the observations `1` to `t`. The estimator keeps the last observations of its window among them, so the window rolls with `t`, and the last row equals the batch fit. Before the window is full, row `t` keeps every observation from `1` to `t`. [`windowed_variance_series`](@ref) states the rule.
+Row `t` is the fit of the estimator on the observations `1` to `t`. The estimator keeps the last observations of its window among them, so the window rolls with `t`, and the last row equals the batch fit. Before the window is full, row `t` keeps every observation from `1` to `t`. [`variance_series(est, w::Option{<:ObsWeights}, window::Option{<:Int_VecInt}, X::MatNum, pnl::Option{<:AssetPanel})`](@ref) states the rule.
 
 A prior calls this method with the `active_mask` and `estimation_mask` keywords, and each fit cuts them to its own rows.
 
@@ -55,12 +55,11 @@ A prior calls this method with the `active_mask` and `estimation_mask` keywords,
 # Related
 
   - [`WindowedCovariance`](@ref)
-  - [`windowed_variance_series`](@ref)
+  - [`variance_series(est, w::Option{<:ObsWeights}, window::Option{<:Int_VecInt}, X::MatNum, pnl::Option{<:AssetPanel})`](@ref)
   - [`variance_series(ce::AbstractCovarianceEstimator, X::MatNum; dims::Int = 1, kwargs...)`](@ref)
 """
 function variance_series(ce::WindowedCovariance, X::MatNum; dims::Int = 1, kwargs...)
-    return windowed_variance_series(ce.ce, ce.w, ce.window, X, nothing; dims = dims,
-                                    kwargs...)
+    return variance_series(ce.ce, ce.w, ce.window, X, nothing; dims = dims, kwargs...)
 end
 """
 $(DocStringExtensions.TYPEDSIGNATURES)
@@ -88,12 +87,12 @@ Row `t` is the fit of the estimator on the observations `1` to `t` of the return
 # Related
 
   - [`WindowedCovariance`](@ref)
-  - [`windowed_variance_series`](@ref)
+  - [`variance_series(est, w::Option{<:ObsWeights}, window::Option{<:Int_VecInt}, X::MatNum, pnl::Option{<:AssetPanel})`](@ref)
   - [`variance_series(ce::AbstractCovarianceEstimator, X::MatNum, pnl::Option{<:AssetPanel}; dims::Int = 1, kwargs...)`](@ref)
 """
 function variance_series(ce::WindowedCovariance, X::MatNum, pnl::Option{<:AssetPanel};
                          dims::Int = 1, kwargs...)
-    return windowed_variance_series(ce.ce, ce.w, ce.window, X, pnl; dims = dims, kwargs...)
+    return variance_series(ce.ce, ce.w, ce.window, X, pnl; dims = dims, kwargs...)
 end
 # The inner count reads the keywords of the inner fit: `mean`, `iv`, and the two masks cut to the
 # window. The fit takes `mean` by name, so the window does not read it.

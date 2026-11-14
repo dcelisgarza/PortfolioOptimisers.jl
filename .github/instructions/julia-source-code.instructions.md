@@ -708,7 +708,9 @@ and every addition:
    `observation_count(est) = observation_count(partial_fit_cache(est))` stays, as a walk owns
    its leaf answer (#2109), and `partial_fit_cache`, a callee of the walk, is not its owner. A
    step on a field, `x.f` or `getfield(x, k)`, is not a self-forward. A dropped or a filled
-   slot still becomes one method in a walk.
+   slot still becomes one method in a walk. A walk is no private worker of the verb that calls
+   it either: its composites call it, so its body does not move into that verb, as
+   `observation_count` stays beside `effective_observation_count` (#2092).
 6. **A rebuild by hand that copies every field but one** goes to
    `rebuild_struct(x, (; f = v))`. A site stays by hand only on a measured loss of
    performance. #2110 rules the edges of the rule:

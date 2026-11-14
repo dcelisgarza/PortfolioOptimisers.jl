@@ -181,9 +181,7 @@ const CENSUS_EXEMPT = Dict{Symbol, String}(
                                            :exposure_weight_fill! => "a step of the benchmark weights of an exposure",
                                            :coverage_panel_moment => "a step of the moments with a Coverage Policy",
                                            :coverage_series_frame => "a step of variance_series",
-                                           :coverage_variance_series => "a step of variance_series",
                                            :windowed_series_row => "a step of variance_series on a windowed estimator",
-                                           :windowed_variance_series => "a step of variance_series on a windowed estimator",
                                            :prior_forecast_location => "a step of forecast_location on a prior",
                                            # Steps of the fit of the Cross-Sectional Factor Prior, whose `prior` has a case below.
                                            :cross_sectional_benchmark_stage => "a step of prior on a CrossSectionalFactorPrior",

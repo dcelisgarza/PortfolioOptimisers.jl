@@ -339,7 +339,8 @@ before its update, else `ce.hac_lags`. The kernel is made the first time the sta
 
 # Arguments
 
-  - `store::NamedTuple`: Store of the state, whose `kernel` fills on the first call (mutated).
+  - `store::Union{DiagonalBiasStore, MahalanobisBiasStore}`: Store of the state, whose `kernel`
+    fills on the first call (mutated).
   - `ce::RegimeAdjustedExpWeightedCovariance`: Covariance estimator configuration.
 
 # Returns
@@ -354,7 +355,8 @@ before its update, else `ce.hac_lags`. The kernel is made the first time the sta
   - [`diagonal_law_correlation`](@ref)
   - [`update_var_cor!`](@ref)
 """
-function correlation_hac_lags!(store::NamedTuple, ce::RegimeAdjustedExpWeightedCovariance)
+function correlation_hac_lags!(store::Union{DiagonalBiasStore, MahalanobisBiasStore},
+                               ce::RegimeAdjustedExpWeightedCovariance)
     if isnothing(ce.hac_lags) ||
        !has_separate_cor_decay(ce) ||
        !volatility_before_update(ce.hac_vol_before)

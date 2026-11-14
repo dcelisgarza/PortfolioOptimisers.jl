@@ -1177,7 +1177,7 @@ end
     kish = sum(w)^2 / sum(abs2, w)
     ew = ExpWeightedCovariance(; decay = 0.97)
     # The Kish count of the weights `0.97^(T - t)`. The estimated centring spends one
-    # observation, as `exp_weighted_variance_count` states.
+    # observation, as `variance_count(decay, X, centring)` states.
     lw = [0.97^k for k in 0:(T - 2)]
     Tew = sum(lw)^2 / sum(abs2, lw) + 1
     # The counts. An unweighted estimator keeps `size(X, 1)`.

@@ -1,8 +1,19 @@
 ```@meta
-Description = "Mahalanobis regime bias, private API of PortfolioOptimisers.jl: lagrange_stencil, chebyshev_stencil, stencil_table, mahalanobis_value_stencil, …"
+Description = "Mahalanobis regime bias, private API of PortfolioOptimisers.jl: MahalanobisBiasGrid, MahalanobisCut, MahalanobisBiasNodes, DiagonalBiasStore, …"
 ```
 
 # [Mahalanobis regime bias: private API](@id private-api-mahalanobis-regime-bias)
+
+## Types
+
+```@docs
+MahalanobisBiasGrid
+MahalanobisCut
+MahalanobisBiasNodes
+DiagonalBiasStore
+PortfolioBiasStore
+MahalanobisBiasStore
+```
 
 ## Functions
 
@@ -15,11 +26,6 @@ mahalanobis_integral_stencil
 mahalanobis_bias_grid
 stencil_dot
 mahalanobis_lattice
-hac_log_det_path!
-hac_log_det_peak
-hac_log_det_slope
-hac_ldl_taylor_row!
-gauss_legendre_rule
 mahalanobis_cut!
 mahalanobis_pair_differences!
 mahalanobis_transform

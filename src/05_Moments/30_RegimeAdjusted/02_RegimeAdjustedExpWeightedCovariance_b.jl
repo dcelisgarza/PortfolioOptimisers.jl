@@ -929,6 +929,11 @@ noise. Where it is not, the grid agrees with the finer one to ``5 \\times 10^{-7
   - `decay::Number`: Decay of the weights.
   - `K::Integer`: Largest count of observations in the table.
   - `hac_lags::Union{Integer, VecNum}`: Count of HAC lags, or the weight of each lag.
+  - `::PreCentred`: The law of a pre-centred estimate, which this table holds. A pre-centred
+    deviation is the return itself, so the terms do not share a location, and the table on the
+    banded weight matrix is exact.
+  - `::Option{<:AbstractRegimeDebias}`: Ignored debias rule: a pre-centred deviation does not
+    depend on the estimate.
 
 # Returns
 
@@ -943,7 +948,9 @@ noise. Where it is not, the grid agrees with the finer one to ``5 \\times 10^{-7
   - [`regime_bias!`](@ref)
 """
 function regime_bias_table(method::Union{RegimeAdjustedMethod, RegimeTermMoments},
-                           decay::Number, K::Integer, hac_lags::Union{Integer, VecNum})
+                           decay::Number, K::Integer, hac_lags::Union{Integer, VecNum},
+                           ::PreCentred = PreCentred(),
+                           ::Option{<:AbstractRegimeDebias} = ExactDebias())
     h = one(decay) / 10
     s = exp.(range(-60 * one(h), 50 * one(h); step = h))
     T = eltype(s)
@@ -1129,7 +1136,7 @@ target holds one factor for each count.
 
 # Returns
 
-  - `bias::Option{<:Union{AbstractVector, NamedTuple}}`: The empty store where
+  - `bias::Option{<:Union{AbstractVector, DiagonalBiasStore, PortfolioBiasStore, MahalanobisBiasStore}}`: The empty store where
     [`debiases`](@ref) holds for `ce.debias` and a regime method is set, else `nothing`.
 
 # Related
@@ -1465,7 +1472,8 @@ julia> size(cov(ce, X))
 function Statistics.cov(ce::RegimeAdjustedExpWeightedCovariance, X::MatNum; dims::Int = 1,
                         estimation_mask::Option{<:AbstractMatrix{<:Bool}} = nothing,
                         active_mask::Option{<:AbstractMatrix{<:Bool}} = nothing, kwargs...)
-    cache = regime_adjusted_covariance_pass!(ce, X, dims, estimation_mask, active_mask)
+    cache = regime_adjusted_covariance_pass!(Returns(nothing), ce, X, dims, estimation_mask,
+                                             active_mask)
     return regime_adjusted_covariance(cache, ce)
 end
 """
@@ -1625,8 +1633,8 @@ function partial_fit!(ce::RegimeAdjustedExpWeightedCovariance{<:Any, <:Any, <:An
                       X::MatNum; dims::Int = 1,
                       estimation_mask::Option{<:AbstractMatrix{<:Bool}} = nothing,
                       active_mask::Option{<:AbstractMatrix{<:Bool}} = nothing, kwargs...)
-    cache = regime_adjusted_covariance_pass!(ce, X, dims, estimation_mask, active_mask,
-                                             ce.cache)
+    cache = regime_adjusted_covariance_pass!(Returns(nothing), ce, X, dims, estimation_mask,
+                                             active_mask, ce.cache)
     return cache === ce.cache ? ce : rebuild_struct(ce, (; cache = cache))
 end
 """

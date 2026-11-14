@@ -572,7 +572,7 @@ Return a new [`ElasticNet`](@ref) whose fit weighs the observations by `w`.
 
 # Algorithm
 
- 1. Build a new [`ElasticNet`](@ref) with `w` in place of `tgt.w` and every other field unchanged. Its keyword constructor passes `w` to `tgt.ve` through [`factory`](@ref), so the standardisation reads the same weights.
+ 1. Rebuild `tgt` with `w` in place of `tgt.w` and every other field unchanged, through [`rebuild_struct`](@ref). The keyword constructor that it calls passes `w` to `tgt.ve` through [`factory`](@ref), so the standardisation reads the same weights.
 
 # Arguments
 
@@ -590,8 +590,7 @@ Return a new [`ElasticNet`](@ref) whose fit weighs the observations by `w`.
   - [`regression_target_weights(::ElasticNet)`](@ref)
 """
 function factory(tgt::ElasticNet, w::ObsWeights)::ElasticNet
-    return ElasticNet(; theta = tgt.theta, strength = tgt.strength, sdiv = tgt.sdiv,
-                      ve = tgt.ve, iters = tgt.iters, tol = tgt.tol, w = w, ic = tgt.ic)
+    return rebuild_struct(tgt, (; w = w))
 end
 """
     factory(tgt::ElasticNet, ic::InterceptColumn) -> ElasticNet
@@ -600,7 +599,7 @@ Return a new [`ElasticNet`](@ref) whose fit leaves the column of ones that an es
 
 # Algorithm
 
- 1. Build a new [`ElasticNet`](@ref) with `ic.k` in place of `tgt.ic` and every other field unchanged.
+ 1. Rebuild `tgt` with `ic.k` in place of `tgt.ic` and every other field unchanged, through [`rebuild_struct`](@ref).
 
 # Arguments
 
@@ -618,8 +617,7 @@ Return a new [`ElasticNet`](@ref) whose fit leaves the column of ones that an es
   - [`factory`](@ref)
 """
 function factory(tgt::ElasticNet, ic::InterceptColumn)::ElasticNet
-    return ElasticNet(; theta = tgt.theta, strength = tgt.strength, sdiv = tgt.sdiv,
-                      ve = tgt.ve, iters = tgt.iters, tol = tgt.tol, w = tgt.w, ic = ic.k)
+    return rebuild_struct(tgt, (; ic = ic.k))
 end
 """
     regression_target_weights(tgt::ElasticNet)
@@ -656,7 +654,7 @@ The target is not [`@propagatable`](@ref), so it needs this method of [`obs_weig
 
  1. Index `tgt.w` with [`obs_weights_index`](@ref).
  2. Cut the variance estimator `tgt.ve` with [`obs_weights_view`](@ref).
- 3. Build the target again with its keyword constructor. The other fields keep their values.
+ 3. Rebuild the target with the two cut fields through [`rebuild_struct`](@ref). The other fields keep their values.
 
 # Arguments
 
@@ -678,9 +676,9 @@ The target is not [`@propagatable`](@ref), so it needs this method of [`obs_weig
   - [`regression_target_weights(::ElasticNet)`](@ref)
 """
 function obs_weights_view(tgt::ElasticNet, i)::ElasticNet
-    return ElasticNet(; theta = tgt.theta, strength = tgt.strength, sdiv = tgt.sdiv,
-                      ve = obs_weights_view(tgt.ve, i), iters = tgt.iters, tol = tgt.tol,
-                      w = obs_weights_index(tgt.w, i), ic = tgt.ic)
+    return rebuild_struct(tgt,
+                          (; ve = obs_weights_view(tgt.ve, i),
+                           w = obs_weights_index(tgt.w, i)))
 end
 """
 $(DocStringExtensions.TYPEDEF)
@@ -1022,7 +1020,41 @@ function StatsAPI.fit(tgt::ElasticNet, X::MatNum, y::VecNum)
                          cnt.rdof)
 end
 """
-    elastic_net_counts(tgt::ElasticNet, sys::NamedTuple) -> NamedTuple
+$(DocStringExtensions.TYPEDEF)
+
+Holds the effective degrees of freedom, the weighted residual sum of squares, the number of observations and the residual count of a fitted [`ElasticNet`](@ref).
+
+This type is an implementation detail and is not intended for direct use. [`elastic_net_counts`](@ref) makes it, and [`StatsAPI.fit(::ElasticNet, ::MatNum, ::VecNum)`](@ref) copies its fields into the [`ElasticNetFit`](@ref) that it returns. [`ElasticNetFit`](@ref) states each count and its derivation.
+
+# Fields
+
+$(DocStringExtensions.FIELDS)
+
+# Related
+
+  - [`elastic_net_counts`](@ref)
+  - [`ElasticNetFit`](@ref)
+"""
+@concrete struct ElasticNetCounts
+    """
+    `df`: The effective degrees of freedom of the fit, the trace of the smoother on the active set plus the term of `sdiv`.
+    """
+    df
+    """
+    `rss`: The weighted residual sum of squares of the fit, under the frequency weights of [`glm_weights`](@ref).
+    """
+    rss
+    """
+    `nobs`: The number of observations, the sum of the frequency weights, or the number of rows without weights.
+    """
+    nobs
+    """
+    `rdof`: The residual count, the number of rows less ``\\operatorname{tr}(2 \\mathbf{S} - \\mathbf{S}^\\intercal \\mathbf{S})``.
+    """
+    rdof
+end
+"""
+    elastic_net_counts(tgt::ElasticNet, sys::NamedTuple) -> ElasticNetCounts
 
 Return the effective degrees of freedom, the weighted residual sum of squares, the number of observations and the residual count of a fitted [`ElasticNet`](@ref).
 
@@ -1066,10 +1098,11 @@ The trace is invariant under a cyclic permutation, so ``\\operatorname{tr}(\\mat
 
 # Returns
 
-  - `(; df, rss, nobs, rdof)::NamedTuple`: The counts that [`ElasticNetFit`](@ref) holds.
+  - `cnt::ElasticNetCounts`: The counts that [`ElasticNetFit`](@ref) holds.
 
 # Related
 
+  - [`ElasticNetCounts`](@ref)
   - [`ElasticNetFit`](@ref)
   - [`StatsAPI.fit(::ElasticNet, ::MatNum, ::VecNum)`](@ref)
   - [`strength_divergence`](@ref)
@@ -1087,7 +1120,7 @@ function elastic_net_counts(tgt::ElasticNet, sys::NamedTuple)
     rss = isnothing(w) ? sum(abs2, res) : LinearAlgebra.dot(w, abs2.(res))
     nobs = isnothing(w) ? size(P, 1) : sum(w)
     rdof = size(P, 1) - (2 * tH - LinearAlgebra.dot(B, transpose(B)))
-    return (; df = df, rss = rss, nobs = nobs, rdof = rdof)
+    return ElasticNetCounts(df, rss, nobs, rdof)
 end
 """
     strength_divergence(sdiv::Nothing, tgt::ElasticNet, sys::NamedTuple) -> Real

@@ -1201,6 +1201,11 @@ does not read an entry at ``K \\le 4``.
     which names the moment, or the table of the moments of one term.
   - `decay::Number`: Decay of the weights.
   - `K::Integer`: Largest count of observations in the table.
+  - `::Nothing`: No HAC lags. The slot lets a caller pass the `hac_lags` of an estimator.
+  - `::PreCentred`: The law of a pre-centred estimate, which this table holds. A pre-centred
+    deviation is the return itself, so the terms do not share a location, and the table is exact.
+  - `::Option{<:AbstractRegimeDebias}`: Ignored debias rule: a pre-centred deviation does not
+    depend on the estimate.
 
 # Returns
 
@@ -1215,7 +1220,9 @@ does not read an entry at ``K \\le 4``.
   - [`RegimeAdjustedExpWeightedVariance`](@ref)
 """
 function regime_bias_table(method::Union{RegimeAdjustedMethod, RegimeTermMoments},
-                           decay::Number, K::Integer)
+                           decay::Number, K::Integer, ::Nothing = nothing,
+                           ::PreCentred = PreCentred(),
+                           ::Option{<:AbstractRegimeDebias} = ExactDebias())
     h = one(decay) / 10
     s = exp.(range(-60 * one(h), 50 * one(h); step = h))
     lG = zero(s)
@@ -1555,7 +1562,8 @@ after each observation.
 The pass holds the argument validation, the orientation and the cache, so the two verbs that read
 it, `var` and `variance_series`, state the recursion once. `f` receives the observation index and
 the cache after that observation. So a point-in-time series is one forward pass, and not one
-refit for each observation.
+refit for each observation. A verb that wants the last cache alone, as `var` and `partial_fit!`
+do, passes `Returns(nothing)` as `f`.
 
 # Arguments
 
@@ -1637,49 +1645,6 @@ function regime_adjusted_variance_pass!(f, ce::RegimeAdjustedExpWeightedVariance
     end
 
     return cache
-end
-"""
-$(DocStringExtensions.TYPEDSIGNATURES)
-
-Run one forward pass of the online variance update over the observations of `X`, and read no
-intermediate cache.
-
-This is the callback method with a callback that does nothing, so a verb that wants the last
-cache alone states no callback of its own. `var` and `partial_fit!` read the pass this way, and
-`variance_series` reads the callback method.
-
-# Arguments
-
-  - `ce`: Regime-adjusted exponentially weighted variance estimator.
-  - $(arg_dict[:X])
-  - $(arg_dict[:dims])
-  - `estimation_mask`: Optional boolean matrix of the size of `X`. Where it is set, the regime
-    state at observation `i` reads only the assets where `estimation_mask[i, :]` (or `[:, i]`)
-    is `true`.
-  - `active_mask`: Optional boolean matrix of the size of `X`. Where it is set, an asset that
-    becomes inactive restarts its variance and its observation count from zero.
-  - `state`: Optional cache to continue from. The default `nothing` builds the cold cache, which
-    is what a fit over a whole sample needs. [`partial_fit!`](@ref) passes the estimator's own
-    state instead, so the pass continues where the last call stopped.
-
-# Returns
-
-  - `cache::RegimeAdjustedVarianceState`: The cache after the last observation.
-
-# Related
-
-  - [`RegimeAdjustedVarianceState`](@ref)
-  - [`regime_adjusted_variance_pass!`](@ref)
-  - [`regime_adjusted_variance`](@ref)
-  - [`partial_fit!`](@ref)
-"""
-function regime_adjusted_variance_pass!(ce::RegimeAdjustedExpWeightedVariance, X::MatNum,
-                                        dims::Int,
-                                        estimation_mask::Option{<:AbstractMatrix{<:Bool}},
-                                        active_mask::Option{<:AbstractMatrix{<:Bool}},
-                                        state::Option{<:RegimeAdjustedVarianceState} = nothing)
-    return regime_adjusted_variance_pass!((args...) -> nothing, ce, X, dims,
-                                          estimation_mask, active_mask, state)
 end
 """
 $(DocStringExtensions.TYPEDSIGNATURES)
@@ -1801,7 +1766,8 @@ result by the square of the regime multiplier.
 function Statistics.var(ce::RegimeAdjustedExpWeightedVariance, X::MatNum; dims::Int = 1,
                         estimation_mask::Option{<:AbstractMatrix{<:Bool}} = nothing,
                         active_mask::Option{<:AbstractMatrix{<:Bool}} = nothing, kwargs...)
-    cache = regime_adjusted_variance_pass!(ce, X, dims, estimation_mask, active_mask)
+    cache = regime_adjusted_variance_pass!(Returns(nothing), ce, X, dims, estimation_mask,
+                                           active_mask)
     return regime_adjusted_variance(cache, ce)
 end
 """
@@ -1931,8 +1897,8 @@ function partial_fit!(ce::RegimeAdjustedExpWeightedVariance{<:Any, <:Any, <:Any,
                       X::MatNum; dims::Int = 1,
                       estimation_mask::Option{<:AbstractMatrix{<:Bool}} = nothing,
                       active_mask::Option{<:AbstractMatrix{<:Bool}} = nothing, kwargs...)
-    cache = regime_adjusted_variance_pass!(ce, X, dims, estimation_mask, active_mask,
-                                           ce.cache)
+    cache = regime_adjusted_variance_pass!(Returns(nothing), ce, X, dims, estimation_mask,
+                                           active_mask, ce.cache)
     return cache === ce.cache ? ce : rebuild_struct(ce, (; cache = cache))
 end
 """
@@ -2412,7 +2378,7 @@ function supports_partial_fit(::RegimeAdjustedExpWeightedVariance)
     return true
 end
 function variance_count(ve::RegimeAdjustedExpWeightedVariance, X::MatNum)
-    return exp_weighted_variance_count(ve.decay, X, ve.centring)
+    return variance_count(ve.decay, X, ve.centring)
 end
 export LogRegimeAdjusted, FirstMomentRegimeAdjusted, RootMeanSquaredAdjusted,
        RegimeAdjustedExpWeightedVariance

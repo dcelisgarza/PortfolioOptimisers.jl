@@ -383,13 +383,33 @@ The method centres the data with `kte.me`, and it repairs the result with `kte.m
 
 # Algorithm
 
-The method passes its arguments to [`coverage_cokurtosis`](@ref), which selects an arm by dispatch on `kte.cvg`. When `kte.cvg` is `nothing`, the arm does these steps.
+The type of `kte.cvg` selects the method, so no branch reads the value of the policy. [`coverage_covariance`](@ref) selects the arm of a covariance in the same way.
+
+When `kte.cvg` is `nothing`, the method takes the Coverage Universe arm. It centres the whole window on one vector. The [`FullMoment`](@ref) and the [`SemiMoment`](@ref) methods differ only in step 5.
 
  1. Orient `X` to observations × assets with [`dims_oriented`](@ref), which validates `dims`.
- 2. Resolve the observation weights `w` from `kte.w` with [`get_observation_weights`](@ref).
- 3. Resolve the centre `mu` from `kte.me` and `kte.w` with [`weighted_centre`](@ref), which reads `mean` when the caller gave one.
- 4. Replace `X` with the deviation matrix. [`FullMoment`](@ref) takes `X .- mu`, and [`SemiMoment`](@ref) takes `min.(X .- mu, 0)`.
- 5. Delegate to [`_cokurtosis`](@ref) with the deviation matrix, `kte.mp` and `w`, and return the matrix it returns.
+ 2. Refuse an inactive cell of `active_mask` with [`assert_finite_sample`](@ref), because a plain estimator reads that cell as a non-finite return.
+ 3. Resolve the observation weights `w` from `kte.w` with [`get_observation_weights`](@ref).
+ 4. Resolve the centre `mu` from `kte.me` and `kte.w` with [`weighted_centre`](@ref), which reads `mean` when the caller gave one.
+ 5. Replace `X` with the deviation matrix. [`FullMoment`](@ref) takes `X .- mu`, and [`SemiMoment`](@ref) takes `min.(X .- mu, 0)`.
+ 6. Delegate to [`_cokurtosis`](@ref) with the deviation matrix, `kte.mp` and `w`, and return the matrix it returns.
+
+When `kte.cvg` is a [`CoveragePolicy`](@ref), the method takes the available-case arm. It fits each quadruple on the observations at which its four assets are all finite and active, so each cell has its own denominator. The centre of each asset is the available-case mean of that asset, over its own finite and active observations. It is not a mean over the observations of the quadruple. [`coskewness`](@ref) states the reason, and the arm refuses an external `mean` for the same reason.
+
+The repair reads the block alone. [`matrix_processing_block!`](@ref) finds the block from the diagonal of the matrix. The diagonal entry at the pair `(i, j)` is `E[yᵢ²yⱼ²]`, and it is finite if and only if the pair shares an observation. So the block is the set of pairs that the fit gives a value for, and the repair does not change the cells outside it.
+
+Neither an available-case cokurtosis nor an available-case coskewness folds. An exact recursion for each cell needs the second and the third comoments over the observations of each quadruple. So the online form of an available-case cokurtosis refits a buffer through [`Online`](@ref).
+
+ 1. Get the valid entries, the deviations from the available-case centre of each asset, and the mask of the admitted assets with [`coverage_comoment_block`](@ref).
+ 2. Take the numerator as `transpose(z) * z` and the denominator as `transpose(zc) * zc`. `z` and `zc` are the pairwise expansions of the zeroed deviations and of the valid mask.
+ 3. Divide with [`coverage_divide`](@ref), and frame the refused assets down both pair axes with [`coverage_refuse_comoment!`](@ref).
+ 4. Repair the block with [`matrix_processing_block!`](@ref).
+
+When `kte.w` holds observation weights as well, the available-case arm makes one weighted pass, because the weights describe the whole sample.
+
+ 1. Read the deviations, the valid entries and the admitted assets with [`weighted_comoment_block`](@ref).
+ 2. Build the fourth co-moment with [`weighted_comoment`](@ref), and reshape it to `N² × N²`.
+ 3. Frame the refused assets with [`coverage_refuse_comoment!`](@ref), and repair the block with [`matrix_processing_block!`](@ref).
 
 # Arguments
 
@@ -405,9 +425,9 @@ The method passes its arguments to [`coverage_cokurtosis`](@ref), which selects 
 
   - `mean`: The optional mean vector. When it is `nothing`, the method computes the centre with `kte.me` and `kte.w`. The available-case arm refuses a mean vector.
 
-  - `active_mask`: The active mask of the Asset Panel over the window, or `nothing`. [`coverage_cokurtosis`](@ref) states how each arm reads it.
+  - `active_mask`: The active mask of the Asset Panel over the window, or `nothing`. The Coverage Universe arm refuses an inactive cell, as it refuses a non-finite return. The available-case arm leaves the cell out of each comoment of its asset.
 
-  - `kwargs...`: More keyword arguments. When `kte.cvg` is `nothing`, the method passes them to [`get_observation_weights`](@ref) and to [`weighted_centre`](@ref).
+  - `kwargs...`: More keyword arguments. When `kte.cvg` is `nothing`, the method passes them to [`get_observation_weights`](@ref) and to [`weighted_centre`](@ref). The available-case arm ignores them.
 
 # Validation
 
@@ -437,60 +457,16 @@ julia> cokurtosis(Cokurtosis(), X)
 # Related
 
   - [`Cokurtosis`](@ref)
+  - [`CoveragePolicy`](@ref)
   - [`_cokurtosis`](@ref)
   - [`weighted_centre`](@ref)
-"""
-function cokurtosis(kte::Cokurtosis, X::MatNum; dims::Int = 1, mean = nothing,
-                    active_mask::Option{<:AbstractMatrix{<:Bool}} = nothing, kwargs...)
-    return coverage_cokurtosis(kte, kte.cvg, X; dims = dims, mean = mean,
-                               active_mask = active_mask, kwargs...)
-end
-"""
-    coverage_cokurtosis(kte, cvg, X; dims::Int = 1, mean = nothing,
-                        active_mask = nothing, kwargs...) -> MatNum
-
-Computes the square cokurtosis matrix with the arm that the coverage policy of the estimator selects.
-
-The caller passes the `cvg` field of the estimator as the second argument. So dispatch on the policy selects the arm, and no branch reads the value of the policy. [`coverage_covariance`](@ref) selects the arm of a covariance in the same way. The moment algorithm of `kte` sets the deviations from the mean of each asset. [`FullMoment`](@ref) keeps them whole, and [`SemiMoment`](@ref) sets each positive deviation to zero.
-
-# Arguments
-
-  - `kte`: The cokurtosis estimator.
-  - `cvg`: The coverage policy of the estimator, which selects the arm.
-  - `X`: The data matrix (observations × assets).
-  - $(arg_dict[:dims])
-  - `mean`: The optional mean vector. The available-case arm refuses one.
-  - `active_mask`: The active mask of the Asset Panel over the window, or `nothing`. The Coverage Universe arm refuses an inactive cell, as it refuses a non-finite return. The available-case arm leaves the cell out of each comoment of its asset.
-  - `kwargs...`: More keyword arguments. The Coverage Universe arm passes them to [`get_observation_weights`](@ref) and to [`weighted_centre`](@ref).
-
-# Returns
-
-  - $(ret_dict[:ckurt])
-
-# Related
-
-  - [`Cokurtosis`](@ref)
-  - [`CoveragePolicy`](@ref)
-  - [`coverage_covariance`](@ref)
   - [`coverage_comoment_block`](@ref)
+  - [`matrix_processing_block!`](@ref)
+  - [`weighted_comoment`](@ref)
 """
-function coverage_cokurtosis end
-"""
-$(DocStringExtensions.TYPEDSIGNATURES)
-
-Computes the [`FullMoment`](@ref) arm of [`coverage_cokurtosis`](@ref) for an estimator with no coverage policy.
-
-This is the Coverage Universe arm. It centres the whole window on one vector and delegates to [`_cokurtosis`](@ref). It refuses an inactive cell of `active_mask` with [`assert_finite_sample`](@ref), because a plain estimator reads that cell as a non-finite return.
-
-# Related
-
-  - [`coverage_cokurtosis`](@ref)
-  - [`_cokurtosis`](@ref)
-"""
-function coverage_cokurtosis(kte::Cokurtosis{<:Any, <:Any, <:FullMoment}, ::Nothing,
-                             X::MatNum; dims::Int = 1, mean = nothing,
-                             active_mask::Option{<:AbstractMatrix{<:Bool}} = nothing,
-                             kwargs...)
+function cokurtosis(kte::Cokurtosis{<:Any, <:Any, <:FullMoment, <:Any, Nothing}, X::MatNum;
+                    dims::Int = 1, mean = nothing,
+                    active_mask::Option{<:AbstractMatrix{<:Bool}} = nothing, kwargs...)
     X = dims_oriented(dims, X)
     assert_finite_sample(X, dims_oriented(dims, active_mask))
     w = get_observation_weights(kte.w, X; dims = 1, kwargs...)
@@ -498,22 +474,9 @@ function coverage_cokurtosis(kte::Cokurtosis{<:Any, <:Any, <:FullMoment}, ::Noth
     X = X .- mu
     return _cokurtosis(X, kte.mp, w)
 end
-"""
-$(DocStringExtensions.TYPEDSIGNATURES)
-
-Computes the [`SemiMoment`](@ref) arm of [`coverage_cokurtosis`](@ref) for an estimator with no coverage policy.
-
-This is the Coverage Universe arm. It centres the whole window on one vector, sets each positive deviation to zero, and delegates to [`_cokurtosis`](@ref). It refuses an inactive cell of `active_mask` with [`assert_finite_sample`](@ref), because a plain estimator reads that cell as a non-finite return.
-
-# Related
-
-  - [`coverage_cokurtosis`](@ref)
-  - [`_cokurtosis`](@ref)
-"""
-function coverage_cokurtosis(kte::Cokurtosis{<:Any, <:Any, <:SemiMoment}, ::Nothing,
-                             X::MatNum; dims::Int = 1, mean = nothing,
-                             active_mask::Option{<:AbstractMatrix{<:Bool}} = nothing,
-                             kwargs...)
+function cokurtosis(kte::Cokurtosis{<:Any, <:Any, <:SemiMoment, <:Any, Nothing}, X::MatNum;
+                    dims::Int = 1, mean = nothing,
+                    active_mask::Option{<:AbstractMatrix{<:Bool}} = nothing, kwargs...)
     X = dims_oriented(dims, X)
     assert_finite_sample(X, dims_oriented(dims, active_mask))
     w = get_observation_weights(kte.w, X; dims = 1, kwargs...)
@@ -521,42 +484,15 @@ function coverage_cokurtosis(kte::Cokurtosis{<:Any, <:Any, <:SemiMoment}, ::Noth
     X = min.(X .- mu, zero(eltype(X)))
     return _cokurtosis(X, kte.mp, w)
 end
-"""
-$(DocStringExtensions.TYPEDSIGNATURES)
-
-Computes the available-case arm of [`coverage_cokurtosis`](@ref) for an estimator with a [`CoveragePolicy`](@ref).
-
-The method fits each quadruple on the observations at which its four assets are all finite and active. Each cell has its own denominator.
-
-The centre of each asset is the available-case mean of that asset, over its own finite and active observations. It is not a mean over the observations of the quadruple. [`coverage_coskewness`](@ref) states the reason, and the method refuses an external `mean` for the same reason.
-
-The repair reads the block alone. [`matrix_processing_block!`](@ref) finds the block from the diagonal of the matrix. The diagonal entry at the pair `(i, j)` is `E[yᵢ²yⱼ²]`, and it is finite if and only if the pair shares an observation. So the block is the set of pairs that the fit gives a value for, and the repair does not change the cells outside it.
-
-Neither an available-case cokurtosis nor an available-case coskewness folds. An exact recursion for each cell needs the second and the third comoments over the observations of each quadruple. So the online form of an available-case cokurtosis refits a buffer through [`Online`](@ref).
-
-# Algorithm
-
- 1. Get the valid entries, the deviations from the available-case centre of each asset, and the mask of the admitted assets with [`coverage_comoment_block`](@ref).
- 2. Take the numerator as `transpose(z) * z` and the denominator as `transpose(zc) * zc`. `z` and `zc` are the pairwise expansions of the zeroed deviations and of the valid mask.
- 3. Divide with [`coverage_divide`](@ref), and frame the refused assets down both pair axes with [`coverage_refuse_comoment!`](@ref).
- 4. Repair the block with [`matrix_processing_block!`](@ref).
-
-# Related
-
-  - [`coverage_cokurtosis`](@ref)
-  - [`coverage_comoment_block`](@ref)
-  - [`coverage_divide`](@ref)
-  - [`matrix_processing_block!`](@ref)
-"""
-function coverage_cokurtosis(kte::Cokurtosis, cvg::CoveragePolicy, X::MatNum; dims::Int = 1,
-                             mean = nothing,
-                             active_mask::Option{<:AbstractMatrix{<:Bool}} = nothing,
-                             kwargs...)
+# The available-case arm. The weighted method of this arm is in `39_WeightedAvailableCase.jl`.
+function cokurtosis(kte::Cokurtosis{<:Any, <:Any, <:Any, <:Any, <:CoveragePolicy},
+                    X::MatNum; dims::Int = 1, mean = nothing,
+                    active_mask::Option{<:AbstractMatrix{<:Bool}} = nothing, kwargs...)
     assert_dims(dims)
     assert_partial_fittable(kte.me, kte.w, "Cokurtosis")
     @argcheck(isnothing(mean),
               ArgumentError("an available-case cokurtosis centres each asset on that asset's own observations, so it cannot take a centre fitted over the whole window. Pass `mean = nothing`, or clear `cvg`."))
-    Xo, _, _, z, zc, cmsk = coverage_comoment_block(kte.alg, cvg, X, active_mask, dims)
+    Xo, _, _, z, zc, cmsk = coverage_comoment_block(kte.alg, kte.cvg, X, active_mask, dims)
     ckurt = coverage_divide(transpose(z) * z, transpose(zc) * zc, false, nothing)
     coverage_refuse_comoment!(ckurt, cmsk, Val(:kt))
     matrix_processing_block!(kte.mp, ckurt, Xo)

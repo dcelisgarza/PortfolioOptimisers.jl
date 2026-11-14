@@ -255,7 +255,11 @@ The inner constructor calls it. The two methods state the valid pairs of criteri
 
 # Algorithm
 
-The two methods run the same steps, through [`assert_stepwise_regression_fields`](@ref), so they hold the same rules.
+Each method holds the checks that its pairs reach, so the copies of the rule on the weights agree.
+
+ 1. Under a [`MaxValStepwiseRegressionCriterion`](@ref), check the variant of a [`GeneralisedLinearModel`](@ref) under `:adjr2`. The method of a [`MinValStepwiseRegressionCriterion`](@ref) has no such step, because `:adjr2` is a maximised criterion.
+ 2. Check the `weights` entry of the `kwargs` of a [`LinearModel`](@ref) or a [`GeneralisedLinearModel`](@ref). Both methods hold this step.
+ 3. Check `included` with [`assert_stepwise_included`](@ref).
 
 # Arguments
 
@@ -281,49 +285,20 @@ The two methods run the same steps, through [`assert_stepwise_regression_fields`
 function assert_stepwise_regression(crit::MinValStepwiseRegressionCriterion,
                                     tgt::AbstractRegressionTarget,
                                     included::Option{<:AbstractVector})::Nothing
-    return assert_stepwise_regression_fields(crit, tgt, included)
+    if isa(tgt, Union{LinearModel, GeneralisedLinearModel}) && haskey(tgt.kwargs, :weights)
+        @argcheck(isa(tgt.kwargs.weights, ObsWeights),
+                  ArgumentError("tgt.kwargs.weights must be a vector of observation weights, one element per observation, of type ObsWeights = Union{DynamicAbstractWeights, StatsBase.AbstractWeights}. Got\ntgt.kwargs.weights => $(typeof(tgt.kwargs.weights))"))
+        if isa(tgt.kwargs.weights, AbstractVector)
+            @argcheck(!isempty(tgt.kwargs.weights), IsEmptyError)
+        end
+    end
+    assert_stepwise_included(included)
+    return nothing
 end
 function assert_stepwise_regression(crit::Union{MaxValStepwiseRegressionCriterion,
                                                 AbstractStepwiseRegressionCriterion},
                                     tgt::AbstractUnpenalisedRegressionTarget,
                                     included::Option{<:AbstractVector})::Nothing
-    return assert_stepwise_regression_fields(crit, tgt, included)
-end
-"""
-    assert_stepwise_regression_fields(crit, tgt::AbstractRegressionTarget,
-                                      included::Option{<:AbstractVector})
-
-Checks the fields of a [`StepwiseRegression`](@ref) whose pair of criterion and target is valid.
-
-Both methods of [`assert_stepwise_regression`](@ref) call it, after their signatures accept the pair.
-
-# Algorithm
-
- 1. Check the variant of a [`GeneralisedLinearModel`](@ref) under `:adjr2`.
- 2. Check the `weights` entry of the `kwargs` of a [`LinearModel`](@ref) or a [`GeneralisedLinearModel`](@ref).
- 3. Check `included` with [`assert_stepwise_included`](@ref).
-
-# Arguments
-
-  - `crit`: The criterion, as the `crit` field holds it.
-  - `tgt`: The regression target.
-  - `included`: The factor sets, one entry per asset, or `nothing`.
-
-# Validation
-
-  - The rules of [`assert_stepwise_regression`](@ref), except the rule on the pair.
-
-# Returns
-
-  - `nothing`.
-
-# Related
-
-  - [`assert_stepwise_regression`](@ref)
-  - [`StepwiseRegression`](@ref)
-"""
-function assert_stepwise_regression_fields(crit, tgt::AbstractRegressionTarget,
-                                           included::Option{<:AbstractVector})::Nothing
     if isa(crit, Val{:adjr2}) && isa(tgt, GeneralisedLinearModel) && !isnothing(tgt.variant)
         @argcheck(tgt.variant in ADJUSTED_PSEUDO_R2_VARIANTS,
                   "The :adjr2 criterion reads StatsAPI.adjr2, which accepts a variant in $ADJUSTED_PSEUDO_R2_VARIANTS. Got\ntgt.variant => $(tgt.variant)")

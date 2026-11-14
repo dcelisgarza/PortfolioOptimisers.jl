@@ -482,8 +482,34 @@ function dimension_reduction_map(model::MultivariateStats.PPCA)
     return model.W / Statistics.cov(model)
 end
 """
+$(DocStringExtensions.TYPEDEF)
+
+Holds the fit of one asset in the reduced basis of a [`DimensionReductionRegression`](@ref), with its coefficients mapped back to the original factors.
+
+This type is an implementation detail and is not intended for direct use. [`_regression(::DimensionReductionRegression, ::VecNum, ::VecNum, ::VecNum, ::MatNum, ::MatNum)`](@ref) makes it, and [`regression(::DimensionReductionRegression, ::MatNum, ::MatNum)`](@ref) collects one for each asset into a [`Regression`](@ref).
+
+# Fields
+
+$(DocStringExtensions.FIELDS)
+
+# Related
+
+  - [`DimensionReductionRegression`](@ref)
+  - [`residual_count`](@ref)
+"""
+@concrete struct ReducedBasisFit <: AbstractResult
+    """
+    `beta`: Regression coefficients in the original factor space, with the intercept as the first element.
+    """
+    beta
+    """
+    `edof`: Residual count of the fit in the reduced space, the number of rows of the projected design less its number of columns under an unpenalised target.
+    """
+    edof
+end
+"""
     _regression(re::DimensionReductionRegression, y::VecNum, mu::VecNum,
-               sigma::VecNum, x1::MatNum, Vp::MatNum)
+               sigma::VecNum, x1::MatNum, Vp::MatNum) -> ReducedBasisFit
 
 Fits one asset in the reduced basis and maps its coefficients back to the original factors.
 
@@ -533,13 +559,11 @@ Where:
 
 # Returns
 
-  - `(; beta, edof)::NamedTuple`:
-
-      + `beta::VecNum`: Regression coefficients in the original factor space, with the intercept as the first element.
-      + `edof::Real`: Residual count of the fit in the reduced space, the number of rows of `x1` less its number of columns under an unpenalised target.
+  - `fit::ReducedBasisFit`: The coefficients `beta` in the original factor space, with the intercept first, and the residual count `edof` of the fit in the reduced space.
 
 # Related
 
+  - [`ReducedBasisFit`](@ref)
   - [`DimensionReductionRegression`](@ref)
   - [`prep_dim_red_reg`](@ref)
   - [`regression_target_weights`](@ref)
@@ -558,7 +582,7 @@ function _regression(re::DimensionReductionRegression, y::VecNum, mu::VecNum, si
     beta = Vp * beta_pc ./ sigma
     beta0 = mean_y - LinearAlgebra.dot(beta, mu)
     pushfirst!(beta, beta0)
-    return (; beta = beta, edof = residual_count(fit_result, x1))
+    return ReducedBasisFit(beta, residual_count(fit_result, x1))
 end
 """
     regression(re::DimensionReductionRegression, X::MatNum, F::MatNum)

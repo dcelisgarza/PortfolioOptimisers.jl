@@ -1,6 +1,38 @@
 """
+$(DocStringExtensions.TYPEDEF)
+
+Holds the three sums of the weights of the separate correlation path at one count of
+observations.
+
+This type is an implementation detail and is not intended for direct use.
+[`separate_path_sums!`](@ref) makes it, and [`separate_direction_moments`](@ref) reads it.
+
+# Fields
+
+$(DocStringExtensions.FIELDS)
+
+# Related
+
+  - [`separate_path_sums!`](@ref)
+  - [`separate_direction_moments`](@ref)
+"""
+@concrete struct SeparatePathSums
+    """
+    `mix`: The sum ``A = s_{\\lambda\\lambda_{c}} - s_{\\lambda_{c}\\lambda_{c}}``, which weights the share of the noise of the variances in the variance of a direction.
+    """
+    mix
+    """
+    `spread`: The sum ``B = s_{\\lambda\\lambda} - 2 s_{\\lambda\\lambda_{c}} + s_{\\lambda_{c}\\lambda_{c}}``, which weights the share in its square.
+    """
+    spread
+    """
+    `shift`: The sum ``S``, which scales the shift of the mean of the estimated variance.
+    """
+    shift
+end
+"""
     portfolio_regime_bias(::Nothing, ce::RegimeAdjustedExpWeightedCovariance, target::PortfolioTarget, C::MatNum, idx::AbstractVector{<:Integer}, K::Integer)
-    portfolio_regime_bias(bias::NamedTuple, ce::RegimeAdjustedExpWeightedCovariance, target::PortfolioTarget, C::MatNum, idx::AbstractVector{<:Integer}, K::Integer)
+    portfolio_regime_bias(bias::PortfolioBiasStore, ce::RegimeAdjustedExpWeightedCovariance, target::PortfolioTarget, C::MatNum, idx::AbstractVector{<:Integer}, K::Integer)
 
 Returns the bias factor of each direction of the portfolio target, at `K` observations.
 
@@ -71,7 +103,8 @@ function portfolio_regime_bias(::Nothing, ce::RegimeAdjustedExpWeightedCovarianc
                                ::Integer)
     return one(ce.decay)
 end
-function portfolio_regime_bias(bias::NamedTuple, ce::RegimeAdjustedExpWeightedCovariance,
+function portfolio_regime_bias(bias::PortfolioBiasStore,
+                               ce::RegimeAdjustedExpWeightedCovariance,
                                target::PortfolioTarget, C::MatNum,
                                idx::AbstractVector{<:Integer}, K::Integer)
     if !has_separate_cor_decay(ce)
@@ -121,7 +154,7 @@ Where:
   - `C::MatNum`: Bias-corrected covariance block of the contributing assets.
   - `p::AbstractVector`: Weights of the direction over those assets.
   - `min_val::Number`: Floor applied to each variance.
-  - `sums::NamedTuple`: `mix`, `spread` and `shift` of [`separate_path_sums!`](@ref).
+  - `sums::SeparatePathSums`: `mix`, `spread` and `shift` of [`separate_path_sums!`](@ref).
 
 # Returns
 
@@ -134,7 +167,7 @@ Where:
   - [`separate_path_sums!`](@ref)
 """
 function separate_direction_moments(C::MatNum, p::AbstractVector, min_val::Number,
-                                    sums::NamedTuple)
+                                    sums::SeparatePathSums)
     Cp = C * p
     v = LinearAlgebra.dot(p, Cp)
     if !(v > zero(v))
@@ -197,10 +230,11 @@ Where:
 
 # Returns
 
-  - `sums::NamedTuple`: `mix` ``A``, `spread` ``B`` and `shift` ``S``.
+  - `sums::SeparatePathSums`: The sums ``A``, ``B`` and ``S``.
 
 # Related
 
+  - [`SeparatePathSums`](@ref)
   - [`separate_direction_moments`](@ref)
   - [`exp_weight_convolution_table`](@ref)
   - [`exp_weight_cross_sum`](@ref)
@@ -224,7 +258,7 @@ function separate_path_sums!(conv::VecNum, ce::RegimeAdjustedExpWeightedCovarian
     sv = exp_weight_cross_sum(lv, lv, K, ce.hac_lags)
     svc = exp_weight_cross_sum(lv, lc, K, ce.hac_lags)
     sc = exp_weight_cross_sum(lc, lc, K, ce.hac_lags)
-    return (; mix = svc - sc, spread = sv - 2 * svc + sc, shift = svc - sv - (sc - Y) / 2)
+    return SeparatePathSums(svc - sc, sv - 2 * svc + sc, svc - sv - (sc - Y) / 2)
 end
 """
 $(DocStringExtensions.TYPEDSIGNATURES)

@@ -14,7 +14,7 @@ windowed_keywords
 windowed_panel
 windowed_series_rows
 windowed_series_row
-windowed_variance_series
+variance_series(est, w::Option{<:ObsWeights}, window::Option{<:Int_VecInt}, X::MatNum, pnl::Option{<:AssetPanel})
 SeedWindowed
 seed_window_path(::SeedWindowed)
 PortfolioOptimisers.observation_count(est::SeedWindowed)

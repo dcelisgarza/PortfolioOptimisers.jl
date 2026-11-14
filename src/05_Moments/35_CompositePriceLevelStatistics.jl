@@ -918,8 +918,46 @@ function fold_statistic(alg::KernelTrendPattern, stat::Option{<:AbstractVector},
     c = min.(trend_reverting_fraction(P) ./ (2 .* x), one(eltype(x)))
     return c .* ptilde .+ (one(eltype(c)) .- c) .* yhat
 end
-function price_level_statistic(alg::KernelTrendPattern, P::AbstractMatrix)
-    return fold_levels(alg, P)
+"""
+$(DocStringExtensions.TYPEDSIGNATURES)
+
+[`ReweightedPriceRelative`](@ref) and [`KernelTrendPattern`](@ref) method of [`price_level_statistic`](@ref): the batch form of the folding statistic over a matrix of levels, from the first row.
+
+The two statistics step one row at a time with [`fold_statistic_row`](@ref), so they share this method. The method sits in this file because [`KernelTrendPattern`](@ref) is defined here.
+
+# Algorithm
+
+ 1. Start with no carried statistic `stat` and no memory `hist`.
+ 2. For each row `t` from the second, form the price relative `x` of row `t` over row `t - 1`.
+ 3. Append `x` to `hist` with [`push_memory`](@ref).
+ 4. Step `stat` with [`fold_statistic_row`](@ref).
+ 5. Multiply `stat` by the last level and return it. For a single level there is no relative, and the result is the last level.
+
+# Arguments
+
+  - `alg`: The folding statistic.
+  - `P`: The levels, `levels × assets`, the last row the current level.
+
+# Returns
+
+  - `stat::Vector`: The statistic per asset, in units of the levels.
+
+# Related
+
+  - [`price_level_statistic`](@ref)
+  - [`fold_statistic`](@ref)
+  - [`fold_statistic_row`](@ref)
+"""
+function price_level_statistic(alg::Union{ReweightedPriceRelative, KernelTrendPattern},
+                               P::AbstractMatrix)
+    stat = nothing
+    hist = nothing
+    for t in 2:size(P, 1)
+        x = view(P, t, :) ./ view(P, t - 1, :)
+        hist = push_memory(alg, hist, x)
+        stat = fold_statistic_row(alg, stat, hist, x)
+    end
+    return isnothing(stat) ? P[end, :] : stat .* view(P, lastindex(P, 1), :)
 end
 export TruncatedExponentialMovingAverage, GaussianWeightedDoubleEstimate, PairwiseSlopeSum,
        RegressionSlope, TrendSwitch, CompositeTrend, KernelTrendPattern

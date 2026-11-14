@@ -6,7 +6,7 @@
 [provenance]
 julia = "1.13.4"
 julia_syntax = "1.0.2"
-commit = "c8adf16988"
+commit = "4004115c7a"
 
 [file]
 "ext/PortfolioOptimisersPlotsExt/01_CumulativeReturnsPlots.jl" = { code = 287, doc = 0, comment = 12, blank = 2, total = 301 }
@@ -142,6 +142,7 @@ commit = "c8adf16988"
 "src/05_Moments/30_RegimeAdjusted/07_EstimatedMahalanobisBias.jl" = { code = 238, doc = 285, comment = 5, blank = 85, total = 613 }
 "src/05_Moments/30_RegimeAdjusted/08_SeparatePortfolioBias.jl" = { code = 113, doc = 217, comment = 1, blank = 73, total = 404 }
 "src/05_Moments/30_RegimeAdjusted/09_MahalanobisLevelClosure.jl" = { code = 302, doc = 346, comment = 4, blank = 139, total = 791 }
+"src/05_Moments/30_RegimeAdjusted/10_HacLogDeterminant.jl" = { code = 105, doc = 109, comment = 0, blank = 43, total = 257 }
 "src/05_Moments/31_HigherMomentPartialFit.jl" = { code = 190, doc = 628, comment = 4, blank = 329, total = 1151 }
 "src/05_Moments/32_CrossSectionalFactorModel/01_CrossSectionalRegression.jl" = { code = 500, doc = 1041, comment = 26, blank = 440, total = 2007 }
 "src/05_Moments/32_CrossSectionalFactorModel/02_CrossSectionalWeights.jl" = { code = 167, doc = 424, comment = 5, blank = 202, total = 798 }

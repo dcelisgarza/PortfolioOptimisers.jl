@@ -407,8 +407,8 @@ function factor_lift(mp::AbstractMatrixProcessingEstimator, ve::AbstractVariance
 end
 """
     residual_variance_counts(cnt::Nothing, edof, T::Integer)
-    residual_variance_counts(cnt::NamedTuple, edof::Nothing, T::Integer)
-    residual_variance_counts(cnt::NamedTuple, edof::VecNum, T::Integer)
+    residual_variance_counts(cnt::VarianceCount, edof::Nothing, T::Integer)
+    residual_variance_counts(cnt::VarianceCount, edof::VecNum, T::Integer)
 
 Degrees of freedom and divisor of each residual variance that a lift measures.
 
@@ -445,15 +445,16 @@ With equal weights ``n_{i} = T``, and the result is the `edof` of the regression
 
   - [`factor_lift`](@ref)
   - [`variance_count`](@ref)
+  - [`VarianceCount`](@ref)
   - [`Regression`](@ref)
 """
 function residual_variance_counts(::Nothing, ::Any, ::Integer)
     return (; edof = nothing, ediv = nothing)
 end
-function residual_variance_counts(cnt::NamedTuple, ::Nothing, ::Integer)
+function residual_variance_counts(cnt::VarianceCount, ::Nothing, ::Integer)
     return (; edof = nothing, ediv = cnt.m)
 end
-function residual_variance_counts(cnt::NamedTuple, edof::VecNum, T::Integer)
+function residual_variance_counts(cnt::VarianceCount, edof::VecNum, T::Integer)
     return (; edof = cnt.n .- (T .- edof), ediv = cnt.m)
 end
 """

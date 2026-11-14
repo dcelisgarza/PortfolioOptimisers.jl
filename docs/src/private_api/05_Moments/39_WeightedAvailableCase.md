@@ -14,13 +14,10 @@ PortfolioOptimisers.coverage_variance(f, ve::SimpleVariance{<:Any, <:PortfolioOp
 PortfolioOptimisers.coverage_variance(f, ve::SimpleVariance{<:Any, <:PortfolioOptimisers.ObsWeights}, cvg::CoveragePolicy, X::PortfolioOptimisers.VecNum)
 PortfolioOptimisers.weighted_correlation_estimator
 PortfolioOptimisers.coverage_inner_corrected
-PortfolioOptimisers.coverage_fittable_estimator
 PortfolioOptimisers.weighted_pair_sample
 PortfolioOptimisers.weighted_pair_covariance
 PortfolioOptimisers.coverage_covariance(f, ce::Covariance{<:Any, <:Any, <:FullMoment, <:PortfolioOptimisers.ObsWeights}, cvg::CoveragePolicy, X::PortfolioOptimisers.MatNum)
 PortfolioOptimisers.weighted_comoment_cell
 PortfolioOptimisers.weighted_comoment
 PortfolioOptimisers.weighted_comoment_block
-PortfolioOptimisers.coverage_coskewness(ske::Coskewness{<:Any, <:Any, <:Any, <:PortfolioOptimisers.ObsWeights}, cvg::CoveragePolicy, X::PortfolioOptimisers.MatNum)
-PortfolioOptimisers.coverage_cokurtosis(kte::Cokurtosis{<:Any, <:Any, <:Any, <:PortfolioOptimisers.ObsWeights}, cvg::CoveragePolicy, X::PortfolioOptimisers.MatNum)
 ```
