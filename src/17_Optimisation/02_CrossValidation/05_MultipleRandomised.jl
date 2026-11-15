@@ -774,9 +774,10 @@ function path_fit_and_predict(opt::OptE_TD, rd::ReturnsResult, train_idx, test_i
     return MultiPeriodPredictionResult(; pred = sort_predictions(test_idx, predictions),
                                        id = id, opt = est)
 end
-function fit_and_predict(opt::OptE_TD, rd::ReturnsResult, cv::MRCVR;
+function fit_and_predict(opt::OptE_TD, rd::ReturnsResult, cv::MRCVR,
+                         cv_res::NonOptimisationSequentialCrossValidationResult = split(cv,
+                                                                                        rd);
                          ex::FLoops.Transducers.Executor = FLoops.ThreadedEx(), kwargs...)
-    cv_res = split(cv, rd)
     (; train_idx, test_idx, asset_idx, path_ids) = cv_res
     assert_unshuffled_folds(cv, train_idx)
     unique_ids = unique(path_ids)

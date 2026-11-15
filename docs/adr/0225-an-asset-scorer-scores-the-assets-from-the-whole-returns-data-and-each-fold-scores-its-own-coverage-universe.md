@@ -87,8 +87,9 @@ would not see that the score keeps the units and the orientation of the measure.
 It checks each candidate at construction with `assert_search_candidates`. `tol = nothing` scores
 the signed mean weight, and a number scores the selection frequency `|w| > tol` (ADR 0222).
 
-- **Each split counts once.** The scorer pins the draw of `cv` with `pin_draw`, splits the data
-  once, and finds the prediction of each split by the first row of its test window. Under
+- **Each split counts once.** The scorer splits the data by `cv` once, passes that split to
+  `cross_val_predict` for each candidate, and finds the prediction of each split by the first row
+  of its test window. Under
   `CombinatorialCrossValidation` it reads the first block of the split in the path that holds it.
   Under `MultipleRandomised` it reads the fold in the path of the split.
 - **Offered is not weighted.** A split offers the Coverage Universe of its training window,

@@ -14,7 +14,6 @@ search_result
 assert_search_entry
 search_candidate
 assert_search_candidates(::Any, ::Any, ::Any)
-pin_draw
 score_rows
 score_path_ids
 fold_train_returns

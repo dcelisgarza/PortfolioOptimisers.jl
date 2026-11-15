@@ -247,7 +247,7 @@ function factory(p::Pipeline, w::VecNum)
     return rebuild_struct(p, (; steps = map(est -> pipeline_step_factory(est, w), p.steps)))
 end
 """
-    cross_val_predict(pipe::Pipeline, data::Prices_RR, cv::CombCVER; ex = FLoops.ThreadedEx(), kwargs...) -> PopulationPredictionResult
+    cross_val_predict(pipe::Pipeline, data::Prices_RR, cv::CombCVER, cv_res = split(cv, data); ex = FLoops.ThreadedEx(), kwargs...) -> PopulationPredictionResult
 
 Run combinatorial cross-validation over a [`Pipeline`](@ref) on price-level or returns-level data.
 
@@ -255,14 +255,14 @@ Each split fits the whole pipeline on its training rows and predicts each of its
 
 The training rows of a split can be non-contiguous, because a test group that the split holds out can sit between them. On returns-level data, each fold fits on returns that the data holds, and the method adds no approximation. On price-level data, [`PricesToReturns`](@ref) converts the training prices of the fold, and it makes one return across each gap. That return spans the prices from the last row before the gap to the first row after it. So a training window in `b` blocks holds `b - 1` returns that span a gap. The test groups are contiguous, so no prediction holds such a return. Use [`MultipleRandomised`](@ref) for contiguous training rows on price-level data.
 
-`cv` is the scheme or its split, a [`CombinatorialCrossValidationResult`](@ref) from `split(cv, data)`. A split result runs the folds it holds, and evaluates them with the defaults of [`fold_evaluation`](@ref), as the direct route does.
+`cv` is the scheme or its split, a [`CombinatorialCrossValidationResult`](@ref) from `split(cv, data)`. A split result runs the folds it holds, and evaluates them with the defaults of [`fold_evaluation`](@ref), as the direct route does. The fourth argument `cv_res` takes the split of `data` by the scheme `cv`, and the default splits `data` there. A search splits once and passes the split to the call of each candidate, so every candidate scores the same folds and evaluates them with the settings of `cv`.
 
 `ex` is the FLoops executor of the splits. The method accepts every other keyword, such as the `id` of the single-path method, and ignores it.
 
 # Algorithm
 
  1. Check the entry with [`assert_pipeline_entry`](@ref).
- 2. Split `data` with `cv`, giving `train_idx` and `test_idx`, and refuse shuffled folds with [`assert_unshuffled_folds`](@ref).
+ 2. Read `train_idx` and `test_idx` from `cv_res`, and refuse shuffled folds with [`assert_unshuffled_folds`](@ref).
  3. Read the evaluation keywords of `cv` with [`fold_evaluation`](@ref), giving `wd`, `pws`, `fa`, `store_weight_path` and `strict`. Read the drift of the held weights with [`held_weights_drift`](@ref), giving `hwd`.
  4. Through [`fold_loop`](@ref), fit the pipeline on the training rows of each split with [`pipeline_fold_fit`](@ref), and predict each test group of the split. This gives one vector of predictions for each split.
  5. Put the predictions into the paths of the scheme with [`sort_predictions`](@ref), and return the paths as a [`PopulationPredictionResult`](@ref).
@@ -276,10 +276,10 @@ The training rows of a split can be non-contiguous, because a test group that th
   - [`CombinatorialCrossValidation`](@ref)
   - [`cross_val_predict(pipe::Pipeline, data::Prices_RR, cv::CVER)`](@ref)
 """
-function cross_val_predict(pipe::Pipeline, data::Prices_RR, cv::CombCVER;
+function cross_val_predict(pipe::Pipeline, data::Prices_RR, cv::CombCVER,
+                           cv_res::CombinatorialCrossValidationResult = split(cv, data);
                            ex::FLoops.Transducers.Executor = FLoops.ThreadedEx(), kwargs...)
     assert_pipeline_entry(pipe, cv)
-    cv_res = split(cv, data)
     (; train_idx, test_idx) = cv_res
     assert_unshuffled_folds(cv, train_idx)
     (; wd, pws, fa, store_weight_path, strict) = fold_evaluation(cv)
@@ -339,7 +339,7 @@ function pipeline_path_fit_and_predict(pipe::Pipeline_OnlPipe, data::Prices_RR, 
                                        id = path_id, opt = est)
 end
 """
-    cross_val_predict(pipe::Pipeline_OnlPipe, data::Prices_RR, cv::MRCVR; ex = FLoops.ThreadedEx(), kwargs...) -> PopulationPredictionResult
+    cross_val_predict(pipe::Pipeline_OnlPipe, data::Prices_RR, cv::MRCVR, cv_res = split(cv, data); ex = FLoops.ThreadedEx(), kwargs...) -> PopulationPredictionResult
 
 Run asset-resampling cross-validation, [`MultipleRandomised`](@ref), over a [`Pipeline`](@ref) on price-level or returns-level data.
 
@@ -347,14 +347,14 @@ Run asset-resampling cross-validation, [`MultipleRandomised`](@ref), over a [`Pi
 
 Each path is an inner walk-forward over a random subset of the assets. The subset applies to the input data as a view through [`port_opt_view`](@ref), and the pipeline fits again on the subset. So the pipeline never selects from its fitted universe. The scheme draws assets and not rows, so each window of observations stays contiguous. Unlike combinatorial cross-validation, the method adds no approximation on price-level data.
 
-`cv` is the scheme or its split, a [`MultipleRandomisedResult`](@ref) from `split(cv, data)`. A split result runs the paths and the asset subsets it holds, and evaluates them with the defaults of [`fold_evaluation`](@ref), as the direct route does.
+`cv` is the scheme or its split, a [`MultipleRandomisedResult`](@ref) from `split(cv, data)`. A split result runs the paths and the asset subsets it holds, and evaluates them with the defaults of [`fold_evaluation`](@ref), as the direct route does. The fourth argument `cv_res` takes the split of `data` by the scheme `cv`, and the default splits `data` there. A search splits once and passes the split to the call of each candidate, so every candidate scores the same folds and evaluates them with the settings of `cv`.
 
 `ex` is the FLoops executor of the paths, and of the folds in each path. The method accepts every other keyword, such as the `id` of the single-path method, and ignores it. Each path carries its own `id`.
 
 # Algorithm
 
  1. Check the entry with [`assert_pipeline_entry`](@ref).
- 2. Split `data` with `cv`, giving `train_idx`, `test_idx`, `asset_idx` and `path_ids`, and refuse shuffled folds with [`assert_unshuffled_folds`](@ref).
+ 2. Read `train_idx`, `test_idx`, `asset_idx` and `path_ids` from `cv_res`, and refuse shuffled folds with [`assert_unshuffled_folds`](@ref).
  3. Put the `(train, test, asset)` tuples of the folds into one vector for each path, giving `dict`.
  4. Read the evaluation keywords of `cv` with [`fold_evaluation`](@ref), and the drift of the held weights with [`held_weights_drift`](@ref), giving `hwd`.
  5. Run each path with [`pipeline_path_fit_and_predict`](@ref) through [`parallel_folds`](@ref), and return the paths as a [`PopulationPredictionResult`](@ref).
@@ -374,10 +374,11 @@ Each path is an inner walk-forward over a random subset of the assets. The subse
   - [`port_opt_view`](@ref)
   - [`cross_val_predict(pipe::Pipeline, data::Prices_RR, cv::CVER)`](@ref)
 """
-function cross_val_predict(pipe::Pipeline_OnlPipe, data::Prices_RR, cv::MRCVR;
+function cross_val_predict(pipe::Pipeline_OnlPipe, data::Prices_RR, cv::MRCVR,
+                           cv_res::NonOptimisationSequentialCrossValidationResult = split(cv,
+                                                                                          data);
                            ex::FLoops.Transducers.Executor = FLoops.ThreadedEx(), kwargs...)
     assert_pipeline_entry(pipe, cv)
-    cv_res = split(cv, data)
     (; train_idx, test_idx, asset_idx, path_ids) = cv_res
     assert_unshuffled_folds(cv, train_idx)
     unique_ids = unique(path_ids)
@@ -397,7 +398,7 @@ function cross_val_predict(pipe::Pipeline_OnlPipe, data::Prices_RR, cv::MRCVR;
     return PopulationPredictionResult(; pred = predictions)
 end
 """
-    cross_val_predict(pipe::Pipeline_OnlPipe, data::Prices_RR, cv::CVER = KFold(); ex = FLoops.ThreadedEx(), id = nothing)
+    cross_val_predict(pipe::Pipeline_OnlPipe, data::Prices_RR, cv::CVER = KFold(), cv_res = split(cv, data); ex = FLoops.ThreadedEx(), id = nothing)
 
 Run cross-validated prediction over a whole [`Pipeline`](@ref), and return a [`MultiPeriodPredictionResult`](@ref).
 
@@ -432,7 +433,7 @@ Under an Online Scheme, the loop takes its online arm. The loop warms the pipeli
 # Algorithm
 
  1. Check the entry with [`assert_pipeline_entry`](@ref).
- 2. Split `data` with `cv`, giving `train_idx` and `test_idx`, and refuse shuffled folds with [`assert_unshuffled_folds`](@ref).
+ 2. Read `train_idx` and `test_idx` from `cv_res`, and refuse shuffled folds with [`assert_unshuffled_folds`](@ref).
  3. Read the evaluation keywords of `cv` with [`fold_evaluation`](@ref), and the drift of the held weights with [`held_weights_drift`](@ref), giving `hwd`.
  4. Run the folds through [`fold_loop`](@ref). Each fold fits with [`pipeline_fold_fit`](@ref) and predicts its test rows. The online arm of the loop resolves `Online(pipe)` at its warm-up, and passes the pipeline from each fold to the next.
  5. Return the predictions as a [`MultiPeriodPredictionResult`](@ref) with `id` and the estimator that the online arm threaded.
@@ -442,6 +443,7 @@ Under an Online Scheme, the loop takes its online arm. The loop warms the pipeli
   - `pipe`: The pipeline, `Online(pipe)`, or `Resume(res)` of a Result that holds a pipeline.
   - `data`: Price-level or returns-level input data ([`Prices_RR`](@ref)).
   - `cv::CVER`: The cross-validation scheme, with contiguous test folds and one path. The default is `KFold()`. [`folds_are_time_ordered`](@ref) decides whether its folds receive the weights of the previous fold, and [`folds_are_stepped`](@ref) decides whether the folds refit or fold.
+  - $(arg_dict[:cv_res])
   - `ex`: The FLoops executor of the folds. The default is `FLoops.ThreadedEx()`.
   - `id`: The identifier that the Result stores.
 
@@ -471,11 +473,11 @@ Under an Online Scheme, the loop takes its online arm. The loop warms the pipeli
   - [`Resume`](@ref)
   - [`PipelineBufferState`](@ref)
 """
-function cross_val_predict(pipe::Pipeline_OnlPipe, data::Prices_RR, cv::CVER = KFold();
+function cross_val_predict(pipe::Pipeline_OnlPipe, data::Prices_RR, cv::CVER = KFold(),
+                           cv_res::CrossValidationResult = split(cv, data);
                            ex::FLoops.Transducers.Executor = FLoops.ThreadedEx(),
                            id = nothing)
     assert_pipeline_entry(pipe, cv)
-    cv_res = split(cv, data)
     (; train_idx, test_idx) = cv_res
     assert_unshuffled_folds(cv, train_idx)
     (; wd, pws, fa, store_weight_path, strict) = fold_evaluation(cv)

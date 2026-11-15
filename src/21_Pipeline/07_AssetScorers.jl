@@ -780,13 +780,12 @@ The scorer reads the result of each split once. Under [`CombinatorialCrossValida
 
 # Algorithm
 
- 1. Fix the random draw of `cv` with [`pin_draw`](@ref), so that the split and the predictions use the same splits.
- 2. Split `rd` once, and find the assets that each split offers with [`split_offered`](@ref).
- 3. Build the candidates of the grid with [`weight_mass_candidates`](@ref).
- 4. Run [`cross_val_predict`](@ref) on each candidate, and find the prediction of each split with [`split_prediction`](@ref).
- 5. Keep each prediction whose optimisation succeeded, and turn it into the record of the split with [`split_weight_record`](@ref).
- 6. Count the records that offered each asset.
- 7. Return the mean of the record values of each asset that at least `min_folds` records offered, over those records, and `NaN` at every other asset. [`min_folds_scores`](@ref) does this step.
+ 1. Split `rd` by `cv` once, giving `cvr`, and find the assets that each split offers with [`split_offered`](@ref).
+ 2. Build the candidates of the grid with [`weight_mass_candidates`](@ref).
+ 3. Run [`cross_val_predict`](@ref) on each candidate over the folds of `cvr`, and find the prediction of each split with [`split_prediction`](@ref). The offered assets and the predictions then read the same splits, and a scheme that draws at random draws once.
+ 4. Keep each prediction whose optimisation succeeded, and turn it into the record of the split with [`split_weight_record`](@ref).
+ 5. Count the records that offered each asset.
+ 6. Return the mean of the record values of each asset that at least `min_folds` records offered, over those records, and `NaN` at every other asset. [`min_folds_scores`](@ref) does this step.
 
 # Fields
 
@@ -1171,12 +1170,11 @@ function weight_mass_value(tol::Real, v::VecNum)
     return [ifelse(abs(x) > tol, one(x), zero(x)) for x in v]
 end
 function asset_scores(s::WeightMassScorer, rd::AbstractReturnsResult)
-    cv = pin_draw(s.cv)
-    cvr = split(cv, rd)
+    cvr = split(s.cv, rd)
     ks = eachindex(cvr.train_idx)
     offered = [split_offered(rd, cvr, k) for k in ks]
     idx = Dict(n => i for (i, n) in enumerate(rd.nx))
-    preds = [cross_val_predict(opt, rd, cv; ex = s.ex)
+    preds = [cross_val_predict(opt, rd, s.cv, cvr; ex = s.ex)
              for opt in weight_mass_candidates(s.opt, s.p)]
     splits = [(split_prediction(pred, cvr, k), k) for pred in preds for k in ks]
     recs = [split_weight_record(p, offered[k], idx, s.tol)

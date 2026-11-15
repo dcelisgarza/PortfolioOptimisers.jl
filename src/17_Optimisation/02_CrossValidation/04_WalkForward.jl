@@ -1313,10 +1313,10 @@ end
 function folds_are_stepped(::Online{<:WalkForwardEstimator})
     return true
 end
-function fit_and_predict(opt::OptE_TD, rd::ReturnsResult, cv::WFCVER; cols = :,
+function fit_and_predict(opt::OptE_TD, rd::ReturnsResult, cv::WFCVER,
+                         cv_res::SequentialCrossValidationResult = split(cv, rd); cols = :,
                          ex::FLoops.Transducers.Executor = FLoops.ThreadedEx(),
                          id = nothing)
-    cv_res = split(cv, rd)
     (; train_idx, test_idx) = cv_res
     assert_unshuffled_folds(cv, train_idx)
     (; wd, pws, fa, store_weight_path, strict) = fold_evaluation(cv)
@@ -1330,9 +1330,10 @@ function fit_and_predict(opt::OptE_TD, rd::ReturnsResult, cv::WFCVER; cols = :,
     return MultiPeriodPredictionResult(; pred = predictions, id = id, opt = est)
 end
 function fit_and_predict(res::NonFiniteAllocationOptimisationResult, rd::ReturnsResult,
-                         cv::WFCVER; ex::FLoops.Transducers.Executor = FLoops.ThreadedEx(),
+                         cv::WFCVER,
+                         cv_res::SequentialCrossValidationResult = split(cv, rd);
+                         ex::FLoops.Transducers.Executor = FLoops.ThreadedEx(),
                          id = nothing)
-    cv_res = split(cv, rd)
     test_idx = cv_res.test_idx
     assert_unshuffled_folds(cv, cv_res.train_idx)
     (; wd, pws, fa, store_weight_path, strict) = fold_evaluation(cv)

@@ -170,8 +170,8 @@ function StatsAPI.predict(res::NonFiniteAllocationOptimisationResult, rd::Return
     return [StatsAPI.predict(res, rd, test_idx, cols; kwargs...) for test_idx in test_idxs]
 end
 """
-    fit_and_predict(opt, rd::ReturnsResult, cv::NonSeqCVER; cols, ex, id) -> MultiPeriodPredictionResult
-    fit_and_predict(opt, rd::ReturnsResult, cv::CombCVER; cols, ex) -> PopulationPredictionResult
+    fit_and_predict(opt, rd::ReturnsResult, cv::NonSeqCVER, cv_res = split(cv, rd); cols, ex, id) -> MultiPeriodPredictionResult
+    fit_and_predict(opt, rd::ReturnsResult, cv::CombCVER, cv_res = split(cv, rd); cols, ex) -> PopulationPredictionResult
     fit_and_predict(opt, rd::ReturnsResult, train_idx, test_idx, cols = :; kwargs...) -> PredictionResult
     fit_and_predict(res::NonFiniteAllocationOptimisationResult, rd::ReturnsResult, train_idx, test_idx, cols = :; kwargs...) -> PredictionResult
     fit_and_predict(pipe::AbstractPipelineEstimator, data::Prices_RR, train_idx, test_idx, cols = :; kwargs...) -> PredictionResult
@@ -180,6 +180,8 @@ end
 Fit an optimisation estimator on training data and predict on test data using cross-validation.
 
 The method over a scheme `cv` predicts over every fold of `cv`. The methods without a scheme predict over one train/test split, or apply a result that is already fitted.
+
+The method over a scheme takes the split `cv_res` of `rd` by `cv` as its fourth argument, and the default splits `rd` there. A search splits its scheme once and passes the split to the call of each candidate. So every candidate scores the same folds, and a [`MultipleRandomised`](@ref) with no `seed` draws from its `rng` once. The scheme stays an argument, because the method reads its evaluation settings and its fold predicates.
 
 A combinatorial `cv` takes its own method, because its folds recombine into several paths and not one. That method regroups the fold predictions by path, and returns one [`MultiPeriodPredictionResult`](@ref) per path in a [`PopulationPredictionResult`](@ref).
 
@@ -193,7 +195,7 @@ The two pipeline methods take price data or returns data. They call only `fit` a
 
 For a scheme `cv` that is not combinatorial:
 
- 1. Split `rd` with `cv`, giving `train_idx` and `test_idx`.
+ 1. Read `train_idx` and `test_idx` from `cv_res`.
  2. Check that the folds are not shuffled with [`assert_unshuffled_folds`](@ref).
  3. Read the evaluation settings of `cv` with [`fold_evaluation`](@ref), and the drift of the Held Weights record with [`held_weights_drift`](@ref).
  4. Run the folds with [`fold_loop`](@ref). Each fold fits its estimator on its training rows and predicts over its test rows, giving one [`PredictionResult`](@ref) per fold, in split order.
@@ -205,6 +207,7 @@ For a scheme `cv` that is not combinatorial:
   - `rd::ReturnsResult`: Returns data.
   - `cv::NonSeqCVER`: Non-sequential cross-validation estimator or result, such as [`KFold`](@ref).
   - `cv::CombCVER`: Combinatorial cross-validation estimator or result ([`CombinatorialCrossValidation`](@ref)).
+  - $(arg_dict[:cv_res])
   - `train_idx::Option{<:VecInt}`: Training indices of one split, or `nothing` to read a stepped estimator out.
   - `test_idx::VecInt_VecVecInt`: Test indices of one split, one vector or one vector per window.
   - `cols = :`: Column selector of one split.
@@ -737,10 +740,10 @@ function fold_loop(fit_fold, est, n::Integer, ex::FLoops.Transducers.Executor,
         (parallel_folds(i -> fold(i, nothing), n, ex, ElT), nothing)
     end
 end
-function fit_and_predict(opt::OptE_Opt_TD, rd::ReturnsResult, cv::NonSeqCVER; cols = :,
-                         ex::FLoops.Transducers.Executor = FLoops.ThreadedEx(),
+function fit_and_predict(opt::OptE_Opt_TD, rd::ReturnsResult, cv::NonSeqCVER,
+                         cv_res::NonSequentialCrossValidationResult = split(cv, rd);
+                         cols = :, ex::FLoops.Transducers.Executor = FLoops.ThreadedEx(),
                          id = nothing)
-    cv_res = split(cv, rd)
     (; train_idx, test_idx) = cv_res
     assert_unshuffled_folds(cv, train_idx)
     (; wd, pws, fa, store_weight_path, strict) = fold_evaluation(cv)

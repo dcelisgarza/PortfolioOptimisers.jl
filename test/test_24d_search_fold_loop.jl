@@ -3,8 +3,8 @@ The search scores every candidate through the one fold loop, issue #1020, agains
 decision of #871 (ADR 0141).
 
 `search_cross_validation` builds candidate `i` through the grid's lenses and scores it through
-`fit_and_predict(opt_i, rd, gscv.cv; ex = SequentialEx())`, one row per fold, whatever the
-scheme's fit. The map's closing test's second half is the identity: a grid search over an
+`fit_and_predict(opt_i, rd, gscv.cv, cv; ex = SequentialEx())`, one row per fold, whatever the
+scheme's fit. `cv` is the one split of the search (#2123). The map's closing test's second half is the identity: a grid search over an
 online walk-forward reads the matrix of the same search over the batch expanding walk-forward
 and picks the same column, through a JuMP optimiser and a hierarchical one, and the randomised
 search under the same seed inherits it. Around it sit what the route changed in batch (a
@@ -252,25 +252,39 @@ The fixture is the online fold loop's, because the identities are structural.
                                                asset_idx = cvr.asset_idx[perm],
                                                path_ids = cvr.path_ids)
         @test po.score_rows(shuffled) == [[3, 4, 5, 1, 2], [6, 7, 8, 9, 10]]
-        # An unseeded scheme is pinned once, so every candidate scores the same folds and
-        # the matrix lines up with a split of the pinned scheme.
-        unseeded = MultipleRandomised(batch_cv; subset_size = 5, n_subsets = 2,
-                                      rng = StableRNG(11))
-        pinned = po.pin_draw(unseeded)
-        @test !isnothing(pinned.seed)
-        @test po.pin_draw(pinned) === pinned
-        @test po.pin_draw(batch_cv) === batch_cv
-        res = search_cross_validation(mr,
-                                      gs(MultipleRandomised(batch_cv; subset_size = 5,
-                                                            n_subsets = 2,
-                                                            rng = StableRNG(11)), jgrid),
-                                      rd)
-        cvp = split(pinned, rd)
+        # The search splits an unseeded scheme once (#2123). Every candidate scores the folds
+        # of that one split, the scheme keeps `seed = nothing`, and its `rng` moves by one
+        # split only.
+        unseeded(rng) = MultipleRandomised(batch_cv; subset_size = 5, n_subsets = 2,
+                                           rng = rng)
+        ugs = gs(unseeded(StableRNG(11)), jgrid)
+        res = search_cross_validation(mr, ugs, rd)
+        ref_rng = StableRNG(11)
+        cvp = split(unseeded(ref_rng), rd)
+        @test isnothing(ugs.cv.seed)
+        @test rand(ugs.cv.rng, UInt64) == rand(ref_rng, UInt64)
         for (i, val) in enumerate(jgrid[1][2]), j in eachindex(cvp.train_idx)
             pred = po.fit_and_predict(Accessors.set(mr, l1, val), rd, cvp.train_idx[j],
                                       cvp.test_idx[j], cvp.asset_idx[j])
             @test res.test_scores[j, i] == -expected_risk(r, pred)
         end
+        # The split form of `fit_and_predict` reads the folds it is handed and draws
+        # nothing, and the form with the scheme alone splits once.
+        mri = Accessors.set(mr, l1, jgrid[1][2][1])
+        f_rng = StableRNG(11)
+        fsplit = po.fit_and_predict(mri, rd, unseeded(f_rng), cvp)
+        fdirect = po.fit_and_predict(mri, rd, unseeded(StableRNG(11)))
+        @test [p.res.w for mp in fsplit.pred for p in mp.pred] ==
+              [p.res.w for mp in fdirect.pred for p in mp.pred]
+        @test rand(f_rng, UInt64) == rand(StableRNG(11), UInt64)
+        # A fitted result takes the split too, and gives the predictions of the form with
+        # the scheme alone.
+        fres = optimise(mri, rd)
+        bsplit = split(batch_cv, rd)
+        rsplit = cross_val_predict(fres, rd, batch_cv, bsplit)
+        rdirect = cross_val_predict(fres, rd, batch_cv)
+        @test length(rsplit.pred) == length(bsplit.test_idx)
+        @test [p.rd.X for p in rsplit.pred] == [p.rd.X for p in rdirect.pred]
     end
 
     @testset "8. The Pipeline's search takes the same route in batch and online" begin
@@ -292,6 +306,19 @@ The fixture is the online fold loop's, because the identities are structural.
         pres = search_cross_validation(pipe, gs(mb, grid), rd)
         dres = search_cross_validation(mr, gs(mb, ["opt.l1" => grid[1][2]]), rd)
         @test isapprox(pres.test_scores, dres.test_scores; atol = 1e-8)
+        # An unseeded scheme: the Pipeline's search splits once too, so it scores the folds
+        # that the optimiser's search scores from the same `rng` state (#2123).
+        unseeded(rng) = MultipleRandomised(batch_cv; subset_size = 5, n_subsets = 2,
+                                           rng = rng)
+        ugs = gs(unseeded(StableRNG(11)), grid)
+        ures = search_cross_validation(pipe, ugs, rd)
+        ref_rng = StableRNG(11)
+        split(unseeded(ref_rng), rd)
+        @test rand(ugs.cv.rng, UInt64) == rand(ref_rng, UInt64)
+        udres = search_cross_validation(mr,
+                                        gs(unseeded(StableRNG(11)),
+                                           ["opt.l1" => grid[1][2]]), rd)
+        @test isapprox(ures.test_scores, udres.test_scores; atol = 1e-8)
         # The door takes an Online Scheme since #1022, and picks the batch candidate; test_24f pins
         # the Pipeline's identities.
         ores = search_cross_validation(pipe, gs(online_cv, grid), rd)

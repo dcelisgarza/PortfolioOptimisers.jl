@@ -978,34 +978,6 @@ function assert_search_candidates(opt, lens_grid, val_grid)::Nothing
     return nothing
 end
 """
-    pin_draw(cv::CVE_Onl)
-    pin_draw(cv::MultipleRandomised{<:Any, <:Any, <:Any, <:Any, <:Any, <:Any, Nothing})
-
-Fix the folds a search scores every candidate over.
-
-A search splits its data once and scores every candidate against the same folds, so a scheme whose `split` draws from a random stream must draw the same folds for every candidate. A [`MultipleRandomised`](@ref) with no `seed` draws from its `rng` afresh at every `split`, and the fold loop splits once per candidate, so this draws one seed from that `rng` and returns the scheme with it set: every candidate's `split` then resolves the same stream, and so does the search's own `split` for the row layout. A seeded scheme, and every other scheme, is returned as it is, because its `split` is already a function of the data alone. The type of the `seed` field selects the method.
-
-# Arguments
-
-  - `cv`: The search's scheme.
-
-# Returns
-
-  - `cv`: The scheme, with a `seed` set when its `split` would otherwise draw afresh.
-
-# Related
-
-  - [`search_cross_validation`](@ref)
-  - [`MultipleRandomised`](@ref)
-  - [`resolve_rng`](@ref)
-"""
-function pin_draw(cv::CVE_Onl)
-    return cv
-end
-function pin_draw(cv::MultipleRandomised{<:Any, <:Any, <:Any, <:Any, <:Any, <:Any, Nothing})
-    return rebuild_struct(cv, (; seed = rand(cv.rng, UInt32)))
-end
-"""
     score_rows(cvr::CrossValidationResult)
     score_rows(cvr::MultipleRandomisedResult)
 

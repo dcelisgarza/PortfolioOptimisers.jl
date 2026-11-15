@@ -412,7 +412,7 @@ The methods of [`cross_val_predict`](@ref) and [`fit_and_predict`](@ref) that ta
 const OptimiserResume = Resume{<:Any, <:NonFiniteAllocationOptimisationEstimator}
 """
     cross_val_predict(r::OptimiserResume, rd::ReturnsResult, cv::CVER; cols = :, ex = FLoops.ThreadedEx())
-    fit_and_predict(r::OptimiserResume, rd::ReturnsResult, cv::CVER; cols = :, ex = FLoops.ThreadedEx(), id = nothing)
+    fit_and_predict(r::OptimiserResume, rd::ReturnsResult, cv::CVER, cv_res = split(cv, rd); cols = :, ex = FLoops.ThreadedEx(), id = nothing)
 
 Continues an online walk-forward from a Result, over the full history extended.
 
@@ -422,7 +422,7 @@ The methods that take an optimiser in the estimator slot take a [`Resume`](@ref)
 
  1. For `cross_val_predict` only, run [`assert_internal_optimiser`](@ref) and [`assert_external_optimiser`](@ref) on `r.opt`, and view `rd` by `cols` when `cols` is not `:`.
  2. Refuse a scheme that a `Resume` cannot re-enter, through [`assert_resume_scheme`](@ref).
- 3. Split `rd` by `cv`, giving `train_idx` and `test_idx`, and refuse shuffled folds through [`assert_unshuffled_folds`](@ref).
+ 3. Read `train_idx` and `test_idx` from the split of `rd` by `cv`, which `fit_and_predict` takes as `cv_res`, and refuse shuffled folds through [`assert_unshuffled_folds`](@ref).
  4. Read the evaluation settings of `cv` through [`fold_evaluation`](@ref), giving `wd`, `pws`, `fa`, `store_weight_path` and `strict`, and the drift of the held weights through [`held_weights_drift`](@ref), giving `hwd`.
  5. Run [`fold_loop`](@ref) on `r`, which takes the resumed arm of [`online_folds`](@ref). Each fold calls the one-fold `fit_and_predict` with its estimator, its test window, its previous weights and the settings of step 4, giving `predictions` and the threaded `est`.
  6. Return a [`MultiPeriodPredictionResult`](@ref) of `predictions`, with `id`, and with `est` as `opt`.
@@ -432,6 +432,7 @@ The methods that take an optimiser in the estimator slot take a [`Resume`](@ref)
   - `r`: The declaration, holding the Result to continue.
   - $(arg_dict[:rd])
   - `cv`: The scheme that the Result came from, an Online Scheme.
+  - $(arg_dict[:cv_res]) `cross_val_predict` takes no `cv_res`, because it views `rd` by `cols` before the split.
   - `cols`: The asset view. `cross_val_predict` views `rd` by it. `fit_and_predict` hands it to every fold, which views its estimator and its prediction by it.
   - `ex`: Not read, because the resumed arm runs the folds in order.
   - `id`: The identifier that the Result carries.
@@ -461,11 +462,11 @@ function cross_val_predict(r::OptimiserResume, rd::ReturnsResult, cv::CVER; cols
     end
     return fit_and_predict(r, rd, cv; ex = ex)
 end
-function fit_and_predict(r::OptimiserResume, rd::ReturnsResult, cv::CVER; cols = :,
+function fit_and_predict(r::OptimiserResume, rd::ReturnsResult, cv::CVER,
+                         cv_res::CrossValidationResult = split(cv, rd); cols = :,
                          ex::FLoops.Transducers.Executor = FLoops.ThreadedEx(),
                          id = nothing)
     assert_resume_scheme(cv)
-    cv_res = split(cv, rd)
     (; train_idx, test_idx) = cv_res
     assert_unshuffled_folds(cv, train_idx)
     (; wd, pws, fa, store_weight_path, strict) = fold_evaluation(cv)

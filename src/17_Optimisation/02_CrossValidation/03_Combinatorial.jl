@@ -629,9 +629,9 @@ function sort_predictions(res::CombinatorialCrossValidationResult,
     return [MultiPeriodPredictionResult(; pred = pred, id = i)
             for (i, pred) in enumerate(sorted_preds)]
 end
-function fit_and_predict(opt::OptE_TD, rd::ReturnsResult, cv::CombCVER; cols = :,
-                         ex::FLoops.Transducers.Executor = FLoops.ThreadedEx())
-    cv_res = split(cv, rd)
+function fit_and_predict(opt::OptE_TD, rd::ReturnsResult, cv::CombCVER,
+                         cv_res::CombinatorialCrossValidationResult = split(cv, rd);
+                         cols = :, ex::FLoops.Transducers.Executor = FLoops.ThreadedEx())
     (; train_idx, test_idx) = cv_res
     assert_unshuffled_folds(cv, train_idx)
     (; wd, pws, fa, store_weight_path, strict) = fold_evaluation(cv)
@@ -649,9 +649,9 @@ function fit_and_predict(opt::OptE_TD, rd::ReturnsResult, cv::CombCVER; cols = :
     return PopulationPredictionResult(; pred = sort_predictions(cv_res, predictions))
 end
 function fit_and_predict(res::NonFiniteAllocationOptimisationResult, rd::ReturnsResult,
-                         cv::CombCVER;
+                         cv::CombCVER,
+                         cv_res::CombinatorialCrossValidationResult = split(cv, rd);
                          ex::FLoops.Transducers.Executor = FLoops.ThreadedEx())
-    cv_res = split(cv, rd)
     test_idx = cv_res.test_idx
     assert_unshuffled_folds(cv, cv_res.train_idx)
     (; wd, pws, fa, store_weight_path, strict) = fold_evaluation(cv)
