@@ -1,5 +1,5 @@
 ```@meta
-Description = "Report writers, private API of PortfolioOptimisers.jl: REPORT_CSS, REPORT_JS, REPORT_CSP, html_escape, md_escape, report_cell, report_cell_html, …"
+Description = "Report writers, private API of PortfolioOptimisers.jl: REPORT_CSS, REPORT_JS, REPORT_CSP, html_escape, md_escape, ReportCell, report_cell, report_cell_html, …"
 ```
 
 # Report writers: private API
@@ -10,6 +10,7 @@ PortfolioOptimisers.REPORT_JS
 PortfolioOptimisers.REPORT_CSP
 PortfolioOptimisers.html_escape
 PortfolioOptimisers.md_escape
+PortfolioOptimisers.ReportCell
 PortfolioOptimisers.report_cell
 PortfolioOptimisers.report_cell_html
 PortfolioOptimisers.report_level

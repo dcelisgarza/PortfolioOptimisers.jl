@@ -100,6 +100,36 @@ function md_escape(s::AbstractString)
     return String(take!(io))
 end
 """
+$(DocStringExtensions.TYPEDEF)
+
+One cell of a [`ReportTable`](@ref): the text to show, the sort value and the kind of the sort value.
+
+This type is an implementation detail and is not intended for direct use. [`report_cell`](@ref) makes it. [`report_cell_html`](@ref) and the Markdown writer of a [`ReportTable`](@ref) read it.
+
+# Fields
+
+$(DocStringExtensions.FIELDS)
+
+# Related
+
+  - [`report_cell`](@ref)
+  - [`report_cell_html`](@ref)
+"""
+@concrete struct ReportCell
+    """
+    `text`: The text to show.
+    """
+    text
+    """
+    `v`: The sort value as a string, or `nothing` for an empty cell.
+    """
+    v
+    """
+    `num`: Whether the sort value is a number.
+    """
+    num
+end
+"""
     report_cell(x::Union{Nothing, Missing}, digits::Integer)
     report_cell(x::Integer, digits::Integer)
     report_cell(x::Bool, digits::Integer)
@@ -118,38 +148,39 @@ A float shows with `digits` significant digits, and its sort value is the full n
 
 # Returns
 
-  - `cell::NamedTuple`: `text`, the text to show; `v`, the sort value as a string, or `nothing` for an empty cell; `num`, whether the sort value is a number.
+  - `cell::ReportCell`: The text, the sort value and the kind of the cell.
 
 # Related
 
+  - [`ReportCell`](@ref)
   - [`ReportTable`](@ref)
 """
 function report_cell(::Union{Nothing, Missing}, ::Integer)
-    return (; text = "—", v = nothing, num = false)
+    return ReportCell("—", nothing, false)
 end
 function report_cell(x::Integer, ::Integer)
-    return (; text = string(x), v = string(x), num = true)
+    return ReportCell(string(x), string(x), true)
 end
 function report_cell(x::Bool, ::Integer)
-    return (; text = string(x), v = string(x), num = false)
+    return ReportCell(string(x), string(x), false)
 end
 function report_cell(x::AbstractFloat, digits::Integer)
     if isnan(x)
-        return (; text = "—", v = nothing, num = false)
+        return ReportCell("—", nothing, false)
     end
     # JavaScript's `Number` reads `Infinity`, and not Julia's `Inf`.
     v = isinf(x) ? (x > zero(x) ? "Infinity" : "-Infinity") : string(x)
-    return (; text = string(round(x; sigdigits = digits)), v = v, num = true)
+    return ReportCell(string(round(x; sigdigits = digits)), v, true)
 end
 function report_cell(x::Real, ::Integer)
-    return (; text = string(x), v = string(x), num = false)
+    return ReportCell(string(x), string(x), false)
 end
 function report_cell(x::Any, ::Integer)
     s = string(x)
-    return (; text = s, v = s, num = false)
+    return ReportCell(s, s, false)
 end
 """
-    report_cell_html(io::IO, c::NamedTuple)
+    report_cell_html(io::IO, c::ReportCell)
 
 Write one cell of a [`ReportTable`](@ref) as an HTML `<td>` element, from its [`report_cell`](@ref).
 
@@ -166,10 +197,11 @@ A number carries the class `po-num`, and a cell with a sort value carries it in 
 
 # Related
 
+  - [`ReportCell`](@ref)
   - [`report_cell`](@ref)
   - [`REPORT_JS`](@ref)
 """
-function report_cell_html(io::IO, c::NamedTuple)
+function report_cell_html(io::IO, c::ReportCell)
     print(io, "<td", c.num ? " class=\"po-num\"" : "")
     if !(isnothing(c.v))
         print(io, " data-v=\"", html_escape(c.v), "\"")

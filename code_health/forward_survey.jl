@@ -1530,8 +1530,6 @@ const RULED_NAMED_TUPLES = Dict{Symbol, Tuple{String, String}}(#
                                                                :covariance_plot_windows =>
                                                                    ("go",
                                                                     "the value travels: `rw` goes to `covariance_plot_entry`: a private defined type (#2113)"),
-                                                               :report_cell => ("go",
-                                                                                "a cell that its callers read by field and pass on: a private record (#2113)"),
                                                                :resolve_sigma_chol =>
                                                                    ("keep (keys)",
                                                                     "the call is `rebuild_with_slots`, which merges it into the fields of the measure by key, so a struct would need a conversion back at each call (#2113, #2100)"))
