@@ -1565,7 +1565,9 @@ const CATALOGUE = [Section("Core abstractions",
                                              label = "Scoring a parameter set"),
                                          [Cap(:HighestMeanScore)]),
                                    Cap(:EachValue;
-                                       label = "One ranking for each value [`EachValue`](@ref) in `r_sca` or `s_sca` keeps each risk measure or each search scorer apart, and the search gives one ranking and one winner for each of them")]),
+                                       label = "One ranking for each value [`EachValue`](@ref) in `r_sca` or `s_sca` keeps each risk measure or each search scorer apart, and the search gives one ranking and one winner for each of them"),
+                                   Cap(:PerCandidate;
+                                       label = "Combining the measures after the search scorer [`PerCandidate`](@ref) in `r_sca` combines the risk measures once per candidate, after the search scorer reduces the folds or the paths of each measure")]),
                             Cap(:NumberSubsetsEstimator, :SubsetSizeEstimator),
                             Cap(:WindowSizeEstimator),
                             Section("Covariance forecast evaluation",

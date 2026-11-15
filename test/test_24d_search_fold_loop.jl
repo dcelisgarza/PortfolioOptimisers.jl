@@ -220,8 +220,9 @@ The fixture is the online fold loop's, because the identities are structural.
             @test all(isnan, res.test_scores[:, 3])
             @test res.idx == 1
             @test res.val_grid[res.idx] == (ok,)
-            @test po.finite_candidate_order(nothing, HighestMeanScore(), res.test_scores,
-                                            3) == ([1], [mean(res.test_scores[:, 1])])
+            @test po.finite_candidate_order(nothing, nothing, HighestMeanScore(),
+                                            res.test_scores, 3) ==
+                  ([1], [mean(res.test_scores[:, 1])])
             @test res.rank_idx == [1]
         end
     end
@@ -577,14 +578,15 @@ The fixture is the online fold loop's, because the identities are structural.
         # A tie keeps grid order, in the order and in the index form.
         S = [0.5 0.8 0.8 0.25
              0.7 0.6 0.6 0.25]
-        o, v = po.finite_candidate_order(nothing, hms, S, 4)
+        o, v = po.finite_candidate_order(nothing, nothing, hms, S, 4)
         @test o == [2, 3, 1, 4] && v == vec(mean(S; dims = 1))[o]
         @test hms(S) == 2
         # A failed candidate never enters the order, and the cap is the count of finite
         # columns.
         Sf = [NaN 0.5 0.8
               0.2 0.5 0.8]
-        @test po.finite_candidate_order(nothing, hms, Sf, 3) == ([3, 2], [0.8, 0.5])
+        @test po.finite_candidate_order(nothing, nothing, hms, Sf, 3) ==
+              ([3, 2], [0.8, 0.5])
         # The index form of HighestMeanScore is argmax of its values.
         X = [0.5 0.75 0.25; 1.0 0.5 0.25]
         @test po.candidate_scores(hms, X) == vec(mean(X; dims = 1))
@@ -621,7 +623,7 @@ The fixture is the online fold loop's, because the identities are structural.
                                         ex = SequentialEx()), rd)
         @test ro.idx == rf.idx && isnothing(ro.rank_scores)
         err = try
-            po.finite_candidate_order(nothing, OnlyIndexScore(), S, 2)
+            po.finite_candidate_order(nothing, nothing, OnlyIndexScore(), S, 2)
             nothing
         catch e
             e
@@ -636,7 +638,7 @@ The fixture is the online fold loop's, because the identities are structural.
                                                             X::AbstractMatrix)
             return vec(minimum(X; dims = 1))
         end
-        @test po.finite_candidate_order(nothing, WorstFoldScore(), S, 2) ==
+        @test po.finite_candidate_order(nothing, nothing, WorstFoldScore(), S, 2) ==
               ([2, 3], [0.6, 0.6])
         # R31 of #1817: the values must line up with the columns, and NaN has no place in an
         # order. A short vector picked a wrong candidate at n_best = 1 with no error, a long
@@ -657,16 +659,17 @@ The fixture is the online fold loop's, because the identities are structural.
             return [1.0, Inf, -Inf, 0.5]
         end
         for sc in (ShortScore(), LongScore()), nb in (1, 2)
-            @test_throws DimensionMismatch po.finite_candidate_order(nothing, sc, S, nb)
+            @test_throws DimensionMismatch po.finite_candidate_order(nothing, nothing, sc,
+                                                                     S, nb)
         end
         err = try
-            po.finite_candidate_order(nothing, NaNScore(), S, 2)
+            po.finite_candidate_order(nothing, nothing, NaNScore(), S, 2)
             nothing
         catch e
             e
         end
         @test err isa IsNonFiniteError && occursin("NaNScore", err.msg)
-        @test po.finite_candidate_order(nothing, InfScore(), S, 4) ==
+        @test po.finite_candidate_order(nothing, nothing, InfScore(), S, 4) ==
               ([2, 1, 4, 3], [Inf, 1.0, 0.5, -Inf])
 
         # The Result refuses kept fields that do not agree.
@@ -865,11 +868,11 @@ The fixture is the online fold loop's, because the identities are structural.
               occursin("candidate_scores", err.msg)
         # A member whose values do not line up with the columns is refused before the
         # reduction, which would broadcast a vector of one value with no error.
-        @test_throws DimensionMismatch po.finite_candidate_order(nothing, [hms, X -> [1.0]],
-                                                                 S, 1)
+        @test_throws DimensionMismatch po.finite_candidate_order(nothing, nothing,
+                                                                 [hms, X -> [1.0]], S, 1)
         # A reduction that gives NaN is refused, and the error names `s_sca`.
         err = try
-            po.finite_candidate_order(StdValue(), [hms], S, 1)
+            po.finite_candidate_order(nothing, StdValue(), [hms], S, 1)
             nothing
         catch e
             e
@@ -877,7 +880,7 @@ The fixture is the online fold loop's, because the identities are structural.
         @test err isa IsNonFiniteError && occursin("s_sca", err.msg)
         # A scorer that gives neither a vector nor an integer is refused.
         err = try
-            po.finite_candidate_order(nothing, X -> 1.5, S, 1)
+            po.finite_candidate_order(nothing, nothing, X -> 1.5, S, 1)
             nothing
         catch e
             e
@@ -995,18 +998,19 @@ The fixture is the online fold loop's, because the identities are structural.
         S2 = fill(NaN, 2, 3)
         S3 = copy(S1)
         S3[1, 3] = NaN
-        ri, rs = po.finite_candidate_order(nothing, hms, [S1, S2, S3], 2)
+        ri, rs = po.finite_candidate_order(EachValue(), nothing, hms, [S1, S2, S3], 2)
         @test ri == [[3, 1], Int[], [1, 2]]
         @test rs[1] ≈ [0.35, 0.15] && rs[2] == Float64[] && rs[3] ≈ [0.15, 0.15]
-        ri, rs = po.finite_candidate_order(nothing, fidx, [S1, S2], 1)
+        ri, rs = po.finite_candidate_order(EachValue(), nothing, fidx, [S1, S2], 1)
         @test ri == [[3], Int[]] && rs == [nothing, nothing]
-        ri, rs = po.finite_candidate_order(EachValue(), [hms, fidx], [S1, S2], 2)
+        ri, rs = po.finite_candidate_order(EachValue(), EachValue(), [hms, fidx], [S1, S2],
+                                           2)
         @test size(ri) == (2, 2) && ri[1, 1] == [3, 1] && ri[1, 2] == [3]
         @test isempty(ri[2, 1]) && isempty(ri[2, 2])
         @test rs[2, 1] == Float64[] && isnothing(rs[2, 2]) && isnothing(rs[1, 2])
         # Under `EachValue`, a member that gives neither a vector nor an index is refused.
         err = try
-            po.finite_candidate_order(EachValue(), [hms, X -> 1.5], S1, 1)
+            po.finite_candidate_order(nothing, EachValue(), [hms, X -> 1.5], S1, 1)
             nothing
         catch e
             e
@@ -1014,14 +1018,14 @@ The fixture is the online fold loop's, because the identities are structural.
         @test err isa ArgumentError && occursin("Float64", err.msg)
         # Every entry empty: the search has nothing to keep.
         err = try
-            po.finite_candidate_order(nothing, hms, [S2, S2], 1)
+            po.finite_candidate_order(EachValue(), nothing, hms, [S2, S2], 1)
             nothing
         catch e
             e
         end
         @test err isa IsNonFiniteError && occursin("2 risk measures", err.msg)
-        @test_throws IsNonFiniteError po.finite_candidate_order(EachValue(), [hms, worst],
-                                                                S2, 1)
+        @test_throws IsNonFiniteError po.finite_candidate_order(nothing, EachValue(),
+                                                                [hms, worst], S2, 1)
 
         # The Result of an empty entry: `nothing` for its winner, and an empty vector of
         # candidates of the element type of a full one.
@@ -1095,6 +1099,181 @@ The fixture is the online fold loop's, because the identities are structural.
         @test po.oriented_score(EachValue(), rv, fit) ==
               [-expected_risk(rv[1], fit), 2 * expected_risk(rv[2], fit)]
         @test po.oriented_score(EachValue(), r, fit) == -expected_risk(r, fit)
+    end
+
+    #=
+    Issue #2002, ADR 0234: `r_sca = PerCandidate(sca)` combines the measures once per
+    candidate, after the search scorer reduces the folds or the paths of each measure. The
+    search keeps the `K` matrices of `EachValue`, and gives one ranking.
+    =#
+    @testset "16. `PerCandidate` combines the measures after the search scorer (#2002)" begin
+        kcv = KFold(; n = 4)
+        hms = HighestMeanScore()
+        means(S) = vec(mean(S; dims = 1))
+        worst = X -> vec(minimum(X; dims = 1))
+        fidx = X -> argmax(vec(minimum(X; dims = 1)))
+        rv = [ConditionalValueatRisk(),
+              MeanReturn(; settings = HierarchicalRiskMeasureSettings(; scale = 2.0))]
+        grid = ["opt.wb" => [WeightBounds(; lb = 0.0, ub = 1.0),
+                             WeightBounds(; lb = 0.0, ub = 0.13),
+                             WeightBounds(; lb = 0.1, ub = 1.0),
+                             WeightBounds(; lb = 0.12, ub = 1.0)]]
+        srch(cv = kcv; kwargs...) = search_cross_validation(hrp,
+                                                            gs(cv, grid; n_best = 3,
+                                                               ex = SequentialEx(),
+                                                               kwargs...), rd)
+
+        # The table of ADR 0234: one candidate, two measures, three folds.
+        S1 = reshape([3.0, 0.0, 0.0], 3, 1)
+        S2 = reshape([0.0, 2.0, 1.0], 3, 1)
+        @test po.finite_candidate_order(MaxScalariser(), nothing, hms, max.(S1, S2), 1) ==
+              ([1], [2.0])
+        @test po.finite_candidate_order(PerCandidate(MaxScalariser()), nothing, hms,
+                                        [S1, S2], 1) == ([1], [1.0])
+
+        # The search: the matrices of `EachValue`, and one ranking by the combination of
+        # the scorer's value of each measure. Each value holds the scale of its measure.
+        ccv = CombinatorialCrossValidation(; n_folds = 4, n_test_folds = 2)
+        for cv in (kcv, ccv)
+            ev = srch(cv; r = rv, r_sca = EachValue(), train_score = true)
+            for (sca, f) in
+                ((nothing, sum), (MaxScalariser(), maximum), (MinScalariser(), minimum),
+                 (MeanValue(), mean), (minimum, minimum))
+                pc = srch(cv; r = rv, r_sca = PerCandidate(sca), train_score = true)
+                hand = [f([means(S)[j] for S in ev.test_scores])
+                        for j in axes(ev.test_scores[1], 2)]
+                @test pc.test_scores == ev.test_scores
+                @test pc.train_scores == ev.train_scores
+                @test pc.rank_idx == sortperm(hand; rev = true)[1:3]
+                @test pc.rank_scores ≈ hand[pc.rank_idx]
+                @test pc.opt === pc.ranked[1] && pc.idx == pc.rank_idx[1]
+            end
+        end
+        # The sum agrees with the sum in each fold for a scorer that is linear in the rows.
+        sm = srch(; r = rv)
+        pc = srch(; r = rv, r_sca = PerCandidate())
+        @test sm.test_scores isa Matrix && pc.test_scores isa Vector{<:Matrix}
+        @test pc.rank_idx == sm.rank_idx && pc.rank_scores ≈ sm.rank_scores
+
+        # The order of the stages: the scorer reduces each matrix, `PerCandidate` combines
+        # the measures for each scorer, and then `s_sca` combines the scaled scorers.
+        ev = srch(; r = rv, r_sca = EachValue())
+        Ss = ev.test_scores
+        sv = [HighestMeanScore(; scale = 2.0), worst]
+        byscorer = [[maximum(means(S)[j] for S in Ss) for j in axes(Ss[1], 2)],
+                    [maximum(worst(S)[j] for S in Ss) for j in axes(Ss[1], 2)]]
+        hand = max.(2 .* byscorer[1], byscorer[2])
+        res = srch(; r = rv, r_sca = PerCandidate(MaxScalariser()), scorer = sv,
+                   s_sca = MaxScalariser())
+        @test res.rank_idx == sortperm(hand; rev = true)[1:3]
+        @test res.rank_scores ≈ hand[res.rank_idx]
+        # `s_sca = EachValue()`: one ranking per scorer, each with its scale.
+        es = srch(; r = rv, r_sca = PerCandidate(MaxScalariser()), scorer = sv,
+                  s_sca = EachValue())
+        @test size(es.rank_idx) == size(es.opt) == (2,)
+        @test es.rank_idx[1] == sortperm(2 .* byscorer[1]; rev = true)[1:3]
+        @test es.rank_scores[2] ≈ sort(byscorer[2]; rev = true)[1:3]
+        @test all(es.opt[l] === es.ranked[l][1] for l in 1:2)
+
+        # ADR 0120: a candidate enters only when it is finite in every matrix.
+        A = [0.1 0.2 0.3 NaN; 0.2 0.1 0.4 0.5]
+        B = [0.3 NaN 0.1 0.2; 0.1 0.2 0.0 0.2]
+        @test po.finite_candidate_order(PerCandidate(), nothing, hms, [A, B], 4)[1] ==
+              [3, 1]
+        err = try
+            po.finite_candidate_order(PerCandidate(), nothing, hms, [A[:, [4]], B[:, [2]]],
+                                      1)
+            nothing
+        catch e
+            e
+        end
+        @test err isa IsNonFiniteError && occursin("PerCandidate", err.msg)
+        # A combination that gives NaN is refused, and the error names `r_sca`.
+        err = try
+            po.finite_candidate_order(PerCandidate(StdValue()), nothing, hms, [A], 1)
+            nothing
+        catch e
+            e
+        end
+        @test err isa IsNonFiniteError && occursin("r_sca", err.msg)
+        err = try
+            po.finite_candidate_order(PerCandidate(), nothing,
+                                      X -> Inf .* vec(sum(X; dims = 1)),
+                                      [A[:, 1:2], -A[:, 1:2]], 1)
+            nothing
+        catch e
+            e
+        end
+        @test err isa IsNonFiniteError && occursin("r_sca", err.msg)
+        # A scorer whose values do not line up with the columns is refused before the
+        # combination.
+        @test_throws DimensionMismatch po.finite_candidate_order(PerCandidate(), nothing,
+                                                                 X -> [1.0], [A, B], 1)
+
+        # An index-only scorer gives no value to combine, so the search refuses it when it
+        # runs. For one measure the rule is inert, and the index is kept.
+        err = try
+            srch(; r = rv, r_sca = PerCandidate(), scorer = fidx, n_best = 1)
+            nothing
+        catch e
+            e
+        end
+        @test err isa ArgumentError &&
+              occursin("PerCandidate", err.msg) &&
+              occursin("candidate_scores", err.msg)
+        @test_throws ArgumentError srch(; r = rv, r_sca = PerCandidate(),
+                                        scorer = [hms, fidx])
+        a = srch()
+        res = srch(; r_sca = PerCandidate(MaxScalariser()))
+        @test res.test_scores == a.test_scores && res.rank_idx == a.rank_idx
+        res = srch(; r_sca = PerCandidate(), scorer = fidx, n_best = 1)
+        @test res.rank_idx == [fidx(a.test_scores)]
+        # A vector of one measure: the scorer's one value, reduced by `sca`.
+        v1 = srch(; r = [r], r_sca = PerCandidate(MaxScalariser()))
+        @test v1.test_scores == [a.test_scores] && v1.rank_idx == a.rank_idx
+        @test v1.rank_scores == a.rank_scores
+
+        # The randomised search and the Pipeline's search forward the rule.
+        rr = search_cross_validation(hrp,
+                                     RandomisedSearchCrossValidation(grid; cv = kcv, r = rv,
+                                                                     r_sca = PerCandidate(MaxScalariser()),
+                                                                     n_iter = 3, seed = 3,
+                                                                     n_best = 2), rd)
+        rg = search_cross_validation(hrp,
+                                     gs(kcv, [["opt.wb" => [v[1]]] for v in rr.val_grid];
+                                        r = rv, r_sca = PerCandidate(MaxScalariser()),
+                                        n_best = 2), rd)
+        @test rr.test_scores == rg.test_scores && rr.rank_idx == rg.rank_idx
+        pipe = Pipeline(; steps = (EmpiricalPrior(), hrp))
+        pgrid = ["steps[2].opt.wb" => grid[1][2]]
+        for cv in (kcv, ccv)
+            pres = search_cross_validation(pipe,
+                                           gs(cv, pgrid; r = rv,
+                                              r_sca = PerCandidate(MaxScalariser()),
+                                              n_best = 3), rd)
+            dres = srch(cv; r = rv, r_sca = PerCandidate(MaxScalariser()))
+            @test all(isapprox.(pres.test_scores, dres.test_scores; atol = 1e-10))
+            @test pres.rank_idx == dres.rank_idx
+        end
+
+        # The constructors. `r_sca` takes the rule, `s_sca` and the readers that need one
+        # value for each sample refuse it.
+        @test isnothing(PerCandidate().sca) &&
+              PerCandidate(; sca = MaxScalariser()).sca === MaxScalariser()
+        @test PerCandidate(minimum).sca === minimum
+        @test_throws MethodError PerCandidate(1.0)
+        for est in (GridSearchCrossValidation, RandomisedSearchCrossValidation)
+            e = est(grid; r = rv, r_sca = PerCandidate(MaxScalariser()))
+            @test e.r_sca === PerCandidate(MaxScalariser())
+            @test_throws TypeError est(grid; s_sca = PerCandidate())
+        end
+        @test_throws TypeError NearestQuantilePrediction(; sca = PerCandidate())
+        @test_throws TypeError FoldRiskScorer(; r = rv, sca = PerCandidate())
+        # `oriented_score` under the rule gives the value of each measure, times its scale.
+        fit = optimise(hrp, rows(rd, 1:80))
+        @test po.oriented_score(PerCandidate(), rv, fit) ==
+              po.oriented_score(EachValue(), rv, fit)
+        @test po.oriented_score(PerCandidate(), r, fit) == -expected_risk(r, fit)
     end
 end
 #=

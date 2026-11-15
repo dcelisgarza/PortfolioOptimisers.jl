@@ -100,7 +100,7 @@ $(DocStringExtensions.FIELDS)
         p::MultiGSCVValType_VecMultiGSCVValType;
         cv::CVE_Onl = KFold(),
         r::BaseRM_VecBaseRM = ConditionalValueatRisk(),
-        r_sca::Union{Option{<:Sca_VecToScaM}, EachValue} = nothing,
+        r_sca::Union{Option{<:Sca_VecToScaM}, AbstractSearchReduction} = nothing,
         scorer::Union{CrossValSearchScorer, AbstractVector} = HighestMeanScore(),
         s_sca::Union{Option{<:Sca_VecToScaM}, EachValue} = nothing,
         n_best::Integer = 1,
@@ -108,6 +108,8 @@ $(DocStringExtensions.FIELDS)
         train_score::Bool = false,
         kwargs::NamedTuple = (;),
     ) -> GridSearchCrossValidation
+
+`r_sca` takes a [`PerCandidate`](@ref), and `s_sca` refuses it with a `TypeError`.
 
 Positional and keyword arguments correspond to fields above. The outer constructor takes a vector of parameter sets whose types differ. Such a literal infers the element type `Vector`, so the constructor narrows it through [`narrow_mixed_vector`](@ref). A vector of search scorers of different types, such as `[HighestMeanScore(), f]`, infers the element type `Any`, so the constructor narrows it the same way.
 
@@ -123,6 +125,10 @@ Positional and keyword arguments correspond to fields above. The outer construct
 
 The search takes no refit, as the `refit` of sklearn does. To fit the winner of value `v` on the whole sample, call `optimise(res.opt[v], rd)`.
 
+## The measures after the search scorer
+
+`r_sca = PerCandidate(sca)` combines the measures once per candidate, after the search scorer reduces the folds or the paths of each measure. The search keeps one score matrix for each of the `K` measures of `r`, as under [`EachValue`](@ref). The scorer reduces each matrix, and `sca` combines the `K` values of each candidate, so the search gives one ranking, or `L` rankings under `s_sca = EachValue()`. A candidate enters only when it finished every fold under every measure. For a sum and [`HighestMeanScore`](@ref) the two stages agree. For [`MaxScalariser`](@ref) they do not, see [`PerCandidate`](@ref).
+
 ## Validation
 
   - `!isempty(p)`.
@@ -132,7 +138,7 @@ The search takes no refit, as the `refit` of sklearn does. To fit the winner of 
   - If `scorer` is a vector: it is not empty, and each member is a [`CrossValSearchScorer`](@ref).
   - `kwargs` must not contain `sca`, through [`assert_search_reduction`](@ref). The reduction is the field `r_sca`.
 
-When the search runs, it refuses a scorer that gives an index with `n_best > 1`, and a member of a vector that gives an index. A function with `n_best > 1` is refused there, not here, because only its return shows its form.
+When the search runs, it refuses a scorer that gives an index with `n_best > 1`, a member of a vector that gives an index, and a scorer that gives an index under `r_sca = PerCandidate(sca)` with a vector of measures. A function with `n_best > 1` is refused there, not here, because only its return shows its form.
 
 $(val_dict[:count_fraction_grid])
 
@@ -229,7 +235,8 @@ GridSearchCrossValidation
                                                 AbstractVector{<:AbstractDict{<:Any,
                                                                               <:AbstractVector}}},
                                        cv::CVE_Onl, r::BaseRM_VecBaseRM,
-                                       r_sca::Union{Option{<:Sca_VecToScaM}, EachValue},
+                                       r_sca::Union{Option{<:Sca_VecToScaM},
+                                                    AbstractSearchReduction},
                                        scorer::Union{CrossValSearchScorer, AbstractVector},
                                        s_sca::Union{Option{<:Sca_VecToScaM}, EachValue},
                                        n_best::Integer, ex::FLoops.Transducers.Executor,
@@ -274,7 +281,8 @@ function GridSearchCrossValidation(p::Union{AbstractVector,
                                             AbstractDict{<:Any, <:AbstractVector}};
                                    cv::CVE_Onl = KFold(),
                                    r::BaseRM_VecBaseRM = ConditionalValueatRisk(),
-                                   r_sca::Union{Option{<:Sca_VecToScaM}, EachValue} = nothing,
+                                   r_sca::Union{Option{<:Sca_VecToScaM},
+                                                AbstractSearchReduction} = nothing,
                                    scorer::Union{CrossValSearchScorer, AbstractVector} = HighestMeanScore(),
                                    s_sca::Union{Option{<:Sca_VecToScaM}, EachValue} = nothing,
                                    n_best::Integer = 1,
@@ -307,7 +315,7 @@ $(DocStringExtensions.FIELDS)
                                                <:RSCVVal}}};
         cv::CVE_Onl = KFold(),
         r::BaseRM_VecBaseRM = ConditionalValueatRisk(),
-        r_sca::Union{Option{<:Sca_VecToScaM}, EachValue} = nothing,
+        r_sca::Union{Option{<:Sca_VecToScaM}, AbstractSearchReduction} = nothing,
         scorer::Union{CrossValSearchScorer, AbstractVector} = HighestMeanScore(),
         s_sca::Union{Option{<:Sca_VecToScaM}, EachValue} = nothing,
         n_best::Integer = 1,
@@ -325,7 +333,7 @@ The search draws its trials from `rng`, so the trials, and the order of the `n_b
 
 ## Multiplicity
 
-`r` takes one risk measure or a vector of them, and `r_sca` reduces a vector, as in [`GridSearchCrossValidation`](@ref). For one measure `r_sca` is inert. `scorer` takes one search scorer or a vector of them, and `s_sca` reduces a vector, as in [`GridSearchCrossValidation`](@ref). For one scorer `s_sca` is inert. [`EachValue`](@ref) in `r_sca` or `s_sca` gives one ranking for each value per candidate, as in [`GridSearchCrossValidation`](@ref).
+`r` takes one risk measure or a vector of them, and `r_sca` reduces a vector, as in [`GridSearchCrossValidation`](@ref). For one measure `r_sca` is inert. `scorer` takes one search scorer or a vector of them, and `s_sca` reduces a vector, as in [`GridSearchCrossValidation`](@ref). For one scorer `s_sca` is inert. [`EachValue`](@ref) in `r_sca` or `s_sca` gives one ranking for each value per candidate, and [`PerCandidate`](@ref) in `r_sca` combines the measures after the search scorer, as in [`GridSearchCrossValidation`](@ref).
 
 ## Validation
 
@@ -447,7 +455,7 @@ RandomisedSearchCrossValidation
                                                       AbstractVector{<:AbstractDict}},
                                              cv::CVE_Onl, r::BaseRM_VecBaseRM,
                                              r_sca::Union{Option{<:Sca_VecToScaM},
-                                                          EachValue},
+                                                          AbstractSearchReduction},
                                              scorer::Union{CrossValSearchScorer,
                                                            AbstractVector},
                                              s_sca::Union{Option{<:Sca_VecToScaM},
@@ -506,7 +514,8 @@ end
 function RandomisedSearchCrossValidation(p::Union{AbstractVector, AbstractDict};
                                          cv::CVE_Onl = KFold(),
                                          r::BaseRM_VecBaseRM = ConditionalValueatRisk(),
-                                         r_sca::Union{Option{<:Sca_VecToScaM}, EachValue} = nothing,
+                                         r_sca::Union{Option{<:Sca_VecToScaM},
+                                                      AbstractSearchReduction} = nothing,
                                          scorer::Union{CrossValSearchScorer,
                                                        AbstractVector} = HighestMeanScore(),
                                          s_sca::Union{Option{<:Sca_VecToScaM}, EachValue} = nothing,
@@ -534,14 +543,14 @@ The scores of the kept candidate `j` over the rows of the scheme are `test_score
 
 Under [`EachValue`](@ref) in `r_sca` or `s_sca` of the search, `opt`, `idx`, `ranked`, `rank_idx` and `rank_scores` hold one entry for each value per candidate. The types of `r`, `r_sca`, `scorer` and `s_sca` decide the container:
 
-| `r_sca`                         | `s_sca`                        | Container of each field                                                  |
-|:------------------------------- |:------------------------------ |:------------------------------------------------------------------------ |
-| a reduction, or one measure     | a reduction, or one scorer     | One ranking, the fields above.                                           |
-| a reduction, or one measure     | `EachValue()` with `L` scorers | A vector of `L` entries, in the order of `scorer`.                       |
-| `EachValue()` with `K` measures | a reduction, or one scorer     | A vector of `K` entries, in the order of `r`.                            |
-| `EachValue()` with `K` measures | `EachValue()` with `L` scorers | A `K × L` matrix, row `k` for measure `k` and column `l` for scorer `l`. |
+| `r_sca`                                             | `s_sca`                        | Container of each field                                                  |
+|:--------------------------------------------------- |:------------------------------ |:------------------------------------------------------------------------ |
+| a reduction, [`PerCandidate`](@ref), or one measure | a reduction, or one scorer     | One ranking, the fields above.                                           |
+| a reduction, [`PerCandidate`](@ref), or one measure | `EachValue()` with `L` scorers | A vector of `L` entries, in the order of `scorer`.                       |
+| `EachValue()` with `K` measures                     | a reduction, or one scorer     | A vector of `K` entries, in the order of `r`.                            |
+| `EachValue()` with `K` measures                     | `EachValue()` with `L` scorers | A `K × L` matrix, row `k` for measure `k` and column `l` for scorer `l`. |
 
-So `res.opt[k, l]` is the winner of measure `k` under scorer `l`. Under `r_sca = EachValue()`, `test_scores` is a vector of `K` matrices in the order of `r`, and `train_scores` takes the same shape. Each ranking keeps at most `n_best` candidates, and a candidate enters the ranking of a measure only when it finished every fold under that measure. A measure under which no candidate finished every fold gives an empty entry: `opt[v]` and `idx[v]` are `nothing`, and `ranked[v]` and `rank_idx[v]` are empty. A scorer that gives the index of one winner keeps one candidate, and its entry of `rank_scores` is `nothing`.
+So `res.opt[k, l]` is the winner of measure `k` under scorer `l`. Under `r_sca = EachValue()` or `r_sca = PerCandidate(sca)` with a vector of measures, `test_scores` is a vector of `K` matrices in the order of `r`, and `train_scores` takes the same shape. Each ranking keeps at most `n_best` candidates, and a candidate enters the ranking of a measure only when it finished every fold under that measure. A measure under which no candidate finished every fold gives an empty entry: `opt[v]` and `idx[v]` are `nothing`, and `ranked[v]` and `rank_idx[v]` are empty. A scorer that gives the index of one winner keeps one candidate, and its entry of `rank_scores` is `nothing`.
 
 # Fields
 
@@ -710,15 +719,15 @@ The four methods of [`search_cross_validation`](@ref) on an optimiser and on a [
 
 # Algorithm
 
- 1. Order the finite candidates by the values of `gscv.scorer`, reduced through `gscv.s_sca` for a vector of scorers, and keep the first `gscv.n_best` through [`finite_candidate_order`](@ref), giving `rank_idx` and `rank_scores`. Under [`EachValue`](@ref), these hold one ranking for each value.
+ 1. Order the finite candidates by the values of `gscv.scorer`, reduced through `gscv.s_sca` for a vector of scorers, and keep the first `gscv.n_best` through [`finite_candidate_order`](@ref), giving `rank_idx` and `rank_scores`. Under [`EachValue`](@ref), these hold one ranking for each value. Under [`PerCandidate`](@ref), `gscv.r_sca` combines the values of the measures first.
  2. Build each kept candidate `k` of `rank_idx` from `base` through [`ranked_candidates`](@ref), giving `ranked`, `opt` and `idx`.
  3. Return a [`SearchCrossValidationResult`](@ref) with `opt = ranked[1]` and `idx = rank_idx[1]`, or these for each ranking.
 
 # Arguments
 
   - `base`: The estimator, or the [`Pipeline`](@ref), that the search tunes.
-  - `gscv`: The grid search. It gives `scorer`, `s_sca` and `n_best`.
-  - `test_scores`: The raw test score matrix, or one matrix for each measure under `r_sca = EachValue()`.
+  - `gscv`: The grid search. It gives `r_sca`, `scorer`, `s_sca` and `n_best`.
+  - `test_scores`: The raw test score matrix, or one matrix for each measure under a rule of [`AbstractSearchReduction`](@ref).
   - `train_scores`: The train scores, or `nothing`.
   - `lens_grid`: The lenses of each grid point.
   - `val_grid`: The values of each grid point.
@@ -743,8 +752,8 @@ function search_result(base, gscv::GridSearchCrossValidation,
                        test_scores::Union{MatNum, AbstractVector{<:MatNum}}, train_scores,
                        lens_grid::AbstractVector, val_grid::AbstractVector,
                        path_ids::Option{<:AbstractVector{<:Integer}})
-    rank_idx, rank_scores = finite_candidate_order(gscv.s_sca, gscv.scorer, test_scores,
-                                                   gscv.n_best)
+    rank_idx, rank_scores = finite_candidate_order(gscv.r_sca, gscv.s_sca, gscv.scorer,
+                                                   test_scores, gscv.n_best)
     opt, idx, ranked = ranked_candidates(base, lens_grid, val_grid, rank_idx)
     return SearchCrossValidationResult(; opt = opt, test_scores = test_scores,
                                        train_scores = train_scores, lens_grid = lens_grid,
@@ -1104,15 +1113,16 @@ function allocate_search_scores(gscv::GridSearchCrossValidation, ::Type{T},
 end
 """
     search_score_array(r_sca, r::BaseRM_VecBaseRM, T::Type, M::Integer, N::Integer)
-    search_score_array(::EachValue, rs::VecBaseRM, T::Type, M::Integer, N::Integer)
+    search_score_array(::AbstractSearchReduction, rs::VecBaseRM, T::Type, M::Integer,
+                       N::Integer)
     search_score_array(r_sca, r::BaseRM_VecBaseRM, T::Type, Ms::AbstractVector{<:Integer},
                        N::Integer)
-    search_score_array(::EachValue, rs::VecBaseRM, T::Type, Ms::AbstractVector{<:Integer},
-                       N::Integer)
+    search_score_array(::AbstractSearchReduction, rs::VecBaseRM, T::Type,
+                       Ms::AbstractVector{<:Integer}, N::Integer)
 
 Allocate one score array of a search, uninitialised.
 
-A reduction to one score, or one measure, gives one `M × N` matrix, and a vector of row counts gives one matrix per path. [`EachValue`](@ref) with a vector of `K` measures keeps one score for each measure, so it gives a vector of `K` such arrays, in the order of `rs`: `scores[k]` is a matrix, or `scores[k][p]` is the matrix of path `p`. The types of `r_sca` and `r` select the method, so the shape is fixed at compile time.
+A reduction to one score, or one measure, gives one `M × N` matrix, and a vector of row counts gives one matrix per path. A rule of [`AbstractSearchReduction`](@ref), such as [`EachValue`](@ref) or [`PerCandidate`](@ref), with a vector of `K` measures keeps one score for each measure, so it gives a vector of `K` such arrays, in the order of `rs`: `scores[k]` is a matrix, or `scores[k][p]` is the matrix of path `p`. The types of `r_sca` and `r` select the method, so the shape is fixed at compile time.
 
 # Arguments
 
@@ -1127,28 +1137,29 @@ A reduction to one score, or one measure, gives one `M × N` matrix, and a vecto
 # Returns
 
   - `scores::Matrix{T}`: One `M × N` matrix.
-  - `scores::Vector{Matrix{T}}`: One `Ms[p] × N` matrix per path `p`, or one `M × N` matrix per measure under [`EachValue`](@ref).
-  - `scores::Vector{Vector{Matrix{T}}}`: Under [`EachValue`](@ref), one matrix per measure `k` and path `p`.
+  - `scores::Vector{Matrix{T}}`: One `Ms[p] × N` matrix per path `p`, or one `M × N` matrix per measure under a rule of [`AbstractSearchReduction`](@ref).
+  - `scores::Vector{Vector{Matrix{T}}}`: Under a rule of [`AbstractSearchReduction`](@ref), one matrix per measure `k` and path `p`.
 
 # Related
 
   - [`allocate_search_scores`](@ref)
   - [`store_search_score!`](@ref)
 """
-function search_score_array(::Union{Option{<:Sca_VecToScaM}, EachValue}, ::BaseRM_VecBaseRM,
-                            ::Type{T}, M::Integer, N::Integer) where {T <: Number}
+function search_score_array(::Union{Option{<:Sca_VecToScaM}, AbstractSearchReduction},
+                            ::BaseRM_VecBaseRM, ::Type{T}, M::Integer,
+                            N::Integer) where {T <: Number}
     return Matrix{T}(undef, M, N)
 end
-function search_score_array(::EachValue, rs::VecBaseRM, ::Type{T}, M::Integer,
+function search_score_array(::AbstractSearchReduction, rs::VecBaseRM, ::Type{T}, M::Integer,
                             N::Integer) where {T <: Number}
     return [Matrix{T}(undef, M, N) for _ in rs]
 end
-function search_score_array(r_sca::Union{Option{<:Sca_VecToScaM}, EachValue},
+function search_score_array(r_sca::Union{Option{<:Sca_VecToScaM}, AbstractSearchReduction},
                             r::BaseRM_VecBaseRM, ::Type{T}, Ms::AbstractVector{<:Integer},
                             N::Integer) where {T <: Number}
     return [search_score_array(r_sca, r, T, M, N) for M in Ms]
 end
-function search_score_array(::EachValue, rs::VecBaseRM, ::Type{T},
+function search_score_array(::AbstractSearchReduction, rs::VecBaseRM, ::Type{T},
                             Ms::AbstractVector{<:Integer}, N::Integer) where {T <: Number}
     return [[Matrix{T}(undef, M, N) for M in Ms] for _ in rs]
 end

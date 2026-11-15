@@ -116,6 +116,9 @@
     `AbstractCountOrFraction` joined with its `# Interfaces` section on 2026-11-06
     (issue #2013): `CountOf` and `FractionOf` subtype it, and each field of a part of a set
     holds one of them.
+    `AbstractSearchReduction` joined with its `# Interfaces` section on 2026-11-15 (issue
+    #2002): `EachValue` and `PerCandidate` subtype it, and the slot `r_sca` of a search holds
+    one of them.
     They are held to their own list for the same reason — public is API too.
     =#
     #! format: off
@@ -238,6 +241,7 @@
         :AbstractRiskMeasureSettings,
         :AbstractSampleSelector,
         :AbstractSearchCrossValidationResult,
+        :AbstractSearchReduction,
         :AbstractSelectionRule,
         :AbstractShrunkExpectedReturnsIntensity,
         :AbstractSignificanceCalibrationAlgorithm,

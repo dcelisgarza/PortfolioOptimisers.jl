@@ -11,6 +11,14 @@ assert_candidate_scores
 candidate_values
 member_candidate_values
 reduce_scorer_values
+assert_reduced_values
+candidate_count
+```
+
+Under [`PerCandidate`](@ref), the search scorer reduces the matrix of each risk measure, and the rule combines the values of each candidate.
+
+```@docs
+measure_candidate_values
 ```
 
 Under [`EachValue`](@ref), the search gives one ranking for each value per candidate.

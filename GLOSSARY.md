@@ -1088,7 +1088,7 @@ One ranking of the candidates of a search for each value that the search keeps a
 *Avoid*: `nothing` for this rule, which gives the sum (ADR 0238). And refit, because the search fits no winner on the whole sample.
 
 **Per-Candidate Combination**
-The combination of the risk measures of a search once for each candidate, after the Search Scorer reduces the folds or the paths of each measure. A wrapper around a scalariser spells it. The plain scalariser combines the measures in each fold or path, before the Search Scorer. For a scalariser that is not a sum, the two give different values. ADR 0234. Build ticket #2002 adds the wrapper.
+The combination of the risk measures of a search once for each candidate, after the Search Scorer reduces the folds or the paths of each measure. `PerCandidate(sca)` in `r_sca` spells it. The search keeps one score matrix per measure, as under `EachValue()`, and a candidate enters only when it is finite in every matrix. The plain scalariser combines the measures in each fold or path, before the Search Scorer. For a scalariser that is not a sum, the two give different values. `EachValue` and `PerCandidate` are the members of `AbstractSearchReduction`. ADR 0234.
 *Avoid*: per path, which names the combination in each path of a combinatorial scheme. And after the folds, because in a combinatorial scheme the search scorer reduces paths.
 
 **Fold Loop**

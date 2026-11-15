@@ -62,7 +62,7 @@ measure is over all the folds.
 
 | Item | Rule |
 | --- | --- |
-| `PerCandidate` | A wrapper that holds one `Sca_VecToScaM`. Exported. The bound of `r_sca` widens to take it. For one measure it is inert, as `r_sca` is. |
+| `PerCandidate` | A wrapper that holds one `Sca_VecToScaM`, or `nothing` for the sum (ADR 0238). Exported. The bound of `r_sca` widens to take it. For one measure it is inert, as `r_sca` is. |
 | The order | The scorer reduces the folds or the paths of each matrix, giving `v[k, l]` for measure `k` and scorer `l`. `PerCandidate` combines `v[:, l]` for each scorer. Then `s_sca` combines the `L` results. So the measures combine before the scorers in both stages, and `s_sca` keeps the definition of ADR 0233. |
 | The scale | Each value of a matrix holds the scale of its measure (ADR 0231), so `PerCandidate` reads the scale as the weight of the measure. |
 | An index-only scorer | It gives no value to combine, so the search refuses it under `PerCandidate` when it runs, as ADR 0233 does under `s_sca`. |
@@ -131,13 +131,18 @@ of the search states this as the form of the `refit` of sklearn.
 
 - **The build tickets of map #1980.** The code holds none of this decision until they land.
   Ticket #2001 builds `EachValue`, the shape of the Result under it on `r_sca` or
-  `s_sca`, the empty entry and its checks. `EachValue` subtypes `AbstractAlgorithm`, and no family
-  type holds it: a family of one member that no method reads is refused by the censuses of
-  ADR 0222, so #2002 adds the family when `PerCandidate` joins it and a bound reads it. One verb,
+  `s_sca`, the empty entry and its checks. One verb,
   `finite_candidate_order`, gives one ranking or one ranking for each value. An empty entry takes
   the form of a full ranking of the same scorer: empty values, or `nothing` for a scorer that
   gives an index. The constructor of the Result checks `opt == ranked[1]` for a search of one
-  value too. Ticket #2002 builds `PerCandidate`. Ticket #2003 shows a search
+  value too. Ticket #2002 builds `PerCandidate`. Its `sca` takes `Option{<:Sca_VecToScaM}` and
+  defaults to `nothing`, the sum, as every scalariser slot does (ADR 0238). The family
+  `AbstractSearchReduction <: AbstractAlgorithm` holds `EachValue` and `PerCandidate`: the bound
+  of `r_sca`, `oriented_score` and the allocator of the scores read it, because both members
+  keep one matrix per measure. The bound of `s_sca` keeps `EachValue` alone.
+  `finite_candidate_order` takes `r_sca` as its first argument, so the type of `r_sca` picks
+  the method for the `K` matrices, and `candidate_values` holds the combination of the measures,
+  one method for each form of `sca`. Ticket #2003 shows a search
   with a vector of risk measures and a vector of search scorers in the tuning example and the
   user guide.
 - **A breaking change, for the build.** Under the per-value form of `r_sca` or `s_sca` with a vector,

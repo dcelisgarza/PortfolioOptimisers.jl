@@ -46,6 +46,32 @@ const PredictionCrossValScorer = Union{PredictionScorer, Function}
 """
 $(DocStringExtensions.TYPEDEF)
 
+Abstract supertype of the rules of the slot `r_sca` of a search that a scalariser cannot spell.
+
+A [`Sca_VecToScaM`](@ref) in `r_sca` combines the risk measures of `r` in each fold or path, so the search keeps one score matrix. A member of this family keeps one score matrix for each measure, so the search scores each fold under each measure apart. The members differ in what the search does with the `K` matrices:
+
+  - [`EachValue`](@ref) combines nothing, and gives one ranking for each measure.
+  - [`PerCandidate`](@ref) combines the measures once per candidate, after the search scorer reduces the rows of each matrix, and gives one ranking.
+
+So [`oriented_score`](@ref) gives the oriented score of each measure under every member, and the allocator of the scores gives one matrix for each measure.
+
+[`expected_risk`](@ref), [`NearestQuantilePrediction`](@ref) and [`FoldRiskScorer`](@ref) need one value for each sample, so their bounds refuse every member.
+
+# Interfaces
+
+The family is closed. The selection of a search dispatches on [`EachValue`](@ref) and on [`PerCandidate`](@ref), and holds the methods of each for its `K` score matrices. A new member needs those methods, so the library adds no member.
+
+# Related
+
+  - [`EachValue`](@ref)
+  - [`PerCandidate`](@ref)
+  - [`GridSearchCrossValidation`](@ref)
+  - [`Sca_VecToScaM`](@ref)
+"""
+abstract type AbstractSearchReduction <: AbstractAlgorithm end
+"""
+$(DocStringExtensions.TYPEDEF)
+
 The per-value rule of a scalariser slot of a search: keep each value apart, and give one ranking for each value per candidate.
 
 It is the multi-metric form of a search in sklearn. The search does not combine the values. It orders the candidates by each value apart, and it keeps one `opt`, one `idx` and one ranking for each value, in one [`SearchCrossValidationResult`](@ref).
@@ -78,22 +104,121 @@ EachValue()
   - [`SearchCrossValidationResult`](@ref)
   - [`Sca_VecToScaM`](@ref)
   - [`finite_candidate_order`](@ref)
+  - [`AbstractSearchReduction`](@ref)
+  - [`PerCandidate`](@ref)
 """
-struct EachValue <: AbstractAlgorithm end
+struct EachValue <: AbstractSearchReduction end
 """
-    oriented_score(sca::Union{Option{<:Sca_VecToScaM}, EachValue}, r::BaseRM_VecBaseRM,
-                   p::PredRes_MultiPredRes; kwargs...)
+$(DocStringExtensions.TYPEDEF)
+
+The per-candidate rule of the slot `r_sca` of a search: combine the risk measures once per candidate, after the search scorer reduces the folds or the paths of each measure.
+
+A [`Sca_VecToScaM`](@ref) in `r_sca` combines the `K` measures of `r` in each fold, or in each path of a combinatorial scheme, and then the search scorer reduces the rows. `PerCandidate(sca)` takes the stages in the other order. The search keeps one score matrix for each measure, as under [`EachValue`](@ref). The search scorer reduces the rows of each matrix, and gives the value ``v_{kj}`` of measure ``k`` for candidate ``j``. Then `sca` combines the `K` values of each candidate to one. The search gives one ranking, as for one measure.
+
+For a sum, and a search scorer that is linear in the rows, such as [`HighestMeanScore`](@ref), the two orders give the same value. For [`MaxScalariser`](@ref), [`MinScalariser`](@ref), [`LogSumExpScalariser`](@ref), a [`VectorToScalarMeasure`](@ref) or a function they do not. The mean over the folds of the best measure is not the best measure of the means. For one candidate, two measures and three folds:
+
+```text
+            fold 1  fold 2  fold 3   mean
+measure 1      3       0       0      1
+measure 2      0       2       1      1
+
+r_sca = MaxScalariser():               max per fold [3, 2, 1], then mean = 2
+r_sca = PerCandidate(MaxScalariser()): mean per measure [1, 1], then max = 1
+```
+
+The first asks how good the best measure is in each fold. The second asks how good the best measure is over all the folds.
+
+# Mathematical definition
+
+```math
+\\begin{align}
+v_{kj} &= c\\left(\\mathbf{S}^{(k)}_{:,\\,\\mathcal{C}}\\right)_j\\,, \\\\
+u_j &= S\\left(v_{1j}, \\, \\ldots, \\, v_{Kj}\\right)\\,.
+\\end{align}
+```
+
+Where:
+
+  - ``\\mathbf{S}^{(k)}``: Score matrix of measure ``k``. Each entry is the oriented score of the measure, multiplied by its scale, see [`oriented_score`](@ref). So the scale of a measure is its weight in `sca`.
+  - ``\\mathcal{C}``: The candidates whose every entry is finite in **every** matrix. A value of fewer than ``K`` measures does not compare with a value of ``K``.
+  - ``c``: The search scorer, through [`candidate_values`](@ref).
+  - ``v_{kj}``: Value of measure ``k`` for candidate ``j``.
+  - ``S``: The reduction `sca`.
+  - ``u_j``: Value of candidate ``j`` for the scorer. A vector of search scorers multiplies ``u_j`` of each scorer by its [`scorer_scale`](@ref), and `s_sca` reduces them, as for one measure.
+  - ``K``: Count of the risk measures in `r`.
+
+# Fields
+
+$(DocStringExtensions.FIELDS)
+
+# Constructors
+
+    PerCandidate(; sca::Option{<:Sca_VecToScaM} = nothing) -> PerCandidate
+
+`PerCandidate(sca)` takes the reduction as the one positional argument.
+
+# Validation
+
+  - When the search runs, a search scorer that gives the index of one winner is refused with an `ArgumentError`, because an index has no value to combine. For one measure in `r` it is admitted.
+  - When the search runs, a reduction that gives `NaN` is refused with an [`IsNonFiniteError`](@ref).
+
+For one measure in `r` the rule is inert, as a reduction is. The search scorer of a vector of one measure gives one value, and `sca` reduces that one value.
+
+The rule is a rule of the slot `r_sca` of [`GridSearchCrossValidation`](@ref) and [`RandomisedSearchCrossValidation`](@ref) alone. The slot `s_sca` refuses it, because no stage follows the scorers. [`expected_risk`](@ref), [`NearestQuantilePrediction`](@ref) and [`FoldRiskScorer`](@ref) have no scorer stage, so their bounds refuse it.
+
+# Examples
+
+```jldoctest
+julia> PerCandidate(MaxScalariser())
+PerCandidate
+  sca ┴ MaxScalariser()
+
+julia> GridSearchCrossValidation([\"opt.l1\" => [0.0, 0.01]];
+                                 r = [ConditionalValueatRisk(), MeanReturn()],
+                                 r_sca = PerCandidate(MaxScalariser())).r_sca.sca
+MaxScalariser()
+```
+
+# Related
+
+  - [`AbstractSearchReduction`](@ref)
+  - [`EachValue`](@ref)
+  - [`GridSearchCrossValidation`](@ref)
+  - [`Sca_VecToScaM`](@ref)
+  - [`candidate_values`](@ref)
+  - [`finite_candidate_order`](@ref)
+"""
+struct PerCandidate{T} <: AbstractSearchReduction
+    """
+    $(field_dict[:sca_candidate])
+    """
+    sca::T
+    # The struct is written by hand, and not with `@concrete`, because `@concrete` appends a
+    # generic positional constructor that skips this one. `PerCandidate(1.0)` would then hold
+    # a reduction that is not a `Sca_VecToScaM`. The positional form is the main form of this
+    # type.
+    function PerCandidate(sca::Option{<:Sca_VecToScaM})
+        return new{typeof(sca)}(sca)
+    end
+end
+function PerCandidate(; sca::Option{<:Sca_VecToScaM} = nothing)
+    return PerCandidate(sca)
+end
+"""
+    oriented_score(sca::Union{Option{<:Sca_VecToScaM}, AbstractSearchReduction},
+                   r::BaseRM_VecBaseRM, p::PredRes_MultiPredRes; kwargs...)
     oriented_score(sca::Option{<:Scalariser}, rs::VecBaseRM, X::VecNum; kwargs...)
     oriented_score(sca::Union{VectorToScalarMeasure, Function}, rs::VecBaseRM, X::VecNum;
                    kwargs...)
-    oriented_score(::EachValue, rs::VecBaseRM, X::VecNum; kwargs...)
-    oriented_score(sca::Union{Option{<:Sca_VecToScaM}, EachValue}, r::AbstractBaseRiskMeasure,
-                   res::OptimisationResult, X::Option{<:MatNum} = nothing; kwargs...)
+    oriented_score(::AbstractSearchReduction, rs::VecBaseRM, X::VecNum; kwargs...)
+    oriented_score(sca::Union{Option{<:Sca_VecToScaM}, AbstractSearchReduction},
+                   r::AbstractBaseRiskMeasure, res::OptimisationResult,
+                   X::Option{<:MatNum} = nothing; kwargs...)
     oriented_score(sca::Option{<:Scalariser}, rs::VecBaseRM, res::OptimisationResult,
                    X::Option{<:MatNum} = nothing; kwargs...)
     oriented_score(sca::Union{VectorToScalarMeasure, Function}, rs::VecBaseRM,
                    res::OptimisationResult, X::Option{<:MatNum} = nothing; kwargs...)
-    oriented_score(::EachValue, rs::VecBaseRM, res::OptimisationResult,
+    oriented_score(::AbstractSearchReduction, rs::VecBaseRM, res::OptimisationResult,
                    X::Option{<:MatNum} = nothing; kwargs...)
 
 Score a prediction, or a fitted result over its own training sample, under one risk measure or a vector of them, so that a higher score is always better.
@@ -121,7 +246,7 @@ Where:
   - ``S``: The reduction `sca`.
   - $(math_dict[:n_rm_vec])
 
-One measure ignores `sca` and its scale, as [`expected_risk`](@ref) does. A search calls the function with the rule [`EachValue`](@ref) in `sca`. For a vector, this rule does not reduce: it gives the vector of the values ``o_k s_k \\mathcal{R}_k(P)``, in the order of `rs`. For one measure it is inert.
+One measure ignores `sca` and its scale, as [`expected_risk`](@ref) does. A search calls the function with a rule of [`AbstractSearchReduction`](@ref) in `sca`, such as [`EachValue`](@ref) or [`PerCandidate`](@ref). For a vector, such a rule does not reduce: it gives the vector of the values ``o_k s_k \\mathcal{R}_k(P)``, in the order of `rs`. For one measure it is inert.
 
 # Algorithm
 
@@ -130,7 +255,7 @@ One measure ignores `sca` and its scale, as [`expected_risk`](@ref) does. A sear
  3. A vector of a series or of a fitted result: compute ``o_k s_k \\mathcal{R}_k(P)`` for each measure on the sample, with [`oriented_member_score`](@ref) with `kwargs`. Reduce the values by the type of `sca`:
      1. A [`Scalariser`](@ref) or `nothing`: through [`scalarise`](@ref). `nothing` gives the sum of [`SumScalariser`](@ref).
      2. A [`VectorToScalarMeasure`](@ref) or a function: collect the values into a vector, and apply [`vec_to_real_measure`](@ref).
-     3. [`EachValue`](@ref): collect the values into a vector, and return the vector.
+     3. A rule of [`AbstractSearchReduction`](@ref): collect the values into a vector, and return the vector. The search combines them later, or not at all.
 
 The reduction of step 3 is written twice, once for a series and once for a fitted result, so that each sample is a method of this function and no helper holds a part of the job. The two copies agree: each reads the members through [`oriented_member_score`](@ref), and each reduces by the type of `sca` in the same two ways. The tests of a search hold the copy for a fitted result, and the tests of a scorer of predictions and of [`FoldRiskScorer`](@ref) hold the copy for a series.
 
@@ -141,13 +266,13 @@ The reduction of step 3 is written twice, once for a series and once for a fitte
   - `p`: A prediction of one fold, a [`PredictionResult`](@ref), or of one path, a [`MultiPeriodPredictionResult`](@ref).
   - `res`: A fitted result.
   - `X`: In the form for a series, the return series. In the form for a fitted result, the training returns of `res`, or `nothing` to score `res` through its prior result.
-  - `sca`: The reduction of a vector. A [`VectorToScalarMeasure`](@ref) or a function must take a vector of numbers. `nothing` gives the sum of [`SumScalariser`](@ref). [`EachValue`](@ref) keeps each value.
+  - `sca`: The reduction of a vector. A [`VectorToScalarMeasure`](@ref) or a function must take a vector of numbers. `nothing` gives the sum of [`SumScalariser`](@ref). A rule of [`AbstractSearchReduction`](@ref) keeps each value.
   - `kwargs...`: Keyword arguments forwarded to [`expected_risk`](@ref).
 
 # Returns
 
   - `score::Number`: The oriented score.
-  - `scores::VecNum`: Under [`EachValue`](@ref) with a vector, the oriented score of each measure, multiplied by its scale.
+  - `scores::VecNum`: Under a rule of [`AbstractSearchReduction`](@ref) with a vector, the oriented score of each measure, multiplied by its scale.
 
 # Related
 
@@ -159,7 +284,7 @@ The reduction of step 3 is written twice, once for a series and once for a fitte
   - [`quantile_by_measure`](@ref): selects a path by the quantile of the negated score.
   - [`candidate_train_score`](@ref): the train score of a search, through the form for a fitted result.
 """
-function oriented_score(::Union{Option{<:Sca_VecToScaM}, EachValue},
+function oriented_score(::Union{Option{<:Sca_VecToScaM}, AbstractSearchReduction},
                         r::AbstractBaseRiskMeasure, p::PredRes_MultiPredRes; kwargs...)
     return oriented_value(r, expected_risk(r, p; kwargs...))
 end
@@ -173,11 +298,11 @@ arithmetic is on concrete types. A call that passed the prediction would box it 
 member. One measure reads `expected_risk` on the prediction, so that a measure that refuses a
 prediction, such as `ExpectedReturn`, still refuses it.
 =#
-function oriented_score(sca::Union{Option{<:Sca_VecToScaM}, EachValue}, rs::VecBaseRM,
-                        p::PredRes_MultiPredRes; kwargs...)
+function oriented_score(sca::Union{Option{<:Sca_VecToScaM}, AbstractSearchReduction},
+                        rs::VecBaseRM, p::PredRes_MultiPredRes; kwargs...)
     return oriented_score(sca, rs, prediction_returns(p); kwargs...)
 end
-function oriented_score(::EachValue, rs::VecBaseRM, X::VecNum; kwargs...)
+function oriented_score(::AbstractSearchReduction, rs::VecBaseRM, X::VecNum; kwargs...)
     return map(r -> oriented_member_score(r, X; kwargs...), rs)
 end
 function oriented_score(sca::Option{<:Scalariser}, rs::VecBaseRM, X::VecNum; kwargs...)
@@ -193,7 +318,7 @@ result to each member. Each member then resolves the result exactly as one measu
 through `expected_risk(r, res, X)`: the investable view, the prior result and a Deferred
 Quantity. The box of the result on each member call is paid by a vector alone.
 =#
-function oriented_score(::Union{Option{<:Sca_VecToScaM}, EachValue},
+function oriented_score(::Union{Option{<:Sca_VecToScaM}, AbstractSearchReduction},
                         r::AbstractBaseRiskMeasure, res::OptimisationResult,
                         X::Option{<:MatNum} = nothing; kwargs...)
     return oriented_value(r, expected_risk(r, res, X; kwargs...))
@@ -207,7 +332,7 @@ function oriented_score(sca::Union{VectorToScalarMeasure, Function}, rs::VecBase
     return vec_to_real_measure(sca,
                                map(r -> oriented_member_score(r, res, X; kwargs...), rs))
 end
-function oriented_score(::EachValue, rs::VecBaseRM, res::OptimisationResult,
+function oriented_score(::AbstractSearchReduction, rs::VecBaseRM, res::OptimisationResult,
                         X::Option{<:MatNum} = nothing; kwargs...)
     return map(r -> oriented_member_score(r, res, X; kwargs...), rs)
 end
@@ -441,7 +566,10 @@ function (s::NearestQuantilePrediction)(ppred::PopulationPredictionResult)
                                q_kwargs = s.q_kwargs)
 end
 
-export NearestQuantilePrediction, EachValue
+export NearestQuantilePrediction, EachValue, PerCandidate
+# The closed family of the rules of `r_sca` that keep one score matrix per measure, with its
+# `# Interfaces` section (ADR 0154, #2002).
+public AbstractSearchReduction
 """
     member_solved(p::PredictionResult)
     member_solved(p::MultiPeriodPredictionResult)

@@ -221,14 +221,19 @@ function scorer_scale(s::HighestMeanScore)
     return s.scale
 end
 """
-    finite_candidate_order(s_sca::Union{Option{<:Sca_VecToScaM}, EachValue}, scorer,
+    finite_candidate_order(r_sca, s_sca::Union{Option{<:Sca_VecToScaM}, EachValue}, scorer,
                            test_scores::MatNum, n_best::Integer)
-    finite_candidate_order(::EachValue, scorers::AbstractVector, test_scores::MatNum,
+    finite_candidate_order(r_sca, ::EachValue, scorers::AbstractVector, test_scores::MatNum,
                            n_best::Integer)
-    finite_candidate_order(s_sca, scorer, test_scores::AbstractVector{<:MatNum},
+    finite_candidate_order(::EachValue, s_sca, scorer, test_scores::AbstractVector{<:MatNum},
                            n_best::Integer)
+    finite_candidate_order(r_sca::PerCandidate,
+                           s_sca::Union{Option{<:Sca_VecToScaM}, EachValue}, scorer,
+                           test_scores::AbstractVector{<:MatNum}, n_best::Integer)
+    finite_candidate_order(r_sca::PerCandidate, ::EachValue, scorers::AbstractVector,
+                           test_scores::AbstractVector{<:MatNum}, n_best::Integer)
 
-Order the candidates of a search, best first, keep the first `n_best`, and never let a failed candidate in. Under [`EachValue`](@ref), give one such ranking for each value per candidate.
+Order the candidates of a search, best first, keep the first `n_best`, and never let a failed candidate in. Under [`EachValue`](@ref), give one such ranking for each value per candidate. Under [`PerCandidate`](@ref), combine the values of the measures of each candidate first.
 
 A candidate that did not finish every fold carries a non-finite entry in its column of the score matrix, and `argmax` over `[0.80, NaN, 0.50]` returns the position of the `NaN`. So the scorer receives the columns whose **every** entry is finite, and the order that it gives, in positions of the matrix that it received, maps back to the grid through the list of those columns.
 
@@ -260,26 +265,30 @@ The sort is stable, so a tie keeps the order of the grid, as `argmax` does.
 
 ## One ranking for each value
 
-A ranking is the pair `(rank_idx, rank_scores)`. The types of `s_sca`, `scorer` and `test_scores` select the shape, never the count at run time.
+A ranking is the pair `(rank_idx, rank_scores)`. The types of `r_sca`, `s_sca`, `scorer` and `test_scores` select the shape, never the count at run time. `r_sca` is read only when `test_scores` holds one matrix per measure, so for one matrix it is inert.
 
   - **One matrix, one value.** A reduction or one scorer gives one ranking, by the steps below. This is the path of a search of one value, and [`EachValue`](@ref) with one scorer takes it too.
+  - **A vector of `K` matrices, `r_sca = PerCandidate(sca)`.** A candidate enters only when its column is finite in every matrix. The scorer reduces each matrix over these columns, and `sca` combines the `K` values of each candidate, through [`candidate_values`](@ref). The rest is the path of one matrix, so the return is one ranking, or `L` rankings under `s_sca = EachValue()`.
   - **One matrix, `s_sca = EachValue()` with `L` scorers.** Each scorer orders the finite candidates alone, through [`scorer_ranking`](@ref). Its values are multiplied by its [`scorer_scale`](@ref), so a negative scale reverses the order of that scorer alone. A scorer that gives the index of one winner keeps one candidate, whatever `n_best` is, and its entry of `rank_scores` is `nothing`. The return is a vector of `L` entries in each part.
   - **A vector of `K` matrices, `r_sca = EachValue()`.** Each matrix is ranked by the rules above, apart from the others, so a candidate can enter the ranking of one measure and stay out of the ranking of another. A matrix with no finite column gives an empty ranking, through [`empty_ranking`](@ref). Its columns are empty, and its values are empty, or `nothing` where a full ranking of the same scorer holds `nothing`. The return is a vector of `K` entries in each part, or a `K × L` matrix, row `k` for measure `k`, under `s_sca = EachValue()` with `L` scorers, through [`measure_rankings`](@ref).
 
 # Algorithm
 
- 1. Mark the columns of `test_scores` whose every entry is finite, giving `cols`, through [`finite_score_columns`](@ref).
+ 1. Mark the columns of `test_scores` whose every entry is finite, giving `cols`, through [`finite_score_columns`](@ref). Under [`PerCandidate`](@ref), a column must be finite in every matrix.
  2. Throw an `IsNonFiniteError` when no column is finite.
- 3. Take the view `X` of `test_scores` at `cols`, and call [`candidate_values`](@ref) with `s_sca` and `scorer` on it, giving `vals`.
+ 3. Take the view `X` of `test_scores` at `cols`, or the view of each matrix under [`PerCandidate`](@ref), and call [`candidate_values`](@ref) with `r_sca`, `s_sca` and `scorer` on it, giving `vals`.
  4. If `vals` is a vector: check it through [`assert_candidate_scores`](@ref). Then take the first `min(n_best, length(cols))` positions of the descending order of `vals` through a partial sort, which breaks a tie by the position, and so gives the order of a stable sort. Return the columns of `cols` at those positions and their values.
  5. If `vals` is an integer, the index of one winner: refuse `n_best > 1`, and return its column of `cols` and `nothing`.
  6. Refuse a `vals` of any other type with an `ArgumentError`.
 
+Steps 1 to 3 are written twice, once for one matrix and once for the `K` matrices of [`PerCandidate`](@ref), and each copy has a method for one scorer and a method for `L` scorers under `s_sca = EachValue()`. So each form of the data is a method of this function, and no helper holds a part of the job. The copies agree: each marks the columns through [`finite_score_columns`](@ref), takes the views at them, and reads the values through [`candidate_values`](@ref). The tests of a search of one value hold the copies for one matrix, and the tests of [`PerCandidate`](@ref) hold the copies for the `K` matrices.
+
 # Arguments
 
+  - $(arg_dict[:r_sca])
   - `s_sca`: The reduction of a vector of search scorers, or [`EachValue`](@ref). Inert for one scorer.
   - `scorer`, `scorers`: One search scorer ([`CrossValSearchScorer`](@ref)), or a vector of them.
-  - `test_scores`: The `folds × candidates`, or `paths × candidates`, score matrix, or one such matrix per measure under `r_sca = EachValue()`.
+  - `test_scores`: The `folds × candidates`, or `paths × candidates`, score matrix, or one such matrix per measure under a rule of [`AbstractSearchReduction`](@ref).
   - `n_best`: The count of the candidates that each ranking keeps.
 
 # Validation
@@ -288,7 +297,8 @@ A ranking is the pair `(rank_idx, rank_scores)`. The types of `s_sca`, `scorer` 
   - A scorer that gives an index keeps one candidate. Otherwise an `ArgumentError` names the type of the scorer and the form to give.
   - The checks of [`assert_candidate_scores`](@ref) and [`candidate_values`](@ref).
   - A scorer gives a vector or an integer. Otherwise an `ArgumentError`.
-  - A vector of matrices: these checks on each matrix that has a finite column, and at least one matrix has a finite column. Otherwise an `IsNonFiniteError` that names the count of the measures.
+  - A vector of matrices under [`EachValue`](@ref): these checks on each matrix that has a finite column, and at least one matrix has a finite column. Otherwise an `IsNonFiniteError` that names the count of the measures.
+  - A vector of matrices under [`PerCandidate`](@ref): at least one column is finite in every matrix. Otherwise an `IsNonFiniteError`. A scorer that gives an index is refused with an `ArgumentError`.
 
 # Returns
 
@@ -304,34 +314,53 @@ A ranking is the pair `(rank_idx, rank_scores)`. The types of `s_sca`, `scorer` 
   - [`search_cross_validation`](@ref)
   - [`IsNonFiniteError`](@ref)
   - [`EachValue`](@ref)
+  - [`PerCandidate`](@ref)
   - [`finite_score_columns`](@ref)
 """
-function finite_candidate_order(s_sca::Union{Option{<:Sca_VecToScaM}, EachValue}, scorer,
+function finite_candidate_order(r_sca, s_sca::Union{Option{<:Sca_VecToScaM}, EachValue},
+                                scorer, test_scores::MatNum, n_best::Integer)
+    cols = finite_score_columns(test_scores)
+    X = view(test_scores, :, cols)
+    return finite_candidate_order(scorer, cols, n_best,
+                                  candidate_values(r_sca, s_sca, scorer, X))
+end
+function finite_candidate_order(r_sca, ::EachValue, scorers::AbstractVector,
                                 test_scores::MatNum, n_best::Integer)
     cols = finite_score_columns(test_scores)
     X = view(test_scores, :, cols)
-    return finite_candidate_order(scorer, cols, n_best, candidate_values(s_sca, scorer, X))
-end
-function finite_candidate_order(::EachValue, scorers::AbstractVector, test_scores::MatNum,
-                                n_best::Integer)
-    cols = finite_score_columns(test_scores)
-    X = view(test_scores, :, cols)
-    rankings = [scorer_ranking(s, cols, n_best, candidate_values(EachValue(), s, X))
+    rankings = [scorer_ranking(s, cols, n_best, candidate_values(r_sca, EachValue(), s, X))
                 for s in scorers]
     return [r[1] for r in rankings], [r[2] for r in rankings]
 end
-function finite_candidate_order(s_sca, scorer, test_scores::AbstractVector{<:MatNum},
-                                n_best::Integer)
+function finite_candidate_order(::EachValue, s_sca, scorer,
+                                test_scores::AbstractVector{<:MatNum}, n_best::Integer)
     full = [any(c -> all(isfinite, c), eachcol(S)) for S in test_scores]
     @argcheck(any(full),
               IsNonFiniteError("no parameter set finished every fold under any of the $(length(test_scores)) risk measures of `r`: every column of each score matrix holds a non-finite entry. Every candidate failed a fold, so none can be compared; widen the grid, or find why the folds failed."))
-    found = [finite_candidate_order(s_sca, scorer, S, n_best)
+    found = [finite_candidate_order(EachValue(), s_sca, scorer, S, n_best)
              for (S, f) in zip(test_scores, full) if f]
     blank = empty_ranking(first(found)...)
     rankings = map(cumsum(full), full) do n, f
         return f ? found[n] : blank
     end
     return measure_rankings(s_sca, scorer, rankings)
+end
+function finite_candidate_order(r_sca::PerCandidate,
+                                s_sca::Union{Option{<:Sca_VecToScaM}, EachValue}, scorer,
+                                test_scores::AbstractVector{<:MatNum}, n_best::Integer)
+    cols = finite_score_columns(test_scores)
+    Xs = [view(S, :, cols) for S in test_scores]
+    return finite_candidate_order(scorer, cols, n_best,
+                                  candidate_values(r_sca, s_sca, scorer, Xs))
+end
+function finite_candidate_order(r_sca::PerCandidate, ::EachValue, scorers::AbstractVector,
+                                test_scores::AbstractVector{<:MatNum}, n_best::Integer)
+    cols = finite_score_columns(test_scores)
+    Xs = [view(S, :, cols) for S in test_scores]
+    rankings = [scorer_ranking(s, cols, n_best,
+                               candidate_values(r_sca, EachValue(), s, Xs))
+                for s in scorers]
+    return [r[1] for r in rankings], [r[2] for r in rankings]
 end
 function finite_candidate_order(scorer, cols::AbstractVector{<:Integer}, n_best::Integer,
                                 vals::VecNum)
@@ -387,13 +416,26 @@ function assert_candidate_scores(scorer, vals::VecNum, n::Integer)::Nothing
     return nothing
 end
 """
-    candidate_values(s_sca::Union{Option{<:Sca_VecToScaM}, EachValue},
+    candidate_values(r_sca, s_sca::Union{Option{<:Sca_VecToScaM}, EachValue},
                      scorer::CrossValSearchScorer, X::MatNum)
-    candidate_values(s_sca::Option{<:Sca_VecToScaM}, scorers::AbstractVector, X::MatNum)
+    candidate_values(r_sca::PerCandidate{<:Option{<:Scalariser}},
+                     s_sca::Union{Option{<:Sca_VecToScaM}, EachValue},
+                     scorer::CrossValSearchScorer, Xs::AbstractVector{<:MatNum})
+    candidate_values(r_sca::PerCandidate{<:Union{VectorToScalarMeasure, Function}},
+                     s_sca::Union{Option{<:Sca_VecToScaM}, EachValue},
+                     scorer::CrossValSearchScorer, Xs::AbstractVector{<:MatNum})
+    candidate_values(r_sca, s_sca::Option{<:Sca_VecToScaM}, scorers::AbstractVector, X)
 
 Give what the search scorer, or the vector of them, gives for the candidates of a search: one value per column of `X`, bigger is better, or the index of one winner.
 
-One scorer gives its [`candidate_scores`](@ref). When these are `nothing`, it is called once on `X`, and the return gives the form: a vector of values from a function, or the index of one winner. `s_sca` and [`scorer_scale`](@ref) are inert, so a search of one scorer makes the one call of the scorer that it made before.
+One scorer gives its [`candidate_scores`](@ref). When these are `nothing`, it is called once on `X`, and the return gives the form: a vector of values from a function, or the index of one winner. `r_sca`, `s_sca` and [`scorer_scale`](@ref) are inert, so a search of one scorer makes the one call of the scorer that it made before.
+
+Under [`PerCandidate`](@ref), `Xs` holds the view of each of the `K` score matrices at the same columns. The scorer gives its values on each view, as one scorer does, and `r_sca.sca` combines the `K` values of each candidate to one, by its type:
+
+  - A [`Scalariser`](@ref) or `nothing` combines through [`scalarise`](@ref), elementwise over the vectors of the measures. `nothing` gives the sum of [`SumScalariser`](@ref).
+  - A [`VectorToScalarMeasure`](@ref) or a function combines the vector of the `K` values of each candidate through [`vec_to_real_measure`](@ref).
+
+These are the two reductions of the scorers below, written once for the measures and once for the scorers, as the rule *one owner, one name* states. The two copies agree: each reduces by the type of its reduction in the same two ways. The tests of [`PerCandidate`](@ref) hold the copy for the measures, and the tests of a vector of scorers hold the copy for the scorers. The scale of each measure is in its matrix, so it is the weight of the measure. The scale of a scorer is read after this combination, so a vector of scorers weights the combined values.
 
 A vector of scorers gives one value per candidate. Each member gives its values as one scorer does, and the values of each member are multiplied by its scale. Then `s_sca` reduces the `L` values of each candidate to one, by its type:
 
@@ -421,25 +463,29 @@ Where:
 # Algorithm
 
  1. One scorer: call [`candidate_scores`](@ref). Return its values, or the return of `scorer(X)` when it gives `nothing`.
- 2. A vector: give the return of each member as in step 1. Check each one through [`assert_candidate_scores`](@ref), and multiply it by the scale of its member.
- 3. Reduce the scaled vectors through the type of `s_sca`, with [`reduce_scorer_values`](@ref), and check that no reduced value is `NaN`.
+ 2. One scorer under [`PerCandidate`](@ref): give the return of the scorer on each view as in step 1, and check each one through [`measure_candidate_values`](@ref). Combine the `K` vectors through the type of `r_sca.sca`, and check that no combined value is `NaN`.
+ 3. A vector: give the return of each member as in step 1, or step 2 under [`PerCandidate`](@ref). Check each one through [`assert_candidate_scores`](@ref), and multiply it by the scale of its member.
+ 4. Reduce the scaled vectors through the type of `s_sca`, with [`reduce_scorer_values`](@ref), and check that no reduced value is `NaN`.
 
 # Arguments
 
+  - $(arg_dict[:r_sca])
   - `s_sca`: The reduction of a vector of scorers.
   - `scorer`: One search scorer.
   - `scorers`: A vector of search scorers.
-  - `X`: The `rows × candidates` score matrix that the scorers receive. Every entry is finite.
+  - `X`: The `rows × candidates` score matrix that the scorers receive, or the view of each matrix under [`PerCandidate`](@ref). Every entry is finite.
+  - `Xs`: The view of each of the `K` score matrices at the same columns.
 
 # Validation
 
   - Each member of a vector gives a vector of values. A member that gives an index, or any other form, is refused with an `ArgumentError`, because an index has no value to combine.
-  - The checks of [`assert_candidate_scores`](@ref) on the values of each member.
-  - No reduced value is `NaN`. Otherwise an [`IsNonFiniteError`](@ref) that names `s_sca`.
+  - Under [`PerCandidate`](@ref), the scorer gives a vector of values on each view. A scorer that gives an index, or any other form, is refused with an `ArgumentError`.
+  - The checks of [`assert_candidate_scores`](@ref) on the values of each member, and of each measure under [`PerCandidate`](@ref).
+  - No reduced value is `NaN`. Otherwise an [`IsNonFiniteError`](@ref) that names `s_sca`, or `r_sca` for the combination of the measures.
 
 # Returns
 
-  - `vals`: One scorer gives its values, `VecNum`, or its return of another type, such as the index of one winner. A vector gives `VecNum`, one value per column of `X`.
+  - `vals`: One scorer gives its values, `VecNum`, or its return of another type, such as the index of one winner. A vector, and one scorer under [`PerCandidate`](@ref), give `VecNum`, one value per candidate.
 
 # Related
 
@@ -447,22 +493,137 @@ Where:
   - [`candidate_scores`](@ref)
   - [`scorer_scale`](@ref)
   - [`Sca_VecToScaM`](@ref)
-  - [`oriented_score`](@ref): the same two reductions for a vector of risk measures.
+  - [`PerCandidate`](@ref)
+  - [`measure_candidate_values`](@ref)
+  - [`assert_reduced_values`](@ref)
+  - [`oriented_score`](@ref): the same two reductions for a vector of risk measures in each fold.
 """
-function candidate_values(::Union{Option{<:Sca_VecToScaM}, EachValue},
+function candidate_values(r_sca, ::Union{Option{<:Sca_VecToScaM}, EachValue},
                           scorer::CrossValSearchScorer, X::MatNum)
     vals = candidate_scores(scorer, X)
     return isnothing(vals) ? scorer(X) : vals
 end
-function candidate_values(s_sca::Option{<:Sca_VecToScaM}, scorers::AbstractVector,
-                          X::MatNum)
-    vals = reduce_scorer_values(s_sca, scorers, X)
-    @argcheck(!any(isnan, vals),
-              IsNonFiniteError("the reduction `s_sca` of type `$(typeof(s_sca))` of the $(length(scorers)) search scorers gave NaN for $(count(isnan, vals)) of the $(size(X, 2)) candidates that finished every fold, first at position $(findfirst(isnan, vals)). A NaN value cannot be ordered."))
+function candidate_values(r_sca::PerCandidate{<:Option{<:Scalariser}},
+                          s_sca::Union{Option{<:Sca_VecToScaM}, EachValue},
+                          scorer::CrossValSearchScorer, Xs::AbstractVector{<:MatNum})
+    n = candidate_count(Xs)
+    vals = scalarise(X -> measure_candidate_values(scorer, n,
+                                                   candidate_values(r_sca, s_sca, scorer,
+                                                                    X)), r_sca.sca, Xs)
+    assert_reduced_values(:r_sca, r_sca.sca, "$(length(Xs)) risk measures", vals)
+    return vals
+end
+function candidate_values(r_sca::PerCandidate{<:Union{VectorToScalarMeasure, Function}},
+                          s_sca::Union{Option{<:Sca_VecToScaM}, EachValue},
+                          scorer::CrossValSearchScorer, Xs::AbstractVector{<:MatNum})
+    n = candidate_count(Xs)
+    V = map(X -> measure_candidate_values(scorer, n,
+                                          candidate_values(r_sca, s_sca, scorer, X)), Xs)
+    vals = [vec_to_real_measure(r_sca.sca, getindex.(V, j)) for j in 1:n]
+    assert_reduced_values(:r_sca, r_sca.sca, "$(length(Xs)) risk measures", vals)
+    return vals
+end
+function candidate_values(r_sca, s_sca::Option{<:Sca_VecToScaM}, scorers::AbstractVector, X)
+    vals = reduce_scorer_values(r_sca, s_sca, scorers, X)
+    assert_reduced_values(:s_sca, s_sca, "$(length(scorers)) search scorers", vals)
     return vals
 end
 """
-    member_candidate_values(scorer, X::MatNum, vals)
+    assert_reduced_values(slot::Symbol, sca, what::AbstractString, vals::VecNum)
+
+Refuse the values of a reduction in a search that hold `NaN`, which no order can place.
+
+[`candidate_values`](@ref) calls it after `s_sca` reduces a vector of search scorers, and after [`PerCandidate`](@ref) combines the values of the risk measures. Finite values can give `NaN` through a reduction: the sum of `Inf` and `-Inf`, or [`StdValue`](@ref) of one value.
+
+# Arguments
+
+  - `slot`: The slot of the search that holds the reduction, `:s_sca` or `:r_sca`.
+  - `sca`: The reduction.
+  - `what`: The count and the name of the reduced items, for the message.
+  - `vals`: The reduced values, one per candidate.
+
+# Validation
+
+  - No value is `NaN`. Otherwise an [`IsNonFiniteError`](@ref) that names `slot`.
+
+# Returns
+
+  - `nothing`.
+
+# Related
+
+  - [`candidate_values`](@ref)
+  - [`assert_candidate_scores`](@ref)
+"""
+function assert_reduced_values(slot::Symbol, sca, what::AbstractString,
+                               vals::VecNum)::Nothing
+    @argcheck(!any(isnan, vals),
+              IsNonFiniteError("the reduction `$slot` of type `$(typeof(sca))` of the $what gave NaN for $(count(isnan, vals)) of the $(length(vals)) candidates that finished every fold, first at position $(findfirst(isnan, vals)). A NaN value cannot be ordered."))
+    return nothing
+end
+"""
+    candidate_count(X::MatNum)
+    candidate_count(Xs::AbstractVector{<:MatNum})
+
+Give the count of the candidates of the score matrix that a search scorer receives, or of the views of the `K` matrices under [`PerCandidate`](@ref), which share their columns.
+
+# Arguments
+
+  - `X`: The score matrix, one column per candidate.
+  - `Xs`: The view of each score matrix at the same columns.
+
+# Returns
+
+  - `n::Int`: The count of the columns.
+
+# Related
+
+  - [`candidate_values`](@ref)
+  - [`reduce_scorer_values`](@ref)
+"""
+function candidate_count(X::MatNum)
+    return size(X, 2)
+end
+function candidate_count(Xs::AbstractVector{<:MatNum})
+    return size(first(Xs), 2)
+end
+"""
+    measure_candidate_values(scorer, n::Integer, vals)
+
+Check the values that a search scorer gives for the score matrix of one risk measure under [`PerCandidate`](@ref).
+
+[`candidate_values`](@ref) calls it once for each measure, before `r_sca.sca` combines the measures. The scale of the scorer is not read here: it weights the combined values, in the stage of the scorers.
+
+# Arguments
+
+  - `scorer`: The search scorer.
+  - `n`: The count of the candidates.
+  - `vals`: The return of the scorer on the matrix of the measure, from [`candidate_values`](@ref).
+
+# Validation
+
+  - `vals` is a vector. A scorer that gives an index, or any other form, is refused with an `ArgumentError`, because an index has no value to combine.
+  - The checks of [`assert_candidate_scores`](@ref).
+
+# Returns
+
+  - `vals::VecNum`: The values of the scorer for the measure.
+
+# Related
+
+  - [`candidate_values`](@ref)
+  - [`PerCandidate`](@ref)
+  - [`member_candidate_values`](@ref): the same check for a member of a vector of scorers.
+"""
+function measure_candidate_values(scorer, n::Integer, vals::VecNum)
+    assert_candidate_scores(scorer, vals, n)
+    return vals
+end
+function measure_candidate_values(scorer, ::Integer, vals)
+    return throw(ArgumentError("`$(typeof(scorer))` gave a `$(typeof(vals))` and no value for each candidate, so it cannot score a search under `r_sca = PerCandidate(sca)`: an index has no value to combine across the risk measures. Make it give one value per column of the score matrix, bigger is better: a function returns the vector, and a subtype adds a method `PortfolioOptimisers.candidate_scores(::$(typeof(scorer)), X::AbstractMatrix)`. Or combine the measures in each fold, with a `Sca_VecToScaM` in `r_sca`."))
+end
+"""
+    member_candidate_values(scorer, n::Integer, vals)
 
 Check the values of one member of a vector of search scorers, and multiply them by its scale.
 
@@ -471,7 +632,7 @@ Check the values of one member of a vector of search scorers, and multiply them 
 # Arguments
 
   - `scorer`: The member.
-  - `X`: The score matrix that the member received.
+  - `n`: The count of the candidates.
   - `vals`: The return of the member, from [`candidate_values`](@ref).
 
 # Validation
@@ -488,32 +649,34 @@ Check the values of one member of a vector of search scorers, and multiply them 
   - [`candidate_values`](@ref)
   - [`reduce_scorer_values`](@ref)
   - [`scorer_scale`](@ref)
+  - [`measure_candidate_values`](@ref): the same check for one measure under [`PerCandidate`](@ref).
 """
-function member_candidate_values(scorer, X::MatNum, vals::VecNum)
-    assert_candidate_scores(scorer, vals, size(X, 2))
+function member_candidate_values(scorer, n::Integer, vals::VecNum)
+    assert_candidate_scores(scorer, vals, n)
     return vals * scorer_scale(scorer)
 end
-function member_candidate_values(scorer, ::MatNum, vals)
+function member_candidate_values(scorer, ::Integer, vals)
     return throw(ArgumentError("`$(typeof(scorer))` gave a `$(typeof(vals))` and no value for each candidate, so it cannot join a vector of search scorers under `s_sca`: an index has no value to combine. Make it give one value per column of the score matrix, bigger is better: a function returns the vector, and a subtype adds a method `PortfolioOptimisers.candidate_scores(::$(typeof(scorer)), X::AbstractMatrix)`. Or use it as the one scorer of the search."))
 end
 """
-    reduce_scorer_values(s_sca::Option{<:Scalariser}, scorers::AbstractVector, X::MatNum)
-    reduce_scorer_values(s_sca::Union{VectorToScalarMeasure, Function},
-                         scorers::AbstractVector, X::MatNum)
+    reduce_scorer_values(r_sca, s_sca::Option{<:Scalariser}, scorers::AbstractVector, X)
+    reduce_scorer_values(r_sca, s_sca::Union{VectorToScalarMeasure, Function},
+                         scorers::AbstractVector, X)
 
 Reduce the scaled values of a vector of search scorers to one value per candidate.
 
-Each member gives its values on `X` through [`candidate_values`](@ref), checked and scaled by [`member_candidate_values`](@ref). Let `v[l][j]` be the scaled value of candidate `j` from member `l`. A [`Scalariser`](@ref) or `nothing` reduces through [`scalarise`](@ref), elementwise over the vectors of the members, and `nothing` gives the sum. A [`VectorToScalarMeasure`](@ref) or a function reduces the vector `[v[l][j] for l]` of each candidate through [`vec_to_real_measure`](@ref). These are the two reductions of [`oriented_score`](@ref) for a vector of risk measures.
+Each member gives its values on `X` through [`candidate_values`](@ref) with `r_sca`, checked and scaled by [`member_candidate_values`](@ref). Under [`PerCandidate`](@ref), `X` holds one view per measure, and the values of a member are the combination of its values over the measures. Let `v[l][j]` be the scaled value of candidate `j` from member `l`. A [`Scalariser`](@ref) or `nothing` reduces through [`scalarise`](@ref), elementwise over the vectors of the members, and `nothing` gives the sum. A [`VectorToScalarMeasure`](@ref) or a function reduces the vector `[v[l][j] for l]` of each candidate through [`vec_to_real_measure`](@ref). These are the two reductions of [`oriented_score`](@ref) for a vector of risk measures.
 
 # Arguments
 
+  - $(arg_dict[:r_sca])
   - `s_sca`: The reduction.
   - `scorers`: The vector of search scorers.
-  - `X`: The score matrix that the members receive.
+  - `X`: The score matrix that the members receive, or one view per measure under [`PerCandidate`](@ref).
 
 # Returns
 
-  - `vals::VecNum`: One value per column of `X`.
+  - `vals::VecNum`: One value per candidate.
 
 # Related
 
@@ -522,29 +685,36 @@ Each member gives its values on `X` through [`candidate_values`](@ref), checked 
   - [`scalarise`](@ref)
   - [`vec_to_real_measure`](@ref)
 """
-function reduce_scorer_values(s_sca::Option{<:Scalariser}, scorers::AbstractVector,
-                              X::MatNum)
-    return scalarise(s -> member_candidate_values(s, X, candidate_values(s_sca, s, X)),
+function reduce_scorer_values(r_sca, s_sca::Option{<:Scalariser}, scorers::AbstractVector,
+                              X)
+    n = candidate_count(X)
+    return scalarise(s -> member_candidate_values(s, n,
+                                                  candidate_values(r_sca, s_sca, s, X)),
                      s_sca, scorers)
 end
-function reduce_scorer_values(s_sca::Union{VectorToScalarMeasure, Function},
-                              scorers::AbstractVector, X::MatNum)
-    V = map(s -> member_candidate_values(s, X, candidate_values(s_sca, s, X)), scorers)
-    return [vec_to_real_measure(s_sca, getindex.(V, j)) for j in axes(X, 2)]
+function reduce_scorer_values(r_sca, s_sca::Union{VectorToScalarMeasure, Function},
+                              scorers::AbstractVector, X)
+    n = candidate_count(X)
+    V = map(s -> member_candidate_values(s, n, candidate_values(r_sca, s_sca, s, X)),
+            scorers)
+    return [vec_to_real_measure(s_sca, getindex.(V, j)) for j in 1:n]
 end
 
 """
     finite_score_columns(test_scores::MatNum)
+    finite_score_columns(test_scores::AbstractVector{<:MatNum})
 
 Give the columns of a score matrix of a search whose every entry is finite: the candidates that finished every fold.
 
+The second form is the rule of a failed candidate under [`PerCandidate`](@ref): a column enters only when it is finite in every matrix, because a value of fewer than `K` measures does not compare with a value of `K`.
+
 # Arguments
 
-  - `test_scores`: The `folds × candidates`, or `paths × candidates`, score matrix.
+  - `test_scores`: The `folds × candidates`, or `paths × candidates`, score matrix, or one such matrix per measure.
 
 # Validation
 
-  - At least one column is finite. Otherwise an `IsNonFiniteError`.
+  - At least one column is finite, in every matrix for the second form. Otherwise an `IsNonFiniteError`.
 
 # Returns
 
@@ -558,6 +728,12 @@ function finite_score_columns(test_scores::MatNum)
     finite = vec(all(isfinite, test_scores; dims = 1))
     @argcheck(any(finite),
               IsNonFiniteError("no parameter set finished every fold: every one of the $(size(test_scores, 2)) columns of the score matrix holds a non-finite entry over its $(size(test_scores, 1)) rows. Every candidate failed a fold, so none can be compared; widen the grid, or find why the folds failed."))
+    return findall(finite)
+end
+function finite_score_columns(test_scores::AbstractVector{<:MatNum})
+    finite = mapreduce(S -> vec(all(isfinite, S; dims = 1)), .&, test_scores)
+    @argcheck(any(finite),
+              IsNonFiniteError("no parameter set finished every fold under every one of the $(length(test_scores)) risk measures of `r`: each of the $(length(finite)) columns holds a non-finite entry in at least one score matrix. Under `r_sca = PerCandidate(sca)` a candidate enters only when it is finite under every measure; widen the grid, or find why the folds failed."))
     return findall(finite)
 end
 """
