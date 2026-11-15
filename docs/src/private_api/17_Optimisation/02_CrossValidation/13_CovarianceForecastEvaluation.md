@@ -1,17 +1,15 @@
 ```@meta
-Description = "Covariance Forecast Evaluation, private API of PortfolioOptimisers.jl: forecast_location, forecast_state_location, prior_forecast_location, …"
+Description = "Covariance Forecast Evaluation, private API of PortfolioOptimisers.jl: forecast_location, prior_forecast_location, prior_state_location, carried_location, …"
 ```
 
 # Covariance Forecast Evaluation: private API
 
 ```@docs
 PortfolioOptimisers.forecast_location
-PortfolioOptimisers.forecast_state_location
 PortfolioOptimisers.prior_forecast_location
 PortfolioOptimisers.prior_state_location
 PortfolioOptimisers.carried_location
 PortfolioOptimisers.horizon_location
-PortfolioOptimisers.forecast_coverage_policy
 PortfolioOptimisers.finite_column_mean
 PortfolioOptimisers.resolve_forecast_weights
 PortfolioOptimisers.step_implied_volatility_kwargs

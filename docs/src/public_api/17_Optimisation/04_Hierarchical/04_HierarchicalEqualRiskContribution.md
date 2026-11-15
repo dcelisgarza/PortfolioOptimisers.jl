@@ -1,5 +1,5 @@
 ```@meta
-Description = "Hierarchical Equal Risk Contribution, public API of PortfolioOptimisers.jl: HierarchicalEqualRiskContribution, factory, port_opt_view, optimise, …"
+Description = "Hierarchical Equal Risk Contribution, public API of PortfolioOptimisers.jl: HierarchicalEqualRiskContribution, factory, port_opt_view, _optimise, …"
 ```
 
 # Hierarchical Equal Risk Contribution
@@ -8,7 +8,7 @@ Description = "Hierarchical Equal Risk Contribution, public API of PortfolioOpti
 HierarchicalEqualRiskContribution
 factory(hec::HierarchicalEqualRiskContribution, w::AbstractVector)
 port_opt_view(hec::HierarchicalEqualRiskContribution, i, X::MatNum, args...)
-optimise(hec::HierarchicalEqualRiskContribution{<:Any, <:Any, <:Any, <:Any, <:Any, <:Any, Nothing}, rd::ReturnsResult; dims::Int = 1, branchorder::Symbol = :optimal, kwargs...)
+_optimise(hec::HierarchicalEqualRiskContribution, rd::ReturnsResult = ReturnsResult())
 needs_previous_weights(opt::HierarchicalEqualRiskContribution)
 ```
 

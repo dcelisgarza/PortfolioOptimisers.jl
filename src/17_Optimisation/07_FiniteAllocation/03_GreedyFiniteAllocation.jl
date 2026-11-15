@@ -402,41 +402,12 @@ function finite_sub_allocation!(w::VecNum, p::VecNum, lu::Num_VecNum, cash::Numb
     idx = invperm(idx)
     return view(shares, idx), view(cost, idx), view(aw, idx), acash, fee
 end
-function _optimise(ga::GreedyAllocation, fai::FiniteAllocationInput; kwargs...)
-    p, cash, ca = fai.prices, fai.cash, fai.ca
-    w, lbgt, sbgt, lidx, sidx, lsf, ssf = prepare_finite_allocation(fai)
-    lu = allocation_lot_unit(ga.unit, ga.sets, ga.strict, fai)
-    sshares, scost, sw, _, sfee = finite_sub_allocation!(-view(w, sidx), view(p, sidx),
-                                                         nothing_scalar_array_view(lu,
-                                                                                   sidx),
-                                                         ca(w, p, cash), sbgt, ssf, ga)
-    lcash = ca(w, p, cash, sum(scost), sfee)
-    lshares, lcost, lw, _, lfee = finite_sub_allocation!(view(w, lidx), view(p, lidx),
-                                                         nothing_scalar_array_view(lu,
-                                                                                   lidx),
-                                                         lcash, lbgt, lsf, ga)
-    # The account keeps the cash that no side received, so the rule states it.
-    rcash = ca(w, p, cash, sum(scost), sfee, sum(lcost), lfee)
-    # An unpriced asset is on neither side, so its row keeps the zero it starts with.
-    res = zeros(eltype(w), length(w), 3)
-    res[lidx, 1] = lshares
-    res[sidx, 1] = -sshares
-    res[lidx, 2] = lcost
-    res[sidx, 2] = -scost
-    res[lidx, 3] = lw
-    res[sidx, 3] = -sw
-    return GreedyAllocationResult(; retcode = OptimisationSuccess(),
-                                  shares = view(res, :, 1), cost = view(res, :, 2),
-                                  w = view(res, :, 3), cash = rcash, fees = lfee + sfee,
-                                  fb = nothing)
-end
 """
-    optimise(ga::GreedyAllocation{<:Any, <:Any, <:Any, Nothing},
-             fai::FiniteAllocationInput; kwargs...) -> GreedyAllocationResult
+    _optimise(ga::GreedyAllocation, fai::FiniteAllocationInput; kwargs...) -> GreedyAllocationResult
 
 Run the Greedy Allocation portfolio optimisation.
 
-This method takes a `GreedyAllocation` with no fallback. The generic `optimise` of a finite allocation runs one with a fallback through its fallback chain.
+[`optimise`](@ref) calls this method, once for an allocator with no fallback, and once for each step of the fallback chain otherwise.
 
 # Algorithm
 
@@ -465,9 +436,32 @@ This method takes a `GreedyAllocation` with no fallback. The generic `optimise` 
   - [`GreedyAllocationResult`](@ref)
   - [`FiniteAllocationInput`](@ref)
 """
-function optimise(ga::GreedyAllocation{<:Any, <:Any, <:Any, Nothing},
-                  fai::FiniteAllocationInput; kwargs...)
-    return _optimise(ga, fai; kwargs...)
+function _optimise(ga::GreedyAllocation, fai::FiniteAllocationInput; kwargs...)
+    p, cash, ca = fai.prices, fai.cash, fai.ca
+    w, lbgt, sbgt, lidx, sidx, lsf, ssf = prepare_finite_allocation(fai)
+    lu = allocation_lot_unit(ga.unit, ga.sets, ga.strict, fai)
+    sshares, scost, sw, _, sfee = finite_sub_allocation!(-view(w, sidx), view(p, sidx),
+                                                         nothing_scalar_array_view(lu,
+                                                                                   sidx),
+                                                         ca(w, p, cash), sbgt, ssf, ga)
+    lcash = ca(w, p, cash, sum(scost), sfee)
+    lshares, lcost, lw, _, lfee = finite_sub_allocation!(view(w, lidx), view(p, lidx),
+                                                         nothing_scalar_array_view(lu,
+                                                                                   lidx),
+                                                         lcash, lbgt, lsf, ga)
+    # The account keeps the cash that no side received, so the rule states it.
+    rcash = ca(w, p, cash, sum(scost), sfee, sum(lcost), lfee)
+    # An unpriced asset is on neither side, so its row keeps the zero it starts with.
+    res = zeros(eltype(w), length(w), 3)
+    res[lidx, 1] = lshares
+    res[sidx, 1] = -sshares
+    res[lidx, 2] = lcost
+    res[sidx, 2] = -scost
+    res[lidx, 3] = lw
+    res[sidx, 3] = -sw
+    return GreedyAllocationResult(; retcode = OptimisationSuccess(),
+                                  shares = view(res, :, 1), cost = view(res, :, 2),
+                                  w = view(res, :, 3), cash = rcash, fees = lfee + sfee,
+                                  fb = nothing)
 end
-
 export GreedyAllocationResult, GreedyAllocation

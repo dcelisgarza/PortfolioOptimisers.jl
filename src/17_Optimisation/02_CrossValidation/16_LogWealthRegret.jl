@@ -435,7 +435,7 @@ The bound also reads the other way. The regret at a given budget ``L`` is the ga
 
  1. Read the strategy's series and timestamps through [`regret_series`](@ref), giving `ra` and `tsa`.
  2. With `b`, read the comparator's series and timestamps the same way, giving `rb` and `tsb`, and check that the two sides share their timestamps. With no `b`, read the benchmark of `a` through [`regret_benchmark`](@ref), giving `rb`, and check that it exists.
- 3. Pass `ra`, `rb`, `mt` and the comparator to [`member_regret`](@ref). It pairs the members, and it gives each pair to [`series_regret`](@ref), which forms the regret, its test and the path length of the comparator's member.
+ 3. Pass `ra`, `rb`, `mt` and the comparator to [`member_regret`](@ref). It pairs the members, and its method on two series forms, for each pair, the regret, its test and the path length of the comparator's member.
 
 # Arguments
 
@@ -495,14 +495,13 @@ function log_wealth_regret(a::PredRes_MultiPredRes;
     return member_regret(ra, rb, mt, nothing)
 end
 """
-    member_regret(ra::VecNum, rb::VecNum, mt::AbstractMeanTestEstimator, b)
     member_regret(ra::VecVecNum, rb::VecNum, mt::AbstractMeanTestEstimator, b)
     member_regret(ra::VecNum, rb::VecVecNum, mt::AbstractMeanTestEstimator, b)
     member_regret(ra::VecVecNum, rb::VecVecNum, mt::AbstractMeanTestEstimator, b)
 
 The log-wealth regret of each member of the strategy against its member of the comparator, as [`log_wealth_regret`](@ref) pairs them.
 
-A side with one series pairs with every member of the other side. Two sides with many members pair by index. The pair of two single series gives one [`LogWealthRegretResult`](@ref), and every other pair gives a vector with one entry for each pair. Thus the shape of the answer follows the types of `ra` and `rb`, and the method is type-stable. Each entry reads the path length of the member of `b` that it pairs with, through [`comparator_path_length`](@ref). A single comparator series is member `1` of `b`.
+A side with one series pairs with every member of the other side. Two sides with many members pair by index. The pair of two single series gives one [`LogWealthRegretResult`](@ref), through the method of two series below, and every other pair gives a vector with one entry for each pair. Thus the shape of the answer follows the types of `ra` and `rb`, and the method is type-stable. Each entry reads the path length of the member of `b` that it pairs with, through [`comparator_path_length`](@ref). A single comparator series is member `1` of `b`.
 
 # Arguments
 
@@ -523,32 +522,27 @@ A side with one series pairs with every member of the other side. Two sides with
 # Related
 
   - [`log_wealth_regret`](@ref)
-  - [`series_regret`](@ref)
   - [`member_vector`](@ref)
 """
-function member_regret(ra::VecNum, rb::VecNum, mt::AbstractMeanTestEstimator,
-                       b::Union{Nothing, PredRes_MultiPredRes})
-    return series_regret(ra, rb, mt, b, 1)
-end
 function member_regret(ra::VecVecNum, rb::VecNum, mt::AbstractMeanTestEstimator,
                        b::Union{Nothing, PredRes_MultiPredRes})
-    return [series_regret(r, rb, mt, b, 1) for r in ra]
+    return [member_regret(r, rb, mt, b, 1) for r in ra]
 end
 function member_regret(ra::VecNum, rb::VecVecNum, mt::AbstractMeanTestEstimator,
                        b::Union{Nothing, PredRes_MultiPredRes})
-    return [series_regret(ra, r, mt, b, j) for (j, r) in enumerate(rb)]
+    return [member_regret(ra, r, mt, b, j) for (j, r) in enumerate(rb)]
 end
 function member_regret(ra::VecVecNum, rb::VecVecNum, mt::AbstractMeanTestEstimator,
                        b::Union{Nothing, PredRes_MultiPredRes})
     @argcheck(length(ra) == length(rb),
               DimensionMismatch("the strategy holds $(length(ra)) members and the comparator holds $(length(rb)): two sides with many members pair by index, so they must hold the same count. Compare one member of a side through a prediction of that member alone."))
-    return [series_regret(ra[j], rb[j], mt, b, j) for j in eachindex(ra, rb)]
+    return [member_regret(ra[j], rb[j], mt, b, j) for j in eachindex(ra, rb)]
 end
 """
-    series_regret(ra::VecNum, rb::VecNum, mt::AbstractMeanTestEstimator,
-                  b::Union{Nothing, PredRes_MultiPredRes}, j::Integer) -> LogWealthRegretResult
+    member_regret(ra::VecNum, rb::VecNum, mt::AbstractMeanTestEstimator,
+                  b::Union{Nothing, PredRes_MultiPredRes}, j::Integer = 1) -> LogWealthRegretResult
 
-The log-wealth regret of the return series `ra` against the return series `rb`, which share their rows. [`member_regret`](@ref) pairs the series of both methods of [`log_wealth_regret`](@ref) and passes each pair here, and that verb's docstring states the mathematics.
+The log-wealth regret of the return series `ra` against the return series `rb`, which share their rows. The methods of [`member_regret`](@ref) on many members pair the series of both methods of [`log_wealth_regret`](@ref) and pass each pair here, and that verb's docstring states the mathematics.
 
 # Algorithm
 
@@ -564,7 +558,7 @@ The log-wealth regret of the return series `ra` against the return series `rb`, 
   - `rb`: Realised return series of the comparator, on the rows of `ra`.
   - `mt`: The Mean Test of the per-row difference.
   - `b`: The comparator's prediction result, or `nothing` for the benchmark.
-  - `j`: The index of the member of `b` that `rb` belongs to.
+  - `j`: The index of the member of `b` that `rb` belongs to. A single comparator series is member `1`.
 
 # Validation
 
@@ -578,13 +572,12 @@ The log-wealth regret of the return series `ra` against the return series `rb`, 
 # Related
 
   - [`log_wealth_regret`](@ref)
-  - [`member_regret`](@ref)
   - [`LogWealthRegretResult`](@ref)
   - [`comparator_path_length`](@ref)
   - [`loss_difference_test`](@ref)
 """
-function series_regret(ra::VecNum, rb::VecNum, mt::AbstractMeanTestEstimator,
-                       b::Union{Nothing, PredRes_MultiPredRes}, j::Integer)
+function member_regret(ra::VecNum, rb::VecNum, mt::AbstractMeanTestEstimator,
+                       b::Union{Nothing, PredRes_MultiPredRes}, j::Integer = 1)
     T = length(ra)
     @argcheck(T == length(rb),
               ArgumentError("the strategy series has $T rows and the comparator series has $(length(rb)): regret is defined over one sequence, so both must be scored over the same rows. Run both through `cross_val_predict` with the same `rd` and `cv`."))
@@ -1026,8 +1019,7 @@ Rebuilds a budgeted path result with the fallback chain `fb` that [`optimise`](@
   - [`FbChain`](@ref)
 """
 function factory(res::BudgetedHindsightPathResult, fb::Option{<:FbChain})
-    return BudgetedHindsightPathResult(res.w, res.wb, res.retcode, res.imsk, res.nx, res.ts,
-                                       fb)
+    return rebuild_struct(res, (; fb = fb))
 end
 """
     row_coverage_mask(rd::ReturnsResult, t::Integer) -> Option{BitVector}

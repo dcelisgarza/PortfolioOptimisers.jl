@@ -926,6 +926,55 @@ function _update_asset_sets(nco::NestedClustered, rdo::ReturnsResult)
         nco
     end
 end
+"""
+$(DocStringExtensions.TYPEDSIGNATURES)
+
+Run the nested clustered optimisation.
+
+[`optimise`](@ref) calls this method. The `# Mathematical definition` of [`NestedClustered`](@ref) states the weights that the method computes.
+
+# Algorithm
+
+ 1. Replace the schedules in the fields of `nco` with their static defaults, through [`reset_time_dependent_estimator`](@ref).
+ 2. Fit the prior of `nco.pe` to `rd`, giving `pr`. The prior reads the returns in the frame that its own `x_src` states. `rd` keeps its raw returns, and the clustering reads the frame that its own `x_src` states. The readers of the inner and outer optimisers state their own sources.
+ 3. Take the element type of the weights, the fees and the weight bounds as `eltype(pr.X)`, giving `Tf`.
+ 4. Read the investable mask of `pr` with [`investable_mask`](@ref), giving `imsk`.
+ 5. Resolve the fees of `nco.fees` over the universe of the caller with [`fees_constraints`](@ref), and place them on the investable assets with [`investable_fees_view`](@ref), giving `fees`.
+ 6. Remove the liquidation charges from `fees` with [`strip_liquidation_charges`](@ref), giving `cfees`. The result charges a forced exit one time, and no cluster holds an asset that exits.
+ 7. Reduce `pr`, `nco` and `rd` to the investable assets with [`investable_reduction`](@ref), giving `pr`, `nco` and `rdr`.
+ 8. Cluster the assets with [`clusterise`](@ref), giving `clr`, and check with [`assert_clustering_universe`](@ref) that `clr` covers every asset. Collect the assets of each cluster, giving `cls`.
+ 9. For each cluster `k`, view `nco.opti` and `rdr` onto the assets `cls[k]` with [`port_opt_view`](@ref), and optimise, giving `resi[k]`. Write its weights into column `k` of `wi`, which is zero outside the cluster.
+10. Predict the returns of the synthetic assets with [`predict_outer_returns`](@ref), `cfees` and a [`ClusterUniverse`](@ref), giving `rdo`. Without `nco.cv` these are the returns of the cluster portfolios over the observations of `pr`. With `nco.cv` they are the out-of-sample predictions of the folds.
+11. Rebuild the asset sets of `nco.opto` over the names of the synthetic assets with [`_update_asset_sets`](@ref).
+12. Optimise `nco.opto` over `rdo`, giving `reso`.
+13. Resolve the weight bounds of `nco.wb` over the investable assets with [`weight_bounds_constraints`](@ref), giving `wb`.
+14. Combine `wi` and `reso.w` and finalise them with `nco.wf` under `wb`, through [`outer_optimisation_finaliser`](@ref), giving `retcode` and `w`.
+15. Build the [`NestedClusteredResult`](@ref). Its keyword constructor expands `w` to the full asset universe.
+
+# Arguments
+
+  - `nco`: The nested clustered optimiser.
+  - $(arg_dict[:rd])
+  - `branchorder`: The branch order of a hierarchical clustering. The method also passes it to the inner and outer optimisers.
+  - `str_names`: Whether the JuMP models name their variables with strings. The method passes it to the inner and outer optimisers.
+  - `save`: Whether the results save their JuMP models. The method passes it to the inner and outer optimisers.
+  - `kwargs`: More keyword arguments for the inner and outer optimisers.
+
+# Validation
+
+  - The clustering covers every investable asset. The method throws a `DimensionMismatch` otherwise.
+  - No intra-cluster optimisation returns an efficient frontier. The method throws an `ArgumentError` otherwise.
+
+# Returns
+
+  - `res::NestedClusteredResult`: The combined portfolio. `retcode` is an [`OptimisationFailure`](@ref) when an intra-cluster optimisation, the inter-cluster optimisation or the weight finalisation fails.
+
+# Related
+
+  - [`NestedClustered`](@ref)
+  - [`NestedClusteredResult`](@ref)
+  - [`optimise`](@ref)
+"""
 function _optimise(nco::NestedClustered, rd::ReturnsResult; branchorder::Symbol = :optimal,
                    str_names::Bool = false, save::Bool = true,
                    rmsk::Option{BitVector} = nothing, kwargs...)
@@ -957,7 +1006,7 @@ function _optimise(nco::NestedClustered, rd::ReturnsResult; branchorder::Symbol 
     # variable that is reassigned and then captured by the fold's closure is boxed, which
     # FLoops reports as a correctness and performance problem on every call.
     nco0, pr0 = nco, pr
-    _, pr, nco, rdr = investable_reduction(imsk, pr, nco, rd)
+    _, pr, nco, rdr = investable_reduction(pr, nco, rd, imsk)
     X = pr.X
     # A distance reader that refuses an asset the prior kept raises before it clusters. Fit
     # again from the same prior result, without that asset (`distance_reader_refusal_mask`).
@@ -996,67 +1045,6 @@ function _optimise(nco::NestedClustered, rd::ReturnsResult; branchorder::Symbol 
     return NestedClusteredResult(; pr = pr, clr = clr, wb = wb, fees = fees, resi = resi,
                                  reso = reso, cv = nco.cv, scorer = nco.scorer,
                                  retcode = retcode, w = w, imsk = imsk, fb = nothing)
-end
-"""
-    optimise(nco::NestedClustered{<:Any, <:Any, <:Any, <:Any, <:Any, <:Any, <:Any,
-                      <:Any, <:Any, <:Any, <:Any, Nothing
-                  }, rd::ReturnsResult;
-             branchorder::Symbol = :optimal, str_names::Bool = false,
-             save::Bool = true, kwargs...) -> NestedClusteredResult
-
-Optimise a portfolio with Nested Clustered Optimisation.
-
-The `# Mathematical definition` of [`NestedClustered`](@ref) states the weights that the method computes.
-
-# Algorithm
-
- 1. Replace the schedules in the fields of `nco` with their static defaults, through [`reset_time_dependent_estimator`](@ref).
- 2. Fit the prior of `nco.pe` to `rd`, giving `pr`. The prior reads the returns in the frame that its own `x_src` states. `rd` keeps its raw returns, and the clustering reads the frame that its own `x_src` states. The readers of the inner and outer optimisers state their own sources.
- 3. Take the element type of the weights, the fees and the weight bounds as `eltype(pr.X)`, giving `Tf`.
- 4. Read the investable mask of `pr` with [`investable_mask`](@ref), giving `imsk`.
- 5. Resolve the fees of `nco.fees` over the universe of the caller with [`fees_constraints`](@ref), and place them on the investable assets with [`investable_fees_view`](@ref), giving `fees`.
- 6. Remove the liquidation charges from `fees` with [`strip_liquidation_charges`](@ref), giving `cfees`. The result charges a forced exit one time, and no cluster holds an asset that exits.
- 7. Reduce `pr`, `nco` and `rd` to the investable assets with [`investable_reduction`](@ref), giving `pr`, `nco` and `rdr`.
- 8. Cluster the assets with [`clusterise`](@ref), giving `clr`, and check with [`assert_clustering_universe`](@ref) that `clr` covers every asset. Collect the assets of each cluster, giving `cls`.
- 9. For each cluster `k`, view `nco.opti` and `rdr` onto the assets `cls[k]` with [`port_opt_view`](@ref), and optimise, giving `resi[k]`. Write its weights into column `k` of `wi`, which is zero outside the cluster.
-10. Predict the returns of the synthetic assets with [`predict_outer_returns`](@ref), `cfees` and a [`ClusterUniverse`](@ref), giving `rdo`. Without `nco.cv` these are the returns of the cluster portfolios over the observations of `pr`. With `nco.cv` they are the out-of-sample predictions of the folds.
-11. Rebuild the asset sets of `nco.opto` over the names of the synthetic assets with [`_update_asset_sets`](@ref).
-12. Optimise `nco.opto` over `rdo`, giving `reso`.
-13. Resolve the weight bounds of `nco.wb` over the investable assets with [`weight_bounds_constraints`](@ref), giving `wb`.
-14. Combine `wi` and `reso.w` and finalise them with `nco.wf` under `wb`, through [`outer_optimisation_finaliser`](@ref), giving `retcode` and `w`.
-15. Build the [`NestedClusteredResult`](@ref). Its keyword constructor expands `w` to the full asset universe.
-
-# Arguments
-
-  - `nco`: The nested clustered optimiser.
-  - $(arg_dict[:rd])
-  - `branchorder`: The branch order of a hierarchical clustering. The method also passes it to the inner and outer optimisers.
-  - `str_names`: Whether the JuMP models name their variables with strings. The method passes it to the inner and outer optimisers.
-  - `save`: Whether the results save their JuMP models. The method passes it to the inner and outer optimisers.
-  - `kwargs`: More keyword arguments for the inner and outer optimisers.
-
-# Validation
-
-  - No field in the tree of `nco` holds an [`Online`](@ref). The method throws an `ArgumentError` that names the field otherwise, through [`assert_batch_entry`](@ref). A plain `optimise` is a batch fit, and a wrapper resolves only at the warm-up of the online arm of a fold loop.
-  - The clustering covers every investable asset. The method throws a `DimensionMismatch` otherwise.
-  - No intra-cluster optimisation returns an efficient frontier. The method throws an `ArgumentError` otherwise.
-
-# Returns
-
-  - `res::NestedClusteredResult`: The combined portfolio. `retcode` is an [`OptimisationFailure`](@ref) when an intra-cluster optimisation, the inter-cluster optimisation or the weight finalisation fails.
-
-# Related
-
-  - [`NestedClustered`](@ref)
-  - [`NestedClusteredResult`](@ref)
-"""
-function optimise(nco::NestedClustered{<:Any, <:Any, <:Any, <:Any, <:Any, <:Any, <:Any,
-                                       <:Any, <:Any, <:Any, <:Any, Nothing},
-                  rd::ReturnsResult; branchorder::Symbol = :optimal,
-                  str_names::Bool = false, save::Bool = true, kwargs...)
-    assert_batch_entry(nco, "`optimise`")
-    return shared_series_solve(nco, rd; branchorder = branchorder, str_names = str_names,
-                               save = save, kwargs...)
 end
 
 export NestedClusteredResult, NestedClustered

@@ -379,6 +379,8 @@ Run the Hierarchical Risk Parity optimisation for a single risk measure.
 
 [`optimise`](@ref) calls this method. The struct [`HierarchicalRiskParity`](@ref) states the mathematics.
 
+Unlike [`HierarchicalEqualRiskContribution`](@ref) and [`NestedClustered`](@ref), this optimiser takes no `branchorder` keyword. Recursive bisection splits the leaf order of the dendrogram, so that order is an input of the allocation, and the clusterisation always keeps the optimal order.
+
 # Algorithm
 
  1. Resolve every [`TimeDependent`](@ref) field of `hrp` to its static default, with [`reset_time_dependent_estimator`](@ref).
@@ -397,6 +399,12 @@ Run the Hierarchical Risk Parity optimisation for a single risk measure.
 14. Multiply `w[lc]` by `alpha` and `w[rc]` by `1 - alpha`, then go back to step 12.
 15. Divide `w` by its sum, and apply the weight finaliser `opt.wf` with [`finalise_weight_bounds`](@ref), giving `retcode` and the final `w`.
 16. Return a [`HierarchicalRiskParityResult`](@ref). Its [`HierarchicalResult`](@ref) expands `w` back onto the full asset universe through `imsk`.
+
+# Arguments
+
+  - `hrp`: The hierarchical risk parity optimiser to use.
+  - $(arg_dict[:rd]) When `hrp.opt.pe` holds a prior result, the allocation reads no returns from `rd`, but a fallback or the clusterisation can.
+  - `kwargs`: Ignored. A `branchorder` passed here has no effect.
 
 # Related
 
@@ -435,7 +443,7 @@ function _optimise(hrp::HierarchicalRiskParity{<:Any, <:OptimisationRiskMeasure}
     # is chosen on the investable universe. The weights are expanded back in
     # `HierarchicalResult`.
     hrp0, pr0, rd0 = hrp, pr, rd
-    _, pr, hrp, rd = investable_reduction(imsk, pr, hrp, rd)
+    _, pr, hrp, rd = investable_reduction(pr, hrp, rd, imsk)
     hrp = bind_data_benchmark(hrp, rd)
     X = pr.X
     # No `branchorder`: recursive bisection splits `clr.res.order`, so the leaf
@@ -614,7 +622,7 @@ function _optimise(hrp::HierarchicalRiskParity{<:Any, <:VecOptRM},
     # is chosen on the investable universe. The weights are expanded back in
     # `HierarchicalResult`.
     hrp0, pr0, rd0 = hrp, pr, rd
-    _, pr, hrp, rd = investable_reduction(imsk, pr, hrp, rd)
+    _, pr, hrp, rd = investable_reduction(pr, hrp, rd, imsk)
     hrp = bind_data_benchmark(hrp, rd)
     X = pr.X
     # No `branchorder`: recursive bisection splits `clr.res.order`, so the leaf
@@ -662,35 +670,6 @@ function _optimise(hrp::HierarchicalRiskParity{<:Any, <:VecOptRM},
                                                                 imsk = imsk), r = r,
                                         sca = hrp.sca, fb = nothing)
 end
-"""
-    optimise(hrp::HierarchicalRiskParity{<:Any, <:Any, <:Any, <:Nothing},
-             rd::ReturnsResult; kwargs...) -> HierarchicalRiskParityResult
-
-Run the Hierarchical Risk Parity portfolio optimisation.
-
-Unlike [`HierarchicalEqualRiskContribution`](@ref) and [`NestedClustered`](@ref), this optimiser takes no `branchorder` keyword. Recursive bisection splits the leaf order of the dendrogram, so that order is an input of the allocation, and the clusterisation always keeps the optimal order.
-
-# Arguments
-
-  - `hrp`: The hierarchical risk parity optimiser to use.
-  - $(arg_dict[:rd]) When `hrp.opt.pe` holds a prior result, the allocation reads no returns from `rd`, but a fallback or the clusterisation can.
-  - `kwargs`: Passed to [`_optimise`](@ref), which ignores them. A `branchorder` passed here has no effect.
-
-# Validation
-
-  - No field in the tree of `hrp` holds an [`Online`](@ref). The method throws an `ArgumentError` that names the field otherwise, through [`assert_batch_entry`](@ref). A plain `optimise` is a batch fit, and a wrapper resolves only at the warm-up of the online arm of the fold loop.
-
-# Related
-
-  - [`HierarchicalRiskParity`](@ref)
-  - [`HierarchicalRiskParityResult`](@ref)
-"""
-function optimise(hrp::HierarchicalRiskParity{<:Any, <:Any, <:Any, <:Nothing},
-                  rd::ReturnsResult; kwargs...)
-    assert_batch_entry(hrp, "`optimise`")
-    return shared_series_solve(hrp, rd; kwargs...)
-end
-
 @pipe_delegates HierarchicalRiskParity opt
 @pipe_route_sigma_ucs HierarchicalRiskParity
 export HierarchicalRiskParity

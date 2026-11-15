@@ -44,11 +44,12 @@ quietly(f) = with_logger(f, NullLogger())
         @test_throws DimensionMismatch prior(ep(short), rd)
         # The universe in the order of the data binds the view to the column that `rd` names.
         @test isapprox(prior(ep(good), rd).mu[3], 0.004; atol = 1e-6)
-        # A universe checked on its own.
-        @test_throws ArgumentError PortfolioOptimisers.assert_universe_axis_order(order, rd)
-        @test isnothing(PortfolioOptimisers.assert_universe_axis_order(good, rd))
+        # A universe checked on its own, against the axes of the data.
+        ax = PortfolioOptimisers.returns_universe_axes(rd)
+        @test_throws ArgumentError PortfolioOptimisers.assert_universe_axis_order(order, ax)
+        @test isnothing(PortfolioOptimisers.assert_universe_axis_order(good, ax))
         # A list that is the vector of the data itself passes with no comparison.
-        @test isnothing(PortfolioOptimisers.assert_universe_axis_order(usets(rd.nx), rd))
+        @test isnothing(PortfolioOptimisers.assert_universe_axis_order(usets(rd.nx), ax))
     end
     @testset "The walk reaches each prior that holds a universe" begin
         @test_throws ArgumentError prior(BlackLittermanPrior(; sets = order, views = mv),

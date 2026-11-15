@@ -622,6 +622,13 @@ Run the Hierarchical Equal Risk Contribution optimisation.
 11. Resolve the weight bounds `wb` from `opt.wb` and `opt.sets`. Divide `w` by its sum, and apply the weight finaliser `opt.wf` with [`finalise_weight_bounds`](@ref), giving `retcode` and the final `w`.
 12. Return a [`HierarchicalEqualRiskContributionResult`](@ref). Its [`HierarchicalResult`](@ref) expands `w` back onto the full asset universe through `imsk`.
 
+# Arguments
+
+  - `hec`: The hierarchical equal risk contribution optimiser to use.
+  - $(arg_dict[:rd]) If `isa(hec.opt.pe, AbstractPriorResult)`, a standalone optimisation does not need `rd`, but a fallback or the clustering can need it.
+  - `branchorder`: The branch order of the clustering. The weights do not depend on the order of the leaves, so a faster order that is not optimal gives the same weights. When `opt.cle` holds a clustering result, the order has no effect.
+  - `kwargs`: Keyword arguments that the method accepts and does not read.
+
 # Related
 
   - [`HierarchicalEqualRiskContribution`](@ref)
@@ -659,7 +666,7 @@ function _optimise(hec::HierarchicalEqualRiskContribution,
     # is chosen on the investable universe. The weights are expanded back in
     # `HierarchicalResult`.
     hec0, pr0, rd0 = hec, pr, rd
-    _, pr, hec, rd = investable_reduction(imsk, pr, hec, rd)
+    _, pr, hec, rd = investable_reduction(pr, hec, rd, imsk)
     hec = bind_data_benchmark(hec, rd)
     X = pr.X
     N = size(X, 2)
@@ -717,37 +724,6 @@ function _optimise(hec::HierarchicalEqualRiskContribution,
                                                                            imsk = imsk),
                                                    ri = ri, ro = ro, scai = hec.scai,
                                                    scao = hec.scao, fb = nothing)
-end
-"""
-    optimise(hec::HierarchicalEqualRiskContribution{
-                     <:Any, <:Any, <:Any, <:Any, <:Any, <:Any, Nothing
-                 },
-            rd::ReturnsResult; branchorder::Symbol = :optimal, kwargs...) -> HierarchicalEqualRiskContributionResult
-
-Run the Hierarchical Equal Risk Contribution portfolio optimisation.
-
-# Arguments
-
-  - `hec`: The hierarchical equal risk contribution optimiser to use.
-  - $(arg_dict[:rd]) If `isa(hec.opt.pe, AbstractPriorResult)`, a standalone optimisation does not need `rd`, but a fallback or the clustering can need it.
-  - `branchorder`: The branch order of the clustering. The weights do not depend on the order of the leaves, so a faster order that is not optimal gives the same weights. When `opt.cle` holds a clustering result, the order has no effect.
-  - `kwargs`: Keyword arguments that the method accepts and does not read.
-
-# Validation
-
-  - No field in the tree of `hec` holds an [`Online`](@ref). The method throws an `ArgumentError` that names the field otherwise, through [`assert_batch_entry`](@ref). A plain `optimise` is a batch fit, and a wrapper resolves only at the warm-up of the fold loop's online arm.
-
-# Related
-
-  - [`HierarchicalEqualRiskContribution`](@ref)
-  - [`HierarchicalEqualRiskContributionResult`](@ref)
-  - [`_optimise`](@ref)
-"""
-function optimise(hec::HierarchicalEqualRiskContribution{<:Any, <:Any, <:Any, <:Any, <:Any,
-                                                         <:Any, Nothing}, rd::ReturnsResult;
-                  branchorder::Symbol = :optimal, kwargs...)
-    assert_batch_entry(hec, "`optimise`")
-    return shared_series_solve(hec, rd; branchorder = branchorder, kwargs...)
 end
 
 export HierarchicalEqualRiskContribution

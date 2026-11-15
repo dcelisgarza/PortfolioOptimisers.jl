@@ -5,7 +5,7 @@ Description = "Investable universe, private API of PortfolioOptimisers.jl: inves
 # Investable universe: private API
 
 ```@docs
-investable_reduction(pr::AbstractPriorResult, opt::AbstractOptimisationEstimator, rd::ReturnsResult)
+investable_reduction(pr::AbstractPriorResult, opt::AbstractOptimisationEstimator, rd::ReturnsResult, ::Nothing)
 coverage_reduction(opt::AbstractOptimisationEstimator, rd::ReturnsResult)
 expand_investable_weights
 assert_internal_optimiser(::NonFiniteAllocationOptimisationResult)

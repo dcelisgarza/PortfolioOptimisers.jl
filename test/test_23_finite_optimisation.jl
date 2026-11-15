@@ -84,14 +84,17 @@
                         atol = 1e-8))
 
     # `DiscreteAllocation` defaults `fb` to a `GreedyAllocation`, so every allocation
-    # above goes through the generic `optimise` and its fallback chain. Only `fb =
-    # nothing` reaches the shortcut method in `02_DiscreteFiniteAllocation.jl`, which
-    # calls `_optimise` directly. The shortcut must agree with the generic exactly: for a
-    # fallback-less estimator the chain runs `_optimise` once and returns it unwrapped.
+    # above walks the fallback chain of the generic `optimise`. An allocator with `fb =
+    # nothing` goes through the same driver (issue #2103): the chain runs `_optimise` once
+    # and returns it unwrapped, with no fallback chain in its type.
     da_nofb = DiscreteAllocation(; slv = mip_slv, fb = nothing)
     fai = FiniteAllocationInput(; w = res.w, prices = vec(values(X[end])), cash = 4206.9)
-    @test which(optimise, Tuple{typeof(da_nofb), typeof(fai)}) !=
+    @test which(optimise, Tuple{typeof(da_nofb), typeof(fai)}) ==
           which(optimise, Tuple{typeof(da), typeof(fai)})
+    # `fb` is the last field, so its type is the last parameter of the inferred type.
+    @test all(T -> T <: DiscreteAllocationResult &&
+                   last(Base.unwrap_unionall(T).parameters) === Nothing,
+              Base.return_types(optimise, Tuple{typeof(da_nofb), typeof(fai)}))
     res_shortcut = optimise(da_nofb, fai)
     @test isa(res_shortcut, DiscreteAllocationResult)
     @test isnothing(res_shortcut.fb)
@@ -624,11 +627,11 @@ end
                    PO.allocation_fee(lsf, p, sh))
     @test iszero(PO.greedy_fee_delta(nothing, p, sh, 1, 2.0))
 
-    # A `GreedyAllocation` with a fallback goes through the generic `optimise`, and the
-    # greedy passes answer it.
+    # A `GreedyAllocation` with or without a fallback goes through the one generic
+    # `optimise` (issue #2103), and the greedy passes answer it.
     fai = FiniteAllocationInput(; w = [0.6, 0.4], prices = p, cash = 1e4)
     gfb = GreedyAllocation(; fb = GreedyAllocation())
-    @test which(optimise, Tuple{typeof(gfb), typeof(fai)}) !=
+    @test which(optimise, Tuple{typeof(gfb), typeof(fai)}) ==
           which(optimise, Tuple{typeof(ga), typeof(fai)})
     rfb = optimise(gfb, fai)
     @test isa(rfb, GreedyAllocationResult)

@@ -561,7 +561,8 @@ The method that Julia selects is the algorithm.
  1. A [`DataBenchmarkTracking`](@ref): return `""`.
  2. An estimator, a result or an algorithm: walk each field in order, giving `paths`, and join the name of the first field that gives a path to that path with [`tree_path`](@ref).
  3. A vector that is not a vector of numbers: walk each element with [`element_path`](@ref).
- 4. A vector of numbers, the state of a partial fit, and any other value: return `nothing`.
+ 4. A `Pair`: walk its second value, as [`returns_tracking_path`](@ref) does.
+ 5. A vector of numbers, the state of a partial fit, and any other value: return `nothing`.
 
 # Arguments
 
@@ -595,6 +596,9 @@ function data_benchmark_path(::AbstractPartialFitState)
 end
 function data_benchmark_path(v::AbstractVector)
     return eltype(v) <: Number ? nothing : element_path(data_benchmark_path, v)
+end
+function data_benchmark_path(p::Pair)
+    return data_benchmark_path(p.second)
 end
 function data_benchmark_path(::Any)
     return nothing

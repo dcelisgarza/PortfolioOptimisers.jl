@@ -825,6 +825,8 @@
             @test all(length.(asset_idx[idx]) .== cv.subset_size.val)
         end
         @test n_splits(cv, rd) == n_splits(cv_res) == length(path_ids)
+        # A result takes the data slot and ignores it, as the docstring of `n_splits` states.
+        @test n_splits(cv_res, rd) == n_splits(cv_res)
 
         cv = MultipleRandomised(IndexWalkForward(127, 171); rng = StableRNG(666), seed = 42,
                                 n_subsets = 5, subset_size = 7, window_size = 321)
@@ -2685,6 +2687,7 @@
             rcs = PO.OptimisationReturnCode[ok_rc, bad_rc]
             @test isequal(PO.held_start_weights(rcs, [w, wn], nothing), [w, wn])
             @test PO.held_start_weights(rcs, [w, wn], wp) == [w, wp]
+            @test_throws DimensionMismatch PO.held_start_weights(rcs, [w, wn, wn], wp)
             @test PO.held_start_weights(rcs, [w, wn], [wp, w]) == [w, w]
             @test_throws DimensionMismatch PO.held_start_weights(rcs, [w, wn], [wp])
             # One return code over a population, a frontier's, is that code for every
@@ -2696,6 +2699,8 @@
             @test PO.held_start_weights(bad_rc, [wn, wn], wp) == [wp, wp]
             @test PO.held_start_weights(bad_rc, [wn, wn], [wp, w]) == [wp, w]
             @test_throws DimensionMismatch PO.held_start_weights(bad_rc, [wn, wn], [wp])
+            # A solved frontier reads no previous weights, so it does not check them.
+            @test PO.held_start_weights(ok_rc, [w, w], [wp]) == [w, w]
             # A non-finite start drifts nothing and is not ruined, alone or as a member.
             X24 = [0.01 0.02; -0.01 0.03]
             (hw, ruined) = PO.held_weights_result(sfd, wn, X24, true)

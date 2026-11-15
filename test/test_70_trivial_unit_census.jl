@@ -283,7 +283,15 @@ end
                                                         (:set_allocation_set_constraints!, :set_allocation_set_constraints!) => "public: (a) the direct call on a `BoundedAllocationSet`, `(model, set, w, X, pr = nothing)`, converts to the canonical form `(model, set, nothing)`, as the direct call on a programme set resolves its step to `(model, set, cbr)` (rule 5, #2102)",
                                                         # src/18_ExpectedReturns (#2104).
                                                         (:expected_risk, :expected_return) => "(interface) the method of `ExpectedReturn` calls `expected_return`, a shared public verb (rule 3, #2104). The pair, not the name, is kept, because another pair of `expected_risk` is still pending",
-                                                        (:expected_risk, :expected_ratio) => "(interface) the method of `ExpectedReturnRiskRatio` calls `expected_ratio`, a shared public verb (rule 3, #2104). The pair, not the name, is kept, because another pair of `expected_risk` is still pending")
+                                                        (:expected_risk, :expected_ratio) => "(interface) the method of `ExpectedReturnRiskRatio` calls `expected_ratio`, a shared public verb (rule 3, #2104). The pair, not the name, is kept, because another pair of `expected_risk` is still pending",
+                                                        # src/17_Optimisation outside the JuMP and the online optimisers (#2103).
+                                                        (:update_time_dependent_estimator, :update_time_dependent_fields) => "(interface) eight methods of `update_time_dependent_estimator` share the kernel, one for each family of optimiser that holds a schedule: each resolves the fields of its own type with it, then recurses into the optimisers that it holds. The families are not subtypes of one another, so no method of the verb can hold the kernel for the others. It is the case of `ERM_worst_case`, which four methods of `worst_case_distribution` share (rule 3, #2100, #2103)",
+                                                        (:reset_time_dependent_estimator, :reset_time_dependent_fields) => "(interface) six methods of `reset_time_dependent_estimator` share the kernel, one for each family of optimiser that holds a schedule: each resets the fields of its own type with it, and the naive, clustering and JuMP methods then recurse into the optimisers that they hold. It is the case of `ERM_worst_case` (rule 3, #2100, #2103)",
+                                                        (:fold_factor_returns, :investable_returns_view) => "(b) the `Nothing` arm holds a policy: it builds the returns of the fold from `pred`, an argument that the callee does not take, and the pair selects between the returns of the caller and of the fold. The `::Nothing` method of `investable_returns_view` is on the mask, not on the returns (#2111, #2103)",
+                                                        (:factory, :SubsetResamplingResult) => "(b) the keyword constructor of `SubsetResamplingResult` expands `w` through the investable mask, so a rebuild through it expands the weights twice: the positional constructor keeps them (#2101, #2103)",
+                                                        (:cross_val_predict, :fit_and_predict) => "(interface) 3 functions share the callee `fit_and_predict` (rule 3, #2103)",
+                                                        (:expected_risk, :expected_risk_from_returns) => "(interface) `expected_risk_from_returns` is a shared public verb (rule 3, #2103)",
+                                                        (:online_step_fold, :partial_fit!) => "(interface) `partial_fit!` is a shared public verb (rule 3, #2103)")
     # The functions whose forward methods are interface methods, with the check that shows
     # it. #2072 adds a name after a check of each one.
     interface_functions = Dict{Symbol, String}(#
@@ -381,7 +389,12 @@ end
                                                :reprojection => "its callee `project` is a shared public verb (rule 3, #2102)",
                                                :blend_projection => "its callee `project` is a shared public verb (rule 3, #2102)",
                                                # src/18_ExpectedReturns (#2104).
-                                               :difference_risk => "its method of `ExpectedReturn` calls `resolved_expected_return`, which 5 functions share (rule 3, #2104)")
+                                               :difference_risk => "its method of `ExpectedReturn` calls `resolved_expected_return`, which 5 functions share (rule 3, #2104)",
+                                               # src/17_Optimisation outside the JuMP and the online optimisers (#2103).
+                                               :universe_axis_visit! => "one method for each value of a field in the walk of the universes: the estimator form calls `universe_axis_children!`, which 2 functions share (rule 3, #2103)",
+                                               :with_position_id => "its callee is the constructor of a type, `MultiPeriodPredictionResult` (rule 3, #2103)",
+                                               :fold_context => "its callee is the constructor of a type, `TimeDependentContext` (rule 3, #2103)",
+                                               :herc_unitary_risks => "2 functions share its callee `unitary_expected_risks` (rule 3, #2103)")
     # The debt that #2072 removes. Do not add a pair: fix the wrapper.
     pending_forwards = Set{Tuple{Symbol, Symbol}}([(:apply_fitted_step,
                                                     :apply_fitted_steps),
@@ -407,11 +420,8 @@ end
                                                    (:attribution_window_basis,
                                                     :factor_basis_slice),
                                                    (:copy_step_states, :copy_states),
-                                                   (:cross_val_predict, :fit_and_predict),
                                                    (:cross_val_predict,
                                                     :pipeline_cross_val_predict),
-                                                   (:expected_risk,
-                                                    :expected_risk_from_returns),
                                                    (:factor_attribution,
                                                     :attribution_realised_entry),
                                                    (:factor_attribution,
@@ -420,32 +430,17 @@ end
                                                     :attribution_rolling_entry),
                                                    (:factor_attribution,
                                                     :factor_attribution),
-                                                   (:factory, :BudgetedHindsightPathResult),
-                                                   (:factory, :SubsetResamplingResult),
                                                    (:fitted_step_keeps_observations,
                                                     :keeps_observations),
-                                                   (:fold_context, :TimeDependentContext),
-                                                   (:fold_factor_returns,
-                                                    :investable_returns_view),
-                                                   (:forecast_coverage_policy,
-                                                    :coverage_policy),
-                                                   (:forecast_location,
-                                                    :forecast_state_location),
                                                    (:group_frames, :pipeline_frames),
                                                    (:group_returns_view,
                                                     :shared_series_fit),
                                                    (:held_timestamps,
                                                     :pipeline_held_timestamps),
-                                                   (:herc_unitary_risks,
-                                                    :unitary_expected_risks),
                                                    (:is_time_dependent,
                                                     :pipeline_step_is_time_dependent),
                                                    (:maybe_inject_step, :inject_context),
-                                                   (:member_regret, :series_regret),
                                                    (:merge_held_data, :partial_fit!),
-                                                   (:n_splits, :n_splits),
-                                                   (:online_step_fold, :partial_fit!),
-                                                   (:optimise, :_optimise),
                                                    (:partial_fit!, :fold_pipeline),
                                                    (:pipeline_lens, :parse_lens),
                                                    (:pipeline_step_factory, :factory),
@@ -453,34 +448,23 @@ end
                                                     :is_time_dependent),
                                                    (:report_risk_contribution,
                                                     :risk_contribution_figure),
-                                                   (:reset_time_dependent_estimator,
-                                                    :reset_time_dependent_fields),
                                                    (:reset_time_dependent_step,
                                                     :reset_time_dependent_estimator),
                                                    (:rewrap_step, :PipelineStep),
                                                    (:run_step, :run_constraint_step),
                                                    (:run_step, :run_step),
                                                    (:run_step, :run_uncertainty_step),
-                                                   (:set_retcode, :NestedClusteredResult),
-                                                   (:set_retcode, :StackingResult),
-                                                   (:set_retcode, :SubsetResamplingResult),
                                                    (:step_online_member,
                                                     :pipeline_online_member),
-                                                   (:universe_axis_visit!,
-                                                    :universe_axis_children!),
                                                    (:update_online_step,
                                                     :update_online_estimator),
-                                                   (:update_time_dependent_estimator,
-                                                    :update_time_dependent_fields),
                                                    (:update_time_dependent_step,
                                                     :update_time_dependent_estimator),
                                                    (:weight_mass_grid,
                                                     :pipeline_lens_val_grid),
                                                    (:window_bigger_is_better,
                                                     :bigger_is_better),
-                                                   (:window_values, :asset_scores),
-                                                   (:with_position_id,
-                                                    :MultiPeriodPredictionResult)])
+                                                   (:window_values, :asset_scores)])
 
     # ------------------------------------------------------------- the type census
 

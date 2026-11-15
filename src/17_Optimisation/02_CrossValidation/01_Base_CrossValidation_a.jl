@@ -121,14 +121,11 @@ Abstract supertype for non-sequential optimisation cross-validation results.
 """
 abstract type NonSequentialCrossValidationResult <: OptimisationCrossValidationResult end
 # The split has already happened, so the count is the length of the enumeration the result
-# carries, and the data argument the estimator methods take is not read. This is the
-# `n_splits(cv)` and `n_splits(cv, rd)` pair that the `n_splits` docstring promises for a
-# result type; every concrete `OptimisationCrossValidationResult` carries `test_idx`.
-function n_splits(res::OptimisationCrossValidationResult)
+# carries, and the data argument the estimator methods take is not read. The ignored slot
+# gives the `n_splits(cv)` and `n_splits(cv, rd)` pair that the `n_splits` docstring promises
+# for a result type; every concrete `OptimisationCrossValidationResult` carries `test_idx`.
+function n_splits(res::OptimisationCrossValidationResult, ::Option{<:Prices_RR} = nothing)
     return length(res.test_idx)
-end
-function n_splits(res::OptimisationCrossValidationResult, ::Prices_RR)
-    return n_splits(res)
 end
 """
     NonSeqCVER
@@ -1776,10 +1773,11 @@ function reconstruct_rd(res::NonFiniteAllocationOptimisationResult, rd::ReturnsR
                                    ivpa = ivpa)
 end
 """
-    held_start_weights(retcode::OptimisationSuccess, w::VecNum, w_prev)
-    held_start_weights(retcode::OptimisationFailure, w::VecNum, w_prev::Nothing)
+    held_start_weights(retcode::OptimisationSuccess, w::VecNum_VecVecNum, w_prev)
+    held_start_weights(retcode::OptimisationFailure, w::VecNum_VecVecNum, w_prev::Nothing)
     held_start_weights(retcode::OptimisationFailure, w::VecNum, w_prev::VecNum)
-    held_start_weights(retcode::OptimisationReturnCode, w::VecVecNum, w_prev)
+    held_start_weights(retcode::OptimisationFailure, w::VecVecNum, w_prev::VecNum)
+    held_start_weights(retcode::OptimisationFailure, w::VecVecNum, w_prev::VecVecNum)
     held_start_weights(retcode::VecOptRetCode, w::VecVecNum, w_prev::Nothing)
     held_start_weights(retcode::VecOptRetCode, w::VecVecNum, w_prev::VecNum)
     held_start_weights(retcode::VecOptRetCode, w::VecVecNum, w_prev::VecVecNum)
@@ -1790,12 +1788,13 @@ A fold that could not rebalance holds what it held. So under a Weight Drift or a
 
 # Algorithm
 
- 1. On an [`OptimisationSuccess`](@ref), give `w`.
- 2. On an [`OptimisationFailure`](@ref) over one vector, give `w_prev`, or `w` when there is none.
- 3. Over a population with one return code, repeat that code once per member.
- 4. Over a population with no `w_prev`, give `w`.
- 5. Over a population with one `w_prev` vector, repeat it once per member.
- 6. Over a population with one `w_prev` per member, give each member its own vector on a success and its entry of `w_prev` on a failure.
+The method that Julia selects is the algorithm. A population with one return code takes the same answer for every member, so its methods agree with the per-member methods under that code repeated once per member.
+
+ 1. On an [`OptimisationSuccess`](@ref), give `w`, one vector or a population.
+ 2. With no `w_prev`, give `w`.
+ 3. On an [`OptimisationFailure`](@ref) over one vector, give `w_prev`.
+ 4. On an [`OptimisationFailure`](@ref) over a population, give `w_prev` to each member: the one vector repeated once per member, or a copy of the vector of one `w_prev` per member.
+ 5. Over a population with one return code per member, give each member its own vector on a success, and on a failure the one `w_prev` vector or its own entry of `w_prev`.
 
 # Arguments
 
@@ -1805,7 +1804,8 @@ A fold that could not rebalance holds what it held. So under a Weight Drift or a
 
 # Validation
 
-  - A per-member `w_prev` has one entry per member of `w`, else a `DimensionMismatch` is raised.
+  - A per-member `w_prev` that a failure reads has one entry per member of `w`, else a `DimensionMismatch` is raised. A success reads no `w_prev`, so it does not check it.
+  - A vector of return codes with one `w_prev` vector has one code per member of `w`, else a `DimensionMismatch` is raised.
 
 # Returns
 
@@ -1818,23 +1818,29 @@ A fold that could not rebalance holds what it held. So under a Weight Drift or a
   - [`previous_weights`](@ref)
   - [`predict(res::NonFiniteAllocationOptimisationResult, rd::ReturnsResult)`](@ref)
 """
-function held_start_weights(::OptimisationSuccess, w::VecNum, ::Any)
+function held_start_weights(::OptimisationSuccess, w::VecNum_VecVecNum, ::Any)
     return w
 end
-function held_start_weights(::OptimisationFailure, w::VecNum, ::Nothing)
+function held_start_weights(::OptimisationFailure, w::VecNum_VecVecNum, ::Nothing)
     return w
 end
 function held_start_weights(::OptimisationFailure, ::VecNum, w_prev::VecNum)
     return w_prev
 end
-function held_start_weights(retcode::OptimisationReturnCode, w::VecVecNum, w_prev)
-    return held_start_weights(fill(retcode, length(w)), w, w_prev)
+function held_start_weights(::OptimisationFailure, w::VecVecNum, w_prev::VecNum)
+    return fill(w_prev, length(w))
+end
+function held_start_weights(::OptimisationFailure, w::VecVecNum, w_prev::VecVecNum)
+    @argcheck(length(w_prev) == length(w),
+              DimensionMismatch("`length(w_prev) == length(w)` must hold.\nlength(w_prev) => $(length(w_prev))\nlength(w) => $(length(w))"))
+    return collect(w_prev)
 end
 function held_start_weights(::VecOptRetCode, w::VecVecNum, ::Nothing)
     return w
 end
 function held_start_weights(retcode::VecOptRetCode, w::VecVecNum, w_prev::VecNum)
-    return held_start_weights(retcode, w, fill(w_prev, length(w)))
+    return [isa(retcode[i], OptimisationSuccess) ? w[i] : w_prev
+            for i in eachindex(retcode, w)]
 end
 function held_start_weights(retcode::VecOptRetCode, w::VecVecNum, w_prev::VecVecNum)
     @argcheck(length(w_prev) == length(w),

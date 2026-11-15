@@ -1,7 +1,6 @@
 """
-    assert_universe_axis_order(sets::UniverseSets, rd::ReturnsResult) -> Nothing
-    assert_universe_axis_order(sets::UniverseSets, ax::NamedTuple) -> Nothing
     assert_universe_axis_order(est::Union{AbstractEstimator, AbstractAlgorithm}, rd::ReturnsResult) -> Nothing
+    assert_universe_axis_order(sets::UniverseSets, ax::NamedTuple) -> Nothing
 
 Assert that every [`UniverseSets`](@ref) on the asset axis of `rd` names the columns of `rd`, name for name and in order.
 
@@ -17,12 +16,12 @@ The estimator method walks the tree of `est` and checks each universe that it fi
 
 The method that Julia selects is the algorithm.
 
- 1. `sets` is a [`UniverseSets`](@ref): check the asset axis, `sets.dict[sets.xkey]` against `rd.nx`, and the factor axis, `sets.dict[sets.tfkey]` against `rd.nf`. An axis is skipped when `rd` holds no names for it, or when `sets` declares no key for it. A list that is `===` to the names of `rd` passes with no comparison.
- 2. `est` is an estimator or an algorithm: walk the fields of `est` with [`universe_axis_children!`](@ref). An `IdSet` holds each universe that the walk checked, so a universe that many estimators share is checked once.
+ 1. `sets` is a [`UniverseSets`](@ref): check the asset axis, `sets.dict[sets.xkey]` against `ax.nx`, and the factor axis, `sets.dict[sets.tfkey]` against `ax.nf`. An axis is skipped when `ax` holds no names for it, or when `sets` declares no key for it. A list that is `===` to the names of `ax` passes with no comparison.
+ 2. `est` is an estimator or an algorithm: walk the fields of `est` with [`universe_axis_children!`](@ref), against the axes of `rd` from [`returns_universe_axes`](@ref). An `IdSet` holds each universe that the walk checked, so a universe that many estimators share is checked once.
 
 # Arguments
 
-  - `sets`: The universe to check.
+  - `sets`: The universe to check. A caller that checks one universe passes `returns_universe_axes(rd)` as `ax`. The method on `rd` is the method of an estimator, and it walks the fields of `est`, so it does not check a universe that it gets as `est`.
   - `est`: The estimator whose tree to check, such as a prior, an optimiser or an algorithm. The walk does not stop at `est` itself, even when it is an optimisation head.
   - $(arg_dict[:rd])
   - `ax`: The names to check against, from [`returns_universe_axes`](@ref). The walk passes them, so that a child on the factor axis is checked against the factor names.
@@ -59,9 +58,6 @@ ERROR: ArgumentError: the asset universe declared under key `nx` does not descri
   - [`investable_reduction`](@ref)
   - [`prior`](@ref)
 """
-function assert_universe_axis_order(sets::UniverseSets, rd::ReturnsResult)
-    return assert_universe_axis_order(sets, returns_universe_axes(rd))
-end
 function assert_universe_axis_order(est::Union{AbstractEstimator, AbstractAlgorithm},
                                     rd::ReturnsResult)
     universe_axis_children!(IdSet{UniverseSets}(), est, returns_universe_axes(rd))

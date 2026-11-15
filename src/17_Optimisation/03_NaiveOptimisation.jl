@@ -526,6 +526,12 @@ Run the inverse volatility portfolio optimisation.
  8. Impose `wb` on `w` with the weight finaliser `iv.wf`, giving `retcode` and `w`.
  9. Build the [`NaiveOptimisationResult`](@ref), which expands `w` onto the full universe.
 
+# Arguments
+
+  - `iv`: The inverse volatility optimiser to use.
+  - $(arg_dict[:rd]) When `iv.pe` is a prior result, the fit reads no returns from `rd`, and an empty `ReturnsResult()` is enough.
+  - `kwargs`: Ignored.
+
 # Related
 
   - [`InverseVolatility`](@ref)
@@ -559,27 +565,6 @@ function _optimise(iv::InverseVolatility, rd::ReturnsResult = ReturnsResult(); k
     retcode, w = finalise_weight_bounds(iv.wf, wb, w)
     return NaiveOptimisationResult(; pr = pr, wb = wb, fees = fees, retcode = retcode,
                                    w = w, imsk = imsk, fb = nothing)
-end
-"""
-    optimise(iv::InverseVolatility{<:Any, <:Any, <:Any, <:Any, <:Any, Nothing},
-             rd::ReturnsResult; kwargs...) -> NaiveOptimisationResult
-
-Run the inverse volatility portfolio optimisation.
-
-# Arguments
-
-  - `iv`: The inverse volatility optimiser to use.
-  - $(arg_dict[:rd]) When `iv.pe` is a prior result, the fit reads no returns from `rd`, and an empty `ReturnsResult()` is enough.
-  - `kwargs`: Ignored.
-
-# Validation
-
-  - No field in the tree of `iv` holds an [`Online`](@ref). [`assert_batch_entry`](@ref) throws an `ArgumentError` that names the field otherwise. A plain `optimise` is a batch fit, and only the warm-up of the online arm of the fold loop resolves a wrapper.
-"""
-function optimise(iv::InverseVolatility{<:Any, <:Any, <:Any, <:Any, <:Any, Nothing},
-                  rd::ReturnsResult; kwargs...)::NaiveOptimisationResult
-    assert_batch_entry(iv, "`optimise`")
-    return shared_series_solve(iv, rd; kwargs...)
 end
 """
 $(DocStringExtensions.TYPEDEF)
@@ -752,6 +737,16 @@ Run the equal-weighted portfolio optimisation.
  8. Impose `wb` on `w` with the weight finaliser `ew.wf`, giving `retcode` and `w`.
  9. Build the [`NaiveOptimisationResult`](@ref), which expands `w` onto the full universe.
 
+# Arguments
+
+  - `ew`: The equal-weighted optimiser to use.
+  - $(arg_dict[:rd]) Its returns matrix and its Asset Panel give the Coverage Universe of the window, and the weights are spread over that universe.
+  - `kwargs`: Ignored.
+
+# Validation
+
+  - `rd.X` is not `nothing`. The method throws an `IsNothingError` otherwise.
+
 # Related
 
   - [`EqualWeighted`](@ref)
@@ -781,26 +776,6 @@ function _optimise(ew::EqualWeighted, rd::ReturnsResult; kwargs...)
     retcode, w = finalise_weight_bounds(ew.wf, wb, w)
     return NaiveOptimisationResult(; pr = rd, wb = wb, fees = fees, retcode = retcode,
                                    w = w, imsk = cmsk, fb = nothing)
-end
-"""
-    optimise(ew::EqualWeighted{<:Any, <:Any, <:Any, <:Any, Nothing},
-             rd::ReturnsResult; kwargs...) -> NaiveOptimisationResult
-
-Run the equal-weighted portfolio optimisation.
-
-# Arguments
-
-  - `ew`: The equal-weighted optimiser to use.
-  - $(arg_dict[:rd]) Its returns matrix and its Asset Panel give the Coverage Universe of the window, and the weights are spread over that universe.
-  - `kwargs`: Ignored.
-
-# Validation
-
-  - `rd.X` is not `nothing`. The method throws an `IsNothingError` otherwise.
-"""
-function optimise(ew::EqualWeighted{<:Any, <:Any, <:Any, <:Any, Nothing}, rd::ReturnsResult;
-                  kwargs...)::NaiveOptimisationResult
-    return _optimise(ew, rd; kwargs...)
 end
 """
 $(DocStringExtensions.TYPEDEF)
@@ -1014,6 +989,17 @@ Run the random-weighted portfolio optimisation.
 10. Impose `wb` on `w` with the weight finaliser `rw.wf`, giving `retcode` and `w`.
 11. Build the [`NaiveOptimisationResult`](@ref), which expands `w` onto the full universe.
 
+# Arguments
+
+  - `rw`: The random-weighted optimiser to use.
+  - $(arg_dict[:rd]) Its returns matrix and its Asset Panel give the Coverage Universe of the window, and the draw is over that universe.
+  - `kwargs`: Ignored.
+
+# Validation
+
+  - `rd.X` is not `nothing`. The method throws an `IsNothingError` otherwise.
+  - A vector `rw.alpha` has one entry per column of `rd.X`. The method throws a `DimensionMismatch` otherwise.
+
 # Related
 
   - [`RandomWeighted`](@ref)
@@ -1055,28 +1041,6 @@ function _optimise(rw::RandomWeighted, rd::ReturnsResult; kwargs...)
     retcode, w = finalise_weight_bounds(rw.wf, wb, w)
     return NaiveOptimisationResult(; pr = rd, wb = wb, fees = fees, retcode = retcode,
                                    w = w, imsk = cmsk, fb = nothing)
-end
-"""
-    optimise(rw::RandomWeighted{<:Any, <:Any, <:Any, <:Any, <:Any, <:Any, <:Any, Nothing},
-             rd::ReturnsResult; kwargs...) -> NaiveOptimisationResult
-
-Run the random-weighted portfolio optimisation.
-
-# Arguments
-
-  - `rw`: The random-weighted optimiser to use.
-  - $(arg_dict[:rd]) Its returns matrix and its Asset Panel give the Coverage Universe of the window, and the draw is over that universe.
-  - `kwargs`: Ignored.
-
-# Validation
-
-  - `rd.X` is not `nothing`. The method throws an `IsNothingError` otherwise.
-  - A vector `rw.alpha` has one entry per column of `rd.X`. The method throws a `DimensionMismatch` otherwise.
-"""
-function optimise(rw::RandomWeighted{<:Any, <:Any, <:Any, <:Any, <:Any, <:Any, <:Any,
-                                     Nothing}, rd::ReturnsResult;
-                  kwargs...)::NaiveOptimisationResult
-    return _optimise(rw, rd; kwargs...)
 end
 """
 $(DocStringExtensions.TYPEDEF)
@@ -1365,6 +1329,18 @@ Run the best constant rebalanced portfolio optimisation.
 10. When `retcode` is an [`OptimisationSuccess`](@ref), replace it with one whose `res` holds `fp.converged`, `fp.iterations` and `fp.gap`.
 11. Build the [`NaiveOptimisationResult`](@ref), which expands `w` onto the full universe.
 
+A Hindsight Comparator is fit on the rows that it is scored on. So `predict(optimise(bcrp, rd_test), rd_test)` is the prediction result of the comparator over `rd_test`, and `cross_val_predict(bcrp, rd, cv)` is the causal constant portfolio over the same rows.
+
+# Arguments
+
+  - `bcrp`: The best constant rebalanced portfolio optimiser to use.
+  - $(arg_dict[:rd]) Its returns matrix and its Asset Panel give the Coverage Universe of the window, and the fixed point runs over that universe.
+  - `kwargs`: Ignored.
+
+# Validation
+
+  - `rd.X` is not `nothing`. The method throws an `IsNothingError` otherwise.
+
 # Related
 
   - [`BestConstantRebalancedPortfolio`](@ref)
@@ -1400,30 +1376,6 @@ function _optimise(bcrp::BestConstantRebalancedPortfolio, rd::ReturnsResult; kwa
     return NaiveOptimisationResult(; pr = rd, wb = wb, fees = fees, retcode = retcode,
                                    w = w, imsk = cmsk, fb = nothing)
 end
-"""
-    optimise(bcrp::BestConstantRebalancedPortfolio{<:Any, <:Any, <:Any, <:Any, Nothing},
-             rd::ReturnsResult; kwargs...) -> NaiveOptimisationResult
-
-Run the best constant rebalanced portfolio optimisation.
-
-A Hindsight Comparator is fit on the rows that it is scored on. So `predict(optimise(bcrp, rd_test), rd_test)` is the prediction result of the comparator over `rd_test`, and `cross_val_predict(bcrp, rd, cv)` is the causal constant portfolio over the same rows.
-
-# Arguments
-
-  - `bcrp`: The best constant rebalanced portfolio optimiser to use.
-  - $(arg_dict[:rd]) Its returns matrix and its Asset Panel give the Coverage Universe of the window, and the fixed point runs over that universe.
-  - `kwargs`: Ignored.
-
-# Validation
-
-  - `rd.X` is not `nothing`. The method throws an `IsNothingError` otherwise.
-"""
-function optimise(bcrp::BestConstantRebalancedPortfolio{<:Any, <:Any, <:Any, <:Any,
-                                                        Nothing}, rd::ReturnsResult;
-                  kwargs...)::NaiveOptimisationResult
-    return _optimise(bcrp, rd; kwargs...)
-end
-
 """
 $(DocStringExtensions.TYPEDEF)
 
@@ -1568,6 +1520,12 @@ A head whose `w` is `nothing` gives an [`OptimisationFailure`](@ref) that names 
  2. With `w` set, give a [`NaiveOptimisationResult`](@ref) that carries `w` and an [`OptimisationSuccess`](@ref).
  3. With `w` unset, give one that carries an [`OptimisationFailure`](@ref) and the weights of [`failed_hold_weights`](@ref).
 
+# Arguments
+
+  - `pw`: The hold-only head.
+  - $(arg_dict[:rd]) The result records it as `pr`. The head reads only the width of `rd.X`, and only when `pw.w` is `nothing`.
+  - `kwargs`: Ignored.
+
 # Related
 
   - [`PreviousWeights`](@ref)
@@ -1605,22 +1563,6 @@ function failed_hold_weights(::Nothing)
 end
 function failed_hold_weights(X::MatNum)
     return fill(convert(eltype(X), NaN), size(X, 2))
-end
-"""
-    optimise(pw::PreviousWeights{<:Any, <:Any, Nothing}, rd::ReturnsResult = ReturnsResult();
-             kwargs...) -> NaiveOptimisationResult
-
-Hold the weights the head carries.
-
-# Arguments
-
-  - `pw`: The hold-only head.
-  - $(arg_dict[:rd]) The result records it as `pr`. The head reads only the width of `rd.X`, and only when `pw.w` is `nothing`.
-  - `kwargs`: Ignored.
-"""
-function optimise(pw::PreviousWeights{<:Any, <:Any, Nothing},
-                  rd::ReturnsResult = ReturnsResult(); kwargs...)::NaiveOptimisationResult
-    return _optimise(pw, rd; kwargs...)
 end
 export NaiveOptimisationResult, InverseVolatility, EqualWeighted, RandomWeighted,
        PreviousWeights, BestConstantRebalancedPortfolio

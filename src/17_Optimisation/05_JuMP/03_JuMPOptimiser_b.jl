@@ -119,7 +119,7 @@ The entry calls it once on the first fit, and once more on each fit again after 
 """
 function resolve_jump_head_block(imsk::Option{BitVector}, opt::JuMPOptimiser,
                                  pr::AbstractPriorResult, rd::ReturnsResult, fees, kwargs)
-    _, prr, optr, rdr = investable_reduction(imsk, pr, opt, rd)
+    _, prr, optr, rdr = investable_reduction(pr, opt, rd, imsk)
     cbr = distance_reader_call(resolve_constraint_block, optr.cbe, prr, rdr; slv = optr.slv,
                                strict = optr.strict, kwargs...)
     return (investable_fees_view(fees, imsk, pr.X), prr, optr), (cbr,)

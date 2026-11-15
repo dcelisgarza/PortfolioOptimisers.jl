@@ -832,6 +832,10 @@ end
     @test PO.data_benchmark_path(DataBenchmarkTracking()) == ""
     @test PO.data_benchmark_path(TrackingError(; tr = DataBenchmarkTracking())) == "tr"
     @test isnothing(PO.data_benchmark_path(PO.ReturnsBufferState()))
+    # A data benchmark in a `Pair` is found, as `returns_tracking_path` finds a series (#2108).
+    @test PO.data_benchmark_path(:a => TrackingError(; tr = DataBenchmarkTracking())) ==
+          "tr"
+    @test isnothing(PO.data_benchmark_path(:a => Variance()))
 
     # The online step folds the frame of the prior, and the gap rule reads the group.
     rdg = ReturnsResult(; nx = rd.nx, X = rd.X, nb = rd.nb, B = rd.B, ts = rd.ts)

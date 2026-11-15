@@ -189,6 +189,11 @@ end
         @test cb == co
         @test cb[3] ≈ mean(Xg[31:60, 3])
         @test cb[1] ≈ mean(Xg[1:60, 1])
+        # The panel arm reads the policy through `coverage_policy`, a query that answers
+        # `nothing` for an estimator that holds no policy (#2109).
+        @test po.coverage_policy(cp) === cp.cvg
+        @test isnothing(po.coverage_policy(GeneralCovariance()))
+        @test isnothing(po.coverage_policy(ExpWeightedCovariance()))
         # The panel arm of the location turns the mask where the caller turns the sample.
         # A mask-aware estimator reads a mask shaped as its sample is, so an arm that
         # handed the panel's mask through unturned threw at `dims = 2` alone (issue #1249).

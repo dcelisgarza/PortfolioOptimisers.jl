@@ -552,6 +552,22 @@ const RULED_REBUILDS = Dict{Tuple{Symbol, Symbol}, Tuple{String, String}}(#
                                                                            :JuMPOptimisationResult) =>
                                                                               ("keep (b)",
                                                                                "the keyword constructor of `JuMPOptimisationResult` expands `sol` through the investable mask, so a rebuild through it expands the weights twice: the positional constructor keeps them, as `set_retcode` does (#2101, #2102)"),
+                                                                          (:set_retcode,
+                                                                           :NestedClusteredResult) =>
+                                                                              ("keep (b)",
+                                                                               "the keyword constructor of `NestedClusteredResult` expands `w` through the investable mask, so a rebuild through it expands the weights twice: the positional constructor keeps them (#2101, #2103)"),
+                                                                          (:set_retcode,
+                                                                           :StackingResult) =>
+                                                                              ("keep (b)",
+                                                                               "the keyword constructor of `StackingResult` expands `w` through the investable mask, so a rebuild through it expands the weights twice: the positional constructor keeps them (#2101, #2103)"),
+                                                                          (:set_retcode,
+                                                                           :SubsetResamplingResult) =>
+                                                                              ("keep (b)",
+                                                                               "the keyword constructor of `SubsetResamplingResult` expands `w` through the investable mask, so a rebuild through it expands the weights twice: the positional constructor keeps them (#2101, #2103)"),
+                                                                          (:factory,
+                                                                           :SubsetResamplingResult) =>
+                                                                              ("keep (b)",
+                                                                               "the keyword constructor of `SubsetResamplingResult` expands `w` through the investable mask, so a rebuild through it expands the weights twice: the positional constructor keeps them (#2101, #2103)"),
                                                                           (:schedule_update!,
                                                                            :WindowedBestRateState) =>
                                                                               ("keep (b)",
@@ -704,6 +720,24 @@ function walk_reason(callee, name)
 end
 
 """
+The verdicts of rule 5 that the parse cannot read, keyed by the name of the function whose
+method calls itself. A private function that converts its arguments goes when its callers can
+pass the canonical form. When a slot of a composite holds either form, no caller can, and the
+conversion is reason (b), a dispatch problem, as the scalariser forms of `expected_risk` are
+(#2100). The census of `test_70` does not flag such a method when the conversion is a nested
+call, so its `kept_forwards` cannot hold the ruling, and this list does. An entry whose name is
+no longer a `self-forward` finding is stale, and `test/test_89_forward_survey_census.jl` fails
+on it.
+"""
+const RULED_SELF_FORWARDS = Dict{Symbol, Tuple{String, String}}(#
+                                                                :oriented_score =>
+                                                                    ("keep (b)",
+                                                                     "a dispatch problem: the slot of a composite holds a measure or a vector, `BaseRM_VecBaseRM`. One measure scores the prediction itself, so that a measure that refuses a prediction still refuses it, and a vector scores the return series of the prediction, read once. So no caller can pass the canonical form (#2100, #2103)"),
+                                                                :make_p_grid =>
+                                                                    ("keep (b)",
+                                                                     "a dispatch problem: the field `p` of a randomised search holds one parameter set or a vector of sets, as the grid of a grid search does, so no caller can pass the canonical form, the vector of sets (#2100, #2103)"))
+
+"""
     self_verdict(t::Tree, d, call) -> Tuple{String, String}
 
 The verdict and the reason for the self-call `call` of the method `d`, by the rulings of #2081
@@ -716,6 +750,9 @@ walk calls, such as `partial_fit_cache`, is not its owner, as a walk owns its le
 walk too.
 """
 function self_verdict(t::Tree, d, call)
+    if haskey(RULED_SELF_FORWARDS, d.name)
+        return RULED_SELF_FORWARDS[d.name]
+    end
     names = CH.forward_signature(d.sig)[1]
     passed = Set{Symbol}()
     converted = false
@@ -923,6 +960,10 @@ const RULED_NOTHING_PAIRS = Dict{Tuple{Symbol, Symbol}, Tuple{String, String}}(#
                                                                                 :dims_oriented) =>
                                                                                    ("keep (b)",
                                                                                     "$POLICY: its answer is the panel, and `dims_oriented(dims, nothing)` is `nothing`"),
+                                                                               (:fold_factor_returns,
+                                                                                :investable_returns_view) =>
+                                                                                   ("keep (b)",
+                                                                                    "$POLICY: the `Nothing` arm builds the returns of the fold from `pred`, an argument that the callee does not take, and the pair selects between the returns of the caller and of the fold. The `::Nothing` method of `investable_returns_view` is on the mask, not on the returns (#2111, #2103)"),
                                                                                (:tail_worst_case_risk,
                                                                                 :worst_case_risk) =>
                                                                                    ("keep (b)",

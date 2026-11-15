@@ -372,7 +372,7 @@ function n_splits(mre::MultipleRandomised, rd::Prices_RR)
     end
     return n_subsets * n_splits(mre.cv, rd)
 end
-function n_splits(mrr::MultipleRandomisedResult)
+function n_splits(mrr::MultipleRandomisedResult, ::Option{<:Prices_RR} = nothing)
     return length(mrr.path_ids)
 end
 """

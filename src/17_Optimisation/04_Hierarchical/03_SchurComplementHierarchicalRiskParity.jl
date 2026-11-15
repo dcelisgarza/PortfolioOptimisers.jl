@@ -458,9 +458,7 @@ A view of the estimator on a subset of assets calls it, for example when an oute
   - [`SchurComplementHierarchicalRiskParity`](@ref)
 """
 function port_opt_view(sp::SchurComplementParams, i, X::MatNum, args...)
-    r = port_opt_view(sp.r, i, X)
-    return SchurComplementParams(; r = r, gamma = sp.gamma, pdm = sp.pdm, alg = sp.alg,
-                                 flag = sp.flag)
+    return rebuild_struct(sp, (; r = port_opt_view(sp.r, i, X)))
 end
 """
 $(DocStringExtensions.TYPEDSIGNATURES)
@@ -1256,6 +1254,14 @@ Fit a Schur complement allocation with one bundle.
 
 [`optimise`](@ref) calls this method. [`SchurComplementHierarchicalRiskParity`](@ref) states its steps under `# Algorithm`. The weights, their bounds and the fee take the element type of the returns, so a `Float32` matrix stays in `Float32`.
 
+Unlike [`HierarchicalEqualRiskContribution`](@ref) and [`NestedClustered`](@ref), this optimiser takes no `branchorder` keyword. Recursive bisection splits the leaf order of the dendrogram, so that order is the input of the algorithm, and the clustering always runs with the optimal order. `kwargs` absorbs a `branchorder` and the fit ignores it.
+
+# Arguments
+
+  - `sh`: The Schur complement hierarchical risk parity optimiser.
+  - $(arg_dict[:rd]) When `sh.opt.pe` is a prior result, the fit itself does not read `rd`, but the clustering and a fallback can read it.
+  - `kwargs`: Absorbed and ignored.
+
 # Related
 
   - [`SchurComplementHierarchicalRiskParity`](@ref)
@@ -1288,7 +1294,7 @@ function _optimise(sh::SchurComplementHierarchicalRiskParity{<:Any, <:Any},
     # indexes the investable universe. The weights are expanded back in
     # `SchurComplementHierarchicalRiskParityResult`.
     sh0, pr0, rd0 = sh, pr, rd
-    _, pr, sh, rd = investable_reduction(imsk, pr, sh, rd)
+    _, pr, sh, rd = investable_reduction(pr, sh, rd, imsk)
     X = pr.X
     # No `branchorder`: recursive bisection splits `clr.res.order`, so the leaf
     # permutation is the algorithm's input and must stay `:optimal` (ADR 0055).
@@ -1371,7 +1377,7 @@ function _optimise(sh::SchurComplementHierarchicalRiskParity{<:Any, <:AbstractVe
     # indexes the investable universe. The weights are expanded back in
     # `SchurComplementHierarchicalRiskParityResult`.
     sh0, pr0, rd0 = sh, pr, rd
-    _, pr, sh, rd = investable_reduction(imsk, pr, sh, rd)
+    _, pr, sh, rd = investable_reduction(pr, sh, rd, imsk)
     X = pr.X
     # No `branchorder`: recursive bisection splits `clr.res.order`, so the leaf
     # permutation is the algorithm's input and must stay `:optimal` (ADR 0055).
@@ -1410,34 +1416,6 @@ function _optimise(sh::SchurComplementHierarchicalRiskParity{<:Any, <:AbstractVe
                                                        gamma = [gammas...],
                                                        retcode = retcode, w = w,
                                                        imsk = imsk, fb = nothing)
-end
-"""
-    optimise(sh::SchurComplementHierarchicalRiskParity{<:Any, <:Any, Nothing},
-             rd::ReturnsResult; kwargs...) -> SchurComplementHierarchicalRiskParityResult
-
-Run the Schur complement hierarchical risk parity optimisation.
-
-Unlike [`HierarchicalEqualRiskContribution`](@ref) and [`NestedClustered`](@ref), this optimiser takes no `branchorder` keyword. Recursive bisection splits the leaf order of the dendrogram, so that order is the input of the algorithm, and the clustering always runs with the optimal order. `kwargs` absorbs a `branchorder` and the fit ignores it.
-
-# Arguments
-
-  - `sh`: The Schur complement hierarchical risk parity optimiser.
-  - $(arg_dict[:rd]) When `sh.opt.pe` is a prior result, the fit itself does not read `rd`, but the clustering and a fallback can read it.
-  - `kwargs`: Absorbed and ignored.
-
-# Validation
-
-  - No field in the tree of `sh` holds an [`Online`](@ref). Otherwise [`assert_batch_entry`](@ref) throws an `ArgumentError` that names the field. A plain `optimise` is a batch fit, and a wrapper resolves only at the warm-up of the online arm of the fold loop.
-
-# Related
-
-  - [`SchurComplementHierarchicalRiskParity`](@ref)
-  - [`SchurComplementHierarchicalRiskParityResult`](@ref)
-"""
-function optimise(sh::SchurComplementHierarchicalRiskParity{<:Any, <:Any, Nothing},
-                  rd::ReturnsResult; kwargs...)
-    assert_batch_entry(sh, "`optimise`")
-    return shared_series_solve(sh, rd; kwargs...)
 end
 
 export SchurComplementHierarchicalRiskParityResult, SchurComplementParams,

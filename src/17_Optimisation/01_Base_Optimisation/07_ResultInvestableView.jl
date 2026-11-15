@@ -140,9 +140,9 @@ function result_investable_fees(imsk::BitVector, ::OptimisationResult, fees::Fee
     return investable_fees_view(fees, imsk, length(imsk))
 end
 """
-    result_investable_view(res::OptimisationResult, pr = nothing, fees = nothing, nx = nothing)
-    result_investable_view(imsk::Nothing, res::OptimisationResult, pr, fees, nx)
-    result_investable_view(imsk::BitVector, res::OptimisationResult, pr, fees, nx)
+    result_investable_view(res::OptimisationResult, pr, fees, nx, imsk::Nothing)
+    result_investable_view(res::OptimisationResult, pr = nothing, fees = nothing, nx = nothing,
+                           imsk::BitVector = result_investable_mask(res))
 
 Puts the weights, the returns data, the fee and the asset names that a consumer of a result reads on the investable universe of the result.
 
@@ -156,7 +156,7 @@ A result whose mask is `nothing` left out no asset, so the weights and the names
 
 # Algorithm
 
- 1. Read the Investable Mask of `res` with [`result_investable_mask`](@ref).
+ 1. Take the Investable Mask `imsk`. By default, [`result_investable_mask`](@ref) reads it off `res`, and the call dispatches on its type.
  2. For a mask `nothing`, return `nothing`, `res.w`, the returns data from [`result_investable_returns`](@ref), the fee from [`result_investable_fees`](@ref), and `nx` unchanged.
  3. For a `BitVector` mask, return the mask, the view of `res.w` at it, the returns data and the fee from the same two functions, and the view of `nx` at the mask.
 
@@ -184,19 +184,16 @@ A result whose mask is `nothing` left out no asset, so the weights and the names
   - [`extract_fees`](@ref)
   - [`fold_fees`](@ref)
 """
-function result_investable_view(res::OptimisationResult, pr::Option{<:MatNum_Pr} = nothing,
-                                fees::Option{<:Fees} = nothing,
-                                nx::Option{<:AbstractVector} = nothing)
-    return result_investable_view(result_investable_mask(res), res, pr, fees, nx)
-end
-function result_investable_view(::Nothing, res::OptimisationResult, pr::Option{<:MatNum_Pr},
-                                fees::Option{<:Fees}, nx::Option{<:AbstractVector})
+function result_investable_view(res::OptimisationResult, pr::Option{<:MatNum_Pr},
+                                fees::Option{<:Fees}, nx::Option{<:AbstractVector},
+                                ::Nothing)
     return nothing, res.w, result_investable_returns(nothing, res, pr),
            result_investable_fees(nothing, res, fees), nx
 end
-function result_investable_view(imsk::BitVector, res::OptimisationResult,
-                                pr::Option{<:MatNum_Pr}, fees::Option{<:Fees},
-                                nx::Option{<:AbstractVector})
+function result_investable_view(res::OptimisationResult, pr::Option{<:MatNum_Pr} = nothing,
+                                fees::Option{<:Fees} = nothing,
+                                nx::Option{<:AbstractVector} = nothing,
+                                imsk::BitVector = result_investable_mask(res))
     return imsk, investable_weights_view(imsk, res.w),
            result_investable_returns(imsk, res, pr),
            result_investable_fees(imsk, res, fees), nothing_scalar_array_view(nx, imsk)

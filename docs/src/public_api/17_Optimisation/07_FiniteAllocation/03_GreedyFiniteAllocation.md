@@ -1,5 +1,5 @@
 ```@meta
-Description = "Greedy finite allocation, public API of PortfolioOptimisers.jl: GreedyAllocationResult, GreedyAllocation, factory, optimise."
+Description = "Greedy finite allocation, public API of PortfolioOptimisers.jl: GreedyAllocationResult, GreedyAllocation, factory, _optimise."
 ```
 
 # Greedy finite allocation
@@ -8,7 +8,7 @@ Description = "Greedy finite allocation, public API of PortfolioOptimisers.jl: G
 GreedyAllocationResult
 GreedyAllocation
 factory(res::GreedyAllocationResult, fb::Option{<:FOptE_FOpt_FbChain})
-optimise(::GreedyAllocation{<:Any, <:Any, <:Any, Nothing}, ::FiniteAllocationInput)
+_optimise(ga::GreedyAllocation, fai::FiniteAllocationInput)
 ```
 
 ## References

@@ -261,11 +261,11 @@ Each family has two arities. The data form answers for a batch fit over `X`. The
   - [`GeneralCovariance`](@ref) answers the sample mean, weighted by `ce.w` when it carries observation weights, or `state.mu`.
   - [`ExpWeightedCovariance`](@ref) and [`RegimeAdjustedExpWeightedCovariance`](@ref) answer `state.location` under [`EstimatedCentring`](@ref), or zero for every asset under [`PreCentred`](@ref), because the estimator then assumes a zero mean. The data form runs over the window the same pass that the batch fit runs, and reads the location at the end of the pass.
   - [`PortfolioOptimisersCovariance`](@ref) and [`CorrelationCovariance`](@ref) answer what the estimator that they hold answers, because a matrix transform moves no centre. A `StatsBase.CovarianceEstimator` that they hold is read as a [`GeneralCovariance`](@ref), as `cov` reads it.
-  - Any other [`AbstractCovarianceEstimator`](@ref) answers the sample mean of the window, over the finite rows of each column. Its data-less form reads the state through [`forecast_state_location`](@ref), which refuses a state of a shape that it does not know.
+  - Any other [`AbstractCovarianceEstimator`](@ref) answers the sample mean of the window, over the finite rows of each column. Its data-less form reads the state through the state methods of this function, which refuse a state of a shape that they do not know.
   - Under [`Online`](@ref), every family answers its data form over the rows and masks of the buffer, because a buffer means the batch verb over its rows each time the estimate is made from the state.
   - An [`AbstractPriorEstimator`](@ref) answers the centre of its `sigma` through [`prior_forecast_location`](@ref). That is the `mu` it publishes for a family that forms both moments about one mean. An [`EmpiricalPrior`](@ref) whose `me` shrinks the mean publishes the shrunk `mu`, but its `ce` centres the covariance on its own estimate of the mean, so it answers the location of its `ce`. A factor prior and a high-order prior answer the centre of the prior that they lift or wrap. The keyword `strict` reaches [`prior`](@ref) alone. The location reads the returns in the frame that the prior fits on, the source that `pe` states through [`returns_source`](@ref). Before the fit and before the location, [`shared_series_fit`](@ref) drops the observations of a gap in a vector benchmark under [`ExcessSource`](@ref), and the observations at which a factor return is not finite when the tree of the prior reads the factor returns. It drops the fixed observation weights of the same observations from the tree of the prior. So the fit and the location read the same observations.
 
-The Asset Panel form follows the Asset Panel method of the estimator's own `cov`. Under no policy it reduces the window to its Coverage Universe and frames the answer with `NaN` outside it. Under a policy, and for the two mask-aware exponentially weighted families, it hands the active mask of the panel to the estimator. A [`PortfolioOptimisersCovariance`](@ref) hands the panel to the estimator that it holds, as its `cov` does.
+The Asset Panel form follows the Asset Panel method of the estimator's own `cov`. It reads the policy with [`coverage_policy`](@ref), which answers `nothing` for an estimator that holds no policy. Under no policy it reduces the window to its Coverage Universe and frames the answer with `NaN` outside it. Under a policy, and for the two mask-aware exponentially weighted families, it hands the active mask of the panel to the estimator. A [`PortfolioOptimisersCovariance`](@ref) hands the panel to the estimator that it holds, as its `cov` does.
 
 # Arguments
 
@@ -281,7 +281,7 @@ The Asset Panel form follows the Asset Panel method of the estimator's own `cov`
 # Validation
 
   - The data-less form requires a state. An `ArgumentError` is thrown otherwise.
-  - The data-less form requires a state of a shape that [`forecast_state_location`](@ref) reads: a [`CovarianceState`](@ref), an exponentially weighted state or a [`SampleBufferState`](@ref). An `ArgumentError` is thrown otherwise.
+  - The data-less form requires a state of a shape that a state method reads: a [`CovarianceState`](@ref), an exponentially weighted state or a [`SampleBufferState`](@ref). An `ArgumentError` is thrown otherwise.
 
 # Returns
 
@@ -342,8 +342,8 @@ function forecast_location(::AbstractCovarianceEstimator, X::MatNum; dims::Int =
 end
 function forecast_location(ce::AbstractCovarianceEstimator, X::MatNum,
                            pnl::Option{<:AssetPanel}; dims::Int = 1, kwargs...)
-    return coverage_panel_moment(forecast_location, ce, forecast_coverage_policy(ce), X,
-                                 pnl, (m, cmsk) -> expand_moment(m, cmsk, 1); dims = dims,
+    return coverage_panel_moment(forecast_location, ce, coverage_policy(ce), X, pnl,
+                                 (m, cmsk) -> expand_moment(m, cmsk, 1); dims = dims,
                                  kwargs...)
 end
 function forecast_location(ce::Union{ExpWeightedCovariance,
@@ -358,23 +358,20 @@ function forecast_location(ce::PortfolioOptimisersCovariance, X::MatNum,
                              kwargs...)
 end
 function forecast_location(ce::Covariance)
-    return forecast_state_location(ce, ce.cache)
+    return forecast_location(ce, ce.cache)
 end
 function forecast_location(ce::GeneralCovariance)
-    return forecast_state_location(ce, ce.cache)
+    return forecast_location(ce, ce.cache)
 end
 function forecast_location(ce::Union{ExpWeightedCovariance,
                                      RegimeAdjustedExpWeightedCovariance})
-    return centring_report_location(ce.centring, forecast_state_location(ce, ce.cache))
+    return centring_report_location(ce.centring, forecast_location(ce, ce.cache))
 end
 function forecast_location(ce::PortfolioOptimisersCovariance)
-    return forecast_state_location(ce, ce.cache)
+    return forecast_location(ce, ce.cache)
 end
 function forecast_location(ce::CorrelationCovariance{<:Any, Nothing})
     return forecast_location(ce.ce)
-end
-function forecast_location(ce::AbstractCovarianceEstimator)
-    return forecast_state_location(ce, partial_fit_cache(ce))
 end
 function forecast_location(pe::AbstractPriorEstimator, rd::ReturnsResult;
                            strict::Bool = false, kwargs...)
@@ -600,11 +597,16 @@ function horizon_location(c::VecNum, pr::AbstractPriorResult, horizon::Number)
     return expm1.(horizon * c + hs / 2)
 end
 """
-    forecast_state_location(ce, state)
+    forecast_location(ce, state::CovarianceState)
+    forecast_location(ce, state::Union{ExpWeightedCovarianceState, RegimeAdjustedCovarianceState})
+    forecast_location(ce, state::SampleBufferState)
+    forecast_location(ce::PortfolioOptimisersCovariance, state::Nothing)
+    forecast_location(ce, state::Nothing)
+    forecast_location(ce, state::AbstractPartialFitState = partial_fit_cache(ce))
 
 Read the location out of the state that a covariance estimator carries, by the type of the state.
 
-This is the data-less arm of [`forecast_location`](@ref), with one method per shape of state:
+These are the state methods of [`forecast_location`](@ref). The data-less form calls them with the state of the estimator, one method per shape of state. An estimator that has no data-less method of its own reads its state with [`partial_fit_cache`](@ref), the default of the last method:
 
   - A [`CovarianceState`](@ref) carries `mu`.
   - The two exponentially weighted states carry `location`.
@@ -623,44 +625,26 @@ The first two methods return the vector of the state itself, and the next fold w
   - [`forecast_location`](@ref)
   - [`partial_fit_cache`](@ref)
 """
-function forecast_state_location(::Any, state::CovarianceState)
+function forecast_location(::Any, state::CovarianceState)
     return state.mu
 end
-function forecast_state_location(::Any,
-                                 state::Union{ExpWeightedCovarianceState,
-                                              RegimeAdjustedCovarianceState})
+function forecast_location(::Any,
+                           state::Union{ExpWeightedCovarianceState,
+                                        RegimeAdjustedCovarianceState})
     return state.location
 end
-function forecast_state_location(ce, state::SampleBufferState)
+function forecast_location(ce, state::SampleBufferState)
     return forecast_location(ce, sample_buffer(state); sample_buffer_kwargs(state)...,
                              implied_volatility_buffer_kwargs(state)...)
 end
-function forecast_state_location(ce::PortfolioOptimisersCovariance, ::Nothing)
+function forecast_location(ce::PortfolioOptimisersCovariance, ::Nothing)
     return forecast_location(ce.ce)
 end
-function forecast_state_location(ce, ::Nothing)
+function forecast_location(ce, ::Nothing)
     return throw(ArgumentError("`$(typeof(ce).name.name)` holds no partial-fit state, so there is no location to read. Call `partial_fit!(ce, X)` first, or `forecast_location(ce, X)` for a fit over a whole sample."))
 end
-function forecast_state_location(ce, state::AbstractPartialFitState)
+function forecast_location(ce, state::AbstractPartialFitState = partial_fit_cache(ce))
     return throw(ArgumentError("`$(typeof(ce).name.name)` carries a `$(typeof(state).name.name)`, and `forecast_location` has no method that reads a location out of it. Add `forecast_location(ce::$(typeof(ce).name.name))`, or wrap the estimator in `Online` so its state is a sample buffer whose column mean is the location."))
-end
-"""
-    forecast_coverage_policy(ce)
-
-Read the [`CoveragePolicy`](@ref) that decides the Asset Panel arm of [`forecast_location`](@ref), out of an estimator that may have no such field.
-
-[`coverage_policy`](@ref) answers for the two families that can carry a policy. Every other covariance estimator answers `nothing`, so the panel form reduces the window to the Coverage Universe, as the Asset Panel method of `cov` does for those estimators. A [`PortfolioOptimisersCovariance`](@ref) does not reach this verb, because its panel form forwards to the estimator that it holds.
-
-# Related
-
-  - [`forecast_location`](@ref)
-  - [`coverage_policy`](@ref)
-"""
-function forecast_coverage_policy(ce::Union{GeneralCovariance, Covariance})
-    return coverage_policy(ce)
-end
-function forecast_coverage_policy(::Any)
-    return nothing
 end
 """
     finite_column_mean(X::MatNum)

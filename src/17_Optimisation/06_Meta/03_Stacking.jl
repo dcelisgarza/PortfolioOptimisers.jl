@@ -730,7 +730,10 @@ Run the stacking optimisation.
 
   - `st`: The stacking optimiser.
   - $(arg_dict[:rd])
-  - `branchorder`, `str_names`, `save`, `kwargs`: Passed to the solve of each inner optimiser and to the solve of `st.opto`.
+  - `branchorder`: Passed to each inner optimiser and to the outer optimiser. The branch order of a clusterisation.
+  - `str_names`: Passed to each inner optimiser and to the outer optimiser. When `true`, the optimisation uses string names for the assets.
+  - `save`: Passed to each inner optimiser and to the outer optimiser. When `true`, a JuMP result keeps its model.
+  - `kwargs`: Passed to each inner optimiser and to the outer optimiser.
 
 # Validation
 
@@ -738,7 +741,7 @@ Run the stacking optimisation.
 
 # Returns
 
-  - `StackingResult`: The stacked portfolio.
+  - `res::StackingResult`: The stacked portfolio. `retcode` is an [`OptimisationFailure`](@ref) when an inner solve, the outer solve or the weight finaliser failed. An outer efficient frontier gives one weight vector and one return code for each point.
 
 # Related
 
@@ -772,7 +775,7 @@ function _optimise(st::Stacking, rd::ReturnsResult; branchorder::Symbol = :optim
     # The reduced `rd` takes a name of its own: a variable that is reassigned and then
     # captured by the fold's closure is boxed, which FLoops reports as a correctness and
     # performance problem on every call.
-    _, pr, st, rdr = investable_reduction(imsk, pr, st, rd)
+    _, pr, st, rdr = investable_reduction(pr, st, rd, imsk)
     X = pr.X
     opti = st.opti
     Ni = length(opti)
@@ -797,48 +800,6 @@ function _optimise(st::Stacking, rd::ReturnsResult; branchorder::Symbol = :optim
     return StackingResult(; pr = pr, wb = wb, fees = fees, resi = resi, reso = reso,
                           cv = st.cv, scorer = st.scorer, retcode = retcode, w = w,
                           imsk = imsk, fb = nothing)
-end
-"""
-    optimise(st::Stacking{<:Any, <:Any, <:Any, <:Any, <:Any, <:Any, <:Any, <:Any,
-                     <:Any, <:Any, <:Any, Nothing
-                 }, rd::ReturnsResult;
-             branchorder::Symbol = :optimal, str_names::Bool = false,
-             save::Bool = true, kwargs...) -> StackingResult
-
-Run the stacking portfolio optimisation.
-
-# Arguments
-
-  - `st`: The stacking optimiser.
-  - $(arg_dict[:rd])
-  - `branchorder`: Passed to each inner optimiser and to the outer optimiser. The branch order of a clusterisation.
-  - `str_names`: Passed to each inner optimiser and to the outer optimiser. When `true`, the optimisation uses string names for the assets.
-  - `save`: Passed to each inner optimiser and to the outer optimiser. When `true`, a JuMP result keeps its model.
-  - `kwargs`: Passed to each inner optimiser and to the outer optimiser.
-
-# Validation
-
-  - No field in the tree of `st` holds an [`Online`](@ref). The method throws an `ArgumentError` that names the field otherwise, through [`assert_batch_entry`](@ref). A plain `optimise` is a batch fit, and a wrapper resolves only at the warm-up of the online arm of the fold loop.
-  - No inner optimiser returns an efficient frontier. The method throws an `ArgumentError` otherwise.
-
-# Returns
-
-  - `res::StackingResult`: The stacked portfolio. `retcode` is an [`OptimisationFailure`](@ref) when an inner solve, the outer solve or the weight finaliser failed. An outer efficient frontier gives one weight vector and one return code for each point.
-
-# Related
-
-  - [`Stacking`](@ref)
-  - [`StackingResult`](@ref)
-  - [`_optimise`](@ref)
-  - [`combination_weights`](@ref)
-"""
-function optimise(st::Stacking{<:Any, <:Any, <:Any, <:Any, <:Any, <:Any, <:Any, <:Any,
-                               <:Any, <:Any, <:Any, Nothing}, rd::ReturnsResult;
-                  branchorder::Symbol = :optimal, str_names::Bool = false,
-                  save::Bool = true, kwargs...)
-    assert_batch_entry(st, "`optimise`")
-    return shared_series_solve(st, rd; branchorder = branchorder, str_names = str_names,
-                               save = save, kwargs...)
 end
 
 export StackingResult, Stacking

@@ -248,11 +248,8 @@ const CombCVER = Union{CombinatorialCrossValidation, CombinatorialCrossValidatio
 function n_splits(n_folds::Integer, n_test_folds::Integer)
     return binomial(n_folds, n_test_folds)
 end
-function n_splits(ccv::CombinatorialCrossValidation)
+function n_splits(ccv::CombinatorialCrossValidation, ::Option{<:Prices_RR} = nothing)
     return n_splits(ccv.n_folds, ccv.n_test_folds)
-end
-function n_splits(ccv::CombinatorialCrossValidation, ::Prices_RR)
-    return n_splits(ccv)
 end
 """
     n_test_paths(n_folds, n_test_folds)

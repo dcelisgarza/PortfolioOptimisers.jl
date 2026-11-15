@@ -666,6 +666,44 @@ function finite_sub_allocation(w::VecNum, p::VecNum, lu::Num_VecNum, cash::Numbe
     acash = cash - sum(cost) - afee
     return shares, cost, aw, acash, afee, res, model
 end
+"""
+    _optimise(da::DiscreteAllocation, fai::FiniteAllocationInput; str_names::Bool = false,
+              save::Bool = true, kwargs...) -> DiscreteAllocationResult
+
+Allocate a book into whole lots with a [`DiscreteAllocation`](@ref).
+
+[`optimise`](@ref) calls this method, once for an allocator with no fallback, and once for each step of the fallback chain otherwise.
+
+# Algorithm
+
+ 1. Read the target weights, the long and the short side, and the charge of each side with [`prepare_finite_allocation`](@ref). It removes each Unpriced Asset from its side, and gives its target weight to the rule `fai.upw`.
+ 2. Resolve the lot unit of each asset with [`allocation_lot_unit`](@ref). Each side views a vector lot unit with its own mask.
+ 3. Start every share count, cost and weight at zero, so an Unpriced Asset holds zero in each.
+ 4. Solve the short side with [`finite_sub_allocation`](@ref), on its negated weights, with the short cash that `fai.ca` gives.
+ 5. Compute the long side's cash with `fai.ca`, from the money of the shares that the short side sold and the fee that it paid. See [`AbstractCollateralAlgorithm`](@ref).
+ 6. Solve the long side with [`finite_sub_allocation`](@ref).
+ 7. Recombine the two sides over the whole universe, and negate the short side's shares, cost and weights.
+ 8. Compute `cash`, the cash that the account holds after the trade, with the third method of `fai.ca`. It includes the cash that no side received, such as the weight of an Unpriced Asset under `upw = nothing`.
+ 9. Set `retcode` to an [`OptimisationFailure`](@ref) when either side failed, with one warning per failed side, and to an [`OptimisationSuccess`](@ref) otherwise.
+
+# Arguments
+
+  - `da`: The discrete allocation optimiser.
+  - `fai`: The [`FiniteAllocationInput`](@ref) carrying the target weights, the prices, the cash, the collateral algorithm, and the optional horizon and fees.
+  - `str_names`: Whether the JuMP variables get string names.
+  - `save`: Whether the result keeps the two JuMP models.
+  - `kwargs`: Accepted, so that every optimiser takes one call, and ignored.
+
+# Returns
+
+  - `res::DiscreteAllocationResult`: The realised allocation. `cash` is the cash that the account holds after the trade, and `fees` is the sum of the two sides' fees.
+
+# Related
+
+  - [`DiscreteAllocation`](@ref)
+  - [`DiscreteAllocationResult`](@ref)
+  - [`FiniteAllocationInput`](@ref)
+"""
 function _optimise(da::DiscreteAllocation, fai::FiniteAllocationInput;
                    str_names::Bool = false, save::Bool = true, kwargs...)
     p, cash, ca = fai.prices, fai.cash, fai.ca
@@ -716,49 +754,4 @@ function _optimise(da::DiscreteAllocation, fai::FiniteAllocationInput;
                                     s_model = ifelse(save, smodel, nothing),
                                     l_model = ifelse(save, lmodel, nothing), fb = nothing)
 end
-"""
-    optimise(da::DiscreteAllocation{<:Any, <:Any, <:Any, <:Any, <:Any, <:Any, <:Any, Nothing},
-             fai::FiniteAllocationInput; str_names::Bool = false,
-             save::Bool = true, kwargs...) -> DiscreteAllocationResult
-
-Allocate a book into whole lots with a [`DiscreteAllocation`](@ref) that carries no fallback.
-
-This method takes `da.fb === nothing` only. An allocator with a fallback goes through the generic `optimise` of an [`OptimisationEstimator`](@ref), which walks the fallback chain and runs the same steps.
-
-# Algorithm
-
- 1. Read the target weights, the long and the short side, and the charge of each side with [`prepare_finite_allocation`](@ref). It removes each Unpriced Asset from its side, and gives its target weight to the rule `fai.upw`.
- 2. Resolve the lot unit of each asset with [`allocation_lot_unit`](@ref). Each side views a vector lot unit with its own mask.
- 3. Start every share count, cost and weight at zero, so an Unpriced Asset holds zero in each.
- 4. Solve the short side with [`finite_sub_allocation`](@ref), on its negated weights, with the short cash that `fai.ca` gives.
- 5. Compute the long side's cash with `fai.ca`, from the money of the shares that the short side sold and the fee that it paid. See [`AbstractCollateralAlgorithm`](@ref).
- 6. Solve the long side with [`finite_sub_allocation`](@ref).
- 7. Recombine the two sides over the whole universe, and negate the short side's shares, cost and weights.
- 8. Compute `cash`, the cash that the account holds after the trade, with the third method of `fai.ca`. It includes the cash that no side received, such as the weight of an Unpriced Asset under `upw = nothing`.
- 9. Set `retcode` to an [`OptimisationFailure`](@ref) when either side failed, with one warning per failed side, and to an [`OptimisationSuccess`](@ref) otherwise.
-
-# Arguments
-
-  - `da`: The discrete allocation optimiser.
-  - `fai`: The [`FiniteAllocationInput`](@ref) carrying the target weights, the prices, the cash, the collateral algorithm, and the optional horizon and fees.
-  - `str_names`: Whether the JuMP variables get string names.
-  - `save`: Whether the result keeps the two JuMP models.
-  - `kwargs`: Accepted, so that every optimiser takes one call, and ignored.
-
-# Returns
-
-  - `res::DiscreteAllocationResult`: The realised allocation. `cash` is the cash that the account holds after the trade, and `fees` is the sum of the two sides' fees.
-
-# Related
-
-  - [`DiscreteAllocation`](@ref)
-  - [`DiscreteAllocationResult`](@ref)
-  - [`FiniteAllocationInput`](@ref)
-"""
-function optimise(da::DiscreteAllocation{<:Any, <:Any, <:Any, <:Any, <:Any, <:Any, <:Any,
-                                         Nothing}, fai::FiniteAllocationInput;
-                  str_names::Bool = false, save::Bool = true, kwargs...)
-    return _optimise(da, fai; str_names = str_names, save = save, kwargs...)
-end
-
 export DiscreteAllocationResult, DiscreteAllocation

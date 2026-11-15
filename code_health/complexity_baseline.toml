@@ -318,7 +318,7 @@ commit = "63edda0ed1"
 "src/17_Optimisation/01_Base_Optimisation/02_PipeRouting.jl" = { cyc = 4, cog = 7, arg = 3, cyc_sum = 18, cog_sum = 17, arg_sum = 11, macros = [] }
 "src/17_Optimisation/01_Base_Optimisation/03_TimeDependent.jl" = { cyc = 5, cog = 6, arg = 7, cyc_sum = 122, cog_sum = 85, arg_sum = 72, macros = [] }
 "src/17_Optimisation/01_Base_Optimisation/04_WeightFinalisers.jl" = { cyc = 5, cog = 6, arg = 4, cyc_sum = 25, cog_sum = 14, arg_sum = 46, macros = [] }
-"src/17_Optimisation/01_Base_Optimisation/05_InvestableUniverse.jl" = { cyc = 5, cog = 4, arg = 5, cyc_sum = 38, cog_sum = 16, arg_sum = 81, macros = [] }
+"src/17_Optimisation/01_Base_Optimisation/05_InvestableUniverse.jl" = { cyc = 6, cog = 4, arg = 5, cyc_sum = 38, cog_sum = 15, arg_sum = 78, macros = [] }
 "src/17_Optimisation/01_Base_Optimisation/06_PanelCollapse.jl" = { cyc = 4, cog = 6, arg = 6, cyc_sum = 85, cog_sum = 53, arg_sum = 208, macros = [] }
 "src/17_Optimisation/01_Base_Optimisation/07_ResultInvestableView.jl" = { cyc = 3, cog = 3, arg = 6, cyc_sum = 20, cog_sum = 11, arg_sum = 62, macros = [] }
 "src/17_Optimisation/01_Base_Optimisation/08_UniverseAxisOrder.jl" = { cyc = 5, cog = 6, arg = 7, cyc_sum = 28, cog_sum = 16, arg_sum = 37, macros = [] }

@@ -1,5 +1,5 @@
 ```@meta
-Description = "Subset resampling, public API of PortfolioOptimisers.jl: SubsetResamplingResult, PowerSubsetSize, SubsetResampling, factory, port_opt_view, optimise, …"
+Description = "Subset resampling, public API of PortfolioOptimisers.jl: SubsetResamplingResult, PowerSubsetSize, SubsetResampling, factory, port_opt_view, _optimise, …"
 ```
 
 # Subset resampling
@@ -11,7 +11,7 @@ SubsetResampling
 factory(sr::SubsetResamplingResult, fb::Option{<:OptE_Opt_FbChain})
 factory(sr::SubsetResampling, w::AbstractVector)
 port_opt_view(sr::SubsetResampling, i, X::MatNum, args...)
-optimise(sr::SubsetResampling{<:Any, <:Any, <:Any, <:Any, <:Any, <:Any, <:Any, <:Any, <:Any, <:Any, <:Any, <:Any, Nothing}, rd::ReturnsResult; dims::Int = 1, branchorder::Symbol = :optimal, str_names::Bool = false, save::Bool = true, kwargs...)
+_optimise(sr::SubsetResampling, rd::ReturnsResult)
 needs_previous_weights(opt::SubsetResampling)
 ```
 

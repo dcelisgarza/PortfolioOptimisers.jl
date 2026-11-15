@@ -738,6 +738,50 @@ function subset_resampling_finaliser(N::Integer, n_subsets::Integer, asset_idx::
     return map(x -> subset_resampling_retcode(ress, x[1]), retcode_w),
            map(x -> x[2], retcode_w)
 end
+"""
+$(DocStringExtensions.TYPEDSIGNATURES)
+
+Run the subset resampling optimisation, and return the averaged portfolio.
+
+[`optimise`](@ref) calls this method. The struct [`SubsetResampling`](@ref) states the mathematics.
+
+# Algorithm
+
+ 1. Reset the schedules of `sr` with [`reset_time_dependent_estimator`](@ref).
+ 2. Fit the prior `sr.pe` on `rd` with [`prior`](@ref), giving `pr`, and read its investable mask with [`investable_mask`](@ref), giving `imsk`. The prior reads the returns in the frame that its own `x_src` states. `rd` keeps its raw returns, and the readers of the subset optimisers state their own sources.
+ 3. Resolve the fees on the full asset universe with [`fees_constraints`](@ref), and put them on the investable universe with [`investable_fees_view`](@ref), giving `fees`.
+ 4. Reduce `pr`, `sr` and `rd` to the investable universe with [`investable_reduction`](@ref), giving `rdr`. `N` is the number of investable assets.
+ 5. Resolve `subset_size` and `n_subsets` on `pr` with [`get_subset_size`](@ref) and [`get_n_subsets`](@ref).
+ 6. Draw the subsets with [`sample_unique_assets`](@ref), giving `asset_idx`. When `binomial(N, subset_size)` is at most `max_comb`, the subsets are distinct. Otherwise the function draws each subset alone, and two subsets can be equal.
+ 7. For each column of `asset_idx`, view `sr.opt` and `rdr` on the subset with [`port_opt_view`](@ref) and optimise the view, giving `ress`. The loop runs on the executor `sr.ex`.
+ 8. Build the weight bounds `wb` over the ``N`` assets with [`weight_bounds_constraints`](@ref).
+ 9. Average and finalise the subset weights with [`subset_resampling_finaliser`](@ref), giving `retcode` and `w`.
+10. Return a [`SubsetResamplingResult`](@ref). Its keyword constructor expands `w` onto the full asset universe.
+
+# Arguments
+
+  - `sr`: The subset resampling optimiser to use.
+  - $(arg_dict[:rd])
+  - `branchorder`: Branch order, passed to each subset optimisation.
+  - `str_names`: Whether each subset optimisation uses string names for the assets.
+  - `save`: Whether each subset optimisation saves its JuMP model in its result.
+  - `kwargs`: Other keyword arguments, passed to each subset optimisation.
+
+# Validation
+
+  - `n_subsets <= binomial(N, subset_size)`. [`sample_unique_assets`](@ref) throws an `ArgumentError` otherwise.
+
+# Returns
+
+  - `res::SubsetResamplingResult`: The averaged portfolio. `retcode` is an [`OptimisationFailure`](@ref) when a subset optimisation fails, or when the weight finaliser fails.
+
+# Related
+
+  - [`SubsetResampling`](@ref)
+  - [`SubsetResamplingResult`](@ref)
+  - [`subset_resampling_finaliser`](@ref)
+  - [`optimise`](@ref)
+"""
 function _optimise(sr::SubsetResampling, rd::ReturnsResult; branchorder::Symbol = :optimal,
                    str_names::Bool = false, save::Bool = true, kwargs...)
     sr = reset_time_dependent_estimator(sr)
@@ -760,7 +804,7 @@ function _optimise(sr::SubsetResampling, rd::ReturnsResult; branchorder::Symbol 
     # The reduced `rd` takes a name of its own: a variable that is reassigned and then
     # captured by the fold's closure is boxed, which FLoops reports as a correctness and
     # performance problem on every call.
-    _, pr, sr, rdr = investable_reduction(imsk, pr, sr, rd)
+    _, pr, sr, rdr = investable_reduction(pr, sr, rd, imsk)
     X = pr.X
     N = size(X, 2)
     (; subset_size, n_subsets, max_comb, rng, seed) = sr
@@ -784,63 +828,6 @@ function _optimise(sr::SubsetResampling, rd::ReturnsResult; branchorder::Symbol 
     return SubsetResamplingResult(; pr = pr, wb = wb, fees = fees, ress = ress,
                                   idx = asset_idx, retcode = retcode, w = w, imsk = imsk,
                                   fb = nothing)
-end
-"""
-    optimise(sr::SubsetResampling{<:Any, <:Any, <:Any, <:Any, <:Any, <:Any, <:Any,
-                     <:Any, <:Any, <:Any, <:Any, <:Any, Nothing
-                 }, rd::ReturnsResult;
-             branchorder::Symbol = :optimal, str_names::Bool = false,
-             save::Bool = true, kwargs...) -> SubsetResamplingResult
-
-Solve a [`SubsetResampling`](@ref) that has no fallback, and return the averaged portfolio.
-
-A `SubsetResampling` with a fallback goes through the generic [`optimise`](@ref), which walks the fallback chain. The two methods give the same result when `fb` is `nothing`.
-
-# Algorithm
-
- 1. Refuse an [`Online`](@ref) in the tree of `sr` with [`assert_batch_entry`](@ref).
- 2. Reset the schedules of `sr` with [`reset_time_dependent_estimator`](@ref).
- 3. Fit the prior `sr.pe` on `rd` with [`prior`](@ref), giving `pr`, and read its investable mask with [`investable_mask`](@ref), giving `imsk`. The prior reads the returns in the frame that its own `x_src` states. `rd` keeps its raw returns, and the readers of the subset optimisers state their own sources.
- 4. Resolve the fees on the full asset universe with [`fees_constraints`](@ref), and put them on the investable universe with [`investable_fees_view`](@ref), giving `fees`.
- 5. Reduce `pr`, `sr` and `rd` to the investable universe with [`investable_reduction`](@ref), giving `rdr`. `N` is the number of investable assets.
- 6. Resolve `subset_size` and `n_subsets` on `pr` with [`get_subset_size`](@ref) and [`get_n_subsets`](@ref).
- 7. Draw the subsets with [`sample_unique_assets`](@ref), giving `asset_idx`. When `binomial(N, subset_size)` is at most `max_comb`, the subsets are distinct. Otherwise the function draws each subset alone, and two subsets can be equal.
- 8. For each column of `asset_idx`, view `sr.opt` and `rdr` on the subset with [`port_opt_view`](@ref) and optimise the view, giving `ress`. The loop runs on the executor `sr.ex`.
- 9. Build the weight bounds `wb` over the ``N`` assets with [`weight_bounds_constraints`](@ref).
-10. Average and finalise the subset weights with [`subset_resampling_finaliser`](@ref), giving `retcode` and `w`.
-11. Return a [`SubsetResamplingResult`](@ref). Its keyword constructor expands `w` onto the full asset universe.
-
-# Arguments
-
-  - `sr`: The subset resampling optimiser to use.
-  - $(arg_dict[:rd])
-  - `branchorder`: Branch order, passed to each subset optimisation.
-  - `str_names`: Whether each subset optimisation uses string names for the assets.
-  - `save`: Whether each subset optimisation saves its JuMP model in its result.
-  - `kwargs`: Other keyword arguments, passed to each subset optimisation.
-
-# Validation
-
-  - No field in the tree of `sr` holds an [`Online`](@ref). [`assert_batch_entry`](@ref) throws an `ArgumentError` that names the field otherwise. A plain `optimise` is a batch fit, and the fold loop resolves the wrapper only at the warm-up of its online arm.
-  - `n_subsets <= binomial(N, subset_size)`. [`sample_unique_assets`](@ref) throws an `ArgumentError` otherwise.
-
-# Returns
-
-  - `res::SubsetResamplingResult`: The averaged portfolio. `retcode` is an [`OptimisationFailure`](@ref) when a subset optimisation fails, or when the weight finaliser fails.
-
-# Related
-
-  - [`SubsetResampling`](@ref)
-  - [`SubsetResamplingResult`](@ref)
-  - [`subset_resampling_finaliser`](@ref)
-"""
-function optimise(sr::SubsetResampling{<:Any, <:Any, <:Any, <:Any, <:Any, <:Any, <:Any,
-                                       <:Any, <:Any, <:Any, <:Any, <:Any, Nothing},
-                  rd::ReturnsResult; branchorder::Symbol = :optimal,
-                  str_names::Bool = false, save::Bool = true, kwargs...)
-    assert_batch_entry(sr, "`optimise`")
-    return shared_series_solve(sr, rd; branchorder = branchorder, str_names = str_names,
-                               save = save, kwargs...)
 end
 """
     group_frames(opt::NestedClustered) -> ReturnsFrames

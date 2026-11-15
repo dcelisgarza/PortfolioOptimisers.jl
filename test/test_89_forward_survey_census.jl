@@ -581,6 +581,16 @@ using Test
         @test ("stale entries of RULED_REBUILDS",
                sort!([p for p in keys(FS.RULED_REBUILDS) if !(p in shapes)])) ==
               ("stale entries of RULED_REBUILDS", Tuple{Symbol, Symbol}[])
+        # An entry of `RULED_SELF_FORWARDS` whose name no longer calls itself is stale: the
+        # build ticket that removed the self-forward deletes it (#2103).
+        selfs = Set(x.name for x in found_real if x.shape == "self-forward")
+        @test ("stale entries of RULED_SELF_FORWARDS",
+               sort!([n for n in keys(FS.RULED_SELF_FORWARDS) if !(n in selfs)])) ==
+              ("stale entries of RULED_SELF_FORWARDS", Symbol[])
+        @test all(x -> x.verdict == "keep (b)",
+                  (x
+                   for x in found_real
+                   if x.name === :oriented_score && x.shape == "self-forward"))
         # An entry of `RULED_NAMED_TUPLES` whose name no longer returns a named tuple is stale:
         # the build ticket that changed the return deletes it (#2113).
         nts = Set(x.name for x in found_real if x.shape == "named tuple")

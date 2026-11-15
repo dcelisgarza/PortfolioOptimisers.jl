@@ -1445,9 +1445,8 @@ function parse_lens(key::Union{ComposedFunction, Accessors.PropertyLens,
 end
 """
     assert_search_grid_cap(total::Integer, detail::AbstractString)
-    assert_search_grid_cap(factors::AbstractVector{<:Pair})
-    assert_search_grid_cap(estval::AbstractVector{<:Pair{<:Any, <:AbstractVector}})
-    assert_search_grid_cap(estval::AbstractDict{<:Any, <:AbstractVector})
+    assert_search_grid_cap(estval::Union{AbstractVector{<:Pair{<:Any, <:AbstractVector}},
+                                         AbstractDict{<:Any, <:AbstractVector}})
 
 Assert the **total** number of search-grid candidates does not exceed the active `max_search_grid` ceiling.
 
@@ -1459,8 +1458,7 @@ Concatenated parameter sets are a **sum** of products, not a product: each set i
 
   - `total`: Candidate count already computed (a `BigInt` on the product path, since `k` parameters at the ceiling overflow an `Int64` before the check reads it).
   - `detail`: Phrase naming how `total` was made, interpolated into the message.
-  - `factors`: `key => value-count` pairs, one per tuned parameter.
-  - `estval`: The parameter grid itself, from which the factors are derived.
+  - `estval`: The parameter grid itself, `key => values` pairs or a dictionary from key to values. The count of each value vector is a factor of the product.
 
 # Validation
 
@@ -1485,21 +1483,19 @@ function assert_search_grid_cap(total::Integer, detail::AbstractString)::Nothing
                           "the search grid is $total candidates — $detail — and exceeds RESOURCE_LIMITS[].max_search_grid = $cap. Every candidate runs a full cross-validated fit, so the ceiling is on the whole grid, not on any single parameter's value count. Tune fewer parameters, or shorten a value vector. Raise the ceiling with set_resource_limits!(; max_search_grid) — or with_resource_limits for a single scope, or the \"max_search_grid\" preference for a whole project — for genuinely large machine-authored runs."))
     return nothing
 end
-function assert_search_grid_cap(factors::AbstractVector{<:Pair})::Nothing
-    for (key, n) in factors
-        @argcheck(!iszero(n),
+function assert_search_grid_cap(estval::Union{AbstractVector{<:Pair{<:Any,
+                                                                    <:AbstractVector}},
+                                              AbstractDict{<:Any, <:AbstractVector}})::Nothing
+    for (key, vals) in estval
+        @argcheck(!isempty(vals),
                   IsEmptyError("the search grid parameter `$key` holds no candidate value, so the grid is the product of an empty set and holds no candidate for the search to score. Give every tuned parameter at least one value."))
     end
-    return assert_search_grid_cap(prod(big(n) for (_, n) in factors; init = big(1)),
+    return assert_search_grid_cap(prod(big(length(vals)) for (_, vals) in estval;
+                                       init = big(1)),
                                   "the product " *
-                                  join(("$key = $n" for (key, n) in factors), " × ") *
+                                  join(("$key = $(length(vals))" for (key, vals) in estval),
+                                       " × ") *
                                   " across every tuned parameter")
-end
-function assert_search_grid_cap(estval::AbstractVector{<:Pair{<:Any, <:AbstractVector}})::Nothing
-    return assert_search_grid_cap([x[1] => length(x[2]) for x in estval])
-end
-function assert_search_grid_cap(estval::AbstractDict{<:Any, <:AbstractVector})::Nothing
-    return assert_search_grid_cap([key => length(val) for (key, val) in estval])
 end
 
 export SearchCrossValidationResult, HighestMeanScore

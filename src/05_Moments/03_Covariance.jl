@@ -1918,16 +1918,16 @@ function Statistics.cov(ce::Union{GeneralCovariance,
     return coverage_covariance(ce, coverage_policy(ce), state; strict = strict)
 end
 """
-    coverage_policy(ce::GeneralCovariance) -> Nothing
+    coverage_policy(ce) -> Nothing
     coverage_policy(ce::Covariance) -> Option{<:CoveragePolicy}
 
 Reads the [`CoveragePolicy`](@ref) of a covariance estimator. The estimator can have no `cvg` field.
 
-[`GeneralCovariance`](@ref) and [`Covariance`](@ref) share one state, and one method that makes the estimate from it, `cov(ce)` with no data. Only [`Covariance`](@ref) has a `cvg` field, so that method gets the policy through this function and not from the field. Dispatch still selects the arm, and the estimator with no field returns `nothing`.
+[`GeneralCovariance`](@ref) and [`Covariance`](@ref) share one state, and one method that makes the estimate from it, `cov(ce)` with no data. Only [`Covariance`](@ref) has a `cvg` field, so that method gets the policy through this function and not from the field. Dispatch still selects the arm. This function is a query, so it owns the answer "none": every estimator other than [`Covariance`](@ref) returns `nothing`. The Asset Panel form of [`forecast_location`](@ref) reads the policy of any covariance estimator through it.
 
 # Arguments
 
-  - `ce`: The covariance estimator.
+  - `ce`: The covariance estimator, of any type.
 
 # Returns
 
@@ -1940,7 +1940,7 @@ Reads the [`CoveragePolicy`](@ref) of a covariance estimator. The estimator can 
   - [`Covariance`](@ref)
   - [`coverage_covariance`](@ref)
 """
-function coverage_policy(::GeneralCovariance)
+function coverage_policy(::Any)
     return nothing
 end
 function coverage_policy(ce::Covariance)
