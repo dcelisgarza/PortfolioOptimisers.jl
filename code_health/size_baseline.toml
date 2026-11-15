@@ -6,7 +6,7 @@
 [provenance]
 julia = "1.13.4"
 julia_syntax = "1.0.2"
-commit = "0e09157222"
+commit = "bf35c74910"
 
 [file]
 "ext/PortfolioOptimisersPlotsExt/01_CumulativeReturnsPlots.jl" = { code = 287, doc = 0, comment = 12, blank = 2, total = 301 }
@@ -334,7 +334,8 @@ commit = "0e09157222"
 "src/17_Optimisation/02_CrossValidation/05_MultipleRandomised.jl" = { code = 286, doc = 376, comment = 16, blank = 164, total = 842 }
 "src/17_Optimisation/02_CrossValidation/06_Validation.jl" = { code = 16, doc = 19, comment = 0, blank = 9, total = 44 }
 "src/17_Optimisation/02_CrossValidation/07_Scoring.jl" = { code = 111, doc = 277, comment = 16, blank = 128, total = 532 }
-"src/17_Optimisation/02_CrossValidation/09_Base_SearchCrossValidation.jl" = { code = 462, doc = 747, comment = 18, blank = 282, total = 1509 }
+"src/17_Optimisation/02_CrossValidation/08_SearchScorers.jl" = { code = 90, doc = 277, comment = 7, blank = 132, total = 506 }
+"src/17_Optimisation/02_CrossValidation/09_Base_SearchCrossValidation.jl" = { code = 416, doc = 606, comment = 11, blank = 216, total = 1249 }
 "src/17_Optimisation/02_CrossValidation/10_GridSearchCrossValidation.jl" = { code = 76, doc = 175, comment = 21, blank = 54, total = 326 }
 "src/17_Optimisation/02_CrossValidation/11_RandomisedSearchCrossValidation.jl" = { code = 78, doc = 173, comment = 0, blank = 72, total = 323 }
 "src/17_Optimisation/02_CrossValidation/12_OnlineFoldLoop.jl" = { code = 68, doc = 162, comment = 5, blank = 70, total = 305 }

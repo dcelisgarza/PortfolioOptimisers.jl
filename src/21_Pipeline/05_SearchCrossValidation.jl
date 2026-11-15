@@ -533,6 +533,7 @@ function search_cross_validation(pipe::Pipeline, rscv::RandomisedSearchCrossVali
                                                              cv = rscv.cv, r = rscv.r,
                                                              r_sca = rscv.r_sca,
                                                              scorer = rscv.scorer,
+                                                             s_sca = rscv.s_sca,
                                                              n_best = rscv.n_best,
                                                              ex = rscv.ex,
                                                              train_score = rscv.train_score,

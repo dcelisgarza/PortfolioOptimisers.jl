@@ -384,7 +384,8 @@
 "src/17_Optimisation/02_CrossValidation/05_MultipleRandomised.jl" = { map = 12, units = 21, swept = false }
 "src/17_Optimisation/02_CrossValidation/06_Validation.jl" = { map = 12, units = 1, swept = false }
 "src/17_Optimisation/02_CrossValidation/07_Scoring.jl" = { map = 12, units = 14, algorithm = 2, swept = true, bindings = ["AbstractCrossValidationScorer", "NearestQuantilePrediction", "PredictionCrossValScorer", "PredictionScorer", "assert_path_reduction", "lacks_id", "member_solved", "oriented_member_score", "oriented_score", "oriented_value", "population_ids", "prediction_returns", "successful_members", "with_position_id"] }
-"src/17_Optimisation/02_CrossValidation/09_Base_SearchCrossValidation.jl" = { map = 12, units = 28, swept = false }
+"src/17_Optimisation/02_CrossValidation/08_SearchScorers.jl" = { map = 12, units = 10, swept = false }
+"src/17_Optimisation/02_CrossValidation/09_Base_SearchCrossValidation.jl" = { map = 12, units = 23, swept = false }
 "src/17_Optimisation/02_CrossValidation/10_GridSearchCrossValidation.jl" = { map = 12, units = 3, algorithm = 3, swept = true, bindings = ["lens_val_grid", "search_cross_validation", "search_cross_validation"] }
 "src/17_Optimisation/02_CrossValidation/11_RandomisedSearchCrossValidation.jl" = { map = 12, units = 5, algorithm = 5, swept = true, bindings = ["draw_search_point", "make_p_grid", "sample_grid_positions", "search_cross_validation", "search_grid_point"] }
 "src/17_Optimisation/02_CrossValidation/12_OnlineFoldLoop.jl" = { map = 12, units = 6, algorithm = 2, swept = true, bindings = ["fit_fold_result", "one_previous_portfolio", "online_folds", "online_step_fold", "step_context", "thread_online_folds!"] }

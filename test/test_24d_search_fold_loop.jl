@@ -220,8 +220,8 @@ The fixture is the online fold loop's, because the identities are structural.
             @test all(isnan, res.test_scores[:, 3])
             @test res.idx == 1
             @test res.val_grid[res.idx] == (ok,)
-            @test po.finite_candidate_order(HighestMeanScore(), res.test_scores, 3) ==
-                  ([1], [mean(res.test_scores[:, 1])])
+            @test po.finite_candidate_order(nothing, HighestMeanScore(), res.test_scores,
+                                            3) == ([1], [mean(res.test_scores[:, 1])])
             @test res.rank_idx == [1]
         end
     end
@@ -577,33 +577,39 @@ The fixture is the online fold loop's, because the identities are structural.
         # A tie keeps grid order, in the order and in the index form.
         S = [0.5 0.8 0.8 0.25
              0.7 0.6 0.6 0.25]
-        o, v = po.finite_candidate_order(hms, S, 4)
+        o, v = po.finite_candidate_order(nothing, hms, S, 4)
         @test o == [2, 3, 1, 4] && v == vec(mean(S; dims = 1))[o]
         @test hms(S) == 2
         # A failed candidate never enters the order, and the cap is the count of finite
         # columns.
         Sf = [NaN 0.5 0.8
               0.2 0.5 0.8]
-        @test po.finite_candidate_order(hms, Sf, 3) == ([3, 2], [0.8, 0.5])
+        @test po.finite_candidate_order(nothing, hms, Sf, 3) == ([3, 2], [0.8, 0.5])
         # The index form of HighestMeanScore is argmax of its values.
         X = [0.5 0.75 0.25; 1.0 0.5 0.25]
         @test po.candidate_scores(hms, X) == vec(mean(X; dims = 1))
         @test argmax(po.candidate_scores(hms, X)) == hms(X)
 
-        # Refusals: a count below one, and a function scorer with more than one candidate,
-        # at construction. A function scorer keeps working at n_best = 1.
+        # Refusals: a count below one at construction. A function that gives an index with
+        # more than one candidate is refused when the search runs, because only its return
+        # shows its form (#2000, ADR 0233). It keeps working at n_best = 1.
         fsc = X -> argmax(vec(minimum(X; dims = 1)))
         @test_throws DomainError GridSearchCrossValidation(cgrid; n_best = 0)
         @test_throws DomainError RandomisedSearchCrossValidation(cgrid; n_best = 0)
         for est in (GridSearchCrossValidation, RandomisedSearchCrossValidation)
-            err = try
-                est(cgrid; scorer = fsc, n_best = 2)
-                nothing
-            catch e
-                e
-            end
-            @test err isa ArgumentError && occursin("candidate_scores", err.msg)
+            @test est(cgrid; scorer = fsc, n_best = 2).n_best == 2
         end
+        err = try
+            search_cross_validation(hrp,
+                                    gs(kcv, cgrid; scorer = fsc, n_best = 2,
+                                       ex = SequentialEx()), rd)
+            nothing
+        catch e
+            e
+        end
+        @test err isa ArgumentError &&
+              occursin("candidate_scores", err.msg) &&
+              occursin("n_best = 2", err.msg)
         rf = search_cross_validation(hrp, gs(kcv, cgrid; scorer = fsc, ex = SequentialEx()),
                                      rd)
         @test rf.idx == fsc(rf.test_scores) && rf.rank_idx == [rf.idx]
@@ -615,7 +621,7 @@ The fixture is the online fold loop's, because the identities are structural.
                                         ex = SequentialEx()), rd)
         @test ro.idx == rf.idx && isnothing(ro.rank_scores)
         err = try
-            po.finite_candidate_order(OnlyIndexScore(), S, 2)
+            po.finite_candidate_order(nothing, OnlyIndexScore(), S, 2)
             nothing
         catch e
             e
@@ -630,7 +636,8 @@ The fixture is the online fold loop's, because the identities are structural.
                                                             X::AbstractMatrix)
             return vec(minimum(X; dims = 1))
         end
-        @test po.finite_candidate_order(WorstFoldScore(), S, 2) == ([2, 3], [0.6, 0.6])
+        @test po.finite_candidate_order(nothing, WorstFoldScore(), S, 2) ==
+              ([2, 3], [0.6, 0.6])
         # R31 of #1817: the values must line up with the columns, and NaN has no place in an
         # order. A short vector picked a wrong candidate at n_best = 1 with no error, a long
         # one raised a BoundsError, and a NaN gave an order that depends on the sort. An
@@ -650,16 +657,16 @@ The fixture is the online fold loop's, because the identities are structural.
             return [1.0, Inf, -Inf, 0.5]
         end
         for sc in (ShortScore(), LongScore()), nb in (1, 2)
-            @test_throws DimensionMismatch po.finite_candidate_order(sc, S, nb)
+            @test_throws DimensionMismatch po.finite_candidate_order(nothing, sc, S, nb)
         end
         err = try
-            po.finite_candidate_order(NaNScore(), S, 2)
+            po.finite_candidate_order(nothing, NaNScore(), S, 2)
             nothing
         catch e
             e
         end
         @test err isa IsNonFiniteError && occursin("NaNScore", err.msg)
-        @test po.finite_candidate_order(InfScore(), S, 4) ==
+        @test po.finite_candidate_order(nothing, InfScore(), S, 4) ==
               ([2, 1, 4, 3], [Inf, 1.0, 0.5, -Inf])
 
         # The Result refuses kept fields that do not agree.
@@ -802,6 +809,108 @@ The fixture is the online fold loop's, because the identities are structural.
               median([-expected_risk(rv[1], fit, Xt), expected_risk(rv[2], fit, Xt)])
         @test po.oriented_score(SumScalariser(), rv, fit, Xt) ==
               -expected_risk(rv[1], fit, Xt) + expected_risk(rv[2], fit, Xt)
+    end
+
+    #=
+    Issue #2000, ADR 0233: a search orders its candidates with a vector of search scorers.
+    It multiplies the values of each scorer by its scale, and `s_sca` reduces the values of
+    each candidate to one. A function gives what a scorer gives, a vector or an index.
+    =#
+    @testset "14. A vector of search scorers reduces per candidate through `s_sca` (#2000)" begin
+        kcv = KFold(; n = 4)
+        hms = HighestMeanScore()
+        means(S) = vec(mean(S; dims = 1))
+        worst = X -> vec(minimum(X; dims = 1))
+        fidx = X -> argmax(vec(minimum(X; dims = 1)))
+        srch(; kwargs...) = search_cross_validation(hrp,
+                                                    gs(kcv, wbgrid; n_best = 3,
+                                                       ex = SequentialEx(), kwargs...), rd)
+        a = srch()
+        S = a.test_scores
+        # The hand formula: scale each scorer, then reduce the values of each candidate.
+        scored = [2 .* means(S), worst(S)]
+        for (sca, f) in
+            ((nothing, sum), (SumScalariser(), sum), (MaxScalariser(), maximum),
+             (MinScalariser(), minimum), (MeanValue(), mean), (minimum, minimum))
+            res = srch(; scorer = [HighestMeanScore(; scale = 2.0), worst], s_sca = sca)
+            hand = [f(getindex.(scored, j)) for j in axes(S, 2)]
+            @test res.test_scores == S
+            @test res.rank_idx == sortperm(hand; rev = true)
+            @test res.rank_scores ≈ hand[res.rank_idx]
+            @test res.opt === res.ranked[1] && res.idx == res.rank_idx[1]
+        end
+        # A negative scale is a negative weight, so a vector of one scorer at scale -1
+        # reverses the order of its means.
+        rn = srch(; scorer = [HighestMeanScore(; scale = -1.0)])
+        @test rn.rank_idx == sortperm(-means(S); rev = true)
+        @test rn.rank_scores == -means(S)[rn.rank_idx]
+        # One scorer: `s_sca` and the scale are inert, alone or in a vector of one at
+        # scale one. A function that gives the column means does the job of the type.
+        for kw in ((; scorer = HighestMeanScore(; scale = -3.0)),
+                   (; scorer = hms, s_sca = MaxScalariser()), (; scorer = [hms]),
+                   (; scorer = X -> vec(mean(X; dims = 1))))
+            res = srch(; kw...)
+            @test res.rank_idx == a.rank_idx && res.rank_scores == a.rank_scores
+        end
+        # A member that gives an index has no value to combine, so the search refuses it
+        # when it runs, and names the form to give.
+        err = try
+            srch(; scorer = [hms, fidx])
+            nothing
+        catch e
+            e
+        end
+        @test err isa ArgumentError &&
+              occursin("cannot join a vector", err.msg) &&
+              occursin("candidate_scores", err.msg)
+        # A member whose values do not line up with the columns is refused before the
+        # reduction, which would broadcast a vector of one value with no error.
+        @test_throws DimensionMismatch po.finite_candidate_order(nothing, [hms, X -> [1.0]],
+                                                                 S, 1)
+        # A reduction that gives NaN is refused, and the error names `s_sca`.
+        err = try
+            po.finite_candidate_order(StdValue(), [hms], S, 1)
+            nothing
+        catch e
+            e
+        end
+        @test err isa IsNonFiniteError && occursin("s_sca", err.msg)
+        # A scorer that gives neither a vector nor an integer is refused.
+        err = try
+            po.finite_candidate_order(nothing, X -> 1.5, S, 1)
+            nothing
+        catch e
+            e
+        end
+        @test err isa ArgumentError && occursin("Float64", err.msg)
+
+        # The constructors: a mixed literal is narrowed, an empty vector and a member that
+        # is not a scorer are refused, and a non-finite scale is refused.
+        for est in (GridSearchCrossValidation, RandomisedSearchCrossValidation)
+            e = est(wbgrid; scorer = Any[hms, worst], s_sca = MaxScalariser())
+            @test eltype(e.scorer) === Union{typeof(worst), typeof(hms)}
+            @test e.s_sca === MaxScalariser()
+            @test isnothing(est(wbgrid).s_sca)
+            @test_throws IsEmptyError est(wbgrid; scorer = Any[])
+            @test_throws ArgumentError est(wbgrid; scorer = Any[hms, 1])
+        end
+        @test_throws IsNonFiniteError HighestMeanScore(; scale = Inf)
+        @test po.scorer_scale(HighestMeanScore(; scale = 2.0)) == 2.0
+        @test po.scorer_scale(hms) == 1.0 && po.scorer_scale(worst) == 1
+
+        # The randomised search forwards `s_sca` to the grid search of its trials.
+        sv = [HighestMeanScore(; scale = 2.0), worst]
+        rr = search_cross_validation(hrp,
+                                     RandomisedSearchCrossValidation(wbgrid; cv = kcv,
+                                                                     r = r, scorer = sv,
+                                                                     s_sca = MaxScalariser(),
+                                                                     n_best = 2, n_iter = 2,
+                                                                     seed = 3), rd)
+        rg = search_cross_validation(hrp,
+                                     gs(kcv, [["opt.wb" => [v[1]]] for v in rr.val_grid];
+                                        scorer = sv, s_sca = MaxScalariser(), n_best = 2),
+                                     rd)
+        @test rr.rank_idx == rg.rank_idx && rr.rank_scores == rg.rank_scores
     end
 end
 #=

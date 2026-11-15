@@ -5,7 +5,7 @@
 julia = "1.13.4"
 code_complexity = "0.2.0"
 julia_syntax = "1.0.2"
-commit = "0e09157222"
+commit = "bf35c74910"
 
 [file]
 "ext/PortfolioOptimisersPlotsExt/01_CumulativeReturnsPlots.jl" = { cyc = 5, cog = 9, arg = 8, cyc_sum = 56, cog_sum = 65, arg_sum = 99, macros = [] }
@@ -333,7 +333,8 @@ commit = "0e09157222"
 "src/17_Optimisation/02_CrossValidation/05_MultipleRandomised.jl" = { cyc = 5, cog = 10, arg = 14, cyc_sum = 37, cog_sum = 30, arg_sum = 75, macros = [] }
 "src/17_Optimisation/02_CrossValidation/06_Validation.jl" = { cyc = 2, cog = 1, arg = 5, cyc_sum = 3, cog_sum = 1, arg_sum = 9, macros = [] }
 "src/17_Optimisation/02_CrossValidation/07_Scoring.jl" = { cyc = 2, cog = 2, arg = 5, cyc_sum = 27, cog_sum = 6, arg_sum = 62, macros = [] }
-"src/17_Optimisation/02_CrossValidation/09_Base_SearchCrossValidation.jl" = { cyc = 9, cog = 14, arg = 12, cyc_sum = 92, cog_sum = 82, arg_sum = 154, macros = [] }
+"src/17_Optimisation/02_CrossValidation/08_SearchScorers.jl" = { cyc = 3, cog = 2, arg = 4, cyc_sum = 21, cog_sum = 7, arg_sum = 40, macros = [] }
+"src/17_Optimisation/02_CrossValidation/09_Base_SearchCrossValidation.jl" = { cyc = 9, cog = 14, arg = 13, cyc_sum = 78, cog_sum = 76, arg_sum = 133, macros = [] }
 "src/17_Optimisation/02_CrossValidation/10_GridSearchCrossValidation.jl" = { cyc = 3, cog = 3, arg = 3, cyc_sum = 8, cog_sum = 5, arg_sum = 9, macros = [] }
 "src/17_Optimisation/02_CrossValidation/11_RandomisedSearchCrossValidation.jl" = { cyc = 6, cog = 9, arg = 3, cyc_sum = 16, cog_sum = 16, arg_sum = 17, macros = [] }
 "src/17_Optimisation/02_CrossValidation/12_OnlineFoldLoop.jl" = { cyc = 3, cog = 3, arg = 12, cyc_sum = 15, cog_sum = 8, arg_sum = 58, macros = [] }
