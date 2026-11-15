@@ -15,7 +15,8 @@ import PortfolioOptimisers: ArrNum, VecNum, MatNum, Arr3Num, Option, VecNum_VecV
                             investable_weights_view, fold_factor_returns, fold_fees,
                             result_investable_view, strip_liquidation_charges,
                             AbstractPredictionResult, PredRes_MultiPredRes, regret_series,
-                            member_vector, prediction_weights
+                            member_vector, prediction_weights, DocStringExtensions,
+                            @concrete
 
 # A result carries its weights on the caller's universe and its prior and fee on the one
 # the fit solved (ADR 0115), so every result arity below reads the three through

@@ -3115,15 +3115,15 @@ end
     investable_plot_view(
         pr::AbstractPriorResult,
         nx::Option{<:AbstractVector} = nothing,
-        w::Option{<:VecNum} = nothing
+        w::Option{<:VecNum} = nothing,
+        imsk::BitVector = investable_mask(pr)
     )
+    investable_plot_view(pr::AbstractPriorResult, nx, w, imsk::Nothing)
     investable_plot_view(
         rd::AbstractReturnsResult,
         nx::Option{<:AbstractVector} = nothing,
         w::Option{<:VecNum} = nothing
     )
-    investable_plot_view(imsk::Nothing, pr::AbstractPriorResult, nx, w)
-    investable_plot_view(imsk::BitVector, pr::AbstractPriorResult, nx, w)
 
 Reduce a prior result, the axis names and the weights a computed figure draws to the Investable Mask.
 
@@ -3138,8 +3138,8 @@ No diagnostic is emitted. A figure is a drawing rather than a number a caller ac
 # Algorithm
 
  1. Return the three arguments unchanged when `pr` is a returns result.
- 2. Derive the Investable Mask once with [`investable_mask`](@ref).
- 3. Return the three unchanged when every asset is investable.
+ 2. Derive the Investable Mask once with [`investable_mask`](@ref), the default of the last slot.
+ 3. Return the three unchanged when every asset is investable, the `nothing` method.
  4. Otherwise return a [`port_opt_view`](@ref) of the prior at `findall(imsk)`, and the views of the names and the weights at the mask.
 
 # Arguments
@@ -3147,7 +3147,7 @@ No diagnostic is emitted. A figure is a drawing rather than a number a caller ac
   - `pr`: Prior result, or [`ReturnsResult`](@ref).
   - `nx`: Asset names of the axis, or `nothing`.
   - `w`: Portfolio weights the figure sizes by, or `nothing`.
-  - `imsk`: The Investable Mask, or `nothing` when every asset is investable.
+  - `imsk`: The Investable Mask of `pr`, or `nothing` when every asset is investable. The default is `investable_mask(pr)`.
 
 # Validation
 
@@ -3170,22 +3170,19 @@ No diagnostic is emitted. A figure is a drawing rather than a number a caller ac
   - [`plot_dendrogram`](@ref)
   - [`plot_clusters`](@ref)
 """
-function investable_plot_view(pr::AbstractPriorResult,
-                              nx::Option{<:AbstractVector} = nothing,
-                              w::Option{<:VecNum} = nothing)
-    return investable_plot_view(investable_mask(pr), pr, nx, w)
-end
 function investable_plot_view(rd::AbstractReturnsResult,
                               nx::Option{<:AbstractVector} = nothing,
                               w::Option{<:VecNum} = nothing)
     return rd, nx, w
 end
-function investable_plot_view(::Nothing, pr::AbstractPriorResult,
-                              nx::Option{<:AbstractVector}, w::Option{<:VecNum})
+function investable_plot_view(pr::AbstractPriorResult, nx::Option{<:AbstractVector},
+                              w::Option{<:VecNum}, ::Nothing)
     return pr, nx, w
 end
-function investable_plot_view(imsk::BitVector, pr::AbstractPriorResult,
-                              nx::Option{<:AbstractVector}, w::Option{<:VecNum})
+function investable_plot_view(pr::AbstractPriorResult,
+                              nx::Option{<:AbstractVector} = nothing,
+                              w::Option{<:VecNum} = nothing,
+                              imsk::BitVector = investable_mask(pr))
     return port_opt_view(pr, findall(imsk)), nothing_scalar_array_view(nx, imsk),
            nothing_scalar_array_view(w, imsk)
 end
@@ -4273,15 +4270,21 @@ function plot_covariance_exceedance end
 
 The default figures of a Portfolio Report, as the keywords `overview_figures` and `entry_figures` of [`portfolio_report`](@ref) take them.
 
-The result has two fields, each a vector of pairs `caption => f`. A caller can add a pair to either vector, or remove one:
+The result has two fields, each a vector of pairs `caption => f`. The fields take the names of the keywords, so the result splats into the call:
+
+```julia
+portfolio_report(preds; default_report_figures()...)
+```
+
+A caller can add a pair to either vector, or remove one. A keyword after the splat replaces the field of the same name. Here `g` is a figure function of the caller:
 
 ```julia
 f = default_report_figures()
-portfolio_report(preds; overview_figures = f.overview, entry_figures = f.entry)
+portfolio_report(preds; f..., entry_figures = [f.entry_figures; \"Turnover\" => g])
 ```
 
-  - `overview`: the cumulative returns of every series of the summary on one axis, each series on its own timestamps, with one colour and one legend label for each prediction, and the risk and the return of each prediction on one scatter plot through [`plot_measures`](@ref).
-  - `entry`: [`plot_composition`](@ref), [`plot_drawdowns`](@ref), [`plot_histogram`](@ref), and [`plot_risk_contribution`](@ref) of a [`ConditionalValueatRisk`](@ref).
+  - `overview_figures`: the cumulative returns of every series of the summary on one axis, each series on its own timestamps, with one colour and one legend label for each prediction, and the risk and the return of each prediction on one scatter plot through [`plot_measures`](@ref).
+  - `entry_figures`: [`plot_composition`](@ref), [`plot_drawdowns`](@ref), [`plot_histogram`](@ref), and [`plot_risk_contribution`](@ref) of a [`ConditionalValueatRisk`](@ref).
 
 A figure function gives `nothing` for a prediction that it cannot draw, and the report then has no such figure. The decision is by dispatch on the type of the prediction, and never a caught error. The risk contribution needs the asset returns of a single fold, so only a [`PredictionResult`](@ref) with a Held Weights record draws it. A prediction whose optimiser gives many portfolios draws no composition, drawdown or histogram figure.
 
@@ -4289,7 +4292,7 @@ A figure of the structure of the assets, such as a dendrogram, needs a clusterin
 
 # Returns
 
-  - `figs::NamedTuple`: The fields `overview` and `entry`.
+  - `figs::NamedTuple`: The fields `overview_figures` and `entry_figures`, the keywords of [`portfolio_report`](@ref).
 
 # Related
 

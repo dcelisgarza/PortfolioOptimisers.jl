@@ -1,11 +1,12 @@
 ## default_report_figures
 function PortfolioOptimisers.default_report_figures()
     return (;
-            overview = ["Cumulative returns" => report_cumulative_returns,
-                        "Risk and return" => report_risk_return],
-            entry = ["Composition" => report_composition, "Drawdowns" => report_drawdowns,
-                     "Histogram of the returns" => report_histogram,
-                     "Risk contribution of the CVaR" => report_risk_contribution])
+            overview_figures = ["Cumulative returns" => report_cumulative_returns,
+                                "Risk and return" => report_risk_return],
+            entry_figures = ["Composition" => report_composition,
+                             "Drawdowns" => report_drawdowns,
+                             "Histogram of the returns" => report_histogram,
+                             "Risk contribution of the CVaR" => report_risk_contribution])
 end
 # The return series of a prediction, or of the first path of a population. Its type says
 # whether the optimiser gave one portfolio, a vector, or many members, a vector of vectors.
@@ -34,16 +35,13 @@ function report_histogram(pred::AbstractPredictionResult)
 end
 # The risk contribution reads the asset returns of a single fold, which only a Held Weights
 # record keeps.
-function report_risk_contribution(pred::PredictionResult)
-    return risk_contribution_figure(pred, pred.hw)
-end
 function report_risk_contribution(::AbstractPredictionResult)
     return nothing
 end
-function risk_contribution_figure(::PredictionResult, ::Nothing)
+function report_risk_contribution(::PredictionResult, ::Nothing)
     return nothing
 end
-function risk_contribution_figure(pred::PredictionResult, ::HeldWeightsResult)
+function report_risk_contribution(pred::PredictionResult, ::HeldWeightsResult = pred.hw)
     return member_figure(p -> plot_risk_contribution(ConditionalValueatRisk(), p), pred,
                          report_series(pred))
 end

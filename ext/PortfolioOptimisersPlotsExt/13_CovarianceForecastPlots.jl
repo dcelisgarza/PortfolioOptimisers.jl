@@ -55,6 +55,67 @@ function covariance_windows(scored::AbstractVector{Bool}, window::Integer,
     return [s[j] => (s[j - window + 1]:s[j]) for j in window:length(s)]
 end
 """
+$(DocStringExtensions.TYPEDEF)
+
+Holds the windows of an evaluation and the first point that a series of a figure draws.
+
+This type is an implementation detail and is not intended for direct use. `covariance_plot_windows` makes one for each figure of an evaluation. The value travels: each line of the figure reads `wins`, and `covariance_plot_entry` reads `from`.
+
+# Fields
+
+$(DocStringExtensions.FIELDS)
+
+# Related
+
+  - `covariance_plot_windows`
+  - `covariance_plot_entry`
+"""
+@concrete struct CovariancePlotWindows
+    """
+    `wins`: One pair `t => r` for each point that has a window, from `covariance_windows`.
+    """
+    wins
+    """
+    `from`: The index of the first point to draw.
+    """
+    from
+end
+"""
+$(DocStringExtensions.TYPEDEF)
+
+Holds one series of a figure of a covariance forecast evaluation, from the first point that it draws.
+
+This type is an implementation detail and is not intended for direct use. `covariance_plot_entry` makes one for each series, and `covariance_plot_lines` draws each one. A record names its four fields, because the dates and the values have one type.
+
+# Fields
+
+$(DocStringExtensions.FIELDS)
+
+# Related
+
+  - `covariance_plot_entry`
+  - `covariance_plot_lines`
+  - `covariance_plot_line!`
+"""
+@concrete struct CovariancePlotSeries
+    """
+    `x`: The dates of the points.
+    """
+    x
+    """
+    `y`: The values of the series at the points.
+    """
+    y
+    """
+    `label`: The legend label.
+    """
+    label
+    """
+    `band`: The lower and the upper edge of the band at the points, or `nothing`.
+    """
+    band
+end
+"""
     covariance_plot_windows(cfer::CovarianceForecastEvaluationResult, wo::NamedTuple)
 
 Check the window keywords of a figure, and return the windows of an evaluation with the first point that its series draws.
@@ -73,13 +134,14 @@ The first point is the first step under `whole_windows = false`. Under `whole_wi
 
 # Returns
 
-  - `rw::NamedTuple`: The windows `wins` from `covariance_windows`, and the index `from` of the first point to draw.
+  - `rw::CovariancePlotWindows`: The windows `wins` from `covariance_windows`, and the index `from` of the first point to draw.
 
 # Related
 
   - [`plot_covariance_calibration`](@ref)
   - `covariance_windows`
   - `covariance_plot_entry`
+  - `CovariancePlotWindows`
 """
 function covariance_plot_windows(cfer::PortfolioOptimisers.CovarianceForecastEvaluationResult,
                                  wo::NamedTuple)
@@ -91,7 +153,7 @@ function covariance_plot_windows(cfer::PortfolioOptimisers.CovarianceForecastEva
                           "window must be in 1:$(M), the steps that the window counts (the scored steps under `scored_steps = true`)"))
     end
     wins = covariance_windows(scored, wo.window, wo.scored_steps)
-    return (; wins = wins, from = wo.whole_windows ? first(first(wins)) : 1)
+    return CovariancePlotWindows(wins, wo.whole_windows ? first(first(wins)) : 1)
 end
 """
     covariance_plot_check_diagnostics(diagnostics)
@@ -643,7 +705,7 @@ The x axis carries the label "Observation", and the figure shows its legend. `kw
 
 # Arguments
 
-  - `entries`: The series to draw, each from `covariance_plot_entry`.
+  - `entries`: The series to draw, each a `CovariancePlotSeries` from `covariance_plot_entry`.
   - `title`: The title of the figure.
   - `ylabel`: The label of the y axis.
   - `kwargs...`: Keyword arguments for the plotting backend.
@@ -692,8 +754,8 @@ function covariance_band_slice(band::Tuple, k::AbstractUnitRange)
     return (band[1][k], band[2][k])
 end
 """
-    covariance_plot_entry(cfer::CovarianceForecastEvaluationResult, rw::NamedTuple, y::VecNum,
-                          label, band)
+    covariance_plot_entry(cfer::CovarianceForecastEvaluationResult, rw::CovariancePlotWindows,
+                          y::VecNum, label, band)
 
 Make the entry of one series to draw, from the first point that the windows draw.
 
@@ -707,19 +769,19 @@ Make the entry of one series to draw, from the first point that the windows draw
 
 # Returns
 
-  - `e::NamedTuple`: The dates `x`, the values `y`, the `label` and the `band`, each from the first point to draw.
+  - `e::CovariancePlotSeries`: The dates `x`, the values `y`, the `label` and the `band`, each from the first point to draw.
 
 # Related
 
   - `covariance_plot_windows`
   - `covariance_band_slice`
   - `covariance_plot_lines`
+  - `CovariancePlotSeries`
 """
 function covariance_plot_entry(cfer::PortfolioOptimisers.CovarianceForecastEvaluationResult,
-                               rw::NamedTuple, y::VecNum, label, band)
+                               rw::CovariancePlotWindows, y::VecNum, label, band)
     k = (rw.from):length(y)
-    return (; x = cfer.dates[k], y = y[k], label = label,
-            band = covariance_band_slice(band, k))
+    return CovariancePlotSeries(cfer.dates[k], y[k], label, covariance_band_slice(band, k))
 end
 """
     covariance_calibration_entries(cfer::CovarianceForecastEvaluationResult, name,
@@ -741,7 +803,7 @@ Make one entry per diagnostic of one evaluation, for `plot_covariance_calibratio
 
 # Returns
 
-  - `entries::Vector{<:NamedTuple}`: One entry per diagnostic, from `covariance_plot_entry`.
+  - `entries::Vector{<:CovariancePlotSeries}`: One entry per diagnostic, from `covariance_plot_entry`.
 
 # Related
 
@@ -778,7 +840,7 @@ Make the entry of one evaluation, for `plot_covariance_qlike`.
 
 # Returns
 
-  - `e::NamedTuple`: The entry, from `covariance_plot_entry`.
+  - `e::CovariancePlotSeries`: The entry, from `covariance_plot_entry`.
 
 # Related
 
@@ -811,7 +873,7 @@ Make one entry per level of one evaluation, for `plot_covariance_exceedance`.
 
 # Returns
 
-  - `entries::Vector{<:NamedTuple}`: One entry per level, from `covariance_plot_entry`.
+  - `entries::Vector{<:CovariancePlotSeries}`: One entry per level, from `covariance_plot_entry`.
 
 # Related
 

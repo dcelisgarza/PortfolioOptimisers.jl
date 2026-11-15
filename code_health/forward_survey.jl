@@ -1520,16 +1520,11 @@ const RULED_NAMED_TUPLES = Dict{Symbol, Tuple{String, String}}(#
                                                                    ("keep (keys)",
                                                                     "the caller splats it into the field set that `cross_sectional_carry_with` rebuilds (#2113)"),
                                                                :default_report_figures =>
-                                                                   ("go",
-                                                                    "its fields take the names of the keywords of `portfolio_report`, `overview_figures` and `entry_figures`, so that a caller splats it; the entry then turns to `keep (keys)` (#2113)"),
+                                                                   ("keep (keys)",
+                                                                    "its fields are the keywords `overview_figures` and `entry_figures` of `portfolio_report`, and the caller splats it into that call (#2113)"),
                                                                :prior_field_values =>
                                                                    ("keep (keys)",
                                                                     "the keys are the field names of the prior (#2113)"),
-                                                               # The transient test of the private helpers, which needs the callers
-                                                               # and the types of the values (#2113).
-                                                               :covariance_plot_windows =>
-                                                                   ("go",
-                                                                    "the value travels: `rw` goes to `covariance_plot_entry`: a private defined type (#2113)"),
                                                                :resolve_sigma_chol =>
                                                                    ("keep (keys)",
                                                                     "the call is `rebuild_with_slots`, which merges it into the fields of the measure by key, so a struct would need a conversion back at each call (#2113, #2100)"))

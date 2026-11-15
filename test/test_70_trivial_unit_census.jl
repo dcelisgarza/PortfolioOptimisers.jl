@@ -423,9 +423,9 @@ end
                                                :window_bigger_is_better => "its callee `bigger_is_better` is a shared public verb (rule 3, #2106)",
                                                :window_values => "its callee `asset_scores` is a shared public verb (rule 3, #2106)",
                                                :weight_mass_grid => "2 functions share its callee `pipeline_lens_val_grid` (rule 3, #2106)")
-    # The debt that #2072 removes. Do not add a pair: fix the wrapper.
-    pending_forwards = Set{Tuple{Symbol, Symbol}}([(:report_risk_contribution,
-                                                    :risk_contribution_figure)])
+    # The debt that #2072 removes. Do not add a pair: fix the wrapper. #2107 removed the last
+    # pair.
+    pending_forwards = Set{Tuple{Symbol, Symbol}}()
 
     # ------------------------------------------------------------- the type census
 
@@ -580,6 +580,11 @@ end
          :update_time_dependent_step, :pipeline_cross_val_predict, :merge_held_data,
          :update_online_step, :copy_step_states, :pipeline_held_timestamps, :fold_pipeline)
         @test (n, isdefined(PO, n)) == (n, false)
+    end
+    # Pinned on the wrapper of the plotting extension that #2107 removed. The census does not
+    # load the extension, so the pin reads the source text.
+    for n in ("risk_contribution_figure",)
+        @test (n, filter(f -> occursin(n, read(f, String)), files)) == (n, String[])
     end
 
     # Pinned on the three units ADR 0168 named and the one dead-end the build removed.

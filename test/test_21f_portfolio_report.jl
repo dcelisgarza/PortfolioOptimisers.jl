@@ -504,14 +504,14 @@ end
 
 @testset "#1943: the default figures of the plotting extension" begin
     f = default_report_figures()
-    @test first.(f.overview) == ["Cumulative returns", "Risk and return"]
-    @test length(f.entry) == 4
+    @test keys(f) == (:overview_figures, :entry_figures)
+    @test first.(f.overview_figures) == ["Cumulative returns", "Risk and return"]
+    @test length(f.entry_figures) == 4
     held = cross_val_predict(InverseVolatility(), RP_RD,
                              IndexWalkForward(20, 10; wd = SelfFinancingDrift())).pred[1]
     preds = [RP_ONE, RP_PATH, RP_POP, held, RP_FRONT]
     nm = ["one", "path", "pop", "held", "front"]
-    r = portfolio_report(preds; names = nm, overview_figures = f.overview,
-                         entry_figures = f.entry)
+    r = portfolio_report(preds; names = nm, default_report_figures()...)
     @test count(b -> b isa ReportFigure, r.overview) == 2
     nfig(k) = length(rp_section(r.entries[k], "Figures").blocks)
     # The risk contribution reads only a fold with a Held Weights record.
@@ -538,8 +538,7 @@ end
     pop = deepcopy(RP_POP)
     pop.pred[1].mrd.X[3] = NaN
     f = default_report_figures()
-    r = portfolio_report([path, pop]; names = ["path", "pop"],
-                         overview_figures = f.overview, entry_figures = f.entry)
+    r = portfolio_report([path, pop]; names = ["path", "pop"], f...)
     nfig(k) = length(rp_section(r.entries[k], "Figures").blocks)
     @test nfig(1) == 3 && nfig(2) == 3
 end

@@ -111,10 +111,11 @@ figures, `rf` is the risk-free rate of one day, and `measures` adds two risk mea
 `allocs` gives the finite allocation of each prediction, or `nothing`.
 
 [`default_report_figures`](@ref) gives the default figures when `GraphRecipes` and `StatsPlots` are loaded:
-`overview` draws every prediction on one figure, and `entry` draws one prediction. A figure of
-your own is a pair `caption => f`. An entry figure calls `f(pred)`, and a function that returns
-`nothing` adds no figure. Here the turnover figure draws a walk-forward path and skips the other
-two kinds of prediction.
+`overview_figures` draws every prediction on one figure, and `entry_figures` draws one
+prediction. The fields take the names of the keywords of `portfolio_report`, so `figs...` passes
+both, and a keyword after it replaces one. A figure of your own is a pair `caption => f`. An entry
+figure calls `f(pred)`, and a function that returns `nothing` adds no figure. Here the turnover
+figure draws a walk-forward path and skips the other two kinds of prediction.
 =#
 
 turnover_figure(p::MultiPeriodPredictionResult) = plot_turnover(p)
@@ -128,9 +129,9 @@ ps_kw = (; ppy = 252, rf = rf,
          measures = [:cvar_95 => ConditionalValueatRisk(), :ulcer => UlcerIndex()])
 r = portfolio_report(preds; names = labels, title = "Minimum risk portfolios",
                      groups = ["search", "search", "search", "population", "single fold"],
-                     allocs = [nothing, nothing, nothing, nothing, alloc],
-                     overview_figures = figs.overview,
-                     entry_figures = [figs.entry; "Turnover" => turnover_figure], ps_kw...);
+                     allocs = [nothing, nothing, nothing, nothing, alloc], figs...,
+                     entry_figures = [figs.entry_figures; "Turnover" => turnover_figure],
+                     ps_kw...);
 
 #=
 A `Report` shows itself as the whole HTML document, so the cell above ends with a semicolon. The

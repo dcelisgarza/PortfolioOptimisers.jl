@@ -155,7 +155,9 @@ increment it. Measured by the sweep of issue #1075 over `test_25_plotting.jl` al
 `function` line, the `Nothing` method beside it has no counter on its `function` line at all, and \
 Codecov records the same single miss on that line for `dev`. The body is reached by every test that \
 draws a computed figure of a gapped prior, so no test can pay the line. A row here is keyed to the \
-one definition that shows it."""
+one definition that shows it. Issue #2107 gave that method the mask as a defaulted slot, and \
+its `function` line now reads the count of the methods that the defaults generate, so its row \
+went."""
 
 [rationale.a-return-after-an-unconditional-throw]
 text = """
@@ -907,12 +909,6 @@ path = "src/05_Moments/20_Base_Regression.jl"
 definition = "MaxValStepwiseRegressionCriterion"
 misses = 1
 rationale = "a-closure-inside-a-top-level-const"
-
-[[coverage_exemption]]
-path = "src/22_Plotting.jl"
-definition = "investable_plot_view"
-misses = 1
-rationale = "a-signature-line-counter-on-a-method-whose-body-is-reached"
 
 # Run 41195231259 (#1922): the `function` line of the `Val{:sigma_ucs}` method reads 0 while its
 # body runs 54 times through the `sigma` routes of a Pipeline. The one count it had came from a
