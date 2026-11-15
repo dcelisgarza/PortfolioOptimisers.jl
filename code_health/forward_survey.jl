@@ -331,21 +331,27 @@ function is_candidate(f::SurveyFinding)
     return f.verdict in ("go", "review") && !startswith(f.ruling, "ruled")
 end
 
-function ruling_of(r::Rulings, name, callee)
+"""
+    ruling_of(r::Rulings, name, callee; forward = true) -> String
+
+The ruling of the census that covers the finding of `name` with `callee`. The pair of
+`kept_forwards` is the narrowest, so it comes first, and a ruling of the name covers what no pair
+rules. `interface_functions` rules the forward methods of a function, so a finding that is no
+forward, such as a fallback (`forward = false`), does not take it: its text is about another
+method.
+"""
+function ruling_of(r::Rulings, name, callee; forward = true)
+    if callee !== nothing && haskey(r.kept_forwards, (name, callee))
+        return "ruled by `kept_forwards`: " * r.kept_forwards[(name, callee)]
+    end
+    if callee !== nothing && (name, callee) in r.pending
+        return "pending"
+    end
     if haskey(r.kept, name)
         return "ruled by `kept`: " * r.kept[name]
     end
-    if haskey(r.interface_functions, name)
+    if forward && haskey(r.interface_functions, name)
         return "ruled by `interface_functions`: " * r.interface_functions[name]
-    end
-    if callee === nothing
-        return ""
-    end
-    if haskey(r.kept_forwards, (name, callee))
-        return "ruled by `kept_forwards`: " * r.kept_forwards[(name, callee)]
-    end
-    if (name, callee) in r.pending
-        return "pending"
     end
     return ""
 end
@@ -715,10 +721,31 @@ function recurses_on_field(t::Tree, d)
                get(t.by_name, d.name, CH.MethodDef[]))
 end
 
-# Whether a method of `name` calls `name` on a field: the function walks the composites, so its
-# composites call it, and it is no private worker of another function (#2116).
-function walks_on_field(t::Tree, name)
-    return any(m -> calls_on_field(m.body, name), get(t.by_name, name, CH.MethodDef[]))
+# Whether a method of `name` calls `name`, or the verb `verb` that calls it, on a field: the
+# function walks the composites, so its composites call it, and it is no private worker of
+# another function (#2116). `obs_weights_fields` calls `obs_weights_view` on every field.
+function walks_on_field(t::Tree, name, verb = name)
+    return any(m -> calls_on_field(m.body, name) || calls_on_field(m.body, verb),
+               get(t.by_name, name, CH.MethodDef[]))
+end
+
+# The number of methods of `name` whose body names `callee`. Rule 3 counts methods: two methods
+# of one function that share a kernel make it no private worker (#2100, #2103).
+function sharing_methods(t::Tree, name, callee)
+    return count(m -> callee in names_in(m.body), get(t.by_name, name, CH.MethodDef[]))
+end
+
+function sharing_reason(n, name, callee)
+    return "$n methods of `$name` share the callee `$callee`, so no one method can hold its body (rule 3)"
+end
+
+# Whether every method of `name` only builds a `callee`: the methods are forms that the
+# constructor of `callee` can hold (#2112, the review of #2072). A function with another form,
+# which builds another type, passes its input through or walks, dispatches over the forms, and
+# its callers cannot call one constructor (#2078).
+function only_builds(t::Tree, name, callee)
+    return length(get(t.forwards, (name, callee), ())) ==
+           length(get(t.by_name, name, CH.MethodDef[]))
 end
 
 # The reason of the verdict that keeps a walk where the body of a callee would move into its one
@@ -996,6 +1023,9 @@ end
 function forward_verdict(t::Tree, name, callee, d)
     others = setdiff(get(t.callers, callee, Set{Symbol}()), (name,))
     n_values = value_arm_count(t, name)
+    # Rule 3 counts the methods that share the callee, also the methods of one function: four
+    # methods of `worst_case_distribution` share `ERM_worst_case` (#2100).
+    n_sharing = sharing_methods(t, name, callee)
     if name in t.public && slots_keywords(d, CH.forward_call(d.body))
         # The wrapper section keeps a keyword wrapper on a verb of a workflow that a user calls.
         return ("keyword form", "keep (a)",
@@ -1005,13 +1035,14 @@ function forward_verdict(t::Tree, name, callee, d)
     elseif is_struct(t, callee)
         if name in t.public
             return ("preset", "keep (a)", "a public preset or keyword constructor (#2079)")
-        elseif n_values >= 2 || name in t.hooks
+        elseif name in t.hooks || !only_builds(t, name, callee)
             return ("interface", "keep (interface)",
-                    "the callee is the constructor of a type (rule 3)")
+                    "the callee is the constructor of a type, and another form of the function gives another answer (rule 3)")
         end
-        # One private method holds a form that the constructor can hold (#2112).
+        # Every method holds a form that the constructor can hold, whatever the number of
+        # methods (#2112, the review of #2072).
         return ("interface", "go",
-                "one private method that builds a `$callee`: a second name for the constructor. Its form goes to `$callee` as a method, and its callers call `$callee` (#2112)")
+                "every method of `$name` only builds a `$callee`: a second name for the constructor. Each form goes to `$callee` as a method, and its callers call `$callee` (#2112)")
     elseif name in t.public && callee in t.hooks && has_driver(t, name, callee)
         return ("worker", "go",
                 "goes around the driver of `$name` to the hook `$callee`, and the driver gives the same answer. A measured loss keeps it as (b) (rule 4)")
@@ -1019,8 +1050,10 @@ function forward_verdict(t::Tree, name, callee, d)
            !(callee in t.public) &&
            !(callee in t.hooks) &&
            isempty(others)
-        return if walks_on_field(t, callee)
+        return if walks_on_field(t, callee, name)
             ("worker", "keep (interface)", walk_reason(callee, name))
+        elseif n_sharing >= 2
+            ("worker", "keep (interface)", sharing_reason(n_sharing, name, callee))
         else
             ("worker", "go",
              "only `$name` calls the private worker `$callee`: its body moves into `$name` (rule 4)")
@@ -1037,8 +1070,10 @@ function forward_verdict(t::Tree, name, callee, d)
         return (shape, "keep (interface)",
                 "`$callee` is a seam that `# Interfaces` names (rule 3)")
     elseif n_values >= 2 || name in t.hooks
-        return if isempty(others) && walks_on_field(t, callee)
+        return if isempty(others) && walks_on_field(t, callee, name)
             (shape, "keep (interface)", walk_reason(callee, name))
+        elseif isempty(others) && n_sharing >= 2
+            (shape, "keep (interface)", sharing_reason(n_sharing, name, callee))
         elseif isempty(others)
             (shape, "go",
              "only `$name` calls `$callee`: its body moves into `$name` as a method (rule 3)")
@@ -1305,9 +1340,13 @@ function default_findings!(out, t::Tree, rulings)
         if !isempty(owners) && (kind != "`false`" || all_forward(t, d))
             owner = sort!(owners)[1]
             verdict, why = step_verdict(t, d, kind, owner)
+            # The leaf of a walk has no owner: a callee of the walk is not one (#2109), so the
+            # finding names none and takes no ruling of a pair of another method.
+            leaf = is_walk(t, d) && !haskey(RULED_DEFAULTS, d.name)
+            callee = leaf ? nothing : owner
             push!(out,
-                  SurveyFinding(d.file, d.line, "default", d.name, owner, verdict, why,
-                                ruling_of(rulings, d.name, owner)))
+                  SurveyFinding(d.file, d.line, "default", d.name, callee, verdict, why,
+                                ruling_of(rulings, d.name, callee; forward = false)))
             continue
         end
         verdict, why = if kind == "`false`"
@@ -1319,7 +1358,7 @@ function default_findings!(out, t::Tree, rulings)
         end
         push!(out,
               SurveyFinding(d.file, d.line, "default", d.name, nothing, verdict, why,
-                            ruling_of(rulings, d.name, nothing)))
+                            ruling_of(rulings, d.name, nothing; forward = false)))
     end
     return out
 end
@@ -1360,8 +1399,9 @@ is_splat(a) = a isa Expr && a.head === :...
 nt_fields(e) = "(; " * join((nt_field(a) for a in nt_entries(e)), ", ") * ")"
 
 # Whether `e` is a call that builds a named tuple: `NamedTuple{…}(…)`, or a `merge` that has a
-# named tuple literal among its arguments. A `merge` of two variables can merge two `Dict`s, so
-# the parse does not read it.
+# named tuple literal among its arguments, also as a branch of a ternary:
+# `merge(c ? (; w1) : (;), …)`. A `merge` of two variables can merge two `Dict`s, so the parse
+# does not read it.
 function is_named_tuple_call(e)
     if !(e isa Expr && e.head === :call && !isempty(e.args))
         return false
@@ -1370,7 +1410,12 @@ function is_named_tuple_call(e)
     if f isa Expr && f.head === :curly && f.args[1] === :NamedTuple
         return true
     end
-    return f === :merge && any(is_named_tuple, e.args[2:end])
+    return f === :merge && any(holds_named_tuple, e.args[2:end])
+end
+
+function holds_named_tuple(a)
+    return is_named_tuple(a) ||
+           (a isa Expr && a.head === :if && any(is_named_tuple, a.args[2:end]))
 end
 
 is_named_tuple_value(e) = is_named_tuple(e) || is_named_tuple_call(e)

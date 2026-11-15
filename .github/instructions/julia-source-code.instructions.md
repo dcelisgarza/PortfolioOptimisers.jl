@@ -692,16 +692,19 @@ and every addition:
 3. **An interface method is not a wrapper** when two or more methods share its callee, or when
    its callee is the constructor of a type. `reader_frames(x::T, path, ::Bool) =
    source_frames(x.x_src, path, true)` is the case. When the method is the only caller of its
-   callee, the body of the callee moves into the method. A private method that only builds a
-   type is not an interface method, whatever the number of methods of its function. It is a
-   second name for the constructor, and it holds a form that the constructor can hold. The form
-   goes to the constructor as a method, and the method goes. #2112 is the case:
+   callee, the body of the callee moves into the method. A private function whose methods each
+   only build one type is not an interface, whatever the number of its methods. It is a second
+   name for the constructor, and it holds forms that the constructor can hold. Each form goes to
+   the constructor as a method, and the function goes. A function whose other forms give
+   another answer, such as a fraction that `count_or_fraction` passes through, dispatches over
+   the forms and stays: a constructor returns its own type. #2112 is the case:
    `resolved_constraint_block(cbe, pr, rd, vals)` read the slots of a block that stage 2 does
    not resolve. It became `ResolvedConstraintBlock(cbe::ConstraintBlock; pr, rd, …)`, with a
    required keyword for each resolved value, as `FiniteAllocationInput(res; prices, …)` takes
    the fields of a result. The review of #2072 (2026-11-15) applies the rule to the two methods
    of `returns_universe_axes`, which each build `UniverseAxes`, and to the method of
-   `fold_context` that builds `TimeDependentContext`.
+   `fold_context` that builds `TimeDependentContext` beside a method of another job under the
+   same name.
 4. **A template hook is not a second name.** A hook that the `# Interfaces` section names, and
    that does one step of a driver, is part of the driver: `_optimise` under `optimise`, as
    `__solve` under `solve` in SciML. A method of the verb that goes around the driver is a

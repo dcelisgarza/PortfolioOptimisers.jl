@@ -29,7 +29,8 @@ using Test
     # `go` entry, so the fixture reads any verdict.
     ruled_nt = first(sort!(collect(keys(FS.RULED_NAMED_TUPLES))))
     source = """
-             export verb, verb2, verb3, verb4, pubf, pubk, mk, kwv, nt_pub, pubfill, pubkwfill
+             export verb, verb2, verb3, verb4, verb5, verb6, pubf, pubk, mk, kwv, nt_pub, pubfill,
+                    pubkwfill
              struct A end
              struct B end
              struct R
@@ -219,6 +220,14 @@ using Test
              verb4(x::A) = walk_count(x)
              walk_count(x::A) = walk_count(x.inner)
              walk_count(x::B) = 1
+             # A callee that calls the verb on every field is the step of the walk of the verb,
+             # as `obs_weights_fields` is of `obs_weights_view` (#2116, the review of #2072).
+             verb5(x::A) = fields_step(x)
+             fields_step(x) = map(f -> verb5(getfield(x, f)), fieldnames(typeof(x)))
+             # Two methods of one verb share a kernel: no one method can hold its body (rule 3).
+             verb6(x::A) = kernel6(x, 1)
+             verb6(x::B) = kernel6(x, 2)
+             kernel6(x, k) = k + 1
 
              # preset
              mk(x::A) = T2(x)
@@ -227,6 +236,9 @@ using Test
              mk_priv(x::T3, v) = T3(; a = x.a, b = v)
              mk_two(x::A) = T2(x)
              mk_two(x::B) = T2(x)
+             # A dispatch over forms: one form builds the type, and another passes it through.
+             mk_disp(x::A) = T2(x)
+             mk_disp(x::T2) = x
 
              # keyword form of a public verb
              kwv(x::A; s = 1) = kwv_worker(x, s)
@@ -242,6 +254,7 @@ using Test
              end
              nt_empty(x::A) = (;)
              nt_plain(x::A) = (x, 1)
+             nt_tern(x::A, c) = merge(c ? (; a = x) : (;), c ? (; b = x) : (;))
              function nt_inner(x::A)
                  g = y -> (; y)
                  h(z) = (; z)
@@ -271,7 +284,7 @@ using Test
     census = """
              kept = Dict{Symbol, String}(:mk => "public preset")
              kept_forwards = Dict{Tuple{Symbol, Symbol}, String}((:w, :only_a) => "(b) a fixture reason")
-             interface_functions = Dict{Symbol, String}()
+             interface_functions = Dict{Symbol, String}(:w => "a name ruling", :walk_path => "its forms walk")
              pending_forwards = Set{Tuple{Symbol, Symbol}}([(:w, :only_b)])
              """
     found, out, status = mktempdir() do dir
@@ -288,6 +301,7 @@ using Test
     # The findings of `name`, as `(shape, callee, verdict)`.
     of(name) = [(x.shape, x.callee, x.verdict) for x in found if x.name === name]
     first_of(name) = only(x for x in found if x.name === name)
+    of_x(name) = [x for x in found if x.name === name]
 
     @testset "interface and per-form (#2078, rule 3)" begin
         @test of(:f) == [("interface", :helper, "keep (interface)"),
@@ -331,7 +345,15 @@ using Test
 
     @testset "step functions in front of an owner (#2109)" begin
         # A walk owns its leaf answer: its callee is not its owner.
-        @test ("default", :elem_path, "keep (default)") in of(:walk_path)
+        # The leaf names no owner, and takes no ruling of the forward methods of the function:
+        # the text of `interface_functions` is about another method (the review of #2072).
+        @test ("default", nothing, "keep (default)") in of(:walk_path)
+        @test only(x for x in found if x.name === :walk_path && x.shape == "default").ruling ==
+              ""
+        @test startswith(only(x
+                              for x in found
+                              if x.name === :walk_path && x.shape != "default").ruling,
+                         "ruled by `interface_functions`")
         @test occursin("a walk owns its leaf",
                        only(x
                             for x in found if x.name === :walk_path && x.shape == "default").why)
@@ -450,14 +472,24 @@ using Test
         # A callee that walks the composites is a function of its own (#2116, #2092).
         @test of(:verb4) == [("worker", :walk_count, "keep (interface)")]
         @test occursin("walks the composites", first_of(:verb4).why)
+        # A callee that calls the verb on every field walks for the verb (#2116).
+        @test of(:verb5) == [("worker", :fields_step, "keep (interface)")]
+        @test occursin("walks the composites", first_of(:verb5).why)
+        # Two methods of the verb share the kernel: rule 3 counts methods (#2100).
+        @test of(:verb6) == [("worker", :kernel6, "keep (interface)"),
+                             ("worker", :kernel6, "keep (interface)")]
+        @test occursin("2 methods of `verb6` share", first(of_x(:verb6)).why)
         @test of(:mk) == [("preset", :T2, "keep (a)")]
         # One private method that builds a type is a second name for the constructor: its
         # form goes to the constructor as a method (#2112).
         @test of(:mk_priv) == [("interface", :T3, "go")]
         @test occursin("#2112", first_of(:mk_priv).why)
-        # Two methods that share the constructor are interface methods (rule 3).
-        @test of(:mk_two) == [("interface", :T2, "keep (interface)"),
-                              ("interface", :T2, "keep (interface)")]
+        # Two methods that each only build the type are forms of its constructor, whatever their
+        # count (#2112, the review of #2072).
+        @test of(:mk_two) == [("interface", :T2, "go"), ("interface", :T2, "go")]
+        # A dispatch over forms, in which another form passes its input through, stays: a
+        # constructor returns its own type (rule 3).
+        @test of(:mk_disp) == [("interface", :T2, "keep (interface)")]
         # A public verb that passes a keyword as a slot is a keyword form, not a worker.
         @test of(:kwv) == [("keyword form", :kwv_worker, "keep (a)")]
     end
@@ -474,6 +506,8 @@ using Test
         @test !occursin("1, 2", nt_of(:nt_long).why)
         @test nt(:nt_empty) == ["review"]
         @test isempty(nt(:nt_plain))
+        # A `merge` of ternaries whose branches are literals builds a named tuple.
+        @test length(nt(:nt_tern)) == 1
         # An inner function gives its value back to its own caller.
         @test isempty(nt(:nt_inner))
         # A named tuple that the method passes to a call is no return.
@@ -531,6 +565,7 @@ using Test
         w = filter(x -> x.name === :w, found)
         ruled = only(x for x in w if x.callee === :only_a)
         pending = only(x for x in w if x.callee === :only_b)
+        # The pair is the narrowest ruling, so it comes before the ruling of the name.
         @test startswith(ruled.ruling, "ruled by `kept_forwards`")
         @test !FS.is_candidate(ruled)
         @test pending.ruling == "pending"
