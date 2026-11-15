@@ -17,6 +17,7 @@ CovarianceForecastSummaryResult
 CovarianceForecastComparisonResult
 covariance_forecast_summary
 covariance_forecast_compare
+CovarianceForecastPortfolioResult
 covariance_forecast_portfolio
 ```
 

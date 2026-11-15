@@ -394,7 +394,9 @@ end
                                                :universe_axis_visit! => "one method for each value of a field in the walk of the universes: the estimator form calls `universe_axis_children!`, which 2 functions share (rule 3, #2103)",
                                                :with_position_id => "its callee is the constructor of a type, `MultiPeriodPredictionResult` (rule 3, #2103)",
                                                :fold_context => "its callee is the constructor of a type, `TimeDependentContext` (rule 3, #2103)",
-                                               :herc_unitary_risks => "2 functions share its callee `unitary_expected_risks` (rule 3, #2103)")
+                                               :herc_unitary_risks => "2 functions share its callee `unitary_expected_risks` (rule 3, #2103)",
+                                               :fold_evaluation => "one method for each scheme: each builds the record `FoldEvaluation`, the constructor of a type (rule 3, #2103)",
+                                               :returns_universe_axes => "one method for each axis: each builds the record `UniverseAxes`, the constructor of a type (rule 3, #2103)")
     # The debt that #2072 removes. Do not add a pair: fix the wrapper.
     pending_forwards = Set{Tuple{Symbol, Symbol}}([(:apply_fitted_step,
                                                     :apply_fitted_steps),

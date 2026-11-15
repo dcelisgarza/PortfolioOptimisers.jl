@@ -2077,19 +2077,15 @@
         end
         @testset "fold_evaluation reads each scheme, and the wrappers inherit" begin
             @test PO.fold_evaluation(KFold(; n = 3, wd = sfd, store_weight_path = true)) ==
-                  (; wd = sfd, pws = nothing, fa = nothing, store_weight_path = true,
-                   strict = false)
+                  PO.FoldEvaluation(sfd, nothing, nothing, true, false)
             @test PO.fold_evaluation(CombinatorialCrossValidation(; wd = sfd)) ==
-                  (; wd = sfd, pws = nothing, fa = nothing, store_weight_path = false,
-                   strict = false)
+                  PO.FoldEvaluation(sfd, nothing, nothing, false, false)
             iwf = IndexWalkForward(200, 50; wd = sfd, pws = dw, store_weight_path = true)
             dwf = DateWalkForward(200, 1; wd = sfd, pws = dw)
             @test PO.fold_evaluation(iwf) ==
-                  (; wd = sfd, pws = dw, fa = nothing, store_weight_path = true,
-                   strict = false)
+                  PO.FoldEvaluation(sfd, dw, nothing, true, false)
             @test PO.fold_evaluation(dwf) ==
-                  (; wd = sfd, pws = dw, fa = nothing, store_weight_path = false,
-                   strict = false)
+                  PO.FoldEvaluation(sfd, dw, nothing, false, false)
             mrand = MultipleRandomised(iwf; subset_size = 5, n_subsets = 2)
             @test PO.fold_evaluation(mrand) == PO.fold_evaluation(iwf)
             pgrid = ["opt.l1" => [0.0005, 0.0008]]
@@ -2098,8 +2094,7 @@
             @test PO.fold_evaluation(gscv.cv) == PO.fold_evaluation(iwf)
             @test PO.fold_evaluation(rscv.cv) == PO.fold_evaluation(iwf)
             @test PO.fold_evaluation(nothing) ==
-                  (; wd = nothing, pws = nothing, fa = nothing, store_weight_path = false,
-                   strict = false)
+                  PO.FoldEvaluation(nothing, nothing, nothing, false, false)
         end
         # Issue #902: the Fee Clock of a fold's realised series is a switch of the scheme,
         # beside `wd` and `pws`. Every scheme carries it, every wrapper inherits it, and

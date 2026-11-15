@@ -602,8 +602,7 @@ end
     PO.finite_sub_allocation!(view(wv, 1:2), [10.0, 20.0], 1, 1000.0, 1.0, nothing, ga)
     @test wv == [0.3, 0.5]
     # An empty side still pays the forced exit, out of its cash.
-    sf = (T = 1, prop = nothing, fixed = nothing, tn_val = nothing, prev_money = nothing,
-          liq = 7.0)
+    sf = PO.SideFees(1, nothing, nothing, nothing, nothing, 7.0)
     re = PO.finite_sub_allocation!(Float64[], Float64[], 1, 100.0, 0.0, sf, ga)
     @test isempty(re[1]) && isempty(re[2]) && isempty(re[3])
     @test re[4] == 93.0

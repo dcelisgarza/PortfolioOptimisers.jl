@@ -1021,33 +1021,11 @@ Runs the Causal Pass.
  2. Fold every row of `rd` from the Start Allocation, with no carried state, through [`fold_online_selection`](@ref), giving `state`.
  3. Read the Next-Period Allocation out of `state` through [`online_selection_result`](@ref).
 
-# Related
-
-  - [`OnlinePortfolioSelection`](@ref)
-  - [`fold_online_selection`](@ref)
-  - [`online_selection_result`](@ref)
-  - [`optimise`](@ref)
-  - [`_optimise`](@ref)
-"""
-function _optimise(opt::OnlinePortfolioSelection, rd::ReturnsResult; kwargs...)
-    opt = reset_time_dependent_estimator(opt)
-    state = fold_online_selection(opt, nothing, rd)
-    return online_selection_result(opt, state)
-end
-"""
-    optimise(opt::OnlinePortfolioSelection{<:Any, <:Any, <:Any, <:Any, Nothing}, rd::ReturnsResult; kwargs...) -> NaiveOptimisationResult
-
-Runs the Causal Pass over `rd`, and returns the Next-Period Allocation.
-
 # Arguments
 
   - `opt`: The head.
   - $(arg_dict[:rd]) Every row is one Online Update, in order.
   - `kwargs`: Additional keyword arguments, ignored.
-
-# Validation
-
-  - No field in the tree of `opt` holds an [`Online`](@ref). An `ArgumentError` naming the field is thrown otherwise, through [`assert_batch_entry`](@ref).
 
 # Returns
 
@@ -1056,13 +1034,16 @@ Runs the Causal Pass over `rd`, and returns the Next-Period Allocation.
 # Related
 
   - [`OnlinePortfolioSelection`](@ref)
-  - [`partial_fit!`](@ref)
+  - [`fold_online_selection`](@ref)
   - [`online_selection_result`](@ref)
+  - [`partial_fit!`](@ref)
+  - [`optimise`](@ref)
+  - [`_optimise`](@ref)
 """
-function optimise(opt::OnlinePortfolioSelection{<:Any, <:Any, <:Any, <:Any, Nothing},
-                  rd::ReturnsResult; kwargs...)::NaiveOptimisationResult
-    assert_batch_entry(opt, "`optimise`")
-    return _optimise(opt, rd; kwargs...)
+function _optimise(opt::OnlinePortfolioSelection, rd::ReturnsResult; kwargs...)
+    opt = reset_time_dependent_estimator(opt)
+    state = fold_online_selection(opt, nothing, rd)
+    return online_selection_result(opt, state)
 end
 """
     optimise(opt::OnlinePortfolioSelection; kwargs...) -> OptimisationResult

@@ -661,11 +661,100 @@ function finite_column_mean(X::MatNum)
     return vec(sum(Xf; dims = 1)) ./ vec(count(fin; dims = 1))
 end
 """
-    covariance_forecast_step(sigma::MatNum, Z::MatNum, c::VecNum, w::Option{<:VecNum_VecVecNum}, target::AbstractRealisedTarget)
+$(DocStringExtensions.TYPEDEF)
+
+The diagnostics of one step of a covariance forecast evaluation, from [`covariance_forecast_step`](@ref).
+
+[`covariance_forecast_evaluation`](@ref) collects one Result for each step into a [`CovarianceForecastEvaluationResult`](@ref), and [`covariance_forecast_portfolio`](@ref) reads the two portfolio fields of each step. A caller who holds forecasts of their own reads the same fields. A step with no active asset is unscored: `n_valid` is `0` and every diagnostic is `NaN`.
+
+# Fields
+
+$(DocStringExtensions.FIELDS)
+
+# Constructors
+
+    CovarianceForecastStepResult(n_valid::Integer, mahalanobis_ratio::Number, diagonal_ratio::VecNum,
+                                 qlike::Number, frobenius::Number, standardised_return::VecNum,
+                                 portfolio_qlike::VecNum)
+    CovarianceForecastStepResult(; n_valid::Integer, mahalanobis_ratio::Number,
+                                 diagonal_ratio::VecNum, qlike::Number, frobenius::Number,
+                                 standardised_return::VecNum, portfolio_qlike::VecNum)
+
+The positional constructor checks the values. The keyword constructor takes each field by name, with no default, and calls it.
+
+## Validation
+
+  - `n_valid` is not negative. Otherwise, the constructor raises a `DomainError`.
+  - `n_valid` is at most `length(diagonal_ratio)`, the count of assets. Otherwise, the constructor raises a `DimensionMismatch`.
+  - `standardised_return` and `portfolio_qlike` hold one entry for each test portfolio, so they have the same length. Otherwise, the constructor raises a `DimensionMismatch`.
+
+# Related
+
+  - [`covariance_forecast_step`](@ref)
+  - [`covariance_forecast_evaluation`](@ref)
+  - [`CovarianceForecastEvaluationResult`](@ref)
+  - [`CovarianceForecastPortfolioResult`](@ref)
+"""
+@concrete struct CovarianceForecastStepResult <: AbstractResult
+    """
+    Count of the active assets of the step, the assets with a finite forecast variance, a finite location and at least one finite test return. `0` for an unscored step.
+    """
+    n_valid
+    """
+    Mahalanobis ratio of the step. The target is one.
+    """
+    mahalanobis_ratio
+    """
+    Diagonal ratio of each asset, `assets × 1`, and `NaN` outside the active assets. The target is one.
+    """
+    diagonal_ratio
+    """
+    QLIKE loss of the step. Only a difference between two forecasts says which forecast is better.
+    """
+    qlike
+    """
+    Frobenius loss of the step, over the cells with a positive count. Only a difference between two forecasts says which forecast is better.
+    """
+    frobenius
+    """
+    Standardised return of each test portfolio, one entry per portfolio.
+    """
+    standardised_return
+    """
+    QLIKE loss of the variance of each test portfolio, one entry per portfolio.
+    """
+    portfolio_qlike
+    function CovarianceForecastStepResult(n_valid::Integer, mahalanobis_ratio::Number,
+                                          diagonal_ratio::VecNum, qlike::Number,
+                                          frobenius::Number, standardised_return::VecNum,
+                                          portfolio_qlike::VecNum)
+        @argcheck(n_valid >= 0,
+                  DomainError(n_valid,
+                              "n_valid is a count of assets, so it cannot be negative"))
+        @argcheck(n_valid <= length(diagonal_ratio),
+                  DimensionMismatch("n_valid => $n_valid counts more assets than diagonal_ratio holds, length(diagonal_ratio) => $(length(diagonal_ratio))"))
+        @argcheck(length(standardised_return) == length(portfolio_qlike),
+                  DimensionMismatch("standardised_return and portfolio_qlike hold one entry for each test portfolio, so `length(standardised_return) == length(portfolio_qlike)` must hold.\nlength(standardised_return) => $(length(standardised_return))\nlength(portfolio_qlike) => $(length(portfolio_qlike))"))
+        return new{typeof(n_valid), typeof(mahalanobis_ratio), typeof(diagonal_ratio),
+                   typeof(qlike), typeof(frobenius), typeof(standardised_return),
+                   typeof(portfolio_qlike)}(n_valid, mahalanobis_ratio, diagonal_ratio,
+                                            qlike, frobenius, standardised_return,
+                                            portfolio_qlike)
+    end
+end
+function CovarianceForecastStepResult(; n_valid::Integer, mahalanobis_ratio::Number,
+                                      diagonal_ratio::VecNum, qlike::Number,
+                                      frobenius::Number, standardised_return::VecNum,
+                                      portfolio_qlike::VecNum)::CovarianceForecastStepResult
+    return CovarianceForecastStepResult(n_valid, mahalanobis_ratio, diagonal_ratio, qlike,
+                                        frobenius, standardised_return, portfolio_qlike)
+end
+"""
+    covariance_forecast_step(sigma::MatNum, Z::MatNum, c::VecNum, w::Option{<:VecNum_VecVecNum}, target::AbstractRealisedTarget) -> CovarianceForecastStepResult
 
 Score one covariance forecast against the returns realised after it.
 
-This is the per-step kernel of [`covariance_forecast_evaluation`](@ref). It takes bare arrays, so a caller who holds forecasts of their own can build the same Result by hand. The kernel reads the forecast on the assets that are active at the step, and centres the test rows on the location of the forecast. It then forms the realised matrix through the target and returns the diagnostics of the step. Four diagnostics read the forecast without a portfolio, and two more come once per test portfolio.
+This is the per-step kernel of [`covariance_forecast_evaluation`](@ref). It takes bare arrays, so a caller who holds forecasts of their own can build the same Result by hand. The kernel reads the forecast on the assets that are active at the step, and centres the test rows on the location of the forecast. It then forms the realised matrix through the target and returns the diagnostics of the step in a [`CovarianceForecastStepResult`](@ref). Four diagnostics read the forecast without a portfolio, and two more come once per test portfolio.
 
 # Mathematical definition
 
@@ -736,7 +825,7 @@ A step with no active asset has nothing to score: no asset has both a forecast a
 
 # Returns
 
-  - `step::NamedTuple`: The diagnostics of the step. `n_valid` is the count of active assets. `mahalanobis_ratio`, `qlike` and `frobenius` are scalars, `diagonal_ratio` is `assets × 1`, and `standardised_return` and `portfolio_qlike` hold one entry per portfolio. A step with no active asset is unscored: `n_valid` is `0` and every diagnostic is `NaN`.
+  - `step::CovarianceForecastStepResult`: The diagnostics of the step. `n_valid` is the count of active assets. `mahalanobis_ratio`, `qlike` and `frobenius` are scalars, `diagonal_ratio` is `assets × 1`, and `standardised_return` and `portfolio_qlike` hold one entry per portfolio. A step with no active asset is unscored: `n_valid` is `0` and every diagnostic is `NaN`.
 
 # Related
 
@@ -757,9 +846,8 @@ function covariance_forecast_step(sigma::MatNum, Z::MatNum, c::VecNum,
     if isempty(a)
         ws = resolve_forecast_weights(w, a, sigma[a, a], N)
         nan = promote_type(real(eltype(sigma)), real(eltype(Z)), real(eltype(c)))(NaN)
-        return (; n_valid = 0, mahalanobis_ratio = nan, diagonal_ratio = fill(nan, N),
-                qlike = nan, frobenius = nan, standardised_return = fill(nan, length(ws)),
-                portfolio_qlike = fill(nan, length(ws)))
+        return CovarianceForecastStepResult(0, nan, fill(nan, N), nan, nan,
+                                            fill(nan, length(ws)), fill(nan, length(ws)))
     end
     h = size(Z, 1)
     na = length(a)
@@ -795,8 +883,7 @@ function covariance_forecast_step(sigma::MatNum, Z::MatNum, c::VecNum,
         b[k] = LinearAlgebra.dot(wk, R) / sqrt(v)
         pq[k] = log(v) + sum(abs2, Zf * wk) / v
     end
-    return (; n_valid = na, mahalanobis_ratio = m, diagonal_ratio = d, qlike = qlike,
-            frobenius = frob, standardised_return = b, portfolio_qlike = pq)
+    return CovarianceForecastStepResult(na, m, d, qlike, frob, b, pq)
 end
 """
     resolve_forecast_weights(w::Nothing, a::VecInt, sa::MatNum, N::Integer)
@@ -957,18 +1044,19 @@ function online_entry_state(o::Online)
     return isnothing(path) ? nothing : string("est.", path)
 end
 """
-    advance_previous_fold(pws, prev, step::NamedTuple)
+    advance_previous_fold(pws, prev, fold::Tuple{CovarianceForecastStepResult, Any, Any})
 
-Hand the next fold what the last fold held, when the result of the fold is a step record and not a prediction.
+Hand the next fold what the last fold held, when the result of the fold is a step of a covariance forecast evaluation and not a prediction.
 
-The step record of the kernel carries no weights, so the method threads nothing and returns `prev` unchanged. [`online_folds`](@ref) reaches this method under [`covariance_forecast_evaluation`](@ref).
+The fold of [`covariance_forecast_evaluation`](@ref) answers the tuple of its [`CovarianceForecastStepResult`](@ref), its stored forecast and its stored location. The step carries no weights, so the method threads nothing and returns `prev` unchanged. [`online_folds`](@ref) reaches this method under [`covariance_forecast_evaluation`](@ref).
 
 # Related
 
   - [`threads_weights`](@ref)
   - [`online_folds`](@ref)
+  - [`CovarianceForecastStepResult`](@ref)
 """
-function advance_previous_fold(::Any, prev, ::NamedTuple)
+function advance_previous_fold(::Any, prev, ::Tuple{CovarianceForecastStepResult, Any, Any})
     return prev
 end
 """
@@ -1208,13 +1296,18 @@ function covariance_forecast_evaluation(est::Union{AbstractCovarianceEstimator,
     (; train_idx, test_idx) = cv_res
     assert_unshuffled_folds(cv, train_idx)
     n = length(train_idx)
-    steps, _ = fold_loop(est, n, FLoops.SequentialEx(), NamedTuple; rd = rdb,
+    folds, _ = fold_loop(est, n, FLoops.SequentialEx(), Tuple; rd = rdb,
                          train_idx = train_idx, test_idx = test_idx, cv = cv) do fold
         sigma, c = forecast_moments(fold.est, fold.rd, fold.train)
         step = covariance_forecast_step(sigma, view(fold.rd.X, fold.test, :), c, w, target)
         # An online state updates its location in place, so a stored step keeps a copy.
-        return store_forecasts ? (; step..., sigma = copy(sigma), location = copy(c)) : step
+        return if store_forecasts
+            (step, copy(sigma), copy(c))
+        else
+            (step, nothing, nothing)
+        end
     end
+    steps = [f[1] for f in folds]
     X = rd.X
     N = size(X, 2)
     P = length(steps[1].standardised_return)
@@ -1236,17 +1329,18 @@ function covariance_forecast_evaluation(est::Union{AbstractCovarianceEstimator,
                                               [s.qlike for s in steps],
                                               [s.frobenius for s in steps], b, pq, w,
                                               if store_forecasts
-                                                  [s.sigma for s in steps]
+                                                  [f[2] for f in folds]
                                               else
                                                   nothing
                                               end, if store_forecasts
-                                                  [s.location for s in steps]
+                                                  [f[3] for f in folds]
                                               else
                                                   nothing
                                               end)
 end
 
 export RealisedCovariance, HorizonReturn, covariance_forecast_step,
-       covariance_forecast_evaluation, CovarianceForecastEvaluationResult
+       CovarianceForecastStepResult, covariance_forecast_evaluation,
+       CovarianceForecastEvaluationResult
 # The `# Interfaces`-marked type and verbs of #1138 (ADR 0154).
 public AbstractRealisedTarget, realised_target, target_dof, target_step_dof

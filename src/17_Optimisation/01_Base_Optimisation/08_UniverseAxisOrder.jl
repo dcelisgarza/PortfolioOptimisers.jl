@@ -1,6 +1,40 @@
 """
+$(DocStringExtensions.TYPEDEF)
+
+The names that a [`UniverseSets`](@ref) is checked against: the asset axis, the factor axis, and the labels of the asset axis for the error message.
+
+This type is an implementation detail and is not intended for direct use. [`returns_universe_axes`](@ref) makes it. [`assert_universe_axis_order`](@ref) reads it.
+
+# Fields
+
+$(DocStringExtensions.FIELDS)
+
+# Related
+
+  - [`returns_universe_axes`](@ref)
+  - [`assert_universe_axis_order`](@ref)
+"""
+@concrete struct UniverseAxes
+    """
+    `nx`: The names of the columns that the asset key of a universe names.
+    """
+    nx
+    """
+    `nf`: The names of the factor axis, or `nothing` when there is none.
+    """
+    nf
+    """
+    `axis`: The name of the axis that `nx` comes from, for the error message.
+    """
+    axis
+    """
+    `sym`: The name of the field of the returns data that `nx` comes from, for the error message.
+    """
+    sym
+end
+"""
     assert_universe_axis_order(est::Union{AbstractEstimator, AbstractAlgorithm}, rd::ReturnsResult) -> Nothing
-    assert_universe_axis_order(sets::UniverseSets, ax::NamedTuple) -> Nothing
+    assert_universe_axis_order(sets::UniverseSets, ax::UniverseAxes) -> Nothing
 
 Assert that every [`UniverseSets`](@ref) on the asset axis of `rd` names the columns of `rd`, name for name and in order.
 
@@ -63,7 +97,7 @@ function assert_universe_axis_order(est::Union{AbstractEstimator, AbstractAlgori
     universe_axis_children!(IdSet{UniverseSets}(), est, returns_universe_axes(rd))
     return nothing
 end
-function assert_universe_axis_order(sets::UniverseSets, ax::NamedTuple)
+function assert_universe_axis_order(sets::UniverseSets, ax::UniverseAxes)
     for (axis, key, names, sym) in
         ((ax.axis, sets.xkey, ax.nx, ax.sym), ("factor", sets.tfkey, ax.nf, "nf"))
         if isnothing(names) || !haskey(sets.dict, key)
@@ -113,12 +147,12 @@ function universe_axis_msg(sets::UniverseSets, declared, names, axis, key, sym, 
            " The list under `$(key)` is `rd.nf`, the names of the factors. Declare the factors under the factor key `$(sets.tfkey)`, and the assets under `$(key)`."
 end
 """
-    returns_universe_axes(rd::ReturnsResult) -> NamedTuple
-    returns_universe_axes(ax::NamedTuple, ::Val{:factor}) -> NamedTuple
+    returns_universe_axes(rd::ReturnsResult) -> UniverseAxes
+    returns_universe_axes(ax::UniverseAxes, ::Val{:factor}) -> UniverseAxes
 
 Return the names that a [`UniverseSets`](@ref) is checked against, as [`assert_universe_axis_order`](@ref) reads them.
 
-The tuple has four entries. `nx` holds the names of the columns that the asset key of a universe names, and `nf` holds the names of the factor axis. `axis` and `sym` name the axis and the field of `rd` that `nx` comes from, for the error message.
+The record has four fields. `nx` holds the names of the columns that the asset key of a universe names, and `nf` holds the names of the factor axis. `axis` and `sym` name the axis and the field of `rd` that `nx` comes from, for the error message.
 
 # Algorithm
 
@@ -134,7 +168,7 @@ The method that Julia selects is the algorithm.
 
 # Returns
 
-  - `ax::NamedTuple`: The tuple `(; nx, nf, axis, sym)`.
+  - `ax::UniverseAxes`: The record of the four fields `nx`, `nf`, `axis` and `sym`.
 
 # Related
 
@@ -142,10 +176,10 @@ The method that Julia selects is the algorithm.
   - [`factor_axis_fields`](@ref)
 """
 function returns_universe_axes(rd::ReturnsResult)
-    return (; nx = rd.nx, nf = rd.nf, axis = "asset", sym = "nx")
+    return UniverseAxes(rd.nx, rd.nf, "asset", "nx")
 end
-function returns_universe_axes(ax::NamedTuple, ::Val{:factor})
-    return (; nx = ax.nf, nf = nothing, axis = "factor", sym = "nf")
+function returns_universe_axes(ax::UniverseAxes, ::Val{:factor})
+    return UniverseAxes(ax.nf, nothing, "factor", "nf")
 end
 """
     factor_axis_fields(x) -> Tuple{Vararg{Symbol}}
@@ -188,7 +222,7 @@ function factor_axis_fields(::AugmentedBlackLittermanPrior)
     return (:f_pe,)
 end
 """
-    universe_axis_children!(seen::IdSet{UniverseSets}, x, ax::NamedTuple) -> Nothing
+    universe_axis_children!(seen::IdSet{UniverseSets}, x, ax::UniverseAxes) -> Nothing
 
 Walk the fields of an estimator, and check each [`UniverseSets`](@ref) in them on the axes `ax`, for [`assert_universe_axis_order`](@ref).
 
@@ -220,7 +254,7 @@ Walk the fields of an estimator, and check each [`UniverseSets`](@ref) in them o
   - [`asset_axis_fields`](@ref)
   - [`factor_axis_fields`](@ref)
 """
-function universe_axis_children!(seen::IdSet{UniverseSets}, x, ax::NamedTuple)
+function universe_axis_children!(seen::IdSet{UniverseSets}, x, ax::UniverseAxes)
     for f in asset_axis_fields(x)
         universe_axis_visit!(seen, getfield(x, f), ax)
     end
@@ -236,7 +270,7 @@ function universe_axis_children!(seen::IdSet{UniverseSets}, x, ax::NamedTuple)
     return nothing
 end
 """
-    universe_axis_visit!(seen::IdSet{UniverseSets}, x, ax::NamedTuple) -> Nothing
+    universe_axis_visit!(seen::IdSet{UniverseSets}, x, ax::UniverseAxes) -> Nothing
 
 Handle one value of a field in the walk of [`universe_axis_children!`](@ref).
 
@@ -269,7 +303,8 @@ The method that Julia selects on the type of `x` is the algorithm.
   - [`universe_axis_children!`](@ref)
   - [`assert_universe_axis_order`](@ref)
 """
-function universe_axis_visit!(seen::IdSet{UniverseSets}, sets::UniverseSets, ax::NamedTuple)
+function universe_axis_visit!(seen::IdSet{UniverseSets}, sets::UniverseSets,
+                              ax::UniverseAxes)
     if sets in seen
         return nothing
     end
@@ -277,22 +312,23 @@ function universe_axis_visit!(seen::IdSet{UniverseSets}, sets::UniverseSets, ax:
     return assert_universe_axis_order(sets, ax)
 end
 function universe_axis_visit!(::IdSet{UniverseSets},
-                              ::Union{OptimisationEstimator, TimeDependent}, ::NamedTuple)
+                              ::Union{OptimisationEstimator, TimeDependent}, ::UniverseAxes)
     return nothing
 end
 function universe_axis_visit!(seen::IdSet{UniverseSets},
                               x::Union{AbstractEstimator, AbstractAlgorithm,
-                                       StatsBase.CovarianceEstimator}, ax::NamedTuple)
+                                       StatsBase.CovarianceEstimator}, ax::UniverseAxes)
     return universe_axis_children!(seen, x, ax)
 end
 function universe_axis_visit!(seen::IdSet{UniverseSets},
                               x::AbstractVector{<:Union{Nothing, AbstractEstimator,
-                                                        AbstractAlgorithm}}, ax::NamedTuple)
+                                                        AbstractAlgorithm}},
+                              ax::UniverseAxes)
     for xi in x
         universe_axis_visit!(seen, xi, ax)
     end
     return nothing
 end
-function universe_axis_visit!(::IdSet{UniverseSets}, ::Any, ::NamedTuple)
+function universe_axis_visit!(::IdSet{UniverseSets}, ::Any, ::UniverseAxes)
     return nothing
 end

@@ -17,6 +17,7 @@ prepare_finite_allocation
 allocation_lot_unit
 allocation_turnover_money
 allocation_liquidation_fee
+SideFees
 allocation_side_fees
 permute_side_fees
 allocation_fee

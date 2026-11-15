@@ -538,9 +538,47 @@ folds_are_time_ordered(::Any)::Bool = true
 folds_are_time_ordered(::NonSeqCVER)::Bool = false
 
 """
+$(DocStringExtensions.TYPEDEF)
+
+The evaluation switches of a cross-validation scheme, in one record.
+
+This type is an implementation detail and is not intended for direct use. [`fold_evaluation`](@ref) makes it. [`fold_loop`](@ref) reads it.
+
+# Fields
+
+$(DocStringExtensions.FIELDS)
+
+# Related
+
+  - [`fold_evaluation`](@ref)
+  - [`fold_loop`](@ref)
+"""
+@concrete struct FoldEvaluation
+    """
+    `wd`: The Weight Drift.
+    """
+    wd
+    """
+    `pws`: The Previous-Weights Source.
+    """
+    pws
+    """
+    `fa`: The Fee Clock of the fold's realised series.
+    """
+    fa
+    """
+    `store_weight_path`: The flag that stores a fold's weight path.
+    """
+    store_weight_path
+    """
+    `strict`: The flag that makes a Held Gap raise rather than warn.
+    """
+    strict
+end
+"""
     fold_evaluation(cv)
 
-Read the evaluation switches of a cross-validation scheme, in one named tuple.
+Read the evaluation switches of a cross-validation scheme, in one record.
 
 Every scheme entry point reads the same settings before it runs its folds, and each scheme states them through a method of its own. A scheme that carries none of them, and a call site that holds a split result in place of the scheme that made it, reach the fallback. The fallback sets no drift, no drifted previous weights, no override of the fee clock, no stored weight path, and a Held Gap that warns.
 
@@ -548,10 +586,11 @@ The method is per type and takes the scheme itself, so inference reads the answe
 
 # Returns
 
-  - `(; wd, pws, fa, store_weight_path, strict)`: The Weight Drift, the Previous-Weights Source, the Fee Clock of the fold's realised series, the flag that stores a fold's weight path, and the flag that makes a Held Gap raise rather than warn.
+  - `fe::FoldEvaluation`: The Weight Drift, the Previous-Weights Source, the Fee Clock of the fold's realised series, the flag that stores a fold's weight path, and the flag that makes a Held Gap raise rather than warn.
 
 # Related
 
+  - [`FoldEvaluation`](@ref)
   - [`folds_are_time_ordered`](@ref)
   - [`held_weights_drift`](@ref)
   - [`override_fee_amortisation`](@ref)
@@ -561,8 +600,7 @@ The method is per type and takes the scheme itself, so inference reads the answe
   - [`fold_loop`](@ref)
 """
 function fold_evaluation(::Any)
-    return (; wd = nothing, pws = nothing, fa = nothing, store_weight_path = false,
-            strict = false)
+    return FoldEvaluation(nothing, nothing, nothing, false, false)
 end
 """
     folds_are_stepped(cv)

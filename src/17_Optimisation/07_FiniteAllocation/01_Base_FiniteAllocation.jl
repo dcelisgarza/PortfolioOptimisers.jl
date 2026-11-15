@@ -1362,6 +1362,49 @@ function allocation_liquidation_fee(fees::Fees, T::Number, prev_cash::Number)
     return fee
 end
 """
+$(DocStringExtensions.TYPEDEF)
+
+The charge of one side of a finite allocation: the horizon, the proportional and the fixed rates of the side, the turnover rate with the money held before the trade, and the forced exit.
+
+This type is an implementation detail and is not intended for direct use. [`allocation_side_fees`](@ref) makes it, and [`permute_side_fees`](@ref) reorders it. [`allocation_fee`](@ref) reads it.
+
+# Fields
+
+$(DocStringExtensions.FIELDS)
+
+# Related
+
+  - [`allocation_side_fees`](@ref)
+  - [`permute_side_fees`](@ref)
+  - [`allocation_fee`](@ref)
+"""
+@concrete struct SideFees
+    """
+    `T`: The horizon, in periods.
+    """
+    T
+    """
+    `prop`: The proportional rate per period of the side, `l` on the long side and `s` on the short side, or `nothing`. A scalar applies to every asset.
+    """
+    prop
+    """
+    `fixed`: The fixed amount per position of the side, `fl` on the long side and `fs` on the short side, or `nothing`.
+    """
+    fixed
+    """
+    `tn_val`: The turnover rate per period, or `nothing`.
+    """
+    tn_val
+    """
+    `prev_money`: The money that the side held before the trade, per asset, or `nothing`.
+    """
+    prev_money
+    """
+    `liq`: The forced-exit charge, a constant of the whole allocation. It is zero on the short side.
+    """
+    liq
+end
+"""
     allocation_side_fees(::Nothing, ::Option{<:Number}, ::Number, ::Any, ::Any, ::Any)
     allocation_side_fees(fees::Fees, T::Number, prev_cash::Number, lidx, sidx, umsk)
 
@@ -1397,7 +1440,7 @@ An Unpriced Asset is on neither side, because no sub-problem can buy it. It ends
   - `lsf`: The long side's charge, or `nothing`.
   - `ssf`: The short side's charge, or `nothing`.
 
-Each charge is a named tuple of `T`, `prop`, `fixed`, `tn_val`, `prev_money` and `liq`.
+Each charge is a [`SideFees`](@ref).
 
 # Related
 
@@ -1422,18 +1465,15 @@ function allocation_side_fees(fees::Fees, T::Number, prev_cash::Number, lidx, si
     # never enters: the charge reads zero money, so only the sale of the old position costs.
     utn_val, uprev = allocation_turnover_money(fees.tn, prev_cash, umsk, false)
     z = fill(zero(liq), count(umsk))
-    liq = allocation_fee((T = T, prop = nothing, fixed = nothing, tn_val = utn_val,
-                          prev_money = uprev, liq = liq), z, z)
-    return ((T = T, prop = nothing_scalar_array_view(fees.l, lidx),
-             fixed = nothing_scalar_array_view(fees.fl, lidx), tn_val = ltn_val,
-             prev_money = lprev, liq = liq),
-            (T = T, prop = nothing_scalar_array_view(fees.s, sidx),
-             fixed = nothing_scalar_array_view(fees.fs, sidx), tn_val = stn_val,
-             prev_money = sprev, liq = zero(liq)))
+    liq = allocation_fee(SideFees(T, nothing, nothing, utn_val, uprev, liq), z, z)
+    return SideFees(T, nothing_scalar_array_view(fees.l, lidx),
+                    nothing_scalar_array_view(fees.fl, lidx), ltn_val, lprev, liq),
+           SideFees(T, nothing_scalar_array_view(fees.s, sidx),
+                    nothing_scalar_array_view(fees.fs, sidx), stn_val, sprev, zero(liq))
 end
 """
     allocation_fee(::Nothing, ::VecNum, shares::VecNum)
-    allocation_fee(sf::NamedTuple, p::VecNum, shares::VecNum)
+    allocation_fee(sf::SideFees, p::VecNum, shares::VecNum)
 
 Charge the whole fee of one side on a vector of share counts.
 
@@ -1501,7 +1541,7 @@ A scalar rate applies to every asset.
 function allocation_fee(::Nothing, p::VecNum, shares::VecNum)
     return zero(promote_type(eltype(p), eltype(shares)))
 end
-function allocation_fee(sf::NamedTuple, p::VecNum, shares::VecNum)
+function allocation_fee(sf::SideFees, p::VecNum, shares::VecNum)
     money = shares .* p
     # The forced exit is a constant of the allocation, so it is owed before a share is
     # bought and it does not move when one is.
@@ -1522,7 +1562,7 @@ function allocation_fee(sf::NamedTuple, p::VecNum, shares::VecNum)
 end
 """
     permute_side_fees(::Nothing, ::Any)
-    permute_side_fees(sf::NamedTuple, idx)
+    permute_side_fees(sf::SideFees, idx)
 
 Put one side's charge in the order that `idx` gives.
 
@@ -1545,9 +1585,9 @@ Put one side's charge in the order that `idx` gives.
 function permute_side_fees(::Nothing, ::Any)
     return nothing
 end
-function permute_side_fees(sf::NamedTuple, idx)
-    return (T = sf.T, prop = nothing_scalar_array_view(sf.prop, idx),
-            fixed = nothing_scalar_array_view(sf.fixed, idx),
-            tn_val = nothing_scalar_array_view(sf.tn_val, idx),
-            prev_money = nothing_scalar_array_view(sf.prev_money, idx), liq = sf.liq)
+function permute_side_fees(sf::SideFees, idx)
+    return SideFees(sf.T, nothing_scalar_array_view(sf.prop, idx),
+                    nothing_scalar_array_view(sf.fixed, idx),
+                    nothing_scalar_array_view(sf.tn_val, idx),
+                    nothing_scalar_array_view(sf.prev_money, idx), sf.liq)
 end

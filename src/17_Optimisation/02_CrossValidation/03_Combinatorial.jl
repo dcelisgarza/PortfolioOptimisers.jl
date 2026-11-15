@@ -668,11 +668,11 @@ end
 
 Read the evaluation switches of a [`CombinatorialCrossValidation`](@ref).
 
-The folds of this scheme are not a timeline, so it carries no Previous-Weights Source and the tuple names `nothing` for it. There is no previous fold whose weights a fold of this scheme could inherit.
+The folds of this scheme are not a timeline, so it carries no Previous-Weights Source and the record holds `nothing` for it. There is no previous fold whose weights a fold of this scheme could inherit.
 
 # Returns
 
-  - `(; wd, pws, fa, store_weight_path, strict)`: The Weight Drift, the Previous-Weights Source, the Fee Clock of the fold's realised series, the flag that stores a fold's weight path, and the flag that makes a Held Gap raise rather than warn.
+  - `fe::FoldEvaluation`: The Weight Drift, the Previous-Weights Source, the Fee Clock of the fold's realised series, the flag that stores a fold's weight path, and the flag that makes a Held Gap raise rather than warn.
 
 # Related
 
@@ -682,8 +682,7 @@ The folds of this scheme are not a timeline, so it carries no Previous-Weights S
   - [`override_fee_amortisation`](@ref)
 """
 function fold_evaluation(cv::CombinatorialCrossValidation)
-    return (; wd = cv.wd, pws = nothing, fa = cv.fa,
-            store_weight_path = cv.store_weight_path, strict = cv.strict)
+    return FoldEvaluation(cv.wd, nothing, cv.fa, cv.store_weight_path, cv.strict)
 end
 export CombinatorialCrossValidation, CombinatorialCrossValidationResult,
        optimal_number_folds

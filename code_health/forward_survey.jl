@@ -540,6 +540,10 @@ const RULED_REBUILDS = Dict{Tuple{Symbol, Symbol}, Tuple{String, String}}(#
                                                                            :ObservedStack) =>
                                                                               (NO_REBUILD,
                                                                                "`cc` is the `ObservedFactors` of `cross_sectional_exposure_series`, another type, cut to the kept rows (#2093)"),
+                                                                          (:fold_evaluation,
+                                                                           :FoldEvaluation) =>
+                                                                              (NO_REBUILD,
+                                                                               "`cv` is a cross-validation scheme, another type: the record reads its evaluation switches (#2110, #2103)"),
                                                                           (:fit_data_step_from_state,
                                                                            :PriceGapFillResult) =>
                                                                               ("go",

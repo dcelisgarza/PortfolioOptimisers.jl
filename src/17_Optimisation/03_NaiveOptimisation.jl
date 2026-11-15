@@ -1242,7 +1242,45 @@ function non_investable_universe(bcrp::BestConstantRebalancedPortfolio,
     return rebuild_struct(bcrp, (; sets = non_investable_sets(bcrp.sets, ni)))
 end
 """
-    cover_fixed_point(X::MatNum, iters::Integer, tol::Number) -> NamedTuple
+$(DocStringExtensions.TYPEDEF)
+
+The fit of one run of Cover's fixed-point iteration: the weights, the log wealth at the weights, the certificate of the shortfall, and how the run stopped.
+
+This type is an implementation detail and is not intended for direct use. [`cover_fixed_point`](@ref) makes it. [`optimise`](@ref) reads it.
+
+# Fields
+
+$(DocStringExtensions.FIELDS)
+
+# Related
+
+  - [`cover_fixed_point`](@ref)
+  - [`BestConstantRebalancedPortfolio`](@ref)
+"""
+@concrete struct CoverFixedPointFit <: AbstractResult
+    """
+    `w`: The weights, on the simplex.
+    """
+    w
+    """
+    `log_wealth`: ``\\sum_t \\log(\\boldsymbol{x}_t^{\\intercal} \\boldsymbol{w})`` at `w`.
+    """
+    log_wealth
+    """
+    `gap`: The certificate at `w`, an upper bound on the optimal log wealth minus `log_wealth`.
+    """
+    gap
+    """
+    `converged`: Whether `gap` met the tolerance.
+    """
+    converged
+    """
+    `iterations`: The number of multiplicative steps, zero when the uniform start already meets the tolerance.
+    """
+    iterations
+end
+"""
+    cover_fixed_point(X::MatNum, iters::Integer, tol::Number) -> CoverFixedPointFit
 
 Run Cover's fixed-point iteration for the best constant rebalanced portfolio over a matrix of price relatives.
 
@@ -1264,13 +1302,7 @@ It is the kernel of [`BestConstantRebalancedPortfolio`](@ref), on a bare matrix,
 
 # Returns
 
-  - `fp::NamedTuple`: Five entries.
-
-      + `w`: The weights, on the simplex.
-      + `log_wealth`: ``\\sum_t \\log(\\boldsymbol{x}_t^{\\intercal} \\boldsymbol{w})`` at `w`.
-      + `gap`: The certificate at `w`, an upper bound on the optimal log wealth minus `log_wealth`.
-      + `converged`: Whether `gap` met the tolerance.
-      + `iterations`: The number of multiplicative steps, zero when the uniform start already meets the tolerance.
+  - `fp::CoverFixedPointFit`: The record of the fixed point, with five fields. See [`CoverFixedPointFit`](@ref).
 
 # Related
 
@@ -1305,8 +1337,7 @@ function cover_fixed_point(X::MatNum, iters::Integer, tol::Number)
         converged = gap <= tol * max(one(lw), abs(lw))
         iterations += 1
     end
-    return (; w = w, log_wealth = lw, gap = gap, converged = converged,
-            iterations = iterations)
+    return CoverFixedPointFit(w, lw, gap, converged, iterations)
 end
 """
 $(DocStringExtensions.TYPEDSIGNATURES)

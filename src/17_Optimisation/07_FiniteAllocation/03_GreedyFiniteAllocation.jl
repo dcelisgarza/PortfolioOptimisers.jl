@@ -206,7 +206,7 @@ function GreedyAllocation(; unit::LuE_Lu = LotUnit(),
 end
 """
     greedy_fee_delta(::Nothing, ::VecNum, shares::VecNum, ::Integer, ::Number)
-    greedy_fee_delta(sf::NamedTuple, p::VecNum, shares::VecNum, i::Integer, qty::Number)
+    greedy_fee_delta(sf::SideFees, p::VecNum, shares::VecNum, i::Integer, qty::Number)
 
 Charge the amount that a purchase of `qty` shares of asset `i` adds to one side's fee.
 
@@ -241,8 +241,7 @@ The greedy allocator buys one asset at a time against a running cash figure, so 
 function greedy_fee_delta(::Nothing, p::VecNum, shares::VecNum, ::Integer, ::Number)
     return zero(promote_type(eltype(p), eltype(shares)))
 end
-function greedy_fee_delta(sf::NamedTuple, p::VecNum, shares::VecNum, i::Integer,
-                          qty::Number)
+function greedy_fee_delta(sf::SideFees, p::VecNum, shares::VecNum, i::Integer, qty::Number)
     pi = p[i]
     m0 = shares[i] * pi
     m1 = m0 + qty * pi
@@ -266,7 +265,7 @@ function greedy_fee_delta(sf::NamedTuple, p::VecNum, shares::VecNum, i::Integer,
 end
 """
     finite_sub_allocation!(w::VecNum, p::VecNum, lu::Num_VecNum, cash::Number, bgt::Number,
-                           sf::Option{<:NamedTuple}, ga::GreedyAllocation)
+                           sf::Option{<:SideFees}, ga::GreedyAllocation)
 
 Run the greedy two-pass allocation over one side, long or short, of the portfolio.
 
@@ -291,7 +290,7 @@ This method runs the two passes of [`GreedyAllocation`](@ref) for a single side.
   - `lu::Num_VecNum`: Lot unit of this side, one scalar for every asset or one value for each asset in the order of `w`.
   - `cash::Number`: Cash allocated to this side.
   - `bgt::Number`: Budget of this side, used to rescale the realised weights.
-  - `sf::Option{<:NamedTuple}`: This side's charge, from [`allocation_side_fees`](@ref), or `nothing`.
+  - `sf::Option{<:SideFees}`: This side's charge, from [`allocation_side_fees`](@ref), or `nothing`.
   - `ga::GreedyAllocation`: Allocator of the side. The method reads none of its fields, because [`allocation_lot_unit`](@ref) resolved its lot unit to `lu`.
 
 # Returns
@@ -312,7 +311,7 @@ This method runs the two passes of [`GreedyAllocation`](@ref) for a single side.
   - [`finite_sub_allocation`](@ref)
 """
 function finite_sub_allocation!(w::VecNum, p::VecNum, lu::Num_VecNum, cash::Number,
-                                bgt::Number, sf::Option{<:NamedTuple}, ga::GreedyAllocation)
+                                bgt::Number, sf::Option{<:SideFees}, ga::GreedyAllocation)
     if isempty(w)
         # An empty side buys nothing, but it can still owe the forced exit: a delisted asset
         # carries a zero target weight, so it lands on the long side even when that side

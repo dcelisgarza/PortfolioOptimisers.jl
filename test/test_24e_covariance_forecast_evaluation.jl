@@ -445,8 +445,10 @@ end
                 end
                 @test a.sigma == z.sigma && a.location == z.location
                 # The re-projection reads the test rows in the frame of the evaluation.
-                @test isequal(covariance_forecast_portfolio(a, rb, wt),
-                              covariance_forecast_portfolio(z, rx, wt))
+                pa = covariance_forecast_portfolio(a, rb, wt)
+                pz = covariance_forecast_portfolio(z, rx, wt)
+                @test isequal(pa.standardised_return, pz.standardised_return)
+                @test isequal(pa.portfolio_qlike, pz.portfolio_qlike)
             end
             # Under `x_src = nothing` and `DataSource()` the benchmark is not read.
             a = cfe(Covariance(), rb, batch_cv)
@@ -1000,17 +1002,62 @@ end
         @test !po.needs_previous_weights(Covariance())
         @test !po.needs_previous_weights(EmpiricalPrior())
         @test !po.needs_previous_weights(po.Online(Covariance()))
-        @test po.advance_previous_fold(nothing, :prev, (; a = 1)) == :prev
+        stp = CovarianceForecastStepResult(0, NaN, [NaN], NaN, NaN, [NaN], [NaN])
+        @test po.advance_previous_fold(nothing, :prev, (stp, nothing, nothing)) == :prev
         @test isdefined(PortfolioOptimisers, :AbstractRealisedTarget)
         @test !Base.isexported(PortfolioOptimisers, :AbstractRealisedTarget)
         for nm in (:RealisedCovariance, :HorizonReturn, :covariance_forecast_step,
                    :covariance_forecast_evaluation, :CovarianceForecastEvaluationResult,
                    :covariance_forecast_summary, :CovarianceForecastSummaryResult,
                    :covariance_forecast_compare, :CovarianceForecastComparisonResult,
-                   :covariance_forecast_portfolio)
+                   :covariance_forecast_portfolio, :CovarianceForecastStepResult,
+                   :CovarianceForecastPortfolioResult)
             @test nm in names(PortfolioOptimisers)
         end
         @test RealisedCovariance() isa po.AbstractRealisedTarget
         @test HorizonReturn() isa po.AbstractRealisedTarget
+    end
+
+    @testset "The Results of a step, of a portfolio and of a summary check their values" begin
+        # Issue #2103: the step and the re-projection return Result types, and each
+        # constructor checks its values, as the summary does.
+        st = CovarianceForecastStepResult(; n_valid = 2, mahalanobis_ratio = 1.0,
+                                          diagonal_ratio = [1.0, 1.0, NaN], qlike = 0.5,
+                                          frobenius = 0.1, standardised_return = [0.2],
+                                          portfolio_qlike = [0.3])
+        @test st.n_valid == 2 && st.standardised_return == [0.2]
+        (; n_valid, qlike) = st
+        @test n_valid == 2 && qlike == 0.5
+        @test_throws DomainError CovarianceForecastStepResult(-1, 1.0, [1.0], 0.5, 0.1,
+                                                              [0.2], [0.3])
+        @test_throws DimensionMismatch CovarianceForecastStepResult(2, 1.0, [1.0], 0.5, 0.1,
+                                                                    [0.2], [0.3])
+        @test_throws DimensionMismatch CovarianceForecastStepResult(1, 1.0, [1.0], 0.5, 0.1,
+                                                                    [0.2], [0.3, 0.4])
+        pr = CovarianceForecastPortfolioResult(; standardised_return = ones(3, 2),
+                                               portfolio_qlike = zeros(3, 2))
+        @test size(pr.portfolio_qlike) == (3, 2)
+        @test_throws DimensionMismatch CovarianceForecastPortfolioResult(ones(3, 2),
+                                                                         zeros(3, 1))
+        cfr = covariance_forecast_evaluation(Covariance(), rd, IndexWalkForward(60, 5))
+        s = covariance_forecast_summary([cfr, cfr])
+        s1 = covariance_forecast_summary(cfr)
+        args = [getfield(s, f) for f in fieldnames(CovarianceForecastSummaryResult)]
+        @test CovarianceForecastSummaryResult(args...) isa CovarianceForecastSummaryResult
+        @test isa(CovarianceForecastSummaryResult(;
+                                                  (f => getfield(s1, f)
+                                                   for f in
+                                                       fieldnames(CovarianceForecastSummaryResult))...),
+                  CovarianceForecastSummaryResult)
+        bad(f, v) = CovarianceForecastSummaryResult((g === f ? v : getfield(s, g)
+                                                     for g in
+                                                         fieldnames(CovarianceForecastSummaryResult))...)
+        @test_throws DomainError bad(:alpha, 1.5)
+        @test_throws DomainError bad(:levels, (0.95, 1.0))
+        @test_throws DimensionMismatch bad(:qlike_mean, [1.0])
+        @test_throws DimensionMismatch bad(:exceedance, zeros(2, 3))
+        @test_throws DomainError bad(:n_steps, [0, 3])
+        @test_throws DomainError bad(:exceedance, fill(2.0, 2, 2))
+        @test_throws DomainError bad(:mahalanobis_band_lo, s.mahalanobis_band_hi .+ 1)
     end
 end

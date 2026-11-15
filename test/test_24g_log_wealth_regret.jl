@@ -345,9 +345,8 @@ and be-the-leader collapses onto the static comparator.
         @test hs.prefix && hs.start == 1
         @test isa(hs, po.WalkForwardEstimator)
         @test !po.folds_are_stepped(hs)
-        @test po.fold_evaluation(hs) ==
-              (; wd = nothing, pws = nothing, fa = nothing, store_weight_path = false,
-               strict = false)
+        @test po.fold_evaluation(hs) ===
+              po.FoldEvaluation(nothing, nothing, nothing, false, false)
         @test po.folds_are_time_ordered(hs)
         @test_throws DomainError HindsightSplit(; start = 0)
         # Prefix folds: train `1:t`, test `t`, one fold per row.

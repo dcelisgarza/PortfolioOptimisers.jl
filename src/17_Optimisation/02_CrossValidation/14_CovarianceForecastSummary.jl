@@ -215,7 +215,13 @@ $(DocStringExtensions.FIELDS)
         step_weighting
     ) -> CovarianceForecastSummaryResult
 
-Arguments correspond to the struct's fields, in the order they are declared. [`covariance_forecast_summary`](@ref) builds the type, and a caller reads it. The type has no keyword constructor, and it validates nothing.
+    CovarianceForecastSummaryResult(; names, mahalanobis_mean, …, step_weighting)
+
+Arguments correspond to the struct's fields, in the order they are declared. [`covariance_forecast_summary`](@ref) builds the type, and a caller reads it. The positional constructor checks the values with [`assert_covariance_summary_fields`](@ref). The keyword constructor takes each field by name, with no default, and calls it.
+
+## Validation
+
+  - The rules of [`assert_covariance_summary_fields`](@ref): the levels are valid, every field of an entry has the shape of `n_steps`, each evaluation scored a step, each exceedance rate is a rate, and each band is ordered. A breach raises a `DomainError` or a `DimensionMismatch`.
 
 # Related
 
@@ -333,6 +339,104 @@ Arguments correspond to the struct's fields, in the order they are declared. [`c
     $(field_dict[:cfe_step_weighting])
     """
     step_weighting
+    function CovarianceForecastSummaryResult(names, mahalanobis_mean, mahalanobis_median,
+                                             mahalanobis_p5, mahalanobis_p95,
+                                             mahalanobis_band_lo, mahalanobis_band_hi,
+                                             diagonal_mean, diagonal_median, diagonal_p5,
+                                             diagonal_p95, diagonal_band_lo,
+                                             diagonal_band_hi, bias_statistic, bias_p5,
+                                             bias_p25, bias_p75, bias_p95, qlike_mean,
+                                             frobenius_mean, portfolio_qlike_mean, levels,
+                                             exceedance, n_steps::Union{Integer, VecInt},
+                                             n_portfolios::Union{Integer, VecInt},
+                                             alpha::Number,
+                                             step_weighting::AbstractStepWeighting)
+        args = (names, mahalanobis_mean, mahalanobis_median, mahalanobis_p5,
+                mahalanobis_p95, mahalanobis_band_lo, mahalanobis_band_hi, diagonal_mean,
+                diagonal_median, diagonal_p5, diagonal_p95, diagonal_band_lo,
+                diagonal_band_hi, bias_statistic, bias_p5, bias_p25, bias_p75, bias_p95,
+                qlike_mean, frobenius_mean, portfolio_qlike_mean, levels, exceedance,
+                n_steps, n_portfolios, alpha, step_weighting)
+        s = new{map(typeof, args)...}(args...)
+        assert_covariance_summary_fields(s)
+        return s
+    end
+end
+function CovarianceForecastSummaryResult(; names, mahalanobis_mean, mahalanobis_median,
+                                         mahalanobis_p5, mahalanobis_p95,
+                                         mahalanobis_band_lo, mahalanobis_band_hi,
+                                         diagonal_mean, diagonal_median, diagonal_p5,
+                                         diagonal_p95, diagonal_band_lo, diagonal_band_hi,
+                                         bias_statistic, bias_p5, bias_p25, bias_p75,
+                                         bias_p95, qlike_mean, frobenius_mean,
+                                         portfolio_qlike_mean, levels, exceedance,
+                                         n_steps::Union{Integer, VecInt},
+                                         n_portfolios::Union{Integer, VecInt},
+                                         alpha::Number,
+                                         step_weighting::AbstractStepWeighting)::CovarianceForecastSummaryResult
+    return CovarianceForecastSummaryResult(names, mahalanobis_mean, mahalanobis_median,
+                                           mahalanobis_p5, mahalanobis_p95,
+                                           mahalanobis_band_lo, mahalanobis_band_hi,
+                                           diagonal_mean, diagonal_median, diagonal_p5,
+                                           diagonal_p95, diagonal_band_lo, diagonal_band_hi,
+                                           bias_statistic, bias_p5, bias_p25, bias_p75,
+                                           bias_p95, qlike_mean, frobenius_mean,
+                                           portfolio_qlike_mean, levels, exceedance,
+                                           n_steps, n_portfolios, alpha, step_weighting)
+end
+"""
+    assert_covariance_summary_fields(s::CovarianceForecastSummaryResult)
+
+Check the fields of a [`CovarianceForecastSummaryResult`](@ref) that its constructor built.
+
+The constructor builds the Result first and checks it here, so the check reads each field by its name and not by its position among twenty-seven arguments. A summary of one evaluation holds a number or a name in each field of an entry, and a summary of many evaluations holds one vector entry for each. `n_steps` gives the shape: an integer for one evaluation, and a vector otherwise. `levels` is the axis of the confidence levels, so `exceedance` is a vector over the levels for one evaluation, and `evaluations × levels` otherwise. The checks are the rules that [`covariance_forecast_summary`](@ref) states, so a summary that it builds always passes them.
+
+# Arguments
+
+  - `s`: The summary to check.
+
+# Validation
+
+  - `0 < alpha < 1`, and `0 < l < 1` for each level `l`. Raises a `DomainError`.
+  - Each field of an entry is not a vector when `n_steps` is an integer, and is a vector of `length(n_steps)` otherwise. `exceedance` has one entry per level for one evaluation, and the size `evaluations × levels` otherwise. Raises a `DimensionMismatch`.
+  - Each evaluation scored at least one step, `n_steps >= 1`, and `n_portfolios` is not negative. Raises a `DomainError`.
+  - Each exceedance rate is `NaN` or in ``[0, 1]``, and no lower end of a band lies above its upper end, a `NaN` end passes. Raises a `DomainError`.
+
+# Returns
+
+  - `nothing`.
+
+# Related
+
+  - [`CovarianceForecastSummaryResult`](@ref)
+  - [`covariance_forecast_summary`](@ref)
+  - [`assert_ordered_bounds`](@ref)
+"""
+function assert_covariance_summary_fields(s::CovarianceForecastSummaryResult)::Nothing
+    assert_unit_interval(s.alpha, :alpha)
+    foreach(l -> assert_unit_interval(l, :levels), s.levels)
+    n = isa(s.n_steps, Integer) ? nothing : length(s.n_steps)
+    shaped = v -> isa(v, AbstractVector) ? length(v) === n : isnothing(n)
+    # Each field is read by its name, in a tuple, so the compiler unrolls the checks.
+    entry = (s.names, s.mahalanobis_mean, s.mahalanobis_median, s.mahalanobis_p5,
+             s.mahalanobis_p95, s.mahalanobis_band_lo, s.mahalanobis_band_hi,
+             s.diagonal_mean, s.diagonal_median, s.diagonal_p5, s.diagonal_p95,
+             s.diagonal_band_lo, s.diagonal_band_hi, s.bias_statistic, s.bias_p5,
+             s.bias_p25, s.bias_p75, s.bias_p95, s.qlike_mean, s.frobenius_mean,
+             s.portfolio_qlike_mean, s.n_steps, s.n_portfolios)
+    ex = isnothing(n) ? (length(s.levels),) : (n, length(s.levels))
+    @argcheck(all(shaped, entry) && size(s.exceedance) == ex,
+              DimensionMismatch("each field of an entry must have the shape of n_steps: one value for one evaluation, or a vector of $(n) entries, and exceedance must have the size $(ex)"))
+    @argcheck(all(>=(1), s.n_steps),
+              DomainError(s.n_steps,
+                          "each evaluation of a summary scored at least one step"))
+    assert_nan_or_nonneg(s.n_portfolios, :n_portfolios)
+    assert_nan_or_closed_unit_interval(s.exceedance, :exceedance)
+    assert_ordered_bounds(s.mahalanobis_band_lo, s.mahalanobis_band_hi,
+                          :mahalanobis_band_lo, :mahalanobis_band_hi)
+    assert_ordered_bounds(s.diagonal_band_lo, s.diagonal_band_hi, :diagonal_band_lo,
+                          :diagonal_band_hi)
+    return nothing
 end
 """
     covariance_forecast_summary(cfers::AbstractVector{<:CovarianceForecastEvaluationResult};
@@ -826,8 +930,57 @@ function loss_difference_test(mt::AbstractMeanTestEstimator, d::VecNum,
     return mean_test(mt, ifelse.(k, d, Tm(NaN)), 1, rng)
 end
 """
+$(DocStringExtensions.TYPEDEF)
+
+The portfolio diagnostics of the stored forecasts of an evaluation, scored again on a new test portfolio by [`covariance_forecast_portfolio`](@ref).
+
+Each matrix holds one row for each step of the evaluation and one column for each test portfolio, as the two portfolio fields of a [`CovarianceForecastEvaluationResult`](@ref) do.
+
+# Fields
+
+$(DocStringExtensions.FIELDS)
+
+# Constructors
+
+    CovarianceForecastPortfolioResult(standardised_return::MatNum, portfolio_qlike::MatNum)
+    CovarianceForecastPortfolioResult(; standardised_return::MatNum, portfolio_qlike::MatNum)
+
+The positional constructor checks the values. The keyword constructor takes each field by name, with no default, and calls it.
+
+## Validation
+
+  - `standardised_return` and `portfolio_qlike` have the same size, `steps × portfolios`. Otherwise, the constructor raises a `DimensionMismatch`.
+
+# Related
+
+  - [`covariance_forecast_portfolio`](@ref)
+  - [`CovarianceForecastEvaluationResult`](@ref)
+  - [`CovarianceForecastStepResult`](@ref)
+"""
+@concrete struct CovarianceForecastPortfolioResult <: AbstractResult
+    """
+    Standardised return of each test portfolio at each step, `steps × portfolios`.
+    """
+    standardised_return
+    """
+    QLIKE loss of the variance of each test portfolio at each step, `steps × portfolios`.
+    """
+    portfolio_qlike
+    function CovarianceForecastPortfolioResult(standardised_return::MatNum,
+                                               portfolio_qlike::MatNum)
+        @argcheck(size(standardised_return) == size(portfolio_qlike),
+                  DimensionMismatch("standardised_return and portfolio_qlike hold one row for each step and one column for each test portfolio, so `size(standardised_return) == size(portfolio_qlike)` must hold.\nsize(standardised_return) => $(size(standardised_return))\nsize(portfolio_qlike) => $(size(portfolio_qlike))"))
+        return new{typeof(standardised_return), typeof(portfolio_qlike)}(standardised_return,
+                                                                         portfolio_qlike)
+    end
+end
+function CovarianceForecastPortfolioResult(; standardised_return::MatNum,
+                                           portfolio_qlike::MatNum)::CovarianceForecastPortfolioResult
+    return CovarianceForecastPortfolioResult(standardised_return, portfolio_qlike)
+end
+"""
     covariance_forecast_portfolio(cfer::CovarianceForecastEvaluationResult, rd::ReturnsResult,
-                                  w::Option{<:VecNum_VecVecNum}) -> NamedTuple
+                                  w::Option{<:VecNum_VecVecNum}) -> CovarianceForecastPortfolioResult
 
 Score the stored forecasts of an evaluation again, on a new test portfolio.
 
@@ -857,7 +1010,7 @@ The test rows are read in the frame of the evaluation, `cfer.x_src`, because a f
 
 # Returns
 
-  - `proj::NamedTuple`: `standardised_return` and `portfolio_qlike`, each `steps × portfolios`.
+  - `proj::CovarianceForecastPortfolioResult`: `standardised_return` and `portfolio_qlike`, each `steps × portfolios`.
 
 # Related
 
@@ -885,10 +1038,11 @@ function covariance_forecast_portfolio(cfer::CovarianceForecastEvaluationResult,
         b[i, :] .= s.standardised_return
         pq[i, :] .= s.portfolio_qlike
     end
-    return (; standardised_return = b, portfolio_qlike = pq)
+    return CovarianceForecastPortfolioResult(b, pq)
 end
 
 export DofStepWeighting, EqualStepWeighting, covariance_forecast_summary,
        CovarianceForecastSummaryResult, covariance_forecast_compare,
-       CovarianceForecastComparisonResult, covariance_forecast_portfolio
+       CovarianceForecastComparisonResult, covariance_forecast_portfolio,
+       CovarianceForecastPortfolioResult
 public AbstractStepWeighting, covariance_step_weights

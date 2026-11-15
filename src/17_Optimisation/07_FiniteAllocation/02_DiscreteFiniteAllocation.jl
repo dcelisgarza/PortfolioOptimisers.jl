@@ -359,7 +359,7 @@ function set_discrete_error!(model::JuMP.Model, w::VecNum, p::VecNum, cash::Numb
 end
 """
     set_allocation_fees!(model::JuMP.Model, p::VecNum, lu::Num_VecNum, cash::Number,
-                         sf::Option{<:NamedTuple})
+                         sf::Option{<:SideFees})
 
 Write one side's fee in the allocation model's own variables, and return it.
 
@@ -448,7 +448,7 @@ $(val_dict[:relax])
   - `p::VecNum`: Asset prices of this side.
   - `lu::Num_VecNum`: Lot unit of this side, one scalar for every asset or one value for each asset.
   - `cash::Number`: Cash of this side. It bounds the lots a binary can switch on.
-  - `sf::Option{<:NamedTuple}`: This side's charge, or `nothing`.
+  - `sf::Option{<:SideFees}`: This side's charge, or `nothing`.
 
 # Returns
 
@@ -467,7 +467,7 @@ function set_allocation_fees!(model::JuMP.Model, ::VecNum, ::Num_VecNum, ::Numbe
     return model[:fee] = zero(JuMP.AffExpr)
 end
 function set_allocation_fees!(model::JuMP.Model, p::VecNum, lu::Num_VecNum, cash::Number,
-                              sf::NamedTuple)
+                              sf::SideFees)
     x = model[:x]
     z = model[:z]
     sc = get_constraint_scale(model)
@@ -518,7 +518,7 @@ function set_allocation_fees!(model::JuMP.Model, p::VecNum, lu::Num_VecNum, cash
 end
 """
     finite_sub_allocation(w::VecNum, p::VecNum, lu::Num_VecNum, cash::Number, bgt::Number,
-                          sf::Option{<:NamedTuple}, da::DiscreteAllocation,
+                          sf::Option{<:SideFees}, da::DiscreteAllocation,
                           str_names::Bool = false)
 
 Build and solve the discrete allocation MIP for one side, long or short, of the book.
@@ -580,7 +580,7 @@ Where:
   - `lu::Num_VecNum`: Lot unit of this side, one scalar for every asset or one value for each asset in the order of `w`.
   - `cash::Number`: Cash of this side.
   - `bgt::Number`: Budget of this side, used to rescale the realised weights.
-  - `sf::Option{<:NamedTuple}`: This side's charge, of [`allocation_side_fees`](@ref), or `nothing`.
+  - `sf::Option{<:SideFees}`: This side's charge, of [`allocation_side_fees`](@ref), or `nothing`.
   - `da::DiscreteAllocation`: Allocator carrying the solvers, the scales and the formulation `wf`.
   - `str_names::Bool = false`: Whether the JuMP variables get string names.
 
@@ -603,8 +603,8 @@ Where:
   - [`AbstractCollateralAlgorithm`](@ref)
 """
 function finite_sub_allocation(w::VecNum, p::VecNum, lu::Num_VecNum, cash::Number,
-                               bgt::Number, sf::Option{<:NamedTuple},
-                               da::DiscreteAllocation, str_names::Bool = false)
+                               bgt::Number, sf::Option{<:SideFees}, da::DiscreteAllocation,
+                               str_names::Bool = false)
     if isempty(w)
         # An empty side buys nothing, but it can still owe the forced exit: a delisted asset
         # carries a zero target weight, so it lands on the long side even when that side

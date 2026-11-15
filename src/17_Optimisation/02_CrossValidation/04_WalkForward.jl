@@ -1394,73 +1394,30 @@ function resolve_previous_weights_source(pws::AbstractPreviousWeightsSource,
     return pws
 end
 """
-    fold_evaluation(cv::IndexWalkForward)
+    fold_evaluation(cv::WalkForwardEstimator)
 
-Read the evaluation switches of a [`IndexWalkForward`](@ref).
+Read the evaluation switches of a walk-forward scheme, in one record.
 
-The folds of this scheme are a timeline, so it carries both weight switches and states both of them here, beside the Fee Clock of its realised series. It states the Previous-Weights Source that [`resolve_previous_weights_source`](@ref) gives, so an unset `pws` follows `wd`.
+The folds of a walk-forward scheme are a timeline, so it carries both weight switches and states both of them here, beside the Fee Clock of its realised series. It states the Previous-Weights Source that [`resolve_previous_weights_source`](@ref) gives, so an unset `pws` follows `wd`.
 
 # Returns
 
-  - `(; wd, pws, fa, store_weight_path, strict)`: The Weight Drift, the Previous-Weights Source, the Fee Clock of the fold's realised series, the flag that stores a fold's weight path, and the flag that makes a Held Gap raise rather than warn.
+  - `fe::FoldEvaluation`: The Weight Drift, the Previous-Weights Source, the Fee Clock of the fold's realised series, the flag that stores a fold's weight path, and the flag that makes a Held Gap raise rather than warn.
 
 # Related
 
   - [`fold_evaluation`](@ref)
+  - [`FoldEvaluation`](@ref)
   - [`IndexWalkForward`](@ref)
-  - [`held_weights_drift`](@ref)
-  - [`resolve_previous_weights_source`](@ref)
-  - [`override_fee_amortisation`](@ref)
-"""
-function fold_evaluation(cv::IndexWalkForward)
-    return (; wd = cv.wd, pws = resolve_previous_weights_source(cv.pws, cv.wd), fa = cv.fa,
-            store_weight_path = cv.store_weight_path, strict = cv.strict)
-end
-"""
-    fold_evaluation(cv::DateWalkForward)
-
-Read the evaluation switches of a [`DateWalkForward`](@ref).
-
-The folds of this scheme are a timeline, so it carries both weight switches and states both of them here, beside the Fee Clock of its realised series. It states the Previous-Weights Source that [`resolve_previous_weights_source`](@ref) gives, so an unset `pws` follows `wd`.
-
-# Returns
-
-  - `(; wd, pws, fa, store_weight_path, strict)`: The Weight Drift, the Previous-Weights Source, the Fee Clock of the fold's realised series, the flag that stores a fold's weight path, and the flag that makes a Held Gap raise rather than warn.
-
-# Related
-
-  - [`fold_evaluation`](@ref)
   - [`DateWalkForward`](@ref)
-  - [`held_weights_drift`](@ref)
-  - [`resolve_previous_weights_source`](@ref)
-  - [`override_fee_amortisation`](@ref)
-"""
-function fold_evaluation(cv::DateWalkForward)
-    return (; wd = cv.wd, pws = resolve_previous_weights_source(cv.pws, cv.wd), fa = cv.fa,
-            store_weight_path = cv.store_weight_path, strict = cv.strict)
-end
-"""
-    fold_evaluation(cv::HindsightSplit)
-
-Read the evaluation switches of a [`HindsightSplit`](@ref).
-
-The folds of this scheme are a timeline, so it carries both weight switches and states both of them here, beside the Fee Clock of its realised series. It states the Previous-Weights Source that [`resolve_previous_weights_source`](@ref) gives, so an unset `pws` follows `wd`.
-
-# Returns
-
-  - `(; wd, pws, fa, store_weight_path, strict)`: The Weight Drift, the Previous-Weights Source, the Fee Clock of the fold's realised series, the flag that stores a fold's weight path, and the flag that makes a Held Gap raise rather than warn.
-
-# Related
-
-  - [`fold_evaluation`](@ref)
   - [`HindsightSplit`](@ref)
   - [`held_weights_drift`](@ref)
   - [`resolve_previous_weights_source`](@ref)
   - [`override_fee_amortisation`](@ref)
 """
-function fold_evaluation(cv::HindsightSplit)
-    return (; wd = cv.wd, pws = resolve_previous_weights_source(cv.pws, cv.wd), fa = cv.fa,
-            store_weight_path = cv.store_weight_path, strict = cv.strict)
+function fold_evaluation(cv::WalkForwardEstimator)
+    return FoldEvaluation(cv.wd, resolve_previous_weights_source(cv.pws, cv.wd), cv.fa,
+                          cv.store_weight_path, cv.strict)
 end
 export WalkForwardResult, IndexWalkForward, DateWalkForward, HindsightSplit,
        OnlineIndexWalkForward, OnlineDateWalkForward, OnlineHindsightSplit, n_splits
