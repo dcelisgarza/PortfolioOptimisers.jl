@@ -1017,6 +1017,12 @@ end
     end
 
     @testset "uncertainty steps and routing" begin
+        # A wrapped uncertainty-set estimator runs through the `run_step` method that reads
+        # the target of its wrapper.
+        function run_ucs(ue, target, ctx)
+            ps = PipelineStep(; est = ue, writes = :uncertainty, target = target)
+            return PortfolioOptimisers.run_step(ue, ctx, ps)
+        end
         rd = make_returns()
         ps_mu = PipelineStep(; est = DeltaUncertaintySet(), reads = (:returns,),
                              writes = :uncertainty, target = :mu)
@@ -1086,10 +1092,9 @@ end
         @test_throws ArgumentError PipelineStep(; est = DeltaUncertaintySet(),
                                                 reads = (:returns,), writes = :uncertainty,
                                                 target = :nonsense)
-        # `run_uncertainty_step` keeps its own check, because an unwrapped estimator reaches
-        # it having declared no target at all.
-        @test_throws ArgumentError PortfolioOptimisers.run_uncertainty_step(DeltaUncertaintySet(),
-                                                                            :nonsense, ctx)
+        # The uncertainty-set method of `run_step` keeps its own check, because a target that
+        # the allowlist admits for another family is not one of its parameters.
+        @test_throws ArgumentError run_ucs(DeltaUncertaintySet(), :lt, ctx)
 
         # Issue #776. An estimator that reads the prior result serves the same three targets,
         # and the slot is the difference: it requires `:prior`, never `:returns`.
@@ -1098,8 +1103,7 @@ end
             pr776 = prior(EmpiricalPrior(), rd)
             ctx776 = PortfolioOptimisers.PipelineContext(; returns = rd, prior = pr776)
             for (target, half) in ((:mu, :mu), (:sigma, :sigma))
-                res776, ctx2 = PortfolioOptimisers.run_uncertainty_step(ue776, target,
-                                                                        ctx776)
+                res776, ctx2 = run_ucs(ue776, target, ctx776)
                 # The set was fitted from the pipeline's own prior.
                 ref = target == :mu ? pr776.mu : pr776.sigma
                 @test res776.val == ref
@@ -1109,32 +1113,27 @@ end
                 @test isnothing(getproperty(ctx2.uncertainty, other))
             end
             # `:both` derives both halves from one read.
-            pair776, ctx_both = PortfolioOptimisers.run_uncertainty_step(ue776, :both,
-                                                                         ctx776)
+            pair776, ctx_both = run_ucs(ue776, :both, ctx776)
             @test pair776 isa PortfolioOptimisers.PipelineUncertaintySets
             @test pair776.mu.val == pr776.mu
             @test pair776.sigma.val == pr776.sigma
             @test ctx_both.uncertainty === pair776
             # The two narrowed steps compose into the same pair.
-            _, ctx_mu = PortfolioOptimisers.run_uncertainty_step(ue776, :mu, ctx776)
-            _, ctx_two = PortfolioOptimisers.run_uncertainty_step(ue776, :sigma, ctx_mu)
+            _, ctx_mu = run_ucs(ue776, :mu, ctx776)
+            _, ctx_two = run_ucs(ue776, :sigma, ctx_mu)
             @test ctx_two.uncertainty.mu.val == pair776.mu.val
             @test ctx_two.uncertainty.sigma.val == pair776.sigma.val
             # The `:prior` slot is required, and the returns alone do not satisfy it.
             ctx_no_prior = PortfolioOptimisers.PipelineContext(; returns = rd)
             for target in (:mu, :sigma, :both)
-                @test_throws PortfolioOptimisers.IsNothingError PortfolioOptimisers.run_uncertainty_step(ue776,
-                                                                                                         target,
-                                                                                                         ctx_no_prior)
+                @test_throws PortfolioOptimisers.IsNothingError run_ucs(ue776, target,
+                                                                        ctx_no_prior)
             end
             # The returns are not read at all, so a context that carries the prior alone runs.
             ctx_prior_only = PortfolioOptimisers.PipelineContext(; prior = pr776)
-            @test PortfolioOptimisers.run_uncertainty_step(ue776, :mu, ctx_prior_only)[1].val ==
-                  pr776.mu
+            @test run_ucs(ue776, :mu, ctx_prior_only)[1].val == pr776.mu
             # The target check is the returns-data method's, unchanged.
-            @test_throws ArgumentError PortfolioOptimisers.run_uncertainty_step(ue776,
-                                                                                :nonsense,
-                                                                                ctx776)
+            @test_throws ArgumentError run_ucs(ue776, :lt, ctx776)
             # A prior step ahead of it fills the slot, so the whole pipeline runs.
             ps776 = PipelineStep(; est = ue776, reads = (:prior,), writes = :uncertainty,
                                  target = :both)
@@ -1147,17 +1146,14 @@ end
             # the root it subtypes.
             ue1015 = DeltaUncertaintySet(; pe = nothing)
             @test PortfolioOptimisers.reads_prior_result(ue1015)
-            res1015, ctx1015 = PortfolioOptimisers.run_uncertainty_step(ue1015, :mu, ctx776)
+            res1015, ctx1015 = run_ucs(ue1015, :mu, ctx776)
             @test res1015.val === pr776.mu
             @test ctx1015.uncertainty.mu.val === pr776.mu
-            @test PortfolioOptimisers.run_uncertainty_step(ue1015, :mu, ctx_prior_only)[1].val ==
-                  pr776.mu
-            @test_throws PortfolioOptimisers.IsNothingError PortfolioOptimisers.run_uncertainty_step(ue1015,
-                                                                                                     :both,
-                                                                                                     ctx_no_prior)
+            @test run_ucs(ue1015, :mu, ctx_prior_only)[1].val == pr776.mu
+            @test_throws PortfolioOptimisers.IsNothingError run_ucs(ue1015, :both,
+                                                                    ctx_no_prior)
             # The same set with its own prior still reads the returns slot.
-            @test PortfolioOptimisers.run_uncertainty_step(DeltaUncertaintySet(), :mu,
-                                                           ctx_no_prior)[1].val == pr776.mu
+            @test run_ucs(DeltaUncertaintySet(), :mu, ctx_no_prior)[1].val == pr776.mu
             ps1015 = PipelineStep(; est = ue1015, reads = (:prior,), writes = :uncertainty,
                                   target = :both)
             res_pipe = fit(Pipeline(; steps = (EmpiricalPrior(), ps1015)), rd)
@@ -2883,8 +2879,8 @@ end
         mr = MeanRisk(; opt = jo(), r = UncertaintySetVariance())
         # A constraint target on an uncertainty step computed both halves, as :both does.
         @test_throws ArgumentError Pipeline(; steps = (EmpiricalPrior(), ucs_step(:lt), mr))
-        @test_throws ArgumentError PO.run_uncertainty_step(NormalUncertaintySet(), :lt,
-                                                           PO.PipelineContext())
+        @test_throws ArgumentError PO.run_step(NormalUncertaintySet(), PO.PipelineContext(),
+                                               ucs_step(:lt))
         # With no target, the step failed only when the fit reached it.
         @test_throws ArgumentError Pipeline(;
                                             steps = (EmpiricalPrior(), ucs_step(nothing),
@@ -3700,11 +3696,11 @@ end
         @test !PO.is_row_owner(1)
         @test PO.is_row_owner(EmpiricalPrior()) && PO.is_row_owner(iv)
         @test isnothing(PO.step_online_cap(1))
-        @test PO.update_online_step(3) === 3
-        @test PO.copy_step_states(3) === 3
+        @test PO.update_online_estimator(3) === 3
+        @test PO.copy_states(3) === 3
         folded = PipelineStep(; est = partial_fit!(EmpiricalPrior(), rdl.X),
                               writes = :prior)
-        cw = PO.copy_step_states(folded)
+        cw = PO.copy_states(folded)
         @test cw.writes == :prior && !(cw.est.cache === folded.est.cache)
         @test prior(cw.est).mu == prior(folded.est).mu
         @test isnothing(PO.port_opt_view(PO.PipelineBufferState(), [1]).data)

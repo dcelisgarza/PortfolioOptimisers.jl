@@ -1,5 +1,5 @@
 ```@meta
-Description = "Asset scorers, private API of PortfolioOptimisers.jl: distinct_test_windows, window_statistic, min_folds_scores, window_bigger_is_better, window_values, …"
+Description = "Asset scorers, private API of PortfolioOptimisers.jl: distinct_test_windows, WindowStatistics, window_statistic, min_folds_scores, window_bigger_is_better, …"
 ```
 
 # Asset scorers: private API
@@ -10,6 +10,7 @@ A [`FoldRiskScorer`](@ref) reads each distinct test window once. In each window 
 
 ```@docs
 PortfolioOptimisers.distinct_test_windows
+PortfolioOptimisers.WindowStatistics
 PortfolioOptimisers.window_statistic
 PortfolioOptimisers.min_folds_scores
 PortfolioOptimisers.window_bigger_is_better
@@ -27,6 +28,7 @@ PortfolioOptimisers.split_assets
 PortfolioOptimisers.split_offered
 PortfolioOptimisers.prediction_at
 PortfolioOptimisers.split_prediction
+PortfolioOptimisers.SplitValues
 PortfolioOptimisers.split_weight_record
 PortfolioOptimisers.weight_mass_value
 ```

@@ -669,6 +669,32 @@ function window_values(sca::Option{<:Sca_VecToScaM}, rs::VecBaseRM, X::MatNum)
     return v
 end
 """
+$(DocStringExtensions.TYPEDEF)
+
+Holds the statistic of each covered asset on one test window of a [`FoldRiskScorer`](@ref), with the position of each asset in those statistics.
+
+This type is an implementation detail and is not intended for direct use. [`window_statistic`](@ref) makes one for each test window, and the [`asset_scores`](@ref) method of the scorer collects them and reads them by field. The value travels in a collection, so a record names its two fields.
+
+# Fields
+
+$(DocStringExtensions.FIELDS)
+
+# Related
+
+  - [`window_statistic`](@ref)
+  - [`FoldRiskScorer`](@ref)
+"""
+@concrete struct WindowStatistics
+    """
+    `pos`: The entry of `v` of each asset, `assets × 1`, or zero at an asset that the window does not cover.
+    """
+    pos
+    """
+    `v`: One statistic for each covered asset.
+    """
+    v
+end
+"""
 $(DocStringExtensions.TYPEDSIGNATURES)
 
 Return the statistic of each covered asset on one test window, with the position of each asset in that window.
@@ -689,11 +715,12 @@ Return the statistic of each covered asset on one test window, with the position
 
 # Returns
 
-  - `(; pos, v)::NamedTuple`: `pos` is `assets × 1`, and holds the entry of `v` of each covered asset, or zero. `v` holds one statistic for each covered asset.
+  - `ws::WindowStatistics`: `pos` is `assets × 1`, and holds the entry of `v` of each covered asset, or zero. `v` holds one statistic for each covered asset.
 
 # Related
 
   - [`FoldRiskScorer`](@ref)
+  - [`WindowStatistics`](@ref)
 """
 function window_statistic(s::FoldRiskScorer, rd::AbstractReturnsResult, T::VecInt,
                           bib::Bool)
@@ -701,7 +728,7 @@ function window_statistic(s::FoldRiskScorer, rd::AbstractReturnsResult, T::VecIn
     v = fold_statistic(s.agg.alg, window_values(s.sca, s.r, view(rd.X, T, live)), bib)
     pos = zeros(Int, size(rd.X, 2))
     pos[live] = eachindex(live)
-    return (; pos = pos, v = v)
+    return WindowStatistics(pos, v)
 end
 function asset_scores(s::FoldRiskScorer, rd::AbstractReturnsResult)
     bib = window_bigger_is_better(s.r)
@@ -1049,6 +1076,32 @@ function split_prediction(pred::PopulationPredictionResult, cvr::MultipleRandomi
     return prediction_at(pred.pred[cvr.path_ids[k]], first(cvr.test_idx[k]))
 end
 """
+$(DocStringExtensions.TYPEDEF)
+
+Holds the record of one successful split of a [`WeightMassScorer`](@ref): the assets that the split offered, and the value of each asset.
+
+This type is an implementation detail and is not intended for direct use. [`split_weight_record`](@ref) makes one for each split whose optimisation succeeded, and the [`asset_scores`](@ref) method of the scorer collects them and reads them by field. The value travels in a collection, so a record names its two fields.
+
+# Fields
+
+$(DocStringExtensions.FIELDS)
+
+# Related
+
+  - [`split_weight_record`](@ref)
+  - [`WeightMassScorer`](@ref)
+"""
+@concrete struct SplitValues
+    """
+    `offered`: The mask of the assets that the split offered, `assets × 1`.
+    """
+    offered
+    """
+    `v`: The value of each asset, from [`weight_mass_value`](@ref).
+    """
+    v
+end
+"""
 $(DocStringExtensions.TYPEDSIGNATURES)
 
 Return the record of one successful split: the assets that it offered, and the value of each.
@@ -1070,11 +1123,12 @@ The weights of a fold are on the universe that its optimiser saw, which a select
 
 # Returns
 
-  - `(; offered, v)::NamedTuple`: `offered` is the mask `assets × 1` of the offered assets, and `v` holds the value of each asset.
+  - `sv::SplitValues`: `offered` is the mask `assets × 1` of the offered assets, and `v` holds the value of each asset.
 
 # Related
 
   - [`WeightMassScorer`](@ref)
+  - [`SplitValues`](@ref)
 """
 function split_weight_record(p::PredictionResult, offered::BitVector, idx::AbstractDict,
                              tol::Option{<:Real})
@@ -1087,7 +1141,7 @@ function split_weight_record(p::PredictionResult, offered::BitVector, idx::Abstr
         v[idx[n]] = wi[j]
         offered[idx[n]] = true
     end
-    return (; offered = offered, v = weight_mass_value(tol, v))
+    return SplitValues(offered, weight_mass_value(tol, v))
 end
 """
     weight_mass_value(tol::Nothing, v::VecNum) -> VecNum

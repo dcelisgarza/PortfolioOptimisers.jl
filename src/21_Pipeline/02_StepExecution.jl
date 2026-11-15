@@ -47,9 +47,11 @@ function set_slot(ctx::PipelineContext, slot::Symbol, val)::PipelineContext
     return Accessors.set(ctx, Accessors.PropertyLens{slot}(), val)
 end
 """
-    run_step(est, ctx::PipelineContext) -> (fitted, ctx′)
+    run_step(est, ctx::PipelineContext, ps::Option{PipelineStep} = nothing) -> (fitted, ctx′)
 
 Execute one pipeline step: fit `est` on the [`PipelineContext`](@ref) slots it reads and return the fitted object together with a new context whose written slot is updated.
+
+A [`PipelineStep`](@ref) checks the slots that it declares, then runs its estimator with itself in the slot `ps`. A bare step runs with `ps = nothing`. Three estimators read the wrapper. A callable writes its value to the slot that `ps.writes` names. An uncertainty-set estimator reads the parameters that it bounds from `ps.target`, and a bare one is refused. A constraint estimator resolves its routing target from `ps.target`, or from its family when it runs bare. Every other estimator ignores the slot.
 
 Each estimator family dispatches to its native verb — [`prior`](@ref) for prior estimators, [`clusterise`](@ref)/[`phylogeny_matrix`](@ref) for phylogeny estimators, [`optimise`](@ref) for optimisation estimators, [`fit_preprocessing`](@ref)/[`apply_preprocessing`](@ref) for preprocessing estimators. The fitted object is what [`apply_preprocessing`](@ref) later uses to transform unseen data windows; for non-preprocessing steps it is the step's ordinary result.
 
@@ -61,6 +63,7 @@ A step that reads the returns reads them from the source that its own reader sta
 
   - `est`: The step estimator (or a [`PipelineStep`](@ref) wrapper).
   - `ctx`: The pipeline context.
+  - `ps`: The wrapper that holds `est`, or `nothing` for a bare step.
 
 # Returns
 
@@ -73,25 +76,29 @@ A step that reads the returns reads them from the source that its own reader sta
   - [`PipelineContext`](@ref)
   - [`PipelineStep`](@ref)
 """
-function run_step(est, ::PipelineContext)
+function run_step(est, ::PipelineContext, ::Any = nothing)
     return throw(ArgumentError("a $(typeof(est)) is not steppable; wrap it in a PipelineStep to declare its reads/writes explicitly"))
 end
-function run_step(pe::AbstractPriorEstimator, ctx::PipelineContext)
+function run_step(pe::AbstractPriorEstimator, ctx::PipelineContext,
+                  ::Option{PipelineStep} = nothing)
     require_slot(ctx, :returns, pe)
     pr = prior(pe, ctx.returns)
     return pr, set_slot(ctx, :prior, pr)
 end
-function run_step(cle::AbstractClustersEstimator, ctx::PipelineContext)
+function run_step(cle::AbstractClustersEstimator, ctx::PipelineContext,
+                  ::Option{PipelineStep} = nothing)
     require_slot(ctx, :returns, cle)
     res = clusterise(cle, ctx.returns; rd = ctx.returns)
     return res, set_slot(ctx, :phylogeny, res)
 end
-function run_step(ne::AbstractNetworkEstimator, ctx::PipelineContext)
+function run_step(ne::AbstractNetworkEstimator, ctx::PipelineContext,
+                  ::Option{PipelineStep} = nothing)
     require_slot(ctx, :returns, ne)
     res = phylogeny_matrix(ne, ctx.returns; rd = ctx.returns)
     return res, set_slot(ctx, :phylogeny, res)
 end
-function run_step(opt::OptimisationEstimator, ctx::PipelineContext)
+function run_step(opt::OptimisationEstimator, ctx::PipelineContext,
+                  ::Option{PipelineStep} = nothing)
     require_slot(ctx, :returns, opt)
     res = optimise(opt, ctx.returns)
     return res, set_slot(ctx, :opt, res)
@@ -109,43 +116,38 @@ This is how a *mixed* [`TimeDependent`](@ref) schedule runs its result entries: 
   - [`maybe_inject_step`](@ref)
   - [`TD_OptE_Opt`](@ref)
 """
-function run_step(res::NonFiniteAllocationOptimisationResult, ctx::PipelineContext)
+function run_step(res::NonFiniteAllocationOptimisationResult, ctx::PipelineContext,
+                  ::Option{PipelineStep} = nothing)
     return res, set_slot(ctx, :opt, res)
 end
-function run_step(est::AbstractPricesPreprocessingEstimator, ctx::PipelineContext)
+function run_step(est::AbstractPricesPreprocessingEstimator, ctx::PipelineContext,
+                  ::Option{PipelineStep} = nothing)
     require_slot(ctx, :prices, est)
     res = fit_preprocessing(est, ctx.prices)
     return res, set_slot(ctx, :prices, apply_preprocessing(res, ctx.prices))
 end
-function run_step(est::AbstractReturnsPreprocessingEstimator, ctx::PipelineContext)
+function run_step(est::AbstractReturnsPreprocessingEstimator, ctx::PipelineContext,
+                  ::Option{PipelineStep} = nothing)
     require_slot(ctx, :returns, est)
     res = fit_preprocessing(est, ctx.returns)
     return res, set_slot(ctx, :returns, apply_preprocessing(res, ctx.returns))
 end
-function run_step(ps::PipelineStep, ctx::PipelineContext)
+# A wrapper inside a wrapper runs as a bare step of the outer one, so the outer slot is ignored.
+function run_step(ps::PipelineStep, ctx::PipelineContext, ::Option{PipelineStep} = nothing)
     for r in ps.reads
         require_slot(ctx, r, ps.est)
     end
-    return run_step(ps.est, ps, ctx)
+    return run_step(ps.est, ctx, ps)
 end
 # The estimator of the step selects the method. A callable writes its value to the slot the
 # step names, a set or a constraint estimator reads the target of the step, and every other
-# estimator runs as a bare step.
-function run_step(f::Function, ps::PipelineStep, ctx::PipelineContext)
+# estimator ignores the step.
+function run_step(f::Function, ctx::PipelineContext, ps::PipelineStep)
     val = f(ctx)
     return val, set_slot(ctx, ps.writes, val)
 end
-function run_step(ue::AbstractUncertaintySetEstimator, ps::PipelineStep,
-                  ctx::PipelineContext)
-    return run_uncertainty_step(ue, ps.target, ctx)
-end
-function run_step(ce::AbstractConstraintEstimator, ps::PipelineStep, ctx::PipelineContext)
-    return run_constraint_step(ce, ps.target, ctx)
-end
-function run_step(est, ::PipelineStep, ctx::PipelineContext)
-    return run_step(est, ctx)
-end
-function run_step(ue::AbstractUncertaintySetEstimator, ::PipelineContext)
+function run_step(ue::AbstractUncertaintySetEstimator, ::PipelineContext,
+                  ::Nothing = nothing)
     return throw(ArgumentError("a $(typeof(ue)) step must declare which parameter it bounds; wrap it in a PipelineStep with target = :mu, target = :sigma, or target = :both"))
 end
 """
@@ -172,7 +174,7 @@ An estimator that reads a prior result — [`reads_prior_result`](@ref) answers 
 
 # Related
 
-  - [`run_uncertainty_step`](@ref)
+  - [`run_step`](@ref)
   - [`reads_prior_result`](@ref)
   - [`require_slot`](@ref)
 """
@@ -204,8 +206,8 @@ Which slot the step reads is decided by [`reads_prior_result`](@ref). An estimat
 # Arguments
 
   - `ue`: The uncertainty-set estimator.
-  - `target`: `:mu`, `:sigma`, or `:both`; anything else throws an `ArgumentError`.
   - `ctx`: The pipeline context; requires the `returns` slot, or the `prior` slot for an estimator that reads a prior result.
+  - `ps`: The wrapper of `ue`. Its `target` is `:mu`, `:sigma`, or `:both`; anything else throws an `ArgumentError`.
 
 # Returns
 
@@ -221,8 +223,9 @@ Which slot the step reads is decided by [`reads_prior_result`](@ref). An estimat
   - [`AbstractPriorUncertaintySetEstimator`](@ref)
   - [`ucs`](@ref)
 """
-function run_uncertainty_step(ue::AbstractUncertaintySetEstimator, target::Option{Symbol},
-                              ctx::PipelineContext)
+function run_step(ue::AbstractUncertaintySetEstimator, ctx::PipelineContext,
+                  ps::PipelineStep)
+    target = ps.target
     @argcheck(target in (:mu, :sigma, :both),
               ArgumentError("the PipelineStep target of a $(typeof(ue)) step must be :mu, :sigma, or :both, got $(repr(target))"))
     ue, src = uncertainty_step_source(ue, ctx)
@@ -299,7 +302,7 @@ Two shapes constraint generation can return are absorbed rather than rejected, b
 
 # Related
 
-  - [`run_constraint_step`](@ref)
+  - [`run_step`](@ref)
   - [`TargetedConstraint`](@ref)
   - [`PipelineContext`](@ref)
   - [`constraint_targets`](@ref)
@@ -341,7 +344,7 @@ $(DocStringExtensions.TYPEDSIGNATURES)
 
 Compute the value a constraint step contributes to the `constraints` slot.
 
-One method per constraint family, each calling that family's constraint-generation verb. The value is paired with its [routing target](@ref PIPELINE_ROUTING_TARGETS) by [`run_constraint_step`](@ref); this method decides only *what* is computed, never where it lands.
+One method per constraint family, each calling that family's constraint-generation verb. The value is paired with its [routing target](@ref PIPELINE_ROUTING_TARGETS) by [`run_step`](@ref); this method decides only *what* is computed, never where it lands.
 
 A family that reads the returns reads them from the source that its own reader states, as it does in the slot of an optimiser. The phylogeny and centrality families pass `ctx.returns` to their verb, which reads the `x_src` of the estimator. An exposure constraint refits through the regression of its [`FactorSpace`](@ref), which states its own source. An estimator of weight bounds gets `ctx.returns` as `rd`, as it does in the `wb` field of an optimiser, so a [`ScoreWeightBounds`](@ref) scores the assets of the window of the step. A [`WeightBoundsEstimator`](@ref) ignores `rd`.
 
@@ -356,7 +359,7 @@ A family that reads the returns reads them from the source that its own reader s
 
 # Related
 
-  - [`run_constraint_step`](@ref)
+  - [`run_step`](@ref)
   - [`pipe_constraint_targets`](@ref)
   - [`pipeline_asset_sets`](@ref)
 """
@@ -394,7 +397,7 @@ The family declares its targets through [`pipe_constraint_targets`](@ref) and th
 # Related
 
   - [`pipe_constraint_targets`](@ref)
-  - [`run_constraint_step`](@ref)
+  - [`run_step`](@ref)
 """
 function resolve_constraint_target(ce::AbstractConstraintEstimator,
                                    target::Option{Symbol})::Symbol
@@ -426,8 +429,8 @@ Every constraint family that computes a value is a step, and every value it comp
 # Arguments
 
   - `ce`: The constraint estimator.
-  - `target`: The [`PipelineStep`](@ref) target, or `nothing` for an unwrapped step.
   - `ctx`: The pipeline context.
+  - `target`: The [`PipelineStep`](@ref) target, or `nothing` for an unwrapped step. The method for a `PipelineStep` passes the `target` of the wrapper.
 
 # Returns
 
@@ -440,11 +443,14 @@ Every constraint family that computes a value is a step, and every value it comp
   - [`constraint_step_value`](@ref)
   - [`add_constraint_result`](@ref)
 """
-function run_constraint_step(ce::AbstractConstraintEstimator, target::Option{Symbol},
-                             ctx::PipelineContext)
+function run_step(ce::AbstractConstraintEstimator, ctx::PipelineContext,
+                  target::Option{Symbol} = nothing)
     target = resolve_constraint_target(ce, target)
     res = constraint_step_value(ce, ctx)
     return res, add_constraint_result(ctx, target, res)
+end
+function run_step(ce::AbstractConstraintEstimator, ctx::PipelineContext, ps::PipelineStep)
+    return run_step(ce, ctx, ps.target)
 end
 """
 $(DocStringExtensions.TYPEDSIGNATURES)
@@ -461,7 +467,7 @@ This is the one constraint step that reads a computed slot other than `:returns`
 
 # Related
 
-  - [`run_constraint_step`](@ref)
+  - [`run_step`](@ref)
   - [`ExposureConstraintEstimator`](@ref)
   - [`linear_constraints`](@ref)
   - [`pipeline_asset_sets`](@ref)
@@ -480,12 +486,10 @@ function constraint_step_value(ce::AbstractCentralityConstraint, ctx::PipelineCo
     require_slot(ctx, :returns, ce)
     return centrality_constraints(ce, ctx.returns; rd = ctx.returns)
 end
-function run_step(ce::AbstractConstraintEstimator, ctx::PipelineContext)
-    return run_constraint_step(ce, nothing, ctx)
-end
 pipe_reads(::PricesToReturns) = (:prices,)
 pipe_writes(::PricesToReturns)::Symbol = :returns
-function run_step(ptr::PricesToReturns, ctx::PipelineContext)
+function run_step(ptr::PricesToReturns, ctx::PipelineContext,
+                  ::Option{PipelineStep} = nothing)
     require_slot(ctx, :prices, ptr)
     return ptr, set_slot(ctx, :returns, apply_preprocessing(ptr, ctx.prices))
 end
@@ -518,7 +522,8 @@ The split runs at whichever level the pipeline input supplied — `prices` when 
   - [`fit_predict`](@ref)
   - [`run_step`](@ref)
 """
-function run_step(tts::TrainTestSplit, ctx::PipelineContext)
+function run_step(tts::TrainTestSplit, ctx::PipelineContext,
+                  ::Option{PipelineStep} = nothing)
     slot = !isnothing(ctx.prices) ? :prices : :returns
     require_slot(ctx, slot, tts)
     res = fit_preprocessing(tts, getproperty(ctx, slot))

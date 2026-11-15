@@ -1058,11 +1058,11 @@ end
 
 Returns `true` if the optimiser holds a schedule.
 
-The fallback returns `false`. An optimiser returns `true` when one of its fields holds a [`TimeDependent`](@ref), see [`time_dependent_fields`](@ref). An optimiser that wraps others recurses into its inner optimiser and its fallback.
+The fallback returns `false` for every value, because a query trait owns `false`. An optimiser returns `true` when one of its fields holds a [`TimeDependent`](@ref), see [`time_dependent_fields`](@ref). An optimiser that wraps others recurses into its inner optimiser and its fallback. A step of a [`Pipeline`](@ref) that holds no schedule, such as a prior or a callable, answers through the fallback.
 
 # Arguments
 
-  - `opt`: An optimisation estimator or result, or a vector of them.
+  - `opt`: An optimisation estimator or result, a vector of them, or any other value.
 
 # Returns
 
@@ -1074,10 +1074,7 @@ The fallback returns `false`. An optimiser returns `true` when one of its fields
   - [`update_time_dependent_estimator`](@ref)
   - [`needs_previous_weights`](@ref)
 """
-function is_time_dependent(::OptE_Opt)
-    return false
-end
-function is_time_dependent(::Nothing)
+function is_time_dependent(::Any)
     return false
 end
 """
@@ -1085,11 +1082,11 @@ end
 
 Resolves the schedules of `opt` at the fold that `ctx` describes.
 
-The fallback returns the estimator unchanged. An optimiser with scheduled fields rebuilds itself with its keyword constructor, which checks the values, and puts the value at the fold into each scheduled field. So the answer is an ordinary static estimator. An optimiser that wraps others recurses.
+The fallback returns its argument unchanged, the identity of a traversal on a leaf. A step of a [`Pipeline`](@ref) that holds no schedule, such as a prior or a callable, comes back through it. An optimiser with scheduled fields rebuilds itself with its keyword constructor, which checks the values, and puts the value at the fold into each scheduled field. So the answer is an ordinary static estimator. An optimiser that wraps others recurses.
 
 # Arguments
 
-  - `opt`: An optimisation estimator or result.
+  - `opt`: An optimisation estimator or result, or any other value.
   - `ctx::TimeDependentContext`: The context of the fold.
   - `all_binds::Bool = true`: When `false`, the schedules with `bind === :nearest` stay in place for the nearest fold loop. A meta-optimiser passes `false` when it recurses into the estimators of its own inner fold loop. A fold loop passes `true`.
 
@@ -1103,12 +1100,8 @@ The fallback returns the estimator unchanged. An optimiser with scheduled fields
   - [`TimeDependentContext`](@ref)
   - [`is_time_dependent`](@ref)
 """
-function update_time_dependent_estimator(opt::OptE_Opt, ::TimeDependentContext,
-                                         ::Bool = true)
+function update_time_dependent_estimator(opt, ::TimeDependentContext, ::Bool = true)
     return opt
-end
-function update_time_dependent_estimator(::Nothing, ::TimeDependentContext, ::Bool = true)
-    return nothing
 end
 """
 $(DocStringExtensions.TYPEDSIGNATURES)

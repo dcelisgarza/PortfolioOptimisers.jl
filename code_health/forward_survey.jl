@@ -552,10 +552,6 @@ const RULED_REBUILDS = Dict{Tuple{Symbol, Symbol}, Tuple{String, String}}(#
                                                                            :RlvarAnchor) =>
                                                                               (NO_REBUILD,
                                                                                "`res` is the `RlvarPrimalMinimum` of `ep_rlvar`, another type (#2097)"),
-                                                                          (:fit_data_step_from_state,
-                                                                           :PriceGapFillResult) =>
-                                                                              ("go",
-                                                                               "`res` is the `PriceGapFillResult` of `fit_preprocessing`, which has no keyword constructor: add the outer keyword constructor of § *Constructor Pattern*, then `rebuild_struct(res, (; nx = res.nx[keep], v = res.v[keep]))` (rule 6, #2110)"),
                                                                           (:set_retcode,
                                                                            :JuMPOptimisationResult) =>
                                                                               ("keep (b)",
@@ -1145,10 +1141,8 @@ const RULED_DEFAULTS = Dict{Symbol, Tuple{String, String}}(#
                                                            :regression_factor_names =>
                                                                ("keep (default)",
                                                                 "a query of the names of the loadings axis owns `nothing`, the answer \"none\". Its callee reads fields of the input, so it owns no default for the input (#2109)"),
-                                                           :update_online_step => ("go",
-                                                                                   "`update_online_estimator` takes the identity and a `PipelineStep` method (#2074)"),
-                                                           :copy_step_states => ("go",
-                                                                                 "`copy_states(x) = x` owns the identity, so only a `PipelineStep` method moves (#2074)"),
+                                                           :rewrap_step => ("keep (b)",
+                                                                            "the owner is the constructor `PipelineStep`, which `rebuild_struct` calls and which owns no default. The bare form is a choice of the pipeline (#2109, #2106)"),
                                                            :pipeline_step_factory =>
                                                                ("keep (b)",
                                                                 "a policy of the pipeline: only the optimiser and a nested pipeline take the weights (#2074)"),
@@ -1540,12 +1534,7 @@ const RULED_NAMED_TUPLES = Dict{Symbol, Tuple{String, String}}(#
                                                                                 "a cell that its callers read by field and pass on: a private record (#2113)"),
                                                                :resolve_sigma_chol =>
                                                                    ("keep (keys)",
-                                                                    "the call is `rebuild_with_slots`, which merges it into the fields of the measure by key, so a struct would need a conversion back at each call (#2113, #2100)"),
-                                                               :split_weight_record =>
-                                                                   ("go",
-                                                                    "the value travels: collected in a generator: a private defined type (#2113)"),
-                                                               :window_statistic => ("go",
-                                                                                     "the value travels: collected in a generator: a private defined type (#2113)"))
+                                                                    "the call is `rebuild_with_slots`, which merges it into the fields of the measure by key, so a struct would need a conversion back at each call (#2113, #2100)"))
 
 # The shape of a literal as a key that does not depend on the order of the fields, or `nothing`
 # for a literal that splats or has no field.

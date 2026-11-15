@@ -97,7 +97,7 @@ Implement both methods, or neither. The fallback of [`pipe_constraint_targets`](
   - [`AbstractEstimator`](@ref)
   - [`constraint_step_value`](@ref)
   - [`pipe_constraint_targets`](@ref)
-  - [`run_constraint_step`](@ref)
+  - [`run_step`](@ref)
 """
 abstract type AbstractConstraintEstimator <: AbstractEstimator end
 """

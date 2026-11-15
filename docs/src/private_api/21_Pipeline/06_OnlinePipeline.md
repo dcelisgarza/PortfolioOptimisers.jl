@@ -1,5 +1,5 @@
 ```@meta
-Description = "Online Pipeline, private API of PortfolioOptimisers.jl: PipelineResume, PipelineBufferState, fold_pipeline, fold_pipeline_owner, fit_pipeline_from_state, …"
+Description = "Online Pipeline, private API of PortfolioOptimisers.jl: PipelineResume, PipelineBufferState, fold_pipeline_owner, fit_pipeline_from_state, …"
 ```
 
 # [Online Pipeline: private API](@id private-api-online-pipeline)
@@ -7,7 +7,6 @@ Description = "Online Pipeline, private API of PortfolioOptimisers.jl: PipelineR
 ```@docs
 PortfolioOptimisers.PipelineResume
 PortfolioOptimisers.PipelineBufferState
-PortfolioOptimisers.fold_pipeline
 PortfolioOptimisers.fold_pipeline_owner
 PortfolioOptimisers.fit_pipeline_from_state
 PortfolioOptimisers.pipeline_returns_result
@@ -29,14 +28,13 @@ PortfolioOptimisers.assert_online_entry(p::Pipeline)
 PortfolioOptimisers.assert_online_owner
 PortfolioOptimisers.assert_pipeline_entry
 PortfolioOptimisers.pipe_writes(o::Online)
-PortfolioOptimisers.run_step(o::Online, ::PortfolioOptimisers.PipelineContext)
-PortfolioOptimisers.update_online_step
+PortfolioOptimisers.run_step(o::Online, ::PortfolioOptimisers.PipelineContext, ::PortfolioOptimisers.Option{PortfolioOptimisers.PipelineStep} = nothing)
 PortfolioOptimisers.update_online_estimator(p::Pipeline)
+PortfolioOptimisers.update_online_estimator(ps::PipelineStep)
 is_time_dependent(o::Online{<:Pipeline})
 PortfolioOptimisers.show_fields(p::Pipeline)
 PortfolioOptimisers.copy_states(p::Pipeline)
-PortfolioOptimisers.copy_step_states
+PortfolioOptimisers.copy_states(ps::PipelineStep)
 PortfolioOptimisers.held_timestamps(p::Pipeline)
-PortfolioOptimisers.pipeline_held_timestamps
-PortfolioOptimisers.merge_held_data
+PortfolioOptimisers.held_timestamps(::Pipeline, cache::PortfolioOptimisers.PipelineBufferState)
 ```

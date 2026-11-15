@@ -74,7 +74,7 @@ $(DocStringExtensions.TYPEDSIGNATURES)
 
 Validate that each constraint step of a [`Pipeline`](@ref) resolves to one [routing target](@ref PIPELINE_ROUTING_TARGETS).
 
-The check calls [`resolve_constraint_target`](@ref) on each constraint step. [`run_constraint_step`](@ref) makes the same call when the step runs, so three failures move from the fold loop to the constructor. The first is a family that computes nothing for the `constraints` slot. The second is a family that names several targets when the step names none. The third is a declared target that another family owns.
+The check calls [`resolve_constraint_target`](@ref) on each constraint step. [`run_step`](@ref) makes the same call when the step runs, so three failures move from the fold loop to the constructor. The first is a family that computes nothing for the `constraints` slot. The second is a family that names several targets when the step names none. The third is a declared target that another family owns.
 
 # Arguments
 
@@ -129,7 +129,7 @@ Validate that each step of a [`Pipeline`](@ref) declares the slot and the target
 
   - [`PipelineStep`](@ref)
   - [`pipe_writes`](@ref)
-  - [`run_uncertainty_step`](@ref)
+  - [`run_step`](@ref)
   - [`assert_constraint_targets`](@ref)
 """
 function assert_step_declarations(ests)::Nothing
@@ -198,7 +198,7 @@ $(DocStringExtensions.TYPEDSIGNATURES)
 
 Return the [routing targets](@ref PIPELINE_ROUTING_TARGETS) of a step that are known before any step runs.
 
-Two kinds of step have such targets. An uncertainty-set step declares the parameters that it bounds in the `target` field of its [`PipelineStep`](@ref). A constraint step takes its target from its family through [`pipe_constraint_targets`](@ref), or from the `target` field of its `PipelineStep` when the family names several. [`run_constraint_step`](@ref) resolves the target from the same declaration, so this function returns the target that the step writes.
+Two kinds of step have such targets. An uncertainty-set step declares the parameters that it bounds in the `target` field of its [`PipelineStep`](@ref). A constraint step takes its target from its family through [`pipe_constraint_targets`](@ref), or from the `target` field of its `PipelineStep` when the family names several. [`run_step`](@ref) resolves the target from the same declaration, so this function returns the target that the step writes.
 
 Every other step returns an empty tuple. A callable step declares no family, and a precomputed result names its target only by its type.
 
@@ -666,7 +666,7 @@ $(DocStringExtensions.TYPEDSIGNATURES)
 
 Return the [routing target](@ref PIPELINE_ROUTING_TARGETS) that one element of the `constraints` slot goes to.
 
-[`run_constraint_step`](@ref) pairs a value that its type cannot place with its target, and this function reads that target. [`implicit_constraint_target`](@ref) places every other element.
+[`run_step`](@ref) pairs a value that its type cannot place with its target, and this function reads that target. [`implicit_constraint_target`](@ref) places every other element.
 
 # Arguments
 
@@ -925,8 +925,7 @@ function maybe_inject_step(res::NonFiniteAllocationOptimisationResult, ctx::Pipe
     return res
 end
 function maybe_inject_step(ps::PipelineStep{<:OptimisationEstimator}, ctx::PipelineContext)
-    return PipelineStep(; est = inject_context(ps.est, ctx), reads = ps.reads,
-                        writes = ps.writes, target = ps.target)
+    return rebuild_struct(ps, (; est = inject_context(ps.est, ctx)))
 end
 """
     StatsAPI.fit(pipe::Pipeline, data::Prices_RR) -> PipelineResult
@@ -1296,7 +1295,7 @@ function fit_predict(pipe::Pipeline, data::Prices_RR)
     test = holdout_window(res)
     return StatsAPI.predict(res, isnothing(test) ? data : test)
 end
-function run_step(p::Pipeline, ctx::PipelineContext)
+function run_step(p::Pipeline, ctx::PipelineContext, ::Option{PipelineStep} = nothing)
     data = if :prices in pipe_reads(p)
         require_slot(ctx, :prices, p)
         ctx.prices

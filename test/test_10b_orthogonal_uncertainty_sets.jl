@@ -521,9 +521,15 @@ struct ProbeMatrixProcessing1955 <: PortfolioOptimisers.AbstractMatrixProcessing
         # A Pipeline context carrying the prior alone runs, because the returns are never
         # read.
         ctx = PortfolioOptimisers.PipelineContext(; prior = pr777)
-        step_mu, _ = PortfolioOptimisers.run_uncertainty_step(ue, :mu, ctx)
+        step_mu, _ = PortfolioOptimisers.run_step(ue, ctx,
+                                                  PipelineStep(; est = ue,
+                                                               writes = :uncertainty,
+                                                               target = :mu))
         @test isapprox(step_mu.L, base.L)
-        step_both, ctx2 = PortfolioOptimisers.run_uncertainty_step(ue, :both, ctx)
+        step_both, ctx2 = PortfolioOptimisers.run_step(ue, ctx,
+                                                       PipelineStep(; est = ue,
+                                                                    writes = :uncertainty,
+                                                                    target = :both))
         @test isapprox(step_both.mu.L, base.L)
         @test isa(step_both.sigma, CompactCovarianceUncertaintySet)
         @test isapprox(ctx2.uncertainty.mu.L, base.L)

@@ -125,7 +125,7 @@ end
                    ("src/02_Tools/06_ForwardProperties.jl", "forward_walk_expr") =>
                        (1, EXPR),
                    ("src/02_Tools/06_ForwardProperties.jl", "forward_properties") =>
-                       (4, EXPR),
+                       (5, EXPR),
                    ("src/05_Moments/01_Base_Moments.jl", "windowed_parse_forward") =>
                        (1, EXPR),
                    ("src/05_Moments/01_Base_Moments.jl", "windowed_method_doc") =>

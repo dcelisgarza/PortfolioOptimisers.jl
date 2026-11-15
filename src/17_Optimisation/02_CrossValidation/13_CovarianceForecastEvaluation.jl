@@ -1006,27 +1006,6 @@ function step_implied_volatility_kwargs(::Any, ::ReturnsResult)
     return (;)
 end
 """
-    is_time_dependent(est::Union{AbstractCovarianceEstimator, AbstractPriorEstimator, Online})
-    needs_previous_weights(est::Union{AbstractCovarianceEstimator, AbstractPriorEstimator, Online})
-
-Answer the two per-type predicates that [`fold_loop`](@ref) reads, for an estimator that is not an optimiser.
-
-No covariance estimator and no prior holds a [`TimeDependent`](@ref) schedule, and neither reads the weights of a previous fold. The schedule type is declared after both families, so no field of theirs can name it. An [`Online`](@ref) wrapper at the root answers the same, because the loop resolves it before the first fold. Both predicates answer `false`. The loop then neither resolves a context nor threads weights, and a batch run of the evaluation takes the parallel arm under the sequential executor that it receives.
-
-# Related
-
-  - [`fold_loop`](@ref)
-  - [`covariance_forecast_evaluation`](@ref)
-"""
-function is_time_dependent(::Union{AbstractCovarianceEstimator, AbstractPriorEstimator,
-                                   Online})
-    return false
-end
-function needs_previous_weights(::Union{AbstractCovarianceEstimator, AbstractPriorEstimator,
-                                        Online})
-    return false
-end
-"""
     online_entry_state(o::Online)
 
 Name the state that a wrapped estimator carries at the entry of the online arm of the fold loop, or answer `nothing`.
@@ -1044,7 +1023,7 @@ function online_entry_state(o::Online)
     return isnothing(path) ? nothing : string("est.", path)
 end
 """
-    advance_previous_fold(pws, prev, fold::Tuple{CovarianceForecastStepResult, Any, Any})
+    advance_previous_fold(pws, prev, fold::Tuple{CovarianceForecastStepResult, Option{<:MatNum}, Option{<:VecNum}})
 
 Hand the next fold what the last fold held, when the result of the fold is a step of a covariance forecast evaluation and not a prediction.
 
@@ -1056,7 +1035,9 @@ The fold of [`covariance_forecast_evaluation`](@ref) answers the tuple of its [`
   - [`online_folds`](@ref)
   - [`CovarianceForecastStepResult`](@ref)
 """
-function advance_previous_fold(::Any, prev, ::Tuple{CovarianceForecastStepResult, Any, Any})
+function advance_previous_fold(::Any, prev,
+                               ::Tuple{CovarianceForecastStepResult, Option{<:MatNum},
+                                       Option{<:VecNum}})
     return prev
 end
 """

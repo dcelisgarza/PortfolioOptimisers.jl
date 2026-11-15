@@ -292,7 +292,11 @@ end
                                                         (:expected_risk, :expected_risk_from_returns) => "(interface) `expected_risk_from_returns` is a shared public verb (rule 3, #2103)",
                                                         (:online_step_fold, :partial_fit!) => "(interface) `partial_fit!` is a shared public verb (rule 3, #2103)",
                                                         # src/19_FactorAttribution (#2105).
-                                                        (:factor_attribution, :factor_attribution) => "public: (a) the rolling method on asset returns with no fees, `(w, pr, X, window)` or `(w, pr, rd, window)`, converts the call to the canonical form `(w, pr, X, nothing, window)`; the filled slot `fees = nothing` comes before `window`, so no trailing default holds it (rule 5, #2090, #2105)")
+                                                        (:factor_attribution, :factor_attribution) => "public: (a) the rolling method on asset returns with no fees, `(w, pr, X, window)` or `(w, pr, rd, window)`, converts the call to the canonical form `(w, pr, X, nothing, window)`; the filled slot `fees = nothing` comes before `window`, so no trailing default holds it (rule 5, #2090, #2105)",
+                                                        # src/21_Pipeline (#2106).
+                                                        (:pipeline_step_factory, :factory) => "(b) a policy of the pipeline: only the optimiser and a nested pipeline take the weights. Its other method calls `factory`, a shared public verb (#2074, #2109, #2106)",
+                                                        (:reset_time_dependent_step, :reset_time_dependent_estimator) => "(b) its `TimeDependent` arm throws for a fit with no folds, a job that differs from the method of the owner. Four functions share the callee (#2074, #2109, #2106)",
+                                                        (:rewrap_step, :rebuild_struct) => "(b) the owner is the constructor `PipelineStep`, which `rebuild_struct` calls and which owns no default. The bare form is a choice of the pipeline (#2109, #2106)")
     # The functions whose forward methods are interface methods, with the check that shows
     # it. #2072 adds a name after a check of each one.
     interface_functions = Dict{Symbol, String}(#
@@ -406,52 +410,22 @@ end
                                                :attribution_standalone => "4 functions share its callee `attribution_finite`, the repair of a non-finite entry (rule 3, #2105)",
                                                :attribution_row_key => "one method for each kind of block: each builds the record `AttributionRowKey`, the constructor of a type (rule 3, #2113, #2105)",
                                                :attribution_key_pair => "one method for each pair of keys: the method on two vectors builds the record `RowKeyPair`, the constructor of a type (rule 3, #2113, #2105)",
-                                               :attribution_unknown_kinds => "one method for each rule: a preset builds `KindwiseUnknown`, the public type of its shape, and a `KindwiseUnknown` is its own answer (rule 3, #2113, #2105)")
+                                               :attribution_unknown_kinds => "one method for each rule: a preset builds `KindwiseUnknown`, the public type of its shape, and a `KindwiseUnknown` is its own answer (rule 3, #2113, #2105)",
+                                               # src/21_Pipeline (#2106).
+                                               :group_returns_view => "10 functions share its callee `shared_series_fit` (rule 3, #2106)",
+                                               :group_frames => "2 functions share its callee `pipeline_frames` (rule 3, #2106)",
+                                               :maybe_inject_step => "2 functions share its callee `inject_context` (rule 3, #2106)",
+                                               :apply_fitted_step => "one method for each kind of step and of data: each calls `apply_preprocessing`, a shared public verb, or `apply_fitted_steps`, which 2 functions share. #2074 keeps it as (b) (rule 3, #2106)",
+                                               :fitted_step_keeps_observations => "its callee `keeps_observations` is a shared public verb (rule 3, #2106)",
+                                               :pipeline_lens => "2 functions share its callee `parse_lens` (rule 3, #2106)",
+                                               :step_online_member => "3 functions share its callee `pipeline_online_member` (rule 3, #2106)",
+                                               :assert_online_owner => "3 functions share its callee `assert_online_entry` (rule 3, #2106)",
+                                               :window_bigger_is_better => "its callee `bigger_is_better` is a shared public verb (rule 3, #2106)",
+                                               :window_values => "its callee `asset_scores` is a shared public verb (rule 3, #2106)",
+                                               :weight_mass_grid => "2 functions share its callee `pipeline_lens_val_grid` (rule 3, #2106)")
     # The debt that #2072 removes. Do not add a pair: fix the wrapper.
-    pending_forwards = Set{Tuple{Symbol, Symbol}}([(:apply_fitted_step,
-                                                    :apply_fitted_steps),
-                                                   (:apply_fitted_step,
-                                                    :apply_preprocessing),
-                                                   (:assert_online_owner,
-                                                    :assert_online_entry),
-                                                   (:copy_step_states, :copy_states),
-                                                   (:cross_val_predict,
-                                                    :pipeline_cross_val_predict),
-                                                   (:fitted_step_keeps_observations,
-                                                    :keeps_observations),
-                                                   (:group_frames, :pipeline_frames),
-                                                   (:group_returns_view,
-                                                    :shared_series_fit),
-                                                   (:held_timestamps,
-                                                    :pipeline_held_timestamps),
-                                                   (:is_time_dependent,
-                                                    :pipeline_step_is_time_dependent),
-                                                   (:maybe_inject_step, :inject_context),
-                                                   (:merge_held_data, :partial_fit!),
-                                                   (:partial_fit!, :fold_pipeline),
-                                                   (:pipeline_lens, :parse_lens),
-                                                   (:pipeline_step_factory, :factory),
-                                                   (:pipeline_step_is_time_dependent,
-                                                    :is_time_dependent),
-                                                   (:report_risk_contribution,
-                                                    :risk_contribution_figure),
-                                                   (:reset_time_dependent_step,
-                                                    :reset_time_dependent_estimator),
-                                                   (:rewrap_step, :PipelineStep),
-                                                   (:run_step, :run_constraint_step),
-                                                   (:run_step, :run_step),
-                                                   (:run_step, :run_uncertainty_step),
-                                                   (:step_online_member,
-                                                    :pipeline_online_member),
-                                                   (:update_online_step,
-                                                    :update_online_estimator),
-                                                   (:update_time_dependent_step,
-                                                    :update_time_dependent_estimator),
-                                                   (:weight_mass_grid,
-                                                    :pipeline_lens_val_grid),
-                                                   (:window_bigger_is_better,
-                                                    :bigger_is_better),
-                                                   (:window_values, :asset_scores)])
+    pending_forwards = Set{Tuple{Symbol, Symbol}}([(:report_risk_contribution,
+                                                    :risk_contribution_figure)])
 
     # ------------------------------------------------------------- the type census
 
@@ -598,6 +572,13 @@ end
         (:attribution_active_mask, :attribution_returns_entry, :attribution_trim_basis,
          :attribution_finite_rows, :attribution_window_basis, :attribution_expand_errors,
          :attribution_no_errors)
+        @test (n, isdefined(PO, n)) == (n, false)
+    end
+    # Pinned on the wrappers of the pipeline that #2106 removed.
+    for n in
+        (:run_uncertainty_step, :run_constraint_step, :pipeline_step_is_time_dependent,
+         :update_time_dependent_step, :pipeline_cross_val_predict, :merge_held_data,
+         :update_online_step, :copy_step_states, :pipeline_held_timestamps, :fold_pipeline)
         @test (n, isdefined(PO, n)) == (n, false)
     end
 

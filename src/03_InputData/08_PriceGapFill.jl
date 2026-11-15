@@ -236,6 +236,12 @@ $(DocStringExtensions.FIELDS)
     """
     strict
 end
+function PriceGapFillResult(; nx::AbstractVector{Symbol}, v::AbstractVector, te,
+                            fill::Union{CarriedPrice, Num_VecToScaM},
+                            strict::Bool)::PriceGapFillResult
+    @argcheck(length(nx) == length(v), DimensionMismatch)
+    return PriceGapFillResult(nx, v, te, fill, strict)
+end
 """
     prices_listing_span(pr::PricesResult) -> Option{<:AbstractMatrix{Bool}}
 

@@ -321,7 +321,7 @@ Keywords correspond to the struct's fields.
 
   - [`pipe_constraint_targets`](@ref)
   - [`constraint_targets`](@ref)
-  - [`run_constraint_step`](@ref)
+  - [`run_step`](@ref)
 """
 @concrete struct TargetedConstraint <: AbstractConstraintResult
     """
@@ -600,7 +600,7 @@ The [routing targets](@ref PIPELINE_ROUTING_TARGETS) a constraint family's step 
 
 This is the one declaration of the estimator → target half of the routing of a [`Pipeline`](@ref) slot into an optimiser, and it has three readers, which is why it exists as a table rather than as scattered knowledge:
 
-  - [`run_constraint_step`](@ref) resolves the target and pairs it with the computed value.
+  - [`run_step`](@ref) resolves the target and pairs it with the computed value.
   - [`pipe_required_targets`](@ref) hands it to [`assert_routable`](@ref), so a step whose target the terminal optimiser cannot receive is refused when the [`Pipeline`](@ref) is built rather than after the first fold has run.
   - [`PipelineStep`](@ref) validates a declared target against it.
 
@@ -627,7 +627,7 @@ julia> PortfolioOptimisers.pipe_constraint_targets(WeightBoundsEstimator())
 
 # Related
 
-  - [`run_constraint_step`](@ref)
+  - [`run_step`](@ref)
   - [`pipe_required_targets`](@ref)
   - [`PIPELINE_ROUTING_TARGETS`](@ref)
 """
@@ -653,15 +653,14 @@ A target is *routing intent*, not a slot. It is needed by exactly the steps whos
 
 `nothing` is the remaining accepted value and means "no annotation", which is what every step of every other family carries.
 
-The allowlist is applied at construction, beside the one on `writes`, so a mistyped target is refused where it is written rather than by [`run_uncertainty_step`](@ref) after the pipeline has already fitted the steps before it. [`run_uncertainty_step`](@ref) and [`run_constraint_step`](@ref) keep their own checks, because an unwrapped estimator reaches them with `target = nothing` and because an annotation legal for one family is not legal for another.
+The allowlist is applied at construction, beside the one on `writes`, so a mistyped target is refused where it is written rather than by [`run_step`](@ref) after the pipeline has already fitted the steps before it. The uncertainty-set and the constraint methods of `run_step` keep their own checks, because an unwrapped estimator reaches them with `target = nothing` and because an annotation legal for one family is not legal for another.
 
 Internal machinery — not part of the user-facing API.
 
 # Related
 
   - [`PipelineStep`](@ref)
-  - [`run_uncertainty_step`](@ref)
-  - [`run_constraint_step`](@ref)
+  - [`run_step`](@ref)
   - [`pipe_constraint_targets`](@ref)
   - [`pipe_required_targets`](@ref)
   - [`PIPELINE_ROUTING_TARGETS`](@ref)

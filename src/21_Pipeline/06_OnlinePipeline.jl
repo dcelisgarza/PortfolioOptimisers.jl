@@ -31,7 +31,7 @@ The warm-up of the online arm resolves a wrapper, and `fit(pipe, data)` runs no 
   - [`Online`](@ref)
   - [`update_online_estimator`](@ref)
 """
-function run_step(o::Online, ::PipelineContext)
+function run_step(o::Online, ::PipelineContext, ::Option{PipelineStep} = nothing)
     return throw(ArgumentError("an `Online($(typeof(o.est).name.name))` step is a declaration the online arm of the fold loop resolves at its warm-up, and `fit(pipe, data)` has none: run the pipeline through an Online Scheme (`OnlineIndexWalkForward` or `OnlineDateWalkForward`), or hand the step the plain estimator."))
 end
 """
@@ -86,7 +86,7 @@ $(DocStringExtensions.TYPEDSIGNATURES)
 
 Appends a block of observations to a [`PipelineBufferState`](@ref), and drops the oldest rows past the cap.
 
-The state is immutable, so the method returns a new state and leaves `state` as it was.
+The state is immutable, so the method returns a new state and leaves `state` as it was. A `data` of `nothing` holds no row, so that method returns `state` itself. [`merge_states`](@ref) passes the data of a second state, which is `nothing` before its first block.
 
 # Algorithm
 
@@ -112,38 +112,13 @@ function partial_fit!(state::PipelineBufferState, data::Prices_RR)
     end
     return PipelineBufferState(; data = held, max_history = state.max_history)
 end
+function partial_fit!(state::PipelineBufferState, ::Nothing)
+    return state
+end
 function merge_states(a::PipelineBufferState, b::PipelineBufferState)
     @argcheck(isequal(a.max_history, b.max_history),
               ArgumentError("two PipelineBufferStates merge under one cap; got $(a.max_history) and $(b.max_history)"))
-    return merge_held_data(a, b.data)
-end
-"""
-    merge_held_data(a::PipelineBufferState, data::Nothing)
-    merge_held_data(a::PipelineBufferState, data::Prices_RR)
-
-Append the data that a second [`PipelineBufferState`](@ref) holds to the state `a`, for [`merge_states`](@ref).
-
-The type of `data` selects the method. A state that holds no data yet adds no row, so the method returns `a`. Data appends to `a` through [`partial_fit!`](@ref), which keeps the cap of `a`.
-
-# Arguments
-
-  - `a`: The first state.
-  - `data`: The data of the second state, or `nothing`.
-
-# Returns
-
-  - `state::PipelineBufferState`: `a`, or a new state that holds the rows of both.
-
-# Related
-
-  - [`merge_states`](@ref)
-  - [`PipelineBufferState`](@ref)
-"""
-function merge_held_data(a::PipelineBufferState, ::Nothing)
-    return a
-end
-function merge_held_data(a::PipelineBufferState, data::Prices_RR)
-    return partial_fit!(a, data)
+    return partial_fit!(a, b.data)
 end
 function Base.copy(x::PipelineBufferState)
     return PipelineBufferState(x.data, x.max_history)
@@ -199,7 +174,7 @@ A [`PipelineStep`](@ref) keeps its reads, its writes and its target, and a bare 
 """
 rewrap_step(::Any, est) = est
 function rewrap_step(ps::PipelineStep, est)
-    return PipelineStep(est, ps.reads, ps.writes, ps.target)
+    return rebuild_struct(ps, (; est = est))
 end
 """
     is_data_step(step) -> Bool
@@ -495,37 +470,6 @@ function assert_pipeline_entry(o::Online{<:Pipeline}, cv)
     return nothing
 end
 """
-    cross_val_predict(o::Online{<:Pipeline}, data::Prices_RR, cv::CVER; ex = FLoops.ThreadedEx(), id = nothing)
-    cross_val_predict(o::Online{<:Pipeline}, data::Prices_RR, cv::MultipleRandomised; ex = FLoops.ThreadedEx(), kwargs...)
-
-Runs a walk-forward over `Online(pipe)`, the declared refit of a [`Pipeline`](@ref) from a buffer of its input data.
-
-These are `cross_val_predict` methods of the pipeline, and the fold loop threads the wrapper through them. The online arm resolves the wrapper at its warm-up into a pipeline that carries a [`PipelineBufferState`](@ref). Every fold appends its new rows to the buffer, and `fit(pipe)` with no data is `fit(pipe, buffer)`. So the run is exact for every configuration, at the cost of a batch fit per fold. This includes the window-valued steps that the fold route refuses.
-
-With `max_history = w` the buffer keeps the last `w` input rows, and the run equals the rolling batch walk-forward whose purged training window holds `w` rows. Build both schemes with the training size `w + purged_size` and the same `purged_size`, such as `IndexWalkForward(w + p, t; purged_size = p)` and `OnlineIndexWalkForward(w + p, t; purged_size = p)`.
-
-# Validation
-
-  - Everything [`assert_pipeline_entry`](@ref) refuses, a scheme that is not an Online Scheme included.
-  - Everything [`assert_online_entry`](@ref) refuses on the refit route.
-
-# Related
-
-  - [`cross_val_predict(pipe::Pipeline, data::Prices_RR, cv::CVER)`](@ref)
-  - [`PipelineBufferState`](@ref)
-  - [`Online`](@ref)
-  - [`assert_pipeline_entry`](@ref)
-"""
-function cross_val_predict(o::Online{<:Pipeline}, data::Prices_RR, cv::CVER;
-                           ex::FLoops.Transducers.Executor = FLoops.ThreadedEx(),
-                           id = nothing)
-    return pipeline_cross_val_predict(o, data, cv; ex = ex, id = id)
-end
-function cross_val_predict(o::Online{<:Pipeline}, data::Prices_RR, cv::MultipleRandomised;
-                           ex::FLoops.Transducers.Executor = FLoops.ThreadedEx(), kwargs...)
-    return pipeline_cross_val_predict(o, data, cv; ex = ex)
-end
-"""
     is_time_dependent(o::Online{<:Pipeline})
     needs_previous_weights(o::Online{<:Pipeline})
     assert_time_dependent_fold_count(o::Online{<:Pipeline}, n::Integer, all_binds::Bool = true)
@@ -547,40 +491,35 @@ function assert_time_dependent_fold_count(o::Online{<:Pipeline}, n::Integer,
     return assert_time_dependent_fold_count(o.est, n, all_binds)
 end
 """
-    update_online_step(step)
+    update_online_estimator(ps::PipelineStep)
 
-Resolves the [`Online`](@ref) declarations of one [`Pipeline`](@ref) step at warm-up.
+Resolves the [`Online`](@ref) declarations of the estimator that a [`PipelineStep`](@ref) wraps, at warm-up.
 
-A wrapper step becomes the estimator that it wraps, with a seeded buffer. The method rebuilds a [`PipelineStep`](@ref) around its resolved estimator. An estimator resolves the wrappers in its own fields through [`update_online_estimator`](@ref). A callable and a result pass through unchanged.
+The method rebuilds the wrapper around the resolved estimator with [`rebuild_struct`](@ref), so the step keeps its reads, its writes and its target. A wrapped `Online` becomes the estimator that it wraps, with a seeded buffer, and a wrapped estimator resolves the wrappers in its own fields. A wrapped callable passes through the fallback of `update_online_estimator` unchanged.
 
 # Related
 
   - [`update_online_estimator(p::Pipeline)`](@ref)
   - [`update_online_estimator`](@ref)
 """
-update_online_step(step) = step
-update_online_step(o::Online) = update_online_estimator(o)
-function update_online_step(est::Union{AbstractEstimator, StatsBase.CovarianceEstimator})
-    return update_online_estimator(est)
-end
-function update_online_step(ps::PipelineStep)
-    return PipelineStep(update_online_step(ps.est), ps.reads, ps.writes, ps.target)
+function update_online_estimator(ps::PipelineStep)
+    return rebuild_struct(ps, (; est = update_online_estimator(ps.est)))
 end
 """
     update_online_estimator(p::Pipeline)
 
 Resolves the [`Online`](@ref) declarations in the steps of a [`Pipeline`](@ref), at warm-up.
 
-On the fold route [`update_online_step`](@ref) resolves every step. So an `Online(EmpiricalPrior(); max_history = w)` step becomes the prior with its buffer, and an optimisation step resolves the wrappers under its own prior. On the refit route the pipeline carries a [`PipelineBufferState`](@ref), which `Online(pipe)` seeded, and the method returns the pipeline unchanged. No member folds under a refit, and [`assert_online_entry`](@ref) already refused any wrapper below the root with an error that names it.
+On the fold route [`update_online_estimator`](@ref) resolves every step: a bare `Online` step, an estimator, and a [`PipelineStep`](@ref) through [`update_online_estimator(ps::PipelineStep)`](@ref). A callable and a result pass through its fallback unchanged. So an `Online(EmpiricalPrior(); max_history = w)` step becomes the prior with its buffer, and an optimisation step resolves the wrappers under its own prior. On the refit route the pipeline carries a [`PipelineBufferState`](@ref), which `Online(pipe)` seeded, and the method returns the pipeline unchanged. No member folds under a refit, and [`assert_online_entry`](@ref) already refused any wrapper below the root with an error that names it.
 
 # Related
 
   - [`update_online_estimator`](@ref)
-  - [`update_online_step`](@ref)
+  - [`update_online_estimator(ps::PipelineStep)`](@ref)
   - [`Online`](@ref)
 """
 function update_online_estimator(p::Pipeline)
-    return Pipeline(p.names, map(update_online_step, p.steps), p.cache)
+    return rebuild_struct(p, (; steps = map(update_online_estimator, p.steps)))
 end
 update_online_estimator(p::Pipeline{<:Any, <:Any, <:PipelineBufferState}) = p
 """
@@ -588,35 +527,31 @@ update_online_estimator(p::Pipeline{<:Any, <:Any, <:PipelineBufferState}) = p
 
 Copies every partial-fit state that a [`Pipeline`](@ref) carries, and rebuilds the pipeline around the copies, for [`Resume`](@ref).
 
-The states are the own `cache` of the pipeline and the states under every step, which [`copy_step_states`](@ref) copies. A fold of the copy leaves the held rows of the original unchanged.
+The states are the own `cache` of the pipeline and the states under every step, which [`copy_states`](@ref) copies. A [`PipelineStep`](@ref) copies through [`copy_states(ps::PipelineStep)`](@ref), and a callable and a result pass through the fallback unchanged. A fold of the copy leaves the held rows of the original unchanged.
 
 # Related
 
   - [`copy_states`](@ref)
-  - [`copy_step_states`](@ref)
+  - [`copy_states(ps::PipelineStep)`](@ref)
   - [`Resume`](@ref)
 """
 function copy_states(p::Pipeline)
-    return Pipeline(p.names, map(copy_step_states, p.steps), copy_state(p.cache))
+    return Pipeline(p.names, map(copy_states, p.steps), copy_state(p.cache))
 end
 """
-    copy_step_states(step)
+    copy_states(ps::PipelineStep)
 
-Copies the partial-fit states under one [`Pipeline`](@ref) step.
+Copies the partial-fit states under the estimator that a [`PipelineStep`](@ref) wraps.
 
-The method rebuilds a [`PipelineStep`](@ref) around its copied estimator, and copies an estimator step through [`copy_states`](@ref). A callable and a result pass through unchanged.
+The method rebuilds the wrapper around the copied estimator with [`rebuild_struct`](@ref), so the step keeps its reads, its writes and its target. A wrapped callable passes through the fallback of `copy_states` unchanged.
 
 # Related
 
   - [`copy_states(p::Pipeline)`](@ref)
-  - [`update_online_step`](@ref)
+  - [`update_online_estimator(ps::PipelineStep)`](@ref)
 """
-copy_step_states(step) = step
-function copy_step_states(est::Union{AbstractEstimator, StatsBase.CovarianceEstimator})
-    return copy_states(est)
-end
-function copy_step_states(ps::PipelineStep)
-    return PipelineStep(copy_step_states(ps.est), ps.reads, ps.writes, ps.target)
+function copy_states(ps::PipelineStep)
+    return rebuild_struct(ps, (; est = copy_states(ps.est)))
 end
 """
     held_timestamps(p::Pipeline)
@@ -635,18 +570,18 @@ At the price level the answer of the fold route starts one row after the answer 
 # Related
 
   - [`held_timestamps`](@ref)
-  - [`pipeline_held_timestamps`](@ref)
+  - [`held_timestamps(::Pipeline, ::PipelineBufferState)`](@ref)
   - [`Resume`](@ref)
 """
 function held_timestamps(p::Pipeline)
-    return pipeline_held_timestamps(p, p.cache)
+    return held_timestamps(p, p.cache)
 end
 """
-    pipeline_held_timestamps(p::Pipeline, cache::PipelineBufferState)
-    pipeline_held_timestamps(p::Pipeline, cache::ReturnsBufferState)
-    pipeline_held_timestamps(p::Pipeline, ::Nothing)
+    held_timestamps(p::Pipeline, cache::PipelineBufferState)
+    held_timestamps(p::Pipeline, cache::ReturnsBufferState)
+    held_timestamps(p::Pipeline, ::Nothing)
 
-The three arms of [`held_timestamps(p::Pipeline)`](@ref), selected by dispatch on the state that the pipeline carries.
+The three arms of [`held_timestamps(p::Pipeline)`](@ref), selected by dispatch on the state that the pipeline carries, which the one-argument method passes.
 
 A buffer of the input data answers with the timestamps of that data, and a Fold Context answers with its own. With no state, the row owner ([`pipeline_row_owner`](@ref)) answers when it carries a state ([`online_entry_state`](@ref)), and the method answers `nothing` otherwise.
 
@@ -655,13 +590,13 @@ A buffer of the input data answers with the timestamps of that data, and a Fold 
   - [`held_timestamps(p::Pipeline)`](@ref)
   - [`pipeline_row_owner`](@ref)
 """
-function pipeline_held_timestamps(::Pipeline, cache::PipelineBufferState)
+function held_timestamps(::Pipeline, cache::PipelineBufferState)
     return isnothing(cache.data) ? nothing : data_timestamps(cache.data)
 end
-function pipeline_held_timestamps(::Pipeline, cache::ReturnsBufferState)
+function held_timestamps(::Pipeline, cache::ReturnsBufferState)
     return cache.ts
 end
-function pipeline_held_timestamps(p::Pipeline, ::Nothing)
+function held_timestamps(p::Pipeline, ::Nothing)
     k = pipeline_row_owner(p)
     owner = iszero(k) ? nothing : step_estimator(p.steps[k])
     return isnothing(online_entry_state(owner)) ? nothing : held_timestamps(owner)
@@ -671,37 +606,14 @@ end
 
 Alias for a [`Resume`](@ref) whose Result carries a [`Pipeline`](@ref).
 
-The `cross_val_predict` methods of the pipeline dispatch on it, so a resumed pipeline takes the pipeline's own entry checks and fold loop, and not those of an optimiser. The second type parameter of `Resume` is the type of the estimator that the Result carries.
-
-# Related
-
-  - [`Resume`](@ref)
-  - [`cross_val_predict(r::PipelineResume, data::Prices_RR, cv::CVER)`](@ref)
-"""
-const PipelineResume = Resume{<:Any, <:Pipeline}
-"""
-    cross_val_predict(r::PipelineResume, data::Prices_RR, cv::CVER; ex = FLoops.ThreadedEx(), id = nothing)
-
-Continues an online walk-forward over a [`Pipeline`](@ref) from its Result, over the full history extended.
-
-This is the `cross_val_predict` method of the pipeline for [`Resume`](@ref). It checks the scheme through [`assert_resume_scheme`](@ref), and it refuses a holdout as the method for a plain pipeline does. The fold loop then takes its resumed arm through [`pipeline_cross_val_predict`](@ref). The fold route and the refit route of `Online(pipe)` resume alike, because the entry reads the state off the pipeline through walks that take any estimator.
-
-# Validation
-
-  - Everything [`assert_pipeline_entry`](@ref) refuses for a `Resume`.
-  - Everything the resumed arm of the fold loop refuses ([`Resume`](@ref)).
+[`Pipeline_OnlPipe`](@ref) holds it, so a resumed pipeline takes the `cross_val_predict` methods of the pipeline, with its own entry check, and not those of an optimiser. The second type parameter of `Resume` is the type of the estimator that the Result carries.
 
 # Related
 
   - [`Resume`](@ref)
   - [`cross_val_predict(pipe::Pipeline, data::Prices_RR, cv::CVER)`](@ref)
-  - [`assert_pipeline_entry`](@ref)
 """
-function cross_val_predict(r::PipelineResume, data::Prices_RR, cv::CVER;
-                           ex::FLoops.Transducers.Executor = FLoops.ThreadedEx(),
-                           id = nothing)
-    return pipeline_cross_val_predict(r, data, cv; ex = ex, id = id)
-end
+const PipelineResume = Resume{<:Any, <:Pipeline}
 function assert_pipeline_entry(r::PipelineResume, cv)
     assert_no_holdout(r.opt)
     assert_resume_scheme(cv)
@@ -726,7 +638,7 @@ On the fold route:
  4. Fold `block` into the owner through [`fold_pipeline_owner`](@ref), giving the folded owner and `cache`. A prior owner folds through [`fold_prior`](@ref), and `cache` is a [`ReturnsBufferState`](@ref) of the Pipeline that records the rest of the `ReturnsResult`, so that `fit(pipe)` can rebuild the `ReturnsResult` that the batch path reads. An optimisation owner folds through its own [`partial_fit!`](@ref) and keeps its own Fold Context, so `cache` is `nothing`.
  5. Return the pipeline rebuilt from the folded steps and `cache`.
 
-On the refit route, append `data` to the buffer through [`partial_fit!`](@ref), and return the pipeline with the new state.
+On the refit route, append `data` to the buffer through [`partial_fit!`](@ref), and return the pipeline with the new state. The refit route is the method on a pipeline whose `cache` is a [`PipelineBufferState`](@ref), which is more specific than this one, so this method holds the fold route alone.
 
 # Arguments
 
@@ -759,26 +671,6 @@ function partial_fit!(pipe::Pipeline{<:Any, <:Any,
                                      <:Option{<:Union{PipelineBufferState,
                                                       ReturnsBufferState}}},
                       data::Prices_RR)
-    return fold_pipeline(pipe, pipe.cache, data)
-end
-"""
-    fold_pipeline(pipe::Pipeline, cache::PipelineBufferState, data::Prices_RR)
-    fold_pipeline(pipe::Pipeline, cache::Option{<:ReturnsBufferState}, data::Prices_RR)
-
-The two routes of [`partial_fit!(pipe::Pipeline{<:Any, <:Any, <:Option{<:Union{PipelineBufferState, ReturnsBufferState}}}, data::Prices_RR)`](@ref), selected by dispatch on the state that the Pipeline carries.
-
-A buffer of the input data appends the block. A Fold Context, or no state, walks the steps. The steps and the refusals are those of the verb.
-
-# Related
-
-  - [`partial_fit!(pipe::Pipeline{<:Any, <:Any, <:Option{<:Union{PipelineBufferState, ReturnsBufferState}}}, data::Prices_RR)`](@ref)
-  - [`PipelineBufferState`](@ref)
-  - [`ReturnsBufferState`](@ref)
-"""
-function fold_pipeline(pipe::Pipeline, cache::PipelineBufferState, data::Prices_RR)
-    return Pipeline(pipe.names, pipe.steps, partial_fit!(cache, data))
-end
-function fold_pipeline(pipe::Pipeline, cache::Option{<:ReturnsBufferState}, data::Prices_RR)
     k = pipeline_row_owner(pipe)
     @argcheck(k > 0,
               ArgumentError("a `Pipeline` with neither a prior step nor an optimisation step has no row owner, so the online step has nothing to fold the observations into."))
@@ -804,10 +696,13 @@ function fold_pipeline(pipe::Pipeline, cache::Option{<:ReturnsBufferState}, data
     @argcheck(isa(block, ReturnsResult),
               ArgumentError("the rows reach the `$(pipe.names[k])` step, the row owner, as a `$(typeof(block).name.name)`, and a prior or an optimiser folds a `ReturnsResult`: put a `PricesToReturns` step before it."))
     owner = step_estimator(steps[k])
-    owner, cache = fold_pipeline_owner(owner, cache, block,
+    owner, cache = fold_pipeline_owner(owner, pipe.cache, block,
                                        pipeline_gap_sources(pipe.steps)[k])
     steps = Base.setindex(steps, rewrap_step(steps[k], owner), k)
-    return Pipeline(pipe.names, steps, cache)
+    return rebuild_struct(pipe, (; steps = steps, cache = cache))
+end
+function partial_fit!(pipe::Pipeline{<:Any, <:Any, <:PipelineBufferState}, data::Prices_RR)
+    return rebuild_struct(pipe, (; cache = partial_fit!(pipe.cache, data)))
 end
 """
     fold_pipeline_owner(pe::AbstractPriorEstimator, cache, rd::ReturnsResult,
@@ -1032,7 +927,7 @@ function fit_data_step_from_state(est::PriceGapFill, rd0::ReturnsResult,
     res = fit_preprocessing(est)
     cur = rd0.nx[idx]
     keep = findall(n -> string(n) in cur, res.nx)
-    return PriceGapFillResult(res.nx[keep], res.v[keep], res.te, res.fill, res.strict), idx
+    return rebuild_struct(res, (; nx = res.nx[keep], v = res.v[keep])), idx
 end
 function fit_data_step_from_state(est::MissingDataFilter, rd0::ReturnsResult,
                                   idx::AbstractVector{<:Integer})
