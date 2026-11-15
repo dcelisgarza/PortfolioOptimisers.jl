@@ -204,8 +204,9 @@ $(DocStringExtensions.FIELDS)
         rng::Random.AbstractRNG = Random.default_rng(),
         seed::Option{<:Integer} = nothing
     ) -> MultipleRandomised
+    MultipleRandomised(; cv::WalkForward_Onl, kwargs...) -> MultipleRandomised
 
-`cv` is positional; remaining arguments are keyword and correspond to the struct's fields. A plain number in `subset_size` or `window_size` is read through [`count_or_fraction`](@ref), so the field holds a [`CountOf`](@ref) or a [`FractionOf`](@ref).
+`cv` is positional; remaining arguments are keyword and correspond to the struct's fields. The second form takes `cv` as a keyword too, so every field is a keyword, as [`rebuild_struct`](@ref) needs. A plain number in `subset_size` or `window_size` is read through [`count_or_fraction`](@ref), so the field holds a [`CountOf`](@ref) or a [`FractionOf`](@ref).
 
 ## Validation
 
@@ -285,6 +286,9 @@ function MultipleRandomised(cv::WalkForward_Onl; subset_size::SubsetSizeE = Coun
                             rng::Random.AbstractRNG = Random.default_rng(),
                             seed::Option{<:Integer} = nothing)
     return MultipleRandomised(cv, subset_size, n_subsets, max_comb, window_size, rng, seed)
+end
+function MultipleRandomised(; cv::WalkForward_Onl, kwargs...)
+    return MultipleRandomised(cv; kwargs...)
 end
 """
 $(DocStringExtensions.TYPEDEF)

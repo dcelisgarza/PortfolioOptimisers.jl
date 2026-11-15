@@ -46,7 +46,7 @@ deferred_slots
 functor_slots
 resolve_calibration_slots(x, pr::AbstractPriorResult)
 resolve_deferred_quantities(x, pr::AbstractPriorResult)
-resolve_deferred_child
+resolve_deferred_quantities(xs::AbstractArray{<:Union{AbstractEstimator, AbstractAlgorithm}}, pr::AbstractPriorResult)
 rebuild_with_slots
 assert_declared_slot_resolver
 assert_resolved_slots

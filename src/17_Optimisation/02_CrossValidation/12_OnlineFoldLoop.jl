@@ -114,47 +114,18 @@ function one_previous_portfolio(est, w_prev::VecVecNum)
     return throw(ArgumentError("`$(typeof(est).name.name)` reads the previous fold's weights (`needs_previous_weights` is `true`), but the previous fold gave a population of $(length(w_prev)) portfolios, one per point of a frontier sweep. Each fold resolves its own frontier span from its own data, so a sweep point at one fold is not the same portfolio as the point with the same index at the next fold, and no one portfolio is the previous one. A frontier sweep and a term that reads the previous weights (a turnover, a tracking error, a fee, or a custom constraint or objective on the weights) contradict each other in a walk-forward. Optimise one portfolio per fold, or fix the previous weights of the term, for example `fixed = true` on a turnover, so that no fold reads them."))
 end
 """
-    fold_context(i::Integer, n::Integer, rd, train_idx, test_idx, w_prev, path_id)
-
-Builds the [`TimeDependentContext`](@ref) of fold `i`. Both places that resolve a schedule against a fold read this record.
-
-The per-fold copy of [`fold_loop`](@ref) builds it and swaps every schedule in before the callback fits the fold. The online arm builds the same record earlier in the same fold, before it folds the rows of the fold, for the schedules that its step reads ([`online_step_fold`](@ref)). Both places call this one constructor, so the step and the call with no data of fold `i` resolve a schedule against equal records.
-
-# Arguments
-
-  - `i`: The index of the fold, in the enumeration of the scheme.
-  - `n`: The number of folds that the scheme enumerates.
-  - `rd`: The returns or the prices of the fold, already viewed by asset where the scheme takes a view.
-  - `train_idx`: The training windows of every fold, in split order.
-  - `test_idx`: The test windows of every fold, in split order.
-  - `w_prev`: The weights of the previous fold, or `nothing`.
-  - `path_id`: The path that the fold belongs to, or `nothing`.
-
-# Returns
-
-  - `ctx::TimeDependentContext`: The context of the fold.
-
-# Related
-
-  - [`fold_loop`](@ref)
-  - [`online_step_fold`](@ref)
-  - [`TimeDependentContext`](@ref)
-"""
-function fold_context(i::Integer, n::Integer, rd, train_idx, test_idx, w_prev, path_id)
-    return TimeDependentContext(; i = i, n = n, rd = rd, train_idx = train_idx,
-                                test_idx = test_idx, w_prev = w_prev, path_id = path_id)
-end
-"""
     step_context(td::Bool, i::Integer, n::Integer, rd, train_idx, test_idx, w_prev, path_id)
 
 Returns the context against which the online arm resolves the schedules that the step of fold `i` reads, or `nothing` when `td` is `false`.
 
 A usual run carries no schedule. [`online_folds`](@ref) and [`thread_online_folds!`](@ref) each read [`is_time_dependent`](@ref) once per call, and not once per fold. The estimator that they thread keeps its schedules unresolved from fold to fold, so one answer holds for every fold.
 
+The per-fold copy of [`fold_loop`](@ref) builds the same record later in the fold, before the callback fits it. Both places call the constructor of [`TimeDependentContext`](@ref) with the same arguments, so the step and the call with no data of fold `i` resolve a schedule against equal records.
+
 # Arguments
 
   - `td`: Whether the threaded estimator carries a schedule.
-  - `i`, `n`, `rd`, `train_idx`, `test_idx`, `w_prev`, `path_id`: As [`fold_context`](@ref) takes them.
+  - `i`, `n`, `rd`, `train_idx`, `test_idx`, `w_prev`, `path_id`: As the constructor of [`TimeDependentContext`](@ref) takes them.
 
 # Returns
 
@@ -162,13 +133,17 @@ A usual run carries no schedule. [`online_folds`](@ref) and [`thread_online_fold
 
 # Related
 
-  - [`fold_context`](@ref)
+  - [`TimeDependentContext`](@ref)
   - [`online_step_fold`](@ref)
   - [`is_time_dependent`](@ref)
 """
 function step_context(td::Bool, i::Integer, n::Integer, rd, train_idx, test_idx, w_prev,
                       path_id)
-    return td ? fold_context(i, n, rd, train_idx, test_idx, w_prev, path_id) : nothing
+    return if td
+        TimeDependentContext(i, n, rd, train_idx, test_idx, w_prev, path_id)
+    else
+        nothing
+    end
 end
 """
     thread_online_folds!(predictions, fit_fold, est, folds, prev; rd, train_idx, test_idx, n, last_end, pws, path_id)

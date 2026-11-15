@@ -959,10 +959,6 @@ const RULED_NOTHING_PAIRS = Dict{Tuple{Symbol, Symbol}, Tuple{String, String}}(#
                                                                                 :descriptor_field_values) =>
                                                                                    ("keep (b)",
                                                                                     "$POLICY: the `Nothing` arm derives the net returns from `cc`, `X`, `lag`, `kept` and `g0`, which the callee does not take, and `descriptor_field_values(rd, nothing)` gives `abs.(rd.X)`, another answer (#2093)"),
-                                                                               (:bl_posteriors,
-                                                                                :vanilla_posteriors) =>
-                                                                                   ("keep (b)",
-                                                                                    "$POLICY: the callers hold an `Option` of the view system, and the callee takes its fields"),
                                                                                (:windowed_inner,
                                                                                 :factory) =>
                                                                                    ("keep (b)",
@@ -1352,7 +1348,8 @@ function default_findings!(out, t::Tree, rulings)
         verdict, why = if kind == "`false`"
             ("keep (default)", "a query trait owns `false` (rule 2)")
         elseif kind == "its input" && length(args) == 1
-            ("keep (default)", "a traversal owns the identity on a leaf (rule 2)")
+            ("keep (default)",
+             "an untyped identity on one slot: a traversal owns it on a leaf, and a pass-through to a gate keeps it (rule 2, #2108)")
         else
             fallback_verdict(t, d, kind, args)
         end
@@ -1558,9 +1555,6 @@ const RULED_NAMED_TUPLES = Dict{Symbol, Tuple{String, String}}(#
                                                                :performance_summary_columns =>
                                                                    ("keep (keys)",
                                                                     "`DataFrame(ps)` walks it with `pairs` and `keys` (#2113)"),
-                                                               :panel_level_coverage =>
-                                                                   ("keep (keys)",
-                                                                    "the caller splats it into a row `(; field, level, …)` (#2113)"),
                                                                :cross_sectional_carry_correlation =>
                                                                    ("keep (keys)",
                                                                     "the caller splats it into the field set that `cross_sectional_carry_with` rebuilds (#2113)"),

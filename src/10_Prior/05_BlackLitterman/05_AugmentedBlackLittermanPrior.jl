@@ -485,7 +485,7 @@ When `pe.tau` is `nothing`, the blending parameter is `1/T`, where `T` is the sm
  9. Build ``\\boldsymbol{\\Sigma}_{aug}``. Its off-diagonal blocks are the cross-covariance ``\\mathbf{M}\\boldsymbol{\\Sigma}_f`` of the factor model and its transpose.
 10. Stack ``\\mathbf{P}_{aug}`` block-diagonally, and stack ``\\boldsymbol{q}_{aug}`` and ``\\boldsymbol{\\Omega}_{aug}`` to match. The asset rows are above the factor rows.
 11. Put the stacked prior mean on the total-return scale of the views. The result is `aug_prior_mu`. When `pe.l` is `nothing`, it stacks the wrapped means, which are on that scale already. When `pe.l` is set, it is the equilibrium mean of [`equilibrium_mu`](@ref), plus `pe.rf` from [`apply_rf`](@ref), plus `rr.b` on the asset half. The equilibrium mean is a risk premium, and it reads `pe.w` sliced to the reduced axis by [`investable_weights_view`](@ref).
-12. Run the master equations with [`vanilla_posteriors`](@ref) over the augmented space. The result is the augmented posterior pair. When **neither** half has a view row left, [`bl_posteriors`](@ref) gives back the joint prior. The master equations with an empty ``\\mathbf{P}_{aug}`` add ``\\tau\\boldsymbol{\\Sigma}_{aug}``, and that makes the joint covariance wider with no view to cause it.
+12. Run the master equations with [`vanilla_posteriors`](@ref) over the augmented space. The result is the augmented posterior pair. When **neither** half has a view row left, [`vanilla_posteriors`](@ref) gives back the joint prior. The master equations with an empty ``\\mathbf{P}_{aug}`` add ``\\tau\\boldsymbol{\\Sigma}_{aug}``, and that makes the joint covariance wider with no view to cause it.
 13. Process the augmented posterior covariance in place with [`sample_matrix_processing!`](@ref), under `pe.mp`, `hcat(posterior_X, F)` and the smaller of the counts of the two prior covariances.
 14. Truncate the asset half from `1:N`. Add nothing to it. The intercept and the rate went into the prior mean at step 11, and the update is affine in that mean.
 15. Let `n` be the smaller of the row counts of `a_prior.X` and `f_prior.X`. A Scenario Cap in one nested prior keeps only the last rows of its own returns. The two blocks of the result must describe the same observations, so the result keeps the last `n` rows. Cut the nested prior with more rows with [`scenario_tail`](@ref). It refuses to cut a prior that carries weights, and it gives the count of the moments in `eoc`. With no cap, `n` is the count of all observations, and the step cuts nothing. The fit of the moments used every observation, so the cut changes no moment.
@@ -623,7 +623,7 @@ function prior(pe::AugmentedBlackLittermanPrior, X::MatNum, F::MatNum,
     # `tau * aug_prior_sigma` and widen the joint covariance on the strength of views that
     # are not there. The joint posterior of a stack with no view is the joint prior.
     aug_posterior_mu, aug_posterior_sigma = if viewless
-        bl_posteriors(nothing, aug_prior_mu, aug_prior_sigma)
+        vanilla_posteriors(nothing, aug_prior_mu, aug_prior_sigma)
     else
         vanilla_posteriors(tau, aug_prior_mu, aug_prior_sigma, aug_omega, aug_P, aug_Q)
     end

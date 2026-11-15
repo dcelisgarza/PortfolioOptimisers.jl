@@ -346,7 +346,7 @@ function gram_geometry(proj::AbstractProjectionGeometry, ::AbstractMatrix)
     return proj
 end
 function gram_geometry(proj::GramProjection, A::AbstractMatrix)
-    return GramProjection(; slv = proj.slv, A = A)
+    return rebuild_struct(proj, (; A = A))
 end
 """
 $(DocStringExtensions.TYPEDEF)

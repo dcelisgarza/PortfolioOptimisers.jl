@@ -23,7 +23,6 @@ ExactOrderedWeightsArray
 ApproxOrderedWeightsArray
 OrderedWeightsArray
 OWAJuMP
-factory(x::OrderedWeightsArray, pr::AbstractPriorResult, args...; kwargs...)
 owa_l_moment_crm
 owa_l_moment
 owa_gmd

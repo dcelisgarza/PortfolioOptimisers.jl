@@ -450,15 +450,8 @@ function ForecastReversion(;
                            proj::EuclideanProjection = EuclideanProjection())::ForecastReversion
     return ForecastReversion(me, eps, scale, proj)
 end
-function port_opt_view(alg::ForecastReversion, i, args...)
-    return rebuild_struct(alg, (; me = port_opt_view(alg.me, i, args...)))
-end
 function rows_needed(alg::ForecastReversion)
     return rows_needed_max(rows_needed(alg.me), window_rows(alg.scale))
-end
-function rule_state_seed(alg::ForecastReversion, ::AbstractVector,
-                         ::Option{<:AbstractAllocationSet} = nothing)
-    return forecaster_seed(alg.me)
 end
 function online_update!(alg::ForecastReversion, st, w::AbstractVector, x::AbstractVector,
                         rows, set::AbstractAllocationSet,
@@ -859,16 +852,6 @@ function ForecastTracking(;
                           proj::EuclideanProjection = EuclideanProjection())::ForecastTracking
     return ForecastTracking(me, eps, proj)
 end
-function port_opt_view(alg::ForecastTracking, i, args...)
-    return rebuild_struct(alg, (; me = port_opt_view(alg.me, i, args...)))
-end
-function rows_needed(alg::ForecastTracking)
-    return rows_needed(alg.me)
-end
-function rule_state_seed(alg::ForecastTracking, ::AbstractVector,
-                         ::Option{<:AbstractAllocationSet} = nothing)
-    return forecaster_seed(alg.me)
-end
 function online_update!(alg::ForecastTracking, st, w::AbstractVector, x::AbstractVector,
                         rows, set::AbstractAllocationSet,
                         ::Option{<:AbstractVector} = nothing)
@@ -1148,16 +1131,6 @@ function KernelTrendTracking(;
                              proj::EuclideanProjection = EuclideanProjection())::KernelTrendTracking
     return KernelTrendTracking(me, eta, q, proj)
 end
-function port_opt_view(alg::KernelTrendTracking, i, args...)
-    return rebuild_struct(alg, (; me = port_opt_view(alg.me, i, args...)))
-end
-function rows_needed(alg::KernelTrendTracking)
-    return rows_needed(alg.me)
-end
-function rule_state_seed(alg::KernelTrendTracking, ::AbstractVector,
-                         ::Option{<:AbstractAllocationSet} = nothing)
-    return forecaster_seed(alg.me)
-end
 function online_update!(alg::KernelTrendTracking, st, w::AbstractVector, x::AbstractVector,
                         rows, set::AbstractAllocationSet,
                         ::Option{<:AbstractVector} = nothing)
@@ -1358,16 +1331,6 @@ function TransactionCostOptimisation(;
                                      proj::EuclideanProjection = EuclideanProjection())::TransactionCostOptimisation
     return TransactionCostOptimisation(me, eta, gamma, proj)
 end
-function port_opt_view(alg::TransactionCostOptimisation, i, args...)
-    return rebuild_struct(alg, (; me = port_opt_view(alg.me, i, args...)))
-end
-function rows_needed(alg::TransactionCostOptimisation)
-    return rows_needed(alg.me)
-end
-function rule_state_seed(alg::TransactionCostOptimisation, ::AbstractVector,
-                         ::Option{<:AbstractAllocationSet} = nothing)
-    return forecaster_seed(alg.me)
-end
 function online_update!(alg::TransactionCostOptimisation, st, w::AbstractVector,
                         x::AbstractVector, rows, set::AbstractAllocationSet,
                         ::Option{<:AbstractVector} = nothing)
@@ -1543,16 +1506,6 @@ function ShortTermSparsePortfolio(;
                                   proj::EuclideanProjection = EuclideanProjection())::ShortTermSparsePortfolio
     return ShortTermSparsePortfolio(me, alg, zeta, proj)
 end
-function port_opt_view(alg::ShortTermSparsePortfolio, i, args...)
-    return rebuild_struct(alg, (; me = port_opt_view(alg.me, i, args...)))
-end
-function rows_needed(alg::ShortTermSparsePortfolio)
-    return rows_needed(alg.me)
-end
-function rule_state_seed(alg::ShortTermSparsePortfolio, ::AbstractVector,
-                         ::Option{<:AbstractAllocationSet} = nothing)
-    return forecaster_seed(alg.me)
-end
 function online_update!(alg::ShortTermSparsePortfolio, st, w::AbstractVector,
                         x::AbstractVector, rows, set::AbstractAllocationSet,
                         ::Option{<:AbstractVector} = nothing)
@@ -1563,6 +1516,32 @@ function online_update!(alg::ShortTermSparsePortfolio, st, w::AbstractVector,
     phi = .-(1.1 .* log.(xhat) .+ one(eltype(xhat)))
     b = sparse_portfolio_iterate(alg.alg, phi, w)
     return st, project(alg.proj, set, alg.zeta .* b, price_adjusted_allocation(w, x))
+end
+"""
+    const ForecastReadingRule = Union{ForecastReversion, ForecastTracking, KernelTrendTracking,
+                                      TransactionCostOptimisation, ShortTermSparsePortfolio}
+
+Union type for the Online Selection Rules that read a Price Relative Forecast on their `me` slot.
+
+Each rule holds its forecaster on `me`. So the rule views the forecaster at an asset subset, holds the rows that the forecaster reads, and seeds its state from the forecaster, through one method of [`port_opt_view`](@ref), of [`rows_needed`](@ref) and of [`rule_state_seed`](@ref) on this union. [`ForecastReversion`](@ref) also reads the rows of its `scale`, so it has a method of `rows_needed` of its own.
+
+# Related
+
+  - [`ForecasterState`](@ref)
+  - [`forecast_relative`](@ref)
+  - [`AbstractOnlinePortfolioSelectionAlgorithm`](@ref)
+"""
+const ForecastReadingRule = Union{ForecastReversion, ForecastTracking, KernelTrendTracking,
+                                  TransactionCostOptimisation, ShortTermSparsePortfolio}
+function port_opt_view(alg::ForecastReadingRule, i, args...)
+    return rebuild_struct(alg, (; me = port_opt_view(alg.me, i, args...)))
+end
+function rows_needed(alg::ForecastReadingRule)
+    return rows_needed(alg.me)
+end
+function rule_state_seed(alg::ForecastReadingRule, ::AbstractVector,
+                         ::Option{<:AbstractAllocationSet} = nothing)
+    return forecaster_seed(alg.me)
 end
 export ForecastReversion, MovingAverageReversion, ExponentialMovingAverageReversion,
        RobustMedianReversion, ReweightedPriceRelativeTracking, GaussianWeightingReversion,

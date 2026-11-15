@@ -978,19 +978,16 @@ function assert_search_candidates(opt, lens_grid, val_grid)::Nothing
     return nothing
 end
 """
-    pin_draw(cv::MultipleRandomised)
-    pin_draw(cv::MultipleRandomised, seed::Nothing)
-    pin_draw(cv::MultipleRandomised, seed::Integer)
-    pin_draw(cv)
+    pin_draw(cv::CVE_Onl)
+    pin_draw(cv::MultipleRandomised{<:Any, <:Any, <:Any, <:Any, <:Any, <:Any, Nothing})
 
 Fix the folds a search scores every candidate over.
 
-A search splits its data once and scores every candidate against the same folds, so a scheme whose `split` draws from a random stream must draw the same folds for every candidate. A [`MultipleRandomised`](@ref) with no `seed` draws from its `rng` afresh at every `split`, and the fold loop splits once per candidate, so this draws one seed from that `rng` and returns the scheme with it set: every candidate's `split` then resolves the same stream, and so does the search's own `split` for the row layout. A seeded scheme, and every other scheme, is returned as it is, because its `split` is already a function of the data alone.
+A search splits its data once and scores every candidate against the same folds, so a scheme whose `split` draws from a random stream must draw the same folds for every candidate. A [`MultipleRandomised`](@ref) with no `seed` draws from its `rng` afresh at every `split`, and the fold loop splits once per candidate, so this draws one seed from that `rng` and returns the scheme with it set: every candidate's `split` then resolves the same stream, and so does the search's own `split` for the row layout. A seeded scheme, and every other scheme, is returned as it is, because its `split` is already a function of the data alone. The type of the `seed` field selects the method.
 
 # Arguments
 
   - `cv`: The search's scheme.
-  - `seed`: The `seed` field of `cv`. Its type selects the method.
 
 # Returns
 
@@ -1002,19 +999,11 @@ A search splits its data once and scores every candidate against the same folds,
   - [`MultipleRandomised`](@ref)
   - [`resolve_rng`](@ref)
 """
-function pin_draw(cv::MultipleRandomised)
-    return pin_draw(cv, cv.seed)
-end
-function pin_draw(cv::MultipleRandomised, ::Nothing)
-    return MultipleRandomised(cv.cv; subset_size = cv.subset_size, n_subsets = cv.n_subsets,
-                              max_comb = cv.max_comb, window_size = cv.window_size,
-                              rng = cv.rng, seed = rand(cv.rng, UInt32))
-end
-function pin_draw(cv::MultipleRandomised, ::Integer)
+function pin_draw(cv::CVE_Onl)
     return cv
 end
-function pin_draw(cv)
-    return cv
+function pin_draw(cv::MultipleRandomised{<:Any, <:Any, <:Any, <:Any, <:Any, <:Any, Nothing})
+    return rebuild_struct(cv, (; seed = rand(cv.rng, UInt32)))
 end
 """
     score_rows(cvr::CrossValidationResult)

@@ -660,10 +660,6 @@ assets is what keeps the JuMP families cheap.
                 @test c.w_prev == res.pred[c.i - 1].res.w
             end
         end
-        # The fold loop inlines the constructor, so the line of its signature has no counter
-        # in a run through the verb. A direct call pins the same record the loop builds.
-        ctx = po.fold_context(2, n, rd, cvr.train_idx, cvr.test_idx, nothing, nothing)
-        @test ctx.i == 2 && ctx.n == n && ctx.test_idx == cvr.test_idx
     end
 
     @testset "The search and the Pipeline take the loop at their doors" begin

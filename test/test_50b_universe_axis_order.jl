@@ -45,7 +45,7 @@ quietly(f) = with_logger(f, NullLogger())
         # The universe in the order of the data binds the view to the column that `rd` names.
         @test isapprox(prior(ep(good), rd).mu[3], 0.004; atol = 1e-6)
         # A universe checked on its own, against the axes of the data.
-        ax = PortfolioOptimisers.returns_universe_axes(rd)
+        ax = PortfolioOptimisers.UniverseAxes(rd)
         @test_throws ArgumentError PortfolioOptimisers.assert_universe_axis_order(order, ax)
         @test isnothing(PortfolioOptimisers.assert_universe_axis_order(good, ax))
         # A list that is the vector of the data itself passes with no comparison.

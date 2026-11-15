@@ -710,8 +710,9 @@ function fold_loop(fit_fold, est, n::Integer, ex::FLoops.Transducers.Executor,
         # the same record earlier in the fold, for the schedules its step reads.
         if td_flag
             esti = update_time_dependent_estimator(esti,
-                                                   fold_context(i, n, rdi, train_idx,
-                                                                test_idx, w_prev, path_id))
+                                                   TimeDependentContext(i, n, rdi,
+                                                                        train_idx, test_idx,
+                                                                        w_prev, path_id))
         end
         if !isnothing(w_prev) && prev_w_flag
             esti = factory(esti, one_previous_portfolio(esti, w_prev))

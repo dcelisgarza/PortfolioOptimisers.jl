@@ -1676,7 +1676,7 @@ end
     # No view is the prior pair itself, and NOT the empty-view algebra: `vanilla_posteriors`
     # adds the estimation-error term, so an empty `P` would answer `(1 + tau) * sigma`, a
     # wider covariance produced by views that no longer exist.
-    pmu, psigma = PortfolioOptimisers.bl_posteriors(nothing, mu, sigma)
+    pmu, psigma = PortfolioOptimisers.vanilla_posteriors(nothing, mu, sigma)
     @test pmu === mu
     @test psigma == sigma
     # The covariance is a copy, because every caller hands it to `matrix_processing!`, which

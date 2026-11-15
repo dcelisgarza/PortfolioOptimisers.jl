@@ -2390,25 +2390,6 @@ is_calibration_rule(::OWA_CalOccupant)::Bool = false
 # a plain function standing in a calibration slot IS a rule everywhere else in the library.
 # The occupant's type is a type parameter, so the branch folds.
 calibration_slots(r::OrderedWeightsArray) = isa(r.w, OWA_CalOccupant) ? (; w = r.w) : (;)
-"""
-$(DocStringExtensions.TYPEDSIGNATURES)
-
-Resolve the weight builder in `w` against prior result `pr`, and return an [`OrderedWeightsArray`](@ref) whose builder holds numbers.
-
-The measure carries no propagation tag, so it generates no prior [`factory`](@ref) method of its own and this is the channel the value-level entry points take. The `JuMP` route reaches the same recursion through [`set_risk_constraints!`](@ref), which calls [`resolve_deferred_quantities`](@ref) directly.
-
-A builder holding numbers, a weight vector and a plain function are all carried through unchanged, so the common case allocates nothing.
-
-# Related
-
-  - [`OrderedWeightsArray`](@ref)
-  - [`resolve_deferred_quantities`](@ref)
-  - [`deferred_slots`](@ref)
-  - [`expected_risk`](@ref)
-"""
-function factory(x::OrderedWeightsArray, pr::AbstractPriorResult, args...; kwargs...)
-    return resolve_deferred_quantities(x, pr)
-end
 function (r::OrderedWeightsArray)(x::VecNum)
     w = owa_weights(r.w, length(x), :w)
     return LinearAlgebra.dot(w, sort(x))

@@ -2722,11 +2722,13 @@ end
     aug = code_lines(joinpath(src, "10_Prior", "05_BlackLitterman",
                               "05_AugmentedBlackLittermanPrior.jl"))
     @test count(l -> occursin(r"\bb\b", l) && occursin("vcat(b,", l), aug) == 1
-    # The kernel carries no rate of its own.
+    # The kernel carries no rate of its own: the master equations, and the two methods on the
+    # view system and on no view.
     kernel = code_lines(joinpath(src, "10_Prior", "05_BlackLitterman",
                                  "02_BlackLittermanPrior.jl"))
-    decl = only(filter(l -> occursin("function vanilla_posteriors(", l), kernel))
-    @test !occursin("rf", decl)
+    decls = filter(l -> occursin("function vanilla_posteriors(", l), kernel)
+    @test length(decls) == 3
+    @test all(d -> !occursin("rf", d), decls)
     # The one verb is declared once, in the file that owns the family's kernel, and the
     # subtraction it used to pair with is gone from the library entirely.
     @test count(l -> occursin("function apply_rf(", l), kernel) == 1

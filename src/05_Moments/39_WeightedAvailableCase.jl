@@ -196,10 +196,9 @@ function weighted_correlation_estimator(ce::StatsBase.SimpleCovariance,
     end
 end
 """
-    coverage_inner_corrected(w::Nothing, ce::StatsBase.CovarianceEstimator) -> Bool
+    coverage_inner_corrected(w::Option{<:ObsWeights}, ce::StatsBase.CovarianceEstimator) -> Bool
     coverage_inner_corrected(w::Nothing, ce::GeneralCovariance) -> Bool
     coverage_inner_corrected(w::ObsWeights, ce::GeneralCovariance) -> Bool
-    coverage_inner_corrected(w::ObsWeights, ce::StatsBase.CovarianceEstimator) -> Bool
 
 Refuses the inner estimator of a [`Covariance`](@ref) that its available-case arm cannot fit, and returns its bias correction.
 
@@ -221,7 +220,7 @@ The type of the weights of the `Covariance` selects the arm. With no weights the
   - [`assert_coverage_fittable`](@ref)
   - [`partial_fit_corrected`](@ref)
 """
-function coverage_inner_corrected(::Nothing, ce::StatsBase.CovarianceEstimator)
+function coverage_inner_corrected(::Option{<:ObsWeights}, ce::StatsBase.CovarianceEstimator)
     return partial_fit_corrected(ce)
 end
 function coverage_inner_corrected(::Nothing, ce::GeneralCovariance)
@@ -231,9 +230,6 @@ function coverage_inner_corrected(::Nothing, ce::GeneralCovariance)
 end
 function coverage_inner_corrected(::ObsWeights, ce::GeneralCovariance)
     return partial_fit_corrected(ce.ce)
-end
-function coverage_inner_corrected(::ObsWeights, ce::StatsBase.CovarianceEstimator)
-    return partial_fit_corrected(ce)
 end
 """
     weighted_pair_sample(alg::FullMoment, Xo::MatNum, msk::AbstractMatrix{Bool},

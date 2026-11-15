@@ -309,16 +309,26 @@ function DataFrames.describe(pnl::AssetPanel; by::Option{<:AbstractString} = not
     g = panel_field(pnl, by)
     @argcheck(g isa CategoricalPanelField,
               ArgumentError("a missing-share report groups the cells by the levels of a categorical Panel Field, and \"$by\" is a $(panel_field_kind(g)) Panel Field"))
-    rows = [(; field = f.name, level = l, panel_level_coverage(f, g, k, act)...)
-            for f in each_panel_field(pnl) if f.name != by for (k, l) in pairs(g.levels)]
-    return DataFrames.DataFrame(; field = String[r.field for r in rows],
-                                level = String[r.level for r in rows],
-                                cells = Int[r.cells for r in rows],
-                                missing = Float64[r.missing / r.cells for r in rows])
+    field_names = String[]
+    levels = String[]
+    counts = Int[]
+    shares = Float64[]
+    for f in each_panel_field(pnl), (k, l) in pairs(g.levels)
+        if f.name == by
+            continue
+        end
+        c, m = panel_level_coverage(f, g, k, act)
+        push!(field_names, f.name)
+        push!(levels, l)
+        push!(counts, c)
+        push!(shares, m / c)
+    end
+    return DataFrames.DataFrame(; field = field_names, level = levels, cells = counts,
+                                missing = shares)
 end
 """
     panel_level_coverage(f::AbstractPanelField, g::CategoricalPanelField, k::Integer,
-                         act::AbstractArray{Bool}) -> NamedTuple
+                         act::AbstractArray{Bool}) -> Tuple{Int, Int}
 
 Count the cells and the missing cells of a Panel Field on the cells of one level of a categorical Panel Field.
 
@@ -338,7 +348,7 @@ A cell belongs to the level when it is active, and when `g` is observed there an
 
 # Returns
 
-  - `cov::NamedTuple`: `cells`, the count of cells of the level; `missing`, the count of missing cells among them.
+  - `(cells, missing)::Tuple{Int, Int}`: The count of cells of the level, and the count of missing cells among them. The caller takes the pair apart at once.
 
 # Related
 
@@ -350,8 +360,8 @@ function panel_level_coverage(f::AbstractPanelField, g::CategoricalPanelField, k
                               act::AbstractArray{Bool})
     member = panel_level_cells(g, k, act)
     miss = panel_field_missing(f)
-    return (; cells = count(member) * panel_field_width(f),
-            missing = sum(m * b for (m, b) in zip(miss, member); init = 0))
+    return count(member) * panel_field_width(f),
+           sum(m * b for (m, b) in zip(miss, member); init = 0)
 end
 """
     panel_level_cells(g::CategoricalPanelField, k::Integer, act::AbstractArray{Bool}) -> BitArray

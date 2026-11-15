@@ -804,18 +804,22 @@ end
 """
 $(DocStringExtensions.TYPEDSIGNATURES)
 
-Resolve the two weight builders of an [`OrderedWeightsArrayRange`](@ref) against prior result `pr`.
+Resolve the weight builders of an [`OrderedWeightsArray`](@ref) or an [`OrderedWeightsArrayRange`](@ref) against prior result `pr`, and return the measure with builders that hold numbers.
 
-It carries the reading of [`factory`](@ref) on [`OrderedWeightsArray`](@ref) unchanged, over two builders instead of one.
+The measure carries no propagation tag, so it generates no prior [`factory`](@ref) method of its own and this is the channel the value-level entry points take. The `JuMP` route reaches the same recursion through [`set_risk_constraints!`](@ref), which calls [`resolve_deferred_quantities`](@ref) directly. The range reads its two builders on the same terms as the single measure reads its one.
+
+A builder holding numbers, a weight vector and a plain function are all carried through unchanged, so the common case allocates nothing.
 
 # Related
 
-  - [`OrderedWeightsArrayRange`](@ref)
   - [`OrderedWeightsArray`](@ref)
+  - [`OrderedWeightsArrayRange`](@ref)
   - [`resolve_deferred_quantities`](@ref)
   - [`deferred_slots`](@ref)
+  - [`expected_risk`](@ref)
 """
-function factory(x::OrderedWeightsArrayRange, pr::AbstractPriorResult, args...; kwargs...)
+function factory(x::Union{OrderedWeightsArray, OrderedWeightsArrayRange},
+                 pr::AbstractPriorResult, args...; kwargs...)
     return resolve_deferred_quantities(x, pr)
 end
 """

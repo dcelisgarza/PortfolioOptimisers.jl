@@ -256,7 +256,7 @@ $(DocStringExtensions.TYPEDEF)
 
 The views of a Black-Litterman system, `tau` and the view uncertainty.
 
-This type is an implementation detail and is not intended for direct use. [`bl_preroll`](@ref) makes it. [`bl_posteriors`](@ref) and [`bl_view_block`](@ref) read it.
+This type is an implementation detail and is not intended for direct use. [`bl_preroll`](@ref) makes it. [`vanilla_posteriors`](@ref) and [`bl_view_block`](@ref) read it.
 
 # Fields
 
@@ -265,7 +265,7 @@ $(DocStringExtensions.FIELDS)
 # Related
 
   - [`bl_preroll`](@ref)
-  - [`bl_posteriors`](@ref)
+  - [`vanilla_posteriors`](@ref)
   - [`bl_view_block`](@ref)
 """
 @concrete struct BlackLittermanViewSystem
@@ -305,7 +305,7 @@ This function is also where `P` meets the distribution that it updates, so it ch
   - The fit uses a *sub-universe* that does not hold the names, such as a cluster of a nested optimisation or a subset of a resampling.
   - The caller wrote a typo.
 
-No cause changes the data that is left for the update, so no cause changes the result. The fit continues as if the caller stated no view. Each member states what that means for it through [`bl_posteriors`](@ref) or [`bl_view_block`](@ref).
+No cause changes the data that is left for the update, so no cause changes the result. The fit continues as if the caller stated no view. Each member states what that means for it through [`vanilla_posteriors`](@ref) or [`bl_view_block`](@ref).
 
 [`strict_diagnostic`](@ref) still reports each name that resolves against neither axis, at the site where the assembly reads it. It raises an `ArgumentError` under `strict = true` and warns otherwise, and the message names the name and the universe that it failed against. That report names the cause. A refusal here can only name the result, and it cannot tell a typo from a correct name that is outside a sub-universe. The ledger keeps the two cases apart *for the report*: only a departed name writes into it, and [`announce_bl_departures`](@ref) reads it to say which case happened.
 
@@ -461,8 +461,8 @@ function announce_bl_departures(ni::VecStr, ledger::VecStr, viewless::Bool)::Not
     return nothing
 end
 """
-    bl_posteriors(::Nothing, prior_mu::VecNum, prior_sigma::MatNum) -> Tuple
-    bl_posteriors(blp::BlackLittermanViewSystem, prior_mu::VecNum, prior_sigma::MatNum) -> Tuple
+    vanilla_posteriors(::Nothing, prior_mu::VecNum, prior_sigma::MatNum) -> Tuple
+    vanilla_posteriors(blp::BlackLittermanViewSystem, prior_mu::VecNum, prior_sigma::MatNum) -> Tuple
 
 Run the master equations, or return the prior pair when no view is left.
 
@@ -489,13 +489,13 @@ The two methods split by dispatch. The result of [`bl_preroll`](@ref) is `nothin
 # Related
 
   - [`bl_preroll`](@ref)
-  - [`vanilla_posteriors`](@ref)
   - [`announce_bl_departures`](@ref)
 """
-function bl_posteriors(::Nothing, prior_mu::VecNum, prior_sigma::MatNum)
+function vanilla_posteriors(::Nothing, prior_mu::VecNum, prior_sigma::MatNum)
     return prior_mu, copy(prior_sigma)
 end
-function bl_posteriors(blp::BlackLittermanViewSystem, prior_mu::VecNum, prior_sigma::MatNum)
+function vanilla_posteriors(blp::BlackLittermanViewSystem, prior_mu::VecNum,
+                            prior_sigma::MatNum)
     return vanilla_posteriors(blp.tau, prior_mu, prior_sigma, blp.omega, blp.P, blp.Q)
 end
 """
@@ -504,11 +504,11 @@ end
 
 Return the `P`, `Q` and `omega` of a view system, or a block with no row when the system has no view left.
 
-Two members use this function and not [`bl_posteriors`](@ref), for two different reasons.
+Two members use this function and not [`vanilla_posteriors`](@ref), for two different reasons.
 
 [`AugmentedBlackLittermanPrior`](@ref) puts a block of asset views above a block of factor views, and **each half can become empty alone**. An empty half adds no row, and the stack does not change to the prior. The other half still holds views that the caller stated and that resolve, so the *joint* posterior still uses them. The prior stack discards those views. Only when both halves are empty is no view left, and that member then reads the two results itself and takes the prior stack. The empty block is `0 × n` and not a row of zeros, so the stack holds no false view, and `aug_Q` has one entry less, not an entry of zero.
 
-[`BayesianBlackLittermanPrior`](@ref) has one view system and no stack. It uses an empty block because, for it, the algebra of an empty block **is** the result with no view. Its update is a sum of precisions, ``\\hat{\\mathbf{\\Sigma}}^{-1} = \\mathbf{\\Sigma}_f^{-1} + \\mathbf{P}^\\intercal\\mathbf{\\Omega}^{-1}\\mathbf{P}``, so a `0 × n` ``\\mathbf{P}`` adds zero, and there is no term of estimation error ``\\tau\\mathbf{\\Sigma}`` to widen the covariance. The members that run [`vanilla_posteriors`](@ref) have that term, and that is why they use [`bl_posteriors`](@ref). The result is not the wrapped prior of that member but ``\\mathbf{\\Sigma}_a + \\mathbf{M}\\mathbf{\\Sigma}_f\\mathbf{M}^\\intercal``, the moments that its factor model gives, and the member has no unchanged prior to return.
+[`BayesianBlackLittermanPrior`](@ref) has one view system and no stack. It uses an empty block because, for it, the algebra of an empty block **is** the result with no view. Its update is a sum of precisions, ``\\hat{\\mathbf{\\Sigma}}^{-1} = \\mathbf{\\Sigma}_f^{-1} + \\mathbf{P}^\\intercal\\mathbf{\\Omega}^{-1}\\mathbf{P}``, so a `0 × n` ``\\mathbf{P}`` adds zero, and there is no term of estimation error ``\\tau\\mathbf{\\Sigma}`` to widen the covariance. The master equations of [`vanilla_posteriors`](@ref) have that term, and that is why the members that run them take its `nothing` method when no view is left. The result is not the wrapped prior of that member but ``\\mathbf{\\Sigma}_a + \\mathbf{M}\\mathbf{\\Sigma}_f\\mathbf{M}^\\intercal``, the moments that its factor model gives, and the member has no unchanged prior to return.
 
 # Arguments
 
@@ -525,7 +525,7 @@ Two members use this function and not [`bl_posteriors`](@ref), for two different
   - [`bl_preroll`](@ref)
   - [`AugmentedBlackLittermanPrior`](@ref)
   - [`BayesianBlackLittermanPrior`](@ref)
-  - [`bl_posteriors`](@ref)
+  - [`vanilla_posteriors`](@ref)
 """
 function bl_view_block(::Nothing, n::Integer, datatype::DataType)
     return Matrix{datatype}(undef, 0, n), Vector{datatype}(undef, 0),
@@ -911,7 +911,7 @@ Where:
  4. Derive the Investable Mask and the reduced view universe with [`investable_views`](@ref). Refuse a precomputed view matrix over a universe with a departed asset, with [`assert_bl_precomputed_universe`](@ref).
  5. View the fitted prior at the mask with [`investable_prior`](@ref), and read `posterior_X`, `prior_mu` and `prior_sigma` from *that* result.
  6. Assemble the views and their uncertainty with [`bl_preroll`](@ref), over the reduced `prior_sigma`, with `T` equal to the number of rows of `prior_model.X`. The result is `P`, `Q`, `tau` and `omega`, or `nothing` when no view is left. The axis keeps its default, `:xkey`, because these views update the assets.
- 7. Run the master equations with [`bl_posteriors`](@ref). The result is `posterior_mu` and `posterior_sigma` over the investable assets.
+ 7. Run the master equations with [`vanilla_posteriors`](@ref). The result is `posterior_mu` and `posterior_sigma` over the investable assets.
  8. Add `pe.rf` to `posterior_mu` with [`apply_rf`](@ref). This is the one site that adds it.
  9. Process `posterior_sigma` in place with [`sample_matrix_processing!`](@ref), under `pe.mp`, `posterior_X` and the count of the covariance of the wrapped prior from [`moment_observation_count`](@ref). Do this before the expansion, because a factorisation exists only for the reduced block.
 10. Report the departures once with [`announce_bl_departures`](@ref).
@@ -1003,7 +1003,7 @@ This function holds each step of the estimator after the wrapped prior gives its
  2. Refuse a precomputed view matrix over a universe with a departed asset, with [`assert_bl_precomputed_universe`](@ref).
  3. View the prior result at the mask with [`investable_prior`](@ref), and read `posterior_X`, `prior_mu` and `prior_sigma` from it.
  4. Assemble `P`, `Q`, `tau` and `omega` with [`bl_preroll`](@ref). Its `T` is the number of rows of `prior_model.X`.
- 5. Run the update with [`bl_posteriors`](@ref), and add `pe.rf` once with [`apply_rf`](@ref).
+ 5. Run the update with [`vanilla_posteriors`](@ref), and add `pe.rf` once with [`apply_rf`](@ref).
  6. Process the reduced covariance with [`sample_matrix_processing!`](@ref), at the count of the covariance of the wrapped prior, before the expansion, because a frame with `NaN` entries has no factorisation.
  7. Report the departures once with [`announce_bl_departures`](@ref).
  8. Expand both moments to the universe of the caller with [`expand_moment`](@ref).
@@ -1024,7 +1024,7 @@ This function holds each step of the estimator after the wrapped prior gives its
 
   - [`BlackLittermanPrior`](@ref)
   - [`bl_preroll`](@ref)
-  - [`bl_posteriors`](@ref)
+  - [`vanilla_posteriors`](@ref)
   - [`investable_views`](@ref)
   - [`forward_prior`](@ref)
 """
@@ -1047,7 +1047,7 @@ function bl_posterior(pe::BlackLittermanPrior, prior_model::AbstractPriorResult,
                      ledger = ledger)
     # `nothing` is a view set with no row left, whatever emptied it, and the pair is then the
     # prior's own.
-    posterior_mu, posterior_sigma = bl_posteriors(blp, prior_mu, prior_sigma)
+    posterior_mu, posterior_sigma = vanilla_posteriors(blp, prior_mu, prior_sigma)
     # `pe.rf` is applied here and only here (see [`apply_rf`](@ref)): once, on the asset
     # expected returns this estimator returns. `prior_model.mu` is the wrapped prior's own
     # answer and is used as it stands, so a rate that prior applied internally is left alone.

@@ -1063,17 +1063,13 @@ A fitted object of the other data level returns the window unchanged. So a pipel
 function apply_fitted_step(::Any, data::Prices_RR)
     return data
 end
-function apply_fitted_step(f::PricesToReturns, pr::AbstractPricesResult)
-    return apply_preprocessing(f, pr)
-end
-apply_fitted_step(::PricesToReturns, rd::AbstractReturnsResult) = rd
 function apply_fitted_step(f::Union{AbstractPricesPreprocessingResult,
-                                    AbstractPricesPreprocessingEstimator},
+                                    AbstractPricesPreprocessingEstimator, PricesToReturns},
                            pr::AbstractPricesResult)
     return apply_preprocessing(f, pr)
 end
 function apply_fitted_step(::Union{AbstractPricesPreprocessingResult,
-                                   AbstractPricesPreprocessingEstimator},
+                                   AbstractPricesPreprocessingEstimator, PricesToReturns},
                            rd::AbstractReturnsResult)
     return rd
 end

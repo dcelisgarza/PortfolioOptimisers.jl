@@ -125,25 +125,6 @@ usually the returns matrix `X` of the JuMP families. With this method, a call
 """
 port_opt_view(x, i, args...; kwargs...) = nothing_scalar_array_view(x, i)
 """
-    port_opt_view(x::VecScalar, i, args...) -> nothing_scalar_array_view(x, i)
-
-[`port_opt_view`](@ref) method for [`VecScalar`](@ref). It views the vector part, keeps
-the scalar part, and calls [`nothing_scalar_array_view`](@ref).
-
-# Algorithm
-
- 1. Drop `args...`.
- 2. Return [`nothing_scalar_array_view`](@ref) of `x` at `i`. Its [`VecScalar`](@ref) method views `x.v` at `i` and keeps `x.s`.
-
-A [`VecScalar`](@ref) that reaches the verb with a threaded tail resolves on this method, not on the universal leaf method. Both methods give the same value.
-
-# Related
-
-  - [`VecScalar`](@ref)
-  - [`nothing_scalar_array_view`](@ref)
-"""
-port_opt_view(x::VecScalar, i, args...) = nothing_scalar_array_view(x, i)
-"""
     port_opt_view(::Nothing, ::Any; kwargs...) -> nothing
     port_opt_view(::Nothing, ::Any, args...; kwargs...) -> nothing
 

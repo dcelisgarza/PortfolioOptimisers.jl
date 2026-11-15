@@ -857,35 +857,6 @@ end
 """
 $(DocStringExtensions.TYPEDSIGNATURES)
 
-Reads a coskewness out of a sample buffer, by refitting the batch verb over the observations the buffer holds.
-
-The method of [`coskewness`](@ref) that makes the estimate from a Sample Buffer, and the whole of the online form at this order. Neither the third nor the fourth co-moment folds exactly under a [`CoveragePolicy`](@ref) — an exact per-cell recursion needs the pairwise second co-moments over each triple's own observation set — so an [`Online`](@ref) wrapper seeds a [`SampleBufferState`](@ref) and `coskewness(ske)` with no data refits from it. The answer is therefore bit-exact with the batch arm over the same rows, by construction rather than by arithmetic coincidence.
-
-The buffer holds the observations verbatim, `NaN` included, so the available-case arm reads the same gaps from it that it would read from the caller's own matrix, and it holds the active mask that explains them beside them. With no active mask a gap is a holiday rather than a delisting, which is what [`coverage_valid_block`](@ref) states; with one, this method reads the delisting the fold was told about.
-
-# Arguments
-
-  - `ske`: Coskewness estimator.
-  - `state`: The sample buffer the wrapper seeded.
-
-# Returns
-
-  - $(ret_dict[:cskew])
-  - $(ret_dict[:cskewV])
-
-# Related
-
-  - [`Coskewness`](@ref)
-  - [`SampleBufferState`](@ref)
-  - [`Online`](@ref)
-  - [`coskewness`](@ref)
-"""
-function coskewness(ske::Coskewness, state::SampleBufferState)
-    return coskewness(ske, sample_buffer(state); dims = 1, sample_buffer_kwargs(state)...)
-end
-"""
-$(DocStringExtensions.TYPEDSIGNATURES)
-
 Reads the coskewness tensor and its negative spectral skewness matrix out of the state the estimator carries.
 
 The one-argument forwarder of [`coskewness`](@ref). It reads `ske.cache`, which [`partial_fit!`](@ref) writes, and refuses an estimator that has been shown no observation.
@@ -960,32 +931,6 @@ function cokurtosis(kte::Cokurtosis{<:Any, <:Any, <:FullMoment},
     shape = SparseArrays.spzeros(eltype(ckurt), state.n, length(state.mu))
     matrix_processing_block!(kte.mp, ckurt, shape)
     return ckurt
-end
-"""
-$(DocStringExtensions.TYPEDSIGNATURES)
-
-Reads a cokurtosis out of a sample buffer, by refitting the batch verb over the observations the buffer holds.
-
-The method of [`cokurtosis`](@ref) that makes the estimate from a Sample Buffer, and the whole of the online form at this order. The [`Coskewness`](@ref) method states the rule; carried one order further, an exact per-cell recursion would need the second and third co-moments over each quadruple's own observation set. The masks the buffer holds are handed to the batch verb on the same terms.
-
-# Arguments
-
-  - `kte`: Cokurtosis estimator.
-  - `state`: The sample buffer the wrapper seeded.
-
-# Returns
-
-  - $(ret_dict[:ckurt])
-
-# Related
-
-  - [`Cokurtosis`](@ref)
-  - [`SampleBufferState`](@ref)
-  - [`Online`](@ref)
-  - [`cokurtosis`](@ref)
-"""
-function cokurtosis(kte::Cokurtosis, state::SampleBufferState)
-    return cokurtosis(kte, sample_buffer(state); dims = 1, sample_buffer_kwargs(state)...)
 end
 """
 $(DocStringExtensions.TYPEDSIGNATURES)

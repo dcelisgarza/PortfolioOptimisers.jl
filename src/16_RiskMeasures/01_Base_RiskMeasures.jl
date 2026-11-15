@@ -2243,31 +2243,6 @@ A slot is named here only when `nothing` there has **no** value-level reading. T
 """
 functor_slots(::Any) = (;)
 """
-    resolve_deferred_child(slot, pr::AbstractPriorResult, slv = nothing)
-
-Resolve one slot that [`deferred_slots`](@ref) declared, on behalf of the derived recursion in [`resolve_deferred_quantities`](@ref).
-
-A slot holds one of three things, and one rule covers all three. A child measure resolves through its own method. A vector of children resolves element by element, which is the rule [`factory`](@ref) already applies on the other path. Any other occupant comes back unchanged, such as a stated value, `nothing` or a **Deferred Quantity** that the enclosing type resolves itself.
-
-The vector arm is bounded by the element type rather than by `AbstractArray`, so a matrix slot is a value and never a container of children.
-
-`slv` is the effective solver, and it travels down to the child untouched. A child that carries a solver of its own settles it against this one; a child that carries none gives its rules none. So a container hands each child the same solver the enclosing measure was resolved against.
-
-# Related
-
-  - [`resolve_deferred_quantities`](@ref)
-  - [`deferred_slots`](@ref)
-  - [`factory`](@ref)
-"""
-function resolve_deferred_child(slot, pr::AbstractPriorResult, slv = nothing)
-    return resolve_deferred_quantities(slot, pr, slv)
-end
-function resolve_deferred_child(slot::AbstractArray{<:Union{AbstractEstimator,
-                                                            AbstractAlgorithm}},
-                                pr::AbstractPriorResult, slv = nothing)
-    return [resolve_deferred_child(s, pr, slv) for s in slot]
-end
-"""
     rebuild_with_slots(x, slots::NamedTuple)
 
 Return `x` itself when every field named by `slots` already holds the value `slots` gives it, and a copy of `x` carrying those values when one of them moved.
@@ -2417,7 +2392,7 @@ Both channels end in **one** rebuild: a measure that carries both kinds of slot 
  1. Read the slots `x` declares with [`deferred_slots`](@ref), giving `slots`.
  2. Read the resolved calibration slots with [`resolve_calibration_slots`](@ref), giving `calibrated`.
  3. Return `x` unchanged when both are empty. A type with neither kind of slot needs no method of its own.
- 4. Resolve every entry of `slots` with [`resolve_deferred_child`](@ref), threading `pr` and `slv` to each, giving `resolved`.
+ 4. Resolve every entry of `slots` with `resolve_deferred_quantities`, threading `pr` and `slv` to each, giving `resolved`. A child measure resolves through its own method, a vector of children through the vector method, and any other occupant comes back unchanged through this method, because it declares no slot: a stated value, `nothing` or a **Deferred Quantity** that the enclosing type resolves itself.
  5. Refuse a slot the recursion left unresolved with [`assert_declared_slot_resolver`](@ref).
  6. Hand `merge(calibrated, resolved)` to [`rebuild_with_slots`](@ref), which returns `x` itself when no entry moved and a rebuilt copy when one did.
 
@@ -2428,7 +2403,6 @@ Both channels end in **one** rebuild: a measure that carries both kinds of slot 
 # Related
 
   - [`deferred_slots`](@ref)
-  - [`resolve_deferred_child`](@ref)
   - [`resolve_calibration_slots`](@ref)
   - [`assert_declared_slot_resolver`](@ref)
   - [`set_risk_constraints!`](@ref)
@@ -2439,11 +2413,30 @@ function resolve_deferred_quantities(x, pr::AbstractPriorResult, slv = nothing)
     if isempty(slots) && isempty(calibrated)
         return x
     end
-    resolved = map(slot -> resolve_deferred_child(slot, pr, slv), slots)
+    resolved = map(slot -> resolve_deferred_quantities(slot, pr, slv), slots)
     assert_declared_slot_resolver(x, resolved)
     # The deferred half is merged last, so it wins a key both channels declare. A container
     # names its children in both, and the child the recursion resolved is the one to keep.
     return rebuild_with_slots(x, merge(calibrated, resolved))
+end
+"""
+    resolve_deferred_quantities(xs::AbstractArray{<:Union{AbstractEstimator, AbstractAlgorithm}},
+                                pr::AbstractPriorResult, slv = nothing)
+
+Resolve a slot that holds a vector of children, element by element, which is the rule [`factory`](@ref) applies on the other path.
+
+The method is bounded by the element type rather than by `AbstractArray`, so a matrix slot is a value and never a container of children. `slv` is the effective solver, and it travels down to each child untouched, so a container hands each child the solver that the enclosing measure was resolved against.
+
+# Related
+
+  - [`resolve_deferred_quantities`](@ref)
+  - [`deferred_slots`](@ref)
+  - [`assert_resolved_slots`](@ref)
+"""
+function resolve_deferred_quantities(xs::AbstractArray{<:Union{AbstractEstimator,
+                                                               AbstractAlgorithm}},
+                                     pr::AbstractPriorResult, slv = nothing)
+    return [resolve_deferred_quantities(x, pr, slv) for x in xs]
 end
 """
     assert_resolved_slots(x)
@@ -2456,7 +2449,7 @@ The same check refuses a slot that holds `nothing` when the functor reads it as 
 
 This is the shape [`HopCount`](@ref) and [`PathLength`](@ref) already use: the consumer resolves, the kernel refuses.
 
-The slots come from [`deferred_slots`](@ref) and the check recurses into whatever they hold, so a container is covered by its children's declarations. A slot that holds a vector of children is recursed element by element, which is the rule [`resolve_deferred_child`](@ref) applies on the resolution path. Every slot of a concretely-typed measure has a concrete field type, so the test is a type-level one and a leaf measure compiles the whole check away. A container pays one small allocation per call for the recursion into its children.
+The slots come from [`deferred_slots`](@ref) and the check recurses into whatever they hold, so a container is covered by its children's declarations. A slot that holds a vector of children is recursed element by element, which is the rule that the vector method of [`resolve_deferred_quantities`](@ref) applies on the resolution path. Every slot of a concretely-typed measure has a concrete field type, so the test is a type-level one and a leaf measure compiles the whole check away. A container pays one small allocation per call for the recursion into its children.
 
 The message names both types with `nameof`, not by printing the type. A printed type carries a module prefix whenever the name is not visible from `Main`, which is the case inside an isolated test worker and inside any module that imports the package qualified. `Variance.sigma` is the path the caller wrote, and the message must read the same in every process.
 

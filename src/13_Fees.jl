@@ -1138,9 +1138,8 @@ function lift_fees(fees::Fees, imsk::BitVector)::Fees
                 imsk = nothing)
 end
 """
-    lift_fee_rate(x::Nothing, ::BitVector)
     lift_fee_rate(x::Number, ::BitVector)
-    lift_fee_rate(x::VecNum, imsk::BitVector)
+    lift_fee_rate(x::Option{<:VecNum}, imsk::BitVector)
 
 Put one per-asset fee rate back onto the full universe, zero where the mask is `false`.
 
@@ -1148,8 +1147,8 @@ This is the per-field step of [`lift_fees`](@ref). A `nothing` field states no f
 
 # Algorithm
 
- 1. On a `nothing` or a `Number` `x`, return `x`.
- 2. On a `VecNum` `x`, return [`expand_investable_weights`](@ref) of `x` at `imsk`. Entry ``k`` of `x` goes to the position of the ``k``-th `true` of `imsk`, and every `false` position holds a zero.
+ 1. On a `Number` `x`, return `x`.
+ 2. On a `VecNum` or a `nothing` `x`, return [`expand_investable_weights`](@ref) of `x` at `imsk`. Entry ``k`` of `x` goes to the position of the ``k``-th `true` of `imsk`, and every `false` position holds a zero. That function returns `nothing` for `nothing`.
 
 # Arguments
 
@@ -1166,13 +1165,10 @@ This is the per-field step of [`lift_fees`](@ref). A `nothing` field states no f
   - [`lift_turnover`](@ref)
   - [`expand_investable_weights`](@ref)
 """
-function lift_fee_rate(::Nothing, ::BitVector)
-    return nothing
-end
 function lift_fee_rate(x::Number, ::BitVector)
     return x
 end
-function lift_fee_rate(x::VecNum, imsk::BitVector)
+function lift_fee_rate(x::Option{<:VecNum}, imsk::BitVector)
     return expand_investable_weights(imsk, x)
 end
 """

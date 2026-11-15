@@ -1446,7 +1446,10 @@ end
     # slots that may hold a Calibration Rule. Both are resolved by the same verb, and the
     # pairing the rule asserts is resolver-with-declaration, not resolver-with-one-verb: the
     # six distributionally robust slots #584 widened resolve a rule and declare it there.
-    resolvers = firstargs(PO.resolve_deferred_quantities)
+    # The vector method resolves a slot that holds many children, element by element. It is
+    # the per-slot rule of the derived recursion and declares no slot of its own (ADR 0051,
+    # amended by the review of #2072).
+    resolvers = setdiff(firstargs(PO.resolve_deferred_quantities), (AbstractArray,))
     declarations = union(firstargs(PO.deferred_slots), firstargs(PO.calibration_slots))
     @test isempty(setdiff(resolvers, declarations))
 

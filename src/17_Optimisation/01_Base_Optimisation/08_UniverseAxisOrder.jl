@@ -3,16 +3,26 @@ $(DocStringExtensions.TYPEDEF)
 
 The names that a [`UniverseSets`](@ref) is checked against: the asset axis, the factor axis, and the labels of the asset axis for the error message.
 
-This type is an implementation detail and is not intended for direct use. [`returns_universe_axes`](@ref) makes it. [`assert_universe_axis_order`](@ref) reads it.
+This type is an implementation detail and is not intended for direct use. [`assert_universe_axis_order`](@ref) reads it.
 
 # Fields
 
 $(DocStringExtensions.FIELDS)
 
+# Constructors
+
+    UniverseAxes(rd::ReturnsResult) -> UniverseAxes
+    UniverseAxes(ax::UniverseAxes, ::Val{:factor}) -> UniverseAxes
+
+The method that Julia selects is the algorithm.
+
+ 1. `rd`: the asset key names `rd.nx` and the factor key names `rd.nf`.
+ 2. `ax` and `Val(:factor)`: the axes of a child that a prior fits on the factor returns. The child reads the factor returns as its asset axis, so its asset key names `ax.nf`. The factor returns have no factor axis of their own, so `nf` is `nothing`.
+
 # Related
 
-  - [`returns_universe_axes`](@ref)
   - [`assert_universe_axis_order`](@ref)
+  - [`factor_axis_fields`](@ref)
 """
 @concrete struct UniverseAxes
     """
@@ -31,6 +41,12 @@ $(DocStringExtensions.FIELDS)
     `sym`: The name of the field of the returns data that `nx` comes from, for the error message.
     """
     sym
+end
+function UniverseAxes(rd::ReturnsResult)
+    return UniverseAxes(rd.nx, rd.nf, "asset", "nx")
+end
+function UniverseAxes(ax::UniverseAxes, ::Val{:factor})
+    return UniverseAxes(ax.nf, nothing, "factor", "nf")
 end
 """
     assert_universe_axis_order(est::Union{AbstractEstimator, AbstractAlgorithm}, rd::ReturnsResult) -> Nothing
@@ -51,14 +67,14 @@ The estimator method walks the tree of `est` and checks each universe that it fi
 The method that Julia selects is the algorithm.
 
  1. `sets` is a [`UniverseSets`](@ref): check the asset axis, `sets.dict[sets.xkey]` against `ax.nx`, and the factor axis, `sets.dict[sets.tfkey]` against `ax.nf`. An axis is skipped when `ax` holds no names for it, or when `sets` declares no key for it. A list that is `===` to the names of `ax` passes with no comparison.
- 2. `est` is an estimator or an algorithm: walk the fields of `est` with [`universe_axis_children!`](@ref), against the axes of `rd` from [`returns_universe_axes`](@ref). An `IdSet` holds each universe that the walk checked, so a universe that many estimators share is checked once.
+ 2. `est` is an estimator or an algorithm: walk the fields of `est` with [`universe_axis_children!`](@ref), against the axes of `rd` from [`UniverseAxes`](@ref). An `IdSet` holds each universe that the walk checked, so a universe that many estimators share is checked once.
 
 # Arguments
 
-  - `sets`: The universe to check. A caller that checks one universe passes `returns_universe_axes(rd)` as `ax`. The method on `rd` is the method of an estimator, and it walks the fields of `est`, so it does not check a universe that it gets as `est`.
+  - `sets`: The universe to check. A caller that checks one universe passes `UniverseAxes(rd)` as `ax`. The method on `rd` is the method of an estimator, and it walks the fields of `est`, so it does not check a universe that it gets as `est`.
   - `est`: The estimator whose tree to check, such as a prior, an optimiser or an algorithm. The walk does not stop at `est` itself, even when it is an optimisation head.
   - $(arg_dict[:rd])
-  - `ax`: The names to check against, from [`returns_universe_axes`](@ref). The walk passes them, so that a child on the factor axis is checked against the factor names.
+  - `ax`: The names to check against, from [`UniverseAxes`](@ref). The walk passes them, so that a child on the factor axis is checked against the factor names.
 
 # Validation
 
@@ -94,7 +110,7 @@ ERROR: ArgumentError: the asset universe declared under key `nx` does not descri
 """
 function assert_universe_axis_order(est::Union{AbstractEstimator, AbstractAlgorithm},
                                     rd::ReturnsResult)
-    universe_axis_children!(IdSet{UniverseSets}(), est, returns_universe_axes(rd))
+    universe_axis_children!(IdSet{UniverseSets}(), est, UniverseAxes(rd))
     return nothing
 end
 function assert_universe_axis_order(sets::UniverseSets, ax::UniverseAxes)
@@ -147,41 +163,6 @@ function universe_axis_msg(sets::UniverseSets, declared, names, axis, key, sym, 
            " The list under `$(key)` is `rd.nf`, the names of the factors. Declare the factors under the factor key `$(sets.tfkey)`, and the assets under `$(key)`."
 end
 """
-    returns_universe_axes(rd::ReturnsResult) -> UniverseAxes
-    returns_universe_axes(ax::UniverseAxes, ::Val{:factor}) -> UniverseAxes
-
-Return the names that a [`UniverseSets`](@ref) is checked against, as [`assert_universe_axis_order`](@ref) reads them.
-
-The record has four fields. `nx` holds the names of the columns that the asset key of a universe names, and `nf` holds the names of the factor axis. `axis` and `sym` name the axis and the field of `rd` that `nx` comes from, for the error message.
-
-# Algorithm
-
-The method that Julia selects is the algorithm.
-
- 1. `rd`: the asset key names `rd.nx` and the factor key names `rd.nf`.
- 2. `ax` and `Val(:factor)`: the axes of a child that a prior fits on the factor returns. The child reads the factor returns as its asset axis, so its asset key names `ax.nf`. The factor returns have no factor axis of their own, so `nf` is `nothing`.
-
-# Arguments
-
-  - $(arg_dict[:rd])
-  - `ax`: The axes of the parent.
-
-# Returns
-
-  - `ax::UniverseAxes`: The record of the four fields `nx`, `nf`, `axis` and `sym`.
-
-# Related
-
-  - [`assert_universe_axis_order`](@ref)
-  - [`factor_axis_fields`](@ref)
-"""
-function returns_universe_axes(rd::ReturnsResult)
-    return UniverseAxes(rd.nx, rd.nf, "asset", "nx")
-end
-function returns_universe_axes(ax::UniverseAxes, ::Val{:factor})
-    return UniverseAxes(ax.nf, nothing, "factor", "nf")
-end
-"""
     factor_axis_fields(x) -> Tuple{Vararg{Symbol}}
 
 Return the names of the fields of `x` that hold a child that `x` fits on the factor returns, or a universe of the factors.
@@ -231,13 +212,13 @@ Walk the fields of an estimator, and check each [`UniverseSets`](@ref) in them o
 # Algorithm
 
  1. Visit the value of each field of [`asset_axis_fields`](@ref) on `ax`.
- 2. When `ax.nf` holds names, visit the value of each field of [`factor_axis_fields`](@ref) on the factor axes of [`returns_universe_axes`](@ref), with a new `IdSet`. A universe on the factor axis names other columns than a universe on the asset axis, so the two do not share a set.
+ 2. When `ax.nf` holds names, visit the value of each field of [`factor_axis_fields`](@ref) on the factor axes `UniverseAxes(ax, Val(:factor))`, see [`UniverseAxes`](@ref), with a new `IdSet`. A universe on the factor axis names other columns than a universe on the asset axis, so the two do not share a set.
 
 # Arguments
 
   - `seen`: The universes that the walk checked.
   - `x`: The estimator whose fields to walk.
-  - `ax`: The axes, from [`returns_universe_axes`](@ref).
+  - `ax`: The axes, from [`UniverseAxes`](@ref).
 
 # Validation
 
@@ -263,7 +244,7 @@ function universe_axis_children!(seen::IdSet{UniverseSets}, x, ax::UniverseAxes)
         return nothing
     end
     fseen = IdSet{UniverseSets}()
-    fax = returns_universe_axes(ax, Val(:factor))
+    fax = UniverseAxes(ax, Val(:factor))
     for f in ffs
         universe_axis_visit!(fseen, getfield(x, f), fax)
     end
@@ -288,7 +269,7 @@ The method that Julia selects on the type of `x` is the algorithm.
 
   - `seen`: The universes that the walk checked.
   - `x`: The value of a field.
-  - `ax`: The axes, from [`returns_universe_axes`](@ref).
+  - `ax`: The axes, from [`UniverseAxes`](@ref).
 
 # Validation
 

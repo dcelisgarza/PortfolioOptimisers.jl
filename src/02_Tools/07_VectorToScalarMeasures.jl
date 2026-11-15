@@ -760,20 +760,12 @@ end
 function vec_to_real_measure(mv::MeanValue{<:ObsWeights}, val::VecNum; kwargs...)
     return Statistics.mean(val, get_observation_weights(mv.w, val))
 end
-function vec_to_real_measure(mv::MeanValue{<:ObsWeights},
-                             val::NTuple{N, <:Number} where {N}; kwargs...)
-    return vec_to_real_measure(mv, collect(val))
-end
 function vec_to_real_measure(mdv::MedianValue{Nothing},
                              val::Union{VecNum, NTuple{N, <:Number} where {N}}; kwargs...)
     return Statistics.median(val)
 end
 function vec_to_real_measure(mdv::MedianValue{<:ObsWeights}, val::VecNum; kwargs...)
     return Statistics.median(val, get_observation_weights(mdv.w, val))
-end
-function vec_to_real_measure(mdv::MedianValue{<:ObsWeights},
-                             val::NTuple{N, <:Number} where {N}; kwargs...)
-    return vec_to_real_measure(mdv, collect(val))
 end
 function vec_to_real_measure(::MaxValue, val::Union{VecNum, NTuple{N, <:Number} where {N}};
                              kwargs...)
@@ -794,10 +786,6 @@ function vec_to_real_measure(sv::StdValue{<:ObsWeights}, val::VecNum; kwargs...)
     return sqrt(weighted_moment_guard(Statistics.var(val, w; corrected = sv.corrected,
                                                      kwargs...), w, sv.corrected))
 end
-function vec_to_real_measure(sv::StdValue{<:ObsWeights}, val::NTuple{N, <:Number} where {N};
-                             kwargs...)
-    return vec_to_real_measure(sv, collect(val); kwargs...)
-end
 function vec_to_real_measure(vv::VarValue{Nothing},
                              val::Union{VecNum, NTuple{N, <:Number} where {N}}; kwargs...)
     return Statistics.var(val; corrected = vv.corrected, kwargs...)
@@ -807,9 +795,11 @@ function vec_to_real_measure(vv::VarValue{<:ObsWeights}, val::VecNum; kwargs...)
     return weighted_moment_guard(Statistics.var(val, w; corrected = vv.corrected,
                                                 kwargs...), w, vv.corrected)
 end
-function vec_to_real_measure(vv::VarValue{<:ObsWeights}, val::NTuple{N, <:Number} where {N};
-                             kwargs...)
-    return vec_to_real_measure(vv, collect(val); kwargs...)
+# A weighted measure reads the weights of a vector, so a tuple of values goes to the vector form.
+function vec_to_real_measure(m::Union{MeanValue{<:ObsWeights}, MedianValue{<:ObsWeights},
+                                      StdValue{<:ObsWeights}, VarValue{<:ObsWeights}},
+                             val::NTuple{N, <:Number} where {N}; kwargs...)
+    return vec_to_real_measure(m, collect(val); kwargs...)
 end
 function vec_to_real_measure(msv::StandardisedValue,
                              val::Union{VecNum, NTuple{N, <:Number} where {N}}; kwargs...)

@@ -393,7 +393,7 @@ The shift is linear in ``r_f``, and it depends on the views through ``\\mathbf{G
  5. Regress `Xi` on `F` with [`factor_reconstruction`](@ref), under `pe.re` viewed to `imsk` with [`coverage_regression`](@ref). The results are the regression result `rr` and the reconstructed returns `posterior_X`.
  6. Make the views and their uncertainty with [`bl_preroll`](@ref), over `prior_sigma` and the count of the factor mean from [`moment_observation_count`](@ref). The result is `blp`. The axis is `:tfkey`, so a departed asset drops no view row, and the step keeps no ledger.
  7. Put the prior mean on the total-return scale of the views. The result is `prior_total_mu`. When `pe.l` is set, it is the equilibrium mean of [`equilibrium_mu`](@ref) plus `pe.rf` from [`apply_rf`](@ref). The equilibrium mean is a risk premium, and it reads `pe.w` sliced to the reduced axis by [`investable_weights_view`](@ref). When `pe.l` is `nothing`, it is `prior_mu`, which is on that scale already.
- 8. Run the master equations with [`bl_posteriors`](@ref). The result is the posterior factor pair. When no view row is left, it gives back `prior_total_mu` and the factor prior covariance. Step 10 lifts them as it lifts a posterior pair.
+ 8. Run the master equations with [`vanilla_posteriors`](@ref). The result is the posterior factor pair. When no view row is left, it gives back `prior_total_mu` and the factor prior covariance. Step 10 lifts them as it lifts a posterior pair.
  9. Process the posterior factor covariance in place with [`sample_matrix_processing!`](@ref), under `pe.f_mp`, `F` and the count of the factor covariance from [`moment_observation_count`](@ref).
 10. Lift the posterior factor pair onto the reduced assets with [`factor_lift`](@ref), with the same count. The results are `mu`, `sigma`, `chol`, `esigma`, `edof` and `ediv`. [`FactorPrior`](@ref) applies the same lift, to different factor moments. The lift adds the residual block when `pe.rsd` is `true`. It takes the square root of the posterior factor covariance for `chol` under `pe.mtx_sqrt`, and it processes `sigma` under `pe.mp`.
 11. Write `esigma`, `edof` and `ediv` onto `rr` with [`set_idiosyncratic_covariance`](@ref). Under `pe.rsd = true`, the fields hold the residual variances that the lift measured and their counts. Under `pe.rsd = false`, `esigma` and `ediv` hold `nothing`, because the lift added no residual block.
@@ -508,8 +508,8 @@ function prior(pe::FactorBlackLittermanPrior, X::MatNum, F::MatNum,
     # below carries them to the assets exactly as it carries a posterior pair. The empty-view
     # algebra is not the answer here: `vanilla_posteriors` would add `tau * prior_sigma` and
     # widen the factor covariance on the strength of views that are not there. See
-    # [`bl_posteriors`](@ref).
-    f_posterior_mu, f_posterior_sigma = bl_posteriors(blp, prior_total_mu, prior_sigma)
+    # [`vanilla_posteriors`](@ref).
+    f_posterior_mu, f_posterior_sigma = vanilla_posteriors(blp, prior_total_mu, prior_sigma)
     sample_matrix_processing!(pe.f_mp, f_posterior_sigma, F, T_sigma)
     # Reconstruct the posteriors using the black litterman adjusted factor statistics. The lift
     # is the same one `FactorPrior` applies; only the factor moments handed to it differ.

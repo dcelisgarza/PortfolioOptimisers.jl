@@ -15,7 +15,7 @@ ComparatorOrdering
 WireOrdering
 PortfolioOptimisers.sorting_network_columns
 OrderedWeightsArrayRange
-factory(x::OrderedWeightsArrayRange, pr::AbstractPriorResult, args...; kwargs...)
+factory(x::Union{OrderedWeightsArray, OrderedWeightsArrayRange}, pr::AbstractPriorResult, args...; kwargs...)
 ```
 
 ## References

@@ -1152,7 +1152,6 @@ function Online(::OnlinePortfolioSelection, args...; kwargs...)
     return throw(ArgumentError("`Online` does not wrap an `OnlinePortfolioSelection` head: the wrapper declares a refit from a buffer, and for a head both of its settings are a batch walk-forward that runs today. Uncapped, the refit is `IndexWalkForward(train_size, test_size; expand_train = true)`, whose allocation is the online arm's to the last bit and which pays a pass over every row folded so far. Capped at `max_history = w`, it is `IndexWalkForward(w, test_size)`, the recursion restarted from `w0` inside each window. Step the head with `OnlineIndexWalkForward`, or refit it with whichever of those two you meant."))
 end
 """
-    fees_carry_turnover(fees::Nothing)
     fees_carry_turnover(fees::FeesE_Fees)
     fees_carry_turnover(v::AbstractVector)
     fees_carry_turnover(td::TimeDependent)
@@ -1160,16 +1159,13 @@ end
 
 Returns whether a fee, or any fee that a per-fold schedule visibly holds, carries a turnover term.
 
-A static fee answers for its own `tn`. A [`TimeDependent`](@ref) schedule answers for every entry of a vector value, including the entries of a nested vector, and for its explicit `default`. The output of a callable does not exist before its fold, so a callable answers `false`. Every other value answers `false` too, as it does for [`needs_previous_weights`](@ref).
+A static fee answers for its own `tn`. A [`TimeDependent`](@ref) schedule answers for every entry of a vector value, including the entries of a nested vector, and for its explicit `default`. The output of a callable does not exist before its fold, so a callable answers `false`. Every other value, `nothing` among them, answers `false` too, as it does for [`needs_previous_weights`](@ref).
 
 # Related
 
   - [`assert_online_fee_source`](@ref)
   - [`needs_previous_weights`](@ref)
 """
-function fees_carry_turnover(::Nothing)::Bool
-    return false
-end
 function fees_carry_turnover(fees::FeesE_Fees)::Bool
     return !isnothing(fees.tn)
 end

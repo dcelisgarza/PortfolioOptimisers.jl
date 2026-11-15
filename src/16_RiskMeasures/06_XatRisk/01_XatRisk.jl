@@ -743,13 +743,13 @@ Resolve the significance level `alpha` of a [`ValueatRisk`](@ref) against prior 
 
 `alpha` can hold a Calibration Rule in place of a number, so it resolves here. The rebuild goes through [`rebuild_with_slots`](@ref), whose call to the inner constructor checks `0 < alpha < 1` again on the calibrated number. So the check that a number of the caller meets also refuses a rule that returns a value outside the slot.
 
-This method is more specific than the derived recursion, so it takes over the `alg` slot that [`deferred_slots`](@ref) declares. It resolves that slot through [`resolve_deferred_child`](@ref), the function that the derived recursion calls.
+This method is more specific than the derived recursion, so it takes over the `alg` slot that [`deferred_slots`](@ref) declares. It resolves that slot through `resolve_deferred_quantities` itself, as the derived recursion resolves each slot.
 
 # Algorithm
 
  1. Set `ws` to the observation weights of the measure, or to those of `pr` when the measure states none.
  2. Resolve `alpha` with [`resolve_calibration_slot`](@ref), which gives the rule `pr`, `ws` and the solver `slv`. The measure holds no solver of its own.
- 3. Resolve `alg` with [`resolve_deferred_child`](@ref).
+ 3. Resolve `alg` with `resolve_deferred_quantities`.
  4. Rebuild the measure with the resolved `alpha` and `alg`.
 
 # Related
@@ -762,7 +762,7 @@ This method is more specific than the derived recursion, so it takes over the `a
 function resolve_deferred_quantities(x::ValueatRisk, pr::AbstractPriorResult, slv = nothing)
     ws = sel(x.w, pr.w)
     alpha = resolve_calibration_slot(x.alpha, :alpha, pr, ws, slv)
-    alg = resolve_deferred_child(x.alg, pr, slv)
+    alg = resolve_deferred_quantities(x.alg, pr, slv)
     return rebuild_with_slots(x, (; alpha = alpha, alg = alg))
 end
 # Calibration slots — see `calibration_slots`. The significance level is the one quantity of
@@ -964,14 +964,14 @@ Resolve the two significance levels of a [`ValueatRiskRange`](@ref) against prio
 
 Each tail has its own slot and its own bound, so a rule for the loss tail and a rule for the gain tail resolve independently. `beta` defaults to `alpha`, so a rule stated for the loss tail alone reaches both tails. The rule states the method, and the slot states the tail. The rebuild goes through [`rebuild_with_slots`](@ref), whose call to the inner constructor checks both levels again on the calibrated numbers.
 
-This method is more specific than the derived recursion, so it takes over the `alg` slot that [`deferred_slots`](@ref) declares, through [`resolve_deferred_child`](@ref).
+This method is more specific than the derived recursion, so it takes over the `alg` slot that [`deferred_slots`](@ref) declares, and resolves it through `resolve_deferred_quantities` itself.
 
 # Algorithm
 
  1. Set `ws` to the observation weights of the measure, or to those of `pr` when the measure states none.
  2. Resolve `alpha` with [`resolve_calibration_slot`](@ref), which gives the rule `pr`, `ws` and the solver `slv`.
  3. Resolve `beta` in the same way.
- 4. Resolve `alg` with [`resolve_deferred_child`](@ref).
+ 4. Resolve `alg` with `resolve_deferred_quantities`.
  5. Rebuild the measure with the resolved `alpha`, `beta` and `alg`.
 
 # Related
@@ -986,7 +986,7 @@ function resolve_deferred_quantities(x::ValueatRiskRange, pr::AbstractPriorResul
     ws = sel(x.w, pr.w)
     alpha = resolve_calibration_slot(x.alpha, :alpha, pr, ws, slv)
     beta = resolve_calibration_slot(x.beta, :beta, pr, ws, slv)
-    alg = resolve_deferred_child(x.alg, pr, slv)
+    alg = resolve_deferred_quantities(x.alg, pr, slv)
     return rebuild_with_slots(x, (; alpha = alpha, beta = beta, alg = alg))
 end
 # Calibration slots — see `calibration_slots`. One slot per tail, each with its own role.
