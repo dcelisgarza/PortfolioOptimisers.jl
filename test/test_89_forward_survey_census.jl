@@ -24,9 +24,10 @@ using Test
                      "## `hook_fn`", "", "A subtype implements it.", q3], '\n')
     nt_hook_doc = join([q3, "    nt_hook(x)", "", "A hook.", "", "# Interfaces", "",
                         "## `nt_hook`", "", "A subtype implements it.", q3], '\n')
-    # A name that `RULED_NAMED_TUPLES` sends to `go`, read from the table, so a build ticket that
-    # deletes its own entry leaves the fixture whole.
-    ruled_go = first(sort!([k for (k, v) in FS.RULED_NAMED_TUPLES if first(v) == "go"]))
+    # A name of `RULED_NAMED_TUPLES`, read from the table with its verdict, so a build ticket that
+    # deletes its own entry leaves the fixture whole. The build tickets of #2072 deleted every
+    # `go` entry, so the fixture reads any verdict.
+    ruled_nt = first(sort!(collect(keys(FS.RULED_NAMED_TUPLES))))
     source = """
              export verb, verb2, verb3, verb4, pubf, pubk, mk, kwv, nt_pub, pubfill, pubkwfill
              struct A end
@@ -250,7 +251,7 @@ using Test
              Mod.nt_q(x::A) = (; x.a)
              # the verdicts of #2113
              fold_step_kwargs(x::A) = (; e = x)
-             $ruled_go(x::A) = (; ppy = x)
+             $ruled_nt(x::A) = (; ppy = x)
              nt_pub(x::A) = (; e = x, f = 1)
              $nt_hook_doc
              nt_hook(x::A) = (; e = x, g = 1)
@@ -492,9 +493,9 @@ using Test
         @test nt(:fold_step_kwargs) == ["keep (keys)"]
         @test !FS.is_candidate(nt_of(:fold_step_kwargs))
         # `RULED_NAMED_TUPLES` gives the verdict that the parse cannot read.
-        @test nt(ruled_go) == ["go"]
-        @test nt_of(ruled_go).why ==
-              "returns the named tuple `(; ppy)`: " * FS.RULED_NAMED_TUPLES[ruled_go][2]
+        @test nt(ruled_nt) == [FS.RULED_NAMED_TUPLES[ruled_nt][1]]
+        @test nt_of(ruled_nt).why ==
+              "returns the named tuple `(; ppy)`: " * FS.RULED_NAMED_TUPLES[ruled_nt][2]
         # A public name takes a `…Result`, and an interface name takes a `public` type.
         @test nt(:nt_pub) == ["go"]
         @test occursin("`…Result <: AbstractResult`", nt_of(:nt_pub).why)
