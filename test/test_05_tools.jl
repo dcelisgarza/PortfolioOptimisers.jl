@@ -1079,6 +1079,69 @@ end
     @test sw.n == 7
     @test getfield(sw, :n) == 3
     #=
+    `hasproperty` gives the names of `propertynames` and no other name, for every rule. The
+    `forward` rule asks it of the child, so it must agree with the tuple that it replaces.
+    =#
+    for o in (f, fn, a, c, sw)
+        @test all(s -> hasproperty(o, s), propertynames(o))
+        @test !hasproperty(o, :absent)
+    end
+    @test hasproperty(c, :cw) && hasproperty(c, :fn)
+    #=
+    A read through a chain of `forward` rules allocates nothing. The test was `sym in
+    propertynames(child)`, and the `propertynames` of a decorated child removes its duplicate
+    names with `unique` on each call: a read of `retcode` through `forward(rr)` and
+    `forward(jr)` of a `FactorRiskContributionResult` allocated 6688 bytes.
+    =#
+    Base.eval(mb, quote
+                  struct Mid
+                      f::OuterF
+                      k::Int
+                  end
+                  struct Top
+                      g::Inner
+                      m::Mid
+                  end
+                  @forward_properties Mid begin
+                      forward(f)
+                  end
+                  @forward_properties Top begin
+                      forward(g, w)
+                      forward(m)
+                  end
+              end)
+    top = mb.Top(inn, mb.Mid(f, 5))
+    read_z(x) = x.z
+    read_k(x) = x.k
+    @test read_z(top) == "zed"
+    @test read_k(top) == 5
+    @test (@allocated read_z(top)) == 0
+    @test (@allocated read_k(top)) == 0
+    @test (@allocated hasproperty(top, :n)) == 0
+    #=
+    A signature with a free parameter, as `Regression{<:Any, Nothing, …}` is, builds a new
+    `UnionAll` on each call when the methods read its `fieldnames`, and allocates. The methods
+    read the names of the bare type name, a constant, so a read of a real field allocates
+    nothing: `re.M` of a `Regression` allocated 2304 bytes.
+    =#
+    Base.eval(mb, quote
+                  struct PSwap{A, B}
+                      a::A
+                      b::B
+                  end
+                  @forward_properties PSwap{<:Any, Nothing} begin
+                      swap(b, a)
+                  end
+              end)
+    ps = mb.PSwap([1.0], nothing)
+    read_a(x) = x.a
+    read_b(x) = x.b
+    @test read_a(ps) == [1.0]
+    @test read_b(ps) == [1.0]
+    @test (@allocated read_a(ps)) == 0
+    @test (@allocated read_b(ps)) == 0
+    @test (@allocated hasproperty(ps, :a)) == 0
+    #=
     Every rejection. The macro returns an `error` at expansion time, so `Base.eval` of the
     declaration raises a `LoadError` that wraps it. The message is asserted, because a rule
     that is rejected with the wrong message sends its author to the wrong line.
