@@ -280,7 +280,10 @@ end
                                                         (:bl_posteriors, :vanilla_posteriors) => "(b) the `Nothing` arm holds a policy: the callers hold an `Option` of the view system, and `vanilla_posteriors` takes its fields (#2111, #2097)",
                                                         (:opinion_pooling_cache, :forward_prior) => "(b) a keyword does not dispatch, and `forward_prior` must throw on a field that the type does not have: the `LowOrderPrior` arm of the writer is the one result type with a field `pc` (#2075, #2097)",
                                                         (:variance_risk_bounds_val, :Frontier) => "(a) its callee is the public constructor `Frontier`: the frontier method rebuilds the sweep in the units of the formulation, as the other methods convert a number or a vector (#2079, #2101)",
-                                                        (:set_allocation_set_constraints!, :set_allocation_set_constraints!) => "public: (a) the direct call on a `BoundedAllocationSet`, `(model, set, w, X, pr = nothing)`, converts to the canonical form `(model, set, nothing)`, as the direct call on a programme set resolves its step to `(model, set, cbr)` (rule 5, #2102)")
+                                                        (:set_allocation_set_constraints!, :set_allocation_set_constraints!) => "public: (a) the direct call on a `BoundedAllocationSet`, `(model, set, w, X, pr = nothing)`, converts to the canonical form `(model, set, nothing)`, as the direct call on a programme set resolves its step to `(model, set, cbr)` (rule 5, #2102)",
+                                                        # src/18_ExpectedReturns (#2104).
+                                                        (:expected_risk, :expected_return) => "(interface) the method of `ExpectedReturn` calls `expected_return`, a shared public verb (rule 3, #2104). The pair, not the name, is kept, because another pair of `expected_risk` is still pending",
+                                                        (:expected_risk, :expected_ratio) => "(interface) the method of `ExpectedReturnRiskRatio` calls `expected_ratio`, a shared public verb (rule 3, #2104). The pair, not the name, is kept, because another pair of `expected_risk` is still pending")
     # The functions whose forward methods are interface methods, with the check that shows
     # it. #2072 adds a name after a check of each one.
     interface_functions = Dict{Symbol, String}(#
@@ -376,7 +379,9 @@ end
                                                :predictor_state_seed => "2 functions share its callee `forecaster_seed` (rule 3, #2102)",
                                                :predictor_state_view => "its callee `port_opt_view` is a shared public verb, and no other method of `predictor_state_view` calls it, so no driver gives the same answer (rule 3, #2089, #2102)",
                                                :reprojection => "its callee `project` is a shared public verb (rule 3, #2102)",
-                                               :blend_projection => "its callee `project` is a shared public verb (rule 3, #2102)")
+                                               :blend_projection => "its callee `project` is a shared public verb (rule 3, #2102)",
+                                               # src/18_ExpectedReturns (#2104).
+                                               :difference_risk => "its method of `ExpectedReturn` calls `resolved_expected_return`, which 5 functions share (rule 3, #2104)")
     # The debt that #2072 removes. Do not add a pair: fix the wrapper.
     pending_forwards = Set{Tuple{Symbol, Symbol}}([(:apply_fitted_step,
                                                     :apply_fitted_steps),
@@ -405,10 +410,6 @@ end
                                                    (:cross_val_predict, :fit_and_predict),
                                                    (:cross_val_predict,
                                                     :pipeline_cross_val_predict),
-                                                   (:difference_risk,
-                                                    :resolved_expected_return),
-                                                   (:expected_risk, :expected_ratio),
-                                                   (:expected_risk, :expected_return),
                                                    (:expected_risk,
                                                     :expected_risk_from_returns),
                                                    (:factor_attribution,
@@ -437,8 +438,6 @@ end
                                                     :pipeline_held_timestamps),
                                                    (:herc_unitary_risks,
                                                     :unitary_expected_risks),
-                                                   (:input_entries, :population_entries),
-                                                   (:input_entries, :prediction_entries),
                                                    (:is_time_dependent,
                                                     :pipeline_step_is_time_dependent),
                                                    (:maybe_inject_step, :inject_context),
@@ -467,7 +466,6 @@ end
                                                    (:set_retcode, :SubsetResamplingResult),
                                                    (:step_online_member,
                                                     :pipeline_online_member),
-                                                   (:summarise_entries, :summarise_returns),
                                                    (:universe_axis_visit!,
                                                     :universe_axis_children!),
                                                    (:update_online_step,
@@ -616,6 +614,12 @@ end
     for n in (:assert_stateless_prior, :context_timestamps, :projection_programme,
               :largest_forecast_split, :update_online_member, :expert_allocation_set,
               :scale_rows, :prior_investable_mask)
+        @test (n, isdefined(PO, n)) == (n, false)
+    end
+    # Pinned on the wrappers and the builders of the performance summary that #2104 removed.
+    for n in
+        (:population_entries, :prediction_entries, :summarise_returns, :summary_options,
+         :summary_entry)
         @test (n, isdefined(PO, n)) == (n, false)
     end
 

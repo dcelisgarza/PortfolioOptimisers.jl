@@ -992,3 +992,64 @@ end
     @test all(isnan,
               (pr.long_exposure, pr.short_exposure, pr.gross_exposure, pr.net_exposure))
 end
+
+@testset "#2104: the Result checks its values, and the private records of the verb" begin
+    ret = [0.01, -0.02, 0.03, 0.005, -0.01, 0.02, -0.005, 0.015]
+    one = performance_summary(ret; measures = [:mdd => MaximumDrawdown()])
+    many = performance_summary([ret, 2 .* ret]; names = ["a", "b"],
+                               measures = [:mdd => MaximumDrawdown()])
+    fields(ps) = Dict(f => getfield(ps, f) for f in fieldnames(PerformanceSummaryResult))
+    # The keyword constructor takes each field by name and rebuilds the same summary.
+    for ps in (one, many)
+        kw = PerformanceSummaryResult(; fields(ps)...)
+        @test all(f -> isequal(getfield(kw, f), getfield(ps, f)),
+                  fieldnames(PerformanceSummaryResult))
+    end
+    # The keys, the dates, `measures` and `risk` take their defaults.
+    bare = PerformanceSummaryResult(;
+                                    (k => v
+                                     for (k, v) in fields(one)
+                                     if !(k in (:names, :paths, :members, :date0, :date1,
+                                                :measures, :risk)))...)
+    @test isnothing(bare.names) && isnothing(bare.date0) && bare.risk == (;)
+    rebuilt(ps, k, v) = PerformanceSummaryResult(; fields(ps)..., k => v)
+    # The settings of the call.
+    @test_throws DomainError rebuilt(one, :alpha, 1.5)
+    @test_throws DomainError rebuilt(one, :ppy, 0)
+    @test_throws DomainError rebuilt(one, :rf, Inf)
+    # `risk` has the names of `measures`, and `measures` holds risk measures.
+    @test_throws ArgumentError rebuilt(one, :risk, (; x = 1.0))
+    @test_throws ArgumentError rebuilt(one, :measures, (; mdd = 1.0))
+    # Each field of an entry has the shape of `n_periods`.
+    @test_throws DimensionMismatch rebuilt(one, :sharpe, [1.0])
+    @test_throws DimensionMismatch rebuilt(many, :sharpe, 1.0)
+    @test_throws DimensionMismatch rebuilt(many, :names, ["a"])
+    @test_throws DimensionMismatch rebuilt(many, :risk, (; mdd = 1.0))
+    # No count, deviation, turnover or exposure is negative, and `NaN` passes.
+    @test_throws DomainError rebuilt(one, :ann_volatility, -0.1)
+    @test_throws DomainError rebuilt(many, :short_exposure, [0.1, -0.1])
+    @test isnan(rebuilt(one, :turnover, NaN).turnover)
+
+    # The checked keywords of the call.
+    opts = PO.SummaryOptions(; ppy = 12, measures = [:mdd => MaximumDrawdown()])
+    @test opts.ppy == 12 && opts.alpha == 0.05 && !opts.compound && opts.rf == 0
+    @test keys(opts.measures) == (:mdd,)
+    @test_throws DomainError PO.SummaryOptions(12, 0.05, false, NaN, (;))
+    @test_throws DomainError PO.SummaryOptions(-1, 0.05, false, 0, (;))
+    @test_throws DomainError PO.SummaryOptions(12, 0.0, false, 0, (;))
+
+    # One record for the weight statistics, and its mean over many weight vectors.
+    ws = PO.weight_statistics([0.65, 0.65, -0.3])
+    @test ws isa PO.WeightStatistics
+    @test (ws.long_exposure, ws.short_exposure, ws.gross_exposure, ws.net_exposure) ==
+          (1.3, 0.3, 1.6, 1.0)
+    mw = PO.mean_weight_statistics([ws, PO.weight_statistics([1.0, 0.0, 0.0])])
+    @test mw.n_eff ≈ (ws.n_eff + 1) / 2 && mw.gross_exposure ≈ 1.3
+    @test PO.entry_weight_statistics(nothing, NaN) isa PO.WeightStatistics
+
+    # An entry takes the name of its candidate through `rebuild_struct`.
+    e = PO.input_entries(nothing, ret)
+    @test e isa PO.SummaryEntry && isnothing(e.name)
+    @test only(PO.entry_list(e, "a")).name == "a"
+    @test only(PO.entry_list(e, "a")).ret === e.ret
+end

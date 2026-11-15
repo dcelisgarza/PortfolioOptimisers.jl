@@ -30,12 +30,25 @@ $(DocStringExtensions.FIELDS)
         excess_ret, tracking_error, information_ratio, turnover, n_eff,
         long_exposure, short_exposure, gross_exposure, net_exposure, measures, risk
     ) -> PerformanceSummaryResult
+    PerformanceSummaryResult(; names = nothing, paths = nothing, members = nothing,
+                             date0 = nothing, date1 = nothing, n_periods, ppy, alpha,
+                             compound, rf, ann_return, ann_volatility, sharpe,
+                             sharpe_stderr, sortino, calmar, max_drawdown, cvar, excess_ret,
+                             tracking_error, information_ratio, turnover, n_eff,
+                             long_exposure, short_exposure, gross_exposure, net_exposure,
+                             measures = (;), risk = (;)) -> PerformanceSummaryResult
 
 The arguments are the fields of the struct, in the order of the declaration. The type is a
-Result, so [`performance_summary`](@ref) builds it and a caller reads it. The type has no
-keyword constructor, and it does no validation of its own.
+Result, so [`performance_summary`](@ref) builds it and a caller reads it. The positional
+constructor checks the values with [`assert_performance_summary_fields`](@ref). The keyword
+constructor takes each field by name, with no default but `nothing` for the five keys and dates
+and an empty `NamedTuple` for `measures` and `risk`, and calls it.
 
-Breaking: the struct gained the fields `names`, `paths`, `members`, `date0`, `date1`, `rf`,
+## Validation
+
+  - The rules of [`assert_performance_summary_fields`](@ref): the settings of the call are valid, `risk` holds one value for each measure, every field of an entry has the shape of `n_periods`, and no count, deviation, turnover or exposure is negative. A breach raises a `DomainError`, an `ArgumentError` or a `DimensionMismatch`.
+
+Breaking: the struct checks its values now, so a summary built by hand with values that break a rule raises an error. The struct gained the fields `names`, `paths`, `members`, `date0`, `date1`, `rf`,
 `n_eff`, `measures` and `risk`, so a positional call of the old sixteen arguments raises a
 `MethodError`. It then gained `long_exposure`, `short_exposure`, `gross_exposure` and
 `net_exposure` after `n_eff`, so a positional call of twenty-five arguments raises a
@@ -166,6 +179,112 @@ Breaking: the struct gained the fields `names`, `paths`, `members`, `date0`, `da
     `risk`: The value of each extra risk measure on the net series of each entry, a `NamedTuple` with the names of `measures`. Each value is `expected_risk_from_returns(r, ret)`, with the sign of its measure.
     """
     risk
+    function PerformanceSummaryResult(names, paths, members, date0, date1,
+                                      n_periods::Union{Integer, VecInt}, ppy::Number,
+                                      alpha::Number, compound::Bool, rf::Number,
+                                      ann_return::Num_VecNum, ann_volatility::Num_VecNum,
+                                      sharpe::Num_VecNum, sharpe_stderr::Num_VecNum,
+                                      sortino::Num_VecNum, calmar::Num_VecNum,
+                                      max_drawdown::Num_VecNum, cvar::Num_VecNum,
+                                      excess_ret::Num_VecNum, tracking_error::Num_VecNum,
+                                      information_ratio::Num_VecNum, turnover::Num_VecNum,
+                                      n_eff::Num_VecNum, long_exposure::Num_VecNum,
+                                      short_exposure::Num_VecNum,
+                                      gross_exposure::Num_VecNum, net_exposure::Num_VecNum,
+                                      measures::NamedTuple, risk::NamedTuple)
+        ps = new{typeof(names), typeof(paths), typeof(members), typeof(date0),
+                 typeof(date1), typeof(n_periods), typeof(ppy), typeof(alpha),
+                 typeof(compound), typeof(rf), typeof(ann_return), typeof(ann_volatility),
+                 typeof(sharpe), typeof(sharpe_stderr), typeof(sortino), typeof(calmar),
+                 typeof(max_drawdown), typeof(cvar), typeof(excess_ret),
+                 typeof(tracking_error), typeof(information_ratio), typeof(turnover),
+                 typeof(n_eff), typeof(long_exposure), typeof(short_exposure),
+                 typeof(gross_exposure), typeof(net_exposure), typeof(measures),
+                 typeof(risk)}(names, paths, members, date0, date1, n_periods, ppy, alpha,
+                               compound, rf, ann_return, ann_volatility, sharpe,
+                               sharpe_stderr, sortino, calmar, max_drawdown, cvar,
+                               excess_ret, tracking_error, information_ratio, turnover,
+                               n_eff, long_exposure, short_exposure, gross_exposure,
+                               net_exposure, measures, risk)
+        assert_performance_summary_fields(ps)
+        return ps
+    end
+end
+function PerformanceSummaryResult(; names = nothing, paths = nothing, members = nothing,
+                                  date0 = nothing, date1 = nothing,
+                                  n_periods::Union{Integer, VecInt}, ppy::Number,
+                                  alpha::Number, compound::Bool, rf::Number,
+                                  ann_return::Num_VecNum, ann_volatility::Num_VecNum,
+                                  sharpe::Num_VecNum, sharpe_stderr::Num_VecNum,
+                                  sortino::Num_VecNum, calmar::Num_VecNum,
+                                  max_drawdown::Num_VecNum, cvar::Num_VecNum,
+                                  excess_ret::Num_VecNum, tracking_error::Num_VecNum,
+                                  information_ratio::Num_VecNum, turnover::Num_VecNum,
+                                  n_eff::Num_VecNum, long_exposure::Num_VecNum,
+                                  short_exposure::Num_VecNum, gross_exposure::Num_VecNum,
+                                  net_exposure::Num_VecNum, measures::NamedTuple = (;),
+                                  risk::NamedTuple = (;))::PerformanceSummaryResult
+    return PerformanceSummaryResult(names, paths, members, date0, date1, n_periods, ppy,
+                                    alpha, compound, rf, ann_return, ann_volatility, sharpe,
+                                    sharpe_stderr, sortino, calmar, max_drawdown, cvar,
+                                    excess_ret, tracking_error, information_ratio, turnover,
+                                    n_eff, long_exposure, short_exposure, gross_exposure,
+                                    net_exposure, measures, risk)
+end
+"""
+    assert_performance_summary_fields(ps::PerformanceSummaryResult)
+
+Check the fields of a [`PerformanceSummaryResult`](@ref) that its constructor built.
+
+The constructor builds the Result first and checks it here, so the check reads each field by its name and not by its position among twenty-nine arguments. A summary of one entry holds a number or a key in each field of an entry, and a summary of many entries holds one vector entry for each. `n_periods` gives the shape: an integer for one entry, and a vector otherwise. The settings take the same three checks as [`SummaryOptions`](@ref), so a summary that [`performance_summary`](@ref) builds always passes them.
+
+# Arguments
+
+  - `ps`: The summary to check.
+
+# Validation
+
+  - `0 < alpha < 1`, `ppy > 0` and `isfinite(rf)`. Raises a `DomainError`.
+  - Each value of `measures` is an `AbstractBaseRiskMeasure`, and `risk` has the names of `measures`. Raises an `ArgumentError`.
+  - Each field of an entry, and each value of `risk`, is not a vector when `n_periods` is an integer, and is a vector of `length(n_periods)` otherwise. Raises a `DimensionMismatch`.
+  - `n_periods`, `ann_volatility`, `sharpe_stderr`, `tracking_error`, `turnover`, `n_eff`, `long_exposure`, `short_exposure` and `gross_exposure` are `NaN` or not negative. Raises a `DomainError`.
+
+# Returns
+
+  - `nothing`.
+
+# Related
+
+  - [`PerformanceSummaryResult`](@ref)
+  - [`SummaryOptions`](@ref)
+"""
+function assert_performance_summary_fields(ps::PerformanceSummaryResult)::Nothing
+    assert_unit_interval(ps.alpha, :alpha)
+    @argcheck(ps.ppy > zero(ps.ppy), DomainError(ps.ppy, "ppy must be positive"))
+    @argcheck(isfinite(ps.rf), DomainError(ps.rf, "rf must be finite"))
+    @argcheck(all(r -> isa(r, AbstractBaseRiskMeasure), ps.measures) &&
+              keys(ps.risk) == keys(ps.measures),
+              ArgumentError("each value of measures must be a risk measure, and risk must have the names of measures"))
+    n = isa(ps.n_periods, Integer) ? nothing : length(ps.n_periods)
+    shaped = v -> isa(v, AbstractVector) ? length(v) === n : isnothing(n)
+    # Each field is read by its name, in a tuple, so the compiler unrolls the checks.
+    entry = (ps.names, ps.paths, ps.members, ps.date0, ps.date1, ps.n_periods,
+             ps.ann_return, ps.ann_volatility, ps.sharpe, ps.sharpe_stderr, ps.sortino,
+             ps.calmar, ps.max_drawdown, ps.cvar, ps.excess_ret, ps.tracking_error,
+             ps.information_ratio, ps.turnover, ps.n_eff, ps.long_exposure,
+             ps.short_exposure, ps.gross_exposure, ps.net_exposure)
+    @argcheck(all(shaped, entry) && all(shaped, values(ps.risk)),
+              DimensionMismatch("each field of an entry, and each value of risk, must have the shape of n_periods: one value for one entry, or a vector of $(n) entries"))
+    assert_nan_or_nonneg(ps.n_periods, :n_periods)
+    assert_nan_or_nonneg(ps.ann_volatility, :ann_volatility)
+    assert_nan_or_nonneg(ps.sharpe_stderr, :sharpe_stderr)
+    assert_nan_or_nonneg(ps.tracking_error, :tracking_error)
+    assert_nan_or_nonneg(ps.turnover, :turnover)
+    assert_nan_or_nonneg(ps.n_eff, :n_eff)
+    assert_nan_or_nonneg(ps.long_exposure, :long_exposure)
+    assert_nan_or_nonneg(ps.short_exposure, :short_exposure)
+    assert_nan_or_nonneg(ps.gross_exposure, :gross_exposure)
+    return nothing
 end
 """
     performance_summary(ret::VecNum; ppy::Number = 1, alpha::Number = 0.05,
@@ -303,7 +422,7 @@ The expression corrects for the third and fourth moments and **not** for serial 
 
 # Algorithm
 
-Every method checks its keywords with [`summary_options`](@ref) first, so no figure is computed for a call that is not valid. Then it makes one entry for each series of the input. A method that takes weights first makes the net returns with [`calc_net_returns`](@ref). A method that takes a prediction reads each member with [`prediction_entries`](@ref), and a population reads each path with [`population_entries`](@ref). [`summarise_returns`](@ref) does the steps below on each entry, and [`summarise_entries`](@ref) gives scalar fields for one entry, or stacks the entries with [`stack_summaries`](@ref).
+Every method checks its keywords with [`SummaryOptions`](@ref) first, so no figure is computed for a call that is not valid. Then it makes one entry for each series of the input with [`input_entries`](@ref). A method that takes weights first makes the net returns with [`calc_net_returns`](@ref). A method that takes a prediction reads each member, and a population reads each path in turn. [`summarise_entries`](@ref) does the steps below on each entry. It gives scalar fields for one entry, or stacks the entries with [`stack_summaries`](@ref).
 
  1. Check `alpha`, `ppy`, `rf` and `measures`, as `# Validation` states.
  2. Take `T`, the number of periods. Take `m`, the sample mean of `ret`, and clamp it to the least and the greatest entry of `ret`. Take `s`, the corrected sample standard deviation of `ret` about `m`. The clamp changes nothing in exact arithmetic. The rounded mean of a constant `ret` can differ from its common value, and the clamp makes `m` equal to that value, so `s` is exactly zero.
@@ -470,16 +589,192 @@ function held_path_turnover(pred::MultiPeriodPredictionResult, j::Integer = 1)
     return sum(sum(abs, view(W0, f, :) - view(W1, f - 1, :)) for f in 2:F) / (F - 1)
 end
 """
-    summarise_returns(e::NamedTuple, opts::NamedTuple) -> PerformanceSummaryResult
+$(DocStringExtensions.TYPEDEF)
 
-Compute the [`PerformanceSummaryResult`](@ref) of one entry, with scalar fields.
+Holds the effective number of assets and the four exposures of the weights of one entry of [`performance_summary`](@ref), or the means of the five figures over many weight vectors.
 
-This function is the one site that computes the figures of a summary. It does the steps of [`performance_summary`](@ref) on the series of one entry. Every `performance_summary` method calls it once for each entry. An entry that holds no weight path gives `nothing` for the turnover, and an entry that holds no weights gives `nothing` for its weight statistics. This function writes each `nothing` as `NaN`.
+This type is an implementation detail and is not intended for direct use. [`weight_statistics`](@ref), [`mean_weight_statistics`](@ref) and [`entry_weight_statistics`](@ref) make it, and [`summarise_entries`](@ref) reads it. The five values are numbers of one type, so a record names them where a plain tuple would let a swap pass silently.
+
+# Fields
+
+$(DocStringExtensions.FIELDS)
+
+# Related
+
+  - [`weight_statistics`](@ref)
+  - [`mean_weight_statistics`](@ref)
+  - [`entry_weight_statistics`](@ref)
+"""
+@concrete struct WeightStatistics
+    """
+    `n_eff`: The effective number of assets, [`number_effective_assets`](@ref) of the weights.
+    """
+    n_eff
+    """
+    `long_exposure`: The sum of the positive weights.
+    """
+    long_exposure
+    """
+    `short_exposure`: The sum of the absolute values of the negative weights.
+    """
+    short_exposure
+    """
+    `gross_exposure`: `long_exposure + short_exposure`.
+    """
+    gross_exposure
+    """
+    `net_exposure`: `long_exposure - short_exposure`.
+    """
+    net_exposure
+end
+"""
+$(DocStringExtensions.TYPEDEF)
+
+Holds the checked keywords of a [`performance_summary`](@ref) call: the values that every entry shares.
+
+This type is an implementation detail and is not intended for direct use. Every method of the verb builds it first, so a call that is not valid computes no figure. [`summarise_entries`](@ref) and [`stack_summaries`](@ref) read it.
+
+# Fields
+
+$(DocStringExtensions.FIELDS)
+
+# Constructors
+
+    SummaryOptions(ppy::Number, alpha::Number, compound::Bool, rf::Number,
+                   measures::NamedTuple) -> SummaryOptions
+    SummaryOptions(; ppy::Number = 1, alpha::Number = 0.05, compound::Bool = false,
+                   rf::Number = 0, measures::Union{Tuple, AbstractVector} = (),
+                   benchmark::Option{<:VecNum} = nothing) -> SummaryOptions
+
+The positional constructor takes the fields in the order of the declaration, with `measures` keyed by name. The keyword constructor takes the keywords of [`performance_summary`](@ref), keys `measures` with [`summary_measures`](@ref), and calls it. It checks the type of `benchmark` and does not keep it, because [`summary_benchmark`](@ref) reads whether the caller gave one.
+
+## Validation
+
+  - `0 < alpha < 1`, `ppy > 0` and `isfinite(rf)`. Otherwise the constructor raises a `DomainError`.
+  - The rules of [`summary_measures`](@ref), in the keyword constructor.
+
+# Related
+
+  - [`performance_summary`](@ref)
+  - [`summary_measures`](@ref)
+  - [`summary_benchmark`](@ref)
+"""
+@concrete struct SummaryOptions
+    """
+    $(field_dict[:ps_ppy])
+    """
+    ppy
+    """
+    $(field_dict[:ps_alpha])
+    """
+    alpha
+    """
+    $(field_dict[:ps_compound])
+    """
+    compound
+    """
+    `rf`: Risk-free rate for each period, at the frequency of the returns.
+    """
+    rf
+    """
+    `measures`: The extra risk measures of the caller, a `NamedTuple` by name.
+    """
+    measures
+    function SummaryOptions(ppy::Number, alpha::Number, compound::Bool, rf::Number,
+                            measures::NamedTuple)
+        assert_unit_interval(alpha, :alpha)
+        @argcheck(ppy > zero(ppy), DomainError(ppy, "ppy must be positive"))
+        @argcheck(isfinite(rf), DomainError(rf, "rf must be finite"))
+        return new{typeof(ppy), typeof(alpha), typeof(compound), typeof(rf),
+                   typeof(measures)}(ppy, alpha, compound, rf, measures)
+    end
+end
+function SummaryOptions(; ppy::Number = 1, alpha::Number = 0.05, compound::Bool = false,
+                        rf::Number = 0, measures::Union{Tuple, AbstractVector} = (),
+                        benchmark::Option{<:VecNum} = nothing)::SummaryOptions
+    return SummaryOptions(ppy, alpha, compound, rf, summary_measures(measures))
+end
+"""
+$(DocStringExtensions.TYPEDEF)
+
+Holds one entry of a [`PerformanceSummaryResult`](@ref): a series, with the inputs of its figures and its keys.
+
+This type is an implementation detail and is not intended for direct use. [`input_entries`](@ref) makes it, [`entry_list`](@ref) sets the name of its candidate, and [`summarise_entries`](@ref) reads it.
+
+# Fields
+
+$(DocStringExtensions.FIELDS)
+
+# Constructors
+
+    SummaryEntry(; ret::VecNum, benchmark::Option{<:VecNum} = nothing,
+                 turnover::Option{<:Number} = nothing,
+                 ws::Option{<:WeightStatistics} = nothing,
+                 ts::Option{<:AbstractVector} = nothing, name = nothing, path = nothing,
+                 member = nothing) -> SummaryEntry
+
+The keyword constructor takes each field by name, so [`rebuild_struct`](@ref) can set one field.
+
+# Related
+
+  - [`input_entries`](@ref)
+  - [`entry_list`](@ref)
+  - [`summarise_entries`](@ref)
+"""
+@concrete struct SummaryEntry
+    """
+    `ret`: The net return series.
+    """
+    ret
+    """
+    `benchmark`: The benchmark series of the entry, or `nothing`.
+    """
+    benchmark
+    """
+    `turnover`: The mean turnover of the held path, or `nothing`.
+    """
+    turnover
+    """
+    `ws`: The weight statistics of the entry, from [`weight_statistics`](@ref), or `nothing` when the entry holds no weights.
+    """
+    ws
+    """
+    `ts`: The timestamps of the series, or `nothing`.
+    """
+    ts
+    """
+    `name`: The name of the candidate, or `nothing`.
+    """
+    name
+    """
+    `path`: The key of the path in a population, or `nothing`.
+    """
+    path
+    """
+    `member`: The index of the member, or `nothing`.
+    """
+    member
+end
+function SummaryEntry(; ret::VecNum, benchmark::Option{<:VecNum} = nothing,
+                      turnover::Option{<:Number} = nothing,
+                      ws::Option{<:WeightStatistics} = nothing,
+                      ts::Option{<:AbstractVector} = nothing, name = nothing,
+                      path = nothing, member = nothing)::SummaryEntry
+    return SummaryEntry(ret, benchmark, turnover, ws, ts, name, path, member)
+end
+"""
+    summarise_entries(e::SummaryEntry, opts::SummaryOptions) -> PerformanceSummaryResult
+    summarise_entries(es::AbstractVector{<:SummaryEntry},
+                      opts::SummaryOptions) -> PerformanceSummaryResult
+
+Summarise the entries of a [`performance_summary`](@ref) call. One entry gives scalar fields, and a vector of entries gives one vector entry for each, also when the vector holds one entry.
+
+The method of one entry is the one site that computes the figures of a summary. It does the steps of [`performance_summary`](@ref) on the series of the entry. An entry that holds no weight path gives `nothing` for the turnover, and an entry that holds no weights gives `nothing` for its weight statistics. The method writes each `nothing` as `NaN`. The method of a vector summarises each entry with the method of one entry, and stacks the summaries with [`stack_summaries`](@ref).
 
 # Arguments
 
-  - `e`: One entry, from [`summary_entry`](@ref).
-  - `opts`: The checked keywords of the call, from [`summary_options`](@ref).
+  - `e`, `es`: One entry, or a vector of entries.
+  - `opts`: The checked keywords of the call.
 
 # Validation
 
@@ -487,17 +782,19 @@ This function is the one site that computes the figures of a summary. It does th
 
 # Returns
 
-  - `summary::PerformanceSummaryResult`: The summary of the entry, with scalar fields.
+  - `summary::PerformanceSummaryResult`: The summary.
 
 # Related
 
   - [`performance_summary`](@ref)
-  - [`summarise_entries`](@ref)
+  - [`SummaryEntry`](@ref)
+  - [`SummaryOptions`](@ref)
+  - [`stack_summaries`](@ref)
   - [`excess_statistics`](@ref)
   - [`held_path_turnover`](@ref)
   - [`entry_weight_statistics`](@ref)
 """
-function summarise_returns(e::NamedTuple, opts::NamedTuple)::PerformanceSummaryResult
+function summarise_entries(e::SummaryEntry, opts::SummaryOptions)::PerformanceSummaryResult
     ret = e.ret
     alpha = opts.alpha
     compound = opts.compound
@@ -555,6 +852,9 @@ function summarise_returns(e::NamedTuple, opts::NamedTuple)::PerformanceSummaryR
                                     something(e.turnover, oftype(ann_ret, NaN)), ws.n_eff,
                                     ws.long_exposure, ws.short_exposure, ws.gross_exposure,
                                     ws.net_exposure, opts.measures, risk)
+end
+function summarise_entries(es::AbstractVector{<:SummaryEntry}, opts::SummaryOptions)
+    return stack_summaries([summarise_entries(e, opts) for e in es], opts)
 end
 """
     performance_summary_columns()
@@ -639,43 +939,6 @@ function summary_measures(measures::Union{Tuple, AbstractVector})
     return NamedTuple{Tuple(ks)}(Tuple(last(p) for p in measures))
 end
 """
-    summary_options(; ppy::Number = 1, alpha::Number = 0.05, compound::Bool = false,
-                    rf::Number = 0, measures = (),
-                    benchmark::Option{<:VecNum} = nothing) -> NamedTuple
-
-Check the keywords of a [`performance_summary`](@ref) call, and give the values that every entry shares.
-
-Every method of the verb calls this function first, so a call that is not valid computes no figure. The function checks the type of `benchmark` and does not keep it, because [`summary_benchmark`](@ref) reads whether the caller gave one.
-
-# Arguments
-
-  - `ppy`, `alpha`, `compound`, `rf`, `measures`, `benchmark`: As [`performance_summary`](@ref) states them.
-
-# Validation
-
-  - `0 < alpha < 1`, `ppy > 0` and `isfinite(rf)`. Otherwise the function raises a `DomainError`.
-  - The rules of [`summary_measures`](@ref).
-
-# Returns
-
-  - `opts::NamedTuple`: `ppy`, `alpha`, `compound`, `rf`, and `measures` keyed by name.
-
-# Related
-
-  - [`performance_summary`](@ref)
-  - [`summary_measures`](@ref)
-  - [`summary_benchmark`](@ref)
-"""
-function summary_options(; ppy::Number = 1, alpha::Number = 0.05, compound::Bool = false,
-                         rf::Number = 0, measures::Union{Tuple, AbstractVector} = (),
-                         benchmark::Option{<:VecNum} = nothing)
-    assert_unit_interval(alpha, :alpha)
-    @argcheck(ppy > zero(ppy), DomainError(ppy, "ppy must be positive"))
-    @argcheck(isfinite(rf), DomainError(rf, "rf must be finite"))
-    return (; ppy = ppy, alpha = alpha, compound = compound, rf = rf,
-            measures = summary_measures(measures))
-end
-"""
     summary_benchmark(kwargs)
 
 Read the `benchmark` keyword of a [`performance_summary`](@ref) call, and state whether the caller gave it.
@@ -693,7 +956,7 @@ A prediction reads the benchmark of its own rows when the caller gives none, and
 # Related
 
   - [`row_benchmark`](@ref)
-  - [`summary_options`](@ref)
+  - [`SummaryOptions`](@ref)
 """
 function summary_benchmark(kwargs)
     return haskey(kwargs, :benchmark) ? Some(kwargs[:benchmark]) : nothing
@@ -725,40 +988,6 @@ function row_benchmark(bm::Some, ::Any)
     return something(bm)
 end
 """
-    summary_entry(ret::VecNum, benchmark::Option{<:VecNum}, turnover::Option{<:Number},
-                  ws::Option{<:NamedTuple}, ts::Option{<:AbstractVector};
-                  path = nothing, member = nothing) -> NamedTuple
-
-One entry of a [`PerformanceSummaryResult`](@ref): a series, with the inputs of its figures and its keys.
-
-[`summarise_returns`](@ref) reads an entry. The name of the candidate is `nothing` here, and [`entry_list`](@ref) sets it.
-
-# Arguments
-
-  - `ret`: The net return series.
-  - `benchmark`: The benchmark series of the entry, or `nothing`.
-  - `turnover`: The mean turnover of the held path, or `nothing`.
-  - `ws`: The effective number of assets and the four exposures, from [`weight_statistics`](@ref), or `nothing` when the entry holds no weights.
-  - `ts`: The timestamps of the series, or `nothing`.
-  - `path`: The key of the path in a population, or `nothing`.
-  - `member`: The index of the member, or `nothing`.
-
-# Returns
-
-  - `e::NamedTuple`: The entry.
-
-# Related
-
-  - [`summarise_returns`](@ref)
-  - [`input_entries`](@ref)
-"""
-function summary_entry(ret::VecNum, benchmark::Option{<:VecNum}, turnover::Option{<:Number},
-                       ws::Option{<:NamedTuple}, ts::Option{<:AbstractVector};
-                       path = nothing, member = nothing)
-    return (; ret = ret, benchmark = benchmark, turnover = turnover, ws = ws, ts = ts,
-            name = nothing, path = path, member = member)
-end
-"""
     series_dates(ts::Nothing)
     series_dates(ts::AbstractVector)
 
@@ -774,7 +1003,7 @@ The first and the last timestamp of the series of an entry, or two `nothing` val
 
 # Related
 
-  - [`summarise_returns`](@ref)
+  - [`summarise_entries`](@ref)
   - [`brinson_attribution`](@ref)
 """
 function series_dates(::Nothing)
@@ -797,17 +1026,20 @@ The closed forms are the `n_eff` and exposure rows of the `# Mathematical defini
 
 # Returns
 
-  - `ws::NamedTuple`: `n_eff`, `long_exposure`, `short_exposure`, `gross_exposure` and `net_exposure`.
+  - `ws::WeightStatistics`: `n_eff`, `long_exposure`, `short_exposure`, `gross_exposure` and `net_exposure`.
 
 # Examples
 
 ```jldoctest
-julia> PortfolioOptimisers.weight_statistics([0.65, 0.65, -0.3])
-(n_eff = 2.737967914438503, long_exposure = 1.3, short_exposure = 0.3, gross_exposure = 1.6, net_exposure = 1.0)
+julia> ws = PortfolioOptimisers.weight_statistics([0.65, 0.65, -0.3]);
+
+julia> (ws.n_eff, ws.long_exposure, ws.short_exposure, ws.gross_exposure, ws.net_exposure)
+(2.737967914438503, 1.3, 0.3, 1.6, 1.0)
 ```
 
 # Related
 
+  - [`WeightStatistics`](@ref)
   - [`number_effective_assets`](@ref)
   - [`prediction_weight_statistics`](@ref)
   - [`mean_weight_statistics`](@ref)
@@ -815,15 +1047,14 @@ julia> PortfolioOptimisers.weight_statistics([0.65, 0.65, -0.3])
 function weight_statistics(w::VecNum)
     long = sum(x -> max(x, zero(x)), w)
     short = sum(x -> max(-x, zero(x)), w)
-    return (; n_eff = number_effective_assets(w), long_exposure = long,
-            short_exposure = short, gross_exposure = long + short,
-            net_exposure = long - short)
+    return WeightStatistics(number_effective_assets(w), long, short, long + short,
+                            long - short)
 end
 function weight_statistics(w::MatNum)
     return mean_weight_statistics([weight_statistics(r) for r in eachrow(w)])
 end
 """
-    mean_weight_statistics(ss::AbstractVector{<:NamedTuple{K}}) where {K}
+    mean_weight_statistics(ss::AbstractVector{<:WeightStatistics})
 
 The mean of each figure of the weight statistics of many weight vectors, as [`weight_statistics`](@ref) gives them.
 
@@ -835,19 +1066,21 @@ A weight path and a multi-period prediction take the mean of each figure, and no
 
 # Returns
 
-  - `ws::NamedTuple`: The mean of each figure, with the keys of `ss`.
+  - `ws::WeightStatistics`: The mean of each figure.
 
 # Related
 
+  - [`WeightStatistics`](@ref)
   - [`weight_statistics`](@ref)
   - [`prediction_weight_statistics`](@ref)
 """
-function mean_weight_statistics(ss::AbstractVector{<:NamedTuple{K}}) where {K}
-    return NamedTuple{K}(map(k -> mean(s -> getfield(s, k), ss), K))
+function mean_weight_statistics(ss::AbstractVector{<:WeightStatistics})
+    return WeightStatistics(map(k -> mean(s -> getfield(s, k), ss),
+                                fieldnames(WeightStatistics))...)
 end
 """
     entry_weight_statistics(ws::Nothing, x::Number)
-    entry_weight_statistics(ws::NamedTuple, x::Number)
+    entry_weight_statistics(ws::WeightStatistics, x::Number)
 
 The weight statistics of one entry of [`performance_summary`](@ref): the statistics of its weights, or `x` for each figure when the entry holds no weights.
 
@@ -858,18 +1091,18 @@ The weight statistics of one entry of [`performance_summary`](@ref): the statist
 
 # Returns
 
-  - `ws::NamedTuple`: `n_eff`, `long_exposure`, `short_exposure`, `gross_exposure` and `net_exposure`.
+  - `ws::WeightStatistics`: `n_eff`, `long_exposure`, `short_exposure`, `gross_exposure` and `net_exposure`.
 
 # Related
 
-  - [`summarise_returns`](@ref)
+  - [`summarise_entries`](@ref)
+  - [`WeightStatistics`](@ref)
   - [`weight_statistics`](@ref)
 """
 function entry_weight_statistics(::Nothing, x::Number)
-    return (; n_eff = x, long_exposure = x, short_exposure = x, gross_exposure = x,
-            net_exposure = x)
+    return WeightStatistics(x, x, x, x, x)
 end
-function entry_weight_statistics(ws::NamedTuple, ::Number)
+function entry_weight_statistics(ws::WeightStatistics, ::Number)
     return ws
 end
 """
@@ -887,7 +1120,7 @@ A single prediction gives the statistics of its target. A multi-period predictio
 
 # Returns
 
-  - `ws::NamedTuple`: `n_eff`, `long_exposure`, `short_exposure`, `gross_exposure` and `net_exposure`.
+  - `ws::WeightStatistics`: `n_eff`, `long_exposure`, `short_exposure`, `gross_exposure` and `net_exposure`.
 
 # Related
 
@@ -900,92 +1133,6 @@ function prediction_weight_statistics(pred::PredictionResult, j::Integer)
 end
 function prediction_weight_statistics(pred::MultiPeriodPredictionResult, j::Integer)
     return mean_weight_statistics([weight_statistics(fold_target(f, j)) for f in pred.pred])
-end
-"""
-    prediction_entries(pred::PredRes_MultiPredRes, bm::Option{<:Some}, path = nothing)
-
-The entries of a prediction: one entry when it holds one series, and one entry for each member when its optimiser gives many portfolios.
-
-The function does not read the first member of a prediction alone, as [`regret_series`](@ref) gives the series. Each member reads its own series, its own benchmark series through [`member_vector`](@ref), its own turnover through [`held_path_turnover`](@ref) and its own weights through [`prediction_weight_statistics`](@ref).
-
-# Arguments
-
-  - `pred`: The prediction result.
-  - `bm`: The benchmark of the caller, from [`summary_benchmark`](@ref).
-  - `path`: The key of the path in a population, or `nothing`.
-
-# Returns
-
-  - `e::NamedTuple`: One entry, for a prediction that holds one series.
-  - `es::Vector`: One entry for each member, for a prediction that holds many series.
-
-# Related
-
-  - [`summary_entry`](@ref)
-  - [`population_entries`](@ref)
-  - [`regret_series`](@ref)
-  - [`regret_benchmark`](@ref)
-"""
-function prediction_entries(pred::PredRes_MultiPredRes, bm::Option{<:Some}, path = nothing)
-    X, ts = regret_series(pred)
-    return prediction_entries(X, ts, regret_benchmark(pred), pred, bm, path)
-end
-function prediction_entries(X::VecNum, ts::Option{<:AbstractVector}, B::Option{<:VecNum},
-                            pred::PredRes_MultiPredRes, bm::Option{<:Some}, path)
-    return summary_entry(X, row_benchmark(bm, B), held_path_turnover(pred),
-                         prediction_weight_statistics(pred, 1), ts; path = path)
-end
-function prediction_entries(X::VecVecNum, ts::Option{<:AbstractVector},
-                            B::Option{<:VecNum_VecVecNum}, pred::PredRes_MultiPredRes,
-                            bm::Option{<:Some}, path)
-    return [summary_entry(X[j], row_benchmark(bm, member_vector(B, j)),
-                          held_path_turnover(pred, j),
-                          prediction_weight_statistics(pred, j), ts; path = path,
-                          member = j) for j in eachindex(X)]
-end
-"""
-    population_entries(ppred::PopulationPredictionResult, bm::Option{<:Some}) -> Vector
-
-The entries of a population: the entries of each path in turn, each keyed by its path.
-
-A multi-period path is keyed by its `id`. A single-fold prediction result in a population has no `id`, so its position in the population keys it, as [`population_ids`](@ref) numbers the paths that lack an `id`.
-
-# Algorithm
-
- 1. Check that the population holds a path.
- 2. Read the entries of each path with [`prediction_entries`](@ref), keyed by [`population_path_key`](@ref): the `id` of the path or its position.
- 3. Join the entries of the paths in the order of the population.
-
-# Arguments
-
-  - `ppred`: The population.
-  - `bm`: The benchmark of the caller, from [`summary_benchmark`](@ref).
-
-# Validation
-
-  - The population holds at least one path. Otherwise the function raises an [`IsEmptyError`](@ref).
-
-# Returns
-
-  - `es::Vector`: The entries, in the order path, then member.
-
-# Related
-
-  - [`prediction_entries`](@ref)
-  - [`population_path_key`](@ref)
-  - [`PopulationPredictionResult`](@ref)
-"""
-function population_entries(ppred::PopulationPredictionResult, bm::Option{<:Some})
-    paths = ppred.pred
-    @argcheck(!isempty(paths),
-              IsEmptyError("the population holds no path, so there is nothing to summarise"))
-    # The loop reads each path by its index, not through `enumerate`, which gives JET a false
-    # report on an untyped element (issue #1341).
-    es = map(eachindex(paths)) do k
-        p = paths[k]
-        return entry_list(prediction_entries(p, bm, population_path_key(p, k)), nothing)
-    end
-    return reduce(vcat, es)
 end
 """
     population_path_key(p::MultiPeriodPredictionResult, k::Integer)
@@ -1006,7 +1153,7 @@ A multi-period path is keyed by its `id`. A single-fold prediction result has no
 
 # Related
 
-  - [`population_entries`](@ref)
+  - [`input_entries`](@ref)
   - [`population_ids`](@ref)
 """
 function population_path_key(p::MultiPeriodPredictionResult, ::Integer)
@@ -1022,46 +1169,72 @@ end
     input_entries(bm::Option{<:Some}, w::Union{ArrNum, VecVecNum}, rd::ReturnsResult,
                   fees::Option{<:Fees} = nothing)
     input_entries(bm::Option{<:Some}, res::OptimisationResult, rd::ReturnsResult)
-    input_entries(bm::Option{<:Some}, pred::PredRes_MultiPredRes)
+    input_entries(bm::Option{<:Some}, pred::PredRes_MultiPredRes, path = nothing)
+    input_entries(bm::Option{<:Some}, ret::VecNum, ts::Option{<:AbstractVector},
+                  B::Option{<:VecNum}, pred::PredRes_MultiPredRes, path)
+    input_entries(bm::Option{<:Some}, rets::VecVecNum, ts::Option{<:AbstractVector},
+                  B::Option{<:VecNum_VecVecNum}, pred::PredRes_MultiPredRes, path)
     input_entries(bm::Option{<:Some}, ppred::PopulationPredictionResult)
 
 The entries of one input of [`performance_summary`](@ref): one entry for an input that holds one series, and a vector of entries otherwise.
 
 A bare series holds no weights. Weights give their net returns through [`calc_net_returns`](@ref), and their effective number of assets and their exposures through [`weight_statistics`](@ref). A `VecVecNum` gives one entry for each member. An [`OptimisationResult`](@ref) reads its weights, its returns and its fee on its investable universe through [`result_investable_view`](@ref).
 
+A prediction gives one entry when it holds one series, and one entry for each member when its optimiser gives many portfolios. Its method reads the series with [`regret_series`](@ref) and the benchmark of its rows with [`regret_benchmark`](@ref), and the method for the type of the series makes the entries. It does not read the first member alone: each member reads its own series, its own benchmark series through [`member_vector`](@ref), its own turnover through [`held_path_turnover`](@ref) and its own weights through [`prediction_weight_statistics`](@ref).
+
+A population gives the entries of each path in turn, each keyed by its path. A multi-period path is keyed by its `id`. A single-fold prediction result in a population has no `id`, so its position in the population keys it, as [`population_ids`](@ref) numbers the paths that lack an `id`.
+
+# Algorithm
+
+The steps of a population:
+
+ 1. Check that the population holds a path.
+ 2. Read the entries of each path with the method of a prediction, keyed by [`population_path_key`](@ref): the `id` of the path or its position.
+ 3. Join the entries of the paths in the order of the population.
+
 # Arguments
 
   - `bm`: The benchmark of the caller, from [`summary_benchmark`](@ref).
-  - `ret`, `w`, `X`, `fees`, `rd`, `res`, `pred`, `ppred`: As [`performance_summary`](@ref) states them.
-  - `ts`: The timestamps of the rows of `X`, or `nothing`.
+  - `ret`, `w`, `X`, `fees`, `rd`, `res`, `pred`, `ppred`: As [`performance_summary`](@ref) states them. In the methods of the series of a prediction, `ret` is its one series.
+  - `ts`: The timestamps of the rows of `X`, or of the series of a prediction, or `nothing`.
+  - `path`: The key of the path in a population, or `nothing`.
+  - `rets`: The series of each member of a prediction.
+  - `B`: The benchmark of the rows of a prediction, one series or one series for each member, or `nothing`.
+
+# Validation
+
+  - A population holds at least one path. Otherwise the function raises an [`IsEmptyError`](@ref).
 
 # Returns
 
-  - `e::NamedTuple`: One entry, for an input that holds one series.
-  - `es::Vector`: One entry for each series otherwise.
+  - `e::SummaryEntry`: One entry, for an input that holds one series.
+  - `es::Vector{<:SummaryEntry}`: One entry for each series otherwise. The entries of a population are in the order path, then member.
 
 # Related
 
-  - [`summary_entry`](@ref)
-  - [`prediction_entries`](@ref)
-  - [`population_entries`](@ref)
+  - [`SummaryEntry`](@ref)
+  - [`population_path_key`](@ref)
+  - [`regret_series`](@ref)
+  - [`regret_benchmark`](@ref)
   - [`summarise_entries`](@ref)
 """
 function input_entries(bm::Option{<:Some}, ret::VecNum)
-    return summary_entry(ret, row_benchmark(bm, nothing), nothing, nothing, nothing)
+    return SummaryEntry(; ret = ret, benchmark = row_benchmark(bm, nothing))
 end
 function input_entries(bm::Option{<:Some}, w::ArrNum, X::MatNum,
                        fees::Option{<:Fees} = nothing,
                        ts::Option{<:AbstractVector} = nothing)
-    return summary_entry(calc_net_returns(w, X, fees), row_benchmark(bm, nothing), nothing,
-                         weight_statistics(w), ts)
+    return SummaryEntry(; ret = calc_net_returns(w, X, fees),
+                        benchmark = row_benchmark(bm, nothing), ws = weight_statistics(w),
+                        ts = ts)
 end
 function input_entries(bm::Option{<:Some}, w::VecVecNum, X::MatNum,
                        fees::Option{<:Fees} = nothing,
                        ts::Option{<:AbstractVector} = nothing)
     b = row_benchmark(bm, nothing)
-    return [summary_entry(calc_net_returns(w[j], X, fees), b, nothing,
-                          weight_statistics(w[j]), ts; member = j) for j in eachindex(w)]
+    return [SummaryEntry(; ret = calc_net_returns(w[j], X, fees), benchmark = b,
+                         ws = weight_statistics(w[j]), ts = ts, member = j)
+            for j in eachindex(w)]
 end
 function input_entries(bm::Option{<:Some}, w::Union{ArrNum, VecVecNum}, rd::ReturnsResult,
                        fees::Option{<:Fees} = nothing)
@@ -1071,15 +1244,39 @@ function input_entries(bm::Option{<:Some}, res::OptimisationResult, rd::ReturnsR
     _, w, X, fees = result_investable_view(res, rd.X)
     return input_entries(bm, w, X, fees, rd.ts)
 end
-function input_entries(bm::Option{<:Some}, pred::PredRes_MultiPredRes)
-    return prediction_entries(pred, bm)
+function input_entries(bm::Option{<:Some}, pred::PredRes_MultiPredRes, path = nothing)
+    rets, ts = regret_series(pred)
+    return input_entries(bm, rets, ts, regret_benchmark(pred), pred, path)
+end
+function input_entries(bm::Option{<:Some}, ret::VecNum, ts::Option{<:AbstractVector},
+                       B::Option{<:VecNum}, pred::PredRes_MultiPredRes, path)
+    return SummaryEntry(; ret = ret, benchmark = row_benchmark(bm, B),
+                        turnover = held_path_turnover(pred),
+                        ws = prediction_weight_statistics(pred, 1), ts = ts, path = path)
+end
+function input_entries(bm::Option{<:Some}, rets::VecVecNum, ts::Option{<:AbstractVector},
+                       B::Option{<:VecNum_VecVecNum}, pred::PredRes_MultiPredRes, path)
+    return [SummaryEntry(; ret = rets[j],
+                         benchmark = row_benchmark(bm, member_vector(B, j)),
+                         turnover = held_path_turnover(pred, j),
+                         ws = prediction_weight_statistics(pred, j), ts = ts, path = path,
+                         member = j) for j in eachindex(rets)]
 end
 function input_entries(bm::Option{<:Some}, ppred::PopulationPredictionResult)
-    return population_entries(ppred, bm)
+    paths = ppred.pred
+    @argcheck(!isempty(paths),
+              IsEmptyError("the population holds no path, so there is nothing to summarise"))
+    # The loop reads each path by its index, not through `enumerate`, which gives JET a false
+    # report on an untyped element (issue #1341).
+    es = map(eachindex(paths)) do k
+        p = paths[k]
+        return entry_list(input_entries(bm, p, population_path_key(p, k)), nothing)
+    end
+    return reduce(vcat, es)
 end
 """
-    entry_list(e::NamedTuple, name)
-    entry_list(es::Vector{<:NamedTuple}, name)
+    entry_list(e::SummaryEntry, name)
+    entry_list(es::Vector{<:SummaryEntry}, name)
 
 The entries of one input as a vector, each with the name of its candidate.
 
@@ -1095,43 +1292,18 @@ The entries of one input as a vector, each with the name of its candidate.
 # Related
 
   - [`candidate_summary`](@ref)
-  - [`population_entries`](@ref)
+  - [`input_entries`](@ref)
+  - [`rebuild_struct`](@ref)
 """
-function entry_list(e::NamedTuple, name)
-    return [merge(e, (; name = name))]
+function entry_list(e::SummaryEntry, name)
+    return [rebuild_struct(e, (; name = name))]
 end
-function entry_list(es::Vector{<:NamedTuple}, name)
-    return [merge(es[i], (; name = name)) for i in eachindex(es)]
-end
-"""
-    summarise_entries(e::NamedTuple, opts::NamedTuple)
-    summarise_entries(es::AbstractVector, opts::NamedTuple)
-
-Summarise the entries of a [`performance_summary`](@ref) call. One entry gives scalar fields, and a vector of entries gives one vector entry for each, also when the vector holds one entry.
-
-# Arguments
-
-  - `e`, `es`: One entry, or a vector of entries.
-  - `opts`: The checked keywords of the call, from [`summary_options`](@ref).
-
-# Returns
-
-  - `summary::PerformanceSummaryResult`: The summary.
-
-# Related
-
-  - [`summarise_returns`](@ref)
-  - [`stack_summaries`](@ref)
-"""
-function summarise_entries(e::NamedTuple, opts::NamedTuple)
-    return summarise_returns(e, opts)
-end
-function summarise_entries(es::AbstractVector, opts::NamedTuple)
-    return stack_summaries([summarise_returns(e, opts) for e in es], opts)
+function entry_list(es::Vector{<:SummaryEntry}, name)
+    return [rebuild_struct(es[i], (; name = name)) for i in eachindex(es)]
 end
 """
     stack_summaries(rs::AbstractVector{<:PerformanceSummaryResult},
-                    opts::NamedTuple) -> PerformanceSummaryResult
+                    opts::SummaryOptions) -> PerformanceSummaryResult
 
 Stack the summaries of single entries into one summary with one vector entry for each.
 
@@ -1144,7 +1316,7 @@ Stack the summaries of single entries into one summary with one vector entry for
 # Arguments
 
   - `rs`: The summary of each entry, each with scalar fields.
-  - `opts`: The checked keywords of the call, from [`summary_options`](@ref).
+  - `opts`: The checked keywords of the call.
 
 # Returns
 
@@ -1153,9 +1325,10 @@ Stack the summaries of single entries into one summary with one vector entry for
 # Related
 
   - [`summarise_entries`](@ref)
-  - [`summarise_returns`](@ref)
+  - [`SummaryOptions`](@ref)
 """
-function stack_summaries(rs::AbstractVector{<:PerformanceSummaryResult}, opts::NamedTuple)
+function stack_summaries(rs::AbstractVector{<:PerformanceSummaryResult},
+                         opts::SummaryOptions)
     # The field travels as a `Val`, so its name is a constant and each column is inferred.
     col(::Val{F}) where {F} = [getfield(r, F) for r in rs]
     ks = keys(opts.measures)
@@ -1190,12 +1363,12 @@ Summarise one input of [`performance_summary`](@ref): check the keywords, make t
 
 # Related
 
-  - [`summary_options`](@ref)
+  - [`SummaryOptions`](@ref)
   - [`input_entries`](@ref)
   - [`summarise_entries`](@ref)
 """
 function summarise_input(kwargs, args...)
-    opts = summary_options(; kwargs...)
+    opts = SummaryOptions(; kwargs...)
     return summarise_entries(input_entries(summary_benchmark(kwargs), args...), opts)
 end
 """
@@ -1205,7 +1378,7 @@ Summarise a vector of candidates of [`performance_summary`](@ref), one candidate
 
 # Algorithm
 
- 1. Check that `xs` is not empty, and check the keywords with [`summary_options`](@ref).
+ 1. Check that `xs` is not empty, and check the keywords with [`SummaryOptions`](@ref).
  2. Resolve one name for each candidate with [`forecast_summary_names`](@ref), with the default `"Portfolio k"`.
  3. Make the entries of each candidate with [`input_entries`](@ref), each with the name of its candidate, and join them in the order of `xs`.
  4. Summarise the entries with [`summarise_entries`](@ref), which gives one vector entry for each.
@@ -1235,7 +1408,7 @@ Summarise a vector of candidates of [`performance_summary`](@ref), one candidate
 function candidate_summary(kwargs, names, xs::AbstractVector, args...)
     @argcheck(!isempty(xs),
               IsEmptyError("the summary needs at least one candidate, and the vector is empty"))
-    opts = summary_options(; kwargs...)
+    opts = SummaryOptions(; kwargs...)
     bm = summary_benchmark(kwargs)
     # A 1-based copy pairs each candidate with its name by one index, with no `enumerate`.
     cs = collect(xs)
