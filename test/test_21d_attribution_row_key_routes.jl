@@ -132,7 +132,8 @@ end
         @test pf.rr.idx == 1:T && isnothing(pf.rr.ts)
         pft = prior(FactorPrior(), rdt)
         @test pft.rr.idx == 1:T && pft.rr.ts == ts
-        @test PO.attribution_row_key(pft.rr) == (; idx = 1:T, ts = ts)
+        k = PO.attribution_row_key(pft.rr)
+        @test k.idx == 1:T && k.ts == ts
         # The view by asset, the expansion to the full universe and the residual block keep it.
         @test PO.port_opt_view(pft.rr, [1, 3]).ts == ts
         @test PO.set_idiosyncratic_covariance(pft.rr, nothing, nothing, nothing).idx == 1:T

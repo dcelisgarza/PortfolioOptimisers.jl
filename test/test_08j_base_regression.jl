@@ -2852,7 +2852,8 @@ using Dates
         @test v.idx === csfm.idx && v.ts === csfm.ts
         h = PO.forecast_history_block(csfm, 2)
         @test h.idx == 3:4 && h.ts == ts[1:2]
-        @test PO.attribution_row_key(csfm) == (; idx = 3:6, ts = ts)
+        k = PO.attribution_row_key(csfm)
+        @test k.idx == 3:6 && k.ts == ts
         # A key names the rows of the fit, so it needs one, with one entry for each row.
         @test_throws ArgumentError CrossSectionalFactorModel(; M = M, b = b, idx = 1:4)
         @test_throws ArgumentError CrossSectionalFactorModel(; M = M, b = b, ts = ts)

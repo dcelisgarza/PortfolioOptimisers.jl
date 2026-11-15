@@ -522,10 +522,13 @@ end
     expand_factor_covariance(fcb::FactorFamilyBasis, sigma::MatNum,
                              t::Integer = size(fcb.ratios, 1))
     expand_factor_covariance(fcb::FactorFamilyBasis, sigma::Arr3Num)
+    expand_factor_covariance(fcb::Nothing, sigma::Arr3Num)
 
 Reconstruct the raw-axis factor covariance from the reduced-axis one.
 
 The answer is singular by construction, because the raw axis is a linear image of a smaller one. [`reduce_factor_covariance`](@ref) undoes it. A stack holds one covariance per observation of the basis, and the function expands slice `t` with the ratios of observation `t`. The standard errors of a realised attribution read such a stack, one covariance of the estimated factor returns per observation.
+
+A fit with no family re-basis holds `nothing` in its basis slot, and its regression axis is the raw axis. The method on `Nothing` returns the stack unchanged, without a check, as [`cross_sectional_transform`](@ref) does for a skipped step.
 
 # Mathematical definition
 
@@ -563,17 +566,17 @@ Where:
 
 # Arguments
 
-  - `fcb`: A Factor Family Basis.
+  - `fcb`: A Factor Family Basis, or `nothing` for a stack on the raw axis.
   - `sigma::MatNum_Arr3Num`: Factor covariance on the reduced axis, `reduced factors × reduced factors`, or a stack of them, `reduced factors × reduced factors × observations`.
   - `t::Integer`: Observation whose ratios the function applies to a matrix. It defaults to the last observation of the basis.
 
 # Validation
 
-  - Both factor axes of `sigma` are the reduced factor count, `t` indexes the observation axis of the basis, and a stack matches that axis.
+  - Both factor axes of `sigma` are the reduced factor count, `t` indexes the observation axis of the basis, and a stack matches that axis, when `fcb` is a Factor Family Basis.
 
 # Returns
 
-  - `sigma::Array{<:Real}`: The factor covariance on the raw axis, of the same number of dimensions as the input.
+  - `sigma::Array{<:Real}`: The factor covariance on the raw axis, of the same number of dimensions as the input. It is a new `Array` under a basis, and `sigma` itself under `nothing`.
 
 # Examples
 
@@ -637,6 +640,9 @@ function expand_factor_covariance(fcb::FactorFamilyBasis, sigma::Arr3Num)
         raw[:, :, t] = expand_factor_covariance(fcb, view(sigma, :, :, t), t)
     end
     return raw
+end
+function expand_factor_covariance(::Nothing, sigma::Arr3Num)
+    return sigma
 end
 """
     project_factor_coordinates(fcb::FactorFamilyBasis, x::MatNum)

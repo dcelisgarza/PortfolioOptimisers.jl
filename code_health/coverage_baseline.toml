@@ -422,9 +422,10 @@ commit = "391be5e"
 "src/18_ExpectedReturns/02_BrinsonAttribution.jl" = { lines = 28, misses = 0 }
 "src/18_ExpectedReturns/03_PerformanceSummary.jl" = { lines = 183, misses = 0 }
 "src/18_ExpectedReturns/04_SharpeRatioInference.jl" = { lines = 68, misses = 0 }
-"src/19_FactorAttribution/01_FactorAttribution.jl" = { lines = 232, misses = 0 }
-"src/19_FactorAttribution/02_FactorAttributionRealised.jl" = { lines = 259, misses = 0 }
-"src/19_FactorAttribution/03_FactorAttributionRealisedMethods.jl" = { lines = 175, misses = 0 }
+"src/19_FactorAttribution/01_FactorAttribution_a.jl" = { lines = 202, misses = 0 }
+"src/19_FactorAttribution/01_FactorAttribution_b.jl" = { lines = 33, misses = 0 }
+"src/19_FactorAttribution/02_FactorAttributionRealised.jl" = { lines = 246, misses = 0 }
+"src/19_FactorAttribution/03_FactorAttributionRealisedMethods.jl" = { lines = 188, misses = 0 }
 "src/20_AssetSelection.jl" = { lines = 178, misses = 0 }
 "src/21_Pipeline/01_Base_Pipeline.jl" = { lines = 62, misses = 10 }
 "src/21_Pipeline/02_StepExecution.jl" = { lines = 260, misses = 1 }

@@ -111,10 +111,13 @@ function panel_field_missing(omsk::AbstractArray{Bool, 3}, ::Tuple{Int, Int})
 end
 """
     panel_active_cells(pnl::AssetPanel) -> AbstractArray{Bool}
+    panel_active_cells(pnl::Nothing) -> Nothing
 
-Return the active cells of an [`AssetPanel`](@ref) over its observation and asset axes.
+Return the active cells of an [`AssetPanel`](@ref) over its observation and asset axes, or `nothing`.
 
 A static panel has no active mask. Each asset of a static panel is in its universe, so every cell is active.
+
+A returns result without a panel states no mask, so no cell of it is known to be active. The method on `Nothing` answers `nothing`, the answer "no mask", and a reader such as [`attribution_net_returns`](@ref) then treats no blank cell as a holiday.
 
 # Algorithm
 
@@ -123,11 +126,11 @@ A static panel has no active mask. Each asset of a static panel is in its univer
 
 # Arguments
 
-  - `pnl`: The Asset Panel.
+  - `pnl`: The Asset Panel, or `nothing`.
 
 # Returns
 
-  - `act::AbstractArray{Bool}`: The active cells.
+  - `act::Option{<:AbstractArray{Bool}}`: The active cells, or `nothing`.
 
 # Related
 
@@ -137,6 +140,9 @@ A static panel has no active mask. Each asset of a static panel is in its univer
 """
 function panel_active_cells(pnl::AssetPanel)
     return panel_is_static(pnl) ? trues(panel_axes(pnl)) : pnl.amsk
+end
+function panel_active_cells(::Nothing)::Nothing
+    return nothing
 end
 """
 $(DocStringExtensions.TYPEDEF)

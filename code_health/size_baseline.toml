@@ -6,7 +6,7 @@
 [provenance]
 julia = "1.13.4"
 julia_syntax = "1.0.2"
-commit = "04e7c67c34"
+commit = "0e09157222"
 
 [file]
 "ext/PortfolioOptimisersPlotsExt/01_CumulativeReturnsPlots.jl" = { code = 287, doc = 0, comment = 12, blank = 2, total = 301 }
@@ -84,7 +84,7 @@ commit = "04e7c67c34"
 "src/03_InputData/18_PreprocessingPartialFit.jl" = { code = 326, doc = 429, comment = 19, blank = 227, total = 1001 }
 "src/03_InputData/19_AssetPanelConcat.jl" = { code = 233, doc = 449, comment = 6, blank = 235, total = 923 }
 "src/03_InputData/20_PanelFieldValues.jl" = { code = 62, doc = 144, comment = 0, blank = 59, total = 265 }
-"src/03_InputData/21_AssetPanelSummary.jl" = { code = 236, doc = 487, comment = 4, blank = 223, total = 950 }
+"src/03_InputData/21_AssetPanelSummary.jl" = { code = 239, doc = 489, comment = 4, blank = 224, total = 956 }
 "src/03_InputData/22_PanelRoundTrip.jl" = { code = 347, doc = 612, comment = 8, blank = 303, total = 1270 }
 "src/04_MatrixProcessing/01_PosdefMatrix.jl" = { code = 163, doc = 477, comment = 3, blank = 221, total = 864 }
 "src/04_MatrixProcessing/02_Denoise.jl" = { code = 141, doc = 550, comment = 36, blank = 200, total = 927 }
@@ -164,7 +164,7 @@ commit = "04e7c67c34"
 "src/05_Moments/32_CrossSectionalFactorModel/04_FactorExposures/13_ExposureNeutralisation.jl" = { code = 91, doc = 125, comment = 2, blank = 55, total = 273 }
 "src/05_Moments/32_CrossSectionalFactorModel/04_FactorExposures/14_ObservedExposure.jl" = { code = 308, doc = 501, comment = 16, blank = 245, total = 1070 }
 "src/05_Moments/32_CrossSectionalFactorModel/05_FactorFamilyBasis.jl" = { code = 216, doc = 362, comment = 0, blank = 163, total = 741 }
-"src/05_Moments/32_CrossSectionalFactorModel/06_FactorFamilyBasisTransforms.jl" = { code = 334, doc = 488, comment = 5, blank = 231, total = 1058 }
+"src/05_Moments/32_CrossSectionalFactorModel/06_FactorFamilyBasisTransforms.jl" = { code = 367, doc = 548, comment = 5, blank = 253, total = 1173 }
 "src/05_Moments/32_CrossSectionalFactorModel/07_ReturnForecasts/01_Base_ReturnForecast.jl" = { code = 182, doc = 596, comment = 2, blank = 294, total = 1074 }
 "src/05_Moments/32_CrossSectionalFactorModel/07_ReturnForecasts/02_DescriptorScores.jl" = { code = 157, doc = 301, comment = 14, blank = 120, total = 592 }
 "src/05_Moments/32_CrossSectionalFactorModel/07_ReturnForecasts/03_CustomValueReturnForecast.jl" = { code = 37, doc = 102, comment = 0, blank = 51, total = 190 }
@@ -425,9 +425,10 @@ commit = "04e7c67c34"
 "src/18_ExpectedReturns/02_BrinsonAttribution.jl" = { code = 37, doc = 62, comment = 2, blank = 34, total = 135 }
 "src/18_ExpectedReturns/03_PerformanceSummary.jl" = { code = 363, doc = 683, comment = 16, blank = 281, total = 1343 }
 "src/18_ExpectedReturns/04_SharpeRatioInference.jl" = { code = 91, doc = 290, comment = 17, blank = 132, total = 530 }
-"src/19_FactorAttribution/01_FactorAttribution.jl" = { code = 494, doc = 1211, comment = 11, blank = 494, total = 2210 }
-"src/19_FactorAttribution/02_FactorAttributionRealised.jl" = { code = 456, doc = 974, comment = 7, blank = 405, total = 1842 }
-"src/19_FactorAttribution/03_FactorAttributionRealisedMethods.jl" = { code = 317, doc = 454, comment = 2, blank = 232, total = 1005 }
+"src/19_FactorAttribution/01_FactorAttribution_a.jl" = { code = 490, doc = 1283, comment = 8, blank = 491, total = 2272 }
+"src/19_FactorAttribution/01_FactorAttribution_b.jl" = { code = 55, doc = 85, comment = 3, blank = 43, total = 186 }
+"src/19_FactorAttribution/02_FactorAttributionRealised.jl" = { code = 467, doc = 1018, comment = 7, blank = 412, total = 1904 }
+"src/19_FactorAttribution/03_FactorAttributionRealisedMethods.jl" = { code = 341, doc = 464, comment = 2, blank = 233, total = 1040 }
 "src/20_AssetSelection.jl" = { code = 312, doc = 805, comment = 1, blank = 401, total = 1519 }
 "src/21_Pipeline/01_Base_Pipeline.jl" = { code = 158, doc = 449, comment = 0, blank = 200, total = 807 }
 "src/21_Pipeline/02_StepExecution.jl" = { code = 389, doc = 513, comment = 11, blank = 288, total = 1201 }

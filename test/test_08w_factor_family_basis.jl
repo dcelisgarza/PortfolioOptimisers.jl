@@ -1307,7 +1307,8 @@ end
             # The standard errors of the row do not depend on the dropped member: before
             # #1609 they differed by 1.6e-6 on the industry family.
             function row_errors(pr)
-                al = PO.attribution_window(PO.attribution_align(pr.rr, pr,
+                al = PO.attribution_window(PO.attribution_align(PO.attribution_block_arrays(pr.rr,
+                                                                                            pr),
                                                                 size(fx.rd.X, 1)), td:td)
                 g = permutedims(dropdims(sum(al.B; dims = 1); dims = 1)) ./ size(al.B, 1)
                 return PO.attribution_standard_errors(g, al, PO.attribution_families(pr.rr),

@@ -132,8 +132,11 @@ $(DocStringExtensions.FIELDS)
     AssetAttributionBreakdown(weight, weight_std, sys_vol_contrib, sys_mu_contrib,
                               idio_vol_contrib, idio_mu_contrib, vol, corr, vol_contrib,
                               pct_var, mu, mu_contrib) -> AssetAttributionBreakdown
+    AssetAttributionBreakdown(; weight, weight_std, sys_vol_contrib, sys_mu_contrib,
+                              idio_vol_contrib, idio_mu_contrib, vol, corr, vol_contrib,
+                              pct_var, mu, mu_contrib) -> AssetAttributionBreakdown
 
-Arguments correspond to the struct's fields, in the order they are declared. The type is a part of a Result, so [`factor_attribution`](@ref) builds it and a caller reads it. It has no keyword constructor, and it validates nothing of its own.
+Arguments correspond to the struct's fields, in the order they are declared, and the keyword constructor takes each field by its name, with no default. The type is a part of a Result, so [`factor_attribution`](@ref) builds it and a caller reads it. The keyword form lets [`rebuild_struct`](@ref) replace a field, as [`attribution_leverage_nan`](@ref) does. It validates nothing of its own.
 
 # Related
 
@@ -189,6 +192,14 @@ Arguments correspond to the struct's fields, in the order they are declared. The
     Contribution of each asset to the portfolio mean return, the systematic and the idiosyncratic parts together. The rows sum to the systematic and idiosyncratic components together.
     """
     mu_contrib
+end
+function AssetAttributionBreakdown(; weight, weight_std, sys_vol_contrib, sys_mu_contrib,
+                                   idio_vol_contrib, idio_mu_contrib, vol, corr,
+                                   vol_contrib, pct_var, mu,
+                                   mu_contrib)::AssetAttributionBreakdown
+    return AssetAttributionBreakdown(weight, weight_std, sys_vol_contrib, sys_mu_contrib,
+                                     idio_vol_contrib, idio_mu_contrib, vol, corr,
+                                     vol_contrib, pct_var, mu, mu_contrib)
 end
 """
 $(DocStringExtensions.TYPEDEF)
@@ -553,6 +564,33 @@ function attribution_lag(::Regression)
     return 0
 end
 """
+$(DocStringExtensions.TYPEDEF)
+
+The key that names the observation of each row of a factor model block or of a return series: its position and its timestamp.
+
+This type is an implementation detail and is not intended for direct use. [`attribution_row_key`](@ref) makes the key of a block, and [`attribution_series_key`](@ref) makes the key of the series of a cross-validation. [`attribution_key_pair`](@ref) reads both.
+
+# Fields
+
+$(DocStringExtensions.FIELDS)
+
+# Related
+
+  - [`attribution_row_key`](@ref)
+  - [`attribution_series_key`](@ref)
+  - [`attribution_key_pair`](@ref)
+"""
+@concrete struct AttributionRowKey
+    """
+    `idx`: The position of each row in the returns data that it was read from, or `nothing`.
+    """
+    idx
+    """
+    `ts`: The timestamp of each row, or `nothing`.
+    """
+    ts
+end
+"""
     attribution_row_key(rr::AbstractLoadingsRegressionResult)
     attribution_row_key(rr::CrossSectionalFactorModel)
     attribution_row_key(rr::Regression)
@@ -567,21 +605,21 @@ A realised [`factor_attribution`](@ref) of a cross-validation reads it to find t
 
 # Returns
 
-  - `idx::Option{<:VecInt}`: The position of each block row, or `nothing`.
-  - `ts::Option{<:VecDate}`: The timestamp of each block row, or `nothing`.
+  - `key::AttributionRowKey`: The position `idx` of each block row, or `nothing`, and the timestamp `ts` of each block row, or `nothing`.
 
 # Related
 
   - [`factor_attribution`](@ref)
   - [`attribution_block_arrays`](@ref)
+  - [`AttributionRowKey`](@ref)
   - [`CrossSectionalFactorModel`](@ref)
   - [`Regression`](@ref)
 """
 function attribution_row_key(::AbstractLoadingsRegressionResult)
-    return (; idx = nothing, ts = nothing)
+    return AttributionRowKey(nothing, nothing)
 end
 function attribution_row_key(rr::Union{CrossSectionalFactorModel, Regression})
-    return (; idx = rr.idx, ts = rr.ts)
+    return AttributionRowKey(rr.idx, rr.ts)
 end
 """
     attribution_families(rr::AbstractLoadingsRegressionResult)
@@ -860,8 +898,8 @@ In order to implement a new rule for an unknown entry which will work seamlessly
 
 ## The marks of a Leverage-One Pair
 
-  - `attribution_leverage_split(rule::MyRule, lev::Option{<:AbstractVector{Bool}}, w::VecNum, M::MatNum) -> Option{<:NamedTuple}`: Returns the marks of a predicted attribution.
-  - `attribution_leverage_split(rule::MyRule, h1::Option{<:AbstractMatrix{Bool}}, W::VecNum_MatNum, B::MatNum_Arr3Num) -> Option{<:NamedTuple}`: Returns the marks of a realised attribution.
+  - `attribution_leverage_split(rule::MyRule, lev::Option{<:AbstractVector{Bool}}, w::VecNum, M::MatNum) -> Option{<:LeverageSplitResult}`: Returns the marks of a predicted attribution.
+  - `attribution_leverage_split(rule::MyRule, h1::Option{<:AbstractMatrix{Bool}}, W::VecNum_MatNum, B::MatNum_Arr3Num) -> Option{<:LeverageSplitResult}`: Returns the marks of a realised attribution.
 
 ### Arguments
 
@@ -875,23 +913,23 @@ In order to implement a new rule for an unknown entry which will work seamlessly
 
 ### Returns
 
-  - `lv::Option{<:NamedTuple}`: `nothing` when the rule marks nothing. Otherwise the asset mask `assets` and the factor mask `factors`. `attribution_leverage_nan` puts `NaN` in every variance number that the marks read.
+  - `lv::Option{<:LeverageSplitResult}`: `nothing` when the rule marks nothing. Otherwise a [`LeverageSplitResult`](@ref) with the asset mask `assets` and the factor mask `factors`, whose constructor refuses marks that name no asset. `attribution_leverage_nan` puts `NaN` in every variance number that the marks read.
 
 ## The standard errors of a Leverage-One Pair
 
-  - `attribution_leverage_errors(rule::MyRule, h1::Option{<:AbstractMatrix{Bool}}, reg::AbstractMatrix{Bool}, ses::NamedTuple, pass) -> NamedTuple`: Returns the standard errors of the mean return contributions after the rule.
+  - `attribution_leverage_errors(rule::MyRule, h1::Option{<:AbstractMatrix{Bool}}, reg::AbstractMatrix{Bool}, ses::AttributionErrorsResult, pass) -> AttributionErrorsResult`: Returns the standard errors of the mean return contributions after the rule.
 
 ### Arguments
 
   - `rule`: The rule.
   - `h1`: The leverage-one mask, `observations × assets`, or `nothing` when the model marks no pair.
   - `reg`: Whether each pair is in the regression, `observations × assets`.
-  - `ses`: The standard errors, with the fields `sys`, `factor` and `family`.
-  - `pass`: The reduction of `attribution_error_pass`, a function of a matrix of variances, `observations × assets`.
+  - `ses`: The standard errors, an [`AttributionErrorsResult`](@ref) with the fields `sys`, `factor` and `family`.
+  - `pass`: The reduction of `attribution_error_pass`, a function of a matrix of variances, `observations × assets`, which returns an [`AttributionErrorsResult`](@ref).
 
 ### Returns
 
-  - `ses::NamedTuple`: The standard errors, with the fields of `ses`.
+  - `ses::AttributionErrorsResult`: The standard errors after the rule. A method that changes an error builds a new [`AttributionErrorsResult`](@ref), whose constructor checks that the three answers agree on what they state.
 
 # Related
 
@@ -992,12 +1030,13 @@ function KindwiseUnknown(; unstated::AbstractUnknownEntryRule = EntrywiseUnknown
 end
 """
     attribution_finite(A::AbstractArray)
+    attribution_finite(A::Nothing)
 
 Return an array with every non-finite entry replaced by zero, or the array itself.
 
 A point-in-time panel carries `NaN` at every cell of an inactive asset, and a Prior Estimator that fits on the coverage universe carries `NaN` in the rows of an asset it could not estimate. `0 * NaN` is `NaN`, so the entry would make every sum `NaN` whether the asset is held or not. The verb replaces the entries once rather than guarding each of the sums. The callers apply it where an unknown entry reads as zero: the factor returns and the regression weights of the realised side, the asset returns of a pair the policy of [`attribution_net_returns`](@ref) fills, and every entry under [`ZeroUnknown`](@ref).
 
-The verb returns an array that is finite throughout as it is, without a copy. That is the case when every asset is investable.
+The verb returns an array that is finite throughout as it is, without a copy. That is the case when every asset is investable. It is a repair, so it owns the identity on the form that needs no repair: an optional history that a block does not carry, such as the regression weights, is `nothing`, and the method on `Nothing` returns `nothing`.
 
 # Mathematical definition
 
@@ -1014,11 +1053,11 @@ Where:
 
 # Arguments
 
-  - `A`: The array.
+  - `A`: The array, or `nothing`.
 
 # Returns
 
-  - `A::AbstractArray`: The array, with every non-finite entry replaced by zero.
+  - `A::Option{<:AbstractArray}`: The array, with every non-finite entry replaced by zero, or `nothing`.
 
 # Related
 
@@ -1028,6 +1067,9 @@ Where:
 """
 function attribution_finite(A::AbstractArray)
     return all(isfinite, A) ? A : map(x -> isfinite(x) ? x : zero(x), A)
+end
+function attribution_finite(::Nothing)::Nothing
+    return nothing
 end
 """
     attribution_investable_diagnostic(w::VecNum_MatNum, pr::AbstractPriorResult,
@@ -1154,6 +1196,8 @@ A prior result carries the loadings in `rr` and the factor distribution in `fpr`
 
 # Returns
 
+The tuple `(rr, fpr)`:
+
   - `rr::AbstractLoadingsRegressionResult`: The factor model block.
   - `fpr::LowOrderPrior`: The factor distribution.
 
@@ -1165,7 +1209,33 @@ A prior result carries the loadings in `rr` and the factor distribution in `fpr`
 """
 function attribution_prior_block(pr::AbstractPriorResult)
     assert_prior_regression(pr)
-    return (; rr = pr.rr, fpr = pr.fpr)
+    return pr.rr, pr.fpr
+end
+"""
+$(DocStringExtensions.TYPEDEF)
+
+The two scale factors that an annualisation applies, one for a mean or a variance and one for a volatility.
+
+This type is an implementation detail and is not intended for direct use. [`attribution_scale`](@ref) makes it, and the predicted and the realised attribution read it.
+
+# Fields
+
+$(DocStringExtensions.FIELDS)
+
+# Related
+
+  - [`attribution_scale`](@ref)
+  - [`FactorAttributionResult`](@ref)
+"""
+@concrete struct AnnualisationScale
+    """
+    `s1`: The factor a mean or a variance takes.
+    """
+    s1
+    """
+    `s2`: The factor a volatility takes.
+    """
+    s2
 end
 """
     attribution_scale(ppy::Number, x::Number = ppy)
@@ -1202,8 +1272,7 @@ Where:
 
 # Returns
 
-  - `s1::Number`: The factor a mean or a variance takes, `ppy` itself.
-  - `s2::Number`: The factor a volatility takes, in the type of `ppy * one(x)` or wider.
+  - `sc::AnnualisationScale`: The factor `s1` a mean or a variance takes, `ppy` itself, and the factor `s2` a volatility takes, in the type of `ppy * one(x)` or wider.
 
 # Related
 
@@ -1212,7 +1281,7 @@ Where:
 """
 function attribution_scale(ppy::Number, x::Number = ppy)
     @argcheck(ppy > zero(ppy), DomainError(ppy, "ppy must be positive"))
-    return (; s1 = ppy, s2 = sqrt(ppy * one(x)))
+    return AnnualisationScale(ppy, sqrt(ppy * one(x)))
 end
 """
     attribution_idiosyncratic_matrix(esigma::VecNum)
@@ -1315,6 +1384,8 @@ The axis is the sorted unique labels, so it is deterministic and independent of 
 
 # Returns
 
+The tuple `(labels, idx)`:
+
   - `labels::Vector{String}`: The sorted unique family labels.
   - `idx::Vector{Vector{Int}}`: The raw factors of each family.
 
@@ -1325,7 +1396,7 @@ The axis is the sorted unique labels, so it is deterministic and independent of 
 """
 function attribution_family_index(fam::VecStr)
     labels = sort(unique(String[String(f) for f in fam]))
-    return (; labels = labels, idx = [findall(f -> String(f) == l, fam) for l in labels])
+    return labels, [findall(f -> String(f) == l, fam) for l in labels]
 end
 """
     attribution_family_axis(fam::Nothing, args...)
@@ -1378,11 +1449,11 @@ function attribution_family_axis(::Nothing, args...)::Nothing
 end
 function attribution_family_axis(fam::VecStr, fbd::AttributionBreakdown,
                                  exposure_std::Option{<:VecNum}, mu_se::Option{<:VecNum})
-    fi = attribution_family_index(fam)
-    total(v) = [sum(view(v, i)) for i in fi.idx]
-    return AttributionBreakdown(fi.labels, total(fbd.exposure), exposure_std, nothing,
-                                nothing, total(fbd.vol_contrib), total(fbd.pct_var),
-                                nothing, total(fbd.mu_contrib), mu_se)
+    labels, fidx = attribution_family_index(fam)
+    total(v) = [sum(view(v, i)) for i in fidx]
+    return AttributionBreakdown(labels, total(fbd.exposure), exposure_std, nothing, nothing,
+                                total(fbd.vol_contrib), total(fbd.pct_var), nothing,
+                                total(fbd.mu_contrib), mu_se)
 end
 """
     factor_attribution(w::VecNum, pr::AbstractPriorResult; assets::Bool = false,
@@ -1401,7 +1472,7 @@ end
                        fees::Option{<:Fees} = nothing; kwargs...) -> FactorAttributionResult
     factor_attribution(res::OptimisationResult, pr::Option{<:Pr_RR}, rd::ReturnsResult;
                        kwargs...) -> FactorAttributionResult
-    factor_attribution(W::MatNum, pr::AbstractPriorResult, ret::VecNum;
+    factor_attribution(W::VecNum_MatNum, pr::AbstractPriorResult, ret::VecNum;
                        kwargs...) -> FactorAttributionResult
     factor_attribution(pred::MultiPeriodPredictionResult, pr::AbstractPriorResult;
                        kwargs...) -> FactorAttributionResult
@@ -1524,10 +1595,12 @@ The three components sum to the total: ``\\sum_{C} \\mathrm{VC}_{C} = \\sqrt{p}\
  4. Sum the factor rows by family when the block names families, and over the assets when `assets = true`.
  5. Scale by `ppy`: means and variances by `ppy`, volatilities by its square root.
 
+The method on a net series `ret` is the canonical form of the realised side. It reports a holding in a non-investable asset through [`attribution_investable_diagnostic`](@ref), and reads the block into bare arrays with [`attribution_block_arrays`](@ref). The four methods on asset returns, a matrix `X` or a returns result `rd`, each with or without a `window`, check the weights through [`assert_attribution_assets`](@ref), form the net series with [`attribution_net_returns`](@ref), and call the method on `ret`. The method on `rd` passes the active mask of its Asset Panel through [`panel_active_cells`](@ref), and the method on `X` passes none. The method on `pred` holds a copy of the steps of the method on `ret`, because it also passes the row key of each observation, and the copies agree.
+
 # Arguments
 
   - `w`: Portfolio weights.
-  - `W`: Portfolio weight history, `observations × assets`.
+  - `W`: Portfolio weight history, `observations × assets`, or the constant weights.
   - `pr`: Prior result carrying the factor model block.
   - `res`: Optimisation result whose weights, prior and fees the verb reads through [`result_investable_view`](@ref). The result's own prior is on the universe the fit solved, and its weights are on the caller's, so the two meet on the result's investable universe, a caller's `pr` or `rd` is viewed at the same mask, and the attribution's asset axis spans the investable assets alone.
   - `X`: Asset returns, `observations × assets`.
@@ -1608,8 +1681,7 @@ function factor_attribution(w::VecNum, B::MatNum, F::MatNum, d::VecNum_MatNum;
 end
 function factor_attribution(w::VecNum, pr::AbstractPriorResult;
                             kwargs...)::FactorAttributionResult
-    blk = attribution_prior_block(pr)
-    rr, fpr = blk.rr, blk.fpr
+    rr, fpr = attribution_prior_block(pr)
     return factor_attribution(w, rr.M, fpr.sigma, attribution_idiosyncratic_covariance(rr);
                               mu_f = fpr.mu, b = rr.b, sigma = pr.sigma, mu = pr.mu,
                               fam = attribution_families(rr),
@@ -1626,13 +1698,84 @@ function factor_attribution(ppred::PopulationPredictionResult, pr::AbstractPrior
     return [factor_attribution(p, pr, args...; kwargs...) for p in ppred.pred]
 end
 """
+$(DocStringExtensions.TYPEDEF)
+
+A factor model block as the bare arrays that a realised attribution reads, untrimmed, on one observation axis.
+
+This type is an implementation detail and is not intended for direct use. [`attribution_block_arrays`](@ref) reads it off a factor model block, and [`attribution_array_block`](@ref) builds it from the arrays of a caller. [`attribution_align`](@ref) and [`attribution_key_align`](@ref) align it against a return series.
+
+# Fields
+
+$(DocStringExtensions.FIELDS)
+
+# Related
+
+  - [`attribution_block_arrays`](@ref)
+  - [`attribution_array_block`](@ref)
+  - [`attribution_align`](@ref)
+"""
+@concrete struct AttributionBlock
+    """
+    `B`: The static loadings, `assets × factors`, or the exposure history, `assets × factors × observations`.
+    """
+    B
+    """
+    `f`: The factor returns, `observations × factors`.
+    """
+    f
+    """
+    `eps`: The idiosyncratic returns, `observations × assets`.
+    """
+    eps
+    """
+    `lag`: The number of observations by which the exposures lag the returns.
+    """
+    lag
+    """
+    `rw`: The regression weight history, `observations × assets`, or `nothing`.
+    """
+    rw
+    """
+    `vs`: The idiosyncratic variance history, `observations × assets`, or `nothing`.
+    """
+    vs
+    """
+    `fcb`: The family re-basis the regression was written in, or `nothing`.
+    """
+    fcb
+    """
+    `unseen`: The Unseen Member rule the regression ran under.
+    """
+    unseen
+    """
+    `no`: The number of observed factors, the last factors of the axis.
+    """
+    no
+    """
+    `fam`: The family label of each factor, or `nothing`.
+    """
+    fam
+    """
+    `h1`: The leverage-one mask, `observations × assets`, or `nothing`.
+    """
+    h1
+    """
+    `dc`: The dropped-column mask of the fit, `observations × estimated factors`, or `nothing`.
+    """
+    dc
+    """
+    `key`: The row key of the block, from [`attribution_row_key`](@ref).
+    """
+    key
+end
+"""
     attribution_array_block(B::MatNum_Arr3Num, f::MatNum, eps::MatNum;
                             lag::Integer = B isa Arr3Num ? 1 : 0, trim::Bool = false,
                             rw::Option{<:MatNum} = nothing, vs::Option{<:MatNum} = nothing,
                             fcb::Option{<:FactorFamilyBasis} = nothing,
                             unseen::AbstractUnseenMemberRule = SolvedUnseenMember(),
                             observed::Integer = 0, fam::Option{<:VecStr} = nothing)
-        -> NamedTuple
+        -> AttributionBlock
 
 Return the bare arrays of a realised attribution as the block [`attribution_align`](@ref) reads.
 
@@ -1658,7 +1801,7 @@ The exposures, the factor returns and the idiosyncratic returns are the model, s
 
 # Returns
 
-  - `blk::NamedTuple`: The fields of [`attribution_block_arrays`](@ref). Its `lag` is zero for a static matrix unless `trim = true`.
+  - `blk::AttributionBlock`: The block, with the row key of no row. Its `lag` is zero for a static matrix unless `trim = true`.
 
 # Related
 
@@ -1677,15 +1820,69 @@ function attribution_array_block(B::MatNum_Arr3Num, f::MatNum, eps::MatNum;
     @argcheck(lag >= zero(lag),
               DomainError(lag,
                           "the exposure lag must be non-negative: a negative lag pairs each return with an exposure from after it"))
-    return (; B = B, f = f, eps = eps, lag = ifelse((B isa Arr3Num) | trim, lag, zero(lag)),
-            rw = rw, vs = vs, fcb = fcb, unseen = unseen, no = observed, fam = fam, h1 = h1,
-            dc = dc, idx = nothing, ts = nothing)
+    return AttributionBlock(B, f, eps, ifelse((B isa Arr3Num) | trim, lag, zero(lag)), rw,
+                            vs, fcb, unseen, observed, fam, h1, dc,
+                            AttributionRowKey(nothing, nothing))
+end
+"""
+$(DocStringExtensions.TYPEDEF)
+
+The factor model that a predicted attribution reads, as bare arrays.
+
+This type is an implementation detail and is not intended for direct use. [`attribution_array_model`](@ref) builds it, and [`predicted_attribution`](@ref) and [`attribution_array_mask`](@ref) read it.
+
+# Fields
+
+$(DocStringExtensions.FIELDS)
+
+# Related
+
+  - [`attribution_array_model`](@ref)
+  - [`predicted_attribution`](@ref)
+"""
+@concrete struct AttributionModel
+    """
+    `M`: The loadings, `assets × factors`.
+    """
+    M
+    """
+    `F`: The factor covariance, `factors × factors`.
+    """
+    F
+    """
+    `d`: The idiosyncratic variances, or the idiosyncratic covariance.
+    """
+    d
+    """
+    `mu_f`: The expected factor returns.
+    """
+    mu_f
+    """
+    `b`: The factor-orthogonal expected return of each asset.
+    """
+    b
+    """
+    `sigma`: The asset covariance the total variance reads, or `nothing`.
+    """
+    sigma
+    """
+    `mu`: The expected asset returns the total mean reads, or `nothing`.
+    """
+    mu
+    """
+    `fam`: The family label of each factor, or `nothing`.
+    """
+    fam
+    """
+    `lev`: The assets whose variance split the model does not identify, or `nothing`.
+    """
+    lev
 end
 """
     attribution_array_model(B::MatNum, F::MatNum, d::VecNum_MatNum;
                             mu_f::Option{<:VecNum} = nothing, b::Option{<:VecNum} = nothing,
                             sigma::Option{<:MatNum} = nothing, mu::Option{<:VecNum} = nothing,
-                            fam::Option{<:VecStr} = nothing) -> NamedTuple
+                            fam::Option{<:VecStr} = nothing) -> AttributionModel
 
 Return the factor model a predicted attribution reads, from bare arrays.
 
@@ -1704,7 +1901,7 @@ The loadings, the factor covariance and the idiosyncratic block are the model, s
 
 # Returns
 
-  - `mdl::NamedTuple`: The fields `M`, `F`, `d`, `mu_f`, `b`, `sigma`, `mu` and `fam`.
+  - `mdl::AttributionModel`: The model, with zeros for an absent mean.
 
 # Related
 
@@ -1718,12 +1915,11 @@ function attribution_array_model(B::MatNum, F::MatNum, d::VecNum_MatNum;
                                  mu::Option{<:VecNum} = nothing,
                                  fam::Option{<:VecStr} = nothing,
                                  lev::Option{<:AbstractVector{Bool}} = nothing)
-    return (; M = B, F = F, d = d, mu_f = something(mu_f, zeros(eltype(F), size(F, 1))),
-            b = something(b, zeros(eltype(B), size(B, 1))), sigma = sigma, mu = mu,
-            fam = fam, lev = lev)
+    return AttributionModel(B, F, d, something(mu_f, zeros(eltype(F), size(F, 1))),
+                            something(b, zeros(eltype(B), size(B, 1))), sigma, mu, fam, lev)
 end
 """
-    attribution_array_mask(mdl::NamedTuple) -> Option{BitVector}
+    attribution_array_mask(mdl::AttributionModel) -> Option{BitVector}
 
 Return the assets a predicted attribution can decompose, or `nothing` when it can decompose every asset.
 
@@ -1742,12 +1938,38 @@ An asset is decomposable when the model states it: its loadings, its idiosyncrat
   - [`predicted_attribution`](@ref)
   - [`investable_mask`](@ref)
 """
-function attribution_array_mask(mdl::NamedTuple)
+function attribution_array_mask(mdl::AttributionModel)
     D = attribution_idiosyncratic_matrix(mdl.d)
     imsk = vec(all(isfinite, mdl.M; dims = 2)) .& isfinite.(LinearAlgebra.diag(D)) .&
            isfinite.(mdl.b) .& isfinite.(LinearAlgebra.diag(something(mdl.sigma, D))) .&
            isfinite.(something(mdl.mu, mdl.b))
     return all(imsk) ? nothing : imsk
+end
+"""
+$(DocStringExtensions.TYPEDEF)
+
+The total of a predicted moment and its gap to the model.
+
+This type is an implementation detail and is not intended for direct use. [`attribution_predicted_total`](@ref) makes it, and [`predicted_attribution`](@ref) reads it. The two values are numbers of one type, so a record names them.
+
+# Fields
+
+$(DocStringExtensions.FIELDS)
+
+# Related
+
+  - [`attribution_predicted_total`](@ref)
+  - [`predicted_attribution`](@ref)
+"""
+@concrete struct PredictedTotal
+    """
+    `total`: The total of the moment.
+    """
+    total
+    """
+    `gap`: The unattributed part, the total less the systematic and the idiosyncratic part.
+    """
+    gap
 end
 """
     attribution_predicted_total(anchor::Nothing, keep, w, sys::Number, idio::Number, mdl)
@@ -1795,8 +2017,7 @@ Where:
 
 # Returns
 
-  - `total::Number`: The total.
-  - `gap::Number`: The unattributed part.
+  - `tv::PredictedTotal`: The total `total` and the unattributed part `gap`.
 
 # Related
 
@@ -1806,7 +2027,7 @@ Where:
 function attribution_predicted_total(::Nothing, ::AbstractVector{Bool}, ::VecNum,
                                      sys::Number, idio::Number, ::NamedTuple)
     total = sys + idio
-    return (; total = total, gap = zero(total))
+    return PredictedTotal(total, zero(total))
 end
 function attribution_predicted_total(sigma::MatNum, keep::AbstractVector{Bool}, w::VecNum,
                                      sys::Number, idio::Number, mdl::NamedTuple)
@@ -1818,17 +2039,17 @@ function attribution_predicted_total(sigma::MatNum, keep::AbstractVector{Bool}, 
                 attribution_finite(M * mdl.F * transpose(M) + mdl.D))
     end
     total = LinearAlgebra.dot(w, S, w)
-    return (; total = total, gap = total - sys - idio)
+    return PredictedTotal(total, total - sys - idio)
 end
 function attribution_predicted_total(mu::VecNum, keep::AbstractVector{Bool}, w::VecNum,
                                      sys::Number, idio::Number, mdl::NamedTuple)
     m = ifelse.(isfinite.(mu) .| keep, mu, attribution_finite(mdl.M * mdl.mu_f + mdl.bp))
     total = LinearAlgebra.dot(w, m)
-    return (; total = total, gap = total - sys - idio)
+    return PredictedTotal(total, total - sys - idio)
 end
 """
-    predicted_attribution(w::VecNum, mdl::NamedTuple; assets::Bool = false, ppy::Number = 1,
-                          strict::Bool = false,
+    predicted_attribution(w::VecNum, mdl::AttributionModel; assets::Bool = false,
+                          ppy::Number = 1, strict::Bool = false,
                           unknown::AbstractUnknownEntryRule = EntrywiseUnknown())
         -> FactorAttributionResult
 
@@ -1870,7 +2091,7 @@ Every predicted method of [`factor_attribution`](@ref) calls this function, the 
   - [`attribution_array_model`](@ref)
   - [`predicted_attribution_assets`](@ref)
 """
-function predicted_attribution(w::VecNum, mdl::NamedTuple; assets::Bool = false,
+function predicted_attribution(w::VecNum, mdl::AttributionModel; assets::Bool = false,
                                ppy::Number = 1, strict::Bool = false,
                                unknown::AbstractUnknownEntryRule = EntrywiseUnknown())::FactorAttributionResult
     F, mu_f = mdl.F, mdl.mu_f
@@ -2010,7 +2231,7 @@ Summed over the assets, ``\\mathrm{VC}^{S}_{i}`` gives ``\\sqrt{p}\\, \\boldsymb
   - [`AssetFactorContribution`](@ref)
 """
 function predicted_attribution_assets(assets::Bool, w::VecNum, mdl::NamedTuple, Fb::VecNum,
-                                      sigma_p::Number, sc::NamedTuple)
+                                      sigma_p::Number, sc::AnnualisationScale)
     if !assets
         return nothing, nothing
     end
@@ -2049,162 +2270,3 @@ export AttributionComponent, AttributionBreakdown, AssetAttributionBreakdown,
        AssetFactorContribution, FactorAttributionResult, factor_attribution,
        EntrywiseUnknown, ZeroUnknown, KindwiseUnknown
 public AbstractUnknownEntryRule
-"""
-    attribution_key_align(blk::NamedTuple, T::Integer, key::Nothing)
-    attribution_key_align(blk::NamedTuple, T::Integer, key::NamedTuple)
-
-Return the lag-aligned history of a factor model block over the observations of a series that may name its rows.
-
-The series of a cross-validation names its rows, and its folds usually cover fewer rows than a prior fitted on the whole sample. A `key` of `nothing` names no row, so the function aligns the block at the tail with [`attribution_align`](@ref). A `key` with the fields `idx` and `ts` names the position and the timestamp of each observation of the series. [`attribution_key_pair`](@ref) picks the key that the block and the series both carry. The function then aligns the whole block, so each block row keeps the exposures of the row `lag` observations before it. Last, it cuts the aligned block with [`attribution_window`](@ref) to the rows that [`attribution_match_rows`](@ref) matches. The first observation of a fold that starts after the first block row therefore keeps its exposures, which a cut of the block before the alignment would lose. When the two carry no common key, the function aligns at the tail.
-
-# Arguments
-
-  - `blk`: The block as bare arrays, from [`attribution_block_arrays`](@ref) or [`attribution_array_block`](@ref).
-  - `T`: The number of observations the caller's return series carries.
-  - `key`: The position `idx` and the timestamp `ts` of each observation of the series, each `nothing` when the series does not carry it, or `nothing`.
-
-# Validation
-
-  - With a common key, the key of the series has `T` entries and the key of the block has one entry for each observation of the block, else a `DimensionMismatch` is raised, and the rules of [`attribution_match_rows`](@ref) hold.
-  - The rules of [`attribution_align`](@ref).
-
-# Returns
-
-  - `al::NamedTuple`: The aligned history, as [`attribution_align`](@ref) states it. Its `rows` are the observations of the series that the block decomposes, and they are consecutive.
-
-# Related
-
-  - [`attribution_align`](@ref)
-  - [`attribution_key_pair`](@ref)
-  - [`attribution_match_rows`](@ref)
-  - [`factor_attribution`](@ref)
-"""
-function attribution_key_align(blk::NamedTuple, T::Integer, ::Nothing)
-    return attribution_align(blk, T)
-end
-function attribution_key_align(blk::NamedTuple, T::Integer, key::NamedTuple)
-    kp = attribution_key_pair(blk, key)
-    if isnothing(kp)
-        return attribution_align(blk, T)
-    end
-    @argcheck(length(kp.series) == T,
-              DimensionMismatch("the row key of the return series ($(length(kp.series)) entries) must have one entry for each observation of the series ($T)"))
-    @argcheck(length(kp.block) == size(blk.f, 1),
-              DimensionMismatch("the row key of the factor model block ($(length(kp.block)) entries) must have one entry for each observation of the block ($(size(blk.f, 1)))"))
-    al = attribution_align(blk, size(blk.f, 1))
-    m = attribution_match_rows(kp.block, kp.series, blk.lag)
-    return merge(attribution_window(al, m.arows), (; rows = m.rows))
-end
-"""
-    attribution_key_pair(blk::NamedTuple, key::NamedTuple)
-    attribution_key_pair(b::AbstractVector, s::AbstractVector)
-    attribution_key_pair(b::Option{<:AbstractVector}, s::Option{<:AbstractVector})
-
-Return the row keys of a factor model block and of a return series that the two share, or `nothing`.
-
-A timestamp names an observation in every returns data that holds it, so the function takes the timestamps when both carry them. A position names an observation in one returns data alone, so the function takes the positions only when one of the two carries no timestamps. The positions of the block are then positions in the returns data that the prior read, and those of the series are positions in the returns data that the cross-validation split. The two agree only when the prior read the returns data that the cross-validation split, and the function cannot check that.
-
-# Arguments
-
-  - `blk`: The block as bare arrays, with the fields `idx` and `ts` of [`attribution_row_key`](@ref).
-  - `key`: The position `idx` and the timestamp `ts` of each observation of the series, each `nothing` when the series does not carry it.
-  - `b`, `s`: One kind of key of the block and of the series, each `nothing` when its side does not carry it. The two methods over them pair the keys when both are present, and answer `nothing` otherwise.
-
-# Returns
-
-  - `kp::Option{<:NamedTuple}`: The key of the block under `block` and that of the series under `series`, or `nothing` when the two share no key.
-
-# Related
-
-  - [`attribution_align`](@ref)
-  - [`attribution_match_rows`](@ref)
-"""
-function attribution_key_pair(blk::NamedTuple, key::NamedTuple)
-    kp = attribution_key_pair(blk.ts, key.ts)
-    return isnothing(kp) ? attribution_key_pair(blk.idx, key.idx) : kp
-end
-function attribution_key_pair(b::AbstractVector, s::AbstractVector)
-    return (; block = b, series = s)
-end
-function attribution_key_pair(::Option{<:AbstractVector}, ::Option{<:AbstractVector})
-    return nothing
-end
-"""
-    attribution_match_rows(bk::AbstractVector, sk::AbstractVector, lag::Integer)
-
-Return the rows of a return series that a factor model block decomposes, and the aligned block row of each.
-
-Block row `t` of a fit with exposure lag `lag` decomposes its returns with the exposures of block row `t - lag`, so the first `lag` block rows decompose nothing. Aligned row `a` is block row `a + lag`. The function finds the aligned row whose key equals the key of each observation of the series. The observations before the first match and after the last match fall outside the block, as the observations of a fold before the first fitted row do, and the attribution leaves them out, when their keys lie outside the range of the keys of the aligned rows. Every other observation must match, because a key inside that range with no row is a gap of the block, for example an observation that the fit dropped for a Shared Series gap. A gap at the head of the series is refused as a gap between two matches is.
-
-# Arguments
-
-  - `bk`: The key of each block row, positions or timestamps.
-  - `sk`: The key of each observation of the series, of the same kind as `bk`.
-  - `lag`: The exposure lag of the block.
-
-# Validation
-
-  - At least one observation of the series matches an aligned row. Raises a `DimensionMismatch`.
-  - Every observation between the first match and the last match, and every observation whose key lies inside the range of the keys of the aligned rows, matches an aligned row. Raises an `ArgumentError` that names the first unmatched observations.
-  - The matched aligned rows increase strictly, so the series repeats no observation and keeps the order of the block. Raises an `ArgumentError`.
-
-# Returns
-
-  - `rows::UnitRange{Int}`: The observations of the series that the block decomposes.
-  - `arows::Vector{Int}`: The aligned block row of each of them.
-
-# Related
-
-  - [`attribution_align`](@ref)
-  - [`attribution_key_pair`](@ref)
-"""
-function attribution_match_rows(bk::AbstractVector, sk::AbstractVector, lag::Integer)
-    Tb = length(bk)
-    pos = Dict(zip(view(bk, (lag + 1):Tb), 1:(Tb - lag)))
-    m = [get(pos, k, 0) for k in sk]
-    kept = findall(!iszero, m)
-    @argcheck(!isempty(kept),
-              DimensionMismatch("no observation of the return series is a row that the factor model block decomposes. The block decomposes $(Tb - lag) rows, those after its exposure lag of $lag. Fit the prior on returns data that covers the rows of the series."))
-    rows = first(kept):last(kept)
-    # An unmatched observation before the first match is outside the block only when its key
-    # comes before the first aligned row. A key inside the range of the aligned rows is a gap
-    # of the block, wherever the observation stands in the series.
-    lo, hi = extrema(view(bk, (lag + 1):Tb))
-    gaps = findall(k -> iszero(m[k]) && (k in rows || lo <= sk[k] <= hi), eachindex(m))
-    @argcheck(isempty(gaps),
-              ArgumentError("observations $(first(gaps, 5)) of the return series lie inside the rows of the factor model block, and the block holds no row for them. Fit the prior on the returns data that the cross-validation split, or drop those observations."))
-    arows = m[rows]
-    @argcheck(all(>(0), diff(arows)),
-              ArgumentError("the return series repeats a row of the factor model block, or does not keep its order. A realised attribution reads the observations in the order of time, so its folds must not overlap and must come in the order of time."))
-    return (; rows = rows, arows = arows)
-end
-"""
-    attribution_series_key(pred::MultiPeriodPredictionResult)
-
-Return the row key of the series that a cross-validation produced.
-
-The series is the folds stacked in order, as [`attribution_prediction_history`](@ref) stacks them, so its key is the keys of the folds stacked in the same order. A fold records its positions in `idx`, and the timestamps of its rows in `rd.ts`. The series carries positions only when every fold carries them, and timestamps only when every fold carries them, as `pred.mrd.ts` holds them.
-
-# Arguments
-
-  - `pred`: A multi-period prediction result.
-
-# Returns
-
-  - `idx::Option{<:VecInt}`: The position of each observation of the series in the returns data that the cross-validation split, or `nothing`.
-  - `ts::Option{<:VecDate}`: The timestamp of each observation of the series, or `nothing`.
-
-# Related
-
-  - [`factor_attribution`](@ref)
-  - [`attribution_prediction_history`](@ref)
-  - [`PredictionResult`](@ref)
-"""
-function attribution_series_key(pred::MultiPeriodPredictionResult)
-    idx = if any(p -> isnothing(p.idx), pred.pred)
-        nothing
-    else
-        reduce(vcat, p.idx for p in pred.pred)
-    end
-    return (; idx = idx, ts = pred.mrd.ts)
-end

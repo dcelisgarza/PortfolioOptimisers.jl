@@ -1,8 +1,8 @@
 ```@meta
-Description = "Factor attribution, public API of PortfolioOptimisers.jl: AbstractUnknownEntryRule, AttributionComponent, AttributionBreakdown, AssetAttributionBreakdown, …"
+Description = "Factor attribution (a), public API of PortfolioOptimisers.jl: AbstractUnknownEntryRule, AttributionComponent, AttributionBreakdown, …"
 ```
 
-# Factor attribution
+# Factor attribution (a)
 
 ```@docs
 AbstractUnknownEntryRule

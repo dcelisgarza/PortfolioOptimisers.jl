@@ -304,7 +304,7 @@ end
     w = fa_weights(pr)
     fa = factor_attribution(w, pr, rd.X; assets = true)
     ret = fa_net_returns(w, pr, rd)
-    al = PO.attribution_align(pr.rr, pr, length(ret))
+    al = PO.attribution_align(PO.attribution_block_arrays(pr.rr, pr), length(ret))
     aret = view(ret, al.rows)
     @testset "The Result reports a mean return over the aligned history" begin
         @test fa.realised
@@ -437,8 +437,8 @@ end
         @test fa.fbd.pct_var ≈ [cv(G[:, k] .* F[:, k]) / sig^2 for k in 1:K]
         @test fa.fbd.mu ≈ vec(mean(F; dims = 1)) .* ppy
         @test fa.fbd.mu_contrib ≈ vec(mean(G .* F; dims = 1)) .* ppy
-        fi = PO.attribution_family_index(rr.fam)
-        @test fa.fmbd.exposure_std ≈ [std(vec(sum(G[:, i]; dims = 2))) for i in fi.idx]
+        _, fidx = PO.attribution_family_index(rr.fam)
+        @test fa.fmbd.exposure_std ≈ [std(vec(sum(G[:, i]; dims = 2))) for i in fidx]
     end
     @testset "Each asset row reads the model return of the asset" begin
         A = S .+ E
@@ -539,7 +539,7 @@ end
     @test isnan(factor_attribution(fa_weights(pr0), pr0, rd.X; se = true).sys.mu_se)
     pr, rd = fa_prior(; ve = FA_VE1)
     w = fa_weights(pr)
-    al = PO.attribution_align(pr.rr, pr, size(rd.X, 1))
+    al = PO.attribution_align(PO.attribution_block_arrays(pr.rr, pr), size(rd.X, 1))
     G = transpose(view(al.B, :, :, 1)) * Diagonal(view(al.rw, 1, :)) * view(al.B, :, :, 1)
     @test PO.cross_sectional_rank(G) < size(G, 2)
     fa = factor_attribution(w, pr, rd.X; se = true)
@@ -576,7 +576,7 @@ end
     pr, rd = fa_prior()
     w = fa_weights(pr)
     ret = fa_net_returns(w, pr, rd)
-    al = PO.attribution_align(pr.rr, pr, length(ret))
+    al = PO.attribution_align(PO.attribution_block_arrays(pr.rr, pr), length(ret))
     T = length(al.rows)
     @testset "One window over the whole aligned history is the single-window call" begin
         roll = factor_attribution(w, pr, rd.X, T)
@@ -665,11 +665,11 @@ end
     @test isnothing(fa.unattr.mu_se)
     @test isnothing(fa.total.mu_se)
     @testset "A family's error reads its whole covariance block" begin
-        fi = PortfolioOptimisers.attribution_family_index(["market", "style"])
-        @test fi.labels == ["market", "style"]
+        labels, fidx = PortfolioOptimisers.attribution_family_index(["market", "style"])
+        @test labels == ["market", "style"]
         @test fa.fmbd.mu_se ≈ [scale *
                                sqrt(sum(dot(view(g[t], i), view(V[t], i, i), view(g[t], i)) for t in 1:2))
-                               for i in fi.idx]
+                               for i in fidx]
     end
     @testset "Annualisation scales the errors as it scales a mean" begin
         b = factor_attribution(w, pr, X; se = true, ppy = 12)
@@ -723,7 +723,7 @@ end
     @test PO.attribution_exposures(rr) === M
     @test iszero(PO.attribution_lag(rr))
     fa = factor_attribution(w, pr, X; assets = true)
-    @test length(PO.attribution_align(rr, pr, 3).rows) == 3
+    @test length(PO.attribution_align(PO.attribution_block_arrays(rr, pr), 3).rows) == 3
     # A static block reconstructs the returns exactly, so nothing is left over.
     @test abs(fa.unattr.pct_var) < 1e-12
     @test sum(fa.fbd.vol_contrib) ≈ fa.sys.vol_contrib
@@ -848,7 +848,7 @@ end
         w = fa_ts_weights(pr)
         T = size(rd.X, 1)
         # The lag is zero, so the aligned history is the whole of the caller's series.
-        @test PO.attribution_align(pr.rr, pr, T).rows == 1:T
+        @test PO.attribution_align(PO.attribution_block_arrays(pr.rr, pr), T).rows == 1:T
         fa = factor_attribution(w, pr, rd.X)
         @test isnothing(fa.fmbd)
         @test isnothing(fa.sys.mu_se)
@@ -967,12 +967,10 @@ end
     @testset "The row match leaves out the edges and refuses a gap, a repeat and no overlap (#1493)" begin
         # Under a lag of one the first key has no exposures, so the aligned keys are 2, 3, 5, 6.
         bk = [1, 2, 3, 5, 6]
-        m = PO.attribution_match_rows(bk, [1, 2, 3], 1)
-        @test m.rows == 2:3 && m.arows == [1, 2]
-        m = PO.attribution_match_rows(bk, [5, 6, 7], 1)
-        @test m.rows == 1:2 && m.arows == [3, 4]
+        @test PO.attribution_match_rows(bk, [1, 2, 3], 1) == (2:3, [1, 2])
+        @test PO.attribution_match_rows(bk, [5, 6, 7], 1) == (1:2, [3, 4])
         d = rd.ts[bk]
-        @test PO.attribution_match_rows(d, d[[3, 4]], 1).arows == [2, 3]
+        @test last(PO.attribution_match_rows(d, d[[3, 4]], 1)) == [2, 3]
         @test_throws DimensionMismatch PO.attribution_match_rows(bk, [7, 8], 1)
         # Key 4 lies between two rows of the block, which holds no row for it.
         @test_throws ArgumentError PO.attribution_match_rows(bk, [3, 4, 5], 1)
@@ -980,21 +978,19 @@ end
         @test_throws ArgumentError PO.attribution_match_rows(bk, [5, 3], 1)
         # The timestamps come first, the positions next, and no shared key gives nothing.
         t = rd.ts[1:3]
-        @test PO.attribution_key_pair((; idx = 1:3, ts = t), (; idx = 4:6, ts = t)).block ==
-              t
-        @test PO.attribution_key_pair((; idx = 1:3, ts = nothing), (; idx = 4:6, ts = t)).block ==
-              1:3
-        @test isnothing(PO.attribution_key_pair((; idx = nothing, ts = nothing),
-                                                (; idx = 4:6, ts = t)))
+        key(idx, ts) = PO.AttributionRowKey(idx, ts)
+        @test PO.attribution_key_pair(key(1:3, t), key(4:6, t)).block == t
+        @test PO.attribution_key_pair(key(1:3, nothing), key(4:6, t)).block == 1:3
+        @test isnothing(PO.attribution_key_pair(key(nothing, nothing), key(4:6, t)))
         blk = PO.attribution_block_arrays(pr.rr, pr)
-        @test_throws DimensionMismatch PO.attribution_key_align(blk, 5,
-                                                                (; idx = 1:4, ts = nothing))
+        @test_throws DimensionMismatch PO.attribution_key_align(blk, 5, key(1:4, nothing))
         # A FactorPrior block records the positions of its observations (#1495), and a block
         # built by hand records no key.
         tsr = first(fa_ts_prior()).rr
-        @test PO.attribution_row_key(tsr) == (; idx = 1:90, ts = nothing)
-        @test PO.attribution_row_key(Regression(; M = tsr.M)) ==
-              (; idx = nothing, ts = nothing)
+        k = PO.attribution_row_key(tsr)
+        @test k.idx == 1:90 && isnothing(k.ts)
+        k = PO.attribution_row_key(Regression(; M = tsr.M))
+        @test isnothing(k.idx) && isnothing(k.ts)
     end
 end
 
@@ -1103,7 +1099,11 @@ end
     @test PO.attribution_standalone_pairs(EntrywiseUnknown(), act) === act
     @test PO.attribution_standalone_pairs(ZeroUnknown(), act) == trues(3)
     # The active mask of the returns data.
-    @test isnothing(PO.attribution_active_mask(nothing))
+    @test isnothing(PO.panel_active_cells(nothing))
+    # A history that the block does not carry, and a stack with no family re-basis.
+    @test isnothing(PO.attribution_finite(nothing))
+    V = reshape(collect(1.0:12.0), 2, 2, 3)
+    @test PO.expand_factor_covariance(nothing, V) === V
 end
 @testset "The refusals" begin
     PO = PortfolioOptimisers
@@ -1301,7 +1301,7 @@ end
         # reduced basis. Mapped back onto the raw axis, it gives the same systematic error.
         fa = factor_attribution(w, pr, rd.X; se = true)
         ret = fa_net_returns(w, pr, rd)
-        al = PO.attribution_align(rr, pr, length(ret))
+        al = PO.attribution_align(PO.attribution_block_arrays(rr, pr), length(ret))
         T = size(al.f, 1)
         g = reduce(vcat, [transpose(transpose(al.B[:, :, t]) * w) for t in 1:T])
         red = PO.attribution_reduce_for_errors(al.fcb, al.unseen, al.B, al.rw, g, al.no, T)
@@ -1309,7 +1309,7 @@ end
         keep = findall(!, red.observed)
         V = [PO.attribution_sandwich(view(red.B, :, :, t), view(al.rw, t, :),
                                      view(al.vs, t, :), keep) for t in 1:T]
-        Vf = PO.attribution_expand_errors(al.fcb, PO.attribution_scatter(V, keep, red.nr))
+        Vf = PO.expand_factor_covariance(al.fcb, PO.attribution_scatter(V, keep, red.nr))
         @test fa.sys.mu_se ≈ sqrt(sum(dot(g[t, :], Vf[:, :, t], g[t, :]) for t in 1:T)) / T
         @test fa.fbd.mu_se ≈
               [sqrt(sum(g[t, k]^2 * Vf[k, k, t] for t in 1:T)) / T for k in axes(g, 2)]

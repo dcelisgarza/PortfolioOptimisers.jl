@@ -176,7 +176,6 @@ end
                                 # Private names that are simple and convenient.
                                 :cv_sequential_info => "the one message of the sequential fold loop, named beside the rule that sends a run there",
                                 :_expr_to_lens => "the base case of the lens-building recursion of `expr_to_lens_chain`",
-                                :attribution_no_errors => "the empty answer of an attribution, named where the Result reads three fields from it",
                                 :no_head_block => "the resolver of the block of a bare head, passed as a function value to `resolve_block_entry`, which takes `f` and its arguments and not a closure, so that no variable of the entry is boxed")
 
     # ------------------------------------------------------------- the forward census
@@ -291,7 +290,9 @@ end
                                                         (:factory, :SubsetResamplingResult) => "(b) the keyword constructor of `SubsetResamplingResult` expands `w` through the investable mask, so a rebuild through it expands the weights twice: the positional constructor keeps them (#2101, #2103)",
                                                         (:cross_val_predict, :fit_and_predict) => "(interface) 3 functions share the callee `fit_and_predict` (rule 3, #2103)",
                                                         (:expected_risk, :expected_risk_from_returns) => "(interface) `expected_risk_from_returns` is a shared public verb (rule 3, #2103)",
-                                                        (:online_step_fold, :partial_fit!) => "(interface) `partial_fit!` is a shared public verb (rule 3, #2103)")
+                                                        (:online_step_fold, :partial_fit!) => "(interface) `partial_fit!` is a shared public verb (rule 3, #2103)",
+                                                        # src/19_FactorAttribution (#2105).
+                                                        (:factor_attribution, :factor_attribution) => "public: (a) the rolling method on asset returns with no fees, `(w, pr, X, window)` or `(w, pr, rd, window)`, converts the call to the canonical form `(w, pr, X, nothing, window)`; the filled slot `fees = nothing` comes before `window`, so no trailing default holds it (rule 5, #2090, #2105)")
     # The functions whose forward methods are interface methods, with the check that shows
     # it. #2072 adds a name after a check of each one.
     interface_functions = Dict{Symbol, String}(#
@@ -396,7 +397,16 @@ end
                                                :fold_context => "its callee is the constructor of a type, `TimeDependentContext` (rule 3, #2103)",
                                                :herc_unitary_risks => "2 functions share its callee `unitary_expected_risks` (rule 3, #2103)",
                                                :fold_evaluation => "one method for each scheme: each builds the record `FoldEvaluation`, the constructor of a type (rule 3, #2103)",
-                                               :returns_universe_axes => "one method for each axis: each builds the record `UniverseAxes`, the constructor of a type (rule 3, #2103)")
+                                               :returns_universe_axes => "one method for each axis: each builds the record `UniverseAxes`, the constructor of a type (rule 3, #2103)",
+                                               # src/19_FactorAttribution (#2105).
+                                               :attribution_idiosyncratic_covariance => "4 functions share its callee `assert_attribution_field`, the check of a field of the block (rule 3, #2105)",
+                                               :attribution_lag => "3 functions share its callee `cs_regression_lag`: the exposure IC and the regression diagnostics read it too (rule 3, #2105)",
+                                               :attribution_fold_weights => "3 functions share its callee `weight_path`: the net returns and the cross-validation read it too (rule 3, #2105)",
+                                               :attribution_unknown_block => "2 functions share its callee `attribution_unknown_rows`: the predicted attribution reads it too (rule 3, #2105)",
+                                               :attribution_standalone => "4 functions share its callee `attribution_finite`, the repair of a non-finite entry (rule 3, #2105)",
+                                               :attribution_row_key => "one method for each kind of block: each builds the record `AttributionRowKey`, the constructor of a type (rule 3, #2113, #2105)",
+                                               :attribution_key_pair => "one method for each pair of keys: the method on two vectors builds the record `RowKeyPair`, the constructor of a type (rule 3, #2113, #2105)",
+                                               :attribution_unknown_kinds => "one method for each rule: a preset builds `KindwiseUnknown`, the public type of its shape, and a `KindwiseUnknown` is its own answer (rule 3, #2113, #2105)")
     # The debt that #2072 removes. Do not add a pair: fix the wrapper.
     pending_forwards = Set{Tuple{Symbol, Symbol}}([(:apply_fitted_step,
                                                     :apply_fitted_steps),
@@ -404,34 +414,9 @@ end
                                                     :apply_preprocessing),
                                                    (:assert_online_owner,
                                                     :assert_online_entry),
-                                                   (:attribution_active_mask,
-                                                    :panel_active_cells),
-                                                   (:attribution_expand_errors,
-                                                    :expand_factor_covariance),
-                                                   (:attribution_finite_rows,
-                                                    :attribution_finite),
-                                                   (:attribution_fold_weights,
-                                                    :weight_path),
-                                                   (:attribution_idiosyncratic_covariance,
-                                                    :assert_attribution_field),
-                                                   (:attribution_lag, :cs_regression_lag),
-                                                   (:attribution_standalone,
-                                                    :attribution_finite),
-                                                   (:attribution_unknown_block,
-                                                    :attribution_unknown_rows),
-                                                   (:attribution_window_basis,
-                                                    :factor_basis_slice),
                                                    (:copy_step_states, :copy_states),
                                                    (:cross_val_predict,
                                                     :pipeline_cross_val_predict),
-                                                   (:factor_attribution,
-                                                    :attribution_realised_entry),
-                                                   (:factor_attribution,
-                                                    :attribution_returns_entry),
-                                                   (:factor_attribution,
-                                                    :attribution_rolling_entry),
-                                                   (:factor_attribution,
-                                                    :factor_attribution),
                                                    (:fitted_step_keeps_observations,
                                                     :keeps_observations),
                                                    (:group_frames, :pipeline_frames),
@@ -606,6 +591,13 @@ end
     for n in
         (:population_entries, :prediction_entries, :summarise_returns, :summary_options,
          :summary_entry)
+        @test (n, isdefined(PO, n)) == (n, false)
+    end
+    # Pinned on the wrappers of the factor attribution that #2105 removed.
+    for n in
+        (:attribution_active_mask, :attribution_returns_entry, :attribution_trim_basis,
+         :attribution_finite_rows, :attribution_window_basis, :attribution_expand_errors,
+         :attribution_no_errors)
         @test (n, isdefined(PO, n)) == (n, false)
     end
 

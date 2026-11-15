@@ -924,22 +924,6 @@ finding is stale, and `test/test_89_forward_survey_census.jl` fails on it, so th
 removes the pair deletes the entry.
 """
 const RULED_NOTHING_PAIRS = Dict{Tuple{Symbol, Symbol}, Tuple{String, String}}(#
-                                                                               (:attribution_window_basis,
-                                                                                :factor_basis_slice) =>
-                                                                                   ("go",
-                                                                                    CASE_2),
-                                                                               (:attribution_expand_errors,
-                                                                                :expand_factor_covariance) =>
-                                                                                   ("go",
-                                                                                    CASE_2),
-                                                                               (:attribution_finite_rows,
-                                                                                :attribution_finite) =>
-                                                                                   ("go",
-                                                                                    CASE_2),
-                                                                               (:attribution_active_mask,
-                                                                                :panel_active_cells) =>
-                                                                                   ("go",
-                                                                                    CASE_2),
                                                                                (:cross_sectional_shared_qr,
                                                                                 :cross_sectional_qr) =>
                                                                                    ("keep (b)",
@@ -1544,40 +1528,11 @@ const RULED_NAMED_TUPLES = Dict{Symbol, Tuple{String, String}}(#
                                                                :default_report_figures =>
                                                                    ("go",
                                                                     "its fields take the names of the keywords of `portfolio_report`, `overview_figures` and `entry_figures`, so that a caller splats it; the entry then turns to `keep (keys)` (#2113)"),
-                                                               :attribution_array_keywords =>
-                                                                   ("go",
-                                                                    "two keyword bundles of one type: a private defined type, because a positional swap is silent (#2113)"),
                                                                :prior_field_values =>
                                                                    ("keep (keys)",
                                                                     "the keys are the field names of the prior (#2113)"),
                                                                # The transient test of the private helpers, which needs the callers
                                                                # and the types of the values (#2113).
-                                                               :attribution_family_index =>
-                                                                   ("go",
-                                                                    "every caller takes it apart at once: a plain tuple, unless two values have one type, which takes a private type (#2113)"),
-                                                               :attribution_key_pair =>
-                                                                   ("go",
-                                                                    "the value travels: returned inside an `if`: a private defined type (#2113)"),
-                                                               :attribution_match_rows =>
-                                                                   ("go",
-                                                                    "every caller takes it apart at once: a plain tuple, unless two values have one type, which takes a private type (#2113)"),
-                                                               :attribution_predicted_total =>
-                                                                   ("go",
-                                                                    "`total` and `gap` are numbers of one type, so a positional swap is silent: a private defined type (#2113)"),
-                                                               :attribution_prior_block =>
-                                                                   ("go",
-                                                                    "every caller takes it apart at once: a plain tuple, unless two values have one type, which takes a private type (#2113)"),
-                                                               :attribution_scale => ("go",
-                                                                                      "the value travels: a later use of `sc`, and its two values have one type: a private defined type (#2113)"),
-                                                               :attribution_unknown_kinds =>
-                                                                   ("go",
-                                                                    "every caller takes it apart at once: a plain tuple, unless two values have one type, which takes a private type (#2113)"),
-                                                               :attribution_weight_moments =>
-                                                                   ("go",
-                                                                    "the value travels: an argument to a call: a private defined type (#2113)"),
-                                                               :attribution_zero_inactive =>
-                                                                   ("go",
-                                                                    "every caller takes it apart at once: a plain tuple, unless two values have one type, which takes a private type (#2113)"),
                                                                :covariance_plot_windows =>
                                                                    ("go",
                                                                     "the value travels: `rw` goes to `covariance_plot_entry`: a private defined type (#2113)"),

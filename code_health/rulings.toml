@@ -365,6 +365,16 @@ definition = "CovarianceForecastSummaryResult"
 metric = "arg"
 rationale = "keyword-constructor-arity"
 
+# The split of `01_FactorAttribution.jl` into letter parts (#2105, ADR 0178).
+# `attribution_array_block` moved with its 13 arguments, the arrays of a block and their keywords,
+# and now drives the maximum of part `_a`. Its signature did not change, and the dead row recorded
+# `arg = 13` for it. Its last line builds the record `AttributionBlock` in place of a named tuple.
+[[exemption]]
+path = "src/19_FactorAttribution/01_FactorAttribution_a.jl"
+definition = "attribution_array_block"
+metric = "arg"
+rationale = "a-definition-a-file-split-moved-unchanged"
+
 # The split of `03_Preprocessing.jl` into the price-to-returns run. Each of these three definitions
 # moved byte-for-byte, and each now drives the maximum of a smaller file rather than sitting under
 # the row that grandfathered it. ADR 0074's entry test reads the new file as an addition, so the
