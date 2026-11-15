@@ -221,10 +221,14 @@ function scorer_scale(s::HighestMeanScore)
     return s.scale
 end
 """
-    finite_candidate_order(s_sca::Option{<:Sca_VecToScaM}, scorer, test_scores::MatNum,
+    finite_candidate_order(s_sca::Union{Option{<:Sca_VecToScaM}, EachValue}, scorer,
+                           test_scores::MatNum, n_best::Integer)
+    finite_candidate_order(::EachValue, scorers::AbstractVector, test_scores::MatNum,
+                           n_best::Integer)
+    finite_candidate_order(s_sca, scorer, test_scores::AbstractVector{<:MatNum},
                            n_best::Integer)
 
-Order the candidates of a search, best first, keep the first `n_best`, and never let a failed candidate in.
+Order the candidates of a search, best first, keep the first `n_best`, and never let a failed candidate in. Under [`EachValue`](@ref), give one such ranking for each value per candidate.
 
 A candidate that did not finish every fold carries a non-finite entry in its column of the score matrix, and `argmax` over `[0.80, NaN, 0.50]` returns the position of the `NaN`. So the scorer receives the columns whose **every** entry is finite, and the order that it gives, in positions of the matrix that it received, maps back to the grid through the list of those columns.
 
@@ -254,9 +258,17 @@ Where:
 
 The sort is stable, so a tie keeps the order of the grid, as `argmax` does.
 
+## One ranking for each value
+
+A ranking is the pair `(rank_idx, rank_scores)`. The types of `s_sca`, `scorer` and `test_scores` select the shape, never the count at run time.
+
+  - **One matrix, one value.** A reduction or one scorer gives one ranking, by the steps below. This is the path of a search of one value, and [`EachValue`](@ref) with one scorer takes it too.
+  - **One matrix, `s_sca = EachValue()` with `L` scorers.** Each scorer orders the finite candidates alone, through [`scorer_ranking`](@ref). Its values are multiplied by its [`scorer_scale`](@ref), so a negative scale reverses the order of that scorer alone. A scorer that gives the index of one winner keeps one candidate, whatever `n_best` is, and its entry of `rank_scores` is `nothing`. The return is a vector of `L` entries in each part.
+  - **A vector of `K` matrices, `r_sca = EachValue()`.** Each matrix is ranked by the rules above, apart from the others, so a candidate can enter the ranking of one measure and stay out of the ranking of another. A matrix with no finite column gives an empty ranking, through [`empty_ranking`](@ref). Its columns are empty, and its values are empty, or `nothing` where a full ranking of the same scorer holds `nothing`. The return is a vector of `K` entries in each part, or a `K × L` matrix, row `k` for measure `k`, under `s_sca = EachValue()` with `L` scorers, through [`measure_rankings`](@ref).
+
 # Algorithm
 
- 1. Mark the columns of `test_scores` whose every entry is finite, giving `cols`.
+ 1. Mark the columns of `test_scores` whose every entry is finite, giving `cols`, through [`finite_score_columns`](@ref).
  2. Throw an `IsNonFiniteError` when no column is finite.
  3. Take the view `X` of `test_scores` at `cols`, and call [`candidate_values`](@ref) with `s_sca` and `scorer` on it, giving `vals`.
  4. If `vals` is a vector: check it through [`assert_candidate_scores`](@ref). Then take the first `min(n_best, length(cols))` positions of the descending order of `vals` through a partial sort, which breaks a tie by the position, and so gives the order of a stable sort. Return the columns of `cols` at those positions and their values.
@@ -265,10 +277,10 @@ The sort is stable, so a tie keeps the order of the grid, as `argmax` does.
 
 # Arguments
 
-  - `s_sca`: The reduction of a vector of search scorers. Inert for one scorer.
-  - `scorer`: One search scorer ([`CrossValSearchScorer`](@ref)), or a vector of them.
-  - `test_scores`: The `folds × candidates`, or `paths × candidates`, score matrix.
-  - `n_best`: The count of the candidates to keep.
+  - `s_sca`: The reduction of a vector of search scorers, or [`EachValue`](@ref). Inert for one scorer.
+  - `scorer`, `scorers`: One search scorer ([`CrossValSearchScorer`](@ref)), or a vector of them.
+  - `test_scores`: The `folds × candidates`, or `paths × candidates`, score matrix, or one such matrix per measure under `r_sca = EachValue()`.
+  - `n_best`: The count of the candidates that each ranking keeps.
 
 # Validation
 
@@ -276,11 +288,12 @@ The sort is stable, so a tie keeps the order of the grid, as `argmax` does.
   - A scorer that gives an index keeps one candidate. Otherwise an `ArgumentError` names the type of the scorer and the form to give.
   - The checks of [`assert_candidate_scores`](@ref) and [`candidate_values`](@ref).
   - A scorer gives a vector or an integer. Otherwise an `ArgumentError`.
+  - A vector of matrices: these checks on each matrix that has a finite column, and at least one matrix has a finite column. Otherwise an `IsNonFiniteError` that names the count of the measures.
 
 # Returns
 
-  - `rank_idx::AbstractVector{<:Integer}`: The positions in the parameter grid of the kept candidates, best first.
-  - `rank_scores::Option{<:VecNum}`: The value of [`candidate_values`](@ref) of each kept candidate, in the order of `rank_idx`, or `nothing` when the scorer gives an index.
+  - `rank_idx::AbstractVector{<:Integer}`: The positions in the parameter grid of the kept candidates, best first. Under [`EachValue`](@ref), one such vector for each value.
+  - `rank_scores::Option{<:VecNum}`: The value of [`candidate_values`](@ref) of each kept candidate, in the order of `rank_idx`, or `nothing` when the scorer gives an index. Under [`EachValue`](@ref), one such entry for each value.
 
 # Related
 
@@ -290,15 +303,35 @@ The sort is stable, so a tie keeps the order of the grid, as `argmax` does.
   - [`CrossValSearchScorer`](@ref)
   - [`search_cross_validation`](@ref)
   - [`IsNonFiniteError`](@ref)
+  - [`EachValue`](@ref)
+  - [`finite_score_columns`](@ref)
 """
-function finite_candidate_order(s_sca::Option{<:Sca_VecToScaM}, scorer, test_scores::MatNum,
-                                n_best::Integer)
-    finite = vec(all(isfinite, test_scores; dims = 1))
-    @argcheck(any(finite),
-              IsNonFiniteError("no parameter set finished every fold: every one of the $(size(test_scores, 2)) columns of the score matrix holds a non-finite entry over its $(size(test_scores, 1)) rows. Every candidate failed a fold, so none can be compared; widen the grid, or find why the folds failed."))
-    cols = findall(finite)
+function finite_candidate_order(s_sca::Union{Option{<:Sca_VecToScaM}, EachValue}, scorer,
+                                test_scores::MatNum, n_best::Integer)
+    cols = finite_score_columns(test_scores)
     X = view(test_scores, :, cols)
     return finite_candidate_order(scorer, cols, n_best, candidate_values(s_sca, scorer, X))
+end
+function finite_candidate_order(::EachValue, scorers::AbstractVector, test_scores::MatNum,
+                                n_best::Integer)
+    cols = finite_score_columns(test_scores)
+    X = view(test_scores, :, cols)
+    rankings = [scorer_ranking(s, cols, n_best, candidate_values(EachValue(), s, X))
+                for s in scorers]
+    return [r[1] for r in rankings], [r[2] for r in rankings]
+end
+function finite_candidate_order(s_sca, scorer, test_scores::AbstractVector{<:MatNum},
+                                n_best::Integer)
+    full = [any(c -> all(isfinite, c), eachcol(S)) for S in test_scores]
+    @argcheck(any(full),
+              IsNonFiniteError("no parameter set finished every fold under any of the $(length(test_scores)) risk measures of `r`: every column of each score matrix holds a non-finite entry. Every candidate failed a fold, so none can be compared; widen the grid, or find why the folds failed."))
+    found = [finite_candidate_order(s_sca, scorer, S, n_best)
+             for (S, f) in zip(test_scores, full) if f]
+    blank = empty_ranking(first(found)...)
+    rankings = map(cumsum(full), full) do n, f
+        return f ? found[n] : blank
+    end
+    return measure_rankings(s_sca, scorer, rankings)
 end
 function finite_candidate_order(scorer, cols::AbstractVector{<:Integer}, n_best::Integer,
                                 vals::VecNum)
@@ -354,7 +387,8 @@ function assert_candidate_scores(scorer, vals::VecNum, n::Integer)::Nothing
     return nothing
 end
 """
-    candidate_values(s_sca::Option{<:Sca_VecToScaM}, scorer::CrossValSearchScorer, X::MatNum)
+    candidate_values(s_sca::Union{Option{<:Sca_VecToScaM}, EachValue},
+                     scorer::CrossValSearchScorer, X::MatNum)
     candidate_values(s_sca::Option{<:Sca_VecToScaM}, scorers::AbstractVector, X::MatNum)
 
 Give what the search scorer, or the vector of them, gives for the candidates of a search: one value per column of `X`, bigger is better, or the index of one winner.
@@ -415,8 +449,8 @@ Where:
   - [`Sca_VecToScaM`](@ref)
   - [`oriented_score`](@ref): the same two reductions for a vector of risk measures.
 """
-function candidate_values(::Option{<:Sca_VecToScaM}, scorer::CrossValSearchScorer,
-                          X::MatNum)
+function candidate_values(::Union{Option{<:Sca_VecToScaM}, EachValue},
+                          scorer::CrossValSearchScorer, X::MatNum)
     vals = candidate_scores(scorer, X)
     return isnothing(vals) ? scorer(X) : vals
 end
@@ -497,6 +531,178 @@ function reduce_scorer_values(s_sca::Union{VectorToScalarMeasure, Function},
                               scorers::AbstractVector, X::MatNum)
     V = map(s -> member_candidate_values(s, X, candidate_values(s_sca, s, X)), scorers)
     return [vec_to_real_measure(s_sca, getindex.(V, j)) for j in axes(X, 2)]
+end
+
+"""
+    finite_score_columns(test_scores::MatNum)
+
+Give the columns of a score matrix of a search whose every entry is finite: the candidates that finished every fold.
+
+# Arguments
+
+  - `test_scores`: The `folds × candidates`, or `paths × candidates`, score matrix.
+
+# Validation
+
+  - At least one column is finite. Otherwise an `IsNonFiniteError`.
+
+# Returns
+
+  - `cols::Vector{Int}`: The finite columns, in the order of the grid.
+
+# Related
+
+  - [`finite_candidate_order`](@ref)
+"""
+function finite_score_columns(test_scores::MatNum)
+    finite = vec(all(isfinite, test_scores; dims = 1))
+    @argcheck(any(finite),
+              IsNonFiniteError("no parameter set finished every fold: every one of the $(size(test_scores, 2)) columns of the score matrix holds a non-finite entry over its $(size(test_scores, 1)) rows. Every candidate failed a fold, so none can be compared; widen the grid, or find why the folds failed."))
+    return findall(finite)
+end
+"""
+    scorer_ranking(scorer, cols::AbstractVector{<:Integer}, n_best::Integer, vals::VecNum)
+    scorer_ranking(scorer, cols::AbstractVector{<:Integer}, n_best::Integer, idx::Integer)
+
+Rank the finite candidates by one member of a vector of search scorers under `s_sca = EachValue()`.
+
+The values of the member are checked through [`assert_candidate_scores`](@ref), multiplied by its [`scorer_scale`](@ref), and ordered through [`finite_candidate_order`](@ref). An index keeps its one candidate with `n_best = 1`, because under [`EachValue`](@ref) a member that gives an index has no value to combine with another member.
+
+# Arguments
+
+  - `scorer`: The member.
+  - `cols`: The positions in the grid of the finite columns of the score matrix, which the member received.
+  - `n_best`: The count of the candidates to keep.
+  - `vals`, `idx`: The return of the member, from [`candidate_values`](@ref).
+
+# Validation
+
+  - The checks of [`assert_candidate_scores`](@ref) and of [`finite_candidate_order`](@ref). A return of another type is refused with an `ArgumentError`.
+
+# Returns
+
+  - `(rank_idx, rank_scores)`: The ranking of the member.
+
+# Related
+
+  - [`finite_candidate_order`](@ref)
+  - [`finite_candidate_order`](@ref)
+"""
+function scorer_ranking(scorer, cols::AbstractVector{<:Integer}, n_best::Integer,
+                        vals::VecNum)
+    # Check the raw values first, so that an infinite value times a scale of zero is not
+    # reported as a NaN of the scorer.
+    assert_candidate_scores(scorer, vals, length(cols))
+    return finite_candidate_order(scorer, cols, n_best, vals * scorer_scale(scorer))
+end
+function scorer_ranking(scorer, cols::AbstractVector{<:Integer}, ::Integer, idx::Integer)
+    return finite_candidate_order(scorer, cols, 1, idx)
+end
+function scorer_ranking(scorer, cols::AbstractVector{<:Integer}, n_best::Integer, vals)
+    return finite_candidate_order(scorer, cols, n_best, vals)
+end
+"""
+    empty_ranking(rank_idx::AbstractVector{<:Integer}, rank_scores)
+    empty_ranking(rank_idx::AbstractVector{<:AbstractVector{<:Integer}},
+                  rank_scores::AbstractVector)
+
+Give an empty ranking with the form of a full one, for a matrix with no finite column under `r_sca = EachValue()`.
+
+The columns are empty. The values are empty where the full ranking holds a vector, and `nothing` where it holds `nothing`, the entry of a scorer that gives an index. The second form does this for each of the `L` rankings of `s_sca = EachValue()`.
+
+# Arguments
+
+  - `rank_idx`, `rank_scores`: A full ranking from [`finite_candidate_order`](@ref).
+
+# Returns
+
+  - `(rank_idx, rank_scores)`: The empty ranking.
+
+# Related
+
+  - [`finite_candidate_order`](@ref)
+"""
+function empty_ranking(rank_idx::AbstractVector{<:Integer}, rank_scores)
+    return similar(rank_idx, 0), isnothing(rank_scores) ? nothing : similar(rank_scores, 0)
+end
+function empty_ranking(rank_idx::AbstractVector{<:AbstractVector{<:Integer}},
+                       rank_scores::AbstractVector)
+    rankings = map(empty_ranking, rank_idx, rank_scores)
+    return [r[1] for r in rankings], [r[2] for r in rankings]
+end
+"""
+    measure_rankings(s_sca, scorer, rankings::AbstractVector)
+    measure_rankings(::EachValue, scorers::AbstractVector, rankings::AbstractVector)
+
+Arrange the rankings of the `K` score matrices of `r_sca = EachValue()` into the fields of the Result.
+
+One ranking for each matrix gives a vector of `K` entries in each part. Under `s_sca = EachValue()` with `L` scorers, each matrix gives `L` rankings, and the parts are `K × L` matrices, row `k` for measure `k` and column `l` for scorer `l`.
+
+# Arguments
+
+  - `s_sca`: The reduction of a vector of search scorers, or [`EachValue`](@ref).
+  - `scorer`, `scorers`: One search scorer, or a vector of them.
+  - `rankings`: The ranking of each score matrix, from [`finite_candidate_order`](@ref).
+
+# Returns
+
+  - `rank_idx`, `rank_scores`: One entry for each value.
+
+# Related
+
+  - [`finite_candidate_order`](@ref)
+"""
+function measure_rankings(s_sca, scorer, rankings::AbstractVector)
+    return [r[1] for r in rankings], [r[2] for r in rankings]
+end
+function measure_rankings(::EachValue, ::AbstractVector, rankings::AbstractVector)
+    # Row `k` of each matrix is the `L` rankings of measure `k`.
+    return stack([r[1] for r in rankings]; dims = 1),
+           stack([r[2] for r in rankings]; dims = 1)
+end
+
+"""
+    ranked_candidates(base, lens_grid::AbstractVector, val_grid::AbstractVector,
+                      rank_idx::AbstractVector{<:Integer})
+    ranked_candidates(base, lens_grid::AbstractVector, val_grid::AbstractVector,
+                      rank_idx::AbstractArray{<:AbstractVector{<:Integer}})
+
+Build the kept candidates of a search from their columns, and give the winner of each ranking.
+
+The first form builds one ranking. The second form builds one ranking for each value, the form of [`EachValue`](@ref), and keeps the shape of `rank_idx`. An empty ranking gives `nothing` for its winner and its column, and an empty vector of candidates with the element type of a ranking that is not empty.
+
+# Arguments
+
+  - `base`: The estimator, or the [`Pipeline`](@ref), that the search tunes.
+  - `lens_grid`: The lenses of each grid point.
+  - `val_grid`: The values of each grid point.
+  - `rank_idx`: The columns of the kept candidates, best first, or one vector of them for each value.
+
+# Returns
+
+  - `opt`: The winner, `ranked[1]`, or the winner of each ranking.
+  - `idx`: The column of the winner, `rank_idx[1]`, or the column of the winner of each ranking.
+  - `ranked`: The kept candidates, built from `base` through [`search_candidate`](@ref), or one vector of them for each value.
+
+# Related
+
+  - [`search_result`](@ref)
+  - [`finite_candidate_order`](@ref)
+  - [`search_candidate`](@ref)
+"""
+function ranked_candidates(base, lens_grid::AbstractVector, val_grid::AbstractVector,
+                           rank_idx::AbstractVector{<:Integer})
+    ranked = [search_candidate(base, lens_grid[k], val_grid[k]) for k in rank_idx]
+    return first(ranked), first(rank_idx), ranked
+end
+function ranked_candidates(base, lens_grid::AbstractVector, val_grid::AbstractVector,
+                           rank_idx::AbstractArray{<:AbstractVector{<:Integer}})
+    # An empty ranking takes the element type of a full one, so that every entry of
+    # `ranked` is a vector of estimators.
+    build(ri) = [search_candidate(base, lens_grid[k], val_grid[k]) for k in ri]
+    full = build(first(Iterators.filter(!isempty, rank_idx)))
+    ranked = [isempty(ri) ? similar(full, 0) : build(ri) for ri in rank_idx]
+    return get.(ranked, 1, nothing), get.(rank_idx, 1, nothing), ranked
 end
 
 export HighestMeanScore

@@ -9,6 +9,7 @@ AbstractSearchCrossValidationEstimator
 assert_search_scorer
 assert_search_reduction
 search_result
+assert_search_ranking
 assert_search_entry
 search_candidate
 assert_search_candidates(::Any, ::Any, ::Any)
@@ -19,6 +20,8 @@ candidate_train_score
 write_candidate_scores!
 allocate_search_scores
 search_score_array
+store_search_score!
+path_train_scores
 parse_lens
 assert_search_grid_cap
 _expr_to_lens

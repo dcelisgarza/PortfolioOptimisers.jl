@@ -398,6 +398,7 @@ end
                                                :with_position_id => "its callee is the constructor of a type, `MultiPeriodPredictionResult` (rule 3, #2103)",
                                                :herc_unitary_risks => "2 functions share its callee `unitary_expected_risks` (rule 3, #2103)",
                                                :fold_evaluation => "one method for each scheme: each builds the record `FoldEvaluation`, the constructor of a type (rule 3, #2103)",
+                                               :scorer_ranking => "one method for each form of the return of a member under `s_sca = EachValue()`: a value vector is checked and scaled, an index keeps one candidate whatever `n_best` is, and any other form meets the refusal. Its callee `finite_candidate_order` is the verb of the order, which 2 functions share (rule 3, #2001)",
                                                # src/19_FactorAttribution (#2105).
                                                :attribution_idiosyncratic_covariance => "4 functions share its callee `assert_attribution_field`, the check of a field of the block (rule 3, #2105)",
                                                :attribution_lag => "3 functions share its callee `cs_regression_lag`: the exposure IC and the regression diagnostics read it too (rule 3, #2105)",

@@ -9,7 +9,7 @@ status: accepted
 Map #1980 lets a search score with a vector of risk measures and a vector of search scorers. ADR
 0232 keeps one score matrix per measure under the per-value form of `r_sca`, and ADR 0233 keeps one
 entry of `rank_scores` per scorer under the per-value form of `s_sca`. The per-value form is a
-singleton type that #2001 names. #1985 spelled it `nothing`, and #2069 (ADR 0238) made `nothing`
+singleton type, `EachValue`, which #2001 built. #1985 spelled it `nothing`, and #2069 (ADR 0238) made `nothing`
 give the sum on every scalariser slot. Both ADRs left the selection open: what `opt`,
 `idx`, `ranked` and `rank_idx` hold when a candidate has more than one value. The direction of the
 maintainer on the map is that the search does not refuse this case. It gives a ranking and an
@@ -44,7 +44,7 @@ folds.**
 | --- | --- | --- |
 | `sca`, a `Sca_VecToScaM`, or `nothing`, which gives the sum | The `K` measures of one row: one fold, or one path in the combinatorial form. Then the scorer reduces the rows. ADR 0232. | One matrix. |
 | `PerCandidate(sca)` | The `K` values of one candidate. Each value is what the scorer gives for one matrix over all its rows. | `K` matrices. |
-| The per-value singleton (#2001) | Nothing. Each measure keeps its own ranking. | `K` matrices. |
+| `EachValue()` (#2001) | Nothing. Each measure keeps its own ranking. | `K` matrices. |
 
 For one candidate, two measures, three folds, `MaxScalariser` and `HighestMeanScore`:
 
@@ -130,8 +130,14 @@ of the search states this as the form of the `refit` of sklearn.
 ## Consequences
 
 - **The build tickets of map #1980.** The code holds none of this decision until they land.
-  Ticket #2001 builds the per-value singleton, the shape of the Result under it on `r_sca` or
-  `s_sca`, the empty entry and its checks. Ticket #2002 builds `PerCandidate`. Ticket #2003 shows a search
+  Ticket #2001 builds `EachValue`, the shape of the Result under it on `r_sca` or
+  `s_sca`, the empty entry and its checks. `EachValue` subtypes `AbstractAlgorithm`, and no family
+  type holds it: a family of one member that no method reads is refused by the censuses of
+  ADR 0222, so #2002 adds the family when `PerCandidate` joins it and a bound reads it. One verb,
+  `finite_candidate_order`, gives one ranking or one ranking for each value. An empty entry takes
+  the form of a full ranking of the same scorer: empty values, or `nothing` for a scorer that
+  gives an index. The constructor of the Result checks `opt == ranked[1]` for a search of one
+  value too. Ticket #2002 builds `PerCandidate`. Ticket #2003 shows a search
   with a vector of risk measures and a vector of search scorers in the tuning example and the
   user guide.
 - **A breaking change, for the build.** Under the per-value form of `r_sca` or `s_sca` with a vector,

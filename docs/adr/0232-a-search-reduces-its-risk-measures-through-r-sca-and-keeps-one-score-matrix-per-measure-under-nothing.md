@@ -8,11 +8,11 @@ status: accepted
 
 Map #1980 lets `GridSearchCrossValidation` and `RandomisedSearchCrossValidation` score with a
 vector of risk measures in `r`. ADR 0231 fixed the score: each measure is oriented, multiplied by
-its scale, and then reduced by a `Sca_VecToScaM`, or kept apart under the per-value form. Issue
-#1983 asked where a search holds that reduction, what its default is, and what shape the scores
+its scale, and then reduced by a `Sca_VecToScaM`, or kept apart under the per-value form.
+Issue #1983 asked where a search holds that reduction, what its default is, and what shape the scores
 take under the per-value form. #1983 spelled that form `nothing`. #2069 (ADR 0238) made `nothing`
-give the sum on every scalariser slot, so the form takes its own singleton type, which #2001
-names. This ADR calls it "the per-value form".
+give the sum on every scalariser slot, so the form takes its own singleton type, `EachValue`,
+which #2001 built. This ADR calls it "the per-value form".
 
 Four facts bore on the answer.
 
@@ -37,7 +37,7 @@ matrix for each measure.**
 
 | Item | Rule |
 | --- | --- |
-| The field | `r_sca::Option{<:Sca_VecToScaM}` on `GridSearchCrossValidation` and `RandomisedSearchCrossValidation`. The bound also takes the per-value singleton of #2001 and `PerCandidate(sca)`, which combines the measures once per candidate after the search scorer (ADR 0234). The constructor refuses a `kwargs.sca`, and the error names `r_sca`. The reduction of the vector of search scorers is `s_sca` (ADR 0233). |
+| The field | `r_sca::Option{<:Sca_VecToScaM}` on `GridSearchCrossValidation` and `RandomisedSearchCrossValidation`. The bound also takes `EachValue()` (#2001) and `PerCandidate(sca)`, which combines the measures once per candidate after the search scorer (ADR 0234). The constructor refuses a `kwargs.sca`, and the error names `r_sca`. The reduction of the vector of search scorers is `s_sca` (ADR 0233). |
 | The name of a slot | A type that holds one reduction names its field `sca`. A type that holds two names them `r_sca`, for the risk measures, and `s_sca`, for the search scorers. So `NearestQuantilePrediction` and `FoldRiskScorer` each hold a field `sca`, and `NearestQuantilePrediction` refuses `r_kwargs.sca`. |
 | The default | `nothing`, which gives the sum of `SumScalariser`, as `expected_risk`, `oriented_score` and every reader bound to `BaseRM_VecBaseRM` (ADR 0238). For one measure the slot is inert, so no search of one measure changes. |
 | The orientation | ADR 0231. Each measure is oriented before the reduction, so a higher score is better. The local `sgn` of each method goes away. A train score is oriented in the same way, so the build gives `oriented_score` a form for a fitted result. |

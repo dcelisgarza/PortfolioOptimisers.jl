@@ -1563,7 +1563,9 @@ const CATALOGUE = [Section("Core abstractions",
                                    Cap(:RandomisedSearchCrossValidation),
                                    Group(Cap(:CrossValidationSearchScorer;
                                              label = "Scoring a parameter set"),
-                                         [Cap(:HighestMeanScore)])]),
+                                         [Cap(:HighestMeanScore)]),
+                                   Cap(:EachValue;
+                                       label = "One ranking for each value [`EachValue`](@ref) in `r_sca` or `s_sca` keeps each risk measure or each search scorer apart, and the search gives one ranking and one winner for each of them")]),
                             Cap(:NumberSubsetsEstimator, :SubsetSizeEstimator),
                             Cap(:WindowSizeEstimator),
                             Section("Covariance forecast evaluation",

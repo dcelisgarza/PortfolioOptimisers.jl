@@ -912,6 +912,190 @@ The fixture is the online fold loop's, because the identities are structural.
                                      rd)
         @test rr.rank_idx == rg.rank_idx && rr.rank_scores == rg.rank_scores
     end
+
+    #=
+    Issue #2001, ADR 0234: `EachValue()` in `r_sca` or `s_sca` keeps each value apart, and
+    the search gives one ranking for each value per candidate, in one Result. Each entry is
+    what a search of that value alone gives, with the scale of its measure or scorer.
+    =#
+    @testset "15. `EachValue` gives one ranking for each value per candidate (#2001)" begin
+        kcv = KFold(; n = 4)
+        hms = HighestMeanScore()
+        means(S) = vec(mean(S; dims = 1))
+        worst = X -> vec(minimum(X; dims = 1))
+        fidx = X -> argmax(vec(minimum(X; dims = 1)))
+        rv = [ConditionalValueatRisk(),
+              MeanReturn(; settings = HierarchicalRiskMeasureSettings(; scale = 2.0))]
+        grid = ["opt.wb" => [WeightBounds(; lb = 0.0, ub = 1.0),
+                             WeightBounds(; lb = 0.0, ub = 0.13),
+                             WeightBounds(; lb = 0.1, ub = 1.0),
+                             WeightBounds(; lb = 0.12, ub = 1.0)]]
+        srch(cv = kcv; kwargs...) = search_cross_validation(hrp,
+                                                            gs(cv, grid; n_best = 3,
+                                                               ex = SequentialEx(),
+                                                               kwargs...), rd)
+        # `r_sca`: one matrix per measure, the score of that measure alone times its scale,
+        # and one ranking per matrix. The combinatorial train scores are `[k][p]`.
+        ccv = CombinatorialCrossValidation(; n_folds = 4, n_test_folds = 2)
+        for cv in (kcv, ccv)
+            ev = srch(cv; r = rv, r_sca = EachValue(), train_score = true)
+            @test ev.test_scores isa Vector{<:Matrix} && length(ev.test_scores) == 2
+            @test size(ev.opt) == size(ev.idx) == size(ev.rank_scores) == (2,)
+            for k in eachindex(rv)
+                one = srch(cv; r = rv[k], train_score = true)
+                s = rv[k].settings.scale
+                @test ev.test_scores[k] == s .* one.test_scores
+                @test ev.train_scores[k] == s .* one.train_scores
+                @test ev.rank_idx[k] == one.rank_idx
+                @test ev.rank_scores[k] == s .* one.rank_scores
+                @test ev.opt[k] === ev.ranked[k][1] && ev.idx[k] == ev.rank_idx[k][1]
+                @test ev.ranked[k] == one.ranked
+            end
+            @test ev.path_ids == srch(cv).path_ids
+        end
+        # `s_sca`: each scorer orders the candidates alone, with its scale, and a scorer that
+        # gives an index keeps its one candidate whatever `n_best` is.
+        sv = [HighestMeanScore(; scale = -1.0), worst, fidx]
+        es = srch(; scorer = sv, s_sca = EachValue())
+        S = es.test_scores
+        @test S isa Matrix && S == srch().test_scores
+        @test es.rank_idx[1] == sortperm(-means(S); rev = true)[1:3]
+        @test es.rank_scores[1] == -means(S)[es.rank_idx[1]]
+        @test es.rank_idx[2] == srch(; scorer = worst).rank_idx
+        @test es.rank_scores[2] == srch(; scorer = worst).rank_scores
+        @test es.rank_idx[3] == [fidx(S)] && isnothing(es.rank_scores[3])
+        @test all(es.opt[l] === es.ranked[l][1] for l in eachindex(sv))
+        # Both: a `K × L` matrix, row `k` for measure `k` and column `l` for scorer `l`.
+        both = srch(; r = rv, r_sca = EachValue(), scorer = sv, s_sca = EachValue())
+        @test size(both.rank_idx) == size(both.opt) == size(both.rank_scores) == (2, 3)
+        # A vector of one scorer under the sum is that scorer alone, with its scale.
+        for l in 1:2
+            byk = srch(; r = rv, r_sca = EachValue(), scorer = sv[l:l])
+            @test both.rank_idx[:, l] == byk.rank_idx
+            @test both.rank_scores[:, l] == byk.rank_scores
+        end
+        @test both.rank_idx[:, 3] == [[fidx(Sk)] for Sk in both.test_scores]
+        @test all(isnothing, both.rank_scores[:, 3])
+        @test all(both.opt[v] === both.ranked[v][1] for v in eachindex(both.opt))
+        # The rule is inert for one measure, and for one scorer. The types decide the shape,
+        # so a vector of one measure gives a vector of one entry.
+        a = srch()
+        for kw in ((; r_sca = EachValue()), (; s_sca = EachValue()),
+                   (; scorer = hms, s_sca = EachValue()))
+            res = srch(; kw...)
+            @test res.test_scores == a.test_scores && res.rank_idx == a.rank_idx
+            @test res.opt === res.ranked[1]
+        end
+        v1 = srch(; r = [r], r_sca = EachValue())
+        @test v1.test_scores == [a.test_scores] && v1.rank_idx == [a.rank_idx]
+
+        # An empty entry: a matrix with no finite column ranks no candidate, and its values
+        # take the form of a full ranking of the same scorer.
+        S1 = [0.1 0.2 0.3; 0.2 0.1 0.4]
+        S2 = fill(NaN, 2, 3)
+        S3 = copy(S1)
+        S3[1, 3] = NaN
+        ri, rs = po.finite_candidate_order(nothing, hms, [S1, S2, S3], 2)
+        @test ri == [[3, 1], Int[], [1, 2]]
+        @test rs[1] ≈ [0.35, 0.15] && rs[2] == Float64[] && rs[3] ≈ [0.15, 0.15]
+        ri, rs = po.finite_candidate_order(nothing, fidx, [S1, S2], 1)
+        @test ri == [[3], Int[]] && rs == [nothing, nothing]
+        ri, rs = po.finite_candidate_order(EachValue(), [hms, fidx], [S1, S2], 2)
+        @test size(ri) == (2, 2) && ri[1, 1] == [3, 1] && ri[1, 2] == [3]
+        @test isempty(ri[2, 1]) && isempty(ri[2, 2])
+        @test rs[2, 1] == Float64[] && isnothing(rs[2, 2]) && isnothing(rs[1, 2])
+        # Under `EachValue`, a member that gives neither a vector nor an index is refused.
+        err = try
+            po.finite_candidate_order(EachValue(), [hms, X -> 1.5], S1, 1)
+            nothing
+        catch e
+            e
+        end
+        @test err isa ArgumentError && occursin("Float64", err.msg)
+        # Every entry empty: the search has nothing to keep.
+        err = try
+            po.finite_candidate_order(nothing, hms, [S2, S2], 1)
+            nothing
+        catch e
+            e
+        end
+        @test err isa IsNonFiniteError && occursin("2 risk measures", err.msg)
+        @test_throws IsNonFiniteError po.finite_candidate_order(EachValue(), [hms, worst],
+                                                                S2, 1)
+
+        # The Result of an empty entry: `nothing` for its winner, and an empty vector of
+        # candidates of the element type of a full one.
+        lg, vg = po.lens_val_grid(grid)
+        opt, idx, ranked = po.ranked_candidates(hrp, lg, vg, [[2, 1], Int[]])
+        @test isnothing(opt[2]) && isnothing(idx[2]) && isempty(ranked[2])
+        @test eltype(ranked[2]) == eltype(ranked[1]) && opt[1] === ranked[1][1]
+        Ss = [S1[:, [1, 2, 3, 3]], fill(NaN, 2, 4)]
+        mk(; kwargs...) = SearchCrossValidationResult(; opt = opt, test_scores = Ss,
+                                                      train_scores = nothing,
+                                                      lens_grid = lg, val_grid = vg,
+                                                      idx = idx, ranked = ranked,
+                                                      rank_idx = [[2, 1], Int[]],
+                                                      rank_scores = [[0.15, 0.15],
+                                                                     Float64[]], kwargs...)
+        @test isnothing(mk().opt[2])
+        # The Result refuses fields that do not agree, entry by entry.
+        @test_throws DimensionMismatch mk(; opt = [ranked[1][2], nothing])
+        @test_throws DimensionMismatch mk(; opt = [opt[1], opt[1]])
+        @test_throws DimensionMismatch mk(; idx = [1, nothing])
+        @test_throws DimensionMismatch mk(; idx = [2, nothing, nothing])
+        @test_throws DimensionMismatch mk(; rank_scores = [[0.15], Float64[]])
+        @test_throws IsEmptyError mk(; opt = [nothing, nothing], idx = [nothing, nothing],
+                                     ranked = [ranked[2], ranked[2]],
+                                     rank_idx = [Int[], Int[]],
+                                     rank_scores = [Float64[], Float64[]])
+        # One value: `opt` is `ranked[1]`.
+        @test_throws DimensionMismatch SearchCrossValidationResult(; opt = ranked[1][2],
+                                                                   test_scores = S1,
+                                                                   train_scores = nothing,
+                                                                   lens_grid = lg,
+                                                                   val_grid = vg, idx = 2,
+                                                                   ranked = ranked[1],
+                                                                   rank_idx = [2, 1])
+
+        # The six methods: the randomised search forwards the rule, and the Pipeline's
+        # search keeps one matrix per measure, batch and combinatorial.
+        rr = search_cross_validation(hrp,
+                                     RandomisedSearchCrossValidation(grid; cv = kcv, r = rv,
+                                                                     r_sca = EachValue(),
+                                                                     scorer = sv,
+                                                                     s_sca = EachValue(),
+                                                                     n_iter = 3, seed = 3,
+                                                                     n_best = 2), rd)
+        rg = search_cross_validation(hrp,
+                                     gs(kcv, [["opt.wb" => [v[1]]] for v in rr.val_grid];
+                                        r = rv, r_sca = EachValue(), scorer = sv,
+                                        s_sca = EachValue(), n_best = 2), rd)
+        @test rr.test_scores == rg.test_scores && rr.rank_idx == rg.rank_idx
+        pipe = Pipeline(; steps = (EmpiricalPrior(), hrp))
+        pgrid = ["steps[2].opt.wb" => grid[1][2]]
+        for cv in (kcv, ccv)
+            pres = search_cross_validation(pipe,
+                                           gs(cv, pgrid; r = rv, r_sca = EachValue(),
+                                              n_best = 3, train_score = true), rd)
+            dres = srch(cv; r = rv, r_sca = EachValue(), train_score = true)
+            @test all(isapprox.(pres.test_scores, dres.test_scores; atol = 1e-10))
+            @test pres.rank_idx == dres.rank_idx
+            @test length(pres.train_scores) == 2
+        end
+
+        # The constructors keep the rule, and the readers that need one value refuse it.
+        for est in (GridSearchCrossValidation, RandomisedSearchCrossValidation)
+            e = est(grid; r = rv, r_sca = EachValue(), scorer = sv, s_sca = EachValue())
+            @test e.r_sca === EachValue() && e.s_sca === EachValue()
+        end
+        @test_throws TypeError NearestQuantilePrediction(; sca = EachValue())
+        @test_throws TypeError FoldRiskScorer(; r = rv, sca = EachValue())
+        # `oriented_score` under the rule gives the value of each measure, times its scale.
+        fit = optimise(hrp, rows(rd, 1:80))
+        @test po.oriented_score(EachValue(), rv, fit) ==
+              [-expected_risk(rv[1], fit), 2 * expected_risk(rv[2], fit)]
+        @test po.oriented_score(EachValue(), r, fit) == -expected_risk(r, fit)
+    end
 end
 #=
 A search tunes a field of a prior with forwarded properties, issue #1497.

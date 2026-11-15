@@ -11,8 +11,8 @@ candidates with a vector of search scorers in `scorer`. ADR 0232 named the slot 
 vector, `s_sca`, beside `r_sca`. Issue #1984 asked how the search combines the values of the
 scorers for each candidate, what a function scorer in the vector does, and what `rank_scores`
 holds under the per-value form. #1984 spelled that form `nothing`. #2069 (ADR 0238) made `nothing`
-give the sum on every scalariser slot, so the form takes its own singleton type, which #2001
-names. This ADR calls it "the per-value form".
+give the sum on every scalariser slot, so the form takes its own singleton type, `EachValue`,
+which #2001 built. This ADR calls it "the per-value form".
 
 Five facts bore on the answer.
 
@@ -41,7 +41,7 @@ Under the per-value form, `rank_scores` holds one entry for each scorer.**
 
 | Item | Rule |
 | --- | --- |
-| The field | `s_sca::Option{<:Sca_VecToScaM}` on `GridSearchCrossValidation` and `RandomisedSearchCrossValidation`, with the default `nothing`, which gives the sum, as `r_sca` (ADR 0232, ADR 0238). The bound also takes the per-value singleton of #2001. No wrapper type holds the vector. |
+| The field | `s_sca::Option{<:Sca_VecToScaM}` on `GridSearchCrossValidation` and `RandomisedSearchCrossValidation`, with the default `nothing`, which gives the sum, as `r_sca` (ADR 0232, ADR 0238). The bound also takes `EachValue()` (#2001). No wrapper type holds the vector. |
 | `scorer` | One search scorer, or an `AbstractVector` of them. A literal vector of a type and a function, such as `[HighestMeanScore(), f]`, has the element type `Any`, so the constructor checks each member and does not bind the element type. A wrong member is a fault of the configuration, so the constructor refuses it. |
 | The orientation | Every value is bigger-is-better before the reduction (ADR 0226, ADR 0231). `MaxScalariser` and `MaxValue` give the best scorer of each candidate, and `MinScalariser` and `MinValue` the worst. `StdValue` gives the highest value to the largest spread. |
 | The seam | A `Scalariser` reduces through `scalarise`, elementwise over the vectors of the scorers. A `VectorToScalarMeasure` or a function reduces the vector of `L` values of each candidate through `vec_to_real_measure`. |
@@ -83,7 +83,7 @@ Under the per-value form, `rank_scores` holds one entry for each scorer.**
 - **The build tickets of map #1980.** The code holds none of this decision until they land.
   Ticket #2000 gives the searches a vector of search scorers, `s_sca`, the scale of each scorer,
   the two forms of a function scorer, and the `n_best` refusal at the run. Ticket #2001 builds
-  the per-value singleton, `rank_scores` under it, and its selection (ADR 0234).
+  `EachValue`, `rank_scores` under it, and its selection (ADR 0234).
 - **A breaking change, for the build.** The released docstring of `CrossValSearchScorer` says
   that a function returns an integer. The build widens it to the two forms. A released index
   function keeps its meaning. A released call of `HighestMeanScore()` keeps its meaning, because
