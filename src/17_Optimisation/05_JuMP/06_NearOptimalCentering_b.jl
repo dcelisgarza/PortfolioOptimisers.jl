@@ -282,6 +282,48 @@ function solve_near_optimal_centering!(::ConstrainedNearOptimalCentering, model:
                       rt_ends, w_min, w_max, Val(shared_has(model, :ret_frontier)),
                       Val(shared_has(model, :risk_frontier)))
 end
+"""
+    _optimise(noc::NearOptimalCentering, rd::ReturnsResult = ReturnsResult();
+              str_names::Bool = false, save::Bool = true, blocks::Tuple = (),
+              kwargs...) -> NearOptimalCenteringResult
+
+Build the model of a [`NearOptimalCentering`](@ref), solve it, and return its result.
+
+[`optimise`](@ref) reaches this method through [`shared_series_solve`](@ref), which drops the observations of a Shared Series gap before the solve.
+
+# Algorithm
+
+ 1. Replace each schedule of `noc` with its static default through [`reset_time_dependent_estimator`](@ref).
+ 2. Solve the anchor portfolios and find the bounds of the near optimal region with [`near_optimal_centering_setup`](@ref), with the blocks of `blocks`, giving `setup`. It holds the anchor weights, their return codes, the inner optimiser `opt` and its processed attributes `attrs`.
+ 3. Take the view of `noc` and of `rd` at the investable assets with [`investable_view`](@ref). Both are unchanged when every asset is investable.
+ 4. Build a new model. Register the scales of `opt` with [`set_model_scales!`](@ref), the number of observations of the prior with [`set_model_observations!`](@ref), the expression `k = 1` with [`set_maximum_ratio_factor_variables!`](@ref), and the weights with [`set_w!`](@ref), which start at the optimal anchor.
+ 5. Add the rows of the variant `noc.alg` with [`assemble_near_optimal_centering_model!`](@ref).
+ 6. Solve the barrier with [`solve_near_optimal_centering!`](@ref), giving `noc_retcode` and `sol`.
+ 7. Combine the return codes of the three anchors and of the barrier with [`get_overall_retcode`](@ref), giving `retcode`.
+ 8. Build the result. It holds `attrs`, `retcode`, `sol`, the model when `save` is `true`, the risk measures resolved against the prior, and the four return codes.
+
+# Arguments
+
+  - `noc::NearOptimalCentering`: The optimiser.
+  - $(arg_dict[:rd]) When `noc.opt.pe` is a prior result, the solve does not read `rd`. A fallback or a clustering step can still read it.
+  - `str_names::Bool`: `true` gives each variable and each row of the model its string name.
+  - `save::Bool`: `true` keeps the model in the result.
+  - $(arg_dict[:blocks_head])
+  - `kwargs...`: Passed on to [`near_optimal_centering_setup`](@ref).
+
+# Returns
+
+  - [`NearOptimalCenteringResult`](@ref): The result, with `fb = nothing`. [`optimise`](@ref) runs the fallback chain when the solve fails.
+
+# Related
+
+  - [`optimise`](@ref)
+  - [`NearOptimalCentering`](@ref)
+  - [`near_optimal_centering_setup`](@ref)
+  - [`assemble_near_optimal_centering_model!`](@ref)
+  - [`solve_near_optimal_centering!`](@ref)
+  - [`NearOptimalCenteringResult`](@ref)
+"""
 function _optimise(noc::NearOptimalCentering, rd::ReturnsResult = ReturnsResult();
                    str_names::Bool = false, save::Bool = true, blocks::Tuple = (),
                    kwargs...)
@@ -315,37 +357,5 @@ function _optimise(noc::NearOptimalCentering, rd::ReturnsResult = ReturnsResult(
                                       w_max_retcode = w_max_retcode,
                                       noc_retcode = noc_retcode, fb = nothing)
 end
-"""
-    optimise(noc::NearOptimalCentering{<:Any, <:Any, <:Any, <:Any, <:Any, <:Any, <:Any,
-                      <:Any, <:Any, <:Any, <:Any, <:Any, Nothing
-                  },
-             rd::ReturnsResult; str_names::Bool = false, save::Bool = true, kwargs...) -> NearOptimalCenteringResult
-
-Run the Near Optimal Centering portfolio optimisation.
-
-# Arguments
-
-  - `noc`: The near optimal centering optimiser to use.
-  - $(arg_dict[:rd]) If `isa(noc.opt.pe, AbstractPriorResult)`, `rd` is not necessary if doing a standalone optimisation, but may be required/desired by fallbacks and/or clusterisation.
-  - `str_names`: Whether to use string names for the assets in the optimisation.
-  - `save`: Whether to save the JuMP model in the optimisation result.
-  - `kwargs`: Additional keyword arguments passed to the optimisation function.
-
-# Validation
-
-  - No field in the tree of `noc` holds an [`Online`](@ref). An `ArgumentError` naming the field is thrown otherwise, through [`assert_batch_entry`](@ref): a plain `optimise` is a batch fit, and a wrapper resolves only at the warm-up of the fold loop's online arm.
-
-# Related
-
-  - [`NearOptimalCentering`](@ref)
-  - [`NearOptimalCenteringResult`](@ref)
-"""
-function optimise(noc::NearOptimalCentering{<:Any, <:Any, <:Any, <:Any, <:Any, <:Any, <:Any,
-                                            <:Any, <:Any, <:Any, <:Any, <:Any, Nothing},
-                  rd::ReturnsResult; str_names::Bool = false, save::Bool = true, kwargs...)
-    assert_batch_entry(noc, "`optimise`")
-    return shared_series_solve(noc, rd; str_names = str_names, save = save, kwargs...)
-end
-
 @pipe_delegates NearOptimalCentering opt
 @pipe_route_sigma_ucs NearOptimalCentering

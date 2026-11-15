@@ -959,7 +959,7 @@ Build the model of a [`MeanRisk`](@ref), solve it, and return its result.
 # Arguments
 
   - `mr::MeanRisk`: The optimiser.
-  - $(arg_dict[:rd])
+  - $(arg_dict[:rd]) When `mr.opt.pe` is a prior result, the solve does not read `rd`. A fallback or a clustering step can still read it.
   - `str_names::Bool`: `true` gives each variable and each row of the model its string name.
   - `save::Bool`: `true` keeps the model in the result.
   - $(arg_dict[:blocks_head])
@@ -967,11 +967,12 @@ Build the model of a [`MeanRisk`](@ref), solve it, and return its result.
 
 # Returns
 
-  - [`MeanRiskResult`](@ref): The result, with `fb = nothing`. The method of [`optimise`](@ref) for an optimiser with a fallback runs the fallback chain.
+  - [`MeanRiskResult`](@ref): The result of the solve, or of the frontier sweep, with `fb = nothing`. [`optimise`](@ref) runs the fallback chain when the solve fails.
 
 # Related
 
   - [`optimise`](@ref)
+  - [`MeanRisk`](@ref)
   - [`build_mean_risk_model`](@ref)
   - [`resolve_ratio_frontier!`](@ref)
   - [`solve_mean_risk!`](@ref)
@@ -1000,42 +1001,6 @@ function _optimise(mr::MeanRisk, rd::ReturnsResult = ReturnsResult();
                                                       model = ifelse(save, model, nothing)),
                           r = factory(mr.r, attrs.pr, mr.opt.slv), fb = nothing)
 end
-"""
-    optimise(mr::MeanRisk{<:Any, <:Any, <:Any, <:Any, Nothing},
-             rd::ReturnsResult; str_names::Bool = false, save::Bool = true, kwargs...) -> MeanRiskResult
-
-Optimise a [`MeanRisk`](@ref) that has no fallback, and return its result.
-
-This method serves an optimiser whose `fb` is `nothing`. It solves through [`shared_series_solve`](@ref), and [`_optimise`](@ref) states the steps of the solve.
-
-# Arguments
-
-  - `mr`: The optimiser.
-  - $(arg_dict[:rd]) When `mr.opt.pe` is a prior result, the solve does not read `rd`. A fallback or a clustering step can still read it.
-  - `str_names`: `true` gives each variable and each row of the model its string name.
-  - `save`: `true` keeps the model in the result.
-  - `kwargs`: Passed on to [`_optimise`](@ref).
-
-# Validation
-
-  - No field in the tree of `mr` holds an [`Online`](@ref). Otherwise [`assert_batch_entry`](@ref) throws an `ArgumentError` that names the field. A plain `optimise` is a batch fit, and the fold loop resolves an `Online` only in its online branch.
-
-# Returns
-
-  - [`MeanRiskResult`](@ref): The result of the solve, or of the frontier sweep.
-
-# Related
-
-  - [`MeanRisk`](@ref)
-  - [`MeanRiskResult`](@ref)
-  - [`_optimise`](@ref)
-"""
-function optimise(mr::MeanRisk{<:Any, <:Any, <:Any, <:Any, Nothing}, rd::ReturnsResult;
-                  str_names::Bool = false, save::Bool = true, kwargs...)
-    assert_batch_entry(mr, "`optimise`")
-    return shared_series_solve(mr, rd; str_names = str_names, save = save, kwargs...)
-end
-
 @pipe_delegates MeanRisk opt
 @pipe_route_sigma_ucs MeanRisk
 export MeanRisk, MeanRiskResult

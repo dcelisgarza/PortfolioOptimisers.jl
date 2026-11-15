@@ -518,7 +518,7 @@ Build the model of a [`FactorRiskContribution`](@ref), solve it, and return its 
 # Arguments
 
   - `frc::FactorRiskContribution`: The optimiser.
-  - $(arg_dict[:rd])
+  - $(arg_dict[:rd]) The solve reads it to fit the loadings when neither `re` nor the prior holds them, and reads its factor returns to resolve `frc_ple`. A fallback or a clustering step can also read it.
   - `str_names::Bool`: `true` gives each variable and each row of the model its string name.
   - `save::Bool`: `true` keeps the model in the result.
   - $(arg_dict[:blocks_head])
@@ -526,11 +526,12 @@ Build the model of a [`FactorRiskContribution`](@ref), solve it, and return its 
 
 # Returns
 
-  - [`FactorRiskContributionResult`](@ref): The result, with `fb = nothing`. The method of [`optimise`](@ref) for an optimiser with a fallback runs the fallback chain.
+  - [`FactorRiskContributionResult`](@ref): The result, with `fb = nothing`. [`optimise`](@ref) runs the fallback chain when the solve fails.
 
 # Related
 
   - [`optimise`](@ref)
+  - [`FactorRiskContribution`](@ref)
   - [`set_factor_risk_contribution_constraints!`](@ref)
   - [`FactorRiskContributionResult`](@ref)
 """
@@ -577,40 +578,6 @@ function _optimise(frc::FactorRiskContribution, rd::ReturnsResult = ReturnsResul
                                         r = factory(frc.r, attrs.pr, frc.opt.slv), rr = rr,
                                         frc_plr = frc_plr, fb = nothing)
 end
-"""
-    optimise(frc::FactorRiskContribution{<:Any, <:Any, <:Any, <:Any, <:Any, <:Any,
-                      <:Any, <:Any, Nothing
-                  },
-             rd::ReturnsResult; str_names::Bool = false, save::Bool = true, kwargs...) -> FactorRiskContributionResult
-
-Optimise a [`FactorRiskContribution`](@ref) that has no fallback, and return its result.
-
-This method serves an optimiser whose `fb` is `nothing`. It solves through [`shared_series_solve`](@ref), and [`_optimise`](@ref) states the steps of the solve.
-
-# Arguments
-
-  - `frc`: The optimiser.
-  - $(arg_dict[:rd]) The solve reads it to fit the loadings when neither `re` nor the prior holds them, and reads its factor returns to resolve `frc_ple`. A fallback or a clustering step can also read it.
-  - `str_names`: `true` gives each variable and each row of the model its string name.
-  - `save`: `true` keeps the model in the result.
-  - `kwargs`: Passed on to [`_optimise`](@ref).
-
-# Validation
-
-  - No field in the tree of `frc` holds an [`Online`](@ref). An `ArgumentError` naming the field is thrown otherwise, through [`assert_batch_entry`](@ref): a plain `optimise` is a batch fit, and a wrapper resolves only at the warm-up of the fold loop's online arm.
-
-# Related
-
-  - [`FactorRiskContribution`](@ref)
-  - [`FactorRiskContributionResult`](@ref)
-"""
-function optimise(frc::FactorRiskContribution{<:Any, <:Any, <:Any, <:Any, <:Any, <:Any,
-                                              <:Any, <:Any, Nothing}, rd::ReturnsResult;
-                  str_names::Bool = false, save::Bool = true, kwargs...)
-    assert_batch_entry(frc, "`optimise`")
-    return shared_series_solve(frc, rd; str_names = str_names, save = save, kwargs...)
-end
-
 @pipe_delegates FactorRiskContribution opt
 @pipe_route_sigma_ucs FactorRiskContribution
 export FactorRiskContribution, FactorRiskContributionResult

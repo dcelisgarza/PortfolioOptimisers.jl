@@ -777,7 +777,7 @@ Build the model of a [`RelaxedRiskBudgeting`](@ref), solve it, and return its re
 # Arguments
 
   - `rrb::RelaxedRiskBudgeting`: The optimiser.
-  - $(arg_dict[:rd])
+  - $(arg_dict[:rd]) When `rrb.opt.pe` is a prior result, the solve does not read `rd`, except to fit the loadings of [`FactorRiskBudgeting`](@ref) when no other source holds them. A fallback or a clustering step can still read it.
   - `str_names::Bool`: `true` gives each variable and each row of the model its string name.
   - `save::Bool`: `true` keeps the model in the result.
   - $(arg_dict[:blocks_head])
@@ -785,11 +785,12 @@ Build the model of a [`RelaxedRiskBudgeting`](@ref), solve it, and return its re
 
 # Returns
 
-  - [`RelaxedRiskBudgetingResult`](@ref): The result, with `fb = nothing`. The method of [`optimise`](@ref) for an optimiser with a fallback runs the fallback chain.
+  - [`RelaxedRiskBudgetingResult`](@ref): The result, with `fb = nothing`. [`optimise`](@ref) runs the fallback chain when the solve fails.
 
 # Related
 
   - [`optimise`](@ref)
+  - [`RelaxedRiskBudgeting`](@ref)
   - [`set_relaxed_risk_budgeting_constraints!`](@ref)
   - [`RelaxedRiskBudgetingResult`](@ref)
 """
@@ -817,42 +818,6 @@ function _optimise(rrb::RelaxedRiskBudgeting, rd::ReturnsResult = ReturnsResult(
                                 model = ifelse(save, model, nothing))
     return RelaxedRiskBudgetingResult(; jr = jr, rbr = rbr, fb = nothing)
 end
-"""
-    optimise(rrb::RelaxedRiskBudgeting{<:Any, <:Any, <:Any, <:Any, Nothing},
-             rd::ReturnsResult; str_names::Bool = false, save::Bool = true, kwargs...) -> RelaxedRiskBudgetingResult
-
-Optimise a [`RelaxedRiskBudgeting`](@ref) that has no fallback, and return its result.
-
-This method serves an optimiser whose `fb` is `nothing`. It solves through [`shared_series_solve`](@ref), and [`_optimise`](@ref) states the steps of the solve.
-
-# Arguments
-
-  - `rrb`: The optimiser.
-  - $(arg_dict[:rd]) When `rrb.opt.pe` is a prior result, the solve does not read `rd`, except to fit the loadings of [`FactorRiskBudgeting`](@ref) when no other source holds them. A fallback or a clustering step can still read it.
-  - `str_names`: `true` gives each variable and each row of the model its string name.
-  - `save`: `true` keeps the model in the result.
-  - `kwargs`: Passed on to [`_optimise`](@ref).
-
-# Validation
-
-  - No field in the tree of `rrb` holds an [`Online`](@ref). Otherwise [`assert_batch_entry`](@ref) throws an `ArgumentError` that names the field. A plain `optimise` is a batch fit, and the fold loop resolves an `Online` only in its online branch.
-
-# Returns
-
-  - [`RelaxedRiskBudgetingResult`](@ref): The result of the solve.
-
-# Related
-
-  - [`RelaxedRiskBudgeting`](@ref)
-  - [`RelaxedRiskBudgetingResult`](@ref)
-  - [`_optimise`](@ref)
-"""
-function optimise(rrb::RelaxedRiskBudgeting{<:Any, <:Any, <:Any, <:Any, Nothing},
-                  rd::ReturnsResult; str_names::Bool = false, save::Bool = true, kwargs...)
-    assert_batch_entry(rrb, "`optimise`")
-    return shared_series_solve(rrb, rd; str_names = str_names, save = save, kwargs...)
-end
-
 @pipe_delegates RelaxedRiskBudgeting opt
 @pipe_route_rkb RelaxedRiskBudgeting
 export BasicRelaxedRiskBudgeting, RegularisedRelaxedRiskBudgeting,

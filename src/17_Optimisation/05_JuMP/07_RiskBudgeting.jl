@@ -1139,7 +1139,7 @@ Build the model of a [`RiskBudgeting`](@ref), solve it, and return its result.
 # Arguments
 
   - `rb::RiskBudgeting`: The optimiser.
-  - $(arg_dict[:rd])
+  - $(arg_dict[:rd]) When `rb.opt.pe` is a prior result, the solve does not read `rd`, except to fit the loadings of [`FactorRiskBudgeting`](@ref) when no other source holds them. A fallback or a clustering step can still read it.
   - `str_names::Bool`: `true` gives each variable and each row of the model its string name.
   - `save::Bool`: `true` keeps the model in the result.
   - $(arg_dict[:blocks_head])
@@ -1147,11 +1147,12 @@ Build the model of a [`RiskBudgeting`](@ref), solve it, and return its result.
 
 # Returns
 
-  - [`RiskBudgetingResult`](@ref): The result, with `fb = nothing`. The method of [`optimise`](@ref) for an optimiser with a fallback runs the fallback chain.
+  - [`RiskBudgetingResult`](@ref): The result, with `fb = nothing`. [`optimise`](@ref) runs the fallback chain when the solve fails.
 
 # Related
 
   - [`optimise`](@ref)
+  - [`RiskBudgeting`](@ref)
   - [`set_risk_budgeting_constraints!`](@ref)
   - [`RiskBudgetingResult`](@ref)
 """
@@ -1182,42 +1183,6 @@ function _optimise(rb::RiskBudgeting, rd::ReturnsResult = ReturnsResult();
                                r = factory(rb.r, attrs.pr, rb.opt.slv), rbr = rbr,
                                fb = nothing)
 end
-"""
-    optimise(rb::RiskBudgeting{<:Any, <:Any, <:Any, <:Any, <:Any, Nothing},
-             rd::ReturnsResult; str_names::Bool = false, save::Bool = true, kwargs...) -> RiskBudgetingResult
-
-Optimise a [`RiskBudgeting`](@ref) that has no fallback, and return its result.
-
-This method serves an optimiser whose `fb` is `nothing`. It solves through [`shared_series_solve`](@ref), and [`_optimise`](@ref) states the steps of the solve.
-
-# Arguments
-
-  - `rb`: The optimiser.
-  - $(arg_dict[:rd]) When `rb.opt.pe` is a prior result, the solve does not read `rd`, except to fit the loadings of [`FactorRiskBudgeting`](@ref) when no other source holds them. A fallback or a clustering step can still read it.
-  - `str_names`: `true` gives each variable and each row of the model its string name.
-  - `save`: `true` keeps the model in the result.
-  - `kwargs`: Passed on to [`_optimise`](@ref).
-
-# Validation
-
-  - No field in the tree of `rb` holds an [`Online`](@ref). Otherwise [`assert_batch_entry`](@ref) throws an `ArgumentError` that names the field. A plain `optimise` is a batch fit, and the fold loop resolves an `Online` only in its online branch.
-
-# Returns
-
-  - [`RiskBudgetingResult`](@ref): The result of the solve.
-
-# Related
-
-  - [`RiskBudgeting`](@ref)
-  - [`RiskBudgetingResult`](@ref)
-  - [`_optimise`](@ref)
-"""
-function optimise(rb::RiskBudgeting{<:Any, <:Any, <:Any, <:Any, <:Any, Nothing},
-                  rd::ReturnsResult; str_names::Bool = false, save::Bool = true, kwargs...)
-    assert_batch_entry(rb, "`optimise`")
-    return shared_series_solve(rb, rd; str_names = str_names, save = save, kwargs...)
-end
-
 @pipe_delegates RiskBudgeting opt
 @pipe_route_rkb RiskBudgeting
 @pipe_route_sigma_ucs RiskBudgeting
