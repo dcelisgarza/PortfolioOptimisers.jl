@@ -569,8 +569,8 @@ function prior(pe::FactorBlackLittermanPrior, X::MatNum, F::MatNum,
                          fpr = fpr)
 end
 function factor_residual_config(pe::FactorBlackLittermanPrior)
-    return (; ve = pe.ve, pdm = pe.rsd ? matrix_processing_posdef(pe.mp) : nothing,
-            rsd = pe.rsd)
+    return ResidualBlockConfig(pe.ve, pe.rsd ? matrix_processing_posdef(pe.mp) : nothing,
+                               pe.rsd)
 end
 
 export FactorBlackLittermanPrior

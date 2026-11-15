@@ -1,8 +1,8 @@
 ```@meta
-Description = "Cross-Sectional Factor Prior, public API of PortfolioOptimisers.jl: CrossSectionalFactorPrior, prior, AbstractSpannedShrinkageCalibrationAlgorithm, …"
+Description = "Cross-Sectional Factor Prior (a), public API of PortfolioOptimisers.jl: CrossSectionalFactorPrior, prior, AbstractSpannedShrinkageCalibrationAlgorithm, …"
 ```
 
-# Cross-Sectional Factor Prior
+# Cross-Sectional Factor Prior (a)
 
 A cross-sectional factor prior fits a factor model at each observation from the exposures in an [`AssetPanel`](@ref), and turns the model into moments of the assets. It returns a [`LowOrderPrior`](@ref) whose `rr` field holds the fitted [`CrossSectionalFactorModel`](@ref).
 

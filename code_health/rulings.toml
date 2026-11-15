@@ -515,10 +515,24 @@ rationale = "keyword-constructor-arity"
 # implementation's own public parameters, one per configuration choice the prior offers.
 
 [[exemption]]
-path = "src/10_Prior/11_CrossSectionalFactorPrior.jl"
+path = "src/10_Prior/11_CrossSectionalFactorPrior_a.jl"
 definition = "CrossSectionalFactorPrior"
 metric = "arg"
 rationale = "keyword-constructor-arity"
+
+# Issue #2097 cut `11_CrossSectionalFactorPrior.jl` into letter parts (ADR 0178). The old row
+# held `arg = 31`, so these two definitions stood inside it, and they moved unchanged to `_a`.
+[[exemption]]
+path = "src/10_Prior/11_CrossSectionalFactorPrior_a.jl"
+definition = "prior"
+metric = "arg"
+rationale = "a-definition-a-file-split-moved-unchanged"
+
+[[exemption]]
+path = "src/10_Prior/11_CrossSectionalFactorPrior_a.jl"
+definition = "cross_sectional_exposure_series"
+metric = "arg"
+rationale = "a-definition-a-file-split-moved-unchanged"
 
 [[exemption]]
 path = "src/01_Base/03_PrettyShow.jl"
@@ -1189,7 +1203,7 @@ definition = "schur_complement_weights"
 rationale = "an-allocation-the-loop-keeps"
 
 [[perf_dismissal]]
-file = "src/10_Prior/11_CrossSectionalFactorPrior.jl"
+file = "src/10_Prior/11_CrossSectionalFactorPrior_a.jl"
 rule = "slice_copy"
 definition = "cross_sectional_assemble"
 code = "vs[end, :]"

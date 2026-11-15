@@ -1692,7 +1692,8 @@ end
     # The stacked products the augmented member forms are all well defined over it.
     @test size(transpose(P) * (omega \ P)) == (2, 2)
     @test all(iszero, transpose(P) * (omega \ P))
-    blp = (; P = [1.0 0.0], Q = [0.5], omega = Diagonal([0.1]), tau = 0.01)
+    blp = PortfolioOptimisers.BlackLittermanViewSystem([1.0 0.0], [0.5], 0.01,
+                                                       Diagonal([0.1]))
     @test PortfolioOptimisers.bl_view_block(blp, 2, Float64) === (blp.P, blp.Q, blp.omega)
 end
 

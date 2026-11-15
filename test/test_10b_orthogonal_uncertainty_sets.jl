@@ -1180,12 +1180,16 @@ struct ProbeMatrixProcessing1955 <: PortfolioOptimisers.AbstractMatrixProcessing
 
         @testset "The counts combine by case" begin
             cnt = PO.VarianceCount([4.0, 4.0], [3.0, 3.0])
-            @test PO.residual_variance_counts(nothing, [1, 2], 5) ==
-                  (; edof = nothing, ediv = nothing)
-            @test PO.residual_variance_counts(cnt, nothing, 5) ==
-                  (; edof = nothing, ediv = [3.0, 3.0])
-            @test PO.residual_variance_counts(cnt, [3, 2], 5) ==
-                  (; edof = [2.0, 1.0], ediv = [3.0, 3.0])
+            # The library defines `==` on no struct, so each case compares the fields.
+            counts(c) = (c.edof, c.ediv)
+            @test PO.residual_variance_counts(nothing, [1, 2], 5) isa
+                  PO.ResidualVarianceCounts
+            @test counts(PO.residual_variance_counts(nothing, [1, 2], 5)) ==
+                  (nothing, nothing)
+            @test counts(PO.residual_variance_counts(cnt, nothing, 5)) ==
+                  (nothing, [3.0, 3.0])
+            @test counts(PO.residual_variance_counts(cnt, [3, 2], 5)) ==
+                  ([2.0, 1.0], [3.0, 3.0])
         end
 
         @testset "The default fit holds the level through the real prior" begin

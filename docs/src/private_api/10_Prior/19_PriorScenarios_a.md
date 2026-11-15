@@ -1,13 +1,22 @@
 ```@meta
-Description = "Prior Scenarios, private API of PortfolioOptimisers.jl: scenario_fill_pairs, scenario_fill_msg, resolve_fill_limit, scenario_window, scenario_tail, …"
+Description = "Prior Scenarios (a), private API of PortfolioOptimisers.jl: RegressionStage, CachedFactorReturns, scenario_fill_pairs, scenario_fill_msg, …"
 ```
 
-# [Prior Scenarios: private API](@id private-api-prior-scenarios)
+# [Prior Scenarios (a): private API](@id private-api-prior-scenarios)
 
-A prior result carries its scenarios in `X`. A cap on the number of scenarios keeps the last rows of the observations. The scenario fill writes zero into each gap of an investable asset, so that a risk measure that reads the scenarios reads a complete matrix. The functions below find the entries to fill, resolve the limit on the filled share, keep the rows under the cap, cut a nested prior result to the rows that a wrapping prior keeps, put the probabilities of the scenarios on the rows that the moments read, report the filled entries, and fill them. A Cross-Sectional Factor Prior reads its scenarios from the factor returns of its regression, so two functions fit that regression and give those rows to an entropy pooling prior around it.
+A prior result carries its scenarios in `X`. A cap on the number of scenarios keeps the last rows of the observations. The scenario fill writes zero into each gap of an investable asset, so that a risk measure that reads the scenarios reads a complete matrix. The functions below find the entries to fill, resolve the limit on the filled share, keep the rows under the cap, cut a nested prior result to the rows that a wrapping prior keeps, put the probabilities of the scenarios on the rows that the moments read, and report the filled entries. The function that fills them is on the page of part (b). A Cross-Sectional Factor Prior reads its scenarios from the factor returns of its regression, so two functions fit that regression and give those rows to an entropy pooling prior around it.
 A fit with `cache_reg = true` stores a cache, and six functions store it or read it, so the refit of an entropy pooling prior runs no regression. They store the cache on the block, find the block of the cache, and read its factor returns. They split the return forecast of the block, and run the steps of the assembly that read the factor moments. The last one keeps the cache of a pool in the factor slot.
 
 Five more functions give the scenarios and the return forecast of a Cross-Sectional Factor Prior. They split a forecast into the part that the factors explain and an alpha, fit the return forecast of the block, blend the forecast into the factor means, divide the scenario weights of the factors by their sum, and give the return scenarios of the assets. Three more functions count the scenarios of a prior with only the steps that drop rows, and check the rows that the exposure lag leaves. Two functions state the effective count of the moments of an empirical prior, and fit its mean together with the count that the fit states.
+
+## Types
+
+```@docs
+PortfolioOptimisers.RegressionStage
+PortfolioOptimisers.CachedFactorReturns
+```
+
+## Functions
 
 ```@docs
 scenario_fill_pairs
@@ -36,5 +45,4 @@ PortfolioOptimisers.scenario_moment_counts
 PortfolioOptimisers.mean_with_count
 PortfolioOptimisers.scenario_fill_report
 PortfolioOptimisers.scenario_fill_remember!
-scenario_fill
 ```

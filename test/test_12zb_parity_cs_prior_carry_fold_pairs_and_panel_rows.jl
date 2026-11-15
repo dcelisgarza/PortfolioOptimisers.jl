@@ -300,7 +300,8 @@ end
             marked = po.orthogonal_forecast_pairs(with_cell(true, 0.0))
             byhand = po.orthogonal_forecast_pairs(with_cell(false, NaN))
             pooled = po.orthogonal_forecast_pairs(with_cell(false, 0.0))
-            @test isequal(marked, byhand)
+            @test all(f -> isequal(getfield(marked, f), getfield(byhand, f)),
+                      fieldnames(typeof(marked)))
             @test length(pooled.a) == length(marked.a) + 1
             slope(x) = po.forecast_calibration_slope(x.a, x.b, x.q)
             @test slope(pooled) != slope(marked)

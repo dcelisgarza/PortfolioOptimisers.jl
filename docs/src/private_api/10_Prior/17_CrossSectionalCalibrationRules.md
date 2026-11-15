@@ -1,11 +1,20 @@
 ```@meta
-Description = "Cross-Sectional Calibration Rules, private API of PortfolioOptimisers.jl: ForecastSplitHistory, cross_sectional_split_history, cross_sectional_context, …"
+Description = "Cross-Sectional Calibration Rules, private API of PortfolioOptimisers.jl: ForecastSplitHistory, SpannedFactorMoments, OrthogonalForecastPairs, …"
 ```
 
 # Cross-Sectional Calibration Rules: private API
 
+## Types
+
 ```@docs
 PortfolioOptimisers.ForecastSplitHistory
+PortfolioOptimisers.SpannedFactorMoments
+PortfolioOptimisers.OrthogonalForecastPairs
+```
+
+## Functions
+
+```@docs
 PortfolioOptimisers.cross_sectional_split_history
 PortfolioOptimisers.cross_sectional_context
 PortfolioOptimisers.spanned_shrinkage_moments

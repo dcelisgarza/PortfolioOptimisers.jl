@@ -6,7 +6,7 @@
 [provenance]
 julia = "1.13.4"
 julia_syntax = "1.0.2"
-commit = "6198d8b31d"
+commit = "04e7c67c34"
 
 [file]
 "ext/PortfolioOptimisersPlotsExt/01_CumulativeReturnsPlots.jl" = { code = 287, doc = 0, comment = 12, blank = 2, total = 301 }
@@ -259,16 +259,19 @@ commit = "6198d8b31d"
 "src/10_Prior/08_HighOrderFactorPriorEstimator.jl" = { code = 266, doc = 442, comment = 71, blank = 165, total = 944 }
 "src/10_Prior/09_AssetPanelEstimators.jl" = { code = 119, doc = 426, comment = 14, blank = 191, total = 750 }
 "src/10_Prior/10_Base_CrossSectionalFactorPrior.jl" = { code = 467, doc = 922, comment = 28, blank = 428, total = 1845 }
-"src/10_Prior/11_CrossSectionalFactorPrior.jl" = { code = 477, doc = 1010, comment = 64, blank = 395, total = 1946 }
+"src/10_Prior/11_CrossSectionalFactorPrior_a.jl" = { code = 493, doc = 1085, comment = 64, blank = 390, total = 2032 }
+"src/10_Prior/11_CrossSectionalFactorPrior_b.jl" = { code = 21, doc = 48, comment = 0, blank = 28, total = 97 }
 "src/10_Prior/12_PriorPartialFit_a.jl" = { code = 482, doc = 920, comment = 19, blank = 426, total = 1847 }
 "src/10_Prior/12_PriorPartialFit_b.jl" = { code = 58, doc = 118, comment = 10, blank = 55, total = 241 }
 "src/10_Prior/13_PriorExpectedReturns.jl" = { code = 56, doc = 129, comment = 4, blank = 55, total = 244 }
 "src/10_Prior/14_LowDimensionEnsemblePrior.jl" = { code = 96, doc = 171, comment = 16, blank = 50, total = 333 }
-"src/10_Prior/15_CrossSectionalPriorFold.jl" = { code = 493, doc = 612, comment = 15, blank = 266, total = 1386 }
+"src/10_Prior/15_CrossSectionalPriorFold_a.jl" = { code = 482, doc = 656, comment = 10, blank = 266, total = 1414 }
+"src/10_Prior/15_CrossSectionalPriorFold_b.jl" = { code = 28, doc = 28, comment = 5, blank = 12, total = 73 }
 "src/10_Prior/16_CrossSectionalForecastHistoryCarry.jl" = { code = 245, doc = 309, comment = 32, blank = 157, total = 743 }
 "src/10_Prior/17_CrossSectionalCalibrationRules.jl" = { code = 311, doc = 786, comment = 5, blank = 366, total = 1468 }
 "src/10_Prior/18_CrossSectionalCarryHistories.jl" = { code = 301, doc = 355, comment = 3, blank = 169, total = 828 }
-"src/10_Prior/19_PriorScenarios.jl" = { code = 485, doc = 757, comment = 47, blank = 335, total = 1624 }
+"src/10_Prior/19_PriorScenarios_a.jl" = { code = 474, doc = 756, comment = 44, blank = 329, total = 1603 }
+"src/10_Prior/19_PriorScenarios_b.jl" = { code = 32, doc = 39, comment = 3, blank = 18, total = 92 }
 "src/10_Prior/20_PriorReturnsSource.jl" = { code = 289, doc = 570, comment = 0, blank = 276, total = 1135 }
 "src/11_UncertaintySets/01_Base_UncertaintySets.jl" = { code = 373, doc = 1218, comment = 3, blank = 573, total = 2167 }
 "src/11_UncertaintySets/02_DeltaUncertaintySets.jl" = { code = 65, doc = 276, comment = 2, blank = 100, total = 443 }

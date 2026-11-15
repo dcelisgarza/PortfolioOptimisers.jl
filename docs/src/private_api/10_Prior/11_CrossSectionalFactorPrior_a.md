@@ -1,8 +1,20 @@
 ```@meta
-Description = "Cross-Sectional Factor Prior, private API of PortfolioOptimisers.jl: Num_SpanShrinkCal, Num_OrthFcScaleCal, assert_forecast_history_rule, …"
+Description = "Cross-Sectional Factor Prior (a), private API of PortfolioOptimisers.jl: SplitReturnForecast, CalibrationValues, ExposureSeries, BenchmarkSeries, …"
 ```
 
-# Cross-Sectional Factor Prior: private API
+# Cross-Sectional Factor Prior (a): private API
+
+## Types
+
+```@docs
+PortfolioOptimisers.SplitReturnForecast
+PortfolioOptimisers.CalibrationValues
+PortfolioOptimisers.ExposureSeries
+PortfolioOptimisers.BenchmarkSeries
+PortfolioOptimisers.LiveRegression
+```
+
+## Functions
 
 ```@docs
 PortfolioOptimisers.Num_SpanShrinkCal
@@ -23,11 +35,8 @@ PortfolioOptimisers.cross_sectional_observed_rebacked
 PortfolioOptimisers.cross_sectional_benchmark_stage
 PortfolioOptimisers.cross_sectional_minra
 PortfolioOptimisers.cross_sectional_live_regression
-PortfolioOptimisers.cross_sectional_live_dropped
-PortfolioOptimisers.cross_sectional_live_factors
 PortfolioOptimisers.cross_sectional_pin_choice
 PortfolioOptimisers.cross_sectional_pinned_families
 PortfolioOptimisers.cross_sectional_axis_pairs
-PortfolioOptimisers.cross_sectional_lookback
 PortfolioOptimisers.show_fields(::CrossSectionalFactorPrior)
 ```

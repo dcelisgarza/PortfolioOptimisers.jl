@@ -1,8 +1,17 @@
 ```@meta
-Description = "Cross-Sectional Prior Fold, private API of PortfolioOptimisers.jl: CrossSectionalCarryState, Base.copy, cross_sectional_forecast_reads_panel, …"
+Description = "Cross-Sectional Prior Fold (a), private API of PortfolioOptimisers.jl: FoldRegression, StepRows, CrossSectionalCarryState, Base.copy, …"
 ```
 
-# Cross-Sectional Prior Fold: private API
+# Cross-Sectional Prior Fold (a): private API
+
+## Types
+
+```@docs
+PortfolioOptimisers.FoldRegression
+PortfolioOptimisers.StepRows
+```
+
+## Functions
 
 ```@docs
 PortfolioOptimisers.CrossSectionalCarryState

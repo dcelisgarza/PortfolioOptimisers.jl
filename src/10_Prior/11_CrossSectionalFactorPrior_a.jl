@@ -857,7 +857,41 @@ function prior(pe::CrossSectionalFactorPrior, X::MatNum, F::Option{<:MatNum} = n
                                     kwargs...)
 end
 """
-    cross_sectional_assemble(pe::CrossSectionalFactorPrior, f_pr::NamedTuple,
+$(DocStringExtensions.TYPEDEF)
+
+The split of the Return Forecast of a [`CrossSectionalFactorPrior`](@ref) into its spanned and orthogonal parts.
+
+This type is an implementation detail and is not intended for direct use. [`cross_sectional_return_forecast`](@ref) and the refit of [`scenario_prior`](@ref) make it. [`cross_sectional_calibration`](@ref), [`cross_sectional_forecast_block`](@ref) and [`cross_sectional_moment_prior`](@ref) read it.
+
+# Fields
+
+$(DocStringExtensions.FIELDS)
+
+# Related
+
+  - [`cross_sectional_return_forecast`](@ref)
+  - [`ForecastSplitResult`](@ref)
+"""
+@concrete struct SplitReturnForecast
+    """
+    `rf`: The Return Forecast Result, or `nothing`.
+    """
+    rf
+    """
+    `g`: The spanned coefficients, or `nothing`.
+    """
+    g
+    """
+    `ap`: The orthogonal part before the Orthogonal Forecast Scale, or `nothing`.
+    """
+    ap
+    """
+    `hist`: The Return Forecast history, or `nothing` when no Calibration Slot reads it.
+    """
+    hist
+end
+"""
+    cross_sectional_assemble(pe::CrossSectionalFactorPrior, f_pr::FactorPriorMoments,
                              ca::AppendedFactorModel, fit::NamedTuple, rde::ReturnsResult;
                              cache_reg::Bool = false, kwargs...) -> LowOrderPrior
 
@@ -899,7 +933,7 @@ The returns-matrix method of [`prior`](@ref) calls it after the variance history
   - [`CrossSectionalFactorModel`](@ref)
   - [`cross_sectional_moment_prior`](@ref)
 """
-function cross_sectional_assemble(pe::CrossSectionalFactorPrior, f_pr::NamedTuple,
+function cross_sectional_assemble(pe::CrossSectionalFactorPrior, f_pr::FactorPriorMoments,
                                   ca::AppendedFactorModel, fit::NamedTuple,
                                   rde::ReturnsResult; cache_reg::Bool = false, kwargs...)
     (; csr, W, vs, cnt, amr, bwr, Xo, r) = fit
@@ -960,8 +994,35 @@ function cross_sectional_assemble(pe::CrossSectionalFactorPrior, f_pr::NamedTupl
                                         Xs, Xo[rs, :]; kwargs...)
 end
 """
-    cross_sectional_calibration(pe::CrossSectionalFactorPrior, f_pr::NamedTuple,
-                                csfm::CrossSectionalFactorModel, sp::NamedTuple) -> NamedTuple
+$(DocStringExtensions.TYPEDEF)
+
+The Spanned Shrinkage and the Orthogonal Forecast Scale of a [`CrossSectionalFactorPrior`](@ref), resolved against its fit.
+
+This type is an implementation detail and is not intended for direct use. [`cross_sectional_calibration`](@ref) makes it. [`cross_sectional_moment_prior`](@ref) reads it. The two fields are numbers of one type, so a positional swap would be silent.
+
+# Fields
+
+$(DocStringExtensions.FIELDS)
+
+# Related
+
+  - [`cross_sectional_calibration`](@ref)
+  - [`resolve_calibration_slot`](@ref)
+"""
+@concrete struct CalibrationValues
+    """
+    `lambda`: The resolved Spanned Shrinkage, in `[0, 1]`.
+    """
+    lambda
+    """
+    `c`: The resolved Orthogonal Forecast Scale, finite and non-negative.
+    """
+    c
+end
+"""
+    cross_sectional_calibration(pe::CrossSectionalFactorPrior, f_pr::FactorPriorMoments,
+                                csfm::CrossSectionalFactorModel, sp::SplitReturnForecast)
+        -> CalibrationValues
 
 Resolves the Spanned Shrinkage `lambda` and the Orthogonal Forecast Scale `c` of a [`CrossSectionalFactorPrior`](@ref) against its fit.
 
@@ -979,7 +1040,7 @@ Resolves the Spanned Shrinkage `lambda` and the Orthogonal Forecast Scale `c` of
   - `pe`: Cross-Sectional Factor Prior estimator.
   - `f_pr`: The factor moments that [`cross_sectional_factor_moments`](@ref) states over the combined reduced factor returns.
   - `csfm`: The factor-model block, with a zero `b` and no Return Forecast.
-  - `sp`: The split of the Return Forecast, `(; rf, g, ap, hist)`, as [`cross_sectional_return_forecast`](@ref) states it.
+  - `sp`: The split of the Return Forecast, a [`SplitReturnForecast`](@ref), as [`cross_sectional_return_forecast`](@ref) states it.
 
 # Validation
 
@@ -988,11 +1049,11 @@ Resolves the Spanned Shrinkage `lambda` and the Orthogonal Forecast Scale `c` of
 
 # Returns
 
-  - `lambda::Number`: The resolved Spanned Shrinkage.
-  - `c::Number`: The resolved Orthogonal Forecast Scale.
+  - `cv::CalibrationValues`: The resolved Spanned Shrinkage `lambda` and the resolved Orthogonal Forecast Scale `c`.
 
 # Related
 
+  - [`CalibrationValues`](@ref)
   - [`CrossSectionalFactorPrior`](@ref)
   - [`cross_sectional_assemble`](@ref)
   - [`resolve_calibration_slot`](@ref)
@@ -1000,8 +1061,10 @@ Resolves the Spanned Shrinkage `lambda` and the Orthogonal Forecast Scale `c` of
   - [`AbstractSpannedShrinkageCalibrationAlgorithm`](@ref)
   - [`AbstractOrthogonalForecastScaleCalibrationAlgorithm`](@ref)
 """
-function cross_sectional_calibration(pe::CrossSectionalFactorPrior, f_pr::NamedTuple,
-                                     csfm::CrossSectionalFactorModel, sp::NamedTuple)
+function cross_sectional_calibration(pe::CrossSectionalFactorPrior,
+                                     f_pr::FactorPriorMoments,
+                                     csfm::CrossSectionalFactorModel,
+                                     sp::SplitReturnForecast)
     pr = LowOrderPrior(; X = f_pr.X, mu = f_pr.mu, sigma = f_pr.sigma, w = f_pr.w,
                        ens = f_pr.ens, eoc = f_pr.eoc, kld = f_pr.kld, ow = f_pr.ow)
     ctx = CalibrationContext(;
@@ -1011,11 +1074,12 @@ function cross_sectional_calibration(pe::CrossSectionalFactorPrior, f_pr::NamedT
     c = resolve_calibration_slot(pe.c, :c, pr, pr.w, nothing, ctx)
     assert_spanned_shrinkage(lambda::Number)
     assert_orthogonal_forecast_scale(c::Number)
-    return (; lambda = lambda, c = c)
+    return CalibrationValues(lambda, c)
 end
 """
-    cross_sectional_forecast_block(csfm::CrossSectionalFactorModel, sp::NamedTuple,
-                                   lambda::Number, c::Number) -> CrossSectionalFactorModel
+    cross_sectional_forecast_block(csfm::CrossSectionalFactorModel,
+                                   sp::SplitReturnForecast, lambda::Number, c::Number)
+        -> CrossSectionalFactorModel
 
 Write the scaled orthogonal part of the Return Forecast, the Return Forecast Result and the resolved Calibration Slots onto the block of a [`CrossSectionalFactorPrior`](@ref).
 
@@ -1041,7 +1105,7 @@ Where:
 # Arguments
 
   - `csfm`: The factor-model block, built with a zero `b` and no Return Forecast.
-  - `sp`: The split of the Return Forecast, `(; rf, g, ap, hist)`, as [`cross_sectional_return_forecast`](@ref) states it.
+  - `sp`: The split of the Return Forecast, a [`SplitReturnForecast`](@ref), as [`cross_sectional_return_forecast`](@ref) states it.
   - `lambda`: The resolved Spanned Shrinkage.
   - `c`: The resolved Orthogonal Forecast Scale.
 
@@ -1059,8 +1123,8 @@ Where:
   - [`cross_sectional_return_forecast`](@ref)
   - [`cross_sectional_calibration`](@ref)
 """
-function cross_sectional_forecast_block(csfm::CrossSectionalFactorModel, sp::NamedTuple,
-                                        lambda::Number, c::Number)
+function cross_sectional_forecast_block(csfm::CrossSectionalFactorModel,
+                                        sp::SplitReturnForecast, lambda::Number, c::Number)
     b = isnothing(sp.ap) ? csfm.b : c * sp.ap
     return rebuild_struct(csfm, (; b = b, rf = sp.rf, lambda = lambda, c = c))
 end
@@ -1119,12 +1183,93 @@ function cross_sectional_warmup(X::MatNum, Ms::Arr3Num, emsk::AbstractMatrix{Boo
     return throw(ArgumentError("no observation of this Asset Panel carries an asset of the estimation universe with both a finite return and a finite Factor Exposure to every factor, so the whole history is Descriptor warm-up. Give more observations, or shorten the warm-up of the Descriptors."))
 end
 """
+$(DocStringExtensions.TYPEDEF)
+
+The steps of the fit of a [`CrossSectionalFactorPrior`](@ref) that give a value per observation: the masks, the benchmark weights, the observed factors, the returns that the regression reads and the exposure history.
+
+This type is an implementation detail and is not intended for direct use. [`cross_sectional_exposure_series`](@ref) makes it with no `rw`, and [`cross_sectional_exposure_stage`](@ref) gives it the rows after the Descriptor warm-up. The regression stage, the online step under a [`PinnedChoice`](@ref) and the carry fold read it.
+
+# Fields
+
+$(DocStringExtensions.FIELDS)
+
+# Constructors
+
+    ExposureSeries(; amsk, emsk, mcap, BW, Xu, cc, Xl, rde, Ms, nf, fam, xf, rw) -> ExposureSeries
+
+Keywords correspond to the struct's fields. [`rebuild_struct`](@ref) calls this form when [`cross_sectional_exposure_stage`](@ref) replaces `rw`.
+
+# Related
+
+  - [`cross_sectional_exposure_series`](@ref)
+  - [`cross_sectional_exposure_stage`](@ref)
+  - [`BenchmarkSeries`](@ref)
+"""
+@concrete struct ExposureSeries
+    """
+    `amsk`: The active mask, `observations × assets`.
+    """
+    amsk
+    """
+    `emsk`: The estimation mask, `observations × assets`.
+    """
+    emsk
+    """
+    `mcap`: The market capitalisation, or `nothing`.
+    """
+    mcap
+    """
+    `BW`: The benchmark weights, `observations × assets`.
+    """
+    BW
+    """
+    `Xu`: The returns that the universe and the warm-up read.
+    """
+    Xu
+    """
+    `cc`: The observed factors, an [`ObservedFactors`](@ref), or `nothing`. Its exposures hold the last `n` rows and the `pe.lag` rows before them, or every row.
+    """
+    cc
+    """
+    `Xl`: The returns that the regression reads.
+    """
+    Xl
+    """
+    `rde`: The returns data that the estimated members read.
+    """
+    rde
+    """
+    `Ms`: The exposure history of the estimated factors over the last `n` rows or every row, `assets × factors × observations`.
+    """
+    Ms
+    """
+    `nf`: Name of each estimated factor.
+    """
+    nf
+    """
+    `fam`: Factor Family label of each estimated factor.
+    """
+    fam
+    """
+    `xf`: The factor list, with the state of each Descriptor after the rows of the step.
+    """
+    xf
+    """
+    `rw`: The rows after the Descriptor warm-up, or `nothing` before [`cross_sectional_exposure_stage`](@ref) takes them.
+    """
+    rw
+end
+function ExposureSeries(; amsk, emsk, mcap, BW, Xu, cc, Xl, rde, Ms, nf, fam, xf,
+                        rw)::ExposureSeries
+    return ExposureSeries(amsk, emsk, mcap, BW, Xu, cc, Xl, rde, Ms, nf, fam, xf, rw)
+end
+"""
     cross_sectional_exposure_stage(pe::CrossSectionalFactorPrior, X::MatNum,
                                    F::Option{<:MatNum}, pnl::AssetPanel;
                                    ne::Option{<:VecStr} = nothing,
                                    E::Option{<:MatNum} = nothing,
                                    iv::Option{<:MatNum} = nothing,
-                                   ivpa::Option{<:Num_VecNum} = nothing) -> NamedTuple
+                                   ivpa::Option{<:Num_VecNum} = nothing) -> ExposureSeries
 
 Runs the steps of the fit of a [`CrossSectionalFactorPrior`](@ref) that read the whole history: the benchmark weights, the observed factors, the returns that the regression reads, the exposure history, and the rows after the Descriptor warm-up.
 
@@ -1152,7 +1297,7 @@ The returns-matrix method of [`prior`](@ref) and the online step under a [`Pinne
 
 # Returns
 
-  - `st::NamedTuple`: The fields of [`cross_sectional_exposure_series`](@ref), and `rw`, the rows after the warm-up.
+  - `st::ExposureSeries`: The record of [`cross_sectional_exposure_series`](@ref), with `rw`, the rows after the warm-up.
 
 # Related
 
@@ -1173,7 +1318,7 @@ function cross_sectional_exposure_stage(pe::CrossSectionalFactorPrior, X::MatNum
     # warm-up of the Descriptor, and its derived net return is then not finite.
     Zo = isnothing(st.cc) ? nothing : st.cc.Z
     rw = (cross_sectional_warmup(st.Xu, st.Ms, st.emsk, Zo) + 1):size(X, 1)
-    return merge(st, (; rw = rw))
+    return rebuild_struct(st, (; rw = rw))
 end
 """
     cross_sectional_exposure_series(pe::CrossSectionalFactorPrior, X::MatNum,
@@ -1185,7 +1330,7 @@ end
                                     kept::Option{<:NamedTuple} = nothing,
                                     g0::Integer = 0,
                                     n::Option{<:Integer} = nothing,
-                                    xf::Option{<:AbstractVector} = nothing) -> NamedTuple
+                                    xf::Option{<:AbstractVector} = nothing) -> ExposureSeries
 
 Runs the steps of the fit of a [`CrossSectionalFactorPrior`](@ref) that give a value per observation: the benchmark weights, the observed factors, the returns that the regression reads, and the exposure history.
 
@@ -1220,7 +1365,7 @@ Runs the steps of the fit of a [`CrossSectionalFactorPrior`](@ref) that give a v
 
 # Returns
 
-  - `st::NamedTuple`: The fields `amsk` and `emsk`, the active mask and the estimation mask; `mcap`, the market capitalisation or `nothing`; `BW`, the benchmark weights; `Xu`, the returns that the universe and the warm-up read; `cc`, the observed factors or `nothing`, whose exposures hold the last `n` rows and the `pe.lag` rows before them, or every row; `Xl`, the returns the regression reads; `rde`, the returns data that the estimated members read; `Ms`, `nf` and `fam`, the exposure history of the estimated factors over the last `n` rows or every row, with their names and Factor Family labels; and `xf`, the factor list with the state of each Descriptor after the rows of the step.
+  - `st::ExposureSeries`: The fields `amsk` and `emsk`, the active mask and the estimation mask; `mcap`, the market capitalisation or `nothing`; `BW`, the benchmark weights; `Xu`, the returns that the universe and the warm-up read; `cc`, the observed factors or `nothing`, whose exposures hold the last `n` rows and the `pe.lag` rows before them, or every row; `Xl`, the returns the regression reads; `rde`, the returns data that the estimated members read; `Ms`, `nf` and `fam`, the exposure history of the estimated factors over the last `n` rows or every row, with their names and Factor Family labels; `xf`, the factor list with the state of each Descriptor after the rows of the step; and `rw = nothing`.
 
 # Related
 
@@ -1259,9 +1404,9 @@ function cross_sectional_exposure_series(pe::CrossSectionalFactorPrior, X::MatNu
     (; Ms, nf, fam, Zo) = cross_sectional_exposure_history(dc.xv, rde, pe.ex; n = n,
                                                            Zo = Zo)
     cc = cross_sectional_observed_rebacked(cc, Zo)
-    return (; amsk = amsk, emsk = emsk, mcap = mcap, BW = BW, Xu = Xu, cc = cc, Xl = Xl,
-            rde = rde, Ms = Ms, nf = nf, fam = fam,
-            xf = cross_sectional_factor_join(fl, dc.xf, isnothing(cc) ? obs : cc.xf))
+    return ExposureSeries(amsk, emsk, mcap, BW, Xu, cc, Xl, rde, Ms, nf, fam,
+                          cross_sectional_factor_join(fl, dc.xf,
+                                                      isnothing(cc) ? obs : cc.xf), nothing)
 end
 """
     cross_sectional_history_observed(cc::Nothing, n) -> nothing
@@ -1340,12 +1485,54 @@ function cross_sectional_observed_rebacked(cc::ObservedFactors, Zo::AbstractArra
     return rebuild_struct(cc, (; Z = Zo))
 end
 """
+$(DocStringExtensions.TYPEDEF)
+
+The masks, the benchmark weights and the rebuilt returns data of a [`CrossSectionalFactorPrior`](@ref).
+
+This type is an implementation detail and is not intended for direct use. [`cross_sectional_benchmark_stage`](@ref) makes it. [`cross_sectional_exposure_series`](@ref) and the forecast history of the carry fold read it.
+
+# Fields
+
+$(DocStringExtensions.FIELDS)
+
+# Related
+
+  - [`cross_sectional_benchmark_stage`](@ref)
+  - [`ExposureSeries`](@ref)
+"""
+@concrete struct BenchmarkSeries
+    """
+    `amsk`: The active mask, `observations × assets`.
+    """
+    amsk
+    """
+    `emsk`: The estimation mask, `observations × assets`.
+    """
+    emsk
+    """
+    `mcap`: The market capitalisation, or `nothing`.
+    """
+    mcap
+    """
+    `BW`: The benchmark weights, `observations × assets`.
+    """
+    BW
+    """
+    `rdb`: The returns data with the benchmark weights on its panel.
+    """
+    rdb
+    """
+    `Xu`: The returns that the universe and the warm-up read.
+    """
+    Xu
+end
+"""
     cross_sectional_benchmark_stage(pe::CrossSectionalFactorPrior, X::MatNum,
                                     F::Option{<:MatNum}, pnl::AssetPanel;
                                     ne::Option{<:VecStr} = nothing,
                                     E::Option{<:MatNum} = nothing,
                                     iv::Option{<:MatNum} = nothing,
-                                    ivpa::Option{<:Num_VecNum} = nothing) -> NamedTuple
+                                    ivpa::Option{<:Num_VecNum} = nothing) -> BenchmarkSeries
 
 Rebuilds the returns data of a [`CrossSectionalFactorPrior`](@ref), and writes its benchmark weights onto the Asset Panel.
 
@@ -1375,7 +1562,7 @@ Rebuilds the returns data of a [`CrossSectionalFactorPrior`](@ref), and writes i
 
 # Returns
 
-  - `st::NamedTuple`: The fields `amsk` and `emsk`, the active mask and the estimation mask; `mcap`, the market capitalisation or `nothing`; `BW`, the benchmark weights; `rdb`, the returns data with the benchmark weights on its panel; and `Xu`, the returns that the universe and the warm-up read.
+  - `st::BenchmarkSeries`: The fields `amsk` and `emsk`, the active mask and the estimation mask; `mcap`, the market capitalisation or `nothing`; `BW`, the benchmark weights; `rdb`, the returns data with the benchmark weights on its panel; and `Xu`, the returns that the universe and the warm-up read.
 
 # Related
 
@@ -1417,7 +1604,7 @@ function cross_sectional_benchmark_stage(pe::CrossSectionalFactorPrior, X::MatNu
     cross_sectional_cap_finite!(bmsk, mcap)
     BW = cross_sectional_cap_weights(pe.bp, mcap, bmsk)
     rdb = cross_sectional_benchmark_returns(rd, pe.bw, BW)
-    return (; amsk = amsk, emsk = emsk, mcap = mcap, BW = BW, rdb = rdb, Xu = Xu)
+    return BenchmarkSeries(amsk, emsk, mcap, BW, rdb, Xu)
 end
 """
     prior(pe::CrossSectionalFactorPrior, rd::ReturnsResult; strict::Bool = false,
@@ -1729,6 +1916,33 @@ function cross_sectional_minra(pe::CrossSectionalFactorPrior, K::Integer)::Integ
     return isnothing(pe.minra) ? max(2 * K, 30) : pe.minra
 end
 """
+$(DocStringExtensions.TYPEDEF)
+
+A cross-sectional regression on the factors that are not empty, and the mark of those factors.
+
+This type is an implementation detail and is not intended for direct use. [`cross_sectional_live_regression`](@ref) and [`cross_sectional_fold_pass`](@ref) make it. The regression stage and the carry fold of a [`CrossSectionalFactorPrior`](@ref) read it.
+
+# Fields
+
+$(DocStringExtensions.FIELDS)
+
+# Related
+
+  - [`cross_sectional_live_regression`](@ref)
+  - [`cross_sectional_fold_pass`](@ref)
+  - [`CrossSectionalRegression`](@ref)
+"""
+@concrete struct LiveRegression
+    """
+    `csr`: The regression on every factor, a [`CrossSectionalRegression`](@ref), with `lv` in its field of the same name.
+    """
+    csr
+    """
+    `lv`: `true` at each factor that is not empty.
+    """
+    lv
+end
+"""
 $(DocStringExtensions.TYPEDSIGNATURES)
 
 Regress each observation on the factors that are not empty, and give every Empty Factor a return of zero.
@@ -1780,11 +1994,11 @@ The method with `lv` regresses on the factors that a caller marks. The carry fol
 
 # Returns
 
-  - `csr::CrossSectionalRegression`: The regression on every factor of `Z`, with `lv` in its field of the same name.
-  - `lv::BitVector`: `true` at each factor that is not empty.
+  - `lr::LiveRegression`: The regression `csr` on every factor of `Z`, with `lv` in its field of the same name, and `lv`, `true` at each factor that is not empty.
 
 # Related
 
+  - [`LiveRegression`](@ref)
   - [`cross_sectional_regression`](@ref)
   - [`cross_sectional_factor_moments`](@ref)
   - [`CrossSectionalFactorPrior`](@ref)
@@ -1801,113 +2015,16 @@ function cross_sectional_live_regression(cre::AbstractCrossSectionalRegressionEs
                                          lv::AbstractVector{Bool}, t0::Integer = 0)
     if all(lv)
         csr = cross_sectional_block_regression(cre, Z, X, W, t0)
-        return (; csr = rebuild_struct(csr, (; lv = lv)), lv = lv)
+        return LiveRegression(rebuild_struct(csr, (; lv = lv)), lv)
     end
     csl = cross_sectional_block_regression(cre, Z[:, lv, :], X, W, t0)
     f = zeros(eltype(csl.f), size(csl.f, 1), size(Z, 2))
     f[:, lv] = csl.f
-    return (;
-            csr = CrossSectionalRegression(; f = f, eps = csl.eps, n = csl.n,
-                                           edof = csl.edof, b = csl.b, h1 = csl.h1,
-                                           dc = cross_sectional_live_dropped(csl.dc, lv),
-                                           lv = lv), lv = lv)
-end
-"""
-    cross_sectional_live_dropped(dc::Nothing, lv::AbstractVector{Bool}) -> Nothing
-    cross_sectional_live_dropped(dc::AbstractMatrix{Bool}, lv::AbstractVector{Bool})
-        -> BitMatrix
-
-Expand the dropped-column mask of a regression on the factors that are not empty onto every factor.
-
-An Empty Factor takes a return of zero because no pair loads on it, not because the solve dropped its column, so its column of the mask is `false`.
-
-# Arguments
-
-  - `dc`: The dropped-column mask of the regression on the factors that `lv` marks, or `nothing`.
-  - `lv`: `true` at each factor that is not empty.
-
-# Returns
-
-  - `dc::Option{<:BitMatrix}`: The mask on every factor, or `nothing`.
-
-# Related
-
-  - [`cross_sectional_live_regression`](@ref)
-  - [`CrossSectionalRegression`](@ref)
-"""
-function cross_sectional_live_dropped(::Nothing, ::AbstractVector{Bool})::Nothing
-    return nothing
-end
-function cross_sectional_live_dropped(dc::AbstractMatrix{Bool},
-                                      lv::AbstractVector{Bool})::BitMatrix
-    d = falses(size(dc, 1), length(lv))
-    d[:, lv] = dc
-    return d
-end
-"""
-$(DocStringExtensions.TYPEDSIGNATURES)
-
-Mark each factor that is not an Empty Factor over the observations of a design.
-
-A factor is empty when its exposure is zero at every (observation, asset) pair of positive weight. [`cross_sectional_live_regression`](@ref) reads the mark over every observation of its design. The carry fold of a [`CrossSectionalFactorPrior`](@ref) reads it over its new observations, and joins it to the mark of the observations it fitted.
-
-# Algorithm
-
- 1. Take the pairs of positive weight with [`cross_sectional_design_mask`](@ref), giving `act`.
- 2. Mark each factor whose exposure is not zero at a pair of `act`.
-
-# Arguments
-
-  - `Z`: Exposure tensor `assets × factors × observations`.
-  - `X`: Asset returns matrix `observations × assets`.
-  - `W`: Cross-sectional weights matrix `observations × assets`.
-
-# Validation
-
-  - The rules of [`cross_sectional_design_mask`](@ref).
-
-# Returns
-
-  - `lv::BitVector`: `true` at each factor that is not empty.
-
-# Related
-
-  - [`cross_sectional_live_regression`](@ref)
-  - [`cross_sectional_design_mask`](@ref)
-"""
-function cross_sectional_live_factors(Z::Arr3Num, X::MatNum, W::MatNum)::BitVector
-    act = findall(cross_sectional_design_mask(Z, X, W))
-    return BitVector([any(c -> !iszero(Z[c[2], k, c[1]]), act) for k in axes(Z, 2)])
-end
-function lookback(pe::CrossSectionalFactorPrior)::Option{<:Integer}
-    return cross_sectional_lookback(pe, lookback(map(last, pe.factors)), lookback)
-end
-"""
-$(DocStringExtensions.TYPEDSIGNATURES)
-
-Returns the look-back of a [`CrossSectionalFactorPrior`](@ref) from the look-back of its factors: that look-back plus `lag`, or the look-back of its Return Forecast Estimator when that one is larger. `nothing` from either part gives `nothing`.
-
-[`lookback`](@ref) gives it the look-back of the factors of the batch fit and itself as `f`. [`carry_lookback`](@ref) gives it the look-back of the factors on the carry fold and itself as `f`, so a Descriptor of the scores of the forecast that carries a state counts one row.
-
-# Arguments
-
-  - `pe`: Cross-Sectional Factor Prior estimator.
-  - `L`: The look-back of its factors, or `nothing`.
-  - `f`: The verb that counts the look-back of the Return Forecast Estimator, [`lookback`](@ref) or [`carry_lookback`](@ref).
-
-# Returns
-
-  - `n::Option{<:Integer}`: The look-back of the prior, or `nothing`.
-
-# Related
-
-  - [`lookback`](@ref)
-  - [`carry_lookback`](@ref)
-"""
-function cross_sectional_lookback(pe::CrossSectionalFactorPrior, L::Option{<:Integer},
-                                  f::Function)::Option{<:Integer}
-    lr = isnothing(pe.rfe) ? 1 : f(pe.rfe)
-    return isnothing(L) || isnothing(lr) ? nothing : max(L + pe.lag, lr)
+    return LiveRegression(CrossSectionalRegression(; f = f, eps = csl.eps, n = csl.n,
+                                                   edof = csl.edof, b = csl.b, h1 = csl.h1,
+                                                   dc = cross_sectional_live_dropped(csl.dc,
+                                                                                     lv),
+                                                   lv = lv), lv)
 end
 
 export CrossSectionalFactorPrior

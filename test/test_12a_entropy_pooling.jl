@@ -1324,8 +1324,8 @@ end
     pe_fac = MeucciEntropyPoolingPrior(; pe = FactorPrior(), sets = sets, cvar_views = cvv)
     @test isnothing(PortfolioOptimisers.factor_residual_config(pe_emp))
     cfg = PortfolioOptimisers.factor_residual_config(pe_fac)
-    @test isa(cfg, NamedTuple)
-    @test keys(cfg) == (:ve, :pdm, :rsd)
+    @test isa(cfg, PortfolioOptimisers.ResidualBlockConfig)
+    @test fieldnames(typeof(cfg)) == (:ve, :pdm, :rsd)
     @test cfg == PortfolioOptimisers.factor_residual_config(FactorPrior())
 
     # A vector of these estimators is a `VecMeucciEP`, and pooling one keeps its order.

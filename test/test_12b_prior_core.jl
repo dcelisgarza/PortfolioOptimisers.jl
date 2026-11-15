@@ -2436,7 +2436,8 @@ no name, and the two guards that stand between a view and the wrong axis. Sweep 
     Sb = cov(Xb)
     for ax in (:xkey, :tfkey)
         @test isa(PortfolioOptimisers.bl_preroll(ready, nothing, nothing, Sb, nothing, 60,
-                                                 Float64, false, ax), NamedTuple)
+                                                 Float64, false, ax),
+                  PortfolioOptimisers.BlackLittermanViewSystem)
     end
     @test_throws DomainError PortfolioOptimisers.bl_preroll(ready, nothing, nothing, Sb,
                                                             nothing, 60, Float64, false,

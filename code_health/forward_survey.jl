@@ -544,6 +544,14 @@ const RULED_REBUILDS = Dict{Tuple{Symbol, Symbol}, Tuple{String, String}}(#
                                                                            :FoldEvaluation) =>
                                                                               (NO_REBUILD,
                                                                                "`cv` is a cross-validation scheme, another type: the record reads its evaluation switches (#2110, #2103)"),
+                                                                          (:scenario_prior,
+                                                                           :SplitReturnForecast) =>
+                                                                              (NO_REBUILD,
+                                                                               "`rr` is the `CrossSectionalFactorModel` of `cross_sectional_cached_block`, another type (#2097)"),
+                                                                          (:ep_rlvar_anchor,
+                                                                           :RlvarAnchor) =>
+                                                                              (NO_REBUILD,
+                                                                               "`res` is the `RlvarPrimalMinimum` of `ep_rlvar`, another type (#2097)"),
                                                                           (:fit_data_step_from_state,
                                                                            :PriceGapFillResult) =>
                                                                               ("go",
@@ -1573,55 +1581,6 @@ const RULED_NAMED_TUPLES = Dict{Symbol, Tuple{String, String}}(#
                                                                :covariance_plot_windows =>
                                                                    ("go",
                                                                     "the value travels: `rw` goes to `covariance_plot_entry`: a private defined type (#2113)"),
-                                                               :cross_sectional_cached_scenarios =>
-                                                                   ("go",
-                                                                    "every caller takes it apart at once: a plain tuple, unless two values have one type, which takes a private type (#2113)"),
-                                                               :cross_sectional_calibration =>
-                                                                   ("go",
-                                                                    "every caller takes it apart at once: a plain tuple, unless two values have one type, which takes a private type (#2113)"),
-                                                               :cross_sectional_carry_append =>
-                                                                   ("go",
-                                                                    "every caller takes it apart at once: a plain tuple, unless two values have one type, which takes a private type (#2113)"),
-                                                               :cross_sectional_correlation_rows =>
-                                                                   ("go",
-                                                                    "every caller takes it apart at once: a plain tuple, unless two values have one type, which takes a private type (#2113)"),
-                                                               :cross_sectional_expand =>
-                                                                   ("go",
-                                                                    "the value travels: a later use of `fr`: a private defined type (#2113)"),
-                                                               :cross_sectional_exposure_rows =>
-                                                                   ("go",
-                                                                    "every caller takes it apart at once: a plain tuple, unless two values have one type, which takes a private type (#2113)"),
-                                                               :cross_sectional_factor_scenarios =>
-                                                                   ("go",
-                                                                    "every caller takes it apart at once: a plain tuple, unless two values have one type, which takes a private type (#2113)"),
-                                                               :cross_sectional_fold_variance =>
-                                                                   ("go",
-                                                                    "every caller takes it apart at once: a plain tuple, unless two values have one type, which takes a private type (#2113)"),
-                                                               :cross_sectional_history_backing =>
-                                                                   ("go",
-                                                                    "every caller takes it apart at once: a plain tuple, unless two values have one type, which takes a private type (#2113)"),
-                                                               :cross_sectional_lift =>
-                                                                   ("go",
-                                                                    "every caller takes it apart at once: a plain tuple, unless two values have one type, which takes a private type (#2113)"),
-                                                               :cross_sectional_residual_block =>
-                                                                   ("go",
-                                                                    "every caller takes it apart at once: a plain tuple, unless two values have one type, which takes a private type (#2113)"),
-                                                               :ep_evar => ("go",
-                                                                            "`evar` and `z` are numbers of one type, so a positional swap is silent: a private defined type (#2113)"),
-                                                               :ep_evar_anchor => ("go",
-                                                                                   "the value travels: the tail value of a method: a private defined type (#2113)"),
-                                                               :ep_rlvar => ("go",
-                                                                             "`rlvar`, `t` and `z` are numbers of one type, so a positional swap is silent: a private defined type (#2113)"),
-                                                               :ep_rlvar_anchor => ("go",
-                                                                                    "the value travels: the tail value of a method: a private defined type (#2113)"),
-                                                               :ep_rlvar_shift => ("go",
-                                                                                   "`risk` and `t` are numbers of one type, so a positional swap is silent: a private defined type (#2113)"),
-                                                               :factor_residual_config =>
-                                                                   ("go",
-                                                                    "the value travels: returned whole by seven priors: a private defined type (#2113)"),
-                                                               :opinion_pooling_scenarios =>
-                                                                   ("go",
-                                                                    "every caller takes it apart at once: a plain tuple, unless two values have one type, which takes a private type (#2113)"),
                                                                :report_cell => ("go",
                                                                                 "a cell that its callers read by field and pass on: a private record (#2113)"),
                                                                :resolve_sigma_chol =>

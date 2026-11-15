@@ -1,5 +1,5 @@
 ```@meta
-Description = "Base cross-sectional factor Prior, private API of PortfolioOptimisers.jl: cross_sectional_prior_pairs, cross_sectional_benchmark_returns, …"
+Description = "Base cross-sectional factor Prior, private API of PortfolioOptimisers.jl: ExposureHistory, HistoryBacking, FactorPriorMoments, ReducedFactorAxis, …"
 ```
 
 # [Base cross-sectional factor Prior: private API](@id private-api-base-cross-sectional-factor-prior)
@@ -15,6 +15,20 @@ The functions below are the steps of a [`CrossSectionalFactorPrior`](@ref) fit. 
 - The moments of the assets, from the moments of the factors and the loadings.
 
 The scenario weights of the factors, the return scenarios of the assets and the forecast of the expected returns are on the page of the [Prior Scenarios](@ref private-api-prior-scenarios).
+
+## Types
+
+```@docs
+PortfolioOptimisers.ExposureHistory
+PortfolioOptimisers.HistoryBacking
+PortfolioOptimisers.FactorPriorMoments
+PortfolioOptimisers.ReducedFactorAxis
+PortfolioOptimisers.RawAxisMoments
+PortfolioOptimisers.IdiosyncraticBlock
+PortfolioOptimisers.LiftedMoments
+```
+
+## Functions
 
 ```@docs
 PortfolioOptimisers.cross_sectional_prior_pairs

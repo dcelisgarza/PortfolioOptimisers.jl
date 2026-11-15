@@ -142,7 +142,7 @@ function cross_sectional_carry_history(pe::CrossSectionalFactorPrior,
     end
     H = keep ? st.hist : nothing
     rd = cross_sectional_carry_forecast_returns(pe, st)
-    (; r, ca) = cross_sectional_carry_append(pe, st)
+    r, ca = cross_sectional_carry_append(pe, st)
     # The observed factor returns fill the reduced factor axis, so the model carries the
     # reduced loadings and the basis, as the batch fit does.
     fnow = factor_basis_slice(ca.fcb, r)
@@ -260,7 +260,7 @@ function cross_sectional_carry_correlation(pe::CrossSectionalFactorPrior, Sc0, c
         return (; Sc = cross_sectional_fold_append(Sc0, Sc), ce = nothing)
     end
     # A `ce` that folds carries the correlation, so the state keeps no row with no fill (#1594).
-    (; X, kw) = cross_sectional_correlation_rows(ce0, Sc, A)
+    X, kw = cross_sectional_correlation_rows(ce0, Sc, A)
     return (; Sc = nothing, ce = partial_fit!(ce0, X; dims = 1, kw...))
 end
 """
@@ -284,7 +284,7 @@ The batch fit passes them to `Statistics.cov`, and the carry fold passes the row
 
 # Returns
 
-  - `(; X, kw)::NamedTuple`: The rows `X` that `ce` reads, and the keyword arguments `kw` that go with them.
+  - `(X, kw)::Tuple`: The rows `X` that `ce` reads, and the keyword arguments `kw` that go with them.
 
 # Related
 
@@ -296,7 +296,7 @@ function cross_sectional_correlation_rows(ce::StatsBase.CovarianceEstimator, S::
                                           amsk::AbstractMatrix{<:Bool})
     fv = gap_fill_value(ce)
     if !isfinite(fv)
-        return (; X = S, kw = (; active_mask = amsk))
+        return S, (; active_mask = amsk)
     end
     Z = Matrix{real(eltype(S))}(S)
     for k in CartesianIndices(Z)
@@ -304,7 +304,7 @@ function cross_sectional_correlation_rows(ce::StatsBase.CovarianceEstimator, S::
             Z[k] = fv
         end
     end
-    return (; X = Z, kw = (;))
+    return Z, (;)
 end
 """
 $(DocStringExtensions.TYPEDSIGNATURES)
@@ -432,7 +432,7 @@ A Return Forecast that computes its history one observation at a time, as [`fold
 """
 function cross_sectional_carry_scores(pe::CrossSectionalFactorPrior,
                                       st::CrossSectionalCarryState, win::ReturnsResult,
-                                      rows::NamedTuple, n::Integer)
+                                      rows::StepRows, n::Integer)
     if !folds_forecast_rows(pe.rfe)
         return st
     end
@@ -514,7 +514,7 @@ function cross_sectional_carry_forecast(pe::CrossSectionalFactorPrior,
     # The targets of the last `g` kept rows mature at this step, so the step reads them again.
     g = forecast_target_gap(pe.rfe)
     j = (k + 1 - min(k, g)):size(st.vs, 1)
-    (; r, ca) = cross_sectional_carry_append(pe, st)
+    r, ca = cross_sectional_carry_append(pe, st)
     csr = st.csr
     fnow = factor_basis_slice(ca.fcb, r[j])
     csfm = CrossSectionalFactorModel(; M = view(ca.Ms, :, :, size(ca.Ms, 3)),

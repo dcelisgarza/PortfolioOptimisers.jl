@@ -392,6 +392,40 @@ A caller that pools opinions holds many estimators, and a method that takes such
 """
 const VecMeucciEP = AbstractVector{<:MeucciEntropyPoolingPrior}
 """
+$(DocStringExtensions.TYPEDEF)
+
+The search data of the conditional value at risk views of a Meucci entropy pooling estimator.
+
+This type is an implementation detail and is not intended for direct use. [`ep_cvar_views_setup`](@ref) makes it. [`ep_cvar_views_solve!`](@ref) reads it.
+
+# Fields
+
+$(DocStringExtensions.FIELDS)
+
+# Related
+
+  - [`ep_cvar_views_setup`](@ref)
+  - [`ep_cvar_views_solve!`](@ref)
+"""
+@concrete struct CvarViewSearch
+    """
+    `X`: The loss columns of the assets that the views name.
+    """
+    X
+    """
+    `B`: The target of each view.
+    """
+    B
+    """
+    `alphas`: The significance level of each view.
+    """
+    alphas
+    """
+    `d_opt`: The optimiser of the search.
+    """
+    d_opt
+end
+"""
     ep_cvar_views_setup(cvar_views::Nothing, args...; kwargs...)
 
 Return `nothing` when the estimator has no conditional value at risk view.
@@ -420,7 +454,8 @@ end
                         sets::UniverseSets, w::ScenarioProbabilities,
                         ds_opt::Option{<:ConditionalValueatRiskEntropyPooling},
                         dm_opt::Option{<:OptimEntropyPooling}; strict::Bool = false,
-                        ledger::Option{<:AbstractVector} = nothing)
+                        ledger::Option{<:AbstractVector} = nothing) ->
+        Option{<:CvarViewSearch}
 
 Resolve the conditional value at risk views once, into the data of one search.
 
@@ -461,10 +496,11 @@ The staged route of [`ep_prior`](@ref) searches up to three times, once for each
 # Returns
 
   - `nothing`: No group states a view, because `strict` is `false` and every row of every group dropped.
-  - `cvv::NamedTuple`: The search data, which holds the loss columns `X`, the targets `B`, the levels `alphas` and the search `d_opt`.
+  - `cvv::CvarViewSearch`: The search data, which holds the loss columns `X`, the targets `B`, the levels `alphas` and the search `d_opt`.
 
 # Related
 
+  - [`CvarViewSearch`](@ref)
   - [`ep_cvar_views_solve!`](@ref): runs the search that this function prepares.
   - [`replace_prior_views`](@ref): resolves the `prior(...)` reference of a target.
   - [`get_pr_value`](@ref): reads the prior conditional value at risk that the reference resolves to.
@@ -551,7 +587,7 @@ function ep_cvar_views_setup(cvar_views::CVV_VecCVV, pr::AbstractPriorResult,
                                            Optim.Options(; outer_x_abstol = 1e-4,
                                                          x_abstol = 1e-4))))
     end
-    return (; X = X, B = B, alphas = alphas, d_opt = d_opt)
+    return CvarViewSearch(X, B, alphas, d_opt)
 end
 """
     ep_cvar_views_solve!(cvv::Nothing, epc::AbstractDict,
@@ -582,6 +618,7 @@ Solve the entropy pooling problem when the estimator has no CVaR view.
 
   - [`entropy_pooling`](@ref)
   - [`ep_cvar_views_setup`](@ref)
+  - [`CvarViewSearch`](@ref)
   - [`OptimEntropyPooling`](@ref)
   - [`JuMPEntropyPooling`](@ref)
   - [`ConditionalValueatRiskEntropyPooling`](@ref)
@@ -592,7 +629,7 @@ function ep_cvar_views_solve!(cvv::Nothing, epc::AbstractDict, w::ScenarioProbab
     return entropy_pooling(w, epc, opt)
 end
 """
-    ep_cvar_views_solve!(cvv::NamedTuple, epc::AbstractDict,
+    ep_cvar_views_solve!(cvv::CvarViewSearch, epc::AbstractDict,
                          w::ScenarioProbabilities,
                          opt::AbstractEntropyPoolingOptimiser)
 
@@ -668,7 +705,8 @@ Where:
 
   - $(ref_dict[:meucciardiakeel2011]) Pages 39–49. $(ref_dict[:no_original_source])
 """
-function ep_cvar_views_solve!(cvv::NamedTuple, epc::AbstractDict, w::ScenarioProbabilities,
+function ep_cvar_views_solve!(cvv::CvarViewSearch, epc::AbstractDict,
+                              w::ScenarioProbabilities,
                               opt::AbstractEntropyPoolingOptimiser)
     (; X, B, alphas, d_opt) = cvv
     N = length(B)

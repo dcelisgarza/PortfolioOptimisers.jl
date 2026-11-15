@@ -357,8 +357,7 @@ The exposure of a row reads the last [`lookback`](@ref) rows of the panel, so th
 
 # Returns
 
-  - `rdi::ReturnsResult`: `rd` when the member reads every row, or a view of its last `k` rows.
-  - `k::Int`: Number of rows of `rdi`.
+  - `(rdi, k)::Tuple`: `rdi::ReturnsResult` is `rd` when the member reads every row, or a view of its last `k` rows. `k::Int` is the number of rows of `rdi`.
 
 # Related
 
@@ -368,7 +367,67 @@ The exposure of a row reads the last [`lookback`](@ref) rows of the panel, so th
 function cross_sectional_exposure_rows(xe, rd::ReturnsResult, m::Integer)
     T = size(rd.X, 1)
     k = min(T, something(lookback(xe), T) + m - 1)
-    return (; rdi = k == T ? rd : port_opt_view(rd, (T - k + 1):T, :), k = k)
+    return k == T ? rd : port_opt_view(rd, (T - k + 1):T, :), k
+end
+"""
+$(DocStringExtensions.TYPEDEF)
+
+The exposure history of a factor list, the factor axis it is written on, and the observed exposures that can share its backing.
+
+This type is an implementation detail and is not intended for direct use. [`cross_sectional_exposure_history`](@ref) makes it. [`cross_sectional_exposure_series`](@ref) reads it.
+
+# Fields
+
+$(DocStringExtensions.FIELDS)
+
+# Related
+
+  - [`cross_sectional_exposure_history`](@ref)
+  - [`HistoryBacking`](@ref)
+"""
+@concrete struct ExposureHistory
+    """
+    `Ms`: The exposure history, `assets × factors × observations`.
+    """
+    Ms
+    """
+    `nf`: Name of each factor.
+    """
+    nf
+    """
+    `fam`: Family label of each factor.
+    """
+    fam
+    """
+    `Zo`: The observed exposures, as a view of the backing that `Ms` shares, or the input `Zo`.
+    """
+    Zo
+end
+"""
+$(DocStringExtensions.TYPEDEF)
+
+The allocated exposure history of the estimated factors, and the observed exposures, which share one backing when they can.
+
+This type is an implementation detail and is not intended for direct use. [`cross_sectional_history_backing`](@ref) makes it. [`cross_sectional_exposure_history`](@ref) reads it. In the shared case the two fields are views of one array, so they have one type, and a positional swap would be silent.
+
+# Fields
+
+$(DocStringExtensions.FIELDS)
+
+# Related
+
+  - [`cross_sectional_history_backing`](@ref)
+  - [`ExposureHistory`](@ref)
+"""
+@concrete struct HistoryBacking
+    """
+    `Ms`: The history of the estimated factors, to be written, `assets × factors × observations`.
+    """
+    Ms
+    """
+    `Zo`: The observed exposures, or `nothing`.
+    """
+    Zo
 end
 """
 $(DocStringExtensions.TYPEDSIGNATURES)
@@ -399,10 +458,7 @@ Build the exposure history of a factor list, and the factor axis it is written o
 
 # Returns
 
-  - `Ms::AbstractArray{<:Real, 3}`: The exposure history, `assets × factors × observations`, of the last `n` rows of `rd`, or of every row. It is a view of a backing that it shares with `Zo` when [`cross_sectional_history_backing`](@ref) gives one.
-  - `nf::Vector{String}`: Name of each factor.
-  - `fam::Vector{String}`: Family label of each factor.
-  - `Zo`: The observed exposures, as a view of the shared backing, or the input `Zo`.
+  - `eh::ExposureHistory`: The exposure history `Ms`, `assets × factors × observations`, of the last `n` rows of `rd` or of every row, the factor names `nf`, the family labels `fam`, and the observed exposures `Zo`, as [`ExposureHistory`](@ref) states them. `Ms` and `Zo` are views of one backing when [`cross_sectional_history_backing`](@ref) gives one.
 
 # Related
 
@@ -434,7 +490,7 @@ function cross_sectional_exposure_history(factors::AbstractVector{<:Pair},
         cross_sectional_foreach(ex, cur) do i, _
             nm = String(first(factors[i]))
             xe = last(factors[i])
-            (; rdi, k) = cross_sectional_exposure_rows(xe, rd, m)
+            rdi, k = cross_sectional_exposure_rows(xe, rd, m)
             # A derived member reads a copy of its source, which an earlier layer wrote.
             if src[i] > 0
                 A = factor_exposure(xe, rdi, permutedims(view(Ms, :, col[src[i]], :)))
@@ -444,15 +500,15 @@ function cross_sectional_exposure_history(factors::AbstractVector{<:Pair},
             return cross_sectional_exposure_fill!(Ms, xe, rdi, k, col[i], wid[i], nm)
         end
     end
-    return (; Ms = Ms, nf = nf, fam = fam, Zo = Zo)
+    return ExposureHistory(Ms, nf, fam, Zo)
 end
 """
     cross_sectional_history_backing(T::Type, m::Integer, N::Integer, K::Integer,
-                                    Zo::Nothing) -> NamedTuple
+                                    Zo::Nothing) -> HistoryBacking
     cross_sectional_history_backing(T::Type, m::Integer, N::Integer, K::Integer,
-                                    Zo::AbstractArray{<:Any, 3}) -> NamedTuple
+                                    Zo::AbstractArray{<:Any, 3}) -> HistoryBacking
     cross_sectional_history_backing(T::Type{Tz}, m::Integer, N::Integer, K::Integer,
-                                    Zo::AbstractArray{Tz, 3}) where {Tz} -> NamedTuple
+                                    Zo::AbstractArray{Tz, 3}) where {Tz} -> HistoryBacking
 
 Allocate the exposure history of [`cross_sectional_exposure_history`](@ref), and give it one backing with the observed exposures `Zo` when the two can share it.
 
@@ -480,7 +536,7 @@ The method that Julia selects is the algorithm.
 
 # Returns
 
-  - `(; Ms, Zo)::NamedTuple`: The history of the estimated factors, to be written, and the observed exposures, or `nothing`.
+  - `hb::HistoryBacking`: The history of the estimated factors, to be written, and the observed exposures, or `nothing`.
 
 # Related
 
@@ -489,12 +545,12 @@ The method that Julia selects is the algorithm.
 """
 function cross_sectional_history_backing(::Type{T}, m::Integer, N::Integer, K::Integer,
                                          ::Nothing) where {T}
-    return (; Ms = Array{T, 3}(undef, N, K, m), Zo = nothing)
+    return HistoryBacking(Array{T, 3}(undef, N, K, m), nothing)
 end
 function cross_sectional_history_backing(::Type{T}, m::Integer, N::Integer, K::Integer,
                                          Zo::AbstractArray{<:Any, 3}) where {T}
     assert_history_backing_axes(Zo, m, N)
-    return (; Ms = Array{T, 3}(undef, N, K, m), Zo = Zo)
+    return HistoryBacking(Array{T, 3}(undef, N, K, m), Zo)
 end
 function cross_sectional_history_backing(::Type{T}, m::Integer, N::Integer, K::Integer,
                                          Zo::AbstractArray{T, 3}) where {T}
@@ -502,7 +558,7 @@ function cross_sectional_history_backing(::Type{T}, m::Integer, N::Integer, K::I
     P = Array{T, 3}(undef, N, K + size(Zo, 2), m)
     Zb = view(P, :, (K + 1):size(P, 2), :)
     copyto!(Zb, Zo)
-    return (; Ms = view(P, :, 1:K, :), Zo = Zb)
+    return HistoryBacking(view(P, :, 1:K, :), Zb)
 end
 """
 $(DocStringExtensions.TYPEDSIGNATURES)
@@ -754,6 +810,69 @@ function assert_cross_sectional_factor_moments(mu::VecNum, sigma::MatNum, n::Int
     return nothing
 end
 """
+$(DocStringExtensions.TYPEDEF)
+
+The factor moments of a Cross-Sectional Factor Prior on the whole factor axis, with the scenario weights and the diagnostics of its factor prior.
+
+This type is an implementation detail and is not intended for direct use. [`cross_sectional_factor_moments`](@ref) makes it. [`cross_sectional_assemble`](@ref), [`cross_sectional_calibration`](@ref), [`cross_sectional_moment_prior`](@ref) and [`cross_sectional_kept_cache`](@ref) read it.
+
+# Fields
+
+$(DocStringExtensions.FIELDS)
+
+# Constructors
+
+    FactorPriorMoments(; X, mu, sigma, w, ens, eoc, kld, ow, pc) -> FactorPriorMoments
+
+Keywords correspond to the struct's fields. [`rebuild_struct`](@ref) calls this form when [`cross_sectional_kept_cache`](@ref) replaces `pc`.
+
+# Related
+
+  - [`cross_sectional_factor_moments`](@ref)
+  - [`LowOrderPrior`](@ref)
+"""
+@concrete struct FactorPriorMoments
+    """
+    `X`: The factor return scenarios on the whole factor axis, `observations × factors`.
+    """
+    X
+    """
+    `mu`: The expected factor returns on the whole factor axis.
+    """
+    mu
+    """
+    `sigma`: The processed factor covariance on the whole factor axis.
+    """
+    sigma
+    """
+    `w`: The scenario weights divided by their sum, or `nothing`.
+    """
+    w
+    """
+    `ens`: The effective number of scenarios of the factor prior.
+    """
+    ens
+    """
+    `eoc`: The effective counts of the moments of the factor prior.
+    """
+    eoc
+    """
+    `kld`: The Kullback-Leibler divergence of the factor prior.
+    """
+    kld
+    """
+    `ow`: The original weights of the factor prior.
+    """
+    ow
+    """
+    `pc`: The cache of an opinion pool in the factor slot, or `nothing`.
+    """
+    pc
+end
+function FactorPriorMoments(; X, mu, sigma, w, ens, eoc, kld, ow, pc)::FactorPriorMoments
+    return FactorPriorMoments(X, mu, sigma, w, ens, eoc, kld, ow, pc)
+end
+"""
 $(DocStringExtensions.TYPEDSIGNATURES)
 
 Fit the factor prior of a Cross-Sectional Factor Prior on the factors that are not empty, and give every Empty Factor no mean and no variance.
@@ -788,14 +907,11 @@ The method over `pr` takes the factor prior already fitted on the factors that a
 
 # Returns
 
-  - `X::MatNum`: The factor return scenarios of `pr` on the whole factor axis.
-  - `mu::VecNum`: The expected factor returns on the whole factor axis. A mean that `pr` does not state is `NaN`.
-  - `sigma::MatNum`: The processed factor covariance on the whole factor axis. The row and the column of a factor that the factor prior states no variance for are `NaN`.
-  - `w`: The scenario weights of `pr` divided by their sum, or `nothing`.
-  - `ens`, `eoc`, `kld`, `ow`: The effective number of scenarios, the effective counts of the moments, the Kullback-Leibler divergence and the original weights of `pr`.
+  - `fm::FactorPriorMoments`: The factor return scenarios `X`, the expected factor returns `mu` and the processed factor covariance `sigma` of `pr` on the whole factor axis; the scenario weights `w` of `pr` divided by their sum, or `nothing`; the effective number of scenarios `ens`, the effective counts of the moments `eoc`, the Kullback-Leibler divergence `kld` and the original weights `ow` of `pr`; and the cache `pc` of an opinion pool. A mean that `pr` does not state is `NaN`, and so are the row and the column of a factor that the factor prior states no variance for.
 
 # Related
 
+  - [`FactorPriorMoments`](@ref)
   - [`cross_sectional_live_regression`](@ref)
   - [`cross_sectional_lift`](@ref)
   - [`CrossSectionalFactorPrior`](@ref)
@@ -835,13 +951,14 @@ function cross_sectional_factor_moments(pr::LowOrderPrior,
         sigma = zeros(eltype(pr.sigma), K, K)
         sigma[lv, lv] = pr.sigma
     end
-    return (; X = X, mu = mu, sigma = sigma, w = cross_sectional_scenario_weights(pr.w),
-            ens = pr.ens, eoc = pr.eoc, kld = pr.kld, ow = pr.ow,
-            pc = opinion_pooling_cache(pr))
+    return FactorPriorMoments(X, mu, sigma, cross_sectional_scenario_weights(pr.w), pr.ens,
+                              pr.eoc, pr.kld, pr.ow, opinion_pooling_cache(pr))
 end
 """
     cross_sectional_variance_counts(cnt::Nothing, csr::CrossSectionalRegression)
+        -> ResidualVarianceCounts
     cross_sectional_variance_counts(cnt::VarianceCount, csr::CrossSectionalRegression)
+        -> ResidualVarianceCounts
 
 Degrees of freedom and divisor of each idiosyncratic variance of a Cross-Sectional Factor Prior.
 
@@ -861,10 +978,11 @@ The method that Julia selects is the algorithm.
 
 # Returns
 
-  - `(; edof, ediv)::NamedTuple`: The degrees of freedom and the divisor of each variance. Both are `nothing` when the variance estimator states no count, and `edof` alone is `nothing` when the fit records no count.
+  - `c::ResidualVarianceCounts`: The degrees of freedom `edof` and the divisor `ediv` of each variance. Both are `nothing` when the variance estimator states no count, and `edof` alone is `nothing` when the fit records no count.
 
 # Related
 
+  - [`ResidualVarianceCounts`](@ref)
   - [`CrossSectionalFactorPrior`](@ref)
   - [`CrossSectionalFactorModel`](@ref)
   - [`variance_count`](@ref)
@@ -873,10 +991,11 @@ The method that Julia selects is the algorithm.
   - [`ResidualInflation`](@ref)
 """
 function cross_sectional_variance_counts(::Nothing, ::CrossSectionalRegression)
-    return (; edof = nothing, ediv = nothing)
+    return ResidualVarianceCounts(nothing, nothing)
 end
 function cross_sectional_variance_counts(cnt::VarianceCount, csr::CrossSectionalRegression)
-    return (; edof = cross_sectional_residual_dof(csr.edof, csr.n, cnt.n), ediv = cnt.m)
+    return ResidualVarianceCounts(cross_sectional_residual_dof(csr.edof, csr.n, cnt.n),
+                                  cnt.m)
 end
 """
 $(DocStringExtensions.TYPEDSIGNATURES)
@@ -948,7 +1067,7 @@ function cross_sectional_idiosyncratic_covariance(th::Real,
     if iszero(th)
         return ev
     end
-    (; X, kw) = cross_sectional_correlation_rows(ce, S, amsk)
+    X, kw = cross_sectional_correlation_rows(ce, S, amsk)
     return cross_sectional_thresholded_covariance(th, pdm,
                                                   Statistics.cov(ce, X; dims = 1, kw...),
                                                   ev)
@@ -1391,9 +1510,43 @@ function cross_sectional_reduced_loadings(::FactorFamilyBasis, L::MatNum)
     return L
 end
 """
-    cross_sectional_family_basis(families::Nothing, Ms, bw, nf, fam) -> NamedTuple
+$(DocStringExtensions.TYPEDEF)
+
+The Factor Family Basis of a Cross-Sectional Factor Prior, and the factor axis that it reduces.
+
+This type is an implementation detail and is not intended for direct use. [`cross_sectional_family_basis`](@ref) makes it. The regression stage and the carry fold of a [`CrossSectionalFactorPrior`](@ref) read it.
+
+# Fields
+
+$(DocStringExtensions.FIELDS)
+
+# Related
+
+  - [`cross_sectional_family_basis`](@ref)
+  - [`FactorFamilyBasis`](@ref)
+"""
+@concrete struct ReducedFactorAxis
+    """
+    `fcb`: The Factor Family Basis, or `nothing` when the prior constrains no Factor Family.
+    """
+    fcb
+    """
+    `Ms`: The exposure history on the reduced axis, `assets × factors × observations`.
+    """
+    Ms
+    """
+    `nf`: Name of each reduced factor.
+    """
+    nf
+    """
+    `fam`: Family label of each reduced factor.
+    """
+    fam
+end
+"""
+    cross_sectional_family_basis(families::Nothing, Ms, bw, nf, fam) -> ReducedFactorAxis
     cross_sectional_family_basis(families::AbstractVector{<:Pair}, Ms, bw, nf, fam)
-        -> NamedTuple
+        -> ReducedFactorAxis
 
 Build the Factor Family Basis of a Cross-Sectional Factor Prior, and reduce the factor axis through it.
 
@@ -1413,32 +1566,59 @@ A prior that constrains no Factor Family fits on the raw axis. The `nothing` met
 
 # Returns
 
-  - `fcb::Option{<:FactorFamilyBasis}`: The basis, or `nothing`.
-  - `Ms::Arr3Num`: The exposure history on the reduced axis.
-  - `nf::VecStr`: Name of each reduced factor.
-  - `fam::VecStr`: Family label of each reduced factor.
+  - `fb::ReducedFactorAxis`: The basis `fcb`, or `nothing`, the exposure history `Ms` on the reduced axis, and the name `nf` and the family label `fam` of each reduced factor.
 
 # Related
 
+  - [`ReducedFactorAxis`](@ref)
+
   - [`factor_family_basis`](@ref)
+
   - [`reduce_exposures`](@ref)
+
   - [`CrossSectionalFactorPrior`](@ref)
 """
 function cross_sectional_family_basis(::Nothing, Ms::Arr3Num, ::MatNum, nf::VecStr,
                                       fam::VecStr)
-    return (; fcb = nothing, Ms = Ms, nf = nf, fam = fam)
+    return ReducedFactorAxis(nothing, Ms, nf, fam)
 end
 function cross_sectional_family_basis(families::AbstractVector{<:Pair}, Ms::Arr3Num,
                                       bw::MatNum, nf::VecStr, fam::VecStr)
     fcb = factor_family_basis(families, Ms, bw, nf, fam)
-    return (; fcb = fcb, Ms = reduce_exposures(fcb, Ms), nf = reduce_factor_names(fcb, nf),
-            fam = reduce_factor_names(fcb, fam))
+    return ReducedFactorAxis(fcb, reduce_exposures(fcb, Ms), reduce_factor_names(fcb, nf),
+                             reduce_factor_names(fcb, fam))
+end
+"""
+$(DocStringExtensions.TYPEDEF)
+
+The factor moments of a Cross-Sectional Factor Prior on the raw factor axis.
+
+This type is an implementation detail and is not intended for direct use. [`cross_sectional_expand`](@ref) makes it. [`cross_sectional_moment_prior`](@ref) reads it.
+
+# Fields
+
+$(DocStringExtensions.FIELDS)
+
+# Related
+
+  - [`cross_sectional_expand`](@ref)
+  - [`FactorPriorMoments`](@ref)
+"""
+@concrete struct RawAxisMoments
+    """
+    `mu`: The expected factor returns on the raw axis.
+    """
+    mu
+    """
+    `sigma`: The factor covariance on the raw axis.
+    """
+    sigma
 end
 """
     cross_sectional_expand(fcb::Nothing, r, lag::Integer, f) -> Nothing
     cross_sectional_expand(fcb::FactorFamilyBasis, r, lag::Integer, f) -> MatNum
-    cross_sectional_expand(fcb::Nothing, r, mu, sigma) -> NamedTuple
-    cross_sectional_expand(fcb::FactorFamilyBasis, r, mu, sigma) -> NamedTuple
+    cross_sectional_expand(fcb::Nothing, r, mu, sigma) -> RawAxisMoments
+    cross_sectional_expand(fcb::FactorFamilyBasis, r, mu, sigma) -> RawAxisMoments
 
 Expand the realised factor returns, or the factor moments, from the reduced axis onto the raw one.
 
@@ -1462,11 +1642,11 @@ The fit of observation `t` regresses the returns of `t` on the exposures of `t -
 # Returns
 
   - `fr::Option{<:MatNum}`: The realised factor returns on the raw axis, or `nothing` with no re-basis.
-  - `mu::VecNum`: The expected factor returns on the raw axis.
-  - `sigma::MatNum`: The factor covariance on the raw axis.
+  - `ex::RawAxisMoments`: The expected factor returns `mu` and the factor covariance `sigma` on the raw axis.
 
 # Related
 
+  - [`RawAxisMoments`](@ref)
   - [`factor_basis_slice`](@ref)
   - [`expand_factor_returns`](@ref)
   - [`expand_factor_returns`](@ref)
@@ -1480,16 +1660,42 @@ function cross_sectional_expand(fcb::FactorFamilyBasis, r, lag::Integer, f::MatN
     return expand_factor_returns(factor_basis_slice(fcb, r .- lag), f)
 end
 function cross_sectional_expand(::Nothing, r, mu::VecNum, sigma::MatNum)
-    return (; mu = mu, sigma = sigma)
+    return RawAxisMoments(mu, sigma)
 end
 function cross_sectional_expand(fcb::FactorFamilyBasis, r, mu::VecNum, sigma::MatNum)
     now = factor_basis_slice(fcb, r)
-    return (; mu = expand_factor_returns(now, mu),
-            sigma = expand_factor_covariance(now, sigma))
+    return RawAxisMoments(expand_factor_returns(now, mu),
+                          expand_factor_covariance(now, sigma))
 end
 """
-    cross_sectional_residual_block(esigma::VecNum, idx, mtx_sqrt = EigenFallbackSquareRoot()) -> NamedTuple
-    cross_sectional_residual_block(esigma::MatNum, idx, mtx_sqrt = EigenFallbackSquareRoot()) -> NamedTuple
+$(DocStringExtensions.TYPEDEF)
+
+The idiosyncratic block of the asset covariance of a Cross-Sectional Factor Prior over the investable assets, and a square root of it.
+
+This type is an implementation detail and is not intended for direct use. [`cross_sectional_residual_block`](@ref) makes it. [`cross_sectional_lift`](@ref) reads it. The two fields have one type, so a positional swap would be silent.
+
+# Fields
+
+$(DocStringExtensions.FIELDS)
+
+# Related
+
+  - [`cross_sectional_residual_block`](@ref)
+  - [`cross_sectional_lift`](@ref)
+"""
+@concrete struct IdiosyncraticBlock
+    """
+    `D`: The block that the asset covariance adds, `investable assets × investable assets`.
+    """
+    D
+    """
+    `R`: A square root of the block, `investable assets × investable assets`.
+    """
+    R
+end
+"""
+    cross_sectional_residual_block(esigma::VecNum, idx, mtx_sqrt = EigenFallbackSquareRoot()) -> IdiosyncraticBlock
+    cross_sectional_residual_block(esigma::MatNum, idx, mtx_sqrt = EigenFallbackSquareRoot()) -> IdiosyncraticBlock
 
 Return the idiosyncratic block of the asset covariance and a square root of it.
 
@@ -1527,11 +1733,11 @@ Where:
 
 # Returns
 
-  - `D::MatNum`: The block the asset covariance adds.
-  - `R::MatNum`: A square root of the block, `investable assets × investable assets`.
+  - `rb::IdiosyncraticBlock`: The block `D` that the asset covariance adds, and a square root `R` of it, `investable assets × investable assets`.
 
 # Related
 
+  - [`IdiosyncraticBlock`](@ref)
   - [`cross_sectional_lift`](@ref)
   - [`cross_sectional_idiosyncratic_covariance`](@ref)
 """
@@ -1539,12 +1745,12 @@ function cross_sectional_residual_block(esigma::VecNum, idx::AbstractVector{<:In
                                         ::Option{<:AbstractMatrixSquareRootAlgorithm} = EigenFallbackSquareRoot())
     d = esigma[idx]
     # A diagonal block holds no dense matrix of its zeros (#1973).
-    return (; D = LinearAlgebra.Diagonal(d), R = LinearAlgebra.Diagonal(sqrt.(d)))
+    return IdiosyncraticBlock(LinearAlgebra.Diagonal(d), LinearAlgebra.Diagonal(sqrt.(d)))
 end
 function cross_sectional_residual_block(esigma::MatNum, idx::AbstractVector{<:Integer},
                                         mtx_sqrt::Option{<:AbstractMatrixSquareRootAlgorithm} = EigenFallbackSquareRoot())
     D = esigma[idx, idx]
-    return (; D = D, R = Matrix(matrix_square_root(mtx_sqrt, D)))
+    return IdiosyncraticBlock(D, Matrix(matrix_square_root(mtx_sqrt, D)))
 end
 """
 $(DocStringExtensions.TYPEDEF)
@@ -1619,6 +1825,36 @@ The carry fold runs the same step under every rule, so a rule that changes the s
 """
 abstract type AbstractCarryRule <: AbstractAlgorithm end
 """
+$(DocStringExtensions.TYPEDEF)
+
+The asset moments that a Cross-Sectional Factor Prior lifts from its factor distribution, and the low-rank square root of the covariance.
+
+This type is an implementation detail and is not intended for direct use. [`cross_sectional_lift`](@ref) makes it. [`cross_sectional_moment_prior`](@ref) reads it. `sigma` and `chol` are matrices of one type, so a positional swap would be silent.
+
+# Fields
+
+$(DocStringExtensions.FIELDS)
+
+# Related
+
+  - [`cross_sectional_lift`](@ref)
+  - [`IdiosyncraticBlock`](@ref)
+"""
+@concrete struct LiftedMoments
+    """
+    `mu`: Expected asset returns.
+    """
+    mu
+    """
+    `sigma`: Asset covariance.
+    """
+    sigma
+    """
+    `chol`: The low-rank square root of the asset covariance, `(factors + investable assets) × assets`.
+    """
+    chol
+end
+"""
 $(DocStringExtensions.TYPEDSIGNATURES)
 
 Lift a factor distribution onto the assets of a Cross-Sectional Factor Prior.
@@ -1690,12 +1926,15 @@ The answer states an entry exactly when the model determines it. An asset of ``\
 
 # Returns
 
-  - `mu::Vector{<:Real}`: Expected asset returns, `NaN` at an asset outside ``\\mathcal{S}`` and at an asset whose loadings read a `NaN` factor mean.
-  - `sigma::Matrix{<:Real}`: Asset covariance, `NaN` at every entry the model does not determine.
-  - `chol::Matrix{<:Real}`: The low-rank square root, `NaN` in the column of an asset outside ``\\mathcal{S}`` or of an asset whose loadings read a factor that is not ready, and below the first ``K`` rows of an asset outside ``\\mathcal{I}``.
+  - `lift::LiftedMoments`: The record of three fields.
+
+      + `mu::Vector{<:Real}`: Expected asset returns, `NaN` at an asset outside ``\\mathcal{S}`` and at an asset whose loadings read a `NaN` factor mean.
+      + `sigma::Matrix{<:Real}`: Asset covariance, `NaN` at every entry the model does not determine.
+      + `chol::Matrix{<:Real}`: The low-rank square root, `NaN` in the column of an asset outside ``\\mathcal{S}`` or of an asset whose loadings read a factor that is not ready, and below the first ``K`` rows of an asset outside ``\\mathcal{I}``.
 
 # Related
 
+  - [`LiftedMoments`](@ref)
   - [`factor_lift`](@ref)
   - [`cross_sectional_residual_block`](@ref)
   - [`cross_sectional_ready_factors`](@ref)
@@ -1774,7 +2013,7 @@ function cross_sectional_lift(srep::Option{<:AbstractSystematicRepair},
     chol[1:K, cdx] = transpose(L[cdx, :] * Cf)
     chol[1:K, idx] = transpose(Li * Cf)
     chol[(K + 1):end, idx] = transpose(R)
-    return (; mu = mu, sigma = sigma, chol = chol)
+    return LiftedMoments(mu, sigma, chol)
 end
 
 export MaskedLeverageOne, UnmaskedLeverageOne

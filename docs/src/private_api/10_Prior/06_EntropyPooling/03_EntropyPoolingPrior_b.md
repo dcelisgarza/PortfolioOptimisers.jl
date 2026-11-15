@@ -1,8 +1,16 @@
 ```@meta
-Description = "Entropy pooling Prior (b), private API of PortfolioOptimisers.jl: ep_view_terms, ep_normalise_view_term, ep_view_formulations, ep_sbar, …"
+Description = "Entropy pooling Prior (b), private API of PortfolioOptimisers.jl: TailViewTerms, ep_view_terms, ep_normalise_view_term, ep_view_formulations, ep_sbar, …"
 ```
 
 # [Entropy pooling Prior (b): private API](@id private-api-entropy-pooling-prior-b)
+
+## Types
+
+```@docs
+TailViewTerms
+```
+
+## Functions
 
 ```@docs
 ep_view_terms

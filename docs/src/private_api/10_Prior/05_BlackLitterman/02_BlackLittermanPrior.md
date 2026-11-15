@@ -1,8 +1,16 @@
 ```@meta
-Description = "Black-Litterman Prior, private API of PortfolioOptimisers.jl: calc_omega, bl_preroll, announce_bl_departures, bl_posteriors, bl_view_block, …"
+Description = "Black-Litterman Prior, private API of PortfolioOptimisers.jl: BlackLittermanViewSystem, calc_omega, bl_preroll, announce_bl_departures, bl_posteriors, …"
 ```
 
 # Black-Litterman Prior: private API
+
+## Types
+
+```@docs
+BlackLittermanViewSystem
+```
+
+## Functions
 
 ```@docs
 calc_omega

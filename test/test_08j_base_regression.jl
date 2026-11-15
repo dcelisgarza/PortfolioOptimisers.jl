@@ -2106,7 +2106,7 @@ struct BareTestRegression <: PortfolioOptimisers.AbstractCrossSectionalRegressio
         @test v.amr == amr[:, [1, 3]]
         @test v.hist == hist[:, [1, 3]]
         # The forecast block keeps the cache, so every refit after the first reads it.
-        sp = (; rf = nothing, g = nothing, ap = nothing, hist = nothing)
+        sp = PortfolioOptimisers.SplitReturnForecast(nothing, nothing, nothing, nothing)
         rb = PortfolioOptimisers.cross_sectional_forecast_block(blk, sp, 1.0, 1.0)
         @test rb.amr === amr
         @test rb.hist === hist

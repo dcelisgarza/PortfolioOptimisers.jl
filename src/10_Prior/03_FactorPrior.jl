@@ -303,11 +303,54 @@ function coverage_regression(re::AbstractTimeSeriesRegressionEstimator, cmsk::Bi
     return port_opt_view(re, findall(cmsk))
 end
 """
+$(DocStringExtensions.TYPEDEF)
+
+The asset moments that a factor lift projects from the factor moments, with the residual variances that it measured.
+
+This type is an implementation detail and is not intended for direct use. [`factor_lift`](@ref) makes it. [`FactorPrior`](@ref) and [`FactorBlackLittermanPrior`](@ref) read it.
+
+# Fields
+
+$(DocStringExtensions.FIELDS)
+
+# Related
+
+  - [`factor_lift`](@ref)
+  - [`FactorPrior`](@ref)
+  - [`FactorBlackLittermanPrior`](@ref)
+"""
+@concrete struct LiftedFactorMoments
+    """
+    `mu`: The asset expected returns.
+    """
+    mu
+    """
+    `sigma`: The asset covariance matrix.
+    """
+    sigma
+    """
+    `chol`: The square-root factor, whose trailing block is the residual standard deviations when the lift adds a residual block.
+    """
+    chol
+    """
+    `esigma`: The residual variances, or `nothing` when the lift adds no residual block.
+    """
+    esigma
+    """
+    `edof`: The degrees of freedom of the residual variances, or `nothing` when none is known.
+    """
+    edof
+    """
+    `ediv`: The divisor of the residual variances, or `nothing` when the variance estimator states none.
+    """
+    ediv
+end
+"""
     factor_lift(mp::AbstractMatrixProcessingEstimator, ve::AbstractVarianceEstimator,
                 rsd::Bool, rr::AbstractLoadingsRegressionResult, f_mu::VecNum, f_sigma::MatNum,
                 X::MatNum, posterior_X::MatNum, T::Real = size(posterior_X, 1);
                 mtx_sqrt::Option{<:AbstractMatrixSquareRootAlgorithm} = EigenFallbackSquareRoot(),
-                kwargs...) -> NamedTuple
+                kwargs...) -> LiftedFactorMoments
 
 Project factor moments onto the asset axis through the regression loadings.
 
@@ -366,10 +409,11 @@ The identity ``\\mathtt{chol}^\\intercal \\mathtt{chol} = \\hat{\\mathbf{\\Sigma
 
 # Returns
 
-  - `(; mu, sigma, chol, esigma, edof, ediv)::NamedTuple`: Asset expected returns, asset covariance, the square-root factor whose trailing block is the residual standard deviations when `rsd` is `true`, the residual variances, and their degrees of freedom and divisors. `esigma` and `ediv` are `nothing` when `rsd` is `false`, because the lift added no residual block. A caller writes the last three onto the loadings result that it returns. A consumer that needs the idiosyncratic variances, or their sampling law, then reads them off the block, and does not compute them again from the reconstruction error.
+  - `lift::LiftedFactorMoments`: Asset expected returns, asset covariance, the square-root factor whose trailing block is the residual standard deviations when `rsd` is `true`, the residual variances, and their degrees of freedom and divisors. `esigma` and `ediv` are `nothing` when `rsd` is `false`, because the lift added no residual block. A caller writes the last three onto the loadings result that it returns. A consumer that needs the idiosyncratic variances, or their sampling law, then reads them off the block, and does not compute them again from the reconstruction error.
 
 # Related
 
+  - [`LiftedFactorMoments`](@ref)
   - [`factor_reconstruction`](@ref)
   - [`factor_residual_config`](@ref)
   - [`Regression`](@ref)
@@ -401,14 +445,41 @@ function factor_lift(mp::AbstractMatrixProcessingEstimator, ve::AbstractVariance
         posdef!(matrix_processing_posdef(mp), posterior_sigma)
         posterior_csigma = hcat(posterior_csigma, sqrt.(err_sigma))
     end
-    return (; mu = posterior_mu, sigma = posterior_sigma,
-            chol = transpose(reshape(posterior_csigma, length(posterior_mu), :)),
-            esigma = esigma, edof = edof, ediv = ediv)
+    return LiftedFactorMoments(posterior_mu, posterior_sigma,
+                               transpose(reshape(posterior_csigma, length(posterior_mu), :)),
+                               esigma, edof, ediv)
 end
 """
-    residual_variance_counts(cnt::Nothing, edof, T::Integer)
-    residual_variance_counts(cnt::VarianceCount, edof::Nothing, T::Integer)
-    residual_variance_counts(cnt::VarianceCount, edof::VecNum, T::Integer)
+$(DocStringExtensions.TYPEDEF)
+
+The degrees of freedom and the divisor of each residual variance that a lift measures.
+
+This type is an implementation detail and is not intended for direct use. [`residual_variance_counts`](@ref) and [`cross_sectional_variance_counts`](@ref) make it. [`factor_lift`](@ref) and [`cross_sectional_assemble`](@ref) read it.
+
+# Fields
+
+$(DocStringExtensions.FIELDS)
+
+# Related
+
+  - [`residual_variance_counts`](@ref)
+  - [`cross_sectional_variance_counts`](@ref)
+  - [`factor_lift`](@ref)
+"""
+@concrete struct ResidualVarianceCounts
+    """
+    `edof`: The degrees of freedom of each variance, or `nothing` when they are not known.
+    """
+    edof
+    """
+    `ediv`: The divisor of each variance, or `nothing` when the variance estimator states none.
+    """
+    ediv
+end
+"""
+    residual_variance_counts(cnt::Nothing, edof, T::Integer) -> ResidualVarianceCounts
+    residual_variance_counts(cnt::VarianceCount, edof::Nothing, T::Integer) -> ResidualVarianceCounts
+    residual_variance_counts(cnt::VarianceCount, edof::VecNum, T::Integer) -> ResidualVarianceCounts
 
 Degrees of freedom and divisor of each residual variance that a lift measures.
 
@@ -439,26 +510,58 @@ With equal weights ``n_{i} = T``, and the result is the `edof` of the regression
 
 # Returns
 
-  - `(; edof, ediv)::NamedTuple`: The degrees of freedom and the divisor of each variance. Both are `nothing` when the variance estimator states no count, because neither fact is then known. `edof` alone is `nothing` when the regression recorded no count.
+  - `counts::ResidualVarianceCounts`: The degrees of freedom and the divisor of each variance. Both are `nothing` when the variance estimator states no count, because neither fact is then known. `edof` alone is `nothing` when the regression recorded no count.
 
 # Related
 
+  - [`ResidualVarianceCounts`](@ref)
   - [`factor_lift`](@ref)
   - [`variance_count`](@ref)
   - [`VarianceCount`](@ref)
   - [`Regression`](@ref)
 """
 function residual_variance_counts(::Nothing, ::Any, ::Integer)
-    return (; edof = nothing, ediv = nothing)
+    return ResidualVarianceCounts(nothing, nothing)
 end
 function residual_variance_counts(cnt::VarianceCount, ::Nothing, ::Integer)
-    return (; edof = nothing, ediv = cnt.m)
+    return ResidualVarianceCounts(nothing, cnt.m)
 end
 function residual_variance_counts(cnt::VarianceCount, edof::VecNum, T::Integer)
-    return (; edof = cnt.n .- (T .- edof), ediv = cnt.m)
+    return ResidualVarianceCounts(cnt.n .- (T .- edof), cnt.m)
 end
 """
-    factor_residual_config(pe::AbstractPriorEstimator) -> Option{<:NamedTuple}
+$(DocStringExtensions.TYPEDEF)
+
+How a prior estimator adds a residual block to the covariance it lifts.
+
+This type is an implementation detail and is not intended for direct use. [`factor_residual_config`](@ref) makes it. [`assert_factor_residual_config`](@ref) checks it, and [`HighOrderFactorPriorEstimator`](@ref) reads it.
+
+# Fields
+
+$(DocStringExtensions.FIELDS)
+
+# Related
+
+  - [`factor_residual_config`](@ref)
+  - [`assert_factor_residual_config`](@ref)
+  - [`HighOrderFactorPriorEstimator`](@ref)
+"""
+@concrete struct ResidualBlockConfig
+    """
+    `ve`: The variance estimator that sizes the residual block.
+    """
+    ve
+    """
+    `pdm`: The positive definite matrix estimator that re-conditions the covariance after a consumer removes the block, or `nothing` when the estimator adds no block.
+    """
+    pdm
+    """
+    `rsd`: Whether the estimator adds the residual block.
+    """
+    rsd
+end
+"""
+    factor_residual_config(pe::AbstractPriorEstimator) -> Option{<:ResidualBlockConfig}
 
 Declare how a prior estimator adds a residual block to the covariance it lifts.
 
@@ -488,10 +591,11 @@ There is no default. A fallback that returns `nothing` cannot tell an estimator 
 # Returns
 
   - `nothing`: The estimator adds no residual block.
-  - `(; ve, pdm, rsd)::NamedTuple`: The variance estimator that sizes the residual block, the positive definite matrix estimator that re-conditions the covariance after a consumer removes the block, and whether the estimator adds the block. A factor prior gives `pdm` from [`matrix_processing_posdef`](@ref) when `rsd` is `true`, and `nothing` when `rsd` is `false`, because no consumer repairs a covariance that has no residual block.
+  - `cfg::ResidualBlockConfig`: The variance estimator that sizes the residual block, the positive definite matrix estimator that re-conditions the covariance after a consumer removes the block, and whether the estimator adds the block. A factor prior gives `pdm` from [`matrix_processing_posdef`](@ref) when `rsd` is `true`, and `nothing` when `rsd` is `false`, because no consumer repairs a covariance that has no residual block.
 
 # Related
 
+  - [`ResidualBlockConfig`](@ref)
   - [`factor_lift`](@ref)
   - [`assert_factor_residual_config`](@ref)
   - [`range_tails`](@ref)
@@ -500,11 +604,11 @@ There is no default. A fallback that returns `nothing` cannot tell an estimator 
   - [`AbstractLowOrderPriorEstimator_F_AF`](@ref)
 """
 function factor_residual_config(pe::AbstractPriorEstimator)
-    return throw(ArgumentError("`factor_residual_config` is not defined for `$(nameof(typeof(pe)))`. Every concrete `AbstractPriorEstimator` must declare its residual block beside its own definition by adding a method returning `(; ve, pdm, rsd)`, forwarding the estimator it wraps, or returning `nothing` when it adds no residual block."))
+    return throw(ArgumentError("`factor_residual_config` is not defined for `$(nameof(typeof(pe)))`. Every concrete `AbstractPriorEstimator` must declare its residual block beside its own definition by adding a method returning a `ResidualBlockConfig`, forwarding the estimator it wraps, or returning `nothing` when it adds no residual block."))
 end
 function factor_residual_config(pe::FactorPrior)
-    return (; ve = pe.ve, pdm = pe.rsd ? matrix_processing_posdef(pe.mp) : nothing,
-            rsd = pe.rsd)
+    return ResidualBlockConfig(pe.ve, pe.rsd ? matrix_processing_posdef(pe.mp) : nothing,
+                               pe.rsd)
 end
 """
     assert_factor_residual_config(pe::AbstractPriorEstimator, cfg) -> Nothing
@@ -520,7 +624,7 @@ A consumer reads `ve`, `pdm` and `rsd` off the answer by property access, which 
 
 # Validation
 
-  - `cfg` is `nothing`, or a `NamedTuple` carrying `ve`, `pdm` and `rsd`.
+  - `cfg` is `nothing`, or a [`ResidualBlockConfig`](@ref).
 
 # Related
 
@@ -528,9 +632,8 @@ A consumer reads `ve`, `pdm` and `rsd` off the answer by property access, which 
   - [`HighOrderFactorPriorEstimator`](@ref)
 """
 function assert_factor_residual_config(pe::AbstractPriorEstimator, cfg)::Nothing
-    @argcheck(isnothing(cfg) ||
-              (isa(cfg, NamedTuple) && all(k -> haskey(cfg, k), (:ve, :pdm, :rsd))),
-              ArgumentError("`factor_residual_config(::$(nameof(typeof(pe))))` must return `nothing` or a `NamedTuple` carrying `ve`, `pdm` and `rsd`. Got\ncfg => $(cfg)::$(typeof(cfg))."))
+    @argcheck(isnothing(cfg) || isa(cfg, ResidualBlockConfig),
+              ArgumentError("`factor_residual_config(::$(nameof(typeof(pe))))` must return `nothing` or a `ResidualBlockConfig`. Got\ncfg => $(cfg)::$(typeof(cfg))."))
     return nothing
 end
 """

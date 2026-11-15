@@ -505,10 +505,44 @@ function assert_cross_sectional_lag_rows(t::Integer, lag::Integer)
     return nothing
 end
 """
+$(DocStringExtensions.TYPEDEF)
+
+The cross-sectional regression of a [`CrossSectionalFactorPrior`](@ref), up to the factor returns that its factor prior reads.
+
+This type is an implementation detail and is not intended for direct use. [`cross_sectional_regression_stage`](@ref) makes it. The returns-matrix method of [`prior`](@ref), [`cross_sectional_factor_scenarios`](@ref) and the refit of [`scenario_prior`](@ref) read it.
+
+# Fields
+
+$(DocStringExtensions.FIELDS)
+
+# Related
+
+  - [`cross_sectional_regression_stage`](@ref)
+  - [`cross_sectional_assemble`](@ref)
+"""
+@concrete struct RegressionStage
+    """
+    `ca`: The estimated factors with the observed factors appended, an [`AppendedFactorModel`](@ref). `ca.f` holds the factor returns, one row per fitted observation.
+    """
+    ca
+    """
+    `lv`: `true` at each factor of `ca.f` that is not empty.
+    """
+    lv
+    """
+    `fit`: The regression, the weights, the variance history and the rows that [`cross_sectional_assemble`](@ref) reads.
+    """
+    fit
+    """
+    `rde`: The returns data that the estimated members read.
+    """
+    rde
+end
+"""
     cross_sectional_regression_stage(pe::CrossSectionalFactorPrior, X::MatNum,
                                      F::Option{<:MatNum}, pnl::Option{<:AssetPanel};
                                      ne = nothing, E = nothing, iv = nothing,
-                                     ivpa = nothing, ts = nothing) -> NamedTuple
+                                     ivpa = nothing, ts = nothing) -> RegressionStage
 
 Fit the cross-sectional regression of a [`CrossSectionalFactorPrior`](@ref), up to the factor returns that its factor prior reads.
 
@@ -534,13 +568,11 @@ The returns-matrix method of [`prior`](@ref) fits `pe.pe` on the factor returns 
 
 # Returns
 
-  - `ca::AppendedFactorModel`: The output of [`cross_sectional_observed_append`](@ref). `ca.f` holds the factor returns, one row per fitted observation.
-  - `lv::BitVector`: `true` at each factor of `ca.f` that is not empty.
-  - `fit::NamedTuple`: The regression, the weights, the variance history and the rows that [`cross_sectional_assemble`](@ref) reads.
-  - `rde::ReturnsResult`: The returns data that the estimated members read.
+  - `rs::RegressionStage`: The output `ca` of [`cross_sectional_observed_append`](@ref), whose `ca.f` holds the factor returns, one row per fitted observation; the mark `lv`, `true` at each factor of `ca.f` that is not empty; the bundle `fit` of the regression, the weights, the variance history and the rows that [`cross_sectional_assemble`](@ref) reads; and the returns data `rde` that the estimated members read.
 
 # Related
 
+  - [`RegressionStage`](@ref)
   - [`prior`](@ref)
   - [`cross_sectional_assemble`](@ref)
   - [`cross_sectional_factor_moments`](@ref)
@@ -608,8 +640,7 @@ function cross_sectional_regression_stage(pe::CrossSectionalFactorPrior, X::MatN
            ce = nothing, idx = rw[r], ts = isnothing(ts) ? nothing : ts[rw[r]],
            rf = nothing)
     # An Observed Factor carries the return the caller observed, so it is never empty.
-    return (; ca = ca, lv = vcat(lv, trues(size(ca.f, 2) - length(lv))), fit = fit,
-            rde = rde)
+    return RegressionStage(ca, vcat(lv, trues(size(ca.f, 2) - length(lv))), fit, rde)
 end
 """
     cross_sectional_factor_scenarios(pe::CrossSectionalFactorPrior, X::MatNum,
@@ -642,9 +673,7 @@ An entropy pooling prior around `pe` states its probabilities on the scenarios o
 
 # Returns
 
-  - `f::Matrix`: The factor returns of `pe.pe`, one row per fitted observation.
-  - `rs::NamedTuple`: The output of [`cross_sectional_regression_stage`](@ref).
-  - `kw`: The keyword arguments in `kwargs...`, which the rest of the fit reads.
+  - `(f, rs, kw)::Tuple`: `f::Matrix`, the factor returns of `pe.pe`, one row per fitted observation; `rs::RegressionStage`, the output of [`cross_sectional_regression_stage`](@ref); and `kw`, the keyword arguments in `kwargs...`, which the rest of the fit reads.
 
 # Related
 
@@ -662,7 +691,7 @@ function cross_sectional_factor_scenarios(pe::CrossSectionalFactorPrior, X::MatN
                                           ts::Option{<:VecDate} = nothing, kwargs...)
     rs = cross_sectional_regression_stage(pe, X, F, pnl; ne = ne, E = E, iv = iv,
                                           ivpa = ivpa, ts = ts)
-    return (; f = all(rs.lv) ? rs.ca.f : rs.ca.f[:, rs.lv], rs = rs, kw = kwargs)
+    return all(rs.lv) ? rs.ca.f : rs.ca.f[:, rs.lv], rs, kwargs
 end
 """
     cross_sectional_cached_block(pe::CrossSectionalFactorPrior, pr::Nothing, X::MatNum)
@@ -720,7 +749,37 @@ function cross_sectional_cached_block(pe::CrossSectionalFactorPrior, pr::LowOrde
     return reads && isnothing(rr.hist) ? nothing : rr
 end
 """
-    cross_sectional_cached_scenarios(rr::CrossSectionalFactorModel) -> NamedTuple
+$(DocStringExtensions.TYPEDEF)
+
+The factor returns that the factor prior of a [`CrossSectionalFactorPrior`](@ref) is fitted on, read from the block of a fit that stores the cache.
+
+This type is an implementation detail and is not intended for direct use. [`cross_sectional_cached_scenarios`](@ref) makes it. [`scenario_prior`](@ref) and [`scenario_factory`](@ref) read it. `fa` and `f` are matrices of one type, so a positional swap would be silent.
+
+# Fields
+
+$(DocStringExtensions.FIELDS)
+
+# Related
+
+  - [`cross_sectional_cached_scenarios`](@ref)
+  - [`cross_sectional_cached_block`](@ref)
+"""
+@concrete struct CachedFactorReturns
+    """
+    `fa`: The factor returns on the combined reduced factor axis.
+    """
+    fa
+    """
+    `f`: The factor returns of the factors that are not empty, which the factor prior reads.
+    """
+    f
+    """
+    `lv`: `true` at each factor of `fa` that is not empty.
+    """
+    lv
+end
+"""
+    cross_sectional_cached_scenarios(rr::CrossSectionalFactorModel) -> CachedFactorReturns
 
 Return the factor returns that the factor prior of a [`CrossSectionalFactorPrior`](@ref) is fitted on, from the block of a fit that stores the cache.
 
@@ -738,19 +797,18 @@ The regression stage gives these factor returns to the fit, as [`cross_sectional
 
 # Returns
 
-  - `fa::MatNum`: The factor returns on the combined reduced factor axis.
-  - `f::MatNum`: The factor returns of the factors that are not empty, which the factor prior reads.
-  - `lv::BitVector`: `true` at each factor of `fa` that is not empty.
+  - `cf::CachedFactorReturns`: The factor returns `fa` on the combined reduced factor axis, the factor returns `f` of the factors that are not empty, which the factor prior reads, and the mark `lv`, `true` at each factor of `fa` that is not empty.
 
 # Related
 
+  - [`CachedFactorReturns`](@ref)
   - [`cross_sectional_cached_block`](@ref)
   - [`cross_sectional_factor_scenarios`](@ref)
 """
 function cross_sectional_cached_scenarios(rr::CrossSectionalFactorModel)
     fa = cross_sectional_factor_returns(rr)
     lv = vcat(rr.csr.lv, trues(size(fa, 2) - length(rr.csr.lv)))
-    return (; fa = fa, f = all(lv) ? fa : fa[:, lv], lv = lv)
+    return CachedFactorReturns(fa, all(lv) ? fa : fa[:, lv], lv)
 end
 """
     cross_sectional_forecast_split(ofit::AbstractOrthogonalForecastFit, rf::Nothing,
@@ -899,13 +957,14 @@ end
                                     rd::ReturnsResult, csfm::CrossSectionalFactorModel,
                                     cre::AbstractCrossSectionalRegressionEstimator,
                                     reads::Bool, H::Option{<:MatNum},
-                                    rf0::Nothing = nothing) -> NamedTuple
+                                    rf0::Nothing = nothing) -> SplitReturnForecast
     cross_sectional_return_forecast(ofit::AbstractOrthogonalForecastFit,
                                     rfe::AbstractReturnForecastEstimator, rd::ReturnsResult,
                                     csfm::CrossSectionalFactorModel,
                                     cre::AbstractCrossSectionalRegressionEstimator,
                                     reads::Bool, H::Option{<:MatNum},
-                                    rf0::Option{<:AbstractReturnForecastResult} = nothing) -> NamedTuple
+                                    rf0::Option{<:AbstractReturnForecastResult} = nothing)
+        -> SplitReturnForecast
 
 Fit the Return Forecast of a [`CrossSectionalFactorPrior`](@ref) under its Orthogonal Forecast Fit, and split it against the latest Factor Exposures.
 
@@ -936,10 +995,7 @@ The split is unscaled by `c`. The Orthogonal Forecast Scale `c` can be a rule th
 
 # Returns
 
-  - `rf::Option{<:AbstractReturnForecastResult}`: The Return Forecast Result, or `nothing`.
-  - `g::Option{<:VecNum}`: The spanned coefficients, or `nothing`.
-  - `ap::Option{<:VecNum}`: The orthogonal part before the Orthogonal Forecast Scale, one entry per asset, or `nothing`.
-  - `hist::Option{<:MatNum}`: The Return Forecast history, `observations × assets`, or `nothing`.
+  - `sp::SplitReturnForecast`: The Return Forecast Result `rf`, the spanned coefficients `g`, the orthogonal part `ap` before the Orthogonal Forecast Scale, one entry per asset, and the Return Forecast history `hist`, `observations × assets`. Each is `nothing` when the fit gives none.
 
 # Related
 
@@ -955,7 +1011,7 @@ function cross_sectional_return_forecast(::AbstractOrthogonalForecastFit, ::Noth
                                          ::ReturnsResult, ::CrossSectionalFactorModel,
                                          ::AbstractCrossSectionalRegressionEstimator,
                                          ::Bool, ::Option{<:MatNum}, ::Nothing = nothing)
-    return (; rf = nothing, g = nothing, ap = nothing, hist = nothing)
+    return SplitReturnForecast(nothing, nothing, nothing, nothing)
 end
 function cross_sectional_return_forecast(ofit::AbstractOrthogonalForecastFit,
                                          rfe::AbstractReturnForecastEstimator,
@@ -971,7 +1027,7 @@ function cross_sectional_return_forecast(ofit::AbstractOrthogonalForecastFit,
     end
     (; g, ap) = cross_sectional_forecast_split(ofit, rf, csfm, cre)
     hist = reads ? cross_sectional_forecast_history(rf, rfo, rd, csfm, H) : nothing
-    return (; rf = rf, g = g, ap = ap, hist = hist)
+    return SplitReturnForecast(rf, g, ap, hist)
 end
 """
     cross_sectional_forecast_mu(lambda::Real, mu::VecNum, g::Nothing) -> VecNum
@@ -1141,8 +1197,9 @@ function cross_sectional_scenarios(Fs::MatNum, L::MatNum, S::MatNum, ev::VecNum)
     return Fn * transpose(L) .+ Sn .* transpose(sqrt.(ev))
 end
 """
-    cross_sectional_moment_prior(pe::CrossSectionalFactorPrior, f_pr::NamedTuple,
-                                 csfm::CrossSectionalFactorModel, sp::NamedTuple, L::MatNum,
+    cross_sectional_moment_prior(pe::CrossSectionalFactorPrior, f_pr::FactorPriorMoments,
+                                 csfm::CrossSectionalFactorModel, sp::SplitReturnForecast,
+                                 L::MatNum,
                                  am::AbstractVector{Bool}, Xs::MatNum, oX::Option{<:MatNum};
                                  kwargs...) -> LowOrderPrior
 
@@ -1165,7 +1222,7 @@ The fit and the call with no data of the carry fold reach it through [`cross_sec
   - `pe`: Cross-Sectional Factor Prior estimator.
   - `f_pr`: The factor moments that [`cross_sectional_factor_moments`](@ref) states over the combined reduced factor returns.
   - `csfm`: The factor-model block, with the regression, the variance history, the idiosyncratic covariance, the basis and the factor returns of the fit.
-  - `sp`: The split of the Return Forecast, `(; rf, g, ap, hist)`.
+  - `sp`: The split of the Return Forecast, a [`SplitReturnForecast`](@ref).
   - `L`: The loadings of the latest observation on the combined reduced factor axis.
   - `am`: The active mask of the latest observation, one entry per asset.
   - `Xs`: The asset return scenarios.
@@ -1188,9 +1245,11 @@ The fit and the call with no data of the carry fold reach it through [`cross_sec
   - [`scenario_prior`](@ref)
   - [`CrossSectionalFactorPrior`](@ref)
 """
-function cross_sectional_moment_prior(pe::CrossSectionalFactorPrior, f_pr::NamedTuple,
-                                      csfm::CrossSectionalFactorModel, sp::NamedTuple,
-                                      L::MatNum, am::AbstractVector{Bool}, Xs::MatNum,
+function cross_sectional_moment_prior(pe::CrossSectionalFactorPrior,
+                                      f_pr::FactorPriorMoments,
+                                      csfm::CrossSectionalFactorModel,
+                                      sp::SplitReturnForecast, L::MatNum,
+                                      am::AbstractVector{Bool}, Xs::MatNum,
                                       oX::Option{<:MatNum}; kwargs...)
     csr = csfm.csr
     T = size(csr.f, 1)
@@ -1263,7 +1322,8 @@ function cross_sectional_stored_cache(csfm::CrossSectionalFactorModel, cache_reg
     return cache_reg ? rebuild_struct(csfm, (; amr = amr, hist = hist)) : csfm
 end
 """
-    cross_sectional_kept_cache(f_pr::NamedTuple, pf::Option{<:AbstractPriorResult}) -> NamedTuple
+    cross_sectional_kept_cache(f_pr::FactorPriorMoments, pf::Option{<:AbstractPriorResult})
+        -> FactorPriorMoments
 
 Keep the cache of a pool in the factor slot of a [`CrossSectionalFactorPrior`](@ref) on the factor moments of its refit.
 
@@ -1276,7 +1336,7 @@ The refit of [`scenario_prior`](@ref) fits the model of the pool under the new w
 
 # Returns
 
-  - `f_pr::NamedTuple`: `f_pr`, with `pc` from `pf` when `f_pr` carries none.
+  - `f_pr::FactorPriorMoments`: `f_pr`, with `pc` from `pf` when `f_pr` carries none.
 
 # Related
 
@@ -1284,8 +1344,13 @@ The refit of [`scenario_prior`](@ref) fits the model of the pool under the new w
   - [`scenario_prior`](@ref)
   - [`cross_sectional_moment_prior`](@ref)
 """
-function cross_sectional_kept_cache(f_pr::NamedTuple, pf::Option{<:AbstractPriorResult})
-    return isnothing(f_pr.pc) ? merge(f_pr, (; pc = opinion_pooling_cache(pf))) : f_pr
+function cross_sectional_kept_cache(f_pr::FactorPriorMoments,
+                                    pf::Option{<:AbstractPriorResult})
+    return if isnothing(f_pr.pc)
+        rebuild_struct(f_pr, (; pc = opinion_pooling_cache(pf)))
+    else
+        f_pr
+    end
 end
 # The refit of a Cross-Sectional Factor Prior under the posterior weights holds its model, as
 # the refit of a `FactorPrior` does (ADR 0205), and gives the weights to `pe` alone, on the
@@ -1297,7 +1362,7 @@ function scenario_factory(pe::CrossSectionalFactorPrior, w,
                           cache_reg::Bool = false, kwargs...)
     rr = cross_sectional_cached_block(pe, pr, X)
     f = if isnothing(rr)
-        cross_sectional_factor_scenarios(pe, X, F, pnl; kwargs...).f
+        first(cross_sectional_factor_scenarios(pe, X, F, pnl; kwargs...))
     else
         cross_sectional_cached_scenarios(rr).f
     end
@@ -1317,7 +1382,7 @@ function scenario_prior(pe::CrossSectionalFactorPrior, w, pr::Option{<:AbstractP
     rr = cross_sectional_cached_block(pe, pr, X)
     pf = scenario_factor_result(pr)
     if isnothing(rr)
-        (; f, rs, kw) = cross_sectional_factor_scenarios(pe, X, F, pnl; kwargs...)
+        f, rs, kw = cross_sectional_factor_scenarios(pe, X, F, pnl; kwargs...)
         fpe = scenario_factory(pe.pe, w, pf, f, nothing, nothing; strict = strict)
         f_pr = cross_sectional_kept_cache(cross_sectional_factor_moments(fpe, pe.f_mp,
                                                                          rs.ca.f, rs.lv;
@@ -1334,7 +1399,7 @@ function scenario_prior(pe::CrossSectionalFactorPrior, w, pr::Option{<:AbstractP
                                                                      strict = strict,
                                                                      kw...), pf)
     (; g, ap) = cross_sectional_forecast_split(pe.ofit, rr.rf, rr, pe.cre)
-    sp = (; rf = rr.rf, g = g, ap = ap, hist = rr.hist)
+    sp = SplitReturnForecast(rr.rf, g, ap, rr.hist)
     am = view(rr.amr, size(rr.amr, 1), :)
     return cross_sectional_moment_prior(pe, f_pr, rr, sp, rr.L, am, pr.X, pr.o_X; kw...)
 end
@@ -1371,8 +1436,8 @@ function scenario_count(pe::CrossSectionalFactorPrior, X::MatNum, F::Option{<:Ma
     if !isnothing(n)
         return n
     end
-    (; f) = cross_sectional_factor_scenarios(pe, X, F, pnl; ne = ne, E = E, iv = iv,
-                                             ivpa = ivpa, kwargs...)
+    f, _, _ = cross_sectional_factor_scenarios(pe, X, F, pnl; ne = ne, E = E, iv = iv,
+                                               ivpa = ivpa, kwargs...)
     return scenario_count(pe.pe, f, nothing, nothing; strict = strict)
 end
 function assert_scenario_model(pe::CrossSectionalFactorPrior)
@@ -1535,96 +1600,4 @@ function scenario_fill_remember!(named::AbstractSet{<:Integer},
         push!(named, last(p))
     end
     return nothing
-end
-"""
-$(DocStringExtensions.TYPEDSIGNATURES)
-
-Return the returns matrix with the missing rows of every investable asset filled with zero, and say so above the fitting estimator's resolved `fill_limit`.
-
-A mask-aware moment estimator answers a young asset from the observations it has, so the asset is investable and its returns column still carries a `NaN` at every row before it listed. Every consumer of a Prior Result reads that column — the JuMP model, the meta-optimisers and the value-level `expected_*` functions among them — so the fill is paid **once**, here, on the estimator's own pass, rather than at each of them.
-
-A non-investable asset keeps its `NaN` column, so [`investable_mask`](@ref) is unchanged. `mu`, `sigma` and every other block are untouched, because the estimator computed them from the rows it saw.
-
-**The share the fill tests is per asset**: the worst investable column's own count of filled entries over the number of observations. A matrix-wide denominator scales with the universe, so the column the notice exists to catch disappears inside it — one asset of a hundred whose column is seven-tenths invented is seven thousandths of the matrix, under any limit a caller would set. The matrix-wide share is reported in the message as context and trips nothing.
-
-How much of the trade passes in silence is the fitting estimator's own answer, carried in its `fill_limit` field and resolved at the fit by [`resolve_fill_limit`](@ref) against the coverage floor of its arms — the share is a property of one fit, not of the session, so two priors in one program may answer differently. Under `strict = false` the trade is silent while the worst column's share stays at or below the resolved limit, and is named through [`strict_diagnostic`](@ref) above it. Under `strict = true` **any** fill refuses, whatever the limit holds.
-
-Two mask-aware families reach this verb. The exponentially weighted family carries no [`CoveragePolicy`](@ref), so a `fill_limit` of `nothing` names every fill there. The plain family is mask-aware exactly where a policy is set, and a policy derives a limit that never fires, so an available-case fit names nothing while it does what it was configured to do. A plain estimator with no policy never reaches this verb at all: under the whole-window rule, an asset it could not cover leaves the Coverage Universe and is not investable.
-
-# Algorithm
-
- 1. Return `X` itself when every entry of `X` is finite, which is every fit over a complete window.
- 2. Derive the Investable Mask from `mu` and the diagonal of `sigma`, as [`investable_mask`](@ref) does, and find the pairs to fill with [`scenario_fill_pairs`](@ref). Return `X` itself when there are none, which is a gap that belongs to a non-investable asset alone.
- 3. Narrow the pairs to report with [`scenario_fill_report`](@ref), which drops the assets a carry state has already named and is the identity when nothing remembers. Under `strict` the narrowing is skipped, because `strict` refuses any fill and must not depend on how often the estimator has been read out.
- 4. Count the reported pairs per asset, take the worst column's share of its own observations, and report through [`strict_diagnostic`](@ref) when `strict` holds, when `fill_limit` is `nothing`, or when that share exceeds `fill_limit`. Record the assets just named with [`scenario_fill_remember!`](@ref).
- 5. Return a copy of `X` with zero written at each of the filled pairs — every one of them, not just the reported ones — and the `NaN` of every non-investable asset left where it is.
-
-# The notice fires once per asset, not once per step
-
-`named` is what separates the batch call from the online one. A batch fit passes `nothing`, reports every fill it finds, and remembers nothing. A call of `prior(pe)` with no data on a folded prior passes the set its [`PriorCarryState`](@ref) carries, so a walk-forward names an asset at the step it lists and stays quiet afterwards instead of emitting the same notice at every one of two thousand steps. The **fill itself is unchanged**: every filled pair is written at every call, whatever the set holds. Under `strict = true` the first fill still throws.
-
-# Arguments
-
-  - `X`: Asset returns, `observations × assets`.
-  - `mu`: The expected returns the estimator answered, `NaN` at a non-investable asset.
-  - `sigma`: The covariance the estimator answered, `NaN` on the diagonal at a non-investable asset.
-  - `strict`: If `true`, any fill raises an `ArgumentError`; if `false`, a fill above the share warns.
-  - `fill_limit`: The share of an investable column the fitting estimator accepts in silence, after [`resolve_fill_limit`](@ref), or `nothing` when it accepts none.
-  - `named`: The assets already named, written in place when a notice fires, or `nothing` when nothing remembers.
-
-# Validation
-
-  - The worst investable column's filled share is at or below `fill_limit`, else a warning naming the assets is emitted, or an `ArgumentError` naming them is raised under `strict`, which any fill raises. A `fill_limit` of `nothing` is at or below no share, so any fill is named.
-
-# Returns
-
-  - `X::MatNum`: The returns matrix whose investable columns are finite.
-
-# Related
-
-  - [`scenario_fill_pairs`](@ref)
-  - [`scenario_fill_msg`](@ref)
-  - [`scenario_fill_report`](@ref)
-  - [`scenario_fill_remember!`](@ref)
-  - [`scenario_window`](@ref)
-  - [`resolve_fill_limit`](@ref)
-  - [`EmpiricalPrior`](@ref)
-  - [`investable_mask`](@ref)
-  - [`strict_diagnostic`](@ref)
-  - [`filter_held_gaps`](@ref)
-"""
-function scenario_fill(X::MatNum, mu::VecNum, sigma::MatNum, strict::Bool,
-                       fill_limit::Option{<:Real},
-                       named::Option{<:AbstractSet{<:Integer}} = nothing)
-    if all(isfinite, X)
-        return X
-    end
-    imsk = isfinite.(mu) .& isfinite.(LinearAlgebra.diag(sigma))
-    filled = scenario_fill_pairs(X, imsk)
-    if isempty(filled)
-        return X
-    end
-    # `strict` refuses **any** fill, so it never reads the memory: an asset that a previous
-    # call of `prior(pe)` with no data named is still a fill, and silencing it here would
-    # make `strict` depend on how many times the estimator had been read out.
-    report = strict ? filled : scenario_fill_report(filled, named)
-    if !isempty(report)
-        counts = zeros(Int, size(X, 2))
-        for (_, i) in report
-            counts[i] += 1
-        end
-        wi = argmax(counts)
-        worst = counts[wi] / size(X, 1)
-        frac = length(filled) / length(X)
-        if strict || isnothing(fill_limit) || worst > fill_limit
-            strict_diagnostic(scenario_fill_msg(report, wi, worst, frac, fill_limit),
-                              strict; id = @log_id())
-            scenario_fill_remember!(named, report)
-        end
-    end
-    Xf = copy(X)
-    for (t, i) in filled
-        Xf[t, i] = zero(eltype(Xf))
-    end
-    return Xf
 end

@@ -740,10 +740,10 @@ function scenario_prior(pe::OpinionPoolingPrior, w, pr::Option{<:AbstractPriorRe
                         X::MatNum, F::Option{<:MatNum}, pnl::Option{<:AssetPanel};
                         kwargs...)
     pc = opinion_pooling_cache(pr)
-    sc = opinion_pooling_scenarios(pe, pc, X, F, pnl; kwargs...)
-    res = scenario_prior(factory(pe.pe2, sc.w), w,
-                         opinion_pooling_cache(pr, isnothing(pc) ? nothing : pc.pe2), sc.X,
-                         F, pnl; kwargs...)
+    Xp, wp = opinion_pooling_scenarios(pe, pc, X, F, pnl; kwargs...)
+    res = scenario_prior(factory(pe.pe2, wp), w,
+                         opinion_pooling_cache(pr, isnothing(pc) ? nothing : pc.pe2), Xp, F,
+                         pnl; kwargs...)
     return opinion_pooling_cache(res, pc)
 end
 # A pool that a factor prior or a Black-Litterman prior embeds is rebuilt as an estimator,
@@ -754,7 +754,7 @@ function scenario_factory(pe::OpinionPoolingPrior, w, pr::Option{<:AbstractPrior
                           X::MatNum, F::Option{<:MatNum}, pnl::Option{<:AssetPanel};
                           kwargs...)
     pc = opinion_pooling_cache(pr)
-    wp = opinion_pooling_scenarios(pe, pc, X, F, pnl; kwargs...).w
+    wp = last(opinion_pooling_scenarios(pe, pc, X, F, pnl; kwargs...))
     return scenario_factory(factory(pe.pe2, wp), w,
                             opinion_pooling_cache(pr, isnothing(pc) ? nothing : pc.pe2), X,
                             F, pnl; kwargs...)
@@ -787,8 +787,7 @@ The method that Julia selects is the algorithm.
 
 # Returns
 
-  - `X::MatNum`: The rows that the opinions read.
-  - `w::StatsBase.AbstractWeights`: The pooled weights.
+  - `(X, w)::Tuple`: The rows that the opinions read, `X::MatNum`, and the pooled weights, `w::StatsBase.AbstractWeights`.
 
 # Related
 
@@ -799,11 +798,11 @@ function opinion_pooling_scenarios(pe::OpinionPoolingPrior, ::Nothing, X::MatNum
                                    F::Option{<:MatNum}, pnl::Option{<:AssetPanel};
                                    kwargs...)
     X = isnothing(pe.pe1) ? X : prior(pe.pe1, X, F, pnl; kwargs...).X
-    return (; X = X, w = first(opinion_pooling_weights(pe, X, F, pnl; kwargs...)))
+    return X, first(opinion_pooling_weights(pe, X, F, pnl; kwargs...))
 end
 function opinion_pooling_scenarios(::OpinionPoolingPrior, pc::NamedTuple, X::MatNum,
                                    ::Option{<:MatNum}, ::Option{<:AssetPanel}; kwargs...)
-    return (; X = something(pc.X, X), w = pc.w)
+    return something(pc.X, X), pc.w
 end
 # A caller's prior probabilities weigh the scenarios of the pool, the rows of `pe1` when it
 # is set. A Scenario Cap in `pe1` keeps the last rows, so `pe1` takes them on the rows that

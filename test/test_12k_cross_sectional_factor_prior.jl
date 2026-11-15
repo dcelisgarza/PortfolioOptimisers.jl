@@ -2019,10 +2019,11 @@ small random arrays, so each check reads one helper alone.
         # A fit that records no count, as one built by hand, states no degrees of freedom, as
         # a time-series block with no `edof` does.
         csr0 = PO.CrossSectionalRegression(; f = csr.f, eps = csr.eps, n = n)
-        @test PO.cross_sectional_variance_counts(cnt, csr0) ==
-              (; edof = nothing, ediv = cnt.m)
-        @test PO.cross_sectional_variance_counts(nothing, csr) ==
-              (; edof = nothing, ediv = nothing)
+        c0 = PO.cross_sectional_variance_counts(cnt, csr0)
+        @test c0 isa PO.ResidualVarianceCounts
+        @test isnothing(c0.edof) && c0.ediv == cnt.m
+        cn = PO.cross_sectional_variance_counts(nothing, csr)
+        @test isnothing(cn.edof) && isnothing(cn.ediv)
     end
     @testset "The scenarios pair the last rows of the two histories" begin
         rng = StableRNG(828_104)
@@ -2443,7 +2444,8 @@ refit reads it from the result of that fit, so it runs no regression (#1751, ADR
     T = size(prior(pe, rd).X, 1)
     w0 = StatsBase.pweights(fill(inv(T), T))
     q = PO.prior_probability_factory(pe, w0, rd.X, nothing, rd.pnl; kw...)
-    n = size(PO.cross_sectional_factor_scenarios(pe, rd.X, nothing, rd.pnl; kw...).f, 1)
+    n = size(first(PO.cross_sectional_factor_scenarios(pe, rd.X, nothing, rd.pnl; kw...)),
+             1)
     @test n == T
     ref = PO.rebuild_struct(PO.factory(pe, PO.scenario_weights(w0, n)),
                             (; pe = PO.factory(pe.pe, PO.scenario_weights(w0, n))))
@@ -2520,4 +2522,20 @@ end
     @test PO.cross_sectional_observed_gap(cb, 2) == ""
     @test occursin("[\"fx\"]", PO.cross_sectional_observed_gap(cb, 1))
     @test PO.cross_sectional_observed_gap(nothing, 1) == ""
+end
+
+@testset "The refit keeps the cache of a pool in the factor slot (#2097)" begin
+    PO = PortfolioOptimisers
+    fm(pc) = PO.FactorPriorMoments(zeros(2, 1), zeros(1), zeros(1, 1), nothing, nothing,
+                                   (nothing, nothing), nothing, nothing, pc)
+    # A factor prior that carries a cache keeps it, and the record passes through unchanged.
+    kept = fm((; tag = 1))
+    @test PO.cross_sectional_kept_cache(kept, nothing) === kept
+    # A factor prior with no cache takes the one of the fit that the views read, through
+    # `rebuild_struct`, and keeps every other field.
+    none = fm(nothing)
+    got = PO.cross_sectional_kept_cache(none, nothing)
+    @test got isa PO.FactorPriorMoments
+    @test isnothing(got.pc)
+    @test got.X === none.X && got.sigma === none.sigma
 end

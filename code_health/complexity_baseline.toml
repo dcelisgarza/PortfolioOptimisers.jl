@@ -258,16 +258,19 @@ commit = "f08e4cd32e"
 "src/10_Prior/08_HighOrderFactorPriorEstimator.jl" = { cyc = 23, cog = 40, arg = 7, cyc_sum = 64, cog_sum = 74, arg_sum = 34, macros = ["@forward_properties", "@propagatable"] }
 "src/10_Prior/09_AssetPanelEstimators.jl" = { cyc = 3, cog = 4, arg = 4, cyc_sum = 27, cog_sum = 13, arg_sum = 27, macros = ["@propagatable"] }
 "src/10_Prior/10_Base_CrossSectionalFactorPrior.jl" = { cyc = 10, cog = 16, arg = 11, cyc_sum = 106, cog_sum = 78, arg_sum = 120, macros = [] }
-"src/10_Prior/11_CrossSectionalFactorPrior.jl" = { cyc = 6, cog = 7, arg = 31, cyc_sum = 75, cog_sum = 48, arg_sum = 147, macros = ["@propagatable"] }
+"src/10_Prior/11_CrossSectionalFactorPrior_a.jl" = { cyc = 6, cog = 7, arg = 31, cyc_sum = 66, cog_sum = 43, arg_sum = 141, macros = ["@propagatable"] }
+"src/10_Prior/11_CrossSectionalFactorPrior_b.jl" = { cyc = 4, cog = 5, arg = 0, cyc_sum = 8, cog_sum = 6, arg_sum = 0, macros = [] }
 "src/10_Prior/12_PriorPartialFit_a.jl" = { cyc = 9, cog = 12, arg = 8, cyc_sum = 131, cog_sum = 80, arg_sum = 221, macros = [] }
 "src/10_Prior/12_PriorPartialFit_b.jl" = { cyc = 2, cog = 2, arg = 4, cyc_sum = 7, cog_sum = 7, arg_sum = 14, macros = [] }
 "src/10_Prior/13_PriorExpectedReturns.jl" = { cyc = 2, cog = 2, arg = 5, cyc_sum = 15, cog_sum = 9, arg_sum = 31, macros = [] }
 "src/10_Prior/14_LowDimensionEnsemblePrior.jl" = { cyc = 3, cog = 2, arg = 7, cyc_sum = 12, cog_sum = 5, arg_sum = 20, macros = [] }
-"src/10_Prior/15_CrossSectionalPriorFold.jl" = { cyc = 7, cog = 11, arg = 5, cyc_sum = 87, cog_sum = 68, arg_sum = 120, macros = [] }
+"src/10_Prior/15_CrossSectionalPriorFold_a.jl" = { cyc = 7, cog = 11, arg = 5, cyc_sum = 82, cog_sum = 62, arg_sum = 112, macros = [] }
+"src/10_Prior/15_CrossSectionalPriorFold_b.jl" = { cyc = 4, cog = 6, arg = 5, cyc_sum = 5, cog_sum = 6, arg_sum = 8, macros = [] }
 "src/10_Prior/16_CrossSectionalForecastHistoryCarry.jl" = { cyc = 6, cog = 8, arg = 6, cyc_sum = 56, cog_sum = 52, arg_sum = 64, macros = [] }
 "src/10_Prior/17_CrossSectionalCalibrationRules.jl" = { cyc = 4, cog = 4, arg = 6, cyc_sum = 65, cog_sum = 36, arg_sum = 102, macros = [] }
 "src/10_Prior/18_CrossSectionalCarryHistories.jl" = { cyc = 3, cog = 3, arg = 4, cyc_sum = 52, cog_sum = 26, arg_sum = 85, macros = [] }
-"src/10_Prior/19_PriorScenarios.jl" = { cyc = 10, cog = 11, arg = 10, cyc_sum = 113, cog_sum = 88, arg_sum = 159, macros = [] }
+"src/10_Prior/19_PriorScenarios_a.jl" = { cyc = 10, cog = 7, arg = 10, cyc_sum = 103, cog_sum = 77, arg_sum = 145, macros = [] }
+"src/10_Prior/19_PriorScenarios_b.jl" = { cyc = 10, cog = 11, arg = 6, cyc_sum = 10, cog_sum = 11, arg_sum = 6, macros = [] }
 "src/10_Prior/20_PriorReturnsSource.jl" = { cyc = 6, cog = 7, arg = 6, cyc_sum = 71, cog_sum = 54, arg_sum = 124, macros = [] }
 "src/11_UncertaintySets/01_Base_UncertaintySets.jl" = { cyc = 3, cog = 3, arg = 7, cyc_sum = 74, cog_sum = 38, arg_sum = 111, macros = [] }
 "src/11_UncertaintySets/02_DeltaUncertaintySets.jl" = { cyc = 1, cog = 1, arg = 5, cyc_sum = 11, cog_sum = 4, arg_sum = 34, macros = [] }

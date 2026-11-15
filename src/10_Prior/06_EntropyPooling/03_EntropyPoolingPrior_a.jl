@@ -1,6 +1,6 @@
 """
     ep_evar(x::VecNum, w::VecNum, alpha::Number; args::Tuple = (),
-            kwargs::NamedTuple = (;), zlo_frac::Option{<:Number} = nothing)
+            kwargs::NamedTuple = (;), zlo_frac::Option{<:Number} = nothing) -> EvarDualMinimum
 
 Compute the sample entropic value at risk of a loss series and the dual variable that attains it.
 
@@ -35,10 +35,11 @@ Compute the sample entropic value at risk of a loss series and the dual variable
 
 # Returns
 
-  - `res::@NamedTuple{evar::Number, z::Number}`: The value and the dual variable that attains it.
+  - `res::EvarDualMinimum`: The value and the dual variable that attains it.
 
 # Related
 
+  - [`EvarDualMinimum`](@ref)
   - [`GridTailView`](@ref)
   - [`ConicEntropicValueatRiskView`](@ref)
   - [`EntropicValueatRisk`](@ref)
@@ -68,7 +69,7 @@ function ep_evar(x::VecNum, w::VecNum, alpha::Number; args::Tuple = (),
     res = Optim.optimize(f, lo, hi, args...; kwargs...)
     @argcheck(Optim.converged(res),
               ErrorException("The search for the sample EVaR did not converge. Relax the `args` and `kwargs` of the view group, or leave them empty to take the defaults."))
-    return (; evar = Optim.minimum(res), z = Optim.minimizer(res))
+    return EvarDualMinimum(Optim.minimum(res), Optim.minimizer(res))
 end
 """
     ep_evar_grid_row(x::VecNum, ebar::Number, z::Number)
@@ -163,7 +164,8 @@ end
 """
     ep_rlvar_shift(x::VecNum, w::VecNum, kappa::Number, lnk::Number, z::Number;
                    args::Tuple = (), kwargs::NamedTuple = (;),
-                   bracket::Option{<:RelativisticValueatRiskViewBracket} = nothing)
+                   bracket::Option{<:RelativisticValueatRiskViewBracket} = nothing) ->
+        RlvarShiftMinimum
 
 Minimise the primal objective of the relativistic value at risk over its shift variable, at a fixed dual variable.
 
@@ -206,7 +208,7 @@ Where:
 
 # Returns
 
-  - `res::@NamedTuple{risk::Number, t::Number}`: The smallest value of the objective, and the shift that attains it.
+  - `res::RlvarShiftMinimum`: The smallest value of the objective, and the shift that attains it.
 
 # Algorithm
 
@@ -215,6 +217,7 @@ Where:
 
 # Related
 
+  - [`RlvarShiftMinimum`](@ref)
   - [`ep_rlvar`](@ref)
   - [`ep_rlvar_tail`](@ref)
   - [`RelativisticValueatRiskView`](@ref)
@@ -243,11 +246,13 @@ function ep_rlvar_shift(x::VecNum, w::VecNum, kappa::Number, lnk::Number, z::Num
     res = Optim.optimize(f, xmin - tspan * span, xmax + tspan * span, args...; kwargs...)
     @argcheck(Optim.converged(res),
               ErrorException("The search for the shift of the sample RLVaR did not converge. Relax the `args` and `kwargs` of the view group, or leave them empty to take the defaults."))
-    return (; risk = Optim.minimum(res), t = Optim.minimizer(res))
+    return RlvarShiftMinimum(Optim.minimum(res), Optim.minimizer(res))
 end
 """
     ep_rlvar(x::VecNum, w::VecNum, alpha::Number, kappa::Number; args::Tuple = (),
-             kwargs::NamedTuple = (;), bracket::Option{<:RelativisticValueatRiskViewBracket} = nothing)
+             kwargs::NamedTuple = (;),
+             bracket::Option{<:RelativisticValueatRiskViewBracket} = nothing) ->
+        RlvarPrimalMinimum
 
 Compute the sample relativistic value at risk of a loss series and the primal point that attains it.
 
@@ -290,7 +295,7 @@ Where:
 
 # Returns
 
-  - `res::@NamedTuple{rlvar::Number, t::Number, z::Number}`: The value and the primal pair that attains it.
+  - `res::RlvarPrimalMinimum`: The value and the primal pair that attains it.
 
 # Algorithm
 
@@ -300,6 +305,7 @@ Where:
 
 # Related
 
+  - [`RlvarPrimalMinimum`](@ref)
   - [`ep_rlvar_tail`](@ref)
   - [`ep_rlvar_shift`](@ref)
   - [`ConicRelativisticValueatRiskView`](@ref)
@@ -333,7 +339,7 @@ function ep_rlvar(x::VecNum, w::VecNum, alpha::Number, kappa::Number; args::Tupl
     z = exp(Optim.minimizer(res))
     shift = ep_rlvar_shift(x, wi, kappa, lnk, z; args = args, kwargs = kwargs,
                            bracket = bracket)
-    return (; rlvar = shift.risk, t = shift.t, z = z)
+    return RlvarPrimalMinimum(shift.risk, shift.t, z)
 end
 """
     ep_rlvar_grid_row(x::VecNum, vbar::Number, t::Number, z::Number, alpha::Number,
@@ -466,7 +472,7 @@ end
     ep_evar_anchor(x::VecNum, w::VecNum, alpha::Number, rhs::Number, z::Number;
                    iters::Integer = 50, tol::Number = 1e-10, tilt_iters::Integer = 200,
                    args::Tuple = (), kwargs::NamedTuple = (;),
-                   zlo_frac::Option{<:Number} = nothing)
+                   zlo_frac::Option{<:Number} = nothing) -> Option{<:EvarAnchor}
 
 Find the dual variable of the entropic value at risk that a posterior attains when it meets an upper-bound view.
 
@@ -488,7 +494,7 @@ A grid point states the view as one row. A posterior that makes the row tight re
 
 # Returns
 
-  - `res::Option{@NamedTuple{z::Number, w::VecNum}}`: The dual variable and the posterior that attains it, or `nothing` when the iteration does not reach the target.
+  - `res::Option{<:EvarAnchor}`: The dual variable and the posterior that attains it, or `nothing` when the iteration does not reach the target.
 
 # Algorithm
 
@@ -500,6 +506,7 @@ A grid point states the view as one row. A posterior that makes the row tight re
 
 # Related
 
+  - [`EvarAnchor`](@ref)
   - [`ep_row_tilt`](@ref)
   - [`ep_evar`](@ref)
   - [`ep_evar_grid`](@ref)
@@ -525,7 +532,7 @@ function ep_evar_anchor(x::VecNum, w::VecNum, alpha::Number, rhs::Number, z::Num
         end
         res = ep_evar(x, q, alpha; args = args, kwargs = kwargs, zlo_frac = zlo_frac)
         if abs(res.evar - rhs) <= tol * abs(rhs)
-            return (; z = res.z, w = q)
+            return EvarAnchor(res.z, q)
         end
         z = res.z
     end
@@ -613,7 +620,8 @@ end
                     t::Number, z::Number; iters::Integer = 50, tol::Number = 1e-10,
                     tilt_iters::Integer = 200, args::Tuple = (),
                     kwargs::NamedTuple = (;),
-                    bracket::Option{<:RelativisticValueatRiskViewBracket} = nothing)
+                    bracket::Option{<:RelativisticValueatRiskViewBracket} = nothing) ->
+        Option{<:RlvarAnchor}
 
 Find the primal point of the relativistic value at risk that a posterior attains when it meets an upper-bound view.
 
@@ -637,7 +645,7 @@ A grid point states the view as one row. A posterior that makes the row tight re
 
 # Returns
 
-  - `res::Option{@NamedTuple{t::Number, z::Number, w::VecNum}}`: The pair and the posterior that attains it, or `nothing` when the iteration does not reach the target.
+  - `res::Option{<:RlvarAnchor}`: The pair and the posterior that attains it, or `nothing` when the iteration does not reach the target.
 
 # Algorithm
 
@@ -649,6 +657,7 @@ A grid point states the view as one row. A posterior that makes the row tight re
 
 # Related
 
+  - [`RlvarAnchor`](@ref)
   - [`ep_row_tilt`](@ref)
   - [`ep_rlvar`](@ref)
   - [`ep_rlvar_grid`](@ref)
@@ -674,7 +683,7 @@ function ep_rlvar_anchor(x::VecNum, w::VecNum, alpha::Number, kappa::Number, rhs
         end
         res = ep_rlvar(x, q, alpha, kappa; args = args, kwargs = kwargs, bracket = bracket)
         if abs(res.rlvar - rhs) <= tol * abs(rhs)
-            return (; t = res.t, z = res.z, w = q)
+            return RlvarAnchor(res.t, res.z, q)
         end
         t, z = res.t, res.z
     end

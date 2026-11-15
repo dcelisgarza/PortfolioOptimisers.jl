@@ -174,8 +174,43 @@ function get_pr_value(pr::AbstractPriorResult, i::Integer, ::Val{:rlvar}, alpha:
                     bracket = bracket).rlvar
 end
 """
+$(DocStringExtensions.TYPEDEF)
+
+The assets that one tail view names, their coefficients, its operator and its target.
+
+This type is an implementation detail and is not intended for direct use. [`ep_view_terms`](@ref) makes it. [`ep_normalise_tail_view`](@ref) and [`ep_add_tail_view!`](@ref) read it.
+
+# Fields
+
+$(DocStringExtensions.FIELDS)
+
+# Related
+
+  - [`ep_view_terms`](@ref)
+  - [`ep_normalise_tail_view`](@ref)
+  - [`ep_add_tail_view!`](@ref)
+"""
+@concrete struct TailViewTerms
+    """
+    `idx`: The indices of the assets that the view names.
+    """
+    idx
+    """
+    `coef`: The coefficient of each named asset.
+    """
+    coef
+    """
+    `op`: The operator of the view (`:eq`, `:geq` or `:leq`).
+    """
+    op
+    """
+    `rhs`: The target of the view.
+    """
+    rhs
+end
+"""
     ep_view_terms(res::ParsingResult, sets::UniverseSets, X::MatNum; strict::Bool = false,
-                  ledger::Option{<:AbstractVector} = nothing)
+                  ledger::Option{<:AbstractVector} = nothing) -> Option{<:TailViewTerms}
 
 Resolve one parsed tail view into the assets that it names, their coefficients, its operator and its target.
 
@@ -199,10 +234,11 @@ Resolve one parsed tail view into the assets that it names, their coefficients, 
 # Returns
 
   - `nothing`: When the universe holds no name of the view.
-  - `terms::@NamedTuple{idx::VecInt, coef::VecNum, op::Symbol, rhs::Number}`: The assets that the view names, their coefficients, the operator of the view (`:eq`, `:geq` or `:leq`) and its target.
+  - `terms::TailViewTerms`: The assets that the view names, their coefficients, the operator of the view (`:eq`, `:geq` or `:leq`) and its target.
 
 # Related
 
+  - [`TailViewTerms`](@ref)
   - [`ep_tail_views!`](@ref)
   - [`get_linear_constraints`](@ref)
   - [`comparison_sign_ineq_flag`](@ref)
@@ -228,7 +264,7 @@ function ep_view_terms(res::ParsingResult, sets::UniverseSets, X::MatNum;
     A = vec(blk.A) * d
     rhs = blk.B[1] * d
     idx = findall(!iszero, A)
-    return (; idx = idx, coef = A[idx], op = op, rhs = rhs)
+    return TailViewTerms(idx, A[idx], op, rhs)
 end
 """
     ep_normalise_view_term(coef::Number, op::Symbol, rhs::Number)
@@ -1071,7 +1107,7 @@ function ep_tail_view_prior_args(tail_views::RelativisticValueatRiskView, w::Vec
             tail_views.args, tail_views.kwargs, tail_views.bracket)
 end
 """
-    ep_normalise_tail_view(terms::NamedTuple, X::MatNum, w::VecNum, eqn::AbstractString,
+    ep_normalise_tail_view(terms::TailViewTerms, X::MatNum, w::VecNum, eqn::AbstractString,
                            name::AbstractString; worst::Bool = false)
 
 Normalise the coefficients of a tail view, read the loss series of its assets, and tell whether its coefficients have both signs.
@@ -1115,7 +1151,7 @@ Otherwise, a tuple of:
   - [`ep_add_tail_view!`](@ref)
   - [`EntropyPoolingPrior`](@ref)
 """
-function ep_normalise_tail_view(terms::NamedTuple, X::MatNum, w::VecNum,
+function ep_normalise_tail_view(terms::TailViewTerms, X::MatNum, w::VecNum,
                                 eqn::AbstractString, name::AbstractString;
                                 worst::Bool = false)
     (; idx, coef, op, rhs) = terms
@@ -1138,13 +1174,13 @@ end
 """
     ep_add_tail_view!(epc::AbstractDict, tvs::AbstractVector,
                       tail_views::ConditionalValueatRiskView, alg, X::MatNum,
-                      terms::NamedTuple, eqn::AbstractString, w::VecNum)
+                      terms::TailViewTerms, eqn::AbstractString, w::VecNum)
     ep_add_tail_view!(epc::AbstractDict, tvs::AbstractVector,
                       tail_views::EntropicValueatRiskView, alg, X::MatNum,
-                      terms::NamedTuple, eqn::AbstractString, w::VecNum)
+                      terms::TailViewTerms, eqn::AbstractString, w::VecNum)
     ep_add_tail_view!(epc::AbstractDict, tvs::AbstractVector,
                       tail_views::RelativisticValueatRiskView, alg, X::MatNum,
-                      terms::NamedTuple, eqn::AbstractString, w::VecNum)
+                      terms::TailViewTerms, eqn::AbstractString, w::VecNum)
 
 Lower one resolved tail view into the constraints that its measure and its formulation need.
 
@@ -1188,7 +1224,7 @@ Every measure accepts a view over several assets. Each method normalises the vie
 """
 function ep_add_tail_view!(epc::AbstractDict, tvs::AbstractVector,
                            tail_views::ConditionalValueatRiskView, alg, X::MatNum,
-                           terms::NamedTuple, eqn::AbstractString, w::VecNum)
+                           terms::TailViewTerms, eqn::AbstractString, w::VecNum)
     alpha = tail_views.alpha
     nt = ep_normalise_tail_view(terms, X, w, eqn, "CVaR"; worst = true)
     if isnothing(nt)
@@ -1203,7 +1239,7 @@ function ep_add_tail_view!(epc::AbstractDict, tvs::AbstractVector,
 end
 function ep_add_tail_view!(epc::AbstractDict, tvs::AbstractVector,
                            tail_views::EntropicValueatRiskView, alg, X::MatNum,
-                           terms::NamedTuple, eqn::AbstractString, w::VecNum)
+                           terms::TailViewTerms, eqn::AbstractString, w::VecNum)
     (; alpha, args, kwargs, zlo_frac) = tail_views
     nt = ep_normalise_tail_view(terms, X, w, eqn, "EVaR")
     if isnothing(nt)
@@ -1224,7 +1260,7 @@ function ep_add_tail_view!(epc::AbstractDict, tvs::AbstractVector,
 end
 function ep_add_tail_view!(epc::AbstractDict, tvs::AbstractVector,
                            tail_views::RelativisticValueatRiskView, alg, X::MatNum,
-                           terms::NamedTuple, eqn::AbstractString, w::VecNum)
+                           terms::TailViewTerms, eqn::AbstractString, w::VecNum)
     (; alpha, kappa, args, kwargs, bracket) = tail_views
     nt = ep_normalise_tail_view(terms, X, w, eqn, "RLVaR")
     if isnothing(nt)

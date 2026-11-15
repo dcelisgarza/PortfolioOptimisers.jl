@@ -14,7 +14,7 @@ and pools a probability vector over the scenarios that fit produced.
 Every one of them built its probability vector over the rows of the matrix it was **handed**, and
 [ADR 0114](0114-the-asset-panel-travels-as-the-third-positional-argument-of-the-returns-matrix-prior-method.md)
 left that as the second, untaken decision of the composition contract.
-[`CrossSectionalFactorPrior`](../../src/10_Prior/11_CrossSectionalFactorPrior.jl) answers on fewer
+[`CrossSectionalFactorPrior`](../../src/10_Prior/11_CrossSectionalFactorPrior_a.jl) answers on fewer
 rows than it is given: it drops the observations its Descriptors warm up over, and the observations
 its exposure lag consumes. Its scenarios are the window the fit is defined on, and that is by
 design.

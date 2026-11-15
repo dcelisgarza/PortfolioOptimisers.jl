@@ -666,3 +666,141 @@ function ep_jump_views!(model::JuMP.Model, x, obj_expr, epc::AbstractDict, tvs::
     end
     return nothing
 end
+"""
+$(DocStringExtensions.TYPEDEF)
+
+The sample entropic value at risk of a loss series and the dual variable that attains it.
+
+This type is an implementation detail and is not intended for direct use. [`ep_evar`](@ref) makes it. [`ep_evar_anchor`](@ref) reads it.
+
+# Fields
+
+$(DocStringExtensions.FIELDS)
+
+# Related
+
+  - [`ep_evar`](@ref)
+  - [`ep_evar_anchor`](@ref)
+"""
+@concrete struct EvarDualMinimum
+    """
+    `evar`: The sample entropic value at risk.
+    """
+    evar
+    """
+    `z`: The dual variable that attains it.
+    """
+    z
+end
+"""
+$(DocStringExtensions.TYPEDEF)
+
+The smallest value of the objective of the sample relativistic value at risk at one dual variable, and the shift that attains it.
+
+This type is an implementation detail and is not intended for direct use. [`ep_rlvar_shift`](@ref) makes it. [`ep_rlvar`](@ref) reads it.
+
+# Fields
+
+$(DocStringExtensions.FIELDS)
+
+# Related
+
+  - [`ep_rlvar_shift`](@ref)
+  - [`ep_rlvar`](@ref)
+"""
+@concrete struct RlvarShiftMinimum
+    """
+    `risk`: The smallest value of the objective over the shift.
+    """
+    risk
+    """
+    `t`: The shift that attains it.
+    """
+    t
+end
+"""
+$(DocStringExtensions.TYPEDEF)
+
+The sample relativistic value at risk of a loss series and the primal pair that attains it.
+
+This type is an implementation detail and is not intended for direct use. [`ep_rlvar`](@ref) makes it. [`ep_rlvar_anchor`](@ref) reads it.
+
+# Fields
+
+$(DocStringExtensions.FIELDS)
+
+# Related
+
+  - [`ep_rlvar`](@ref)
+  - [`ep_rlvar_anchor`](@ref)
+"""
+@concrete struct RlvarPrimalMinimum
+    """
+    `rlvar`: The sample relativistic value at risk.
+    """
+    rlvar
+    """
+    `t`: The shift that attains it.
+    """
+    t
+    """
+    `z`: The dual variable that attains it.
+    """
+    z
+end
+"""
+$(DocStringExtensions.TYPEDEF)
+
+The dual variable and the posterior probabilities at which the sample entropic value at risk meets the target of a view.
+
+This type is an implementation detail and is not intended for direct use. [`ep_evar_anchor`](@ref) makes it. The grid of an entropic value at risk view reads it.
+
+# Fields
+
+$(DocStringExtensions.FIELDS)
+
+# Related
+
+  - [`ep_evar_anchor`](@ref)
+  - [`EvarDualMinimum`](@ref)
+"""
+@concrete struct EvarAnchor
+    """
+    `z`: The dual variable of the posterior.
+    """
+    z
+    """
+    `w`: The posterior probabilities.
+    """
+    w
+end
+"""
+$(DocStringExtensions.TYPEDEF)
+
+The primal pair and the posterior probabilities at which the sample relativistic value at risk meets the target of a view.
+
+This type is an implementation detail and is not intended for direct use. [`ep_rlvar_anchor`](@ref) makes it. The grid of a relativistic value at risk view reads it.
+
+# Fields
+
+$(DocStringExtensions.FIELDS)
+
+# Related
+
+  - [`ep_rlvar_anchor`](@ref)
+  - [`RlvarPrimalMinimum`](@ref)
+"""
+@concrete struct RlvarAnchor
+    """
+    `t`: The shift of the posterior.
+    """
+    t
+    """
+    `z`: The dual variable of the posterior.
+    """
+    z
+    """
+    `w`: The posterior probabilities.
+    """
+    w
+end

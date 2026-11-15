@@ -840,7 +840,7 @@ function cross_sectional_observed_tensor(A::AbstractArray{<:Any, 3})
 end
 function cross_sectional_observed_rows(xe::AbstractObservedExposureEstimator,
                                        rd::ReturnsResult, n::Integer)::Array{<:Real, 3}
-    (; rdi, k) = cross_sectional_exposure_rows(xe, rd, n)
+    rdi, k = cross_sectional_exposure_rows(xe, rd, n)
     A = cross_sectional_observed_rows(xe, rdi, nothing)
     return k == n ? A : A[:, :, (k - n + 1):k]
 end

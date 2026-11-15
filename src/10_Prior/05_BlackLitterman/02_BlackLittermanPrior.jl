@@ -252,6 +252,41 @@ function assert_bl(views::Lc_BLV, sets::Option{<:UniverseSets},
     return nothing
 end
 """
+$(DocStringExtensions.TYPEDEF)
+
+The views of a Black-Litterman system, `tau` and the view uncertainty.
+
+This type is an implementation detail and is not intended for direct use. [`bl_preroll`](@ref) makes it. [`bl_posteriors`](@ref) and [`bl_view_block`](@ref) read it.
+
+# Fields
+
+$(DocStringExtensions.FIELDS)
+
+# Related
+
+  - [`bl_preroll`](@ref)
+  - [`bl_posteriors`](@ref)
+  - [`bl_view_block`](@ref)
+"""
+@concrete struct BlackLittermanViewSystem
+    """
+    `P`: The view matrix, `views × n`.
+    """
+    P
+    """
+    `Q`: The view returns, `views × 1`.
+    """
+    Q
+    """
+    `tau`: The value of `tau` that the system used.
+    """
+    tau
+    """
+    `omega`: The view uncertainty matrix, multiplied by `tau`.
+    """
+    omega
+end
+"""
 $(DocStringExtensions.TYPEDSIGNATURES)
 
 Assemble the views, `tau` and the view uncertainty that the Black-Litterman members share.
@@ -308,7 +343,7 @@ The returned `omega` includes ``\\tau``, so a caller passes it to [`vanilla_post
 
 # Returns
 
-  - `(; P, Q, tau, omega)`: A named tuple of:
+  - `blp::BlackLittermanViewSystem`: The views and their uncertainty:
 
       + `P::MatNum`: The view matrix, `views × n`.
       + `Q::VecNum`: The view returns, `views × 1`.
@@ -319,6 +354,7 @@ The returned `omega` includes ``\\tau``, so a caller passes it to [`vanilla_post
 
 # Related
 
+  - [`BlackLittermanViewSystem`](@ref)
   - [`BlackLittermanPrior`](@ref)
   - [`black_litterman_views`](@ref)
   - [`calc_omega`](@ref)
@@ -365,7 +401,7 @@ function bl_preroll(views, sets, views_conf, prior_sigma, pe_tau, T, datatype, s
     tau = isnothing(pe_tau) ? inv(T) : pe_tau
     views_conf = remove_excl_views(views_conf, excl)
     omega = tau * calc_omega(views_conf, P, prior_sigma)
-    return (; P, Q, tau, omega)
+    return BlackLittermanViewSystem(P, Q, tau, omega)
 end
 """
     announce_bl_departures(ni::VecStr, ledger::VecStr, viewless::Bool) -> Nothing
@@ -426,7 +462,7 @@ function announce_bl_departures(ni::VecStr, ledger::VecStr, viewless::Bool)::Not
 end
 """
     bl_posteriors(::Nothing, prior_mu::VecNum, prior_sigma::MatNum) -> Tuple
-    bl_posteriors(blp::NamedTuple, prior_mu::VecNum, prior_sigma::MatNum) -> Tuple
+    bl_posteriors(blp::BlackLittermanViewSystem, prior_mu::VecNum, prior_sigma::MatNum) -> Tuple
 
 Run the master equations, or return the prior pair when no view is left.
 
@@ -438,7 +474,7 @@ The function returns the prior pair, not the result of the master equations with
 
 The function copies the covariance. Each caller passes the result to [`matrix_processing!`](@ref), which writes in place, and the function must not change a prior result that a caller still holds.
 
-The two methods split by dispatch. The result of [`bl_preroll`](@ref) is `nothing` or one concrete `NamedTuple`, so the compiler splits that small union at the call.
+The two methods split by dispatch. The result of [`bl_preroll`](@ref) is `nothing` or one concrete [`BlackLittermanViewSystem`](@ref), so the compiler splits that small union at the call.
 
 # Arguments
 
@@ -459,12 +495,12 @@ The two methods split by dispatch. The result of [`bl_preroll`](@ref) is `nothin
 function bl_posteriors(::Nothing, prior_mu::VecNum, prior_sigma::MatNum)
     return prior_mu, copy(prior_sigma)
 end
-function bl_posteriors(blp::NamedTuple, prior_mu::VecNum, prior_sigma::MatNum)
+function bl_posteriors(blp::BlackLittermanViewSystem, prior_mu::VecNum, prior_sigma::MatNum)
     return vanilla_posteriors(blp.tau, prior_mu, prior_sigma, blp.omega, blp.P, blp.Q)
 end
 """
     bl_view_block(::Nothing, n::Integer, datatype::DataType) -> Tuple
-    bl_view_block(blp::NamedTuple, ::Integer, ::DataType) -> Tuple
+    bl_view_block(blp::BlackLittermanViewSystem, ::Integer, ::DataType) -> Tuple
 
 Return the `P`, `Q` and `omega` of a view system, or a block with no row when the system has no view left.
 
@@ -495,7 +531,7 @@ function bl_view_block(::Nothing, n::Integer, datatype::DataType)
     return Matrix{datatype}(undef, 0, n), Vector{datatype}(undef, 0),
            LinearAlgebra.Diagonal(Vector{datatype}(undef, 0))
 end
-function bl_view_block(blp::NamedTuple, ::Integer, ::DataType)
+function bl_view_block(blp::BlackLittermanViewSystem, ::Integer, ::DataType)
     return blp.P, blp.Q, blp.omega
 end
 """

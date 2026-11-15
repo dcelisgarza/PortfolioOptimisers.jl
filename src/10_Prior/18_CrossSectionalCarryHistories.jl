@@ -62,11 +62,38 @@ function cross_sectional_fold_append(a::CrossSectionalRegression,
                                     dc = cross_sectional_fold_append(a.dc, b.dc))
 end
 """
-    cross_sectional_fold_join(Ms, obs, b::AbstractArray, bo::Nothing) -> NamedTuple
+$(DocStringExtensions.TYPEDEF)
+
+The exposure history of the estimated factors and the observed factors, after a block joined them.
+
+This type is an implementation detail and is not intended for direct use. [`cross_sectional_fold_join`](@ref) and [`cross_sectional_fold_split`](@ref) make it. [`cross_sectional_fold_histories`](@ref) reads it.
+
+# Fields
+
+$(DocStringExtensions.FIELDS)
+
+# Related
+
+  - [`cross_sectional_fold_join`](@ref)
+  - [`cross_sectional_fold_split`](@ref)
+  - [`cross_sectional_fold_histories`](@ref)
+"""
+@concrete struct FoldHistories
+    """
+    `Ms`: The exposure history of the estimated factors.
+    """
+    Ms
+    """
+    `obs`: The observed factors of the history, an [`ObservedStack`](@ref), or `nothing`.
+    """
+    obs
+end
+"""
+    cross_sectional_fold_join(Ms, obs, b::AbstractArray, bo::Nothing) -> FoldHistories
     cross_sectional_fold_join(Ms::Nothing, obs::Nothing, b::AbstractArray{<:Any, 3},
-                              bo::ObservedStack) -> NamedTuple
+                              bo::ObservedStack) -> FoldHistories
     cross_sectional_fold_join(Ms::AbstractArray{<:Any, 3}, obs::ObservedStack,
-                              b::AbstractArray{<:Any, 3}, bo::ObservedStack) -> NamedTuple
+                              b::AbstractArray{<:Any, 3}, bo::ObservedStack) -> FoldHistories
 
 Appends the rows of a block to the exposure history and to the observed factors that the carry fold of a Cross-Sectional Factor Prior carries.
 
@@ -81,16 +108,17 @@ The call with no data reads the exposure history with the observed exposures aft
 
 # Returns
 
-  - `h::NamedTuple`: `(; Ms, obs)`, the two histories followed by the rows of the block.
+  - `h::FoldHistories`: The two histories followed by the rows of the block.
 
 # Related
 
+  - [`FoldHistories`](@ref)
   - [`cross_sectional_fold_append`](@ref)
   - [`cross_sectional_joined_exposures`](@ref)
   - [`cross_sectional_fold_histories`](@ref)
 """
 function cross_sectional_fold_join(Ms, obs, b::AbstractArray, ::Nothing)
-    return (; Ms = cross_sectional_fold_append(Ms, b), obs = obs)
+    return FoldHistories(cross_sectional_fold_append(Ms, b), obs)
 end
 function cross_sectional_fold_join(::Nothing, ::Nothing, b::AbstractArray{<:Any, 3},
                                    bo::ObservedStack)
@@ -119,18 +147,20 @@ Both histories are views of the backing of `J` with a `Base.OneTo` index on the 
 
 # Returns
 
-  - `h::NamedTuple`: `(; Ms, obs)`, as [`cross_sectional_fold_join`](@ref) states it.
+  - `h::FoldHistories`: The two histories, as [`cross_sectional_fold_join`](@ref) states it.
 
 # Related
 
+  - [`FoldHistories`](@ref)
   - [`cross_sectional_fold_join`](@ref)
 """
 function cross_sectional_fold_split(J::AbstractArray{<:Any, 3}, K::Integer,
                                     R::AbstractMatrix, o::ObservedStack)
     P = parent(J)
     k = Base.OneTo(size(J, 3))
-    return (; Ms = view(P, :, 1:K, k),
-            obs = rebuild_struct(o, (; Z = view(P, :, (K + 1):size(P, 2), k), R = R)))
+    return FoldHistories(view(P, :, 1:K, k),
+                         rebuild_struct(o,
+                                        (; Z = view(P, :, (K + 1):size(P, 2), k), R = R)))
 end
 """
     cross_sectional_spare_backing(a::AbstractArray, T::Type, k::Integer)
@@ -356,6 +386,33 @@ function cross_sectional_rebase_family(fcb::FactorFamilyBasis, j::Integer, d::In
     return R[:, axes(R, 2) .!= d] ./ rho
 end
 """
+$(DocStringExtensions.TYPEDEF)
+
+The factors that are not empty in each of the two regression passes of the carry fold of a Cross-Sectional Factor Prior.
+
+This type is an implementation detail and is not intended for direct use. [`cross_sectional_move_marks`](@ref) and [`cross_sectional_move_row_marks`](@ref) make it. [`cross_sectional_rebase_state`](@ref) reads it.
+
+# Fields
+
+$(DocStringExtensions.FIELDS)
+
+# Related
+
+  - [`cross_sectional_move_marks`](@ref)
+  - [`cross_sectional_move_row_marks`](@ref)
+  - [`cross_sectional_rebase_state`](@ref)
+"""
+@concrete struct FactorMarks
+    """
+    `lv1`: The marks of the first pass.
+    """
+    lv1
+    """
+    `lv`: The marks of the last pass.
+    """
+    lv
+end
+"""
 $(DocStringExtensions.TYPEDSIGNATURES)
 
 Marks the factors that are not empty in each regression pass of the carry fold of a Cross-Sectional Factor Prior, under a basis whose dropped members moved.
@@ -370,10 +427,11 @@ A factor outside a Factor Family that moved keeps its column of the design, so i
 
 # Returns
 
-  - `marks::NamedTuple`: `lv1` and `lv`, the marks of the two passes on the new reduced axis.
+  - `marks::FactorMarks`: The marks of the two passes on the new reduced axis.
 
 # Related
 
+  - [`FactorMarks`](@ref)
   - [`cross_sectional_fold_move`](@ref)
   - [`cross_sectional_move_row_marks`](@ref)
   - [`cross_sectional_live_factors`](@ref)
@@ -400,7 +458,7 @@ function cross_sectional_move_marks(pe::CrossSectionalFactorPrior,
         lv1[mv] .|= r.lv1[mv]
         lv[mv] .|= r.lv[mv]
     end
-    return (; lv1 = lv1, lv = lv)
+    return FactorMarks(lv1, lv)
 end
 """
 $(DocStringExtensions.TYPEDSIGNATURES)
@@ -418,10 +476,11 @@ The function runs the steps of [`cross_sectional_fold_regression`](@ref) that th
 
 # Returns
 
-  - `marks::NamedTuple`: `lv1` and `lv`, the marks of the observation in the two passes.
+  - `marks::FactorMarks`: The marks of the observation in the two passes.
 
 # Related
 
+  - [`FactorMarks`](@ref)
   - [`cross_sectional_move_marks`](@ref)
   - [`cross_sectional_live_factors`](@ref)
 """
@@ -440,8 +499,8 @@ function cross_sectional_move_row_marks(pe::CrossSectionalFactorPrior,
     W = st.W[s:s, :]
     Z1 = unseen_member_design(pe.unseen, sl, B, Zl, W1).Z
     Z = unseen_member_design(pe.unseen, sl, B, Zl, W).Z
-    return (; lv1 = cross_sectional_live_factors(Z1, Xr, W1),
-            lv = cross_sectional_live_factors(Z, Xr, W))
+    return FactorMarks(cross_sectional_live_factors(Z1, Xr, W1),
+                       cross_sectional_live_factors(Z, Xr, W))
 end
 """
 $(DocStringExtensions.TYPEDSIGNATURES)
@@ -801,6 +860,7 @@ Appends the observed factors to the fitted factors of the carry fold of a Cross-
 
 # Returns
 
+  - `(r, ca)::Tuple`:
   - `r::UnitRange`: The fitted observations among the observations after the warm-up.
   - `ca::AppendedFactorModel`: The answer of [`cross_sectional_observed_append`](@ref).
 
@@ -816,5 +876,5 @@ function cross_sectional_carry_append(pe::CrossSectionalFactorPrior,
     cb = cross_sectional_observed_block(st.obs, 1:Tf, r, buffer_fit_count(st.buf) - Tf)
     ca = cross_sectional_observed_append(cb, st.csr.f, view(st.Z, :, :, size(st.Z, 3)),
                                          view(st.Ms, :, :, r), st.nf, st.fam, st.fcb)
-    return (; r = r, ca = ca)
+    return r, ca
 end

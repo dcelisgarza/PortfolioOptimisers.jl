@@ -242,8 +242,47 @@ function cross_sectional_context(ctx)
     return cs::NamedTuple
 end
 """
+$(DocStringExtensions.TYPEDEF)
+
+The moments of the estimated factors that a Spanned Shrinkage rule reads, with the factor covariance in its whitened form.
+
+This type is an implementation detail and is not intended for direct use. [`spanned_shrinkage_moments`](@ref) makes it. [`PrecisionBlend`](@ref) and [`SteinShrinkage`](@ref) read it.
+
+# Fields
+
+$(DocStringExtensions.FIELDS)
+
+# Related
+
+  - [`spanned_shrinkage_moments`](@ref)
+  - [`PrecisionBlend`](@ref)
+  - [`SteinShrinkage`](@ref)
+"""
+@concrete struct SpannedFactorMoments
+    """
+    `mu`: The factor mean of the kept estimated factors.
+    """
+    mu
+    """
+    `G`: The rows of the spanned coefficients at the kept estimated factors.
+    """
+    G
+    """
+    `W`: The whitening matrix, `kept estimated factors × K`.
+    """
+    W
+    """
+    `ev`: The kept eigenvalues.
+    """
+    ev
+    """
+    `K`: Number of kept eigenvalues.
+    """
+    K
+end
+"""
     spanned_shrinkage_moments(pr::AbstractPriorResult, cs::NamedTuple, G::AbstractMatrix)
-        -> NamedTuple
+        -> SpannedFactorMoments
 
 Return the factor mean, the spanned coefficients and the factor covariance in the form that a Spanned Shrinkage rule reads.
 
@@ -275,14 +314,11 @@ Where:
 
 # Returns
 
-  - `mu::VecNum`: The factor mean of the kept estimated factors.
-  - `G::AbstractMatrix`: The rows of the spanned coefficients at the kept estimated factors.
-  - `W::MatNum`: The whitening matrix, `kept estimated factors × K`.
-  - `ev::VecNum`: The kept eigenvalues.
-  - `K::Int`: Number of kept eigenvalues.
+  - `m::SpannedFactorMoments`: The factor mean of the kept estimated factors, the rows of the spanned coefficients at them, the whitening matrix, the kept eigenvalues, and their number `K`.
 
 # Related
 
+  - [`SpannedFactorMoments`](@ref)
   - [`PrecisionBlend`](@ref)
   - [`SteinShrinkage`](@ref)
   - [`spanned_forecast_sample`](@ref)
@@ -297,8 +333,8 @@ function spanned_shrinkage_moments(pr::AbstractPriorResult, cs::NamedTuple,
     lmax = maximum(E.values)
     keep = E.values .> sqrt(eps(eltype(E.values))) * lmax
     ev = E.values[keep]
-    return (; mu = pr.mu[rk], G = G[rk, :], W = E.vectors[:, keep] ./ transpose(sqrt.(ev)),
-            ev = ev, K = count(keep))
+    return SpannedFactorMoments(pr.mu[rk], G[rk, :],
+                                E.vectors[:, keep] ./ transpose(sqrt.(ev)), ev, count(keep))
 end
 """
 $(DocStringExtensions.TYPEDEF)
@@ -944,7 +980,41 @@ function reads_forecast_history(::ForecastCalibrationSlope)
     return true
 end
 """
-    orthogonal_forecast_pairs(cs::NamedTuple) -> NamedTuple
+$(DocStringExtensions.TYPEDEF)
+
+The pairs of the orthogonal part of each forecast row and the idiosyncratic return of the next row, pooled over the rows.
+
+This type is an implementation detail and is not intended for direct use. [`orthogonal_forecast_pairs`](@ref) makes it. [`ForecastCalibrationSlope`](@ref) reads it.
+
+# Fields
+
+$(DocStringExtensions.FIELDS)
+
+# Related
+
+  - [`orthogonal_forecast_pairs`](@ref)
+  - [`ForecastCalibrationSlope`](@ref)
+"""
+@concrete struct OrthogonalForecastPairs
+    """
+    `a`: The orthogonal forecast of each pair.
+    """
+    a
+    """
+    `b`: The idiosyncratic return of each pair, at the next row.
+    """
+    b
+    """
+    `q`: The weight of each pair.
+    """
+    q
+    """
+    `n`: Number of rows that give at least one pair.
+    """
+    n
+end
+"""
+    orthogonal_forecast_pairs(cs::NamedTuple) -> OrthogonalForecastPairs
 
 Pool the pairs of the orthogonal part of each forecast row and the idiosyncratic return of the next row.
 
@@ -965,13 +1035,11 @@ Pool the pairs of the orthogonal part of each forecast row and the idiosyncratic
 
 # Returns
 
-  - `a::VecNum`: The orthogonal forecast of each pair.
-  - `b::VecNum`: The idiosyncratic return of each pair, at the next row.
-  - `q::VecNum`: The weight of each pair.
-  - `n::Int`: Number of rows that give at least one pair.
+  - `p::OrthogonalForecastPairs`: The orthogonal forecast `a` of each pair, the idiosyncratic return `b` of each pair at the next row, the weight `q` of each pair, and the number `n` of rows that give at least one pair.
 
 # Related
 
+  - [`OrthogonalForecastPairs`](@ref)
   - [`ForecastCalibrationSlope`](@ref)
   - [`cross_sectional_split_history`](@ref)
   - [`forecast_calibration_pairs`](@ref)
@@ -985,7 +1053,7 @@ function orthogonal_forecast_pairs(cs::NamedTuple)
     dates = 1:(size(ap, 1) - 1)
     a, b, q = forecast_calibration_pairs(ap, Y, rw, dates)
     n = count(t -> any(i -> isfinite(ap[t, i]) && isfinite(Y[t, i]), axes(ap, 2)), dates)
-    return (; a = a, b = b, q = q, n = n)
+    return OrthogonalForecastPairs(a, b, q, n)
 end
 """
     forecast_calibration_slope_se(a::AbstractVector{<:Real}, b::AbstractVector{<:Real},
