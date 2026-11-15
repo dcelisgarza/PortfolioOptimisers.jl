@@ -601,7 +601,11 @@ keep it:
 - **The function only inserts a field to dispatch on it, or picks an arity by type.** The
   callers pass the field, or the owner takes the method for the type.
 - **Several methods share one body.** Write one method on the abstract type, or on the `Union`
-  of a mixed family.
+  of a mixed family. A `Union` joins the methods of one file, or of the parts `_a` and `_b` of a
+  split file. Across files, each type keeps its method beside its definition: a `Union` in a
+  late file takes the method away from each type, and a new member then edits a far file. The
+  review of #2072 ruled this on 2026-11-15: the nine methods
+  `obs_weights_view(x, i) = obs_weights_fields(x, i)` stay beside their nine types.
 
 **One owner, one name, even at the cost of a second copy.** A helper that holds part of the job
 of a function for several forms of input is a second name for that job. Give each form to the
@@ -688,13 +692,16 @@ and every addition:
 3. **An interface method is not a wrapper** when two or more methods share its callee, or when
    its callee is the constructor of a type. `reader_frames(x::T, path, ::Bool) =
    source_frames(x.x_src, path, true)` is the case. When the method is the only caller of its
-   callee, the body of the callee moves into the method. A private function with one method that
-   only builds a type is not an interface method. It is a second name for the constructor, and
-   it holds a form that the constructor can hold. The form goes to the constructor as a method,
-   and the function goes. #2112 is the case: `resolved_constraint_block(cbe, pr, rd, vals)` read
-   the slots of a block that stage 2 does not resolve. It became
-   `ResolvedConstraintBlock(cbe::ConstraintBlock; pr, rd, …)`, with a required keyword for each
-   resolved value, as `FiniteAllocationInput(res; prices, …)` takes the fields of a result.
+   callee, the body of the callee moves into the method. A private method that only builds a
+   type is not an interface method, whatever the number of methods of its function. It is a
+   second name for the constructor, and it holds a form that the constructor can hold. The form
+   goes to the constructor as a method, and the method goes. #2112 is the case:
+   `resolved_constraint_block(cbe, pr, rd, vals)` read the slots of a block that stage 2 does
+   not resolve. It became `ResolvedConstraintBlock(cbe::ConstraintBlock; pr, rd, …)`, with a
+   required keyword for each resolved value, as `FiniteAllocationInput(res; prices, …)` takes
+   the fields of a result. The review of #2072 (2026-11-15) applies the rule to the two methods
+   of `returns_universe_axes`, which each build `UniverseAxes`, and to the method of
+   `fold_context` that builds `TimeDependentContext`.
 4. **A template hook is not a second name.** A hook that the `# Interfaces` section names, and
    that does one step of a driver, is part of the driver: `_optimise` under `optimise`, as
    `__solve` under `solve` in SciML. A method of the verb that goes around the driver is a

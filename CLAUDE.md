@@ -6,6 +6,11 @@ name.
 
 ## Orientation
 
+- **The standing test picks every design**: the form that improves the code most by
+  architecture, maintenance, ergonomics and Julia idiom, with no loss of performance. Make the
+  better change even when it breaks an interface or replaces a past choice, and name the break in
+  `docs/src/migration.md`. `.github/instructions/julia-source-code.instructions.md`
+  § *A design is chosen by the standing test* owns the rule.
 - **`CODING_STANDARDS.md` is the map.** It routes a subject, such as a docstring, an `export`, a
   constructor or a test, to the file that owns the rule and to the check that fails when the rule
   breaks. It carries no rules of its own. `/improve-standards` audits it.
