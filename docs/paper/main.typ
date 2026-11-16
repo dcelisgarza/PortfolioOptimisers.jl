@@ -150,7 +150,7 @@ There also exist myriad optimisation methods, pre-filtering, distribution and mo
 
 #figure(
   // placement: auto,
-  caption: [Concrete estimator and algorithm types per family, counted from the library's own type tree; the Result types they return are not counted. The 20 optimisers are 6 naïve, 5 #jump based, 4 clustering, 2 ensemble, 2 finite allocators, and 1 hindsight comparator. One of the naïve optimisers holds any of the 22 online portfolio selection rules, and 24 named constructors fix a rule to its published form. Composition multiplies them: any covariance estimator feeds any distance, any distance feeds any clustering or network algorithm, and any of those feeds any optimiser that asks for one.],
+  caption: [Concrete estimator and algorithm types per family, counted from the library's own type tree; the Result types they return are not counted. The 20 optimisers are 6 naïve, 5 #jump based, 4 clustering, 2 ensemble, 2 finite allocators, and 1 hindsight comparator. One of the naïve optimisers holds any of the 21 online portfolio selection rules, and 24 named constructors fix a rule to its published form. Composition multiplies them: any covariance estimator feeds any distance, any distance feeds any clustering or network algorithm, and any of those feeds any optimiser that asks for one.],
   table(
     columns: (0.5fr, 0.2fr, 2.3fr),
     align: (left + top, center + top, left + top),
@@ -178,7 +178,7 @@ There also exist myriad optimisation methods, pre-filtering, distribution and mo
     [Weight bounds, three budget forms, linear equations, thresholds, risk budgets, factor exposure, two phylogeny forms, centrality, fees, turnover, two allocation sets of an online rule, and L2 or Lp weight penalties. Custom constraints and objectives are an abstract type to subtype, so they are not counted],
     [Optimisers], [20],
     [Equal weighted, inverse volatility, online portfolio selection, best constant rebalanced portfolio, mean risk, near optimal centering, risk budgeting, HRP, HERC, Schur, nested clustering, stacking, discrete allocation],
-    [Online portfolio selection rules], [22],
+    [Online portfolio selection rules], [21],
     [Buy and hold, constant rebalancing, mirror descent, Newton step, passive aggressive and confidence weighted mean reversion, pattern matching, expert mixtures],
     [Cross-validation and tuning], [8],
     [K-fold, combinatorial, walk-forward by index or by date, hindsight split, multiple randomised, grid and randomised search. Every sequential scheme can also step online],
@@ -451,7 +451,7 @@ There are several planned features that have not yet been implemented. These inc
 
 = High standards of quality in the age of AI
 
-The library has an extensive and growing test suite that as of now has 98% #coverage. It has a fully documented public and private #api, very comprehensive #examples and #user_guide, and an entire toolchain dedicated to automatically finding and reporting regressions, type instabilities, missing documentation, code smells, and other potential issues that unequivocally improve code quality and maintainability as the library evolves. These tools are run both when code is committed---serving as a measure of immediate quality control---but also as part of weekly continuous integration checks which serve to improve the overall code quality and maintainability of the existing codebase. These tools are deterministic in their reporting, so they do not require an AI to interpret, analyse or fix their findings, however we have found frontier models to be particularly good at fixing these measurable, interpretable results.
+The library has an extensive and growing test suite that as of now has 99% #coverage. It has a fully documented public and private #api, very comprehensive #examples and #user_guide, and an entire toolchain dedicated to automatically finding and reporting regressions, type instabilities, missing documentation, code smells, and other potential issues that unequivocally improve code quality and maintainability as the library evolves. These tools are run both when code is committed---serving as a measure of immediate quality control---but also as part of weekly continuous integration checks which serve to improve the overall code quality and maintainability of the existing codebase. These tools are deterministic in their reporting, so they do not require an AI to interpret, analyse or fix their findings, however we have found frontier models to be particularly good at fixing these measurable, interpretable results.
 
 Even before AI tools became as prevalent and---for frontier models---unambiguously beneficial as they are today, the library defined high standards of quality. These have been greatly expanded and reinforced with automated checks and continuous integration, ensuring that both human and AI contributions maintain the library's high standards. There are also entire workflows that use AI tools to assist in code review; improve testing and documentation; add new features; find and fix bugs; improve the user experience by simplifying interfaces, improving logging and error messages; and overall doing the menial and boring maintenance refactors that unlock new possibilities and fix latent issues before they manifest.
 

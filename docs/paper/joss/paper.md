@@ -85,8 +85,9 @@ are hard to add to a design that assumes a fixed, complete panel of returns.
 
 # Software design
 
-Every type in the library, with the exception of the covariance estimators defined in StatsBase.jl,
-is a subtype of one of three types. An `AbstractEstimator` contains all the parameters needed to
+Every public type in the library is a subtype of one of three types. The exceptions are the
+covariance estimators, which subtype the covariance estimator of StatsBase.jl, one distance, which
+subtypes a metric of Distances.jl, and the error types. An `AbstractEstimator` contains all the parameters needed to
 estimate a particular quantity. An `AbstractResult` holds the quantities that an estimation
 returns: estimators are configuration, results are data. An `AbstractAlgorithm` modifies the
 behaviour of an estimator via multiple dispatch. The design rests on four pillars: well-defined
@@ -112,7 +113,7 @@ At the time of writing, the library counts 57 risk measures, 22 covariance and c
 estimators, 13 priors, including Black-Litterman variants [@blacklitterman1992] and entropy
 pooling [@meucci2008], 20 optimisers, from mean risk with conditional value at risk
 [@rockafellar2000] and distributionally robust measures [@drcvar] to hierarchical risk parity
-[@hrp2016], 22 online portfolio selection rules [@lihoi2014], and eight cross-validation and
+[@hrp2016], 21 online portfolio selection rules [@lihoi2014], and eight cross-validation and
 tuning schemes, including combinatorial splits [@lopezdepradobook].
 
 Real universes change. Assets list late, delist, and are suspended. PortfolioOptimisers.jl never
@@ -128,8 +129,8 @@ DRAFT: new text. Add the evidence that you have: downloads from the Julia packag
 GitHub stars, citations, talks, and users outside your own projects. Do not claim a number
 that you cannot show.
 -->
-PortfolioOptimisers.jl is registered in the Julia General registry under the MIT licence. Its
-test suite covers 98% of the lines. Its public and private API are documented, and its examples
+PortfolioOptimisers.jl is registered in the Julia General registry under the EUPL-1.2 licence.
+Its test suite covers 99% of the lines. Its public and private API are documented, and its examples
 cover the foundations, the moments and priors, the optimisers, the constraints and costs, the
 validation and tuning, and the post-processing, each executed by the documentation build. A
 toolchain of deterministic checks finds regressions, type instabilities, missing documentation
@@ -144,9 +145,9 @@ DRAFT: new text. Check every fact below. JOSS asks for the tools and their versi
 were used, and a confirmation that humans reviewed the output and made the core design decisions.
 -->
 Generative AI tools were used to write code, tests, documentation and reviews of this library,
-and to draft this paper. Since September 2025, 360 of the 447 commits of the repository carry a
-co-author trailer for Claude Opus 5.5 (Anthropic), used through Claude Code. One commit carries
-Claude Sonnet 5.5 and one carries GitHub Copilot. The tools were used for new features, bug
+and to draft this paper. A commit made with one of these tools carries a co-author trailer that
+names it: Claude Opus 5.5 or Claude Sonnet 5.5 (Anthropic), used through Claude Code, or GitHub
+Copilot. The tools were used for new features, bug
 fixes, tests, documentation, code review, and maintenance refactors.
 
 The author made the core design decisions. The architecture, the type hierarchy and each design

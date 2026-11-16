@@ -99,7 +99,7 @@ julia> PortfolioOptimisers.predict_outer_returns(nothing,
   - [`fold_weight_matrix`](@ref)
   - [`predict_outer_returns`](@ref)
 """
-abstract type SubPortfolioUniverse end
+abstract type SubPortfolioUniverse <: AbstractAlgorithm end
 """
 $(DocStringExtensions.TYPEDEF)
 

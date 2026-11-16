@@ -147,7 +147,7 @@ $(DocStringExtensions.FIELDS)
   - [`Online`](@ref)
   - [`TimeDependent`](@ref)
 """
-@concrete struct Resume
+@concrete struct Resume <: AbstractResult
     """
     The Result of the online run to continue, carrying the threaded estimator in `opt`.
     """

@@ -185,7 +185,18 @@ const NOT_A_CHOICE = Dict{Symbol, Symbol}(
                                           # the carried state of the Descriptor at each step
                                           # (#1583). The capability is the Descriptor, and a
                                           # caller never holds the carried values.
-                                          :CarriedDescriptor => :internal)
+                                          :CarriedDescriptor => :internal,
+                                          # The two point measures that `range_tails`
+                                          # returns for a range that decomposes. The
+                                          # capability is the range risk measure, and its
+                                          # constraint builder reads the tails.
+                                          :RangeTails => :internal,
+                                          # The sub-portfolio enumerations that `Stacking`
+                                          # and `NestedClustered` pass to the module that
+                                          # they share (ADR 0066). The capability is the
+                                          # meta-optimiser, and a caller never holds one.
+                                          :FullUniverse => :internal,
+                                          :ClusterUniverse => :internal)
 
 """
     CATALOGUE

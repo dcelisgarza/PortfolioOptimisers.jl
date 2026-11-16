@@ -52,7 +52,7 @@ CarriedPrice()
   - [`PriceGapFillResult`](@ref)
   - [`Num_VecToScaM`](@ref)
 """
-struct CarriedPrice end
+struct CarriedPrice <: AbstractAlgorithm end
 """
 $(DocStringExtensions.TYPEDEF)
 

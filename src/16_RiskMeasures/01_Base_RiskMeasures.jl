@@ -787,7 +787,7 @@ Stacktrace:
   - [`RiskMeasureSettings`](@ref)
   - [`GenericValueatRiskRange`](@ref)
 """
-@concrete struct RangeTails
+@concrete struct RangeTails <: AbstractEstimator
     """
     The point measure of the losses, at the first level of the range.
     """
@@ -805,7 +805,6 @@ end
 function RangeTails(; loss::RiskMeasure, gain::RiskMeasure)::RangeTails
     return RangeTails(loss, gain)
 end
-@define_pretty_show(RangeTails)
 """
     const VecRM = AbstractVector{<:RiskMeasure}
 

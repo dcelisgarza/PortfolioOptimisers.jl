@@ -21,7 +21,7 @@ Arguments correspond to the struct's fields, in the order they are declared. The
   - [`FactorAttributionResult`](@ref)
   - [`factor_attribution`](@ref)
 """
-@concrete struct AttributionComponent
+@concrete struct AttributionComponent <: AbstractResult
     """
     Volatility of the component's own return series. It is `NaN` on the predicted side of the unattributed remainder, which is a gap between two moments and carries no series.
     """
@@ -72,7 +72,7 @@ Arguments correspond to the struct's fields, in the order they are declared. The
   - [`FactorAttributionResult`](@ref)
   - [`factor_attribution`](@ref)
 """
-@concrete struct AttributionBreakdown
+@concrete struct AttributionBreakdown <: AbstractResult
     """
     Label of each row, or `nothing`. It is `nothing` on the factor axis and the sorted unique family labels on the family axis.
     """
@@ -143,7 +143,7 @@ Arguments correspond to the struct's fields, in the order they are declared, and
   - [`FactorAttributionResult`](@ref)
   - [`factor_attribution`](@ref)
 """
-@concrete struct AssetAttributionBreakdown
+@concrete struct AssetAttributionBreakdown <: AbstractResult
     """
     Weight of each asset. It is the weight vector on the predicted side and under a constant weight, and the mean of the weight history otherwise.
     """
@@ -223,7 +223,7 @@ Arguments correspond to the struct's fields, in the order they are declared. The
   - [`FactorAttributionResult`](@ref)
   - [`factor_attribution`](@ref)
 """
-@concrete struct AssetFactorContribution
+@concrete struct AssetFactorContribution <: AbstractResult
     """
     Contribution to the portfolio volatility, `assets × factors`.
     """
