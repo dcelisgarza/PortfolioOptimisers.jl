@@ -172,10 +172,14 @@ end
         fapv = PortfolioOptimisers.fit_and_predict(res, rd, nothing,
                                                    [collect(61:80), collect(81:100)])
         @test fapv[2].rd.X ≈ preds[2].rd.X
-        # It passes every keyword to `predict`, which refuses a wrong one (#2066).
-        @test_throws MethodError PortfolioOptimisers.fit_and_predict(res, rd, nothing,
-                                                                     collect(61:100);
-                                                                     w_previous = nothing)
+        # It passes every keyword to `predict`, which refuses a wrong one (#2066). The
+        # message names `predict`, so the call reached it: a missing method of
+        # `fit_and_predict` would name `fit_and_predict`.
+        @test_throws r"no method matching predict\(" PortfolioOptimisers.fit_and_predict(res,
+                                                                                         rd,
+                                                                                         nothing,
+                                                                                         collect(61:100);
+                                                                                         w_previous = nothing)
     end
 
     @testset "predict at price level, on several windows and from a result" begin

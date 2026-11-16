@@ -621,10 +621,13 @@ assets is what keeps the JuMP families cheap.
             @test isapprox(warm.res.w, cold.res.w; atol = 1e-5)
             @test isapprox(warm.rd.X, cold.rd.X; atol = 1e-5)
             # The result form ignores the training window and predicts as `predict` does.
-            # It passes every keyword to `predict`, which refuses a wrong one (#2066).
+            # It passes every keyword to `predict`, which refuses a wrong one (#2066). The
+            # message names `predict`, so the call reached it: a missing method of
+            # `fit_and_predict` would name `fit_and_predict`.
             @test po.fit_and_predict(cold.res, rd, train, test).rd.X == cold.rd.X
-            @test_throws MethodError po.fit_and_predict(cold.res, rd, train, test;
-                                                        w_previous = nothing)
+            @test_throws r"no method matching predict\(" po.fit_and_predict(cold.res, rd,
+                                                                            train, test;
+                                                                            w_previous = nothing)
             # And with an asset view: the stepped estimator is sliced as the cold one is.
             cold = po.fit_and_predict(mr, rd, train, test, 2:6)
             warm = po.fit_and_predict(stepped, rd, nothing, test, 2:6)

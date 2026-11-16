@@ -55,9 +55,10 @@ sum of `SumScalariser`. With one member, every slot is inert, as before.**
 
 - **A breaking change.** The default of each field is `nothing` in place of `SumScalariser()`. A
   caller that reads the field, such as `opt.sca isa SumScalariser`, now reads `nothing`. The value
-  of every call is the same. `NearestQuantilePrediction`, `sort_by_measure`, `quantile_by_measure`
-  and `FoldRiskScorer` with a vector and `sca = nothing` now give the sum, where they threw an
-  `IsNothingError`. The migration guide names both.
+  of every call is the same. The migration guide names the change of the default.
+  `NearestQuantilePrediction`, `sort_by_measure`, `quantile_by_measure` and `FoldRiskScorer` with
+  a vector and `sca = nothing` now give the sum. The `IsNothingError` that #1997 and #1999 gave
+  them did not reach a release, so the guide does not name it.
 - **ADR 0231, ADR 0232, ADR 0233 and ADR 0234 change in place**, because none of them reached
   `main`. Each `nothing` that named the per-value form now names the singleton of #2001, and the
   rows that refused `nothing` with a vector are removed.
