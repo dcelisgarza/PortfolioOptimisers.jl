@@ -415,7 +415,7 @@ $(DocStringExtensions.FIELDS)
     ForecastICSummaryResult(spearman::ICSummaryResult, pearson::ICSummaryResult)
     ForecastICSummaryResult(; spearman::ICSummaryResult, pearson::ICSummaryResult)
 
-The types of the two arguments are the check, because each [`ICSummaryResult`](@ref) checks its own values. The keyword constructor takes each field by name, with no default, and calls the positional one.
+The keyword constructor checks the types of the two arguments, and each [`ICSummaryResult`](@ref) checks its own values. The keyword constructor takes each field by name, with no default, and calls the positional one.
 
 # Related
 

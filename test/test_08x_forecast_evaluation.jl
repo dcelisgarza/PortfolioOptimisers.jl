@@ -4325,14 +4325,31 @@ end
         cv0 = PO.forecast_summary_coverage(fe, nothing)
         @test all(f -> isequal(getfield(row.coverage, f), getfield(cv0, f)),
                   fieldnames(PO.CoverageFigures))
-        @test fs.spearman_mean_ic == row.ic.spearman.mean_ic
-        @test fs.pearson_hit_rate == row.ic.pearson.hit_rate
-        @test fs.rank_ann_return == row.rank.summary.ann_return
-        @test fs.zscore_mean_turnover == row.zscore.mean_turnover
-        @test fs.calibration_slope == row.calibration.slope
-        @test fs.n_bins == row.calibration.n_bins
-        @test fs.mean_coverage == row.coverage.mean_coverage
-        @test fs.n_silenced == row.coverage.n_silenced
+        # Each of the 39 columns against the field of the row that it reads, so two columns of
+        # one type that change places turn this red (R57 of #1817).
+        ic_fields = (:mean_ic, :std_ic, :ic_ir, :t_stat, :p_value, :mean_ci_lower,
+                     :mean_ci_upper, :hit_rate)
+        book(r, k) = (Symbol(k, :_ann_return) => r.summary.ann_return,
+                      Symbol(k, :_ann_volatility) => r.summary.ann_volatility,
+                      Symbol(k, :_sharpe) => r.summary.sharpe,
+                      Symbol(k, :_hit_rate) => r.hit_rate,
+                      Symbol(k, :_mean_turnover) => r.mean_turnover)
+        sources = (Tuple(Symbol(:spearman_, f) => getfield(row.ic.spearman, f)
+                         for f in ic_fields)...,
+                   Tuple(Symbol(:pearson_, f) => getfield(row.ic.pearson, f)
+                         for f in ic_fields)..., book(row.rank, :rank)...,
+                   book(row.zscore, :zscore)...,
+                   :calibration_slope => row.calibration.slope,
+                   :mean_alpha => row.calibration.mean_alpha,
+                   :std_alpha => row.calibration.std_alpha,
+                   :mean_y => row.calibration.mean_y, :std_y => row.calibration.std_y,
+                   :n_bins => row.calibration.n_bins,
+                   Tuple(f => getfield(row.coverage, f)
+                         for f in fieldnames(PO.CoverageFigures))...)
+        @test first.(sources) == fieldnames(ForecastSummaryResult)[2:40]
+        for (col, v) in sources
+            @test isequal(getfield(fs, col), v)
+        end
     end
 
     @testset "The aligned grid is the set the definition states, on the later phase" begin

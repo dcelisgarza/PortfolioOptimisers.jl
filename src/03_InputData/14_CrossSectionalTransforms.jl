@@ -1444,7 +1444,7 @@ end
 
 Derive the group labels of a cross-sectional transform from a one-hot block, or from a categorical Panel Field of an Asset Panel.
 
-Both forms return the `observations × assets` label matrix [`cross_sectional_transform`](@ref) takes, where a label is the position of a level in the level order and [`CS_MISSING_GROUP`](@ref) marks an asset with no level. No grouping field gives no group labels, `nothing`, as the slot `groups::Option` of [`cross_sectional_transform`](@ref) reads it: each observation is one cross-section.
+The one-hot form and the panel form return the `observations × assets` label matrix [`cross_sectional_transform`](@ref) takes, where a label is the position of a level in the level order and [`CS_MISSING_GROUP`](@ref) marks an asset with no level. No grouping field gives no group labels, `nothing`, as the slot `groups::Option` of [`cross_sectional_transform`](@ref) reads it: each observation is one cross-section.
 
 In the one-hot form, an asset carries a one in the column of the level it belongs to, and an asset whose row sets no level has no group. In the panel form, the codes of a [`CategoricalPanelField`](@ref) are the labels, and two kinds of cell have no group. A cell its fill policy wrote (`omsk` is `false`) has none: the fill resolved a blank so that the Panel Field holds no blank, and a fill value is not a membership, so the read undoes it, as [`OneHotExposure`](@ref) and [`descriptor_field_values`](@ref) do for the same cell. A cell outside the universe (`amsk` is `false`) has none either: the panel keeps a code there, and a group that counted it would count an asset the universe does not hold.
 

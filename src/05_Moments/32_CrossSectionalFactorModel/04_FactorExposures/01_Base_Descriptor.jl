@@ -260,7 +260,7 @@ $(DocStringExtensions.TYPEDEF)
 
 The answer of a step of a **Descriptor Estimator** that folds new observations from a carried state: the estimator with the state after them, and the Descriptor of each of them.
 
-[`descriptor_step`](@ref) returns it, and a Descriptor of a caller that folds builds it in its own method of that verb. So the type is the contract of the verb, and its constructor checks the two values. `partial_fit!` keeps `de`, and the carry fold of a [`CrossSectionalFactorPrior`](@ref) reads both fields through [`descriptor_carried`](@ref). A caller reads the fields by name, as `res.D` or `(; de, D) = res`.
+[`descriptor_step`](@ref) returns it, and a Descriptor of a caller that folds builds it in its own method of that verb. So the type is the contract of the verb, and its keyword constructor checks the types of the two values. `partial_fit!` keeps `de`, and the carry fold of a [`CrossSectionalFactorPrior`](@ref) reads both fields through [`descriptor_carried`](@ref). A caller reads the fields by name, as `res.D` or `(; de, D) = res`.
 
 # Fields
 

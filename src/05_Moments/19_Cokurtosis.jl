@@ -432,6 +432,7 @@ When `kte.w` holds observation weights as well, the available-case arm makes one
 # Validation
 
   - `dims` is either `1` or `2`.
+  - The available-case arm with no observation weights: `kte.me` is a `SimpleExpectedReturns` with no weights, and `mean` is `nothing`. Otherwise, it raises an `ArgumentError`.
 
 # Returns
 
