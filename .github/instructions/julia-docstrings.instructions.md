@@ -388,7 +388,7 @@ end
 
 When `@propagatable` decorates a struct, its fields carry stackable tags inside the struct body. Each of three tags controls a generated method, and a reader of the type needs to know what that method does:
 
-- `@fprop` selects **factory propagation**. [`factory`](@ref) on the enclosing struct passes its arguments on to the field. `factory_child` states the dispatch rules.
+- `@fprop` selects **factory propagation**. [`factory`](@ref) on the enclosing struct passes its arguments on to the field. The docstring of [`factory`](@ref) states the dispatch rules.
 - `@vprop` selects **view propagation**. [`port_opt_view`](@ref) on the enclosing struct takes the view of the field along the **asset** axis. It recurses into composed children and slices data arrays.
 - `@wprop` marks the **observation weights**. The field holds the weights. The tag controls **two** channels, and they do different things to the field. [`factory`](@ref) **replaces** it with an incoming [`ObsWeights`](@ref) value, and [`obs_weights_view`](@ref) **indexes** the value that is already there, along the **observation** axis.
 

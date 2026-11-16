@@ -1378,8 +1378,8 @@ end
     mrr = R(MeanReturnRiskRatio(; rk = Variance(; sigma = ce)), lop)
     @test mrr.rk.sigma ≈ lop.sigma
 
-    # A vector slot resolves element by element, which is the rule `factory_child` already
-    # applies on the other path.
+    # A vector slot resolves element by element, which is the rule that the array method of
+    # `factory` already applies on the other path.
     nrr = R(NonOptimisationRiskRatio(; r1 = [Variance(; sigma = ce), StandardDeviation()],
                                      r2 = [LowOrderMoment(; mu = me)]), lop)
     @test nrr.r1[1].sigma ≈ lop.sigma

@@ -221,8 +221,9 @@ $(DocStringExtensions.FIELDS)
                                     diagonal_p5, diagonal_p95, diagonal_band_lo,
                                     diagonal_band_hi, bias_statistic, bias_p5, bias_p25,
                                     bias_p75, bias_p95, qlike_mean, frobenius_mean,
-                                    portfolio_qlike_mean, levels, exceedance,
-                                    n_steps::Union{Integer, VecInt},
+                                    portfolio_qlike_mean,
+                                    levels::Union{Tuple{Vararg{Real}}, AbstractVector{<:Real}},
+                                    exceedance, n_steps::Union{Integer, VecInt},
                                     n_portfolios::Union{Integer, VecInt}, alpha::Number,
                                     step_weighting::AbstractStepWeighting) -> CovarianceForecastSummaryResult
 
@@ -355,7 +356,9 @@ Arguments correspond to the struct's fields, in the order they are declared. [`c
                                              diagonal_p95, diagonal_band_lo,
                                              diagonal_band_hi, bias_statistic, bias_p5,
                                              bias_p25, bias_p75, bias_p95, qlike_mean,
-                                             frobenius_mean, portfolio_qlike_mean, levels,
+                                             frobenius_mean, portfolio_qlike_mean,
+                                             levels::Union{Tuple{Vararg{Real}},
+                                                           AbstractVector{<:Real}},
                                              exceedance, n_steps::Union{Integer, VecInt},
                                              n_portfolios::Union{Integer, VecInt},
                                              alpha::Number,
@@ -378,7 +381,9 @@ function CovarianceForecastSummaryResult(; names, mahalanobis_mean, mahalanobis_
                                          diagonal_p95, diagonal_band_lo, diagonal_band_hi,
                                          bias_statistic, bias_p5, bias_p25, bias_p75,
                                          bias_p95, qlike_mean, frobenius_mean,
-                                         portfolio_qlike_mean, levels, exceedance,
+                                         portfolio_qlike_mean,
+                                         levels::Union{Tuple{Vararg{Real}},
+                                                       AbstractVector{<:Real}}, exceedance,
                                          n_steps::Union{Integer, VecInt},
                                          n_portfolios::Union{Integer, VecInt},
                                          alpha::Number,
@@ -449,8 +454,9 @@ function assert_covariance_summary_fields(s::CovarianceForecastSummaryResult)::N
 end
 """
     covariance_forecast_summary(cfers::AbstractVector{<:CovarianceForecastEvaluationResult};
-                                names = nothing, alpha::Real = 0.05,
-                                levels = (0.95, 0.99),
+                                names::Option{<:AbstractVector} = nothing,
+                                alpha::Real = 0.05,
+                                levels::Union{Tuple{Vararg{Real}}, AbstractVector{<:Real}} = (0.95, 0.99),
                                 step_weighting::AbstractStepWeighting = DofStepWeighting())
         -> CovarianceForecastSummaryResult
     covariance_forecast_summary(cfer::CovarianceForecastEvaluationResult; kwargs...)
@@ -476,7 +482,7 @@ The mean of a ratio weights each step by `step_weighting`. The default, [`DofSte
   - `cfers`: The evaluations to summarise.
   - `names`: A name per evaluation, or `nothing` for `"forecast_1"`, `"forecast_2"`, ….
   - `alpha`: Level of the Gaussian bands, `1 - alpha` coverage.
-  - `levels`: Confidence levels of the exceedance rates.
+  - `levels`: Confidence levels of the exceedance rates, a tuple or a vector of real numbers.
   - $(arg_dict[:cfe_step_weighting])
 
 # Validation
@@ -502,7 +508,9 @@ The mean of a ratio weights each step by `step_weighting`. The default, [`DofSte
 """
 function covariance_forecast_summary(cfers::AbstractVector{<:CovarianceForecastEvaluationResult};
                                      names::Option{<:AbstractVector} = nothing,
-                                     alpha::Real = 0.05, levels = (0.95, 0.99),
+                                     alpha::Real = 0.05,
+                                     levels::Union{Tuple{Vararg{Real}},
+                                                   AbstractVector{<:Real}} = (0.95, 0.99),
                                      step_weighting::AbstractStepWeighting = DofStepWeighting())
     @argcheck(!isempty(cfers), IsEmptyError("`cfers` cannot be empty"))
     @argcheck(zero(alpha) < alpha < one(alpha),

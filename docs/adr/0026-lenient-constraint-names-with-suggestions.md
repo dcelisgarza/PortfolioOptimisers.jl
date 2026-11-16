@@ -129,8 +129,9 @@ visible. That is not true. The first line of the error of `JuMP.assert_is_solved
 holds no status, so the warning never said that a problem was infeasible or unbounded.
 
 Each solve loop now records `JuMP.termination_status` under `:termination_status` in the trial of
-a failed solver. `failed_solve_msg` writes that key as one line, and `solve_status_msg` states in
-words what an infeasible or unbounded status means. The builder skips `:err`, the many lines of the
+a failed solver. `failed_solve_msg` writes that key as one line, and the method of
+`first_error_line` on a termination status states in words what an infeasible or unbounded status
+means. The builder skips `:err`, the many lines of the
 solution summary, as it skips `:settings`. The loop of `JuMPOptimisationEstimator` warns through
 `failed_solve_msg` too, in place of a generic text. The raw data stays in the trials.
 

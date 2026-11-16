@@ -1054,6 +1054,17 @@ end
                                                          fieldnames(CovarianceForecastSummaryResult))...)
         @test_throws DomainError bad(:alpha, 1.5)
         @test_throws DomainError bad(:levels, (0.95, 1.0))
+        # `levels` holds real numbers. A level of another type is a `TypeError` at the
+        # keyword, not a `MethodError` from inside the check of its range (R56 of #1817).
+        @test_throws TypeError CovarianceForecastSummaryResult(;
+                                                               (f => (if f === :levels
+                                                                          ("a",)
+                                                                      else
+                                                                          getfield(s1, f)
+                                                                      end)
+                                                                for f in
+                                                                    fieldnames(CovarianceForecastSummaryResult))...)
+        @test_throws TypeError covariance_forecast_summary(cfr; levels = ("a",))
         @test_throws DimensionMismatch bad(:qlike_mean, [1.0])
         @test_throws DimensionMismatch bad(:exceedance, zeros(2, 3))
         @test_throws DomainError bad(:n_steps, [0, 3])
