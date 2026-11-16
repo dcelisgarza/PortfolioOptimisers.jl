@@ -264,5 +264,7 @@ ADRs 0017, 0018, and 0028 carry no `status` frontmatter. Every other ADR is `acc
 
 ## Not an ADR
 
+| 0239 | [A cost budget is a ceiling, and its floor bounds the invested weights](0239-a-cost-budget-is-a-ceiling-and-its-floor-bounds-the-invested-weights.md) | | `BudgetCosts` and `BudgetMarketImpact` write `sum(w) + cost <= k ub`, and a `BudgetRange` floor writes `sum(w) >= k lb`. The equality on a split trade is not convex, and its relaxation held cash as a false charge. The unused budget is cash. `BudgetCosts(; xbgt = true)` pins the budget exactly with one binary for each asset. |
+
 [`examples-coverage.md`](examples-coverage.md) is the current inventory of which pipeline-stage
 topics have an example or a user-guide page. ADR 0014 records the decision behind its grouping.

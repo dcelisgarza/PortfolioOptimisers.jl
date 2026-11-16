@@ -247,6 +247,7 @@ unique_key_dict!(ref_dict, :ref_dict,
                  :roncalliweisang2012 => "[roncalliweisang2012](@cite) T. Roncalli and G. Weisang. *Risk parity portfolios with risk factors*. Available at SSRN 2155159 (2012).",#
                  :meucci2007 => "[meucci2007](@cite) A. Meucci. *Risk contributions from generic user-defined factors*. Available at SSRN 930034 (2007).",#
                  :mosek2023c => "[mosek2023c](@cite) MOSEK ApS. *MOSEK Portfolio Optimization Cookbook* (2023).",#
+                 :boyd2017 => "[boyd2017](@cite) S. Boyd, E. Busseti, S. Diamond, R. N. Kahn, K. Koh, P. Nystrup and J. Speth. *Multi-Period Trading via Convex Optimization*. Foundations and Trends in Optimization 3, 1–76 (2017).",#
                  :lobo1998 => "[lobo1998](@cite) M. S. Lobo, L. Vandenberghe, S. Boyd and H. Lebret. *Applications of second-order cone programming*. Linear Algebra and its Applications 284, 193–228 (1998).",#
                  :cajas2019noc => "[cajas2019noc](@cite) D. Cajas. *Robust portfolio selection with near optimal centering*. Available at SSRN 3572435 (2019).",#
                  :degraaf2016 => "[degraaf2016](@cite) T. de Graaf. *Robust Mean-Variance Optimization*. Master's Thesis, Leiden University (2016).",#

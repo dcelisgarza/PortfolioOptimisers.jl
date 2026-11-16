@@ -1029,6 +1029,10 @@ The number of assets of equal absolute weight that have the concentration of a b
 **Exact vs Bounded Budgets**
 The distinction between a budget that *bounds* the realised exposure and one that *pins* it. A pin needs a sign bit for each asset, which makes the problem mixed-integer. So a pin is opt-in.
 
+**Cost Budget**
+A net budget that charges the cost of the trade against the budget: `BudgetCosts` and `BudgetMarketImpact`. It is a ceiling: the weights and their costs together must not exceed `bgt`, and the unused part of the budget is cash. The floor of a `BudgetRange` in its `bgt` bounds the invested weights alone. An equality, or a floor that holds the cost, is not convex, and its relaxation charges a buy and a sale of one asset together and holds that charge as cash. `BudgetCosts(; xbgt = true)` pins the budget exactly with one binary for each asset, under a mixed-integer solver. ADR 0239, #2128.
+*Avoid*: a self-financing equality on the parts of the trade.
+
 **Time-Dependent Input (Schedule)**
 An optimiser input whose value changes across the folds of a cross-validation scheme, in place of one value for the whole horizon. Only **problem definition** may vary this way, never **execution control**.
 

@@ -9,12 +9,13 @@ unique_key_dict!(arg_dict, :arg_dict,
                  :feese => "`fees`: Fees estimator.",#
                  :feesr => "`fees`: Fees result.",
                  # Trading costs.
-                 :bgt_cost_target => "`bgt`: Budget target or range that the weights and their trading costs must meet together.",#
+                 :bgt_cost_target => "`bgt`: Ceiling that the weights and their trading costs together must not exceed, or a [`BudgetRange`](@ref) whose `ub` is that ceiling and whose `lb` is a floor of the invested weights alone. The unused part of the budget is cash.",#
                  :vp_cost => "`vp`: Cost coefficients for positive weight changes. Non-negative.",#
                  :vn_cost => "`vn`: Cost coefficients for negative weight changes. Non-negative.",#
                  :up_cost => "`up`: Upper limit on positive weight changes. Non-negative.",#
                  :un_cost => "`un`: Upper limit on negative weight changes. Non-negative.",#
                  :beta_mic => "`beta`: Reciprocal of the market impact exponent, `0 < beta < 1`. The realised exponent is `1/beta`.",#
+                 :xbgt_cost => "`xbgt`: Whether to pin the budget exactly. When `false` (the default), the budget is a ceiling of the weights and their costs, and a [`BudgetRange`](@ref) floor bounds the invested weights alone, so the programme stays convex and the unused budget is cash. When `true`, one binary for each asset keeps the buy or the sale of the asset at zero, so a scalar `bgt` pins the weights and their costs, and a [`BudgetRange`](@ref) floor holds the costs too. The problem is then mixed-integer.",#
                  # Risk measure settings.
                  :settings_rm => "`settings`: Risk measure settings.",#
                  :scale_rm => "`scale`: Weight of this risk measure in the aggregate risk expression formed from a vector of measures. It is a combination weight, so it is inert on a single measure: an optimiser given one measure drops it before the risk expression is built, and the value-level readers ignore it too. The upper bound in `ub` binds on the measure's own expression, before `scale` is applied.",#

@@ -1466,7 +1466,7 @@ end
     end
 end
 
-using Clarabel
+using Clarabel, HiGHS, JuMP, Pajarito
 
 #=
 `BudgetCosts` and `BudgetMarketImpact` are exported, are admitted by `JuMPOptimiser`'s own
@@ -1518,14 +1518,16 @@ w0 = fill(0.2, 5)
     cost2 = 0.5 * sum(max.(w2 .- w0, 0)) + 0.5 * sum(max.(w0 .- w2, 0))
     @test isapprox(sum(w2) + cost2, 1.0; atol = 1e-7)
     @test cost2 > cost
-    # A `BudgetRange` cost budget takes the other overload.
+    # A `BudgetRange` cost budget takes the other overload. Its `ub` caps the weights and
+    # their costs, and its `lb` is a floor of the invested weights alone (#2128).
     bc3 = BudgetCosts(; bgt = BudgetRange(; lb = 0.8, ub = 1.0), w = w0, vp = 0.01,
                       vn = 0.01, up = 0.5, un = 0.5)
     res3 = optimise(MeanRisk(; obj = MaximumReturn(),
                              opt = JuMPOptimiser(; pe = pr, slv = slv, bgt = bc3)))
     w3 = res3.w
     cost3 = 0.01 * sum(max.(w3 .- w0, 0)) + 0.01 * sum(max.(w0 .- w3, 0))
-    @test 0.8 - 1e-7 <= sum(w3) + cost3 <= 1.0 + 1e-7
+    @test sum(w3) >= 0.8 - 1e-7
+    @test sum(w3) + cost3 <= 1.0 + 1e-7
 end
 
 @testset "BudgetMarketImpact: the power-law budget" begin
@@ -1550,7 +1552,8 @@ end
     w2 = res2.w
     cost2 = 10.0 * sum(max.(w2 .- w0, 0) .^ (1 / beta)) +
             10.0 * sum(max.(w0 .- w2, 0) .^ (1 / beta))
-    @test isapprox(sum(w2) + cost2, 1.0; atol = 1e-7)
+    # The budget row is a ceiling (#2128), and the solver meets it to 1.25e-7 here.
+    @test isapprox(sum(w2) + cost2, 1.0; atol = 1e-6)
     @test sum(abs.(w2 .- w0)) < sum(abs.(w .- w0))
     # The charge also reaches the return expression, and `settings.mic` removes it.
     res3 = optimise(MeanRisk(; obj = MaximumReturn(),
@@ -1611,12 +1614,13 @@ end
                                             up = 0.5, un = 0.5))
     @test all(r -> isa(r.retcode, PortfolioOptimisers.OptimisationSuccess), rbc)
     @test all(r -> isapprox(sr(r.w), sr(rbc[1].w); rtol = 1e-5), rbc)
-    # The market-impact charge also leaves the return, and its budget identity is tight.
+    # The market-impact charge also leaves the return. The budget row is a ceiling (#2128),
+    # and the ratio keeps the weights within 4.5e-5 of it.
     rmi = maximum_ratio_weights(BudgetMarketImpact(; bgt = 1.0, w = w0, vp = 0.01,
                                                    vn = 0.01, up = 0.5, un = 0.5))
     mic(w) = 0.01 * sum(abs.(w .- w0) .^ 1.5)
     @test all(r -> isa(r.retcode, PortfolioOptimisers.OptimisationSuccess), rmi)
-    @test all(r -> isapprox(sum(r.w) + mic(r.w), 1.0; atol = 1e-6), rmi)
+    @test all(r -> 1.0 - 1e-4 <= sum(r.w) + mic(r.w) <= 1.0 + 1e-6, rmi)
     @test all(r -> isapprox((dot(pr.mu, r.w) - mic(r.w)) / sqrt(dot(r.w, pr.sigma, r.w)),
                             (dot(pr.mu, rmi[1].w) - mic(rmi[1].w)) /
                             sqrt(dot(rmi[1].w, pr.sigma, rmi[1].w)); rtol = 1e-5), rmi)
@@ -1673,6 +1677,92 @@ end
     # A `fixed` cost budget keeps the caller's reference at every fold.
     wf = fold_weights(bcf)
     @test all(w -> isapprox(sum(w) + cost(w, w0), 1.0; atol = 1e-6), wf)
+end
+
+@testset "A cost budget is a ceiling and charges no trade that does not happen (#2128)" begin
+    #=
+    The budget row was the equality `sum(w) + vp' wp + vn' wn == bgt`, as in Equation 9.15 of
+    cajas2025 and Equation 6.2 of mosek2023c. Nothing makes `wp` and `wn` complementary, so a
+    programme that gains from cash bought and sold one asset together and held the charge as
+    cash. With every mean negative and caps of 0.05, the equality gave
+    `w = [0.15, 0.25, 0.25, 0.197, 0.15]`: it bought two losing assets to the cap, and charged a
+    buy of 0.047 and a sale of 0.05 of the fourth. Section 4.7 of boyd2017 relaxes the
+    self-financing equality to a ceiling, which admits exactly the weights whose cost fits.
+    =#
+    PO = PortfolioOptimisers
+    Xn = randn(StableRNG(2128), 200, 5) * 0.01 .- 0.002
+    prn = prior(EmpiricalPrior(), ReturnsResult(; nx = string.(1:5), X = Xn))
+    @test all(<(0), prn.mu)
+    function mr(bgt, p; obj = MaximumReturn(), s = slv)
+        return optimise(MeanRisk(; obj = obj,
+                                 opt = JuMPOptimiser(; pe = p, slv = s, bgt = bgt)))
+    end
+    lc(w) = 0.01 * sum(abs.(w .- w0))
+    # Every asset loses, so the optimum sells each one to its cap and holds the rest as cash.
+    bn = BudgetCosts(; bgt = 1.0, w = w0, vp = 0.01, vn = 0.01, up = 0.05, un = 0.05)
+    rn = mr(bn, prn)
+    @test isa(rn.retcode, PO.OptimisationSuccess)
+    @test isapprox(rn.w, fill(0.15, 5); atol = 1e-6)
+    @test sum(rn.w) + lc(rn.w) <= 1.0 + 1e-7
+    # The row is a ceiling.
+    @test isa(JuMP.constraint_object(rn.model[:cost_bgt]).set, JuMP.MOI.LessThan)
+    # The market-impact charge leaves the return too, and the programme still holds cash.
+    rmn = mr(BudgetMarketImpact(; bgt = 1.0, w = w0, vp = 0.01, vn = 0.01, up = 0.05,
+                                un = 0.05), prn)
+    @test isa(rmn.retcode, PO.OptimisationSuccess)
+    @test sum(rmn.w) + 0.01 * sum(abs.(rmn.w .- w0) .^ 1.5) < 0.9
+    # A risk objective sells to cash under a scalar budget, where the equality spent 0.0486
+    # of the budget on trades that cost 0.0014. A floor on the invested weights bounds the
+    # cash, and the floor holds no cost.
+    rr = mr(BudgetCosts(; bgt = 1.0, w = w0, vp = 0.01, vn = 0.01, up = 0.5, un = 0.5), pr;
+            obj = MinimumRisk())
+    @test sum(rr.w) < 0.01
+    bf = BudgetCosts(; bgt = BudgetRange(; lb = 0.95, ub = 1.0), w = w0, vp = 0.01,
+                     vn = 0.01, up = 0.5, un = 0.5)
+    rf = mr(bf, pr; obj = MinimumRisk())
+    @test isapprox(sum(rf.w), 0.95; atol = 1e-6)
+    @test sum(rf.w) + lc(rf.w) <= 1.0 + 1e-7
+    @test JuMP.normalized_coefficient(rf.model[:cost_bgt_lb], rf.model[:wp][1]) == 0
+    @test isa(JuMP.constraint_object(rf.model[:cost_bgt_ub]).set, JuMP.MOI.LessThan)
+    # `xbgt = true` pins the budget exactly: one binary for each asset keeps the buy or the
+    # sale at zero, so the floor that holds the cost charges only the trade that happens.
+    mip = Solver(; name = :pajarito,
+                 solver = JuMP.optimizer_with_attributes(Pajarito.Optimizer,
+                                                         "verbose" => false,
+                                                         "oa_solver" =>
+                                                             JuMP.optimizer_with_attributes(HiGHS.Optimizer,
+                                                                                            JuMP.MOI.Silent() =>
+                                                                                                true),
+                                                         "conic_solver" =>
+                                                             JuMP.optimizer_with_attributes(Clarabel.Optimizer,
+                                                                                            "verbose" =>
+                                                                                                false)),
+                 check_sol = (; allow_local = true, allow_almost = true))
+    cmin(r) = maximum(min.(JuMP.value.(r.model[:wp]), JuMP.value.(r.model[:wn])))
+    bx = BudgetCosts(; bgt = 1.0, w = w0, vp = 0.01, vn = 0.01, up = 0.05, un = 0.05,
+                     xbgt = true)
+    @test !bn.xbgt && bx.xbgt
+    # With every mean negative the equality must still invest the budget, as v0.33 did, but
+    # it charges no false trade: the fourth weight is 0.19798, where the relaxed equality
+    # gave 0.19703 and booked a buy of 0.047 and a sale of 0.05.
+    rx = mr(bx, prn; s = mip)
+    @test isa(rx.retcode, PO.OptimisationSuccess)
+    @test isapprox(sum(rx.w) + lc(rx.w), 1.0; atol = 1e-8)
+    @test cmin(rx) <= 1e-8
+    @test isapprox(rx.w[4], 0.19798; atol = 1e-5)
+    @test haskey(rx.model, :cost_bgt_lb) && !haskey(rx.model, :cost_bgt_gz_lb)
+    # A `BudgetRange` floor holds the cost under `xbgt`.
+    rxr = mr(BudgetCosts(; bgt = BudgetRange(; lb = 0.98, ub = 1.0), w = w0, vp = 0.01,
+                         vn = 0.01, up = 0.05, un = 0.05, xbgt = true), prn; s = mip)
+    @test isapprox(sum(rxr.w) + lc(rxr.w), 0.98; atol = 1e-8)
+    @test cmin(rxr) <= 1e-8
+    # Under `MaximumRatio` the scale `k` is a variable, so the product `k z` is a gate
+    # variable on the big-M of the model.
+    rxk = mr(bx, prn; s = mip, obj = MaximumRatio(; rf = -0.01))
+    @test isa(rxk.retcode, PO.OptimisationSuccess)
+    @test isapprox(sum(rxk.w) + lc(rxk.w), 1.0; atol = 1e-8)
+    @test cmin(rxk) <= 1e-8
+    @test haskey(rxk.model, :cost_bgt_gz_lb)
 end
 
 @testset "NoReturn: the contributions of an expected return beside any fee (#1912)" begin
