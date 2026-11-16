@@ -1763,6 +1763,21 @@ end
     @test isapprox(sum(rxk.w) + lc(rxk.w), 1.0; atol = 1e-8)
     @test cmin(rxk) <= 1e-8
     @test haskey(rxk.model, :cost_bgt_gz_lb)
+    # The centring model of `UnconstrainedNearOptimalCentering` runs no MIP step, so it states
+    # the convex form of the budget and keeps the floor of the invested weights. Before R63 of
+    # #1817 it held no floor under `xbgt = true`: `sum(w) + cost` was 0.869 under a floor of
+    # 0.95, where `xbgt = false` held `sum(w) = 0.95`.
+    bxf = BudgetCosts(; bgt = BudgetRange(; lb = 0.95, ub = 1.0), w = w0, vp = 0.01,
+                      vn = 0.01, up = 0.5, un = 0.5, xbgt = true)
+    noc(bgt, s) = optimise(NearOptimalCentering(; obj = MinimumRisk(),
+                                                alg = UnconstrainedNearOptimalCentering(),
+                                                opt = JuMPOptimiser(; pe = pr, slv = s,
+                                                                    bgt = bgt)))
+    rnx = noc(bxf, mip)
+    @test isa(rnx.retcode, PO.OptimisationSuccess)
+    @test sum(rnx.w) >= 0.95 - 1e-6
+    @test sum(rnx.w) + lc(rnx.w) <= 1.0 + 1e-6
+    @test isapprox(sum(noc(1.0, slv).w), 1.0; atol = 1e-6)
 end
 
 @testset "NoReturn: the contributions of an expected return beside any fee (#1912)" begin

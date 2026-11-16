@@ -105,9 +105,9 @@
 #let user_guide = link(user_guide_link)[user guide]
 #let api = link(api_link)[API]
 #let coverage = link(codecov)[coverage]
-#let jump = link("https://github.com/jump-dev/JuMP.jl")[JuMP.jl]
+#let jump = link("https://jump.dev/JuMP.jl/stable/")[JuMP.jl]
 #let statsbase = link("https://juliastats.org/StatsBase.jl/stable/cov/#StatsBase.CovarianceEstimator")[StatsBase.jl]
-#let distances = link("https://github.com/JuliaStats/Distances.jl")[Distances.jl]
+#let distances = link("https://docs.juliahub.com/General/Distances/stable/")[Distances.jl]
 
 // Modify some arguments, which can be overwritten in the template call
 #page-args.insert("numbering", "1/1")
@@ -303,7 +303,7 @@ The same panel holds the features of the assets, such as a market capitalisation
 
 == Moments
 
-#po comes with a large number of moment estimation and prior statistics methods. It leverages #statsbase's covariance estimator definitions and API to allow interoperability with the Julia ecosystem, for example shrinkage is supported by composing with #link("https://github.com/mateuszbaran/CovarianceEstimation.jl")[CovarianceEstimation.jl]. They are highly composable with each other, as well as with different priors, and uncertainty sets.
+#po comes with a large number of moment estimation and prior statistics methods. It leverages #statsbase's covariance estimator definitions and API to allow interoperability with the Julia ecosystem, for example shrinkage is supported by composing with #link("https://mateuszbaran.github.io/CovarianceEstimation.jl/stable/")[CovarianceEstimation.jl]. They are highly composable with each other, as well as with different priors, and uncertainty sets.
 
 - Full or downside co-moments.
 - Weighted, unweighted.
@@ -413,7 +413,7 @@ The library comes equipped with a pipeline framework that can run an entire stra
 
 Every sequential scheme also has an online form, in which each fold updates one estimator with its new observations instead of refitting it, and a finished run can be resumed over a longer history. A hindsight split trains each fold on the row it tests, which yields the per-row comparators of dynamic regret. A fold can also be scored on the weights a fund actually holds, which drift with the returns of their assets between trades, and those held weights can be passed on to the next fold.
 
-The hyperparameter tuning framework is built on top of the cross-validation framework. Users address the steps of a pipeline by index or by name, and the fields to tune by name. Grid search takes grids of values, and random search takes grids, distributions from #link("https://github.com/JuliaStats/Distributions.jl")[Distributions.jl] @distributionsjl, or both.
+The hyperparameter tuning framework is built on top of the cross-validation framework. Users address the steps of a pipeline by index or by name, and the fields to tune by name. Grid search takes grids of values, and random search takes grids, distributions from #link("https://juliastats.org/Distributions.jl/stable/")[Distributions.jl] @distributionsjl, or both.
 
 == Evaluation and attribution
 

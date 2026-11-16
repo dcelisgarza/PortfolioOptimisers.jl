@@ -118,8 +118,10 @@ end
 
 #=
 The tracked text that the docs site and the repository publish: the library and its extensions,
-whose docstrings the site renders, the docs tree with its generators and ADRs, the Literate
-sources and the README. The generated pages are untracked, so the walk skips them (ADR 0151).
+whose docstrings the site renders, the docs tree with its generators, ADRs and papers, the
+Literate sources and the README. The long paper `docs/paper/main.typ` is a Typst file, so the
+walk reads `.typ` beside `.jl` and `.md` (R63 of #1817). The generated pages are untracked, so
+the walk skips them (ADR 0151).
 =#
 function published_text_files(repo::AbstractString)
     docs_src = joinpath(repo, "docs", "src")
@@ -135,7 +137,7 @@ function published_text_files(repo::AbstractString)
             end
             for name in names
                 path = joinpath(dir, name)
-                if (endswith(name, ".jl") || endswith(name, ".md")) &&
+                if any(e -> endswith(name, e), (".jl", ".md", ".typ")) &&
                    path ∉ generated_pages
                     push!(files, path)
                 end
@@ -436,6 +438,7 @@ end
         @test isempty(external_repository_links("![d](https://raw.githubusercontent.com/x/A.jl/main/b.json)"))
         files = published_text_files(REPO_ROOT)
         @test joinpath(REPO_ROOT, "README.md") in files
+        @test joinpath(REPO_ROOT, "docs", "paper", "main.typ") in files
         @test count(f -> startswith(relpath(f, REPO_ROOT), "src"), files) >= 300
         @test count(f -> startswith(relpath(f, REPO_ROOT), "examples"), files) >= 60
         @test count(f -> startswith(relpath(f, REPO_ROOT), joinpath("docs", "adr")),

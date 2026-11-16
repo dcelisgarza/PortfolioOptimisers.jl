@@ -50,7 +50,9 @@ all only when `w_min`, `w_opt` and `w_max` are all given, because then no sub-pr
 
 `pe`, `slv`, `wb`, `bgt`, `sbgt`, `gbgt`, `sc`, `so`, `sca`, the part of `fees` that is not
 fixed, and `ret`. The model reads the copy of `ret` without bounds, see
-[`no_bounds_optimiser`](@ref).
+[`no_bounds_optimiser`](@ref). It reads the convex form of `bgt`, [`convex_budget`](@ref), so a
+[`BudgetCosts`](@ref) with `xbgt = true` keeps its ceiling and the floor of the invested
+weights, and not the floor that holds the cost.
 
 # Settings the centring model does not read
 

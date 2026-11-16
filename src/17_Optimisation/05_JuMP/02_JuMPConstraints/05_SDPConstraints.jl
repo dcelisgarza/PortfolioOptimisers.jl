@@ -93,7 +93,7 @@ $(DocStringExtensions.TYPEDSIGNATURES)
 
 Mark `sdp_phylogeny` on the weights under `prefix` when `plgs` holds a [`SemiDefinitePhylogeny`](@ref).
 
-The mark goes to the namespace that owns the weights, [`weights_prefix`](@ref). So a block after the first, which registers the weights of the model with the owner `Symbol("")`, marks the weights of the head. [`set_block_constraints!`](@ref) calls the function in phase 1 of each block, before the risk step of the owner. [`sdp_variance_flag!`](@ref) reads the mark, so a variance on the weights takes the semidefinite formulation when any block on them holds a semidefinite phylogeny. The variance then states its term on the lifted matrix that the rows of [`set_sdp_phylogeny_constraints!`](@ref) bind, and a variance that the objective minimises holds that matrix down.
+The mark goes to the namespace that owns the weights, [`weights_prefix`](@ref). So a block after the first, which registers the weights of the model with the owner `Symbol("")`, marks the weights of the head. [`set_block_constraints!`](@ref) calls the function in phase 1 of each block, before the risk step of the owner. [`assemble_jump_model!`](@ref) also calls it for each block after the first before phase 1 of the head, because a tracking error of the head builds its variance in that phase. [`sdp_variance_flag!`](@ref) reads the mark, so a variance on the weights takes the semidefinite formulation when any block on them holds a semidefinite phylogeny. The variance then states its term on the lifted matrix that the rows of [`set_sdp_phylogeny_constraints!`](@ref) bind, and a variance that the objective minimises holds that matrix down.
 
 The mark belongs to the weights and not to one block, because the rows of every block bind the one lifted matrix of the weights. In the model of a leader, the block of a [`ProgrammeAllocationSet`](@ref) comes after the block of the head. A variance of the head with the second-order cone would leave the lift of the rows of the set to no term. The variance also marks `variance_flag`, so the rows would get no penalty either, and they would bind nothing.
 
@@ -112,6 +112,7 @@ The mark belongs to the weights and not to one block, because the rows of every 
   - [`sdp_variance_flag!`](@ref)
   - [`set_sdp_phylogeny_constraints!`](@ref)
   - [`set_block_constraints!`](@ref)
+  - [`assemble_jump_model!`](@ref)
 """
 function mark_sdp_phylogeny!(model::JuMP.Model, plgs::Option{<:PlC_VecPlC};
                              prefix::Symbol = Symbol(""))::Nothing

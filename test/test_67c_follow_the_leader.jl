@@ -633,6 +633,27 @@ end
         @test haskey(m, :sdp_phylogeny) && haskey(m, :blk_2_sdp_plg_1)
         @test !haskey(m, :blk_2_sdp_plg_p_1) && !haskey(m, :dev_1)
         @test issubset(keys(m[:variance_risk_1].terms), Set(vec(m[:W])))
+        # The tracking errors of the head build their variance in phase 1 of the head, before
+        # phase 1 of the set. So the block of the set marks the weights before the head (R63
+        # of #1817). A dependent variance tracks only in the semidefinite form, and on the
+        # parent of the fix it took the second-order cone, and every solve raised
+        # `UnsupportedConstraint`. It now gives the weights of the phylogeny on the head.
+        trk = RiskTrackingError(; tr = WeightsTracking(; w = fill(1 / Np, Np)),
+                                r = Variance(), err = 1e-4,
+                                alg = DependentVariableTracking())
+        tlead = MeanRisk(; opt = JuMPOptimiser(; slv = slvp, tr = trk))
+        tlead_pl = MeanRisk(;
+                            opt = JuMPOptimiser(; slv = slvp, tr = trk,
+                                                ple = SemiDefinitePhylogeny(; A = Ap,
+                                                                            p = 0.05)))
+        rt = optimise(po.leader_chain(tlead, sres, 1.0), rdv;
+                      blocks = (po.leader_block(sres, tlead, fill(1 / Np, Np), rdv),))
+        s0 = resolve(pset(nothing), Np)
+        rt0 = optimise(po.leader_chain(tlead_pl, s0, 1.0), rdv;
+                       blocks = (po.leader_block(s0, tlead_pl, fill(1 / Np, Np), rdv),))
+        @test isa(rt.retcode, po.OptimisationSuccess)
+        @test link(rt.w) < 1e-6
+        @test isapprox(rt.w, rt0.w; atol = 1e-6)
         # A factor head writes no term on the lift of the asset weights, so the head refuses
         # the set with a semidefinite phylogeny on a chain that holds one.
         frc = FactorRiskContribution(; opt = JuMPOptimiser(; slv = slvp))

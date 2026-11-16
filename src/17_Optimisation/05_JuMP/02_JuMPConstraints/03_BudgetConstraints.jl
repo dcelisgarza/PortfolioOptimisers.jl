@@ -249,7 +249,7 @@ Where:
 
 The rows above are those of `xbgt = false`. With `xbgt = true`, the floor holds the cost, ``\\boldsymbol{1}^\\intercal \\boldsymbol{w} + \\boldsymbol{v}_p^\\intercal \\boldsymbol{w}_p + \\boldsymbol{v}_n^\\intercal \\boldsymbol{w}_n \\geq k\\,\\mathrm{lb}``, a scalar `bgt` is also its ``\\mathrm{lb}``, and [`set_cost_budget_mip_constraints!`](@ref) states the complementarity rows.
 
-Every row is homogeneous in ``(\\boldsymbol{w}, k)``. Under [`MaximumRatio`](@ref), the start portfolio ``\\boldsymbol{w}_0``, the caps and the budget therefore scale with ``k``, and the weights do not depend on `ohf`. Every other objective fixes ``k = 1``.
+Every row is homogeneous in ``(\\boldsymbol{w}, k)``. Under [`MaximumRatio`](@ref), the start portfolio ``\\boldsymbol{w}_0``, the caps and the budget therefore scale with ``k``, and the weights do not depend on `ohf` while the ceiling binds. Where it does not bind, `ohf` sets the share of cash, see the warning below. Every other objective fixes ``k = 1``.
 
 A `bgt = 1.0` and a [`MaximumReturn`](@ref) objective meet the ceiling to **1.5e-8** on a
 five-asset sample with a positive mean: `sum(w) + 0.01 * sum(abs.(w - w0))` lands on
@@ -263,9 +263,10 @@ five-asset sample with a positive mean: `sum(w) + 0.01 * sum(abs.(w - w0))` land
     the invested weights to bound the cash: `bgt = BudgetRange(; lb = 0.95, ub = 1.0)` gives
     `sum(w) = 0.95` on the same sample. Or write `xbgt = true` to hold no cash, under a
     mixed-integer solver. Under [`MaximumRatio`](@ref) with `rf = 0`, cash does
-    not change the ratio, so the share of cash is not unique: on the same sample the ratio
-    agrees to 1e-6 at every `ohf`, and `sum(w)` plus the cost moves from 0.36 to 0.95. A
-    positive `rf` makes cash lower the ratio, so the ceiling binds.
+    not change the ratio, so the share of cash is not unique and `ohf` sets it: on the same
+    sample the ratio agrees to 1e-6 from `ohf = 1e-3` to `ohf = 0.3`, and `sum(w)` plus the
+    cost is 0.70 at `ohf = 1e-3`, 0.71 at the default and 0.95 at `ohf = 0.3`. A positive `rf`
+    makes cash lower the ratio, so the ceiling binds.
 
 !!! note
 
@@ -1219,7 +1220,7 @@ end
 
 Pin a [`BudgetCosts`](@ref) budget whose `xbgt` is `true`: keep one part of the trade of each asset at zero, and add the floor that holds the cost.
 
-The budget builder [`set_budget_constraints!`](@ref) writes the ceiling of the weights and their costs. A ceiling is exact under any split of the trade, and a floor that holds the cost is exact only under a complementary split. So this builder adds one binary ``z_i`` for each asset, keeps the buy under ``z_i`` and the sale under ``1 - z_i``, and then adds the floor. A scalar `bgt` gets its floor at `bgt`, so the ceiling and the floor pin the weights and their costs. It runs in the MIP step of [`set_block_constraints!`](@ref), which holds the big-M `ss` and the weight bounds. A model that skips that step keeps the convex ceiling.
+The budget builder [`set_budget_constraints!`](@ref) writes the ceiling of the weights and their costs. A ceiling is exact under any split of the trade, and a floor that holds the cost is exact only under a complementary split. So this builder adds one binary ``z_i`` for each asset, keeps the buy under ``z_i`` and the sale under ``1 - z_i``, and then adds the floor. A scalar `bgt` gets its floor at `bgt`, so the ceiling and the floor pin the weights and their costs. It runs in the MIP step of [`set_block_constraints!`](@ref), which holds the big-M `ss` and the weight bounds. A model that skips that step states the convex form of the budget, [`convex_budget`](@ref).
 
 The method on a number, on a [`BudgetRange`](@ref), on `nothing` and on a [`BudgetMarketImpact`](@ref) adds no row, and so does a [`BudgetCosts`](@ref) whose `xbgt` is `false`. A [`BudgetMarketImpact`](@ref) has no exact form: the cone variables can exceed ``w_p^{1/\\beta}`` and ``w_n^{1/\\beta}``, and an upper bound on a convex power is not convex.
 
@@ -1298,6 +1299,34 @@ function set_cost_budget_mip_constraints!(model::JuMP.Model, bgt::BudgetCosts,
                          0)
     end
     return nothing
+end
+"""
+    convex_budget(bgt)
+    convex_budget(bgt::BudgetCosts)
+
+Return the net budget `bgt` in the form that a model with no MIP step states: a [`BudgetCosts`](@ref) with `xbgt = false`, and every other budget as it is.
+
+A [`BudgetCosts`](@ref) with `xbgt = true` leaves out the floor of its [`BudgetRange`](@ref) in [`set_cost_budget_constraints!`](@ref), because [`set_cost_budget_mip_constraints!`](@ref) adds the floor that holds the cost, in the MIP step of [`set_block_constraints!`](@ref). The centring model of [`UnconstrainedNearOptimalCentering`](@ref) runs no MIP step, so with that budget it would hold no floor at all. The convex form keeps the floor `sum(w) >= k lb` of the invested weights. The cost is not negative, so a portfolio on that floor also meets the floor that holds the cost. A scalar `bgt` keeps its ceiling in both forms.
+
+# Arguments
+
+  - `bgt`: The net budget of the optimiser.
+
+# Returns
+
+  - `bgt`, or a copy of a [`BudgetCosts`](@ref) with `xbgt = false`.
+
+# Related
+
+  - [`BudgetCosts`](@ref)
+  - [`set_cost_budget_constraints!`](@ref)
+  - [`set_cost_budget_mip_constraints!`](@ref)
+  - [`UnconstrainedNearOptimalCentering`](@ref)
+"""
+convex_budget(bgt) = bgt
+function convex_budget(bgt::BudgetCosts)::BudgetCosts
+    return BudgetCosts(; bgt = bgt.bgt, w = bgt.w, vp = bgt.vp, vn = bgt.vn, up = bgt.up,
+                       un = bgt.un, fixed = bgt.fixed, xbgt = false)
 end
 
 """

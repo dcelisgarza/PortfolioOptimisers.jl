@@ -166,6 +166,13 @@ sets it on `weights_prefix` with `mark_sdp_phylogeny!` when the phylogeny `plr` 
 variance on the weights takes the semidefinite formulation when any block on them holds a
 semidefinite phylogeny, and not only when the block of its own builder holds one (#2126).
 
+`assemble_jump_model!` also marks each block after the first before phase 1 of the head. A
+tracking error of the head builds its variance in that phase, before phase 1 of a later block.
+Without the early mark, a dependent `Variance` tracking error of a leader took the second-order
+cone under a semidefinite phylogeny of the set, which that tracking mode cannot solve, so every
+re-solve failed and the rule traded nothing (R63 of #1817). The mark in phase 1 stays, for the
+block of the head and for a programme that builds one block.
+
 Before the mark, the set of a leader re-solve holds its phylogeny in the block `blk_2_`, and the
 variance of the head read the `plr` of the head alone. The variance took the second-order cone and
 marked `variance_flag`. Phase 2 of the set then built `W`, saw the mark, and omitted the penalty,

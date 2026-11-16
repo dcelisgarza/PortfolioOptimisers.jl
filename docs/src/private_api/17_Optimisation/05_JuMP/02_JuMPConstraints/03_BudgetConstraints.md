@@ -15,6 +15,7 @@ assert_cost_budget_prefix
 set_long_short_budget_constraints!
 set_cost_budget_constraints!
 set_cost_budget_mip_constraints!
+convex_budget
 set_gross_budget_constraints!
 budget_row!
 budget_row_set

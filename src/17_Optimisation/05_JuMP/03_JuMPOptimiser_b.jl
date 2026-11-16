@@ -320,7 +320,7 @@ $(DocStringExtensions.TYPEDSIGNATURES)
 
 Add weight bound and budget constraints to `model` from the optimiser's own budget group.
 
-[`UnconstrainedNearOptimalCentering`](@ref) reaches [`set_weight_constraints!`](@ref) through this method, because its centring solve adds the bounds of the block and no other row of it. Every other JuMP head adds its bounds and its budgets in phase 1 of its block, [`set_block_constraints!`](@ref), with the net budget of the head. Both routes pass the whole budget group (`bgt`, `sbgt`, `gbgt`) as one object, so a budget field cannot reach one head and miss the others.
+[`UnconstrainedNearOptimalCentering`](@ref) reaches [`set_weight_constraints!`](@ref) through this method, because its centring solve adds the bounds of the block and no other row of it. The solve runs no MIP step, so the method passes the convex form of the net budget, [`convex_budget`](@ref). A [`BudgetCosts`](@ref) with `xbgt = true` then keeps the floor of the invested weights. Every other JuMP head adds its bounds and its budgets in phase 1 of its block, [`set_block_constraints!`](@ref), with the net budget of the head. Both routes pass the whole budget group (`bgt`, `sbgt`, `gbgt`) as one object, so a budget field cannot reach one head and miss the others.
 
 # Arguments
 
@@ -339,7 +339,8 @@ Add weight bound and budget constraints to `model` from the optimiser's own budg
   - [`set_gross_budget_constraints!`](@ref)
 """
 function set_weight_constraints!(model::JuMP.Model, wb::WeightBounds, opt::JuMPOptimiser)
-    return set_weight_constraints!(model, wb, opt.bgt, opt.sbgt; gbgt = opt.gbgt)
+    return set_weight_constraints!(model, wb, convex_budget(opt.bgt), opt.sbgt;
+                                   gbgt = opt.gbgt)
 end
 
 """
@@ -418,6 +419,11 @@ first, and the keyword `blocks` gives the others, as the head gave them to
 [`resolve_jump_optimiser`](@ref). Each block after the first takes its own namespace, and its
 owner is its [`ProgrammeAllocationSet`](@ref), see [`later_constraint_blocks`](@ref).
 
+ 0. Each block after the first marks `sdp_phylogeny` on the weights of the head when its
+    phylogeny `plr` holds a semidefinite phylogeny, [`mark_sdp_phylogeny!`](@ref). The mark
+    comes before phase 1 of the head, because a tracking error of the head builds a variance
+    in that phase. A dependent [`Variance`](@ref) tracking error then takes the semidefinite
+    formulation, as it does under a phylogeny of the head, and it solves.
  1. Phase 1 of each block, [`set_block_constraints!`](@ref), adds the weight bounds, the
     budgets and every row before the risk step. The block of the head takes the net budget
     `opt.bgt`, the fees and the tracking errors of the head. A block of a set takes no net
@@ -492,6 +498,11 @@ function assemble_jump_model!(model::JuMP.Model, optimiser::JuMPOptimisationEsti
     # Each block after the first comes with the set that owns it and its own namespace
     # (ADR 0237).
     later = later_constraint_blocks(blocks, attrs)
+    # A later block holds the weights of the head, so it marks its semidefinite phylogeny on
+    # them before phase 1 of the head, whose tracking errors build a variance too (#2126).
+    for (_, cbri, _) in later
+        mark_sdp_phylogeny!(model, cbri.plr)
+    end
     # The head binds a data benchmark of its tracking errors to its rows, so `tr` is read
     # from the head and not from the block Result.
     set_block_constraints!(model, cbr, optimiser, opt.bgt, fees; tr = opt.tr, b1 = b1,
