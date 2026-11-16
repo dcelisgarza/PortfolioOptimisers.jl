@@ -1273,6 +1273,47 @@ end
     end
 end
 
+@testset "An asset that never lists parks its share of the uniform start as cash (#2127)" begin
+    # The asset `e` has no row. The uniform start gives it 1/8, the held first row reads it as
+    # cash, and the gradient of the second row reads that cash in the gross return. So the
+    # listed weights differ from the fit without `e` (ADR 0162). A start with a zero at `e`
+    # is the fit without `e`, bit for bit.
+    rng7 = StableRNG(424242)
+    T7, N7 = 24, 8
+    F7 = randn(rng7, T7, 2)
+    X7 = (F7 * randn(rng7, 2, N7) .+ randn(rng7, T7, N7)) ./ 100 .+ 0.0005
+    X7[:, 5] .= NaN
+    amsk7 = trues(T7, N7)
+    amsk7[:, 5] .= false
+    rd7 = ReturnsResult(; nx = string.('a':'h'), X = X7,
+                        pnl = AssetPanel(; pf = nothing, amsk = amsk7, emsk = amsk7))
+    k7 = [1, 2, 3, 4, 6, 7, 8]
+    rdk7 = ReturnsResult(; nx = string.('a':'h')[k7], X = X7[:, k7])
+    pe7 = EmpiricalPrior(; me = ExpWeightedExpectedReturns(; decay = 0.9, min_obs = 2),
+                         ce = ExpWeightedCovariance(; decay = 0.9, min_obs = 2,
+                                                    centring = PreCentred()),
+                         fill_limit = 1)
+    sce7 = PortfolioOptimisersCovariance(;
+                                         ce = Covariance(;
+                                                         cvg = CoveragePolicy(;
+                                                                              min_coverage = 0.6)))
+    set7 = ProgrammeAllocationSet(; slv = slv, pe = pe7,
+                                  ple = SemiDefinitePhylogenyEstimator(;
+                                                                       pl = NetworkEstimator(;
+                                                                                             ce = sce7)))
+    ops7(w0) = OnlinePortfolioSelection(; alg = ExponentiatedGradient(), set = set7,
+                                        w0 = w0)
+    held = (:warn, r"Held Step at 1")
+    wk7 = (@test_logs held match_mode = :any optimise(ops7(nothing), rdk7)).w
+    w7 = (@test_logs held match_mode = :any optimise(ops7(nothing), rd7)).w
+    @test iszero(w7[5])
+    @test !isapprox(w7[k7], wk7; rtol = 0, atol = 1e-6)
+    w07 = [i == 5 ? 0.0 : 1 / 7 for i in 1:N7]
+    wz7 = (@test_logs held match_mode = :any optimise(ops7(w07), rd7)).w
+    @test iszero(wz7[5])
+    @test wz7[k7] == wk7
+end
+
 @testset "The projection resolves its set through the entry of a bare head (#2046)" begin
     # The data of #2028. The prior of the set fills the gap of `e`, and a plain graph
     # reader of the set reads that gap. The entry drops `e` before the reader runs, as the
