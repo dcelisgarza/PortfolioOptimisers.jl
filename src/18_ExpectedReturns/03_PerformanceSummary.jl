@@ -31,12 +31,19 @@ $(DocStringExtensions.FIELDS)
         long_exposure, short_exposure, gross_exposure, net_exposure, measures, risk
     ) -> PerformanceSummaryResult
     PerformanceSummaryResult(; names = nothing, paths = nothing, members = nothing,
-                             date0 = nothing, date1 = nothing, n_periods, ppy, alpha,
-                             compound, rf, ann_return, ann_volatility, sharpe,
-                             sharpe_stderr, sortino, calmar, max_drawdown, cvar, excess_ret,
-                             tracking_error, information_ratio, turnover, n_eff,
-                             long_exposure, short_exposure, gross_exposure, net_exposure,
-                             measures = (;), risk = (;)) -> PerformanceSummaryResult
+                             date0 = nothing, date1 = nothing,
+                             n_periods::Union{Integer, VecInt}, ppy::Number,
+                             alpha::Number, compound::Bool, rf::Number,
+                             ann_return::Num_VecNum, ann_volatility::Num_VecNum,
+                             sharpe::Num_VecNum, sharpe_stderr::Num_VecNum,
+                             sortino::Num_VecNum, calmar::Num_VecNum,
+                             max_drawdown::Num_VecNum, cvar::Num_VecNum,
+                             excess_ret::Num_VecNum, tracking_error::Num_VecNum,
+                             information_ratio::Num_VecNum, turnover::Num_VecNum,
+                             n_eff::Num_VecNum, long_exposure::Num_VecNum,
+                             short_exposure::Num_VecNum, gross_exposure::Num_VecNum,
+                             net_exposure::Num_VecNum, measures::NamedTuple = (;),
+                             risk::NamedTuple = (;)) -> PerformanceSummaryResult
 
 The arguments are the fields of the struct, in the order of the declaration. The type is a
 Result, so [`performance_summary`](@ref) builds it and a caller reads it. The positional

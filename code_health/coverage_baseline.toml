@@ -140,6 +140,7 @@ commit = "391be5e"
 "src/05_Moments/30_RegimeAdjusted/07_EstimatedMahalanobisBias.jl" = { lines = 174, misses = 2 }
 "src/05_Moments/30_RegimeAdjusted/08_SeparatePortfolioBias.jl" = { lines = 84, misses = 0 }
 "src/05_Moments/30_RegimeAdjusted/09_MahalanobisLevelClosure.jl" = { lines = 244, misses = 0 }
+"src/05_Moments/30_RegimeAdjusted/10_HacLogDeterminant.jl" = { lines = 86, misses = 0 }
 "src/05_Moments/31_HigherMomentPartialFit.jl" = { lines = 113, misses = 0 }
 "src/05_Moments/32_CrossSectionalFactorModel/01_CrossSectionalRegression_a.jl" = { lines = 262, misses = 0 }
 "src/05_Moments/32_CrossSectionalFactorModel/01_CrossSectionalRegression_b.jl" = { lines = 18, misses = 0 }
@@ -369,7 +370,7 @@ commit = "391be5e"
 "src/17_Optimisation/05_JuMP/03_JuMPOptimiser_a.jl" = { lines = 97, misses = 0 }
 "src/17_Optimisation/05_JuMP/03_JuMPOptimiser_b.jl" = { lines = 116, misses = 3 }
 "src/17_Optimisation/05_JuMP/04_MeanRisk.jl" = { lines = 167, misses = 0 }
-"src/17_Optimisation/05_JuMP/05_FactorRiskContribution.jl" = { lines = 72, misses = 0 }
+"src/17_Optimisation/05_JuMP/05_FactorRiskContribution.jl" = { lines = 73, misses = 1 }
 "src/17_Optimisation/05_JuMP/06_NearOptimalCentering_a.jl" = { lines = 220, misses = 0 }
 "src/17_Optimisation/05_JuMP/06_NearOptimalCentering_b.jl" = { lines = 75, misses = 0 }
 "src/17_Optimisation/05_JuMP/07_RiskBudgeting.jl" = { lines = 138, misses = 0 }

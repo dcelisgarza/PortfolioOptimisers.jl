@@ -215,7 +215,16 @@ $(DocStringExtensions.FIELDS)
         step_weighting
     ) -> CovarianceForecastSummaryResult
 
-    CovarianceForecastSummaryResult(; names, mahalanobis_mean, …, step_weighting)
+    CovarianceForecastSummaryResult(; names, mahalanobis_mean, mahalanobis_median,
+                                    mahalanobis_p5, mahalanobis_p95, mahalanobis_band_lo,
+                                    mahalanobis_band_hi, diagonal_mean, diagonal_median,
+                                    diagonal_p5, diagonal_p95, diagonal_band_lo,
+                                    diagonal_band_hi, bias_statistic, bias_p5, bias_p25,
+                                    bias_p75, bias_p95, qlike_mean, frobenius_mean,
+                                    portfolio_qlike_mean, levels, exceedance,
+                                    n_steps::Union{Integer, VecInt},
+                                    n_portfolios::Union{Integer, VecInt}, alpha::Number,
+                                    step_weighting::AbstractStepWeighting) -> CovarianceForecastSummaryResult
 
 Arguments correspond to the struct's fields, in the order they are declared. [`covariance_forecast_summary`](@ref) builds the type, and a caller reads it. The positional constructor checks the values with [`assert_covariance_summary_fields`](@ref). The keyword constructor takes each field by name, with no default, and calls it.
 

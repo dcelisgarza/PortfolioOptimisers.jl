@@ -963,6 +963,16 @@ definition = "undefined_correlation_diagonal!"
 misses = 1
 rationale = "a-signature-line-counter-on-a-method-whose-body-is-reached"
 
+# Run 43814236929 (c51fe04fa1, G1 of #1817, extension 7): the `function` line of
+# `port_opt_view(::FactorRiskContribution, i, X, args...)` reads 0 while each line of its body runs
+# 5 times. The line has read 0 on every run since 16f9f5b233 (#2101) removed the shortcut
+# `optimise` method of the file. The file had no miss before it.
+[[coverage_exemption]]
+path = "src/17_Optimisation/05_JuMP/05_FactorRiskContribution.jl"
+definition = "port_opt_view"
+misses = 1
+rationale = "a-signature-line-counter-on-a-method-whose-body-is-reached"
+
 # --- JET dismissals --------------------------------------------------------
 #
 # Keyed (file, kind, message), ADR 0071. A Dismissal matches every report of its fingerprint in

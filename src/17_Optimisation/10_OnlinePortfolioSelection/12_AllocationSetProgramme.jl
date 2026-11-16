@@ -667,12 +667,11 @@ function projection_solver(proj::AbstractProjectionGeometry, ::BoundedAllocation
     return throw(ArgumentError("a `$(nameof(typeof(proj)))` onto a BoundedAllocationSet is a scalar root, not a programme: no solver is read for it."))
 end
 """
-    allocation_set_ready(set::AbstractAllocationSet, X)
-    allocation_set_ready(set::ProgrammeAllocationSet, X)
+    allocation_set_ready(set::ProgrammeAllocationSet, X::Option{<:ReturnsResult})
 
 Tells whether the set's constraints can be built on the rows `X` of the step.
 
-A programme set that fits its prior on the rows cannot be built while the head holds fewer than two rows, because a covariance of one observation does not exist. Every other set can always be built.
+A programme set that fits its prior on the rows cannot be built while the head holds fewer than two rows, because a covariance of one observation does not exist. A bounded set reads no rows, so [`project`](@ref) does not call the function for it.
 
 # Returns
 
@@ -684,9 +683,6 @@ A programme set that fits its prior on the rows cannot be built while the head h
   - [`project`](@ref)
   - [`HeldStep`](@ref)
 """
-function allocation_set_ready(::AbstractAllocationSet, ::Any)
-    return nothing
-end
 function allocation_set_ready(set::ProgrammeAllocationSet, X::Option{<:ReturnsResult})
     if isnothing(rows_needed(set)) && !isnothing(X) && size(X.X, 1) < 2
         return "the set's prior estimator fits on the head's rows and a covariance of one observation does not exist, so the step trades nothing until the head holds two"

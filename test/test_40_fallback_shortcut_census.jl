@@ -1,30 +1,27 @@
-@testset "Fallback-shortcut census: `Nothing` always lands on `fb`" begin
+@testset "Fallback-shortcut census: no `optimise` method goes around the driver" begin
     using PortfolioOptimisers, Test
 
-    # Sixteen optimisers carry a shortcut method of the form
+    # An estimator with no fallback holds `fb = nothing`. The driver `optimise` in
+    # `01_Base_Optimisation/05_InvestableUniverse.jl` returns the first answer before it builds
+    # the fallback chain, so for `fb::Nothing` the compiler folds the test of the fallback, and
+    # the driver infers the type of the hook `_optimise` alone (#2101, #2103).
+    #
+    # Many optimisers once carried a shortcut method of the form
     #
     #     optimise(o::Opt{<:Any, …, Nothing}, args…; kwargs…) = _optimise(o, args…; kwargs…)
     #
-    # which skips the fallback chain in the generic `optimise`
-    # (`01_Base_Optimisation/05_InvestableUniverse.jl`) when the estimator has no fallback. The `Nothing` is
-    # positional, so each site re-encodes "`fb` is type parameter k" by hand, and the
-    # count is invisible to the reader.
+    # that went around the driver. The `Nothing` was positional, so each site re-encoded
+    # "`fb` is type parameter k" by hand. `02_DiscreteFiniteAllocation.jl` miscounted: its
+    # `Nothing` sat on `wf`, and the method could never match. A field inserted before `fb`
+    # gives the dangerous polarity: `Nothing` slides onto that field, and the shortcut matches
+    # an estimator that DOES have a fallback and skips its chain in silence.
     #
-    # `02_DiscreteFiniteAllocation.jl` miscounted: it wrote four parameters for a
-    # five-field estimator, so `Nothing` sat on `wf` instead of `fb`. Because
-    # `Nothing <: JuMPWeightFinaliserFormulation` is false, the method could never match
-    # and the miscount was silent.
-    #
-    # The dangerous polarity is the other one. Insert a field before `fb` in any of the
-    # other fifteen and `Nothing` slides onto that field while `fb` goes free — the
-    # shortcut then matches estimators that DO have a fallback and calls `_optimise`
-    # directly, silently skipping the fallback chain.
-    #
-    # This census names no optimiser, so a shortcut added in future is covered the day it
-    # is written. It asserts two things about every shortcut it finds:
-    #
-    #   1. Exactly one type parameter is constrained to `Nothing`.
-    #   2. That parameter is the position of the field `fb`.
+    # #2101 and #2103 measured each shortcut against the driver and removed all of them. A
+    # method of the verb that goes around the driver is a wrapper, by
+    # `.github/instructions/julia-source-code.instructions.md` § *A wrapper is for convenience
+    # or for a dispatch problem*, item 4. So this census asserts that no `optimise` method of
+    # the package pins a type parameter of its estimator to `Nothing`, whatever its position.
+    # It names no optimiser, so a shortcut added in future fails the day it is written.
 
     # Strip the `UnionAll` wrappers off a method signature and off the first argument.
     function base_type(m::Method)
@@ -39,35 +36,43 @@
         return T
     end
 
-    # A parameter is "pinned to `Nothing`" whether it is spelled `Nothing` or `<:Nothing`
-    # (`02_HierarchicalRiskParity.jl` uses the second spelling; the two are equivalent
-    # here because `Nothing` is a singleton).
+    # A parameter is "pinned to `Nothing`" whether it is spelled `Nothing` or `<:Nothing`. The
+    # two are equivalent here because `Nothing` is a singleton.
     is_nothing_param(p) = p === Nothing || (isa(p, TypeVar) && p.ub === Nothing)
 
-    shortcuts = Tuple{Method, DataType, Vector{Int}, Union{Int, Nothing}}[]
-    for m in methods(PortfolioOptimisers.optimise)
-        m.module === PortfolioOptimisers || continue
-        T = base_type(m)
-        isa(T, DataType) || continue
-        isempty(T.parameters) && continue
-        idxs = findall(is_nothing_param, collect(T.parameters))
-        isempty(idxs) && continue
-        fields = fieldnames(T.name.wrapper)
-        push!(shortcuts, (m, T, idxs, findfirst(==(:fb), fields)))
+    # Each method of `ms` whose first argument pins a type parameter to `Nothing`, with the
+    # positions of the pins and the position of the field `fb`.
+    function nothing_pins(ms)
+        out = Tuple{Method, DataType, Vector{Int}, Union{Int, Nothing}}[]
+        for m in ms
+            T = base_type(m)
+            isa(T, DataType) || continue
+            isempty(T.parameters) && continue
+            idxs = findall(is_nothing_param, collect(T.parameters))
+            isempty(idxs) && continue
+            push!(out, (m, T, idxs, findfirst(==(:fb), fieldnames(T.name.wrapper))))
+        end
+        return out
     end
 
-    # A shortcut that stops being found is a shape that was deleted, not a passing test.
-    @test !isempty(shortcuts)
+    # The detector must find a shortcut, or the empty census below passes in silence. The
+    # probe is a local function with the exact shape of the removed shortcuts, and a generic
+    # method beside it.
+    fb_slot(fb) = DiscreteAllocation{<:Any, <:Any, <:Any, <:Any, <:Any, <:Any, <:Any, fb}
+    probe_optimise(::fb_slot(Nothing), ::Any) = :shortcut
+    probe_optimise(::DiscreteAllocation, ::Any) = :driver
+    probe = nothing_pins(methods(probe_optimise))
+    @test length(probe) == 1
+    @test probe[1][3] == [probe[1][4]] == [8]
 
-    for (m, T, idxs, fbpos) in shortcuts
-        site = string(basename(string(m.file)), ":", m.line, " (", T.name.name, ")")
-        @test (site, fbpos !== nothing) == (site, true)
-        @test (site, idxs) == (site, [fbpos])
-    end
+    shortcuts = nothing_pins(filter(m -> m.module === PortfolioOptimisers,
+                                    collect(methods(PortfolioOptimisers.optimise))))
+    sites = [string(basename(string(m.file)), ":", m.line, " (", T.name.name, ", pins ",
+                    idxs, ", fb at ", fbpos, ")") for (m, T, idxs, fbpos) in shortcuts]
+    @test isempty(sites)
 
-    # The site that miscounted, pinned by name so the regression cannot come back quietly.
-    # `fb` is the eighth field, and an estimator without a fallback reaches the shortcut
-    # while an estimator with one still reaches the generic `optimise`.
+    # The site that miscounted, pinned by name. `fb` is the eighth field, and an estimator
+    # without a fallback reaches the same driver as an estimator with one.
     @test fieldnames(DiscreteAllocation) ==
           (:slv, :sc, :so, :wf, :unit, :sets, :strict, :fb)
     da_type(fb) = DiscreteAllocation{Any, Float64, Float64,
@@ -77,6 +82,6 @@
                   Tuple{da_type(Nothing), FiniteAllocationInput})
     with_fb = which(PortfolioOptimisers.optimise,
                     Tuple{da_type(GreedyAllocation), FiniteAllocationInput})
-    @test basename(string(no_fb.file)) == "02_DiscreteFiniteAllocation.jl"
-    @test basename(string(with_fb.file)) == "05_InvestableUniverse.jl"
+    @test no_fb === with_fb
+    @test basename(string(no_fb.file)) == "05_InvestableUniverse.jl"
 end

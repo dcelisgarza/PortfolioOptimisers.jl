@@ -702,7 +702,9 @@ and every addition:
    not resolve. It became `ResolvedConstraintBlock(cbe::ConstraintBlock; pr, rd, …)`, with a
    required keyword for each resolved value, as `FiniteAllocationInput(res; prices, …)` takes
    the fields of a result. The review of #2072 (2026-11-15) applies the rule to the two methods
-   of `returns_universe_axes`, which each build `UniverseAxes`, and to the method of
+   of a private function that each built `UniverseAxes`. They are the methods
+   `UniverseAxes(rd::ReturnsResult)` and `UniverseAxes(ax::UniverseAxes, ::Val{:factor})` now.
+   The review applies it also to the method of
    `fold_context` that builds `TimeDependentContext` beside a method of another job under the
    same name.
 4. **A template hook is not a second name.** A hook that the `# Interfaces` section names, and
