@@ -1044,7 +1044,7 @@ Where:
 """
 function attribution_standard_errors(g::MatNum, al::AlignedAttributionBlock,
                                      fam::Option{<:VecStr}, s1::Number, T::Integer,
-                                     rule::AbstractUnknownEntryRule)
+                                     rule::AbstractUnknownEntryRule)::AttributionErrorsResult
     rw = assert_attribution_field(al.rw, :rw)
     vs = assert_attribution_field(al.vs, :vs)
     red = attribution_reduce_for_errors(al.fcb, al.unseen, al.B, rw, g, al.no, T)

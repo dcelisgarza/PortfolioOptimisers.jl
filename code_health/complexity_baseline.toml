@@ -5,7 +5,7 @@
 julia = "1.13.4"
 code_complexity = "0.2.0"
 julia_syntax = "1.0.2"
-commit = "a3476608a6"
+commit = "9d633b0237"
 
 [file]
 "ext/PortfolioOptimisersPlotsExt/01_CumulativeReturnsPlots.jl" = { cyc = 5, cog = 9, arg = 8, cyc_sum = 56, cog_sum = 65, arg_sum = 99, macros = [] }
@@ -423,7 +423,7 @@ commit = "a3476608a6"
 "src/17_Optimisation/11_ProjectionWeightFinalisers.jl" = { cyc = 9, cog = 13, arg = 3, cyc_sum = 36, cog_sum = 34, arg_sum = 17, macros = [] }
 "src/18_ExpectedReturns/01_ExpectedReturns.jl" = { cyc = 3, cog = 4, arg = 9, cyc_sum = 55, cog_sum = 27, arg_sum = 179, macros = ["@propagatable"] }
 "src/18_ExpectedReturns/02_BrinsonAttribution.jl" = { cyc = 4, cog = 4, arg = 7, cyc_sum = 4, cog_sum = 4, arg_sum = 7, macros = [] }
-"src/18_ExpectedReturns/03_PerformanceSummary.jl" = { cyc = 6, cog = 10, arg = 29, cyc_sum = 72, cog_sum = 39, arg_sum = 121, macros = [] }
+"src/18_ExpectedReturns/03_PerformanceSummary.jl" = { cyc = 8, cog = 10, arg = 29, cyc_sum = 77, cog_sum = 45, arg_sum = 121, macros = [] }
 "src/18_ExpectedReturns/04_SharpeRatioInference.jl" = { cyc = 5, cog = 5, arg = 4, cyc_sum = 21, cog_sum = 17, arg_sum = 26, macros = [] }
 "src/19_FactorAttribution/01_FactorAttribution_a.jl" = { cyc = 3, cog = 6, arg = 13, cyc_sum = 80, cog_sum = 30, arg_sum = 111, macros = [] }
 "src/19_FactorAttribution/01_FactorAttribution_b.jl" = { cyc = 3, cog = 3, arg = 3, cyc_sum = 12, cog_sum = 8, arg_sum = 16, macros = [] }

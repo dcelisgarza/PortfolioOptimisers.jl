@@ -48,8 +48,9 @@ $(DocStringExtensions.FIELDS)
 The arguments are the fields of the struct, in the order of the declaration. The type is a
 Result, so [`performance_summary`](@ref) builds it and a caller reads it. The positional
 constructor checks the values with [`assert_performance_summary_fields`](@ref). The keyword
-constructor takes each field by name, with no default but `nothing` for the five keys and dates
-and an empty `NamedTuple` for `measures` and `risk`, and calls it.
+constructor takes each field by name, and calls it. Its only defaults are `nothing` for the five
+keys and dates, and an empty `NamedTuple` for `measures` and `risk`. An omitted key or date of a
+summary of many entries is `nothing` at each entry.
 
 ## Validation
 
@@ -231,8 +232,11 @@ function PerformanceSummaryResult(; names = nothing, paths = nothing, members = 
                                   short_exposure::Num_VecNum, gross_exposure::Num_VecNum,
                                   net_exposure::Num_VecNum, measures::NamedTuple = (;),
                                   risk::NamedTuple = (;))::PerformanceSummaryResult
-    return PerformanceSummaryResult(names, paths, members, date0, date1, n_periods, ppy,
-                                    alpha, compound, rf, ann_return, ann_volatility, sharpe,
+    # An omitted key or date of a summary of many entries is `nothing` at each entry.
+    entries(v) = isnothing(v) && !isa(n_periods, Integer) ? fill(v, length(n_periods)) : v
+    return PerformanceSummaryResult(entries(names), entries(paths), entries(members),
+                                    entries(date0), entries(date1), n_periods, ppy, alpha,
+                                    compound, rf, ann_return, ann_volatility, sharpe,
                                     sharpe_stderr, sortino, calmar, max_drawdown, cvar,
                                     excess_ret, tracking_error, information_ratio, turnover,
                                     n_eff, long_exposure, short_exposure, gross_exposure,
@@ -253,7 +257,7 @@ The constructor builds the Result first and checks it here, so the check reads e
 
   - `0 < alpha < 1`, `ppy > 0` and `isfinite(rf)`. Raises a `DomainError`.
   - Each value of `measures` is an `AbstractBaseRiskMeasure`, and `risk` has the names of `measures`. Raises an `ArgumentError`.
-  - Each field of an entry, and each value of `risk`, is not a vector when `n_periods` is an integer, and is a vector of `length(n_periods)` otherwise. Raises a `DimensionMismatch`.
+  - Each field of an entry, and each value of `risk`, is not a vector when `n_periods` is an integer, and is a vector of `length(n_periods)` otherwise. A key of one entry, `names`, `paths` or `members`, can be any value, such as the vector `id` of a path. Raises a `DimensionMismatch`.
   - `n_periods`, `ann_volatility`, `sharpe_stderr`, `tracking_error`, `turnover`, `n_eff`, `long_exposure`, `short_exposure` and `gross_exposure` are `NaN` or not negative. Raises a `DomainError`.
 
 # Returns
@@ -272,16 +276,23 @@ function assert_performance_summary_fields(ps::PerformanceSummaryResult)::Nothin
     @argcheck(all(r -> isa(r, AbstractBaseRiskMeasure), ps.measures) &&
               keys(ps.risk) == keys(ps.measures),
               ArgumentError("each value of measures must be a risk measure, and risk must have the names of measures"))
-    n = isa(ps.n_periods, Integer) ? nothing : length(ps.n_periods)
+    n, shape = if isa(ps.n_periods, Integer)
+        nothing, "one value, because the summary has one entry"
+    else
+        length(ps.n_periods), "a vector of $(length(ps.n_periods)) entries"
+    end
     shaped = v -> isa(v, AbstractVector) ? length(v) === n : isnothing(n)
+    # A key of one entry is any value, such as the vector `id` of a path.
+    keyed = v -> isnothing(n) || (isa(v, AbstractVector) && length(v) === n)
     # Each field is read by its name, in a tuple, so the compiler unrolls the checks.
-    entry = (ps.names, ps.paths, ps.members, ps.date0, ps.date1, ps.n_periods,
-             ps.ann_return, ps.ann_volatility, ps.sharpe, ps.sharpe_stderr, ps.sortino,
-             ps.calmar, ps.max_drawdown, ps.cvar, ps.excess_ret, ps.tracking_error,
-             ps.information_ratio, ps.turnover, ps.n_eff, ps.long_exposure,
-             ps.short_exposure, ps.gross_exposure, ps.net_exposure)
-    @argcheck(all(shaped, entry) && all(shaped, values(ps.risk)),
-              DimensionMismatch("each field of an entry, and each value of risk, must have the shape of n_periods: one value for one entry, or a vector of $(n) entries"))
+    entry = (ps.date0, ps.date1, ps.n_periods, ps.ann_return, ps.ann_volatility, ps.sharpe,
+             ps.sharpe_stderr, ps.sortino, ps.calmar, ps.max_drawdown, ps.cvar,
+             ps.excess_ret, ps.tracking_error, ps.information_ratio, ps.turnover, ps.n_eff,
+             ps.long_exposure, ps.short_exposure, ps.gross_exposure, ps.net_exposure)
+    @argcheck(all(keyed, (ps.names, ps.paths, ps.members)) &&
+              all(shaped, entry) &&
+              all(shaped, values(ps.risk)),
+              DimensionMismatch("each field of an entry, and each value of risk, must have the shape of n_periods: $(shape)"))
     assert_nan_or_nonneg(ps.n_periods, :n_periods)
     assert_nan_or_nonneg(ps.ann_volatility, :ann_volatility)
     assert_nan_or_nonneg(ps.sharpe_stderr, :sharpe_stderr)

@@ -2834,6 +2834,14 @@ end
         @test cached.mu ≈ full.mu
         @test cached.sigma ≈ full.sigma
         @test cached.pc === prc.pc
+        # A cache that holds no cache of `pe2`, as the fit of a `pe2` that stores none gives,
+        # clears the cache of the result that the refit of `pe2` reads. The inner pool then
+        # pools its own opinions again. A refit that kept the outer cache moved `mu` by 157 %.
+        prn = PO.forward_prior(prc; pc = (; X = prc.pc.X, w = prc.pc.w, pe2 = nothing))
+        bare = PO.scenario_prior(outer, w, prn, X, F, nothing)
+        @test bare.X == full.X
+        @test bare.mu ≈ full.mu
+        @test bare.pc === prn.pc
     end
 end
 

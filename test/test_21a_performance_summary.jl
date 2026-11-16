@@ -1012,7 +1012,26 @@ end
                                      if !(k in (:names, :paths, :members, :date0, :date1,
                                                 :measures, :risk)))...)
     @test isnothing(bare.names) && isnothing(bare.date0) && bare.risk == (;)
+    # A summary of many entries takes `nothing` at each entry of an omitted key or date, the
+    # shape that `performance_summary` builds and that the readers index.
+    bare2 = PerformanceSummaryResult(;
+                                     (k => v
+                                      for (k, v) in fields(many)
+                                      if !(k in (:names, :paths, :members, :date0, :date1)))...)
+    @test isequal(bare2.names, [nothing, nothing]) && isequal(bare2.paths, many.paths)
+    @test isequal(bare2.date1, many.date1)
     rebuilt(ps, k, v) = PerformanceSummaryResult(; fields(ps)..., k => v)
+    # A key of one entry is any value, such as the vector `id` of a path.
+    @test rebuilt(one, :paths, [1, 2]).paths == [1, 2]
+    @test_throws DimensionMismatch rebuilt(many, :paths, [1, 2, 3])
+    pp = cross_val_predict(InverseVolatility(), PS_RD,
+                           CombinatorialCrossValidation(; n_folds = 5, n_test_folds = 2))
+    pv = PopulationPredictionResult(;
+                                    pred = [MultiPeriodPredictionResult(; pred = p.pred,
+                                                                        id = [k, 0],
+                                                                        opt = p.opt)
+                                            for (k, p) in enumerate(pp.pred)])
+    @test performance_summary(pv).paths[1:2] == [[1, 0], [2, 0]]
     # The settings of the call.
     @test_throws DomainError rebuilt(one, :alpha, 1.5)
     @test_throws DomainError rebuilt(one, :ppy, 0)
@@ -1022,7 +1041,10 @@ end
     @test_throws ArgumentError rebuilt(one, :measures, (; mdd = 1.0))
     # Each field of an entry has the shape of `n_periods`.
     @test_throws DimensionMismatch rebuilt(one, :sharpe, [1.0])
+    @test_throws r"one value, because the summary has one entry" rebuilt(one, :sharpe,
+                                                                         [1.0])
     @test_throws DimensionMismatch rebuilt(many, :sharpe, 1.0)
+    @test_throws r"a vector of 2 entries" rebuilt(many, :sharpe, 1.0)
     @test_throws DimensionMismatch rebuilt(many, :names, ["a"])
     @test_throws DimensionMismatch rebuilt(many, :risk, (; mdd = 1.0))
     # No count, deviation, turnover or exposure is negative, and `NaN` passes.

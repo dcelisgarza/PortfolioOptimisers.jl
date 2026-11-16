@@ -1512,3 +1512,29 @@ end
     full = [dot(w, B * f[t, :]) for t in 1:3]
     @test !isapprox(fa.sys.vol, std(full); rtol = 1e-3)
 end
+
+# A rule of one's own for the variance of a Leverage-One Pair. Its errors answer what `answer`
+# makes of the plug-in errors.
+struct FaOwnLeverage{F} <: PortfolioOptimisers.AbstractUnknownEntryRule
+    answer::F
+end
+PortfolioOptimisers.attribution_leverage_split(::FaOwnLeverage, args...) = nothing
+function PortfolioOptimisers.attribution_leverage_errors(rule::FaOwnLeverage, h1, reg, ses,
+                                                         pass)
+    return rule.answer(ses)
+end
+
+@testset "A rule of one's own answers its standard errors as an AttributionErrorsResult (#2105)" begin
+    pr, rd = fa_prior(; ve = FA_VE1)
+    w = fa_weights(pr)
+    fa(answer) = factor_attribution(w, pr, rd.X; se = true,
+                                    unknown = KindwiseUnknown(;
+                                                              leverage = FaOwnLeverage(answer)))
+    ref = @test_logs min_level = Logging.Error factor_attribution(w, pr, rd.X; se = true,
+                                                                  unknown = KindwiseUnknown(;
+                                                                                            leverage = ZeroUnknown()))
+    @test (@test_logs min_level = Logging.Error fa(identity)).sys.mu_se == ref.sys.mu_se
+    # A named tuple of the v0.33 shape is refused, so the check of the type runs on every
+    # answer.
+    @test_throws MethodError fa(s -> (; sys = s.sys, factor = s.factor, family = s.family))
+end

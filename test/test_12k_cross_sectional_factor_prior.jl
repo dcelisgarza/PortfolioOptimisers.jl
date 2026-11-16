@@ -2534,8 +2534,11 @@ end
     # A factor prior with no cache takes the one of the fit that the views read, through
     # `rebuild_struct`, and keeps every other field.
     none = fm(nothing)
-    got = PO.cross_sectional_kept_cache(none, nothing)
+    @test isnothing(PO.cross_sectional_kept_cache(none, nothing).pc)
+    pf = PO.forward_prior(prior(EmpiricalPrior(), [0.01 0.02; -0.01 0.0; 0.02 -0.01]);
+                          pc = (; X = nothing, w = fill(1 / 3, 3), pe2 = nothing))
+    got = PO.cross_sectional_kept_cache(none, pf)
     @test got isa PO.FactorPriorMoments
-    @test isnothing(got.pc)
+    @test got.pc === pf.pc
     @test got.X === none.X && got.sigma === none.sigma
 end

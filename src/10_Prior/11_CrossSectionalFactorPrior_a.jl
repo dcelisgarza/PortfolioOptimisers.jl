@@ -998,7 +998,7 @@ $(DocStringExtensions.TYPEDEF)
 
 The Spanned Shrinkage and the Orthogonal Forecast Scale of a [`CrossSectionalFactorPrior`](@ref), resolved against its fit.
 
-This type is an implementation detail and is not intended for direct use. [`cross_sectional_calibration`](@ref) makes it. [`cross_sectional_moment_prior`](@ref) reads it. The two fields are numbers of one type, so a positional swap would be silent.
+This type is an implementation detail and is not intended for direct use. [`cross_sectional_calibration`](@ref) makes it. [`cross_sectional_moment_prior`](@ref) reads it. The two fields are numbers, so a positional swap would be silent. They can have two types: a stated `c` keeps its type, such as the `Int` target of a [`ForecastCalibrationSlope`](@ref) on a short history.
 
 # Fields
 
