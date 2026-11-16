@@ -82,7 +82,8 @@ function PipelineBufferState(; data::Option{<:Prices_RR} = nothing,
     return PipelineBufferState(data, max_history)
 end
 """
-$(DocStringExtensions.TYPEDSIGNATURES)
+    partial_fit!(state::PipelineBufferState, data::Prices_RR) -> PipelineBufferState
+    partial_fit!(state::PipelineBufferState, ::Nothing) -> PipelineBufferState
 
 Appends a block of observations to a [`PipelineBufferState`](@ref), and drops the oldest rows past the cap.
 

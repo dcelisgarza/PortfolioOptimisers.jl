@@ -1254,9 +1254,9 @@ end
 """
     optimise(pw::PreviousWeights; kwargs...)
 
-Reads out a [`PreviousWeights`](@ref) that carries a fallback, with no returns data.
+Reads out a [`PreviousWeights`](@ref) with no returns data, with or without a fallback.
 
-The head holds `w` when `w` is set, as the batch verb does. With `w` unset the head fails, and the batch verb hands its returns data to the fallback. Here no returns data exists to hand on, so the fallback reads itself out from the rows that [`partial_fit!`](@ref) folded into it through [`step_fallback`](@ref). So the head answers online as it answers in batch, also when it is the fallback of an [`OnlinePortfolioSelection`](@ref) head. A head with no fallback takes the batch method, with an empty [`ReturnsResult`](@ref).
+The head holds `w` when `w` is set, as the batch verb does. With `w` unset the head fails, and the batch verb hands its returns data to the fallback. Here no returns data exists to hand on, so the fallback reads itself out from the rows that [`partial_fit!`](@ref) folded into it through [`step_fallback`](@ref). So the head answers online as it answers in batch, also when it is the fallback of an [`OnlinePortfolioSelection`](@ref) head. A head with no fallback takes this method too, and [`read_out_fallback`](@ref) returns its Result as it is: the held weights, or a failure when `w` is `nothing`.
 
 # Algorithm
 

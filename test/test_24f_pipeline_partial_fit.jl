@@ -946,4 +946,31 @@ what keeps the JuMP families cheap.
         R[1, 1] = 99.0
         @test Matrix(rfb.X)[1, 1] != 99.0
     end
+
+    @testset "An Online(pipe) step with a schedule resolves at each fold, and the loop sizes it (R60 of #1817)" begin
+        # Since #2106 a pipeline asks each step `is_time_dependent`, so an `Online(pipe)`
+        # step answers for the pipeline that it wraps. At v0.33 the step answered `false`, and
+        # each fold ran the `default`. The step now gives the answer of `Online(pipe)` run
+        # alone, and the fold count of its schedule is checked as for a bare step.
+        X4 = randn(StableRNG(1), 150, 4) ./ 100
+        rd4 = ReturnsResult(; nx = ["A", "B", "C", "D"], X = X4,
+                            ts = Date(2024, 1, 1) .+ Day.(0:149))
+        sched = TimeDependent([EqualWeighted(), InverseVolatility(), EqualWeighted()];
+                              default = EqualWeighted())
+        inner = Pipeline(; steps = (EmpiricalPrior(), sched))
+        outer = Pipeline(; steps = (EmpiricalPrior(), po.Online(inner)))
+        @test po.is_time_dependent(outer)
+        cv3 = OnlineIndexWalkForward(60, 30)
+        a = cross_val_predict(outer, rd4, cv3)
+        d = cross_val_predict(po.Online(inner), rd4, cv3)
+        @test length(a.pred) == length(d.pred) == 3
+        @test all(isapprox(pa.res.w, pd.res.w; atol = 1e-14)
+                  for (pa, pd) in zip(a.pred, d.pred))
+        @test isa(a.pred[2].res, po.NaiveOptimisationResult) &&
+              a.pred[2].res.w != fill(0.25, 4)
+        # Four folds and three entries: the named refusal of the schedule, as for `Online(inner)`.
+        cv4 = OnlineIndexWalkForward(30, 30)
+        @test_throws DimensionMismatch cross_val_predict(po.Online(inner), rd4, cv4)
+        @test_throws DimensionMismatch cross_val_predict(outer, rd4, cv4)
+    end
 end

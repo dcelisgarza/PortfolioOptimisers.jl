@@ -627,6 +627,7 @@ Run the Hierarchical Equal Risk Contribution optimisation.
   - `hec`: The hierarchical equal risk contribution optimiser to use.
   - $(arg_dict[:rd]) If `isa(hec.opt.pe, AbstractPriorResult)`, a standalone optimisation does not need `rd`, but a fallback or the clustering can need it.
   - `branchorder`: The branch order of the clustering. The weights do not depend on the order of the leaves, so a faster order that is not optimal gives the same weights. When `opt.cle` holds a clustering result, the order has no effect.
+  - `rmsk`: The mask of a fit again after a refusal, or `nothing` on the first fit.
   - `kwargs`: Keyword arguments that the method accepts and does not read.
 
 # Related

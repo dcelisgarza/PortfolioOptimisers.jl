@@ -958,6 +958,7 @@ Run the nested clustered optimisation.
   - `branchorder`: The branch order of a hierarchical clustering. The method also passes it to the inner and outer optimisers.
   - `str_names`: Whether the JuMP models name their variables with strings. The method passes it to the inner and outer optimisers.
   - `save`: Whether the results save their JuMP models. The method passes it to the inner and outer optimisers.
+  - `rmsk`: The mask of a fit again after a refusal, or `nothing` on the first fit.
   - `kwargs`: More keyword arguments for the inner and outer optimisers.
 
 # Validation

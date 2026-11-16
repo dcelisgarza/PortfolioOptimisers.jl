@@ -50,6 +50,12 @@ quietly(f) = with_logger(f, NullLogger())
         @test isnothing(PortfolioOptimisers.assert_universe_axis_order(good, ax))
         # A list that is the vector of the data itself passes with no comparison.
         @test isnothing(PortfolioOptimisers.assert_universe_axis_order(usets(rd.nx), ax))
+        # A universe passed with the returns data is the root of the walk, and the walk checks
+        # it. Before R60 of #1817 the call walked the fields of the universe and passed.
+        @test_throws ArgumentError PortfolioOptimisers.assert_universe_axis_order(order, rd)
+        @test_throws DimensionMismatch PortfolioOptimisers.assert_universe_axis_order(short,
+                                                                                      rd)
+        @test isnothing(PortfolioOptimisers.assert_universe_axis_order(good, rd))
     end
     @testset "The walk reaches each prior that holds a universe" begin
         @test_throws ArgumentError prior(BlackLittermanPrior(; sets = order, views = mv),

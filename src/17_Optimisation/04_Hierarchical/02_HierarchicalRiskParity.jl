@@ -404,6 +404,7 @@ Unlike [`HierarchicalEqualRiskContribution`](@ref) and [`NestedClustered`](@ref)
 
   - `hrp`: The hierarchical risk parity optimiser to use.
   - $(arg_dict[:rd]) When `hrp.opt.pe` holds a prior result, the allocation reads no returns from `rd`, but a fallback or the clusterisation can.
+  - `rmsk`: The mask of a fit again after a refusal, or `nothing` on the first fit.
   - `kwargs`: Ignored. A `branchorder` passed here has no effect.
 
 # Related
@@ -586,6 +587,13 @@ Run the Hierarchical Risk Parity optimisation for a vector of risk measures, sca
  3. Run steps 9 to 11 of the single-measure method.
  4. For each pair of halves `lc` and `rc`, combine the measures into one pair `lrisk` and `rrisk`, with [`hrp_scalarised_risk`](@ref) and `sca`.
  5. Run steps 13 to 16 of the single-measure method.
+
+# Arguments
+
+  - `hrp`: The hierarchical risk parity optimiser to use, with a vector of risk measures.
+  - $(arg_dict[:rd]) When `hrp.opt.pe` holds a prior result, the allocation reads no returns from `rd`, but a fallback or the clusterisation can.
+  - `rmsk`: The mask of a fit again after a refusal, or `nothing` on the first fit.
+  - `kwargs`: Ignored. A `branchorder` passed here has no effect.
 
 # Related
 

@@ -67,12 +67,12 @@ The estimator method walks the tree of `est` and checks each universe that it fi
 The method that Julia selects is the algorithm.
 
  1. `sets` is a [`UniverseSets`](@ref): check the asset axis, `sets.dict[sets.xkey]` against `ax.nx`, and the factor axis, `sets.dict[sets.tfkey]` against `ax.nf`. An axis is skipped when `ax` holds no names for it, or when `sets` declares no key for it. A list that is `===` to the names of `ax` passes with no comparison.
- 2. `est` is an estimator or an algorithm: walk the fields of `est` with [`universe_axis_children!`](@ref), against the axes of `rd` from [`UniverseAxes`](@ref). An `IdSet` holds each universe that the walk checked, so a universe that many estimators share is checked once.
+ 2. `est` is an estimator or an algorithm: walk the fields of `est` with [`universe_axis_children!`](@ref), against the axes of `rd` from [`UniverseAxes`](@ref). A [`UniverseSets`](@ref) is an estimator, and the walk checks it at its root as in step 1. An `IdSet` holds each universe that the walk checked, so a universe that many estimators share is checked once.
 
 # Arguments
 
-  - `sets`: The universe to check. A caller that checks one universe passes `UniverseAxes(rd)` as `ax`. The method on `rd` is the method of an estimator, and it walks the fields of `est`, so it does not check a universe that it gets as `est`.
-  - `est`: The estimator whose tree to check, such as a prior, an optimiser or an algorithm. The walk does not stop at `est` itself, even when it is an optimisation head.
+  - `sets`: The universe to check, against the names `ax`. A universe passed with `rd` takes the method of an estimator, and the walk checks it at its root.
+  - `est`: The estimator whose tree to check, such as a prior, an optimiser or an algorithm, or a universe. The walk does not stop at `est` itself, even when it is an optimisation head.
   - $(arg_dict[:rd])
   - `ax`: The names to check against, from [`UniverseAxes`](@ref). The walk passes them, so that a child on the factor axis is checked against the factor names.
 
@@ -211,13 +211,14 @@ Walk the fields of an estimator, and check each [`UniverseSets`](@ref) in them o
 
 # Algorithm
 
- 1. Visit the value of each field of [`asset_axis_fields`](@ref) on `ax`.
- 2. When `ax.nf` holds names, visit the value of each field of [`factor_axis_fields`](@ref) on the factor axes `UniverseAxes(ax, Val(:factor))`, see [`UniverseAxes`](@ref), with a new `IdSet`. A universe on the factor axis names other columns than a universe on the asset axis, so the two do not share a set.
+ 1. `x` is a [`UniverseSets`](@ref) that `seen` holds: return. Any other universe: add it to `seen`, and check it with [`assert_universe_axis_order`](@ref). A universe at the root of the walk and a universe in a field both reach this method, because [`universe_axis_visit!`](@ref) walks an estimator with `universe_axis_children!`, and a universe is an estimator.
+ 2. Any other `x`: visit the value of each field of [`asset_axis_fields`](@ref) on `ax`.
+ 3. When `ax.nf` holds names, visit the value of each field of [`factor_axis_fields`](@ref) on the factor axes `UniverseAxes(ax, Val(:factor))`, see [`UniverseAxes`](@ref), with a new `IdSet`. A universe on the factor axis names other columns than a universe on the asset axis, so the two do not share a set.
 
 # Arguments
 
   - `seen`: The universes that the walk checked.
-  - `x`: The estimator whose fields to walk.
+  - `x`: The estimator whose fields to walk, or a universe to check.
   - `ax`: The axes, from [`UniverseAxes`](@ref).
 
 # Validation
@@ -250,6 +251,14 @@ function universe_axis_children!(seen::IdSet{UniverseSets}, x, ax::UniverseAxes)
     end
     return nothing
 end
+function universe_axis_children!(seen::IdSet{UniverseSets}, sets::UniverseSets,
+                                 ax::UniverseAxes)
+    if sets in seen
+        return nothing
+    end
+    push!(seen, sets)
+    return assert_universe_axis_order(sets, ax)
+end
 """
     universe_axis_visit!(seen::IdSet{UniverseSets}, x, ax::UniverseAxes) -> Nothing
 
@@ -259,11 +268,10 @@ Handle one value of a field in the walk of [`universe_axis_children!`](@ref).
 
 The method that Julia selects on the type of `x` is the algorithm.
 
- 1. A [`UniverseSets`](@ref) that `seen` holds: return. Any other universe: add it to `seen`, and check it with [`assert_universe_axis_order`](@ref).
- 2. An [`OptimisationEstimator`](@ref) or a [`TimeDependent`](@ref): return, for the reasons that [`assert_universe_axis_order`](@ref) states.
- 3. An estimator, an algorithm or a covariance estimator: walk its fields with `universe_axis_children!`.
- 4. A vector of estimators or algorithms: visit each element.
- 5. Any other value: return.
+ 1. An [`OptimisationEstimator`](@ref) or a [`TimeDependent`](@ref): return, for the reasons that [`assert_universe_axis_order`](@ref) states.
+ 2. An estimator, an algorithm or a covariance estimator: walk it with `universe_axis_children!`. A [`UniverseSets`](@ref) is an estimator, and that method checks it.
+ 3. A vector of estimators or algorithms: visit each element.
+ 4. Any other value: return.
 
 # Arguments
 
@@ -284,14 +292,6 @@ The method that Julia selects on the type of `x` is the algorithm.
   - [`universe_axis_children!`](@ref)
   - [`assert_universe_axis_order`](@ref)
 """
-function universe_axis_visit!(seen::IdSet{UniverseSets}, sets::UniverseSets,
-                              ax::UniverseAxes)
-    if sets in seen
-        return nothing
-    end
-    push!(seen, sets)
-    return assert_universe_axis_order(sets, ax)
-end
 function universe_axis_visit!(::IdSet{UniverseSets},
                               ::Union{OptimisationEstimator, TimeDependent}, ::UniverseAxes)
     return nothing

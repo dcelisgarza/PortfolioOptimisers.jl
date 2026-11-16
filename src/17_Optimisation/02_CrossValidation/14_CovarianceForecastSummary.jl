@@ -232,6 +232,7 @@ Arguments correspond to the struct's fields, in the order they are declared. [`c
 ## Validation
 
   - The rules of [`assert_covariance_summary_fields`](@ref): the levels are valid, every field of an entry has the shape of `n_steps`, each evaluation scored a step, each exceedance rate is a rate, and each band is ordered. A breach raises a `DomainError` or a `DimensionMismatch`.
+  - The keyword constructor refuses a value of another type than its signature states with a `TypeError`. The positional constructor checks only the types of its signature: the generic positional method that `@concrete` adds takes values of any other type, such as a `Float64` `n_steps`, with no check.
 
 # Related
 
@@ -967,6 +968,7 @@ The positional constructor checks the values. The keyword constructor takes each
 ## Validation
 
   - `standardised_return` and `portfolio_qlike` have the same size, `steps × portfolios`. Otherwise, the constructor raises a `DimensionMismatch`.
+  - The keyword constructor refuses a value that is not a matrix of numbers with a `TypeError`. The positional constructor checks only two matrices: the generic positional method that `@concrete` adds takes values of any other type, such as two vectors, with no check.
 
 # Related
 

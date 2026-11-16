@@ -19,7 +19,7 @@ $(DocStringExtensions.TYPEDSIGNATURES)
 
 Return `true` when a step of the [`Pipeline`](@ref) holds a schedule.
 
-Three steps can hold one: a [`TimeDependent`](@ref) step in the place of the optimiser, an optimisation step with a scheduled field, and a nested pipeline that holds one of the two. A [`PipelineStep`](@ref) answers for the estimator that it wraps. Every other step answers `false` through the fallback of [`is_time_dependent`](@ref). A preprocessing step, a prior, a phylogeny, an uncertainty set, a constraint estimator and a callable hold no schedule. A schedule for one of these families is a field of the optimisation step.
+Three steps can hold one: a [`TimeDependent`](@ref) step in the place of the optimiser, an optimisation step with a scheduled field, and a nested pipeline that holds one of the two. A nested pipeline in an [`Online`](@ref) wrapper answers as the pipeline that it wraps, and the online arm of the fold loop resolves its schedule at each fold. A [`PipelineStep`](@ref) answers for the estimator that it wraps. Every other step answers `false` through the fallback of [`is_time_dependent`](@ref). A preprocessing step, a prior, a phylogeny, an uncertainty set, a constraint estimator and a callable hold no schedule. A schedule for one of these families is a field of the optimisation step.
 
 # Related
 
@@ -57,7 +57,7 @@ end
 
 Check the number of folds `n` against the schedules of one [`Pipeline`](@ref) step.
 
-An optimisation step, a [`TimeDependent`](@ref) step and a nested pipeline answer through [`assert_time_dependent_fold_count`](@ref). That check sizes the entries of a schedule to the loop, and it does not read the `default`. A [`PipelineStep`](@ref) answers for the estimator that it wraps, and a wrapped callable passes. Every other step passes.
+An optimisation step, a [`TimeDependent`](@ref) step and a nested pipeline, bare or in an [`Online`](@ref) wrapper, answer through [`assert_time_dependent_fold_count`](@ref). That check sizes the entries of a schedule to the loop, and it does not read the `default`. A [`PipelineStep`](@ref) answers for the estimator that it wraps, and a wrapped callable passes. Every other step passes. The steps that this check reads are the steps for which [`is_time_dependent`](@ref) can answer `true`, so a schedule that the loop resolves at each fold is always sized.
 
 # Validation
 
@@ -68,8 +68,9 @@ An optimisation step, a [`TimeDependent`](@ref) step and a nested pipeline answe
   - [`assert_time_dependent_fold_count`](@ref)
 """
 assert_pipeline_step_fold_count(::Any, ::Integer, ::Bool)::Nothing = nothing
-function assert_pipeline_step_fold_count(x::Union{OptE_Opt, TD_OptE_Opt, Pipeline},
-                                         n::Integer, all_binds::Bool)::Nothing
+function assert_pipeline_step_fold_count(x::Union{OptE_Opt, TD_OptE_Opt, Pipeline,
+                                                  Online{<:Pipeline}}, n::Integer,
+                                         all_binds::Bool)::Nothing
     assert_time_dependent_fold_count(x, n, all_binds)
     return nothing
 end

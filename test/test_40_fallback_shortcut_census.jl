@@ -23,15 +23,17 @@
     # the package pins a type parameter of its estimator to `Nothing`, whatever its position.
     # It names no optimiser, so a shortcut added in future fails the day it is written.
 
-    # Strip the `UnionAll` wrappers off a method signature and off the first argument.
+    # Strip the `UnionAll` wrappers off a method signature and off the first argument. A first
+    # argument spelled `::E` with `where {E <: Opt{…, Nothing}}` is a `TypeVar`, so its upper
+    # bound is the type that the method pins.
     function base_type(m::Method)
         sig = m.sig
         while isa(sig, UnionAll)
             sig = sig.body
         end
         T = sig.parameters[2]
-        while isa(T, UnionAll)
-            T = T.body
+        while isa(T, UnionAll) || isa(T, TypeVar)
+            T = isa(T, TypeVar) ? T.ub : T.body
         end
         return T
     end
@@ -62,6 +64,12 @@
     probe_optimise(::fb_slot(Nothing), ::Any) = :shortcut
     probe_optimise(::DiscreteAllocation, ::Any) = :driver
     probe = nothing_pins(methods(probe_optimise))
+    @test length(probe) == 1
+    @test probe[1][3] == [probe[1][4]] == [8]
+    # The same shape with the estimator type in a `where` clause.
+    probe_where(::E, ::Any) where {E <: fb_slot(Nothing)} = :shortcut
+    probe_where(::DiscreteAllocation, ::Any) = :driver
+    probe = nothing_pins(methods(probe_where))
     @test length(probe) == 1
     @test probe[1][3] == [probe[1][4]] == [8]
 

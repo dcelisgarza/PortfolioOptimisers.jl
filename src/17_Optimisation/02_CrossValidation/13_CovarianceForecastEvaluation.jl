@@ -687,6 +687,7 @@ The positional constructor checks the values. The keyword constructor takes each
   - `n_valid` is not negative. Otherwise, the constructor raises a `DomainError`.
   - `n_valid` is at most `length(diagonal_ratio)`, the count of assets. Otherwise, the constructor raises a `DimensionMismatch`.
   - `standardised_return` and `portfolio_qlike` hold one entry for each test portfolio, so they have the same length. Otherwise, the constructor raises a `DimensionMismatch`.
+  - The keyword constructor refuses a value of another type than its signature states with a `TypeError`. The positional constructor checks only the types of its signature: the generic positional method that `@concrete` adds takes values of any other type, such as a `Float64` count, with no check.
 
 # Related
 

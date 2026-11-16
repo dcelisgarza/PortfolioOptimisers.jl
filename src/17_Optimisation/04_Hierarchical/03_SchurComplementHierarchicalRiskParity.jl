@@ -1260,6 +1260,7 @@ Unlike [`HierarchicalEqualRiskContribution`](@ref) and [`NestedClustered`](@ref)
 
   - `sh`: The Schur complement hierarchical risk parity optimiser.
   - $(arg_dict[:rd]) When `sh.opt.pe` is a prior result, the fit itself does not read `rd`, but the clustering and a fallback can read it.
+  - `rmsk`: The mask of a fit again after a refusal, or `nothing` on the first fit.
   - `kwargs`: Absorbed and ignored.
 
 # Related
@@ -1347,6 +1348,13 @@ Where:
   - ``\\boldsymbol{w}_k``: Weights of the allocation of bundle ``k``, which sum to one.
 
 The denominator is the sum of the blended weights, because each ``\\boldsymbol{w}_k`` sums to one.
+
+# Arguments
+
+  - `sh`: The Schur complement hierarchical risk parity optimiser, with a vector of bundles.
+  - $(arg_dict[:rd]) When `sh.opt.pe` is a prior result, the fit itself does not read `rd`, but the clustering and a fallback can read it.
+  - `rmsk`: The mask of a fit again after a refusal, or `nothing` on the first fit.
+  - `kwargs`: Absorbed and ignored.
 
 # Related
 
