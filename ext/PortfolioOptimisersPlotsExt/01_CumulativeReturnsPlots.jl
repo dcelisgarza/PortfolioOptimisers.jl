@@ -74,7 +74,8 @@ function PortfolioOptimisers.plot_portfolio_cumulative_returns(pred::Union{Predi
                                                                  kwargs...)
 end
 # `plot!(plt, q)` with a whole figure `q` adds no series to `plt`, so the population copies
-# the curves of each member, labelled by the key of the member.
+# the curves of each member, labelled by the key of the member. Each curve takes `kwargs` as
+# the curve of a path does, so a series attribute such as `linewidth` reaches every member.
 function PortfolioOptimisers.plot_portfolio_cumulative_returns(pred::PopulationPredictionResult;
                                                                compound::Bool = false,
                                                                kwargs...)
@@ -86,7 +87,7 @@ function PortfolioOptimisers.plot_portfolio_cumulative_returns(pred::PopulationP
         key = string(PortfolioOptimisers.population_path_key(p, k))
         for s in q.series_list
             lbl = length(q.series_list) == 1 ? key : "$(key), $(s[:label])"
-            plot!(plt, s[:x], s[:y]; label = lbl)
+            plot!(plt, s[:x], s[:y]; kwargs..., label = lbl)
         end
     end
     return plt

@@ -50,7 +50,7 @@
 
 Plot the cumulative returns of a portfolio against time.
 
-The curve is [`cumulative_returns`](@ref) of the net portfolio returns that [`calc_net_returns`](@ref) forms from `w`, `X` and `fees`. A vector of weight vectors draws one curve per portfolio, labelled `Portfolio i`. The method that takes `net_ret` draws a return series the caller already formed. A population draws the curve of each member on one figure. The package extension `PortfolioOptimisersPlotsExt` implements the methods, and it loads after `using GraphRecipes, StatsPlots`.
+The curve is [`cumulative_returns`](@ref) of the net portfolio returns that [`calc_net_returns`](@ref) forms from `w`, `X` and `fees`. A vector of weight vectors draws one curve per portfolio, labelled `Portfolio i`. The method that takes `net_ret` draws a return series the caller already formed. A population draws the curve of each member on one figure, labelled by the key of the member that [`portfolio_report`](@ref) uses. A member with many portfolios adds `Portfolio i` to its key. Each curve of a population takes `kwargs`, as the curve of a path does. The package extension `PortfolioOptimisersPlotsExt` implements the methods, and it loads after `using GraphRecipes, StatsPlots`.
 
 A gapped panel reaches this figure only through the returns that the caller gives it. A prediction arity is finite already, because the fold set the Held Gap to zero once in [`predict`](@ref). A `w, X` or `w, pr` arity computes on the matrix that the caller holds and checks nothing, and `X * w` is `NaN` at a gap even where the weight is zero. Score a gapped panel through `predict(res, rd)` and plot the prediction.
 
@@ -1215,7 +1215,7 @@ function plot_rolling_measure end
 
 Plot the distribution of the weight of each asset over the folds of a path or the members of a population, as one box per asset.
 
-The weights are the rows of [`prediction_weights`](@ref): the target of each fold, or of each member, on the union of the asset names. A member that is a walk-forward path gives one weight vector, the mean of its fold targets. A fold that failed to solve, and a path that holds one, gives a row that is `NaN` at every name. That row holds no weight, so it is absent from every box, and ``K`` does not count it. When no row is left, the figure draws the axes alone. [`relevant_assets`](@ref) ranks the assets by their mean absolute weight and chooses how many boxes to draw, in the order of the asset axis. The package extension `PortfolioOptimisersPlotsExt` implements the methods, and it loads after `using GraphRecipes, StatsPlots`.
+The weights are the rows of [`prediction_weights`](@ref): the target of each fold, or of each member, on the union of the asset names. A member that is a walk-forward path gives one weight vector, the mean of its fold targets. A fold that failed to solve, and a path that holds one, gives a row that is `NaN` at every name, unless the fold holds the previous weights under a Weight Drift, as [`prediction_weights`](@ref) states. That row holds no weight, so it is absent from every box, and ``K`` does not count it. When no row is left, the figure draws the axes alone. [`relevant_assets`](@ref) ranks the assets by their mean absolute weight and chooses how many boxes to draw, in the order of the asset axis. The package extension `PortfolioOptimisersPlotsExt` implements the methods, and it loads after `using GraphRecipes, StatsPlots`.
 
 # Mathematical definition
 

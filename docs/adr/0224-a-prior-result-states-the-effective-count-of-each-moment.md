@@ -81,7 +81,12 @@ the exact count of the variance of a weighted mean of independent draws.
      differs from entry 1 only when the covariance counts fewer observations than the mean. It then
      gives the rule a larger estimate of that error, and the rule trusts the mean less. The
      decision accepts that cost, because to overstate an uncertainty is safer than to understate
-     it (R38 of #1817).
+     it (R38 of #1817). R61 of #1817 measured the cost on the fixture of
+     `test_12i_cross_sectional_factor_rr_slot.jl`, with 119 rows of factor returns, a plain mean
+     and an `ExpWeightedCovariance` in the nested prior. The Spanned Shrinkage of `PrecisionBlend`
+     falls from 0.9700 to 0.9666 at a decay of 0.99 (106.9 of 119 rows), from 0.9744 to 0.9517 at
+     0.97 (63.2 rows), and from 0.9803 to 0.9296 at 0.94 (33.3 rows). The `mu` of the prior moves
+     by 0.06 %, 0.39 % and 0.86 % of its norm.
 
 ## Considered options
 

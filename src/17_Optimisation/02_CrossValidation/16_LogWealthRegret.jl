@@ -222,7 +222,7 @@ end
 
 One weight vector per fold, read by `read` and embedded by asset name on the union of the folds' universes.
 
-The folds of a multi-period result need not share a universe. A [`Pipeline`](@ref) with an Asset Selector fits each fold on the assets it selected, so the fold of a top-1 selector carries one name and one weight. A path over the folds is stated on one axis, so each fold's weights go into the columns of its own names on the union axis, and every other entry of its row is zero.
+The folds of a multi-period result need not share a universe. A [`Pipeline`](@ref) with an Asset Selector fits each fold on the assets it selected, so the fold of a top-1 selector carries one name and one weight. A path over the folds is stated on one axis, so each fold's weights go into the columns of its own names on the union axis, and every other entry of its row is zero. The row of a fold that failed to solve with no weights to hold is `NaN` at every name, as [`weights_by_name`](@ref) states.
 
 # Algorithm
 
@@ -261,7 +261,7 @@ Embed weight vectors that sit on different asset names on the union of their nam
 
 Each vector `ws[i]` holds one weight for each name of `nxs[i]`. The union axis holds every name once, in the order of first appearance. A vector puts each weight in the column of its name, and every other entry of its row is zero. [`stacked_fold_weights`](@ref) embeds the folds of a path with this function, and [`prediction_weights`](@ref) embeds the paths of a population.
 
-A vector whose every weight is `NaN` is a failed portfolio. A fold that failed to solve holds such a vector, and so does a path or a population mean that reads one. Its row is `NaN` at every name of the union. A zero at a name that the vector does not hold would read as a book with no position in that asset, and the failed portfolio holds no book. A vector with no weight is not a failed portfolio.
+A vector whose every weight is `NaN` is a failed portfolio. A fold that failed to solve holds such a vector, and so does a path or a population mean that reads one. Under a Weight Drift, a failed fold that the fold loop handed the previous weights holds those weights, as [`fold_target`](@ref) states, so its vector is finite and its row is not failed. Its row is `NaN` at every name of the union. A zero at a name that the vector does not hold would read as a book with no position in that asset, and the failed portfolio holds no book. A vector with no weight is not a failed portfolio.
 
 # Algorithm
 
@@ -329,7 +329,7 @@ P_T &= \\sum_{t=2}^{T} \\lVert \\boldsymbol{u}_t - \\boldsymbol{u}_{t-1} \\rVert
 Where:
 
   - $(math_dict[:P_T_path])
-  - ``\\boldsymbol{u}_t``: Comparator's target on fold ``t``, embedded by asset name on the union of the folds' universes, with a zero at every asset outside the fold's own universe.
+  - ``\\boldsymbol{u}_t``: Comparator's target on fold ``t``, embedded by asset name on the union of the folds' universes, with a zero at every asset outside the fold's own universe. A fold that failed to solve with no weights to hold is `NaN` at every asset, so the path length is `NaN`.
   - ``T``: Number of folds.
 
 # Algorithm

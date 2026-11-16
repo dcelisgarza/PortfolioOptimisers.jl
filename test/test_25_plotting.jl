@@ -424,6 +424,11 @@
         @test [s[:label] for s in pc.series_list] ==
               [string(PortfolioOptimisers.population_path_key(p, k))
                for (k, p) in enumerate(pop.pred)]
+        # A series attribute reaches each curve of a population, as it reaches the curve of a
+        # path, and the curve keeps the key of its member as its label.
+        pk = plot_portfolio_cumulative_returns(pop; linewidth = 5, linestyle = :dash)
+        @test all(s -> s[:linewidth] == 5 && s[:linestyle] === :dash, pk.series_list)
+        @test [s[:label] for s in pk.series_list] == [s[:label] for s in pc.series_list]
         @test isempty(plot_weight_stability(PopulationPredictionResult(; pred = [bad])).series_list)
     end
 

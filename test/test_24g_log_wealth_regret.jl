@@ -575,6 +575,25 @@ and be-the-leader collapses onto the static comparator.
         @test isnan(We[1, 1]) && We[1, 2] == 0.5 && iszero(We[2, :])
         _, Wf = po.weights_by_name([Float32[NaN32], Float32[1]], [["A"], ["B"]])
         @test eltype(Wf) == Float32 && all(isnan, Wf[1, :])
+        # Under a Weight Drift, a failed fold that the loop handed the previous weights holds
+        # them, so its row is that book. The turnover fee makes the loop hand them, and the
+        # floor on the return fails the folds whose window has no mean above it.
+        rng = StableRNG(64)
+        Xd = 0.01 .* randn(rng, 400, 4)
+        rdd = ReturnsResult(; nx = ["A", "B", "C", "D"], X = Xd,
+                            ts = collect(Date(2024, 1, 1):Day(1):Date(2025, 2, 3)))
+        ret = ArithmeticReturn(; settings = po.JuMPReturnsSettings(; lb = 0.0015))
+        fees = Fees(; tn = Turnover(; w = fill(0.25, 4), val = 1e-4))
+        estd = MeanRisk(; opt = JuMPOptimiser(; slv = slv, fees = fees, ret = ret))
+        held = cross_val_predict(estd, rdd,
+                                 IndexWalkForward(60, 30; wd = SelfFinancingDrift()))
+        bare = cross_val_predict(estd, rdd, IndexWalkForward(60, 30))
+        @test isa(held.pred[1].res.retcode, OptimisationSuccess)
+        @test isa(held.pred[2].res.retcode, OptimisationFailure)
+        _, Wh, _ = prediction_weights(held)
+        @test all(isfinite, Wh[2, :]) && Wh[2, :] == fold_target(held.pred[2])
+        @test Wh[2, :] == held.pred[2].hw.w0 && Wh[2, :] != Wh[1, :]
+        @test all(isnan, prediction_weights(bare)[2][2, :])
     end
 
     @testset "A prediction with many members gives one regret for each member (#1936)" begin
