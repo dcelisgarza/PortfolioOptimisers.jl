@@ -80,9 +80,9 @@ Under the per-value form, `rank_scores` holds one entry for each scorer.**
 
 ## Consequences
 
-- **The build tickets of map #1980.** The code holds none of this decision until they land.
-  Ticket #2000 gives the searches a vector of search scorers, `s_sca`, the scale of each scorer,
-  the two forms of a function scorer, and the `n_best` refusal at the run. Ticket #2001 builds
+- **The build tickets of map #1980.** They landed this decision on `dev`.
+  Ticket #2000 gave the searches a vector of search scorers, `s_sca`, the scale of each scorer,
+  the two forms of a function scorer, and the `n_best` refusal at the run. Ticket #2001 built
   `EachValue`, `rank_scores` under it, and its selection (ADR 0234).
 - **A breaking change, for the build.** The released docstring of `CrossValSearchScorer` says
   that a function returns an integer. The build widens it to the two forms. A released index

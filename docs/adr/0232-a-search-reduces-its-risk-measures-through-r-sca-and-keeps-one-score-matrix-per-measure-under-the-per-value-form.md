@@ -69,14 +69,15 @@ matrix for each measure.**
 
 ## Consequences
 
-- **The build tickets of map #1980.** The code holds none of this decision until they land.
-  Ticket #1997 gives `NearestQuantilePrediction` its field `sca`, gives `sort_by_measure` and
-  `quantile_by_measure` their keyword `sca`, and removes the keyword form of `oriented_score`.
-  Ticket #1998 gives the two searches `r_sca`, the one writer and the one allocator.
-  Ticket #1999 gives `FoldRiskScorer` its field `sca`, with the default `nothing` (ADR 0238). A
+- **The build tickets of map #1980.** They landed this decision on `dev`.
+  Ticket #1997 gave `NearestQuantilePrediction` its field `sca`, gave `sort_by_measure` and
+  `quantile_by_measure` the reduction `sca` as their first argument, and removed the keyword form
+  of `oriented_score`.
+  Ticket #1998 gave the two searches `r_sca`, the one writer and the one allocator.
+  Ticket #1999 gave `FoldRiskScorer` its field `sca`, with the default `nothing` (ADR 0238). A
   vector gives each asset its oriented score on each window, so `bigger_is_better` of the scorer
   reads `true` as the orientation of the values. One measure keeps its raw value and its own
-  orientation, so no number of one measure moves. Ticket #2001 builds the per-value
+  orientation, so no number of one measure moves. Ticket #2001 built the per-value
   singleton, its shape and its selection (ADR 0234).
 - **A breaking change, for the build.** The released `quantile_by_measure` and
   `NearestQuantilePrediction` pass `r_kwargs` to `expected_risk`, so a released caller can write

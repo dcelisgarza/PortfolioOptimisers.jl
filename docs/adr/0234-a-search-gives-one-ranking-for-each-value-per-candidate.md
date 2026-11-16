@@ -129,20 +129,20 @@ of the search states this as the form of the `refit` of sklearn.
 
 ## Consequences
 
-- **The build tickets of map #1980.** The code holds none of this decision until they land.
-  Ticket #2001 builds `EachValue`, the shape of the Result under it on `r_sca` or
+- **The build tickets of map #1980.** They landed this decision on `dev`.
+  Ticket #2001 built `EachValue`, the shape of the Result under it on `r_sca` or
   `s_sca`, the empty entry and its checks. One verb,
   `finite_candidate_order`, gives one ranking or one ranking for each value. An empty entry takes
   the form of a full ranking of the same scorer: empty values, or `nothing` for a scorer that
   gives an index. The constructor of the Result checks `opt == ranked[1]` for a search of one
-  value too. Ticket #2002 builds `PerCandidate`. Its `sca` takes `Option{<:Sca_VecToScaM}` and
+  value too. Ticket #2002 built `PerCandidate`. Its `sca` takes `Option{<:Sca_VecToScaM}` and
   defaults to `nothing`, the sum, as every scalariser slot does (ADR 0238). The family
   `AbstractSearchReduction <: AbstractAlgorithm` holds `EachValue` and `PerCandidate`: the bound
   of `r_sca`, `oriented_score` and the allocator of the scores read it, because both members
   keep one matrix per measure. The bound of `s_sca` keeps `EachValue` alone.
   `finite_candidate_order` takes `r_sca` as its first argument, so the type of `r_sca` picks
   the method for the `K` matrices, and `candidate_values` holds the combination of the measures,
-  one method for each form of `sca`. Ticket #2003 shows a search
+  one method for each form of `sca`. Ticket #2003 showed a search
   with a vector of risk measures and a vector of search scorers in the tuning example and the
   user guide.
 - **A breaking change, for the build.** Under the per-value form of `r_sca` or `s_sca` with a vector,
