@@ -157,3 +157,23 @@ Phase 1 of the builder registers the weights of the model under that namespace w
 `w_owner = Symbol("")`. So `weights_prefix` keeps `W`, `variance_flag` and `rc_variance` with the
 weights, as the amendment of 2026-09-24 decided. Every builder with a fixed name takes the prefix
 of its block (#2041). The rule of the owner does not change.
+
+## Amendment (2026-11-16): a semidefinite phylogeny marks the weights
+
+The marks of the weights take a third entry, `sdp_phylogeny`. Phase 1 of each Constraint Block
+sets it on `weights_prefix` with `mark_sdp_phylogeny!` when the phylogeny `plr` of the block holds a
+`SemiDefinitePhylogeny`, and `sdp_variance_flag!` reads it beside `rc_variance`. So every
+variance on the weights takes the semidefinite formulation when any block on them holds a
+semidefinite phylogeny, and not only when the block of its own builder holds one (#2126).
+
+Before the mark, the set of a leader re-solve holds its phylogeny in the block `blk_2_`, and the
+variance of the head read the `plr` of the head alone. The variance took the second-order cone and
+marked `variance_flag`. Phase 2 of the set then built `W`, saw the mark, and omitted the penalty,
+so no term held `W` down and the rows bound nothing.
+
+The `pl` argument of `sdp_variance_flag!` stays. It reaches a namespace that owns its own weights,
+such as the inner build of `IndependentVariableTracking`, which a mark of the head does not reach.
+A `FactorRiskContribution` writes no term on the lift of the asset weights, so
+`OnlinePortfolioSelection` refuses a `FollowTheLeader` with one in its chain and a programme set
+with a semidefinite phylogeny, as the constructor of the head refuses one in `opt.ple`.
+`test/test_67c_follow_the_leader.jl` covers the re-solve, the model and the refusal.

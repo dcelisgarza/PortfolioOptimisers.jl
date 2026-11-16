@@ -1606,7 +1606,7 @@ end
 
 Refuses, when the head is built, a rule and an Allocation Set that cannot work together.
 
-The default admits every pair. A rule that holds an optimisation estimator with no model for a programme set, such as [`FollowTheLeader`](@ref), refuses that set by name. A rule over other rules sends the check to each of them.
+The default admits every pair. A rule that holds an optimisation estimator with no model for a programme set, such as [`FollowTheLeader`](@ref), refuses that set by name. A [`FollowTheLeader`](@ref) whose held estimator, or a member of its fallback chain, is a [`FactorRiskContribution`](@ref) refuses a programme set with a semidefinite phylogeny. A rule over other rules sends the check to each of them.
 
 # Related
 

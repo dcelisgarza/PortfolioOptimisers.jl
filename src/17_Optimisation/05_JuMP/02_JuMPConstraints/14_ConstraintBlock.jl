@@ -1217,11 +1217,12 @@ The block reads its own prior `cbr.pr` and its own phylogeny `cbr.plr`. The buil
 Phase 1:
 
  1. When `prefix` is not empty, register the weights of the model under it, with the owner `Symbol("")`. Add the weight bounds, the net budget `bgt`, and the short and gross budgets of the block. [`set_block_weight_constraints!`](@ref) does both.
- 2. Add the linear rows `lcsr`, then the centrality rows `ctr`, with [`set_linear_weight_constraints!`](@ref).
- 3. Add the MIP kinds with [`set_mip_constraints!`](@ref), then the sub-group MIP kinds with [`set_smip_constraints!`](@ref).
- 4. Add the turnover ceilings with [`set_turnover_constraints!`](@ref).
- 5. Add the tracking errors `tr` with [`set_tracking_error_constraints!`](@ref), on the prior of the block.
- 6. Add the norm ceilings `l2c`, `lpc` and `linfc`, then the penalties `l1`, `l2`, `lp` and `linf`.
+ 2. Mark `sdp_phylogeny` on the owner of the weights when `cbr.plr` holds a semidefinite phylogeny, with [`mark_sdp_phylogeny!`](@ref). Every variance on the weights then takes the semidefinite formulation, so a variance of the owner that the objective minimises holds down the lift that the rows of phase 2 bind.
+ 3. Add the linear rows `lcsr`, then the centrality rows `ctr`, with [`set_linear_weight_constraints!`](@ref).
+ 4. Add the MIP kinds with [`set_mip_constraints!`](@ref), then the sub-group MIP kinds with [`set_smip_constraints!`](@ref).
+ 5. Add the turnover ceilings with [`set_turnover_constraints!`](@ref).
+ 6. Add the tracking errors `tr` with [`set_tracking_error_constraints!`](@ref), on the prior of the block.
+ 7. Add the norm ceilings `l2c`, `lpc` and `linfc`, then the penalties `l1`, `l2`, `lp` and `linf`.
 
 Phase 2:
 
@@ -1253,6 +1254,7 @@ Phase 2:
   - [`set_allocation_risk_return_bounds!`](@ref)
   - [`set_block_objective_terms!`](@ref)
   - [`weights_prefix`](@ref)
+  - [`mark_sdp_phylogeny!`](@ref)
 """
 function set_block_constraints!(model::JuMP.Model, cbr::ResolvedConstraintBlock, owner,
                                 bgt::Option{<:Num_BgtCE}, fees::Option{<:Fees};
@@ -1260,6 +1262,9 @@ function set_block_constraints!(model::JuMP.Model, cbr::ResolvedConstraintBlock,
                                 prefix::Symbol = Symbol(""), kwargs...)::Nothing
     (; wb, lt, st, lcsr, ctr, gcardr, sgcardr, smtx, sgmtx, slt, sst, sglt, sgst, plr, ss) = cbr
     set_block_weight_constraints!(model, cbr, bgt; prefix = prefix)
+    # Before every variance of the model, the tracking errors of this phase too, so a variance
+    # on the weights reads the semidefinite phylogeny of every block on them (#2126).
+    mark_sdp_phylogeny!(model, plr; prefix = prefix)
     set_linear_weight_constraints!(model, lcsr, :lcs_ineq_, :lcs_eq_; prefix = prefix)
     set_linear_weight_constraints!(model, ctr, :cent_ineq_, :cent_eq_; prefix = prefix)
     set_mip_constraints!(model, wb, cbr.card, gcardr, plr, lt, st, fees, ss, cbr.xbgt;

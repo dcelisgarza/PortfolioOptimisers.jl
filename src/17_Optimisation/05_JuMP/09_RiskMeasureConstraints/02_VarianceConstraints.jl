@@ -289,13 +289,15 @@ $(DocStringExtensions.TYPEDSIGNATURES)
 
 Return the [`FrontierBoundEstimator`](@ref) that names the formulation of a variance.
 
-The function returns [`LinearBound`](@ref), the semidefinite formulation, when `rc_flag` is `true`, when the namespace that owns the weights carries the `rc_variance` mark, or when `pl` holds a [`SemiDefinitePhylogeny`](@ref). It returns [`SquareRootBound`](@ref), the second-order cone formulation, otherwise. [`rc_variance_constraints!`](@ref) sets the mark, so a variance built after one with risk-contribution rows on the same weights also takes the semidefinite formulation. A variance built before it keeps the second-order cone, so the formulation of a variance without rows depends on its place in the vector of measures.
+The function returns [`LinearBound`](@ref), the semidefinite formulation, when `rc_flag` is `true`, when the namespace that owns the weights carries the `rc_variance` mark or the `sdp_phylogeny` mark, or when `pl` holds a [`SemiDefinitePhylogeny`](@ref). It returns [`SquareRootBound`](@ref), the second-order cone formulation, otherwise. [`rc_variance_constraints!`](@ref) sets the `rc_variance` mark, so a variance built after one with risk-contribution rows on the same weights also takes the semidefinite formulation. A variance built before it keeps the second-order cone, so the formulation of a variance without rows depends on its place in the vector of measures.
+
+[`mark_sdp_phylogeny!`](@ref) sets the `sdp_phylogeny` mark in phase 1 of each block that holds a [`SemiDefinitePhylogeny`](@ref), before every variance of the model. So a variance reads the semidefinite phylogeny of every block on its weights. `pl` is the phylogeny of the block of the builder. It also reaches a namespace that owns its own weights, such as the inner build of an [`IndependentVariableTracking`](@ref), which no mark of the head reaches.
 
 # Arguments
 
   - $(arg_dict[:model])
   - `rc_flag::Bool`: Whether the measure's own rows need the semidefinite formulation.
-  - `pl`: Optional phylogeny constraint result or results.
+  - `pl`: Optional phylogeny constraint result or results of the block of the builder.
 
 # Keyword arguments
 
@@ -314,10 +316,11 @@ The function returns [`LinearBound`](@ref), the semidefinite formulation, when `
 """
 function sdp_variance_flag!(model::JuMP.Model, rc_flag::Bool, pl::Option{<:PlC_VecPlC};
                             prefix::Symbol = Symbol(""))
+    owner = weights_prefix(model, prefix)
     return if rc_flag ||
-              state_has(model, weights_prefix(model, prefix), :rc_variance) ||
-              isa(pl, SemiDefinitePhylogeny) ||
-              isa(pl, AbstractVector) && any(x -> isa(x, SemiDefinitePhylogeny), pl)
+              state_has(model, owner, :rc_variance) ||
+              state_has(model, owner, :sdp_phylogeny) ||
+              holds_precomputed(pl, SemiDefinitePhylogeny)
         LinearBound()
     else
         SquareRootBound()

@@ -3,7 +3,7 @@
 
 Returns the Model State namespace that owns the weights registered under `prefix`.
 
-One lifted matrix ``\\mathbf{W}`` belongs to one weight vector, and so do the marks that describe the measures built on it, `variance_flag` and `rc_variance`. A build that registers weights it did not make also registers `w_owner`, the namespace that owns them. A later block of a JuMP head, such as the block of a programme Allocation Set in a leader's model, registers the model's own `w` under its namespace `blk_i_` with the owner `Symbol("")`. A build under [`DependentVariableTracking`](@ref) registers the weights of its enclosing build under its tracking prefix, with the owner of those weights. So the set's ceiling, the inner measures of the tracking build and the head's measures read one ``\\mathbf{W}`` and one set of marks. A prefix without `w_owner` owns itself. An [`IndependentVariableTracking`](@ref) prefix is one of these, because the benchmark shifts its weights.
+One lifted matrix ``\\mathbf{W}`` belongs to one weight vector, and so do the marks that describe the measures and the phylogenies built on it, `variance_flag`, `rc_variance` and `sdp_phylogeny`. A build that registers weights it did not make also registers `w_owner`, the namespace that owns them. A later block of a JuMP head, such as the block of a programme Allocation Set in a leader's model, registers the model's own `w` under its namespace `blk_i_` with the owner `Symbol("")`. A build under [`DependentVariableTracking`](@ref) registers the weights of its enclosing build under its tracking prefix, with the owner of those weights. So the set's ceiling, the inner measures of the tracking build and the head's measures read one ``\\mathbf{W}`` and one set of marks. A prefix without `w_owner` owns itself. An [`IndependentVariableTracking`](@ref) prefix is one of these, because the benchmark shifts its weights.
 
 # Arguments
 
@@ -85,6 +85,38 @@ function mark_objective_variance!(model::JuMP.Model, prefix::Symbol,
                                   settings::RiskMeasureSettings)
     if settings.rke && settings.scale > zero(settings.scale)
         mark_state!(model, weights_prefix(model, prefix), :variance_flag)
+    end
+    return nothing
+end
+"""
+$(DocStringExtensions.TYPEDSIGNATURES)
+
+Mark `sdp_phylogeny` on the weights under `prefix` when `plgs` holds a [`SemiDefinitePhylogeny`](@ref).
+
+The mark goes to the namespace that owns the weights, [`weights_prefix`](@ref). So a block after the first, which registers the weights of the model with the owner `Symbol("")`, marks the weights of the head. [`set_block_constraints!`](@ref) calls the function in phase 1 of each block, before the risk step of the owner. [`sdp_variance_flag!`](@ref) reads the mark, so a variance on the weights takes the semidefinite formulation when any block on them holds a semidefinite phylogeny. The variance then states its term on the lifted matrix that the rows of [`set_sdp_phylogeny_constraints!`](@ref) bind, and a variance that the objective minimises holds that matrix down.
+
+The mark belongs to the weights and not to one block, because the rows of every block bind the one lifted matrix of the weights. In the model of a leader, the block of a [`ProgrammeAllocationSet`](@ref) comes after the block of the head. A variance of the head with the second-order cone would leave the lift of the rows of the set to no term. The variance also marks `variance_flag`, so the rows would get no penalty either, and they would bind nothing.
+
+# Arguments
+
+  - $(arg_dict[:model])
+  - `plgs`: The phylogeny constraints of the block, `nothing`, one result, or a vector of results.
+  - `prefix::Symbol`: The Model State namespace of the block. The mark goes to its owner, [`weights_prefix`](@ref).
+
+# Returns
+
+  - `nothing`.
+
+# Related
+
+  - [`sdp_variance_flag!`](@ref)
+  - [`set_sdp_phylogeny_constraints!`](@ref)
+  - [`set_block_constraints!`](@ref)
+"""
+function mark_sdp_phylogeny!(model::JuMP.Model, plgs::Option{<:PlC_VecPlC};
+                             prefix::Symbol = Symbol(""))::Nothing
+    if holds_precomputed(plgs, SemiDefinitePhylogeny)
+        mark_state!(model, weights_prefix(model, prefix), :sdp_phylogeny)
     end
     return nothing
 end

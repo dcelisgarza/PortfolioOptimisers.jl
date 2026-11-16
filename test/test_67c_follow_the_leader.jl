@@ -525,6 +525,76 @@ end
         @test ftlw(; okw = cost(c / 2))[1] > 0.99
     end
 
+    @testset "A semidefinite phylogeny of the set binds in the re-solve (#2126)" begin
+        # The reproduction of #2126. On `c51fe04fa1` the variance of the leader took the
+        # second-order cone, because it read the phylogeny of the block of the head alone.
+        # The rows of the set sat on a lift that no term held down and that took no penalty,
+        # so the linked pairs kept 0.01997 at `p = 0.05` and at `p = 10`.
+        rngp = StableRNG(123)
+        Tp, Np, Nfp = 120, 6, 3
+        Fp = randn(rngp, Tp, Nfp) .* 0.02
+        Bp = randn(rngp, Np, Nfp)
+        Xp = Fp * transpose(Bp) .+ randn(rngp, Tp, Np) .* 0.01 .+ 0.001
+        rdp = ReturnsResult(; X = Xp, nx = string.(1:Np), F = Fp, nf = string.(1:Nfp))
+        slvp = Solver(; name = :clarabel, solver = Clarabel.Optimizer,
+                      settings = Dict("verbose" => false),
+                      check_sol = (; allow_local = true, allow_almost = true))
+        Ap = zeros(Int, Np, Np)
+        Ap[2, 6] = Ap[6, 2] = 1
+        Ap[2, 3] = Ap[3, 2] = 1
+        pset(p) =
+            if isnothing(p)
+                ProgrammeAllocationSet(; slv = slvp)
+            else
+                ProgrammeAllocationSet(; slv = slvp,
+                                       ple = SemiDefinitePhylogeny(; A = Ap, p = p))
+            end
+        link(w) = maximum(abs, Ap .* (w * transpose(w)))
+        vlead = MeanRisk(; opt = JuMPOptimiser(; slv = slvp))
+        clead = MeanRisk(; r = ConditionalValueatRisk(), opt = JuMPOptimiser(; slv = slvp))
+        ftlp(h, p) = optimise(OPS(; alg = FollowTheLeader(; opt = h), set = pset(p)), rdp).w
+        batch = optimise(MeanRisk(;
+                                  opt = JuMPOptimiser(; slv = slvp,
+                                                      ple = SemiDefinitePhylogeny(; A = Ap,
+                                                                                  p = 0.05))),
+                         rdp).w
+        @test link(batch) < 1e-6
+        # The variance of the leader holds the lift down, as in the batch head, so the rows
+        # bind and the penalty is omitted at each `p`.
+        @test link(ftlp(vlead, nothing)) > 1e-2
+        wv = ftlp(vlead, 0.05)
+        @test link(wv) < 1e-6
+        @test isapprox(ftlp(vlead, 10.0), wv; atol = 1e-6)
+        # A leader with no variance keeps the penalty, which binds the rows.
+        @test link(ftlp(clead, nothing)) > 1e-2
+        @test link(ftlp(clead, 0.05)) < 1e-6
+        # Phase 1 of the block of the set marks the weights of the head, so the variance
+        # states its term on the `W` that the rows of the set bind.
+        rdv = rows(rdp, 1:60)
+        sres = resolve(pset(0.05), Np)
+        e = po.leader_block(sres, vlead, fill(1 / Np, Np), rdv)
+        m = optimise(po.leader_chain(vlead, sres, 1.0), rdv; blocks = (e,)).model
+        @test haskey(m, :sdp_phylogeny) && haskey(m, :blk_2_sdp_plg_1)
+        @test !haskey(m, :blk_2_sdp_plg_p_1) && !haskey(m, :dev_1)
+        @test issubset(keys(m[:variance_risk_1].terms), Set(vec(m[:W])))
+        # A factor head writes no term on the lift of the asset weights, so the head refuses
+        # the set with a semidefinite phylogeny on a chain that holds one.
+        frc = FactorRiskContribution(; opt = JuMPOptimiser(; slv = slvp))
+        @test_throws "whose `ple` holds a semidefinite phylogeny" OPS(;
+                                                                      alg = FollowTheLeader(;
+                                                                                            opt = frc),
+                                                                      set = pset(0.05))
+        @test_throws ArgumentError OPS(;
+                                       alg = FollowTheLeader(;
+                                                             opt = MeanRisk(;
+                                                                            opt = JuMPOptimiser(;
+                                                                                                slv = slvp),
+                                                                            fb = frc)),
+                                       set = pset(0.05))
+        @test isa(OPS(; alg = FollowTheLeader(; opt = frc), set = pset(nothing)), OPS)
+        @test isa(OPS(; alg = FollowTheLeader(; opt = vlead), set = pset(0.05)), OPS)
+    end
+
     @testset "A schedule in a leader resolves at each fold (#2049)" begin
         # The leader solves at each step, and its `optimise` resets a schedule to its
         # fold-less value. At `a449f96722` the fold loop read the head's own fields alone, so
