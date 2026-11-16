@@ -1413,6 +1413,116 @@ end
     @test s.w == 3
     @test occursin("forwards from `sol.w`", set_error(() -> Accessors.@set s.w = 0))
 end
+@testset "@forward_properties: the refusal of a forwarded name names the path that stores it (#2129)" begin
+    using PortfolioOptimisers, StableRNGs, Test
+    PO = PortfolioOptimisers
+    #=
+    A rule names the path that it reads, and a hop of that path can be a forwarded or
+    computed property of the value before it. The refusal follows the chain of rules, so the
+    path that it names does not refuse the patch too.
+    =#
+    mc = Module(:ForwardChainProbe)
+    Base.eval(mc, :(using PortfolioOptimisers: @forward_properties))
+    Base.eval(mc, quote
+                  struct CLeaf
+                      a::Int
+                  end
+                  struct CMid
+                      leaf::CLeaf
+                  end
+                  CMid(; leaf = CLeaf(1)) = CMid(leaf)
+                  @forward_properties CMid begin
+                      forward(leaf)
+                      alias(al, leaf.a)
+                      compute(c, x -> 1)
+                  end
+                  struct CTop
+                      mid::CMid
+                  end
+                  CTop(; mid = CMid()) = CTop(mid)
+                  @forward_properties CTop begin
+                      forward(mid)
+                      alias(m2, mid.c)
+                  end
+                  struct CHead
+                      top::CTop
+                  end
+                  @forward_properties CHead begin
+                      forward(top)
+                  end
+                  struct CMidS
+                      leaf::CLeaf
+                  end
+                  CMidS(; leaf = CLeaf(1), a = nothing) = CMidS(if isnothing(a)
+                                                                    leaf
+                                                                else
+                                                                    CLeaf(a)
+                                                                end)
+                  @forward_properties CMidS begin
+                      forward(leaf; settable)
+                  end
+                  struct CTopS
+                      mid::CMidS
+                  end
+                  CTopS(; mid = CMidS()) = CTopS(mid)
+                  @forward_properties CTopS begin
+                      forward(mid)
+                  end
+                  struct CTopN
+                      mid::Union{Nothing, CMid}
+                  end
+                  @forward_properties CTopN begin
+                      alias(x, mid.leaf.a)
+                  end
+              end)
+    function set_error(f)
+        return try
+            f()
+            ""
+        catch err
+            sprint(showerror, err)
+        end
+    end
+    t = mc.CTop(mc.CMid(mc.CLeaf(1)))
+    # A chain of `forward` and `alias` rules ends at the field that stores the value.
+    msg = set_error(() -> Accessors.@set t.a = 0)
+    @test occursin("forwards from `mid.a`", msg)
+    @test occursin("Set `mid.leaf.a` of the `CTop` instead", msg)
+    @test Accessors.set(t, PO.parse_lens("mid.leaf.a"), 5).a == 5
+    @test occursin("Set `mid.leaf.a` of the `CTop` instead",
+                   set_error(() -> Accessors.@set t.al = 0))
+    # A chain that ends at a computed property names it, and the fields of its type.
+    for (lens, path) in ((PO.parse_lens("c"), "mid.c"), (PO.parse_lens("m2"), "mid.c"))
+        msg = set_error(() -> Accessors.set(t, lens, 0))
+        @test occursin("forwards from `$(path)`", msg)
+        @test occursin("`mid.c` is a property that `CMid` computes from its fields", msg)
+        @test occursin("Set one of the fields (:leaf,) of `mid` of the `CTop` instead", msg)
+    end
+    # The walk follows a chain of any length, and a nested end at a computed property stops it.
+    msg = set_error(() -> Accessors.setproperties(mc.CHead(t), (; c = 0)))
+    @test occursin("forwards from `top.c`", msg)
+    @test occursin("`top.mid.c` is a property that `CMid` computes from its fields", msg)
+    @test occursin("of `top.mid` of the `CHead` instead", msg)
+    @test occursin("Set `top.mid.leaf.a` of the `CHead` instead",
+                   set_error(() -> Accessors.setproperties(mc.CHead(t), (; a = 0))))
+    # A settable name of the nested value ends the chain, and its path sets the value.
+    ts = mc.CTopS()
+    @test occursin("Set `mid.a` of the `CTopS` instead",
+                   set_error(() -> Accessors.@set ts.a = 0))
+    @test Accessors.set(ts, PO.parse_lens("mid.a"), 7).a == 7
+    # The walk reads nothing through a `nothing` node, and it keeps the rest of the path.
+    @test occursin("Set `mid.leaf.a` of the `CTopN` instead",
+                   set_error(() -> Accessors.setproperties(mc.CTopN(nothing), (; x = 0))))
+    # The case of the issue: a `HighOrderPrior` forwards `f_mu` from a `LowOrderPrior`.
+    rd = ReturnsResult(; nx = ["a", "b", "c", "d"], X = randn(StableRNG(1), 100, 4))
+    hp = prior(HighOrderPriorEstimator(), rd)
+    msg = set_error(() -> Accessors.setproperties(hp, (; f_mu = 1.0)))
+    @test occursin("`pr.f_mu` is a property that `LowOrderPrior` computes from its fields",
+                   msg)
+    @test occursin("of `pr` of the `HighOrderPrior` instead", msg)
+    @test occursin("Set `pr.mu` of the `HighOrderPrior` instead",
+                   set_error(() -> Accessors.setproperties(hp, (; mu = 1.0))))
+end
 using Dates
 @testset "A carrier converts integer data once, and fits as its float copy does (#1972)" begin
     # Integer data are supported only where an integer is the natural type. The carriers

@@ -266,3 +266,27 @@ The hand-written `getproperty` and `propertynames` of `RJR_NRJR`, the results of
 `NearOptimalCentering`, take the same `hasproperty` method by hand, because the macro does not
 decorate a `Union`. Before, `hasproperty(res, :retcode)` on a `MeanRiskResult` allocated 5 648
 bytes (R55 of [#1817](https://github.com/dcelisgarza/PortfolioOptimisers.jl/pull/1817)).
+
+## Amendment (2026-11-16, second)
+
+**The macro also generates a method of `forward_source`, and the refusal of a patch names the
+path that stores the value.** The amendment of 2026-10-07 makes the refusal of a forwarded name
+name the path of the rule. The `source` of that rule was a closure inside the generated
+`setproperties`, so it gave the path as a string, and it could not ask the source of a nested
+value. [#2129](https://github.com/dcelisgarza/PortfolioOptimisers.jl/issues/2129) found that the
+path can have no storage either. `HighOrderPrior` forwards every property of `pr`, and `f_mu` is a
+computed property of the `LowOrderPrior` at `pr`. The refusal said "Set `pr.f_mu`", and that set
+gave a second refusal.
+
+The `source_branches` now make the method `forward_source(x::T, sym::Symbol)`, beside
+`getproperty`, `propertynames`, `hasproperty` and `setproperties`. It gives the same pair as the
+closure did, with the path as a tuple of symbols. A fallback method gives `nothing` for a type
+that the macro does not decorate. `forward_storage_path` walks the path one hop at a time, and it
+asks `forward_source` of the value at each hop. It puts the path of a rule in place of a hop that
+the rule reads. The walk ends at a stored field, at a settable name, or at a computed property.
+The refusal names the stored path, or the computed property with its type and the fields of that
+type.
+
+The fifth method replaces the closure, so the macro makes no more branches. The method that
+`setproperties` calls drops its `source` argument. No public name changes, and every patch that
+the macro let through before still goes through.
