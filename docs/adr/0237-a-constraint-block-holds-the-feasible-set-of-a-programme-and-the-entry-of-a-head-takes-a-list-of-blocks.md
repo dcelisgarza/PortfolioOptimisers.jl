@@ -120,7 +120,9 @@ the set in a leader model, gets the Result of its block. `jump_optimiser_from_at
 moves to the block.
 
 **A second block reaches the entry as an internal keyword of `_optimise`.** The precedent is
-`rmsk`, which reaches the resolver of a JuMP head as a keyword. The keyword carries the set after
+`rmsk`, the mask of a fit again after a refusal, which reaches a resolver as a keyword. It is a
+keyword of the shared entry `resolve_block_entry` and of the hierarchical heads, and no longer
+of `resolve_jump_optimiser` (#2046). The keyword `blocks` carries the set after
 `factory(set, w)`, which is configuration, and the rows `X`, which are an argument. So no
 estimator holds a Result, and `AllocationSetConstraint` goes. The keyword also carries the `r` and
 the `ret` of the set, and a bounds builder adds them after `mark_risk_minimised!`. The entry takes

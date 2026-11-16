@@ -974,7 +974,7 @@ end
 
 Add one budget row on the sum of one vector or of two, `sc * (sum(x) - k * v)` against zero, under `prefix` and `name`.
 
-`sense` is `==`, `>=` or `<=`, the comparison of the row with zero, and the method states it as the MOI set `EqualTo`, `GreaterThan` or `LessThan` at zero. That set gives the row that the comparison gives. A bound `v = nothing` states no side, so the method adds no row. Every budget builder writes its rows through this function, so each row of a block goes into the namespace of the block.
+`sense` is `==`, `>=` or `<=`, the comparison of the row with zero, and the method states it as the MOI set `EqualTo`, `GreaterThan` or `LessThan` at zero. That set gives the row that the comparison gives. A bound `v = nothing` states no side, so the method adds no row. Every number and [`BudgetRange`](@ref) budget writes its rows through this function, so each such row of a block goes into the namespace of the block. A budget that pays costs writes its rows in the shared Model State and refuses a prefix, [`assert_cost_budget_prefix`](@ref).
 
 The method takes the vectors and not their sum, so the whole expression goes inside one `JuMP.@constraint`, which builds it in place. A sum built outside the macro allocates each partial expression. On 50 assets, the gross row built from `s = sum(lw) + sum(sw)` and `e = sc * (s - k * v)` outside the macro allocated 50168 bytes, and the same row inside the macro allocated 38568 bytes.
 

@@ -1204,7 +1204,7 @@ end
 
 Add a [`ResolvedConstraintBlock`](@ref) to a model, in its own namespace and in two phases. This is the block builder.
 
-Every programme that holds a block adds it through these two functions: a JuMP head in [`assemble_jump_model!`](@ref) for its own block and for each later block, such as the set in the model of a leader, and the projection of a [`ProgrammeAllocationSet`](@ref) in [`set_allocation_set_constraints!`](@ref). So the order of the Model Assembly is written once. The owner of the model runs its own steps between the two phases: the fees, the risk step, the return terms and [`mark_risk_minimised!`](@ref).
+Every programme that holds a block adds it through these two functions: a JuMP head in [`assemble_jump_model!`](@ref) for its own block and for each later block, such as the set in the model of a leader, and the projection of a [`ProgrammeAllocationSet`](@ref) in [`set_allocation_set_constraints!`](@ref). So the order of the Model Assembly is written once. A JuMP head runs its own steps between the two phases: the fees, the risk step, the return terms and [`mark_risk_minimised!`](@ref), then the bounds builder [`set_allocation_risk_return_bounds!`](@ref) of each later block. The projection minimises no risk, so it runs the bounds builder of its set alone between the two phases, and sets no mark.
 
 Phase 1, `set_block_constraints!`, adds the rows that come before the risk step of the owner. Phase 2, `set_block_post_risk_constraints!`, adds the rows that read the marks of the objective of the owner, `risk_minimised` and `variance_flag`: the semidefinite phylogeny reads them. The integer phylogeny and the custom constraints come after them too, as they did in each owner.
 
@@ -1326,7 +1326,7 @@ $(DocStringExtensions.TYPEDSIGNATURES)
 
 Add phase 2 of a [`ResolvedConstraintBlock`](@ref) to a model: the rows that come after the risk step and the marks of the owner.
 
-The owner calls it after [`mark_risk_minimised!`](@ref), because the semidefinite phylogeny reads the marks `risk_minimised` and `variance_flag` of the weights. [`set_block_constraints!`](@ref) states both phases, their order and their arguments.
+A JuMP head calls it after [`mark_risk_minimised!`](@ref), because the semidefinite phylogeny reads the marks `risk_minimised` and `variance_flag` of the weights. The projection calls it after the bounds builder, with no mark, so the phylogeny keeps its penalty. [`set_block_constraints!`](@ref) states both phases, their order and their arguments.
 
 # Algorithm
 

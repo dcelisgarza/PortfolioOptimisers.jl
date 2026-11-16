@@ -331,13 +331,14 @@ function graph_reader_gaps(xs::Union{Tuple, AbstractVector}, pr::AbstractPriorRe
 end
 """
     graph_reader_mask(x, imsk::Option{<:BitVector}, pr::AbstractPriorResult,
-                      rd::ReturnsResult, strict::Bool) -> Option{BitVector}
+                      rd::ReturnsResult, strict::Bool,
+                      owner::AbstractString = "this optimiser") -> Option{BitVector}
 
 Compose the Investable Mask with the assets that the plain graph readers of a fit can read, at the entry of the fit.
 
 A graph reader that reads the returns data meets each gap that a mask-aware prior filled in its own returns only, see [`scenario_fill`](@ref). The `ce` of the reader decides what the gap is. A mask-aware `ce` reads the observed cells, so this function keeps the asset. A plain `ce` has no correct answer for a gapped sample. So this function drops each kept asset that holds a non-finite cell in the rows that the readers read, as a plain estimator over an Asset Panel leaves the asset out of its Coverage Universe. The asset then departs as a non-investable asset: [`investable_reduction`](@ref) announces it, the fit gives it a zero weight, and it is listed on the Non-Investable Axis.
 
-The fit warns once, and the warning names the assets and the two remedies of [`graph_gap_remedy`](@ref). Under `strict = true` the fit refuses the gap instead. A reader that states the prior as its source, `x_src = PriorSource()`, reads the returns of the prior, where a kept column is finite, so this function keeps every asset for it. Each reader states its own source, so [`graph_reader_gaps`](@ref) finds the gaps reader by reader.
+The fit warns once, and the warning names the owner of the readers, the assets and the two remedies of [`graph_gap_remedy`](@ref). Under `strict = true` the fit refuses the gap instead. A reader that states the prior as its source, `x_src = PriorSource()`, reads the returns of the prior, where a kept column is finite, so this function keeps every asset for it. Each reader states its own source, so [`graph_reader_gaps`](@ref) finds the gaps reader by reader.
 
 Every fit that calls [`feature_readable_mask`](@ref) calls this function on the mask that it gives. A direct call of a graph verb has no entry of a fit, so it refuses the gap with [`assert_graph_readable`](@ref).
 
@@ -354,6 +355,7 @@ Every fit that calls [`feature_readable_mask`](@ref) calls this function on the 
   - `pr`: The prior result of the fit, on the full asset universe.
   - $(arg_dict[:rd])
   - `strict`: The `strict` field of the optimiser. `true` refuses a gap in place of the warning.
+  - `owner`: The owner of the readers, as the message names it. The mask of a block of a [`ProgrammeAllocationSet`](@ref), [`allocation_set_entry_mask`](@ref), gives `"the Allocation Set"`.
 
 # Validation
 
@@ -373,7 +375,8 @@ Every fit that calls [`feature_readable_mask`](@ref) calls this function on the 
   - [`investable_reduction`](@ref)
 """
 function graph_reader_mask(x, imsk::Option{<:BitVector}, pr::AbstractPriorResult,
-                           rd::ReturnsResult, strict::Bool)
+                           rd::ReturnsResult, strict::Bool,
+                           owner::AbstractString = "this optimiser")
     gap = graph_reader_gaps(x, pr, rd)
     if isnothing(gap)
         return imsk
@@ -385,25 +388,26 @@ function graph_reader_mask(x, imsk::Option{<:BitVector}, pr::AbstractPriorResult
         return imsk
     end
     assets = isnothing(rd.nx) ? findall(gap) : rd.nx[gap]
-    msg = "a graph reader of this optimiser reads the returns data with a plain moment estimator, and the rows that it reads hold a gap for $(count(gap)) asset(s) that the prior kept: $(assets). A plain moment estimator has no correct answer for a gapped sample"
+    msg = "a graph reader of $(owner) reads the returns data with a plain moment estimator, and the rows that it reads hold a gap for $(count(gap)) asset(s) that the prior kept: $(assets). A plain moment estimator has no correct answer for a gapped sample"
     @argcheck(!strict,
               IsNonFiniteError("$(msg), and `strict = true` refuses the gap. $(graph_gap_remedy)"))
     @warn("$(msg), so the fit leaves these assets out of the Investable Mask and gives each a zero weight. $(graph_gap_remedy) Pass `strict = true` to refuse the gap.",
           maxlog = log_limit(:warn), _id = @log_id())
     keep = isnothing(imsk) ? .!gap : imsk .& .!gap
     @argcheck(any(keep),
-              IsEmptyError("every asset that the prior kept holds a gap in the rows that a plain graph reader of this optimiser reads, so the fit has no asset left. $(graph_gap_remedy)"))
+              IsEmptyError("every asset that the prior kept holds a gap in the rows that a plain graph reader of $(owner) reads, so the fit has no asset left. $(graph_gap_remedy)"))
     return keep
 end
 """
     distance_reader_refusal_mask(err::DistanceReaderRefusalError, imsk::Option{<:BitVector},
-                                 rd::ReturnsResult, strict::Bool) -> BitVector
+                                 rd::ReturnsResult, strict::Bool,
+                                 owner::AbstractString = "this optimiser") -> BitVector
 
 Compose the Investable Mask with the assets that a distance reader of a fit refused, after the fit caught the refusal.
 
 A distance reader can refuse an asset that the prior keeps, see [`DistanceReaderRefusalError`](@ref). The fit learns of the refusal only when the reader has estimated its distance matrix, after [`investable_reduction`](@ref). So the fit catches the error around the call of its own reader, takes the mask from this function, and fits again from the same prior result with that mask. A fit with no refusal does no extra work. The asset then departs as a non-investable asset: the reduction announces it, the fit gives it a zero weight, and it is listed on the Non-Investable Axis. This is the rule of [`graph_reader_mask`](@ref) for a plain reader that meets a gap.
 
-The fit warns once, and the warning names the assets, the two causes and a remedy for each cause. Under `strict = true` the fit refuses the assets instead.
+The fit warns once, and the warning names the owner of the reader, the assets, the two causes and a remedy for each cause. Under `strict = true` the fit refuses the assets instead.
 
 # Algorithm
 
@@ -417,6 +421,7 @@ The fit warns once, and the warning names the assets, the two causes and a remed
   - `imsk`: The Investable Mask that the fit reduced to, or `nothing` when every asset was investable.
   - $(arg_dict[:rd]) It is the returns data on the full universe, read for the asset names.
   - `strict`: The `strict` field of the optimiser. `true` refuses the assets in place of the warning.
+  - `owner`: The owner of the reader, as the message names it. The shared entry of a JuMP head, [`resolve_block_entry`](@ref), gives `"the Allocation Set"` for a reader of a block of a [`ProgrammeAllocationSet`](@ref), so the user can find the `ple` or the `cte` to change.
 
 # Validation
 
@@ -437,19 +442,20 @@ The fit warns once, and the warning names the assets, the two causes and a remed
 """
 function distance_reader_refusal_mask(err::DistanceReaderRefusalError,
                                       imsk::Option{<:BitVector}, rd::ReturnsResult,
-                                      strict::Bool)
+                                      strict::Bool,
+                                      owner::AbstractString = "this optimiser")
     keep = isnothing(imsk) ? trues(size(rd.X, 2)) : copy(imsk)
     cols = findall(keep)[err.idx]
     keep[cols] .= false
     assets = isnothing(rd.nx) ? cols : rd.nx[cols]
-    msg = "a distance reader of this optimiser cannot estimate the correlation of $(length(cols)) asset(s) that the prior kept: $(assets). An asset with zero variance gives such a row, and so does an asset that the `CoveragePolicy` of the `ce` of the reader refuses"
+    msg = "a distance reader of $(owner) cannot estimate the correlation of $(length(cols)) asset(s) that the prior kept: $(assets). An asset with zero variance gives such a row, and so does an asset that the `CoveragePolicy` of the `ce` of the reader refuses"
     remedy = "To keep an asset that the `CoveragePolicy` refuses, give the reader the `CoveragePolicy` of the prior, or state the prior as its source, `x_src = PriorSource()`. To keep an asset with zero variance, give the reader an estimator that defines the dependence of a constant, such as `GerberCovariance`."
     @argcheck(!strict,
               IsNonFiniteError("$(msg), and `strict = true` refuses them. $(remedy)"))
     @warn("$(msg), so the fit leaves these assets out of the Investable Mask and gives each a zero weight. $(remedy) Pass `strict = true` to refuse them.",
           maxlog = log_limit(:warn), _id = @log_id())
     @argcheck(any(keep),
-              IsEmptyError("a distance reader of this optimiser refuses every asset that the prior kept, so the fit has no asset left. $(remedy)"))
+              IsEmptyError("a distance reader of $(owner) refuses every asset that the prior kept, so the fit has no asset left. $(remedy)"))
     return keep
 end
 """

@@ -217,14 +217,17 @@ calls it, and takes `(model, obj)`.
 
 The per-solve objective had a defect that the option above did not weigh. The Objective Penalty
 is registered once and keeps every contribution, and no solve resets it. So each call of the
-hook added the term again. A `Frontier` sweep sets the objective of each end point on the same
-model, and a point of a one-term sweep counted the term three times. The terms of a later
+hook added the term again. A `Frontier` sweep under every objective but `MaximumRatio` sets the
+objective of each end point on the same model, and a point of a one-term sweep counted the term
+three times. The terms of a later
 block (#2045) and the penalties `l1`, `l2`, `lp` and `linf` already went in once, in the
 assembly. The head now does the same.
 
 The two reasons for the rejection do not apply to this form. The assembly already takes an
 `obj`, so `RiskBudgeting` and `RelaxedRiskBudgeting` give `MinimumRisk` and need no accessor.
 The constrained `NearOptimalCentering` gives `MinimumRisk` to its centring model, as before. The
-cost of the old decision changes: an end point of a sweep now gives the term the declared
-objective, so a term cannot change at an end point. A term still moves the end points, because
+cost of the old decision changes: an end point of a sweep on the model of the head now gives the
+term the declared objective, so a term cannot change at an end point. A `MaximumRatio` sweep
+solves its end points on a copy of the head that `resolve_ratio_frontier!` builds under
+`MinimumRisk`, so a term there gets `MinimumRisk`, once. A term still moves the end points, because
 the end points solve with the penalty.

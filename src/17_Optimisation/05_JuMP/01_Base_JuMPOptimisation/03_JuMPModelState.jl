@@ -354,7 +354,7 @@ end
 
 Compose the Model State prefix that a nested build passes down to its own builders.
 
-It gives a prefix and not a key, so no entry of the nested build can take the key of an entry of the enclosing build. `tag` names the kind of nesting (`:tr_iv_`, `:tr_dv_`, `:tr_ir_`, `:tr_dr_`, `:gain_`). The method with `i` adds the measure index and a closing `_`, so `nested_prefix(:a_, :tr_dr_, 3)` is `:a_tr_dr_3_`. The index keeps a tracking measure inside a tracking measure free of collisions.
+It gives a prefix and not a key, so no entry of the nested build can take the key of an entry of the enclosing build. `tag` names the kind of nesting (`:tr_iv_`, `:tr_dv_`, `:tr_ir_`, `:tr_dr_`, `:gain_`, and `:blk_` for a later block of a JuMP head, [`later_constraint_blocks`](@ref)). The method with `i` adds the measure index and a closing `_`, so `nested_prefix(:a_, :tr_dr_, 3)` is `:a_tr_dr_3_`. The index keeps a tracking measure inside a tracking measure free of collisions.
 
 # Related
 

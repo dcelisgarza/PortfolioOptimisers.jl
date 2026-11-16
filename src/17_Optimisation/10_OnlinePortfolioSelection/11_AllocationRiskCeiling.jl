@@ -325,7 +325,7 @@ The shared entry [`resolve_block_entry`](@ref) folds the function over the entri
  2. Read the `strict` flag of the online head with [`projection_step_strict`](@ref).
  3. Intersect `imsk` with the assets that `pr` prices, with [`allocation_set_priced_mask`](@ref).
  4. Compose the result with the assets that a [`FeatureDistance`](@ref) of the readers `ple` and `cte` of the set can read, [`feature_readable_mask`](@ref), on `X`.
- 5. Compose the result with the assets that a plain graph reader of the set can read, [`graph_reader_mask`](@ref), on `pr` and `X`, and return it.
+ 5. Compose the result with the assets that a plain graph reader of the set can read, [`graph_reader_mask`](@ref), on `pr` and `X`, and return it. Its warning names the Allocation Set as the owner of the reader.
 
 # Arguments
 
@@ -359,7 +359,7 @@ function allocation_set_entry_mask(imsk::Option{BitVector},
     readers = (set.ple, set.cte)
     pmsk = allocation_set_priced_mask(imsk, investable_mask(pr), X, strict)
     return graph_reader_mask(readers, feature_readable_mask(readers, pmsk, X), pr, X,
-                             strict)
+                             strict, "the Allocation Set")
 end
 """
 $(DocStringExtensions.TYPEDSIGNATURES)
@@ -417,7 +417,7 @@ A distance reader of a block, its `cte` or its `ple`, can refuse an asset that i
 
  1. On the first fit, intersect `imsk` with the mask of each entry of `blocks`, [`allocation_set_entry_mask`](@ref). On a fit again, take `rmsk`.
  2. Resolve the block of the head with `f(imsk, args...)`. Resolve each entry of `blocks` at the mask with [`resolve_allocation_set_block`](@ref).
- 3. If a block gives a [`DistanceReaderRefusalError`](@ref), take the `strict` flag of its owner: `strict` for the block of the head, and [`projection_step_strict`](@ref) for the block of a set. Fit again from step 1 with the mask of [`distance_reader_refusal_mask`](@ref), and return its value.
+ 3. If a block gives a [`DistanceReaderRefusalError`](@ref), take the `strict` flag of its owner: `strict` for the block of the head, and [`projection_step_strict`](@ref) for the block of a set. The message of the refusal names the owner, the optimiser or the Allocation Set. Fit again from step 1 with the mask of [`distance_reader_refusal_mask`](@ref), and return its value.
  4. Return the mask, the values of the head and the Results of every block.
 
 # Arguments
@@ -457,10 +457,16 @@ function resolve_block_entry(f::F, args::Tuple, imsk::Option{BitVector}, blocks:
     end
     # A distance reader that refuses an asset the prior kept raises before it builds its
     # graph. The block of the head refuses under the flag of the head, and the block of a
-    # set under the flag of the online head that holds the set.
-    s = i <= length(hcbrs) ? strict : projection_step_strict()
+    # set under the flag of the online head that holds the set. The message names the owner
+    # of the reader, so the user can find the `ple` or the `cte` to change.
+    s, owner = if i <= length(hcbrs)
+        (strict, "this optimiser")
+    else
+        (projection_step_strict(), "the Allocation Set")
+    end
     return resolve_block_entry(f, args, imsk, blocks, rd, strict;
-                               rmsk = distance_reader_refusal_mask(cbrs[i], imsk, rd, s))
+                               rmsk = distance_reader_refusal_mask(cbrs[i], imsk, rd, s,
+                                                                   owner))
 end
 """
     no_head_block(imsk::Option{BitVector}) -> Tuple
@@ -599,7 +605,7 @@ Adds the risk ceilings `r` and the return floor `ret` of a programme set to a mo
 
 `r` and `ret` are flat fields of the set and not slots of its [`ConstraintBlock`](@ref), because a [`JuMPOptimiser`](@ref) holds no bound that stands alone. So the block builder [`set_block_constraints!`](@ref) does not add them, and this builder reads them beside the [`ResolvedConstraintBlock`](@ref) of the set: its prior `cbr.pr`, its rows `cbr.rd` and its phylogeny `cbr.plr`. The set must come after `factory(set, w)`, so a [`WeightsTracking`](@ref) benchmark or a [`TurnoverRiskMeasure`](@ref) reference that is not fixed holds the Price-Adjusted Allocation of the step.
 
-The owner calls it after [`mark_risk_minimised!`](@ref), where the ceilings of the set ran through the custom constraints of a leader before. A ceiling clears its `rke` and a floor clears its `rte`, so neither joins the risk expression or the return expression of the objective of the owner. The set stays the [`RiskConstraintOwner`](@ref) of its ceilings. `nothing` in a field adds nothing.
+A JuMP head calls it after [`mark_risk_minimised!`](@ref), and the projection calls it between the two phases of the block of its set, with no mark. A ceiling clears its `rke` and a floor clears its `rte`, so neither joins the risk expression or the return expression of the objective of the owner. The set stays the [`RiskConstraintOwner`](@ref) of its ceilings. `nothing` in a field adds nothing.
 
 # Algorithm
 

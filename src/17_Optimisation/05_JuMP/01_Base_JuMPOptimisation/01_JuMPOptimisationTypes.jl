@@ -273,14 +273,14 @@ To add a constraint, subtype `CustomJuMPConstraint` with the parameters of the c
 
 ## `add_custom_constraint!`
 
-  - `add_custom_constraint!(model::JuMP.Model, ccnt::MyConstraint, optimiser, attrs::ResolvedJuMPOptimiser) -> Nothing`: Add the constraint to `model`. The verb has no fallback for a subtype, so a subtype with no method of its own raises. Multiply the constraint by [`get_constraint_scale`](@ref). Multiply a constant bound by [`get_k`](@ref), the homogenisation variable, so that the bound holds on the reported weights under a ratio objective.
+  - `add_custom_constraint!(model::JuMP.Model, ccnt::MyConstraint, optimiser, attrs) -> Nothing`: Add the constraint to `model`. The verb has no fallback for a subtype, so a subtype with no method of its own raises. Multiply the constraint by [`get_constraint_scale`](@ref). Multiply a constant bound by [`get_k`](@ref), the homogenisation variable, so that the bound holds on the reported weights under a ratio objective.
 
 ### Arguments
 
   - `model`: The JuMP model while it is built. Read the weights with [`get_w`](@ref).
   - `ccnt`: The instance of the subtype.
-  - `optimiser`: The outer optimiser, for example the [`MeanRisk`](@ref).
-  - `attrs`: The processed problem data. `attrs.pr` is the prior and `attrs.wb` the weight bounds.
+  - `optimiser`: The owner of the constraint: the outer optimiser, for example the [`MeanRisk`](@ref), or the [`ProgrammeAllocationSet`](@ref) of a constraint in its `ccnt`.
+  - `attrs`: For a constraint of a head, the [`ResolvedJuMPOptimiser`](@ref): `attrs.pr` is the prior and `attrs.wb` the weight bounds. For a constraint of a set, `nothing`, because the set has no bundle. Leave `attrs` untyped, so one method serves a constraint of a head and of a set.
 
 ### Returns
 
@@ -332,15 +332,15 @@ To add a penalty or a reward, subtype `CustomJuMPObjective` with the parameters 
 
 ## `add_custom_objective_term!`
 
-  - `add_custom_objective_term!(model::JuMP.Model, obj::ObjectiveFunction, cobj::MyObjective, optimiser, attrs::ResolvedJuMPOptimiser) -> Nothing`: Add the term to the objective of `model`. The verb has no fallback for a subtype, so a subtype with no method of its own raises. Add the term through [`add_to_objective_penalty!`](@ref), and do not write the objective expression. The model adds the accumulated penalty with the sign that the sense of the objective needs, so a positive term always makes the objective worse, and a reward is a negative term. A term that is not homogeneous of degree one in the weights multiplies its constants by [`get_k`](@ref).
+  - `add_custom_objective_term!(model::JuMP.Model, obj, cobj::MyObjective, optimiser, attrs) -> Nothing`: Add the term to the objective of `model`. The verb has no fallback for a subtype, so a subtype with no method of its own raises. Add the term through [`add_to_objective_penalty!`](@ref), and do not write the objective expression. The model adds the accumulated penalty with the sign that the sense of the objective needs, so a positive term always makes the objective worse, and a reward is a negative term. A term that is not homogeneous of degree one in the weights multiplies its constants by [`get_k`](@ref).
 
 ### Arguments
 
   - `model`: The JuMP model while it is built. Read the weights with [`get_w`](@ref).
   - `obj`: The objective of the optimiser that builds the model, see [`add_custom_objective_term!`](@ref). The corners of a [`Frontier`](@ref) sweep solve the same model under other objectives, and the term keeps this `obj` and counts once in each solve.
   - `cobj`: The instance of the subtype.
-  - `optimiser`: The outer optimiser, for example the [`MeanRisk`](@ref).
-  - `attrs`: The processed problem data. `attrs.pr` is the prior and `attrs.wb` the weight bounds.
+  - `optimiser`: The owner of the term: the outer optimiser, for example the [`MeanRisk`](@ref), or the [`ProgrammeAllocationSet`](@ref) of a term in its `cobj`.
+  - `attrs`: The resolved problem data. For a term of a head it is the [`ResolvedJuMPOptimiser`](@ref), and for a term of a set it is the [`ResolvedConstraintBlock`](@ref) of the set. In both, `attrs.pr` is the prior and `attrs.wb` the weight bounds. Leave `obj` and `attrs` untyped, so one method serves a term of a head and of a set.
 
 ### Returns
 
@@ -425,15 +425,15 @@ A term that is not homogeneous of degree one in `w` multiplies each constant by 
 
 `nothing`, the value when no custom term is configured, is the only no-op.
 
-[`assemble_jump_model!`](@ref) calls the verb once for each model, while it builds the model. A [`Frontier`](@ref) sweep of [`MeanRisk`](@ref) solves its end points as [`MinimumRisk`](@ref) and [`MaximumReturn`](@ref) on the same model, and the term is in each of these objectives once, with the `obj` of the model.
+[`assemble_jump_model!`](@ref) calls the verb once for each model, while it builds the model. A [`Frontier`](@ref) sweep of [`MeanRisk`](@ref) solves its end points as [`MinimumRisk`](@ref) and [`MaximumReturn`](@ref) on the same model, and the term is in each of these objectives once, with the `obj` of the model. A sweep under [`MaximumRatio`](@ref) solves its end points on a copy of the head built under [`MinimumRisk`](@ref), and the term is in that copy once too.
 
 # Arguments
 
   - `model::JuMP.Model`: The JuMP model while it is built.
   - `obj`: The objective of the optimiser that builds the model. It is the `obj` of a [`MeanRisk`](@ref) or a [`FactorRiskContribution`](@ref), and [`MinimumRisk`](@ref) for [`RiskBudgeting`](@ref), [`RelaxedRiskBudgeting`](@ref) and the centring solve of [`NearOptimalCentering`](@ref). The end points of a frontier of a [`MaximumRatio`](@ref) solve a copy of the head with [`MinimumRisk`](@ref), so a term there gets [`MinimumRisk`](@ref). The projection programme of a [`ProgrammeAllocationSet`](@ref) gives its Projection Geometry.
   - `cobj`: The custom term, the argument to dispatch on.
-  - `optimiser`: The outer optimiser, for example the [`MeanRisk`](@ref). Its `opt` field is the [`JuMPOptimiser`](@ref).
-  - `attrs::ResolvedJuMPOptimiser`: The processed problem data: the prior `attrs.pr`, the returns estimator `attrs.ret`, the weight bounds `attrs.wb` and the rest.
+  - `optimiser`: The owner of the term. For a term of a head it is the outer optimiser, for example the [`MeanRisk`](@ref), whose `opt` field is the [`JuMPOptimiser`](@ref). For a term in the `cobj` of a [`ProgrammeAllocationSet`](@ref) it is the set.
+  - `attrs`: The resolved problem data. For a term of a head it is the [`ResolvedJuMPOptimiser`](@ref): the prior `attrs.pr`, the returns estimator `attrs.ret`, the weight bounds `attrs.wb` and the rest. For a term of a set it is the [`ResolvedConstraintBlock`](@ref) of the set, which holds the prior `attrs.pr`, the rows `attrs.rd` and the slots of the block, and no returns estimator.
 
 # Validation
 
@@ -500,8 +500,8 @@ Implement this verb for a subtype of [`CustomJuMPConstraint`](@ref) to impose a 
 
   - `model::JuMP.Model`: The JuMP model while it is built.
   - `ccnt`: The custom constraint, the argument to dispatch on.
-  - `optimiser`: The outer optimiser, for example the [`MeanRisk`](@ref).
-  - `attrs::ResolvedJuMPOptimiser`: The processed problem data.
+  - `optimiser`: The owner of the constraint. For a constraint of a head it is the outer optimiser, for example the [`MeanRisk`](@ref). For a constraint in the `ccnt` of a [`ProgrammeAllocationSet`](@ref) it is the set.
+  - `attrs`: The [`ResolvedJuMPOptimiser`](@ref) of a head, or `nothing` for a constraint of a set, which has no bundle.
 
 # Validation
 

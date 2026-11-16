@@ -1253,8 +1253,9 @@ end
                                                                   comp = <=))
     ops(set; strict = false) = OnlinePortfolioSelection(; alg = ExponentiatedGradient(),
                                                         set = set, strict = strict)
+    # The warning names the set as the owner of the reader (R50 of #1817).
     refused = (:warn,
-               r"distance reader of this optimiser cannot estimate the correlation of 1 asset\(s\) that the prior kept: \[\"e\"\]")
+               r"distance reader of the Allocation Set cannot estimate the correlation of 1 asset\(s\) that the prior kept: \[\"e\"\]")
     for mk in (plset, ctset)
         r = @test_logs refused match_mode = :any optimise(ops(mk(pe8)), rd8)
         @test iszero(r.w[5])
@@ -1338,8 +1339,9 @@ end
                                          kw...)
     ops(set; strict = false) = OnlinePortfolioSelection(; alg = ExponentiatedGradient(),
                                                         set = set, strict = strict)
+    # The warning names the set as the owner of the reader (R50 of #1817).
     gap = (:warn,
-           r"a graph reader of this optimiser reads the returns data with a plain moment estimator, and the rows that it reads hold a gap for 1 asset\(s\) that the prior kept: \[\"e\"\]")
+           r"a graph reader of the Allocation Set reads the returns data with a plain moment estimator, and the rows that it reads hold a gap for 1 asset\(s\) that the prior kept: \[\"e\"\]")
     r = @test_logs gap match_mode = :any optimise(ops(mk()), rd8)
     @test iszero(r.w[5])
     @test isapprox(sum(r.w), 1)
@@ -1416,11 +1418,14 @@ end
                                          ple = SemiDefinitePhylogenyEstimator(;
                                                                               pl = NetworkEstimator(;
                                                                                                     ce = sce9))))
-    refused(a) = (:warn,
-                  Regex("distance reader of this optimiser cannot estimate the correlation of 1 asset\\(s\\) that the prior kept: \\[\"$a\"\\]"))
-    res = @test_logs refused("f") refused("e") match_mode = :any optimise(head(false), rdh;
-                                                                          blocks = ((set9,
-                                                                                     rd9),))
+    # Each warning names the owner of the reader that refused (R50 of #1817): the reader of
+    # the head refuses `f`, and the reader of the set refuses `e`.
+    refused(a, who = "this optimiser") = (:warn,
+                                          Regex("distance reader of $who cannot estimate the correlation of 1 asset\\(s\\) that the prior kept: \\[\"$a\"\\]"))
+    res = @test_logs refused("f") refused("e", "the Allocation Set") match_mode = :any optimise(head(false),
+                                                                                                rdh;
+                                                                                                blocks = ((set9,
+                                                                                                           rd9),))
     @test res.imsk == BitVector([1, 1, 1, 1, 0, 0])
     @test iszero(res.w[5]) && iszero(res.w[6])
     @test isapprox(sum(res.w), 1)
@@ -1494,9 +1499,10 @@ end
     @test PO.constraint_block_steps((), res1.jor) === ()
     # A sub-problem of `NearOptimalCentering` reads the reduced blocks.
     noc = NearOptimalCentering(; opt = JuMPOptimiser(; slv = slv, cte = cte9))
-    resc = @test_logs refused("f") refused("e") match_mode = :any optimise(noc, rdh;
-                                                                           blocks = ((set9,
-                                                                                      rd9),))
+    resc = @test_logs refused("f") refused("e", "the Allocation Set") match_mode = :any optimise(noc,
+                                                                                                 rdh;
+                                                                                                 blocks = ((set9,
+                                                                                                            rd9),))
     @test resc.imsk == BitVector([1, 1, 1, 1, 0, 0])
     @test iszero(resc.w[5]) && iszero(resc.w[6])
     # The prior of a cut replaces the prior of the block of the head alone.
@@ -1532,8 +1538,9 @@ end
     ops(opt; strict = false) = OnlinePortfolioSelection(;
                                                         alg = FollowTheLeader(; opt = opt),
                                                         set = set8, strict = strict)
-    refused(a) = (:warn,
-                  Regex("distance reader of this optimiser cannot estimate the correlation of 1 asset\\(s\\) that the prior kept: \\[\"$a\"\\]"))
+    # Each warning names the owner of the reader that refused (R50 of #1817).
+    refused(a, who = "the Allocation Set") = (:warn,
+                                              Regex("distance reader of $who cannot estimate the correlation of 1 asset\\(s\\) that the prior kept: \\[\"$a\"\\]"))
     for opt in (MeanRisk(; opt = jopt()), RiskBudgeting(; opt = jopt()))
         r = @test_logs refused("e") match_mode = :any optimise(ops(opt), rd8)
         @test iszero(r.w[5])
@@ -1549,16 +1556,15 @@ end
     end
     # The asset `d` is constant, so the reader of the head refuses it for its zero variance.
     # That reader asks for 10 %, so it keeps `e` at every step after row 66. The reader of the
-    # set refuses `e` at those steps, and a warning that names `e` alone is the set's. Both
-    # assets depart.
+    # set refuses `e` at those steps, and each warning names its owner. Both assets depart.
     X9 = copy(X8)
     X9[:, 4] .= 0.0005
     rd9 = ReturnsResult(; nx = string.('a':'h'), X = X9,
                         pnl = AssetPanel(; pf = nothing, amsk = amsk8, emsk = amsk8))
-    r9 = @test_logs refused("d") refused("e") match_mode = :any optimise(ops(MeanRisk(;
-                                                                                      opt = jopt(;
-                                                                                                 ple = plc(0.1)))),
-                                                                         rd9)
+    r9 = @test_logs refused("d", "this optimiser") refused("e") match_mode = :any optimise(ops(MeanRisk(;
+                                                                                                        opt = jopt(;
+                                                                                                                   ple = plc(0.1)))),
+                                                                                           rd9)
     @test iszero(r9.w[4]) && iszero(r9.w[5])
     @test isapprox(sum(r9.w), 1)
 end

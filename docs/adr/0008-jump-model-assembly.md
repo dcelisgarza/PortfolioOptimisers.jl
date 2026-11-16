@@ -431,9 +431,12 @@ leader. `assemble_allocation_set!`, the copy of the middle for the set, is gone.
 1. **Phase 1, `set_block_constraints!`**, adds the rows before the risk step of the owner: the
    weight bounds and the short and gross budgets of the block, the linear and centrality rows, the
    MIP and sub-group MIP kinds, the turnover ceilings, the tracking errors, the norm ceilings and
-   the penalties.
+   the penalties. When the phylogeny of the block is semidefinite, phase 1 also marks
+   `sdp_phylogeny` on the owner of the weights (`mark_sdp_phylogeny!`, #2126).
 2. **The owner's steps** follow: the fees, the risk measures, the return terms and
-   `mark_risk_minimised!`. The risk measures read the phylogeny of the owner's first block.
+   `mark_risk_minimised!`. The risk measures get the phylogeny of the owner's first block as
+   `pl`. A variance also reads the mark `sdp_phylogeny`, so it takes the semidefinite form when
+   any block on its weights holds a semidefinite phylogeny.
 3. **Phase 2, `set_block_post_risk_constraints!`**, adds the integer and the semidefinite
    phylogeny rows and the custom constraints. The semidefinite rows read the marks of the
    objective of the owner.
@@ -480,9 +483,10 @@ The middle of a head with more than one block runs in this order:
    owner.
 2. The fees, the risk measures, the return terms and `mark_risk_minimised!` of the head.
 3. The bounds builder `set_allocation_risk_return_bounds!` of each set, after the marks.
-4. Phase 2 of the block of the head, then phase 2 of each later block. A later block then adds
-   its custom objective terms with the `obj` of the assembly, the set and its block Result. The
-   objective builder of the head adds the terms of the block of the head alone.
+4. Phase 2 of the block of the head, then the custom objective terms of the head, with the `obj`
+   of the assembly, the head and `attrs` (#2065). Then phase 2 of each later block, and its custom
+   objective terms with the `obj` of the assembly, the set and its block Result. The objective
+   builder adds no term.
 
 Block `i` after the first takes the prefix `blk_i_` (`later_constraint_blocks`). The set that owns
 it is viewed at the Investable Mask of the bundle. The frontier model of a `MaximumRatio` under a

@@ -94,9 +94,9 @@ The entry calls it once on the first fit, and once more on each fit again after 
 
 # Algorithm
 
- 1. Place the fees on the axes that the mask leaves with [`investable_fees_view`](@ref).
- 2. Reduce the prior, the optimiser and `rd` to the mask with [`investable_reduction`](@ref). The reduction views the block of stage 1, and it declares the Non-Investable Axis on its `sets`.
- 3. Resolve stage 2 of the reduced block with [`resolve_constraint_block`](@ref), through [`distance_reader_call`](@ref), under the solver and the `strict` flag of the head.
+ 1. Reduce the prior, the optimiser and `rd` to the mask with [`investable_reduction`](@ref). The reduction views the block of stage 1, and it declares the Non-Investable Axis on its `sets`.
+ 2. Resolve stage 2 of the reduced block with [`resolve_constraint_block`](@ref), through [`distance_reader_call`](@ref), under the solver and the `strict` flag of the head.
+ 3. Place the fees on the axes that the mask leaves with [`investable_fees_view`](@ref), and return them with the reduced prior and optimiser.
 
 # Arguments
 
@@ -423,8 +423,9 @@ owner is its [`ProgrammeAllocationSet`](@ref), see [`later_constraint_blocks`](@
     `opt.bgt`, the fees and the tracking errors of the head. A block of a set takes no net
     budget and no fees, and its own tracking errors.
  2. The head adds its fees, its risk measures and its return terms, and marks the objective
-    with [`mark_risk_minimised!`](@ref). The risk measures read the phylogeny `plr` of the
-    block of the head.
+    with [`mark_risk_minimised!`](@ref). The risk measures get the phylogeny `plr` of the
+    block of the head. A variance also reads the mark `sdp_phylogeny` that phase 1 of any
+    block sets, [`mark_sdp_phylogeny!`](@ref).
  3. The bounds builder [`set_allocation_risk_return_bounds!`](@ref) adds the risk ceilings
     `r` and the return floor `ret` of each set.
  4. Phase 2 of each block, [`set_block_post_risk_constraints!`](@ref), adds the phylogeny
@@ -504,7 +505,7 @@ function assemble_jump_model!(model::JuMP.Model, optimiser::JuMPOptimisationEsti
     set_risk_and_scalarise!(model, r, optimiser, opt, pr, cbr.plr, fees, b1; rd = rd)
     set_return_constraints!(model, ret, obj, pr; rd = rd)
     # After the return constraints, so a `MaximumRatio` has chosen its form, and before
-    # every semidefinite phylogeny, including a programme set's in `add_custom_constraint!`.
+    # every semidefinite phylogeny, including the phylogeny of a later block in phase 2.
     mark_risk_minimised!(model, obj)
     for (set, cbri, prefix) in later
         set_allocation_risk_return_bounds!(model, set, cbri; prefix = prefix)
