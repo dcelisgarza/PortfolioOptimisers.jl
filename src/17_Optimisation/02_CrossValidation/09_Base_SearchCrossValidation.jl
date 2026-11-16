@@ -1048,12 +1048,12 @@ Every method of [`search_cross_validation`](@ref) writes through this function, 
   - **One row for a whole path.** A [`CombinatorialCrossValidation`](@ref) pools the test groups of a path into one series, so the path's test score is [`oriented_score`](@ref) of the path, at its own row. The folds of one path train on different windows, so the train scores stay one per fold, in the matrix of the path, `train_scores[row]`.
   - **A population.** Each path is written against its own entry of `rows`, by one of the two methods above. Under a [`MultipleRandomised`](@ref) scheme an entry is a vector of rows, and under a [`CombinatorialCrossValidation`](@ref) it is one row.
 
-Every score is oriented, so a higher score is always better whatever measures `r` holds, which is the orientation a [`CrossValidationSearchScorer`](@ref) relies on. `r_sca` reduces a vector of measures to one score. Under [`EachValue`](@ref) with a vector of measures, each measure keeps its own score, and [`store_search_score!`](@ref) writes score `k` into matrix `k`. A fold or a path that failed scores `NaN`, and [`finite_candidate_order`](@ref) keeps that column from the scorer.
+Every score is oriented, so a higher score is always better whatever measures `r` holds, which is the orientation a [`CrossValidationSearchScorer`](@ref) relies on. `r_sca` reduces a vector of measures to one score. Under a rule of [`AbstractSearchReduction`](@ref) with a vector of measures, each measure keeps its own score, and [`store_search_score!`](@ref) writes score `k` into matrix `k`. A fold or a path that failed scores `NaN`, and [`finite_candidate_order`](@ref) keeps that column from the scorer.
 
 # Arguments
 
-  - `test_scores`: The test score matrix, with one row per fold or per path, or one such matrix per measure under [`EachValue`](@ref).
-  - `train_scores`: The train score matrix of the same shape, a vector of one matrix per path under a [`CombinatorialCrossValidation`](@ref), or `nothing` when the search records none. Under [`EachValue`](@ref), one of these per measure.
+  - `test_scores`: The test score matrix, with one row per fold or per path, or one such matrix per measure under a rule of [`AbstractSearchReduction`](@ref).
+  - `train_scores`: The train score matrix of the same shape, a vector of one matrix per path under a [`CombinatorialCrossValidation`](@ref), or `nothing` when the search records none. Under a rule of [`AbstractSearchReduction`](@ref), one of these per measure.
   - `i`: The candidate's column.
   - `predictions`, `path`: The candidate's predictions over the scheme, or one path of them.
   - `rows`, `row`: The rows the predictions fill.
@@ -1119,7 +1119,7 @@ end
 
 Allocate the test and the train scores of a search, with `N` columns, one per candidate.
 
-The four methods of [`search_cross_validation`](@ref) on an optimiser and on a [`Pipeline`](@ref), batch and combinatorial, call it. [`search_score_array`](@ref) allocates each array, and the types of `gscv.r_sca` and `gscv.r` select its method. Under `r_sca = EachValue()` with a vector of measures, each array holds one entry per measure.
+The four methods of [`search_cross_validation`](@ref) on an optimiser and on a [`Pipeline`](@ref), batch and combinatorial, call it. [`search_score_array`](@ref) allocates each array, and the types of `gscv.r_sca` and `gscv.r` select its method. Under a rule of [`AbstractSearchReduction`](@ref) in `r_sca`, [`EachValue`](@ref) or [`PerCandidate`](@ref), with a vector of measures, each array holds one entry per measure.
 
 # Arguments
 
@@ -1210,7 +1210,7 @@ end
 
 Store the score of candidate `i` at row `j` of a score array of a search.
 
-[`write_candidate_scores!`](@ref) calls it with the return of [`oriented_score`](@ref). One score goes into one matrix. Under [`EachValue`](@ref) with a vector of measures, the score is a vector of one value per measure, and value `k` goes into matrix `k`.
+[`write_candidate_scores!`](@ref) calls it with the return of [`oriented_score`](@ref). One score goes into one matrix. Under a rule of [`AbstractSearchReduction`](@ref) with a vector of measures, the score is a vector of one value per measure, and value `k` goes into matrix `k`.
 
 # Arguments
 
@@ -1246,7 +1246,7 @@ end
 
 Give the train scores of path `p` of a combinatorial search, one row per fold of the path.
 
-The train scores hold one matrix per path. Under [`EachValue`](@ref) with a vector of measures they hold one such vector per measure, `train_scores[k][p]`, so the scores of path `p` are one matrix per measure.
+The train scores hold one matrix per path. Under a rule of [`AbstractSearchReduction`](@ref) with a vector of measures they hold one such vector per measure, `train_scores[k][p]`, so the scores of path `p` are one matrix per measure.
 
 # Arguments
 

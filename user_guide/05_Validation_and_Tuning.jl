@@ -90,7 +90,8 @@ a risk measure can share one vector. The field `r_sca` sets the stage where the 
 The field `s_sca` combines the values of the search scorers of each candidate. It takes a
 reduction, `nothing` for the sum, or `EachValue()`. Under `EachValue()`, the search gives one
 ranking for each value, in one Result. The types of the four fields decide the shape of `opt`,
-`idx`, `ranked`, `rank_idx` and `rank_scores`.
+`idx`, `ranked`, `rank_idx` and `rank_scores`, and of `rank_predictions` under
+`rank_prediction = true`.
 
 | `r_sca`                                  | `s_sca`                        | Each field                                                            |
 |:---------------------------------------- |:------------------------------ |:--------------------------------------------------------------------- |

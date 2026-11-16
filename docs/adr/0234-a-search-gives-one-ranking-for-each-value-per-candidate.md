@@ -71,7 +71,7 @@ measure is over all the folds.
 ### The shape of the Result
 
 One `SearchCrossValidationResult`. `opt`, `idx`, `ranked`, `rank_idx` and `rank_scores` hold one
-entry per value. The shape follows the types of `r`, `r_sca`, `scorer` and `s_sca`, never the count
+entry per value, and so does `rank_predictions` under `rank_prediction = true` (#2058). The shape follows the types of `r`, `r_sca`, `scorer` and `s_sca`, never the count
 at run time (ADR 0227).
 
 | `r_sca` | `s_sca` | Values per candidate | Container of each field |

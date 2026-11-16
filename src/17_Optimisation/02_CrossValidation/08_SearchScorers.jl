@@ -762,7 +762,7 @@ The values of the member are checked through [`assert_candidate_scores`](@ref), 
 # Related
 
   - [`finite_candidate_order`](@ref)
-  - [`finite_candidate_order`](@ref)
+  - [`scorer_scale`](@ref)
 """
 function scorer_ranking(scorer, cols::AbstractVector{<:Integer}, n_best::Integer,
                         vals::VecNum)

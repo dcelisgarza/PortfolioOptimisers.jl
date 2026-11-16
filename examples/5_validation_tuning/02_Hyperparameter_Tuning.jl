@@ -304,7 +304,7 @@ size(mm_sum.test_scores), mm_sum.idx
 [`EachValue`](@ref) in `r_sca` does not combine the measures. The search keeps one score matrix
 for each measure, and ranks the candidates by each measure apart, as the multi-metric search of
 sklearn does. `opt`, `idx`, `ranked`, `rank_idx` and `rank_scores` then hold one entry for each
-measure, in the order of `r`.
+measure, in the order of `r`, and so does `rank_predictions` under `rank_prediction = true`.
 =#
 
 mm_each = search_cross_validation(st,

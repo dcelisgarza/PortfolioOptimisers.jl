@@ -33,8 +33,7 @@ the index form and keeps one candidate, as it did before, and it refuses `n_best
 `ArgumentError` that names the type and the method to add. A function scorer gives what a subtype
 gives, in the same form: one value per column, or the index of one winner. The search reads the
 form from the type of the return of its one call, and an index takes the same path as the index
-form of a subtype (ADR 0233). Build ticket #2000 builds this rule. Until then a function scorer
-gives an index and takes the fallback, as a subtype with only the index form does.
+form of a subtype (ADR 0233). Build ticket #2000 built this rule.
 
 Issue #1937 asked for a fallback that throws. A fallback that returns `nothing` keeps the same
 refusal at `n_best > 1`, and it lets the search read the values of every scorer that has them,
@@ -46,28 +45,29 @@ rank 1 comes from the same order at every `n_best`. The library spells "no value
 
 `GridSearchCrossValidation` and `RandomisedSearchCrossValidation` take `n_best::Integer = 1` after
 `scorer`. The constructor checks `n_best > 0`. A function scorer that returns an index is refused
-with `n_best > 1` when the search runs, because only its return shows its form (ADR 0233). Until
-build ticket #2000 lands, the constructor refuses every function scorer with `n_best > 1`. The
+with `n_best > 1` when the search runs, because only its return shows its form (ADR 0233). The
 randomised search forwards `n_best` to the grid search of its trials. Its trials come from `rng`,
 so its order is the same in two runs only when `seed` is set.
 
 ### 3. The order, the cap and the failed candidates
 
-`finite_candidate_order(scorer, test_scores, n_best)` replaces `finite_candidate_index`, so the
-rule of ADR 0120 is written once. Only a column whose every entry is finite enters the order. The
-order is `cols[sortperm(candidate_scores(scorer, view(test_scores, :, cols)); rev = true)]`, cut at
-`min(n_best, length(cols))`. The sort is stable, so a tie keeps grid order, as `argmax` does. The
-cap gives no warning: `test_scores` shows each failed column.
+`finite_candidate_order(r_sca, s_sca, scorer, test_scores, n_best)` replaces
+`finite_candidate_index`, so the rule of ADR 0120 is written once. ADRs 0232 to 0234 add the slots
+`r_sca` and `s_sca`. Only a column whose every entry is finite enters the order. The order is the
+descending order of `candidate_values(r_sca, s_sca, scorer, view(test_scores, :, cols))`, cut at
+`min(n_best, length(cols))`. For one scorer, `candidate_values` gives `candidate_scores`. A tie
+keeps grid order, as a stable sort and `argmax` do. The cap gives no warning: `test_scores` shows
+each failed column.
 
 ### 4. The Result keeps configurations, not fits
 
-`SearchCrossValidationResult` has four more fields:
+`SearchCrossValidationResult` has five more fields:
 
 | Field | Content |
 | --- | --- |
 | `ranked` | The kept candidates, best first, each built from the estimator or the `Pipeline` that the search was given, through the lenses of its own grid point. |
 | `rank_idx` | The column of `test_scores` of each kept candidate. |
-| `rank_scores` | `candidate_scores` of each kept candidate, or `nothing`. |
+| `rank_scores` | `candidate_values` of each kept candidate, `candidate_scores` for one scorer, or `nothing`. |
 | `path_ids` | The path of each row of `test_scores`: `cv.path_ids` under `MultipleRandomised`, `1:M` under `CombinatorialCrossValidation`, `nothing` for a scheme with one path. |
 | `rank_predictions` | With `rank_prediction = true`, the Result also keeps the prediction that the search scored for each kept candidate (#2058). Otherwise `nothing`. |
 
