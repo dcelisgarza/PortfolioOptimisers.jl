@@ -143,9 +143,12 @@ of cost, the fast ones first, and the slow ones once, on the tree you will push:
    Run the forward survey on each `src/` or `ext/` file that you changed, in one call:
    `julia --project=code_health code_health/forward_survey.jl <file> <file> …`. It parses the
    tree in about ten seconds and loads no package. Each finding carries the verdict of a ruling
-   of #2072. A `go` finding that your change adds is a wrapper: give the form to its owner. A
-   `review` finding that your change adds needs a decision of the maintainer: ask before you
-   push. A finding that `test_70` lists as ruled, or that a `keep` verdict covers, needs no work.
+   of #2072. A `go` finding that your change adds takes the form that its reason names. A
+   `review` finding that your change adds takes a ruling by
+   `.github/instructions/julia-source-code.instructions.md` § *A design is chosen by the standing
+   test*, which also states when to ask the maintainer, and the ruling goes into the list that
+   its reason names. A finding that `test_70` lists as ruled, or that a `keep` verdict covers,
+   needs no work.
    A `named tuple` finding that your change adds takes the form that its reason names, from the
    table of `.github/instructions/julia-source-code.instructions.md` § *A function returns a
    defined type or a plain tuple, not a named tuple*. Its `review` verdict asks for the transient

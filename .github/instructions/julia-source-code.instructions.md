@@ -382,7 +382,8 @@ An **alias** is the case to check first. Its docstring carries a different set o
   new_obj = new_value === obj.field ? obj : rebuild_struct(obj, (; field = new_value))
   ```
 
-  A small type can call its own keyword constructor instead. The rule covers every form of
+  Rule 6 of *The rulings of #2072*, in § *A wrapper is for convenience or for a dispatch
+  problem*, states when a call by hand stays. The rule covers every form of
   `Accessors.jl` on a named field: `Accessors.@set`, `Accessors.@reset`, `Accessors.setproperties`,
   and `Accessors.set` with a literal lens such as `PropertyLens{:ucs}()`.
 - Use `Accessors.jl` only when the code cannot know the field in advance. Tuning is the case: a key
@@ -538,10 +539,11 @@ A unit wider than that stays, because it reduces the complexity of its caller, k
 type of the caller concrete, or names a rule that the caller would otherwise restate:
 
 - **Two methods are dispatch when each arm does work.** A `Nothing`/value pair and a two-family
-  pair save the caller an `isa` branch. A pair whose value arm only forwards to another function
-  is a wrapper: the `Nothing` method belongs on that function, and the callers call it. A set of
-  methods that only sends each form of an input on to another function is a wrapper all the
-  same. § *A wrapper is for convenience or for a dispatch problem* below governs both.
+  pair save the caller an `isa` branch. A pair whose value arm only forwards to another function,
+  and a set of methods that only sends each form of an input on to another function, are read as
+  wrappers. § *A wrapper is for convenience or for a dispatch problem* below governs both. Its
+  rule 2 of *The rulings of #2072* states when a `Nothing` arm moves to the callee, and when the
+  pair stays (#2111).
 - **A decision, an operator, an index, a nested call, a comprehension or a string template is
   logic the unit owns.** A ternary that picks a formulation, a message template, an accessor
   that slices, and a helper that names one rule all stay.
@@ -573,7 +575,10 @@ wrapper earns its place for two reasons only:
   short name for a call that users write often.
 - **A dispatch problem that a method on the owning function cannot solve.** The owning function
   belongs to another module, so a new method is type piracy. Or a new method makes a method
-  ambiguity that no narrower signature removes.
+  ambiguity that no narrower signature removes. Or a slot of a composite holds either of two
+  forms, so no caller can pass the canonical form: the scalariser forms of `expected_risk` send a
+  single measure to the method that takes the measure first, where the method of each type wins
+  (#2100).
 
 A new form of an input is a new method of its reader and of its check, not a new function in
 front of them. #2005 is the case. A reader of the inputs of a scorer sent two of its four forms
@@ -597,7 +602,7 @@ keep it:
 - **The target takes the slot as a keyword, by the precedent of its family.** Give the target a
   method for the form, and keep the keyword in that method.
 - **Another arm of the function holds logic, or owns a fallback.** The arm that only forwards
-  still moves. A `Nothing` arm moves with it, to the function that takes the value.
+  still moves. Rule 2 of *The rulings of #2072* below states where a `Nothing` arm goes (#2111).
 - **The function only inserts a field to dispatch on it, or picks an arity by type.** The
   callers pass the field, or the owner takes the method for the type.
 - **Several methods share one body.** Write one method on the abstract type, or on the `Union`
@@ -632,8 +637,9 @@ and every addition:
    which steps of a pipeline take the weights, stays in a function of the container, and that
    function is kept by reason (b). #2108 rules the untyped fallback that returns `nothing`:
    - **A contract verb takes a `::Nothing` method on the empty slot**, with the arity of its
-     typed methods, as `set_turnover_fees!(::JuMP.Model, ::Nothing) = nothing`. A fallback on
-     `args...` goes, because it takes every type and every arity.
+     typed methods, as `set_turnover_fees!(::JuMP.Model, ::Nothing) = nothing`.
+     § *A branch that a type decides is a method* states how it types its other arguments. A
+     fallback on `args...` goes, because it takes every type and every arity.
    - **A value check takes a no-op method on the set that reaches it, never on `::Any`.** A
      value check tests a number, a container or a length against a rule. A slot that holds no
      value yet holds an **Unresolved Value**: an Estimator, an Algorithm or a function that
@@ -713,7 +719,8 @@ and every addition:
    wrapper.
 5. **A self-forward that drops an ignored argument** becomes one method with an ignored or
    defaulted positional slot. A conversion to the canonical form is reason (a) on a public
-   verb. On a private function, the conversion goes. #2116 rules the exception: **the leaf of
+   verb. On a private function, the conversion goes, unless the slot of a composite holds
+   either form, which is reason (b) above. #2116 rules the exception: **the leaf of
    a walk keeps its conversion.** When another method of the function recurses on a field,
    the function walks the composites. A composite passes an inner value, a leaf or another
    composite, so it cannot pass the canonical form. The leaf
@@ -723,9 +730,13 @@ and every addition:
    slot still becomes one method in a walk. A walk is no private worker of the verb that calls
    it either: its composites call it, so its body does not move into that verb, as
    `observation_count` stays beside `effective_observation_count` (#2092).
-6. **A rebuild by hand that copies every field but one** goes to
-   `rebuild_struct(x, (; f = v))`. A site stays by hand only on a measured loss of
-   performance. #2110 rules the edges of the rule:
+6. **A rebuild by hand that copies every field but one or two** goes to
+   `rebuild_struct(x, (; f = v))`, through the positional or the keyword constructor alike. A
+   call that copies one field is as short as the rebuild, and it stays. A site stays by hand
+   also on a measured loss of performance, and when the keyword constructor transforms an
+   input, because a rebuild through it applies the transform twice. The keyword constructor of
+   `JuMPOptimisationResult` expands `sol` through the investable mask, so `set_retcode` keeps
+   the positional call as (b) (#2101, #2103). #2110 rules the other edges of the rule:
    - **A build from another type is no rebuild.** A call that copies fields of an estimator, a
      model or a `NamedTuple` into a struct of another type is a conversion, as
      `SmythBrobyKernel(ce.alg, mu, sd, ce.c1, …)` is.

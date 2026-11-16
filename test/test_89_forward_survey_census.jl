@@ -24,10 +24,26 @@ using Test
                      "## `hook_fn`", "", "A subtype implements it.", q3], '\n')
     nt_hook_doc = join([q3, "    nt_hook(x)", "", "A hook.", "", "# Interfaces", "",
                         "## `nt_hook`", "", "A subtype implements it.", q3], '\n')
-    # A name of `RULED_NAMED_TUPLES`, read from the table with its verdict, so a build ticket that
-    # deletes its own entry leaves the fixture whole. The build tickets of #2072 deleted every
-    # `go` entry, so the fixture reads any verdict.
-    ruled_nt = first(sort!(collect(keys(FS.RULED_NAMED_TUPLES))))
+    # The rulings of the fixture, one or more for each table of the verdicts that the parse
+    # cannot read. A live entry goes when its build ticket fixes the site, because the last
+    # testset fails on a stale entry. A fixture that read a live entry went red when the last
+    # `go` entry of `RULED_NAMED_TUPLES` went (`3fde4a4f04`), so the fixture names its own
+    # methods and holds its own entries. They are in the copy of the tables of this file only
+    # while the survey of the fixture runs.
+    fx_defaults = Dict(:assert_fx_pl => FS.refusal_check("a fixture type"),
+                       :fx_positions =>
+                           ("keep (default)", "an index of the fixture passes to its gate"),
+                       :fx_step_factory => ("keep (b)",
+                                            "a policy of the fixture: only `A` takes the factory"))
+    fx_pairs = Dict((:fx_mask_source, :fx_dims_oriented) => ("keep (b)",
+                                                             "the callee of the fixture takes `nothing` with another answer"))
+    fx_rebuilds = Dict((:fx_fit, :ElasticNetFit) =>
+                           (FS.NO_REBUILD, "`cnt` of the fixture is another type"))
+    fx_named_tuples = Dict(:fx_ruled_nt => ("keep (keys)",
+                                            "the caller of the fixture splats it into a call"))
+    fixture_ruled = (FS.RULED_DEFAULTS => fx_defaults, FS.RULED_NOTHING_PAIRS => fx_pairs,
+                     FS.RULED_REBUILDS => fx_rebuilds,
+                     FS.RULED_NAMED_TUPLES => fx_named_tuples)
     source = """
              export verb, verb2, verb3, verb4, verb5, verb6, pubf, pubk, mk, kwv, nt_pub, pubfill,
                     pubkwfill
@@ -98,9 +114,9 @@ using Test
              pt(::Nothing) = throw(ArgumentError("no prior"))
              pt(x::A) = qt(x)
              qt(x::A) = x + 1
-             coverage_mask_source(p, ::Nothing) = p
-             coverage_mask_source(p, m::A) = dims_oriented(m)
-             dims_oriented(m::Option{<:A}) = m
+             fx_mask_source(p, ::Nothing) = p
+             fx_mask_source(p, m::A) = fx_dims_oriented(m)
+             fx_dims_oriented(m::Option{<:A}) = m
 
              # default
              trait(x) = false
@@ -130,8 +146,8 @@ using Test
              step_i(x::A) = owner_i(x)
              step_i(x) = x
              owner_i(x::A) = 1
-             pipeline_step_factory(v::A) = factory(v)
-             pipeline_step_factory(v) = v
+             fx_step_factory(v::A) = factory(v)
+             fx_step_factory(v) = v
              factory(v::A) = 1
 
              # untyped fallbacks with no owner (#2108)
@@ -143,8 +159,8 @@ using Test
              assert_role(x::A) = throw(ArgumentError("a role"))
              refuse(::Any, ::Any) = nothing
              refuse(x::A, y::B) = throw(ArgumentError("refused"))
-             assert_rc_pl(::Any) = nothing
-             assert_rc_pl(x::A) = throw(ArgumentError("refused"))
+             assert_fx_pl(::Any) = nothing
+             assert_fx_pl(x::A) = throw(ArgumentError("refused"))
              net_budget_floor(::Any) = nothing
              net_budget_floor(x::A) = 1
              fill_slot!(::Any) = nothing
@@ -153,8 +169,8 @@ using Test
              pair_op(x::A, y::A) = 1
              leaf_pass(x, ::Any) = x
              leaf_pass(x::A, y::B) = 1
-             timestamp_positions(::Any, i) = i
-             timestamp_positions(::Any, i::A) = 1
+             fx_positions(::Any, i) = i
+             fx_positions(::Any, i::A) = 1
 
              # rebuild
              set_c(r::R, v) = R(r.a, r.b, v)
@@ -167,7 +183,7 @@ using Test
              fold_ps(s::PS, v) = PS(s.a, s.b, v)
              fold_local(x, v) = PS(x.a, x.b, v)
              from_m_ps(m::M, v) = PS(m.a, m.b, v)
-             function fit(x, v)
+             function fx_fit(x, v)
                  cnt = x
                  return ElasticNetFit(cnt.a, cnt.b, v)
              end
@@ -264,7 +280,7 @@ using Test
              Mod.nt_q(x::A) = (; x.a)
              # the verdicts of #2113
              fold_step_kwargs(x::A) = (; e = x)
-             $ruled_nt(x::A) = (; ppy = x)
+             fx_ruled_nt(x::A) = (; ppy = x)
              nt_pub(x::A) = (; e = x, f = 1)
              $nt_hook_doc
              nt_hook(x::A) = (; e = x, g = 1)
@@ -287,16 +303,28 @@ using Test
              interface_functions = Dict{Symbol, String}(:w => "a name ruling", :walk_path => "its forms walk")
              pending_forwards = Set{Tuple{Symbol, Symbol}}([(:w, :only_b)])
              """
-    found, out, status = mktempdir() do dir
-        mkpath(joinpath(dir, "src"))
-        mkpath(joinpath(dir, "test"))
-        write(joinpath(dir, "src", "a.jl"), source)
-        write(joinpath(dir, "test", "census.jl"), census)
-        c = joinpath(dir, "test", "census.jl")
-        found = FS.survey(; root = dir, files = ["src/a.jl"], census = c)
-        io = IOBuffer()
-        status = FS.main(["src/a.jl"]; io, root = dir, files = ["src/a.jl"])
-        return found, String(take!(io)), status
+    # An entry of the fixture that shared a key with a live entry would replace it, and the
+    # `delete!` after the survey would remove the live entry.
+    for (table, entries) in fixture_ruled
+        @test isdisjoint(keys(table), keys(entries))
+        merge!(table, entries)
+    end
+    found, out, status = try
+        mktempdir() do dir
+            mkpath(joinpath(dir, "src"))
+            mkpath(joinpath(dir, "test"))
+            write(joinpath(dir, "src", "a.jl"), source)
+            write(joinpath(dir, "test", "census.jl"), census)
+            c = joinpath(dir, "test", "census.jl")
+            found = FS.survey(; root = dir, files = ["src/a.jl"], census = c)
+            io = IOBuffer()
+            status = FS.main(["src/a.jl"]; io, root = dir, files = ["src/a.jl"])
+            return found, String(take!(io)), status
+        end
+    finally
+        for (table, entries) in fixture_ruled
+            foreach(k -> delete!(table, k), keys(entries))
+        end
     end
     # The findings of `name`, as `(shape, callee, verdict)`.
     of(name) = [(x.shape, x.callee, x.verdict) for x in found if x.name === name]
@@ -326,9 +354,9 @@ using Test
         @test of(:pt) == [("nothing pair", :qt, "keep (b)")]
         @test occursin("throws", first_of(:pt).why)
         # A ruling comes before case 1: the callee takes `nothing` with another answer.
-        @test of(:coverage_mask_source) == [("nothing pair", :dims_oriented, "keep (b)")]
-        @test first_of(:coverage_mask_source).why ==
-              FS.RULED_NOTHING_PAIRS[(:coverage_mask_source, :dims_oriented)][2]
+        @test of(:fx_mask_source) == [("nothing pair", :fx_dims_oriented, "keep (b)")]
+        @test first_of(:fx_mask_source).why ==
+              fx_pairs[(:fx_mask_source, :fx_dims_oriented)][2]
     end
 
     @testset "default (#2074, rule 2)" begin
@@ -365,11 +393,9 @@ using Test
         @test ("default", :T3, "keep (b)") in of(:rewrap)
         # The input in front of a function: a person rules it, and `RULED_DEFAULTS` holds it.
         @test ("default", :owner_i, "review") in of(:step_i)
-        @test ("default", :factory, "keep (b)") in of(:pipeline_step_factory)
-        @test only(x
-                   for x in found
-                   if x.name === :pipeline_step_factory && x.shape == "default").why ==
-              FS.RULED_DEFAULTS[:pipeline_step_factory][2]
+        @test ("default", :factory, "keep (b)") in of(:fx_step_factory)
+        @test only(x for x in found if x.name === :fx_step_factory && x.shape == "default").why ==
+              fx_defaults[:fx_step_factory][2]
     end
 
     @testset "untyped fallbacks with no owner (#2108)" begin
@@ -384,9 +410,9 @@ using Test
         @test of(:refuse) == [("default", nothing, "go")]
         @test occursin("value check", first_of(:refuse).why)
         # A refusal check that `RULED_DEFAULTS` names keeps its open method.
-        @test of(:assert_rc_pl) == [("default", nothing, "keep (default)")]
-        @test first_of(:assert_rc_pl).why == FS.RULED_DEFAULTS[:assert_rc_pl][2]
-        @test occursin("refusal check", first_of(:assert_rc_pl).why)
+        @test of(:assert_fx_pl) == [("default", nothing, "keep (default)")]
+        @test first_of(:assert_fx_pl).why == fx_defaults[:assert_fx_pl][2]
+        @test occursin("refusal check", first_of(:assert_fx_pl).why)
         # A query whose only reader is a value check takes the set that reaches it, but the
         # parse cannot tell it from another query, so `RULED_DEFAULTS` names each one. With no
         # entry, a query owns `nothing`, the answer "none". #2101 typed the last one that the
@@ -399,9 +425,8 @@ using Test
         @test of(:pair_op) == [("default", nothing, "go")]
         # An identity on two slots: a person rules it, and `RULED_DEFAULTS` holds the ruling.
         @test of(:leaf_pass) == [("default", nothing, "review")]
-        @test of(:timestamp_positions) == [("default", nothing, "keep (default)")]
-        @test first_of(:timestamp_positions).why ==
-              FS.RULED_DEFAULTS[:timestamp_positions][2]
+        @test of(:fx_positions) == [("default", nothing, "keep (default)")]
+        @test first_of(:fx_positions).why == fx_defaults[:fx_positions][2]
     end
 
     @testset "rebuild (#2082, rule 6)" begin
@@ -429,8 +454,8 @@ using Test
         @test of(:fold_local) == [("rebuild", :PS, "keep (b)")]
         @test occursin("fold exception", first_of(:fold_ps).why)
         @test !FS.is_candidate(first_of(:fold_ps))
-        # A pair of `RULED_REBUILDS` takes its verdict: `fit` builds from a `NamedTuple`.
-        @test all(x -> x[1] != "rebuild", of(:fit))
+        # A pair of `RULED_REBUILDS` takes its verdict: `fx_fit` builds from another type.
+        @test all(x -> x[1] != "rebuild", of(:fx_fit))
     end
 
     @testset "self-forward (#2081, rule 5)" begin
@@ -527,9 +552,9 @@ using Test
         @test nt(:fold_step_kwargs) == ["keep (keys)"]
         @test !FS.is_candidate(nt_of(:fold_step_kwargs))
         # `RULED_NAMED_TUPLES` gives the verdict that the parse cannot read.
-        @test nt(ruled_nt) == [FS.RULED_NAMED_TUPLES[ruled_nt][1]]
-        @test nt_of(ruled_nt).why ==
-              "returns the named tuple `(; ppy)`: " * FS.RULED_NAMED_TUPLES[ruled_nt][2]
+        @test nt(:fx_ruled_nt) == [fx_named_tuples[:fx_ruled_nt][1]]
+        @test nt_of(:fx_ruled_nt).why ==
+              "returns the named tuple `(; ppy)`: " * fx_named_tuples[:fx_ruled_nt][2]
         # A public name takes a `…Result`, and an interface name takes a `public` type.
         @test nt(:nt_pub) == ["go"]
         @test occursin("`…Result <: AbstractResult`", nt_of(:nt_pub).why)

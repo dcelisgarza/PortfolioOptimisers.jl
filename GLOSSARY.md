@@ -85,7 +85,7 @@ The mechanism that propagates runtime-computed values down a composed struct tre
 A moment Estimator in the place of a value derived from the prior. So the slot takes either the value or the method that computes it. Factory resolves it against the Prior of the optimisation.
 
 **Unresolved Value**
-The form of a value slot that holds no value yet: an Estimator, an Algorithm or a function that computes the value. The alias `UnresolvedValue` names it, and `Option{<:UnresolvedValue}` adds the empty slot. A value check has no number to test in it, so its no-op method takes this set, and any other form with no rule is a `MethodError` (#2108). A Deferred Quantity, a Calibration Rule, a `CountOf` or a `FractionOf`, a `TimeDependent` schedule and a `DynamicAbstractWeights` are Unresolved Values.
+The form of a value slot that holds no value yet: an Estimator, an Algorithm or a function that computes the value. The alias `UnresolvedValue` names it, and `Option{<:UnresolvedValue}` adds the empty slot. `.github/instructions/julia-source-code.instructions.md`, rule 2 of *The rulings of #2072*, states how a value check takes this set (#2108). A Deferred Quantity, a Calibration Rule, a `CountOf` or a `FractionOf`, a `TimeDependent` schedule and a `DynamicAbstractWeights` are Unresolved Values.
 *Avoid*: a check that passes every type it has no rule for, which lets a form that a widened bound admits skip the check.
 
 **View**

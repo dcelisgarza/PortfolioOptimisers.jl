@@ -19,8 +19,8 @@
 #   interface, per-form  a method that only forwards, and the count of callers of its callee
 #                        (#2078, rule 3). A shared callee, a public callee, a hook or a type
 #                        keeps it. A callee with this method as its only caller moves its body in.
-#                        One private method in front of a type goes to the constructor of the
-#                        type as a method (#2112).
+#                        A private method that only builds a type goes to the constructor of
+#                        the type as a method, whatever the number of its methods (#2112).
 #   nothing pair         the value arm of a `Nothing`/value pair, and whether the callee takes
 #                        `nothing` (#2077). Case 1 goes. A constructor as the callee, and a
 #                        `Nothing` arm that throws, keep the pair as (b). `RULED_NOTHING_PAIRS`
@@ -71,8 +71,9 @@
 #
 # THE VERDICTS. `go`: the rulings remove the method, or change its return. `keep (a)` and
 # `keep (b)`: the two reasons of the standard. `keep (interface)`: the method is not a wrapper, by
-# rule 3 or rule 4. `keep (default)`: a query trait owns `false`, and a traversal owns the
-# identity (rule 2). `keep (keys)`: the caller uses the keys of the named tuple as keys (#2113).
+# rule 3 or rule 4. `keep (default)`: the function owns the default, by rule 2 (a query, a
+# traversal, a pass-through to a gate, the leaf of a walk) or by rule 5 (the conversion of the
+# leaf of a walk). `keep (keys)`: the caller uses the keys of the named tuple as keys (#2113).
 # `review`: the rulings do not settle the finding alone, and a person checks it.
 #
 # THE RULINGS. A finding that `kept`, `kept_forwards` or `interface_functions` of
@@ -504,7 +505,8 @@ end
 
 Whether the struct `T` is a subtype of `AbstractPartialFitState`, through the supertypes that the
 tree declares. A rebuild of such a state keeps the positional constructor, called by name, as the
-fold exception of `.github/instructions/julia-source-code.instructions.md` § *Immutability* states
+fold exception of `.github/instructions/julia-source-code.instructions.md`
+§ *Immutability and `Accessors.jl`* states
 (#1807, #2110).
 """
 function is_partial_fit_state(t::Tree, T)
@@ -757,10 +759,11 @@ end
 """
 The verdicts of rule 5 that the parse cannot read, keyed by the name of the function whose
 method calls itself. A private function that converts its arguments goes when its callers can
-pass the canonical form. When a slot of a composite holds either form, no caller can, and the
-conversion is reason (b), a dispatch problem, as the scalariser forms of `expected_risk` are
-(#2100). The census of `test_70` does not flag such a method when the conversion is a nested
-call, so its `kept_forwards` cannot hold the ruling, and this list does. An entry whose name is
+pass the canonical form. Reason (b) of `.github/instructions/julia-source-code.instructions.md`
+§ *A wrapper is for convenience or for a dispatch problem* keeps the conversion when a slot of a
+composite holds either form (#2100). The census of `test_70` does not flag such a method when
+the conversion is a nested call, so its `kept_forwards` cannot hold the ruling, and this list
+does. An entry whose name is
 no longer a `self-forward` finding is stale, and `test/test_89_forward_survey_census.jl` fails
 on it.
 """
