@@ -75,9 +75,47 @@ We optimise the tuned estimator on the full sample, with the same call as any ot
 res_tuned = optimise(gs_res.opt, rd)
 
 #=
+### Many measures and many scorers
+
+`r` takes a vector of risk measures, and `scorer` takes a vector of search scorers. The search
+orients each measure before it combines them, so a higher score is always better, and a ratio and
+a risk measure can share one vector. The field `r_sca` sets the stage where the measures combine.
+
+| `r_sca`                                                                | Where the measures combine                                                     | `test_scores`           |
+|:---------------------------------------------------------------------- |:------------------------------------------------------------------------------ |:----------------------- |
+| a reduction, such as [`MaxScalariser`](@ref), or `nothing` for the sum | In each fold, before the search scorer reduces the folds.                      | One matrix.             |
+| [`PerCandidate`](@ref)`(sca)`                                          | Once per candidate, after the search scorer reduces the folds of each measure. | One matrix per measure. |
+| [`EachValue`](@ref)`()`                                                | Nowhere. Each measure ranks the candidates alone.                              | One matrix per measure. |
+
+The field `s_sca` combines the values of the search scorers of each candidate. It takes a
+reduction, `nothing` for the sum, or `EachValue()`. Under `EachValue()`, the search gives one
+ranking for each value, in one Result. The types of the four fields decide the shape of `opt`,
+`idx`, `ranked`, `rank_idx` and `rank_scores`.
+
+| `r_sca`                                  | `s_sca`                        | Each field                                                            |
+|:---------------------------------------- |:------------------------------ |:--------------------------------------------------------------------- |
+| a reduction, `nothing` or `PerCandidate` | a reduction or `nothing`       | One ranking.                                                          |
+| a reduction, `nothing` or `PerCandidate` | `EachValue()` with `L` scorers | A vector of `L` rankings, in the order of `scorer`.                   |
+| `EachValue()` with `K` measures          | a reduction or `nothing`       | A vector of `K` rankings, in the order of `r`.                        |
+| `EachValue()` with `K` measures          | `EachValue()` with `L` scorers | A `K × L` matrix, row `k` for measure `k`, column `l` for scorer `l`. |
+
+The search takes no refit. To fit the winner of value `v` on the full sample, call
+`optimise(res.opt[v], rd)`. We rank the same grid by the ratio and by the
+[`ConditionalValueatRisk`](@ref) apart, and get one index of a winner for each measure.
+=#
+
+gs_each = search_cross_validation(mr,
+                                  GridSearchCrossValidation(grid;
+                                                            r = [score,
+                                                                 ConditionalValueatRisk()],
+                                                            r_sca = EachValue()), rd)
+gs_each.idx
+
+#=
 [`RandomisedSearchCrossValidation`](@ref) draws candidates from the grid, or from distributions,
 instead of trying every one. It costs less on a large grid. See
-[Hyperparameter Tuning](@ref example-hyperparameter-tuning).
+[Hyperparameter Tuning](@ref example-hyperparameter-tuning). That page also shows each stage of
+`r_sca` on a larger grid, and keeps the predictions that the search scored.
 
 ## 3. Time-dependent inputs
 

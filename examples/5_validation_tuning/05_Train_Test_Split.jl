@@ -24,8 +24,6 @@ This example covers these subjects.
   - The pipeline step, and why it must come first.
   - Scoring on the held-out window with `fit_predict`.
   - Why cross-validation throws an error for a pipeline with a split.
-
-`docs/adr/0031-holdout-split-as-a-pipeline-step.md` gives the reasons for the design.
 =#
 using PortfolioOptimisers, PrettyTables
 

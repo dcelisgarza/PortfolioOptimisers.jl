@@ -808,7 +808,7 @@ Return the frequency weights that `GLM` reads as the observation weights `w`, or
 
 The scale does not change the coefficients, because a weighted fit does not change under a constant scale of its weights. The Kish count is the correct count for observations that are drawn alike and then reweighted. The scenario probabilities and the decay weights of the library are such weights. The count is ``T`` under uniform weights, so the fit equals the unweighted fit. It is ``k`` under equal weights on ``k`` of the rows, so the fit equals the fit of those rows alone.
 
-`docs/adr/0203-a-weighted-regression-reads-the-kish-count-of-its-weights.md` records the choice and the null test that measured it. A caller who wants another count states it with `StatsBase.fweights`.
+A caller who wants another count states it with `StatsBase.fweights`.
 
 # Mathematical definition
 

@@ -51,7 +51,9 @@
 
     ------------------------------------------------------------- what is a citation
 
-    A citation is one of: `ADR` followed by four digits; a `#` followed by three or four
+    A citation is one of: `ADR` followed by four digits; the path of an ADR file, `adr/`
+    followed by four digits, such as `docs/adr/0031-….md`, which names an ADR as surely as its
+    number; a `#` followed by three or four
     digits at a word boundary, which is how this repository writes an issue or pull
     request number; the words `pull request`; `PR` followed by a number; or a GitHub
     `issues/` or `pull/` URL. Three digits is the floor because the tracker passed #100
@@ -64,7 +66,7 @@
     =#
 
     ROOT = normpath(joinpath(@__DIR__, ".."))
-    CITATION = r"\bADR\s?\d{4}\b|(?<![\w/])#\d{3,4}\b|pull request|\bPR\s?#?\d+\b|github\.com/[^\s)]*/(?:issues|pull)/\d+"
+    CITATION = r"\bADR\s?\d{4}\b|\badr/\d{4}|(?<![\w/])#\d{3,4}\b|pull request|\bPR\s?#?\d+\b|github\.com/[^\s)]*/(?:issues|pull)/\d+"
 
     function files_under(dir, ext; skip = String[])
         acc = String[]
@@ -226,5 +228,12 @@
             append!(offenders, literate_hits(f))
         end
         @test offenders == String[]
+        # The path of an ADR file is a citation, as its number is. A word that only ends in
+        # `adr`, and a year after a slash, are not.
+        @test occursin(CITATION,
+                       "`docs/adr/0031-holdout-split-as-a-pipeline-step.md` gives")
+        @test occursin(CITATION, "[a rule](../docs/adr/0106-a-rule.md)")
+        @test !occursin(CITATION, "the quadr/2024 run")
+        @test !occursin(CITATION, "see the folder `adr/` of the repository")
     end
 end

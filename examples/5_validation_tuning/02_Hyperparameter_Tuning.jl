@@ -7,7 +7,8 @@ Description = "Hyperparameter tuning in PortfolioOptimisers.jl: grid and randomi
 
 Hyperparameter tuning chooses the parameters of an estimator by how they score on the test
 folds of a cross-validation. This example shows the two searches of PortfolioOptimisers.jl, a
-grid search and a randomised search.
+grid search and a randomised search. Then it shows a search that scores with many risk measures
+and many search scorers, and keeps the predictions that it scored.
 =#
 using PortfolioOptimisers, PrettyTables
 tsfmt = (v, i, j) -> begin
@@ -128,6 +129,8 @@ these fields.
     test score.
   - `path_ids` gives the path of each row of `test_scores`. It is `nothing` here, because the
     default scheme has one path.
+  - `rank_predictions` is `nothing` unless you set `rank_prediction = true`. Section 2.3 shows
+    it.
 
 The best candidate has the highest mean test score. The search negates a measure for which a
 lower value is better, such as a risk measure, and keeps a ratio as it is. Here the measure is
@@ -265,6 +268,152 @@ randomised search over vectors, and the randomised search with distributions.
 =#
 
 plot_stacked_bar_composition([res_gs1, res_rs1, res_rs2], rd)
+
+#=
+### 2.3 Many risk measures and many search scorers
+
+A search can score each fold with a vector of risk measures in `r`, and order the candidates
+with a vector of search scorers in `scorer`. We score with a ratio and with a risk measure. A
+higher ratio is better, and a lower risk is better. The search orients each measure before it
+combines them. It negates a measure for which a lower value is better, and multiplies each value
+by the scale of its measure. So every score is higher-is-better, and two measures of mixed
+orientation can share one vector.
+
+We search a grid of nine candidates. The ratio divides the mean return by the
+[`ConditionalValueatRisk`](@ref), so the two measures have values of about the same size.
+=#
+
+p_mm = [["opti[2].opt.l1" => [0.0005, 0.001, 0.002],
+         "opti[1].opt.l2.val" => [0.0005, 0.005, 0.05]]]
+r_mm = [MeanReturnRiskRatio(; rk = ConditionalValueatRisk()), ConditionalValueatRisk()]
+
+#=
+#### 2.3.1 One score for each fold
+
+The field `r_sca` combines the measures in each fold. Its default `nothing` gives the sum, so the
+score of a fold is the ratio minus the CVaR. `test_scores` is one matrix, as for one measure, and
+the search gives one ranking.
+=#
+
+mm_sum = search_cross_validation(st, GridSearchCrossValidation(p_mm; r = r_mm), rd);
+size(mm_sum.test_scores), mm_sum.idx
+
+#=
+#### 2.3.2 One ranking for each measure
+
+[`EachValue`](@ref) in `r_sca` does not combine the measures. The search keeps one score matrix
+for each measure, and ranks the candidates by each measure apart, as the multi-metric search of
+sklearn does. `opt`, `idx`, `ranked`, `rank_idx` and `rank_scores` then hold one entry for each
+measure, in the order of `r`.
+=#
+
+mm_each = search_cross_validation(st,
+                                  GridSearchCrossValidation(p_mm; r = r_mm,
+                                                            r_sca = EachValue()), rd);
+pretty_table(DataFrame("Measure" => ["Ratio", "CVaR"], "Column" => mm_each.idx,
+                       "Mean score" => [s[1] for s in mm_each.rank_scores]))
+
+#=
+The search takes no refit, where sklearn takes a `refit` argument. A refit is a call to
+[`optimise`](@ref). We fit the winner of each measure on the full data and compare the weights.
+=#
+
+res_each = [optimise(o, rd) for o in mm_each.opt]
+plot_stacked_bar_composition(res_each, rd)
+
+#=
+#### 2.3.3 Combine the measures in each fold, or once for each candidate
+
+A reduction in `r_sca` combines the measures in each fold, and then the search scorer reduces the
+folds. [`PerCandidate`](@ref)`(sca)` takes the two stages in the other order. The search scorer
+reduces the folds of each measure, and then `sca` combines the values of each candidate. For the
+sum and [`HighestMeanScore`](@ref) the two orders give the same value, because the mean of a sum
+is the sum of the means. For a scorer that is not linear in the folds, the two orders differ.
+
+A search scorer can be a function. It reads the score matrix, with one row per fold and one column
+per candidate, and returns one value per column, higher is better. `worst_fold` scores a candidate
+by its worst fold.
+=#
+
+worst_fold(X) = vec(minimum(X; dims = 1))
+
+mm_fold = search_cross_validation(st,
+                                  GridSearchCrossValidation(p_mm; r = r_mm,
+                                                            scorer = worst_fold), rd);
+mm_cand = search_cross_validation(st,
+                                  GridSearchCrossValidation(p_mm; r = r_mm,
+                                                            r_sca = PerCandidate(),
+                                                            scorer = worst_fold), rd);
+pretty_table(DataFrame("r_sca" => ["nothing", "PerCandidate()"],
+                       "Column" => [mm_fold.idx, mm_cand.idx],
+                       "Score" => [mm_fold.rank_scores[1], mm_cand.rank_scores[1]]))
+
+#=
+The first search keeps the candidate whose worst fold has the highest sum of the two scores. The
+second search keeps the candidate with the highest sum of its worst ratio and its worst CVaR. The
+two worst values can come from different folds. Under `PerCandidate`, `test_scores` holds one
+matrix for each measure, as under `EachValue()`, but the search gives one ranking.
+
+#### 2.3.4 Many search scorers, and the predictions of the kept candidates
+
+`scorer` takes a vector of search scorers. The field `s_sca` combines the values of the scorers
+of each candidate. Its default `nothing` gives the sum, and each built-in scorer holds a `scale`,
+its weight in the sum. Here each candidate scores the sum of its mean and of its worst fold.
+=#
+
+mm_ssum = search_cross_validation(st,
+                                  GridSearchCrossValidation(p_mm; r = r_mm,
+                                                            scorer = [HighestMeanScore(),
+                                                                      worst_fold]), rd);
+mm_ssum.idx, mm_ssum.rank_scores
+
+#=
+`s_sca = EachValue()` lets each scorer rank the candidates alone. Under `EachValue()` in both
+`r_sca` and `s_sca`, the search keeps a `K × L` matrix of rankings, with row `k` for measure `k`
+and column `l` for scorer `l`. We keep the two best candidates of each ranking.
+
+`rank_prediction = true` also keeps the prediction that the search scored for each kept
+candidate. A prediction holds one optimisation Result for each fold, so the switch costs memory
+for every candidate of the grid until the search ends. Its default is `false`.
+=#
+
+mm_kl = search_cross_validation(st,
+                                GridSearchCrossValidation(p_mm; r = r_mm,
+                                                          r_sca = EachValue(),
+                                                          scorer = [HighestMeanScore(),
+                                                                    worst_fold],
+                                                          s_sca = EachValue(), n_best = 2,
+                                                          rank_prediction = true), rd);
+pretty_table(DataFrame("Measure" => ["Ratio", "CVaR"], "Mean" => mm_kl.idx[:, 1],
+                       "Worst fold" => mm_kl.idx[:, 2]))
+
+#=
+`mm_kl.opt[k, l]` is the winner of measure `k` under scorer `l`. We fit the winner of the CVaR
+under the worst fold on the full data.
+=#
+
+res_kl = optimise(mm_kl.opt[2, 2], rd)
+plot_composition(res_kl, rd)
+
+#=
+`mm_kl.rank_predictions[k, l][j]` is the prediction of the candidate `mm_kl.ranked[k, l][j]`. It
+is the object that the search scored, with no copy and no refit. The risk of each fold of the
+prediction, with the sign of the search, gives the column of the candidate in `test_scores`. The
+CVaR is a risk measure, so its sign is negative.
+=#
+
+pred_kl = mm_kl.rank_predictions[2, 2][1]
+pretty_table(DataFrame("Fold" => eachindex(pred_kl.pred),
+                       "-CVaR of the prediction" =>
+                           [-expected_risk(r_mm[2], p) for p in pred_kl.pred],
+                       "test_scores" => mm_kl.test_scores[2][:, mm_kl.rank_idx[2, 2][1]]))
+
+#=
+A kept prediction goes into the same functions as the output of [`cross_val_predict`](@ref).
+[`plot_cv_scores`](@ref) plots the CVaR of each fold of the winner.
+=#
+
+plot_cv_scores(r_mm[2], pred_kl)
 
 #=
 You can tune any estimator that cross-validation accepts. You can also tune a
