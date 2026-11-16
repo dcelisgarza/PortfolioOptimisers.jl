@@ -433,7 +433,7 @@ The postprocessing stage scores what the processing stage produced. The forecast
 + Compositional design. This lets us build complex objects from simpler ones, enables code reuse, and aids in extensibility.
 + Defensive programming. This lets us catch errors as early as possible, and provides a clear and consistent interface to the user.
 
-With the exception of covariance estimators, which are defined in #statsbase, every type in the library is a subtype of one of three types:
+With the exception of the covariance estimators, which subtype the covariance estimator of #statsbase, one distance, which subtypes a metric of Distances.jl, and the error types, every public type in the library is a subtype of one of three types:
 
 + `AbstractEstimator`: these contain all the parameters needed to estimate a particular quantity, and are consumed by the functions that perform the estimation. They are the user-level vocabulary, they nest within each other, and they build more complex estimators.
 + `AbstractResult`: many estimators return more than one quantity, and those are returned in a result type. Estimators are configuration; results are data.
