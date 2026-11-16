@@ -178,6 +178,11 @@ Rebuild a [`NearOptimalCenteringResult`](@ref) with a different return code.
 function set_retcode(res::NearOptimalCenteringResult, retcode::OptRetCode_VecOptRetCode)
     return rebuild_struct(res, (; jr = set_retcode(res.jr, retcode)))
 end
+# Each field resolves directly; every other property forwards into the embedded
+# [`JuMPOptimisationResult`](@ref) `jr` (the virtual `:w` and `jor` fall-through).
+@forward_properties NearOptimalCenteringResult begin
+    forward(jr)
+end
 """
 $(DocStringExtensions.TYPEDSIGNATURES)
 

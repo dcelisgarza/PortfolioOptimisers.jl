@@ -131,7 +131,7 @@ Abstract supertype for the JuMP optimisation results that carry a resolved risk 
 
 It is the result-side twin of [`RiskJuMPOptimisationEstimator`](@ref), and [`NonRiskJuMPOptimisationResult`](@ref) is its sibling for the results that carry no risk measure. A concrete subtype holds an embedded [`JuMPOptimisationResult`](@ref) in its first field `jr`, then its own fields, then the fallback `fb`. Every subtype carries a resolved `r`.
 
-The default `getproperty` of [`RJR_NRJR`](@ref) reads a field of the subtype directly and forwards every other name, `w` and the fields of `jor` among them, to `jr`. A subtype that holds a composed result in a field overrides it and forwards into that field first.
+A concrete subtype declares a [`@forward_properties`](@ref) block that reads a field of the subtype directly and forwards every other name, `w` and the fields of `jor` among them, to `jr`. A subtype that holds a composed result in a field forwards into that field first, see [`RJR_NRJR`](@ref).
 
 # Related
 
@@ -161,56 +161,15 @@ abstract type NonRiskJuMPOptimisationResult <: NonFiniteAllocationOptimisationRe
 
 Union of the two branches of JuMP optimisation results.
 
-The default `getproperty` and `propertynames` dispatch on this union, not on one branch. [`MeanRiskResult`](@ref) and [`NearOptimalCenteringResult`](@ref) declare no [`@forward_properties`](@ref) rule, and read `res.w` through the default. A default on the risk branch alone would leave a new result on the other branch with no forwarding.
+Every concrete member declares its own [`@forward_properties`](@ref) block, with `forward(jr)` as its last rule. So a field of the result reads the field, and every other name, `w` and the fields of `jor` among them, reads the embedded [`JuMPOptimisationResult`](@ref) `jr`. The block also gives `ConstructionBase.setproperties`, so `Accessors.set` patches a field of the result, and it refuses a forwarded name with the path that stores it. No property method is written on the union, because the macro does not decorate a `Union`, and a method on it gives no `setproperties`.
 
 # Related
 
   - [`RiskJuMPOptimisationResult`](@ref)
   - [`NonRiskJuMPOptimisationResult`](@ref)
+  - [`@forward_properties`](@ref)
 """
 const RJR_NRJR = Union{RiskJuMPOptimisationResult, NonRiskJuMPOptimisationResult}
-"""
-$(DocStringExtensions.TYPEDSIGNATURES)
-
-Read the property `sym` of a JuMP optimisation result.
-
-# Algorithm
-
- 1. When `sym` is a field of the result, return that field.
- 2. Otherwise return `getproperty` of the embedded [`JuMPOptimisationResult`](@ref) `jr`, which in turn reads the fields of `jor`.
-"""
-function Base.getproperty(r::RJR_NRJR, sym::Symbol)
-    return if sym in fieldnames(typeof(r))
-        getfield(r, sym)
-    else
-        getproperty(getfield(r, :jr), sym)
-    end
-end
-"""
-$(DocStringExtensions.TYPEDSIGNATURES)
-
-Return the names that the default `getproperty` of [`RJR_NRJR`](@ref) reads.
-
-The tuple holds the field names of the result, then the property names of the embedded [`JuMPOptimisationResult`](@ref) `jr` that are not field names of the result. The names of `jr` include the fields of `jor`. A subtype that overrides `getproperty` through [`@forward_properties`](@ref) gets its own `propertynames` from that macro.
-"""
-function Base.propertynames(r::RJR_NRJR)
-    return Tuple(unique((fieldnames(typeof(r))..., propertynames(getfield(r, :jr))...)))
-end
-"""
-$(DocStringExtensions.TYPEDSIGNATURES)
-
-Return `true` when `sym` is one of the names that the default `getproperty` of [`RJR_NRJR`](@ref) reads.
-
-The method gives the answer of `sym in propertynames(r)`, without the tuple of `propertynames`. That tuple removes its duplicate names with `unique`, which allocates on each call. So the method allocates nothing, as the `hasproperty` method that [`@forward_properties`](@ref) makes for the embedded result does.
-
-# Algorithm
-
- 1. When `sym` is a field of the result, return `true`.
- 2. Otherwise return `hasproperty` of the embedded [`JuMPOptimisationResult`](@ref) `jr`.
-"""
-function Base.hasproperty(r::RJR_NRJR, sym::Symbol)
-    return sym in fieldnames(typeof(r)) || hasproperty(getfield(r, :jr), sym)
-end
 """
 $(DocStringExtensions.TYPEDEF)
 

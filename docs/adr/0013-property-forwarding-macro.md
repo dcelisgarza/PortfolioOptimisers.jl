@@ -290,3 +290,31 @@ type.
 The fifth method replaces the closure, so the macro makes no more branches. The method that
 `setproperties` calls drops its `source` argument. No public name changes, and every patch that
 the macro let through before still goes through.
+
+## Amendment (2026-11-16, third)
+
+**Every JuMP optimisation Result takes its property methods from the macro, and no method is
+written on `RJR_NRJR`.** The first amendment of 2026-11-16 kept the hand-written `getproperty`,
+`propertynames` and `hasproperty` of `RJR_NRJR`, because the macro does not decorate a `Union`.
+Those three methods had no `ConstructionBase.setproperties` beside them. So `Accessors.set` and
+`Accessors.setproperties` refused every patch of a `MeanRiskResult` or a
+`NearOptimalCenteringResult` with the generic error of ConstructionBase, also a patch of a field
+([#2131](https://github.com/dcelisgarza/PortfolioOptimisers.jl/issues/2131)).
+
+A census of every concrete type of the library found 27 types that change their property access.
+These two Results were the only types with no `setproperties` method. The three other subtypes of
+the union, `RiskBudgetingResult`, `RelaxedRiskBudgetingResult` and
+`FactorRiskContributionResult`, already used the macro.
+
+The two Results now declare `@forward_properties T begin forward(jr) end`, and the three methods
+on the union are gone. One mechanism serves all five subtypes. The macro gives the fifth and the
+sixth methods too, so a patch of a field rebuilds the Result through its keyword constructor, and
+the refusal of a forwarded name names the path that stores it. A new subtype of
+`RiskJuMPOptimisationResult` or `NonRiskJuMPOptimisationResult` declares its own block. The
+amendment of 2026-08-16 of ADR 0011 put the default on the union so that a new subtype forwards
+without a declaration. That reason does not hold against a type that cannot take a patch, and a
+subtype with no block fails at its first read of `res.w`.
+
+No library code patches a Result through `Accessors`. The library rebuilds a Result through
+`rebuild_struct`, and the search, the pipe routing and the pipeline context write estimators
+alone.

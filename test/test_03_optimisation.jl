@@ -1519,7 +1519,7 @@ struct HookObjective03d <: PortfolioOptimisers.CustomJuMPObjective end
         @test k > 0 && !isapprox(k, 1)
         @test res.w ≈ JuMP.value.(res.model[:w]) / k
         @test sum(res.w) ≈ 1
-        # The default `getproperty` forwards `w` and the fields of `jor` to `jr`.
+        # The `@forward_properties` block forwards `w` and the fields of `jor` to `jr`.
         @test res.w === getfield(res, :jr).w
         @test res.r === getfield(res, :r)
         @test :w in propertynames(res) && :jor in propertynames(res)
@@ -1533,6 +1533,34 @@ struct HookObjective03d <: PortfolioOptimisers.CustomJuMPObjective end
         @test hasproperty(res, :retcode) && hasproperty(res, :r)
         @test (@allocated hasproperty(res, :retcode)) == 0
         @test (@allocated hasproperty(res, :not_a_property)) == 0
+        #=
+        A patch of `Accessors` rebuilds a field of the result, and it refuses a forwarded name
+        with the path that stores it. The methods on `RJR_NRJR` gave no `setproperties`, so
+        ConstructionBase refused every patch, also a patch of a field (#2131).
+        =#
+        AC = PO.Accessors
+        patched = AC.setproperties(res, (; fb = nothing))
+        @test patched isa MeanRiskResult && patched.jr === res.jr && isnothing(patched.fb)
+        msg = try
+            AC.setproperties(res, (; w = res.w))
+            ""
+        catch e
+            sprint(showerror, e)
+        end
+        @test occursin("Set `jr.sol.w` of the `MeanRiskResult` instead", msg)
+        noc = optimise(NearOptimalCentering(; r = Variance(),
+                                            opt = JuMPOptimiser(; slv = slv)), rd)
+        @test noc.w === getfield(noc, :jr).w && noc.r === getfield(noc, :r)
+        moved = AC.set(noc, PO.parse_lens("w_min_retcode"), noc.w_max_retcode)
+        @test moved isa NearOptimalCenteringResult &&
+              moved.w_min_retcode === noc.w_max_retcode
+        msg = try
+            AC.setproperties(noc, (; retcode = noc.retcode))
+            ""
+        catch e
+            sprint(showerror, e)
+        end
+        @test occursin("Set `jr.retcode` of the `NearOptimalCenteringResult` instead", msg)
         # Every solver fails, so the weights are `NaN`.
         all_bad = MeanRisk(; r = Variance(), opt = JuMPOptimiser(; slv = bad))
         failed = @test_logs (:warn, r"bad: set_optimizer → no solver") match_mode = :any optimise(all_bad,
