@@ -95,7 +95,7 @@ silence. A contradiction between two standards files is a defect.
 | A constructor signature | [`.github/instructions/julia-source-code.instructions.md`](.github/instructions/julia-source-code.instructions.md) | `test/test_41_constructor_docstring_drift.jl` |
 | An optimiser fallback shortcut | `test/test_40_fallback_shortcut_census.jl`. The census comment is the only written statement of this Rule | the same file |
 | JuMP model state | ADR 0037, amending ADR 0004 | `test/test_28_model_state_lock.jl` |
-| The form of a JuMP row, expression, variable or model, and its registration | [`.github/instructions/julia-source-code.instructions.md`](.github/instructions/julia-source-code.instructions.md) § *A JuMP model is built in the measured forms* | `test/test_88_jump_build_form_census.jl` for the plural macros, the sums over an axis, `+=` and `sum(c .* w)`. A review for the other rules |
+| The form of a JuMP row, expression, variable or model, and its registration | [`.github/instructions/julia-source-code.instructions.md`](.github/instructions/julia-source-code.instructions.md) § *A JuMP model is built in the measured forms* | `test/test_88_jump_build_form_census.jl` for the plural macros, the sums over an axis, `+=` and `.+=`, `sum(c .* w)` and a broadcast comparison in a row. A review for the other rules |
 | A risk-measure ↔ optimiser pairing | ADR 0018 | `test/test_29_risk_measure_compatibility.jl` |
 | A range risk measure | ADR 0057 | `test/test_44_range_tails_census.jl` |
 | A moment estimator that joins a Choice Surface | [ADR 0099](docs/adr/0099-choice-surface-membership-means-the-verbs-exist.md). The leaf answers the verbs of its family, and `test/moment_family_setup.jl` holds the split and the ownership predicate | `test/test_08l_moment_verb_census.jl`, and `test/test_08d_dims_guard.jl` for the `dims` guard on each pairing it admits |
@@ -189,7 +189,7 @@ Every Gate below is a real check that fails on a real breach.
 | `test/test_89_forward_survey_census.jl` | each detector of `code_health/forward_survey.jl` gives the verdict of its ruling of #2072 on a fixture tree, the survey reads the lists of `test/test_70_trivial_unit_census.jl` from its parse, and every pair that those lists hold is a finding of the survey | run the file |
 | `test/test_42_combination_weight_stacking.jl` | a combination weight on a meta-optimiser reaches the model | run the file |
 | `test/test_28_model_state_lock.jl` | JuMP model state is reached only through its typed interface | run the file |
-| `test/test_88_jump_build_form_census.jl` | no code under `src/` or `ext/` holds a plural JuMP macro. No definition that holds a JuMP macro sums or averages over a `dims` axis or updates with `+=` or `-=`, and no JuMP macro holds `sum(a .* b)`, except the definitions of its `KEEP` list | run the file |
+| `test/test_88_jump_build_form_census.jl` | no code under `src/` or `ext/` holds a plural JuMP macro. No definition that holds a JuMP macro sums, averages or reduces over a `dims` axis, updates with `+=`, `-=`, `.+=` or `.-=`, or holds `sum(a .* b)`, and no `@constraint` holds a broadcast comparison, except the definitions of its `KEEP` list | run the file |
 | `test/test_29_risk_measure_compatibility.jl` | a risk measure is paired only with an optimiser that supports it | run the file |
 | `test/test_27_prefix_registration.jl` | a nested risk build namespaces its model-state keys | run the file |
 | `.github/workflows/Docs.yml` (`doctest`) | every `jldoctest` block still produces its printed output | see the `run-doctests` skill |

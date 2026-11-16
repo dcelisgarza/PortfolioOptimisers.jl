@@ -755,7 +755,9 @@ function path_budget_constraint!(model::JuMP.Model, u, L::Number, p::Number)::No
     s = JuMP.@variable(model, [1:(T - 1)])
     d = JuMP.@variable(model, [1:(T - 1), 1:size(u, 2)])
     for t in 2:T
-        JuMP.@constraint(model, view(d, t - 1, :) .== view(u, t, :) - view(u, t - 1, :))
+        # One vector row for each step: the build and the copy to a conic solver cost 27 %
+        # less than one broadcast row for each asset, on 1000 rows and 100 assets (#2062).
+        JuMP.@constraint(model, view(d, t - 1, :) == view(u, t, :) - view(u, t - 1, :))
         norm_epigraph!(model, s[t - 1], view(d, t - 1, :), p, 1)
     end
     JuMP.@constraint(model, sum(s) <= L)
