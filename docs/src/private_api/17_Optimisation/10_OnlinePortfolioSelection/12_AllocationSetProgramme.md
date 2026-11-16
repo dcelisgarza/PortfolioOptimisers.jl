@@ -25,4 +25,5 @@ PortfolioOptimisers.investable_geometry_view
 PortfolioOptimisers.solve_projection_programme!
 PortfolioOptimisers.projection_scale
 PortfolioOptimisers.blend_projection
+PortfolioOptimisers.assert_leader_keeps_programme_set
 ```

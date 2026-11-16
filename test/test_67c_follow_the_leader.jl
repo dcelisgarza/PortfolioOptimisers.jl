@@ -491,6 +491,62 @@ end
         @test_throws ArgumentError FollowTheLeader(; opt = lead(bad; fb = EqualWeighted()))
     end
 
+    @testset "A centring leader that drops rows of a programme set is refused (R48 of #1817)" begin
+        # The centring model of `UnconstrainedNearOptimalCentering` holds the bounds and the
+        # budgets of a later block alone. Under the set's row `a + b <= 0.05` the head played
+        # `a + b = 0.2054` at `gamma = 0`, at `c51fe04fa1` and at `v0.33.0`, outside its set.
+        rngc = StableRNG(424242)
+        Tc, Nc = 80, 8
+        Fc = randn(rngc, Tc, 2)
+        Rc = (Fc * randn(rngc, 2, Nc) .+ randn(rngc, Tc, Nc)) ./ 100 .+ 0.0005
+        rdc = ReturnsResult(; nx = string.('a':'h'), X = Rc)
+        lset = ProgrammeAllocationSet(; slv = slv,
+                                      sets = UniverseSets(; dict = Dict("nx" => rdc.nx)),
+                                      lcse = LinearConstraintEstimator(;
+                                                                       val = ["a + b <= 0.05"]))
+        bset = BoundedAllocationSet(; wb = WeightBounds(; lb = 0.0, ub = 0.2))
+        noc(alg; fb = nothing) = NearOptimalCentering(; opt = JuMPOptimiser(; slv = slv),
+                                                      alg = alg, fb = fb)
+        ucn = UnconstrainedNearOptimalCentering()
+        ccn = ConstrainedNearOptimalCentering()
+        mr = MeanRisk(; opt = JuMPOptimiser(; slv = slv))
+        # The held leader, a member of its chain, an expert of a mixture and an entry of a
+        # schedule on the set are each refused.
+        @test_throws ArgumentError OPS(; alg = FollowTheLeader(; opt = noc(ucn)),
+                                       set = lset)
+        @test_throws "UnconstrainedNearOptimalCentering" OPS(;
+                                                             alg = FollowTheLeader(;
+                                                                                   opt = noc(ucn)),
+                                                             set = lset)
+        @test_throws ArgumentError OPS(;
+                                       alg = FollowTheLeader(;
+                                                             opt = MeanRisk(;
+                                                                            opt = JuMPOptimiser(;
+                                                                                                slv = slv),
+                                                                            fb = noc(ucn))),
+                                       set = lset)
+        @test_throws ArgumentError OPS(;
+                                       alg = ExpertMixture(;
+                                                           experts = [BuyAndHold(),
+                                                                      FollowTheLeader(;
+                                                                                      opt = noc(ucn))]),
+                                       set = lset)
+        @test_throws ArgumentError OPS(; alg = FollowTheLeader(; opt = noc(ucn)),
+                                       set = TimeDependent([lset, lset]))
+        # A bounded set holds bounds alone, which the centring model keeps. The constrained
+        # centring keeps every row of the set, as the other heads do.
+        wb = optimise(OPS(; alg = FollowTheLeader(; opt = noc(ucn)), set = bset), rdc).w
+        @test maximum(wb) <= 0.2 + 1e-8
+        for h in (noc(ccn), mr, noc(ccn; fb = noc(ccn)))
+            w = optimise(OPS(; alg = FollowTheLeader(; opt = h), set = lset), rdc).w
+            @test w[1] + w[2] <= 0.05 + 1e-6
+            @test isapprox(sum(w), 1; atol = 1e-8)
+        end
+        # The leader alone gives `a` and `b` more than the row admits, so the row binds.
+        wfree = optimise(OPS(; alg = FollowTheLeader(; opt = noc(ccn))), rdc).w
+        @test wfree[1] + wfree[2] > 0.05 + 1e-3
+    end
+
     @testset "The set's custom objective term enters the re-solve (#2032)" begin
         # The reproduction of #2032. The first asset has the highest drift, so the leader
         # alone holds it. A cost of 10 on its weight moves the leader to another asset. At

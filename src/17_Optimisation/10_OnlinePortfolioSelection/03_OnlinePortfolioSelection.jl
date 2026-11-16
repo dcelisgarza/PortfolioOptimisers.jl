@@ -80,7 +80,7 @@ Keywords correspond to the struct's fields. `set`, `fees` and `fb` can hold a [`
   - `w0`: non-empty and finite, when given. It need not lie in the set, because the first step projects it onto the set.
   - If `fees` is a [`FeesEstimator`](@ref): `!isnothing(set.sets)`. A schedule on `set` is held to it per entry.
   - Everything [`assert_geometry_admits_set`](@ref) refuses: a negative lower bound under an entropic, Tsallis or log-barrier rule. A schedule on `set` is held to it per entry.
-  - Everything [`assert_rule_admits_set`](@ref) refuses: a solver-free leader under a programme set. A schedule on `set` is held to it per entry.
+  - Everything [`assert_rule_admits_set`](@ref) refuses: a solver-free leader under a programme set, and a leader under a programme set whose fallback chain holds a [`NearOptimalCentering`](@ref) under [`UnconstrainedNearOptimalCentering`](@ref), or a [`FactorRiskContribution`](@ref) beside a semidefinite phylogeny of the set, see [`assert_leader_keeps_programme_set`](@ref). A schedule on `set` is held to it per entry.
   - `fb` schedules: `bind !== :nearest`.
   - `x_src` is `nothing`, `DataSource()` or `ExcessSource()`, see [`assert_returns_source`](@ref). The step reads no prior, so it refuses `PriorSource()`.
   - A reader that states no source and reads the raw returns data, beside a reader that states `x_src = ExcessSource()`, logs one warning that names its path, see [`warn_raw_readers`](@ref). The head then builds as configured.

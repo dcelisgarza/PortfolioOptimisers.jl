@@ -173,11 +173,13 @@ configuration alone decides the result (`assert_leader_budget`):
   redundant row, as any other bound in both homes is.
 - `bgt` must not be a `BudgetCostEstimator`, in any form. Such an estimator charges its cost
   against the budget, `Σw + c(w) ∈ k · [lb, ub]`. With the head's row this is
-  `c(w) ∈ k · [lb − 1, ub − 1]`, a band on the cost that the wealth recursion never pays. Its
-  reference `w` is the caller's fixed vector, because `factory` does not reach `bgt`. Measured on
-  the reproduction of #2034: `bgt = 1` pins the leader to the reference at every step,
-  `bgt = 0.98` holds every step, and `bgt = 1.002` keeps the leader on an L1 ball of radius 0.2
-  about the reference. None of these is a cost charged against the budget. A cost that the series
+  `c(w) ∈ k · [lb − 1, ub − 1]`, a band on the cost that the wealth recursion never pays.
+  Measured on the reproduction of #2034, where the reference `w` was the caller's fixed vector:
+  `bgt = 1` pins the leader to the reference at every step, `bgt = 0.98` holds every step, and
+  `bgt = 1.002` keeps the leader on an L1 ball of radius 0.2 about the reference. Since #2050,
+  `factory` sets the reference to `ŵ_t` unless the estimator is `fixed`. So `bgt = 1` pins the
+  leader to `ŵ_t`, and the leader never trades. None of these is a cost charged against the
+  budget. A cost that the series
   pays is the head's `fees` (ADR 0160). A cost that the leader weighs is the `fees` of `opt`, which
   `factory` measures from `ŵ_t`, and a ceiling on the trade is a `Turnover`.
 - `sbgt`, `gbgt` and `wb` of `opt` pass `assert_gross_budget_admissible` with a net budget of one,
@@ -192,7 +194,9 @@ of the net budget is infeasible. `assert_gross_budget_admissible` now refuses it
 owners. Part 2 of #2034, the row `Σw = k` that the head keeps in the leader's model when the
 block of map #1213 replaces the adapter, belongs to #2047. Issue #2049 records that a schedule
 inside a held optimiser never resolves at a fold, and #2050 records that `factory` does not reach
-the reference of a cost estimator.
+the reference of a cost estimator. Both are fixed in this release: the fold loop of the head
+resolves each schedule of its rule tree at the fold (#2049, #2054), and `factory` gives a cost
+estimator the weights of the fold (#2050).
 
 ## Amendment (2026-11-13): the set enters the re-solve as a second block, not on `ccnt`
 
@@ -228,6 +232,17 @@ has the kind of the held estimator, a JuMP estimator under a JuMP estimator and 
 `BestConstantRebalancedPortfolio` under a `BestConstantRebalancedPortfolio`, and no member is a
 precomputed result. A member of another kind ignores the block, and a precomputed result has
 nothing to solve, so either one would answer outside the set.
+
+**A member that drops rows of the block.** The centring model of a `NearOptimalCentering` under
+`UnconstrainedNearOptimalCentering`, its default, holds the weight bounds and the short and gross
+budgets of a later block alone. So the leader of such a member leaves every other row of a
+`ProgrammeAllocationSet`, and at `γ = 0` the rule plays it with no projection. On 80 rows of
+eight assets and a set with the row `a + b ≤ 0.05`, the head played `a + b = 0.2054`, on the
+review head of #1817 and on `v0.33.0`. The four other JuMP heads and the constrained centring
+kept `0.05`. The configuration alone decides it, so the head refuses a programme set over a
+chain that holds such a member (`assert_leader_keeps_programme_set`), at the site where it
+refuses a programme set over the solver-free estimator. A `BoundedAllocationSet` holds bounds
+alone, so it admits the member.
 
 The rest of the Decision holds: the optimum is the leader with no projection, the damped mix is
 projected once more in the Euclidean geometry, and a failed re-solve is a Held Step.

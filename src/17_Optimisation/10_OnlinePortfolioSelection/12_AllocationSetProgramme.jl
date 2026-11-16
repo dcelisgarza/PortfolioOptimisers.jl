@@ -1170,4 +1170,69 @@ function blend_projection(proj::EuclideanProjection, set::AbstractAllocationSet,
                           q::AbstractVector, w::AbstractVector)
     return project(proj, set, q, w)
 end
+function assert_rule_admits_set(alg::FollowTheLeader{<:Any, <:JuMPOptimisationEstimator},
+                                set::ProgrammeAllocationSet)::Nothing
+    # The constructor of the rule admits only JuMP members in the chain, see
+    # `assert_leader_chain`, so the walk ends at `nothing`.
+    member = alg.opt
+    while !isnothing(member)
+        assert_leader_keeps_programme_set(member, set)
+        member = member.fb
+    end
+    return nothing
+end
+"""
+    assert_leader_keeps_programme_set(opt::JuMPOptimisationEstimator, set::ProgrammeAllocationSet)
+    assert_leader_keeps_programme_set(opt::NearOptimalCentering, set::ProgrammeAllocationSet)
+    assert_leader_keeps_programme_set(opt::FactorRiskContribution, set::ProgrammeAllocationSet)
+
+Assert that one member of the fallback chain of the held JuMP estimator of a [`FollowTheLeader`](@ref) rule keeps every constraint of the head's [`ProgrammeAllocationSet`](@ref) in the model of its answer.
+
+The re-solve passes the set as a later block of the entry, and the rule plays the optimum with no projection at `gamma = 0`. So the answer of each member must lie in the set. Every JuMP head adds every row of a later block to its model, and two members drop rows of it:
+
+  - The centring model of [`UnconstrainedNearOptimalCentering`](@ref) holds the weight bounds and the short and gross budgets of the block alone. So a linear constraint, a ceiling or a turnover of the set would not bind the leader, and the allocation of the head would leave the set.
+  - The rows of a semidefinite phylogeny of the set bind the lift of the asset weights. A [`FactorRiskContribution`](@ref) writes no term on that lift, so the rows bind nothing, as its constructor states for `opt.ple`.
+
+The configuration alone decides each one, so [`assert_rule_admits_set`](@ref) calls this function on each member of the chain, and the head refuses the pair at construction, as it refuses the solver-free leader under a programme set. A [`BoundedAllocationSet`](@ref) holds bounds alone, so it admits every member.
+
+# Arguments
+
+  - `opt`: The held estimator, or a member of its fallback chain.
+  - `set`: The head's Allocation Set.
+
+# Validation
+
+  - `opt` is not a [`NearOptimalCentering`](@ref) under [`UnconstrainedNearOptimalCentering`](@ref). An `ArgumentError` is thrown otherwise. Use [`ConstrainedNearOptimalCentering`](@ref), which adds every row of the set.
+  - `opt` is not a [`FactorRiskContribution`](@ref) when the `ple` of `set` holds a semidefinite phylogeny. An `ArgumentError` is thrown otherwise.
+
+# Returns
+
+  - `nothing`.
+
+# Related
+
+  - [`assert_rule_admits_set`](@ref)
+  - [`assert_leader_chain`](@ref)
+"""
+function assert_leader_keeps_programme_set(::JuMPOptimisationEstimator,
+                                           ::ProgrammeAllocationSet)::Nothing
+    return nothing
+end
+function assert_leader_keeps_programme_set(opt::NearOptimalCentering,
+                                           ::ProgrammeAllocationSet)::Nothing
+    @argcheck(!isa(opt.alg, UnconstrainedNearOptimalCentering),
+              ArgumentError("a `FollowTheLeader` holds a `NearOptimalCentering` leader under `UnconstrainedNearOptimalCentering` beside a `ProgrammeAllocationSet`. The centring model of that algorithm holds the weight bounds and the short and gross budgets of the set alone, and the rule plays the leader with no projection at `gamma = 0`, so a linear constraint, a ceiling or a turnover of the set would not bind the allocation of the head. Use `alg = ConstrainedNearOptimalCentering()`, which adds every row of the set, or a `BoundedAllocationSet` for bounds alone."))
+    return nothing
+end
+# The rows of a semidefinite phylogeny of the set bind the lift of the asset weights. A factor
+# head writes no term on that lift, so the rows bind nothing, as its constructor states for
+# `opt.ple` (#2033, #2126).
+function assert_leader_keeps_programme_set(::FactorRiskContribution,
+                                           set::ProgrammeAllocationSet)::Nothing
+    @argcheck(!holds_precomputed(set.cbe.ple,
+                                 Union{SemiDefinitePhylogeny,
+                                       SemiDefinitePhylogenyEstimator}),
+              ArgumentError("a `FollowTheLeader` over a `FactorRiskContribution` cannot take a `ProgrammeAllocationSet` whose `ple` holds a semidefinite phylogeny, and neither can a leader with a `FactorRiskContribution` in its fallback chain. The re-solve gives the set to the leader as a block. The rows of the phylogeny bind the lift of the asset weights, and the factor head writes no term on that lift, so the rows would bind nothing. Put the phylogeny on a `MeanRisk` leader, or use an `IntegerPhylogeny` on the set."))
+    return nothing
+end
 public set_allocation_set_constraints!
