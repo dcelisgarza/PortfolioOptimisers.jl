@@ -454,7 +454,13 @@ files it includes run pruned to the selected test sets, and a file that selects 
 """
 function run_file(path::AbstractString; code::Expr = init_code(),
                   select::Union{Nothing, Select} = nothing, time_depth::Integer = 0)
-    m = Module(Symbol(splitext(basename(path))[1]))
+    # The suite binds the module of each file in `Main` (`@eval(Main, module $(gensym(name))
+    # end)` in ParallelTestRunner), so `subtypes` reaches the types that a file defines, and a
+    # census of a later file in the same process reads them. A bare module takes no `include` of
+    # its own, so the line below can define the one that prunes.
+    m = Core.eval(Main,
+                  Expr(:module, false, gensym(splitext(basename(path))[1]),
+                       Expr(:block, :(using Base))))
     mapexpr = select === nothing ? identity : (ex -> prune_toplevel(select, ex))
     Core.eval(m, :(include(x) = Base.include($mapexpr, $m, x)))
     local ts

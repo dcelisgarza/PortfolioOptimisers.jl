@@ -576,6 +576,33 @@ end
               joinpath(RF.TEST_DIR, "test_76_gate_tooling.jl")
         @test_throws ErrorException RF.resolve("test_no_such_file.jl")
 
+        # The suite binds the module of each file in `Main`, so a census of a later file reads
+        # the types of an earlier one through `subtypes`, as on a worker of CI (R59 of #1817).
+        dir = mktempdir()
+        first_file = joinpath(dir, "test_defines.jl")
+        write(first_file, """
+              struct RunFilesProbeLeaf <: Base.AbstractDisplay end
+              @testset "bound" begin
+                  @test getfield(Main, nameof(@__MODULE__)) === @__MODULE__
+              end
+              """)
+        second_file = joinpath(dir, "test_reads.jl")
+        write(second_file, """
+              using InteractiveUtils
+              @testset "reads" begin
+                  @test any(T -> nameof(T) === :RunFilesProbeLeaf,
+                            InteractiveUtils.subtypes(Base.AbstractDisplay))
+              end
+              """)
+        RF.OUT[] = devnull
+        ts1, ts2 = redirect_stdout(devnull) do
+            return first(RF.run_file(first_file; code)),
+                   first(RF.run_file(second_file; code))
+        end
+        RF.OUT[] = stdout
+        @test (ts1.pass, ts1.fail, ts1.error) == (1, 0, 0)
+        @test (ts2.pass, ts2.fail, ts2.error) == (1, 0, 0)
+
         cov = joinpath(mktempdir(), "x.jl.123.cov")
         write(cov,
               "        - function f(x)\n        3     y = x\n        0     z = 1\n" *

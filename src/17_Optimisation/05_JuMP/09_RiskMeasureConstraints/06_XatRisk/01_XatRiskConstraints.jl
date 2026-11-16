@@ -56,7 +56,7 @@ where ``z_\\alpha`` is the distribution quantile at level ``\\alpha`` and ``\\ma
 
 # Returns
 
-  - `nothing`.
+  - `var_risk`: The quantile risk variable, registered under `:var_risk_`.
 
 # Related
 
@@ -177,8 +177,9 @@ sides.
 
   - `loss::Bool`: If `true` (default), the measure is applied to the portfolio `w`; if
     `false`, to the negated portfolio `-w`. The method of `set_risk_constraints!` for a
-    [`RangeRiskMeasure`](@ref) sets it to `false` to build the gain tail of
-    [`GenericValueatRiskRange`](@ref).
+    [`GenericValueatRiskRange`](@ref) of two `DistributionValueatRisk` tails sets it to
+    `false` to build the gain tail. The method for a [`RangeRiskMeasure`](@ref) does so when
+    only one tail is a `DistributionValueatRisk`.
   - `prefix::Symbol`: Model State namespace (default: empty, i.e. the bare key).
   - `g_var::Option{<:JuMP.AbstractVariableRef}`: The standard deviation variable of a cone
     that the two tails of a [`GenericValueatRiskRange`](@ref) share, or `nothing` (default)
@@ -319,7 +320,7 @@ between the lower-tail and upper-tail VaR expressions.
 
 # Returns
 
-  - `nothing`.
+  - `var_range_risk`: The range risk expression, registered under `:var_range_risk_`.
 
 # Related
 
@@ -372,7 +373,7 @@ the empirical drawdown quantile at confidence level `r.alpha`.
 
 # Returns
 
-  - `nothing`.
+  - `dar_risk`: The quantile risk variable, registered under `:dar_risk_`.
 
 # Related
 

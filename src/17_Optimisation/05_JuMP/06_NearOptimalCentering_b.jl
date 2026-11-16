@@ -296,7 +296,7 @@ Build the model of a [`NearOptimalCentering`](@ref), solve it, and return its re
  1. Replace each schedule of `noc` with its static default through [`reset_time_dependent_estimator`](@ref).
  2. Solve the anchor portfolios and find the bounds of the near optimal region with [`near_optimal_centering_setup`](@ref), with the blocks of `blocks`, giving `setup`. It holds the anchor weights, their return codes, the inner optimiser `opt` and its resolved bundle `attrs`.
  3. Take the view of `noc` and of `rd` at the investable assets with [`investable_view`](@ref). Both are unchanged when every asset is investable.
- 4. Build a new model. Register the scales of `opt` with [`set_model_scales!`](@ref), the number of observations of the prior with [`set_model_observations!`](@ref), the expression `k = 1` with [`set_maximum_ratio_factor_variables!`](@ref), and the weights with [`set_w!`](@ref), which start at the optimal anchor.
+ 4. Build a new model. Register the scales of `opt` with [`set_model_scales!`](@ref), the number of observations of the prior with [`set_model_observations!`](@ref), the expression `k = 1` with [`set_maximum_ratio_factor_variables!`](@ref), and the weights with [`set_w!`](@ref). The weights start at the optimal anchor when `w_opt` is one weight vector. A vector of anchors, of a sweep, sets no start value.
  5. Add the rows of the variant `noc.alg` with [`assemble_near_optimal_centering_model!`](@ref).
  6. Solve the barrier with [`solve_near_optimal_centering!`](@ref), giving `noc_retcode` and `sol`.
  7. Combine the return codes of the three anchors and of the barrier with [`get_overall_retcode`](@ref), giving `retcode`.

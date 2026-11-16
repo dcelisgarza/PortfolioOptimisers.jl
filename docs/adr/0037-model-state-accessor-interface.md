@@ -340,9 +340,9 @@ must not exist (the ruling on #1212). §2 still holds for each named accessor th
 `get_w`, `get_k`, `get_T`, `get_ret`, `get_risk` and `has_net_X`/`get_net_X` stay. A new
 accessor earns its place with a reader. It does not earn it because its entry has a builder.
 
-## Amendment (2026-11-14) — the range builder of §1 is a method of `set_risk_constraints!`
+## Amendment (2026-11-14) — the range builder of the first amendment is a method of `set_risk_constraints!`
 
-§1 names `set_range_risk_constraints!` as the composite measure that builds its `loss` and `gain`
+§1 of the amendment of 2026-08-17 names `set_range_risk_constraints!` as the composite measure that builds its `loss` and `gain`
 tails in the same build. That builder is now the method of `set_risk_constraints!` for a
 `RangeRiskMeasure` (ADR [0057](0057-a-range-risk-measure-is-its-base-measure-applied-twice.md),
 amendment of 2026-11-14). The parts still separate by `nested_index(:loss_, i)` and

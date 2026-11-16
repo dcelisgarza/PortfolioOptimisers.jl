@@ -20,6 +20,7 @@ PortfolioOptimisers.projection_solver
 PortfolioOptimisers.programme_answer
 PortfolioOptimisers.allocation_set_ready
 PortfolioOptimisers.resolve_projection_entry
+PortfolioOptimisers.project(::PortfolioOptimisers.AbstractProjectionGeometry, ::Tuple, ::AbstractVector, ::AbstractVector, ::PortfolioOptimisers.Option{<:PortfolioOptimisers.ReturnsResult})
 PortfolioOptimisers.programme_investable_reduction
 PortfolioOptimisers.investable_geometry_view
 PortfolioOptimisers.solve_projection_programme!

@@ -65,8 +65,15 @@
     @test length(probe) == 1
     @test probe[1][3] == [probe[1][4]] == [8]
 
-    shortcuts = nothing_pins(filter(m -> m.module === PortfolioOptimisers,
-                                    collect(methods(PortfolioOptimisers.optimise))))
+    # The methods of the package and of its extensions, whose root module is the extension.
+    # The list must hold the driver, or a filter that keeps nothing passes in silence.
+    of_package(m) = startswith(string(nameof(Base.moduleroot(m.module))),
+                               "PortfolioOptimisers")
+    pkg_methods = filter(of_package, collect(methods(PortfolioOptimisers.optimise)))
+    driver = which(PortfolioOptimisers.optimise,
+                   Tuple{PortfolioOptimisers.OptimisationEstimator})
+    @test driver in pkg_methods
+    shortcuts = nothing_pins(pkg_methods)
     sites = [string(basename(string(m.file)), ":", m.line, " (", T.name.name, ", pins ",
                     idxs, ", fb at ", fbpos, ")") for (m, T, idxs, fbpos) in shortcuts]
     @test isempty(sites)

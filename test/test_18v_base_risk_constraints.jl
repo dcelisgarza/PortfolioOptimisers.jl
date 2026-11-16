@@ -1090,7 +1090,9 @@ struct UserCVaRRange{T1, T2, T3} <: PortfolioOptimisers.RangeRiskMeasure
     alpha::T2
     beta::T3
 end
-PortfolioOptimisers.risk_input_kind(::UserCVaRRange) = NetReturnsInput()
+# `NetReturnsInput` is not exported, so the method names it by its module. A bare name throws an
+# `UndefVarError` at the call, and the census of `test_09` sees the type of this file.
+PortfolioOptimisers.risk_input_kind(::UserCVaRRange) = PortfolioOptimisers.NetReturnsInput()
 function PortfolioOptimisers.range_tails(r::UserCVaRRange)
     off = RiskMeasureSettings(; rke = false)
     return PortfolioOptimisers.RangeTails(ConditionalValueatRisk(; settings = off,
@@ -1101,6 +1103,10 @@ end
 PortfolioOptimisers.range_risk_key(::UserCVaRRange) = :user_cvar_range_risk_
 
 @testset "A range of a user's own builds through the method for a RangeRiskMeasure" begin
+    # The declared kind answers, so `expected_risk` routes the range to its net returns.
+    @test PortfolioOptimisers.risk_input_kind(UserCVaRRange(RiskMeasureSettings(), 0.05,
+                                                            0.1)) ===
+          PortfolioOptimisers.NetReturnsInput()
     opt = JuMPOptimiser(; pe = pr, slv = slv)
     mine = optimise(MeanRisk(; r = [UserCVaRRange(RiskMeasureSettings(), 0.05, 0.1)],
                              obj = MinimumRisk(), opt = opt))

@@ -251,5 +251,13 @@
         # The typed keyword constructor is the door that refuses another type. `@concrete`
         # appends a generic positional constructor, so the positional route does not.
         @test_throws TypeError RangeTails(; loss = loss, gain = nothing)
+        # A public part of a configuration shows as the library shows its estimators: the
+        # wrapper name and one line for each field, not the long parametric header.
+        txt = sprint(show, MIME"text/plain"(), tails)
+        # A name carries its module when `Main` of the process does not load the package.
+        @test occursin(r"^(PortfolioOptimisers\.)?RangeTails\n", txt)
+        @test occursin(r"loss ┼ (PortfolioOptimisers\.)?ConditionalValueatRisk\n", txt)
+        @test occursin(r"gain ┼ (PortfolioOptimisers\.)?ConditionalValueatRisk\n", txt)
+        @test !occursin('{', first(split(txt, '\n')))
     end
 end

@@ -709,7 +709,7 @@ A range measure is its base measure applied twice: once to the losses at level `
   - The method of [`set_risk_constraints!`](@ref) for a [`RangeRiskMeasure`](@ref) builds `loss` with `loss = true` and `gain` with `loss = false`, then sums the two expressions.
   - The measure's own `r(x::VecNum)` functor is the value-level twin of the same sum, `loss(x) + gain(-x)`.
 
-The tails carry `RiskMeasureSettings(; rke = false)`: an upper bound and a risk-expression contribution belong to the range as a whole, which registers them once from the composite expression. A range that *fuses* its two tails into a shared formulation rather than duplicating one ([`OrderedWeightsArrayRange`](@ref) under [`ExactOrderedWeightsArray`](@ref), [`ValueatRiskRange`](@ref) under [`DistributionValueatRisk`](@ref)) declares no tails, because there are no two sub-models to build.
+The tails carry `RiskMeasureSettings(; rke = false)`: an upper bound and a risk-expression contribution belong to the range as a whole, which registers them once from the composite expression. A range that *fuses* its two tails into a shared formulation rather than duplicating one ([`Range`](@ref), [`ValueatRiskRange`](@ref) under [`DistributionValueatRisk`](@ref), and [`OrderedWeightsArrayRange`](@ref) under [`ExactOrderedWeightsArray`](@ref) or [`SortingNetworkOrderedWeightsArray`](@ref)) declares no tails, because there are no two sub-models to build.
 
 There is no default. A range that fuses throws rather than returning a decomposition that does not describe it. A measure that is not a range has no method.
 
@@ -755,6 +755,7 @@ $(DocStringExtensions.FIELDS)
 # Validation
 
   - `loss.settings.rke` and `gain.settings.rke` are `false`. Otherwise an `ArgumentError` is raised.
+  - The keyword constructor refuses a tail that is not a [`RiskMeasure`](@ref) with a `TypeError`. The positional constructor checks only a pair of `RiskMeasure`s: the generic positional method that `@concrete` adds takes any other pair with no check.
 
 # Examples
 
@@ -804,6 +805,7 @@ end
 function RangeTails(; loss::RiskMeasure, gain::RiskMeasure)::RangeTails
     return RangeTails(loss, gain)
 end
+@define_pretty_show(RangeTails)
 """
     const VecRM = AbstractVector{<:RiskMeasure}
 

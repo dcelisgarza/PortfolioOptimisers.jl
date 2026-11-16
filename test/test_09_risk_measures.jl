@@ -954,14 +954,20 @@ function declared_kinds(@nospecialize(T))
     return unique(Base.return_types(PO.risk_input_kind, (T,)))
 end
 
+# The census reads every concrete subtype in the process, so a type that another test file of
+# the same worker defines is read too. A red names each type and the kinds that it infers.
 @testset "risk_input_kind — every concrete measure is classified" begin
+    unclassified = Pair{Any, Vector{Any}}[]
     for T in all_concrete(PO.AbstractBaseRiskMeasure)
         if T in _EXPLICIT
             continue
         end
         ks = declared_kinds(T)
-        @test !isempty(ks) && all(k -> isconcretetype(k) && k <: PO.RiskInputKind, ks)
+        if isempty(ks) || !all(k -> isconcretetype(k) && k <: PO.RiskInputKind, ks)
+            push!(unclassified, T => ks)
+        end
     end
+    @test isempty(unclassified)
 end
 
 # ── ADR 0007: the precomputed-returns contract ────────────────────────────────────────────
