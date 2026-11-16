@@ -524,12 +524,9 @@ function mr_block2(idx)
         #
         # 42 is not in that table at all. Its weights are not compared. See the block below.
         #
-        # 18 and 28 joined them: 18 needs 0.1 on a developer machine under the CI flags, at
-        # 07e51899a0 and after it, and 28 needs 0.25 on the CI runner (runs 43500807458 to
-        # 43573334652).
-        rtol = if i in (12, 15, 28)
-            0.25
-        elseif i == 27
+        # 12, 15, 18 and 28 are not in that table either. Their optimum is not unique, so the
+        # block below compares their ratio (#2119).
+        rtol = if i == 27
             5e-3
         elseif i == 46
             5e-6
@@ -537,7 +534,7 @@ function mr_block2(idx)
             5e-4
         elseif i in (13, 16)
             0.05
-        elseif i in (17, 18, 41)
+        elseif i in (17, 41)
             0.1
         elseif i == 29
             1e-5
@@ -554,7 +551,15 @@ function mr_block2(idx)
         else
             1e-6
         end
-        if i != 42
+        # #2119: the optimum of 12, 15, 18 and 28 is not unique, so their weights differ by
+        # host (28 on CI: `0.081` against `0.144`). Compare the ratio that `MaximumRatio`
+        # maximises, as 246 and 282 do (#1280). On a developer machine the ratio misses by
+        # 3.1e-3 (12), 2.5e-4 (15), 5.2e-3 (18) and 4.8e-3 (28). The bound of 2e-2 is the
+        # one of 246 and 282, about four times the largest miss measured.
+        if i in (12, 15, 18, 28)
+            ratio, ref = mr_ratio(r1, res.w), mr_ratio(r1, df[!, "$i"])
+            @test isapprox(ratio, ref; rtol = 2e-2)
+        elseif i != 42
             success = isapprox(res.w, df[!, "$i"]; rtol = rtol)
             if !success
                 println("Counter: $i")
