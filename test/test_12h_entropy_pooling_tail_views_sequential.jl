@@ -565,6 +565,17 @@ end
     pAe = ep_sevar(1, ep_sw0) + ep_sevar(2, ep_sw0)
     pAr = ep_srlvar(1, ep_sw0) + ep_srlvar(2, ep_sw0)
     pAc = ep_scvar(1, ep_sw0) + ep_scvar(2, ep_sw0)
+    # On the developer host the outer approximation of Pajarito finds the upper bound's
+    # incumbent at the third iteration and never improves it. The integral solution repeats,
+    # and the bound stays about 12% below, so the default gap of 1e-5 never closes (#2121).
+    # The incumbent is the optimum: its divergence is the sequential formulation's to 3e-5,
+    # and its CVaR is on the target to 1e-9. A relative gap of 0.2 stops the solve at the
+    # fourth iteration. The claims read the CVaR, which the stop does not change.
+    gap_mopt = JuMPEntropyPooling(;
+                                  slv = Solver(; name = :ep_mip_gap,
+                                               solver = ep_mip_slv[1].solver,
+                                               settings = "tol_rel_gap" => 0.2,
+                                               check_sol = ep_mip_slv[1].check_sol))
     for (op, f) in (("<=", 0.95), ("==", 0.97))
         v = LinearConstraintEstimator(; val = "gA $op $(f)*prior(gA)")
         pe = prior(EntropyPoolingPrior(; sets = ep_gsets, opt = ep_jopt,
@@ -577,7 +588,7 @@ end
                                                                                   views = v)),
                     ep_srd)
         @test isapprox(ep_srlvar(1, pr_.w) + ep_srlvar(2, pr_.w), f * pAr, rtol = 1e-4)
-        pc = prior(EntropyPoolingPrior(; sets = ep_gsets, opt = ep_mopt,
+        pc = prior(EntropyPoolingPrior(; sets = ep_gsets, opt = gap_mopt,
                                        cvar_views = ConditionalValueatRiskView(; views = v)),
                    ep_srd)
         @test isapprox(ep_scvar(1, pc.w) + ep_scvar(2, pc.w), f * pAc, rtol = 5e-3)
