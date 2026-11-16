@@ -228,6 +228,6 @@ The size, complexity, expansion, performance, prose and JET baselines were refre
 in the commit that moved the Manifest. That commit changes no file under `src/` or `ext/`. No
 binding number rose, so no row needed `--accept-rise`. JET fell in four rows by 13 reports each:
 `20_Base_Regression.jl` and `02_DimensionReductionRegression.jl`, in the `main` run and in the
-`plots_ext` run. These are the rows that rose under 1.13.3. The binding complexity numbers fell in
-31 files, because `dev` carried drift under the thresholds, and a refresh imports it. The coverage
+`plots_ext` run. These are the rows that rose under 1.13.3. Forty-eight binding complexity numbers
+fell, in 28 files, because `dev` carried drift under the thresholds, and a refresh imports it. The coverage
 baseline's provenance line was moved by hand, for the reason the first amendment gives.

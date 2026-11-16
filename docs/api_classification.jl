@@ -17,9 +17,9 @@
 # The foreign-owned class ADR 0128 names, keyed by the bare method name: a page may spell the
 # name qualified or bare, and both resolve to the same classification, so the set holds only
 # the bare form.
-const FOREIGN_PUBLIC_BINDINGS = Set([:iterate, :getproperty, :getindex, :propertynames,
-                                     :showerror, :split, :fit, :predict, :vcat, :describe,
-                                     :show, :DataFrame])
+const FOREIGN_PUBLIC_BINDINGS = Set([:iterate, :getproperty, :hasproperty, :getindex,
+                                     :propertynames, :showerror, :split, :fit, :predict,
+                                     :vcat, :describe, :show, :DataFrame])
 
 """
     classify_binding(name) -> Symbol

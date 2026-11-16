@@ -214,8 +214,8 @@ order of preference. Route 1 applies when the lower form is also the better desi
 the rise applies when the higher number comes from the correct form: the precedent of the library,
 a signature that a test can call, or the file of the subject. The number must stay within its
 threshold in `code_health/rulings.toml`, and the commit names the rise and its reason. The message
-ends with one more line: "Never change a signature, a type bound or the home of a function only to
-pass a ratchet."
+gains one more line, before its pointer to the guide: "Never change a signature, a type bound or
+the home of a function only to pass a ratchet."
 
 The message of the decision above put route 1 first, "in order of preference", and the developer
 guide added "This is the route to take whenever you can". Nothing stated that a lower number must

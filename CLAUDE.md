@@ -71,31 +71,44 @@ name.
   hand.** Cover it with a test, and name the fix in your report.
 - **File an issue when the fix is large, or when it needs the maintainer's decision.** Give the
   reproduction, the file and the line, the cause, the fix you would make, and the reason you did
-  not make it. Name the work that found it, and name the issue in that work.
+  not make it. Name the work that found it in the issue, and name the issue in the pull request,
+  the commit or the report of that work.
 - **A name or an interface that a library precedent settles is not the maintainer's decision**,
   and a breaking change is not either (`.github/instructions/julia-source-code.instructions.md`
   § *A design is chosen by the standing test*). A case that the same mechanism reaches belongs to
-  the fix in hand.
+  the fix in hand: list every such case in the plan before the first test run.
 
 ## Functionality you add
 
 Every file under `src/` and `ext/` carries a row in `code_health/sweep_manifest.toml`, and an
-addition joins the systematic audit of #404 in the same change. Before the first commit that
-changes `src/` or `ext/`, load the `sweep-conform` skill. It gives the four steps of an addition,
-the check that reports them (`code_health/sweep_check.jl --fetch`), and the order of the gates in
-its § *Land the branch*. The `sweep-file-issues` skill does steps 3 and 4. Defer a feature whose
-design is not settled, as `sweep-conform` states.
+addition joins the systematic audit of #404 in the same change, in four steps:
+
+1. Add or correct the row of the file, with `swept = false` for a new file.
+2. Cover every line of a new file, or give it a Coverage Exemption (ADR 0082).
+3. Reopen the child map that owns the file, and reopen #404.
+4. Open one sub-issue of that child map for the addition (ADR 0084).
+
+Before the first commit that changes `src/` or `ext/`, load the `sweep-conform` skill. It
+details each step, runs the check that reports them (`code_health/sweep_check.jl --fetch`), and
+gives the order of the gates in its § *Land the branch*. The `sweep-file-issues` skill does
+steps 3 and 4. Defer a feature whose design is not settled, as `sweep-conform` states.
 
 ## Repo etiquette
 
 - **Never link to or post in repositories outside `dcelisgarza`'s.** Name external sources in
-  prose. `CODING_STANDARDS.md` lists the exceptions for a docs site and for a bibliography entry,
-  and `test/test_64_docs_page_metadata_census.jl` fails on a link to an external repository.
+  prose. A page or a docstring can link the published docs site of an external package (#1794),
+  or its JuliaHub page, `https://docs.juliahub.com/General/<Package>/stable/`, when it has no
+  site. A bibliography entry in a `.bib` file can link the repository of the work it cites. A
+  comment that cites a source file of another repository names the package, the commit and the
+  path in prose. `test/test_64_docs_page_metadata_census.jl` fails on a link to an external
+  repository.
 - **A session that works an issue commits without being asked.** It commits, rebases and pushes
   `dev` as § *Parallel sessions* states. Any other session commits only when asked.
 - **Assign the issue to your `gh` account before your first edit**, with
-  `gh issue edit <number> --add-assignee @me`.
-- **Close the issue yourself after the commit that resolves it**, with
-  `gh issue close <number> --comment "…"` that names the commit. A closing keyword acts only when
-  the commit reaches `main`, the default branch. Leave the issue open while a part of the work
-  remains.
+  `gh issue edit <number> --add-assignee @me`. An issue that you fix, close, or leave open with a
+  part of the work done carries your account.
+- **Close the issue yourself after the commit that resolves it**, for every kind of issue: a
+  defect, a feature, a sweep sub-issue, a map. Name the issue in the commit message, for example
+  `Fix #493: …`. Close it with `gh issue close <number> --comment "…"` that names the commit. A
+  closing keyword acts only when the commit reaches `main`, the default branch. Leave the issue
+  open while a part of the work remains.

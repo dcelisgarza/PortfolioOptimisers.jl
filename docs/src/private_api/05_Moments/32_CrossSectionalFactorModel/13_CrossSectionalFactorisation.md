@@ -1,8 +1,8 @@
 ```@meta
-Description = "Cross-Sectional Leverage, private API of PortfolioOptimisers.jl: cross_sectional_leverage_one, cross_sectional_leverage, cross_sectional_pivot_columns, …"
+Description = "Cross-Sectional Factorisation, private API of PortfolioOptimisers.jl: cross_sectional_leverage_one, cross_sectional_leverage, cross_sectional_pivot_columns, …"
 ```
 
-# [Cross-Sectional Leverage: private API](@id private-api-cross-sectional-leverage)
+# [Cross-Sectional Factorisation: private API](@id private-api-cross-sectional-factorisation)
 
 ## Functions
 

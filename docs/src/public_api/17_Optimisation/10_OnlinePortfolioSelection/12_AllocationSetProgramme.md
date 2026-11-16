@@ -1,5 +1,5 @@
 ```@meta
-Description = "Allocation Set programme, public API of PortfolioOptimisers.jl: set_allocation_set_constraints!."
+Description = "Allocation Set programme, public API of PortfolioOptimisers.jl: set_allocation_set_constraints!, project."
 ```
 
 # Allocation Set programme
@@ -8,4 +8,5 @@ Description = "Allocation Set programme, public API of PortfolioOptimisers.jl: s
 
 ```@docs
 PortfolioOptimisers.set_allocation_set_constraints!
+PortfolioOptimisers.project(::PortfolioOptimisers.AbstractProjectionGeometry, ::Tuple, ::AbstractVector, ::AbstractVector, ::PortfolioOptimisers.Option{<:PortfolioOptimisers.ReturnsResult})
 ```
