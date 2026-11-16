@@ -292,7 +292,7 @@ end
             @test raw[t, :] == PO.expand_factor_returns(fcb, mu[t, :], t)
         end
         L = PO.reduce_exposures(fcb, Ms)
-        @test L == PO.reduce_exposures(fcb, Ms)
+        @test size(L) == (N, Kr, T)
         for t in 1:T
             @test L[:, :, t] == PO.reduce_loadings(fcb, Ms[:, :, t], t)
         end
@@ -523,7 +523,7 @@ end
         @test eltype(PO.reduce_loadings(f32, B32[:, :, 1])) == Float32
         @test eltype(PO.expand_factor_returns(f32, ones(Float32, T, Kr))) == Float32
         @test eltype(PO.expand_factor_returns(f32, ones(Float32, Kr))) == Float32
-        @test eltype(PO.expand_factor_returns(f32, ones(Float32, Kr))) == Float32
+        @test eltype(PO.expand_factor_returns(f32, ones(Float32, Kr), 1)) == Float32
         @test eltype(PO.expand_factor_covariance(f32,
                                                  Matrix{Float32}(LinearAlgebra.I, Kr, Kr))) ==
               Float32

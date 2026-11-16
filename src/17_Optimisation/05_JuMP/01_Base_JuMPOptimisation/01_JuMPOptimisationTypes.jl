@@ -197,6 +197,21 @@ function Base.propertynames(r::RJR_NRJR)
     return Tuple(unique((fieldnames(typeof(r))..., propertynames(getfield(r, :jr))...)))
 end
 """
+$(DocStringExtensions.TYPEDSIGNATURES)
+
+Return `true` when `sym` is one of the names that the default `getproperty` of [`RJR_NRJR`](@ref) reads.
+
+The method gives the answer of `sym in propertynames(r)`, without the tuple of `propertynames`. That tuple removes its duplicate names with `unique`, which allocates on each call. So the method allocates nothing, as the `hasproperty` method that [`@forward_properties`](@ref) makes for the embedded result does.
+
+# Algorithm
+
+ 1. When `sym` is a field of the result, return `true`.
+ 2. Otherwise return `hasproperty` of the embedded [`JuMPOptimisationResult`](@ref) `jr`.
+"""
+function Base.hasproperty(r::RJR_NRJR, sym::Symbol)
+    return sym in fieldnames(typeof(r)) || hasproperty(getfield(r, :jr), sym)
+end
+"""
 $(DocStringExtensions.TYPEDEF)
 
 Abstract supertype for the objective functions of a JuMP portfolio optimisation.

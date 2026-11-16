@@ -238,3 +238,31 @@ that an earlier rule reads stays refused, even when a later `settable` rule forw
 An option on a rule that it does not apply to is now refused. Before this amendment, the macro
 ignored `broadcast` on `forward` and `alias` with no error. `broadcast` applies to `compute` and
 `swap`, and `settable` applies to `forward`.
+
+## Amendment (2026-11-16)
+
+**The macro also generates `Base.hasproperty`, and a read through it allocates nothing.** The
+decision above names the `getproperty` and `propertynames` pair, and the amendment of 2026-10-07
+adds `ConstructionBase.setproperties`. `12058f0c14`
+([#2101](https://github.com/dcelisgarza/PortfolioOptimisers.jl/issues/2101)) adds the fourth
+method. Before it, every read of a forwarded property allocated, for two causes:
+
+- A `forward(loc)` rule tested `sym in propertynames(child)`. The `propertynames` of a decorated
+  child removes its duplicate names with `unique` on each call, and allocates.
+- The own-field check read `fieldnames(T)`. For a signature with a free parameter, such as
+  `Regression{<:Any, Nothing, …}`, that expression builds a new `UnionAll` on each call.
+
+The generated `hasproperty` gives `true` for the names of `propertynames`, from one branch for
+each rule, and no other name. A `forward(loc)` rule asks `hasproperty` of the child, so a chain of
+`forward` rules runs one generated method for each link. The three methods read the field names of
+the bare name of `T`, a constant with the same field names. `propertynames` keeps its answer.
+
+Measured on a `git archive` copy of the parent of `12058f0c14`, against `dev`: `retcode` of a
+`RiskBudgetingResult` allocated 3 872 bytes, of a `FactorRiskContributionResult` 6 688 bytes,
+`re.M` of a `Regression` 2 304 bytes, and `mu` of a `HighOrderPrior` 1 664 bytes. Each allocates
+0 bytes after it.
+
+The hand-written `getproperty` and `propertynames` of `RJR_NRJR`, the results of `MeanRisk` and
+`NearOptimalCentering`, take the same `hasproperty` method by hand, because the macro does not
+decorate a `Union`. Before, `hasproperty(res, :retcode)` on a `MeanRiskResult` allocated 5 648
+bytes (R55 of [#1817](https://github.com/dcelisgarza/PortfolioOptimisers.jl/pull/1817)).

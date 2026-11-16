@@ -1523,6 +1523,16 @@ struct HookObjective03d <: PortfolioOptimisers.CustomJuMPObjective end
         @test res.w === getfield(res, :jr).w
         @test res.r === getfield(res, :r)
         @test :w in propertynames(res) && :jor in propertynames(res)
+        #=
+        `hasproperty` gives the names of `propertynames`, and no other name. The method of
+        `Base` reads `propertynames`, whose `unique` allocated 5 648 bytes on each call (R55 of
+        #1817).
+        =#
+        @test all(s -> hasproperty(res, s), propertynames(res))
+        @test !hasproperty(res, :not_a_property)
+        @test hasproperty(res, :retcode) && hasproperty(res, :r)
+        @test (@allocated hasproperty(res, :retcode)) == 0
+        @test (@allocated hasproperty(res, :not_a_property)) == 0
         # Every solver fails, so the weights are `NaN`.
         all_bad = MeanRisk(; r = Variance(), opt = JuMPOptimiser(; slv = bad))
         failed = @test_logs (:warn, r"bad: set_optimizer → no solver") match_mode = :any optimise(all_bad,
