@@ -817,6 +817,37 @@ function variation_info(X::MatNum, bins::Int_Bin = HacineGharbiRavier(),
     return var_mtx
 end
 """
+    normalised_mutual_info(mut_ixy::Number, ex::Number, ey::Number) -> Number
+
+Divide the mutual information of a pair by the smaller of its two marginal entropies.
+
+The quotient is the normalised mutual information of [`mutual_info`](@ref). A constant variable has an entropy of zero, so the quotient is `0 / 0`, and the function returns `NaN`. The mutual information of such a pair is zero only up to the rounding of the histogram, so a plain division can give `Inf` in place of `NaN`.
+
+# Algorithm
+
+ 1. Take the smaller entropy `h` of `ex` and `ey`.
+ 2. When `h` is zero, return `h / h`, the `NaN` of the number type of `h`.
+ 3. Otherwise return `mut_ixy / h`.
+
+# Arguments
+
+  - `mut_ixy`: The mutual information of the pair, in nats.
+  - `ex`, `ey`: The marginal entropies of the two variables, in nats.
+
+# Returns
+
+  - `nmi::Number`: The normalised mutual information, or `NaN` when an entropy is zero.
+
+# Related
+
+  - [`mutual_info`](@ref)
+  - [`mutual_variation_info`](@ref)
+"""
+function normalised_mutual_info(mut_ixy::Number, ex::Number, ey::Number)
+    h = min(ex, ey)
+    return iszero(h) ? h / h : mut_ixy / h
+end
+"""
     mutual_variation_info(X::MatNum, bins::Int_Bin = Knuth(), normalise::Bool = true)
 
 Compute the pairwise mutual information and variation of information matrices from a data matrix.
@@ -859,7 +890,7 @@ The two unnormalised forms are the rate of transmission of Section 12 of [shanno
  3. For each pair `(j, i)` on or below the diagonal, take the bin count from [`calc_num_bins`](@ref) into `nbins`.
  4. Take the two marginal entropies `ex` and `ey` and the joint histogram `hxy` from [`calc_hist_data`](@ref).
  5. Take the mutual information of `hxy` from [`intrinsic_mutual_info`](@ref) into `mut_ixy`, and make `var_ixy` from it and the two entropies.
- 6. When `normalise` is true, divide `var_ixy` by the joint entropy `vxy` and `mut_ixy` by the smaller of `ex` and `ey`.
+ 6. When `normalise` is true, divide `var_ixy` by the joint entropy `vxy`, and divide `mut_ixy` by the smaller of `ex` and `ey` with [`normalised_mutual_info`](@ref), which gives `NaN` for a zero entropy.
  7. Clamp both below at zero, and write each into both of its symmetric positions.
  8. After the inner loop, write an exact zero at `var_mtx[j, j]`, for the reason that [`variation_info`](@ref) gives. `mut_mtx[j, j]` keeps its estimate, because ``I(X; X) = H(X)`` is not zero.
 
@@ -907,7 +938,7 @@ function mutual_variation_info(X::MatNum, bins::Int_Bin = Knuth(), normalise::Bo
             if normalise
                 vxy = ex + ey - mut_ixy
                 var_ixy = var_ixy / vxy
-                mut_ixy /= min(ex, ey)
+                mut_ixy = normalised_mutual_info(mut_ixy, ex, ey)
             end
 
             # if abs(mut_ixy) < eps(typeof(mut_ixy)) || mut_ixy < zero(eltype(X))
@@ -979,7 +1010,7 @@ Equation 18 of [meila2007](@cite) shows that the smaller marginal entropy is the
  3. For each pair `(j, i)` on or below the diagonal, take the bin count from [`calc_num_bins`](@ref) into `nbins`.
  4. Take the two marginal entropies `ex` and `ey` and the joint histogram `hxy` from [`calc_hist_data`](@ref).
  5. Take the mutual information of `hxy` from [`intrinsic_mutual_info`](@ref) into `mut_ixy`.
- 6. When `normalise` is true, divide `mut_ixy` by the smaller of `ex` and `ey`.
+ 6. When `normalise` is true, divide `mut_ixy` by the smaller of `ex` and `ey` with [`normalised_mutual_info`](@ref). A constant variable has an entropy of zero, so its normalised mutual information is `NaN`.
  7. Clamp `mut_ixy` below at zero, and write it into both `mut_mtx[j, i]` and `mut_mtx[i, j]`.
 
 # Arguments
@@ -1020,7 +1051,7 @@ function mutual_info(X::MatNum, bins::Int_Bin = HacineGharbiRavier(),
             ex, ey, hxy = calc_hist_data(xj, xi, nbins)
             mut_ixy = intrinsic_mutual_info(hxy)
             if normalise
-                mut_ixy /= min(ex, ey)
+                mut_ixy = normalised_mutual_info(mut_ixy, ex, ey)
             end
             mut_ixy = clamp(mut_ixy, zero(eltype(X)), typemax(eltype(X)))
             mut_mtx[j, i] = mut_mtx[i, j] = mut_ixy

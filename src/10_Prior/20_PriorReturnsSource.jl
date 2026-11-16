@@ -403,7 +403,7 @@ Compose the Investable Mask with the assets that a distance reader of a fit refu
 
 A distance reader can refuse an asset that the prior keeps, see [`DistanceReaderRefusalError`](@ref). The fit learns of the refusal only when the reader has estimated its distance matrix, after [`investable_reduction`](@ref). So the fit catches the error around the call of its own reader, takes the mask from this function, and fits again from the same prior result with that mask. A fit with no refusal does no extra work. The asset then departs as a non-investable asset: the reduction announces it, the fit gives it a zero weight, and it is listed on the Non-Investable Axis. This is the rule of [`graph_reader_mask`](@ref) for a plain reader that meets a gap.
 
-The fit warns once, and the warning names the assets and the two remedies. Under `strict = true` the fit refuses the assets instead.
+The fit warns once, and the warning names the assets, the two causes and a remedy for each cause. Under `strict = true` the fit refuses the assets instead.
 
 # Algorithm
 
@@ -443,7 +443,7 @@ function distance_reader_refusal_mask(err::DistanceReaderRefusalError,
     keep[cols] .= false
     assets = isnothing(rd.nx) ? cols : rd.nx[cols]
     msg = "a distance reader of this optimiser cannot estimate the correlation of $(length(cols)) asset(s) that the prior kept: $(assets). An asset with zero variance gives such a row, and so does an asset that the `CoveragePolicy` of the `ce` of the reader refuses"
-    remedy = "To keep them, give the reader the `CoveragePolicy` of the prior, or state the prior as its source, `x_src = PriorSource()`."
+    remedy = "To keep an asset that the `CoveragePolicy` refuses, give the reader the `CoveragePolicy` of the prior, or state the prior as its source, `x_src = PriorSource()`. To keep an asset with zero variance, give the reader an estimator that defines the dependence of a constant, such as `GerberCovariance`."
     @argcheck(!strict,
               IsNonFiniteError("$(msg), and `strict = true` refuses them. $(remedy)"))
     @warn("$(msg), so the fit leaves these assets out of the Investable Mask and gives each a zero weight. $(remedy) Pass `strict = true` to refuse them.",

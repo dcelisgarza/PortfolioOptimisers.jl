@@ -1158,6 +1158,70 @@ end
     @test isone(PO.cov2cor_nan!(copy(m))[3, 3])
 end
 
+@testset "A constant other than zero leaves the universe too (R47 of #1817)" begin
+    using CovarianceEstimation: LinearShrinkage, DiagonalUnitVariance
+    # The mean of a constant can differ from it by one unit in the last place, so the variance
+    # of cash at 0.0005 is about 1e-38, not zero. The Pearson correlation of its row was then
+    # rounding noise, not NaN, and a hierarchical fit gave the cash the whole weight.
+    keepc = [1, 2, 3, 5]
+    for c in (0.0005, 0.01, 0.07)
+        Xc = 0.01 .* randn(StableRNG(7), 200, 5) .+ 0.0005
+        Xc[:, 4] .= c
+        c == 0.0005 && @test !iszero(var(Xc[:, 4]))
+        wc = AnalyticWeights(collect(eweights(200, 0.01)))
+        # The plain, general, default, weighted and transposed Pearson correlations. Then the
+        # mutual information: the entropy of a constant is zero, and the rounding of its mutual
+        # information gave Inf in place of 0 / 0.
+        for S in (cor(Covariance(), Xc), cor(GeneralCovariance(), Xc),
+                  cor(PortfolioOptimisersCovariance(), Xc), cor(Covariance(; w = wc), Xc),
+                  cor(Covariance(), permutedims(Xc); dims = 2), cor(MutualInfoCovariance(), Xc),
+                  cor(MutualInfoCovariance(; bins = 10), Xc),
+                  PO.mutual_variation_info(Xc, Knuth(), true)[1])
+            @test all(isnan, S[4, :]) && all(isnan, S[:, 4])
+            @test all(isfinite, S[keepc, keepc])
+        end
+        rdc = ReturnsResult(; nx = ["a", "b", "c", "d", "e"], X = Xc)
+        res = @test_logs (:warn, r"cannot estimate the correlation of 1 asset\(s\)") match_mode = :any optimise(HierarchicalRiskParity(),
+                                                                                                                rdc)
+        @test res.imsk == BitVector([1, 1, 1, 0, 1])
+        prc = prior(EmpiricalPrior(), rdc)
+        resk = optimise(HierarchicalRiskParity(;
+                                               opt = HierarchicalOptimiser(;
+                                                                           pe = PO.port_opt_view(prc,
+                                                                                                 keepc))),
+                        PO.port_opt_view(rdc, keepc))
+        @test res.w[keepc] == resk.w
+    end
+    Xc = 0.01 .* randn(StableRNG(7), 200, 5) .+ 0.0005
+    # A column that is constant on the observations of positive weight alone is constant for
+    # the weighted moments, and for them alone.
+    X0 = copy(Xc)
+    X0[101:end, 1] .= 0.3
+    w0 = AnalyticWeights([zeros(100); ones(100)])
+    @test all(isnan, cor(Covariance(; w = w0), X0)[1, :])
+    @test all(isfinite, cor(Covariance(), X0))
+    # A shrinkage defines the dependence of a constant, so it keeps its values.
+    Xc[:, 4] .= 0.0005
+    ls = LinearShrinkage(DiagonalUnitVariance(), :lw)
+    @test isequal(cor(Covariance(; ce = ls), Xc), PO.robust_cor(ls, Xc))
+    # Another estimator in a `GeneralCovariance` gets the NaN diagonal of a zero variance where
+    # its matrix holds a NaN.
+    Xc[:, 4] .= 0.0
+    S = cor(GeneralCovariance(; ce = SpearmanCovariance()), Xc)
+    @test all(isnan, S[4, :]) && all(i -> isone(S[i, i]), keepc)
+    # The refusal names a remedy for each cause, and a reader whose estimator defines the
+    # dependence of a constant keeps the asset.
+    rdc = ReturnsResult(; nx = ["a", "b", "c", "d", "e"], X = Xc)
+    @test_logs (:warn, r"To keep an asset with zero variance.*GerberCovariance"s) match_mode = :any optimise(HierarchicalRiskParity(),
+                                                                                                             rdc)
+    reg = optimise(HierarchicalRiskParity(;
+                                          opt = HierarchicalOptimiser(;
+                                                                      cle = ClustersEstimator(;
+                                                                                              ce = GerberCovariance()))),
+                   rdc)
+    @test isnothing(reg.imsk) || all(reg.imsk)
+end
+
 @testset "A programme set drops an asset that its distance reader refuses (#2028)" begin
     # The asset `e` holds the last 60 of 120 observations. The prior of the set keeps it with
     # its fill, and the reader asks for 60 %, so it refuses `e` at every step after row 60.

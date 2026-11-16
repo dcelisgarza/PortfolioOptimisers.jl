@@ -531,7 +531,7 @@ The method calls [`robust_cor`](@ref) with or without observation weights, as `c
  2. Get the observation weights `w` from `ce.w` and `X`.
  3. When `w` is `nothing`, call [`robust_cor`](@ref) with `ce.ce` and `X` only.
  4. Otherwise call [`robust_cor`](@ref) with the estimator of [`weighted_correlation_estimator`](@ref), `X` and `w`. Write `NaN` where the sample gives the correlation no value, with [`weighted_comoment_guard`](@ref). A `StatsBase.SimpleCovariance` on one observation of positive weight is then `NaN` at every entry, as the unweighted fit is.
- 5. When `rho` holds a `NaN`, read the variances `v` from the diagonal of the covariance of the same fit, and write `NaN` on the diagonal entry of each zero variance with [`undefined_correlation_diagonal!`](@ref). The correlation of a constant return is `0 / 0`, and `StatsBase` computes a correlation as `cov2cor!(cov(...))`, which writes one on its diagonal. A zero variance makes each entry of its row `NaN`, so a matrix with no `NaN` needs no second fit. The step reads the variances and not the rows of `NaN`, because a row alone does not name the asset: with two assets and one constant, both rows are `NaN` off the diagonal.
+ 5. Give each constant return the `NaN` row and column of an undefined correlation with [`mark_constant_correlation!`](@ref). Under the Pearson estimator `StatsBase.SimpleCovariance`, it tests the data, because the variance of a constant can be about `1e-38` and not zero. Another estimator keeps its values, and only a zero variance in a matrix that holds a `NaN` gets a `NaN` diagonal entry.
 
 # Arguments
 
@@ -574,12 +574,8 @@ function Statistics.cor(ce::GeneralCovariance, X::MatNum; dims::Int = 1, mean = 
                                 robust_cor(weighted_correlation_estimator(ce.ce, w), X, w;
                                            dims = dims, mean = mean, kwargs...), w)
     end
-    # A zero variance makes its row `NaN`, so a matrix with no `NaN` has none to mark.
-    if any(isnan, rho)
-        v = LinearAlgebra.diag(Statistics.cov(ce, X; dims = dims, mean = mean, kwargs...))
-        undefined_correlation_diagonal!(rho, v)
-    end
-    return rho
+    return mark_constant_correlation!(ce.ce, ce, rho, X, w; dims = dims, mean = mean,
+                                      kwargs...)
 end
 """
     library_covariance_estimator(ce::AbstractCovarianceEstimator) -> AbstractCovarianceEstimator

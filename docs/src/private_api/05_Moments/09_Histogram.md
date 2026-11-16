@@ -1,5 +1,5 @@
 ```@meta
-Description = "Histogram, private API of PortfolioOptimisers.jl: Int_Bin, calc_hist_data, intrinsic_mutual_info, variation_info, mutual_info, mutual_variation_info."
+Description = "Histogram, private API of PortfolioOptimisers.jl: Int_Bin, calc_hist_data, intrinsic_mutual_info, variation_info, mutual_info, normalised_mutual_info, …"
 ```
 
 # Histogram: private API
@@ -10,6 +10,7 @@ calc_hist_data
 intrinsic_mutual_info
 variation_info
 mutual_info
+normalised_mutual_info
 mutual_variation_info
 ```
 

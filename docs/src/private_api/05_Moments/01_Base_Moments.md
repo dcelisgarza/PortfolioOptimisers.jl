@@ -18,6 +18,8 @@ weighted_centre
 demean_returns
 cov2cor_nan!
 undefined_correlation_diagonal!
+constant_column_correlation!
+mark_constant_correlation!
 ```
 
 ## Windowed estimator generation

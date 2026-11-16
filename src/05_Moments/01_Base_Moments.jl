@@ -1095,7 +1095,7 @@ end
 
 Rescale a covariance matrix to its correlation matrix in place, with a `NaN` diagonal entry for each asset whose correlation is not defined.
 
-The correlation of asset ``i`` with itself is ``\\sigma_{ii} / (s_i s_i)``. A zero standard deviation, the one of a constant return, makes it ``0 / 0``. A standard deviation that is not finite, the one of an asset outside the Coverage Universe, makes it `NaN` too. `StatsBase.cov2cor!` writes one on the whole diagonal, so it gives such an asset a correlation of one with itself and `NaN` with every other asset. This function writes the `NaN` back on the diagonal. The row of the asset is then `NaN` at every entry, as the row of an asset that a distance reader refuses is, see [`DistanceReaderRefusalError`](@ref).
+The correlation of asset ``i`` with itself is ``\\sigma_{ii} / (s_i s_i)``. A zero standard deviation, the one of a constant return, makes it ``0 / 0``. A standard deviation that is not finite, the one of an asset outside the Coverage Universe, makes it `NaN` too. `StatsBase.cov2cor!` writes one on the whole diagonal, so it gives such an asset a correlation of one with itself and `NaN` with every other asset. This function writes the `NaN` back on the diagonal. The row of the asset is then `NaN` at every entry, as the row of an asset that a distance reader refuses is, see [`DistanceReaderRefusalError`](@ref). A matrix holds no data, so the function cannot find a constant whose variance rounding left above zero. The `cor` of an estimator that reads the data marks such an asset, see [`constant_column_correlation!`](@ref).
 
 # Algorithm
 
@@ -1145,12 +1145,113 @@ The correlation of asset ``i`` with itself is ``\\sigma_{ii} / (s_i s_i)``. It i
 # Related
 
   - [`cov2cor_nan!`](@ref)
-  - [`cor(ce::GeneralCovariance, X::MatNum; dims::Int = 1, mean = nothing, kwargs...)`](@ref)
+  - [`constant_column_correlation!`](@ref)
 """
 function undefined_correlation_diagonal!(rho::AbstractMatrix, s::VecNum)
     idx = findall(x -> iszero(x) || !isfinite(x), s)
     for i in idx
         rho[i, i] = s[i] / s[i]
+    end
+    return rho
+end
+"""
+    constant_column_correlation!(rho::MatNum, X::MatNum, w::Option{<:VecNum} = nothing) -> MatNum
+
+Write `NaN` on the row and the column of each constant column of `X`, after an estimator computed the correlation matrix `rho` of `X`.
+
+The correlation of a constant return is `0 / 0` with every asset, itself included. The library gives such an asset a `NaN` row and column, its diagonal entry included, so a distance reader refuses it, see [`DistanceReaderRefusalError`](@ref). An estimator does not always give that row:
+
+  - `StatsBase.corkendall` and `StatsBase.corspearman` give `NaN` at every other column and one on the diagonal.
+  - The Pearson correlation of `StatsBase` subtracts a mean that can differ from the constant by one unit in the last place. The variance of the column is then about `1e-38`, not zero, and its correlations are rounding noise, not `NaN`. Cash at a constant return of `0.0005` gives such a column.
+
+So the test reads the data, not `rho` or a variance. With observation weights, it reads the observations of positive weight alone, because the weighted moments do not read the others.
+
+# Algorithm
+
+ 1. Take the rows of `X` whose weight in `w` is positive, or every row when `w` is `nothing`.
+ 2. For each column `i` of `X` whose entries on those rows are all equal, write `zero(T) / zero(T)` on row `i` and column `i` of `rho`, where `T` is the element type of `rho`.
+ 3. Return `rho`.
+
+# Arguments
+
+  - `rho`: The correlation matrix, `assets × assets`. It must be mutable.
+  - `X`: The data matrix, `observations × assets`.
+  - `w`: The observation weights, or `nothing`.
+
+# Returns
+
+  - `rho::MatNum`: The input matrix, with a `NaN` row and column for each constant column.
+
+# Related
+
+  - [`cov2cor_nan!`](@ref)
+  - [`KendallCovariance`](@ref)
+  - [`SpearmanCovariance`](@ref)
+  - [`cor(ce::GeneralCovariance, X::MatNum; dims::Int = 1, mean = nothing, kwargs...)`](@ref)
+"""
+function constant_column_correlation!(rho::MatNum, X::MatNum, w::Option{<:VecNum} = nothing)
+    T = eltype(rho)
+    rows = isnothing(w) ? axes(X, 1) : findall(>(zero(eltype(w))), w)
+    for i in axes(X, 2)
+        if allequal(view(X, rows, i))
+            rho[i, :] .= zero(T) / zero(T)
+            rho[:, i] .= zero(T) / zero(T)
+        end
+    end
+    return rho
+end
+"""
+    mark_constant_correlation!(est::StatsBase.SimpleCovariance, ce::AbstractCovarianceEstimator,
+                               rho::AbstractMatrix, X::MatNum,
+                               w::Option{<:StatsBase.AbstractWeights}; dims::Int = 1,
+                               kwargs...) -> AbstractMatrix
+    mark_constant_correlation!(est::StatsBase.CovarianceEstimator, ce::AbstractCovarianceEstimator,
+                               rho::AbstractMatrix, X::MatNum,
+                               w::Option{<:StatsBase.AbstractWeights}; dims::Int = 1,
+                               mean = nothing, kwargs...) -> AbstractMatrix
+
+Give each constant return the `NaN` row and column of an undefined correlation, in the correlation matrix `rho` that the inner estimator `est` of `ce` computed from `X`.
+
+The Pearson correlation of a constant return is `0 / 0` with every asset, itself included, so the library gives the asset a `NaN` row and column, see [`cov2cor_nan!`](@ref). The method depends on `est`:
+
+  - **`StatsBase.SimpleCovariance`**, the Pearson correlation. The mean of a constant can differ from the constant by one unit in the last place. The variance is then about `1e-38`, not zero, and the row holds rounding noise, not `NaN`. So the method tests the data with [`constant_column_correlation!`](@ref), on the observations of positive weight.
+  - **Any other estimator.** An estimator such as a shrinkage defines the dependence of a constant, and keeps its values. Where its matrix holds a `NaN`, the method reads the variances `v` from the diagonal of the covariance of the same fit. It writes `NaN` on the diagonal entry of each zero variance with [`undefined_correlation_diagonal!`](@ref), because `StatsBase` computes a correlation as `cov2cor!(cov(...))`, which writes one on its diagonal. A matrix with no `NaN` needs no second fit.
+
+# Arguments
+
+  - `est`: The inner estimator `ce.ce`. The method dispatches on it.
+  - $(arg_dict[:ce])
+  - `rho`: The correlation matrix, `assets × assets`. It must be mutable where the method writes.
+  - $(arg_dict[:X])
+  - `w`: The observation weights, or `nothing`.
+  - $(arg_dict[:dims])
+  - $(arg_dict[:omean])
+  - `kwargs...`: More keyword arguments for the covariance of the second method.
+
+# Returns
+
+  - `rho::AbstractMatrix`: The input matrix, with the `NaN` entries of each constant return.
+
+# Related
+
+  - [`cor(ce::AbstractCovarianceEstimator, X::MatNum; dims::Int = 1, mean = nothing, kwargs...)`](@ref)
+  - [`constant_column_correlation!`](@ref)
+  - [`undefined_correlation_diagonal!`](@ref)
+"""
+function mark_constant_correlation!(::StatsBase.SimpleCovariance,
+                                    ::AbstractCovarianceEstimator, rho::AbstractMatrix,
+                                    X::MatNum, w::Option{<:StatsBase.AbstractWeights};
+                                    dims::Int = 1, kwargs...)
+    return constant_column_correlation!(rho, dims_oriented(dims, X), w)
+end
+function mark_constant_correlation!(::StatsBase.CovarianceEstimator,
+                                    ce::AbstractCovarianceEstimator, rho::AbstractMatrix,
+                                    X::MatNum, ::Option{<:StatsBase.AbstractWeights};
+                                    dims::Int = 1, mean = nothing, kwargs...)
+    # A zero variance makes its row `NaN`, so a matrix with no `NaN` has none to mark.
+    if any(isnan, rho)
+        v = LinearAlgebra.diag(Statistics.cov(ce, X; dims = dims, mean = mean, kwargs...))
+        undefined_correlation_diagonal!(rho, v)
     end
     return rho
 end
