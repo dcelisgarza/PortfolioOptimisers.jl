@@ -140,8 +140,8 @@ A candidate that failed one fold is never selected, whatever the scorer computes
  8. For each candidate `i`, in parallel over `gscv.ex`, do steps 9 to 11.
  9. Build `opti` through [`search_candidate`](@ref).
 10. Fit and predict `opti` over the folds of `cv` through [`fit_and_predict`](@ref), with the folds in sequence, giving `predictions`.
-11. Write ``\\mathcal{O}`` of each fold into column `i` of `test_scores` and `train_scores` through [`write_candidate_scores!`](@ref).
-12. Order the finite candidates, keep the best `gscv.n_best`, build each from `opt`, and return the [`SearchCrossValidationResult`](@ref) through [`search_result`](@ref). The path of each row is [`score_path_ids`](@ref) of `cv`.
+11. Write ``\\mathcal{O}`` of each fold into column `i` of `test_scores` and `train_scores` through [`write_candidate_scores!`](@ref). Store `predictions` at entry `i` of the store of [`allocate_search_predictions`](@ref) through [`store_search_prediction!`](@ref), which stores nothing when `gscv.rank_prediction` is `false`.
+12. Order the finite candidates, keep the best `gscv.n_best`, build each from `opt`, and return the [`SearchCrossValidationResult`](@ref) through [`search_result`](@ref), with the predictions of the kept candidates. The path of each row is [`score_path_ids`](@ref) of `cv`.
 
 # Arguments
 
@@ -191,7 +191,13 @@ function search_cross_validation(opt::NonFiniteAllocationOptimisationEstimator,
     else
         nothing
     end
-    let opt = opt, test_scores = test_scores, train_scores = train_scores, train_X = train_X
+    store = allocate_search_predictions(gscv, N)
+    let opt = opt,
+        test_scores = test_scores,
+        train_scores = train_scores,
+        train_X = train_X,
+        store = store
+
         FLoops.@floop gscv.ex for (i, (lenses, vals)) in
                                   enumerate(zip(lens_grid, val_grid))
             local opti = search_candidate(opt, lenses, vals)
@@ -201,10 +207,11 @@ function search_cross_validation(opt::NonFiniteAllocationOptimisationEstimator,
                                                 ex = FLoops.SequentialEx())
             write_candidate_scores!(test_scores, train_scores, i, predictions, rows,
                                     train_X, gscv.r_sca, gscv.r, gscv.kwargs)
+            store_search_prediction!(store, i, predictions)
         end
     end
     return search_result(opt, gscv, test_scores, train_scores, lens_grid, val_grid,
-                         score_path_ids(cv))
+                         score_path_ids(cv), store)
 end
 """
     search_cross_validation(opt::NonFiniteAllocationOptimisationEstimator,
@@ -253,8 +260,8 @@ A candidate that failed one path is never selected, whatever the scorer computes
  8. For each candidate `i`, in sequence, do steps 9 to 11.
  9. Build `opti` through [`search_candidate`](@ref).
 10. Fit and predict `opti` over the folds of `cv` through [`fit_and_predict`](@ref), with the executor `gscv.ex`, giving `predictions`, one path per member.
-11. Write column `i` through [`write_candidate_scores!`](@ref), with row `p` for path `p`. The test score of each path is ``\\mathcal{O}`` of the path. When `gscv.train_score` is `true`, the train score of each fold of each path goes into column `i` of the matrix of that path, through [`candidate_train_score`](@ref) with the view of `path_X`.
-12. Order the finite candidates, keep the best `gscv.n_best`, build each from `opt`, and return the [`SearchCrossValidationResult`](@ref) through [`search_result`](@ref). Row `p` is path `p`, so the path of each row is `1:M`.
+11. Write column `i` through [`write_candidate_scores!`](@ref), with row `p` for path `p`. The test score of each path is ``\\mathcal{O}`` of the path. When `gscv.train_score` is `true`, the train score of each fold of each path goes into column `i` of the matrix of that path, through [`candidate_train_score`](@ref) with the view of `path_X`. Store `predictions` at entry `i` of the store of [`allocate_search_predictions`](@ref) through [`store_search_prediction!`](@ref), which stores nothing when `gscv.rank_prediction` is `false`.
+12. Order the finite candidates, keep the best `gscv.n_best`, build each from `opt`, and return the [`SearchCrossValidationResult`](@ref) through [`search_result`](@ref), with the predictions of the kept candidates. Row `p` is path `p`, so the path of each row is `1:M`.
 
 # Arguments
 
@@ -309,6 +316,7 @@ function search_cross_validation(opt::NonFiniteAllocationOptimisationEstimator,
     # [`candidate_train_score`](@ref).
     path_X = [[fold_train_returns(cv, rd, I[2]) for I in findall(==(p), cv.path_ids)]
               for p in 1:M]
+    store = allocate_search_predictions(gscv, N)
     for (i, (lenses, vals)) in enumerate(zip(lens_grid, val_grid))
         opti = search_candidate(opt, lenses, vals)
         # Fold-level parallelism happens inside fit_and_predict; the candidate loop is
@@ -317,7 +325,9 @@ function search_cross_validation(opt::NonFiniteAllocationOptimisationEstimator,
         # Row `p` is path `p`, so each path writes one test score at its own row.
         write_candidate_scores!(test_scores, train_scores, i, predictions, 1:M, path_X,
                                 gscv.r_sca, gscv.r, gscv.kwargs)
+        store_search_prediction!(store, i, predictions)
     end
-    return search_result(opt, gscv, test_scores, train_scores, lens_grid, val_grid, 1:M)
+    return search_result(opt, gscv, test_scores, train_scores, lens_grid, val_grid, 1:M,
+                         store)
 end
 export search_cross_validation, GridSearchCrossValidation

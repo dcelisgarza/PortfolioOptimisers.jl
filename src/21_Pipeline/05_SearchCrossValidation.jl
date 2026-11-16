@@ -348,8 +348,8 @@ For `gscv`:
  7. For each candidate `i`, in parallel over `gscv.ex`, do steps 8 to 10.
  8. Build `pipei` through [`search_candidate`](@ref).
  9. Run `pipei` over the folds of `cv` through [`cross_val_predict`](@ref), with the folds in sequence, giving `predictions`.
-10. Write ``\\mathcal{O}`` of each fold into column `i` of `test_scores` and `train_scores` through [`write_candidate_scores!`](@ref), with no view of the training returns.
-11. Order the finite candidates, keep the best `gscv.n_best`, build each from `pipe`, and return the [`SearchCrossValidationResult`](@ref) through [`search_result`](@ref). The path of each row is [`score_path_ids`](@ref) of `cv`.
+10. Write ``\\mathcal{O}`` of each fold into column `i` of `test_scores` and `train_scores` through [`write_candidate_scores!`](@ref), with no view of the training returns. Store `predictions` at entry `i` of the store of [`allocate_search_predictions`](@ref) through [`store_search_prediction!`](@ref), which stores nothing when `gscv.rank_prediction` is `false`.
+11. Order the finite candidates, keep the best `gscv.n_best`, build each from `pipe`, and return the [`SearchCrossValidationResult`](@ref) through [`search_result`](@ref), with the predictions of the kept candidates. The path of each row is [`score_path_ids`](@ref) of `cv`.
 
 For `rscv`:
 
@@ -399,7 +399,8 @@ function search_cross_validation(pipe::Pipeline, gscv::GridSearchCrossValidation
     N = length(val_grid)
     M = length(cv.train_idx)
     test_scores, train_scores = allocate_search_scores(gscv, cv_data_eltype(data), M, M, N)
-    let pipe = pipe, test_scores = test_scores, train_scores = train_scores
+    store = allocate_search_predictions(gscv, N)
+    let pipe = pipe, test_scores = test_scores, train_scores = train_scores, store = store
         FLoops.@floop gscv.ex for (i, (lenses, vals)) in
                                   enumerate(zip(lens_grid, val_grid))
             local pipei = search_candidate(pipe, lenses, vals)
@@ -413,10 +414,11 @@ function search_cross_validation(pipe::Pipeline, gscv::GridSearchCrossValidation
             # through the prior result.
             write_candidate_scores!(test_scores, train_scores, i, predictions, rows,
                                     nothing, gscv.r_sca, gscv.r, gscv.kwargs)
+            store_search_prediction!(store, i, predictions)
         end
     end
     return search_result(pipe, gscv, test_scores, train_scores, lens_grid, val_grid,
-                         score_path_ids(cv))
+                         score_path_ids(cv), store)
 end
 """
     search_cross_validation(pipe::Pipeline,
@@ -466,8 +468,8 @@ The scorer never reads the column of a candidate that failed a path, so the sear
  7. For each candidate `i`, in sequence, do steps 8 to 10.
  8. Build `pipei` through [`search_candidate`](@ref).
  9. Run `pipei` over the folds of `cv` through [`cross_val_predict`](@ref), with the executor `gscv.ex`, giving `predictions`, one path per member.
-10. Write column `i` through [`write_candidate_scores!`](@ref), with row `p` for path `p`. The test score of each path is ``\\mathcal{O}`` of the path. When `gscv.train_score` is `true`, the train score of each fold of each path goes into column `i` of the matrix of that path, through [`candidate_train_score`](@ref) with no view of the training returns.
-11. Order the finite candidates, keep the best `gscv.n_best`, build each from `pipe`, and return the [`SearchCrossValidationResult`](@ref) through [`search_result`](@ref). Row `p` is path `p`, so the path of each row is `1:M`.
+10. Write column `i` through [`write_candidate_scores!`](@ref), with row `p` for path `p`. The test score of each path is ``\\mathcal{O}`` of the path. When `gscv.train_score` is `true`, the train score of each fold of each path goes into column `i` of the matrix of that path, through [`candidate_train_score`](@ref) with no view of the training returns. Store `predictions` at entry `i` of the store of [`allocate_search_predictions`](@ref) through [`store_search_prediction!`](@ref), which stores nothing when `gscv.rank_prediction` is `false`.
+11. Order the finite candidates, keep the best `gscv.n_best`, build each from `pipe`, and return the [`SearchCrossValidationResult`](@ref) through [`search_result`](@ref), with the predictions of the kept candidates. Row `p` is path `p`, so the path of each row is `1:M`.
 
 # Arguments
 
@@ -513,6 +515,7 @@ function search_cross_validation(pipe::Pipeline,
     test_scores, train_scores = allocate_search_scores(gscv, cv_data_eltype(data), M,
                                                        [count(==(p), cv.path_ids)
                                                         for p in 1:M], N)
+    store = allocate_search_predictions(gscv, N)
     for (i, (lenses, vals)) in enumerate(zip(lens_grid, val_grid))
         pipei = search_candidate(pipe, lenses, vals)
         # cross_val_predict fits every split and recombines groups into paths (handling any
@@ -521,8 +524,10 @@ function search_cross_validation(pipe::Pipeline,
         # Row `p` is path `p`. The window is `nothing`, as in the batch method above.
         write_candidate_scores!(test_scores, train_scores, i, predictions, 1:M, nothing,
                                 gscv.r_sca, gscv.r, gscv.kwargs)
+        store_search_prediction!(store, i, predictions)
     end
-    return search_result(pipe, gscv, test_scores, train_scores, lens_grid, val_grid, 1:M)
+    return search_result(pipe, gscv, test_scores, train_scores, lens_grid, val_grid, 1:M,
+                         store)
 end
 function search_cross_validation(pipe::Pipeline, rscv::RandomisedSearchCrossValidation,
                                  data::Prices_RR)
@@ -537,5 +542,6 @@ function search_cross_validation(pipe::Pipeline, rscv::RandomisedSearchCrossVali
                                                              n_best = rscv.n_best,
                                                              ex = rscv.ex,
                                                              train_score = rscv.train_score,
+                                                             rank_prediction = rscv.rank_prediction,
                                                              kwargs = rscv.kwargs), data)
 end

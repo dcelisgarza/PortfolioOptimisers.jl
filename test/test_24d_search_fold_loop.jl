@@ -1275,6 +1275,139 @@ The fixture is the online fold loop's, because the identities are structural.
               po.oriented_score(EachValue(), rv, fit)
         @test po.oriented_score(PerCandidate(), r, fit) == -expected_risk(r, fit)
     end
+
+    #=
+    Issue #2058: `rank_prediction = true` keeps, in `rank_predictions[j]`, the prediction that
+    the search scored for candidate `ranked[j]`. So the risk of each fold or path of that
+    prediction, with the sign of the search, is column `rank_idx[j]` of `test_scores`.
+    =#
+    @testset "17. `rank_prediction` keeps the prediction of each kept candidate (#2058)" begin
+        kcv = KFold(; n = 4)
+        ccv = CombinatorialCrossValidation(; n_folds = 4, n_test_folds = 2)
+        mcv = MultipleRandomised(batch_cv; subset_size = 5, n_subsets = 2, seed = 7)
+        grid = ["opt.wb" => [WeightBounds(; lb = 0.0, ub = 1.0),
+                             WeightBounds(; lb = 0.0, ub = 0.13),
+                             WeightBounds(; lb = 0.1, ub = 1.0),
+                             WeightBounds(; lb = 0.12, ub = 1.0)]]
+        pipe = Pipeline(; steps = (EmpiricalPrior(), hrp))
+        pgrid = ["steps[2].opt.wb" => grid[1][2]]
+        # The oriented score of one prediction: `r` is smaller-is-better.
+        sc(p) = -expected_risk(r, p)
+        # A batch scheme: one prediction per fold, in the order of the rows.
+        scores(p::po.MultiPeriodPredictionResult, res) = [sc(q) for q in p.pred]
+        # A population: one row per path under a combinatorial scheme, and under a
+        # `MultipleRandomised` scheme the folds of path `k` fill the rows of path `k`.
+        function scores(p::po.PopulationPredictionResult, res)
+            res.path_ids == 1:length(p.pred) && return [sc(q) for q in p.pred]
+            col = similar(res.test_scores, size(res.test_scores, 1))
+            for (k, path) in enumerate(p.pred)
+                col[res.path_ids .== k] = [sc(q) for q in path.pred]
+            end
+            return col
+        end
+        function check_kept(res)
+            @test length(res.rank_predictions) == length(res.ranked)
+            for (j, k) in enumerate(res.rank_idx)
+                @test scores(res.rank_predictions[j], res) == res.test_scores[:, k]
+            end
+        end
+        srch(base, g, cv; kwargs...) = search_cross_validation(base,
+                                                               gs(cv, g; n_best = 3,
+                                                                  ex = SequentialEx(),
+                                                                  kwargs...), rd)
+        # The six methods: the grid search on an optimiser and on a Pipeline, batch and
+        # combinatorial, and the randomised search on both.
+        for (base, g) in ((hrp, grid), (pipe, pgrid)), cv in (kcv, ccv, mcv)
+            off = srch(base, g, cv)
+            on = srch(base, g, cv; rank_prediction = true)
+            @test isnothing(off.rank_predictions)
+            @test on.test_scores == off.test_scores && on.rank_idx == off.rank_idx
+            @test eltype(on.rank_predictions) <: po.AbstractPredictionResult
+            @test isconcretetype(eltype(on.rank_predictions))
+            check_kept(on)
+            rr = search_cross_validation(base,
+                                         RandomisedSearchCrossValidation(g; cv = cv, r = r,
+                                                                         n_iter = 3,
+                                                                         seed = 3,
+                                                                         n_best = 2,
+                                                                         rank_prediction = true),
+                                         rd)
+            check_kept(rr)
+        end
+        @test isa(srch(hrp, grid, kcv; rank_prediction = true).rank_predictions[1],
+                  po.MultiPeriodPredictionResult)
+        for cv in (ccv, mcv)
+            @test isa(srch(hrp, grid, cv; rank_prediction = true).rank_predictions[1],
+                      po.PopulationPredictionResult)
+        end
+
+        # `EachValue`: one vector for each measure, in the order of `ranked`, and a
+        # candidate that two rankings keep is the same object in both.
+        rv = [ConditionalValueatRisk(),
+              MeanReturn(; settings = HierarchicalRiskMeasureSettings(; scale = 2.0))]
+        osc = [p -> -expected_risk(rv[1], p), p -> 2 * expected_risk(rv[2], p)]
+        ev = srch(hrp, grid, kcv; r = rv, r_sca = EachValue(), n_best = 4,
+                  rank_prediction = true)
+        @test size(ev.rank_predictions) == size(ev.rank_idx) == (2,)
+        for k in eachindex(rv), (j, c) in enumerate(ev.rank_idx[k])
+            @test [osc[k](q) for q in ev.rank_predictions[k][j].pred] ==
+                  ev.test_scores[k][:, c]
+        end
+        # Four candidates under `n_best = 4`: both rankings keep every one.
+        for (j, c) in enumerate(ev.rank_idx[1])
+            @test ev.rank_predictions[1][j] ===
+                  ev.rank_predictions[2][findfirst(==(c), ev.rank_idx[2])]
+        end
+        evp = srch(pipe, pgrid, kcv; r = rv, r_sca = EachValue(), rank_prediction = true)
+        @test size(evp.rank_predictions) == (2,)
+
+        # The helpers: `nothing` keeps nothing, and an empty ranking gives an empty vector
+        # of the element type of a full one.
+        preds = Vector{po.AbstractPredictionResult}(ev.rank_predictions[1][[2, 1]])
+        @test isnothing(po.ranked_predictions(nothing, [1, 2]))
+        @test isnothing(po.ranked_predictions(nothing, [[1], Int[]]))
+        kept = po.ranked_predictions(preds, [[2, 1], Int[]])
+        @test kept[1][1] === preds[2] && isempty(kept[2])
+        @test eltype(kept[2]) == eltype(kept[1]) && isconcretetype(eltype(kept[1]))
+        @test isnothing(po.allocate_search_predictions(gs(kcv, grid), 3))
+        store = po.allocate_search_predictions(gs(kcv, grid; rank_prediction = true), 3)
+        @test store isa Vector{po.AbstractPredictionResult} && length(store) == 3
+
+        # The constructors keep the switch, and the Result refuses a count that does not
+        # agree with `ranked`.
+        for est in (GridSearchCrossValidation, RandomisedSearchCrossValidation)
+            @test !est(grid).rank_prediction
+            @test est(grid; rank_prediction = true).rank_prediction
+        end
+        on = srch(hrp, grid, kcv; rank_prediction = true)
+        mk(; kwargs...) = SearchCrossValidationResult(; opt = on.opt,
+                                                      test_scores = on.test_scores,
+                                                      train_scores = nothing,
+                                                      lens_grid = on.lens_grid,
+                                                      val_grid = on.val_grid, idx = on.idx,
+                                                      ranked = on.ranked,
+                                                      rank_idx = on.rank_idx,
+                                                      rank_scores = on.rank_scores,
+                                                      kwargs...)
+        @test mk(; rank_predictions = on.rank_predictions).rank_predictions ===
+              on.rank_predictions
+        @test isnothing(mk().rank_predictions)
+        @test_throws DimensionMismatch mk(; rank_predictions = on.rank_predictions[1:2])
+        mkv(; kwargs...) = SearchCrossValidationResult(; opt = ev.opt,
+                                                       test_scores = ev.test_scores,
+                                                       train_scores = nothing,
+                                                       lens_grid = ev.lens_grid,
+                                                       val_grid = ev.val_grid, idx = ev.idx,
+                                                       ranked = ev.ranked,
+                                                       rank_idx = ev.rank_idx,
+                                                       rank_scores = ev.rank_scores,
+                                                       kwargs...)
+        @test isnothing(mkv().rank_predictions)
+        @test_throws DimensionMismatch mkv(; rank_predictions = ev.rank_predictions[1:1])
+        @test_throws DimensionMismatch mkv(;
+                                           rank_predictions = [ev.rank_predictions[1],
+                                                               ev.rank_predictions[2][1:2]])
+    end
 end
 #=
 A search tunes a field of a prior with forwarded properties, issue #1497.

@@ -318,6 +318,7 @@ function search_cross_validation(opt::NonFiniteAllocationOptimisationEstimator,
                                                              n_best = rscv.n_best,
                                                              ex = rscv.ex,
                                                              train_score = rscv.train_score,
+                                                             rank_prediction = rscv.rank_prediction,
                                                              kwargs = rscv.kwargs), rd)
 end
 

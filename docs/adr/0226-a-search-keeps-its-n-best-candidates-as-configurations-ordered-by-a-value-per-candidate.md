@@ -69,6 +69,7 @@ cap gives no warning: `test_scores` shows each failed column.
 | `rank_idx` | The column of `test_scores` of each kept candidate. |
 | `rank_scores` | `candidate_scores` of each kept candidate, or `nothing`. |
 | `path_ids` | The path of each row of `test_scores`: `cv.path_ids` under `MultipleRandomised`, `1:M` under `CombinatorialCrossValidation`, `nothing` for a scheme with one path. |
+| `rank_predictions` | With `rank_prediction = true`, the Result also keeps the prediction that the search scored for each kept candidate (#2058). Otherwise `nothing`. |
 
 `opt` is `ranked[1]` and `idx` is `rank_idx[1]`, and the constructor refuses fields that do not
 agree. At `n_best = 1` the Result holds the `opt`, `idx`, `test_scores` and `train_scores` of the

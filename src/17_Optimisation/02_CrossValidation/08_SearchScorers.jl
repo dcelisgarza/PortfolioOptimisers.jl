@@ -880,6 +880,152 @@ function ranked_candidates(base, lens_grid::AbstractVector, val_grid::AbstractVe
     ranked = [isempty(ri) ? similar(full, 0) : build(ri) for ri in rank_idx]
     return get.(ranked, 1, nothing), get.(rank_idx, 1, nothing), ranked
 end
+"""
+    allocate_search_predictions(gscv, N::Integer)
+
+Allocate the store of the predictions of the `N` candidates of a search, or give `nothing`.
+
+The four methods of [`search_cross_validation`](@ref) on an optimiser and on a [`Pipeline`](@ref), batch and combinatorial, call it before their score loop. With `gscv.rank_prediction = true`, the loop writes the prediction of candidate `i` at entry `i`, and [`ranked_predictions`](@ref) keeps the entries of the kept candidates. With `false`, the loop stores no prediction. The element type is [`AbstractPredictionResult`](@ref), because only the fit gives the type of a prediction. [`ranked_predictions`](@ref) narrows the kept entries to the type of their values.
+
+# Arguments
+
+  - `gscv`: The [`GridSearchCrossValidation`](@ref). It gives `rank_prediction`.
+  - `N`: The candidate count.
+
+# Returns
+
+  - `predictions::Option{<:AbstractVector{<:AbstractPredictionResult}}`: A store of `N` entries, uninitialised, or `nothing`.
+
+# Related
+
+  - [`ranked_predictions`](@ref)
+  - [`search_result`](@ref)
+  - [`allocate_search_scores`](@ref)
+"""
+function allocate_search_predictions(gscv, N::Integer)
+    return gscv.rank_prediction ? Vector{AbstractPredictionResult}(undef, N) : nothing
+end
+"""
+    ranked_predictions(::Nothing, rank_idx::AbstractArray)
+    ranked_predictions(predictions::AbstractVector{<:AbstractPredictionResult},
+                       rank_idx::AbstractVector{<:Integer})
+    ranked_predictions(predictions::AbstractVector{<:AbstractPredictionResult},
+                       rank_idx::AbstractArray{<:AbstractVector{<:Integer}})
+
+Keep the predictions of the kept candidates of a search, in the order of `rank_idx`.
+
+The first form is a search with `rank_prediction = false`, and gives `nothing`. The second form keeps one ranking. The third form keeps one ranking for each value, the form of [`EachValue`](@ref), and keeps the shape of `rank_idx`. Each entry is the object of `predictions`, with no copy, so two rankings that keep the same candidate hold the same object. A comprehension narrows each ranking to the type of its predictions. An empty ranking gives an empty vector with the element type of a ranking that is not empty, as [`ranked_candidates`](@ref) does.
+
+# Arguments
+
+  - `predictions`: The prediction of each candidate, in grid order, or `nothing`.
+  - `rank_idx`: The columns of the kept candidates, best first, or one vector of them for each value.
+
+# Returns
+
+  - `rank_predictions`: The kept predictions, one vector of them for each value, or `nothing`.
+
+# Related
+
+  - [`allocate_search_predictions`](@ref)
+  - [`search_result`](@ref)
+  - [`ranked_candidates`](@ref)
+"""
+function ranked_predictions(::Nothing, ::AbstractArray)
+    return nothing
+end
+function ranked_predictions(predictions::AbstractVector{<:AbstractPredictionResult},
+                            rank_idx::AbstractVector{<:Integer})
+    return [predictions[k] for k in rank_idx]
+end
+function ranked_predictions(predictions::AbstractVector{<:AbstractPredictionResult},
+                            rank_idx::AbstractArray{<:AbstractVector{<:Integer}})
+    full = ranked_predictions(predictions, first(Iterators.filter(!isempty, rank_idx)))
+    return [isempty(ri) ? similar(full, 0) : ranked_predictions(predictions, ri)
+            for ri in rank_idx]
+end
+"""
+    store_search_prediction!(::Nothing, i::Integer, p::AbstractPredictionResult)
+    store_search_prediction!(store::AbstractVector{<:AbstractPredictionResult}, i::Integer,
+                             p::AbstractPredictionResult)
+
+Store the prediction of candidate `i` of a search at entry `i` of `store`.
+
+The score loop of each method of [`search_cross_validation`](@ref) calls it after [`write_candidate_scores!`](@ref). The first form is a search with `rank_prediction = false`, whose store is `nothing`, and stores nothing. The prediction is the object that the loop scored, with no copy.
+
+# Arguments
+
+  - `store`: The store of [`allocate_search_predictions`](@ref), or `nothing`.
+  - `i`: The column of the candidate.
+  - `p`: The prediction of the candidate.
+
+# Returns
+
+  - `nothing`.
+
+# Related
+
+  - [`allocate_search_predictions`](@ref)
+  - [`ranked_predictions`](@ref)
+  - [`store_search_score!`](@ref)
+"""
+function store_search_prediction!(::Nothing, ::Integer, ::AbstractPredictionResult)
+    return nothing
+end
+function store_search_prediction!(store::AbstractVector{<:AbstractPredictionResult},
+                                  i::Integer, p::AbstractPredictionResult)
+    store[i] = p
+    return nothing
+end
+"""
+    assert_rank_predictions(rank_idx::AbstractArray, ::Nothing)
+    assert_rank_predictions(rank_idx::AbstractVector{<:Integer},
+                            rank_predictions::AbstractVector)
+    assert_rank_predictions(rank_idx::AbstractArray{<:AbstractVector{<:Integer}},
+                            rank_predictions::AbstractArray)
+
+Refuse the kept predictions of a [`SearchCrossValidationResult`](@ref) when they do not agree with its ranking.
+
+The inner constructor of the Result calls it after [`assert_search_ranking`](@ref). The first form is a Result with no predictions, and checks nothing. The second form checks one ranking, and the third form checks one ranking for each value, the form of [`EachValue`](@ref).
+
+# Arguments
+
+  - `rank_idx`: The columns of the kept candidates, or one vector of them for each value.
+  - `rank_predictions`: The kept predictions, in the shape of `rank_idx`, or `nothing`.
+
+# Validation
+
+  - The second form: `length(rank_predictions) == length(rank_idx)`. Otherwise a `DimensionMismatch`.
+  - The third form: `size(rank_predictions) == size(rank_idx)`, and each entry holds one prediction for each entry of `rank_idx`. Otherwise a `DimensionMismatch`.
+
+# Returns
+
+  - `nothing`.
+
+# Related
+
+  - [`assert_search_ranking`](@ref)
+  - [`ranked_predictions`](@ref)
+"""
+function assert_rank_predictions(::AbstractArray, ::Nothing)
+    return nothing
+end
+function assert_rank_predictions(rank_idx::AbstractVector{<:Integer},
+                                 rank_predictions::AbstractVector)
+    @argcheck(length(rank_predictions) == length(rank_idx),
+              DimensionMismatch("`rank_predictions` must hold one prediction per kept candidate, in the order of `ranked`: got $(length(rank_predictions)) predictions for the columns $(rank_idx)."))
+    return nothing
+end
+function assert_rank_predictions(rank_idx::AbstractArray{<:AbstractVector{<:Integer}},
+                                 rank_predictions::AbstractArray)
+    @argcheck(size(rank_predictions) == size(rank_idx),
+              DimensionMismatch("`rank_predictions` must hold one entry for each value, in the shape of `rank_idx`: got the sizes $(size(rank_predictions)) and $(size(rank_idx))."))
+    for v in eachindex(rank_idx)
+        @argcheck(length(rank_predictions[v]) == length(rank_idx[v]),
+                  DimensionMismatch("entry $v of `rank_predictions` must hold one prediction per kept candidate of `rank_idx[$v]`: got $(length(rank_predictions[v])) predictions for the columns $(rank_idx[v])."))
+    end
+    return nothing
+end
 
 export HighestMeanScore
 # The `# Interfaces`-marked type of #1138 (ADR 0154). `CrossValidationSearchScorer` names its

@@ -367,6 +367,21 @@ definition = "CovarianceForecastSummaryResult"
 metric = "arg"
 rationale = "keyword-constructor-arity"
 
+# The two search estimators take one field for each option of the search, and `rank_prediction`
+# joined `train_score` as a switch (#2058). So `GridSearchCrossValidation` takes 11 arguments and
+# `RandomisedSearchCrossValidation` takes 14.
+[[exemption]]
+path = "src/17_Optimisation/02_CrossValidation/09_Base_SearchCrossValidation.jl"
+definition = "GridSearchCrossValidation"
+metric = "arg"
+rationale = "keyword-constructor-arity"
+
+[[exemption]]
+path = "src/17_Optimisation/02_CrossValidation/09_Base_SearchCrossValidation.jl"
+definition = "RandomisedSearchCrossValidation"
+metric = "arg"
+rationale = "keyword-constructor-arity"
+
 # The split of `01_FactorAttribution.jl` into letter parts (#2105, ADR 0178).
 # `attribution_array_block` moved with its 13 arguments, the arrays of a block and their keywords,
 # and now drives the maximum of part `_a`. Its signature did not change, and the dead row recorded

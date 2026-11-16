@@ -1084,7 +1084,7 @@ The rule by which a search orders its candidates. It reads the score matrix of t
 *Avoid*: scorer alone, which another library uses for the risk measure `r` of a search. And Asset Scorer, which gives one score to each asset.
 
 **Per-Value Ranking**
-One ranking of the candidates of a search for each value that the search keeps apart per candidate: one per measure, one per scorer, or one per pair of the two. `EachValue()` in `r_sca` or `s_sca` spells it, the multi-metric search of sklearn. Each ranking has its own winner, and a measure under which no candidate finished every fold gives an empty one. `opt`, `idx`, `ranked`, `rank_idx` and `rank_scores` hold one entry per value, in a vector or a `K × L` matrix. ADR 0234.
+One ranking of the candidates of a search for each value that the search keeps apart per candidate: one per measure, one per scorer, or one per pair of the two. `EachValue()` in `r_sca` or `s_sca` spells it, the multi-metric search of sklearn. Each ranking has its own winner, and a measure under which no candidate finished every fold gives an empty one. `opt`, `idx`, `ranked`, `rank_idx` and `rank_scores` hold one entry per value, in a vector or a `K × L` matrix, and so does `rank_predictions` under `rank_prediction = true`. ADR 0234.
 *Avoid*: `nothing` for this rule, which gives the sum (ADR 0238). And refit, because the search fits no winner on the whole sample.
 
 **Per-Candidate Combination**

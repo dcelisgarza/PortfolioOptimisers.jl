@@ -1218,7 +1218,7 @@ in the sense of `CODING_STANDARDS.md`.
         # The count of dispatch aliases carrying no `# Related`. Each file's own #404 prose
         # ticket pays its share. Lower the number in the commit that pays it, and retire the
         # ratchet at zero.
-        NO_RELATED_TOTAL = 8
+        NO_RELATED_TOTAL = 7
 
         # A `const` bound to a bare name is an acronym; to a type expression, a dispatch
         # alias. `Expr(:curly, ...)` is a type expression and `Expr(:call, ...)` is a value,

@@ -106,12 +106,13 @@ $(DocStringExtensions.FIELDS)
         n_best::Integer = 1,
         ex::FLoops.Transducers.Executor = FLoops.ThreadedEx(),
         train_score::Bool = false,
+        rank_prediction::Bool = false,
         kwargs::NamedTuple = (;),
     ) -> GridSearchCrossValidation
 
 `r_sca` takes a [`PerCandidate`](@ref), and `s_sca` refuses it with a `TypeError`.
 
-Positional and keyword arguments correspond to fields above. The outer constructor takes a vector of parameter sets whose types differ. Such a literal infers the element type `Vector`, so the constructor narrows it through [`narrow_mixed_vector`](@ref). A vector of search scorers of different types, such as `[HighestMeanScore(), f]`, infers the element type `Any`, so the constructor narrows it the same way.
+Positional and keyword arguments correspond to fields above. The positional constructor takes `rank_prediction` after `train_score`, so a positional call without it raises a `MethodError`. The outer constructor takes a vector of parameter sets whose types differ. Such a literal infers the element type `Vector`, so the constructor narrows it through [`narrow_mixed_vector`](@ref). A vector of search scorers of different types, such as `[HighestMeanScore(), f]`, infers the element type `Any`, so the constructor narrows it the same way.
 
 ## Multiplicity
 
@@ -128,6 +129,14 @@ The search takes no refit, as the `refit` of sklearn does. To fit the winner of 
 ## The measures after the search scorer
 
 `r_sca = PerCandidate(sca)` combines the measures once per candidate, after the search scorer reduces the folds or the paths of each measure. The search keeps one score matrix for each of the `K` measures of `r`, as under [`EachValue`](@ref). The scorer reduces each matrix, and `sca` combines the `K` values of each candidate, so the search gives one ranking, or `L` rankings under `s_sca = EachValue()`. A candidate enters only when it finished every fold under every measure. For a sum and [`HighestMeanScore`](@ref) the two stages agree. For [`MaxScalariser`](@ref) they do not, see [`PerCandidate`](@ref).
+
+## The predictions of the kept candidates
+
+`rank_prediction = true` makes the Result keep, in `rank_predictions[j]`, the prediction that the search scored for candidate `ranked[j]`: the object that [`fit_and_predict`](@ref) gave, with no copy and no refit. So `expected_risk(r, p)` of each fold prediction `p` of `res.rank_predictions[j].pred`, with the sign of the search, gives column `rank_idx[j]` of `test_scores`. The ranking is known only after the search scores every candidate, so the search keeps the prediction of each candidate until the end, and then drops the predictions of the candidates that it does not keep.
+
+!!! warning
+
+    With `rank_prediction = true`, the peak memory of the search holds the predictions of every candidate of the grid, and each prediction holds one optimisation Result for each fold. A large grid over many folds can need much memory. With the default `false`, the search stores no prediction.
 
 ## Validation
 
@@ -147,30 +156,31 @@ $(val_dict[:count_fraction_grid])
 ```jldoctest
 julia> GridSearchCrossValidation(Dict(\"alpha\" => [0.1, 0.2], \"beta\" => [1.0, 2.0]))
 GridSearchCrossValidation
-            p ┼ Dict{String, Vector{Float64}}: Dict("alpha" => [0.1, 0.2], "beta" => [1.0, 2.0])
-           cv ┼ KFold
-              │                   n ┼ Int64: 5
-              │         purged_size ┼ Int64: 0
-              │        embargo_size ┼ Int64: 0
-              │                  wd ┼ nothing
-              │                  fa ┼ nothing
-              │   store_weight_path ┼ Bool: false
-              │              strict ┴ Bool: false
-            r ┼ ConditionalValueatRisk
-              │   settings ┼ RiskMeasureSettings
-              │            │   scale ┼ Float64: 1.0
-              │            │      ub ┼ nothing
-              │            │     rke ┴ Bool: true
-              │      alpha ┼ Float64: 0.05
-              │          w ┴ nothing
-        r_sca ┼ nothing
-       scorer ┼ HighestMeanScore
-              │   scale ┴ Float64: 1.0
-        s_sca ┼ nothing
-       n_best ┼ Int64: 1
-           ex ┼ Transducers.ThreadedEx{@NamedTuple{}}: Transducers.ThreadedEx()
-  train_score ┼ Bool: false
-       kwargs ┴ @NamedTuple{}: NamedTuple()
+                p ┼ Dict{String, Vector{Float64}}: Dict("alpha" => [0.1, 0.2], "beta" => [1.0, 2.0])
+               cv ┼ KFold
+                  │                   n ┼ Int64: 5
+                  │         purged_size ┼ Int64: 0
+                  │        embargo_size ┼ Int64: 0
+                  │                  wd ┼ nothing
+                  │                  fa ┼ nothing
+                  │   store_weight_path ┼ Bool: false
+                  │              strict ┴ Bool: false
+                r ┼ ConditionalValueatRisk
+                  │   settings ┼ RiskMeasureSettings
+                  │            │   scale ┼ Float64: 1.0
+                  │            │      ub ┼ nothing
+                  │            │     rke ┴ Bool: true
+                  │      alpha ┼ Float64: 0.05
+                  │          w ┴ nothing
+            r_sca ┼ nothing
+           scorer ┼ HighestMeanScore
+                  │   scale ┴ Float64: 1.0
+            s_sca ┼ nothing
+           n_best ┼ Int64: 1
+               ex ┼ Transducers.ThreadedEx{@NamedTuple{}}: Transducers.ThreadedEx()
+      train_score ┼ Bool: false
+  rank_prediction ┼ Bool: false
+           kwargs ┴ @NamedTuple{}: NamedTuple()
 ```
 
 # Related
@@ -224,6 +234,10 @@ GridSearchCrossValidation
     """
     train_score
     """
+    $(field_dict[:rank_prediction])
+    """
+    rank_prediction
+    """
     $(field_dict[:kwargs])
     """
     kwargs
@@ -240,7 +254,8 @@ GridSearchCrossValidation
                                        scorer::Union{CrossValSearchScorer, AbstractVector},
                                        s_sca::Union{Option{<:Sca_VecToScaM}, EachValue},
                                        n_best::Integer, ex::FLoops.Transducers.Executor,
-                                       train_score::Bool, kwargs::NamedTuple)
+                                       train_score::Bool, rank_prediction::Bool,
+                                       kwargs::NamedTuple)
         @argcheck(!isempty(p), IsEmptyError)
         p_flag = isa(p, AbstractVector{<:Pair})
         d_flag = isa(p, AbstractDict)
@@ -273,8 +288,9 @@ GridSearchCrossValidation
         scorer = narrow_mixed_vector(scorer, CrossValSearchScorer, :scorer)
         return new{typeof(p), typeof(cv), typeof(r), typeof(r_sca), typeof(scorer),
                    typeof(s_sca), typeof(n_best), typeof(ex), typeof(train_score),
-                   typeof(kwargs)}(p, cv, r, r_sca, scorer, s_sca, n_best, ex, train_score,
-                                   kwargs)
+                   typeof(rank_prediction), typeof(kwargs)}(p, cv, r, r_sca, scorer, s_sca,
+                                                            n_best, ex, train_score,
+                                                            rank_prediction, kwargs)
     end
 end
 function GridSearchCrossValidation(p::Union{AbstractVector,
@@ -287,13 +303,14 @@ function GridSearchCrossValidation(p::Union{AbstractVector,
                                    s_sca::Union{Option{<:Sca_VecToScaM}, EachValue} = nothing,
                                    n_best::Integer = 1,
                                    ex::FLoops.Transducers.Executor = FLoops.ThreadedEx(),
-                                   train_score::Bool = false, kwargs::NamedTuple = (;))
+                                   train_score::Bool = false, rank_prediction::Bool = false,
+                                   kwargs::NamedTuple = (;))
     p = narrow_mixed_vector(p,
                             Union{Pair{<:Any, <:AbstractVector},
                                   AbstractVector{<:Pair{<:Any, <:AbstractVector}},
                                   AbstractDict{<:Any, <:AbstractVector}}, :p)
     return GridSearchCrossValidation(p, cv, r, r_sca, scorer, s_sca, n_best, ex,
-                                     train_score, kwargs)
+                                     train_score, rank_prediction, kwargs)
 end
 """
 $(DocStringExtensions.TYPEDEF)
@@ -324,16 +341,23 @@ $(DocStringExtensions.FIELDS)
         rng::Random.AbstractRNG = Random.default_rng(),
         seed::Option{<:Integer} = nothing,
         train_score::Bool = false,
+        rank_prediction::Bool = false,
         kwargs::NamedTuple = (;),
     ) -> RandomisedSearchCrossValidation
 
-Positional and keyword arguments correspond to the struct's fields. The outer constructor takes a vector of parameter sets whose types differ, such as a vector of pairs and a vector of pairs with other value types. Such a literal infers the element type `Vector`, so the constructor narrows it through [`narrow_mixed_vector`](@ref).
+Positional and keyword arguments correspond to the struct's fields. The positional constructor takes `rank_prediction` after `train_score`, so a positional call without it raises a `MethodError`. The outer constructor takes a vector of parameter sets whose types differ, such as a vector of pairs and a vector of pairs with other value types. Such a literal infers the element type `Vector`, so the constructor narrows it through [`narrow_mixed_vector`](@ref).
 
 The search draws its trials from `rng`, so the trials, and the order of the `n_best` kept candidates, are the same in two runs only when `seed` is set.
 
 ## Multiplicity
 
 `r` takes one risk measure or a vector of them, and `r_sca` reduces a vector, as in [`GridSearchCrossValidation`](@ref). For one measure `r_sca` is inert. `scorer` takes one search scorer or a vector of them, and `s_sca` reduces a vector, as in [`GridSearchCrossValidation`](@ref). For one scorer `s_sca` is inert. [`EachValue`](@ref) in `r_sca` or `s_sca` gives one ranking for each value per candidate, and [`PerCandidate`](@ref) in `r_sca` combines the measures after the search scorer, as in [`GridSearchCrossValidation`](@ref).
+
+`rank_prediction = true` keeps the prediction that the search scored for each kept candidate in `rank_predictions`, as in [`GridSearchCrossValidation`](@ref).
+
+!!! warning
+
+    With `rank_prediction = true`, the peak memory of the search holds the predictions of every trial, and each prediction holds one optimisation Result for each fold.
 
 ## Validation
 
@@ -356,33 +380,34 @@ $(val_dict[:count_fraction_grid])
 julia> RandomisedSearchCrossValidation(Dict(\"alpha\" => [0.1, 0.2, 0.3],
                                             \"beta\" => Normal(1.0, 0.5)))
 RandomisedSearchCrossValidation
-            p ┼ Dict{String, Any}: Dict{String, Any}("alpha" => [0.1, 0.2, 0.3], "beta" => Normal(1.0, 0.5))
-           cv ┼ KFold
-              │                   n ┼ Int64: 5
-              │         purged_size ┼ Int64: 0
-              │        embargo_size ┼ Int64: 0
-              │                  wd ┼ nothing
-              │                  fa ┼ nothing
-              │   store_weight_path ┼ Bool: false
-              │              strict ┴ Bool: false
-            r ┼ ConditionalValueatRisk
-              │   settings ┼ RiskMeasureSettings
-              │            │   scale ┼ Float64: 1.0
-              │            │      ub ┼ nothing
-              │            │     rke ┴ Bool: true
-              │      alpha ┼ Float64: 0.05
-              │          w ┴ nothing
-        r_sca ┼ nothing
-       scorer ┼ HighestMeanScore
-              │   scale ┴ Float64: 1.0
-        s_sca ┼ nothing
-       n_best ┼ Int64: 1
-           ex ┼ Transducers.ThreadedEx{@NamedTuple{}}: Transducers.ThreadedEx()
-       n_iter ┼ Int64: 10
-          rng ┼ Random.TaskLocalRNG: Random.TaskLocalRNG()
-         seed ┼ nothing
-  train_score ┼ Bool: false
-       kwargs ┴ @NamedTuple{}: NamedTuple()
+                p ┼ Dict{String, Any}: Dict{String, Any}("alpha" => [0.1, 0.2, 0.3], "beta" => Normal(1.0, 0.5))
+               cv ┼ KFold
+                  │                   n ┼ Int64: 5
+                  │         purged_size ┼ Int64: 0
+                  │        embargo_size ┼ Int64: 0
+                  │                  wd ┼ nothing
+                  │                  fa ┼ nothing
+                  │   store_weight_path ┼ Bool: false
+                  │              strict ┴ Bool: false
+                r ┼ ConditionalValueatRisk
+                  │   settings ┼ RiskMeasureSettings
+                  │            │   scale ┼ Float64: 1.0
+                  │            │      ub ┼ nothing
+                  │            │     rke ┴ Bool: true
+                  │      alpha ┼ Float64: 0.05
+                  │          w ┴ nothing
+            r_sca ┼ nothing
+           scorer ┼ HighestMeanScore
+                  │   scale ┴ Float64: 1.0
+            s_sca ┼ nothing
+           n_best ┼ Int64: 1
+               ex ┼ Transducers.ThreadedEx{@NamedTuple{}}: Transducers.ThreadedEx()
+           n_iter ┼ Int64: 10
+              rng ┼ Random.TaskLocalRNG: Random.TaskLocalRNG()
+             seed ┼ nothing
+      train_score ┼ Bool: false
+  rank_prediction ┼ Bool: false
+           kwargs ┴ @NamedTuple{}: NamedTuple()
 ```
 
 # Related
@@ -446,6 +471,10 @@ RandomisedSearchCrossValidation
     """
     train_score
     """
+    $(field_dict[:rank_prediction])
+    """
+    rank_prediction
+    """
     $(field_dict[:kwargs])
     """
     kwargs
@@ -463,7 +492,7 @@ RandomisedSearchCrossValidation
                                              ex::FLoops.Transducers.Executor,
                                              n_iter::Integer, rng::Random.AbstractRNG,
                                              seed::Option{<:Integer}, train_score::Bool,
-                                             kwargs::NamedTuple)
+                                             rank_prediction::Bool, kwargs::NamedTuple)
         @argcheck(!isempty(p), IsEmptyError)
         p_flag = isa(p, AbstractVector{<:Pair})
         d_flag = isa(p, AbstractDict)
@@ -505,10 +534,9 @@ RandomisedSearchCrossValidation
         scorer = narrow_mixed_vector(scorer, CrossValSearchScorer, :scorer)
         return new{typeof(p), typeof(cv), typeof(r), typeof(r_sca), typeof(scorer),
                    typeof(s_sca), typeof(n_best), typeof(ex), typeof(n_iter), typeof(rng),
-                   typeof(seed), typeof(train_score), typeof(kwargs)}(p, cv, r, r_sca,
-                                                                      scorer, s_sca, n_best,
-                                                                      ex, n_iter, rng, seed,
-                                                                      train_score, kwargs)
+                   typeof(seed), typeof(train_score), typeof(rank_prediction),
+                   typeof(kwargs)}(p, cv, r, r_sca, scorer, s_sca, n_best, ex, n_iter, rng,
+                                   seed, train_score, rank_prediction, kwargs)
     end
 end
 function RandomisedSearchCrossValidation(p::Union{AbstractVector, AbstractDict};
@@ -525,10 +553,12 @@ function RandomisedSearchCrossValidation(p::Union{AbstractVector, AbstractDict};
                                          rng::Random.AbstractRNG = Random.default_rng(),
                                          seed::Option{<:Integer} = nothing,
                                          train_score::Bool = false,
+                                         rank_prediction::Bool = false,
                                          kwargs::NamedTuple = (;))
     p = narrow_mixed_vector(p, Union{Pair, AbstractVector{<:Pair}, AbstractDict}, :p)
     return RandomisedSearchCrossValidation(p, cv, r, r_sca, scorer, s_sca, n_best, ex,
-                                           n_iter, rng, seed, train_score, kwargs)
+                                           n_iter, rng, seed, train_score, rank_prediction,
+                                           kwargs)
 end
 """
 $(DocStringExtensions.TYPEDEF)
@@ -537,11 +567,13 @@ Result type for search-based cross-validation routines. Stores the optimal estim
 
 The search keeps the `n_best` best candidates in rank order, as configurations, in `ranked`. It keeps no fitted result. Fit a kept candidate outside the search, as you fit `opt`. A candidate that failed a fold never enters `ranked`, so `ranked` holds fewer than `n_best` candidates when fewer finished every fold.
 
+A search with `rank_prediction = true` also keeps, in `rank_predictions[j]`, the prediction that it scored for candidate `ranked[j]`. A caller can give it to [`expected_risk`](@ref) or [`performance_summary`](@ref), and get the numbers that the search used. With the default `rank_prediction = false`, `rank_predictions` is `nothing`. The positional constructor takes `rank_predictions` after `rank_scores`.
+
 The scores of the kept candidate `j` over the rows of the scheme are `test_scores[:, rank_idx[j]]`. The Result keeps no summary of their spread. Compute it from the matrix, for example `std(res.test_scores[:, res.rank_idx]; dims = 1)`. Under a [`MultipleRandomised`](@ref) scheme, `path_ids` gives the path of each row, so `test_scores[path_ids .== k, rank_idx[j]]` are the scores of candidate `j` over path `k`.
 
 ## One ranking for each value
 
-Under [`EachValue`](@ref) in `r_sca` or `s_sca` of the search, `opt`, `idx`, `ranked`, `rank_idx` and `rank_scores` hold one entry for each value per candidate. The types of `r`, `r_sca`, `scorer` and `s_sca` decide the container:
+Under [`EachValue`](@ref) in `r_sca` or `s_sca` of the search, `opt`, `idx`, `ranked`, `rank_idx`, `rank_scores` and `rank_predictions` hold one entry for each value per candidate. The types of `r`, `r_sca`, `scorer` and `s_sca` decide the container:
 
 | `r_sca`                                             | `s_sca`                        | Container of each field                                                  |
 |:--------------------------------------------------- |:------------------------------ |:------------------------------------------------------------------------ |
@@ -550,7 +582,7 @@ Under [`EachValue`](@ref) in `r_sca` or `s_sca` of the search, `opt`, `idx`, `ra
 | `EachValue()` with `K` measures                     | a reduction, or one scorer     | A vector of `K` entries, in the order of `r`.                            |
 | `EachValue()` with `K` measures                     | `EachValue()` with `L` scorers | A `K × L` matrix, row `k` for measure `k` and column `l` for scorer `l`. |
 
-So `res.opt[k, l]` is the winner of measure `k` under scorer `l`. Under `r_sca = EachValue()` or `r_sca = PerCandidate(sca)` with a vector of measures, `test_scores` is a vector of `K` matrices in the order of `r`, and `train_scores` takes the same shape. Each ranking keeps at most `n_best` candidates, and a candidate enters the ranking of a measure only when it finished every fold under that measure. A measure under which no candidate finished every fold gives an empty entry: `opt[v]` and `idx[v]` are `nothing`, and `ranked[v]` and `rank_idx[v]` are empty. A scorer that gives the index of one winner keeps one candidate, and its entry of `rank_scores` is `nothing`.
+So `res.opt[k, l]` is the winner of measure `k` under scorer `l`. Under `r_sca = EachValue()` or `r_sca = PerCandidate(sca)` with a vector of measures, `test_scores` is a vector of `K` matrices in the order of `r`, and `train_scores` takes the same shape. Each ranking keeps at most `n_best` candidates, and a candidate enters the ranking of a measure only when it finished every fold under that measure. A measure under which no candidate finished every fold gives an empty entry: `opt[v]` and `idx[v]` are `nothing`, and `ranked[v]`, `rank_idx[v]` and `rank_predictions[v]` are empty. A prediction belongs to a candidate, so two rankings that keep the same candidate hold the same prediction, with no copy. A scorer that gives the index of one winner keeps one candidate, and its entry of `rank_scores` is `nothing`.
 
 # Fields
 
@@ -601,6 +633,10 @@ $(DocStringExtensions.FIELDS)
     """
     rank_scores
     """
+    $(field_dict[:rank_predictions_cv])
+    """
+    rank_predictions
+    """
     $(field_dict[:path_ids_search])
     """
     path_ids
@@ -621,28 +657,27 @@ $(DocStringExtensions.FIELDS)
                                                          AbstractArray{<:AbstractVector{<:Integer}}},
                                          rank_scores::Union{Option{<:VecNum},
                                                             AbstractArray{<:Option{<:VecNum}}},
+                                         rank_predictions::Option{<:Union{AbstractVector{<:AbstractPredictionResult},
+                                                                          AbstractArray{<:AbstractVector{<:AbstractPredictionResult}}}},
                                          path_ids::Option{<:AbstractVector{<:Integer}})
         assert_search_ranking(opt, idx, ranked, rank_idx, rank_scores)
+        assert_rank_predictions(rank_idx, rank_predictions)
         return new{typeof(opt), typeof(test_scores), typeof(train_scores),
                    typeof(lens_grid), typeof(val_grid), typeof(idx), typeof(ranked),
-                   typeof(rank_idx), typeof(rank_scores), typeof(path_ids)}(opt,
-                                                                            test_scores,
-                                                                            train_scores,
-                                                                            lens_grid,
-                                                                            val_grid, idx,
-                                                                            ranked,
-                                                                            rank_idx,
-                                                                            rank_scores,
-                                                                            path_ids)
+                   typeof(rank_idx), typeof(rank_scores), typeof(rank_predictions),
+                   typeof(path_ids)}(opt, test_scores, train_scores, lens_grid, val_grid,
+                                     idx, ranked, rank_idx, rank_scores, rank_predictions,
+                                     path_ids)
     end
 end
 function SearchCrossValidationResult(; opt, test_scores, train_scores,
                                      lens_grid::AbstractVector, val_grid::AbstractVector,
                                      idx, ranked = [opt], rank_idx = [idx],
-                                     rank_scores = nothing,
+                                     rank_scores = nothing, rank_predictions = nothing,
                                      path_ids::Option{<:AbstractVector{<:Integer}} = nothing)::SearchCrossValidationResult
     return SearchCrossValidationResult(opt, test_scores, train_scores, lens_grid, val_grid,
-                                       idx, ranked, rank_idx, rank_scores, path_ids)
+                                       idx, ranked, rank_idx, rank_scores, rank_predictions,
+                                       path_ids)
 end
 """
     assert_search_ranking(opt::AbstractEstimator, idx::Integer, ranked::AbstractVector,
@@ -711,7 +746,8 @@ end
     search_result(base, gscv::GridSearchCrossValidation,
                   test_scores::Union{MatNum, AbstractVector{<:MatNum}}, train_scores,
                   lens_grid::AbstractVector, val_grid::AbstractVector,
-                  path_ids::Option{<:AbstractVector{<:Integer}})
+                  path_ids::Option{<:AbstractVector{<:Integer}},
+                  predictions::Option{<:AbstractVector{<:AbstractPredictionResult}})
 
 Build the Result of a search from its score matrices: order the candidates, keep the best `gscv.n_best`, and build each kept candidate from the estimator that the search was given.
 
@@ -721,7 +757,8 @@ The four methods of [`search_cross_validation`](@ref) on an optimiser and on a [
 
  1. Order the finite candidates by the values of `gscv.scorer`, reduced through `gscv.s_sca` for a vector of scorers, and keep the first `gscv.n_best` through [`finite_candidate_order`](@ref), giving `rank_idx` and `rank_scores`. Under [`EachValue`](@ref), these hold one ranking for each value. Under [`PerCandidate`](@ref), `gscv.r_sca` combines the values of the measures first.
  2. Build each kept candidate `k` of `rank_idx` from `base` through [`ranked_candidates`](@ref), giving `ranked`, `opt` and `idx`.
- 3. Return a [`SearchCrossValidationResult`](@ref) with `opt = ranked[1]` and `idx = rank_idx[1]`, or these for each ranking.
+ 3. Keep the prediction of each kept candidate through [`ranked_predictions`](@ref), giving `rank_predictions`, or `nothing` when `predictions` is `nothing`.
+ 4. Return a [`SearchCrossValidationResult`](@ref) with `opt = ranked[1]` and `idx = rank_idx[1]`, or these for each ranking.
 
 # Arguments
 
@@ -732,6 +769,7 @@ The four methods of [`search_cross_validation`](@ref) on an optimiser and on a [
   - `lens_grid`: The lenses of each grid point.
   - `val_grid`: The values of each grid point.
   - `path_ids`: The path of each row of `test_scores`, or `nothing` for a scheme with one path.
+  - `predictions`: The prediction of each candidate, in grid order, from [`allocate_search_predictions`](@ref), or `nothing` when `gscv.rank_prediction` is `false`.
 
 # Validation
 
@@ -751,7 +789,8 @@ The four methods of [`search_cross_validation`](@ref) on an optimiser and on a [
 function search_result(base, gscv::GridSearchCrossValidation,
                        test_scores::Union{MatNum, AbstractVector{<:MatNum}}, train_scores,
                        lens_grid::AbstractVector, val_grid::AbstractVector,
-                       path_ids::Option{<:AbstractVector{<:Integer}})
+                       path_ids::Option{<:AbstractVector{<:Integer}},
+                       predictions::Option{<:AbstractVector{<:AbstractPredictionResult}})
     rank_idx, rank_scores = finite_candidate_order(gscv.r_sca, gscv.s_sca, gscv.scorer,
                                                    test_scores, gscv.n_best)
     opt, idx, ranked = ranked_candidates(base, lens_grid, val_grid, rank_idx)
@@ -759,6 +798,8 @@ function search_result(base, gscv::GridSearchCrossValidation,
                                        train_scores = train_scores, lens_grid = lens_grid,
                                        val_grid = val_grid, idx = idx, ranked = ranked,
                                        rank_idx = rank_idx, rank_scores = rank_scores,
+                                       rank_predictions = ranked_predictions(predictions,
+                                                                             rank_idx),
                                        path_ids = path_ids)
 end
 """

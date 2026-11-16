@@ -29,4 +29,8 @@ scorer_ranking
 empty_ranking
 measure_rankings
 ranked_candidates
+allocate_search_predictions
+ranked_predictions
+store_search_prediction!
+assert_rank_predictions
 ```
