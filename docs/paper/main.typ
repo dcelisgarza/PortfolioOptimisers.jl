@@ -107,6 +107,7 @@
 #let coverage = link(codecov)[coverage]
 #let jump = link("https://github.com/jump-dev/JuMP.jl")[JuMP.jl]
 #let statsbase = link("https://juliastats.org/StatsBase.jl/stable/cov/#StatsBase.CovarianceEstimator")[StatsBase.jl]
+#let distances = link("https://github.com/JuliaStats/Distances.jl")[Distances.jl]
 
 // Modify some arguments, which can be overwritten in the template call
 #page-args.insert("numbering", "1/1")
@@ -433,7 +434,7 @@ The postprocessing stage scores what the processing stage produced. The forecast
 + Compositional design. This lets us build complex objects from simpler ones, enables code reuse, and aids in extensibility.
 + Defensive programming. This lets us catch errors as early as possible, and provides a clear and consistent interface to the user.
 
-With the exception of the covariance estimators, which subtype the covariance estimator of #statsbase, one distance, which subtypes a metric of Distances.jl, and the error types, every public type in the library is a subtype of one of three types:
+With the exception of the covariance estimators, which subtype the covariance estimator of #statsbase, one distance, which subtypes a metric of #distances, and the error types, every public type in the library is a subtype of one of three types:
 
 + `AbstractEstimator`: these contain all the parameters needed to estimate a particular quantity, and are consumed by the functions that perform the estimation. They are the user-level vocabulary, they nest within each other, and they build more complex estimators.
 + `AbstractResult`: many estimators return more than one quantity, and those are returned in a result type. Estimators are configuration; results are data.
