@@ -980,36 +980,14 @@ const EP_TIGHT = OptimEntropyPooling(;
                                                                                outer_iterations = 50)))
 
 #=
-#573 is open: a CVaR solve below lands on a different root, or throws, depending on what ran
-before it in the process. Over 80 CI runs it missed or threw in 15, at a different site each
-time, on both hosts. These two helpers keep the known flake out of the verdict and keep its
-count. `flaky_prior` returns `nothing` when the solve throws the entropy pooling failure, and
-rethrows any other error. `@test_flaky` records a check that holds as a pass, and a check that
-misses as broken, at the line of the caller. A site that passes stays a pass, so a fix of #573
-shows as no broken checks here. Use them only at a site that #573 has measured.
+#573: a CVaR solve below landed on a different root, or threw, depending on what ran before it
+in the process. Over 80 CI runs it missed or threw in 15, at a different site each time, on
+both hosts. The cause was the stale dual cache of #2031: the cache of the last point started as
+uninitialised memory, and a freed start of an earlier solve could fill it. R46 of #1817
+measured the loop that the testset below removed, twenty assets at three levels: 3 bad solves
+in 180 on the old cache, none on the fixed one. The sites below that #573 measured were held by
+two helpers that recorded a miss as broken, and they are plain tests again.
 =#
-function flaky_prior(pe, rd)
-    return try
-        prior(pe, rd)
-    catch err
-        if !occursin("ntropy pooling optimisation failed", sprint(showerror, err))
-            rethrow()
-        end
-        nothing
-    end
-end
-macro test_flaky(ex)
-    pass = Expr(:macrocall, Symbol("@test"), __source__, :ok)
-    broken = Expr(:macrocall, Symbol("@test_broken"), __source__, :ok)
-    return quote
-        local ok = $(esc(ex))
-        if ok
-            $pass
-        else
-            $broken
-        end
-    end
-end
 
 # #539: the outer search lands on the value at risk the CVaR view implies. With one view and
 # no other row the posterior is an exponential tilt in closed form, so the check needs no
@@ -1100,9 +1078,10 @@ end
     # inside the bracket. The four assets and the three levels are swept by the next testset,
     # `MeucciEntropyPoolingPrior CVaR bracket ends inside B`, over the same twelve cases.
     #
-    # It carried the flake because #573 makes the answer of a solve depend on what ran before
-    # it in the process, and a few solves in every hundred then miss the view whatever they
-    # ask. Measured under `EP_TIGHT`: 10 misses in 240 solves at a multiplier of 1.03, 6 in
+    # It carried the flake because #573 made the answer of a solve depend on what ran before
+    # it in the process, and a few solves in every hundred then missed the view whatever they
+    # asked. The cause was the stale dual cache of #2031. Measured under `EP_TIGHT`, before
+    # that fix: 10 misses in 240 solves at a multiplier of 1.03, 6 in
     # 240 at 0.95, 4 in 144 of the crossed cases and 7 in 128 of a milder set at 1.01. Over
     # all twenty assets, three levels and four multipliers, 2880 solves miss at the same rate,
     # the failing asset is a different one on every run, and pinning BLAS to one thread does
@@ -1121,22 +1100,20 @@ end
                                            PortfolioOptimisers.Optim.Options(;
                                                                              outer_x_abstol = 1e-4,
                                                                              x_abstol = 1e-4))))
-        # #573 measured this solve throwing, and both of its views missing.
-        prt = flaky_prior(MeucciEntropyPoolingPrior(; sets = sets, dm_opt = dm,
-                                                    cvar_views = two), rd)
+        # #573 measured this solve throwing, and both of its views missing, on the stale
+        # cache of #2031.
+        prt = prior(MeucciEntropyPoolingPrior(; sets = sets, dm_opt = dm, cvar_views = two),
+                    rd)
         # The box search stops at an `x_abstol` of 1e-4 on each `eta`, and the targets are
         # near 0.05, so it holds the views to a few percent rather than to the 1e-9 the
         # single-view bracket reaches. The tolerance states that bound, and it is still far
         # tighter than the gap to the prior conditional value at risk, which is 0.049.
-        @test_flaky !isnothing(prt) &&
-                    isapprox(ConditionalValueatRisk(; w = prt.w)(rd.X[:, 1]), 0.053,
-                             rtol = 5e-2)
-        @test_flaky !isnothing(prt) &&
-                    isapprox(ConditionalValueatRisk(; w = prt.w)(rd.X[:, end]), 0.045,
-                             rtol = 5e-2)
-        @test_flaky !isnothing(prt) && all(>(0), prt.w)
+        @test isapprox(ConditionalValueatRisk(; w = prt.w)(rd.X[:, 1]), 0.053, rtol = 5e-2)
+        @test isapprox(ConditionalValueatRisk(; w = prt.w)(rd.X[:, end]), 0.045,
+                       rtol = 5e-2)
+        @test all(>(0), prt.w)
         # The posterior is not degenerate: the box search reached a real interior solution.
-        @test_flaky !isnothing(prt) && prt.ens > 0.5 * size(rd.X, 1)
+        @test prt.ens > 0.5 * size(rd.X, 1)
     end
 end
 
@@ -1165,9 +1142,9 @@ end
         # The end the search now uses demands a strictly positive tail contribution, so an
         # interior posterior answers it and the dual that carries it is bounded.
         @test Bt - hi > 0
-        # #573 measured the default rule missing here, 1.8e-3 against 4.8e-10.
-        @test_flaky isapprox(ep_end(x, a, Bt, hi, OptimEntropyPooling()), Bt - hi,
-                             rtol = 1e-2)
+        # #573 measured the default rule missing here, 1.8e-3 against 4.8e-10, on the stale
+        # cache of #2031.
+        @test isapprox(ep_end(x, a, Bt, hi, OptimEntropyPooling()), Bt - hi, rtol = 1e-2)
         # The tight rule lands within 1.5e-4 of the demanded value at worst, so its tolerance
         # is ten times that miss; the default rule keeps the 1e-2 above.
         @test isapprox(ep_end(x, a, Bt, hi, EP_TIGHT), Bt - hi, rtol = 1e-3)
@@ -1189,15 +1166,14 @@ end
     for j in (1, 20), a in (0.05, 0.10)
         x = rd.X[:, j]
         Bt = ConditionalValueatRisk(; alpha = a, w = qw)(x) * 1.03
-        # #573 measured this solve throwing.
-        prj = flaky_prior(MeucciEntropyPoolingPrior(; sets = sets, opt = EP_TIGHT,
-                                                    cvar_views = ConditionalValueatRiskView(;
-                                                                                            alpha = a,
-                                                                                            views = LinearConstraintEstimator(;
-                                                                                                                              val = "$(rd.nx[j]) == prior($(rd.nx[j]))*1.03"))),
-                          rd)
-        @test_flaky !isnothing(prj) &&
-                    0.3 < ValueatRisk(; alpha = a, w = prj.w)(x) / Bt < 0.7
+        # #573 measured this solve throwing, on the stale cache of #2031.
+        prj = prior(MeucciEntropyPoolingPrior(; sets = sets, opt = EP_TIGHT,
+                                              cvar_views = ConditionalValueatRiskView(;
+                                                                                      alpha = a,
+                                                                                      views = LinearConstraintEstimator(;
+                                                                                                                        val = "$(rd.nx[j]) == prior($(rd.nx[j]))*1.03"))),
+                    rd)
+        @test 0.3 < ValueatRisk(; alpha = a, w = prj.w)(x) / Bt < 0.7
     end
 end
 
@@ -1222,9 +1198,9 @@ end
                                        cvar_views = cvv)
         @test isapprox(sum(pe.w), 1, rtol = 1e-10)
         pr = prior(pe, rd)
-        # #573 measured this view missing, 0.0698 and 0.0478 against 0.07.
-        @test_flaky isapprox(ConditionalValueatRisk(; w = pr.w)(rd.X[:, 1]), 0.07,
-                             rtol = 1e-5)
+        # #573 measured this view missing, 0.0698 and 0.0478 against 0.07, on the stale
+        # cache of #2031.
+        @test isapprox(ConditionalValueatRisk(; w = pr.w)(rd.X[:, 1]), 0.07, rtol = 1e-5)
         @test isapprox(sum(pr.w), 1, rtol = 5e-7)
         @test all(>(0), pr.w)
         # The divergence is measured from the exponential weights, not from the uniform ones,
@@ -1293,23 +1269,21 @@ end
     # stage-one mean view. The variance view names a different asset from the CVaR view: a
     # variance view that shrinks the same asset the CVaR view fattens is infeasible, and the
     # testset below pins what that pair answers.
-    # #573 measured this solve throwing, in four runs of 80.
-    prc = flaky_prior(MeucciEntropyPoolingPrior(; sets = sets, opt = EP_TIGHT,
-                                                mu_views = mu_v,
-                                                sigma_views = LinearConstraintEstimator(;
-                                                                                        val = "WMT == 1.3*prior(WMT)"),
-                                                cvar_views = ConditionalValueatRiskView(;
-                                                                                        views = LinearConstraintEstimator(;
-                                                                                                                          val = "AAPL == 0.07"))),
-                      rd)
-    @test_flaky !isnothing(prc) &&
-                isapprox(ConditionalValueatRisk(; w = prc.w)(rd.X[:, 1]), 0.07, rtol = 1e-5)
+    # #573 measured this solve throwing, in four runs of 80, on the stale cache of #2031.
+    prc = prior(MeucciEntropyPoolingPrior(; sets = sets, opt = EP_TIGHT, mu_views = mu_v,
+                                          sigma_views = LinearConstraintEstimator(;
+                                                                                  val = "WMT == 1.3*prior(WMT)"),
+                                          cvar_views = ConditionalValueatRiskView(;
+                                                                                  views = LinearConstraintEstimator(;
+                                                                                                                    val = "AAPL == 0.07"))),
+                rd)
+    @test isapprox(ConditionalValueatRisk(; w = prc.w)(rd.X[:, 1]), 0.07, rtol = 1e-5)
     # The mean view is an upper bound. The CVaR view fattens AAPL's left tail, which pulls the
     # posterior mean below that bound rather than onto it, so the view holds slack.
-    @test_flaky !isnothing(prc) && prc.mu[1] <= 0.75 * pr0.mu[1] + sqrt(eps())
+    @test prc.mu[1] <= 0.75 * pr0.mu[1] + sqrt(eps())
     # The posterior spreads over the sample rather than collapsing onto a few observations.
-    @test_flaky !isnothing(prc) && prc.ens > 0.5 * size(rd.X, 1)
-    @test_flaky !isnothing(prc) && maximum(prc.w) < 0.05
+    @test prc.ens > 0.5 * size(rd.X, 1)
+    @test maximum(prc.w) < 0.05
 end
 
 # #539: `factor_residual_config` forwards the wrapped estimator's declaration, and
@@ -1511,18 +1485,18 @@ end
     # solve, so a second stage does not move it: the posterior of a chain that also carries a
     # variance view meets the same target.
     for alg in (H1_EntropyPooling(), H2_EntropyPooling())
-        # #573 measured this solve throwing, and its view missing.
-        prs = flaky_prior(MeucciEntropyPoolingPrior(; sets = sets, w = wnu, alg = alg,
-                                                    cvar_views = cvv,
-                                                    sigma_views = LinearConstraintEstimator(;
-                                                                                            val = "WMT == 1.2*prior(WMT)")),
-                          rd)
+        # #573 measured this solve throwing, and its view missing, on the stale cache of
+        # #2031.
+        prs = prior(MeucciEntropyPoolingPrior(; sets = sets, w = wnu, alg = alg,
+                                              cvar_views = cvv,
+                                              sigma_views = LinearConstraintEstimator(;
+                                                                                      val = "WMT == 1.2*prior(WMT)")),
+                    rd)
         # The chain solves twice under the default stopping rule, so it meets the view
         # to a few parts in ten thousand. The uniform reading it must not have used sits
         # 3.7% away, which is two orders of magnitude further out.
-        @test_flaky !isnothing(prs) &&
-                    isapprox(ConditionalValueatRisk(; alpha = a, w = prs.w)(x), ref_w * f,
-                             rtol = 1e-3)
+        @test isapprox(ConditionalValueatRisk(; alpha = a, w = prs.w)(x), ref_w * f,
+                       rtol = 1e-3)
     end
 
     # The same rule on the `EntropyPoolingPrior` route, whose value at risk view writes a tail

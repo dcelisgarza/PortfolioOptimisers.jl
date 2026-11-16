@@ -748,17 +748,19 @@ function ep_cvar_views_solve!(cvv::CvarViewSearch, epc::AbstractDict,
             throw(ErrorException("CVaR entropy pooling optimisation failed. Relax the view, increase alpha, use different solver parameters, use VaR views instead, or use a different prior.\n$(e)"))
         end
     else
-        #! The line search of the outer solve probes trial values of `etas`, and at some of
-        #! them the inner dual does not converge. The points it probes move with the rounding
-        #! of the host, through the finite-difference gradient, so one CI host met such a
-        #! point where the others did not. A failed trial point answers `Inf`: `HagerZhang`
-        #! shrinks a step whose value or slope is not finite, so the search moves on. Only
-        #! the failure of the inner solve is caught, which every inner solver raises as an
-        #! `ErrorException`. A failure before the first point that solves still raises: the
-        #! first point is the start, and with no finite value there `Fminbox` raises an
-        #! error about its barrier, and the message below would hold that error and not the
-        #! failure of the inner solve. The last call
-        #! `func(res)` stays strict, so a failure at the minimiser still raises.
+        #! The line search of the outer solve probes trial values of `etas`, and the inner
+        #! dual can fail to converge at a trial point far from the start. The one CI red of
+        #! issue #2017 had another cause: the stale dual cache of issue #2031, which made an
+        #! inner solve fail at random. On the old cache, 2 of 240 fits of two CVaR views
+        #! raised and 134 moved. With the cache fixed, none did. This catch guards a trial
+        #! point at which the inner solve itself fails. A failed trial point answers `Inf`:
+        #! `HagerZhang` shrinks a step whose value or slope is not finite, so the search
+        #! moves on. Only the failure of the inner solve is caught, which every inner solver
+        #! raises as an `ErrorException`. A failure before the first point that solves still
+        #! raises: the first point is the start, and with no finite value there `Fminbox`
+        #! raises an error about its barrier, and the message below would hold that error and
+        #! not the failure of the inner solve. The last call `func(res)` stays strict, so a
+        #! failure at the minimiser still raises.
         #! `Roots.find_zero` of one view reads the sign of the residual, where `Inf` is a
         #! wrong sign and not a rejected point, so that branch keeps the error. See issue
         #! #2017.

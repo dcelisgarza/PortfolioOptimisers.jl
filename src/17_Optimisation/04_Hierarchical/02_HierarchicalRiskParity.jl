@@ -391,7 +391,7 @@ Unlike [`HierarchicalEqualRiskContribution`](@ref) and [`NestedClustered`](@ref)
  6. Cluster the assets with `opt.cle`, giving `clr`. The call passes no `branchorder`, so the leaf order `clr.res.order` keeps the default optimal order, because a different order changes the allocation.
  7. Resolve the risk measure `r` against `pr` and `opt.slv`, with [`factory`](@ref).
  8. Compute the risk of each asset held alone, `rku`, with [`unitary_expected_risks`](@ref).
- 9. Resolve the weight bounds `wb` from `opt.wb` and `opt.sets`.
+ 9. Resolve the weight bounds `wb` from `opt.wb` and `opt.sets`. Expand a side that resolves to a scalar or to `nothing` to one bound per asset, because [`split_factor_weight_constraints`](@ref) sums the bounds of each half.
 10. Set every entry of `w` to one, and set `items` to the one part `clr.res.order`.
 11. Replace each part in `items` that holds more than one asset by its two halves. Stop when `items` is empty.
 12. For each pair of halves `lc` and `rc`, write their naive risk parity weights into the two columns of `wu`, and compute their risks `lrisk` and `rrisk` with [`expected_risk`](@ref).
@@ -465,6 +465,9 @@ function _optimise(hrp::HierarchicalRiskParity{<:Any, <:OptimisationRiskMeasure}
     rku = unitary_expected_risks(r, X, cfees)
     wb = weight_bounds_constraints(hrp.opt.wb, hrp.opt.sets; rd = rd, N = size(X, 2),
                                    strict = hrp.opt.strict, datatype = T)
+    # The estimator method keeps a scalar or a `nothing` side. The split sums the bounds of
+    # each half, so this call expands such a side to one bound per asset.
+    wb = weight_bounds_constraints(wb; N = size(X, 2), datatype = T)
     w = ones(T, size(X, 2))
     items = [clr.res.order]
     while length(items) > 0
@@ -580,9 +583,9 @@ Run the Hierarchical Risk Parity optimisation for a vector of risk measures, sca
 
  1. Run steps 1 to 8 of the single-measure method. `r` is now a vector of resolved measures.
  2. Compute the unitary risks of each measure once, `rkus`, with [`unitary_expected_risks`](@ref). They do not depend on the split.
- 3. Run steps 10 to 12 of the single-measure method.
+ 3. Run steps 9 to 11 of the single-measure method.
  4. For each pair of halves `lc` and `rc`, combine the measures into one pair `lrisk` and `rrisk`, with [`hrp_scalarised_risk`](@ref) and `sca`.
- 5. Run steps 14 to 17 of the single-measure method.
+ 5. Run steps 13 to 16 of the single-measure method.
 
 # Related
 
@@ -644,6 +647,8 @@ function _optimise(hrp::HierarchicalRiskParity{<:Any, <:VecOptRM},
     rkus = [unitary_expected_risks(ri, X, cfees) for ri in r]
     wb = weight_bounds_constraints(hrp.opt.wb, hrp.opt.sets; rd = rd, N = size(X, 2),
                                    strict = hrp.opt.strict, datatype = T)
+    # As in the single-measure method: one bound per asset on each side.
+    wb = weight_bounds_constraints(wb; N = size(X, 2), datatype = T)
     w = ones(T, size(X, 2))
     items = [clr.res.order]
     while length(items) > 0

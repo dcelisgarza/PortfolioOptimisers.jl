@@ -535,7 +535,7 @@ The fit of [`optimise`](@ref) runs these steps.
  3. Resolve the fees `fees` on the full asset universe.
  4. Reduce `pr`, the estimator and `rd` to the investable universe.
  5. Cluster the reduced prior with `opt.cle`, giving `clr`. The leaf order `clr.res.order` is the input of the recursion.
- 6. Resolve the weight bounds `wb` on the investable universe.
+ 6. Resolve the weight bounds `wb` on the investable universe, with one bound per asset on each side.
  7. Run [`schur_complement_weights`](@ref) with `params`, giving the weights `w`, the value `gamma` it ran at, and the resolved measure `r`. When `params` is a vector, run it once per bundle, add the weights of each bundle times the `r.settings.scale` of the bundle into `w`, and divide `w` by its sum.
  8. Check that the recursion produced weights, with [`assert_schur_weights`](@ref).
  9. Apply the weight finaliser `opt.wf` to `w` with `wb`, giving the return code `retcode` and the final weights.
@@ -1313,6 +1313,9 @@ function _optimise(sh::SchurComplementHierarchicalRiskParity{<:Any, <:Any},
     items = [clr.res.order]
     wb = weight_bounds_constraints(sh.opt.wb, sh.opt.sets; rd = rd, N = size(X, 2),
                                    strict = sh.opt.strict, datatype = T)
+    # The estimator method keeps a scalar or a `nothing` side. The split sums the bounds of
+    # each half, so this call expands such a side to one bound per asset.
+    wb = weight_bounds_constraints(wb; N = size(X, 2), datatype = T)
     w, gamma, r = schur_complement_weights(pr, items, wb, sh.params)
     assert_schur_weights(w, gamma)
     retcode, w = finalise_weight_bounds(sh.opt.wf, wb, w)
@@ -1396,6 +1399,8 @@ function _optimise(sh::SchurComplementHierarchicalRiskParity{<:Any, <:AbstractVe
     items = [clr.res.order]
     wb = weight_bounds_constraints(sh.opt.wb, sh.opt.sets; rd = rd, N = size(X, 2),
                                    strict = sh.opt.strict, datatype = T)
+    # As in the single-measure method: one bound per asset on each side.
+    wb = weight_bounds_constraints(wb; N = size(X, 2), datatype = T)
     params = sh.params
     # Each bundle returns the `gamma` it ran at, of that bundle's own type. The vector
     # literal below promotes them to one type. The two vectors name the families that the

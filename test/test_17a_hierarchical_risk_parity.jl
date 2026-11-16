@@ -330,3 +330,41 @@ end
         @test_throws DimensionMismatch PO.assert_time_dependent_fold_count(hrp, 3)
     end
 end
+#=
+R46 of #1817. The estimator method of `weight_bounds_constraints` keeps a scalar or a `nothing`
+side, and the split of both bisection heads took `view` of each side, so every such estimator
+raised a `MethodError`: `view(::Float64, ::Vector{Int64})`. Each head now expands the sides to
+one bound per asset. Each estimator gives the weights of the same bounds stated as two vectors.
+=#
+@testset "A bisection head takes a scalar or a nothing side of a weight bounds estimator" begin
+    Xb = randn(StableRNG(12), 300, 3) ./ 100
+    rdb = ReturnsResult(; nx = ["A", "C", "B"], X = Xb)
+    sb = UniverseSets(; dict = Dict("nx" => rdb.nx))
+    vwb(lb, ub) = WeightBounds(; lb = lb, ub = ub)
+    cases = [(WeightBoundsEstimator(; lb = 0.0, ub = 0.6), vwb(fill(0.0, 3), fill(0.6, 3))),
+             (WeightBoundsEstimator(; ub = Dict("B" => 0.2)),
+              vwb(fill(0.0, 3), [1.0, 1.0, 0.2])),
+             (WeightBoundsEstimator(; lb = nothing, ub = Dict("B" => 0.2)),
+              vwb(fill(-Inf, 3), [1.0, 1.0, 0.2])),
+             (WeightBoundsEstimator(; lb = Dict("A" => 0.4), ub = 1.0),
+              vwb([0.4, 0.0, 0.0], fill(1.0, 3)))]
+    heads(wb) = [HierarchicalRiskParity(;
+                                        opt = HierarchicalOptimiser(; sets = sb, wb = wb)),
+                 HierarchicalRiskParity(; r = [Variance(), ConditionalValueatRisk()],
+                                        opt = HierarchicalOptimiser(; sets = sb, wb = wb)),
+                 SchurComplementHierarchicalRiskParity(;
+                                                       opt = HierarchicalOptimiser(;
+                                                                                   sets = sb,
+                                                                                   wb = wb)),
+                 SchurComplementHierarchicalRiskParity(;
+                                                       params = [SchurComplementParams(),
+                                                                 SchurComplementParams()],
+                                                       opt = HierarchicalOptimiser(;
+                                                                                   sets = sb,
+                                                                                   wb = wb))]
+    for (est, vec) in cases, (he, hv) in zip(heads(est), heads(vec))
+        @test optimise(he, rdb).w == optimise(hv, rdb).w
+    end
+    # The bound of `B` binds.
+    @test optimise(heads(cases[2][1])[1], rdb).w[3] <= 0.2 + sqrt(eps())
+end
