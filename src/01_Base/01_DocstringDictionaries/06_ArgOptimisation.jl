@@ -243,7 +243,7 @@ unique_key_dict!(arg_dict, :arg_dict,
                  # Optimiser config.
                  :kwargs => "`kwargs`: More keyword arguments.",#
                  # Near optimal centering result fields.
-                 :attrs_noc => "`attrs`: Processed JuMP optimiser attributes for the model-assembly pipeline.",#
+                 :attrs_noc => "`attrs`: The resolved bundle of the inner JuMP optimiser, a [`ResolvedJuMPOptimiser`](@ref), which the Model Assembly reads.",#
                  :w_opt => "`w_opt`: Anchor portfolio of the objective, or a vector of them.",#
                  :w_max => "`w_max`: Anchor portfolio of maximum return.",#
                  :w_min => "`w_min`: Anchor portfolio of minimum risk.",#

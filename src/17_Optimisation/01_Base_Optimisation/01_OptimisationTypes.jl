@@ -81,7 +81,7 @@ Returns the Investable Mask that an optimisation result was reduced to.
 
 An optimisation reduces its universe to the Investable Mask at its entry, and it expands the solved weights back to the universe of the caller. So `res.w` spans the full universe, and the mask records which assets the optimisation traded. A fold reads the mask to view its test window before it scores the weights.
 
-The families hold the mask in different places. A JuMP result holds it in its processed attributes, a hierarchical result holds it in the core it embeds, and a family that derives no mask has none. So this function dispatches on the type of the result. A family that gets a mask must add its own method here. A result that forwards its properties to a core must also add a method, because a forwarded `res.imsk` does not change the dispatch.
+The families hold the mask in different places. A JuMP result holds it in its resolved bundle, a [`ResolvedJuMPOptimiser`](@ref), a hierarchical result holds it in the core it embeds, and a family that derives no mask has none. So this function dispatches on the type of the result. A family that gets a mask must add its own method here. A result that forwards its properties to a core must also add a method, because a forwarded `res.imsk` does not change the dispatch.
 
 # Arguments
 

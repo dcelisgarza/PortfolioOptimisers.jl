@@ -355,7 +355,7 @@ $(DocStringExtensions.TYPEDSIGNATURES)
 
 Resolves the slots of a [`ProgrammeAllocationSet`](@ref) that hold a name or an estimator, once per fold.
 
-This is stage 1 of the resolution of the set's block, [`resolve_constraint_block_names`](@ref), the stage that a [`JuMPOptimiser`](@ref) runs on its own block. The online head runs it once for each fold, before it knows the Investable Mask of a step. At every step, [`resolve_allocation_set_step`](@ref) runs stage 2, [`resolve_constraint_block`](@ref), on the set viewed at the mask of the step. So the set orders the names and the reduction by the rule of a JuMP head.
+This is stage 1 of the resolution of the set's block, [`resolve_constraint_block_names`](@ref), the stage that a [`JuMPOptimiser`](@ref) runs on its own block. The online head runs it once for each fold, before it knows the Investable Mask of a step. At every step, the shared entry of the head, [`resolve_projection_entry`](@ref), runs stage 2, [`resolve_constraint_block`](@ref), on the set viewed at the mask of the step. So the set orders the names and the reduction by the rule of a JuMP head.
 
 The weight bounds `wb` are a stage 2 slot of the block, because their resolver can read the rows. A bound that reads only names, a [`WeightBounds`](@ref) or a [`WeightBoundsEstimator`](@ref), resolves here, over the `N` assets, once per fold. Stage 2 then gives the resolved bounds back unchanged. A bound that reads the rows, such as a [`ScoreWeightBounds`](@ref), stays in the set, and stage 2 resolves it at each step on the head's rows ([`bounds_read_rows`](@ref)).
 

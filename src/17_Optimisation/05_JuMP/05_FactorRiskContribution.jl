@@ -505,7 +505,7 @@ Build the model of a [`FactorRiskContribution`](@ref), solve it, and return its 
 # Algorithm
 
  1. Replace each schedule of `frc` with its static default through [`reset_time_dependent_estimator`](@ref).
- 2. Process the attributes of `frc.opt` against `rd` with [`resolve_jump_optimiser`](@ref), with the blocks of `blocks`, giving `attrs`.
+ 2. Resolve `frc.opt` against `rd` with [`resolve_jump_optimiser`](@ref), with the blocks of `blocks`, giving `attrs`.
  3. Take the view of `frc` and of `rd` at the investable assets with [`investable_view`](@ref). Both are unchanged when every asset is investable.
  4. Bind the benchmark of each [`DataBenchmarkTracking`](@ref) measure to `rd` with [`bind_data_benchmark`](@ref).
  5. Build a new model. Register the scales with [`set_model_scales!`](@ref), the number of observations with [`set_model_observations!`](@ref), the homogenisation variables of a ratio with [`set_maximum_ratio_factor_variables!`](@ref) and the corner of a lifted variance with [`set_sdp_lift_corner!`](@ref).

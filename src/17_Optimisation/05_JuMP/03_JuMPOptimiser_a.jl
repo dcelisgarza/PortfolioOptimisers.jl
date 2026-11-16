@@ -248,7 +248,7 @@ function JuMPOptimisationResult(; jor::ResolvedJuMPOptimiser,
     return JuMPOptimisationResult(jor, retcode, expand_investable_weights(jor.imsk, sol),
                                   model)
 end
-# The JuMP families carry the mask on the processed attribute bundle, and every concrete JuMP
+# The JuMP families carry the mask on the resolved bundle, `jor`, and every concrete JuMP
 # result embeds the shared core as `jr`, so two methods cover the whole side.
 function result_investable_mask(res::JuMPOptimisationResult)
     return res.jor.imsk
@@ -362,7 +362,7 @@ The constructor of [`ConstraintBlock`](@ref) checks each slot on its own. This c
   - If `gbgt` is not `nothing` and `wb` is a [`WeightBounds`](@ref): `wb` admits a negative weight. The check of an [`AbstractWeightBoundsEstimator`](@ref) waits for the solve.
   - If `gbgt` has an upper end: it is non-negative, and it is at least the least magnitude that `bgt` admits, see [`assert_gross_budget_reaches_net`](@ref). The gross exposure is at least `abs(sum(w))`, so a smaller gross budget leaves no feasible weights. An `ArgumentError` is thrown otherwise.
   - If `lcse`, `cte`, `smtx`, `sgmtx`, `tn`, `tr`, `ple`, `l2`, `lp` or `lpc` is a vector: `!isempty`. An empty `l2`, `lp` or `lpc` builds no term, which is what `nothing` states.
-  - If `card`, `l2c`, `linfc`, `l1` or `linf` is a number: it is finite and `> 0`. `l1` and `linf` also take an ambiguity-radius rule, and `l2c` and `linfc` a norm-ceiling rule. A rule states no number at construction, so [`assemble_jump_model!`](@ref) checks the number that the rule returns.
+  - If `card`, `l2c`, `linfc`, `l1` or `linf` is a number: it is finite and `> 0`. `l1` and `linf` also take an ambiguity-radius rule, and `l2c` and `linfc` a norm-ceiling rule. A rule states no number at construction, so stage 2 of the block, [`resolve_constraint_block`](@ref), checks the number that the rule returns.
   - The rule in each [`LpRegularisation`](@ref) agrees with the field that holds it. `lp` is a penalty, so it refuses a norm-ceiling rule, and `lpc` is a constraint, so it refuses an ambiguity-radius rule. The term has one field for both readings, so the constructor of the block is the first point that knows the reading. The constructors of [`L2Regularisation`](@ref) and [`LpRegularisation`](@ref) check the other values of `l2`, `lp` and `lpc`.
   - The shapes of `scard`, `smtx`, `slt` and `sst` agree, see [`assert_subgroup_mip_fields`](@ref). The shapes of `sgcarde`, `sgmtx`, `sglt` and `sgst` agree, see [`assert_subgrouped_mip_fields`](@ref).
   - If a slot holds an estimator keyed by name ([`name_keyed`](@ref)), or `fees` is a [`FeesEstimator`](@ref): `!isnothing(sets)`.

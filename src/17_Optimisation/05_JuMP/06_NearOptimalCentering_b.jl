@@ -294,7 +294,7 @@ Build the model of a [`NearOptimalCentering`](@ref), solve it, and return its re
 # Algorithm
 
  1. Replace each schedule of `noc` with its static default through [`reset_time_dependent_estimator`](@ref).
- 2. Solve the anchor portfolios and find the bounds of the near optimal region with [`near_optimal_centering_setup`](@ref), with the blocks of `blocks`, giving `setup`. It holds the anchor weights, their return codes, the inner optimiser `opt` and its processed attributes `attrs`.
+ 2. Solve the anchor portfolios and find the bounds of the near optimal region with [`near_optimal_centering_setup`](@ref), with the blocks of `blocks`, giving `setup`. It holds the anchor weights, their return codes, the inner optimiser `opt` and its resolved bundle `attrs`.
  3. Take the view of `noc` and of `rd` at the investable assets with [`investable_view`](@ref). Both are unchanged when every asset is investable.
  4. Build a new model. Register the scales of `opt` with [`set_model_scales!`](@ref), the number of observations of the prior with [`set_model_observations!`](@ref), the expression `k = 1` with [`set_maximum_ratio_factor_variables!`](@ref), and the weights with [`set_w!`](@ref), which start at the optimal anchor.
  5. Add the rows of the variant `noc.alg` with [`assemble_near_optimal_centering_model!`](@ref).

@@ -147,7 +147,7 @@ pretty_table(DataFrame("Factor" => rd.nf, "Baseline" => exposures(res_base),
 
 #=
 Compare the momentum exposure with its floor of 20%. The optimiser receives one row on the asset
-weights, and the result stores it in `pa.lcsr`, as it stores any linear constraint. We print the
+weights, and the result stores it in `jor.lcsr`, as it stores any linear constraint. We print the
 coefficients of the row.
 =#
 

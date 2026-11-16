@@ -201,8 +201,11 @@ records the wider census of what that variant reads.
 
 The bundle that a Custom Objective Term and a Custom Constraint receive is `ResolvedJuMPOptimiser`
 (ADR 0237, #2042). It holds `pr`, `fees`, `ret`, `sca`, `imsk` and the Resolved Constraint Block
-`cbr`, and a named forward rule keeps the reads of v0.33, such as `attrs.wb` and `attrs.plr`. The
-bundle stays the extension point of decision 4.
+`cbr`, and its `compute` rules keep the reads of v0.33, such as `attrs.wb` and `attrs.plr`. The
+bundle stays the extension point of decision 4. The terms of a programme Allocation Set get other
+data, in its projection and in the model of a leader: a Custom Objective Term of the set gets the
+`ResolvedConstraintBlock` of the set (ADR 0159, amendment of 2026-11-13), and a Custom Constraint
+of the set gets `nothing`, because the set has no bundle.
 
 ## Amendment (2026-11-13)
 

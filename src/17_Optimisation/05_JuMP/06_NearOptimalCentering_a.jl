@@ -1049,7 +1049,7 @@ The middle of [`UnconstrainedNearOptimalCentering`](@ref) calls no [`add_custom_
   - `alg`: [`UnconstrainedNearOptimalCentering`](@ref) or [`ConstrainedNearOptimalCentering`](@ref).
   - $(arg_dict[:model])
   - `noc::NearOptimalCentering`: The estimator. The method reads no field of it.
-  - `attrs::ResolvedJuMPOptimiser`: The processed attributes of the optimiser.
+  - `attrs::ResolvedJuMPOptimiser`: The resolved bundle of the optimiser.
   - `m_rk::Number`, `m_rt::Number`: The scales of the anchor cones of [`set_near_optimal_centering_constraints!`](@ref).
 
 # Returns
@@ -1115,7 +1115,7 @@ The method dispatches on the type of the bounds, on the variant, and on the fron
   - `s_rk::Number`: The [`anchor_cone_scale`](@ref) of `rk_delta` of [`NearOptimalSetup`](@ref), which divides the risk cone of the barrier.
   - `s_rt::Number`: The [`anchor_cone_scale`](@ref) of `rt_delta` of [`NearOptimalSetup`](@ref), which divides the return cone of the barrier.
   - `opt::BaseJuMPOptimisationEstimator`: The optimiser of the centring model.
-  - `attrs::ResolvedJuMPOptimiser`: The processed attributes of the optimiser.
+  - `attrs::ResolvedJuMPOptimiser`: The resolved bundle of the optimiser.
   - `args...`: For the constrained variant, the returns of the anchors, the spans of [`return_term_ends`](@ref), the anchors of minimum risk and of maximum return, and one `Val` flag for each frontier registry.
 
 # Returns
@@ -1179,7 +1179,7 @@ The constant is the [`bound_scale`](@ref) of the bounds, so each parameter takes
 
   - $(arg_dict[:model])
   - `noc::NearOptimalCentering`: The estimator, which selects the objective.
-  - `attrs::ResolvedJuMPOptimiser`: The processed attributes of the optimiser.
+  - `attrs::ResolvedJuMPOptimiser`: The resolved bundle of the optimiser.
   - `rk_opts::VecNum`: The risk ceilings, one for each point of the sweep.
   - `rt_opts::VecNum`: The return floors, one for each point of the sweep.
   - `s_rk::Number`, `s_rt::Number`: The scales of the anchor cones, which [`set_near_optimal_objective_function!`](@ref) receives.

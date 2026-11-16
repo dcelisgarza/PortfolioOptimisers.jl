@@ -236,7 +236,7 @@
         # The natural setting: solve the problem. The optimisation reduces at its entry,
         # solves on the four surviving assets, and expands the weights back to the full
         # universe with a zero at the asset that delisted. The fees it actually used are on
-        # its processed attributes, and they carry the two axes.
+        # its resolved bundle, and they carry the two axes.
         res = optimise(MeanRisk(;
                                 opt = JuMPOptimiser(; pe = prn, fees = fees,
                                                     wb = WeightBounds(; lb = 0, ub = 1),

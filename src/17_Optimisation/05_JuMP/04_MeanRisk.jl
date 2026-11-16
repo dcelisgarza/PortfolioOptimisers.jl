@@ -25,7 +25,7 @@ Keywords correspond to the struct's fields.
 """
 @concrete struct MeanRiskResult <: RiskJuMPOptimisationResult
     """
-    The [`JuMPOptimisationResult`](@ref) that holds the processed attributes, the return code, the solution and the model.
+    The [`JuMPOptimisationResult`](@ref) that holds the resolved bundle of the optimiser, the return code, the solution and the model.
     """
     jr
     """
@@ -453,7 +453,7 @@ The first `Val` is `true` when the model holds a `:ret_frontier` registry, and t
   - `::Val{Bool}`: `true` for a return frontier.
   - `::Val{Bool}`: `true` for a risk frontier.
   - $(arg_dict[:fees_opt])
-  - `attrs::ResolvedJuMPOptimiser`: The processed attributes of the optimiser, which hold the return terms.
+  - `attrs::ResolvedJuMPOptimiser`: The resolved bundle of the optimiser, which holds the return terms.
 
 # Returns
 
@@ -518,7 +518,7 @@ The high end of term `i` comes from a portfolio that maximises term `i` alone. T
   - `mr::MeanRisk`: The optimiser.
   - $(arg_dict[:pr])
   - $(arg_dict[:fees_opt])
-  - `attrs::ResolvedJuMPOptimiser`: The processed attributes of the optimiser, which hold the return terms.
+  - `attrs::ResolvedJuMPOptimiser`: The resolved bundle of the optimiser, which holds the return terms.
 
 # Validation
 
@@ -651,7 +651,7 @@ Two corner portfolios bound every span, and the method solves each of them once.
   - $(arg_dict[:fees_opt])
   - `risk_frontier::VecPair`: The `:risk_frontier` registry.
   - `idx::VecInt`: Registry positions that need a rebuild, as [`unresolved_risk_frontier`](@ref) returns them.
-  - `attrs::ResolvedJuMPOptimiser`: The processed attributes of the optimiser.
+  - `attrs::ResolvedJuMPOptimiser`: The resolved bundle of the optimiser.
 
 # Validation
 
@@ -741,7 +741,7 @@ Resolve the sweep points of the risk frontier of the model.
   - `mr::MeanRisk`: The optimiser.
   - $(arg_dict[:pr])
   - $(arg_dict[:fees_opt])
-  - `attrs::ResolvedJuMPOptimiser`: The processed attributes of the optimiser.
+  - `attrs::ResolvedJuMPOptimiser`: The resolved bundle of the optimiser.
 
 # Returns
 
@@ -798,7 +798,7 @@ Build the model of a [`MeanRisk`](@ref), with every constraint, return term and 
 # Arguments
 
   - `mr::MeanRisk`: The optimiser, already reduced to the investable assets.
-  - `attrs::ResolvedJuMPOptimiser`: The processed attributes of the optimiser.
+  - `attrs::ResolvedJuMPOptimiser`: The resolved bundle of the optimiser.
   - $(arg_dict[:rd])
   - `str_names::Bool`: `true` gives each variable and each row of the model its string name.
   - `blocks`: The blocks after the block of the head, as [`assemble_jump_model!`](@ref) takes them.
@@ -888,7 +888,7 @@ The cost is one more model build. Only a `MaximumRatio` pays it, and only when a
 
   - $(arg_dict[:model])
   - `mr::MeanRisk`: The optimiser, already reduced to the investable assets.
-  - `attrs::ResolvedJuMPOptimiser`: The processed attributes of the optimiser.
+  - `attrs::ResolvedJuMPOptimiser`: The resolved bundle of the optimiser.
   - $(arg_dict[:rd])
   - `blocks`: The blocks after the block of the head, as [`assemble_jump_model!`](@ref) takes them.
 
@@ -948,7 +948,7 @@ Build the model of a [`MeanRisk`](@ref), solve it, and return its result.
 # Algorithm
 
  1. Replace each schedule of `mr` with its static default through [`reset_time_dependent_estimator`](@ref).
- 2. Process the attributes of `mr.opt` against `rd` with [`resolve_jump_optimiser`](@ref), with the blocks of `blocks`, giving `attrs`. It holds the prior, the block Results, the fees, the return terms and the Investable Mask.
+ 2. Resolve `mr.opt` against `rd` with [`resolve_jump_optimiser`](@ref), with the blocks of `blocks`, giving `attrs`. It holds the prior, the block Results, the fees, the return terms and the Investable Mask.
  3. Take the view of `mr` and of `rd` at the investable assets with [`investable_view`](@ref). Both are unchanged when every asset is investable.
  4. Bind the benchmark of each [`DataBenchmarkTracking`](@ref) measure to `rd` with [`bind_data_benchmark`](@ref).
  5. Build the model with [`build_mean_risk_model`](@ref), which adds every block.

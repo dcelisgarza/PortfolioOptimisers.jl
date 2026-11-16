@@ -47,8 +47,8 @@ The maintainer ruled the four decisions of the map on 2026-11-11, and the names 
 The **Constraint Block**, `ConstraintBlock`, holds the feasible set of a programme over `w` and
 the terms that the programme adds to the Objective Penalty. `JuMPOptimiser` holds it in the field
 `cbe`, beside its prior, solver, budget, fees, return term, scalariser and execution settings.
-`ProgrammeAllocationSet` holds it in the field `cbe`, beside its prior, solver, risk ceilings `r`
-and return floor `ret`. A constraint kind is added to the block, and it reaches both owners.
+`ProgrammeAllocationSet` holds it in the field `cbe`, beside its prior, solver, risk ceilings `r`,
+return floor `ret` and the scales `sc` and `so`. A constraint kind is added to the block, and it reaches both owners.
 
 ### 2. The partition rule
 
@@ -62,7 +62,7 @@ the return of `w` that stands alone, and that no objective reads, stays a field 
 | `sbgt`, `gbgt` | Block. `bgt` stays on the owner. | They cap the leverage of the feasible set. `set_long_short_budget_constraints!(model, bgt, sbgt)` also reads the net budget, so the builder takes the net budget of the owner of the block. The set's block passes `nothing`. `assert_gross_budget_admissible` reads both sides, so it runs in the constructor of the owner. |
 | `xbgt` | Block. | It pins `lw` and `sw`, which belong to the weights, so the builder writes the pin once, when any block asks for it. |
 | `lcse`, with its exposure rows | Block, with no special case. | Both owners make one call, `linear_constraints(lcse, sets; rr = pr.rr, rd = rd)`. `assert_investable_constraint_width` applies to every block. |
-| `ple`, with the semidefinite kind | Block. | It reads the lifted `W` and the marks of the owner's objective. So the builder has two phases: the rows before the owner's risk step, and the floor, the phylogeny rows and `ccnt` after `mark_risk_minimised!`. The risk measures of the owner read the `plr` of its first block. |
+| `ple`, with the semidefinite kind | Block. | It reads the lifted `W` and the marks of the owner's objective. So the builder has two phases: the rows before the owner's risk step, and the floor, the phylogeny rows and `ccnt` after `mark_risk_minimised!`. The risk measures of the owner read the `plr` of its first block. Phase 1 of every block marks `sdp_phylogeny` on the owner of the weights, so a variance on the weights takes the semidefinite formulation when any block on them holds a semidefinite phylogeny (#2126). |
 | `l1`, `l2`, `lp`, `linf`, `cobj` | Block, as terms of the Objective Penalty. | ADR 0164 sends the penalties and the `cobj` of the set into the leader's objective, and only the block reaches the leader. The builders add to `op`. Two blocks give the sum of their terms. The owner decides whether its objective reads `op`. |
 | `ret` of `JuMPOptimiser` | Owner. | It is the objective term, the normalisation of `MaximumRatio`, a frontier, the target of `no_bounds_optimiser` and of `pipe_route(:mu_ucs)`. |
 | `r` and `ret` of `ProgrammeAllocationSet` | Flat fields of the set. | A JuMP head holds no bound that stands alone, so a ceiling slot and a floor slot in its block are always empty. The bounds of the set stay one family: `assert_risk_ceiling`, `assert_return_floor`, `risk_reads_rows` and `set_allocation_risk_ceiling!`. |
@@ -75,12 +75,20 @@ A block field can read these data:
 3. The solver of its owner. A Calibration Rule in `l2c`, `lpc`, `linfc`, `l1`, `l2`, `lp` or
    `linf` resolves against `slv`.
 4. The Price-Adjusted Allocation, through `factory`.
-5. Four values of its owner, which the block builder takes as arguments: the net budget, for
-   `sbgt` and `gbgt`; `fees`, for the MIP kinds; the marks `risk_minimised` and `variance_flag`,
-   for the semidefinite `ple`; and the objective with its owner, for `cobj`.
+5. The values of its owner that the block cannot hold. The block builder `set_block_constraints!`
+   takes them as arguments: the owner, the net budget `bgt`, for `sbgt` and `gbgt`; `fees`, for
+   the MIP kinds and the tracking errors; the tracking errors `tr` that the owner bound to its
+   rows; and the factor loadings `b1` of a factor head. Its second phase takes the bundle that
+   the custom constraints read. The semidefinite `ple` reads the marks `risk_minimised` and
+   `variance_flag` from the Model State, which the owner writes between the two phases. A `cobj`
+   gets the objective of the model and the owner, through `add_custom_objective_term!`.
 
-A block field writes to three places: its own namespace, the state of the shared weights once
-(`lw` and `sw`, `W`, the MIP bits), and the Objective Penalty.
+A block field writes to three places: its own namespace, the state of the shared weights (`lw`
+and `sw`, `W`, the MIP bits), and the Objective Penalty. The shared state is written once, with
+two exceptions that the builders state. A later block makes its own `lw` and `sw` under its prefix
+when a block before it is long-only, so the weights have a long part and no short part
+(`set_weight_constraints!`). A MIP bundle of a kind that cannot serve a later block gives that
+block a bundle of its own under its prefix (`mip_indicators!`).
 
 **The budget of one is enforced on the owner.** The online head owns the budget of one
 (ADR 0159). The bare projection writes `Σw = k`. The block of the set in a leader model carries no
@@ -106,8 +114,9 @@ set to a bare head.
 
 The bundle of a JuMP head, `ResolvedJuMPOptimiser`, holds `pr`, `fees`, `ret`, `sca`, `imsk` and
 the resolved blocks in `cbr`. `cbr` holds one block Result or a vector of them, as `plr` holds one
-phylogeny Result or a vector. The `cobj` of a block gets the model's `obj`, the owner of its block,
-and the Result of its block. `jump_optimiser_from_attributes` keeps its rename table, and the table
+phylogeny Result or a vector. The `cobj` of a block gets the model's `obj` and the owner of its
+block. The block of the head also gets the bundle `attrs` of the head, and a later block, such as
+the set in a leader model, gets the Result of its block. `jump_optimiser_from_attributes` keeps its rename table, and the table
 moves to the block.
 
 **A second block reaches the entry as an internal keyword of `_optimise`.** The precedent is
@@ -126,7 +135,8 @@ replaces the `:aset_` prefix, and the rule "not on both" goes. A kind on both th
 optimiser gives two constraints.
 
 **The MIP bits belong to the weights.** There is one bit for each asset, written once, as `lw`,
-`sw` and the pin of `xbgt` are. Each block adds its own rows `w_i ≤ ub_i^b z_i`,
+`sw` and the pin of `xbgt` are. A bundle of bits of a kind that cannot serve a later block is the
+exception: that block gets a bundle of its own (`mip_indicators!`). Each block adds its own rows `w_i ≤ ub_i^b z_i`,
 `w_i ≥ lt_i^b z_i` and `Σ z ≤ card_b` on the shared `z`. "Asset `i` is held" is a fact of `w`, so
 the rows of two blocks intersect exactly, with half the binaries. The fixed fee of the owner reads
 the same bits once.
@@ -169,8 +179,10 @@ The batch entry runs the two stages one after the other. A slot whose resolver r
    and a forwarded slot is not a field. So the owner routes a slot target of
    `PIPELINE_ROUTING_TARGETS` into the block, as `@pipe_delegates` routes every target into `opt`
    ([ADR 0038](0038-optimisers-own-pipeline-routing.md)), and it keeps `pe` on itself.
-7. **The reads of the stored bundle stay**, through a named `forward` rule on the bundle. The
-   reads `pa.wb`, `pa.tn` and `pa.lcsr` become `jor.wb`, `jor.tn` and `jor.lcsr`.
+7. **The reads of the stored bundle stay**, through one `compute` rule of `@forward_properties`
+   for each read, which reads the block of the owner. `cbr` can hold a vector of blocks, and a
+   path of fields cannot read the first entry of a vector. The reads `pa.wb`, `pa.tn` and
+   `pa.lcsr` become `jor.wb`, `jor.tn` and `jor.lcsr`.
 
 ### 5. The names
 
@@ -227,7 +239,7 @@ because RRB is `RelaxedRiskBudgeting`.
   because the block becomes a field. `AllocationSetConstraint` is `public`, and it leaves the API.
   The exported `ProcessedJuMPOptimiserAttributes` and the Result fields `pa` and `prb` take their
   new names. A prior of the set that prices fewer assets than the leader drops them with the
-  warning of `distance_reader_refusal_mask`, and `strict` refuses them. Before, it raised an
+  warning of `allocation_set_priced_mask`, and `strict` refuses them with an `IsNonFiniteError`. Before, it raised an
   `ArgumentError`. Each break takes a row in `docs/src/migration.md`.
 - **`resolve_allocation_set_rows` and `assemble_allocation_set!` go.** The projection programme
   uses the shared entry, and the refusal rebuild of #2028 in its method of seven arguments goes.
@@ -254,8 +266,8 @@ because RRB is `RelaxedRiskBudgeting`.
   bound that reads only names resolves once for each fold, and `bounds_read_rows` keeps every
   other bound for stage 2, which scores the head's rows at the Investable Mask of each step, as the
   batch fit does. Every reader of the bound at a step reads that result: the bounds rows of both
-  arms, the floor and the clip of a barrier geometry in `projection_programme`, and the read-out
-  of the head, which scores the rows that the head holds. `set_allocation_set_constraints!`
+  arms, the floor and the clip of a barrier geometry in the programme arm of `project`, and the
+  result that `optimise` returns for the head, which scores the rows that the head holds. `set_allocation_set_constraints!`
   returns the bounds of the step for the barrier geometry. A `BoundedAllocationSet` still refuses
   such a bound, because its closed-form projections read the bound as a value.
 - **Other decision records.** The builder ticket amends ADR 0008: the middle of the assembly runs

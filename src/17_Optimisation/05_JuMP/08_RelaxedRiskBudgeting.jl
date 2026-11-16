@@ -359,7 +359,7 @@ Keywords correspond to the struct's fields.
 """
 @concrete struct RelaxedRiskBudgetingResult <: NonRiskJuMPOptimisationResult
     """
-    The [`JuMPOptimisationResult`](@ref) that holds the processed attributes, the return code, the solution and the model.
+    The [`JuMPOptimisationResult`](@ref) that holds the resolved bundle of the optimiser, the return code, the solution and the model.
     """
     jr
     """
@@ -765,7 +765,7 @@ Build the model of a [`RelaxedRiskBudgeting`](@ref), solve it, and return its re
 # Algorithm
 
  1. Replace each schedule of `rrb` with its static default through [`reset_time_dependent_estimator`](@ref).
- 2. Process the attributes of `rrb.opt` against `rd` with [`resolve_jump_optimiser`](@ref), with the blocks of `blocks`, giving `attrs`. It holds the prior, the block Results, the fees, the return terms and the Investable Mask.
+ 2. Resolve `rrb.opt` against `rd` with [`resolve_jump_optimiser`](@ref), with the blocks of `blocks`, giving `attrs`. It holds the prior, the block Results, the fees, the return terms and the Investable Mask.
  3. Take the view of `rrb` and of `rd` at the investable assets with [`investable_view`](@ref). Both are unchanged when every asset is investable.
  4. Bind the benchmark of each [`DataBenchmarkTracking`](@ref) term to `rd` with [`bind_data_benchmark`](@ref).
  5. Build a new model. Register the scales with [`set_model_scales!`](@ref), the number of observations with [`set_model_observations!`](@ref), and the expression `k = 1` with [`set_maximum_ratio_factor_variables!`](@ref), because [`MinimumRisk`](@ref) does not scale the weights.
