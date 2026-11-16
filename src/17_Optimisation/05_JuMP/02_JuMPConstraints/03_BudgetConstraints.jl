@@ -1288,9 +1288,8 @@ function set_cost_budget_mip_constraints!(model::JuMP.Model, bgt::BudgetCosts,
         JuMP.@constraint(model, cost_bgt_gz_lb,
                          sc * ((cost_bgt_g + s * (1 .- cost_bgt_z)) .- k) >= 0)
     end
-    g = model[:cost_bgt_g]
-    JuMP.@constraint(model, cost_bgt_wp_xbgt, sc * (wp ⊖ bgt.up ⊙ g) <= 0)
-    JuMP.@constraint(model, cost_bgt_wn_xbgt, sc * (wn ⊖ bgt.un ⊙ (k .- g)) <= 0)
+    JuMP.@constraint(model, cost_bgt_wp_xbgt, sc * (wp ⊖ bgt.up ⊙ cost_bgt_g) <= 0)
+    JuMP.@constraint(model, cost_bgt_wn_xbgt, sc * (wn ⊖ bgt.un ⊙ (k .- cost_bgt_g)) <= 0)
     lb = isa(bgt.bgt, Number) ? bgt.bgt : bgt.bgt.lb
     if !isnothing(lb)
         JuMP.@constraint(model, cost_bgt_lb,
