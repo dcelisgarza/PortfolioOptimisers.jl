@@ -1,12 +1,14 @@
 """
     brinson_attribution(X::TimeArray, w::VecNum, wb::VecNum,
-                        asset_classes::DataFrame, col, date0 = nothing, date1 = nothing)
+                        asset_classes::DataFrame, col,
+                        date0::Option{<:Dates.AbstractTime} = nothing,
+                        date1::Option{<:Dates.AbstractTime} = nothing)
 
 Compute the Brinson performance attribution of each asset class [brinson_attribution](@cite).
 
 `brinson_attribution` returns a DataFrame with the Brinson attribution of each asset class. It splits the total excess return of the class into asset allocation, security selection and interaction. The function reads the asset weights, the benchmark weights and the class of each asset over the date range.
 
-`date0` and `date1` are **positional** arguments after `col`. The filter applies only when the call gives both. A call that gives only one of them attributes the whole of `X`.
+`date0` and `date1` are **positional** arguments after `col`. Each bound applies on its own, and both are inclusive. A call that gives only `date0` attributes from `date0` to the last observation of `X`, and a call that gives only `date1` attributes from the first observation of `X` to `date1`. The bounds must compare with the timestamps of `X`, see [`assert_timestamp_type`](@ref). So zoned prices take zoned bounds, and a `Date` bound of `DateTime` prices is midnight of that day.
 
 `X` holds **prices**, not returns. The period return of an asset is the ratio of its last value in the range to its first value, minus one. This ratio is a return only when the entries are prices.
 
@@ -47,7 +49,7 @@ Where:
 
 # Algorithm
 
- 1. Filter the date range. When the call gives `date0` and `date1`, find the first and the last observation of `X` in the range. These are `idx1` and `idx2`. Otherwise take the whole of `X`, so `idx1` is `1` and `idx2` is `length(X)`.
+ 1. Filter the date range. Check the type of each bound. A bound that is `nothing` becomes the first or the last timestamp of `X`. `idx1` is the first observation of `X` at or after `date0`, through `searchsortedfirst`. `idx2` is the last observation at or before `date1`, through `searchsortedlast`. Throw when `idx1 > idx2`, because the window then holds no observation.
  2. Make `ret`, the period return of each asset, from the values at `idx1` and `idx2`.
  3. Take the dot product of `ret` and `wb`. This is `ret_b`, the benchmark return of the whole universe.
  4. Read the class of each asset from column `col` of `asset_classes`. Build `sets_mat`, the membership matrix. Its entry is `true` when the asset belongs to the class.
@@ -63,8 +65,13 @@ Where:
   - `wb`: Vector of benchmark weights.
   - `asset_classes`: DataFrame that gives the class of each asset.
   - `col`: Column of `asset_classes` that holds the class of each asset.
-  - `date0`: Optional start date of the attribution period.
-  - `date1`: Optional end date of the attribution period.
+  - `date0`: Optional start date of the attribution period, inclusive.
+  - `date1`: Optional end date of the attribution period, inclusive.
+
+# Validation
+
+  - `date0` and `date1` compare with the timestamps of `X`. Raises an `ArgumentError`. See [`assert_timestamp_type`](@ref).
+  - The window holds at least one observation of `X`. Raises an `ArgumentError` that names both bounds.
 
 # Returns
 
@@ -82,17 +89,19 @@ Where:
   - $(ref_dict[:brinson_attribution]) Pages 73-76. $(ref_dict[:no_original_source])
 """
 function brinson_attribution(X::TimeSeries.TimeArray, w::VecNum, wb::VecNum,
-                             asset_classes::DataFrames.DataFrame, col, date0 = nothing,
-                             date1 = nothing)
-    # Efficient filtering of date range
-    idx1, idx2 = if !isnothing(date0) && !isnothing(date1)
-        timestamps = TimeSeries.timestamp(X)
-        idx = (Dates.DateTime(date0) .<= timestamps) .&
-              (timestamps .<= Dates.DateTime(date1))
-        findfirst(idx), findlast(idx)
-    else
-        1, length(X)
-    end
+                             asset_classes::DataFrames.DataFrame, col,
+                             date0::Option{<:Dates.AbstractTime} = nothing,
+                             date1::Option{<:Dates.AbstractTime} = nothing)
+    ts = TimeSeries.timestamp(X)
+    assert_timestamp_type(eltype(ts), typeof(date0), :date0)
+    assert_timestamp_type(eltype(ts), typeof(date1), :date1)
+    #! The timestamps of a TimeArray are sorted and unique, so each bound is a binary
+    #! search. A missing bound is the first or the last timestamp, whose search gives the
+    #! first or the last position.
+    idx1 = searchsortedfirst(ts, something(date0, first(ts)))
+    idx2 = searchsortedlast(ts, something(date1, last(ts)))
+    @argcheck(idx1 <= idx2,
+              ArgumentError("the attribution window from date0 = $(date0) to date1 = $(date1) holds no observation of X, whose timestamps run from $(first(ts)) to $(last(ts)). Give a window that holds at least one observation."))
 
     ret = vec(values(X[idx2]) ./ values(X[idx1]) .- 1)
     ret_b = LinearAlgebra.dot(ret, wb)

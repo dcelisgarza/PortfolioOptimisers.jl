@@ -469,7 +469,7 @@ end
         @test isapprox(df[4, "Total"], -0.021)
     end
 
-    @testset "both dates filter, and one date alone does not" begin
+    @testset "both dates filter, and each date filters alone (#2161)" begin
         df = brinson_attribution(Xta, wp, wb, ac, :Class, Date(2020, 1, 2),
                                  Date(2020, 1, 3))
         ret23 = [104.0 / 102 - 1, 49.0 / 51 - 1, 22.0 / 21 - 1, 11.0 / 10.5 - 1]
@@ -479,11 +479,31 @@ end
         # what settles the question the ticket asks.
         raw = vec(values(Xta[3]))
         @test !isapprox(df[4, "Total"], dot(wp, raw) - dot(wb, raw))
-        whole = brinson_attribution(Xta, wp, wb, ac, :Class)
-        @test brinson_attribution(Xta, wp, wb, ac, :Class, Date(2020, 1, 2), nothing) ==
-              whole
-        @test brinson_attribution(Xta, wp, wb, ac, :Class, nothing, Date(2020, 1, 3)) ==
-              whole
+        # Issue #2161: each bound applies on its own. A start alone runs to the last
+        # observation, and an end alone runs from the first.
+        from2 = brinson_attribution(Xta, wp, wb, ac, :Class, Date(2020, 1, 2), nothing)
+        ret24 = [110.0 / 102 - 1, 56.0 / 51 - 1, 23.0 / 21 - 1, 12.5 / 10.5 - 1]
+        @test isapprox(from2[4, "Total"], dot(wp, ret24) - dot(wb, ret24))
+        @test from2 == brinson_attribution(Xta, wp, wb, ac, :Class, Date(2020, 1, 2),
+                                           Date(2020, 1, 4))
+        to3 = brinson_attribution(Xta, wp, wb, ac, :Class, nothing, Date(2020, 1, 3))
+        ret13 = [104.0 / 100 - 1, 49.0 / 50 - 1, 22.0 / 20 - 1, 11.0 / 10 - 1]
+        @test isapprox(to3[4, "Total"], dot(wp, ret13) - dot(wb, ret13))
+        @test !isapprox(from2[4, "Total"], to3[4, "Total"])
+        # A DateTime bound of Date prices compares through the promotion of Dates, and a
+        # bound between two observations takes the observations inside it.
+        @test brinson_attribution(Xta, wp, wb, ac, :Class, DateTime(2020, 1, 1, 12),
+                                  DateTime(2020, 1, 3, 12)) == df
+        # A window that holds no observation is refused, and the message names both bounds.
+        err = @test_throws ArgumentError brinson_attribution(Xta, wp, wb, ac, :Class,
+                                                             DateTime(2020, 1, 2, 1),
+                                                             DateTime(2020, 1, 2, 2))
+        @test occursin("2020-01-02T01:00:00", err.value.msg) &&
+              occursin("2020-01-02T02:00:00", err.value.msg)
+        @test_throws ArgumentError brinson_attribution(Xta, wp, wb, ac, :Class,
+                                                       Date(2020, 1, 3), Date(2020, 1, 2))
+        # A bound is a timestamp. A string is not parsed.
+        @test_throws MethodError brinson_attribution(Xta, wp, wb, ac, :Class, "2020-01-02")
     end
 
     @testset "a zero-weight class is a `NaN`, and neither division is guarded" begin

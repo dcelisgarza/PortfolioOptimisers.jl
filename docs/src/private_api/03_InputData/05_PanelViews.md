@@ -1,5 +1,5 @@
 ```@meta
-Description = "Panel views, private API of PortfolioOptimisers.jl: feature_row_indices, matched_row_indices, panel_feature_names, label_positions, timestamp_positions, …"
+Description = "Panel views, private API of PortfolioOptimisers.jl: feature_row_indices, matched_row_indices, panel_feature_names, label_positions, assert_timestamp_type, …"
 ```
 
 # [Panel views: private API](@id private-api-panel-views)
@@ -9,6 +9,7 @@ feature_row_indices
 PortfolioOptimisers.matched_row_indices
 PortfolioOptimisers.panel_feature_names
 PortfolioOptimisers.label_positions
+PortfolioOptimisers.assert_timestamp_type
 PortfolioOptimisers.timestamp_positions
 PortfolioOptimisers.each_panel_field
 ```

@@ -556,6 +556,8 @@ Implements date-based walk-forward cross-validation for time series, supporting 
 
 `purged_size` drops the last `purged_size` rows of each training window. This opens a gap of that many observations before the test window, and removes the training rows whose labels reach into the test period. The test window itself is not shortened, so `purged_size` must be smaller than the training window.
 
+A range of `ZonedDateTime` timestamps of TimeZones.jl steps by `period` under the rules of TimeZones.jl. A calendar period, such as `Dates.Day(1)` or `Dates.Month(1)`, keeps the wall-clock time across a change to or from daylight saving time. A fixed period, such as `Dates.Hour(24)`, adds an absolute duration, so the wall-clock time of the range moves by one hour at the change. Then each date of the range after the change is one hour away from its observation. For daily observations at noon, a range date falls at 13:00 after the change to daylight saving time, and `previous = false` maps it to the observation of the next day. Use a calendar period for zoned timestamps.
+
 # Fields
 
 $(DocStringExtensions.FIELDS)
