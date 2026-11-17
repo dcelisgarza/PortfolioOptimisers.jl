@@ -37,7 +37,7 @@ Where:
   - `epc`: Dictionary of entropy pooling constraints, which maps each key to an `(lhs, rhs)` pair.
   - `lhs`: Left-hand side constraint matrix.
   - `rhs`: Right-hand side constraint vector.
-  - `key`: Key of the sense of the block, one of `:eq`, `:ineq`, `:feq` and `:cvar_eq`.
+  - `key`: Key of the sense of the block, one of `:eq`, `:ineq`, `:feq`, `:cvar_eq` and `:cvar_ineq`.
 
 # Returns
 

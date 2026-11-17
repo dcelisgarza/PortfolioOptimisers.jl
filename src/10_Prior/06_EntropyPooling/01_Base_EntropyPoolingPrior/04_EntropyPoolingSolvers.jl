@@ -332,7 +332,7 @@ Where:
 
  1. Return `w` when `epc` holds no row. An empty view set states nothing, so the posterior is the prior, and the method returns it exactly with no solve.
  2. Start `A` and `B` with the row that holds the sum of the posterior at one, with both sides divided by ``\\sqrt{T}``.
- 3. Stack the block of every key of `epc` onto `A` and `B`, in the sorted order of the keys. Set the box `wb` of the dual variables of that block from the key. The box is free for `:eq` and `:cvar_eq`, non-negative for `:ineq`, and ``[-s_{c2},\\, s_{c2}]`` for `:feq`. Raise on any other key. Leave out a `:feq` block when ``s_{c2}`` is zero, because that box holds its dual variables at zero and the fixed rows then have no weight.
+ 3. Stack the block of every key of `epc` onto `A` and `B`, in the sorted order of the keys. Set the box `wb` of the dual variables of that block from the key. The box is free for `:eq` and `:cvar_eq`, non-negative for `:ineq` and `:cvar_ineq`, and ``[-s_{c2},\\, s_{c2}]`` for `:feq`. Raise on any other key. Leave out a `:feq` block when ``s_{c2}`` is zero, because that box holds its dual variables at zero and the fixed rows then have no weight.
  4. Start every dual variable at ``1/\\sqrt{T}``, clamped into its own box. A `:feq` box is ``[-s_{c2},\\, s_{c2}]``, so with no clamp, an ``s_{c2}`` below ``1/\\sqrt{T}`` puts the start outside the box.
  5. Minimise the dual objective over that box with `Optim.optimize`, through the branch that `alg` selects. The method multiplies both the objective and its gradient by ``s_{c1}``.
  6. Raise when `Optim.converged` reports that the solve failed.
@@ -351,7 +351,7 @@ Where:
 
 # Validation
 
-  - Every key of `epc` is one of `:eq`, `:ineq`, `:cvar_eq` and `:feq`. Any other key raises a `KeyError`.
+  - Every key of `epc` is one of `:eq`, `:ineq`, `:cvar_eq`, `:cvar_ineq` and `:feq`. Any other key raises a `KeyError`.
   - The solve must converge. A solve that `Optim.converged` reports as failed raises an `ErrorException`.
   - The method does not catch an infeasible view set. `Optim.converged` is true on `x_converged` or `f_converged` only, and the dual of an infeasible set stops on one of those. The warning above states the shape of that result and the signs that show it.
 
@@ -403,7 +403,7 @@ function entropy_pooling(w::VecNum, epc::AbstractDict,
         push!(blocks, val)
         lo, hi = if key == :eq || key == :cvar_eq
             typemin(eltype(w)), typemax(eltype(w))
-        elseif key == :ineq
+        elseif key == :ineq || key == :cvar_ineq
             zero(eltype(w)), typemax(eltype(w))
         elseif key == :feq
             -opt.sc2, opt.sc2
@@ -502,7 +502,7 @@ function entropy_pooling(w::VecNum, epc::AbstractDict,
         push!(blocks, val)
         lo, hi = if key == :eq || key == :cvar_eq
             typemin(eltype(w)), typemax(eltype(w))
-        elseif key == :ineq
+        elseif key == :ineq || key == :cvar_ineq
             zero(eltype(w)), typemax(eltype(w))
         elseif key == :feq
             -opt.sc2, opt.sc2

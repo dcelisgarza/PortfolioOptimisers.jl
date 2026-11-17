@@ -698,15 +698,23 @@ end
                    rtol = 1e-12)
     @test isapprox(post(JuMPEntropyPooling(; slv = slv, sc2 = 0)), eq_only, rtol = 5e-7)
 
-    # The documented key set is `:eq`, `:ineq`, `:feq` and `:cvar_eq`. Both algorithms raise
-    # on anything else; `:cvar_ineq` was a dead disjunct of the `Exp` branch alone.
+    # The documented key set is `:eq`, `:ineq`, `:feq`, `:cvar_eq` and `:cvar_ineq`. Both
+    # algorithms raise on anything else. `:cvar_ineq` holds the rows of the CVaR views at the
+    # worst loss (#2160), with the non-negative dual box of `:ineq`: a row that the prior
+    # meets leaves the prior.
     bogus = Dict{Symbol, Tuple{<:PortfolioOptimisers.MatNum, <:PortfolioOptimisers.VecNum}}()
-    bogus[:cvar_ineq] = (reshape(X[:, 1], 1, :), [0.002])
-    @test_throws KeyError PortfolioOptimisers.entropy_pooling(w, bogus,
-                                                              OptimEntropyPooling())
-    @test_throws KeyError PortfolioOptimisers.entropy_pooling(w, bogus,
-                                                              OptimEntropyPooling(;
-                                                                                  alg = LogEntropyPooling()))
+    bogus[:bogus] = (reshape(X[:, 1], 1, :), [0.002])
+    cvi = Dict{Symbol, Tuple{<:PortfolioOptimisers.MatNum, <:PortfolioOptimisers.VecNum}}()
+    cvi[:cvar_ineq] = (reshape(X[:, 1], 1, :), [maximum(X[:, 1])])
+    for alg in (ExpEntropyPooling(), LogEntropyPooling())
+        @test_throws KeyError PortfolioOptimisers.entropy_pooling(w, bogus,
+                                                                  OptimEntropyPooling(;
+                                                                                      alg = alg))
+        @test isapprox(collect(PortfolioOptimisers.entropy_pooling(w, cvi,
+                                                                   OptimEntropyPooling(;
+                                                                                       alg = alg))),
+                       collect(w); rtol = 1e-6)
+    end
 end
 
 # #538: the guard read `any` where it needed `all`. A row over a universe of more than one
@@ -952,6 +960,87 @@ end
     @test isapprox(cv(prs.w), hs; rtol = 1e-8)
     @test iszero(prs.w[jw])
     @test isapprox(prs.kld, kl(count(==(hs), x) / (length(x) - 1)); rtol = 1e-6)
+end
+
+@testset "MeucciEntropyPoolingPrior writes a CVaR view at the worst loss as a row (#2160)" begin
+    #=
+    A CVaR view at the worst loss of the support is the row `sum(p[W]) >= alpha`. The search
+    wrote it as the root of the tail mass, and every candidate below the target forced that
+    mass to `alpha`, so the residual was zero up to rounding. The search raised in 6 of these
+    12 cases, and it could not give the prior where the prior meets the view. With the row,
+    the posterior is the prior when the worst scenario holds at least `alpha`, and the prior
+    scaled to `alpha` on the worst scenario and to `1 - alpha` on the rest otherwise.
+    =#
+    X201 = rd.X[(end - 200):end, :]
+    cvar(a, w, x) = ConditionalValueatRisk(; alpha = a, w = w)(x)
+    view_at(a, v) = ConditionalValueatRiskView(; alpha = a,
+                                               views = LinearConstraintEstimator(; val = v))
+    for T in (10, 20, 50, 201), a in (0.05, 0.2, 0.3)
+        XT = X201[1:T, :]
+        x = -XT[:, 1]
+        hi = maximum(x)
+        q = count(==(hi), x) / T
+        kl = q >= a ? zero(q) : a * log(a / q) + (1 - a) * log((1 - a) / (1 - q))
+        pr = prior(MeucciEntropyPoolingPrior(; sets = sets,
+                                             cvar_views = view_at(a, "AAPL == $hi")),
+                   ReturnsResult(; nx = rd.nx, X = XT))
+        @test isapprox(cvar(a, pr.w, XT[:, 1]), hi; rtol = 1e-8)
+        @test isapprox(pr.kld, kl; atol = 1e-8, rtol = 1e-6)
+    end
+    # A view at the worst loss beside a searched view on another asset, on both routes and
+    # with a JuMP inner solve. The one-problem formulation of `EntropyPoolingPrior` is the
+    # reference: it writes both views as exact constraints of one solve.
+    a = 0.05
+    rd201 = ReturnsResult(; nx = rd.nx, X = X201)
+    hi = maximum(-X201[:, 1])
+    v = 1.1 * cvar(a, nothing, X201[:, 3])
+    views = ["AAPL == $hi", "$(rd.nx[3]) == $v"]
+    ref = prior(EntropyPoolingPrior(; sets = sets, opt = JuMPEntropyPooling(; slv = slv),
+                                    cvar_views = view_at(a, views)), rd201)
+    for (alg, opt) in ((H1_EntropyPooling(), OptimEntropyPooling()),
+                       (H0_EntropyPooling(), OptimEntropyPooling()),
+                       (H1_EntropyPooling(), JuMPEntropyPooling(; slv = slv)))
+        pr = prior(MeucciEntropyPoolingPrior(; sets = sets, alg = alg, opt = opt,
+                                             cvar_views = view_at(a, views)), rd201)
+        @test isapprox(cvar(a, pr.w, X201[:, 1]), hi; rtol = 1e-6)
+        @test isapprox(cvar(a, pr.w, X201[:, 3]), v; rtol = 1e-4)
+        @test isapprox(pr.kld, ref.kld; rtol = 1e-3)
+    end
+    #=
+    A non-negative target can need a value at risk below zero: the posterior then puts less
+    than `alpha` on the losses above zero. The bracket of one view started at zero, so it
+    held no root, and the search raised. The first ten scenarios hold one loss above zero,
+    so a target just below it needs less than `alpha` there. On 201 scenarios, a view at
+    half the prior CVaR at a high `alpha` does the same.
+    =#
+    X10 = X201[1:10, :]
+    hi10 = maximum(-X10[:, 1])
+    for a in (0.05, 0.2, 0.3), t in (hi10 * (1 - 1e-9), hi10 * (1 - 1e-6))
+        pr = prior(MeucciEntropyPoolingPrior(; sets = sets,
+                                             cvar_views = view_at(a, "AAPL == $t")),
+                   ReturnsResult(; nx = rd.nx, X = X10))
+        @test isapprox(cvar(a, pr.w, X10[:, 1]), t; rtol = 1e-6)
+    end
+    for a in (0.4, 0.5, 0.6)
+        t = 0.5 * cvar(a, nothing, X201[:, 1])
+        pr = prior(MeucciEntropyPoolingPrior(; sets = sets,
+                                             cvar_views = view_at(a, "AAPL == $t")), rd201)
+        @test isapprox(cvar(a, pr.w, X201[:, 1]), t; rtol = 1e-6)
+        @test ValueatRisk(; alpha = a, w = pr.w)(X201[:, 1]) < 0
+    end
+    # The box of the search over more than one view started at zero too, and the view below
+    # missed its target by 0.55 % with no error.
+    a = 0.6
+    t = 0.5 * cvar(a, nothing, X201[:, 1])
+    v = 1.1 * cvar(0.05, nothing, X201[:, 3])
+    pr = prior(MeucciEntropyPoolingPrior(; sets = sets,
+                                         cvar_views = view_at(a,
+                                                              ["AAPL == $t",
+                                                               "$(rd.nx[3]) == $v"])),
+               rd201)
+    @test isapprox(cvar(a, pr.w, X201[:, 1]), t; rtol = 1e-4)
+    @test isapprox(cvar(a, pr.w, X201[:, 3]), v; rtol = 1e-4)
+    @test ValueatRisk(; alpha = a, w = pr.w)(X201[:, 1]) < 0
 end
 
 # #573: `Optim`'s default stopping rule leaves the entropy pooling dual short of its own

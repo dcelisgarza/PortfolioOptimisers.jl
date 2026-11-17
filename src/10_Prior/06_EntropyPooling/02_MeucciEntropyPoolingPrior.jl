@@ -35,6 +35,8 @@ A `prior(...)` reference in a skewness or kurtosis view reads the sample statist
 
     Read the result, not the flag. Measure the posterior with [`ConditionalValueatRisk`](@ref) at the `alpha` of the view, and compare it with the target of the view. For a result that repeats, give a tighter `Optim.Options` in the `args` of the optimiser. [`OptimEntropyPooling`](@ref) shows the block. The library reads no tolerance on the residual, because a threshold that decides if a solve succeeded is a policy that this library does not set.
 
+    With more than one view, the default `dm_opt` stops when the candidate value at risk moves by less than `1e-4`. A target whose value at risk is below zero, or a view that lowers the CVaR beside a view that raises it, can then miss by more than `1e-5` relative. In one measurement on five pairs of views, the largest miss was `4.2e-5` relative under the default. Under `dm_opt = OptimEntropyPooling(; args = (Optim.Fminbox(), Optim.Options(; outer_x_abstol = 1e-6, x_abstol = 1e-6)))`, it was `1.1e-5`, at 3 to 9 times the time. A tighter rule than `1e-6` gave no smaller miss, because the inner solves set the floor. For a smaller miss than that floor, give `opt` a tighter rule too.
+
 # Algorithm
 
 The constructor derives the prior probabilities and validates every other field.
@@ -196,7 +198,7 @@ This prior has no exact incremental recursion, and it takes the online step by a
 # References
 
   - $(ref_dict[:meucci2008]) Section 4, Equations 25 to 27, and Appendix A.2, Equations 65 to 73.
-  - $(ref_dict[:meucciardiakeel2011]) Pages 39–49. $(ref_dict[:no_original_source])
+  - $(ref_dict[:meucciardiakeel2011]) Section 3, Equations 3.1 to 3.5.
   - $(ref_dict[:EPTail]) Section 2.2.
   - $(ref_dict[:vorobets2021]) Section 3.
 """
@@ -409,21 +411,25 @@ $(DocStringExtensions.FIELDS)
 """
 @concrete struct CvarViewSearch
     """
-    `X`: The loss columns of the assets that the views name.
+    `X`: The loss columns of the assets that the searched views name.
     """
     X
     """
-    `B`: The target of each view.
+    `B`: The target of each searched view.
     """
     B
     """
-    `alphas`: The significance level of each view.
+    `alphas`: The significance level of each searched view.
     """
     alphas
     """
-    `d_opt`: The optimiser of the search.
+    `d_opt`: The optimiser of the search, or `nothing` when no view needs a search.
     """
     d_opt
+    """
+    `edge`: The `(lhs, rhs)` block of the views whose target is the worst loss of their asset on the support, or `nothing` when no view has such a target. Each row states `-sum(p[W]) <= -alpha`, where `W` holds the scenarios of that loss.
+    """
+    edge
 end
 """
     ep_cvar_views_setup(cvar_views::Nothing, args...; kwargs...)
@@ -463,6 +469,27 @@ Resolve the conditional value at risk views once, into the data of one search.
 
 The staged route of [`ep_prior`](@ref) searches up to three times, once for each stage, and each stage must read the same reference value. So [`ep_prior`](@ref) calls this function once, before the first solve. The call reads the first fit of the wrapped estimator and the prior probabilities of that fit. A later stage holds a refit `pr` whose weights are the posterior of the stage before. A reference resolved there gives a different target at each stage, and the view that the caller wrote changes. One call also keeps the parse out of the search, so the search does not parse again at each stage.
 
+# Mathematical definition
+
+The conditional value at risk of a loss is never larger than the worst loss ``L_{w}`` on the support. It equals that loss when, and only when, the posterior puts at least ``\\alpha`` on the scenarios of that loss. So a view at that target is one linear row:
+
+```math
+\\begin{align}
+\\mathrm{CVaR}_{\\alpha}(X) = L_{w} \\iff \\sum_{t \\in W} p_{t} \\geq \\alpha\\,, \\qquad W = \\left\\{t : q_{t} > 0,\\; -x_{t,\\,i} = L_{w}\\right\\}.
+\\end{align}
+```
+
+When the prior mass ``\\sum_{t \\in W} q_{t}`` is at least ``\\alpha``, the prior meets the row, and the row adds no divergence. The search of [`ep_cvar_views_solve!`](@ref) cannot write such a view. Its row at every candidate value at risk below ``L_{w}`` forces ``\\sum_{t \\in W} p_{t} = \\alpha``, so its residual is zero only up to rounding.
+
+Where:
+
+  - $(math_dict[:ep_post_probs])
+  - $(math_dict[:ep_prior_probs])
+  - $(math_dict[:x_ti_ret])
+  - $(math_dict[:alpha_rm])
+  - ``L_{w}``: Worst loss of asset ``i`` on the support of the prior.
+  - ``W``: Scenarios of the support at the loss ``L_{w}``.
+
 # Algorithm
 
  1. Loop over the view groups of `cvar_views`. One view group iterates as a collection of one element, so one loop reads both forms.
@@ -471,9 +498,10 @@ The staged route of [`ep_prior`](@ref) searches up to three times, once for each
  4. Turn the parsed views into the equality block `lcs`. Under `strict = false`, every row of the group can drop, and `lcs` is then `nothing`. The group then states no view, and the loop goes to the next group.
  5. Check that each row of `lcs` names one asset, and that each target is not negative.
  6. For each row of the block, add the asset that it names to `cols`, its target to `B`, its level to `alphas` and its text to `eqns`. All the groups go into one search, because each level is only the divisor of the positive part of its own view.
- 7. Read the worst realisation of every named asset into `min_X`. Raise an error when a target is equal to or larger than it.
- 8. Select the search `d_opt`. One view takes `ds_opt`, or a default [`ConditionalValueatRiskEntropyPooling`](@ref). More than one view takes `dm_opt`, or a default [`OptimEntropyPooling`](@ref) over `Optim.Fminbox`.
- 9. Return `nothing` when no group states a view, so the stage uses the plain solve. Otherwise, return the loss columns `X`, the targets `B`, the levels `alphas` and the search `d_opt`.
+ 7. Read the worst realisation of every named asset on the support of `w` into `min_X`. Raise an error when a target is larger than it.
+ 8. Write each view whose target equals `min_X` as one row of the block `edge`. The row is `-sum(p[W]) <= -alpha`, where `W` holds the scenarios of the support at that loss. Keep the other views for the search.
+ 9. Select the search `d_opt` from the number of kept views. No kept view takes `nothing`. One kept view takes `ds_opt`, or a default [`ConditionalValueatRiskEntropyPooling`](@ref). More than one kept view takes `dm_opt`, or a default [`OptimEntropyPooling`](@ref) over `Optim.Fminbox`.
+10. Return `nothing` when no group states a view, so the stage uses the plain solve. Otherwise, return the loss columns `X`, the targets `B` and the levels `alphas` of the kept views, the search `d_opt` and the block `edge`.
 
 # Arguments
 
@@ -496,7 +524,7 @@ The staged route of [`ep_prior`](@ref) searches up to three times, once for each
 # Returns
 
   - `nothing`: No group states a view, because `strict` is `false` and every row of every group dropped.
-  - `cvv::CvarViewSearch`: The search data, which holds the loss columns `X`, the targets `B`, the levels `alphas` and the search `d_opt`.
+  - `cvv::CvarViewSearch`: The search data, which holds the loss columns `X`, the targets `B` and the levels `alphas` of the searched views, the search `d_opt`, and the block `edge` of the views at the worst loss.
 
 # Related
 
@@ -510,7 +538,7 @@ The staged route of [`ep_prior`](@ref) searches up to three times, once for each
 
 # References
 
-  - $(ref_dict[:meucciardiakeel2011]) Pages 39–49. $(ref_dict[:no_original_source])
+  - $(ref_dict[:meucciardiakeel2011]) Section 3, Equations 3.1 to 3.5.
 """
 function ep_cvar_views_setup(cvar_views::CVV_VecCVV, pr::AbstractPriorResult,
                              sets::UniverseSets, w::ScenarioProbabilities,
@@ -578,7 +606,25 @@ function ep_cvar_views_setup(cvar_views::CVV_VecCVV, pr::AbstractPriorResult,
         msg *= "\nPlease lower the views or use a different prior with fatter tails."
         throw(DomainError(B[invalid], msg))
     end
-    d_opt = if isone(length(B))
+    #! A target at the worst loss of the support is a linear row, not a search. The CVaR
+    #! equals that loss exactly when the posterior puts at least `alpha` on the scenarios of
+    #! that loss. In the search, every candidate below the target makes the row of the view
+    #! force that mass to `alpha`, so the residual is zero up to rounding over the top of the
+    #! bracket. The search then finds no bracket when the rounding has the sign of the
+    #! bottom, and it cannot reach the prior when the prior meets the view. See issue #2160.
+    edge = B .== min_X
+    erows = if any(edge)
+        sup = w .> zero(eltype(w))
+        lhs = -transpose(sup .& (view(X, :, edge) .== -transpose(min_X[edge])))
+        (convert(Matrix{eltype(X0)}, lhs), -alphas[edge])
+    else
+        nothing
+    end
+    keep = .!edge
+    X, B, alphas = view(X0, :, cols[keep]), B[keep], alphas[keep]
+    d_opt = if isempty(B)
+        nothing
+    elseif isone(length(B))
         ifelse(!isnothing(ds_opt), ds_opt, ConditionalValueatRiskEntropyPooling())
     else
         ifelse(!isnothing(dm_opt), dm_opt,
@@ -587,7 +633,7 @@ function ep_cvar_views_setup(cvar_views::CVV_VecCVV, pr::AbstractPriorResult,
                                            Optim.Options(; outer_x_abstol = 1e-4,
                                                          x_abstol = 1e-4))))
     end
-    return CvarViewSearch(X, B, alphas, d_opt)
+    return CvarViewSearch(X, B, alphas, d_opt, erows)
 end
 """
     ep_cvar_views_solve!(cvv::Nothing, epc::AbstractDict,
@@ -635,11 +681,11 @@ end
 
 Solve the entropy pooling problem with conditional value at risk (CVaR) views.
 
-`ep_cvar_views_solve!` reads the targets, the levels and the search that [`ep_cvar_views_setup`](@ref) resolved. It finds the posterior probability weights with a root search for one CVaR view, and with an optimisation for more than one. It parses nothing and resolves nothing, because the staged route calls it once for each stage, and every stage must read the same targets.
+`ep_cvar_views_solve!` reads the targets, the levels, the search and the rows that [`ep_cvar_views_setup`](@ref) resolved. A view whose target is the worst loss of its asset on the support is a linear row, and every solve holds it. For the other views, it finds the posterior probability weights with a root search for one CVaR view, and with an optimisation for more than one. With no other view, it solves once. It parses nothing and resolves nothing, because the staged route calls it once for each stage, and every stage must read the same targets.
 
-The search is over the value at risk levels `etas`, one for each view, each in `[0, B]`. This search is a continuous relaxation of the recursive algorithm, which searches over discrete tail sizes. It gets the same target, and it also takes more than one view.
+The search is over the value at risk levels `etas`, one for each searched view. A candidate is in `[lo, B]`, where `lo` is the lowest loss of its asset on the support. A target is not negative, but the value at risk is below zero when the posterior puts less than `alpha` on the losses above zero. This search is a continuous relaxation of the recursive algorithm, which searches over discrete tail sizes. It gets the same target, and it also takes more than one view.
 
-The bracket for one view stops a small distance inside `B`, at `B * (1 - sqrt(eps))`. At `B`, the constraint needs a posterior tail contribution of exactly zero. No posterior with all its weights above zero has such a contribution, so the problem at `B` is degenerate and its dual is unbounded. `Roots` evaluates the two ends of a bracket before it searches, so without the shrink each search for one view solves that problem once. The root is between about a third and two thirds of `B`, so the shrunk bracket holds it.
+The bracket for one view stops a small distance inside `B`, at `B * (1 - sqrt(eps))`. At `B`, the constraint needs a posterior tail contribution of exactly zero. No posterior with all its weights above zero has such a contribution, so the problem at `B` is degenerate and its dual is unbounded. `Roots` evaluates the two ends of a bracket before it searches, so without the shrink each search for one view solves that problem once. The root is between about a third and two thirds of `B`, so the shrunk bracket holds it. The bracket starts at zero when the residual at zero is positive. Otherwise the root is at or below zero, and the bracket is `[lo, 0]`.
 
 # Mathematical definition
 
@@ -668,10 +714,11 @@ Where:
 
 # Algorithm
 
- 1. Read the loss columns `X`, the targets `B`, the levels `alphas` and the search `d_opt` from `cvv`.
- 2. Define `func(etas)`. At the candidate `etas`, it writes the second line above into `epc` under the key `:cvar_eq`. It solves the whole constraint set with [`entropy_pooling`](@ref) into `wi`, and returns `wi` and the residual of the third line. For one view, the residual is the posterior tail mass minus `alpha`. For more than one view, it is the [`norm_error`](@ref) over the views of the posterior conditional value at risk minus the target.
- 3. Search for the value at risk `res`. For one view, `Roots.find_zero` finds the root of the residual of `func` over `[0, B[1] * (1 - sqrt(eps))]`. For more than one view, `Optim.optimize` minimises the residual over the box `[0, B]` from the start `0.5 * B`. After the start, a trial point at which the inner solve fails gets the residual `Inf`, and the line search rejects that point.
- 4. Call `func(res)` one more time, and return the posterior probability weights that it calculates.
+ 1. Read the loss columns `X`, the targets `B`, the levels `alphas`, the search `d_opt` and the block `edge` from `cvv`.
+ 2. Delete the key `:cvar_ineq` from `epc`, and write `edge` under it when `edge` is not `nothing`. The key holds the rows of the views at the worst loss, the inequality of [`ep_cvar_views_setup`](@ref). When no view needs a search, solve `epc` once with [`entropy_pooling`](@ref), and return the result.
+ 3. Define `func(etas)`. At the candidate `etas`, it writes the second line above into `epc` under the key `:cvar_eq`. It solves the whole constraint set with [`entropy_pooling`](@ref) into `wi`, and returns `wi` and the residual of the third line. For one view, the residual is the posterior tail mass minus `alpha`. For more than one view, it is the [`norm_error`](@ref) over the views of the posterior conditional value at risk minus the target.
+ 4. Search for the value at risk `res`. For one view, calculate the residual of `func` at zero. When it is positive, `Roots.find_zero` finds the root of the residual over `[0, B[1] * (1 - sqrt(eps))]`. Otherwise it finds the root over `[lo, 0]`. The search reuses the residual at zero, and solves no inner problem there again. For more than one view, `Optim.optimize` minimises the residual over the box `[lo, B]` from the start `0.5 * B`. After the start, a trial point at which the inner solve fails gets the residual `Inf`, and the line search rejects that point.
+ 5. Call `func(res)` one more time, and return the posterior probability weights that it calculates.
 
 # Arguments
 
@@ -682,7 +729,7 @@ Where:
 
 # Validation
 
-  - Every candidate value at risk is in `[0, B]`. A candidate outside the box raises a `DomainError`.
+  - Every candidate value at risk is in `[lo, B]`. A candidate outside the box raises a `DomainError`.
   - The search must succeed. When `Roots.find_zero` or `Optim.optimize` raises an error, this method raises an `ErrorException` that holds it. An inner [`entropy_pooling`](@ref) solve that fails at one point of the search for one view is such an error. With more than one view, the search rejects a trial point after the start at which the inner solve fails, so that failure does not raise. A failed inner solve at the start `0.5 * B` raises. When `Optim.converged` reports that `Optim.optimize` failed, this method raises an `ErrorException`. A failed inner solve at the last call, at the minimiser, raises its own error.
   - The method does not detect an infeasible view set. The residual of this search is the posterior tail mass minus `alpha`. A posterior with almost all of its mass on one observation has a small residual, but it can miss the view by a large amount. The warning of [`MeucciEntropyPoolingPrior`](@ref) states how to find such a result.
   - The method does not detect a missed feasible view. The search reads its own residual, not how closely the inner [`entropy_pooling`](@ref) solve meets the constraint of the view. With more than one view, `Optim.converged` accepts a solve that stopped on the step in `x` and not on stationarity. The warning of [`MeucciEntropyPoolingPrior`](@ref) states the mechanism, the measured sizes, and how to read the result.
@@ -703,17 +750,31 @@ Where:
 
 # References
 
-  - $(ref_dict[:meucciardiakeel2011]) Pages 39–49. $(ref_dict[:no_original_source])
+  - $(ref_dict[:meucciardiakeel2011]) Section 3, Equations 3.1 to 3.6.
 """
 function ep_cvar_views_solve!(cvv::CvarViewSearch, epc::AbstractDict,
                               w::ScenarioProbabilities,
                               opt::AbstractEntropyPoolingOptimiser)
-    (; X, B, alphas, d_opt) = cvv
+    (; X, B, alphas, d_opt, edge) = cvv
+    #! The rows of the views at the worst loss hold at every candidate of the search. They
+    #! are written again at each stage, because `epc` keeps its rows between the stages.
+    delete!(epc, :cvar_ineq)
+    if !isnothing(edge)
+        add_ep_constraint!(epc, edge..., :cvar_ineq)
+    end
     N = length(B)
+    if iszero(N)
+        return entropy_pooling(w, epc, opt)
+    end
+    #! A non-negative target does not make a non-negative value at risk. When the posterior
+    #! puts less than `alpha` on the losses above zero, the value at risk is below zero, so a
+    #! candidate starts at the lowest loss on the support. See issue #2160.
+    lo = -vec(maximum(view(X, w .> zero(eltype(w)), :); dims = 1))
     function func(etas)
         delete!(epc, :cvar_eq)
-        @argcheck(all(zero(eltype(etas)) .<= etas .<= B),
-                  DomainError(etas, "all elements of etas must be in [0, B] where B = $B"))
+        @argcheck(all(lo .<= etas .<= B),
+                  DomainError(etas,
+                              "all elements of etas must be in [lo, B] where lo = $lo and B = $B"))
         pos_part = max.(-X .- transpose(etas), zero(eltype(X)))
         add_ep_constraint!(epc, transpose(pos_part ./ transpose(alphas)), B .- etas,
                            :cvar_eq)
@@ -741,8 +802,15 @@ function ep_cvar_views_solve!(cvv::CvarViewSearch, epc::AbstractDict,
         #! sits between 0.32 and 0.64 of `B[1]`, so the shrink does not move it. See issue
         #! #574.
         hi = B[1] * (one(eltype(B)) - sqrt(eps(eltype(B))))
+        z = zero(eltype(B))
         try
-            [Roots.find_zero(x -> func(x)[2], (zero(eltype(B)), hi), d_opt.args...;
+            #! The residual at zero picks the bracket. A residual at or below zero puts at
+            #! most `alpha` on the losses above zero, so the root is in `[lo, 0]`. The closure
+            #! reuses that residual, so a root above zero costs no inner solve more than the
+            #! bracket `[0, hi]` did. See issue #2160.
+            f0 = func([z])[2]
+            ab = ifelse(f0 > z, (z, hi), (lo[1], z))
+            [Roots.find_zero(x -> iszero(x) ? f0 : func(x)[2], ab, d_opt.args...;
                              d_opt.kwargs...)]
         catch e
             throw(ErrorException("CVaR entropy pooling optimisation failed. Relax the view, increase alpha, use different solver parameters, use VaR views instead, or use a different prior.\n$(e)"))
@@ -778,7 +846,9 @@ function ep_cvar_views_solve!(cvv::CvarViewSearch, epc::AbstractDict,
             end
         end
         res = try
-            Optim.optimize(trial, zeros(N), B, 0.5 * B, d_opt.args...; d_opt.kwargs...)
+            #! The box starts at `lo` for the reason that the bracket of one view does. A box
+            #! from zero missed a view of a value at risk below zero with no error.
+            Optim.optimize(trial, lo, B, 0.5 * B, d_opt.args...; d_opt.kwargs...)
         catch e
             throw(ErrorException("CVaR entropy pooling optimisation failed. Relax the views, increase alpha, use different solver parameters, use VaR views instead, reduce the number of CVaR views, or use a different prior.\n$(e)"))
         end

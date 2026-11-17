@@ -314,7 +314,7 @@ Where:
 
   - Maximise `t`.
 
-The programme leaves out three kinds of row. A `:feq` row fixes a moment of an earlier stage, and the solve relaxes it with a penalised slack, so it cannot make the solve infeasible. A `:cvar_eq` row is a trial of the root search of [`ep_cvar_views_solve!`](@ref), not a view. A tail view constraint that is a restriction of its view can be infeasible where the view is not, so [`ep_diagnose_tail_view!`](@ref) adds only the exact ones.
+The programme leaves out four kinds of row. A `:feq` row fixes a moment of an earlier stage, and the solve relaxes it with a penalised slack, so it cannot make the solve infeasible. A `:cvar_eq` row is a trial of the root search of [`ep_cvar_views_solve!`](@ref), not a view. A `:cvar_ineq` row is a CVaR view that the same function writes only during the solve, and the diagnosis reads no CVaR view. A tail view constraint that is a restriction of its view can be infeasible where the view is not, so [`ep_diagnose_tail_view!`](@ref) adds only the exact ones.
 
 # Algorithm
 
@@ -573,7 +573,7 @@ Add every view constraint of an entropy pooling problem to a JuMP model.
 
  1. Add the row `ceq` when `epc` holds an `:eq` block.
  2. Add the row `cineq` when `epc` holds an `:ineq` block.
- 3. Add the row `ccvareq` when `epc` holds a `:cvar_eq` block.
+ 3. Add the row `ccvareq` when `epc` holds a `:cvar_eq` block. Add the row `ccvarineq` when `epc` holds a `:cvar_ineq` block.
  4. When `epc` holds a `:feq` block, create the slack `c` and its norm `tc`. Add the row `cfeq`, which lets the block miss its target by `c`, and bound the norm of `c` by `tc`. Add the penalty `so * sc2 * tc` to `obj_expr`.
  5. Give each tail view of `tvs` to [`add_ep_tail_view!`](@ref) in turn.
 
@@ -590,10 +590,11 @@ Add every view constraint of an entropy pooling problem to a JuMP model.
   - `ceq`: ``s_{c1} \\left(\\mathbf{A}_{\\mathrm{eq}} \\boldsymbol{p} - \\boldsymbol{B}_{\\mathrm{eq}}\\right) = 0``
   - `cineq`: ``s_{c1} \\left(\\mathbf{A}_{\\mathrm{ineq}} \\boldsymbol{p} - \\boldsymbol{B}_{\\mathrm{ineq}}\\right) \\leq 0``
   - `ccvareq`: ``s_{c1} \\left(\\mathbf{A}_{\\mathrm{cvar}} \\boldsymbol{p} - \\boldsymbol{B}_{\\mathrm{cvar}}\\right) = 0``
+  - `ccvarineq`: ``s_{c1} \\left(\\mathbf{A}_{\\mathrm{cvi}} \\boldsymbol{p} - \\boldsymbol{B}_{\\mathrm{cvi}}\\right) \\leq 0``
   - `cfeq`: ``s_{c1} \\left(\\mathbf{A}_{\\mathrm{feq}} \\boldsymbol{p} - \\boldsymbol{B}_{\\mathrm{feq}} - \\boldsymbol{c}\\right) = 0``
   - Registered with no name, together with `cfeq`: ``\\left(s_{c1} \\eta_{c},\\; s_{c1} \\boldsymbol{c}\\right) \\in \\mathcal{K}_{1}``, which states ``\\eta_{c} \\geq \\lVert \\boldsymbol{c} \\rVert_{1}``.
 
-The function registers each of the four named rows only when `epc` holds the block of that row. [`add_ep_tail_view!`](@ref) registers every row that a tail view needs. Its methods are in `src/10_Prior/06_EntropyPooling/03_EntropyPoolingPrior_a.jl` and `src/10_Prior/06_EntropyPooling/03_EntropyPoolingPrior_b.jl`.
+The function registers each of the five named rows only when `epc` holds the block of that row. [`add_ep_tail_view!`](@ref) registers every row that a tail view needs. Its methods are in `src/10_Prior/06_EntropyPooling/03_EntropyPoolingPrior_a.jl` and `src/10_Prior/06_EntropyPooling/03_EntropyPoolingPrior_b.jl`.
 
 ## Relaxation
 
@@ -612,7 +613,7 @@ Where:
   - $(math_dict[:ep_sc1])
   - $(math_dict[:ep_sc2])
   - $(math_dict[:ep_so])
-  - ``\\mathrm{cvar}``, ``\\mathrm{feq}``: Subscripts of the `:cvar_eq` and `:feq` blocks of `epc`.
+  - ``\\mathrm{cvar}``, ``\\mathrm{cvi}``, ``\\mathrm{feq}``: Subscripts of the `:cvar_eq`, `:cvar_ineq` and `:feq` blocks of `epc`.
   - ``\\boldsymbol{c}``: Slack of the fixed equality rows, with one entry for each row of the `:feq` block.
   - ``\\eta_{c}``: Bound on the ``L_{1}`` norm of ``\\boldsymbol{c}``.
   - ``\\mathcal{K}_{1}``: Norm one cone, `JuMP.MOI.NormOneCone(N + 1)`.
@@ -651,6 +652,10 @@ function ep_jump_views!(model::JuMP.Model, x, obj_expr, epc::AbstractDict, tvs::
     if haskey(epc, :cvar_eq)
         A, B = epc[:cvar_eq]
         JuMP.@constraint(model, ccvareq, sc1 * (A * x ⊖ B) == 0)
+    end
+    if haskey(epc, :cvar_ineq)
+        A, B = epc[:cvar_ineq]
+        JuMP.@constraint(model, ccvarineq, sc1 * (A * x ⊖ B) <= 0)
     end
     if haskey(epc, :feq)
         A, B = epc[:feq]

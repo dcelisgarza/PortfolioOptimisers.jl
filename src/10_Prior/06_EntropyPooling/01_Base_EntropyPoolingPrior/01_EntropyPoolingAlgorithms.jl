@@ -168,7 +168,7 @@ $(DocStringExtensions.TYPEDEF)
 
 Finds with a root finder the value at risk level that meets one conditional value-at-risk view.
 
-With this optimiser, [`MeucciEntropyPoolingPrior`](@ref) writes no CVaR constraint. It searches for the level instead. For each candidate level, it makes the positive-part rows again, solves the full entropy pooling problem again, and reads the tail mass of the posterior. This type holds the arguments of the [`Roots.jl`](https://juliamath.github.io/Roots.jl/stable/) call that does the search. A group of more than one CVaR view uses the [`OptimEntropyPooling`](@ref) of the `dm_opt` field instead.
+With this optimiser, [`MeucciEntropyPoolingPrior`](@ref) writes no CVaR constraint for a view below the worst loss of its asset. It searches for the level instead. For each candidate level, it makes the positive-part rows again, solves the full entropy pooling problem again, and reads the tail mass of the posterior. This type holds the arguments of the [`Roots.jl`](https://juliamath.github.io/Roots.jl/stable/) call that does the search. A group of more than one searched CVaR view uses the [`OptimEntropyPooling`](@ref) of the `dm_opt` field instead. A view at the worst loss is one linear row, and it needs no search.
 
 # Fields
 
@@ -202,7 +202,7 @@ ConditionalValueatRiskEntropyPooling
 
 # References
 
-  - $(ref_dict[:meucciardiakeel2011]) Pages 39–49. $(ref_dict[:no_original_source])
+  - $(ref_dict[:meucciardiakeel2011]) Section 3, Equations 3.1 to 3.6.
 """
 @concrete struct ConditionalValueatRiskEntropyPooling <: AbstractEntropyPoolingOptimiser
     """
