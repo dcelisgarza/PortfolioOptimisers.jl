@@ -287,5 +287,53 @@ false
 function bigger_is_better(r::Union{RiskRatio, NonOptimisationRiskRatio})::Bool
     return bigger_is_better(r.r1)
 end
+"""
+    const RkRatioRM = Union{RiskRatio, NonOptimisationRiskRatio}
+
+Groups the two ratio measures whose value is one risk divided by another risk.
+
+Both members hold their two risks in the fields `r1` and `r2`, so one method of [`supports_precomputed_returns`](@ref) answers for both. Their [`expected_risk`](@ref) methods stay separate, because only [`NonOptimisationRiskRatio`](@ref) carries a scalariser for each field.
+
+# Related
+
+  - [`RiskRatio`](@ref)
+  - [`NonOptimisationRiskRatio`](@ref)
+  - [`supports_precomputed_returns`](@ref)
+  - [`expected_risk`](@ref)
+"""
+const RkRatioRM = Union{RiskRatio, NonOptimisationRiskRatio}
+"""
+$(DocStringExtensions.TYPEDSIGNATURES)
+
+Return whether [`RkRatioRM`](@ref) `r` supports evaluation on a precomputed return series.
+
+Returns `true` only when both constituent risk measures support precomputed returns.
+
+# Related
+
+  - [`RkRatioRM`](@ref)
+  - [`supports_precomputed_returns`](@ref)
+  - [`expected_risk_from_returns`](@ref)
+"""
+function supports_precomputed_returns(r::RkRatioRM)
+    return supports_precomputed_returns(r.r1) && supports_precomputed_returns(r.r2)
+end
+# Precomputed-returns contract for the ratio composites: decompose onto the series, mirroring
+# the `(w, X, fees)` decomposition of their `expected_risk` methods. Each component routes
+# through `expected_risk_from_returns` rather than being called as a function, because a
+# widened field may hold a **vector** — a vector is not callable, and a call method on
+# `AbstractVector` would be piracy on `Base`. The detour also upgrades a raw `MethodError` to
+# the guard's named refusal. On a single supported measure the guard returns `r(x)`, so the
+# number is unchanged.
+#
+# `RkRatioRM` splits for the same reason its `expected_risk` methods do: `RiskRatio` has no
+# `sca1`/`sca2` to name.
+function (r::RiskRatio)(x::VecNum)
+    return expected_risk_from_returns(r.r1, x) / expected_risk_from_returns(r.r2, x)
+end
+function (r::NonOptimisationRiskRatio)(x::VecNum)
+    return expected_risk_from_returns(r.sca1, r.r1, x) /
+           expected_risk_from_returns(r.sca2, r.r2, x)
+end
 
 export RiskRatio, NonOptimisationRiskRatio

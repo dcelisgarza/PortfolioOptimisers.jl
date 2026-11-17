@@ -308,6 +308,29 @@ function needs_previous_weights(r::MeanReturnRiskRatio)
     return needs_previous_weights(r.rk)
 end
 """
+$(DocStringExtensions.TYPEDSIGNATURES)
+
+Return whether [`MeanReturnRiskRatio`](@ref) `r` supports evaluation on a precomputed return series.
+
+Returns `true` only when both the return measure `rt` and the risk measure `rk` support precomputed returns.
+
+# Related
+
+  - [`MeanReturnRiskRatio`](@ref)
+  - [`supports_precomputed_returns`](@ref)
+  - [`expected_risk_from_returns`](@ref)
+"""
+function supports_precomputed_returns(r::MeanReturnRiskRatio)
+    return supports_precomputed_returns(r.rt) && supports_precomputed_returns(r.rk)
+end
+# Precomputed-returns contract: decompose onto the series, as the `(w, X, fees)` method of
+# `expected_risk` does. `rk` routes through `expected_risk_from_returns`, because the field may
+# hold a vector of measures, which is not callable.
+function (r::MeanReturnRiskRatio)(x::VecNum)
+    return (expected_risk_from_returns(r.rt, x) - r.rf) /
+           expected_risk_from_returns(r.sca, r.rk, x)
+end
+"""
 $(DocStringExtensions.TYPEDEF)
 
 Measures the third central moment of the portfolio returns, or the standardised skewness when `ve` is a variance estimator.

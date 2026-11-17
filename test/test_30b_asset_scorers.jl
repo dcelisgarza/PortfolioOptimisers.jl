@@ -26,6 +26,29 @@ struct NoOrientationScorer <: PortfolioOptimisers.AbstractAssetScorer end
         return [(count(<(x), u) + count(<=(x), u)) / (2n) for x in u]
     end
 
+    @testset "asset_scores refuses a measure that cannot score a return series" begin
+        bad = (Variance(), StandardDeviation(), Skewness(), Kurtosis(),
+               LowOrderMoment(; mu = fill(0.0, 6)), MeanReturnRiskRatio(; rk = Variance()),
+               RiskRatio(; r1 = ConditionalValueatRisk(), r2 = Variance()))
+        for r in bad
+            @test_throws ArgumentError PO.asset_scores(r, rd.X)
+            @test_throws ArgumentError PO.asset_scores(r, rd)
+        end
+        @test_throws "SCM()" PO.asset_scores(Variance(), rd)
+        @test_throws "HighOrderMoment" PO.asset_scores(Kurtosis(), rd.X)
+        @test_throws "ThirdCentralMoment" PO.asset_scores(Skewness(), rd)
+        # The ratio functors on a column: the score is the ratio of the scores of the sides.
+        cvar = PO.asset_scores(ConditionalValueatRisk(), rd)
+        mdd = PO.asset_scores(MaximumDrawdown(), rd)
+        mr = PO.asset_scores(MeanReturn(), rd)
+        @test PO.asset_scores(RiskRatio(; r1 = ConditionalValueatRisk(),
+                                        r2 = MaximumDrawdown()), rd) ≈ cvar ./ mdd
+        @test PO.asset_scores(NonOptimisationRiskRatio(; r1 = MeanReturn(),
+                                                       r2 = ConditionalValueatRisk()), rd) ≈
+              mr ./ cvar
+        @test PO.asset_scores(MeanReturnRiskRatio(; rk = ConditionalValueatRisk(),
+                                                  rf = 1e-4), rd) ≈ (mr .- 1e-4) ./ cvar
+    end
     @testset "the seam: a risk measure is the in-sample score" begin
         @test PO.asset_scores(SCM(), rd) == PO.asset_scores(SCM(), rd.X)
         s = FoldRiskScorer(; r = SCM())

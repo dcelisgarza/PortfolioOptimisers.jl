@@ -1,7 +1,9 @@
 ```@meta
-Description = "Ratio Risk Measure has no private API in PortfolioOptimisers.jl; its names are in the public API."
+Description = "Ratio Risk Measure, private API of PortfolioOptimisers.jl: RkRatioRM."
 ```
 
 # Ratio Risk Measure: private API
 
-Every name of this topic is public. The [public page](@ref api-ratio-risk-measure) documents them.
+```@docs
+RkRatioRM
+```

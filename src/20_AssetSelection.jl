@@ -519,6 +519,7 @@ The method on an [`AbstractAssetScorer`](@ref) checks nothing and returns `nothi
 # Related
 
   - [`ScoreSelector`](@ref)
+  - [`asset_scores`](@ref)
   - [`supports_precomputed_returns`](@ref)
 """
 function assert_scoreable(score::AbstractBaseRiskMeasure)::Nothing
@@ -556,9 +557,10 @@ The two routes give an asset that they cannot score the same score, `NaN`. A col
 
 # Algorithm
 
- 1. Find the live columns, those in the Coverage Universe, with [`cv_live_assets`](@ref).
- 2. Evaluate `score` on a view of each live column, one column after the other, check that every score is finite, and write `NaN` at every other column, with [`live_asset_scores`](@ref).
- 3. Return `scores`.
+ 1. Check that a risk measure can take the return series of one asset, with [`assert_scoreable`](@ref).
+ 2. Find the live columns, those in the Coverage Universe, with [`cv_live_assets`](@ref).
+ 3. Evaluate `score` on a view of each live column, one column after the other, check that every score is finite, and write `NaN` at every other column, with [`live_asset_scores`](@ref).
+ 4. Return `scores`.
 
 # Arguments
 
@@ -568,6 +570,7 @@ The two routes give an asset that they cannot score the same score, `NaN`. A col
 
 # Validation
 
+  - With a risk measure, `supports_precomputed_returns(score)`. Otherwise [`assert_scoreable`](@ref) throws an `ArgumentError` that names the measure and a scoreable measure that computes the same quantity. The answer of [`supports_precomputed_returns`](@ref) comes from the type of `score` alone, so the compiler removes the check for a scoreable measure.
   - No column is live. Otherwise [`coverage_mask`](@ref) throws an `IsEmptyError`, as it does for an Asset Scorer.
   - With a risk measure, every live column has a finite score. Otherwise the function throws a `DomainError` that names those columns. [`ThirdCentralMoment`](@ref) with a variance estimator in `ve`, on a constant series for example, divides by a zero standard deviation and gives `NaN`. A rule drops a `NaN` score, so the defect of the measure becomes silent if the function does not throw. A column that is not live is not scored and raises no error: its entry is `NaN`.
 
@@ -582,11 +585,13 @@ The two routes give an asset that they cannot score the same score, `NaN`. A col
   - [`AbstractAssetScorer`](@ref)
 """
 function asset_scores(score::AbstractBaseRiskMeasure, X::MatNum)
+    assert_scoreable(score)
     return live_asset_scores(score, X,
                              cv_live_assets(coverage_mask(X, nothing; dims = 1),
                                             size(X, 2)))
 end
 function asset_scores(score::AbstractBaseRiskMeasure, rd::AbstractReturnsResult)
+    assert_scoreable(score)
     return live_asset_scores(score, rd.X, cv_live_assets(rd))
 end
 """
