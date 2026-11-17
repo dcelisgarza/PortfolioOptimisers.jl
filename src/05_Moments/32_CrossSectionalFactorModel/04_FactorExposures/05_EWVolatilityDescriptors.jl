@@ -305,7 +305,7 @@ Exponentially weighted volatility of the market-model residual, at every observa
 
 This is the archetype of every residual volatility Descriptor. It removes the part of a return the market explains, and measures the volatility of what is left, so the Descriptor carries the risk that belongs to the asset alone. A caller who already models market beta reads this in place of the total volatility, because the two together would count the market twice.
 
-[`ew_beta_series`](@ref) estimates the beta at its own decay, and the residual of an observation takes the beta of that same observation. The volatility of the residual is the [`variance_series`](@ref) of the estimator in the `ce` field. That estimator carries the recursion, the bias correction and the reset of an asset that turns inactive, so this type repeats none of them.
+[`ew_regression_series!`](@ref) estimates the beta at its own decay, as [`EWBeta`](@ref) states, and the residual of an observation takes the beta of that same observation. The volatility of the residual is the [`variance_series`](@ref) of the estimator in the `ce` field. That estimator carries the recursion, the bias correction and the reset of an asset that turns inactive, so this type repeats none of them.
 
 # Mathematical definition
 
@@ -317,7 +317,7 @@ d_{t,i} &= \\sqrt{\\hat{\\sigma}_{t,i}^2}\\,.
 \\end{align}
 ```
 
-The beta includes observation ``t``. At the first valid observation of an asset, the beta is ``x_{t,\\,i} / r_{m,t}`` up to the floor ``\\texttt{min\\_val}``, so the residual there is zero up to that floor.
+The beta includes observation ``t``, and it is fitted with an intercept that the residual keeps. A beta from a few observations can be extreme and inflate the residual, so the beta exists only from the `beta_min_obs`-th valid observation of the asset, and the residual exists only where the beta does. A residual that does not exist does not enter the variance, so the warm-up of `ce` counts the residuals alone. The Descriptor is `NaN` where the beta of the observation is `NaN`, for example where the market does not vary, and the variance still keeps its history there.
 
 Where:
 
@@ -325,13 +325,12 @@ Where:
   - $(math_dict[:x_ti_ret])
   - $(math_dict[:r_mt_ewb])
   - $(math_dict[:beta_ti_ewb])
-  - $(math_dict[:min_val_ewb])
-  - ``\\varepsilon_{t,i}``: Market-model residual of asset ``i`` at observation ``t``, `NaN` where the asset is inactive or its return is not finite.
+  - ``\\varepsilon_{t,i}``: Market-model residual of asset ``i`` at observation ``t``, `NaN` where the asset is inactive, its return is not finite, or its beta is `NaN`.
   - ``y_{t,i}``: Input the variance estimator reads for asset ``i`` at observation ``t``.
   - ``\\hat{\\sigma}_{t,i}^2``: Variance of asset ``i`` after observation ``t``, as `ce` estimates it from the inputs ``y`` up to ``t``. The default `ce` is the recursion that [`ew_variance_estimator`](@ref) states.
   - ``\\mathrm{mar}``: `mar`, the minimum acceptable return.
 
-[`market_return_series`](@ref) builds ``r_{m,t}``, and [`ew_beta_series`](@ref) runs the recursion of ``\\beta_{t,i}`` at the decay `beta_decay`.
+[`market_return_series`](@ref) builds ``r_{m,t}``, and [`ew_regression_series!`](@ref) runs the recursion of ``\\beta_{t,i}`` at the decay `beta_decay`.
 
 # Fields
 
@@ -342,21 +341,21 @@ $(DocStringExtensions.FIELDS)
     EWResidualVolatility(; mcap::AbstractString = "market_cap", half_life::Real = 40.0,
                          beta_half_life::Real = 60.0,
                          beta_decay::Real = half_life_decay(beta_half_life, :beta_half_life),
+                         beta_min_obs::Integer = 10,
                          ce::AbstractCovarianceEstimator = ew_variance_estimator(half_life,
                                                                                  max(half_life,
                                                                                      beta_half_life)),
                          alg::AbstractMomentAlgorithm = FullMoment(), mar::Real = 0.0,
-                         min_val::Real = 1e-12,
                          cache::Option{<:AbstractPartialFitState} = nothing) -> EWResidualVolatility
 
-Keywords correspond to the struct's fields, except `half_life` and `beta_half_life`, which are not fields. `half_life` fixes the decay of `ce`, `beta_half_life` fixes `beta_decay`, and the **longer** of the two fixes the warm-up of `ce`, because a residual is no better estimated than the beta that formed it. The constructor keeps a `ce` or a `beta_decay` that the caller passes as it is. The default half-lives of `40` and `60` weight about as far back as two months and one quarter of daily observations.
+Keywords correspond to the struct's fields, except `half_life` and `beta_half_life`, which are not fields. `half_life` fixes the decay of `ce`, `beta_half_life` fixes `beta_decay`, and the **longer** of the two fixes the warm-up of `ce`, because a residual is no better estimated than the beta that formed it. The constructor keeps a `ce` or a `beta_decay` that the caller passes as it is. The default half-lives of `40` and `60` weight about as far back as two months and one quarter of daily observations. With the defaults and no missing return, the first value is at observation `69`: the beta needs ten observations, and `ce` then needs sixty residuals.
 
 ## Validation
 
   - `mcap` is not empty.
   - `0 < beta_decay < 1`.
+  - `beta_min_obs >= 1`.
   - `isfinite(mar)`.
-  - `0 < min_val < Inf`.
   - `0 < half_life < Inf` and `0 < beta_half_life < Inf`, where each fixes a default. Raises a `DomainError` that names the half-life.
 
 # Examples
@@ -364,8 +363,9 @@ Keywords correspond to the struct's fields, except `half_life` and `beta_half_li
 ```jldoctest
 julia> de = EWResidualVolatility(; half_life = 5, beta_half_life = 8);
 
-julia> (de.ce.decay ≈ exp2(-inv(5.0)), de.ce.min_obs, de.beta_decay ≈ exp2(-inv(8.0)))
-(true, 8, true)
+julia> (de.ce.decay ≈ exp2(-inv(5.0)), de.ce.min_obs, de.beta_decay ≈ exp2(-inv(8.0)),
+        de.beta_min_obs)
+(true, 8, true, 10)
 ```
 
 # Related
@@ -374,7 +374,7 @@ julia> (de.ce.decay ≈ exp2(-inv(5.0)), de.ce.min_obs, de.beta_decay ≈ exp2(-
   - [`descriptor`](@ref)
   - [`EWResidualDownsideVolatility`](@ref)
   - [`EWVolatility`](@ref)
-  - [`ew_beta_series`](@ref)
+  - [`ew_regression_series!`](@ref)
   - [`ew_variance_estimator`](@ref)
   - [`market_return_series`](@ref)
   - [`variance_series`](@ref)
@@ -393,6 +393,10 @@ julia> (de.ce.decay ≈ exp2(-inv(5.0)), de.ce.min_obs, de.beta_decay ≈ exp2(-
     """
     beta_decay
     """
+    Number of valid observations of an asset, since its last reset, that its beta needs before a residual is formed from it. A beta from a few observations can be extreme, and its residual then inflates the volatility.
+    """
+    beta_min_obs
+    """
     $(field_dict[:malg])
     """
     alg
@@ -401,36 +405,33 @@ julia> (de.ce.decay ≈ exp2(-inv(5.0)), de.ce.min_obs, de.beta_decay ≈ exp2(-
     """
     mar
     """
-    $(field_dict[:min_val])
-    """
-    min_val
-    """
     $(field_dict[:ew_vol_desc_cache])
     """
     cache
     function EWResidualVolatility(mcap::AbstractString, ce::AbstractCovarianceEstimator,
-                                  beta_decay::Real, alg::AbstractMomentAlgorithm, mar::Real,
-                                  min_val::Real, cache::Option{<:AbstractPartialFitState})
+                                  beta_decay::Real, beta_min_obs::Integer,
+                                  alg::AbstractMomentAlgorithm, mar::Real,
+                                  cache::Option{<:AbstractPartialFitState})
         assert_panel_terms(mcap, :mcap)
         assert_ew_decay(beta_decay)
+        assert_nonempty_gt0_finite_val(beta_min_obs, :beta_min_obs)
         assert_finite(mar, :mar)
-        assert_nonempty_gt0_finite_val(min_val, :min_val)
-        return new{typeof(mcap), typeof(ce), typeof(beta_decay), typeof(alg), typeof(mar),
-                   typeof(min_val), typeof(cache)}(mcap, ce, beta_decay, alg, mar, min_val,
-                                                   cache)
+        return new{typeof(mcap), typeof(ce), typeof(beta_decay), typeof(beta_min_obs),
+                   typeof(alg), typeof(mar), typeof(cache)}(mcap, ce, beta_decay,
+                                                            beta_min_obs, alg, mar, cache)
     end
 end
 function EWResidualVolatility(; mcap::AbstractString = "market_cap", half_life::Real = 40.0,
                               beta_half_life::Real = 60.0,
                               beta_decay::Real = half_life_decay(beta_half_life,
                                                                  :beta_half_life),
+                              beta_min_obs::Integer = 10,
                               ce::AbstractCovarianceEstimator = ew_variance_estimator(half_life,
                                                                                       max(half_life,
                                                                                           beta_half_life)),
                               alg::AbstractMomentAlgorithm = FullMoment(), mar::Real = 0.0,
-                              min_val::Real = 1e-12,
                               cache::Option{<:AbstractPartialFitState} = nothing)::EWResidualVolatility
-    return EWResidualVolatility(mcap, ce, beta_decay, alg, mar, min_val, cache)
+    return EWResidualVolatility(mcap, ce, beta_decay, beta_min_obs, alg, mar, cache)
 end
 """
     ew_residual_returns(X::AbstractMatrix{<:Real}, rm::AbstractVector{<:Real},
@@ -480,7 +481,7 @@ julia> PortfolioOptimisers.ew_residual_returns([0.1 0.2; NaN 0.0], [0.1, -0.05],
 # Related
 
   - [`EWResidualVolatility`](@ref)
-  - [`ew_beta_series`](@ref)
+  - [`ew_regression_series!`](@ref)
   - [`descriptor`](@ref)
 """
 function ew_residual_returns(X::AbstractMatrix{<:Real}, rm::AbstractVector{<:Real},
@@ -504,11 +505,11 @@ Compute an exponentially weighted residual volatility Descriptor from a [`Return
 # Algorithm
 
  1. Build the market return `rm` through [`market_return_series`](@ref).
- 2. Run the beta recursion through [`ew_beta_series`](@ref), giving the betas `B`. The recursion resets an asset that turns inactive, and its warm-up of one observation writes a beta at every valid observation.
- 3. Remove the market from every return through [`ew_residual_returns`](@ref), giving the residuals `E`.
+ 2. Run the beta regression through [`ew_regression_series!`](@ref), giving the betas `B`. The regression resets an asset that turns inactive, and it writes a beta from the `beta_min_obs`-th valid observation of the asset.
+ 3. Remove the market from every return through [`ew_residual_returns`](@ref), giving the residuals `E`. A residual is `NaN` where the beta is `NaN`.
  4. Transform the residuals through [`ew_volatility_input`](@ref), which reads the `alg` field, giving `Y`.
  5. Take the point-in-time variance series `V` of `Y` through [`variance_series`](@ref), and take its square root `D`.
- 6. Write `NaN` into the inactive cells through [`descriptor_active_fill!`](@ref).
+ 6. Write `NaN` where the beta is `NaN` through [`ew_residual_unresolved!`](@ref), and into the inactive cells through [`descriptor_active_fill!`](@ref).
 
 The variance estimator owns the warm-up and the bias correction, so a cell where it returns `NaN` is `NaN` in the Descriptor. The call is [`ew_volatility_fold`](@ref) from no state, so a step of the carry fold runs the same arithmetic.
 
@@ -535,18 +536,18 @@ julia> pnl = asset_panel([NumericPanelInput(; name = \"market_cap\",
 
 julia> rd = ReturnsResult(; nx = [\"A\", \"B\"], X = [0.1 0.2; -0.1 0.0; 0.05 0.05], pnl = pnl);
 
-julia> descriptor(EWResidualVolatility(; half_life = 1, beta_half_life = 1), rd)
+julia> descriptor(EWResidualVolatility(; half_life = 1, beta_half_life = 1, beta_min_obs = 2), rd)
 3×2 Matrix{Float64}:
- 7.20002e-12  1.44e-11
- 0.0496512    0.0343739
- 0.0325048    0.0226705
+ NaN          NaN
+   0.0590909    0.0409091
+   0.0341457    0.0239417
 ```
 
 # Related
 
   - [`EWResidualVolatility`](@ref)
   - [`EWResidualDownsideVolatility`](@ref)
-  - [`ew_beta_series`](@ref)
+  - [`ew_regression_series!`](@ref)
   - [`ew_residual_returns`](@ref)
   - [`ew_volatility_input`](@ref)
   - [`variance_series`](@ref)
@@ -563,7 +564,7 @@ end
                                  ce::AbstractCovarianceEstimator = ew_variance_estimator(half_life,
                                                                                          max(half_life,
                                                                                              beta_half_life)),
-                                 min_val::Real = 1e-12) -> EWResidualVolatility
+                                 beta_min_obs::Integer = 10) -> EWResidualVolatility
 
 Exponentially weighted volatility of the market-model residuals that fall short of a minimum acceptable return.
 
@@ -577,7 +578,7 @@ The value is the volatility of [`EWResidualVolatility`](@ref) measured on `min(�
   - `mar`: Minimum acceptable return. A residual above it contributes zero.
   - `beta_decay`: Decay factor of the beta recursion.
   - `ce`: Variance estimator the Descriptor reads.
-  - $(arg_dict[:min_val])
+  - `beta_min_obs`: Number of valid observations that the beta of an asset needs before a residual is formed from it.
 
 # Validation
 
@@ -612,9 +613,9 @@ function EWResidualDownsideVolatility(; mcap::AbstractString = "market_cap",
                                       ce::AbstractCovarianceEstimator = ew_variance_estimator(half_life,
                                                                                               max(half_life,
                                                                                                   beta_half_life)),
-                                      min_val::Real = 1e-12)::EWResidualVolatility
+                                      beta_min_obs::Integer = 10)::EWResidualVolatility
     return EWResidualVolatility(; mcap = mcap, ce = ce, beta_decay = beta_decay,
-                                alg = SemiMoment(), mar = mar, min_val = min_val)
+                                beta_min_obs = beta_min_obs, alg = SemiMoment(), mar = mar)
 end
 
 """
@@ -807,10 +808,10 @@ The batch call [`descriptor`](@ref) is this function from no state, so a step eq
 
 # Algorithm
 
- 1. For an [`EWResidualVolatility`](@ref), build the market return, and run the beta recursion with [`ew_beta_series!`](@ref) from the beta state, or from zero. Remove the market from every return.
+ 1. For an [`EWResidualVolatility`](@ref), build the market return, and run the beta regression with [`ew_regression_series!`](@ref) from the beta state, or from zero. Remove the market from every return.
  2. Transform the returns, or the residuals, through [`ew_volatility_input`](@ref).
  3. Take the variance of each observation and the state of `ce` after them with [`ew_volatility_variance`](@ref), and take the square root.
- 4. Write `NaN` into the inactive cells through [`descriptor_active_fill!`](@ref).
+ 4. For an [`EWResidualVolatility`](@ref), write `NaN` where the beta is `NaN` through [`ew_residual_unresolved!`](@ref). Write `NaN` into the inactive cells through [`descriptor_active_fill!`](@ref).
 
 # Arguments
 
@@ -853,14 +854,42 @@ function ew_volatility_fold(de::EWResidualVolatility, rd::ReturnsResult,
     rm = market_return_series(rd, de.mcap)
     X = rd.X
     amsk = pnl.amsk
-    bs = ew_beta_state(beta, X, rm, de.beta_decay)
-    B, _, bst = ew_beta_series!(bs, X, rm, de.beta_decay, 1, de.min_val, amsk)
+    bs = ew_beta_state(beta, X, rm, nothing, de.beta_decay, nothing, 1)
+    B, bst = ew_regression_series!(bs, nothing, X, rm, nothing, amsk, de.beta_min_obs, 1)
     E = ew_residual_returns(X, rm, B, amsk)
     Y = ew_volatility_input(de.alg, E, de.mar)
     V, vst = ew_volatility_variance(de.ce, Y, pnl, ve)
     D = sqrt.(V)
+    ew_residual_unresolved!(D, B)
     descriptor_active_fill!(D, pnl)
     return DescriptorFold(ew_volatility_state(vst, bst), D)
+end
+"""
+    ew_residual_unresolved!(D::AbstractMatrix{<:Real}, B::AbstractMatrix{<:Real}) -> D
+
+Writes `NaN` into every cell of the residual volatility `D` whose beta in `B` is `NaN`, in place. A beta that the regression cannot resolve leaves no residual, so the volatility of that observation is not stated, and the variance keeps its history for the next observation.
+
+# Arguments
+
+  - `D`: The residual volatility, `observations × assets`, changed in place.
+  - `B`: The betas of the same cells.
+
+# Returns
+
+  - `D::AbstractMatrix{<:Real}`: The residual volatility.
+
+# Related
+
+  - [`ew_volatility_fold`](@ref)
+  - [`EWResidualVolatility`](@ref)
+"""
+function ew_residual_unresolved!(D::AbstractMatrix{<:Real}, B::AbstractMatrix{<:Real})
+    for k in eachindex(D, B)
+        if isnan(B[k])
+            D[k] = eltype(D)(NaN)
+        end
+    end
+    return D
 end
 """
     descriptor_step(de::Union{EWVolatility{<:RegimeAdjustedExpWeightedVariance},

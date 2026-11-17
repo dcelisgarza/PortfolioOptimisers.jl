@@ -1180,7 +1180,7 @@ function cross_sectional_warmup(X::MatNum, Ms::Arr3Num, emsk::AbstractMatrix{Boo
     if !isnothing(t)
         return t - 1
     end
-    return throw(ArgumentError("no observation of this Asset Panel carries an asset of the estimation universe with both a finite return and a finite Factor Exposure to every factor, so the whole history is Descriptor warm-up. Give more observations, or shorten the warm-up of the Descriptors."))
+    return throw(ArgumentError("no observation of this Asset Panel carries an asset of the estimation universe with both a finite return and a finite Factor Exposure to every factor, so the whole history is Descriptor warm-up.$(cross_sectional_cold_factors(Ms, Zo)) Give more observations, or shorten the warm-up of the Descriptors."))
 end
 """
 $(DocStringExtensions.TYPEDEF)

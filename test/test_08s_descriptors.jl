@@ -665,23 +665,12 @@ end
     @test B[1, 1, 1] == 1 && iszero(B[1, 2, 1]) && B[1, 2, 2] == 1 && iszero(B[1, 1, 2])
 
     X = Complex{Float64}[1 2; 3 4]
-    @test isnan(real(PortfolioOptimisers.ew_active_returns(X, pnl)[1, 2]))
-
-    Ba = Complex{Float64}[1 2; 3 4]
-    @test PortfolioOptimisers.ew_beta_expand(Ba, 4, 2)[2, :] == Complex{Float64}[1, 2]
 
     v = Complex{Float64}[1, 2, 6]
     w = Complex{Float64}[1, 1, 3]
     msk = [true, false, true]
     @test PortfolioOptimisers.ew_masked_mean(v, msk) == 3.5
     @test PortfolioOptimisers.ew_masked_weighted_mean(v, w, msk) == 4.75
-
-    mu = Complex{Float64}[1, 2]
-    cv = Complex{Float64}[3, 4]
-    PortfolioOptimisers.ew_beta_reset!([true false; true true], mu, cv, [1, 1],
-                                       [true, true], 1)
-    @test iszero(mu[2]) && iszero(cv[2])
-    PortfolioOptimisers.ew_beta_reset!(nothing, mu, cv, [1, 1], [true, true], 1)
 
     @test PortfolioOptimisers.ew_volatility_input(FullMoment(), X, 0) === X
 
@@ -2139,10 +2128,9 @@ end
     @test_throws r"half_life" EWAmihudIlliquidity(; half_life = -1)
     @test_throws r"half_life" DaysToCover(; half_life = NaN)
 end
-
 #=
 Check `src/05_Moments/32_CrossSectionalFactorModel/04_FactorExposures/06_EWBetaDescriptors_a.jl` and `_b.jl`, the residual half of
-`05_EWVolatilityDescriptors.jl`, and the market-return builder and beta recursion they share
+`05_EWVolatilityDescriptors.jl`, and the market-return builder and regression they share
 in `01_Base_Descriptor.jl`, against the contract their docstrings state and against the
 oracle. Issue #719, map #643.
 
@@ -2154,27 +2142,25 @@ FIVE CONVENTIONS SHAPE THE PROBES, and the first three are `test_08s_descriptors
    observation neither advances its state nor resets it, and the observation does not count
    toward its warm-up.
 
-3. AN INACTIVE CELL IS ALSO A GAP. The oracle's own container refuses a
-   return outside the active mask, so no member ever advances a state there. The library
-   masks the returns through `ew_active_returns` before the recursion starts, which is the
-   same rule stated on this side.
+3. AN INACTIVE CELL RESETS THE ASSET. Every beta Descriptor and the residual volatility
+   restart an asset where it is inactive, so a relisted asset starts a new history.
 
-4. THE MARKET STATE IS ONE STATE FOR THE WHOLE PANEL, and it advances at every observation
-   whatever any single asset does. Only [`EWMacroSensitivity`](@ref) freezes it, and only
-   where the reference return is not finite, because a partial beta needs both series.
+4. THE SERIES OF AN ASSET SHARE ITS OBSERVATIONS. The market return enters the moments of
+   an asset only at the observations of that asset, so the beta is the slope of a weighted
+   regression with an intercept on those observations alone. The hand helpers below state it
+   as explicit weighted sums over the valid observations of the current history, not as a
+   recursion, so they check the recursion of the library from outside it.
 
-5. ONLY THE RESIDUAL VOLATILITY RESETS. Its beta and its variance both restart where an
-   asset turns inactive. The three beta Descriptors freeze instead, so an asset that
-   re-enters the universe resumes from the state it left.
+5. A WINDOW AVERAGES THE SERIES OF AN ASSET OVER THE SAME OBSERVATIONS, where `agg_obs > 1`,
+   and an inactive observation clears the open window of the asset.
 
 THE STORED CASES ARE THE ORACLE'S OWN OUTPUT. `assets/EWMarketBeta.csv.gz`
 is `EWMarketBeta(half_life = 5, group = "industry", min_group_size = 2,
 bounds = (0.1, 0.9))`, and `assets/EWMacroSensitivity.csv.gz` is
 `EWMacroSensitivity(half_life = 5, agg_obs = 3)`. Both were produced on the panel the last
-testset rebuilds. They were chosen for the two paths the hand recursions below exercise
+testset rebuilds. They were chosen for the two paths the hand checks below exercise
 least: the James-Stein shrinkage under a clamped weight, and the bivariate partial beta on
-an aggregated clock. All thirteen cases of the diff agreed with no difference in the `NaN`
-pattern and a worst relative difference of 2.5e-13 over the finite cells.
+an aggregated clock.
 =#
 
 # A small hand panel carrying a market capitalisation beside the returns, and optionally an
@@ -2225,129 +2211,129 @@ function ewb_hand_market(X::AbstractMatrix{<:Real}, W::AbstractMatrix{<:Real},
     return rm
 end
 
-# The exponentially weighted market beta, written out by hand. Deviations are taken from the
-# means of the previous step. A cell outside the active mask, or whose return is not finite,
-# advances nothing; the beta of that cell is the one the asset last carried. `reset` says
-# whether an asset that turns inactive restarts.
-function ewb_hand_beta(X::AbstractMatrix{<:Real}, rm::AbstractVector{<:Real},
-                       amsk::AbstractMatrix{Bool}, decay::Real, min_obs::Integer,
-                       min_val::Real; reset::Bool = false)
+# The valid observations of asset `i` up to `t` since its last inactive observation, where
+# every series in `S` is finite, and their exponential weights: the last one weighs `1 - λ`,
+# and each earlier one `λ` times the next.
+function ewb_hand_history(S::AbstractVector, amsk::AbstractMatrix{Bool}, decay::Real,
+                          t::Integer, i::Integer)
+    s0 = something(findlast(s -> !amsk[s, i], 1:t), 0) + 1
+    H = [s for s in s0:t if all(x -> isfinite(x[s]), S)]
+    w = [(1 - decay) * decay^(length(H) - k) for k in eachindex(H)]
+    return H, w
+end
+
+# Weighted mean and weighted cross product, over the history `H` with weights `w`.
+ewb_wmean(x, H, w) = sum(w[k] * x[H[k]] for k in eachindex(H)) / sum(w)
+function ewb_wcross(x, y, H, w)
+    mx, my = ewb_wmean(x, H, w), ewb_wmean(y, H, w)
+    return sum(w[k] * (x[H[k]] - mx) * (y[H[k]] - my) for k in eachindex(H))
+end
+
+# The exponentially weighted market beta, written out as the slope of the weighted regression
+# with an intercept over the history of each asset. `RM` is the market return, one column per
+# asset, so an aggregated market can differ between assets.
+function ewb_hand_beta(X::AbstractMatrix{<:Real}, RM::AbstractVecOrMat{<:Real},
+                       amsk::AbstractMatrix{Bool}, decay::Real, min_obs::Integer)
     T, N = size(X)
     B = fill(NaN, T, N)
-    b, mu, cv, n, act = fill(NaN, N), zeros(N), zeros(N), zeros(Int, N), trues(N)
-    mu_m, var_m = 0.0, 0.0
-    for t in 1:T
-        if reset
-            for i in 1:N
-                if act[i] && !amsk[t, i]
-                    mu[i], cv[i], n[i] = 0.0, 0.0, 0
-                end
-                act[i] = amsk[t, i]
-            end
-        end
-        dm = rm[t] - mu_m
-        mu_m = decay * mu_m + (1 - decay) * rm[t]
-        var_m = decay * var_m + (1 - decay) * dm * dm
-        for i in 1:N
-            if amsk[t, i] && isfinite(X[t, i])
-                d = X[t, i] - mu[i]
-                mu[i] = decay * mu[i] + (1 - decay) * X[t, i]
-                cv[i] = decay * cv[i] + (1 - decay) * d * dm
-                n[i] += 1
-                if t >= min_obs && n[i] >= min_obs
-                    b[i] = cv[i] / (var_m + min_val)
-                end
-            end
-            B[t, i] = b[i]
+    for t in 1:T, i in 1:N
+        r = RM isa AbstractVector ? RM : view(RM, :, i)
+        x = view(X, :, i)
+        H, w = ewb_hand_history([r, x], amsk, decay, t, i)
+        if length(H) >= max(2, min_obs)
+            B[t, i] = ewb_wcross(r, x, H, w) / ewb_wcross(r, r, H, w)
         end
     end
     return B
 end
 
-# The exponentially weighted downside beta, written out by hand. The market's shortfall
-# advances at every observation, and a ready asset reads it whether or not its own return is
-# finite at that observation.
+# The sampling variance of each beta of `ewb_hand_beta`, from the weighted least-squares
+# formula with an intercept: the residual sum of squares over the residual weight, times the
+# leverage of the weighted design over the square of the market's sum of squares.
+function ewb_hand_bev(X::AbstractMatrix{<:Real}, RM::AbstractVecOrMat{<:Real},
+                      amsk::AbstractMatrix{Bool}, decay::Real, t::Integer)
+    N = size(X, 2)
+    v = fill(NaN, N)
+    for i in 1:N
+        x = view(X, :, i)
+        rm = RM isa AbstractVector ? RM : view(RM, :, i)
+        H, w = ewb_hand_history([rm, x], amsk, decay, t, i)
+        if !(length(H) >= 3)
+            continue
+        end
+        W, Q = sum(w), sum(abs2, w)
+        mu = ewb_wmean(rm, H, w)
+        S = ewb_wcross(rm, rm, H, w)
+        L = sum(w[k]^2 * (rm[H[k]] - mu)^2 for k in eachindex(H))
+        rss = ewb_wcross(x, x, H, w) - ewb_wcross(rm, x, H, w)^2 / S
+        rho = 1 - Q / W^2 - L / (S * W)
+        v[i] = max(rss, 0.0) / (W * rho) * L / S^2
+    end
+    return v
+end
+
+# The exponentially weighted downside beta, written out as the quotient of the two weighted
+# sums of the shortfalls over the history of each asset.
 function ewb_hand_downside(X::AbstractMatrix{<:Real}, rm::AbstractVector{<:Real},
                            amsk::AbstractMatrix{Bool}, decay::Real, min_obs::Integer,
-                           mar::Real, min_val::Real)
+                           mar::Real)
     T, N = size(X)
     B = fill(NaN, T, N)
-    cd, n, vd = zeros(N), zeros(Int, N), 0.0
-    for t in 1:T
-        dm = min(rm[t] - mar, 0.0)
-        vd = decay * vd + (1 - decay) * dm * dm
-        for i in 1:N
-            if amsk[t, i] && isfinite(X[t, i])
-                cd[i] = decay * cd[i] + (1 - decay) * min(X[t, i] - mar, 0.0) * dm
-                n[i] += 1
-            end
-            if t >= min_obs && n[i] >= min_obs
-                B[t, i] = cd[i] / (vd + min_val)
-            end
+    for t in 1:T, i in 1:N
+        x = view(X, :, i)
+        H, w = ewb_hand_history([x], amsk, decay, t, i)
+        dm = [min(rm[s] - mar, 0.0) for s in H]
+        vd = sum(w[k] * dm[k]^2 for k in eachindex(H); init = 0.0)
+        if length(H) >= min_obs && vd > 0
+            B[t, i] = sum(w[k] * min(x[H[k]] - mar, 0.0) * dm[k] for k in eachindex(H)) / vd
         end
     end
     return B
 end
 
-# The exponentially weighted partial beta on a reference series, written out by hand through
-# the Frisch-Waugh closed form. A reference return that is not finite freezes the whole
-# state, market included.
-function ewb_hand_macro(X::AbstractMatrix{<:Real}, rm::AbstractVector{<:Real},
-                        rf::AbstractVector{<:Real}, amsk::AbstractMatrix{Bool}, decay::Real,
-                        min_obs::Integer, min_val::Real)
+# The partial beta on a reference series, written out as the coefficient of the weighted
+# least-squares regression of each asset on an intercept, the market and the reference series,
+# over the history where all three are finite. `RM` and `RF` hold one column per asset.
+function ewb_hand_macro(X::AbstractMatrix{<:Real}, RM::AbstractVecOrMat{<:Real},
+                        RF::AbstractVecOrMat{<:Real}, amsk::AbstractMatrix{Bool},
+                        decay::Real, min_obs::Integer)
     T, N = size(X)
     B = fill(NaN, T, N)
-    b, mu, cam, caf, n = fill(NaN, N), zeros(N), zeros(N), zeros(N), zeros(Int, N)
-    mu_m, mu_f, var_m, var_f, cov_mf, c = 0.0, 0.0, 0.0, 0.0, 0.0, 0
-    for t in 1:T
-        if isfinite(rf[t])
-            c += 1
-            dm, df = rm[t] - mu_m, rf[t] - mu_f
-            mu_m = decay * mu_m + (1 - decay) * rm[t]
-            mu_f = decay * mu_f + (1 - decay) * rf[t]
-            var_m = decay * var_m + (1 - decay) * dm * dm
-            var_f = decay * var_f + (1 - decay) * df * df
-            cov_mf = decay * cov_mf + (1 - decay) * dm * df
-            vm = var_m + min_val
-            vf = var_f - cov_mf * cov_mf / vm + min_val
-            for i in 1:N
-                if amsk[t, i] && isfinite(X[t, i])
-                    d = X[t, i] - mu[i]
-                    mu[i] = decay * mu[i] + (1 - decay) * X[t, i]
-                    cam[i] = decay * cam[i] + (1 - decay) * d * dm
-                    caf[i] = decay * caf[i] + (1 - decay) * d * df
-                    n[i] += 1
-                    if c >= min_obs && n[i] >= min_obs
-                        b[i] = (caf[i] - cam[i] * cov_mf / vm) / vf
-                    end
-                end
-            end
+    col(A, i) = A isa AbstractVector ? A : view(A, :, i)
+    for t in 1:T, i in 1:N
+        r, f, x = col(RM, i), col(RF, i), view(X, :, i)
+        H, w = ewb_hand_history([r, f, x], amsk, decay, t, i)
+        if length(H) >= max(3, min_obs)
+            A = hcat(ones(length(H)), r[H], f[H])
+            sw = sqrt.(w)
+            B[t, i] = ((sw .* A) \ (sw .* x[H]))[3]
         end
-        B[t, :] = b
     end
     return B
 end
 
 # The exponentially weighted volatility of the market-model residual, written out by hand:
-# uncentred, bias corrected by `1 / (1 - λ^n)`, and reset where the asset turns inactive.
+# uncentred, bias corrected by `1 / (1 - λ^n)`, and reset where the asset turns inactive. A
+# residual exists only where the beta `B` of its observation does, and the volatility is
+# `NaN` where that beta is.
 function ewb_hand_residual(X::AbstractMatrix{<:Real}, rm::AbstractVector{<:Real},
                            B::AbstractMatrix{<:Real}, amsk::AbstractMatrix{Bool},
                            decay::Real, min_obs::Integer; mar = nothing)
     T, N = size(X)
     D = fill(NaN, T, N)
-    v, n, act = zeros(N), zeros(Int, N), trues(N)
+    v, n = zeros(N), zeros(Int, N)
     for t in 1:T, i in 1:N
-        if act[i] && !amsk[t, i]
+        if !amsk[t, i]
             v[i], n[i] = 0.0, 0
+            continue
         end
-        act[i] = amsk[t, i]
-        if amsk[t, i] && isfinite(X[t, i])
+        if isfinite(X[t, i]) && isfinite(B[t, i])
             e = X[t, i] - B[t, i] * rm[t]
             c = isnothing(mar) ? e : min(e - mar, 0.0)
             v[i] = decay * v[i] + (1 - decay) * c * c
             n[i] += 1
         end
-        if n[i] >= min_obs
+        if n[i] >= min_obs && isfinite(B[t, i])
             D[t, i] = sqrt(v[i] / (1 - decay^n[i]))
         end
     end
@@ -2355,17 +2341,17 @@ function ewb_hand_residual(X::AbstractMatrix{<:Real}, rm::AbstractVector{<:Real}
 end
 
 # The James-Stein shrinkage of one cross-section, written out from its closed form. The
-# estimation set is every asset whose beta is not `NaN`, whose group is set and whose weight
-# is finite and strictly positive. A group below `mgs` takes the prior of the whole set.
+# shrinkable set is every asset whose beta is finite, whose group is set and whose weight is
+# finite and strictly positive. A shrinkable asset with no finite estimation error variance
+# turns `NaN`. A group below `mgs` takes the prior of the whole set.
 function ewb_hand_shrink(b::AbstractVector{<:Real}, bev::AbstractVector{<:Real},
                          L::AbstractVector{<:Integer}, w::AbstractVector{<:Real},
-                         mgs::Integer, bounds::Tuple{<:Real, <:Real}, min_val::Real)
-    ix = [i
-          for i in eachindex(b)
-          if !isnan(b[i]) &&
-                 L[i] != PortfolioOptimisers.CS_MISSING_GROUP &&
-                 isfinite(w[i]) &&
-                 w[i] > 0]
+                         mgs::Integer, bounds::Tuple{<:Real, <:Real})
+    sh = [isfinite(b[i]) &&
+              L[i] != PortfolioOptimisers.CS_MISSING_GROUP &&
+              isfinite(w[i]) &&
+              w[i] > 0 for i in eachindex(b)]
+    ix = [i for i in eachindex(b) if sh[i] && isfinite(bev[i])]
     function prior(jx)
         W = sum(w[j] for j in jx)
         mu = sum(w[j] * b[j] for j in jx) / W
@@ -2374,13 +2360,34 @@ function ewb_hand_shrink(b::AbstractVector{<:Real}, bev::AbstractVector{<:Real},
         return mu, max(tau2, 0.0)
     end
     s = copy(b)
+    s[sh] .= NaN
     for i in ix
         gx = [j for j in ix if L[j] == L[i]]
         mu, tau2 = length(gx) < mgs ? prior(ix) : prior(gx)
-        q = clamp(tau2 / (tau2 + bev[i] + min_val), bounds...)
+        q = clamp(tau2 > 0 ? tau2 / (tau2 + bev[i]) : 0.0, bounds...)
         s[i] = q * b[i] + (1 - q) * mu
     end
     return s
+end
+
+# The mean of each series of each asset over a window of `a` observations, over the
+# observations of the window where the asset is active and every series is finite. An
+# inactive observation clears the open window of its asset.
+function ewb_hand_windows(S::AbstractVector, amsk::AbstractMatrix{Bool}, a::Integer)
+    T, N = size(amsk)
+    K = div(T, a)
+    out = [fill(NaN, K, N) for _ in S]
+    for k in 1:K, i in 1:N
+        rows = ((k - 1) * a + 1):(k * a)
+        # `findlast` over a range answers a position in it, so the position names the row.
+        p = findlast(s -> !amsk[s, i], rows)
+        s0 = isnothing(p) ? first(rows) : rows[p] + 1
+        H = [s for s in s0:last(rows) if all(x -> isfinite(x[s, i]), S)]
+        for (j, x) in enumerate(S)
+            out[j][k, i] = isempty(H) ? NaN : sum(x[s, i] for s in H) / length(H)
+        end
+    end
+    return out
 end
 
 @testset "EW beta descriptors: the market return" begin
@@ -2430,7 +2437,7 @@ end
     end
 end
 
-@testset "EW beta descriptors: EWBeta against its hand recursion" begin
+@testset "EW beta descriptors: EWBeta against its hand regression" begin
     X = [0.10 0.20 -0.05
          -0.10 0.00 0.03
          0.05 NaN 0.01
@@ -2450,26 +2457,38 @@ end
     rd = ewb_hand_panel(X, W; amsk = amsk, emsk = emsk)
     rm = ewb_hand_market(X, W, emsk)
     Xm = ifelse.(amsk, X, NaN)
-    decay, min_obs, min_val = exp2(-inv(2.0)), 2, 1e-12
-    @testset "The beta is the hand recursion, masked by the active mask" begin
+    decay, min_obs = exp2(-inv(2.0)), 2
+    @testset "The beta is the hand regression, masked by the active mask" begin
         D = descriptor(EWMarketBeta(; half_life = 2), rd)
-        B = ewb_hand_beta(Xm, rm, amsk, decay, min_obs, min_val)
+        B = ewb_hand_beta(Xm, rm, amsk, decay, min_obs)
         @test ewb_same(D, ifelse.(amsk, B, NaN))
         @test all(k -> !amsk[k] ? isnan(D[k]) : true, CartesianIndices(D))
     end
-    @testset "A gap holds the beta rather than resetting it" begin
+    @testset "A gap holds the beta, and an inactive observation resets the asset" begin
         D = descriptor(EWMarketBeta(; half_life = 2), rd)
         # Asset 2 has no return at observation 3, so it carries observation 2's beta there.
         @test D[3, 2] == D[2, 2]
         # Asset 1 leaves the universe at observation 5 and comes back at observation 6, so
-        # its beta at observation 6 continues the state it left rather than restarting.
+        # its history starts again with one observation, short of the warm-up of two.
         @test isnan(D[5, 1])
-        @test isfinite(D[6, 1])
+        @test isnan(D[6, 1])
+    end
+    @testset "A late listing regresses its own observations alone" begin
+        # Asset 3 is listed at observation 2. The market of observation 1 does not enter its
+        # beta, so the beta equals the one of the panel without observation 1.
+        D = descriptor(EWMarketBeta(; half_life = 2), rd)
+        rdv = PortfolioOptimisers.port_opt_view(rd, 2:6, 1:3)
+        @test ewb_same(D[2:6, 3:3], descriptor(EWMarketBeta(; half_life = 2), rdv)[:, 3:3])
     end
     @testset "The warm-up answers NaN before an asset has min_obs of its own" begin
         D = descriptor(EWMarketBeta(; half_life = 4), rd)
         @test all(isnan, D[1:3, :])
         @test isfinite(D[4, 1])
+    end
+    @testset "A market that does not vary over the history gives NaN" begin
+        Xc = [0.01 0.01; 0.01 0.01; 0.01 0.01]
+        D = descriptor(EWMarketBeta(; half_life = 2), ewb_hand_panel(Xc, ones(3, 2)))
+        @test all(isnan, D)
     end
     @testset "The recursion reads the decay and the warm-up, not the half-life" begin
         a = descriptor(EWBeta(; decay = decay, min_obs = min_obs), rd)
@@ -2478,37 +2497,55 @@ end
         c = descriptor(EWBeta(; decay = decay, min_obs = 4), rd)
         @test all(isnan, c[1:3, :])
     end
+    @testset "Returns that overflow the moments are refused" begin
+        Xo = [1e200 -1e200; -1e200 1e200; 1e200 1e200]
+        @test_throws PortfolioOptimisers.IsNonFiniteError descriptor(EWMarketBeta(;
+                                                                                  half_life = 2),
+                                                                     ewb_hand_panel(Xo,
+                                                                                    ones(3,
+                                                                                         2)))
+    end
 end
 
 @testset "EW beta descriptors: the aggregated clock" begin
     X = [0.10 0.20
-         -0.10 0.00
+         -0.10 NaN
          0.05 0.03
          0.02 -0.03
          -0.04 0.06
          0.03 0.01
-         0.04 -0.01]
-    W = ones(7, 2) .+ 0.5
-    rd = ewb_hand_panel(X, W)
-    rm = ewb_hand_market(X, W, trues(7, 2))
+         0.04 -0.01
+         0.01 0.02
+         -0.02 0.05
+         0.03 0.04]
+    W = ones(10, 2) .+ 0.5
+    amsk = trues(10, 2)
+    amsk[5, 2] = false
+    rd = ewb_hand_panel(X, W; amsk = amsk)
+    rm = ewb_hand_market(X, W, amsk)
+    RM = repeat(rm, 1, 2)
     D = descriptor(EWMarketBeta(; half_life = 2, agg_obs = 3), rd)
-    @testset "It aggregates, then spreads the windows over their observations" begin
-        Xa = PortfolioOptimisers.ew_agg_series(X, 3)
-        rma = PortfolioOptimisers.ew_agg_vector(rm, 3)
-        @test size(Xa) == (2, 2)
-        @test Xa[1, 1] ≈ (0.10 - 0.10 + 0.05) / 3
-        B = ewb_hand_beta(Xa, rma, trues(2, 2), exp2(-inv(2.0)), 2, 1e-12)
+    Xa, Ma = ewb_hand_windows([ifelse.(amsk, X, NaN), RM], amsk, 3)
+    @testset "Each window averages the market over the observations of the asset" begin
+        # Asset 2 misses observation 2, so its first window averages observations 1 and 3,
+        # and so does its market.
+        @test Xa[1, 2] ≈ (0.20 + 0.03) / 2
+        @test Ma[1, 2] ≈ (rm[1] + rm[3]) / 2
+        # Asset 2 is inactive at observation 5, which clears its open window there, so its
+        # second window holds observation 6 alone.
+        @test Ma[2, 2] ≈ rm[6]
+    end
+    @testset "It regresses the windows, and holds a beta until the next window closes" begin
+        # The reset at observation 5 also starts the regression of asset 2 again.
+        Ba = ewb_hand_beta(Xa, Ma, [true true; true false; true true], exp2(-inv(2.0)), 2)
         @test all(isnan, D[1:5, :])
-        @test isequal(D[6, :], B[2, :])
-        @test isequal(D[7, :], B[2, :])
-    end
-    @testset "A window whose entries are all missing aggregates to NaN" begin
-        A = [1.0 NaN; 3.0 NaN; 5.0 NaN]
-        @test PortfolioOptimisers.ew_agg_series(A, 3) ≈ [3.0 NaN] nans = true
-    end
-    @testset "A tail shorter than one window is dropped" begin
-        @test size(PortfolioOptimisers.ew_agg_series(X, 4)) == (1, 2)
-        @test PortfolioOptimisers.ew_agg_vector([1.0, 3.0, 5.0], 2) ≈ [2.0]
+        @test D[6, 1] ≈ Ba[2, 1]
+        @test isequal(D[7:8, 1], fill(D[6, 1], 2))
+        @test D[9, 1] ≈ Ba[3, 1]
+        # Asset 2 has one window after its reset by observation 6 and two by observation 9.
+        @test isnan(D[6, 2])
+        @test isfinite(D[9, 2])
+        @test D[10, :] == D[9, :]
     end
 end
 
@@ -2518,12 +2555,13 @@ end
         bev = [0.01, 0.01, 0.01, 0.01]
         L = [1, 1, 1, 1]
         w = ones(4)
-        s = PortfolioOptimisers.ew_beta_shrink(b, bev, L, w, 1, (0.0, 1.0), 1e-12)
+        s = PortfolioOptimisers.ew_beta_shrink(b, bev, L, w, 1, (0.0, 1.0))
         m = sum(b) / 4
         for i in eachindex(b)
             @test min(b[i], m) <= s[i] <= max(b[i], m)
         end
         @test sum(s) ≈ sum(b)
+        @test s ≈ ewb_hand_shrink(b, bev, L, w, 1, (0.0, 1.0))
     end
     @testset "The bounds clamp the weight the raw beta keeps" begin
         # Twenty precise betas and one noisy one. The precise assets want the whole of
@@ -2534,39 +2572,55 @@ end
         L = ones(Int, 21)
         w = ones(21)
         m = sum(b) / 21
-        s = PortfolioOptimisers.ew_beta_shrink(b, bev, L, w, 1, (0.25, 0.75), 1e-12)
+        s = PortfolioOptimisers.ew_beta_shrink(b, bev, L, w, 1, (0.25, 0.75))
         @test s[1] ≈ 0.75 * b[1] + 0.25 * m
         @test s[21] ≈ 0.25 * b[21] + 0.75 * m
         # With no clamp the precise asset keeps almost the whole of its raw beta and the
         # noisy one moves almost the whole way to the mean, so it is the bounds that set
         # the two weights above and not the data.
-        u = PortfolioOptimisers.ew_beta_shrink(b, bev, L, w, 1, (0.0, 1.0), 1e-12)
+        u = PortfolioOptimisers.ew_beta_shrink(b, bev, L, w, 1, (0.0, 1.0))
         @test abs(u[1] - b[1]) < abs(s[1] - b[1])
         @test abs(u[21] - m) < abs(s[21] - m)
+    end
+    @testset "A group with no dispersion of its own takes the lower bound" begin
+        # The noise of each beta exceeds the dispersion of the group, so its prior variance
+        # is zero, and every beta keeps the lower bound of its raw value.
+        b = [0.9, 1.1]
+        s = PortfolioOptimisers.ew_beta_shrink(b, [1.0, 1.0], [1, 1], ones(2), 1,
+                                               (0.2, 1.0))
+        @test s ≈ 0.2 .* b .+ 0.8 .* 1.0
     end
     @testset "An asset outside the estimation set keeps its raw beta" begin
         b = [0.6, 1.4, 2.0, 3.0]
         bev = fill(0.01, 4)
         L = [1, 1, PortfolioOptimisers.CS_MISSING_GROUP, 1]
         w = [1.0, 1.0, 1.0, 0.0]
-        s = PortfolioOptimisers.ew_beta_shrink(b, bev, L, w, 1, (0.0, 1.0), 1e-12)
+        s = PortfolioOptimisers.ew_beta_shrink(b, bev, L, w, 1, (0.0, 1.0))
         @test s[3] == b[3]
         @test s[4] == b[4]
         @test s[1] != b[1]
         # A NaN beta is outside the set too, and it stays NaN.
         @test isnan(PortfolioOptimisers.ew_beta_shrink([NaN], [0.01], [1], [1.0], 1,
-                                                       (0.0, 1.0), 1e-12)[1])
+                                                       (0.0, 1.0))[1])
+    end
+    @testset "A shrinkable beta with no measure of its noise turns NaN" begin
+        b = [0.6, 1.4, 1.0]
+        s = PortfolioOptimisers.ew_beta_shrink(b, [0.01, 0.01, NaN], ones(Int, 3), ones(3),
+                                               1, (0.0, 1.0))
+        @test isnan(s[3])
+        @test isequal(s,
+                      ewb_hand_shrink(b, [0.01, 0.01, NaN], ones(Int, 3), ones(3), 1,
+                                      (0.0, 1.0)))
     end
     @testset "A group below min_group_size falls back on the whole cross-section" begin
         b = [0.5, 0.7, 1.5, 1.7, 3.0]
         bev = fill(0.01, 5)
         L = [1, 1, 2, 2, 3]
         w = ones(5)
-        small = PortfolioOptimisers.ew_beta_shrink(b, bev, L, w, 3, (0.0, 1.0), 1e-12)
-        whole = PortfolioOptimisers.ew_beta_shrink(b, bev, ones(Int, 5), w, 1, (0.0, 1.0),
-                                                   1e-12)
+        small = PortfolioOptimisers.ew_beta_shrink(b, bev, L, w, 3, (0.0, 1.0))
+        whole = PortfolioOptimisers.ew_beta_shrink(b, bev, ones(Int, 5), w, 1, (0.0, 1.0))
         @test small ≈ whole
-        grouped = PortfolioOptimisers.ew_beta_shrink(b, bev, L, w, 2, (0.0, 1.0), 1e-12)
+        grouped = PortfolioOptimisers.ew_beta_shrink(b, bev, L, w, 2, (0.0, 1.0))
         @test !(grouped ≈ whole)
         # The lone asset of group 3 is below min_group_size either way, so it takes the
         # whole cross-section's mean in both runs.
@@ -2576,35 +2630,46 @@ end
         b = [0.6, 1.4]
         s = PortfolioOptimisers.ew_beta_shrink(b, [0.01, 0.01],
                                                fill(PortfolioOptimisers.CS_MISSING_GROUP,
-                                                    2), ones(2), 1, (0.0, 1.0), 1e-12)
+                                                    2), ones(2), 1, (0.0, 1.0))
         @test s == b
     end
-    @testset "The Descriptor shrinks only after the warm-up, and only with a group" begin
-        X = [0.10 0.20 -0.05
-             -0.10 0.00 0.03
-             0.05 0.02 0.01
-             0.02 -0.03 0.04
-             -0.04 0.06 -0.02]
-        W = fill(2.0, 5, 3)
-        ind = repeat(["a" "a" "b"], 5, 1)
-        rd = ewb_hand_panel(X, W; industry = ind)
+    X = [0.10 0.20 -0.05 0.07
+         -0.10 0.00 0.03 -0.04
+         0.05 0.02 0.01 0.03
+         0.02 -0.03 0.04 0.00
+         -0.04 0.06 -0.02 0.02
+         0.03 -0.01 0.05 -0.03]
+    W = fill(2.0, 6, 4)
+    ind = repeat(["a" "a" "b" "b"], 6, 1)
+    rd = ewb_hand_panel(X, W; industry = ind)
+    rm = ewb_hand_market(X, W, trues(6, 4))
+    decay = exp2(-inv(2.0))
+    @testset "The estimation error variance is the weighted least-squares formula" begin
+        po = PortfolioOptimisers
+        st = po.ew_beta_state(nothing, X, rm, nothing, decay, "industry", 1)
+        for t in 1:6
+            _, st = po.ew_regression_series!(st, nothing, X[t:t, :], rm[t:t], nothing,
+                                             trues(1, 4), 2, 1)
+            v = [po.ew_beta_variance(st.mo, st.sq, st.b[i], i) for i in 1:4]
+            @test ewb_same(reshape(v, 1, :),
+                           reshape(ewb_hand_bev(X, rm, trues(6, 4), decay, t), 1, :);
+                           rtol = 1e-9)
+        end
+    end
+    @testset "The Descriptor shrinks each window with the hand variances" begin
         raw = descriptor(EWMarketBeta(; half_life = 2), rd)
         shr = descriptor(EWMarketBeta(; half_life = 2, group = "industry",
                                       min_group_size = 2), rd)
-        @test isequal(raw[1, :], shr[1, :])
-        @test !isequal(raw[3, :], shr[3, :])
-        @test isequal(isnan.(raw), isnan.(shr))
-    end
-    @testset "The residual variance reads the previous observation's beta" begin
-        X = [0.10 0.20; -0.10 0.00; 0.05 0.02; 0.02 -0.03]
-        rm = [0.15, -0.05, 0.035, -0.005]
-        B, _ = PortfolioOptimisers.ew_beta_series(X, rm, 0.5, 1, 1e-12)
-        Vr = PortfolioOptimisers.ew_beta_residual_variance(X, rm, B, 0.5, 1)
-        @test all(iszero, Vr[1, :])
-        for t in 2:4, i in 1:2
-            e = X[t, i] - B[t - 1, i] * rm[t]
-            @test Vr[t, i] ≈ 0.5 * Vr[t - 1, i] + 0.5 * e * e
+        L = PortfolioOptimisers.cross_sectional_groups(rd.pnl, "industry")
+        for t in 1:6
+            s = ewb_hand_shrink(raw[t, :], ewb_hand_bev(X, rm, trues(6, 4), decay, t),
+                                L[t, :], W[t, :], 2, (0.0, 1.0))
+            @test ewb_same(reshape(shr[t, :], 1, :), reshape(s, 1, :); rtol = 1e-9)
         end
+        # The variance needs three observations, so the beta of observation 2 has no
+        # measure of its noise, and it turns NaN.
+        @test isfinite(raw[2, 1]) && isnan(shr[2, 1])
+        @test !isequal(raw[4, :], shr[4, :])
     end
     @testset "The half-life is recovered from the decay exactly enough" begin
         for hl in (1.0, 5.0, 40.0, 60.0, 87.0)
@@ -2620,28 +2685,59 @@ end
          0.05 0.02 0.01
          0.02 -0.03 0.04
          -0.04 0.06 -0.02
-         0.03 0.01 0.05]
-    W = fill(2.0, 6, 3)
-    amsk = trues(6, 3)
+         0.03 0.01 0.05
+         0.01 -0.02 0.03
+         -0.03 0.04 -0.01]
+    W = [2.0 2.0 2.0
+         2.0 3.0 2.0
+         1.0 2.0 2.0
+         2.0 2.0 3.0
+         2.0 1.0 2.0
+         3.0 2.0 2.0
+         2.0 2.0 1.0
+         1.0 2.0 2.0]
+    amsk = trues(8, 3)
     amsk[1, 3] = false
     rd = ewb_hand_panel(X, W; amsk = amsk, emsk = amsk)
     rm = ewb_hand_market(X, W, amsk)
-    ref = [0.02, -0.01, 0.03, 0.00, NaN, 0.01]
+    ref = [0.02, -0.01, 0.03, 0.00, NaN, 0.01, -0.02, 0.015]
     Xm = ifelse.(amsk, X, NaN)
-    @testset "It is the Frisch-Waugh partial beta of the hand recursion" begin
+    @testset "It is the partial coefficient of the hand regression" begin
         D = descriptor(EWMacroSensitivity(; half_life = 2), rd; ref = ref)
-        B = ewb_hand_macro(Xm, rm, ref, amsk, exp2(-inv(2.0)), 2, 1e-12)
-        @test ewb_same(D, ifelse.(amsk, B, NaN))
+        B = ewb_hand_macro(Xm, rm, ref, amsk, exp2(-inv(2.0)), 2)
+        @test ewb_same(D, ifelse.(amsk, B, NaN); rtol = 1e-9)
+        # Three observations fit the intercept and the two slopes exactly, so the first
+        # partial beta is at the third valid observation of an asset.
+        @test all(isnan, D[1:2, :])
+        @test isnan(D[3, 3])
     end
-    @testset "A reference return that is not finite freezes the whole state" begin
+    @testset "A reference return that is missing leaves every asset as it was" begin
         D = descriptor(EWMacroSensitivity(; half_life = 2), rd; ref = ref)
         @test isequal(D[5, :], D[4, :])
-        # The freeze reaches the market too: a run whose fifth reference return is present
-        # differs at every later observation.
+        # A run whose fifth reference return is present differs at every later observation.
         rf = copy(ref)
         rf[5] = 0.005
         Dn = descriptor(EWMacroSensitivity(; half_life = 2), rd; ref = rf)
         @test !isequal(Dn[6, :], D[6, :])
+    end
+    @testset "A constant market is absorbed by the intercept" begin
+        # The market holds the first two assets alone, and their returns sum to a constant.
+        # The returns are multiples of 1/8, so the sum is the same to the last bit: a market
+        # that varies by rounding noise alone has no beta, and the slope would be NaN.
+        Xc = [0.125 0.125 0.03
+              0.375 -0.125 -0.02
+              -0.125 0.375 0.01
+              0.25 0.0 0.04
+              0.0 0.25 -0.01]
+        em = trues(5, 3)
+        em[:, 3] .= false
+        rdc = ewb_hand_panel(Xc, ones(5, 3); emsk = em)
+        f = [0.01, -0.02, 0.015, 0.005, -0.01]
+        D = descriptor(EWMacroSensitivity(; half_life = 2), rdc; ref = f)
+        H, w = ewb_hand_history([f], trues(5, 3), exp2(-inv(2.0)), 5, 3)
+        @test D[5, 3] ≈ ewb_wcross(f, Xc[:, 3], H, w) / ewb_wcross(f, f, H, w)
+        # Two observations are enough for the slope on the reference series alone.
+        @test isfinite(D[2, 3])
     end
     @testset "The reference series is required, and it is one entry per observation" begin
         @test_throws PortfolioOptimisers.IsNothingError descriptor(EWMacroSensitivity(;
@@ -2650,15 +2746,19 @@ end
         @test_throws DimensionMismatch descriptor(EWMacroSensitivity(; half_life = 2), rd;
                                                   ref = ref[1:3])
     end
-    @testset "The aggregated clock aggregates the reference series too" begin
-        D = descriptor(EWMacroSensitivity(; half_life = 2, agg_obs = 3), rd; ref = ref)
-        Xa = PortfolioOptimisers.ew_agg_series(Xm, 3)
-        rma = PortfolioOptimisers.ew_agg_vector(rm, 3)
-        rfa = PortfolioOptimisers.ew_agg_vector(ref, 3)
-        @test rfa[2] ≈ (0.00 + 0.01) / 2
-        B = ewb_hand_macro(Xa, rma, rfa, trues(2, 3), exp2(-inv(2.0)), 2, 1e-12)
-        @test isequal(D[6, :], ifelse.(amsk[6, :], B[2, :], NaN))
-        @test all(isnan, D[1:2, :])
+    @testset "The aggregated clock averages the three series over the same observations" begin
+        D = descriptor(EWMacroSensitivity(; half_life = 2, agg_obs = 2), rd; ref = ref)
+        Xa, Ma, Fa = ewb_hand_windows([Xm, repeat(rm, 1, 3), repeat(ref, 1, 3)], amsk, 2)
+        # The third window holds observation 6 alone, because the reference return of
+        # observation 5 is missing.
+        @test Ma[3, 1] ≈ rm[6]
+        # Asset 3 is inactive at observation 1, so its first window holds observation 2.
+        @test Xa[1, 3] ≈ X[2, 3]
+        Ba = ewb_hand_macro(Xa, Ma, Fa, trues(4, 3), exp2(-inv(2.0)), 2)
+        @test all(isnan, D[1:5, :])
+        @test ewb_same(reshape(D[6, :], 1, :), Ba[3:3, :]; rtol = 1e-9)
+        @test ewb_same(reshape(D[8, :], 1, :), Ba[4:4, :]; rtol = 1e-9)
+        @test D[7, :] == D[6, :]
     end
 end
 
@@ -2838,25 +2938,41 @@ end
     rd = ewb_hand_panel(X, W; amsk = amsk, emsk = amsk)
     rm = ewb_hand_market(X, W, amsk)
     Xm = ifelse.(amsk, X, NaN)
-    @testset "It is the lower partial co-moment of the hand recursion" begin
+    @testset "It is the lower partial co-moment of the hand sums" begin
         for mar in (0.0, 0.001, -0.01)
             D = descriptor(EWDownsideBeta(; half_life = 2, mar = mar), rd)
-            B = ewb_hand_downside(Xm, rm, amsk, exp2(-inv(2.0)), 2, mar, 1e-12)
+            B = ewb_hand_downside(Xm, rm, amsk, exp2(-inv(2.0)), 2, mar)
             @test ewb_same(D, ifelse.(amsk, B, NaN))
         end
     end
-    @testset "A ready asset reads the market's shortfall through its own gap" begin
+    @testset "A gap holds the beta, because both moments share the observations" begin
         D = descriptor(EWDownsideBeta(; half_life = 2), rd)
-        # Asset 2 has no return at observation 3, and the market's downside variance still
-        # advances there, so its beta moves even though its co-moment holds its value.
+        # Asset 2 has no return at observation 3, so neither of its moments advances there.
         @test isfinite(D[3, 2])
-        @test D[3, 2] != D[2, 2]
+        @test D[3, 2] == D[2, 2]
     end
-    @testset "A market that never falls short leaves every beta at zero" begin
+    @testset "A market that never falls short gives NaN, because the beta has no denominator" begin
         Xp = fill(0.01, 4, 2)
         rdp = ewb_hand_panel(Xp, ones(4, 2))
-        D = descriptor(EWDownsideBeta(; half_life = 2, mar = 0.0), rdp)
-        @test all(iszero, D[2:end, :])
+        @test all(isnan, descriptor(EWDownsideBeta(; half_life = 2, mar = 0.0), rdp))
+    end
+    @testset "An inactive observation resets the asset" begin
+        amr = trues(5, 3)
+        amr[3, 1] = false
+        rdr = ewb_hand_panel(X, W; amsk = amr, emsk = amr)
+        D = descriptor(EWDownsideBeta(; half_life = 2), rdr)
+        @test isnan(D[4, 1])
+        B = ewb_hand_downside(ifelse.(amr, X, NaN), ewb_hand_market(X, W, amr), amr,
+                              exp2(-inv(2.0)), 2, 0.0)
+        @test ewb_same(D, ifelse.(amr, B, NaN))
+    end
+    @testset "Returns that overflow the moments are refused" begin
+        Xo = [-1e200 -1e200; -1e200 -1e200]
+        @test_throws PortfolioOptimisers.IsNonFiniteError descriptor(EWDownsideBeta(;
+                                                                                    half_life = 2),
+                                                                     ewb_hand_panel(Xo,
+                                                                                    ones(2,
+                                                                                         2)))
     end
 end
 
@@ -2867,37 +2983,55 @@ end
          0.02 -0.03 0.04
          -0.04 0.06 -0.02
          0.03 0.01 0.05
-         0.01 -0.02 0.02]
-    W = fill(2.0, 7, 3)
-    amsk = trues(7, 3)
+         0.01 -0.02 0.02
+         0.02 0.03 -0.01
+         -0.01 0.01 0.02]
+    W = fill(2.0, 9, 3)
+    W[:, 2] .= 3.0
+    amsk = trues(9, 3)
     amsk[4, 1] = false
     rd = ewb_hand_panel(X, W; amsk = amsk, emsk = amsk)
     rm = ewb_hand_market(X, W, amsk)
     Xm = ifelse.(amsk, X, NaN)
     bdecay = exp2(-inv(3.0))
     vdecay = exp2(-inv(2.0))
-    B = ewb_hand_beta(Xm, rm, amsk, bdecay, 1, 1e-12; reset = true)
+    B = ewb_hand_beta(Xm, rm, amsk, bdecay, 2)
     @testset "It is the volatility of the hand residuals" begin
-        D = descriptor(EWResidualVolatility(; half_life = 2, beta_half_life = 3), rd)
+        D = descriptor(EWResidualVolatility(; half_life = 2, beta_half_life = 3,
+                                            beta_min_obs = 2), rd)
         E = ewb_hand_residual(Xm, rm, B, amsk, vdecay, 3)
         @test ewb_same(D, ifelse.(amsk, E, NaN); rtol = 1e-10)
     end
     @testset "The downside form clips every excess above the target" begin
         for mar in (0.0, 0.001)
             D = descriptor(EWResidualDownsideVolatility(; half_life = 2, beta_half_life = 3,
-                                                        mar = mar), rd)
+                                                        mar = mar, beta_min_obs = 2), rd)
             E = ewb_hand_residual(Xm, rm, B, amsk, vdecay, 3; mar = mar)
             @test ewb_same(D, ifelse.(amsk, E, NaN); rtol = 1e-10)
         end
     end
     @testset "An asset that turns inactive restarts both recursions" begin
-        D = descriptor(EWResidualVolatility(; half_life = 2, beta_half_life = 3), rd)
-        @test isnan(D[4, 1])
-        # Asset 1 restarts at observation 5, so it needs three more valid returns before it
-        # answers again, and it answers at observation 7.
-        @test isnan(D[5, 1])
-        @test isnan(D[6, 1])
-        @test isfinite(D[7, 1])
+        D = descriptor(EWResidualVolatility(; half_life = 2, beta_half_life = 3,
+                                            beta_min_obs = 2), rd)
+        # Asset 1 restarts at observation 5. Its beta returns at observation 6, and the
+        # variance then needs three residuals, so the Descriptor returns at observation 8.
+        @test all(isnan, D[4:7, 1])
+        @test isfinite(D[8, 1])
+    end
+    @testset "A residual starts at the beta_min_obs-th valid observation" begin
+        de = EWResidualVolatility(; half_life = 2, beta_half_life = 3, beta_min_obs = 3,
+                                  ce = PortfolioOptimisers.ew_variance_estimator(2.0, 1.0))
+        D = descriptor(de, rd)
+        @test all(isnan, D[1:2, 1])
+        @test isfinite(D[3, 1])
+        # Asset 2 misses observation 3, so its third valid observation is observation 4.
+        @test isnan(D[3, 2])
+        @test isfinite(D[4, 2])
+    end
+    @testset "With the defaults the first value is at observation 69" begin
+        Xl = 0.01 .* randn(StableRNGs.StableRNG(2131), 80, 3)
+        D = descriptor(EWResidualVolatility(), ewb_hand_panel(Xl, ones(80, 3)))
+        @test findfirst(isfinite, D[:, 1]) == 69
     end
     @testset "The warm-up is the longer of the two half-lives" begin
         a = EWResidualVolatility(; half_life = 2, beta_half_life = 9)
@@ -2918,18 +3052,6 @@ end
         @test E[1, 1] ≈ 0.0
         @test E[2, 2] ≈ 0.1
     end
-    @testset "At the first valid observation the residual is zero up to the floor" begin
-        # The beta includes observation 1, so β = (1 - λ) x r_m / ((1 - λ) r_m² + min_val) and
-        # the residual is x min_val / ((1 - λ) r_m² + min_val). A warm-up of one observation
-        # makes the Descriptor its absolute value there. A large floor keeps the subtraction
-        # well conditioned.
-        mv = 1e-4
-        de = EWResidualVolatility(; half_life = 2, beta_half_life = 3, min_val = mv,
-                                  ce = PortfolioOptimisers.ew_variance_estimator(2.0, 1.0))
-        D = descriptor(de, rd)
-        expected = abs.(Xm[1, :] .* mv ./ ((1 - bdecay) * rm[1]^2 + mv))
-        @test isapprox(D[1, :], expected; rtol = 1e-8)
-    end
     @testset "A refusal names the half-life the caller passed" begin
         @test_throws r"beta_half_life" EWResidualVolatility(; beta_half_life = Inf)
         @test_throws r"beta_half_life" EWResidualDownsideVolatility(; beta_half_life = 0)
@@ -2947,13 +3069,14 @@ end
             @test_throws DomainError f(-0.5)
         end
     end
-    @testset "Every archetype refuses a warm-up, a group size or a floor below one" begin
+    @testset "Every archetype refuses a warm-up or a group size below one" begin
         @test_throws DomainError EWBeta(; decay = 0.5, min_obs = 0)
         @test_throws DomainError EWBeta(; decay = 0.5, min_obs = 2, min_group_size = 0)
-        @test_throws DomainError EWBeta(; decay = 0.5, min_obs = 2, min_val = 0.0)
         @test_throws DomainError EWMacroSensitivity(; min_obs = 0)
         @test_throws DomainError EWDownsideBeta(; min_obs = 0)
-        @test_throws DomainError EWResidualVolatility(; min_val = 0.0)
+        @test_throws DomainError EWResidualVolatility(; beta_min_obs = 0)
+        @test EWResidualVolatility().beta_min_obs == 10
+        @test EWResidualDownsideVolatility(; beta_min_obs = 4).beta_min_obs == 4
     end
     @testset "The aggregation period is at least one observation" begin
         @test_throws DomainError EWBeta(; decay = 0.5, min_obs = 2, agg_obs = 0)
@@ -3049,14 +3172,14 @@ end
         D = descriptor(EWMarketBeta(; half_life = 5, group = "industry", min_group_size = 2,
                                     bounds = (0.1, 0.9)), rd)
         E = Matrix(CSV.read(joinpath(@__DIR__, "assets/EWMarketBeta.csv.gz"), DataFrame))
-        # rtol = 1e-12 cell by cell; measured maxrel 1.7e-15 (#1380).
+        # rtol = 1e-12 cell by cell; measured maxrel 1.6e-13 (#2132).
         @test parity_compare(D, E; name = "EWMarketBeta").ok
     end
     @testset "The aggregated macro sensitivity matches the stored case cell by cell" begin
         D = descriptor(EWMacroSensitivity(; half_life = 5, agg_obs = 3), rd; ref = ref)
         E = Matrix(CSV.read(joinpath(@__DIR__, "assets/EWMacroSensitivity.csv.gz"),
                             DataFrame))
-        # rtol = 1e-12 cell by cell; measured maxrel 3.1e-14 (#1380).
+        # rtol = 1e-12 cell by cell; measured maxrel 6.1e-14 (#2132).
         @test parity_compare(D, E; name = "EWMacroSensitivity").ok
         # The same series named in the Exogenous Series gives the same case (#1365). Its
         # gap at observation 123 falls in a window that holds two finite values.
@@ -3075,12 +3198,12 @@ end
         L = [1, 1, 1, 2, 2, 3, PortfolioOptimisers.CS_MISSING_GROUP, 1]
         w = [3.0, 1.0, 2.0, 5.0, 1.0, 2.0, 4.0, 1.0]
         for bounds in ((0.0, 1.0), (0.2, 0.7))
-            s = PortfolioOptimisers.ew_beta_shrink(b, bev, L, w, 2, bounds, 1e-12)
-            @test ewb_same(s[:, :], ewb_hand_shrink(b, bev, L, w, 2, bounds, 1e-12)[:, :];
+            s = PortfolioOptimisers.ew_beta_shrink(b, bev, L, w, 2, bounds)
+            @test ewb_same(s[:, :], ewb_hand_shrink(b, bev, L, w, 2, bounds)[:, :];
                            rtol = 1e-14)
         end
         # The asset with no group keeps its raw beta, and the NaN beta stays NaN.
-        s = PortfolioOptimisers.ew_beta_shrink(b, bev, L, w, 2, (0.0, 1.0), 1e-12)
+        s = PortfolioOptimisers.ew_beta_shrink(b, bev, L, w, 2, (0.0, 1.0))
         @test s[7] == b[7]
         @test isnan(s[8])
     end
@@ -3092,7 +3215,9 @@ end
              -0.04 0.06 -0.02 0.03
              0.03 0.01 0.05 -0.04
              0.06 -0.02 0.02 0.01
-             -0.01 0.04 -0.03 0.05]
+             -0.01 0.04 -0.03 0.05
+             0.02 0.01 -0.01 0.03
+             -0.03 0.02 0.04 -0.02]
         W = [1.0 3.0 2.0 1.5
              2.0 2.0 2.0 1.0
              5.0 1.0 4.0 2.0
@@ -3100,139 +3225,86 @@ end
              2.0 3.0 1.0 1.0
              1.0 2.0 3.0 2.0
              3.0 1.0 2.0 1.0
-             2.0 2.0 1.0 4.0]
-        ind = repeat(["a" "a" "b" "b"], 8, 1)
+             2.0 2.0 1.0 4.0
+             1.0 1.0 2.0 2.0
+             2.0 1.0 1.0 3.0]
+        ind = repeat(["a" "a" "b" "b"], 10, 1)
         rd = ewb_hand_panel(X, W; industry = ind)
         D = descriptor(EWMarketBeta(; half_life = 2, agg_obs = 2, group = "industry",
                                     min_group_size = 2, bounds = (0.1, 0.9)), rd)
-        decay, min_obs, min_val, en = exp2(-inv(2.0)), 2, 1e-12, 4.0
-        # Each window is the mean of the finite entries of its two observations.
-        rm = ewb_hand_market(X, W, trues(8, 4))
-        Xa = [sum(filter(isfinite, X[(2k - 1):(2k), i])) /
-              count(isfinite, X[(2k - 1):(2k), i]) for k in 1:4, i in 1:4]
-        rma = [(rm[2k - 1] + rm[2k]) / 2 for k in 1:4]
-        Ba = ewb_hand_beta(Xa, rma, trues(4, 4), decay, min_obs, min_val)
-        # The market variance, and the residual variance against the previous window's beta.
-        Vm, Vr = zeros(4), zeros(4, 4)
-        let mu = 0.0, v = 0.0, r = zeros(4)
-            for k in 1:4
-                d = rma[k] - mu
-                mu = decay * mu + (1 - decay) * rma[k]
-                v = decay * v + (1 - decay) * d * d
-                Vm[k] = v
-                if k - 1 >= min_obs
-                    for i in 1:4
-                        e = Xa[k, i] - Ba[k - 1, i] * rma[k]
-                        r[i] = decay * r[i] + (1 - decay) * e * e
-                    end
-                end
-                Vr[k, :] = r
-            end
-        end
-        E = fill(NaN, 8, 4)
-        s = fill(NaN, 4)
-        for t in 1:8
+        decay = exp2(-inv(2.0))
+        rm = ewb_hand_market(X, W, trues(10, 4))
+        # Each window is the mean of the observations of its asset, and so is its market.
+        Xa, Ma = ewb_hand_windows([X, repeat(rm, 1, 4)], trues(10, 4), 2)
+        Ba = ewb_hand_beta(Xa, Ma, trues(5, 4), decay, 2)
+        E = fill(NaN, 10, 4)
+        for t in 2:10
             k = div(t, 2)
-            if iseven(t) && k >= min_obs
-                s = ewb_hand_shrink(Ba[k, :], Vr[k, :] ./ (en * (Vm[k] + min_val)),
-                                    [1, 1, 2, 2], W[t, :], 2, (0.1, 0.9), min_val)
-            end
-            if k >= min_obs
-                E[t, :] = s
-            elseif k >= 1
-                E[t, :] = Ba[k, :]
-            end
+            E[t, :] = ewb_hand_shrink(Ba[k, :], ewb_hand_bev(Xa, Ma, trues(5, 4), decay, k),
+                                      [1, 1, 2, 2], W[2k, :], 2, (0.1, 0.9))
         end
-        @test ewb_same(D, E; rtol = 1e-12)
-        @test all(isfinite, D[4:8, :])
+        @test ewb_same(D, E; rtol = 1e-9)
+        # The variance needs three windows, so the first shrunk beta is at observation 6.
+        @test all(isnan, D[1:5, :])
+        @test all(isfinite, D[6:10, :])
         # The shrinkage moved every beta of the last window.
-        @test all(D[8, :] .!= Ba[4, :])
+        @test all(D[10, :] .!= Ba[5, :])
     end
 end
 
 @testset "EW beta descriptors: the number type comes from the data" begin
     # Issue #1972 removed the integer case: integer data convert at the carrier.
-    @testset "The helpers keep every non-integer type" begin
-        R = PortfolioOptimisers.ew_agg_series([1//2 1//3; 1//4 1//5], 2)
-        @test R == [3//8 4//15]
-        @test eltype(R) == Rational{Int}
-        @test eltype(PortfolioOptimisers.ew_agg_series(Float32[1 2; 3 4], 2)) == Float32
-        @test PortfolioOptimisers.ew_beta_expand([1//2 1//3; 1//4 1//5], 2, 1) ==
-              [1//2 1//3; 1//4 1//5]
-        V = PortfolioOptimisers.ew_beta_residual_variance([1.0 2.0; -1.0 0.0; 2.0 1.0],
-                                                          [1.0, -1.0, 0.0],
-                                                          [1.0 2.0; 1.0 1.0; 1.0 1.0], 0.5,
-                                                          1)
-        @test V[2, :] ≈ [0.5 * (-1 - 1 * -1)^2, 0.5 * (0 - 2 * -1)^2]
-        @test eltype(V) == Float64
-    end
+    po = PortfolioOptimisers
+    X = Float32[0.1 0.2; -0.1 0.0; 0.05 0.03; 0.02 -0.01]
+    rm = Float32[0.15, -0.05, 0.04, 0.005]
+    st = po.ew_beta_state(nothing, X, rm, nothing, 0.5f0, "g", 2)
+    B, st = po.ew_regression_series!(st, nothing, X, rm, nothing, trues(4, 2), 1, 2)
+    @test eltype(B) == Float32
+    @test eltype(st.mo.C) == Float32 &&
+          eltype(st.sq.C) == Float32 &&
+          eltype(st.wn.r) == Float32
+    ds = po.ew_downside_beta_state(nothing, X, rm, 0.5f0)
+    Bd, _ = po.ew_downside_beta_series!(ds, X, rm, trues(4, 2), 0.5f0, 1, 0.0f0)
+    @test eltype(Bd) == Float32
+    # A decay in a wider type widens the moments, as the recursion does.
+    @test eltype(po.ew_beta_state(nothing, X, rm, nothing, 0.5, nothing, 1).mo.C) == Float64
 end
 
-# The beta series from its closed form in BigFloat: each mean, variance and covariance is a sum
-# over the valid observations of its asset since the last restart, so it shares no loop with
-# the recursion it checks. A restart happens where an asset turns inactive, and a cell that
-# writes no new beta holds the last one.
-function ewb_closed_beta(X::AbstractMatrix{<:Real}, rm::AbstractVector{<:Real},
-                         amsk::AbstractMatrix{Bool}, decay::Real, min_obs::Integer,
-                         min_val::Real)
-    lam = BigFloat(decay)
-    T, N = size(X)
-    r = BigFloat.(rm)
-    # `mum[s]` is the market mean after `s - 1` observations, the mean a deviation at `s` uses.
-    mum = [(1 - lam) * sum((lam^(s - 1 - u) * r[u] for u in 1:(s - 1)); init = zero(lam))
-           for s in 1:T]
-    Vm = [(1 - lam) * sum(lam^(t - s) * (r[s] - mum[s])^2 for s in 1:t) for t in 1:T]
-    B = fill(BigFloat(NaN), T, N)
-    for i in 1:N
-        start = 1
-        b = BigFloat(NaN)
-        for t in 1:T
-            if t > 1 && amsk[t - 1, i] && !amsk[t, i]
-                start = t
-            end
-            v = [s for s in start:t if amsk[s, i] && isfinite(X[s, i])]
-            k = length(v)
-            if k > 0 && last(v) == t && t >= min_obs && k >= min_obs
-                x = BigFloat.(X[v, i])
-                mu = [(1 - lam) *
-                      sum((lam^(j - 1 - l) * x[l] for l in 1:(j - 1)); init = zero(lam))
-                      for j in 1:k]
-                C = (1 - lam) *
-                    sum(lam^(k - j) * (x[j] - mu[j]) * (r[v[j]] - mum[v[j]]) for j in 1:k)
-                b = C / (Vm[t] + min_val)
-            end
-            B[t, i] = b
-        end
-    end
-    return B, Vm
-end
-
-@testset "The beta series is the closed form of its recursion (#726)" begin
+@testset "The regression is the closed form of its recursion (#726)" begin
     # Asset 1 has a gap at observation 3, and asset 2 turns inactive at observation 4. The
-    # warm-up of two observations delays the first beta and the first beta after the restart.
+    # closed form is evaluated in BigFloat, as explicit weighted sums that share no loop with
+    # the recursion it checks.
+    po = PortfolioOptimisers
     X = [0.10 0.20
          -0.10 0.00
          NaN 0.05
          0.02 -0.03
          -0.04 0.06
-         0.03 0.01]
-    rm = [0.15, -0.05, 0.035, -0.005, 0.01, 0.02]
-    amsk = [true true; true true; true true; true false; true true; true true]
-    decay, min_obs, min_val = 0.6, 2, 1e-4
-    B, Vm = PortfolioOptimisers.ew_beta_series(X, rm, decay, min_obs, min_val, amsk)
-    Bc, Vc = ewb_closed_beta(X, rm, amsk, decay, min_obs, min_val)
-    @test ewb_same(B, Float64.(Bc); rtol = 1e-12)
-    @test Vm ≈ Float64.(Vc) rtol = 1e-12
+         0.03 0.01
+         0.01 -0.02]
+    rm = [0.15, -0.05, 0.035, -0.005, 0.01, 0.02, -0.01]
+    amsk = [true true; true true; true true; true false; true true; true true; true true]
+    decay, min_obs = 0.6, 2
+    st = po.ew_beta_state(nothing, X, rm, nothing, decay, nothing, 1)
+    B, st = po.ew_regression_series!(st, nothing, X, rm, nothing, amsk, min_obs, 1)
+    Bc = ewb_hand_beta(BigFloat.(X), BigFloat.(rm), amsk, BigFloat(decay), min_obs)
+    @test ewb_same(B, ifelse.(amsk, Bc, NaN); rtol = 1e-12)
     @test all(isnan, B[1, :])
-    # A gap holds the beta, and a restart does not clear it: the first valid return after the
-    # restart counts one observation, below the warm-up, so the old beta holds one more step.
+    @test st.t == 7
+    # A gap holds the beta.
     @test B[3, 1] == B[2, 1]
-    @test B[5, 2] == B[3, 2]
-    @test B[6, 2] != B[5, 2]
-    # With no mask, no state restarts: the inactive cell is an ordinary finite return.
-    B0, _ = PortfolioOptimisers.ew_beta_series(X, rm, decay, min_obs, min_val)
-    Bc0, _ = ewb_closed_beta(X, rm, trues(size(X)), decay, min_obs, min_val)
-    @test ewb_same(B0, Float64.(Bc0); rtol = 1e-12)
+    # A restart clears the beta, and the first valid return after it counts one observation,
+    # below the warm-up, so the beta is NaN until observation 6.
+    @test all(isnan, B[4:5, 2])
+    @test isfinite(B[6, 2])
+    # A step that folds the observations two at a time gives the batch call to the last bit.
+    sf = po.ew_beta_state(nothing, X, rm, nothing, decay, nothing, 1)
+    Bf = similar(B)
+    for r in (1:2, 3:4, 5:6, 7:7)
+        Bf[r, :], sf = po.ew_regression_series!(sf, nothing, X[r, :], rm[r], nothing,
+                                                amsk[r, :], min_obs, 1)
+    end
+    @test isequal(Bf, B)
 end
 
 @testset "A negative capitalisation enters the market return as it stands (#726)" begin

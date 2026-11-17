@@ -417,6 +417,17 @@ end
         # history is warm-up.
         Ms = fill(NaN, size(rd.X, 2), 2, size(rd.X, 1))
         @test_throws ArgumentError PO.cross_sectional_warmup(rd.X, Ms, rd.pnl.emsk)
+        # The refusal names the factors whose exposure is finite nowhere, the observed ones
+        # after the estimated ones. A factor that is finite somewhere is not named.
+        @test_throws r"position\(s\) \[1, 2\] of the exposure history" PO.cross_sectional_warmup(rd.X,
+                                                                                                 Ms,
+                                                                                                 rd.pnl.emsk)
+        Mh = copy(Ms)
+        Mh[2, 1, 3] = 0.0
+        Zo = fill(NaN, size(rd.X, 2), 1, size(rd.X, 1))
+        @test_throws r"position\(s\) \[2, 3\] of" PO.cross_sectional_warmup(rd.X, Mh,
+                                                                            rd.pnl.emsk, Zo)
+        @test PO.cross_sectional_cold_factors(Mh[:, 1:1, :], nothing) == ""
         # The first observation is warm, so the count of leading cold observations is zero.
         Ms[1, :, 1] .= 0.0
         @test iszero(PO.cross_sectional_warmup(rd.X, Ms, rd.pnl.emsk))

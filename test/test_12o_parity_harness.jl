@@ -1258,10 +1258,13 @@ with them:
 | `EWMean`, `EWMomentum` | 4.2e-13 (large panel, default) |
 | `EWVolumeRatio`, `EWShareTurnover`, `EWAmihudIlliquidity`, `DaysToCover` | 0.0 |
 | `EWVolatility`, `EWDownsideVolatility` | 3.3e-16 |
-| `EWResidualVolatility`, `EWResidualDownsideVolatility` | 7.5e-16 |
-| `EWBeta`, `EWMarketBeta` | 7.4e-14 |
-| `EWMacroSensitivity` | 1.9e-13 |
-| `EWDownsideBeta` | 1.1e-15 |
+| `EWResidualVolatility`, `EWResidualDownsideVolatility` | 4.6e-16 (#2132) |
+| `EWBeta`, `EWMarketBeta` | 1.5e-13 (#2132) |
+| `EWMacroSensitivity` | 1.3e-13 (#2132) |
+| `EWDownsideBeta` | 1.1e-15 (#2132) |
+
+The beta rows were measured again when the regression of each asset came to share its own
+observations (#2132), and their stored cases were made again then.
 | `RollingLogReturn`, `RollingMomentum`, `Reversal` | 3.0e-12 cell by cell, 9.6e-17 against the largest entry |
 | `RollingMax`, `MaxReturn` | 0.0 |
 

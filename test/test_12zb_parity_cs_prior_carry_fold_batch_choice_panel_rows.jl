@@ -267,7 +267,9 @@ end
             if fs === dlf
                 @test rs == (unseen === ZeroUnseenMember() ? Int[] : unseen_rows(st))
             else
-                @test unseen === SolvedUnseenMember() || length(rs) == 131
+                # 145 rows since the shrinkage weighs the sampling variance of the
+                # weighted least-squares slope (#2132), and 131 before.
+                @test unseen === SolvedUnseenMember() || length(rs) == 145
                 @test issubset(unseen === ZeroUnseenMember() ? Int[] : unseen_rows(st), rs)
             end
         end

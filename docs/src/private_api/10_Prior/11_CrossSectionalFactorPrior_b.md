@@ -9,5 +9,6 @@ Description = "Cross-Sectional Factor Prior (b), private API of PortfolioOptimis
 ```@docs
 PortfolioOptimisers.cross_sectional_live_dropped
 PortfolioOptimisers.cross_sectional_live_factors
+PortfolioOptimisers.cross_sectional_cold_factors
 PortfolioOptimisers.cross_sectional_lookback
 ```

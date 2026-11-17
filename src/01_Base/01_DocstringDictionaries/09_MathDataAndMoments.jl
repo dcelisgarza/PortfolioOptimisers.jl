@@ -130,9 +130,6 @@ unique_key_dict!(math_dict, :math_dict,
                  # stated by two or more Units of those files.
                  :r_mt_ewb => "``r_{m,t}``: Market return at observation ``t``, the capitalisation-weighted mean return over the estimation universe.",#
                  :beta_ti_ewb => "``\\beta_{t,i}``: Raw market beta of asset ``i`` after observation ``t``, before any shrinkage.",#
-                 :V_mt_ewb => "``V_{m,t}``: Market variance after observation ``t``, the exponentially weighted variance of ``r_{m,t}``.",#
-                 :V_eps_ti_ewb => "``V^{\\varepsilon}_{t,i}``: Residual variance of asset ``i`` after observation ``t``, the exponentially weighted mean square of its market-model residual.",#
-                 :min_val_ewb => "``\\texttt{min\\_val}``: `min_val`, the floor added to a denominator so that it never reaches zero.",#
                  # The rolling Descriptors of `04_FactorExposures/`, stated by two or
                  # more Units of that file.
                  :w_roll => "``w``: `window`, the number of observations in the window.",#

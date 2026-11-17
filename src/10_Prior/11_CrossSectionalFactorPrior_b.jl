@@ -65,6 +65,34 @@ function cross_sectional_live_factors(Z::Arr3Num, X::MatNum, W::MatNum)::BitVect
     act = findall(cross_sectional_design_mask(Z, X, W))
     return BitVector([any(c -> !iszero(Z[c[2], k, c[1]]), act) for k in axes(Z, 2)])
 end
+"""
+    cross_sectional_cold_factors(Ms::Arr3Num, Zo::Option{<:Arr3Num}) -> String
+
+Returns the sentence that names the positions of the factors whose exposure history holds no finite value, or an empty string where every factor holds one, so the refusal of [`cross_sectional_warmup`](@ref) can name the factor that consumed the whole history. The factors of `Zo` follow those of `Ms`.
+
+# Arguments
+
+  - `Ms`: The exposure history, `assets × factors × observations`.
+  - `Zo`: The exposure history of the observed factors, on the axes of `Ms`, or `nothing`.
+
+# Returns
+
+  - `msg::String`: The sentence, with a leading space, or `""`.
+
+# Related
+
+  - [`cross_sectional_warmup`](@ref)
+  - [`cross_sectional_eligible`](@ref)
+"""
+function cross_sectional_cold_factors(Ms::Arr3Num, Zo::Option{<:Arr3Num})::String
+    H = isnothing(Zo) ? Ms : cat(Ms, Zo; dims = 2)
+    k = findall(j -> !any(isfinite, view(H, :, j, :)), axes(H, 2))
+    return if isempty(k)
+        ""
+    else
+        " The factors at position(s) $k of the exposure history have no finite Factor Exposure at any observation."
+    end
+end
 function lookback(pe::CrossSectionalFactorPrior)::Option{<:Integer}
     return cross_sectional_lookback(pe, lookback(map(last, pe.factors)), lookback)
 end

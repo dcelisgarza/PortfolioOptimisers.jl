@@ -1,477 +1,4 @@
 """
-    ew_active_returns(X::AbstractMatrix{<:Number}, pnl::AssetPanel) -> Matrix
-
-Copy the returns with every inactive cell written to `NaN`.
-
-An asset outside the universe has no return, so its cell must not advance a recursion. Every market beta Descriptor takes this copy before its recursion starts. A recursion skips a `NaN` return, so the state of an asset holds its value at every observation where the asset is not listed.
-
-# Arguments
-
-  - `X`: The returns, `observations × assets`.
-  - `pnl`: The Asset Panel whose active mask is read.
-
-# Returns
-
-  - `Xm::Matrix{<:Real}`: The returns, `NaN` wherever the active mask is `false`. The element type of the returns is kept.
-
-# Related
-
-  - [`EWBeta`](@ref)
-  - [`EWDownsideBeta`](@ref)
-  - [`EWMacroSensitivity`](@ref)
-  - [`descriptor_active_fill!`](@ref)
-"""
-function ew_active_returns(X::AbstractMatrix{<:Number}, pnl::AssetPanel)
-    Xm = Matrix{eltype(X)}(X)
-    descriptor_active_fill!(Xm, pnl)
-    return Xm
-end
-"""
-    ew_agg_series(A::AbstractMatrix{<:Real}, agg_obs::Integer) -> Matrix{<:Real}
-
-Aggregate a matrix into one row per complete window of consecutive observations.
-
-Two series that close at different times of day record one move on different observations, so the exponentially weighted covariance of their raw returns is biased toward zero. A window of several observations holds the move of both series, and the covariance of the aggregated series does not carry that bias. A tail shorter than one window is dropped, so an aggregated series never mixes a complete window with a partial one.
-
-# Mathematical definition
-
-```math
-\\begin{align}
-\\bar{a}_{k,i} &= \\frac{1}{\\lvert \\mathcal{V}_{k,i} \\rvert} \\sum_{t \\in \\mathcal{V}_{k,i}} a_{t,i}\\,, \\\\
-\\mathcal{V}_{k,i} &= \\left\\{ t \\in \\{(k - 1) h + 1, \\ldots, k h\\} : a_{t,i} \\text{ is finite} \\right\\}\\,.
-\\end{align}
-```
-
-Where:
-
-  - ``a_{t,i}``: Entry of the series at observation ``t`` and column ``i``.
-  - ``\\bar{a}_{k,i}``: Aggregated entry of window ``k`` and column ``i``. It is `NaN` when ``\\mathcal{V}_{k,i}`` is empty.
-  - ``\\mathcal{V}_{k,i}``: Observations of window ``k`` whose entry in column ``i`` is finite.
-  - ``h``: `agg_obs`, the number of observations in one window.
-
-# Arguments
-
-  - `A`: The series, `observations × assets`.
-  - $(arg_dict[:agg_obs])
-
-# Returns
-
-  - `B::Matrix{<:Real}`: The aggregated series, `div(observations, agg_obs) × assets`. The element type of the series is kept.
-
-# Examples
-
-```jldoctest
-julia> PortfolioOptimisers.ew_agg_series([1.0 2.0; 3.0 NaN; 5.0 6.0], 2)
-1×2 Matrix{Float64}:
- 2.0  2.0
-```
-
-# Related
-
-  - [`ew_agg_vector`](@ref)
-  - [`EWBeta`](@ref)
-  - [`EWMacroSensitivity`](@ref)
-"""
-function ew_agg_series(A::AbstractMatrix{<:Real}, agg_obs::Integer)
-    Tf = eltype(A)
-    T, N = size(A)
-    K = div(T, agg_obs)
-    B = Matrix{Tf}(undef, K, N)
-    for k in 1:K, i in 1:N
-        s = zero(Tf)
-        c = 0
-        for t in ((k - 1) * agg_obs + 1):(k * agg_obs)
-            a = A[t, i]
-            if isfinite(a)
-                s += a
-                c += 1
-            end
-        end
-        B[k, i] = iszero(c) ? Tf(NaN) : s / c
-    end
-    return B
-end
-"""
-    ew_agg_vector(v::AbstractVector{<:Real}, agg_obs::Integer) -> Vector{<:Real}
-
-Aggregate a series into one entry per complete window of consecutive observations.
-
-This is [`ew_agg_series`](@ref) over one column. The Descriptors use it to aggregate the market return and the reference return, which are vectors with one entry per observation.
-
-# Arguments
-
-  - `v`: The series, one entry per observation.
-  - $(arg_dict[:agg_obs])
-
-# Returns
-
-  - `w::Vector{<:Real}`: The aggregated series, of length `div(length(v), agg_obs)`.
-
-# Examples
-
-```jldoctest
-julia> PortfolioOptimisers.ew_agg_vector([1.0, 3.0, 5.0, 9.0], 2)
-2-element Vector{Float64}:
- 2.0
- 7.0
-```
-
-# Related
-
-  - [`ew_agg_series`](@ref)
-  - [`EWBeta`](@ref)
-  - [`EWMacroSensitivity`](@ref)
-"""
-function ew_agg_vector(v::AbstractVector{<:Real}, agg_obs::Integer)
-    return vec(ew_agg_series(reshape(v, :, 1), agg_obs))
-end
-"""
-    ew_beta_expand(Ba::AbstractMatrix{<:Number}, T::Integer, agg_obs::Integer,
-                   b0::Option{<:AbstractVector{<:Number}} = nothing,
-                   r0::Integer = 0) -> Matrix
-
-Spread an aggregated beta series back over the observations it was aggregated from.
-
-The recursion advances once per complete window, so each observation takes the beta of the last window that closed at or before it. An observation before the first window closes takes `b0`, or `NaN` when `b0` is `nothing`. The batch call starts at the first observation, where no beta exists yet, so it is `NaN`. A step of the carry fold starts after `r0` observations of a window that is not yet complete, and `b0` is the beta of the last window that the state folded.
-
-# Arguments
-
-  - `Ba`: The aggregated betas, `windows × assets`.
-  - `T`: Number of observations of the unaggregated series.
-  - $(arg_dict[:agg_obs])
-  - `b0`: The beta before the first window of `Ba` closes, one entry per asset, or `nothing` for `NaN`.
-  - `r0`: The number of observations of the first window that come before the series.
-
-# Returns
-
-  - `B::Matrix{<:Real}`: The betas, `T × assets`. The element type of the inputs is kept.
-
-# Examples
-
-```jldoctest
-julia> PortfolioOptimisers.ew_beta_expand([1.0 2.0; 3.0 4.0], 5, 2)
-5×2 Matrix{Float64}:
- NaN    NaN
-   1.0    2.0
-   1.0    2.0
-   3.0    4.0
-   3.0    4.0
-```
-
-# Related
-
-  - [`ew_agg_series`](@ref)
-  - [`EWBeta`](@ref)
-  - [`EWMacroSensitivity`](@ref)
-"""
-function ew_beta_expand(Ba::AbstractMatrix{<:Number}, T::Integer, agg_obs::Integer,
-                        b0::Option{<:AbstractVector{<:Number}} = nothing,
-                        r0::Integer = 0)::Matrix
-    Tf = eltype(Ba)
-    B = Matrix{Tf}(undef, T, size(Ba, 2))
-    for t in 1:T
-        k = div(r0 + t, agg_obs)
-        if k >= 1
-            B[t, :] = view(Ba, k, :)
-        elseif isnothing(b0)
-            B[t, :] .= Tf(NaN)
-        else
-            B[t, :] = b0
-        end
-    end
-    return B
-end
-"""
-$(DocStringExtensions.TYPEDEF)
-
-The carried state of an exponentially weighted Descriptor whose recursion reads one aggregated row per window of `agg_obs` observations, an [`EWBeta`](@ref) or an [`EWMacroSensitivity`](@ref).
-
-The recursion folds a window only when it is complete, so a step of the carry fold of a [`CrossSectionalFactorPrior`](@ref) that ends inside a window keeps its observations here, and the next step aggregates them with its own. The observations start at the first observation of a window, so a window aggregates the same values, in the same order, as the batch call. With `agg_obs = 1` every window is complete, and the state keeps no observation.
-
-# Fields
-
-$(DocStringExtensions.FIELDS)
-
-# Constructors
-
-    EWBlockState(; st::AbstractPartialFitState, X::AbstractMatrix{<:Real},
-                 m::AbstractVector{<:Real}, f::Option{<:AbstractVector{<:Real}} = nothing,
-                 v::Option{<:AbstractVector{<:Real}} = nothing,
-                 s::Option{<:AbstractVector{<:Real}} = nothing) -> EWBlockState
-
-Keywords correspond to the struct's fields.
-
-## Validation
-
-  - `X`, `m` and `f` hold the same number of observations, and `v` and `s` one entry per asset of `X`. A `DimensionMismatch` is thrown otherwise.
-
-# Related
-
-  - [`EWMacroSensitivityState`](@ref)
-  - [`ew_block_state`](@ref)
-  - [`ew_block_rows`](@ref)
-  - [`ew_beta_fold`](@ref)
-"""
-@concrete struct EWBlockState <: AbstractPartialFitState
-    """
-    The state of the recursion after the last complete window, an [`EWBetaState`](@ref) or an [`EWMacroSensitivityState`](@ref).
-    """
-    st
-    """
-    The masked returns of the observations of the window that is not yet complete, `observations × assets`.
-    """
-    X
-    """
-    The market return of those observations.
-    """
-    m
-    """
-    The reference return of those observations for an [`EWMacroSensitivity`](@ref), or `nothing`.
-    """
-    f
-    """
-    The residual variance of each asset after the last complete window, for an [`EWBeta`](@ref) with a `group`, or `nothing`.
-    """
-    v
-    """
-    The shrunk beta of each asset after the last complete window, for an [`EWBeta`](@ref) with a `group`, or `nothing`.
-    """
-    s
-    function EWBlockState(st::AbstractPartialFitState, X::AbstractMatrix{<:Real},
-                          m::AbstractVector{<:Real}, f::Option{<:AbstractVector{<:Real}},
-                          v::Option{<:AbstractVector{<:Real}},
-                          s::Option{<:AbstractVector{<:Real}})
-        @argcheck(size(X, 1) == length(m) && (isnothing(f) || length(f) == length(m)),
-                  DimensionMismatch("the observations of an EWBlockState hold one market return and one reference return each, got $(size(X, 1)) rows, $(length(m)) market returns and $(isnothing(f) ? 0 : length(f)) reference returns"))
-        @argcheck(all(x -> isnothing(x) || length(x) == size(X, 2), (v, s)),
-                  DimensionMismatch("the residual variance and the shrunk beta of an EWBlockState hold one entry per asset, got $(size(X, 2)) assets"))
-        return new{typeof(st), typeof(X), typeof(m), typeof(f), typeof(v), typeof(s)}(st, X,
-                                                                                      m, f,
-                                                                                      v, s)
-    end
-end
-function EWBlockState(; st::AbstractPartialFitState, X::AbstractMatrix{<:Real},
-                      m::AbstractVector{<:Real},
-                      f::Option{<:AbstractVector{<:Real}} = nothing,
-                      v::Option{<:AbstractVector{<:Real}} = nothing,
-                      s::Option{<:AbstractVector{<:Real}} = nothing)::EWBlockState
-    return EWBlockState(st, X, m, f, v, s)
-end
-"""
-$(DocStringExtensions.TYPEDSIGNATURES)
-
-Copies an [`EWBlockState`](@ref), so that the copy shares no vector with the original.
-
-# Arguments
-
-  - `x`: The state to copy.
-
-# Returns
-
-  - `state::EWBlockState`: A new state, equal to `x`.
-
-# Related
-
-  - [`EWBlockState`](@ref)
-"""
-function Base.copy(x::EWBlockState)
-    return EWBlockState(copy(x.st), copy(x.X), copy(x.m), ew_block_copy(x.f),
-                        ew_block_copy(x.v), ew_block_copy(x.s))
-end
-"""
-    ew_block_copy(::Nothing)
-    ew_block_copy(x::AbstractVector)
-
-Returns `nothing` for `nothing`, and a copy of a vector otherwise, for the optional vectors of an [`EWBlockState`](@ref).
-
-# Arguments
-
-  - `x`: The vector, or `nothing`.
-
-# Returns
-
-  - `x::Option{<:AbstractVector}`: The copy, or `nothing`.
-
-# Related
-
-  - [`EWBlockState`](@ref)
-"""
-function ew_block_copy(::Nothing)::Nothing
-    return nothing
-end
-function ew_block_copy(x::AbstractVector)::AbstractVector
-    return copy(x)
-end
-"""
-$(DocStringExtensions.TYPEDSIGNATURES)
-
-Refuses to merge two [`EWBlockState`](@ref): the recursion of the second block starts from the state after the first one, so two states fitted on disjoint blocks do not give the state of their union to the last bit.
-
-# Validation
-
-  - Always throws an `ArgumentError`.
-
-# Related
-
-  - [`EWBlockState`](@ref)
-  - [`partial_fit!`](@ref)
-"""
-function merge_states(::EWBlockState, ::EWBlockState)
-    return throw(ArgumentError("an EWBlockState cannot merge two states fitted on disjoint blocks: the recursion of the second block starts from the state after the first one. Fold the second block into the state of the first with partial_fit!."))
-end
-"""
-$(DocStringExtensions.TYPEDEF)
-
-Holds the observations of a step of an [`EWBlockState`](@ref) joined to the carried ones, and the observations after the last complete window.
-
-This type is an implementation detail and is not intended for direct use. [`ew_block_rows`](@ref) makes it, and [`ew_beta_fold`](@ref) reads it. The two values are arrays of one element type, so a record names them where a plain tuple would let a swap pass silently.
-
-# Fields
-
-$(DocStringExtensions.FIELDS)
-
-# Related
-
-  - [`ew_block_rows`](@ref)
-  - [`EWBlockState`](@ref)
-"""
-@concrete struct JoinedRows
-    """
-    `A`: The joined observations.
-    """
-    A
-    """
-    `P`: A copy of the observations after the last complete window, which the state carries.
-    """
-    P
-end
-"""
-    ew_block_rows(P::AbstractVecOrMat{<:Real}, Y::AbstractVecOrMat{<:Real},
-                  agg_obs::Integer) -> JoinedRows
-
-Joins the observations that an [`EWBlockState`](@ref) carries to the observations of a step, and splits the result at the end of the last complete window.
-
-[`ew_agg_series`](@ref) and [`ew_agg_vector`](@ref) aggregate the complete windows of the joined rows and drop the rest, so the rest is what the state carries to the next step.
-
-# Arguments
-
-  - `P`: The carried observations, which start a window.
-  - `Y`: The observations of the step.
-  - $(arg_dict[:agg_obs])
-
-# Returns
-
-  - `rows::JoinedRows`: `A`, the joined observations, and `P`, a copy of the observations after the last complete window.
-
-# Related
-
-  - [`EWBlockState`](@ref)
-  - [`ew_beta_fold`](@ref)
-  - [`JoinedRows`](@ref)
-"""
-function ew_block_rows(P::AbstractVecOrMat{<:Real}, Y::AbstractVecOrMat{<:Real},
-                       agg_obs::Integer)::JoinedRows
-    A = isempty(P) ? Y : vcat(P, Y)
-    n = div(size(A, 1), agg_obs) * agg_obs
-    return JoinedRows(A, collect(selectdim(A, 1, (n + 1):size(A, 1))))
-end
-"""
-    ew_beta_residual_variance(X::AbstractMatrix{<:Real}, rm::AbstractVector{<:Real},
-                              B::AbstractMatrix{<:Real}, decay::Real, min_obs::Integer,
-                              v0::AbstractVector{<:Real} = zeros(…, size(X, 2)),
-                              b0::AbstractVector{<:Real} = similar(B, size(X, 2)),
-                              k0::Integer = 0) -> Matrix{<:Real}
-
-Run the exponentially weighted variance of the market-model residual of every asset.
-
-The shrinkage of [`EWBeta`](@ref) weighs each raw beta against the noise of its own estimate, and this variance measures that noise. Each residual is measured against the beta of the **previous** observation, so the beta that the residual helps to correct does not enter it. The recursion starts from zero one observation after the warm-up ends, because no residual exists before the first beta. An observation where the return or the previous beta is not finite leaves the variance of that asset unchanged.
-
-The batch call starts at the first observation with the defaults. A step of the carry fold starts after the `k0` observations that its state folded, from the variance `v0` and the beta `b0` of the last of them, so the step runs the arithmetic of the batch call. `v0` is not changed.
-
-# Mathematical definition
-
-```math
-\\begin{align}
-e_{t,i} &= x_{t,\\,i} - \\beta_{t-1,i}\\, r_{m,t}\\,, \\\\
-V^{\\varepsilon}_{t,i} &= \\lambda V^{\\varepsilon}_{t-1,i} + (1 - \\lambda)\\, e_{t,i}^2\\,.
-\\end{align}
-```
-
-Where:
-
-  - ``e_{t,i}``: Market-model residual of asset ``i`` at observation ``t``.
-  - $(math_dict[:V_eps_ti_ewb])
-  - $(math_dict[:x_ti_ret])
-  - $(math_dict[:beta_ti_ewb])
-  - $(math_dict[:r_mt_ewb])
-  - $(math_dict[:lambda_ew])
-
-# Arguments
-
-  - `X`: The returns, `observations × assets`.
-  - `rm`: The market return, one entry per observation.
-  - `B`: The raw betas, `observations × assets`, as [`ew_beta_series`](@ref) returns them.
-  - $(arg_dict[:decay])
-  - $(arg_dict[:min_obs])
-  - `v0`: The residual variance before the first observation, one entry per asset. Its element type is the element type of `Vr`.
-  - `b0`: The raw beta of the observation before the first one, one entry per asset. The recursion reads it only when `k0 >= min_obs`, so the default of the batch call holds no value.
-  - `k0`: The number of observations before the first one.
-
-# Returns
-
-  - `Vr::Matrix{<:Real}`: The residual variance after each observation, `observations × assets`.
-
-# Examples
-
-```jldoctest
-julia> B, Vm = PortfolioOptimisers.ew_beta_series([0.1 0.2; -0.1 0.3; 0.05 -0.05],
-                                                  [0.1, -0.05, 0.02], 0.5, 1, 1e-12);
-
-julia> PortfolioOptimisers.ew_beta_residual_variance([0.1 0.2; -0.1 0.3; 0.05 -0.05],
-                                                     [0.1, -0.05, 0.02], B, 0.5, 1)
-3×2 Matrix{Float64}:
- 0.0          0.0
- 0.00125      0.08
- 0.000897222  0.0406722
-```
-
-# Related
-
-  - [`EWBeta`](@ref)
-  - [`ew_beta_series`](@ref)
-  - [`ew_beta_shrink`](@ref)
-"""
-function ew_beta_residual_variance(X::AbstractMatrix{<:Real}, rm::AbstractVector{<:Real},
-                                   B::AbstractMatrix{<:Real}, decay::Real, min_obs::Integer,
-                                   v0::AbstractVector{<:Real} = zeros(promote_type(eltype(X),
-                                                                                   eltype(rm),
-                                                                                   eltype(B)),
-                                                                      size(X, 2)),
-                                   b0::AbstractVector{<:Real} = similar(B, size(X, 2)),
-                                   k0::Integer = 0)
-    v = copy(v0)
-    Tf = eltype(v)
-    K, N = size(X)
-    Vr = Matrix{Tf}(undef, K, N)
-    om = one(Tf) - decay
-    p = copy(b0)
-    for k in 1:K
-        if k0 + k - 1 >= min_obs
-            for i in 1:N
-                x = X[k, i]
-                bp = p[i]
-                if isfinite(x) && isfinite(bp)
-                    e = x - bp * rm[k]
-                    v[i] = decay * v[i] + om * e * e
-                end
-            end
-        end
-        Vr[k, :] = v
-        p .= view(B, k, :)
-    end
-    return Vr
-end
-"""
     ew_masked_mean(v::AbstractVector{<:Number}, msk::AbstractVector{Bool}) -> Number
 
 Mean of the entries a mask selects.
@@ -589,8 +116,7 @@ end
 """
     ew_beta_shrink(b::AbstractVector{<:Real}, bev::AbstractVector{<:Real},
                    L::AbstractVector{<:Integer}, w::AbstractVector{<:Real},
-                   min_group_size::Integer, bounds::Tuple{Real, Real},
-                   min_val::Real) -> Vector{<:Real}
+                   min_group_size::Integer, bounds::Tuple{Real, Real}) -> Vector{<:Real}
 
 Shrink one cross-section of raw betas toward the capitalisation-weighted mean of its group.
 
@@ -601,8 +127,7 @@ A beta estimated from few observations is mostly noise, and the mean beta of the
 ```math
 \\begin{align}
 \\beta^{\\ast}_{t,i} &= q_{t,i}\\, \\beta_{t,i} + (1 - q_{t,i})\\, \\mu_{t,g}\\,, \\\\
-q_{t,i} &= \\mathrm{clamp}\\!\\left(\\frac{\\tau^2_{t,g}}{\\tau^2_{t,g} + \\sigma^2_{t,i} + \\texttt{min\\_val}},\\, q_{\\mathrm{lo}},\\, q_{\\mathrm{hi}}\\right)\\,, \\\\
-\\sigma^2_{t,i} &= \\frac{V^{\\varepsilon}_{t,i}}{n_{\\mathrm{eff}} \\left(V_{m,t} + \\texttt{min\\_val}\\right)}\\,, \\\\
+q_{t,i} &= \\mathrm{clamp}\\!\\left(\\frac{\\tau^2_{t,g}}{\\tau^2_{t,g} + \\sigma^2_{t,i}},\\, q_{\\mathrm{lo}},\\, q_{\\mathrm{hi}}\\right)\\,, \\\\
 \\mu_{t,g} &= \\frac{\\sum_{j \\in g} c_{t,j}\\, \\beta_{t,j}}{\\sum_{j \\in g} c_{t,j}}\\,, \\\\
 \\tau^2_{t,g} &= \\max\\!\\left(\\frac{\\sum_{j \\in g} c_{t,j} \\left(\\beta_{t,j} - \\mu_{t,g}\\right)^2}{\\sum_{j \\in g} c_{t,j}} - \\frac{1}{\\lvert g \\rvert} \\sum_{j \\in g} \\sigma^2_{t,j},\\, 0\\right)\\,.
 \\end{align}
@@ -611,26 +136,23 @@ q_{t,i} &= \\mathrm{clamp}\\!\\left(\\frac{\\tau^2_{t,g}}{\\tau^2_{t,g} + \\sigm
 Where:
 
   - ``\\beta^{\\ast}_{t,i}``: Shrunk beta of asset ``i``.
-  - ``q_{t,i}``: Weight that the shrunk beta keeps on the raw beta.
+  - ``q_{t,i}``: Weight that the shrunk beta keeps on the raw beta. It is ``q_{\\mathrm{lo}}`` where ``\\tau^2_{t,g}`` is zero.
   - ``g``: Group of asset ``i``, the assets of the estimation set that carry its label. A group smaller than `min_group_size` takes the whole estimation set in its place.
   - ``\\mu_{t,g}``: Capitalisation-weighted mean beta of group ``g``.
   - ``\\tau^2_{t,g}``: Prior variance of group ``g``, its observed dispersion less its mean estimation error variance.
-  - ``\\sigma^2_{t,i}``: Estimation error variance of ``\\beta_{t,i}``.
+  - ``\\sigma^2_{t,i}``: Estimation error variance of ``\\beta_{t,i}``, from [`ew_beta_variance`](@ref).
   - ``c_{t,j}``: Capitalisation of asset ``j`` at observation ``t``.
   - ``q_{\\mathrm{lo}}``, ``q_{\\mathrm{hi}}``: The two entries of `bounds`.
-  - ``n_{\\mathrm{eff}}``: Effective sample size of the recursion, twice its half-life.
   - $(math_dict[:beta_ti_ewb])
-  - $(math_dict[:V_eps_ti_ewb])
-  - $(math_dict[:V_mt_ewb])
-  - $(math_dict[:min_val_ewb])
 
 # Algorithm
 
- 1. Build the estimation set `vld`, the assets whose beta is not `NaN`, whose group label is set, and whose weight is finite and strictly positive. An asset outside `vld` keeps its raw beta, and an empty `vld` returns the raw betas unchanged.
- 2. Compute the mean `gm` and the prior variance `gpv` of the whole estimation set through [`ew_beta_group_prior`](@ref).
- 3. For each group label in `vld`, compute its mean `m` and its prior variance `pv` through [`ew_beta_group_prior`](@ref). A group with fewer than `min_group_size` members takes `gm` and `gpv` instead.
- 4. For each member of the group, compute the weight `q` and clamp it to `bounds`.
- 5. Write the shrunk beta, `q` times the raw beta plus `1 - q` times `m`.
+ 1. Build the shrinkable set, the assets whose beta is finite, whose group label is set, and whose weight is finite and strictly positive. An asset outside it keeps its raw beta.
+ 2. Build the estimation set `vld`, the shrinkable assets whose estimation error variance is finite. A shrinkable asset outside `vld` has no measure of its own noise, so its beta turns `NaN`. An empty `vld` returns the betas there.
+ 3. Compute the mean `gm` and the prior variance `gpv` of the whole estimation set through [`ew_beta_group_prior`](@ref).
+ 4. For each group label in `vld`, compute its mean `m` and its prior variance `pv` through [`ew_beta_group_prior`](@ref). A group with fewer than `min_group_size` members takes `gm` and `gpv` instead.
+ 5. For each member of the group, compute the weight `q`, zero where `pv` is zero, and clamp it to `bounds`.
+ 6. Write the shrunk beta, `q` times the raw beta plus `1 - q` times `m`.
 
 # Arguments
 
@@ -640,7 +162,6 @@ Where:
   - `w`: The capitalisation weights.
   - $(arg_dict[:min_group_size_ewb])
   - $(arg_dict[:bounds_ewb])
-  - $(arg_dict[:min_val])
 
 # Returns
 
@@ -650,33 +171,34 @@ Where:
 
 ```jldoctest
 julia> PortfolioOptimisers.ew_beta_shrink([0.8, 1.4], [0.01, 0.01], [1, 1], [1.0, 1.0], 1,
-                                          (0.0, 1.0), 1e-12)
+                                          (0.0, 1.0))
 2-element Vector{Float64}:
- 0.8333333333362964
- 1.3666666666637035
+ 0.8333333333333334
+ 1.3666666666666667
 ```
 
 # Related
 
   - [`EWBeta`](@ref)
   - [`ew_beta_group_prior`](@ref)
-  - [`ew_beta_residual_variance`](@ref)
+  - [`ew_beta_variance`](@ref)
   - [`cross_sectional_groups`](@ref)
   - [`CS_MISSING_GROUP`](@ref)
 """
 function ew_beta_shrink(b::AbstractVector{<:Real}, bev::AbstractVector{<:Real},
                         L::AbstractVector{<:Integer}, w::AbstractVector{<:Real},
-                        min_group_size::Integer, bounds::Tuple{Real, Real}, min_val::Real)
+                        min_group_size::Integer, bounds::Tuple{Real, Real})
     s = collect(b)
-    vld = [!isnan(b[i]) &&
-               L[i] != CS_MISSING_GROUP &&
-               isfinite(w[i]) &&
-               w[i] > zero(eltype(w)) for i in eachindex(b, L, w)]
+    sh = [isfinite(b[i]) &&
+              L[i] != CS_MISSING_GROUP &&
+              isfinite(w[i]) &&
+              w[i] > zero(eltype(w)) for i in eachindex(b, L, w)]
+    vld = sh .& isfinite.(bev)
+    s[sh .& .!vld] .= eltype(s)(NaN)
     if !any(vld)
         return s
     end
     gm, gpv = ew_beta_group_prior(b, bev, w, vld)
-    lo, hi = bounds
     msk = similar(vld)
     for g in unique(L[i] for i in eachindex(L) if vld[i])
         msk .= vld .& (L .== g)
@@ -685,14 +207,170 @@ function ew_beta_shrink(b::AbstractVector{<:Real}, bev::AbstractVector{<:Real},
         else
             ew_beta_group_prior(b, bev, w, msk)
         end
-        for i in eachindex(msk)
-            if msk[i]
-                q = clamp(pv / (pv + bev[i] + min_val), lo, hi)
-                s[i] = q * b[i] + (one(q) - q) * m
-            end
-        end
+        ew_beta_shrink_group!(s, b, bev, msk, m, pv, bounds)
     end
     return s
+end
+"""
+    ew_beta_shrink_group!(s::AbstractVector{<:Real}, b::AbstractVector{<:Real},
+                          bev::AbstractVector{<:Real}, msk::AbstractVector{Bool}, m::Real,
+                          pv::Real, bounds::Tuple{Real, Real}) -> nothing
+
+Writes the shrunk beta of every member of one group into `s`, in place, as [`ew_beta_shrink`](@ref) states.
+
+# Arguments
+
+  - `s`: The shrunk betas, changed in place.
+  - `b`: The raw betas.
+  - `bev`: The estimation error variance of each beta.
+  - `msk`: The mask of the members of the group.
+  - `m`: The mean of the group.
+  - `pv`: The prior variance of the group.
+  - $(arg_dict[:bounds_ewb])
+
+# Returns
+
+  - `nothing`.
+
+# Related
+
+  - [`ew_beta_shrink`](@ref)
+"""
+function ew_beta_shrink_group!(s::AbstractVector{<:Real}, b::AbstractVector{<:Real},
+                               bev::AbstractVector{<:Real}, msk::AbstractVector{Bool},
+                               m::Real, pv::Real, bounds::Tuple{Real, Real})::Nothing
+    lo, hi = bounds
+    for i in eachindex(msk)
+        if msk[i]
+            q = clamp(pv > zero(pv) ? pv / (pv + bev[i]) : zero(pv), lo, hi)
+            s[i] = q * b[i] + (one(q) - q) * m
+        end
+    end
+    return nothing
+end
+"""
+    ew_beta_variance(mo::EWMoments, sq::EWMoments, b::Real, i::Integer) -> Real
+
+Estimate the sampling variance of the raw market beta `b` of asset `i`, the noise that the shrinkage of [`EWBeta`](@ref) weighs each beta against.
+
+The regression has an intercept and a slope, and its errors are taken as independent with one variance. The exponential weights enter twice: the weighted residual sum of squares estimates the variance of the errors, and the moments of the market under squared weights measure the leverage of the weighted design. The degrees of freedom that the intercept and the slope take are removed from the residual weight.
+
+# Mathematical definition
+
+```math
+\\begin{align}
+\\sigma^2_{t,i} &= \\frac{S^{xx}_{t,i} - \\beta_{t,i} S^{mx}_{t,i}}{W_{t,i}\\, \\rho_{t,i}}\\, \\frac{L_{t,i}}{\\left(S^{mm}_{t,i}\\right)^2}\\,, \\\\
+L_{t,i} &= Q^{mm}_{t,i} + Q_{t,i} \\left(\\mu^{m,Q}_{t,i} - \\mu^{m}_{t,i}\\right)^2\\,, \\\\
+\\rho_{t,i} &= 1 - \\frac{Q_{t,i}}{W_{t,i}^2} - \\frac{L_{t,i}}{S^{mm}_{t,i}\\, W_{t,i}}\\,.
+\\end{align}
+```
+
+Where:
+
+  - ``\\sigma^2_{t,i}``: Estimation error variance of ``\\beta_{t,i}``.
+  - $(math_dict[:beta_ti_ewb])
+  - ``S^{xx}_{t,i}``, ``S^{mx}_{t,i}``, ``S^{mm}_{t,i}``: The covariance numerators of the asset with itself, of the market with the asset, and of the market with itself, from the moments `mo`.
+  - ``W_{t,i}``: The weight sum of `mo`.
+  - ``Q^{mm}_{t,i}``, ``Q_{t,i}``, ``\\mu^{m,Q}_{t,i}``: The covariance numerator of the market, the weight sum and the mean of the market under the squared weights, from `sq`.
+  - ``\\mu^{m}_{t,i}``: The mean of the market under the weights of `mo`.
+  - ``L_{t,i}``: The leverage of the weighted design, recentred at the mean of `mo`.
+  - ``\\rho_{t,i}``: The share of the weight left to the residual after the intercept and the slope.
+
+A residual sum of squares below zero within `64 eps` of its scale is rounding, and it is read as zero. The variance is `NaN` where the beta is not finite, before the asset has three observations, where ``\\rho_{t,i}`` is not above `64 eps`, where the residual sum of squares is still negative, and where the result is not a finite number at or above zero.
+
+# Arguments
+
+  - `mo`: The moments of the regression.
+  - `sq`: The moments of the market under squared weights.
+  - `b`: The raw beta of the asset.
+  - `i`: The asset.
+
+# Returns
+
+  - `v::Real`: The estimation error variance, or `NaN`.
+
+# Related
+
+  - [`ew_beta_shrink`](@ref)
+  - [`EWMoments`](@ref)
+  - [`EWBetaState`](@ref)
+"""
+function ew_beta_variance(mo::EWMoments, sq::EWMoments, b::Real, i::Integer)::Real
+    K = size(mo.C, 1)
+    smm = mo.C[1, 1, i]
+    sxx = mo.C[K, K, i]
+    W = mo.w[i]
+    Q = sq.w[i]
+    rl = (sq.C[1, 1, i] + Q * (sq.o[1, i] - mo.o[1, i])^2) / smm
+    rho = 1 - Q / W^2 - rl / W
+    ess = b * mo.C[1, K, i]
+    rss = sxx - ess
+    tol = 64 * eps(typeof(rss))
+    rss = ifelse(-tol * (sxx + abs(ess)) <= rss < zero(rss), zero(rss), rss)
+    v = rss / (W * rho) * rl / smm
+    ok = isfinite(b) && mo.n[i] >= 3 && rho > tol && rss >= zero(rss) && isfinite(v)
+    return ok && v >= zero(v) ? v : oftype(v, NaN)
+end
+"""
+$(DocStringExtensions.TYPEDEF)
+
+The model of [`ew_regression_series!`](@ref) for an [`EWBeta`](@ref) with a `group`: the group labels and the capitalisation of every observation, and the two settings of the shrinkage.
+
+This type is an implementation detail and is not intended for direct use. [`ew_beta_shrinkage`](@ref) makes it, and [`ew_beta_shrink_row!`](@ref) reads it at each complete window.
+
+# Fields
+
+$(DocStringExtensions.FIELDS)
+
+# Related
+
+  - [`ew_beta_shrinkage`](@ref)
+  - [`ew_beta_shrink`](@ref)
+"""
+@concrete struct EWBetaShrinkage
+    """
+    `L`: The group label of each asset at each observation, `observations × assets`.
+    """
+    L
+    """
+    `W`: The capitalisation of each asset at each observation, `observations × assets`.
+    """
+    W
+    """
+    $(field_dict[:min_group_size_ewb])
+    """
+    min_group_size
+    """
+    $(field_dict[:bounds_ewb])
+    """
+    bounds
+end
+"""
+    ew_beta_shrink_row!(sh::EWBetaShrinkage, st::EWBetaState, t::Integer) -> nothing
+
+Shrinks the raw betas of the window that closes at observation `t`, in place, through [`ew_beta_shrink`](@ref), with the group labels and the capitalisation of `t`. The estimation error variance of each beta comes from [`ew_beta_variance`](@ref). The shrunk betas hold until the next window closes, and the next window starts again from the raw betas of the moments.
+
+# Arguments
+
+  - `sh`: The shrinkage.
+  - `st`: The state, whose betas change in place.
+  - `t`: The observation that closes the window.
+
+# Returns
+
+  - `nothing`.
+
+# Related
+
+  - [`ew_regression_series!`](@ref)
+  - [`EWBetaShrinkage`](@ref)
+"""
+function ew_beta_shrink_row!(sh::EWBetaShrinkage, st::EWBetaState, t::Integer)::Nothing
+    b = st.b
+    bev = [ew_beta_variance(st.mo, st.sq, b[i], i) for i in eachindex(b)]
+    b .= ew_beta_shrink(b, bev, view(sh.L, t, :), view(sh.W, t, :), sh.min_group_size,
+                        sh.bounds)
+    return nothing
 end
 """
     assert_ew_shrinkage_bounds(bounds::Tuple{Real, Real}) -> nothing
@@ -744,7 +422,7 @@ Check the number of observations an exponentially weighted recursion aggregates 
 
   - [`EWBeta`](@ref)
   - [`EWMacroSensitivity`](@ref)
-  - [`ew_agg_series`](@ref)
+  - [`EWReturnWindow`](@ref)
 """
 function assert_ew_agg_obs(agg_obs::Integer)::Nothing
     @argcheck(agg_obs >= one(agg_obs),
@@ -757,32 +435,29 @@ $(DocStringExtensions.TYPEDEF)
 
 Exponentially weighted beta of the returns against the market return, at every observation.
 
-This is the archetype of every market beta Descriptor. The beta is the exponentially weighted covariance of an asset with the market, divided by the exponentially weighted variance of the market. [sharpe1964](@citet) defines the beta of an asset as the slope of the regression of its return on the return of the market, which is the covariance over the variance (pages 438 and 439). The exponential weights and the recursion below are this library's own, and no source for them was found. [`market_return_series`](@ref) builds the market return from the Asset Panel. Where the estimator names a categorical Panel Field in `group`, [`ew_beta_shrink`](@ref) shrinks each raw beta toward the capitalisation-weighted mean beta of its group.
+This is the archetype of every market beta Descriptor. The beta of an asset is the slope of the exponentially weighted regression of its return on the market return, with an intercept. [sharpe1964](@citet) defines the beta of an asset as the slope of the regression of its return on the return of the market, which is the covariance over the variance (pages 438 and 439). The exponential weights and the recursion below are this library's own, and no source for them was found. [`market_return_series`](@ref) builds the market return from the Asset Panel. Where the estimator names a categorical Panel Field in `group`, [`ew_beta_shrink`](@ref) shrinks each raw beta toward the capitalisation-weighted mean beta of its group.
 
 # Mathematical definition
 
 ```math
 \\begin{align}
-\\beta_{t,i} &= \\frac{C_{t,i}}{V_{m,t} + \\texttt{min\\_val}}\\,, \\\\
-C_{t,i} &= \\lambda C_{t-1,i} + (1 - \\lambda)\\left(x_{t,\\,i} - \\mu_{t-1,i}\\right)\\left(r_{m,t} - \\mu_{m,t-1}\\right)\\,, \\\\
-V_{m,t} &= \\lambda V_{m,t-1} + (1 - \\lambda)\\left(r_{m,t} - \\mu_{m,t-1}\\right)^2\\,, \\\\
-\\mu_{t,i} &= \\lambda \\mu_{t-1,i} + (1 - \\lambda)\\, x_{t,\\,i}\\,, \\\\
-\\mu_{m,t} &= \\lambda \\mu_{m,t-1} + (1 - \\lambda)\\, r_{m,t}\\,.
+\\beta_{t,i} &= \\frac{S^{mx}_{t,i}}{S^{mm}_{t,i}}\\,, \\\\
+S^{mx}_{t,i} &= \\sum_{s \\in \\mathcal{V}_{t,i}} w_{s,i} \\left(r_{m,s} - \\mu^{m}_{t,i}\\right)\\left(x_{s,\\,i} - \\mu^{x}_{t,i}\\right)\\,, \\\\
+S^{mm}_{t,i} &= \\sum_{s \\in \\mathcal{V}_{t,i}} w_{s,i} \\left(r_{m,s} - \\mu^{m}_{t,i}\\right)^2\\,.
 \\end{align}
 ```
 
 Where:
 
-  - ``C_{t,i}``: Exponentially weighted covariance of asset ``i`` with the market.
-  - ``\\mu_{t,i}``, ``\\mu_{m,t}``: Exponentially weighted means of asset ``i`` and of the market.
   - $(math_dict[:beta_ti_ewb])
-  - $(math_dict[:V_mt_ewb])
+  - ``\\mathcal{V}_{t,i}``: The valid observations of asset ``i`` up to ``t`` since its last reset: the asset is active there, and its return and the market return are both finite.
+  - ``w_{s,i}``: The weight of observation ``s`` for asset ``i``, ``(1 - \\lambda) \\lambda^{k}``, where ``k`` counts the valid observations of the asset after ``s``.
+  - ``\\mu^{m}_{t,i}``, ``\\mu^{x}_{t,i}``: The weighted means of the market return and of the return of asset ``i`` over ``\\mathcal{V}_{t,i}``.
   - $(math_dict[:x_ti_ret])
   - $(math_dict[:r_mt_ewb])
   - $(math_dict[:lambda_ew])
-  - $(math_dict[:min_val_ewb])
 
-Every state starts from zero, and each deviation uses the mean of the previous observation.
+Both sums run over the observations of the asset alone, with the same weights, so the beta is the slope of a weighted regression with an intercept. An asset that is listed late, or that misses an observation, weights the market over its own observations, and its beta carries no bias toward zero. [`EWMoments`](@ref) holds the sums, and [`ew_regression_series!`](@ref) runs the recursion. A missing return holds the beta of its asset. An inactive observation resets the asset, so its beta is `NaN` until it has `min_obs` valid observations again. The beta is also `NaN` where the market does not vary over the observations of the asset.
 
 # Fields
 
@@ -792,8 +467,7 @@ $(DocStringExtensions.FIELDS)
 
     EWBeta(; mcap::AbstractString = "market_cap", decay::Real, min_obs::Integer,
            agg_obs::Integer = 1, group::Option{<:AbstractString} = nothing,
-           min_group_size::Integer = 5,
-           bounds::Tuple{Real, Real} = (0.0, 1.0), min_val::Real = 1e-12,
+           min_group_size::Integer = 5, bounds::Tuple{Real, Real} = (0.0, 1.0),
            cache::Option{<:AbstractPartialFitState} = nothing) -> EWBeta
 
 Keywords correspond to the struct's fields. `decay` and `min_obs` take no default, because their values depend on the data frequency. [`EWMarketBeta`](@ref) takes a half-life instead, and converts it through [`half_life_decay`](@ref) and [`half_life_min_obs`](@ref).
@@ -805,7 +479,6 @@ Keywords correspond to the struct's fields. `decay` and `min_obs` take no defaul
   - `agg_obs >= 1`.
   - `min_group_size >= 1`.
   - `0 <= bounds[1] <= bounds[2] <= 1`.
-  - `min_val > 0`.
 
 # Examples
 
@@ -818,8 +491,7 @@ EWBeta
          agg_obs ┼ Int64: 1
            group ┼ nothing
   min_group_size ┼ Int64: 5
-          bounds ┼ Tuple{Float64, Float64}: (0.0, 1.0)
-         min_val ┴ Float64: 1.0e-12
+          bounds ┴ Tuple{Float64, Float64}: (0.0, 1.0)
 ```
 
 # Related
@@ -828,7 +500,7 @@ EWBeta
   - [`descriptor`](@ref)
   - [`EWMarketBeta`](@ref)
   - [`EWDownsideBeta`](@ref)
-  - [`ew_beta_series`](@ref)
+  - [`ew_regression_series!`](@ref)
   - [`ew_beta_shrink`](@ref)
   - [`market_return_series`](@ref)
 
@@ -866,155 +538,65 @@ EWBeta
     """
     bounds
     """
-    $(field_dict[:min_val])
-    """
-    min_val
-    """
     $(field_dict[:ew_beta_desc_cache])
     """
     cache
     function EWBeta(mcap::AbstractString, decay::Real, min_obs::Integer, agg_obs::Integer,
                     group::Option{<:AbstractString}, min_group_size::Integer,
-                    bounds::Tuple{Real, Real}, min_val::Real,
-                    cache::Option{<:AbstractPartialFitState})
+                    bounds::Tuple{Real, Real}, cache::Option{<:AbstractPartialFitState})
         assert_panel_terms(mcap, :mcap)
         assert_ew_decay(decay)
         assert_nonempty_gt0_finite_val(min_obs, :min_obs)
         assert_ew_agg_obs(agg_obs)
         assert_nonempty_gt0_finite_val(min_group_size, :min_group_size)
         assert_ew_shrinkage_bounds(bounds)
-        assert_nonempty_gt0_finite_val(min_val, :min_val)
         return new{typeof(mcap), typeof(decay), typeof(min_obs), typeof(agg_obs),
-                   typeof(group), typeof(min_group_size), typeof(bounds), typeof(min_val),
-                   typeof(cache)}(mcap, decay, min_obs, agg_obs, group, min_group_size,
-                                  bounds, min_val, cache)
+                   typeof(group), typeof(min_group_size), typeof(bounds), typeof(cache)}(mcap,
+                                                                                         decay,
+                                                                                         min_obs,
+                                                                                         agg_obs,
+                                                                                         group,
+                                                                                         min_group_size,
+                                                                                         bounds,
+                                                                                         cache)
     end
 end
 function EWBeta(; mcap::AbstractString = "market_cap", decay::Real, min_obs::Integer,
                 agg_obs::Integer = 1, group::Option{<:AbstractString} = nothing,
                 min_group_size::Integer = 5, bounds::Tuple{Real, Real} = (0.0, 1.0),
-                min_val::Real = 1e-12,
                 cache::Option{<:AbstractPartialFitState} = nothing)::EWBeta
-    return EWBeta(mcap, decay, min_obs, agg_obs, group, min_group_size, bounds, min_val,
-                  cache)
+    return EWBeta(mcap, decay, min_obs, agg_obs, group, min_group_size, bounds, cache)
 end
 """
-$(DocStringExtensions.TYPEDEF)
+    ew_beta_shrinkage(::Nothing, ::EWBeta, ::ReturnsResult) -> nothing
+    ew_beta_shrinkage(group::AbstractString, de::EWBeta, rd::ReturnsResult) -> EWBetaShrinkage
 
-Holds the Descriptor of an [`EWBeta`](@ref) and the two cross-sections of the shrinkage that its state carries after the last window.
-
-This type is an implementation detail and is not intended for direct use. [`ew_beta_output`](@ref) makes it, and [`ew_beta_fold`](@ref) reads it. `v` and `s` are vectors of one type, so a record names them where a plain tuple would let a swap pass silently.
-
-# Fields
-
-$(DocStringExtensions.FIELDS)
-
-# Related
-
-  - [`ew_beta_output`](@ref)
-  - [`EWBlockState`](@ref)
-"""
-@concrete struct EWBetaOutput
-    """
-    `D`: The Descriptor before the active mask is applied, `observations × assets`.
-    """
-    D
-    """
-    `v`: The residual variance after the last window, or `nothing` with no group.
-    """
-    v
-    """
-    `s`: The shrunk beta after the last window, or `nothing` with no group.
-    """
-    s
-end
-"""
-    ew_beta_output(group::Nothing, de::EWBeta, rd::ReturnsResult,
-                   Ba::AbstractMatrix{<:Real}, Vm::AbstractVector{<:Real},
-                   Xa::AbstractMatrix{<:Real}, rma::AbstractVector{<:Real},
-                   b0::AbstractVector{<:Real}, st::EWBlockState) -> EWBetaOutput
-    ew_beta_output(group::AbstractString, de::EWBeta, rd::ReturnsResult,
-                   Ba::AbstractMatrix{<:Real}, Vm::AbstractVector{<:Real},
-                   Xa::AbstractMatrix{<:Real}, rma::AbstractVector{<:Real},
-                   b0::AbstractVector{<:Real}, st::EWBlockState) -> EWBetaOutput
-
-Turn the raw betas of the recursion into the Descriptor of an [`EWBeta`](@ref).
-
-Dispatch on the `group` slot selects the method. With no group, the raw betas are spread over the observations that they were aggregated from. With a group, each cross-section is shrunk first. A shrunk cross-section is computed again only at an observation that closes a window, and it holds its value between windows, so the shrinkage runs on the same clock as the recursion.
-
-The windows of `Ba` follow the windows that the state `st` folded, and the observations of `rd` follow the observations of the window that `st` carries. The batch call starts from a new state, and a step of the carry fold from the carried one, so both run the same arithmetic.
-
-# Algorithm
-
- 1. With no group, spread `Ba` over the observations through [`ew_beta_expand`](@ref), and stop.
- 2. Read the capitalisation `W` and the group labels `L` at every observation.
- 3. Compute the residual variance `Vr` of every window through [`ew_beta_residual_variance`](@ref), from the residual variance of the state.
- 4. Compute the effective sample size `en`, twice the half-life that `decay` implies.
- 5. At each observation `t` that closes window `k`, with `k >= min_obs`, compute the estimation error variance `bev` of each beta of that window.
- 6. Shrink the betas of window `k` through [`ew_beta_shrink`](@ref), with the labels and the weights of observation `t`. The result `s` holds its value until the next window closes. It starts from the shrunk beta of the state.
- 7. Spread `Ba` over the observations through [`ew_beta_expand`](@ref), which gives the raw betas of the last closed window during the warm-up and `NaN` before the first window closes, and write `s` over every observation after the warm-up.
+Returns the model of [`ew_regression_series!`](@ref) that the `group` slot of an [`EWBeta`](@ref) selects: `nothing` for the raw market beta, or the [`EWBetaShrinkage`](@ref) of the group labels and of the capitalisation of `rd`.
 
 # Arguments
 
   - `group`: The `group` slot of the estimator.
   - `de`: Descriptor Estimator.
   - $(arg_dict[:rd]) It must carry an Asset Panel in `rd.pnl`.
-  - `Ba`: The raw betas, `windows × assets`.
-  - `Vm`: The market variance after each window.
-  - `Xa`: The aggregated returns, `windows × assets`.
-  - `rma`: The aggregated market return, one entry per window.
-  - `b0`: The raw beta of the last window that the state folded, `NaN` before the first one.
-  - `st`: The state before the step.
 
 # Returns
 
-  - `out::EWBetaOutput`: `D`, the Descriptor before the active mask is applied, `observations × assets`, and `v` and `s`, the residual variance and the shrunk beta after the last window, or `nothing` with no group.
+  - `md::Option{<:EWBetaShrinkage}`: The model.
 
 # Related
 
-  - [`EWBeta`](@ref)
-  - [`descriptor`](@ref)
-  - [`ew_beta_shrink`](@ref)
-  - [`ew_beta_expand`](@ref)
+  - [`EWBetaShrinkage`](@ref)
+  - [`ew_beta_fold`](@ref)
   - [`cross_sectional_groups`](@ref)
 """
-function ew_beta_output(::Nothing, de::EWBeta, rd::ReturnsResult,
-                        Ba::AbstractMatrix{<:Real}, ::AbstractVector{<:Real},
-                        ::AbstractMatrix{<:Real}, ::AbstractVector{<:Real},
-                        b0::AbstractVector{<:Real}, st::EWBlockState)
-    return EWBetaOutput(ew_beta_expand(Ba, size(rd.X, 1), de.agg_obs, b0, size(st.X, 1)),
-                        nothing, nothing)
+function ew_beta_shrinkage(::Nothing, ::EWBeta, ::ReturnsResult)::Nothing
+    return nothing
 end
-function ew_beta_output(group::AbstractString, de::EWBeta, rd::ReturnsResult,
-                        Ba::AbstractMatrix{<:Real}, Vm::AbstractVector{<:Real},
-                        Xa::AbstractMatrix{<:Real}, rma::AbstractVector{<:Real},
-                        b0::AbstractVector{<:Real}, st::EWBlockState)
-    W = Matrix(descriptor_field_values(rd, de.mcap))
-    L = cross_sectional_groups(descriptor_asset_panel(rd), group)
-    Tf = eltype(Ba)
-    T, N = size(W)
-    k0 = st.st.t
-    r0 = size(st.X, 1)
-    v0 = something(st.v, zeros(promote_type(eltype(Xa), eltype(rma), eltype(Ba)), N))
-    Vr = ew_beta_residual_variance(Xa, rma, Ba, de.decay, de.min_obs, v0, b0, k0)
-    en = 2 * decay_half_life(de.decay)
-    agg_obs = de.agg_obs
-    min_obs = de.min_obs
-    B = ew_beta_expand(Ba, T, agg_obs, b0, r0)
-    s = something(st.s, fill(Tf(NaN), N))
-    for t in 1:T
-        j = div(r0 + t, agg_obs)
-        k = k0 + j
-        if iszero((r0 + t) % agg_obs) && k >= min_obs
-            bev = view(Vr, j, :) ./ (en * (Vm[j] + de.min_val))
-            s = ew_beta_shrink(view(Ba, j, :), bev, view(L, t, :), view(W, t, :),
-                               de.min_group_size, de.bounds, de.min_val)
-        end
-        if k >= min_obs
-            B[t, :] = s
-        end
-    end
-    return EWBetaOutput(B, isempty(Vr) ? v0 : Vr[end, :], s)
+function ew_beta_shrinkage(group::AbstractString, de::EWBeta,
+                           rd::ReturnsResult)::EWBetaShrinkage
+    return EWBetaShrinkage(cross_sectional_groups(descriptor_asset_panel(rd), group),
+                           Matrix(descriptor_field_values(rd, de.mcap)), de.min_group_size,
+                           de.bounds)
 end
 """
     descriptor(de::EWBeta, rd::ReturnsResult) -> Matrix{<:Real}
@@ -1024,15 +606,13 @@ Compute an exponentially weighted market beta Descriptor from a [`ReturnsResult`
 # Algorithm
 
  1. Build the market return `rm` through [`market_return_series`](@ref).
- 2. Mask the returns into `X` through [`ew_active_returns`](@ref).
- 3. Where `agg_obs` is greater than one, aggregate `X` and `rm` into `Xa` and `rma` through [`ew_agg_series`](@ref) and [`ew_agg_vector`](@ref).
- 4. Run the recursion from a new state through [`ew_beta_series!`](@ref), for the raw betas `Ba` and the market variance `Vm` of every window.
- 5. Shrink and spread `Ba` into the Descriptor `D` through [`ew_beta_output`](@ref), which dispatches on the `group` slot.
- 6. Write `NaN` into the inactive cells of `D` through [`descriptor_active_fill!`](@ref).
+ 2. Build a new state through [`ew_beta_state`](@ref), and the shrinkage of the `group` slot through [`ew_beta_shrinkage`](@ref).
+ 3. Run the regression through [`ew_regression_series!`](@ref), which resets an asset that turns inactive, averages each window where `agg_obs > 1`, and shrinks each complete window where the estimator names a `group`.
+ 4. Write `NaN` into the inactive cells through [`descriptor_active_fill!`](@ref).
 
 [`ew_beta_fold`](@ref) holds these steps, and a step of the carry fold runs them from the carried state.
 
-An asset whose return is missing at an observation keeps its last raw beta, and the market state still advances at that observation. With a group, the shrunk beta of that asset can still change, because the mean and the prior variance of its group change.
+An asset whose return is missing at an observation keeps its raw beta. With a group, the shrunk beta of that asset can still change, because the mean and the prior variance of its group change.
 
 # Arguments
 
@@ -1043,6 +623,7 @@ An asset whose return is missing at an observation keeps its last raw beta, and 
 
   - `rd.pnl` is an [`AssetPanel`](@ref). Raises an [`IsNothingError`](@ref).
   - The rules of [`market_return_series`](@ref).
+  - The moments stay finite. Raises an [`IsNonFiniteError`](@ref).
 
 # Returns
 
@@ -1059,17 +640,16 @@ julia> rd = ReturnsResult(; nx = [\"A\", \"B\"], X = [0.1 0.2; -0.1 0.0; 0.05 0.
 
 julia> descriptor(EWMarketBeta(; half_life = 1), rd)
 3×2 Matrix{Float64}:
- 0.6       1.2
- 0.914432  0.982316
- 1.00449   0.927219
+ NaN         NaN
+   0.954545    0.954545
+   1.03478     0.904026
 ```
 
 # Related
 
   - [`EWBeta`](@ref)
   - [`EWMarketBeta`](@ref)
-  - [`ew_beta_series!`](@ref)
-  - [`ew_beta_output`](@ref)
+  - [`ew_regression_series!`](@ref)
   - [`ew_beta_fold`](@ref)
   - [`market_return_series`](@ref)
 """
@@ -1081,8 +661,7 @@ end
                  decay::Real = half_life_decay(half_life),
                  min_obs::Integer = half_life_min_obs(half_life), agg_obs::Integer = 1,
                  group::Option{<:AbstractString} = nothing, min_group_size::Integer = 5,
-                 bounds::Tuple{Real, Real} = (0.0, 1.0),
-                 min_val::Real = 1e-12) -> EWBeta
+                 bounds::Tuple{Real, Real} = (0.0, 1.0)) -> EWBeta
 
 Exponentially weighted sensitivity of an asset to the market portfolio.
 
@@ -1098,7 +677,6 @@ The value is the beta of [`EWBeta`](@ref) against the capitalisation-weighted ma
   - $(arg_dict[:group_ewb])
   - $(arg_dict[:min_group_size_ewb])
   - $(arg_dict[:bounds_ewb])
-  - $(arg_dict[:min_val])
 
 # Returns
 
@@ -1115,8 +693,7 @@ EWBeta
          agg_obs ┼ Int64: 1
            group ┼ nothing
   min_group_size ┼ Int64: 5
-          bounds ┼ Tuple{Float64, Float64}: (0.0, 1.0)
-         min_val ┴ Float64: 1.0e-12
+          bounds ┴ Tuple{Float64, Float64}: (0.0, 1.0)
 ```
 
 # Related
@@ -1130,11 +707,10 @@ function EWMarketBeta(; mcap::AbstractString = "market_cap", half_life::Real = 6
                       decay::Real = half_life_decay(half_life),
                       min_obs::Integer = half_life_min_obs(half_life), agg_obs::Integer = 1,
                       group::Option{<:AbstractString} = nothing,
-                      min_group_size::Integer = 5, bounds::Tuple{Real, Real} = (0.0, 1.0),
-                      min_val::Real = 1e-12)::EWBeta
+                      min_group_size::Integer = 5,
+                      bounds::Tuple{Real, Real} = (0.0, 1.0))::EWBeta
     return EWBeta(; mcap = mcap, decay = decay, min_obs = min_obs, agg_obs = agg_obs,
-                  group = group, min_group_size = min_group_size, bounds = bounds,
-                  min_val = min_val)
+                  group = group, min_group_size = min_group_size, bounds = bounds)
 end
 
 export EWBeta, EWMarketBeta

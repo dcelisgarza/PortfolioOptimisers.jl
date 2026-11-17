@@ -954,6 +954,10 @@ const RULED_NOTHING_PAIRS = Dict{Tuple{Symbol, Symbol}, Tuple{String, String}}(#
                                                                                 :cross_sectional_qr) =>
                                                                                    ("keep (b)",
                                                                                     "$POLICY: the `Nothing` arm answers that no reader needs a factorisation, from the two masks and the solve algorithm, which the callee does not take, and `cross_sectional_qr(D, nothing)` takes the factorisation, another answer (#2093)"),
+                                                                               (:ew_regression_take!,
+                                                                                :ew_window_add!) =>
+                                                                                   ("keep (b)",
+                                                                                    "$POLICY: the `Nothing` arm answers that no window is open, so the observation updates the regression of the asset through the model `md` and the state `st`, which `ew_window_add!` does not take (#2132)"),
                                                                                (:cross_sectional_observed_rebacked,
                                                                                 :rebuild_struct) =>
                                                                                    ("keep (b)",
