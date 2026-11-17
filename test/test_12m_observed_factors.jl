@@ -272,6 +272,19 @@ end
             @test err isa PO.IsNonFiniteError
             @test occursin("[\"EUR\"]", err.msg) && occursin("observation 6", err.msg)
         end
+        # Issue #2135: an observed member whose Descriptor warms up over the whole history is
+        # named in the refusal by its name, after the names of the estimated factors.
+        rdm = ReturnsResult(; nx = fx.rd.nx, X = fx.rd.X, ne = ["EUR", "USD", "SPX"],
+                            E = hcat(fx.R, 0.004 .* randn(StableRNG(7), 80)),
+                            pnl = fx.rd.pnl)
+        mom = CompositeExposure(; descriptors = [RollingLogReturn(; window = 100)],
+                                family = "momentum")
+        pm = obs_prior(;
+                       factors = ["beta" => obs_pass("beta", "style"),
+                                  "currency" => CurrencyExposure(),
+                                  "mom" => ObservedExposure(; xe = mom, series = "SPX")])
+        res = @test_throws ArgumentError prior(pm, rdm)
+        @test occursin("factor(s) \"mom\" have no finite", res.value.msg)
         # A family holds estimated factors or observed ones.
         @test_throws ArgumentError CrossSectionalFactorPrior(; lambda = 1,
                                                              factors = ["beta" =>

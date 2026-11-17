@@ -416,21 +416,36 @@ end
         # Every exposure is NaN, so no observation carries a usable asset and the whole
         # history is warm-up.
         Ms = fill(NaN, size(rd.X, 2), 2, size(rd.X, 1))
-        @test_throws ArgumentError PO.cross_sectional_warmup(rd.X, Ms, rd.pnl.emsk)
-        # The refusal names the factors whose exposure is finite nowhere, the observed ones
-        # after the estimated ones. A factor that is finite somewhere is not named.
-        @test_throws r"position\(s\) \[1, 2\] of the exposure history" PO.cross_sectional_warmup(rd.X,
-                                                                                                 Ms,
-                                                                                                 rd.pnl.emsk)
+        nf = ["momentum", "industry=Energy"]
+        # Issue #2135: the refusal names the factors whose exposure is finite nowhere, the
+        # observed ones after the estimated ones, by name and not by column. A factor that
+        # is finite somewhere is not named.
+        res = @test_throws ArgumentError PO.cross_sectional_warmup(rd.X, Ms, rd.pnl.emsk,
+                                                                   nf)
+        @test occursin("factor(s) \"momentum\", \"industry=Energy\" have no finite",
+                       res.value.msg)
         Mh = copy(Ms)
         Mh[2, 1, 3] = 0.0
         Zo = fill(NaN, size(rd.X, 2), 1, size(rd.X, 1))
-        @test_throws r"position\(s\) \[2, 3\] of" PO.cross_sectional_warmup(rd.X, Mh,
-                                                                            rd.pnl.emsk, Zo)
-        @test PO.cross_sectional_cold_factors(Mh[:, 1:1, :], nothing) == ""
+        res = @test_throws ArgumentError PO.cross_sectional_warmup(rd.X, Mh, rd.pnl.emsk,
+                                                                   [nf; "beta"], Zo)
+        @test occursin("factor(s) \"industry=Energy\", \"beta\" have", res.value.msg)
+        @test PO.cross_sectional_cold_factors(Mh[:, 1:1, :], nf[1:1], nothing) == ""
+        # A name per column of the two histories, or the refusal could not name them.
+        @test_throws DimensionMismatch PO.cross_sectional_warmup(rd.X, Mh, rd.pnl.emsk, nf,
+                                                                 Zo)
+        # The fit names the factor that the user wrote. The one-hot block before it takes
+        # three columns, so its column is the fifth.
+        f = ["market" => ConstantExposure(),
+             "industry" => OneHotExposure(; field = "industry", family = "industry"),
+             "momentum" =>
+                 CompositeExposure(; descriptors = [RollingLogReturn(; window = 50)],
+                                   family = "style")]
+        res = @test_throws ArgumentError prior(CrossSectionalFactorPrior(; factors = f), rd)
+        @test occursin("factor(s) \"momentum\" have no finite", res.value.msg)
         # The first observation is warm, so the count of leading cold observations is zero.
         Ms[1, :, 1] .= 0.0
-        @test iszero(PO.cross_sectional_warmup(rd.X, Ms, rd.pnl.emsk))
+        @test iszero(PO.cross_sectional_warmup(rd.X, Ms, rd.pnl.emsk, nf))
         # A pair with no market capitalisation leaves the two weight masks.
         msk = trues(2, 2)
         PO.cross_sectional_cap_finite!(msk, [1.0 NaN; 2.0 3.0])
@@ -1771,11 +1786,12 @@ function csfp_oracle(pe, rd; alpha = nothing)
     mcap = PO.panel_field_values(rd, pe.mcap)
     bmsk = isfinite.(X) .& emsk .& isfinite.(mcap)
     BW = PO.cross_sectional_cap_weights(pe.bp, mcap, bmsk)
-    Z = PO.cross_sectional_exposure_history(pe.factors,
-                                            PO.cross_sectional_benchmark_returns(rd, pe.bw,
-                                                                                 BW)).Ms
+    eh = PO.cross_sectional_exposure_history(pe.factors,
+                                             PO.cross_sectional_benchmark_returns(rd, pe.bw,
+                                                                                  BW))
+    Z = eh.Ms
     ell = pe.lag
-    ts = (PO.cross_sectional_warmup(X, Z, emsk) + ell + 1):Tn
+    ts = (PO.cross_sectional_warmup(X, Z, emsk, eh.nf) + ell + 1):Tn
     K = size(Z, 2)
     F = zeros(length(ts), K)
     Q = zeros(length(ts), N)
@@ -1957,9 +1973,10 @@ small random arrays, so each check reads one helper alone.
         m = [emsk[t, i] && isfinite(X[t, i]) && all(isfinite, Ms[i, :, t])
              for t in 1:nT, i in 1:nN]
         @test PO.cross_sectional_eligible(X, Ms, emsk) == m
-        @test PO.cross_sectional_warmup(X, Ms, emsk) ==
+        nf = ["f$k" for k in 1:(nK + 2)]
+        @test PO.cross_sectional_warmup(X, Ms, emsk, nf[1:nK]) ==
               findfirst(t -> any(m[t, :]), 1:nT) - 1
-        @test PO.cross_sectional_warmup(X, Ms, emsk) == 3
+        @test PO.cross_sectional_warmup(X, Ms, emsk, nf[1:nK]) == 3
         # Issue #1970: an observed block that the caller holds apart reads as the history that
         # joins it, so the fit tests the two blocks with no copy. Its own generator keeps the
         # fixtures below unchanged.
@@ -1972,9 +1989,9 @@ small random arrays, so each check reads one helper alone.
               [all(isfinite, J[i, :, t]) for t in 1:nT, i in 1:nN]
         @test PO.cross_sectional_eligible(X, Ms, emsk, Zo) ==
               PO.cross_sectional_eligible(X, J, emsk)
-        @test PO.cross_sectional_warmup(X, Ms, emsk, Zo) ==
-              PO.cross_sectional_warmup(X, J, emsk) >
-              PO.cross_sectional_warmup(X, Ms, emsk)
+        @test PO.cross_sectional_warmup(X, Ms, emsk, nf, Zo) ==
+              PO.cross_sectional_warmup(X, J, emsk, nf) >
+              PO.cross_sectional_warmup(X, Ms, emsk, nf[1:nK])
         @test_throws DimensionMismatch PO.cross_sectional_eligible(X, Ms, emsk,
                                                                    Zo[:, :, 1:(end - 1)])
         amsk = rand(rng, nN) .< 0.7

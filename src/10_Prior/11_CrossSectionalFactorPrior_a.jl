@@ -1156,12 +1156,14 @@ Where:
   - `X`: Asset returns, `observations × assets`.
   - `Ms`: The exposure history, `assets × factors × observations`.
   - `emsk`: The estimation mask, `observations × assets`.
+  - `nf`: The name of each factor, the columns of `Ms` and then the columns of `Zo`. The refusal names the factors whose exposure history holds no finite value.
   - `Zo`: The exposure history of the observed factors, on the axes of `Ms`, or `nothing`. Its factors join the factors of the definition beside those of `Ms`, so a caller that holds the two histories apart does not join them to test them.
 
 # Validation
 
+  - `nf` holds one name per factor of `Ms` and `Zo`. Raises a `DimensionMismatch`.
   - The rules of [`cross_sectional_eligible`](@ref).
-  - At least one observation is not cold. Raises an `ArgumentError`.
+  - At least one observation is not cold. Raises an `ArgumentError` that names the factors whose exposure history holds no finite value.
 
 # Returns
 
@@ -1174,13 +1176,16 @@ Where:
   - [`CrossSectionalFactorPrior`](@ref)
 """
 function cross_sectional_warmup(X::MatNum, Ms::Arr3Num, emsk::AbstractMatrix{Bool},
-                                Zo::Option{<:Arr3Num} = nothing)::Int
+                                nf::VecStr, Zo::Option{<:Arr3Num} = nothing)::Int
+    K = size(Ms, 2) + (isnothing(Zo) ? 0 : size(Zo, 2))
+    @argcheck(length(nf) == K,
+              DimensionMismatch("the exposure history holds $K factors, but $(length(nf)) names were given"))
     # The first observation that holds an eligible pair, as the carry fold finds it.
     t = findfirst(any, eachrow(cross_sectional_eligible(X, Ms, emsk, Zo)))
     if !isnothing(t)
         return t - 1
     end
-    return throw(ArgumentError("no observation of this Asset Panel carries an asset of the estimation universe with both a finite return and a finite Factor Exposure to every factor, so the whole history is Descriptor warm-up.$(cross_sectional_cold_factors(Ms, Zo)) Give more observations, or shorten the warm-up of the Descriptors."))
+    return throw(ArgumentError("no observation of this Asset Panel carries an asset of the estimation universe with both a finite return and a finite Factor Exposure to every factor, so the whole history is Descriptor warm-up.$(cross_sectional_cold_factors(Ms, nf, Zo)) Give more observations, or shorten the warm-up of the Descriptors."))
 end
 """
 $(DocStringExtensions.TYPEDEF)
@@ -1316,8 +1321,8 @@ function cross_sectional_exposure_stage(pe::CrossSectionalFactorPrior, X::MatNum
                                          ivpa = ivpa)
     # An observed member warms up too: one that wraps a Descriptor gives no exposure over the
     # warm-up of the Descriptor, and its derived net return is then not finite.
-    Zo = isnothing(st.cc) ? nothing : st.cc.Z
-    rw = (cross_sectional_warmup(st.Xu, st.Ms, st.emsk, Zo) + 1):size(X, 1)
+    Zo, nf = isnothing(st.cc) ? (nothing, st.nf) : (st.cc.Z, vcat(st.nf, st.cc.nf))
+    rw = (cross_sectional_warmup(st.Xu, st.Ms, st.emsk, nf, Zo) + 1):size(X, 1)
     return rebuild_struct(st, (; rw = rw))
 end
 """

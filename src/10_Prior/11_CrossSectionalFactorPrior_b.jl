@@ -66,13 +66,16 @@ function cross_sectional_live_factors(Z::Arr3Num, X::MatNum, W::MatNum)::BitVect
     return BitVector([any(c -> !iszero(Z[c[2], k, c[1]]), act) for k in axes(Z, 2)])
 end
 """
-    cross_sectional_cold_factors(Ms::Arr3Num, Zo::Option{<:Arr3Num}) -> String
+    cross_sectional_cold_factors(Ms::Arr3Num, nf::VecStr, Zo::Option{<:Arr3Num}) -> String
 
-Returns the sentence that names the positions of the factors whose exposure history holds no finite value, or an empty string where every factor holds one, so the refusal of [`cross_sectional_warmup`](@ref) can name the factor that consumed the whole history. The factors of `Zo` follow those of `Ms`.
+Returns the sentence that names the factors whose exposure history holds no finite value, or an empty string where every factor holds one, so the refusal of [`cross_sectional_warmup`](@ref) can name the factor that consumed the whole history. The factors of `Zo` follow those of `Ms`.
+
+The sentence gives the name of the factor, as `"momentum"` or `"industry=Energy"`, not the position of its column. A one-hot family takes one column per level, so a position does not match the order of the factors that the user wrote.
 
 # Arguments
 
   - `Ms`: The exposure history, `assets × factors × observations`.
+  - `nf`: The name of each factor, the columns of `Ms` and then the columns of `Zo`. [`cross_sectional_warmup`](@ref) checks its length.
   - `Zo`: The exposure history of the observed factors, on the axes of `Ms`, or `nothing`.
 
 # Returns
@@ -84,13 +87,14 @@ Returns the sentence that names the positions of the factors whose exposure hist
   - [`cross_sectional_warmup`](@ref)
   - [`cross_sectional_eligible`](@ref)
 """
-function cross_sectional_cold_factors(Ms::Arr3Num, Zo::Option{<:Arr3Num})::String
+function cross_sectional_cold_factors(Ms::Arr3Num, nf::VecStr,
+                                      Zo::Option{<:Arr3Num})::String
     H = isnothing(Zo) ? Ms : cat(Ms, Zo; dims = 2)
     k = findall(j -> !any(isfinite, view(H, :, j, :)), axes(H, 2))
     return if isempty(k)
         ""
     else
-        " The factors at position(s) $k of the exposure history have no finite Factor Exposure at any observation."
+        " The factor(s) $(join(map(repr, nf[k]), ", ")) have no finite Factor Exposure at any observation."
     end
 end
 function lookback(pe::CrossSectionalFactorPrior)::Option{<:Integer}
