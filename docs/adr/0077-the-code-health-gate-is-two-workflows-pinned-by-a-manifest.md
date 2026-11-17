@@ -231,3 +231,14 @@ binding number rose, so no row needed `--accept-rise`. JET fell in four rows by 
 `plots_ext` run. These are the rows that rose under 1.13.3. Forty-eight binding complexity numbers
 fell, in 28 files, because `dev` carried drift under the thresholds, and a refresh imports it. The coverage
 baseline's provenance line was moved by hand, for the reason the first amendment gives.
+
+## Amendment (2026-11-17)
+
+JET is **0.13.3**, its newest release. The maintainer asked to update JET. The Julia pin stays
+at 1.13.4. `code_health/Manifest.toml` took `Pkg.update("JET"; preserve = PRESERVE_ALL)`. Only
+JET moved, from 0.13.1 to 0.13.3, and the entry of the package took the version of its path
+source. CodeComplexity and JuliaSyntax keep their versions.
+
+Only the JET baseline records the version of JET, so only it was refreshed, with
+`--accept-rise`, in the commit that moved the Manifest. That commit changes no file under `src/`
+or `ext/`. No row moved in any run. Only the provenance lines `jet` and `commit` changed.

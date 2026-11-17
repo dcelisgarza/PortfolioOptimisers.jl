@@ -4,11 +4,11 @@
 
 [provenance]
 julia = "1.13.4"
-jet = "0.13.1"
+jet = "0.13.3"
 filter = "AnyFrameModule"
 attribution = "deepest_repository_frame"
 load_set = ["GraphRecipes", "StatsPlots"]
-commit = "bf35c74910"
+commit = "6ae1c4d01b"
 
 [run.main]
 load_set = ["GraphRecipes", "StatsPlots"]
