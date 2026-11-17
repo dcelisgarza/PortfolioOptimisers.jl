@@ -1539,19 +1539,22 @@ function ew_same(A::AbstractMatrix, B::AbstractMatrix; atol::Real = 0, rtol::Rea
 end
 
 # The exponentially weighted mean recursion, written out by hand. A cell that is not finite
-# holds the state and does not count toward the warm-up.
+# holds the state and does not count toward the warm-up. The state is divided by the running
+# sum `w` of the weights it carries, a recursion of its own rather than the closed form
+# `1 - decay^n` the library uses.
 function ew_hand_mean(R::AbstractMatrix{<:Real}, decay::Real, min_obs::Integer)
     T, N = size(R)
     S = fill(NaN, T, N)
     for i in 1:N
-        s, n = 0.0, 0
+        s, w, n = 0.0, 0.0, 0
         for t in 1:T
             if isfinite(R[t, i])
                 s = decay * s + (1 - decay) * R[t, i]
+                w = decay * w + (1 - decay)
                 n += 1
             end
             if n >= min_obs
-                S[t, i] = s
+                S[t, i] = s / w
             end
         end
     end
@@ -1883,16 +1886,17 @@ end
          0.001 0.005; -0.002 0.003]
     rd = ew_hand_panel(["market_cap" => ones(size(X))], X)
     lam = exp2(-inv(5.0))
-    @testset "EWMomentum(half_life = 5, skip = 0) is the recursion over log1p" begin
+    @testset "EWMomentum(half_life = 5, skip = 0) is the recursion over log1p / (1 - lambda^n)" begin
         S = zeros(2)
         expected = fill(NaN, size(X))
         for t in axes(X, 1), i in axes(X, 2)
             S[i] = lam * S[i] + (1 - lam) * log1p(X[t, i])
             if t >= 5
-                expected[t, i] = S[i]
+                expected[t, i] = S[i] / (1 - lam^t)
             end
         end
-        @test ew_same(descriptor(EWMomentum(; half_life = 5, skip = 0), rd), expected)
+        @test ew_same(descriptor(EWMomentum(; half_life = 5, skip = 0), rd), expected;
+                      rtol = 1e-12)
     end
     @testset "EWVolatility(half_life = 5) is sqrt(var / (1 - lambda^n))" begin
         V = zeros(2)
@@ -2091,12 +2095,42 @@ are what the oracle printed.
            0.3295118216932188 0.3008875865182181 0.27623046849190186;
            0.30842551111616473 0.2706803719462379 0.2582857997177295;
            0.29518328704247854 0.25374393090195446 0.24932100399519014]
-    @test ew_same(descriptor(EWMomentum(; half_life = 3, skip = 2), rd), mom)
-    @test ew_same(descriptor(EWMomentum(; half_life = 3, skip = 0, exponentiate = true),
-                             rd), mom_exp)
-    @test ew_same(descriptor(EWShareTurnover(; half_life = 3), rd), trn)
-    @test ew_same(descriptor(EWAmihudIlliquidity(; half_life = 3), rd), ami)
-    @test ew_same(descriptor(DaysToCover(; half_life = 3), rd), dtc)
+    # The literals hold the state of the recursion, which the start at zero shrinks toward
+    # zero. The Descriptors divide the state by `1 - λ^n`, so the values are broken until the
+    # reference corrects that start.
+    @test_broken ew_same(descriptor(EWMomentum(; half_life = 3, skip = 2), rd), mom)
+    @test_broken ew_same(descriptor(EWMomentum(; half_life = 3, skip = 0,
+                                               exponentiate = true), rd), mom_exp)
+    @test_broken ew_same(descriptor(EWShareTurnover(; half_life = 3), rd), trn)
+    @test_broken ew_same(descriptor(EWAmihudIlliquidity(; half_life = 3), rd), ami)
+    @test_broken ew_same(descriptor(DaysToCover(; half_life = 3), rd), dtc)
+end
+
+@testset "A mean Descriptor of an asset listed late equals the one of a full history" begin
+    # The state starts at zero, so without the division by `1 - λ^n` the first values of an
+    # asset are shrunk by that factor, about one half after one half-life, and an asset listed
+    # late sits apart from the assets observed since the start, although its inputs are the
+    # same. With constant inputs, the Descriptor equals the raw value at every observation, so
+    # the test takes no tolerance to tune.
+    T, listing, hl = 40, 15, 10
+    amsk = trues(T, 2)
+    amsk[1:listing, 1] .= false
+    field(v) = ifelse.(amsk, v, NaN)
+    rd = ew_hand_panel(["adj_volume" => field(fill(1e6, T, 2)),
+                        "adj_shares_outstanding" => field(fill(1e8, T, 2)),
+                        "adj_close" => field(fill(50.0, T, 2)),
+                        "short_interest" => field(fill(5e6, T, 2))],
+                       field(fill(0.01, T, 2)); amsk = amsk)
+    first_out = listing + hl
+    for (de, val) in ((EWMomentum(; half_life = hl, skip = 0), log1p(0.01)),
+                      (EWShareTurnover(; half_life = hl), 1e6 / 1e8),
+                      (EWAmihudIlliquidity(; half_life = hl), 0.01 / (50.0 * 1e6)),
+                      (DaysToCover(; half_life = hl), 5e6 / 1e6))
+        D = descriptor(de, rd)
+        @test all(isnan, view(D, 1:(first_out - 1), 1))
+        @test all(isapprox(val; rtol = 1e-12), view(D, hl:T, 2))
+        @test all(isapprox(val; rtol = 1e-12), view(D, first_out:T, 1))
+    end
 end
 
 @testset "A named mean Descriptor refuses a half-life that is not positive and finite" begin

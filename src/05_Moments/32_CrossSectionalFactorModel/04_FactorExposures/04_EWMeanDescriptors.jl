@@ -124,11 +124,11 @@ This is the one recursion every exponentially weighted mean Descriptor shares, s
 \\begin{align}
 S_{t,i} &= \\begin{cases} \\lambda S_{t-1,i} + (1 - \\lambda) y_{t,i} & \\text{if } y_{t,i} \\text{ is finite} \\\\ S_{t-1,i} & \\text{otherwise} \\end{cases}\\,, \\quad S_{0,i} = 0\\,, \\\\
 n_{t,i} &= \\begin{cases} n_{t-1,i} + 1 & \\text{if } y_{t,i} \\text{ is finite} \\\\ n_{t-1,i} & \\text{otherwise} \\end{cases}\\,, \\quad n_{0,i} = 0\\,, \\\\
-m_{t,i} &= \\begin{cases} S_{t,i} & \\text{if } n_{t,i} \\geq \\texttt{min\\_obs} \\\\ \\mathrm{NaN} & \\text{otherwise} \\end{cases}\\,.
+m_{t,i} &= \\begin{cases} S_{t,i} / \\left(1 - \\lambda^{n_{t,i}}\\right) & \\text{if } n_{t,i} \\geq \\texttt{min\\_obs} \\\\ \\mathrm{NaN} & \\text{otherwise} \\end{cases}\\,.
 \\end{align}
 ```
 
-The recursion applies no bias correction, so the first value of an asset is ``(1 - \\lambda) y_{t,i}`` and not ``y_{t,i}``. The start at zero biases the first values toward zero, and the warm-up `min_obs` replaces them with `NaN`.
+The state starts at zero, so after ``n_{t,i}`` finite inputs it is ``1 - \\lambda^{n_{t,i}}`` times a weighted mean of those inputs whose weights sum to one. The division removes that factor, so the first value of an asset is ``y_{t,i}``. Without it, every value of an asset with a short history is shrunk toward zero, by about one half after one half-life. An asset listed late would then not be comparable with an asset observed since the start.
 
 Where:
 
@@ -153,10 +153,10 @@ Where:
 ```jldoctest
 julia> PortfolioOptimisers.ew_mean_series([1.0; 3.0; NaN; 5.0;;], 0.5, 1)
 4×1 Matrix{Float64}:
- 0.5
- 1.75
- 1.75
- 3.375
+ 1.0
+ 2.3333333333333335
+ 2.3333333333333335
+ 3.857142857142857
 ```
 
 # Related
@@ -210,7 +210,7 @@ function ew_mean_series!(s::AbstractVector{<:Real}, n::AbstractVector{<:Integer}
                 ni += 1
             end
             if ni >= min_obs
-                S[t, i] = si
+                S[t, i] = si / (one(Tf) - decay^ni)
             end
         end
         s[i] = si
@@ -231,11 +231,12 @@ This is the archetype of every momentum Descriptor. The skip separates a medium-
 \\begin{align}
 y_{t,i} &= \\begin{cases} \\log(1 + x_{t-s,\\,i}) & \\text{if } t > s \\\\ \\mathrm{NaN} & \\text{otherwise} \\end{cases}\\,, \\\\
 S_{t,i} &= \\lambda S_{t-1,i} + (1 - \\lambda) y_{t,i}\\,, \\quad S_{0,i} = 0\\,, \\\\
-d_{t,i} &= \\begin{cases} \\exp(S_{t,i}) - 1 & \\text{if } \\texttt{exponentiate} \\\\ S_{t,i} & \\text{otherwise} \\end{cases}\\,.
+\\bar{S}_{t,i} &= S_{t,i} / \\left(1 - \\lambda^{n_{t,i}}\\right)\\,, \\\\
+d_{t,i} &= \\begin{cases} \\exp(\\bar{S}_{t,i}) - 1 & \\text{if } \\texttt{exponentiate} \\\\ \\bar{S}_{t,i} & \\text{otherwise} \\end{cases}\\,.
 \\end{align}
 ```
 
-The state moves only where ``y_{t,i}`` is finite, and holds everywhere else. The delay counts rows of the panel, not valid observations of the asset, so a gap in the returns of asset ``i`` reaches the recursion ``s`` rows later as a hold. ``d_{t,i}`` is `NaN` until ``n_{t,i} \\geq \\texttt{min\\_obs}``, and where asset ``i`` is inactive. [`ew_mean_series`](@ref) states the hold and the count in full.
+The state moves only where ``y_{t,i}`` is finite, and holds everywhere else. The delay counts rows of the panel, not valid observations of the asset, so a gap in the returns of asset ``i`` reaches the recursion ``s`` rows later as a hold. ``d_{t,i}`` is `NaN` until ``n_{t,i} \\geq \\texttt{min\\_obs}``, and where asset ``i`` is inactive. [`ew_mean_series`](@ref) states the hold, the count and the division in full.
 
 Where:
 
@@ -245,6 +246,7 @@ Where:
   - ``s``: `skip`, the delay in observations.
   - $(math_dict[:lambda_ew])
   - ``S_{t,i}``: State of the recursion of asset ``i`` after observation ``t``.
+  - ``\\bar{S}_{t,i}``: Exponentially weighted mean of asset ``i`` after observation ``t``.
   - ``n_{t,i}``: Count of the finite inputs ``y`` of asset ``i`` up to observation ``t``.
 
 # Fields
@@ -334,11 +336,11 @@ This is the archetype of every liquidity Descriptor built from a daily ratio. A 
 \\begin{align}
 q_{t,i} &= \\begin{cases} \\dfrac{a_{t,i}}{b_{t,i}} & \\text{if } b_{t,i} > 0 \\\\ \\mathrm{NaN} & \\text{otherwise} \\end{cases}\\,, \\\\
 S_{t,i} &= \\lambda S_{t-1,i} + (1 - \\lambda) q_{t,i}\\,, \\quad S_{0,i} = 0\\,, \\\\
-d_{t,i} &= S_{t,i}\\,.
+d_{t,i} &= S_{t,i} / \\left(1 - \\lambda^{n_{t,i}}\\right)\\,.
 \\end{align}
 ```
 
-The state moves only where ``q_{t,i}`` is finite, and holds everywhere else. A missing Panel Field on either side, and a denominator that is not strictly positive, both hold the state. A negative value of a Panel Field that `nonneg` names is a data error, so [`descriptor`](@ref) refuses it before the recursion starts. ``d_{t,i}`` is `NaN` until ``n_{t,i} \\geq \\texttt{min\\_obs}``, and where asset ``i`` is inactive. [`ew_mean_series`](@ref) states the hold and the count in full.
+The state moves only where ``q_{t,i}`` is finite, and holds everywhere else. A missing Panel Field on either side, and a denominator that is not strictly positive, both hold the state. A negative value of a Panel Field that `nonneg` names is a data error, so [`descriptor`](@ref) refuses it before the recursion starts. ``d_{t,i}`` is `NaN` until ``n_{t,i} \\geq \\texttt{min\\_obs}``, and where asset ``i`` is inactive. [`ew_mean_series`](@ref) states the hold, the count and the division in full.
 
 Where:
 
@@ -460,9 +462,12 @@ The days to cover of a short position is the shares held short divided by a smoo
 ```math
 \\begin{align}
 V_{t,i} &= \\begin{cases} \\lambda V_{t-1,i} + (1 - \\lambda) b_{t,i} & \\text{if } b_{t,i} > 0 \\\\ V_{t-1,i} & \\text{otherwise} \\end{cases}\\,, \\quad V_{0,i} = 0\\,, \\\\
-d_{t,i} &= \\begin{cases} \\dfrac{a_{t,i}}{V_{t,i}} & \\text{if } V_{t,i} > 0 \\\\ \\mathrm{NaN} & \\text{otherwise} \\end{cases}\\,.
+\\bar{V}_{t,i} &= V_{t,i} / \\left(1 - \\lambda^{n_{t,i}}\\right)\\,, \\\\
+d_{t,i} &= \\begin{cases} \\dfrac{a_{t,i}}{\\bar{V}_{t,i}} & \\text{if } \\bar{V}_{t,i} > 0 \\\\ \\mathrm{NaN} & \\text{otherwise} \\end{cases}\\,.
 \\end{align}
 ```
+
+The volume is in the denominator, so without the division by ``1 - \\lambda^{n_{t,i}}`` the days to cover of an asset with a short history would be too large, by about two after one half-life.
 
 A zero or a missing volume holds the state and does not count toward the warm-up. A missing short interest gives a `NaN` Descriptor at that observation, and the state of the volume moves all the same. A negative short interest or a negative volume is a data error, so [`descriptor`](@ref) refuses it before the recursion starts, for every Panel Field that `nonneg` names. With `nonneg = nothing`, a negative volume holds the state, and a negative short interest gives a negative Descriptor. ``d_{t,i}`` is `NaN` until ``n_{t,i} \\geq \\texttt{min\\_obs}``, and where asset ``i`` is inactive.
 
@@ -472,7 +477,8 @@ Where:
   - ``a_{t,i}``: Value of the Panel Field `num` for asset ``i`` at observation ``t``.
   - ``b_{t,i}``: Value of the Panel Field `den` for asset ``i`` at observation ``t``.
   - $(math_dict[:lambda_ew])
-  - ``V_{t,i}``: Smoothed denominator of asset ``i`` after observation ``t``.
+  - ``V_{t,i}``: State of the recursion of the denominator of asset ``i`` after observation ``t``.
+  - ``\\bar{V}_{t,i}``: Smoothed denominator of asset ``i`` after observation ``t``.
   - ``n_{t,i}``: Count of the strictly positive values ``b`` of asset ``i`` up to observation ``t``.
 
 # Fields
@@ -611,16 +617,16 @@ julia> rd = ReturnsResult(; nx = [\"A\", \"B\"], X = [0.1 0.2; -0.1 0.0; 0.05 0.
 
 julia> descriptor(EWMean(; decay = 0.5, min_obs = 1), rd)
 3×2 Matrix{Float64}:
-  0.0476551   0.0911608
- -0.0288527   0.0455804
-  0.00996873  0.0471853
+  0.0953102  0.182322
+ -0.0384703  0.0607739
+  0.0113928  0.053926
 
 julia> descriptor(EWVolumeRatio(; num = \"adj_volume\", den = \"adj_shares_outstanding\", decay = 0.5,
                                 min_obs = 1), rd)
 3×2 Matrix{Float64}:
- 0.05    0.1
- 0.175   0.15
- 0.3375  0.225
+ 0.1       0.2
+ 0.233333  0.2
+ 0.385714  0.257143
 ```
 
 # Related

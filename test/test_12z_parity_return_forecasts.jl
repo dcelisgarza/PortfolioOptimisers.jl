@@ -127,13 +127,21 @@ include(joinpath(@__DIR__, "parity_harness.jl"))
     # A matrix or a forecast compares against its largest entry, a coefficient cell by cell.
     same(a, b, n) = parity_compare(a, b; scale = :array, name = n).ok
     cell(a, b, n) = parity_compare(a, b; name = n).ok
+    # `EWMomentum` divides its state by the sum of its weights, `1 - λ^n`. The stored fixtures
+    # hold the state itself, which the start at zero shrinks toward zero, so each check that
+    # reads the momentum score is broken until the reference corrects that start. A check
+    # whose case reads no momentum, or whose number the change moves less than its
+    # tolerance, stays a test, because an unexpected pass of a broken test is an error.
+    check(ok, broken::Bool) = broken ? (@test_broken ok) : (@test ok)
 
     @testset "The Descriptor Scores, $(c)" for (c, d) in scores
         (_, rd, pr) = panels[1]
         S = descriptor_scores(d, rd, pr.rr).S
         for k in axes(S, 2)
-            @test same(permutedims(S[:, k, :]),
-                       load("DescriptorScores", "Small$(c)", "Scores$(k)"), "$(c) $(k)")
+            # The third Descriptor is the momentum.
+            check(same(permutedims(S[:, k, :]),
+                       load("DescriptorScores", "Small$(c)", "Scores$(k)"), "$(c) $(k)"),
+                  k == 3)
         end
     end
 
@@ -154,9 +162,11 @@ include(joinpath(@__DIR__, "parity_harness.jl"))
             rows = PO.return_forecast_rows(rd, pr.rr)
             # The oracle states the whole observation axis, and the member the block's rows.
             H = load("FixedWeightedReturnForecast", "Small$(c)", "Hist")
-            @test same(rf.hist, H[rows, :], "$(c) hist")
+            # "Raw" reads the two Panel Fields alone.
+            check(same(rf.hist, H[rows, :], "$(c) hist"), c != "Raw")
         end
-        @test same(rf.mu, loadv("FixedWeightedReturnForecast", "$(p)$(c)", "Mu"), "$(c) mu")
+        check(same(rf.mu, loadv("FixedWeightedReturnForecast", "$(p)$(c)", "Mu"),
+                   "$(c) mu"), c != "Raw" && (p, c) != ("Large", "Equal"))
     end
 
     @testset "The exponentially weighted member, $(p) $(c)" for (p, rd, pr) in panels,
@@ -166,18 +176,20 @@ include(joinpath(@__DIR__, "parity_harness.jl"))
         if p == "Small"
             rows = PO.return_forecast_rows(rd, pr.rr)
             H = load("ExpWeightedReturnForecast", "Small$(c)", "Hist")
-            @test same(rf.hist, H[rows, :], "$(c) hist")
+            check(same(rf.hist, H[rows, :], "$(c) hist"), true)
         end
-        @test same(rf.mu, loadv("ExpWeightedReturnForecast", "$(p)$(c)", "Mu"), "$(c) mu")
-        @test cell(rf.coef, loadv("ExpWeightedReturnForecast", "$(p)$(c)", "Coef"),
-                   "$(c) coef")
+        check(same(rf.mu, loadv("ExpWeightedReturnForecast", "$(p)$(c)", "Mu"), "$(c) mu"),
+              true)
+        check(cell(rf.coef, loadv("ExpWeightedReturnForecast", "$(p)$(c)", "Coef"),
+                   "$(c) coef"), (p, c) != ("Large", "Decay"))
     end
 
     @testset "The target member, $(p) $(c)" for (p, rd, pr) in panels, (c, e) in target
         rf = return_forecast(e, rd, pr.rr)
-        @test same(rf.mu, loadv("TargetReturnForecast", "$(p)$(c)", "Mu"), "$(c) mu")
-        @test cell([rf.calib], loadv("TargetReturnForecast", "$(p)$(c)", "Calib"),
-                   "$(c) calib")
+        check(same(rf.mu, loadv("TargetReturnForecast", "$(p)$(c)", "Mu"), "$(c) mu"), true)
+        # "NoCal" does not calibrate, so its calibration reads no score.
+        check(cell([rf.calib], loadv("TargetReturnForecast", "$(p)$(c)", "Calib"),
+                   "$(c) calib"), c != "NoCal")
     end
 
     @testset "An in-sample calibration is ours only, and it is biased" begin

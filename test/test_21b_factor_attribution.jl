@@ -1538,3 +1538,35 @@ end
     # answer.
     @test_throws MethodError fa(s -> (; sys = s.sys, factor = s.factor, family = s.family))
 end
+
+@testset "Static loadings take no factor return at an inactive pair" begin
+    # Asset 1 has no idiosyncratic return at observation 2, so it is inactive there and adds
+    # nothing to the portfolio return. A static loadings matrix must then add nothing to the
+    # systematic component at that pair either. Had the matrix kept `w B f` there, the
+    # systematic mean would be 0.01 and the remainder -0.0016667, so the total would hide the
+    # error. The direct computation reads each active pair alone.
+    w = [0.5, 0.5]
+    B = reshape([1.0, 2.0], 2, 1)
+    f = reshape([0.01, 0.02, -0.01, 0.03, -0.02, 0.01], 6, 1)
+    eps = zeros(6, 2)
+    eps[2, 1] = NaN
+    act = isfinite.(eps)
+    ret = [sum(w[i] * act[t, i] * B[i, 1] * f[t, 1] for i in 1:2) for t in 1:6]
+    sys = [w[i] * act[t, i] * B[i, 1] * f[t, 1] for t in 1:6, i in 1:2]
+    r = factor_attribution(w, B, f, eps, ret; assets = true)
+    @test r.sys.mu_contrib ≈ mean(ret) rtol = 1e-14
+    @test r.sys.mu_contrib ≈ 0.008333333333333333 rtol = 1e-14
+    @test abs(r.unattr.mu_contrib) < 1e-16
+    @test r.fbd.mu_contrib ≈ [mean(ret)] rtol = 1e-14
+    @test vec(r.afc.mu_contrib) ≈ vec(mean(sys; dims = 1)) rtol = 1e-14
+    @test r.abd.sys_mu_contrib ≈ vec(mean(sys; dims = 1)) rtol = 1e-14
+    # The same loadings as a history give the same split.
+    B3 = repeat(B, 1, 1, 6)
+    @test factor_attribution(w, B3, f, eps, ret; lag = 0, assets = true).afc.mu_contrib ≈
+          r.afc.mu_contrib rtol = 1e-14
+    # Each rolling window reads the zeroed pairs of its own rows.
+    for (j, x) in enumerate(factor_attribution(w, B, f, eps, ret, 3))
+        @test x.sys.mu_contrib ≈ mean(view(ret, j:(j + 2))) atol = 1e-16
+        @test abs(x.unattr.mu_contrib) < 1e-16
+    end
+end
