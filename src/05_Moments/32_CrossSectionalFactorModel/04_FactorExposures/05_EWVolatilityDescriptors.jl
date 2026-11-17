@@ -223,6 +223,7 @@ The variance estimator owns the warm-up and the bias correction, so a cell where
 # Validation
 
   - `rd.pnl` is an [`AssetPanel`](@ref). Raises an [`IsNothingError`](@ref).
+  - No variance overflows the arithmetic. Raises an `IsNonFiniteError`, as [`assert_ew_volatility_finite`](@ref) states.
 
 # Returns
 
@@ -522,6 +523,7 @@ The variance estimator owns the warm-up and the bias correction, so a cell where
 
   - `rd.pnl` is an [`AssetPanel`](@ref). Raises an [`IsNothingError`](@ref).
   - The rules of [`market_return_series`](@ref).
+  - No variance of a residual overflows the arithmetic. Raises an `IsNonFiniteError`, as [`assert_ew_volatility_finite`](@ref) states.
 
 # Returns
 
@@ -810,7 +812,7 @@ The batch call [`descriptor`](@ref) is this function from no state, so a step eq
 
  1. For an [`EWResidualVolatility`](@ref), build the market return, and run the beta regression with [`ew_regression_series!`](@ref) from the beta state, or from zero. Remove the market from every return.
  2. Transform the returns, or the residuals, through [`ew_volatility_input`](@ref).
- 3. Take the variance of each observation and the state of `ce` after them with [`ew_volatility_variance`](@ref), and take the square root.
+ 3. Take the variance of each observation and the state of `ce` after them with [`ew_volatility_variance`](@ref), refuse an infinite variance with [`assert_ew_volatility_finite`](@ref), and take the square root.
  4. For an [`EWResidualVolatility`](@ref), write `NaN` where the beta is `NaN` through [`ew_residual_unresolved!`](@ref). Write `NaN` into the inactive cells through [`descriptor_active_fill!`](@ref).
 
 # Arguments
@@ -821,7 +823,7 @@ The batch call [`descriptor`](@ref) is this function from no state, so a step eq
 
 # Validation
 
-  - The rules of [`descriptor`](@ref), of [`ew_beta_state`](@ref) and of [`ew_volatility_variance`](@ref).
+  - The rules of [`descriptor`](@ref), of [`ew_beta_state`](@ref), of [`ew_volatility_variance`](@ref) and of [`assert_ew_volatility_finite`](@ref).
   - The state of an [`EWResidualVolatility`](@ref) holds a beta state, and the state of an [`EWVolatility`](@ref) holds none. An `ArgumentError` is thrown otherwise.
 
 # Returns
@@ -841,6 +843,7 @@ function ew_volatility_fold(de::EWVolatility, rd::ReturnsResult,
     pnl = descriptor_asset_panel(rd)
     Y = ew_volatility_input(de.alg, rd.X, de.mar)
     V, vst = ew_volatility_variance(de.ce, Y, pnl, ve)
+    assert_ew_volatility_finite(V)
     D = sqrt.(V)
     descriptor_active_fill!(D, pnl)
     return DescriptorFold(ew_volatility_state(vst, nothing), D)
@@ -859,6 +862,7 @@ function ew_volatility_fold(de::EWResidualVolatility, rd::ReturnsResult,
     E = ew_residual_returns(X, rm, B, amsk)
     Y = ew_volatility_input(de.alg, E, de.mar)
     V, vst = ew_volatility_variance(de.ce, Y, pnl, ve)
+    assert_ew_volatility_finite(V)
     D = sqrt.(V)
     ew_residual_unresolved!(D, B)
     descriptor_active_fill!(D, pnl)
@@ -890,6 +894,34 @@ function ew_residual_unresolved!(D::AbstractMatrix{<:Real}, B::AbstractMatrix{<:
         end
     end
     return D
+end
+"""
+    assert_ew_volatility_finite(V::AbstractMatrix{<:Real}) -> nothing
+
+Checks that no variance of a volatility Descriptor is infinite. The returns are finite, so an infinite variance is the square of a return or of a residual that overflows the arithmetic. Without the check, the Descriptor would be an infinite volatility, where every other cell is finite or `NaN`. A `NaN` variance, as in the warm-up, passes.
+
+# Arguments
+
+  - `V`: The variance of each observation, `observations × assets`.
+
+# Validation
+
+  - No entry of `V` is infinite. An `IsNonFiniteError` that names the observation and the asset is thrown otherwise.
+
+# Returns
+
+  - `nothing`.
+
+# Related
+
+  - [`ew_volatility_fold`](@ref)
+  - [`ew_volatility_variance`](@ref)
+"""
+function assert_ew_volatility_finite(V::AbstractMatrix{<:Real})::Nothing
+    k = findfirst(isinf, V)
+    @argcheck(isnothing(k),
+              IsNonFiniteError("the exponentially weighted variance of asset $(k[2]) at observation $(k[1]) is not finite, because the square of its return or of its residual overflows the arithmetic. Rescale the returns."))
+    return nothing
 end
 """
     descriptor_step(de::Union{EWVolatility{<:RegimeAdjustedExpWeightedVariance},

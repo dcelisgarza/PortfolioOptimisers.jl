@@ -457,7 +457,7 @@ Where:
   - $(math_dict[:r_mt_ewb])
   - $(math_dict[:lambda_ew])
 
-Both sums run over the observations of the asset alone, with the same weights, so the beta is the slope of a weighted regression with an intercept. An asset that is listed late, or that misses an observation, weights the market over its own observations, and its beta carries no bias toward zero. [`EWMoments`](@ref) holds the sums, and [`ew_regression_series!`](@ref) runs the recursion. A missing return holds the beta of its asset. An inactive observation resets the asset, so its beta is `NaN` until it has `min_obs` valid observations again. The beta is also `NaN` where the market does not vary over the observations of the asset.
+Both sums run over the observations of the asset alone, with the same weights, so the beta is the slope of a weighted regression with an intercept. An asset that is listed late, or that misses an observation, weights the market over its own observations, and its beta carries no bias toward zero. [`EWMoments`](@ref) holds the sums, and [`ew_regression_series!`](@ref) runs the recursion. A missing return holds the beta of its asset. An inactive observation resets the asset, so its beta is `NaN` until it has `max(2, min_obs)` valid observations again, as [`ew_model_beta`](@ref) states. The beta is also `NaN` where the market does not vary over the observations of the asset.
 
 # Fields
 

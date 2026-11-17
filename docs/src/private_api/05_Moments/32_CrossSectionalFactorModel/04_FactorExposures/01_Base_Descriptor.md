@@ -29,7 +29,6 @@ ew_moments_vary
 ew_return_window
 Base.copy(x::PortfolioOptimisers.EWReturnWindow)
 ew_window_reset!
-ew_window_add!
 Base.copy(x::PortfolioOptimisers.EWBetaState)
 ew_beta_state
 ew_regression_series!

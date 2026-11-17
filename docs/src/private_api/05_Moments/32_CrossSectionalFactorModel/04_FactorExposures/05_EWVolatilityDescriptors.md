@@ -22,5 +22,6 @@ ew_volatility_parts
 ew_volatility_state
 ew_volatility_variance
 ew_volatility_fold
+assert_ew_volatility_finite
 show_fields(de::Union{PortfolioOptimisers.EWVolatility, PortfolioOptimisers.EWResidualVolatility})
 ```

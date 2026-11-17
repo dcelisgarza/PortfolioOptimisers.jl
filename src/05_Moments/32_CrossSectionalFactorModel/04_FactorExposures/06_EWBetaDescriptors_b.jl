@@ -363,16 +363,28 @@ $(DocStringExtensions.TYPEDEF)
 
 Holds the values that a step of an [`EWMacroSensitivity`](@ref) reads off its carried state to check its reference return.
 
-This type is an implementation detail and is not intended for direct use. [`ew_macro_carried`](@ref) makes it, all at zero for the batch call, and [`ew_macro_windows`](@ref) and [`ew_beta_fold`](@ref) read it. `c` and `t0` are integers of one type, so a record names them where a plain tuple would let a swap pass silently.
+This type is an implementation detail and is not intended for direct use. [`ew_beta_fold`](@ref) makes it from the carried state, and [`ew_macro_windows`](@ref) and [`ew_beta_fold`](@ref) read it. `c` and `t0` are integers of one type, so a record names them where a plain tuple would let a swap pass silently.
 
 # Fields
 
 $(DocStringExtensions.FIELDS)
 
+# Constructors
+
+    CarriedReference(::Nothing) -> CarriedReference
+    CarriedReference(st::EWMacroSensitivityState) -> CarriedReference
+    CarriedReference(::AbstractPartialFitState)
+
+The method that Julia selects is the algorithm. The batch call starts from no state, so every value is zero. A carried [`EWMacroSensitivityState`](@ref) gives its count `c` of the windows with a finite reference return, its flag `hf`, and `st.be.t`, the number of the observations that it folded.
+
+## Validation
+
+  - A carried state is an [`EWMacroSensitivityState`](@ref). An `ArgumentError` is thrown otherwise, because the state belongs to another Descriptor.
+
 # Related
 
-  - [`ew_macro_carried`](@ref)
   - [`ew_macro_windows`](@ref)
+  - [`EWMacroSensitivityState`](@ref)
 """
 @concrete struct CarriedReference
     """
@@ -461,7 +473,7 @@ The recursion reads a window only where it holds a finite reference return, and 
   - `series`: The field `series` of `de`.
   - `rf`: The reference return of the step, one entry per observation.
   - `de`: Descriptor Estimator.
-  - `carried`: The values that [`ew_macro_carried`](@ref) reads off the carried state, all at zero for the batch call.
+  - `carried`: The values that [`CarriedReference`](@ref) reads off the carried state, all at zero for the batch call.
 
 # Validation
 
@@ -475,7 +487,7 @@ The recursion reads a window only where it holds a finite reference return, and 
 
   - [`EWMacroSensitivity`](@ref)
   - [`ew_macro_reference`](@ref)
-  - [`ew_macro_carried`](@ref)
+  - [`CarriedReference`](@ref)
 """
 function ew_macro_windows(series::Option{<:AbstractString}, rf::AbstractVector{<:Real},
                           de::EWMacroSensitivity, carried::CarriedReference)
@@ -1047,37 +1059,13 @@ function ew_macro_state(st::EWMacroSensitivityState, de::EWMacroSensitivity,
     be = ew_beta_state(st.be, X, rm, rf, de.decay, nothing, de.agg_obs)
     return EWMacroSensitivityState(be, copy(st.cm), st.c, st.hf)
 end
-"""
-    ew_macro_carried(::Nothing) -> CarriedReference
-    ew_macro_carried(st::EWMacroSensitivityState) -> CarriedReference
-    ew_macro_carried(::AbstractPartialFitState)
-
-Returns what the refusals of an [`EWMacroSensitivity`](@ref) read off its carried state: the count `c` of the windows with a finite reference return, whether the open window holds one, `hf`, and the number `t0` of the observations that the state folded. The batch call starts from no state, with every value at zero.
-
-# Arguments
-
-  - `st`: The carried state, or `nothing`.
-
-# Validation
-
-  - A carried state is an [`EWMacroSensitivityState`](@ref). An `ArgumentError` is thrown otherwise, because the state belongs to another Descriptor.
-
-# Returns
-
-  - `carried::CarriedReference`: `c`, `hf` and `t0`.
-
-# Related
-
-  - [`ew_macro_windows`](@ref)
-  - [`EWMacroSensitivityState`](@ref)
-"""
-function ew_macro_carried(::Nothing)::CarriedReference
+function CarriedReference(::Nothing)::CarriedReference
     return CarriedReference(0, false, 0)
 end
-function ew_macro_carried(st::EWMacroSensitivityState)::CarriedReference
+function CarriedReference(st::EWMacroSensitivityState)::CarriedReference
     return CarriedReference(st.c, st.hf, st.be.t)
 end
-function ew_macro_carried(::AbstractPartialFitState)
+function CarriedReference(::AbstractPartialFitState)
     return throw(ArgumentError("the state of this EWMacroSensitivity is not an EWMacroSensitivityState, so it belongs to another Descriptor. A Descriptor folds from its own state, or from no state."))
 end
 """
@@ -1094,7 +1082,7 @@ The batch call [`descriptor`](@ref) is this function from no state, so a step eq
 
 # Algorithm
 
- 1. Check the data and build the market return as [`descriptor`](@ref) does. An [`EWMacroSensitivity`](@ref) first selects its reference return through [`ew_macro_reference`](@ref), refuses an infinite value of it, and checks its windows through [`ew_macro_windows`](@ref), from the counts that [`ew_macro_carried`](@ref) reads off the state.
+ 1. Check the data and build the market return as [`descriptor`](@ref) does. An [`EWMacroSensitivity`](@ref) first selects its reference return through [`ew_macro_reference`](@ref), refuses an infinite value of it, and checks its windows through [`ew_macro_windows`](@ref), from the counts that [`CarriedReference`](@ref) reads off the state.
  2. Take the state from [`ew_beta_state`](@ref), [`ew_macro_state`](@ref) or [`ew_downside_beta_state`](@ref).
  3. Run the recursion from the state, through [`ew_regression_series!`](@ref) or [`ew_downside_beta_series!`](@ref).
  4. Write `NaN` where an observation is inactive, through [`descriptor_active_fill!`](@ref).
@@ -1108,7 +1096,7 @@ The batch call [`descriptor`](@ref) is this function from no state, so a step eq
 
 # Validation
 
-  - The rules of [`descriptor`](@ref), of [`ew_beta_state`](@ref), of [`ew_macro_state`](@ref), of [`ew_macro_carried`](@ref) and of [`ew_downside_beta_state`](@ref).
+  - The rules of [`descriptor`](@ref), of [`ew_beta_state`](@ref), of [`ew_macro_state`](@ref), of [`CarriedReference`](@ref) and of [`ew_downside_beta_state`](@ref).
 
 # Returns
 
@@ -1136,7 +1124,7 @@ function ew_beta_fold(de::EWMacroSensitivity, rd::ReturnsResult,
                       cache::Option{<:AbstractPartialFitState};
                       ref::Option{<:AbstractVector{<:Real}} = nothing)
     pnl = descriptor_asset_panel(rd)
-    cr = ew_macro_carried(cache)
+    cr = CarriedReference(cache)
     rf = ew_macro_reference(de.series, de, rd, ref)
     t = findfirst(isinf, rf)
     @argcheck(isnothing(t),

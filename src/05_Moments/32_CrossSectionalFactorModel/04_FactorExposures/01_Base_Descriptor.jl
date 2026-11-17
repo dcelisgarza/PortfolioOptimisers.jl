@@ -865,7 +865,7 @@ $(DocStringExtensions.FIELDS)
 # Related
 
   - [`EWBetaState`](@ref)
-  - [`ew_window_add!`](@ref)
+  - [`ew_regression_take!`](@ref)
   - [`ew_regression_close!`](@ref)
 """
 @concrete struct EWReturnWindow
@@ -965,44 +965,6 @@ function ew_window_reset!(wn::EWReturnWindow, i::Integer)::Nothing
     return nothing
 end
 function ew_window_reset!(::Nothing, ::Integer)::Nothing
-    return nothing
-end
-"""
-    ew_window_add!(wn::EWReturnWindow, y::AbstractVector{<:Real}, i::Integer) -> nothing
-
-Adds one observation of the series of asset `i` to the running means of its open window, in place.
-
-# Arguments
-
-  - `wn`: The window.
-  - `y`: The values of the series, the market return first.
-  - `i`: The asset.
-
-# Validation
-
-  - Every mean stays finite. Raises an [`IsNonFiniteError`](@ref), because a difference of two finite returns can overflow.
-
-# Returns
-
-  - `nothing`.
-
-# Related
-
-  - [`EWReturnWindow`](@ref)
-  - [`ew_regression_take!`](@ref)
-"""
-function ew_window_add!(wn::EWReturnWindow, y::AbstractVector{<:Real}, i::Integer)::Nothing
-    (; r, o) = wn
-    k = wn.n[i]
-    f = k / (k + 1)
-    for a in axes(r, 1)
-        d = (y[a] - r[a, i]) - o[a, i]
-        o[a, i] = -f * d
-        r[a, i] = y[a]
-    end
-    wn.n[i] += 1
-    @argcheck(all(isfinite, view(o, :, i)),
-              IsNonFiniteError("the mean of the returns of asset $i over its window of observations is not finite, because the returns overflow the arithmetic. Rescale the returns."))
     return nothing
 end
 """
@@ -1353,7 +1315,7 @@ end
     ew_regression_take!(::Nothing, md, st::EWBetaState, i::Integer) -> nothing
     ew_regression_take!(wn::EWReturnWindow, ::Any, st::EWBetaState, i::Integer) -> nothing
 
-Takes the values `st.y` of one observation of asset `i`: into its regression where there is no window, through [`ew_regression_update!`](@ref), or into its open window through [`ew_window_add!`](@ref).
+Takes the values `st.y` of one observation of asset `i`, in place. Where there is no window, the observation updates the regression of the asset through [`ew_regression_update!`](@ref). Otherwise it joins the running means of the open window of the asset: each mean is held as the last value `r` plus an offset `o`, as in [`EWMoments`](@ref), and the count `n` of the window grows by one.
 
 # Arguments
 
@@ -1362,6 +1324,11 @@ Takes the values `st.y` of one observation of asset `i`: into its regression whe
   - `st`: The state.
   - `i`: The asset.
 
+# Validation
+
+  - The rules of [`ew_regression_update!`](@ref).
+  - Every mean of an open window stays finite. Raises an [`IsNonFiniteError`](@ref), because a difference of two finite returns can overflow.
+
 # Returns
 
   - `nothing`.
@@ -1369,13 +1336,26 @@ Takes the values `st.y` of one observation of asset `i`: into its regression whe
 # Related
 
   - [`ew_regression_add!`](@ref)
+  - [`EWReturnWindow`](@ref)
 """
 function ew_regression_take!(::Nothing, md, st::EWBetaState, i::Integer)::Nothing
     return ew_regression_update!(md, st, st.y, i)
 end
 function ew_regression_take!(wn::EWReturnWindow, ::Any, st::EWBetaState,
                              i::Integer)::Nothing
-    return ew_window_add!(wn, st.y, i)
+    (; r, o) = wn
+    y = st.y
+    k = wn.n[i]
+    f = k / (k + 1)
+    for a in axes(r, 1)
+        d = (y[a] - r[a, i]) - o[a, i]
+        o[a, i] = -f * d
+        r[a, i] = y[a]
+    end
+    wn.n[i] += 1
+    @argcheck(all(isfinite, view(o, :, i)),
+              IsNonFiniteError("the mean of the returns of asset $i over its window of observations is not finite, because the returns overflow the arithmetic. Rescale the returns."))
+    return nothing
 end
 """
     ew_regression_close!(::Nothing, ::Any, ::EWBetaState) -> nothing

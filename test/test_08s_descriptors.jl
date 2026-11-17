@@ -2507,6 +2507,31 @@ end
     end
 end
 
+@testset "A volatility Descriptor refuses a variance that overflows" begin
+    # Asset 1 is the market alone, so asset 2 has a beta of zero, and its residual is its
+    # return. The square of 1e155 overflows, while every moment of the beta stays finite.
+    # Each Descriptor gave an infinite volatility before the check (R65 of #1817).
+    T = 30
+    X = hcat(0.01 .* randn(StableRNGs.StableRNG(65), T), fill(1e155, T))
+    emsk = trues(T, 2)
+    emsk[:, 2] .= false
+    rd = ewb_hand_panel(X, ones(T, 2); emsk = emsk)
+    Xn = copy(X)
+    Xn[:, 2] .= -1e155
+    rdn = ewb_hand_panel(Xn, ones(T, 2); emsk = emsk)
+    for (de, r) in
+        ((EWVolatility(; half_life = 2), rd), (EWDownsideVolatility(; half_life = 2), rdn),
+         (EWResidualVolatility(; half_life = 2, beta_half_life = 2, beta_min_obs = 3), rd),
+         (EWResidualDownsideVolatility(; half_life = 2, beta_half_life = 2,
+                                       beta_min_obs = 3), rdn))
+        @test_throws r"variance of asset 2 at observation" descriptor(de, r)
+        @test_throws PortfolioOptimisers.IsNonFiniteError descriptor(de, r)
+    end
+    # A finite panel passes, and its warm-up stays NaN.
+    D = descriptor(EWVolatility(; half_life = 2), ewb_hand_panel(X[:, 1:1], ones(T, 1)))
+    @test isnan(D[1, 1]) && all(isfinite, D[3:end, 1])
+end
+
 @testset "EW beta descriptors: the aggregated clock" begin
     X = [0.10 0.20
          -0.10 NaN

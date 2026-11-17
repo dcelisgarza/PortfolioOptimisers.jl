@@ -1255,18 +1255,21 @@ with them:
 
 | Family | `maxrel` |
 | --- | --- |
-| `EWMean`, `EWMomentum` | 4.2e-13 (large panel, default) |
-| `EWVolumeRatio`, `EWShareTurnover`, `EWAmihudIlliquidity`, `DaysToCover` | 0.0 |
+| `EWMean`, `EWMomentum` | 4.2e-13 (large panel, default), before the division of #2134 |
+| `EWVolumeRatio`, `EWShareTurnover`, `EWAmihudIlliquidity`, `DaysToCover` | 0.0, before the division of #2134 |
 | `EWVolatility`, `EWDownsideVolatility` | 3.3e-16 |
 | `EWResidualVolatility`, `EWResidualDownsideVolatility` | 4.6e-16 (#2132) |
 | `EWBeta`, `EWMarketBeta` | 1.5e-13 (#2132) |
 | `EWMacroSensitivity` | 1.3e-13 (#2132) |
 | `EWDownsideBeta` | 1.1e-15 (#2132) |
-
-The beta rows were measured again when the regression of each asset came to share its own
-observations (#2132), and their stored cases were made again then.
 | `RollingLogReturn`, `RollingMomentum`, `Reversal` | 3.0e-12 cell by cell, 9.6e-17 against the largest entry |
 | `RollingMax`, `MaxReturn` | 0.0 |
+
+The beta rows were measured again when the regression of each asset came to share its own
+observations (#2132), and their stored cases were made again then. Since then, the mean
+Descriptors divide their state by `1 - λ^n`, and the oracle does not. So the cases of the
+first two rows check the `NaN` pattern alone, until a field reaches the rule of the oracle
+(#2134).
 
 A rolling log return is the difference of two cumulative sums, on both sides. A window whose
 sum is near zero keeps the round-off of the cumulative sums, so its relative error is large
