@@ -12,7 +12,6 @@ AssetRiskBudgeting
 FactorRiskBudgeting
 RiskBudgeting
 factory(res::RiskBudgetingResult, fb::Option{<:OptE_Opt_FbChain})
-Base.getproperty(r::RiskBudgetingResult, sym::Symbol)
 port_opt_view(alg::LogRiskBudgeting{<:VecInt}, i, args...)
 factory(rb::RiskBudgeting, w::AbstractVector)
 port_opt_view(rb::RiskBudgeting, i, X::MatNum, args...)

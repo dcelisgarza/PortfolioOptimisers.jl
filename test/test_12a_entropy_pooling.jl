@@ -2754,6 +2754,12 @@ end
     @test isnothing(PO.port_opt_view(lp, [1, 2]).pc)
     @test isnothing(PO.opinion_pooling_cache(nothing))
     @test PO.opinion_pooling_cache(lp) === lp.pc
+    # A result with no field `pc` takes no cache. In the library only the refit of a `pe2` of
+    # a user, whose `prior` returns another result type, reaches this method (G1 of #1817,
+    # extension 9).
+    hp = prior(HighOrderPriorEstimator(), X)
+    @test PO.opinion_pooling_cache(hp, lp.pc) === hp
+    @test isnothing(PO.opinion_pooling_cache(hp))
     # The count of the rows stands in for the data of a prior that reads no Asset Panel.
     for p in (EmpiricalPrior(), EmpiricalPrior(; max_scenarios = 30),
               OpinionPoolingPrior(; pes = [EntropyPoolingPrior()]),

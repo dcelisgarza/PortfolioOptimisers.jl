@@ -1301,10 +1301,10 @@ function set_cost_budget_mip_constraints!(model::JuMP.Model, bgt::BudgetCosts,
     return nothing
 end
 """
-    convex_budget(bgt)
+    convex_budget(bgt::Option{<:Union{Num_BgtRg, BudgetMarketImpact}})
     convex_budget(bgt::BudgetCosts)
 
-Return the net budget `bgt` in the form that a model with no MIP step states: a [`BudgetCosts`](@ref) with `xbgt = false`, and every other budget as it is.
+Return the net budget `bgt` in the form that a model with no MIP step states: a [`BudgetCosts`](@ref) with `xbgt = false`. A number, a [`BudgetRange`](@ref), a [`BudgetMarketImpact`](@ref) and `nothing` have no MIP form, so they come back as they are. Any other type is a `MethodError`.
 
 A [`BudgetCosts`](@ref) with `xbgt = true` leaves out the floor of its [`BudgetRange`](@ref) in [`set_cost_budget_constraints!`](@ref), because [`set_cost_budget_mip_constraints!`](@ref) adds the floor that holds the cost, in the MIP step of [`set_block_constraints!`](@ref). The centring model of [`UnconstrainedNearOptimalCentering`](@ref) runs no MIP step, so with that budget it would hold no floor at all. The convex form keeps the floor `sum(w) >= k lb` of the invested weights. The cost is not negative, so a portfolio on that floor also meets the floor that holds the cost. A scalar `bgt` keeps its ceiling in both forms.
 
@@ -1323,10 +1323,11 @@ A [`BudgetCosts`](@ref) with `xbgt = true` leaves out the floor of its [`BudgetR
   - [`set_cost_budget_mip_constraints!`](@ref)
   - [`UnconstrainedNearOptimalCentering`](@ref)
 """
-convex_budget(bgt) = bgt
+function convex_budget(bgt::Option{<:Union{Num_BgtRg, BudgetMarketImpact}})
+    return bgt
+end
 function convex_budget(bgt::BudgetCosts)::BudgetCosts
-    return BudgetCosts(; bgt = bgt.bgt, w = bgt.w, vp = bgt.vp, vn = bgt.vn, up = bgt.up,
-                       un = bgt.un, fixed = bgt.fixed, xbgt = false)
+    return rebuild_struct(bgt, (; xbgt = false))
 end
 
 """

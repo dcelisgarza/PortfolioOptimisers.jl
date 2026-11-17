@@ -380,6 +380,7 @@ end
                                                # src/17_Optimisation/05_JuMP (#2101).
                                                :mip_key => "one method for each MIP space: 13 functions share its callee `state_key` (rule 3, #2101)",
                                                :mip_bit_space => "its callee is the constructor of a type, `AssetMIPSpace` (rule 3, #2101)",
+                                               :convex_budget => "one method for each form of the net budget: the `BudgetCosts` form calls `rebuild_struct`, which many functions share, with `xbgt = false` (rule 6). The forms with no MIP form, a number, a `BudgetRange`, a `BudgetMarketImpact` and `nothing`, are the identity, another answer than a constructor gives (rules 2 and 3, #2133)",
                                                :mip_wx! => "one method for each MIP space: the asset form calls `get_w`, a shared public verb, and the factor form calls `shared_get`, which 45 functions share (rule 3, #2101)",
                                                :set_retcode => "one method for each Result type: each calls `rebuild_struct`, which many functions share, or the constructor of `JuMPOptimisationResult`, whose keyword form would expand the weights twice (rule 3, #2101)",
                                                # The online optimisers, src/17_Optimisation/09_OnlineOptimisation.jl and 10_OnlinePortfolioSelection (#2102).
