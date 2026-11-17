@@ -65,6 +65,7 @@ Mark a topic covered (✅) only when all of the following hold:
 | ✅ | Subset resampling and cross-validation: `SubsetResampling`, `cross_val_predict`, frontier of a meta-optimiser, Deferred Quantities in a risk-measure slot (fold and subset stability, ADR 0051) | `examples/3_optimisers/14_Subset_Resampling_and_Cross_Validation.jl` |
 | ✅ | Near optimal centering | `examples/3_optimisers/15_Near_Optimal_Centering.jl` |
 | ✅ | Feature matrices as a distance source: `FeatureDistance` driving `ClustersEstimator`, all four producers (literal matrix, `AssetSetsFeatures` and its graded edge-authoring grammar, `RegressionFeatures`, `PhylogenyFeatures`), `Proximity`'s `decay` crossed against `HopCount`/`PathLength` separations, metric domains and the `sim` slot, static vs time-varying shapes and the four collapse rules, the `z_src` carrier selector (`:data` slices, `:prior` refits), the square-`Z` non-commutation with an asset view, the meta-optimiser collapse onto synthetic assets, and what cross-validation exposes (a time-varying literal `ze` fails an observation fold, and a bare `PathLength()` makes `Z`'s scale sample-dependent, additively) | `examples/3_optimisers/16_Feature_Distance_Clustering.jl` |
+| ✅ | Maximum diversification: `MaximumRatio` with `rf = 0` of `StandardDeviation` on a prior whose `me` is `StandardDeviationExpectedReturns`, compared with `InverseVolatility`, minimum variance and equal weight, the identity with the minimum variance of a `CorrelationCovariance` prior, and a cap on the number of assets by `card` and by an `L1UncertaintySet` on the volatilities with `MaximumReturn` and `NoRisk` (#2152, #2177) | `examples/3_optimisers/19_Maximum_Diversification.jl` |
 
 ## 4. Constraints and costs
 
@@ -79,6 +80,7 @@ Mark a topic covered (✅) only when all of the following hold:
 | ✅ | Regularisation and effective assets | `examples/4_constraints_costs/07_Regularisation.jl` |
 | ✅ | Nested clustered optimisation with layered constraints and fees | `examples/4_constraints_costs/08_Nested_Clustered_Constraints.jl` |
 | ✅ | Custom objectives and constraints (`cobj`/`ccnt`): `CustomJuMPObjective`/`CustomJuMPConstraint`, `add_custom_objective_term!`/`add_custom_constraint!`, the `get_w`/`get_k`/`get_constraint_scale` idiom, objective-sense sign, and vector composition | `examples/4_constraints_costs/09_Custom_Objectives_and_Constraints.jl` |
+| ✅ | Benchmark tracker: `MinimumRisk` of a `TrackingRiskMeasure` with a `ReturnsTracking` index, a `card` sweep through a mixed-integer solver, and the check that each capped tracker beats the equal-weighted portfolio (#2152) | `examples/4_constraints_costs/11_Benchmark_Tracker.jl` |
 
 ## 5. Validation and tuning
 
