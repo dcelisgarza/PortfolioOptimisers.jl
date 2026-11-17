@@ -570,7 +570,11 @@ end
     # and the bound stays about 12% below, so the default gap of 1e-5 never closes (#2121).
     # The incumbent is the optimum: its divergence is the sequential formulation's to 3e-5,
     # and its CVaR is on the target to 1e-9. A relative gap of 0.2 stops the solve at the
-    # fourth iteration. The claims read the CVaR, which the stop does not change.
+    # fourth iteration, at that incumbent. A stop under a gap can end at an incumbent that is
+    # not the optimum, where an upper bound need not bind. So the claims hold because the
+    # incumbent is the optimum: R64 of #1817 measured the CVaR on the target to 1.2e-9 (`<=`)
+    # and 6.1e-10 (`==`), and the divergence of the sequential formulation to 2.9e-5 and
+    # 3.5e-8.
     gap_mopt = JuMPEntropyPooling(;
                                   slv = Solver(; name = :ep_mip_gap,
                                                solver = ep_mip_slv[1].solver,

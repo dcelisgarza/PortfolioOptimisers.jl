@@ -554,11 +554,20 @@ function mr_block2(idx)
         # #2119: the optimum of 12, 15, 18 and 28 is not unique, so their weights differ by
         # host (28 on CI: `0.081` against `0.144`). Compare the ratio that `MaximumRatio`
         # maximises, as 246 and 282 do (#1280). On a developer machine the ratio misses by
-        # 3.1e-3 (12), 2.5e-4 (15), 5.2e-3 (18) and 4.8e-3 (28). The bound of 2e-2 is the
-        # one of 246 and 282, about four times the largest miss measured.
+        # 3.1e-3 (12), 2.5e-4 (15), 5.2e-3 (18) and 4.8e-3 (28). Under the CI flags
+        # (`run_files.jl --ci`) it misses by 1.3e-7, 5.3e-7, 8.8e-3 and 3.3e-3 (R64 of #1817),
+        # and 7 CI runs from 4703e87aba pass. The bound of 2e-2 is the one of 246 and 282,
+        # about twice the largest miss measured. A failure prints the ratio and the reference.
         if i in (12, 15, 18, 28)
             ratio, ref = mr_ratio(r1, res.w), mr_ratio(r1, df[!, "$i"])
-            @test isapprox(ratio, ref; rtol = 2e-2)
+            success = isapprox(ratio, ref; rtol = 2e-2)
+            if !success
+                println("Counter: $i")
+                println("ratio: $ratio")
+                println("ref:   $ref")
+                find_tol(ratio, ref)
+            end
+            @test success
         elseif i != 42
             success = isapprox(res.w, df[!, "$i"]; rtol = rtol)
             if !success
