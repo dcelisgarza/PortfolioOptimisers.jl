@@ -392,7 +392,7 @@ Each field that is `nothing` stays `nothing`. No step copies data.
 # Arguments
 
   - `rd`: A `ReturnsResult` object containing asset and/or factor returns.
-  - `i`: The assets to view: integer positions, a range, a `Colon`, or a vector of asset names.
+  - `i`: The assets to view: one integer, integer positions, a range, a `Colon`, one asset name, or a vector of asset names. One integer and one name select one asset, and the view keeps its matrix shape.
 
 # Validation
 
@@ -484,9 +484,9 @@ Each field that is `nothing` stays `nothing`. No step copies data.
 # Arguments
 
   - `rd`: A `ReturnsResult` object containing asset and/or factor returns.
-  - `i`: The observations to view: integer positions, a range, a `Colon`, one timestamp, or a vector of timestamps. A timestamp of a vector that `ts` does not hold selects no row, and the rows keep their clock order, as in the timestamp view of a [`PricesResult`](@ref). One timestamp selects the one observation at that timestamp, and the view keeps its matrix shape.
-  - `j`: The assets to view: integer positions, a range, a `Colon`, or a vector of asset names.
-  - `k`: The factors to view: integer positions, a range, a `Colon`, or a vector of factor names.
+  - `i`: The observations to view: one integer, integer positions, a range, a `Colon`, one timestamp, or a vector of timestamps. A timestamp of a vector that `ts` does not hold selects no row, and the rows keep their clock order, as in the timestamp view of a [`PricesResult`](@ref). One integer and one timestamp select one observation, and the view keeps its matrix shape.
+  - `j`: The assets to view: one integer, integer positions, a range, a `Colon`, one asset name, or a vector of asset names. One integer and one name select one asset, and the view keeps its matrix shape.
+  - `k`: The factors to view: one integer, integer positions, a range, a `Colon`, one factor name, or a vector of factor names. One integer and one name select one factor, and the view keeps its matrix shape.
 
 # Validation
 

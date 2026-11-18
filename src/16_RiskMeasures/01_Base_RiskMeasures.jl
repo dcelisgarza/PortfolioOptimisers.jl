@@ -2234,7 +2234,7 @@ Declare the slots of `x` that its functor reads **as they stand**, as a `NamedTu
 
 [`assert_resolved_slots`](@ref) reads this beside [`deferred_slots`](@ref). A slot named here that holds `nothing` is refused at a value-level entry point with an error that names it, because nothing on that route fills it and the functor would otherwise meet the `nothing` several frames down, as `dot(w, nothing, w)` inside `LinearAlgebra`.
 
-A slot is named here only when `nothing` there has **no** value-level reading. The covariance a [`Variance`](@ref) contracts the weights with is one: the functor is `dot(w, r.sigma, w)`, and a bare matrix cannot stand in. A moment measure's `mu` is not: `nothing` there means *centre on the sample mean*, which the functor computes from the returns, so [`LowOrderMoment`](@ref) declares no method. A slot that holds a child measure is not named here either. The child names its own slots, and [`assert_resolved_slots`](@ref) reaches it through [`deferred_slots`](@ref). So the functor of [`VarianceSkewKurtosis`](@ref) reads the matrices of its children, and a refusal names the child, such as `Skewness.sk`.
+A slot is named here only when `nothing` there has **no** value-level reading. The covariance a [`Variance`](@ref) contracts the weights with is one: the functor is `dot(w, r.sigma, w)`, and a bare matrix cannot stand in. The solver `slv` of a measure whose functor solves a programme, such as [`EntropicValueatRisk`](@ref), is one too: an optimiser fills it through [`factory`](@ref), and no data can. [`assert_scoreable`](@ref) reads the declaration too, so a selector refuses such a measure in its constructor. A moment measure's `mu` is not: `nothing` there means *centre on the sample mean*, which the functor computes from the returns, so [`LowOrderMoment`](@ref) declares no method. A slot that holds a child measure is not named here either. The child names its own slots, and [`assert_resolved_slots`](@ref) reaches it through [`deferred_slots`](@ref). So the functor of [`VarianceSkewKurtosis`](@ref) reads the matrices of its children, and a refusal names the child, such as `Skewness.sk`.
 
 # Related
 
@@ -2458,7 +2458,7 @@ The message names both types with `nameof`, not by printing the type. A printed 
 
  1. Walk the pairs that [`deferred_slots`](@ref) declares for `x`, giving each slot's name `key` and its occupant `slot`, and refuse an occupant that holds a [`DeferredQuantity`](@ref).
  2. Recurse into every occupant, so a child measure's own slots are checked as well. A slot that holds a vector of children is walked element by element.
- 3. Walk the pairs that [`functor_slots`](@ref) declares for `x`, and refuse an occupant that is `nothing`.
+ 3. Walk the pairs that [`functor_slots`](@ref) declares for `x`, and refuse an occupant that is `nothing`, with [`assert_filled_functor_slots`](@ref).
  4. Return `nothing` once the three walks are spent.
 
 The order is the precedence. A Deferred Quantity on `x` is named before anything below it, because its fit is what would fill the empty slots of the children. A `VarianceSkewKurtosis` whose `pe` is deferred has an empty `sigma` on its `vr` for that reason alone. A child is walked before the slots `x` reads off it, for the same reason one level down: a `Skewness` whose `pe` is deferred has an empty `sk`, and that is the slot the container reads.
@@ -2466,7 +2466,7 @@ The order is the precedence. A Deferred Quantity on `x` is named before anything
 # Validation
 
   - Throws an `ArgumentError` when a slot of `x`, or of any child the walk reaches, holds a [`DeferredQuantity`](@ref). The message names the slot, the Estimator standing in it and the two ways out.
-  - Throws an [`IsNothingError`](@ref) when a slot that [`functor_slots`](@ref) declares for `x`, or for any child the walk reaches, holds `nothing`. The message names the slot and the two ways out: a prior result that carries the quantity, or the quantity stated on the measure.
+  - Throws an [`IsNothingError`](@ref) when a slot that [`functor_slots`](@ref) declares for `x`, or for any child the walk reaches, holds `nothing`. The message names the slot and the ways out: a prior result that carries the quantity, or the quantity stated on the measure. For the solver slot `slv`, the way out is a `Solver` stated on the measure.
 
 # Returns
 
@@ -2489,9 +2489,53 @@ function assert_resolved_slots(x)
     for slot in slots
         assert_resolved_slots(slot)
     end
+    assert_filled_functor_slots(x)
+    return nothing
+end
+"""
+    assert_filled_functor_slots(x) -> Nothing
+
+Refuse a slot that [`functor_slots`](@ref) declares for `x` and that holds `nothing`.
+
+[`assert_resolved_slots`](@ref) calls it at each level of its walk, and [`assert_scoreable`](@ref) calls it on the measure that a selector scores with. Neither route has an optimiser to fill a slot, so the functor would meet the `nothing` several frames down, with an error that names neither the measure nor the slot.
+
+The message depends on the slot. A moment slot, such as the `sigma` of a [`Variance`](@ref), can come from a prior result, so the message names a prior result and the quantity stated on the measure. A solver slot `slv`, such as that of an [`EntropicValueatRisk`](@ref), comes from no data, so the message names a `Solver` stated on the measure.
+
+# Algorithm
+
+ 1. Walk the pairs that [`functor_slots`](@ref) declares for `x`, and throw on the first occupant that is `nothing`.
+ 2. Return `nothing`.
+
+# Arguments
+
+  - `x`: The measure, or the child of a measure, to check.
+
+# Validation
+
+  - Throws an [`IsNothingError`](@ref) that names the slot and the way out, when a declared slot holds `nothing`.
+
+# Returns
+
+  - `nothing`.
+
+# Related
+
+  - [`functor_slots`](@ref)
+  - [`assert_resolved_slots`](@ref)
+  - [`assert_scoreable`](@ref)
+  - [`checked_kernel_solver`](@ref)
+"""
+function assert_filled_functor_slots(x)::Nothing
     for (key, slot) in pairs(functor_slots(x))
-        @argcheck(!isnothing(slot),
-                  IsNothingError("`$(nameof(typeof(x))).$key` is `nothing`, and the functor reads the slot as it stands, so the call would meet the `nothing` several frames down. Nothing on this route fills it: a bare returns matrix carries no moments, and a prior result fills a slot only from a field it carries. Pass a prior result that carries the quantity — `expected_risk(r, w, prior(EmpiricalPrior(), X))` fills a covariance, and `prior(HighOrderPriorEstimator(), X)` a co-moment tensor — or state the quantity on the measure, as `Variance(; sigma = cov(PortfolioOptimisersCovariance(), X))` does."))
+        if isnothing(slot)
+            name = nameof(typeof(x))
+            msg = if key === :slv
+                "`$name.slv` is `nothing`, and the functor solves a conic programme with it, so the call would meet the `nothing` several frames down. Nothing on this route fills it: a returns matrix and a prior result carry no solver, and only an optimiser gives the measure its own. State the solver on the measure, as `$name(; slv = Solver(; solver = Clarabel.Optimizer))` does."
+            else
+                "`$name.$key` is `nothing`, and the functor reads the slot as it stands, so the call would meet the `nothing` several frames down. Nothing on this route fills it: a bare returns matrix carries no moments, and a prior result fills a slot only from a field it carries. Pass a prior result that carries the quantity — `expected_risk(r, w, prior(EmpiricalPrior(), X))` fills a covariance, and `prior(HighOrderPriorEstimator(), X)` a co-moment tensor — or state the quantity on the measure, as `Variance(; sigma = cov(PortfolioOptimisersCovariance(), X))` does."
+            end
+            throw(IsNothingError(msg))
+        end
     end
     return nothing
 end

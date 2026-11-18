@@ -95,6 +95,60 @@ include(joinpath(@__DIR__, "asset_panel_fixture.jl"))
         @test isnothing(pv3.ivpa)
     end
 
+    # Issue #2190. One integer, one name or one timestamp in an index selects one entry of
+    # its axis, and the view keeps the matrix shape of the data on both carriers. Before,
+    # a ReturnsResult raised a TypeError that named a field, and a PricesResult refused.
+    @testset "port_opt_view of a scalar index keeps the matrix shape (#2190)" begin
+        PV = PortfolioOptimisers.port_opt_view
+        X, F, B, iv = make_prices()
+        pr = PricesResult(; X = X, F = F, B = B, iv = iv, ivpa = [0.1, 0.2, 0.3])
+        ts = timestamp(X)
+        for v in (PV(pr, 2), PV(pr, 2:2), PV(pr, ts[2]), PV(pr, 2, :), PV(pr, ts[2], :))
+            @test timestamp(v.X) == ts[2:2]
+            @test values(v.X) == values(X)[2:2, :]
+            @test values(v.F) == values(F)[2:2, :]
+        end
+        for v in (PV(pr, :, 2), PV(pr, :, "A2"), PV(pr, ts, 2), PV(pr, ts, "A2"))
+            @test colnames(v.X) == [:A2]
+            @test values(v.X) == values(X)[:, 2:2]
+            @test values(v.iv) == values(iv)[:, 2:2]
+            @test v.ivpa == [0.2]
+        end
+        v = PV(pr, ts[4], "A3")
+        @test values(v.X) == values(X)[4:4, 3:3]
+        # A timestamp that the prices do not hold is refused by name, as on a
+        # ReturnsResult, and a name never selects an asset it cannot find.
+        err = @test_throws ArgumentError PV(pr, ts[end] + Day(1))
+        @test occursin("do not hold it", err.value.msg)
+        @test_throws ArgumentError PV(pr, :, "Z")
+        # The fallback lists the scalar shapes.
+        err = @test_throws ArgumentError PV(pr, 1:2, :, 1)
+        @test occursin("one integer", err.value.msg)
+
+        rd = prices_to_returns(pr)
+        rdf = ReturnsResult(; nx = rd.nx, X = rd.X, nf = ["f1", "f2"], F = rd.X[:, 1:2],
+                            ts = rd.ts)
+        v = PV(rd, 2, :)
+        @test v.X == rd.X[2:2, :]
+        @test v.ts == rd.ts[2:2]
+        for v in (PV(rd, :, 2), PV(rd, :, "A2"), PV(rd, 2), PV(rd, "A2"))
+            @test v.X == rd.X[:, 2:2]
+            @test v.nx == ["A2"]
+        end
+        for v in (PV(rdf, :, :, 2), PV(rdf, :, :, "f2"))
+            @test v.F == rdf.F[:, 2:2]
+            @test v.nf == ["f2"]
+        end
+        v = PV(rdf, 3, "A1", "f2")
+        @test v.X == rdf.X[3:3, 1:1]
+        @test v.F == rdf.F[3:3, 2:2]
+        # A name in the observation index is refused, as a vector of names is there.
+        err = @test_throws ArgumentError PV(rd, "A2", :)
+        @test occursin("selects the observations", err.value.msg)
+        err = @test_throws ArgumentError PV(rd, :, "Z")
+        @test occursin("Z", err.value.msg)
+    end
+
     @testset "slot traits" begin
         # estimator families map to slots by dispatch
         @test PortfolioOptimisers.pipe_writes(EmpiricalPrior()) == :prior

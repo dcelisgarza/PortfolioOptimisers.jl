@@ -50,6 +50,7 @@ resolve_deferred_quantities(xs::AbstractArray{<:Union{AbstractEstimator, Abstrac
 rebuild_with_slots
 assert_declared_slot_resolver
 assert_resolved_slots
+assert_filled_functor_slots
 sigma_chol_selector
 assert_derived_slot_has_source
 risk_measure_nothing_scalar_array_view

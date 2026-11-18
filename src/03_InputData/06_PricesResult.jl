@@ -254,9 +254,9 @@ The method that Julia selects is the algorithm. The timestamp methods do the wor
 
  2. `i` is a vector of timestamps and `j` is a `Colon`: give `i` in a form that indexes `X`, with [`clock_selection`](@ref). A `Vector` in the element type of the timestamps of `X` passes as it is, and another type goes through [`timestamp_positions`](@ref). Then index `X`, `F`, `B`, `E` and `iv` by the timestamps `i`. Recover the rows of a time-varying Asset Panel from the kept timestamps with [`feature_row_indices`](@ref), and view the panel on that observation axis with [`port_opt_view`](@ref). A static panel has no observation axis and ignores the row index. View the Listing Span at the same timestamps with [`listing_span_view`](@ref). Pass `ivpa` through unchanged, because the asset index does not reach it. Rebuild the [`PricesResult`](@ref).
 
- 3. `i` is a vector of timestamps and `j` is a vector of asset positions or asset names:
+ 3. `i` is a vector of timestamps and `j` is one asset position, one asset name, or a vector of asset positions or asset names:
 
-     1. Replace `i` with the timestamps of `X` that it selects, as in step 2. Resolve the asset names of `j` to positions in the column names of `X` with [`label_positions`](@ref). Positions pass through.
+     1. Replace `i` with the timestamps of `X` that it selects, as in step 2. Resolve the asset names of `j` to positions in the column names of `X` with [`label_positions`](@ref). One position `n` becomes `n:n`, and one name becomes a vector of one position, so the view keeps its matrix shape. Positions pass through.
      2. Index `X` by the timestamps `i`, then keep the asset columns `j`.
      3. Index `F` and `E` by the timestamps `i` alone. `j` is an asset index, and the factors and the Exogenous Series are separate axes, so every column of each stays.
      4. Index `B` by the timestamps `i`. Keep its columns `j` when `B` holds one column per asset, and keep its single column otherwise. The test reads the width of `B`, because a shared benchmark has only one column to give.
@@ -265,20 +265,21 @@ The method that Julia selects is the algorithm. The timestamp methods do the wor
      7. View the Listing Span at the kept timestamps and the assets `j` with [`listing_span_view`](@ref).
      8. Rebuild the [`PricesResult`](@ref).
 
- 4. `i` is integer indices, a range or a `Colon`, and `j` is integer indices, a range, a `Colon` or asset names: read the timestamps `TimeSeries.timestamp(pr.X)[i]`, and call step 2 or step 3 with them. A call such as `port_opt_view(pr, 2:3)` reaches this method.
+ 4. `i` is one integer, integer indices, a range, a `Colon` or one timestamp, and `j` is one integer, one asset name, integer indices, a range, a `Colon` or asset names: find the positions of `i` with [`timestamp_positions`](@ref), read the timestamps of `X` at them, and call step 2 or step 3 with them. One integer `n` gives the positions `n:n`, and one timestamp gives the position of the one observation at it. A call such as `port_opt_view(pr, 2:3)` reaches this method.
 
- 5. Any other call on an [`AbstractPricesResult`](@ref): throw an `ArgumentError` that names the type of each index argument, the keyword arguments, and the two call shapes of the interface. A call with one integer, with three indices or with a keyword argument reaches this step. So does a subtype that implements no method.
+ 5. Any other call on an [`AbstractPricesResult`](@ref): throw an `ArgumentError` that names the type of each index argument, the keyword arguments, and the two call shapes of the interface. A call with three indices or with a keyword argument reaches this step. So does a subtype that implements no method.
 
 # Arguments
 
   - `pr`: A `PricesResult` object.
-  - `i`: Observation window into the rows of `pr.X`. Either integer indices (`AbstractVector{<:Integer}`, `AbstractRange`, or `Colon`) or a vector of timestamps (`AbstractVector{<:Dates.AbstractTime}`).
-  - `j`: Asset window into the columns of `pr.X`. Integer indices, an `AbstractRange`, a vector of asset names, or `Colon` for the whole universe. A `Colon` keeps every asset column of `X`, `B` and `iv`, and passes `ivpa` through unchanged.
+  - `i`: Observation window into the rows of `pr.X`. Either integer positions (one `Integer`, an `AbstractVector{<:Integer}`, an `AbstractRange`, or a `Colon`), or timestamps (one `Dates.AbstractTime`, or an `AbstractVector{<:Dates.AbstractTime}`). One integer and one timestamp select one observation, and the view keeps its matrix shape.
+  - `j`: Asset window into the columns of `pr.X`. One integer, integer indices, an `AbstractRange`, one asset name, a vector of asset names, or `Colon` for the whole universe. One integer and one name select one asset, and the view keeps its matrix shape. A `Colon` keeps every asset column of `X`, `B` and `iv`, and passes `ivpa` through unchanged.
 
 # Validation
 
   - A window that keeps no row raises the `IsEmptyError` of the [`PricesResult`](@ref) constructor.
   - The timestamps of `i` compare with the timestamps of `X`. Raises an `ArgumentError`. See [`assert_timestamp_type`](@ref).
+  - `X` holds the timestamp `i`, when `i` is one timestamp. Raises an `ArgumentError`. See [`timestamp_positions`](@ref).
   - Every asset name of `j` is a column name of `X`. Raises an `ArgumentError`. See [`label_positions`](@ref).
   - A call shape that step 5 takes raises an `ArgumentError`.
 
@@ -332,7 +333,8 @@ function port_opt_view(pr::PricesResult, i::AbstractVector{<:Dates.AbstractTime}
                         span = span)
 end
 function port_opt_view(pr::PricesResult, i::AbstractVector{<:Dates.AbstractTime},
-                       j::AbstractVector)
+                       j::Union{AbstractVector, Integer, AbstractString,
+                                Dates.AbstractTime})
     i = clock_selection(TimeSeries.timestamp(pr.X), i)
     nx = string.(TimeSeries.colnames(pr.X))
     j = label_positions(nx, j, "asset")
@@ -360,14 +362,15 @@ function port_opt_view(pr::PricesResult, i::AbstractVector{<:Dates.AbstractTime}
                         span = span)
 end
 function port_opt_view(pr::PricesResult,
-                       i::Union{VecInt, AbstractRange{<:Integer}, Colon} = :,
-                       j::Union{VecInt, VecStr, AbstractRange{<:Integer}, Colon} = :)
-    return port_opt_view(pr, TimeSeries.timestamp(pr.X)[i], j)
+                       i::Union{Integer, VecInt, Colon, Dates.AbstractTime} = :,
+                       j::Union{Integer, AbstractString, VecInt, VecStr, Colon} = :)
+    ts = TimeSeries.timestamp(pr.X)
+    return port_opt_view(pr, ts[timestamp_positions(ts, i)], j)
 end
 function port_opt_view(pr::AbstractPricesResult, args...; kwargs...)
     kws = keys(kwargs)
     kwmsg = isempty(kws) ? "" : " and the keyword argument(s) " * join(kws, ", ")
-    return throw(ArgumentError("port_opt_view has no method for a $(nameof(typeof(pr))) with the index argument type(s) ($(join(typeof.(args), ", ")))$(kwmsg). A PricesResult takes port_opt_view(pr, observations) or port_opt_view(pr, observations, assets), with no keyword argument. The observations are integer indices, a range, a Colon or a vector of timestamps, and the assets are integer indices, a range, a Colon or a vector of asset names. A subtype of AbstractPricesResult implements these two shapes."))
+    return throw(ArgumentError("port_opt_view has no method for a $(nameof(typeof(pr))) with the index argument type(s) ($(join(typeof.(args), ", ")))$(kwmsg). A PricesResult takes port_opt_view(pr, observations) or port_opt_view(pr, observations, assets), with no keyword argument. The observations are one integer, integer indices, a range, a Colon, one timestamp or a vector of timestamps, and the assets are one integer, integer indices, a range, a Colon, one asset name or a vector of asset names. A subtype of AbstractPricesResult implements these two shapes."))
 end
 export PricesResult
 public AbstractPricesResult

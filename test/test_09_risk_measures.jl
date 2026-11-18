@@ -2032,7 +2032,7 @@ end
         @test isapprox(rl[1], evar; rtol = 1e-3)
         @test isapprox(rl[end], -minimum(x); rtol = 1e-6)
         # The functor needs a solver, and `factory` fills it.
-        @test_throws MethodError RelativisticValueatRisk()(x)
+        @test_throws IsNothingError RelativisticValueatRisk()(x)
         pr = prior(EmpiricalPrior(), hcat(x, 0.01 .* randn(StableRNG(7), 200)))
         @test factory(RelativisticValueatRisk(), pr, slv).slv === slv
     end
@@ -2073,6 +2073,74 @@ end
                            rl_reference(xz, a, k, wz); rtol = 1e-5)
         end
     end
+end
+
+# Issue #2191. A measure whose functor solves a conic programme reads its solver `slv` as it
+# stands, and only an optimiser fills it. A direct evaluation with `slv = nothing` raised a
+# `MethodError` of `ERM`, `RRM` or `PRM` several frames down, and a selector built with such a
+# measure and failed at the fit. Each route now refuses the slot by name.
+@testset "A measure that solves a programme refuses a missing solver by name (#2191)" begin
+    PO = PortfolioOptimisers
+    rng = StableRNG(2191)
+    X = 0.01 .* randn(rng, 60, 3)
+    w = fill(1 / 3, 3)
+    x = X * w
+    pr = prior(EmpiricalPrior(), X)
+    slv = Solver(; name = :clarabel, solver = Clarabel.Optimizer,
+                 settings = Dict("verbose" => false),
+                 check_sol = (; allow_local = true, allow_almost = true))
+    for M in (EntropicValueatRisk, EntropicValueatRiskRange, EntropicDrawdownatRisk,
+              RelativeEntropicDrawdownatRisk, RelativisticValueatRisk,
+              RelativisticValueatRiskRange, RelativisticDrawdownatRisk,
+              RelativeRelativisticDrawdownatRisk, PowerNormValueatRisk,
+              PowerNormValueatRiskRange, PowerNormDrawdownatRisk,
+              RelativePowerNormDrawdownatRisk)
+        r = M()
+        slot = "`$(nameof(M)).slv`"
+        # The entry points name the measure and the slot, and show a `Solver`.
+        err = @test_throws IsNothingError expected_risk(r, w, X)
+        @test occursin(slot, err.value.msg) && occursin("Solver(", err.value.msg)
+        err = @test_throws IsNothingError expected_risk(r, w, pr)
+        @test occursin(slot, err.value.msg)
+        err = @test_throws IsNothingError PO.asset_scores(r, X)
+        @test occursin(slot, err.value.msg)
+        # The constructors of a selector and of the scorers refuse it before any fit.
+        err = @test_throws IsNothingError ScoreSelector(; score = r,
+                                                        rule = RankRule(; best = 2))
+        @test occursin(slot, err.value.msg)
+        @test_throws IsNothingError RedundancySelector(; score = r)
+        @test_throws IsNothingError FoldRiskScorer(; r = r)
+        @test_throws IsNothingError FoldRiskScorer(; r = [ConditionalValueatRisk(), r])
+        @test_throws IsNothingError ScoreWeightBounds(; score = r)
+        # The functor and the Worst-Case Distribution reach the kernel, which names `slv`.
+        err = @test_throws IsNothingError r(x)
+        @test occursin("`slv` is `nothing`", err.value.msg)
+        @test_throws IsNothingError PO.worst_case_distribution(r, x)
+        # A measure with a solver builds every selector.
+        @test ScoreSelector(; score = M(; slv = slv), rule = RankRule(; best = 2)) isa
+              ScoreSelector
+    end
+    # With a solver, the routes answer and agree.
+    r = EntropicValueatRisk(; slv = slv)
+    @test isfinite(r(x))
+    @test isapprox(expected_risk(r, w, X), r(x); rtol = 1e-10)
+    @test isapprox(PO.asset_scores(r, X)[2], r(X[:, 2]); rtol = 1e-10)
+    # The kernel refuses a missing solver also when it needs no model. The value of `PRM`
+    # is the largest loss at this `alpha`, and the measure still does not answer, because
+    # that condition depends on the returns.
+    @test PO.power_norm_is_worst_loss(x, 1e-3, 2.0, nothing)
+    err = @test_throws IsNothingError PO.PRM(x, nothing, 1e-3, 2.0)
+    @test occursin("PRM", err.value.msg)
+    @test_throws IsNothingError PO.PRM_worst_case(x, nothing, 1e-3, 2.0)
+    @test_throws IsNothingError PO.ERM(x, nothing, 0.0)
+    @test_throws IsNothingError PO.ERM_worst_case(x, nothing, 0.05)
+    @test_throws IsNothingError PO.RRM_worst_case(x, nothing, 0.05, 0.3)
+    # An empty vector of solvers is still refused as empty.
+    @test_throws IsEmptyError PO.ERM(x, Solver[], 0.05)
+    @test_throws IsEmptyError PO.PRM(x, Solver[], 0.05, 2.0)
+    @test_throws IsEmptyError PO.ERM_worst_case(x, Solver[], 0.05)
+    @test_throws IsEmptyError PO.RRM_worst_case(x, Solver[], 0.05, 0.3)
+    @test_throws IsEmptyError PO.PRM_worst_case(x, Solver[], 0.05, 2.0)
 end
 
 # The entropic risk measures of `src/16_RiskMeasures/06_XatRisk/03_EntropicXatRisk.jl`,
@@ -2162,7 +2230,7 @@ end
             @test_throws IsEmptyError T(; slv = Solver[])
         end
         # The functor needs a solver, and `factory` fills it.
-        @test_throws MethodError EntropicValueatRisk()(x)
+        @test_throws IsNothingError EntropicValueatRisk()(x)
         pr = prior(EmpiricalPrior(), hcat(x, 0.01 .* randn(StableRNG(7), 200)))
         @test factory(EntropicValueatRisk(), pr, slv).slv === slv
     end
@@ -2306,7 +2374,7 @@ end
             @test_throws IsEmptyError T(; slv = Solver[])
         end
         # The functor needs a solver, and `factory` fills it.
-        @test_throws MethodError PowerNormValueatRisk()(x)
+        @test_throws IsNothingError PowerNormValueatRisk()(x)
         pr = prior(EmpiricalPrior(), hcat(x, 0.01 .* randn(StableRNG(7), 1000)))
         @test factory(PowerNormValueatRisk(), pr, slv).slv === slv
     end

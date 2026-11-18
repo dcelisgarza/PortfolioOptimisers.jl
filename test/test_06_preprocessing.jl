@@ -597,9 +597,11 @@ include(joinpath(@__DIR__, "asset_panel_fixture.jl"))
             catch e
                 e isa ArgumentError ? sprint(showerror, e) : string(typeof(e))
             end
-        m1 = msg(() -> port_opt_view(pr, 2))
-        @test occursin("PricesResult with the index argument type(s) (Int64)", m1)
+        m1 = msg(() -> port_opt_view(pr, 2.5))
+        @test occursin("PricesResult with the index argument type(s) (Float64)", m1)
         @test occursin("port_opt_view(pr, observations, assets)", m1)
+        # One integer selects one observation since #2190, as `2:2` does.
+        @test values(port_opt_view(pr, 2).X) == values(port_opt_view(pr, 2:2).X)
         @test occursin("(UnitRange{Int64}, UnitRange{Int64}, Colon)",
                        msg(() -> port_opt_view(pr, 1:2, 1:2, :)))
         @test occursin("keyword argument(s) foo",

@@ -70,6 +70,24 @@ using Dates, TimeZones
         @test_throws ArgumentError PV(pr, [DateTime(2020, 3, 5, 12)], ["a"])
     end
 
+    # Issue #2190. A vector of an abstract element type passes the check of its type, so
+    # each entry is checked. Before, a naive entry raised a bare error about promotion.
+    @testset "a vector of an abstract timestamp type is checked entry by entry (#2190)" begin
+        rd = prices_to_returns(P)
+        pr = PricesResult(; X = P)
+        mixed = Dates.AbstractTime[ts[3], DateTime(2020, 3, 5, 12)]
+        for f in (() -> PV(rd, mixed, :), () -> PV(pr, mixed), () -> PV(pr, mixed, ["a"]))
+            err = @test_throws ArgumentError f()
+            @test occursin("i holds", err.value.msg) &&
+                  occursin("DateTime, and the timestamps", err.value.msg) &&
+                  occursin("ZonedDateTime", err.value.msg)
+        end
+        # A vector whose entries are all zoned still selects.
+        zoned = Dates.AbstractTime[ts[5], ts[3]]
+        @test PV(rd, zoned, :).ts == ts[[3, 5]]
+        @test TimeSeries.timestamp(PV(pr, zoned).X) == ts[[3, 5]]
+    end
+
     @testset "a Date selects the observations at midnight of DateTime timestamps" begin
         # Dates promotes a Date and a DateTime, so the two compare across their types. The
         # PricesResult view gave a bare MethodError for this call before #2161.

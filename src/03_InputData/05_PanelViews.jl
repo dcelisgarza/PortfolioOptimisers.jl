@@ -139,13 +139,16 @@ function panel_feature_names(pnl::AssetPanel)
 end
 """
     label_positions(names, sel, what::AbstractString) -> typeof(sel)
+    label_positions(names, sel::Integer, what::AbstractString) -> UnitRange
     label_positions(names, sel::Union{Dates.AbstractTime, VecDate}, what::AbstractString) -> Union{}
-    label_positions(names::Nothing, sel::VecStr, what::AbstractString) -> Union{}
-    label_positions(names::AbstractVector, sel::VecStr, what::AbstractString) -> Vector{Int}
+    label_positions(names::Nothing, sel::Union{AbstractString, VecStr}, what::AbstractString) -> Union{}
+    label_positions(names::AbstractVector, sel::Union{AbstractString, VecStr}, what::AbstractString) -> Vector{Int}
 
 Turn the names that select assets or factors in a view into the positions of those names.
 
-[`port_opt_view`](@ref) of a [`ReturnsResult`](@ref) and of a [`PricesResult`](@ref) calls it on each index that names assets or factors, so a caller can select them by name or by position. An integer index, a range and a `Colon` pass through unchanged.
+[`port_opt_view`](@ref) of a [`ReturnsResult`](@ref) and of a [`PricesResult`](@ref) calls it on each index that names assets or factors, so a caller can select them by name or by position. An integer vector, a range and a `Colon` pass through unchanged.
+
+One integer `n` gives the range `n:n`, and one name gives the position of that name in a vector. So the view keeps its matrix shape, as one timestamp in the observation index does, see [`timestamp_positions`](@ref). Without this step, `view(X, :, n)` drops the asset axis, and the constructor of the view refuses the vector with an error that names a field and not the index.
 
 A name that the input data does not hold is refused. An integer past the end of an axis throws, and a name that selects nothing is the same mistake. If the view dropped the name, a misspelt ticker would give a smaller universe and no error.
 
@@ -153,26 +156,27 @@ A name that the input data does not hold is refused. An integer past the end of 
 
 The method that Julia selects is the algorithm.
 
- 1. `sel` is not a vector of names, not a timestamp and not a vector of timestamps: return it unchanged.
- 2. `sel` is a timestamp or a vector of timestamps: throw. A timestamp selects an observation, and this index selects `what`.
- 3. `sel` is a vector of names and `names` is `nothing`: throw. The input data carries no names to match.
- 4. `sel` is a vector of names: match it into `names` with `indexin`, giving the positions. Throw when a name has no match, and name every such entry.
+ 1. `sel` is not an integer, not a name, not a vector of names, not a timestamp and not a vector of timestamps: return it unchanged.
+ 2. `sel` is one integer `n`: return `n:n`.
+ 3. `sel` is a timestamp or a vector of timestamps: throw. A timestamp selects an observation, and this index selects `what`.
+ 4. `sel` is a name or a vector of names, and `names` is `nothing`: throw. The input data carries no names to match.
+ 5. `sel` is a name or a vector of names: put one name in a vector of one name. Match the vector into `names` with `indexin`, giving the positions. Throw when a name has no match, and name every such entry.
 
 # Arguments
 
   - `names`: The names of the axis that `sel` selects, or `nothing`.
-  - `sel`: The index of the view: names, integer positions, a range or a `Colon`.
+  - `sel`: The index of the view: one name or a vector of names, one integer or a vector of integer positions, a range or a `Colon`.
   - `what`: The name of the axis, such as `"asset"`, for the messages.
 
 # Validation
 
   - `sel` is not a timestamp and not a vector of timestamps. Raises an `ArgumentError`.
-  - `names` is not `nothing` when `sel` is a vector of names. Raises an `ArgumentError`.
-  - Every entry of `sel` is in `names`. Raises an `ArgumentError`.
+  - `names` is not `nothing` when `sel` is a name or a vector of names. Raises an `ArgumentError`.
+  - Every name of `sel` is in `names`. Raises an `ArgumentError`.
 
 # Returns
 
-  - `idx`: `sel` unchanged, or the position of each name of `sel` in `names`, in the order of `sel`.
+  - `idx`: `sel` unchanged, the range `sel:sel` of one integer, or the position of each name of `sel` in `names`, in the order of `sel`.
 
 # Related
 
@@ -185,14 +189,21 @@ The method that Julia selects is the algorithm.
 function label_positions(::Any, sel, ::AbstractString)
     return sel
 end
+function label_positions(::Any, sel::Integer, ::AbstractString)
+    return sel:sel
+end
 function label_positions(::Any, sel::Union{Dates.AbstractTime, VecDate},
                          what::AbstractString)
     return throw(ArgumentError("a timestamp selects an observation, but this index of the view selects the $(what)s. Pass the timestamps as the observation index, which is the first index of port_opt_view(rd, observations, assets) and of port_opt_view(pr, observations, assets)."))
 end
-function label_positions(::Nothing, sel::VecStr, what::AbstractString)
+function label_positions(::Nothing, sel::Union{AbstractString, VecStr},
+                         what::AbstractString)
     return throw(ArgumentError("the view selects the $(what)s by name, but the input data carries no $what names to match. Select the $(what)s by position, or build the input data with its $what names. Got\nsel => $(sel)"))
 end
-function label_positions(names::AbstractVector, sel::VecStr, what::AbstractString)
+function label_positions(names::AbstractVector, sel::Union{AbstractString, VecStr},
+                         what::AbstractString)
+    #! One name selects as a vector of one name, so the view keeps its matrix shape.
+    sel = isa(sel, AbstractString) ? [sel] : sel
     pos = indexin(sel, names)
     missed = findall(isnothing, pos)
     @argcheck(isempty(missed),
@@ -253,46 +264,48 @@ function assert_timestamp_type(::Type{T}, ::Type{S}, sym::Sym_Str)::Nothing wher
 end
 """
     timestamp_positions(ts, i) -> typeof(i)
-    timestamp_positions(ts, i::VecStr) -> Union{}
+    timestamp_positions(ts, i::Integer) -> UnitRange
+    timestamp_positions(ts, i::Union{AbstractString, VecStr}) -> Union{}
     timestamp_positions(ts::Nothing, i::Union{Dates.AbstractTime, VecDate}) -> Union{}
     timestamp_positions(ts::AbstractVector, i::Dates.AbstractTime) -> Vector{Int}
     timestamp_positions(ts::AbstractVector, i::VecDate) -> Vector{Int}
 
-Turn the timestamps that select observations in a view of a [`ReturnsResult`](@ref) into the positions of those observations.
+Turn the timestamps that select observations in a view of a [`ReturnsResult`](@ref) or of a [`PricesResult`](@ref) into the positions of those observations.
 
-[`port_opt_view`](@ref) of a `ReturnsResult` calls it on its observation index, so a caller can select the observations by timestamp or by position. An integer index, a range and a `Colon` pass through unchanged.
+[`port_opt_view`](@ref) of a `ReturnsResult` calls it on its observation index, so a caller can select the observations by timestamp or by position. The integer view of a `PricesResult` calls it on its integer index, and the timestamp view of a `PricesResult` calls it through [`clock_selection`](@ref). An integer vector, a range and a `Colon` pass through unchanged.
 
 A vector of timestamps selects the observations that the clock holds, as the timestamp view of a [`PricesResult`](@ref) does. The rows come back in clock order whatever the order of `i`, and a timestamp that the clock does not hold selects no row. So a calendar range selects the trading days inside it. A window that keeps no row is refused by the [`ReturnsResult`](@ref) constructor, which refuses empty returns.
 
-One timestamp selects the one observation at that timestamp, and it gives a vector of one position. So the view keeps its matrix shape, as a vector of one timestamp does. A timestamp that the clock does not hold is refused, because one timestamp names one observation and not a window.
+One timestamp selects the one observation at that timestamp, and it gives a vector of one position. One integer `n` gives the range `n:n`. So the view keeps its matrix shape, as a vector of one timestamp does. A timestamp that the clock does not hold is refused, because one timestamp names one observation and not a window.
 
-The timestamps of `i` must compare with `ts`. [`assert_timestamp_type`](@ref) checks their types, so a `DateTime` selector of zoned timestamps raises an error that names `i`.
+The timestamps of `i` must compare with `ts`. [`assert_timestamp_type`](@ref) checks their types, so a `DateTime` selector of zoned timestamps raises an error that names `i`. When the element type of a vector `i` is abstract, such as `Dates.AbstractTime`, the check of that type passes, so the function also checks the type of each entry.
 
 # Algorithm
 
 The method that Julia selects is the algorithm.
 
- 1. `i` is not a timestamp, not a vector of timestamps and not a vector of names: return it unchanged.
- 2. `i` is a vector of names: throw. A name selects an asset or a factor, and this index selects observations.
- 3. `i` is a timestamp or a vector of timestamps, and `ts` is `nothing`: throw. The returns carry no timestamps to match.
- 4. `i` is a timestamp: check its type, and keep the positions of `ts` that equal `i`. Throw when no position equals `i`.
- 5. `i` is a vector of timestamps: check its element type, sort it, and keep the position of each timestamp of `ts` that the sorted vector holds, with `insorted`.
+ 1. `i` is not an integer, not a timestamp, not a vector of timestamps, not a name and not a vector of names: return it unchanged.
+ 2. `i` is one integer `n`: return `n:n`.
+ 3. `i` is a name or a vector of names: throw. A name selects an asset or a factor, and this index selects observations.
+ 4. `i` is a timestamp or a vector of timestamps, and `ts` is `nothing`: throw. The returns carry no timestamps to match.
+ 5. `i` is a timestamp: check its type, and keep the positions of `ts` that equal `i`. Throw when no position equals `i`.
+ 6. `i` is a vector of timestamps: check its element type. When that type is abstract, check the type of each entry. Sort `i`, and keep the position of each timestamp of `ts` that the sorted vector holds, with `insorted`.
 
 # Arguments
 
-  - `ts`: The timestamps of the returns, or `nothing`.
-  - `i`: The observation index of the view: a timestamp, a vector of timestamps, integer positions, a range or a `Colon`.
+  - `ts`: The timestamps of the returns or of the prices, or `nothing`.
+  - `i`: The observation index of the view: a timestamp, a vector of timestamps, one integer, integer positions, a range or a `Colon`.
 
 # Validation
 
-  - `i` is not a vector of names. Raises an `ArgumentError`.
+  - `i` is not a name and not a vector of names. Raises an `ArgumentError`.
   - `ts` is not `nothing` when `i` is a timestamp or a vector of timestamps. Raises an `ArgumentError`.
-  - The timestamps of `i` compare with `ts`. Raises an `ArgumentError`. See [`assert_timestamp_type`](@ref).
+  - The timestamps of `i` compare with `ts`, and so does each entry of a vector `i` whose element type is abstract. Raises an `ArgumentError`. See [`assert_timestamp_type`](@ref).
   - `ts` holds the timestamp `i`, when `i` is one timestamp. Raises an `ArgumentError`.
 
 # Returns
 
-  - `idx`: `i` unchanged, or the positions in `ts` of the timestamps that `i` holds, in clock order.
+  - `idx`: `i` unchanged, the range `i:i` of one integer, or the positions in `ts` of the timestamps that `i` holds, in clock order.
 
 # Related
 
@@ -306,7 +319,10 @@ The method that Julia selects is the algorithm.
 function timestamp_positions(::Any, i)
     return i
 end
-function timestamp_positions(::Any, i::VecStr)
+function timestamp_positions(::Any, i::Integer)
+    return i:i
+end
+function timestamp_positions(::Any, i::Union{AbstractString, VecStr})
     return throw(ArgumentError("a name selects an asset or a factor, but the first index of port_opt_view(rd, observations, assets, factors) selects the observations. Pass the asset names as the second index and the factor names as the third. Got\ni => $(i)"))
 end
 function timestamp_positions(::Nothing, i::Union{Dates.AbstractTime, VecDate})
@@ -316,11 +332,16 @@ function timestamp_positions(ts::AbstractVector, i::Dates.AbstractTime)
     assert_timestamp_type(eltype(ts), typeof(i), :i)
     pos = findall(==(i), ts)
     @argcheck(!isempty(pos),
-              ArgumentError("the view selects the observation at the timestamp $(i), and the timestamps `ts` of the ReturnsResult do not hold it. One timestamp names one observation, so the view refuses a timestamp that it cannot find. Pass a vector of timestamps to select the observations of a window that the clock holds."))
+              ArgumentError("the view selects the observation at the timestamp $(i), and the timestamps of the data do not hold it. One timestamp names one observation, so the view refuses a timestamp that it cannot find. Pass a vector of timestamps to select the observations of a window that the clock holds."))
     return pos
 end
 function timestamp_positions(ts::AbstractVector, i::VecDate)
     assert_timestamp_type(eltype(ts), eltype(i), :i)
+    #! An abstract element type, such as `Dates.AbstractTime`, passes the check of the type
+    #! and can still hold an entry that does not compare with `ts`.
+    if !isconcretetype(eltype(i))
+        foreach(t -> assert_timestamp_type(eltype(ts), typeof(t), :i), i)
+    end
     s = sort(i)
     return findall(t -> insorted(t, s), ts)
 end

@@ -188,6 +188,61 @@ A single `Solver` iterates as a vector of one solver. So [`optimise_JuMP_model!`
 """
 const Slv_VecSlv = Union{Solver, VecSlv}
 """
+    checked_kernel_solver(slv::Solver, kernel::Symbol) -> Solver
+    checked_kernel_solver(slv::VecSlv, kernel::Symbol) -> VecSlv
+    checked_kernel_solver(slv::Nothing, kernel::Symbol) -> Union{}
+
+Check that a kernel that solves a programme to evaluate a risk measure has a solver, and return that solver.
+
+[`ERM`](@ref), [`RRM`](@ref) and [`PRM`](@ref), and their twins of the Worst-Case Distribution, solve a conic programme with the `slv` of the measure. An optimiser gives the measure its own solver through [`factory`](@ref), but a direct evaluation does not, so `slv` can reach the kernel as `nothing`. Without this check, the call raises a `MethodError` that names no field.
+
+The kernel refuses `nothing` also when it can answer with no model, such as [`PRM`](@ref) when [`power_norm_is_worst_loss`](@ref) holds. That condition depends on the returns, so without the refusal one measure answers on one series and fails on a different series.
+
+The kernel binds the result to `slv`, as it binds the result of [`checked_observation_weights`](@ref) to `w`. The type of the result has no `Nothing` arm, so the code after the check sees a solver.
+
+# Algorithm
+
+The method that Julia selects is the algorithm.
+
+ 1. `slv` is a `Solver`: return `slv`.
+ 2. `slv` is a vector of solvers: check that it is not empty, and return `slv`.
+ 3. `slv` is `nothing`: throw.
+
+# Arguments
+
+  - $(arg_dict[:slv])
+  - `kernel`: The name of the kernel, for the message.
+
+# Validation
+
+  - `slv` is not `nothing`. Raises an [`IsNothingError`](@ref) that names the field `slv` and shows a `Solver`.
+  - `slv` is not an empty vector. Raises an `IsEmptyError`.
+
+# Returns
+
+  - `slv::Slv_VecSlv`: The solver or the vector of solvers, unchanged.
+
+# Related
+
+  - [`Solver`](@ref)
+  - [`Slv_VecSlv`](@ref)
+  - [`ERM`](@ref)
+  - [`RRM`](@ref)
+  - [`PRM`](@ref)
+  - [`checked_observation_weights`](@ref)
+  - [`functor_slots`](@ref)
+"""
+function checked_kernel_solver(slv::Solver, ::Symbol)
+    return slv
+end
+function checked_kernel_solver(slv::VecSlv, ::Symbol)
+    @argcheck(!isempty(slv), IsEmptyError("slv cannot be empty"))
+    return slv
+end
+function checked_kernel_solver(::Nothing, kernel::Symbol)
+    return throw(IsNothingError("`slv` is `nothing`, and $kernel solves a conic programme with it to evaluate the risk measure. An optimiser gives the measure its own solver, but a direct evaluation, such as a call of the functor, of `expected_risk` or of `asset_scores`, does not. State the solver on the measure, for example `EntropicValueatRisk(; slv = Solver(; solver = Clarabel.Optimizer))`."))
+end
+"""
 $(DocStringExtensions.TYPEDEF)
 
 Records which solvers failed, at which stage, and whether one of them succeeded.

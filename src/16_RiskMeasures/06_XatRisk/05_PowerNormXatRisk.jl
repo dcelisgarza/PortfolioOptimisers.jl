@@ -1,6 +1,6 @@
 # Clarabel.jl 4915b83e0d, `warmstart_test/portfolioOpt/higherorderRiskMeansure.jl`, L23
 """
-    PRM(x::VecNum, slv::Slv_VecSlv, alpha::Number = 0.05, p::Number = 2.0,
+    PRM(x::VecNum, slv::Option{<:Slv_VecSlv}, alpha::Number = 0.05, p::Number = 2.0,
         w::Option{<:ObsWeights} = nothing) -> Number
 
 Compute the Power Norm Value-at-Risk of the returns `x` with a power cone programme.
@@ -10,7 +10,7 @@ Compute the Power Norm Value-at-Risk of the returns `x` with a power cone progra
 # Algorithm
 
  1. Check `w` against `x` with [`checked_observation_weights`](@ref).
- 2. Check that `slv` is not empty when it is a vector.
+ 2. Check that `slv` is a solver, and not empty when it is a vector, with [`checked_kernel_solver`](@ref). The check comes before step 3, so the function refuses `slv = nothing` also when it needs no model.
  3. When [`power_norm_is_worst_loss`](@ref) holds, return the largest loss among the observations of positive weight, with [`worst_positive_weight_loss`](@ref). This step builds no model.
  4. Build and solve the power cone programme that [`PRM_model`](@ref) states.
  5. When a solver solves the model, return its objective value. Otherwise, return `NaN`.
@@ -26,7 +26,7 @@ Compute the Power Norm Value-at-Risk of the returns `x` with a power cone progra
 # Validation
 
   - `w` passes [`checked_observation_weights`](@ref) against `x`. Otherwise that function raises its error.
-  - If `slv` is a `VecSlv`: `!isempty(slv)`, else `IsEmptyError`.
+  - `slv` is not `nothing`, else [`IsNothingError`](@ref), and if `slv` is a `VecSlv`: `!isempty(slv)`, else `IsEmptyError`. See [`checked_kernel_solver`](@ref).
 
 The function does not check `alpha` or `p`. The constructors of the measures check them.
 
@@ -53,12 +53,10 @@ The function does not check `alpha` or `p`. The constructors of the measures che
   - $(ref_dict[:pnvar]) Equation 32.
   - $(ref_dict[:chares2009]) Section 4.1, Equations 4.4 and 4.5.
 """
-function PRM(x::VecNum, slv::Slv_VecSlv, alpha::Number = 0.05, p::Number = 2.0,
+function PRM(x::VecNum, slv::Option{<:Slv_VecSlv}, alpha::Number = 0.05, p::Number = 2.0,
              w::Option{<:ObsWeights} = nothing)
     w = checked_observation_weights(w, x)
-    if isa(slv, VecSlv)
-        @argcheck(!isempty(slv), IsEmptyError("slv cannot be empty"))
-    end
+    slv = checked_kernel_solver(slv, :PRM)
     if power_norm_is_worst_loss(x, alpha, p, w)
         return worst_positive_weight_loss(x, w)
     end
@@ -70,7 +68,7 @@ function PRM(x::VecNum, slv::Slv_VecSlv, alpha::Number = 0.05, p::Number = 2.0,
     end
 end
 """
-    PRM_worst_case(x::VecNum, slv::Slv_VecSlv, alpha::Number = 0.05, p::Number = 2.0,
+    PRM_worst_case(x::VecNum, slv::Option{<:Slv_VecSlv}, alpha::Number = 0.05, p::Number = 2.0,
                    w::Option{<:ObsWeights} = nothing) -> Option{<:VecNum}
 
 Compute the Worst-Case Distribution of the Power Norm Value-at-Risk of the returns `x`, from the dual of the programme of [`PRM_model`](@ref).
@@ -80,7 +78,7 @@ The Power Norm Value-at-Risk is a coherent measure, so it is the largest expecte
 # Algorithm
 
  1. Check `w` against `x` with [`checked_observation_weights`](@ref).
- 2. Check that `slv` is not empty when it is a vector.
+ 2. Check that `slv` is a solver, and not empty when it is a vector, with [`checked_kernel_solver`](@ref). The check comes before step 3, so the function refuses `slv = nothing` also when it needs no model.
  3. When [`power_norm_is_worst_loss`](@ref) holds, return the distribution of the largest loss, with [`worst_loss_distribution`](@ref). This step builds no model.
  4. Build and solve the programme with [`PRM_model`](@ref).
  5. When no solver solves the model, or the solver gives no dual, return `nothing`.
@@ -97,7 +95,7 @@ The Power Norm Value-at-Risk is a coherent measure, so it is the largest expecte
 # Validation
 
   - `w` passes [`checked_observation_weights`](@ref) against `x`. Otherwise that function raises its error.
-  - If `slv` is a `VecSlv`: `!isempty(slv)`, else `IsEmptyError`.
+  - `slv` is not `nothing`, else [`IsNothingError`](@ref), and if `slv` is a `VecSlv`: `!isempty(slv)`, else `IsEmptyError`. See [`checked_kernel_solver`](@ref).
 
 # Returns
 
@@ -111,12 +109,10 @@ The Power Norm Value-at-Risk is a coherent measure, so it is the largest expecte
   - [`ERM_worst_case`](@ref)
   - [`worst_case_distribution`](@ref)
 """
-function PRM_worst_case(x::VecNum, slv::Slv_VecSlv, alpha::Number = 0.05, p::Number = 2.0,
-                        w::Option{<:ObsWeights} = nothing)
+function PRM_worst_case(x::VecNum, slv::Option{<:Slv_VecSlv}, alpha::Number = 0.05,
+                        p::Number = 2.0, w::Option{<:ObsWeights} = nothing)
     w = checked_observation_weights(w, x)
-    if isa(slv, VecSlv)
-        @argcheck(!isempty(slv), IsEmptyError("slv cannot be empty"))
-    end
+    slv = checked_kernel_solver(slv, :PRM_worst_case)
     if power_norm_is_worst_loss(x, alpha, p, w)
         return worst_loss_distribution(x, w)
     end
@@ -384,7 +380,7 @@ Keywords correspond to the struct's fields.
 
     (r::PowerNormValueatRisk)(x::VecNum)
 
-Computes the PNVaR of a portfolio returns vector `x` with [`PRM`](@ref). The value equals the largest loss of `x` under the condition in the mathematical definition, and [`PRM`](@ref) then returns it without a solver. Otherwise it returns `NaN` when no solver of `slv` solves the programme. The functor needs a solver: with `slv = nothing` the call raises a `MethodError`. [`factory`](@ref) fills `slv` from the solver of the optimiser.
+Computes the PNVaR of a portfolio returns vector `x` with [`PRM`](@ref). The value equals the largest loss of `x` under the condition in the mathematical definition, and [`PRM`](@ref) then returns it without a solver. Otherwise it returns `NaN` when no solver of `slv` solves the programme. The functor needs a solver: with `slv = nothing` the call raises an [`IsNothingError`](@ref) that names `slv`, see [`checked_kernel_solver`](@ref). It raises the error also under the condition in which the value is the largest loss. [`factory`](@ref) fills `slv` from the solver of the optimiser.
 
 ## Arguments
 
@@ -1001,6 +997,12 @@ risk_input_kind(::PowerNormValueatRiskRange) = NetReturnsInput()
 risk_input_kind(::PowerNormDrawdownatRisk) = NetReturnsInput()
 risk_input_kind(::RelativePowerNormDrawdownatRisk) = NetReturnsInput()
 # Worst-Case Distribution — see `worst_case_distribution` and `worst_case_risk`.
+# The functor solves a programme with `slv`, and `nothing` there has no value-level reading.
+# An optimiser fills it through `factory` — see `functor_slots`.
+function functor_slots(r::Union{PowerNormValueatRisk, PowerNormValueatRiskRange,
+                                PowerNormDrawdownatRisk, RelativePowerNormDrawdownatRisk})
+    return (; slv = r.slv)
+end
 function worst_case_distribution(r::PowerNormValueatRisk, x::VecNum)
     return PRM_worst_case(x, r.slv, r.alpha, r.p, r.w)
 end

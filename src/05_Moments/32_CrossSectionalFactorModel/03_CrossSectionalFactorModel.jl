@@ -1205,29 +1205,27 @@ function FactorDiagnosticResult(; X::AbstractArray, nf::Option{<:VecStr} = nothi
     return FactorDiagnosticResult(X, nf, fam, dims)
 end
 """
-    factor_axis_positions(nf::Option{<:VecStr}, fam::Option{<:VecStr}, i) -> typeof(i)
-    factor_axis_positions(nf::Option{<:VecStr}, fam::Option{<:VecStr}, i::Integer) -> UnitRange{Int}
+    factor_axis_positions(nf::Option{<:VecStr}, fam::Option{<:VecStr}, i) -> Union{typeof(i), UnitRange{Int}, Vector{Int}}
     factor_axis_positions(nf::Option{<:VecStr}, fam::Nothing, i::LabelGroup) -> Union{}
     factor_axis_positions(nf::Option{<:VecStr}, fam::VecStr, i::LabelGroup) -> Vector{Int}
 
 Turn the factor index of a view of a diagnostic answer into positions on its factor axis.
 
-A position, a range and a `Colon` pass through. A vector of names goes through [`label_positions`](@ref), which refuses a name it cannot find. One integer becomes a range of one position, so the answer keeps its factor axis. A [`LabelGroup`](@ref) selects every factor whose family label is the group, in the order of the axis.
+A position vector, a range and a `Colon` pass through. A name and a vector of names go through [`label_positions`](@ref), which refuses a name it cannot find. One integer becomes a range of one position through [`label_positions`](@ref), so the answer keeps its factor axis. A [`LabelGroup`](@ref) selects every factor whose family label is the group, in the order of the axis.
 
 # Algorithm
 
 The method that Julia selects is the algorithm.
 
- 1. `i` is not an integer and not a [`LabelGroup`](@ref): return [`label_positions`](@ref) of `nf` and `i`.
- 2. `i` is an integer: return `i:i`.
- 3. `i` is a [`LabelGroup`](@ref) and `fam` is `nothing`: throw.
- 4. `i` is a [`LabelGroup`](@ref): return the positions of the entries of `fam` that equal the group, and throw when there is none.
+ 1. `i` is not a [`LabelGroup`](@ref): return [`label_positions`](@ref) of `nf` and `i`. One integer `n` gives `n:n`.
+ 2. `i` is a [`LabelGroup`](@ref) and `fam` is `nothing`: throw.
+ 3. `i` is a [`LabelGroup`](@ref): return the positions of the entries of `fam` that equal the group, and throw when there is none.
 
 # Arguments
 
   - $(arg_dict[:fd_nf])
   - $(arg_dict[:fd_fam])
-  - `i`: The factor index of the view: positions, a range, a `Colon`, a vector of names, or a [`LabelGroup`](@ref).
+  - `i`: The factor index of the view: one integer, positions, a range, a `Colon`, one name, a vector of names, or a [`LabelGroup`](@ref).
 
 # Validation
 
@@ -1249,9 +1247,6 @@ The method that Julia selects is the algorithm.
 """
 function factor_axis_positions(nf::Option{<:VecStr}, ::Option{<:VecStr}, i)
     return label_positions(nf, i, "factor")
-end
-function factor_axis_positions(::Option{<:VecStr}, ::Option{<:VecStr}, i::Integer)
-    return i:i
 end
 function factor_axis_positions(::Option{<:VecStr}, ::Nothing, i::LabelGroup)
     return throw(ArgumentError("the view selects the factors of the family $(i.group), but the answer carries no family labels. Build the block with its family labels `fam`, or select the factors by position or by name."))

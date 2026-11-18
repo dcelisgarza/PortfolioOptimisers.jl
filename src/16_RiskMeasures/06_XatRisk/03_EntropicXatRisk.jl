@@ -1,5 +1,5 @@
 """
-    ERM(x::VecNum, slv::Slv_VecSlv, alpha::Number = 0.05,
+    ERM(x::VecNum, slv::Option{<:Slv_VecSlv}, alpha::Number = 0.05,
         w::Option{<:ObsWeights} = nothing) -> Number
 
 Compute the Entropic Value-at-Risk of the returns `x` with an exponential cone programme.
@@ -9,7 +9,7 @@ Compute the Entropic Value-at-Risk of the returns `x` with an exponential cone p
 # Algorithm
 
  1. Check `w` against `x` with [`checked_observation_weights`](@ref).
- 2. Check that `slv` is not empty when it is a vector.
+ 2. Check that `slv` is a solver, and not empty when it is a vector, with [`checked_kernel_solver`](@ref).
  3. When `alpha` is zero, return the largest loss among the observations of positive weight, with [`worst_positive_weight_loss`](@ref). This step builds no model.
  4. Build and solve the exponential cone programme that [`ERM_model`](@ref) states.
  5. When a solver solves the model, return its objective value. Otherwise, return `NaN`.
@@ -24,7 +24,7 @@ Compute the Entropic Value-at-Risk of the returns `x` with an exponential cone p
 # Validation
 
   - `w` passes [`checked_observation_weights`](@ref) against `x`. Otherwise that function raises its error.
-  - If `slv` is a `VecSlv`: `!isempty(slv)`, else `IsEmptyError`.
+  - `slv` is not `nothing`, else [`IsNothingError`](@ref), and if `slv` is a `VecSlv`: `!isempty(slv)`, else `IsEmptyError`. See [`checked_kernel_solver`](@ref).
 
 The function does not check `alpha`. The constructors of the measures check it.
 
@@ -43,12 +43,10 @@ The function does not check `alpha`. The constructors of the measures check it.
   - [`optimise_JuMP_model!`](@ref)
   - [`Slv_VecSlv`](@ref)
 """
-function ERM(x::VecNum, slv::Slv_VecSlv, alpha::Number = 0.05,
+function ERM(x::VecNum, slv::Option{<:Slv_VecSlv}, alpha::Number = 0.05,
              w::Option{<:ObsWeights} = nothing)
     w = checked_observation_weights(w, x)
-    if isa(slv, VecSlv)
-        @argcheck(!isempty(slv), IsEmptyError("slv cannot be empty"))
-    end
+    slv = checked_kernel_solver(slv, :ERM)
     if iszero(alpha)
         return worst_positive_weight_loss(x, w)
     end
@@ -60,7 +58,7 @@ function ERM(x::VecNum, slv::Slv_VecSlv, alpha::Number = 0.05,
     end
 end
 """
-    ERM_worst_case(x::VecNum, slv::Slv_VecSlv, alpha::Number = 0.05,
+    ERM_worst_case(x::VecNum, slv::Option{<:Slv_VecSlv}, alpha::Number = 0.05,
                    w::Option{<:ObsWeights} = nothing) -> Option{<:VecNum}
 
 Compute the Worst-Case Distribution of the Entropic Value-at-Risk of the returns `x`, from the dual of the programme of [`ERM_model`](@ref).
@@ -70,7 +68,7 @@ The Entropic Value-at-Risk is the largest expected loss over a Kullback-Leibler 
 # Algorithm
 
  1. Check `w` against `x` with [`checked_observation_weights`](@ref).
- 2. Check that `slv` is not empty when it is a vector.
+ 2. Check that `slv` is a solver, and not empty when it is a vector, with [`checked_kernel_solver`](@ref).
  3. When `alpha` is zero, return the distribution of the largest loss, with [`worst_loss_distribution`](@ref). This step builds no model.
  4. Build and solve the programme with [`ERM_model`](@ref).
  5. When no solver solves the model, or the solver gives no dual, return `nothing`.
@@ -86,7 +84,7 @@ The Entropic Value-at-Risk is the largest expected loss over a Kullback-Leibler 
 # Validation
 
   - `w` passes [`checked_observation_weights`](@ref) against `x`. Otherwise that function raises its error.
-  - If `slv` is a `VecSlv`: `!isempty(slv)`, else `IsEmptyError`.
+  - `slv` is not `nothing`, else [`IsNothingError`](@ref), and if `slv` is a `VecSlv`: `!isempty(slv)`, else `IsEmptyError`. See [`checked_kernel_solver`](@ref).
 
 # Returns
 
@@ -100,12 +98,10 @@ The Entropic Value-at-Risk is the largest expected loss over a Kullback-Leibler 
   - [`RRM_worst_case`](@ref)
   - [`worst_case_distribution`](@ref)
 """
-function ERM_worst_case(x::VecNum, slv::Slv_VecSlv, alpha::Number = 0.05,
+function ERM_worst_case(x::VecNum, slv::Option{<:Slv_VecSlv}, alpha::Number = 0.05,
                         w::Option{<:ObsWeights} = nothing)
     w = checked_observation_weights(w, x)
-    if isa(slv, VecSlv)
-        @argcheck(!isempty(slv), IsEmptyError("slv cannot be empty"))
-    end
+    slv = checked_kernel_solver(slv, :ERM_worst_case)
     if iszero(alpha)
         return worst_loss_distribution(x, w)
     end
@@ -340,7 +336,7 @@ Keywords correspond to the struct's fields.
 
     (r::EntropicValueatRisk)(x::VecNum)
 
-Computes the EVaR of a portfolio returns vector `x` with [`ERM`](@ref), and returns `NaN` when no solver of `slv` solves the programme. The functor needs a solver: with `slv = nothing` the call raises a `MethodError`. [`factory`](@ref) fills `slv` from the solver of the optimiser.
+Computes the EVaR of a portfolio returns vector `x` with [`ERM`](@ref), and returns `NaN` when no solver of `slv` solves the programme. The functor needs a solver: with `slv = nothing` the call raises an [`IsNothingError`](@ref) that names `slv`, see [`checked_kernel_solver`](@ref). [`factory`](@ref) fills `slv` from the solver of the optimiser.
 
 ## Arguments
 
@@ -905,6 +901,12 @@ risk_input_kind(::EntropicValueatRiskRange) = NetReturnsInput()
 risk_input_kind(::EntropicDrawdownatRisk) = NetReturnsInput()
 risk_input_kind(::RelativeEntropicDrawdownatRisk) = NetReturnsInput()
 # Worst-Case Distribution — see `worst_case_distribution` and `worst_case_risk`.
+# The functor solves a programme with `slv`, and `nothing` there has no value-level reading.
+# An optimiser fills it through `factory` — see `functor_slots`.
+function functor_slots(r::Union{EntropicValueatRisk, EntropicValueatRiskRange,
+                                EntropicDrawdownatRisk, RelativeEntropicDrawdownatRisk})
+    return (; slv = r.slv)
+end
 function worst_case_distribution(r::EntropicValueatRisk, x::VecNum)
     return ERM_worst_case(x, r.slv, r.alpha, r.w)
 end

@@ -1,5 +1,5 @@
 """
-    RRM(x::VecNum, slv::Slv_VecSlv, alpha::Number = 0.05, kappa::Number = 0.3,
+    RRM(x::VecNum, slv::Option{<:Slv_VecSlv}, alpha::Number = 0.05, kappa::Number = 0.3,
         w::Option{<:ObsWeights} = nothing) -> Number
 
 Compute the Relativistic Value-at-Risk of the returns `x` with a power-cone programme.
@@ -11,7 +11,7 @@ Both models hold the variables and the rows of the observations of positive weig
 # Algorithm
 
  1. Check `w` against `x` with [`checked_observation_weights`](@ref).
- 2. Check that `slv` is not empty when it is a vector.
+ 2. Check that `slv` is a solver, and not empty when it is a vector, with [`checked_kernel_solver`](@ref).
  3. Build and solve the primal programme, or the dual programme when no solver solves the primal one, with [`RRM_model`](@ref).
  4. When a solver solves one of them, return its objective value. Otherwise, return `NaN`.
 
@@ -26,7 +26,7 @@ Both models hold the variables and the rows of the observations of positive weig
 # Validation
 
   - `w` passes [`checked_observation_weights`](@ref) against `x`. Otherwise that function raises its error.
-  - If `slv` is a `VecSlv`: `!isempty(slv)`, else `IsEmptyError`.
+  - `slv` is not `nothing`, else [`IsNothingError`](@ref), and if `slv` is a `VecSlv`: `!isempty(slv)`, else `IsEmptyError`. See [`checked_kernel_solver`](@ref).
 
 # Returns
 
@@ -42,12 +42,10 @@ Both models hold the variables and the rows of the observations of positive weig
   - [`optimise_JuMP_model!`](@ref)
   - [`Slv_VecSlv`](@ref)
 """
-function RRM(x::VecNum, slv::Slv_VecSlv, alpha::Number = 0.05, kappa::Number = 0.3,
-             w::Option{<:ObsWeights} = nothing)
+function RRM(x::VecNum, slv::Option{<:Slv_VecSlv}, alpha::Number = 0.05,
+             kappa::Number = 0.3, w::Option{<:ObsWeights} = nothing)
     w = checked_observation_weights(w, x)
-    if isa(slv, VecSlv)
-        @argcheck(!isempty(slv), IsEmptyError("slv cannot be empty"))
-    end
+    slv = checked_kernel_solver(slv, :RRM)
     sol = RRM_model(x, slv, alpha, kappa, w)
     if isnothing(sol)
         return NaN
@@ -56,7 +54,7 @@ function RRM(x::VecNum, slv::Slv_VecSlv, alpha::Number = 0.05, kappa::Number = 0
     return JuMP.objective_value(model)
 end
 """
-    RRM_worst_case(x::VecNum, slv::Slv_VecSlv, alpha::Number = 0.05, kappa::Number = 0.3,
+    RRM_worst_case(x::VecNum, slv::Option{<:Slv_VecSlv}, alpha::Number = 0.05, kappa::Number = 0.3,
                    w::Option{<:ObsWeights} = nothing) -> Option{<:VecNum}
 
 Compute the Worst-Case Distribution of the Relativistic Value-at-Risk of the returns `x`, from the programmes of [`RRM_model`](@ref).
@@ -66,7 +64,7 @@ The Relativistic Value-at-Risk is the largest expected loss over a Kaniadakis ba
 # Algorithm
 
  1. Check `w` against `x` with [`checked_observation_weights`](@ref).
- 2. Check that `slv` is not empty when it is a vector.
+ 2. Check that `slv` is a solver, and not empty when it is a vector, with [`checked_kernel_solver`](@ref).
  3. Build and solve the programmes with [`RRM_model`](@ref). When no solver solves it, return `nothing`.
  4. When the solved model is the primal one, negate the dual of each row of `rrm_loss`. When the solver gives no dual, return `nothing`.
  5. When the solved model is the dual one, take the value of its variable `z`.
@@ -83,7 +81,7 @@ The Relativistic Value-at-Risk is the largest expected loss over a Kaniadakis ba
 # Validation
 
   - `w` passes [`checked_observation_weights`](@ref) against `x`. Otherwise that function raises its error.
-  - If `slv` is a `VecSlv`: `!isempty(slv)`, else `IsEmptyError`.
+  - `slv` is not `nothing`, else [`IsNothingError`](@ref), and if `slv` is a `VecSlv`: `!isempty(slv)`, else `IsEmptyError`. See [`checked_kernel_solver`](@ref).
 
 # Returns
 
@@ -97,12 +95,10 @@ The Relativistic Value-at-Risk is the largest expected loss over a Kaniadakis ba
   - [`ERM_worst_case`](@ref)
   - [`worst_case_distribution`](@ref)
 """
-function RRM_worst_case(x::VecNum, slv::Slv_VecSlv, alpha::Number = 0.05,
+function RRM_worst_case(x::VecNum, slv::Option{<:Slv_VecSlv}, alpha::Number = 0.05,
                         kappa::Number = 0.3, w::Option{<:ObsWeights} = nothing)
     w = checked_observation_weights(w, x)
-    if isa(slv, VecSlv)
-        @argcheck(!isempty(slv), IsEmptyError("slv cannot be empty"))
-    end
+    slv = checked_kernel_solver(slv, :RRM_worst_case)
     sol = RRM_model(x, slv, alpha, kappa, w)
     if isnothing(sol) || last(sol) && !JuMP.has_duals(first(sol))
         return nothing
@@ -381,7 +377,7 @@ Keywords correspond to the struct's fields.
 
     (r::RelativisticValueatRisk)(x::VecNum)
 
-Computes the RLVaR of a portfolio returns vector `x` with [`RRM`](@ref), and returns `NaN` when no solver of `slv` solves the programme. The functor needs a solver: with `slv = nothing` the call raises a `MethodError`. [`factory`](@ref) fills `slv` from the solver of the optimiser.
+Computes the RLVaR of a portfolio returns vector `x` with [`RRM`](@ref), and returns `NaN` when no solver of `slv` solves the programme. The functor needs a solver: with `slv = nothing` the call raises an [`IsNothingError`](@ref) that names `slv`, see [`checked_kernel_solver`](@ref). [`factory`](@ref) fills `slv` from the solver of the optimiser.
 
 ## Arguments
 
@@ -1155,6 +1151,13 @@ risk_input_kind(::RelativisticValueatRiskRange) = NetReturnsInput()
 risk_input_kind(::RelativisticDrawdownatRisk) = NetReturnsInput()
 risk_input_kind(::RelativeRelativisticDrawdownatRisk) = NetReturnsInput()
 # Worst-Case Distribution — see `worst_case_distribution` and `worst_case_risk`.
+# The functor solves a programme with `slv`, and `nothing` there has no value-level reading.
+# An optimiser fills it through `factory` — see `functor_slots`.
+function functor_slots(r::Union{RelativisticValueatRisk, RelativisticValueatRiskRange,
+                                RelativisticDrawdownatRisk,
+                                RelativeRelativisticDrawdownatRisk})
+    return (; slv = r.slv)
+end
 function worst_case_distribution(r::RelativisticValueatRisk, x::VecNum)
     return RRM_worst_case(x, r.slv, r.alpha, r.kappa, r.w)
 end
