@@ -251,6 +251,42 @@ end
               """
     end
 
+    #=
+    Issue #2189. A run that the baseline does not hold had no rows, so `jet.jl refresh` checked
+    no file in it, and a file new to the tree entered that run with `reviewed > 0`.
+    =#
+    @testset "a new run checks the files new to the tree" begin
+        equal(a, b) = a["raw"] == b["raw"]
+        r(raw) = Dict("raw" => raw, "reviewed" => 0)
+        files = ["ext/new.jl", "src/a.jl", "src/moved.jl"]
+        recorded = Dict("main" => Dict("src/a.jl" => r(2), "src/gone.jl" => r(3)),
+                        "other" => Dict("src/a.jl" => r(1), "src/gone.jl" => r(4)))
+        measured = Dict("main" => Dict("src/a.jl" => r(2), "src/moved.jl" => r(3),
+                                       "ext/new.jl" => r(1)),
+                        "other" => Dict("src/a.jl" => r(1), "src/moved.jl" => r(4),
+                                        "ext/new.jl" => r(0)),
+                        "fresh" => Dict("src/a.jl" => r(5), "src/moved.jl" => r(6),
+                                        "ext/new.jl" => r(7)))
+        CH.set_scope!(nothing)
+        e = CH.entries_by_run(files, recorded, measured, equal)
+        @test e["main"].pairs == ["src/gone.jl" => "src/moved.jl"]
+        @test e["other"].pairs == ["src/gone.jl" => "src/moved.jl"]
+        @test e["main"].added == e["other"].added == ["ext/new.jl"]
+        # The new run checks the file new to the tree. The tree held `src/a.jl`, and the move of
+        # `src/gone.jl` is a rename, so both enter the new run with their measured numbers.
+        @test isempty(e["fresh"].pairs)
+        @test e["fresh"].added == ["ext/new.jl"]
+        # A file that one held run pairs as a rename is not new to the tree.
+        measured["other"]["src/moved.jl"] = r(9)
+        e = CH.entries_by_run(files, recorded, measured, equal)
+        @test e["other"].added == ["ext/new.jl", "src/moved.jl"]
+        @test e["fresh"].added == ["ext/new.jl"]
+        # With no run held, the refresh writes the first baseline, and no file is added.
+        e = CH.entries_by_run(files, Dict{String, Any}(), measured, equal)
+        @test sort(collect(keys(e))) == ["fresh", "main", "other"]
+        @test all(v -> isempty(v.pairs) && isempty(v.added), values(e))
+    end
+
     @testset "branch_files starts at the merge-base" begin
         dir, _, _, _ = fixture_repo()
         # `trunk` changed `src/b/two.jl` after `work` started. A diff against `trunk` itself

@@ -1619,6 +1619,41 @@ function pair_renames(dead, added, recorded, measured, equal)
     return pairs, left, right
 end
 
+"""
+    entries_by_run(files, recorded, measured, equal) -> Dict{String, NamedTuple}
+
+ADR 0074 over a baseline keyed by run. `recorded` and `measured` map each run to its rows, and the
+result maps each run of `measured` to `(; pairs, added)`.
+
+A run that the baseline holds pairs its renames with [`pair_renames`](@ref), and `added` holds the
+files that stay unpaired. A run that the baseline does not hold has no rows to pair with, so its
+`added` holds the files that every held run counts as added: the files new to the tree. A file that
+the tree held before enters the new run with its measured number. With no run held, the refresh
+writes the first baseline, and no file is added. Issue #2189.
+"""
+function entries_by_run(files, recorded, measured, equal)
+    out = Dict{String,
+               @NamedTuple{pairs::Vector{Pair{String, String}}, added::Vector{String}}}()
+    held = [run for run in keys(measured) if !isempty(get(recorded, run, Dict()))]
+    for run in held
+        rec = recorded[run]
+        missing_rows, dead_rows = set_differences(files, collect(keys(rec)))
+        pairs, _, added = pair_renames(dead_rows, missing_rows, rec, measured[run], equal)
+        out[run] = (; pairs, added)
+    end
+    new = if isempty(held)
+        String[]
+    else
+        sort!(collect(reduce(intersect, (out[r].added for r in held))))
+    end
+    for run in keys(measured)
+        if !haskey(out, run)
+            out[run] = (; pairs = Pair{String, String}[], added = copy(new))
+        end
+    end
+    return out
+end
+
 # --- refusing a refresh ----------------------------------------------------
 
 """
