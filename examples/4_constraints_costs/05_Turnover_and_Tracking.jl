@@ -26,8 +26,7 @@ distance the quantity you minimise.
     goal itself.
 =#
 
-using PortfolioOptimisers, CSV, TimeSeries, DataFrames, PrettyTables, Clarabel, StatsPlots,
-      GraphRecipes
+using PortfolioOptimisers, CSV, TimeSeries, DataFrames, PrettyTables, Clarabel, StatsPlots
 
 resfmt = (v, i, j) -> begin
     return if j == 1

@@ -83,7 +83,7 @@ pretty_table(DataFrame(["Assets" => rd.nx, "Sample mean" => pr_sample.mu,
                         "Equilibrium" => pr_eq.mu]); formatters = [mmtfmt],
              title = "Sample mean and equilibrium expected returns")
 
-using StatsPlots, GraphRecipes
+using StatsPlots
 # The sample mean of each asset.
 plot_mu(pr_sample, rd.nx)
 # The equilibrium expected return of each asset.

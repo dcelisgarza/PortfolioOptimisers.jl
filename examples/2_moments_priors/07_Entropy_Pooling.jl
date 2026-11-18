@@ -123,7 +123,7 @@ pretty_table(DataFrame(["Assets" => rd.nx, "Empirical" => pr_emp.mu,
              title = "Expected returns of every asset under the empirical prior and the entropy pooling posterior")
 
 # The expected returns of the entropy pooling posterior.
-using StatsPlots, GraphRecipes
+using StatsPlots
 plot_mu(pr_ep, rd.nx)
 
 #=

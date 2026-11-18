@@ -112,7 +112,7 @@ kfold_pred = cross_val_predict(mr, rd, kfold)
 We load the plot packages and draw four plots of the K-fold prediction.
 =#
 
-using StatsPlots, GraphRecipes
+using StatsPlots
 # The cumulative returns of the portfolio over all the KFold test windows.
 plot_portfolio_cumulative_returns(kfold_pred)
 # The distribution of the weight of every asset over the folds.

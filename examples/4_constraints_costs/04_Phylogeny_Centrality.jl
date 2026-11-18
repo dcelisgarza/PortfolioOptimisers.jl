@@ -35,8 +35,7 @@ constraint is. It is the `sep` field of a [`NetworkEstimator`](@ref), and sectio
 Section 4.1 shows which centrality scores it changes.
 =#
 
-using PortfolioOptimisers, CSV, TimeSeries, DataFrames, PrettyTables, Clarabel, StatsPlots,
-      GraphRecipes
+using PortfolioOptimisers, CSV, TimeSeries, DataFrames, PrettyTables, Clarabel, StatsPlots
 
 resfmt = (v, i, j) -> begin
     return if j == 1

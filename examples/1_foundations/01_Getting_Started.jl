@@ -110,7 +110,7 @@ pretty_table(DataFrame(:assets => rd.nx, :weights => res.w); formatters = [resfm
 We plot the composition of the portfolio, its cumulative returns, the distribution of its returns and its drawdowns.
 =#
 
-using StatsPlots, GraphRecipes
+using StatsPlots
 # The portfolio weights as a bar chart.
 plot_composition(res, rd)
 # The cumulative returns of the portfolio over the sample.

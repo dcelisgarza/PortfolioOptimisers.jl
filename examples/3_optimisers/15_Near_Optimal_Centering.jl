@@ -147,7 +147,7 @@ the extreme point occupies.
 The plot stacks the three allocations, with the extreme portfolio first.
 =#
 
-using StatsPlots, GraphRecipes
+using StatsPlots
 plot_stacked_bar_composition([res_mr, res_noc_u, res_noc_c], rd)
 
 #src ## Findings (authoring dogfooding — stripped from rendered docs)

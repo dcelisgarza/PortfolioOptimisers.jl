@@ -100,7 +100,7 @@ each. SubsetResampling averages over many smaller universes, so its largest weig
 than in the other three columns, and it holds more assets. The plot below stacks the four allocations.
 =#
 
-using StatsPlots, GraphRecipes
+using StatsPlots
 plot_stacked_bar_composition([res_bench, res_nco, res_stk, res_ssr], rd)
 
 #=

@@ -100,7 +100,7 @@ The plots show what the empirical prior and the factor prior with stepwise regre
 The empirical prior is the baseline.
 =#
 
-using StatsPlots, GraphRecipes
+using StatsPlots
 # The expected returns, the volatilities and the correlations of the empirical prior.
 plot_prior(prs[1], rd)
 # The same three panels for the factor prior with stepwise regression.
@@ -296,7 +296,7 @@ ress = optimise.(mrs)
 #=
 Each prior gets a composition plot and a frontier plot.
 =#
-using StatsPlots, GraphRecipes
+using StatsPlots
 # Empirical prior composition.
 plot_stacked_area_composition(ress[1].w, rd.nx;
                               kwargs = (; xlabel = "Portfolios", ylabel = "Weight",

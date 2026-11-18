@@ -225,7 +225,7 @@ all(isapprox(a.res.w, b.res.w) for (a, b) in zip(pred_wf_struct.pred, pred_wf_fn
 The composition plot shows the schedule's weights on every fold. On the last folds the cap
 binds, and the weight spreads over more assets.
 =#
-using StatsPlots, GraphRecipes
+using StatsPlots
 plot_composition(pred_wf_sched)
 #=
 ### 3.1 Previous weights

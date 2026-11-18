@@ -188,7 +188,7 @@ pretty_table(DataFrame(:strategy => ["defensive", "aggressive", "regime switch"]
                            [expected_risk(rk, pred_def), expected_risk(rk, pred_agg),
                             expected_risk(rk, pred_regime)]); formatters = [resfmt])
 #
-using StatsPlots, GraphRecipes
+using StatsPlots
 plot_portfolio_cumulative_returns(pred_regime)
 #=
 The composition plot shows the switch. The first fold has the capped weights of the defensive

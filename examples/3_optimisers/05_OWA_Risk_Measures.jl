@@ -149,7 +149,7 @@ so the portfolios differ.
     the mix of the orders.
 =#
 
-using StatsPlots, GraphRecipes
+using StatsPlots
 plot_stacked_bar_composition(results, rd)
 
 #=

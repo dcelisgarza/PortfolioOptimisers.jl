@@ -157,7 +157,7 @@ pretty_table(DataFrame(; :assets => rd.nx, :MinVar => res_bench.w, :NCO => res_n
 The plot stacks the same four allocations, with the plain minimum-variance fit first.
 =#
 
-using StatsPlots, GraphRecipes
+using StatsPlots
 plot_stacked_bar_composition([res_bench, res_nco, res_stk, res_ssr], rd)
 
 #src ## Findings (authoring dogfooding — stripped from rendered docs)

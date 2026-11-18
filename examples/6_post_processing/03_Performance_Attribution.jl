@@ -209,7 +209,7 @@ its weight, and the weights alone do not show it.
 The last plot draws the compounded wealth of the three portfolios over the sample.
 =#
 
-using StatsPlots, GraphRecipes
+using StatsPlots
 curves = [name => cumulative_returns(r, true) for (name, r) in port_ret]
 plot(cumulative_returns(port_ret[1][2], true); label = first(port_ret[1]), xlabel = "Day",
      ylabel = "Compounded wealth (×)", title = "Realised equity curves", legend = :topleft)

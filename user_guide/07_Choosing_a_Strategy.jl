@@ -62,7 +62,7 @@ We run three strategies from the table on the same data: equal weights, the mini
 the HRP bar has one colour for every asset.
 =#
 
-using PortfolioOptimisers, CSV, TimeSeries, Clarabel, StatsPlots, GraphRecipes
+using PortfolioOptimisers, CSV, TimeSeries, Clarabel, StatsPlots
 
 X = TimeArray(CSV.File(joinpath(@__DIR__, "../examples/SP500.csv.gz")); timestamp = :Date)[(end - 252):end]
 rd = prices_to_returns(X)

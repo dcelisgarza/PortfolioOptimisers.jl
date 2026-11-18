@@ -120,7 +120,7 @@ pretty_table(DataFrame(["Assets" => rd.nx, "Nominal" => res_nom.w,
              formatters = [resfmt], title = "Minimum-variance weights, nominal and robust")
 
 # The composition of the nominal, box-robust and ellipsoid-robust portfolios.
-using StatsPlots, GraphRecipes
+using StatsPlots
 plot_stacked_bar_composition([res_nom, res_box, res_ell], rd;
                              xticks = (1:3, ["Nominal", "Box", "Ellipsoid"]))
 

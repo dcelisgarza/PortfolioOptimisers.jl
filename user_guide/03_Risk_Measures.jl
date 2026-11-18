@@ -23,7 +23,7 @@ meanings are written by hand, and the docs build fails if a measure has none.
 =#
 
 using PortfolioOptimisers, CSV, TimeSeries, DataFrames, PrettyTables, InteractiveUtils,
-      StatsPlots, GraphRecipes
+      StatsPlots
 
 #=
 ## 1. How a measure is used

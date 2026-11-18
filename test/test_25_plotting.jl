@@ -93,6 +93,29 @@
         @test all(f -> any(m -> m.module === ext_of(f), methods(f)), verbs)
     end
 
+    @testset "A page loads GraphRecipes only to draw a network (#2186)" begin
+        # GraphRecipes serves `plot_network` alone, and it invalidates much of the compiled
+        # code of the caller. A reader copies the `using` line of a page, so a page that draws
+        # no network loads StatsPlots alone. R71 of #1817 found 62 pages that still loaded both.
+        root = pkgdir(PortfolioOptimisers)
+        pages = [joinpath(dir, f) for top in ("examples", "user_guide")
+                 for (dir, _, fs) in walkdir(joinpath(root, top))
+                 for f in fs if endswith(f, ".jl")]
+        @test length(pages) > 50
+        # `\s` also matches a line break, so the pattern reads a `using` line that continues.
+        loads_graphrecipes(text) = occursin(r"^using\s+(?:[\w.]+\s*,\s*)*GraphRecipes\b"m,
+                                            text)
+        draws_network(text) = occursin(r"\bplot_network\(", text)
+        stale(p) = (text = read(p, String);
+                    loads_graphrecipes(text) && !draws_network(text))
+        @test isempty([relpath(p, root) for p in pages if stale(p)])
+        # The pattern reads a `using` line that continues, and a call of `plot_network`.
+        @test loads_graphrecipes("x = 1\nusing PortfolioOptimisers, StatsPlots,\n      GraphRecipes\n")
+        @test !loads_graphrecipes("# `plot_network` also needs `GraphRecipes`.\n")
+        @test draws_network("plot_network(NetworkEstimator(), rd)")
+        @test !draws_network("[`plot_network`](@ref)")
+    end
+
     @testset "plot_portfolio_cumulative_returns" begin
         @test is_plot(plot_portfolio_cumulative_returns(w, X))
         @test is_plot(plot_portfolio_cumulative_returns(w, X; ts = 1:T))

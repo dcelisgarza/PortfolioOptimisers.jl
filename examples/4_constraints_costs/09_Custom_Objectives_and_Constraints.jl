@@ -32,8 +32,7 @@ guide](@ref user-guide-constraints-and-costs) gives a short summary of the same 
     fits.
 =#
 
-using PortfolioOptimisers, CSV, TimeSeries, DataFrames, PrettyTables, Clarabel, StatsPlots,
-      GraphRecipes
+using PortfolioOptimisers, CSV, TimeSeries, DataFrames, PrettyTables, Clarabel, StatsPlots
 using JuMP: JuMP
 
 resfmt = (v, i, j) -> begin

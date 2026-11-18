@@ -294,7 +294,7 @@ We plot the weights of the five portfolios side by side.
 =#
 
 # From left to right: fully invested, market neutral, short-only, leveraged, and a budget of 0.5.
-using StatsPlots, GraphRecipes
+using StatsPlots
 plot_stacked_bar_composition([res1, res2, res3, res4, res5], rd)
 
 #=

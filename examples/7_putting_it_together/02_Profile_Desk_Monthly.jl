@@ -28,7 +28,7 @@ Three of the limits in the
 =#
 
 using PortfolioOptimisers, CSV, TimeSeries, DataFrames, PrettyTables, Clarabel, HiGHS,
-      StatsPlots, GraphRecipes
+      StatsPlots
 
 resfmt = (v, i, j) -> begin
     return if j == 1

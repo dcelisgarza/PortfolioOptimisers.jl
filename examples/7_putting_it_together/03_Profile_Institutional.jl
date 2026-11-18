@@ -29,7 +29,7 @@ three shape this mandate's choices.
 =#
 
 using PortfolioOptimisers, CSV, TimeSeries, DataFrames, PrettyTables, Clarabel, HiGHS,
-      StatsPlots, GraphRecipes
+      StatsPlots
 
 resfmt = (v, i, j) -> begin
     return if j == 1

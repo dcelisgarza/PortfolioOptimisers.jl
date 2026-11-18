@@ -15,8 +15,7 @@ We compute one empirical prior and give it to every JuMP, clustering and meta-op
 optimisers take the returns directly.
 =#
 
-using PortfolioOptimisers, CSV, TimeSeries, DataFrames, PrettyTables, Clarabel, StatsPlots,
-      GraphRecipes
+using PortfolioOptimisers, CSV, TimeSeries, DataFrames, PrettyTables, Clarabel, StatsPlots
 
 resfmt = (v, i, j) -> begin
     return if j == 1

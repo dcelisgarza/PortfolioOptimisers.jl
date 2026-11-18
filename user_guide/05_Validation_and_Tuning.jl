@@ -12,7 +12,7 @@ minimal path. For the other splitters and searches, see the
 [validation and tuning examples](@ref example-cross-validation).
 =#
 
-using PortfolioOptimisers, CSV, TimeSeries, Clarabel, StatsPlots, GraphRecipes
+using PortfolioOptimisers, CSV, TimeSeries, Clarabel, StatsPlots
 
 X = TimeArray(CSV.File(joinpath(@__DIR__, "../examples/SP500.csv.gz")); timestamp = :Date)[(end - 252):end]
 rd = prices_to_returns(X)

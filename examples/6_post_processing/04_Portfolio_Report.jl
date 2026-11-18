@@ -24,8 +24,7 @@ This page builds one report from the three kinds of prediction:
     [`performance_summary`](@ref) when you want the numbers alone.
 =#
 
-using PortfolioOptimisers, CSV, TimeSeries, DataFrames, Clarabel, HiGHS, StatsPlots,
-      GraphRecipes
+using PortfolioOptimisers, CSV, TimeSeries, DataFrames, Clarabel, HiGHS, StatsPlots
 
 #=
 ## 1. The data

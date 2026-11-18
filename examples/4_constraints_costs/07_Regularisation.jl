@@ -144,7 +144,7 @@ ress = optimise.(nocs)
 For each regularisation we plot the weights along the frontier, and the frontier itself in the
 plane of variance and return, coloured by the ratio of return to risk.
 =#
-using StatsPlots, GraphRecipes
+using StatsPlots
 
 r = Variance()
 # Weights along the frontier with no regularisation.

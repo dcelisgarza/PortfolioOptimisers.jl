@@ -184,7 +184,7 @@ pretty_table(first(cmp, 8); formatters = [mmtfmt],
              title = "Posterior expected returns (first 8 assets)")
 
 # The posterior expected returns of the augmented model, for every asset.
-using StatsPlots, GraphRecipes
+using StatsPlots
 plot_mu(pr_aug, rd.nx)
 
 #=

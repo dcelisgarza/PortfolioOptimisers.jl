@@ -89,7 +89,7 @@ pretty_table(DataFrame(["Assets" => rd.nx; [k => p.mu for (k, p) in prs]]);
 estimator spread less than the bars of the sample mean.
 =#
 
-using StatsPlots, GraphRecipes
+using StatsPlots
 # The sample mean.
 plot_mu(prs[1].second, rd.nx)
 # Bayes-Stein shrinkage toward the volatility-weighted target.

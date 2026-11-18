@@ -22,7 +22,7 @@ This example applies cardinality and threshold constraints at four levels.
 =#
 
 using PortfolioOptimisers, CSV, TimeSeries, DataFrames, PrettyTables, Clarabel, HiGHS,
-      Pajarito, JuMP, StatsPlots, GraphRecipes
+      Pajarito, JuMP, StatsPlots
 
 resfmt = (v, i, j) -> begin
     if j == 1

@@ -17,8 +17,7 @@ last two minimises the risk. You can then compare the portfolio under each const
 same base portfolio.
 =#
 
-using PortfolioOptimisers, CSV, TimeSeries, DataFrames, PrettyTables, Clarabel, StatsPlots,
-      GraphRecipes
+using PortfolioOptimisers, CSV, TimeSeries, DataFrames, PrettyTables, Clarabel, StatsPlots
 
 resfmt = (v, i, j) -> begin
     return if j == 1

@@ -37,7 +37,7 @@ compares it with the [`InverseVolatility`](@ref) and the minimum-variance portfo
 =#
 
 using PortfolioOptimisers, CSV, TimeSeries, DataFrames, PrettyTables, Clarabel, HiGHS,
-      Pajarito, JuMP, StatsPlots, GraphRecipes, LinearAlgebra
+      Pajarito, JuMP, StatsPlots, LinearAlgebra
 
 resfmt = (v, i, j) -> begin
     if j == 1

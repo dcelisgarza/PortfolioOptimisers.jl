@@ -27,7 +27,7 @@ hold away from the target weights, and the smaller the account, the larger the m
 =#
 
 using PortfolioOptimisers, CSV, TimeSeries, DataFrames, PrettyTables, Clarabel, HiGHS,
-      StatsPlots, GraphRecipes
+      StatsPlots
 
 resfmt = (v, i, j) -> begin
     return if j == 1

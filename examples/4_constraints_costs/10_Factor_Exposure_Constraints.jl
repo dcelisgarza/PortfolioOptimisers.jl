@@ -36,7 +36,7 @@ accepts it and needs no knowledge of factors.
 =#
 
 using PortfolioOptimisers, CSV, TimeSeries, DataFrames, PrettyTables, Clarabel, StatsPlots,
-      GraphRecipes, LinearAlgebra
+      LinearAlgebra
 
 resfmt = (v, i, j) -> begin
     return if j == 1

@@ -21,8 +21,7 @@ charges for the positions, and section 5 names the charge on trades.
     assets, and `calc_net_returns` to find the return of a candidate book after costs.
 =#
 
-using PortfolioOptimisers, CSV, TimeSeries, DataFrames, PrettyTables, Clarabel, StatsPlots,
-      GraphRecipes
+using PortfolioOptimisers, CSV, TimeSeries, DataFrames, PrettyTables, Clarabel, StatsPlots
 
 resfmt = (v, i, j) -> begin
     return if j == 1

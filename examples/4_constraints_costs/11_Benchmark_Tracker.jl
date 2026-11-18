@@ -33,7 +33,7 @@ falls.
 =#
 
 using PortfolioOptimisers, CSV, TimeSeries, DataFrames, PrettyTables, HiGHS, JuMP,
-      StatsPlots, GraphRecipes
+      StatsPlots
 
 resfmt = (v, i, j) -> begin
     if j == 1

@@ -154,7 +154,7 @@ end
 We optimise the best estimator on the full data and plot its weights.
 =#
 
-using StatsPlots, GraphRecipes
+using StatsPlots
 
 res_gs1 = optimise(gs_res1.opt, rd)
 plot_composition(res_gs1, rd)

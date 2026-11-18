@@ -164,7 +164,7 @@ the high-return end toward the minimum-risk end. We plot the risk and return of 
 portfolio to show that path.
 =#
 
-using StatsPlots, GraphRecipes
+using StatsPlots
 
 plot([s[2] for s in sweep], [s[3] for s in sweep]; seriestype = :path,
      marker = (:circle, 5), xlabel = "Semi-standard deviation",

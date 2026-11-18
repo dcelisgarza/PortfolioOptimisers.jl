@@ -31,7 +31,7 @@ A classification raises none of the three questions that come up on the way.
 =#
 
 using PortfolioOptimisers, CSV, TimeSeries, DataFrames, PrettyTables, Clarabel, StatsPlots,
-      GraphRecipes, Statistics, LinearAlgebra, Clustering
+      Statistics, LinearAlgebra, Clustering
 
 #=
 ## 1. The universe and the table

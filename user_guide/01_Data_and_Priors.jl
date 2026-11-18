@@ -13,7 +13,7 @@ take views, see the
 =#
 
 using PortfolioOptimisers, CSV, TimeSeries, DataFrames, PrettyTables, LinearAlgebra,
-      StatsPlots, GraphRecipes
+      StatsPlots
 
 resfmt = (v, i, j) -> begin
     return if j == 1

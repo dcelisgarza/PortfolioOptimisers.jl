@@ -146,7 +146,7 @@ ys_A = [expected_return(ArithmeticReturn(), w, pr) for w in resA.w]
 xs_B = [expected_risk(rcvar, w, pr.X) for w in resB.w]
 ys_B = [expected_return(ArithmeticReturn(), w, pr) for w in resB.w]
 
-using StatsPlots, GraphRecipes
+using StatsPlots
 
 plot(xs_A, ys_A; seriestype = :scatter, marker = (:circle, 5),
      label = "Minimum risk above a return floor", xlabel = "CVaR",

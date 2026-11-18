@@ -39,7 +39,7 @@ check every claim against it.
 =#
 
 using PortfolioOptimisers, StableRNGs, Statistics, LinearAlgebra, Dates, PrettyTables,
-      DataFrames, StatsPlots, GraphRecipes
+      DataFrames, StatsPlots
 
 numfmt = (v, i, j) -> begin
     return isa(v, AbstractFloat) ? round(v; sigdigits = 4) : v

@@ -37,7 +37,7 @@ section 4 covers its settings.
 =#
 
 using PortfolioOptimisers, CSV, TimeSeries, DataFrames, PrettyTables, Clarabel, StatsPlots,
-      GraphRecipes, Statistics, LinearAlgebra, Clustering
+      Statistics, LinearAlgebra, Clustering
 
 resfmt = (v, i, j) -> begin
     return if j == 1

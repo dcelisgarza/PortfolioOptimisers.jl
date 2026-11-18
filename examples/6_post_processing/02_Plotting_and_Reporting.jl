@@ -18,7 +18,7 @@ This page draws them for one pair of portfolios.
     several views in one call.
 =#
 
-using PortfolioOptimisers, CSV, TimeSeries, Clarabel, StatsPlots, GraphRecipes
+using PortfolioOptimisers, CSV, TimeSeries, Clarabel, StatsPlots
 
 #=
 ## 1. The portfolios
