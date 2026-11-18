@@ -35,7 +35,7 @@ A `prior(...)` reference in a skewness or kurtosis view reads the sample statist
 
     Read the result, not the flag. Measure the posterior with [`ConditionalValueatRisk`](@ref) at the `alpha` of the view, and compare it with the target of the view. For a result that repeats, give a tighter `Optim.Options` in the `args` of the optimiser. [`OptimEntropyPooling`](@ref) shows the block. The library reads no tolerance on the residual, because a threshold that decides if a solve succeeded is a policy that this library does not set.
 
-    With more than one view, the default `dm_opt` stops when the candidate value at risk moves by less than `1e-4`. A target whose value at risk is below zero, or a view that lowers the CVaR beside a view that raises it, can then miss by more than `1e-5` relative. In one measurement on five pairs of views, the largest miss was `4.2e-5` relative under the default. Under `dm_opt = OptimEntropyPooling(; args = (Optim.Fminbox(), Optim.Options(; outer_x_abstol = 1e-6, x_abstol = 1e-6)))`, it was `1.1e-5`, at 3 to 9 times the time. A tighter rule than `1e-6` gave no smaller miss, because the inner solves set the floor. For a smaller miss than that floor, give `opt` a tighter rule too.
+    With more than one view, the default `dm_opt` stops when the candidate value at risk moves by less than `1e-4`. A target whose value at risk is below zero, or a view that lowers the CVaR beside a view that raises it, can then miss by more than `1e-5` relative. In one measurement on five pairs of views, the largest miss was `4.2e-5` relative under the default. Under `dm_opt = OptimEntropyPooling(; args = (Optim.Fminbox(), Optim.Options(; outer_x_abstol = 1e-6, x_abstol = 1e-6)))`, it was `1.1e-5`, at 3 to 9 times the time. On ten scenarios, a pair with an asset whose every loss is above zero missed by `1.7e-3` relative under the default, and by `5.5e-6` under the tighter rule. A tighter rule than `1e-6` gave no smaller miss, because the inner solves set the floor. For a smaller miss than that floor, give `opt` a tighter rule too.
 
 # Algorithm
 
@@ -685,7 +685,7 @@ Solve the entropy pooling problem with conditional value at risk (CVaR) views.
 
 The search is over the value at risk levels `etas`, one for each searched view. A candidate is in `[lo, B]`, where `lo` is the lowest loss of its asset on the support. A target is not negative, but the value at risk is below zero when the posterior puts less than `alpha` on the losses above zero. This search is a continuous relaxation of the recursive algorithm, which searches over discrete tail sizes. It gets the same target, and it also takes more than one view.
 
-The bracket for one view stops a small distance inside `B`, at `B * (1 - sqrt(eps))`. At `B`, the constraint needs a posterior tail contribution of exactly zero. No posterior with all its weights above zero has such a contribution, so the problem at `B` is degenerate and its dual is unbounded. `Roots` evaluates the two ends of a bracket before it searches, so without the shrink each search for one view solves that problem once. The root is between about a third and two thirds of `B`, so the shrunk bracket holds it. The bracket starts at zero when the residual at zero is positive. Otherwise the root is at or below zero, and the bracket is `[lo, 0]`.
+The bracket for one view stops a small distance inside `B`, at `B * (1 - sqrt(eps))`. At `B`, the constraint needs a posterior tail contribution of exactly zero. No posterior with all its weights above zero has such a contribution, so the problem at `B` is degenerate and its dual is unbounded. `Roots` evaluates the two ends of a bracket before it searches, so without the shrink each search for one view solves that problem once. The root is between about a third and two thirds of `B`, so the shrunk bracket holds it. The bracket starts at zero when the residual at zero is positive. Otherwise the root is at or below zero, and the bracket is `[lo, 0]`. When every loss of the asset on the support is above zero, `lo` is above zero, and the bracket starts at `lo`.
 
 # Mathematical definition
 
@@ -717,7 +717,7 @@ Where:
  1. Read the loss columns `X`, the targets `B`, the levels `alphas`, the search `d_opt` and the block `edge` from `cvv`.
  2. Delete the key `:cvar_ineq` from `epc`, and write `edge` under it when `edge` is not `nothing`. The key holds the rows of the views at the worst loss, the inequality of [`ep_cvar_views_setup`](@ref). When no view needs a search, solve `epc` once with [`entropy_pooling`](@ref), and return the result.
  3. Define `func(etas)`. At the candidate `etas`, it writes the second line above into `epc` under the key `:cvar_eq`. It solves the whole constraint set with [`entropy_pooling`](@ref) into `wi`, and returns `wi` and the residual of the third line. For one view, the residual is the posterior tail mass minus `alpha`. For more than one view, it is the [`norm_error`](@ref) over the views of the posterior conditional value at risk minus the target.
- 4. Search for the value at risk `res`. For one view, calculate the residual of `func` at zero. When it is positive, `Roots.find_zero` finds the root of the residual over `[0, B[1] * (1 - sqrt(eps))]`. Otherwise it finds the root over `[lo, 0]`. The search reuses the residual at zero, and solves no inner problem there again. For more than one view, `Optim.optimize` minimises the residual over the box `[lo, B]` from the start `0.5 * B`. After the start, a trial point at which the inner solve fails gets the residual `Inf`, and the line search rejects that point.
+ 4. Search for the value at risk `res`. For one view, calculate the residual of `func` at `z = max(0, lo)`. When it is positive, `Roots.find_zero` finds the root of the residual over `[z, B[1] * (1 - sqrt(eps))]`. Otherwise it finds the root over `[lo, z]`. The search reuses the residual at `z`, and solves no inner problem there again. For more than one view, `Optim.optimize` minimises the residual over the box `[lo, B]` from the start `0.5 * (max(lo, 0) + B)`, which is `0.5 * B` when `lo` is at or below zero. After the start, a trial point at which the inner solve fails, or a trial point outside the box, gets the residual `Inf`, and the line search rejects that point.
  5. Call `func(res)` one more time, and return the posterior probability weights that it calculates.
 
 # Arguments
@@ -729,8 +729,8 @@ Where:
 
 # Validation
 
-  - Every candidate value at risk is in `[lo, B]`. A candidate outside the box raises a `DomainError`.
-  - The search must succeed. When `Roots.find_zero` or `Optim.optimize` raises an error, this method raises an `ErrorException` that holds it. An inner [`entropy_pooling`](@ref) solve that fails at one point of the search for one view is such an error. With more than one view, the search rejects a trial point after the start at which the inner solve fails, so that failure does not raise. A failed inner solve at the start `0.5 * B` raises. When `Optim.converged` reports that `Optim.optimize` failed, this method raises an `ErrorException`. A failed inner solve at the last call, at the minimiser, raises its own error.
+  - Every candidate value at risk is in `[lo, B]`. A candidate outside the box raises a `DomainError`. With more than one view, the search rejects a trial point outside the box after the start, so that point does not raise.
+  - The search must succeed. When `Roots.find_zero` or `Optim.optimize` raises an error, this method raises an `ErrorException` that holds it. An inner [`entropy_pooling`](@ref) solve that fails at one point of the search for one view is such an error. With more than one view, the search rejects a trial point after the start at which the inner solve fails, so that failure does not raise. A failed inner solve at the start of the box raises. When `Optim.converged` reports that `Optim.optimize` failed, this method raises an `ErrorException`. A failed inner solve at the last call, at the minimiser, raises its own error.
   - The method does not detect an infeasible view set. The residual of this search is the posterior tail mass minus `alpha`. A posterior with almost all of its mass on one observation has a small residual, but it can miss the view by a large amount. The warning of [`MeucciEntropyPoolingPrior`](@ref) states how to find such a result.
   - The method does not detect a missed feasible view. The search reads its own residual, not how closely the inner [`entropy_pooling`](@ref) solve meets the constraint of the view. With more than one view, `Optim.converged` accepts a solve that stopped on the step in `x` and not on stationarity. The warning of [`MeucciEntropyPoolingPrior`](@ref) states the mechanism, the measured sizes, and how to read the result.
 
@@ -802,15 +802,16 @@ function ep_cvar_views_solve!(cvv::CvarViewSearch, epc::AbstractDict,
         #! sits between 0.32 and 0.64 of `B[1]`, so the shrink does not move it. See issue
         #! #574.
         hi = B[1] * (one(eltype(B)) - sqrt(eps(eltype(B))))
-        z = zero(eltype(B))
+        #! The residual at `z` picks the bracket. A residual at or below zero puts at most
+        #! `alpha` on the losses above zero, so the root is in `[lo, 0]`. The closure reuses
+        #! that residual, so a root above zero costs no inner solve more than the bracket
+        #! `[0, hi]` did. When every loss of the support is above zero, `lo` is above zero,
+        #! and zero is outside the box, so `z` is `lo`. See issue #2160.
+        z = max(zero(eltype(B)), lo[1])
         try
-            #! The residual at zero picks the bracket. A residual at or below zero puts at
-            #! most `alpha` on the losses above zero, so the root is in `[lo, 0]`. The closure
-            #! reuses that residual, so a root above zero costs no inner solve more than the
-            #! bracket `[0, hi]` did. See issue #2160.
             f0 = func([z])[2]
-            ab = ifelse(f0 > z, (z, hi), (lo[1], z))
-            [Roots.find_zero(x -> iszero(x) ? f0 : func(x)[2], ab, d_opt.args...;
+            ab = ifelse(f0 > zero(f0), (z, hi), (lo[1], z))
+            [Roots.find_zero(x -> x == z ? f0 : func(x)[2], ab, d_opt.args...;
                              d_opt.kwargs...)]
         catch e
             throw(ErrorException("CVaR entropy pooling optimisation failed. Relax the view, increase alpha, use different solver parameters, use VaR views instead, or use a different prior.\n$(e)"))
@@ -824,7 +825,8 @@ function ep_cvar_views_solve!(cvv::CvarViewSearch, epc::AbstractDict,
         #! point at which the inner solve itself fails. A failed trial point answers `Inf`:
         #! `HagerZhang` shrinks a step whose value or slope is not finite, so the search
         #! moves on. Only the failure of the inner solve is caught, which every inner solver
-        #! raises as an `ErrorException`. A failure before the first point that solves still
+        #! raises as an `ErrorException`, and the `DomainError` of a point outside the box.
+        #! A failure before the first point that solves still
         #! raises: the first point is the start, and with no finite value there `Fminbox`
         #! raises an error about its barrier, and the message below would hold that error and
         #! not the failure of the inner solve. The last call `func(res)` stays strict, so a
@@ -833,13 +835,17 @@ function ep_cvar_views_solve!(cvv::CvarViewSearch, epc::AbstractDict,
         #! wrong sign and not a rejected point, so that branch keeps the error. See issue
         #! #2017.
         solved = Ref(false)
+        #! The line search of `Fminbox` can also step out of the box after the start: on ten
+        #! scenarios, a trial point exceeded `B[1]` by 1e-4 of it, and the guard of `func`
+        #! raised its `DomainError`. Such a point is rejected as a failed inner solve is. See
+        #! issue #2160.
         trial = function (x)
             try
                 err = func(x)[2]
                 solved[] = true
                 return err
             catch e
-                if !(solved[] && e isa ErrorException)
+                if !(solved[] && e isa Union{ErrorException, DomainError})
                     rethrow()
                 end
                 return typemax(eltype(B))
@@ -847,8 +853,11 @@ function ep_cvar_views_solve!(cvv::CvarViewSearch, epc::AbstractDict,
         end
         res = try
             #! The box starts at `lo` for the reason that the bracket of one view does. A box
-            #! from zero missed a view of a value at risk below zero with no error.
-            Optim.optimize(trial, lo, B, 0.5 * B, d_opt.args...; d_opt.kwargs...)
+            #! from zero missed a view of a value at risk below zero with no error. The start
+            #! is the midpoint of `[max(lo, 0), B]`, which is `0.5 * B` when `lo` is at or
+            #! below zero, and inside the box when every loss of an asset is above zero.
+            Optim.optimize(trial, lo, B, 0.5 * (max.(lo, zero(eltype(lo))) .+ B),
+                           d_opt.args...; d_opt.kwargs...)
         catch e
             throw(ErrorException("CVaR entropy pooling optimisation failed. Relax the views, increase alpha, use different solver parameters, use VaR views instead, reduce the number of CVaR views, or use a different prior.\n$(e)"))
         end

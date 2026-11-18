@@ -1041,6 +1041,45 @@ end
     @test isapprox(cvar(a, pr.w, X201[:, 1]), t; rtol = 1e-4)
     @test isapprox(cvar(a, pr.w, X201[:, 3]), v; rtol = 1e-4)
     @test ValueatRisk(; alpha = a, w = pr.w)(X201[:, 1]) < 0
+    #=
+    When every loss of an asset on the support is above zero, its lowest loss `lo` is above
+    zero. The search of one view read its residual at zero, outside `[lo, B]`, and the box of
+    two views started at `0.5 * B`, which is below `lo` when the losses are shifted by 0.03.
+    Both raised. One view now reads its residual at `lo`, and the box starts at the midpoint
+    of `[lo, B]`. The parent of #2160 solved the one view of the shift 0.001 to the same value.
+    =#
+    for sh in (0.001, 0.03), a in (0.2, 0.3)
+        Xs = copy(X201[1:10, :])
+        Xs[:, 1] .= -abs.(Xs[:, 1]) .- sh
+        rds = ReturnsResult(; nx = rd.nx, X = Xs)
+        t = 0.5 * (cvar(a, nothing, Xs[:, 1]) + maximum(-Xs[:, 1]))
+        v = 0.5 * (cvar(a, nothing, Xs[:, 3]) + maximum(-Xs[:, 3]))
+        pr = prior(MeucciEntropyPoolingPrior(; sets = sets,
+                                             cvar_views = view_at(a, "AAPL == $t")), rds)
+        @test isapprox(cvar(a, pr.w, Xs[:, 1]), t; rtol = 1e-8)
+        pr = prior(MeucciEntropyPoolingPrior(; sets = sets,
+                                             cvar_views = view_at(a,
+                                                                  ["AAPL == $t",
+                                                                   "$(rd.nx[3]) == $v"])),
+                   rds)
+        @test isapprox(cvar(a, pr.w, Xs[:, 1]), t; rtol = 1e-3)
+        @test isapprox(cvar(a, pr.w, Xs[:, 3]), v; rtol = 1e-3)
+    end
+    # On this pair, a trial point of the line search of `Fminbox` exceeds the target of the
+    # first view. The search rejects that point, and does not raise. The default stopping
+    # rule misses the second view by 1.7e-3 here, as the warning of the estimator states.
+    Xs = copy(X201[1:10, :])
+    Xs[:, 1] .= -abs.(Xs[:, 1]) .- 0.001
+    a = 0.2
+    t = 0.5 * (cvar(a, nothing, Xs[:, 1]) + maximum(-Xs[:, 1]))
+    v = 1.1 * cvar(a, nothing, Xs[:, 3])
+    pr = prior(MeucciEntropyPoolingPrior(; sets = sets,
+                                         cvar_views = view_at(a,
+                                                              ["AAPL == $t",
+                                                               "$(rd.nx[3]) == $v"])),
+               ReturnsResult(; nx = rd.nx, X = Xs))
+    @test isapprox(cvar(a, pr.w, Xs[:, 1]), t; rtol = 1e-3)
+    @test isapprox(cvar(a, pr.w, Xs[:, 3]), v; rtol = 1e-2)
 end
 
 # #573: `Optim`'s default stopping rule leaves the entropy pooling dual short of its own
