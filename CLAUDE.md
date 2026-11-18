@@ -26,7 +26,9 @@ name.
 
 - **Work in your own worktree.** Create it with the `EnterWorktree` tool before your first edit.
   Commit there, rebase onto `dev`, merge into the local `dev` as a fast-forward, and push `dev` to
-  `origin`, never the worktree branch. Then leave with `ExitWorktree` and delete the branch.
+  `origin`, never the worktree branch. Then leave with `ExitWorktree` `remove`. Its commit count
+  compares with `main`, so it always reports hundreds of commits. When `git status --short` is
+  empty and `git branch -r --contains HEAD` lists `origin/dev`, pass `discard_changes: true`.
 - **Never commit a change you did not make.** Check `git status`, and stage the files you edited
   by name, never with `git add -A`.
 - **Do not edit a file at the same time as another session.** The session that finishes last
