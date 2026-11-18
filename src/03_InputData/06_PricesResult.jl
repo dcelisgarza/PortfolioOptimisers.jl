@@ -252,7 +252,7 @@ The method that Julia selects is the algorithm. The timestamp methods do the wor
 
  1. `i` and `j` are both `Colon`: return `pr` itself. No view is built.
 
- 2. `i` is a vector of timestamps and `j` is a `Colon`: replace `i` with the timestamps of `X` that it selects, through [`timestamp_positions`](@ref). Then index `X`, `F`, `B`, `E` and `iv` by the timestamps `i`. Recover the rows of a time-varying Asset Panel from the kept timestamps with [`feature_row_indices`](@ref), and view the panel on that observation axis with [`port_opt_view`](@ref). A static panel has no observation axis and ignores the row index. View the Listing Span at the same timestamps with [`listing_span_view`](@ref). Pass `ivpa` through unchanged, because the asset index does not reach it. Rebuild the [`PricesResult`](@ref).
+ 2. `i` is a vector of timestamps and `j` is a `Colon`: give `i` in a form that indexes `X`, with [`clock_selection`](@ref). A `Vector` in the element type of the timestamps of `X` passes as it is, and another type goes through [`timestamp_positions`](@ref). Then index `X`, `F`, `B`, `E` and `iv` by the timestamps `i`. Recover the rows of a time-varying Asset Panel from the kept timestamps with [`feature_row_indices`](@ref), and view the panel on that observation axis with [`port_opt_view`](@ref). A static panel has no observation axis and ignores the row index. View the Listing Span at the same timestamps with [`listing_span_view`](@ref). Pass `ivpa` through unchanged, because the asset index does not reach it. Rebuild the [`PricesResult`](@ref).
 
  3. `i` is a vector of timestamps and `j` is a vector of asset positions or asset names:
 
@@ -318,8 +318,7 @@ function port_opt_view(pr::PricesResult, ::Colon, ::Colon)
 end
 function port_opt_view(pr::PricesResult, i::AbstractVector{<:Dates.AbstractTime},
                        ::Colon = :)
-    tsx = TimeSeries.timestamp(pr.X)
-    i = tsx[timestamp_positions(tsx, i)]
+    i = clock_selection(TimeSeries.timestamp(pr.X), i)
     X = pr.X[i]
     F = isnothing(pr.F) ? nothing : pr.F[i]
     B = isnothing(pr.B) ? nothing : pr.B[i]
@@ -334,8 +333,7 @@ function port_opt_view(pr::PricesResult, i::AbstractVector{<:Dates.AbstractTime}
 end
 function port_opt_view(pr::PricesResult, i::AbstractVector{<:Dates.AbstractTime},
                        j::AbstractVector)
-    tsx = TimeSeries.timestamp(pr.X)
-    i = tsx[timestamp_positions(tsx, i)]
+    i = clock_selection(TimeSeries.timestamp(pr.X), i)
     nx = string.(TimeSeries.colnames(pr.X))
     j = label_positions(nx, j, "asset")
     X = pr.X[i][TimeSeries.colnames(pr.X)[j]]

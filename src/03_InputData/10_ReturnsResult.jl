@@ -484,13 +484,14 @@ Each field that is `nothing` stays `nothing`. No step copies data.
 # Arguments
 
   - `rd`: A `ReturnsResult` object containing asset and/or factor returns.
-  - `i`: The observations to view: integer positions, a range, a `Colon`, or a vector of timestamps. A timestamp that `ts` does not hold selects no row, and the rows keep their clock order, as in the timestamp view of a [`PricesResult`](@ref).
+  - `i`: The observations to view: integer positions, a range, a `Colon`, one timestamp, or a vector of timestamps. A timestamp of a vector that `ts` does not hold selects no row, and the rows keep their clock order, as in the timestamp view of a [`PricesResult`](@ref). One timestamp selects the one observation at that timestamp, and the view keeps its matrix shape.
   - `j`: The assets to view: integer positions, a range, a `Colon`, or a vector of asset names.
   - `k`: The factors to view: integer positions, a range, a `Colon`, or a vector of factor names.
 
 # Validation
 
   - `ts` is not `nothing` when `i` holds timestamps, and `i` holds no names. Raises an `ArgumentError`. See [`timestamp_positions`](@ref).
+  - The timestamps of `i` compare with `ts`, and `ts` holds `i` when `i` is one timestamp. Raises an `ArgumentError`. See [`assert_timestamp_type`](@ref).
   - Every name of `j` is in `nx`, and every name of `k` is in `nf`. Raises an `ArgumentError`. See [`label_positions`](@ref).
   - A window that keeps no observation or no asset raises the `IsEmptyError` of the [`ReturnsResult`](@ref) constructor.
 

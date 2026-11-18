@@ -208,7 +208,7 @@ end
 
 Check that a timestamp of type `S`, which selects or bounds observations, compares with timestamps of type `T`.
 
-A comparison of two timestamps of different types goes through the promotion of their types. Dates promotes a `Date` and a `DateTime`, so a `Date` selects the observations at midnight of `DateTime` timestamps. Other pairs do not promote. A `DateTime` and a `ZonedDateTime` of TimeZones.jl is such a pair, and TimeZones.jl refuses its promotion on purpose, because a naive time names no instant. Without this check, the comparison fails with an error about promotion that does not name the argument.
+A comparison of two timestamps of different types goes through the promotion of their types. Dates promotes a `Date` and a `DateTime`, so a `Date` selects the observations at midnight of `DateTime` timestamps. Other pairs do not promote. A `DateTime` and a `ZonedDateTime` of TimeZones.jl is such a pair. A naive time names no instant, so TimeZones.jl defines no conversion between the two, and its promotion rule for the pair raises an error, which stops the comparison fallback of Dates from a recursion. Without this check, the comparison fails with an error about promotion that does not name the argument.
 
 # Algorithm
 
@@ -323,6 +323,46 @@ function timestamp_positions(ts::AbstractVector, i::VecDate)
     assert_timestamp_type(eltype(ts), eltype(i), :i)
     s = sort(i)
     return findall(t -> insorted(t, s), ts)
+end
+"""
+    clock_selection(ts::AbstractVector{T}, i::Vector{T}) where {T <: Dates.AbstractTime} -> Vector{T}
+    clock_selection(ts::AbstractVector, i::VecDate) -> AbstractVector
+
+Give the timestamps that index a `TimeArray` whose clock is `ts`, for the observation index `i` of a view of a [`PricesResult`](@ref).
+
+`getindex` of a `TimeArray` takes only a `Vector` in the element type of its timestamps. It keeps the timestamps that the clock holds, in clock order. A `Vector` in that type therefore indexes the `TimeArray` as it is, and the type check of [`timestamp_positions`](@ref) has nothing to refuse. The integer view of a `PricesResult` and the price filters pass such a `Vector`. A search through [`timestamp_positions`](@ref) would only repeat the match of `getindex`, at up to twice the cost of the view. Another element type, a view or a range goes through [`timestamp_positions`](@ref), which checks the type and matches across it. So a `Date` window of `DateTime` prices selects the observations at midnight.
+
+# Algorithm
+
+The method that Julia selects is the algorithm.
+
+ 1. `i` is a `Vector` in the element type of `ts`: return `i`.
+ 2. Otherwise: find the positions of `ts` that `i` selects with [`timestamp_positions`](@ref), and return the timestamps of `ts` at them.
+
+# Arguments
+
+  - `ts`: The timestamps of the asset prices, the clock of the view.
+  - `i`: The timestamps that select the observations of the view.
+
+# Validation
+
+  - The timestamps of `i` compare with `ts`, outside of step 1. Raises an `ArgumentError`. See [`assert_timestamp_type`](@ref).
+
+# Returns
+
+  - The timestamps that index the `TimeArray`: `i` itself in step 1, and the timestamps of `ts` that `i` selects otherwise.
+
+# Related
+
+  - [`timestamp_positions`](@ref)
+  - [`port_opt_view`](@ref)
+  - [`PricesResult`](@ref)
+"""
+function clock_selection(::AbstractVector{T}, i::Vector{T}) where {T <: Dates.AbstractTime}
+    return i
+end
+function clock_selection(ts::AbstractVector, i::VecDate)
+    return ts[timestamp_positions(ts, i)]
 end
 """
     each_panel_field(pnl::AssetPanel{Nothing}) -> Tuple{}

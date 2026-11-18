@@ -83,6 +83,26 @@ using Dates, TimeZones
         @test PV(rdd, Date(2020, 3, 6), :).X == rdd.X[3:3, :]
     end
 
+    @testset "a Vector in the type of the clock indexes the prices as it is" begin
+        # The integer view of a PricesResult and the price filters pass a Vector of the
+        # timestamps of the clock. A second match through timestamp_positions repeated the
+        # match of `getindex`, at up to twice the cost of the view, so that Vector passes
+        # unchanged. Another type, a view or a range is matched and checked.
+        CS = PortfolioOptimisers.clock_selection
+        tsd = DateTime(2020, 3, 3) .+ Day.(0:9)
+        sel = tsd[[2, 5]]
+        @test CS(tsd, sel) === sel
+        zsel = ts[[1, 3]]
+        @test CS(ts, zsel) === zsel
+        @test CS(tsd, [Date(2020, 3, 4), Date(2020, 3, 6)]) == tsd[[2, 4]]
+        @test CS(tsd, view(tsd, [5, 2])) == tsd[[2, 5]]
+        @test CS(tsd, tsd[2]:Day(2):tsd[6]) == tsd[[2, 4, 6]]
+        @test_throws ArgumentError CS(ts, [DateTime(2020, 3, 5, 12)])
+        pr = PricesResult(; X = TimeArray(tsd, values(P), [:a, :b, :c]))
+        @test values(PV(pr, 2:3).X) == values(P)[2:3, :]
+        @test values(PV(pr, [4, 2], [3]).X) == values(P)[[2, 4], 3:3]
+    end
+
     @testset "a walk-forward split of zoned timestamps keeps the wall clock under a calendar period" begin
         # Thirty daily observations at noon local time, across the change on 2020-03-08.
         tsz = ZonedDateTime(2020, 2, 25, 12, tz) .+ Day.(0:29)
