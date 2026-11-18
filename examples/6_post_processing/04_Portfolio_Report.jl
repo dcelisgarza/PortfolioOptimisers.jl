@@ -110,7 +110,7 @@ figures, `rf` is the risk-free rate of one day, and `measures` adds two risk mea
 `groups` labels each prediction, and the HTML file shows or hides the portfolios of each group.
 `allocs` gives the finite allocation of each prediction, or `nothing`.
 
-[`default_report_figures`](@ref) gives the default figures when `GraphRecipes` and `StatsPlots` are loaded:
+[`default_report_figures`](@ref) gives the default figures when `StatsPlots` is loaded:
 `overview_figures` draws every prediction on one figure, and `entry_figures` draws one
 prediction. The fields take the names of the keywords of `portfolio_report`, so `figs...` passes
 both, and a keyword after it replaces one. A figure of your own is a pair `caption => f`. An entry

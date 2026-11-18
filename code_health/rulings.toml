@@ -1187,6 +1187,21 @@ message = "no matching method found `convert(::Type{Bool}, ::Nothing)` (1/4 unio
 count = 1
 rationale = "a-union-split-that-loses-the-type-of-its-value"
 
+# `plot_network` calls `graphplot(A; names, node_weights, title, kwargs...)`, the form that the
+# GraphRecipes manual gives for an adjacency matrix. The recipe runs through the series pipeline of
+# Plots, and JET reports `isless(::Nothing, ::Int64)` in `Plots._update_series_attributes!`
+# (`src/args.jl`) under keyword arguments of an abstract type. The `plots_ext` run holds the same
+# report on `ext/PortfolioOptimisersPlotsExt/01_CumulativeReturnsPlots.jl`, because JET reports one
+# site once, at its first caller. The report reached this file when `plot_network` moved into an
+# extension of its own, under #2186. Measured on 2026-11-18 with Julia 1.13.4, JET 0.13.3,
+# GraphRecipes 0.5.16 and Plots 1.41.4: the report is the only one of the file.
+[[dismissal]]
+file = "ext/PortfolioOptimisersGraphRecipesExt.jl"
+kind = "MethodErrorReport"
+message = "no matching method found `isless(::Nothing, ::Int64)`"
+count = 1
+rationale = "a-form-its-package-recommends"
+
 # --- performance dismissals ------------------------------------------------
 #
 # ADR 0175. A row with `code` covers the one Finding whose printed code matches; a row without it

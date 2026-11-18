@@ -1027,6 +1027,16 @@ end
         gone = getpid(p)
         wait(p)
         @test JS.rss_gb(gone) == 0
+        # The parent PID of a `stat` text, whose name can hold spaces and a `)`. A process that
+        # stopped after the listing of `/proc` gives an empty text, which raised a `MethodError`
+        # in `rss_gb` and stopped the run that waited for a slot (#2186).
+        @test JS.stat_parent("123 (a b) c) S 45 6 7") == 45
+        if isfile("/proc/self/stat")
+            @test JS.stat_parent(read("/proc/self/stat", String)) ==
+                  ccall(:getppid, Cint, ())
+        end
+        @test JS.stat_parent("") === nothing
+        @test JS.stat_parent("123 (x) S") === nothing
         # A holder is found whatever its slot index, and a dead one is not.
         write(joinpath(dir, "slot-7.pid"), "$(getpid()) self\n")
         write(joinpath(dir, "slot-2.pid"), "$gone gone\n")

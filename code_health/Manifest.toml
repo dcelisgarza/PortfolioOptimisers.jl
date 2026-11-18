@@ -1466,7 +1466,8 @@ version = "0.34.0"
 weakdeps = ["GraphRecipes", "StatsPlots"]
 
     [deps.PortfolioOptimisers.extensions]
-    PortfolioOptimisersPlotsExt = ["GraphRecipes", "StatsPlots"]
+    PortfolioOptimisersGraphRecipesExt = ["GraphRecipes", "StatsPlots"]
+    PortfolioOptimisersPlotsExt = "StatsPlots"
 
 [[deps.PositiveFactorizations]]
 deps = ["LinearAlgebra"]

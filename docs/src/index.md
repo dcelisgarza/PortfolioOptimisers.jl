@@ -101,7 +101,7 @@ This section loads a year of prices, finds the portfolio of minimum variance, tu
 
 We first load the packages that the example needs.
 
-- `StatsPlots` and `GraphRecipes` load the plotting extension.
+- `StatsPlots` loads the plotting extension.
 - `Clarabel` and `HiGHS` are the solvers.
 - `CSV`, `TimeSeries` and `DataFrames` load and hold the price data.
 - `PrettyTables` prints the tables.
@@ -109,7 +109,7 @@ We first load the packages that the example needs.
 The two functions `fmt1` and `fmt2` format the columns of the two tables that the example prints.
 
 ```@example 0_index
-using PortfolioOptimisers, StatsPlots, GraphRecipes
+using PortfolioOptimisers, StatsPlots
 using Clarabel, HiGHS
 using CSV, TimeSeries, DataFrames
 using PrettyTables

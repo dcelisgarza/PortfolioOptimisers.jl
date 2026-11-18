@@ -1,11 +1,11 @@
 module PortfolioOptimisersPlotsExt
 
-using PortfolioOptimisers, StatsPlots, GraphRecipes, LinearAlgebra, Statistics, StatsBase,
-      Clustering, Distributions, StatsAPI
+using PortfolioOptimisers, StatsPlots, LinearAlgebra, Statistics, StatsBase, Clustering,
+      Distributions, StatsAPI
 
 import PortfolioOptimisers: ArrNum, VecNum, MatNum, Arr3Num, Option, VecNum_VecVecNum,
                             Slv_VecSlv, MatNum_Pr, PrE_Pr, Pr_RR, HClE_HCl, VecVecNum,
-                            RegE_Reg, NwE_ClE_Cl, AbstractCentralityEstimator,
+                            RegE_Reg, AbstractCentralityEstimator,
                             AbstractClustersEstimator, AbstractClusteringResult,
                             AbstractBaseRiskMeasure, BaseRM_VecBaseRM, VecBaseRM,
                             Scalariser, SumScalariser, measure_label, extract_pr,

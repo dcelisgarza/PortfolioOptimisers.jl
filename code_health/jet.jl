@@ -155,7 +155,8 @@ end
 
 # --- measurement -----------------------------------------------------------
 
-const RUNS = ("main" => :package, "plots_ext" => :PortfolioOptimisersPlotsExt)
+const RUNS = ("main" => :package, "plots_ext" => :PortfolioOptimisersPlotsExt,
+              "graph_ext" => :PortfolioOptimisersGraphRecipesExt)
 
 function target_module(name::Symbol)
     m = Base.get_extension(PortfolioOptimisers, name)

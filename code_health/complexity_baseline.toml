@@ -5,14 +5,15 @@
 julia = "1.13.4"
 code_complexity = "0.2.0"
 julia_syntax = "1.0.2"
-commit = "f04cefcf01"
+commit = "4d83c186be"
 
 [file]
+"ext/PortfolioOptimisersGraphRecipesExt.jl" = { cyc = 3, cog = 2, arg = 6, cyc_sum = 6, cog_sum = 4, arg_sum = 16, macros = [] }
 "ext/PortfolioOptimisersPlotsExt/01_CumulativeReturnsPlots.jl" = { cyc = 5, cog = 9, arg = 8, cyc_sum = 56, cog_sum = 65, arg_sum = 99, macros = [] }
 "ext/PortfolioOptimisersPlotsExt/02_DrawdownAndHistogramPlots.jl" = { cyc = 10, cog = 15, arg = 10, cyc_sum = 59, cog_sum = 70, arg_sum = 148, macros = [] }
 "ext/PortfolioOptimisersPlotsExt/03_MeasurePlots.jl" = { cyc = 7, cog = 14, arg = 10, cyc_sum = 47, cog_sum = 65, arg_sum = 79, macros = [] }
 "ext/PortfolioOptimisersPlotsExt/04_CompositionPlots.jl" = { cyc = 10, cog = 10, arg = 13, cyc_sum = 47, cog_sum = 33, arg_sum = 118, macros = [] }
-"ext/PortfolioOptimisersPlotsExt/05_ClusteringPlots.jl" = { cyc = 6, cog = 6, arg = 8, cyc_sum = 31, cog_sum = 24, arg_sum = 69, macros = [] }
+"ext/PortfolioOptimisersPlotsExt/05_ClusteringPlots.jl" = { cyc = 6, cog = 6, arg = 8, cyc_sum = 25, cog_sum = 20, arg_sum = 53, macros = [] }
 "ext/PortfolioOptimisersPlotsExt/06_MomentPlots.jl" = { cyc = 5, cog = 6, arg = 5, cyc_sum = 81, cog_sum = 50, arg_sum = 167, macros = [] }
 "ext/PortfolioOptimisersPlotsExt/07_FactorMomentPlots.jl" = { cyc = 3, cog = 4, arg = 4, cyc_sum = 29, cog_sum = 16, arg_sum = 66, macros = [] }
 "ext/PortfolioOptimisersPlotsExt/08_AttributionPlots.jl" = { cyc = 4, cog = 5, arg = 7, cyc_sum = 14, cog_sum = 12, arg_sum = 31, macros = [] }
@@ -438,7 +439,7 @@ commit = "f04cefcf01"
 "src/21_Pipeline/06_OnlinePipeline.jl" = { cyc = 6, cog = 7, arg = 5, cyc_sum = 111, cog_sum = 64, arg_sum = 155, macros = [] }
 "src/21_Pipeline/07_AssetScorers.jl" = { cyc = 3, cog = 3, arg = 6, cyc_sum = 58, cog_sum = 19, arg_sum = 91, macros = [] }
 "src/21_Pipeline/08_ScoreWeightBounds.jl" = { cyc = 4, cog = 5, arg = 3, cyc_sum = 16, cog_sum = 15, arg_sum = 4, macros = ["@propagatable"] }
-"src/22_Plotting.jl" = { cyc = 5, cog = 8, arg = 4, cyc_sum = 103, cog_sum = 28, arg_sum = 34, macros = [] }
+"src/22_Plotting.jl" = { cyc = 5, cog = 8, arg = 4, cyc_sum = 104, cog_sum = 27, arg_sum = 33, macros = [] }
 "src/23_Aliases.jl" = { cyc = 1, cog = 0, arg = 8, cyc_sum = 21, cog_sum = 0, arg_sum = 30, macros = [] }
 "src/24_Report/01_PredictionWeights.jl" = { cyc = 1, cog = 1, arg = 2, cyc_sum = 8, cog_sum = 3, arg_sum = 13, macros = [] }
 "src/24_Report/02_ReportModel.jl" = { cyc = 2, cog = 2, arg = 5, cyc_sum = 21, cog_sum = 7, arg_sum = 37, macros = [] }

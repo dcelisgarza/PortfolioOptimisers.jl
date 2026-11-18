@@ -1,6 +1,6 @@
 @testset "Plotting" begin
     using Test, PortfolioOptimisers, StatsPlots, GraphRecipes, Clarabel, CSV, TimeSeries,
-          LinearAlgebra, Random, Statistics
+          TOML, LinearAlgebra, Random, Statistics
 
     ## ── helpers ──────────────────────────────────────────────────────────────
     is_plot(x) = x isa Plots.Plot || x isa Plots.AbstractLayout
@@ -62,7 +62,17 @@
         hint(exc, args...) = sprint(io -> PO_h.plots_extension_hint(io, exc, args...))
         msg = hint(MethodError(plot_composition, (1,)), false)
         @test occursin("`PortfolioOptimisersPlotsExt` implements `plot_composition`", msg)
-        @test occursin("using GraphRecipes, StatsPlots", msg)
+        @test occursin("using StatsPlots`.", msg)
+        # `plot_network` alone draws with GraphRecipes, so it has an extension of its own,
+        # and the other plot functions load without GraphRecipes and GeometryTypes (#2186).
+        msg = hint(MethodError(plot_network, (1,)), false)
+        @test occursin("`PortfolioOptimisersGraphRecipesExt` implements `plot_network`",
+                       msg)
+        @test occursin("using GraphRecipes, StatsPlots`.", msg)
+        exts = TOML.parsefile(joinpath(pkgdir(PO_h), "Project.toml"))["extensions"]
+        @test exts["PortfolioOptimisersPlotsExt"] == "StatsPlots"
+        @test Set(exts["PortfolioOptimisersGraphRecipesExt"]) ==
+              Set(["GraphRecipes", "StatsPlots"])
         # With the extension loaded, a `MethodError` comes from a wrong argument. The handler
         # that the error display calls reads the loaded extension.
         @test isempty(hint(MethodError(plot_composition, (1,)), Any[Int], ()))
@@ -71,8 +81,7 @@
         # A function of another module gets no hint.
         @test isempty(hint(MethodError(sum, (1, 2, 3)), false))
         # The rule of the hint: each function of the package with no method of the package
-        # itself takes its methods from the extension.
-        ext = Base.get_extension(PO_h, :PortfolioOptimisersPlotsExt)
+        # itself takes its methods from the extension that `plot_extension` names.
         verbs = [f
                  for f in (getfield(PO_h, n)
                            for n in names(PO_h; all = true) if isdefined(PO_h, n))
@@ -80,7 +89,8 @@
                         parentmodule(f) === PO_h &&
                         !any(m -> m.module === PO_h, methods(f))]
         @test default_report_figures in verbs
-        @test all(f -> any(m -> m.module === ext, methods(f)), verbs)
+        ext_of(f) = Base.get_extension(PO_h, first(PO_h.plot_extension(f)))
+        @test all(f -> any(m -> m.module === ext_of(f), methods(f)), verbs)
     end
 
     @testset "plot_portfolio_cumulative_returns" begin

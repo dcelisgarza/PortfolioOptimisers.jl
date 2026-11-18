@@ -416,9 +416,8 @@ plot_stacked_bar_composition(results, rd; xticks = (1:length(labels), labels))
 #src   Also: constrained NOC does NOT solve on this SP500 slice (NaN) with Variance OR
 #src   StandardDeviation — test_20 uses a curated dataset + multi-solver list. Hence the NOC
 #src   test is deliberately solver-free (asserts on the assembly-time call, not the solution).
-#src - plot_stacked_bar_composition lives in the Plots EXTENSION, whose trigger is BOTH
-#src   GraphRecipes AND StatsPlots (Project.toml [extensions]) — loading StatsPlots alone leaves
-#src   the method undefined (MethodError). Import both, matching the other examples. StatsPlots
+#src - plot_stacked_bar_composition lives in the Plots EXTENSION, whose trigger is StatsPlots
+#src   (Project.toml [extensions]). Only plot_network needs GraphRecipes too. StatsPlots
 #src   also re-exports mean/std, so no separate `using Statistics`.
 #src - Cold include verified end-to-end on kaimon: every solve + pretty_table runs; final plot
 #src   returns a Plots.Plot. Struct redefinition needs a REPL restart between runs (top-level

@@ -53,7 +53,7 @@ The example below loads a year of prices, finds the portfolio of minimum varianc
 
 The example needs these packages:
 
-- `StatsPlots` and `GraphRecipes` load the plotting extension.
+- `StatsPlots` loads the plotting extension.
 - `Clarabel` and `HiGHS` are the solvers.
 - `CSV`, `TimeSeries` and `DataFrames` load and hold the price data.
 - `PrettyTables` prints the tables.
@@ -61,7 +61,7 @@ The example needs these packages:
 The data is the S&P 500 sample in [`examples/SP500.csv.gz`](https://github.com/dcelisgarza/PortfolioOptimisers.jl/tree/main/examples), which has the daily adjusted close prices of 20 large-cap stocks. We keep the last 253 rows, about one year, so the example runs fast. The two functions `fmt1` and `fmt2` format the columns of the two tables that the example prints.
 
 ```julia
-using PortfolioOptimisers, StatsPlots, GraphRecipes
+using PortfolioOptimisers, StatsPlots
 using Clarabel, HiGHS
 using CSV, TimeSeries, DataFrames
 using PrettyTables

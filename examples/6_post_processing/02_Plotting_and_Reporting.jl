@@ -6,10 +6,10 @@ Description = "Plotting and reporting in PortfolioOptimisers.jl: inputs, allocat
 # [Plotting and reporting](@id example-plotting-and-reporting)
 
 `PortfolioOptimisers.jl` has plotting functions for each stage of an optimisation. They load when
-you load `StatsPlots` and `GraphRecipes` with the package. They plot the inputs, the allocation,
-the risk of each asset, the performance over the sample, and the portfolios on axes of risk and
-return. Two dashboards put several of these plots into one figure. This page draws them for one
-pair of portfolios.
+you load `StatsPlots` with the package, and `plot_network` also needs `GraphRecipes`. They plot
+the inputs, the allocation, the risk of each asset, the performance over the sample, and the
+portfolios on axes of risk and return. Two dashboards put several of these plots into one figure.
+This page draws them for one pair of portfolios.
 
 !!! tip "When to reach for this"
     Reach for these plots to check the inputs before you optimise, to show an allocation to

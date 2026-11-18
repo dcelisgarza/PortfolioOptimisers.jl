@@ -356,7 +356,7 @@ Load hook of the package. It reads the preferences of [`PREFERENCE_KEYS`](@ref) 
 
 A preference is the one way to change a guard with no code. A `LocalPreferences.toml` is data, it comes with a cloned project or a template, and this hook reads it before any user code runs. The package thus applies a valid value, and it warns about a value that widens a guard, through [`relaxed_preferences_msg`](@ref).
 
-The hook also registers [`plots_extension_hint`](@ref) for `MethodError`. A call to a plot function before its package extension loads then names the two packages that load the extension.
+The hook also registers [`plots_extension_hint`](@ref) for `MethodError`. A call to a plot function before its package extension loads then names the packages that load its extension.
 
 # Algorithm
 

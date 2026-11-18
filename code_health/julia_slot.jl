@@ -57,6 +57,22 @@ function mem_available_gb()
 end
 
 """
+    stat_parent(text) -> Union{Nothing, Int}
+
+The parent PID in the text of a `/proc/<pid>/stat` file. The name in parentheses can hold spaces,
+so the parent PID is the second field after the last `)`. A process that stops between the listing
+of `/proc` and the read of its file gives an empty text, and the answer is then `nothing`.
+"""
+function stat_parent(text::AbstractString)
+    i = findlast(')', text)
+    if i === nothing
+        return nothing
+    end
+    fields = split(text[(i + 1):end])
+    return length(fields) < 2 ? nothing : tryparse(Int, fields[2])
+end
+
+"""
     rss_gb(pid) -> Float64
 
 The `VmRSS` of the process `pid` and of every process below it, in GB. A run under `--coverage`
@@ -78,9 +94,11 @@ function rss_gb(pid::Integer)
         catch
             continue
         end
-        # The name in parentheses can hold spaces. The parent PID is the second field after it.
-        fields = split(text[(findlast(')', text) + 1):end])
-        push!(get!(children, parse(Int, fields[2]), Int[]), p)
+        parent = stat_parent(text)
+        if parent === nothing
+            continue
+        end
+        push!(get!(children, parent, Int[]), p)
     end
     kb = 0
     todo = [Int(pid)]

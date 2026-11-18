@@ -6,14 +6,15 @@
 [provenance]
 julia = "1.13.4"
 julia_syntax = "1.0.2"
-commit = "bf35c74910"
+commit = "4d83c186be"
 
 [file]
+"ext/PortfolioOptimisersGraphRecipesExt.jl" = { code = 35, doc = 0, comment = 5, blank = 4, total = 44 }
 "ext/PortfolioOptimisersPlotsExt/01_CumulativeReturnsPlots.jl" = { code = 287, doc = 0, comment = 12, blank = 2, total = 301 }
 "ext/PortfolioOptimisersPlotsExt/02_DrawdownAndHistogramPlots.jl" = { code = 323, doc = 0, comment = 22, blank = 13, total = 358 }
 "ext/PortfolioOptimisersPlotsExt/03_MeasurePlots.jl" = { code = 240, doc = 0, comment = 36, blank = 2, total = 278 }
 "ext/PortfolioOptimisersPlotsExt/04_CompositionPlots.jl" = { code = 276, doc = 0, comment = 24, blank = 2, total = 302 }
-"ext/PortfolioOptimisersPlotsExt/05_ClusteringPlots.jl" = { code = 198, doc = 0, comment = 10, blank = 0, total = 208 }
+"ext/PortfolioOptimisersPlotsExt/05_ClusteringPlots.jl" = { code = 168, doc = 0, comment = 7, blank = 0, total = 175 }
 "ext/PortfolioOptimisersPlotsExt/06_MomentPlots.jl" = { code = 367, doc = 0, comment = 30, blank = 9, total = 406 }
 "ext/PortfolioOptimisersPlotsExt/07_FactorMomentPlots.jl" = { code = 133, doc = 0, comment = 23, blank = 3, total = 159 }
 "ext/PortfolioOptimisersPlotsExt/08_AttributionPlots.jl" = { code = 77, doc = 0, comment = 7, blank = 1, total = 85 }
@@ -23,7 +24,7 @@ commit = "bf35c74910"
 "ext/PortfolioOptimisersPlotsExt/12_ForecastEvaluationPlots.jl" = { code = 446, doc = 0, comment = 39, blank = 0, total = 485 }
 "ext/PortfolioOptimisersPlotsExt/13_CovarianceForecastPlots.jl" = { code = 317, doc = 426, comment = 13, blank = 235, total = 991 }
 "ext/PortfolioOptimisersPlotsExt/14_ReportFigures.jl" = { code = 80, doc = 0, comment = 15, blank = 0, total = 95 }
-"ext/PortfolioOptimisersPlotsExt/PortfolioOptimisersPlotsExt.jl" = { code = 44, doc = 0, comment = 8, blank = 5, total = 57 }
+"ext/PortfolioOptimisersPlotsExt/PortfolioOptimisersPlotsExt.jl" = { code = 45, doc = 0, comment = 8, blank = 5, total = 58 }
 "src/01_Base/01_DocstringDictionaries/01_Tables.jl" = { code = 17, doc = 122, comment = 0, blank = 44, total = 183 }
 "src/01_Base/01_DocstringDictionaries/02_ArgDataAndMoments.jl" = { code = 218, doc = 0, comment = 24, blank = 0, total = 242 }
 "src/01_Base/01_DocstringDictionaries/03_ArgPriorsAndUncertaintySets.jl" = { code = 140, doc = 0, comment = 14, blank = 0, total = 154 }
@@ -439,7 +440,7 @@ commit = "bf35c74910"
 "src/21_Pipeline/06_OnlinePipeline.jl" = { code = 397, doc = 499, comment = 4, blank = 237, total = 1137 }
 "src/21_Pipeline/07_AssetScorers.jl" = { code = 296, doc = 708, comment = 1, blank = 323, total = 1328 }
 "src/21_Pipeline/08_ScoreWeightBounds.jl" = { code = 81, doc = 205, comment = 1, blank = 75, total = 362 }
-"src/22_Plotting.jl" = { code = 180, doc = 3069, comment = 111, blank = 1014, total = 4374 }
+"src/22_Plotting.jl" = { code = 181, doc = 3086, comment = 111, blank = 1024, total = 4402 }
 "src/23_Aliases.jl" = { code = 265, doc = 591, comment = 24, blank = 161, total = 1041 }
 "src/24_Report/01_PredictionWeights.jl" = { code = 37, doc = 54, comment = 0, blank = 31, total = 122 }
 "src/24_Report/02_ReportModel.jl" = { code = 123, doc = 192, comment = 2, blank = 83, total = 400 }
