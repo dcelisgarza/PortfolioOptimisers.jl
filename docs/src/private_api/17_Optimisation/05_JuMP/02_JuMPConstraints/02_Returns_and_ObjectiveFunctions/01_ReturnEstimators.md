@@ -9,7 +9,7 @@ VecJRE
 JRE_VecJRE
 ArithRetMu
 resolve_deferred_quantities(rt::ArithmeticReturn, pr::AbstractPriorResult)
-no_bounds_returns_estimator(r::ArithmeticReturn, flag::Bool)
+no_bounds_returns_estimator
 resolved_expected_return
 ucs_expected_return
 ucs_returns_estimator

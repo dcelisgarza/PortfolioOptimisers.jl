@@ -1,9 +1,9 @@
-function no_bounds_risk_measure(r::RiskMeasure, ::Any = nothing)
+function no_bounds_risk_measure(r::RiskMeasure)
     settings = r.settings
     s = rebuild_struct(settings, (; ub = nothing))
     return s === settings ? r : rebuild_struct(r, (; settings = s))
 end
-function no_bounds_no_risk_expr_risk_measure(r::RiskMeasure, ::Any = nothing)
+function no_bounds_no_risk_expr_risk_measure(r::RiskMeasure)
     settings = r.settings
     s = RiskMeasureSettings(; rke = false, scale = one(settings.scale))
     return s === settings ? r : rebuild_struct(r, (; settings = s))
@@ -28,12 +28,11 @@ function bounds_risk_measure(r::RiskMeasure, ub::Number)
     return s === settings ? r : rebuild_struct(r, (; settings = s))
 end
 function no_bounds_risk_measure(r::Union{HierarchicalRiskMeasure,
-                                         NonOptimisationRiskMeasure}, ::Any = nothing)
+                                         NonOptimisationRiskMeasure})
     return r
 end
 function no_bounds_no_risk_expr_risk_measure(r::Union{HierarchicalRiskMeasure,
-                                                      NonOptimisationRiskMeasure},
-                                             ::Any = nothing)
+                                                      NonOptimisationRiskMeasure})
     return r
 end
 function no_risk_expr_risk_measure(r::Union{HierarchicalRiskMeasure,
@@ -49,27 +48,27 @@ function bounds_risk_measure(r::Union{HierarchicalRiskMeasure, NonOptimisationRi
     return r
 end
 """
-    no_bounds_risk_measure(r::RiskMeasure, flag = nothing)
-    no_bounds_risk_measure(r::VecBaseRM, flag = nothing)
+    no_bounds_risk_measure(r::RiskMeasure)
+    no_bounds_risk_measure(r::VecBaseRM)
 
 Return a copy of the risk measure `r` with no bound, or a vector of such copies when `r` is a vector.
 
 [`NearOptimalCentering`](@ref) solves its corner portfolios with this copy, so a bound of the measure does not constrain a corner. The copy keeps the risk-expression flag `rke` and the `scale`. A vector applies the method of each element to that element. A field that the table does not name keeps its value.
 
-| Measure                                                                 | Changed                                                                              | Kept                                                                          |
-|:----------------------------------------------------------------------- |:------------------------------------------------------------------------------------ |:----------------------------------------------------------------------------- |
-| [`RiskMeasure`](@ref)                                                   | `settings.ub = nothing`                                                              | `settings.rke`, `settings.scale`                                              |
-| [`Skewness`](@ref)                                                      | `settings.lb = nothing`                                                              | `settings.rke`, `settings.scale`                                              |
-| [`VarianceSkewKurtosis`](@ref), [`GenericValueatRiskRange`](@ref)       | `settings.ub = nothing`, and the bound of each child                                 | `settings.rke`, `settings.scale`, and the `rke` and the `scale` of each child |
-| [`UncertaintySetVariance`](@ref)                                        | `settings.ub = nothing`. With `flag = Val(false)`, the copy is a [`Variance`](@ref). | `settings.rke`, `settings.scale`                                              |
-| [`HierarchicalRiskMeasure`](@ref), [`NonOptimisationRiskMeasure`](@ref) | nothing                                                                              | every field                                                                   |
+| Measure                                                                 | Changed                                              | Kept                                                                          |
+|:----------------------------------------------------------------------- |:---------------------------------------------------- |:----------------------------------------------------------------------------- |
+| [`RiskMeasure`](@ref)                                                   | `settings.ub = nothing`                              | `settings.rke`, `settings.scale`                                              |
+| [`Skewness`](@ref)                                                      | `settings.lb = nothing`                              | `settings.rke`, `settings.scale`                                              |
+| [`VarianceSkewKurtosis`](@ref), [`GenericValueatRiskRange`](@ref)       | `settings.ub = nothing`, and the bound of each child | `settings.rke`, `settings.scale`, and the `rke` and the `scale` of each child |
+| [`HierarchicalRiskMeasure`](@ref), [`NonOptimisationRiskMeasure`](@ref) | nothing                                              | every field                                                                   |
+
+An [`UncertaintySetVariance`](@ref) is a [`RiskMeasure`](@ref), so its copy keeps its uncertainty set. The anchors of [`NearOptimalCentering`](@ref) read the worst case of the set through [`expected_risk`](@ref), as the model does.
 
 The method for a [`RiskMeasure`](@ref) returns `r` itself when `r` has no bound.
 
 # Arguments
 
   - $(arg_dict[:r])
-  - $(arg_dict[:flag_nb])
 
 # Returns
 
@@ -98,31 +97,29 @@ julia> [r.settings.scale for r in no_bounds_risk_measure(rs)]
   - [`no_bounds_no_risk_expr_risk_measure`](@ref)
   - [`NearOptimalCentering`](@ref)
 """
-function no_bounds_risk_measure(rs::VecBaseRM, flag::Any = nothing)
-    return no_bounds_risk_measure.(rs, flag)
+function no_bounds_risk_measure(rs::VecBaseRM)
+    return no_bounds_risk_measure.(rs)
 end
 """
-    no_bounds_no_risk_expr_risk_measure(r::RiskMeasure, flag = nothing)
-    no_bounds_no_risk_expr_risk_measure(r::VecBaseRM, flag = nothing)
+    no_bounds_no_risk_expr_risk_measure(r::RiskMeasure)
+    no_bounds_no_risk_expr_risk_measure(r::VecBaseRM)
 
 Return a copy of the risk measure `r` with no bound, with `rke = false` and with a unit `scale`, or a vector of such copies when `r` is a vector.
 
 The constructors of [`RiskTrackingRiskMeasure`](@ref) and [`TrackingRiskMeasure`](@ref) take this copy of the tracked measure, because that measure only measures a distance. The copy bounds nothing and adds nothing to the risk of the objective. The unit `scale` has the type of the old `scale`. A vector applies the method of each element to that element. A field that the table does not name keeps its value.
 
-| Measure                                                                 | Changed                                                                                                                            | Kept                                    |
-|:----------------------------------------------------------------------- |:---------------------------------------------------------------------------------------------------------------------------------- |:--------------------------------------- |
-| [`RiskMeasure`](@ref)                                                   | `settings.ub = nothing`, `settings.rke = false`, `settings.scale = 1`                                                              | nothing in `settings`                   |
-| [`Skewness`](@ref)                                                      | `settings.lb = nothing`, `settings.rke = false`, `settings.scale = 1`                                                              | nothing in `settings`                   |
-| [`VarianceSkewKurtosis`](@ref), [`GenericValueatRiskRange`](@ref)       | `settings.ub = nothing`, `settings.rke = false`, `settings.scale = 1`, and the bound of each child                                 | the `rke` and the `scale` of each child |
-| [`UncertaintySetVariance`](@ref)                                        | `settings.ub = nothing`, `settings.rke = false`, `settings.scale = 1`. With `flag = Val(false)`, the copy is a [`Variance`](@ref). | nothing in `settings`                   |
-| [`HierarchicalRiskMeasure`](@ref), [`NonOptimisationRiskMeasure`](@ref) | nothing                                                                                                                            | every field                             |
+| Measure                                                                 | Changed                                                                                            | Kept                                    |
+|:----------------------------------------------------------------------- |:-------------------------------------------------------------------------------------------------- |:--------------------------------------- |
+| [`RiskMeasure`](@ref)                                                   | `settings.ub = nothing`, `settings.rke = false`, `settings.scale = 1`                              | nothing in `settings`                   |
+| [`Skewness`](@ref)                                                      | `settings.lb = nothing`, `settings.rke = false`, `settings.scale = 1`                              | nothing in `settings`                   |
+| [`VarianceSkewKurtosis`](@ref), [`GenericValueatRiskRange`](@ref)       | `settings.ub = nothing`, `settings.rke = false`, `settings.scale = 1`, and the bound of each child | the `rke` and the `scale` of each child |
+| [`HierarchicalRiskMeasure`](@ref), [`NonOptimisationRiskMeasure`](@ref) | nothing                                                                                            | every field                             |
 
 The method for a [`RiskMeasure`](@ref) returns `r` itself when `r` already has no bound, `rke = false` and a unit `scale`.
 
 # Arguments
 
   - $(arg_dict[:r])
-  - $(arg_dict[:flag_nb])
 
 # Returns
 
@@ -152,8 +149,8 @@ julia> [r.settings.scale for r in no_bounds_no_risk_expr_risk_measure(rs)]
   - [`RiskTrackingRiskMeasure`](@ref)
   - [`TrackingRiskMeasure`](@ref)
 """
-function no_bounds_no_risk_expr_risk_measure(r::VecBaseRM, flag::Any = nothing)
-    return no_bounds_no_risk_expr_risk_measure.(r, flag)
+function no_bounds_no_risk_expr_risk_measure(r::VecBaseRM)
+    return no_bounds_no_risk_expr_risk_measure.(r)
 end
 """
     no_risk_expr_risk_measure(r::RiskMeasure)

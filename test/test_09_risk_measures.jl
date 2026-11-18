@@ -2905,25 +2905,20 @@ end
         usv = UncertaintySetVariance(; ucs = box, sigma = S,
                                      settings = RiskMeasureSettings(; ub = 1.0,
                                                                     scale = 2.0))
-        # `flag` keeps the set, or drops it for the nominal Variance.
-        for f in (nothing, Val(true))
-            a = PO.no_bounds_risk_measure(usv, f)
-            @test a isa UncertaintySetVariance && a.ucs === box && a.sigma === S
-            @test isnothing(a.settings.ub) && a.settings.scale == 2 && a.settings.rke
-            c = PO.no_bounds_no_risk_expr_risk_measure(usv, f)
-            @test c isa UncertaintySetVariance && c.ucs === box
-            @test isnothing(c.settings.ub) && isone(c.settings.scale) && !c.settings.rke
-        end
-        b = PO.no_bounds_risk_measure(usv, Val(false))
-        @test b isa Variance && b.sigma === S
-        @test isnothing(b.settings.ub) && b.settings.scale == 2 && b.settings.rke
-        d = PO.no_bounds_no_risk_expr_risk_measure(usv, Val(false))
-        @test d isa Variance && d.sigma === S && isnothing(d.rc)
-        @test isnothing(d.settings.ub) && isone(d.settings.scale) && !d.settings.rke
+        # Each copy keeps the set, and the method of every `RiskMeasure` makes it.
+        a = PO.no_bounds_risk_measure(usv)
+        @test a isa UncertaintySetVariance && a.ucs === box && a.sigma === S
+        @test isnothing(a.settings.ub) && a.settings.scale == 2 && a.settings.rke
+        c = PO.no_bounds_no_risk_expr_risk_measure(usv)
+        @test c isa UncertaintySetVariance && c.ucs === box && c.sigma === S
+        @test isnothing(c.settings.ub) && isone(c.settings.scale) && !c.settings.rke
+        # The flag of the removed `ucs_flag` has no slot.
+        @test_throws MethodError PO.no_bounds_risk_measure(usv, Val(false))
+        @test_throws MethodError PO.no_bounds_no_risk_expr_risk_measure(usv, Val(false))
         # The copy of an uncertainty-set variance matches the copy of every other measure.
         e = PO.no_bounds_no_risk_expr_risk_measure(Variance(; sigma = S,
                                                             settings = usv.settings))
-        @test e.settings.scale == d.settings.scale && e.settings.rke == d.settings.rke
+        @test e.settings.scale == c.settings.scale && e.settings.rke == c.settings.rke
     end
 
     @testset "ucs_risk_measure fits the set on the returns" begin

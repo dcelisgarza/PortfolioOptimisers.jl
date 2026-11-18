@@ -186,19 +186,18 @@ range_tails(r::GenericValueatRiskRange) = RangeTails(r.loss, r.gain)
 # the bound of the container. The method for a `RiskMeasure` rebuilds `settings` alone, so the
 # corner solves of `NearOptimalCentering` would keep a tail bound. The tails keep `rke` and
 # `scale`, as `no_bounds_risk_measure` states.
-function no_bounds_risk_measure(r::GenericValueatRiskRange, flag::Any = nothing)
+function no_bounds_risk_measure(r::GenericValueatRiskRange)
     return GenericValueatRiskRange(;
                                    settings = rebuild_struct(r.settings, (; ub = nothing)),
-                                   loss = no_bounds_risk_measure(r.loss, flag),
-                                   gain = no_bounds_risk_measure(r.gain, flag))
+                                   loss = no_bounds_risk_measure(r.loss),
+                                   gain = no_bounds_risk_measure(r.gain))
 end
-function no_bounds_no_risk_expr_risk_measure(r::GenericValueatRiskRange,
-                                             flag::Any = nothing)
+function no_bounds_no_risk_expr_risk_measure(r::GenericValueatRiskRange)
     return GenericValueatRiskRange(;
                                    settings = RiskMeasureSettings(; rke = false,
                                                                   scale = one(r.settings.scale)),
-                                   loss = no_bounds_risk_measure(r.loss, flag),
-                                   gain = no_bounds_risk_measure(r.gain, flag))
+                                   loss = no_bounds_risk_measure(r.loss),
+                                   gain = no_bounds_risk_measure(r.gain))
 end
 function (r::GenericValueatRiskRange)(x::VecNum)
     @argcheck(!isa(r.loss, ValueatRisk{<:Any, <:Any, <:Any, <:DistributionValueatRisk}) &&

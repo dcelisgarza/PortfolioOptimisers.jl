@@ -118,27 +118,25 @@ end
         @test rts[1] >= expected_return(ret_l1, w_min, pr) - 1e-8
         @test issorted(rts)
     end
-    # Each anchor of a centring is a value of the expression that its model bounds. The
-    # unconstrained model with `ucs_flag = false` reads the nominal moments, and the
-    # constrained model keeps the sets.
+    # Each anchor of a centring is a value of the expression that its model bounds. Both
+    # models keep the sets, so each anchor is the worst case over the sets.
     sus = sigma_ucs(nue(BoxUncertaintySetAlgorithm()), pr.X)
     usv = UncertaintySetVariance(; ucs = sus)
-    for (alg, nominal) in ((UnconstrainedNearOptimalCentering(), true),
-                           (ConstrainedNearOptimalCentering(), false))
-        noc = NearOptimalCentering(; alg = alg, ucs_flag = false, r = usv,
+    for alg in (UnconstrainedNearOptimalCentering(), ConstrainedNearOptimalCentering())
+        noc = NearOptimalCentering(; alg = alg, r = usv,
                                    opt = JuMPOptimiser(; pe = pr, slv = slv, ret = ret_l1))
         s = PortfolioOptimisers.near_optimal_centering_setup(noc, rd)
         rk = s.rk_opt - s.rk_delta
         rt = s.rt_opt + s.rt_delta
-        if nominal
-            @test isapprox(rk, expected_risk(Variance(), s.w_opt, pr); rtol = 1e-10)
-            @test isapprox(rt, LinearAlgebra.dot(pr.mu, s.w_opt); rtol = 1e-10)
-            @test rk < expected_risk(usv, s.w_opt, pr)
-        else
-            @test isapprox(rk, expected_risk(usv, s.w_opt, pr); rtol = 1e-10)
-            @test isapprox(rt, expected_return(ret_l1, s.w_opt, pr); rtol = 1e-10)
-        end
+        @test isapprox(rk, expected_risk(usv, s.w_opt, pr); rtol = 1e-10)
+        @test isapprox(rt, expected_return(ret_l1, s.w_opt, pr); rtol = 1e-10)
+        @test rk > expected_risk(Variance(), s.w_opt, pr)
+        @test rt < LinearAlgebra.dot(pr.mu, s.w_opt)
+        @test s.r isa UncertaintySetVariance && s.opt.ret.ucs isa L1UncertaintySet
     end
+    # The removed `ucs_flag` is not a keyword.
+    @test_throws MethodError NearOptimalCentering(; ucs_flag = false, r = usv,
+                                                  opt = JuMPOptimiser(; pe = pr, slv = slv))
 end
 
 @testset "Weight bounds" begin

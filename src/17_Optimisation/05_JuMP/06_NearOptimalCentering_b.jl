@@ -1,5 +1,5 @@
 """
-    compute_risk_ubs(model::JuMP.Model, noc::NearOptimalCentering{<:Any, <:Any, <:Any, <:Any, <:Any, <:Any, <:Any, <:Any, <:Any, <:Any, <:Any, <:ConstrainedNearOptimalCentering}, pr::AbstractPriorResult, fees::Option{<:Fees}, w_min::VecNum, w_max::VecNum, args...)
+    compute_risk_ubs(model::JuMP.Model, noc::NearOptimalCentering{<:Any, <:Any, <:Any, <:Any, <:Any, <:Any, <:Any, <:Any, <:Any, <:Any, <:ConstrainedNearOptimalCentering}, pr::AbstractPriorResult, fees::Option{<:Fees}, w_min::VecNum, w_max::VecNum, args...)
 
 Compute risk upper bounds for a constrained `NearOptimalCentering` frontier sweep.
 
@@ -28,7 +28,6 @@ Identifies risk frontier entries that are not yet resolved (i.e. not concrete we
 function compute_risk_ubs(model::JuMP.Model,
                           noc::NearOptimalCentering{<:Any, <:Any, <:Any, <:Any, <:Any,
                                                     <:Any, <:Any, <:Any, <:Any, <:Any,
-                                                    <:Any,
                                                     <:ConstrainedNearOptimalCentering},
                           pr::AbstractPriorResult, fees::Option{<:Fees}, w_min::VecNum,
                           w_max::VecNum, args...)
@@ -39,7 +38,7 @@ function compute_risk_ubs(model::JuMP.Model,
     return rebuild_risk_frontier(noc, pr, fees, risk_frontier, w_min, w_max, idx, args...)
 end
 function solve_noc!(noc::NearOptimalCentering{<:Any, <:Any, <:Any, <:Any, <:Any, <:Any,
-                                              <:Any, <:Any, <:Any, <:Any, <:Any,
+                                              <:Any, <:Any, <:Any, <:Any,
                                               <:ConstrainedNearOptimalCentering},
                     model::JuMP.Model, rk_opts::VecNum, rt_opts::VecNum, s_rk::Number,
                     s_rt::Number, opt::BaseJuMPOptimisationEstimator,
@@ -54,7 +53,7 @@ function solve_noc!(noc::NearOptimalCentering{<:Any, <:Any, <:Any, <:Any, <:Any,
                            i -> set_noc_anchor!(p_rk, p_rt, rk_units, rt_units, i))
 end
 function solve_noc!(noc::NearOptimalCentering{<:Any, <:Any, <:Any, <:Any, <:Any, <:Any,
-                                              <:Any, <:Any, <:Any, <:Any, <:Any,
+                                              <:Any, <:Any, <:Any, <:Any,
                                               <:ConstrainedNearOptimalCentering},
                     model::JuMP.Model, rk_opts::VecNum, rt_opts::VecNum, s_rk::Number,
                     s_rt::Number, opt::BaseJuMPOptimisationEstimator,

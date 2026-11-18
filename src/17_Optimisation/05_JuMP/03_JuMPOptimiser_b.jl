@@ -129,14 +129,14 @@ function resolve_jump_head_block(imsk::Option{BitVector}, opt::JuMPOptimiser,
     return (investable_fees_view(fees, imsk, pr.X), prr, optr, rdr), (cbr,)
 end
 """
-    no_bounds_optimiser(opt::JuMPOptimiser, args...) -> JuMPOptimiser
+    no_bounds_optimiser(opt::JuMPOptimiser) -> JuMPOptimiser
 
 Return a copy of `opt` with every return term replaced by its unbounded variant.
 
-Only the `ret` field changes. [`no_bounds_returns_estimator`](@ref) clears the term's own
-return lower bound `settings.lb`, and drops its uncertainty set when the forwarded flag is
-`false`; every other field of `opt`, weight bounds and risk bounds included, is carried
-through unchanged. A vector of terms is stripped term by term.
+Only the `ret` field changes. [`no_bounds_returns_estimator`](@ref) clears the lower bound
+`settings.lb` of each term, and each term keeps its uncertainty set. Every other field of
+`opt`, the weight bounds and the risk bounds included, keeps its value. A vector of terms
+loses the bound of each term.
 
 [`NearOptimalCentering`](@ref) is the caller: its anchor sub-problems must range over the
 whole frontier, so the return bound that shapes the user's own problem is removed from them.
@@ -144,8 +144,6 @@ whole frontier, so the return bound that shapes the user's own problem is remove
 # Arguments
 
   - `opt::JuMPOptimiser`: JuMP optimiser configuration.
-  - `args...`: Forwarded to [`no_bounds_returns_estimator`](@ref). The one caller forwards
-    `noc.ucs_flag`, which keeps the uncertainty set when `true`.
 
 # Returns
 
@@ -165,9 +163,9 @@ true
   - [`no_bounds_returns_estimator`](@ref)
   - [`JuMPOptimiser`](@ref)
 """
-function no_bounds_optimiser(opt::JuMPOptimiser, args...)
+function no_bounds_optimiser(opt::JuMPOptimiser)
     pnames = Tuple(setdiff(fieldnames(typeof(opt)), (:ret,)))
-    return JuMPOptimiser(; ret = no_bounds_returns_estimator(opt.ret, args...),
+    return JuMPOptimiser(; ret = no_bounds_returns_estimator(opt.ret),
                          NamedTuple{pnames}(getfield.(opt, pnames))...)
 end
 """

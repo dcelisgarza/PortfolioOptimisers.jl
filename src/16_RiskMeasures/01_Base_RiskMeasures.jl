@@ -2656,7 +2656,7 @@ Generic function extended by concrete risk measure types that support the precom
 """
 function expected_risk_from_returns end
 """
-    no_bounds_risk_measure(r, args...; kwargs...)
+    no_bounds_risk_measure(r)
 
 Return a copy of risk measure `r` with no bound, and with its `scale` and its risk-expression flag kept.
 
@@ -2669,7 +2669,7 @@ Generic function extended by concrete risk measure types. It builds no model. A 
 """
 function no_bounds_risk_measure end
 """
-    no_bounds_no_risk_expr_risk_measure(r, args...; kwargs...)
+    no_bounds_no_risk_expr_risk_measure(r)
 
 Return a copy of risk measure `r` with no bound, with its risk-expression flag disabled and with a unit `scale`.
 

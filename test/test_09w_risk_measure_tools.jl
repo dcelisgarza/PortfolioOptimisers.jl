@@ -200,13 +200,15 @@ const _changed610 = (; no_bounds = (; rm = ["settings.ub"], sk = ["settings.lb"]
         @test_throws DimensionMismatch bounds_risk_measure(rs, [0.1, 0.2])
         @test_throws DomainError bounds_risk_measure(rs[1:1], [-0.1])
         @test_throws DomainError bounds_risk_measure(rs[1], Inf)
-        # `flag` reaches an `UncertaintySetVariance` through the vector form.
+        # The vector form keeps the uncertainty set of an `UncertaintySetVariance`.
         ucs = UncertaintySetVariance(; settings = RiskMeasureSettings(; ub = 0.1),
                                      ucs = BoxUncertaintySet(; lb = zeros(2, 2),
                                                              ub = ones(2, 2)))
-        @test no_bounds_risk_measure([ucs], Val(false))[1] isa Variance
-        @test no_bounds_risk_measure([ucs], Val(true))[1] isa UncertaintySetVariance
-        @test no_bounds_no_risk_expr_risk_measure([ucs], Val(false))[1] isa Variance
+        nbu = no_bounds_risk_measure([ucs])[1]
+        @test nbu isa UncertaintySetVariance && nbu.ucs === ucs.ucs
+        @test isnothing(nbu.settings.ub)
+        nbe = no_bounds_no_risk_expr_risk_measure([ucs])[1]
+        @test nbe isa UncertaintySetVariance && nbe.ucs === ucs.ucs
     end
 
     @testset "A dynamic weight gives the risk of its resolved weights" begin

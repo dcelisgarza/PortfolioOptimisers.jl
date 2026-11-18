@@ -271,12 +271,11 @@ $(DocStringExtensions.FIELDS)
         w_opt_ini::TD_Option{<:VecNum_VecVecNum} = nothing,
         w_max::TD_Option{<:VecNum} = nothing,
         w_max_ini::TD_Option{<:VecNum} = nothing,
-        ucs_flag::Bool = true,
         alg::NearOptimalCenteringAlgorithm = UnconstrainedNearOptimalCentering(),
         fb::TDO_Option{<:OptE_Opt} = nothing
     ) -> NearOptimalCentering
 
-Keywords correspond to the struct's fields. A field of the type [`TD`](@ref), [`TD_Option`](@ref) or [`TDO_Option`](@ref) can hold a [`TimeDependent`](@ref) schedule in place of a static value. The risk measures, the objective, the anchor weights, the initial weights and the fallback define the problem, so a cross-validation fold loop resolves them for each fold. An `optimise` outside a fold loop uses the static default of each field. `bins`, `ucs_flag` and `alg` control the solve, and they stay static.
+Keywords correspond to the struct's fields. A field of the type [`TD`](@ref), [`TD_Option`](@ref) or [`TDO_Option`](@ref) can hold a [`TimeDependent`](@ref) schedule in place of a static value. The risk measures, the objective, the anchor weights, the initial weights and the fallback define the problem, so a cross-validation fold loop resolves them for each fold. An `optimise` outside a fold loop uses the static default of each field. `bins` and `alg` control the solve, and they stay static.
 
 ## Validation
 
@@ -311,7 +310,7 @@ Keywords correspond to the struct's fields. A field of the type [`TD`](@ref), [`
   - `opt` and `r` recurse through [`port_opt_view`](@ref) with that matrix.
   - `fb` recurses through [`view_child`](@ref) with that matrix.
   - The six weight vectors `w_min`, `w_min_ini`, `w_opt`, `w_opt_ini`, `w_max` and `w_max_ini` are sliced to the selected assets.
-  - `obj`, `bins`, `ucs_flag` and `alg` pass through unchanged.
+  - `obj`, `bins` and `alg` pass through unchanged.
 
 # Related
 
@@ -375,10 +374,6 @@ Keywords correspond to the struct's fields. A field of the type [`TD`](@ref), [`
     """
     w_max_ini
     """
-    $(field_dict[:ucs_flag])
-    """
-    ucs_flag
-    """
     Near Optimal Centering algorithm variant. It selects the constraints that the centring model builds, so it selects the settings of `opt` that the model reads. [`ConstrainedNearOptimalCentering`](@ref) reads all of them. The default [`UnconstrainedNearOptimalCentering`](@ref) reads the settings that its docstring lists.
     """
     alg
@@ -393,7 +388,7 @@ Keywords correspond to the struct's fields. A field of the type [`TD`](@ref), [`
                                   w_opt::TD_Option{<:VecNum_VecVecNum},
                                   w_opt_ini::TD_Option{<:VecNum_VecVecNum},
                                   w_max::TD_Option{<:VecNum},
-                                  w_max_ini::TD_Option{<:VecNum}, ucs_flag::Bool,
+                                  w_max_ini::TD_Option{<:VecNum},
                                   alg::NearOptimalCenteringAlgorithm,
                                   fb::TDO_Option{<:OptE_Opt})
         assert_no_nearest_bind_optimiser_schedule(fb, :fb, :NearOptimalCentering)
@@ -434,20 +429,12 @@ Keywords correspond to the struct's fields. A field of the type [`TD`](@ref), [`
         end
         assert_time_dependent_substitution(NearOptimalCentering,
                                            (; opt, r, obj, bins, w_min, w_min_ini, w_opt,
-                                            w_opt_ini, w_max, w_max_ini, ucs_flag, alg, fb),
+                                            w_opt_ini, w_max, w_max_ini, alg, fb),
                                            near_optimal_centering_td_defaults())
         assert_data_benchmark_prior(r, opt.pe, :r, :NearOptimalCentering, "opt.pe")
-        est = new{typeof(opt), typeof(r), typeof(obj), typeof(bins), typeof(w_min),
-                  typeof(w_min_ini), typeof(w_opt), typeof(w_opt_ini), typeof(w_max),
-                  typeof(w_max_ini), typeof(ucs_flag), typeof(alg), typeof(fb)}(opt, r, obj,
-                                                                                bins, w_min,
-                                                                                w_min_ini,
-                                                                                w_opt,
-                                                                                w_opt_ini,
-                                                                                w_max,
-                                                                                w_max_ini,
-                                                                                ucs_flag,
-                                                                                alg, fb)
+        fs = (opt, r, obj, bins, w_min, w_min_ini, w_opt, w_opt_ini, w_max, w_max_ini, alg,
+              fb)
+        est = new{map(typeof, fs)...}(fs...)
         warn_raw_readers(est)
         return est
     end
@@ -461,11 +448,10 @@ function NearOptimalCentering(; opt::JuMPOptimiser, r::TD{<:RM_VecRM} = Standard
                               w_opt_ini::TD_Option{<:VecNum_VecVecNum} = nothing,
                               w_max::TD_Option{<:VecNum} = nothing,
                               w_max_ini::TD_Option{<:VecNum} = nothing,
-                              ucs_flag::Bool = true,
                               alg::NearOptimalCenteringAlgorithm = UnconstrainedNearOptimalCentering(),
                               fb::TDO_Option{<:OptE_Opt} = nothing)::NearOptimalCentering
     return NearOptimalCentering(opt, r, obj, bins, w_min, w_min_ini, w_opt, w_opt_ini,
-                                w_max, w_max_ini, ucs_flag, alg, fb)
+                                w_max, w_max_ini, alg, fb)
 end
 function time_dependent_field_defaults(::NearOptimalCentering)::NamedTuple
     return near_optimal_centering_td_defaults()
@@ -503,7 +489,7 @@ Return a copy of [`NearOptimalCentering`](@ref) for the assets `i`.
  1. If `noc.opt.pe` holds a prior result, replace `X` with its matrix `noc.opt.pe.X`.
  2. View `opt` and `r` through [`port_opt_view`](@ref), and `fb` through [`view_child`](@ref), with that matrix.
  3. Slice the six weight vectors `w_min`, `w_min_ini`, `w_opt`, `w_opt_ini`, `w_max` and `w_max_ini` to `i`.
- 4. Build the estimator, with `obj`, `bins`, `ucs_flag` and `alg` unchanged.
+ 4. Build the estimator, with `obj`, `bins` and `alg` unchanged.
 
 # Related
 
@@ -521,11 +507,10 @@ function port_opt_view(noc::NearOptimalCentering, i, X::MatNum,
     w_opt_ini = nothing_scalar_array_view(noc.w_opt_ini, i)
     w_max = nothing_scalar_array_view(noc.w_max, i)
     w_max_ini = nothing_scalar_array_view(noc.w_max_ini, i)
-    return NearOptimalCentering(; alg = noc.alg, ucs_flag = noc.ucs_flag, r = r,
-                                obj = noc.obj, opt = opt, bins = noc.bins, w_min = w_min,
-                                w_min_ini = w_min_ini, w_opt = w_opt, w_opt_ini = w_opt_ini,
-                                w_max = w_max, w_max_ini = w_max_ini,
-                                fb = view_child(noc.fb, i, X))
+    return NearOptimalCentering(; alg = noc.alg, r = r, obj = noc.obj, opt = opt,
+                                bins = noc.bins, w_min = w_min, w_min_ini = w_min_ini,
+                                w_opt = w_opt, w_opt_ini = w_opt_ini, w_max = w_max,
+                                w_max_ini = w_max_ini, fb = view_child(noc.fb, i, X))
 end
 """
     near_optimal_centering_risks(scalariser, r, pr, fees, slv, w_min, w_opt, w_max)
@@ -709,7 +694,7 @@ Solve the anchors of [`NearOptimalCentering`](@ref), and compute the bounds of i
 # Algorithm
 
  1. Process the optimiser into its attributes with [`resolve_jump_optimiser`](@ref), with the blocks of `blocks`, reduce `noc` and `rd` to the investable universe, and bind a data benchmark to the rows of the view. Give the blocks after the first of the bundle to every anchor sub-problem below, viewed at the investable universe, with [`constraint_block_steps`](@ref).
- 2. If an anchor of minimum risk or of maximum return is missing, if the variant is [`UnconstrainedNearOptimalCentering`](@ref), or if a return term holds a [`Frontier`](@ref), make the copies of the risk measures and of the optimiser without bounds. `ucs_flag` selects whether they keep their uncertainty sets.
+ 2. If an anchor of minimum risk or of maximum return is missing, if the variant is [`UnconstrainedNearOptimalCentering`](@ref), or if a return term holds a [`Frontier`](@ref), make the copies of the risk measures and of the optimiser without bounds. The copies keep their uncertainty sets, so every anchor and the centring model read the same worst case.
  3. Solve each missing anchor as a [`MeanRisk`](@ref) problem. The anchors of minimum risk and of maximum return solve with the copies without bounds, and the anchor of `obj` solves with `r` and `opt` as they are.
  4. For the unconstrained variant, replace `r` and `opt` with the copies without bounds, which the centring model reads.
  5. Compute the risks of the anchors with [`near_optimal_centering_risks`](@ref) on `r`, and their returns with [`expected_return`](@ref) on the return terms of `opt`. Thus each anchor is a value of the expression that the centring model bounds. A term with a fitted uncertainty set gives its worst-case return, through [`ucs_expected_return`](@ref).
@@ -764,8 +749,8 @@ function near_optimal_centering_setup(noc::NearOptimalCentering, rd::ReturnsResu
     # anchor portfolios were supplied.
     swept = frontier_return_terms(attrs.ret)
     if w_min_flag || w_max_flag || unconstrained || !isempty(swept)
-        nb_r = no_bounds_risk_measure(r, Val(noc.ucs_flag))
-        nb_opt = no_bounds_optimiser(opt, noc.ucs_flag)
+        nb_r = no_bounds_risk_measure(r)
+        nb_opt = no_bounds_optimiser(opt)
     end
     if w_min_flag
         res_min = optimise(MeanRisk(; r = nb_r, obj = MinimumRisk(), opt = nb_opt,
@@ -786,8 +771,7 @@ function near_optimal_centering_setup(noc::NearOptimalCentering, rd::ReturnsResu
         w_max = res_max.w
     end
     # The anchors are values of the expressions that the centring model bounds. The
-    # unconstrained model reads the copies without bounds, so with `ucs_flag = false` its
-    # anchors read the nominal moments, as its rows do.
+    # unconstrained model reads the copies without bounds, so its anchors read them too.
     if unconstrained
         r, opt = nb_r, nb_opt
     end
@@ -1148,7 +1132,7 @@ function solve_noc!(noc::NearOptimalCentering, model::JuMP.Model, rk_opt::Number
     return optimise_JuMP_model!(model, noc, eltype(opt.pe.X))
 end
 function solve_noc!(noc::NearOptimalCentering{<:Any, <:Any, <:Any, <:Any, <:Any, <:Any,
-                                              <:Any, <:Any, <:Any, <:Any, <:Any,
+                                              <:Any, <:Any, <:Any, <:Any,
                                               <:UnconstrainedNearOptimalCentering},
                     model::JuMP.Model, rk_opts::VecNum, rt_opts::VecNum, s_rk::Number,
                     s_rt::Number, opt::BaseJuMPOptimisationEstimator,
@@ -1326,7 +1310,7 @@ function compute_ret_lbs(ret_frontier::VecPair, rt_ends::VecPair)
     return ret_frontier
 end
 function solve_noc!(noc::NearOptimalCentering{<:Any, <:Any, <:Any, <:Any, <:Any, <:Any,
-                                              <:Any, <:Any, <:Any, <:Any, <:Any,
+                                              <:Any, <:Any, <:Any, <:Any,
                                               <:ConstrainedNearOptimalCentering},
                     model::JuMP.Model, rk_opts::VecNum, rt_opts::VecNum, s_rk::Number,
                     s_rt::Number, opt::BaseJuMPOptimisationEstimator,
@@ -1342,7 +1326,6 @@ function solve_noc!(noc::NearOptimalCentering{<:Any, <:Any, <:Any, <:Any, <:Any,
 end
 function rebuild_risk_frontier(noc::NearOptimalCentering{<:Any, <:Any, <:Any, <:Any, <:Any,
                                                          <:Any, <:Any, <:Any, <:Any, <:Any,
-                                                         <:Any,
                                                          <:ConstrainedNearOptimalCentering},
                                pr::AbstractPriorResult, fees::Option{<:Fees},
                                risk_frontier::VecPair, w_min::VecNum, w_max::VecNum,

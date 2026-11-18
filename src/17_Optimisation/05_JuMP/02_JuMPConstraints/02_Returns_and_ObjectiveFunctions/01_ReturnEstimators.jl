@@ -388,22 +388,22 @@ function port_opt_view(r::ArithmeticReturn, i, args...)
     return rebuild_struct(r, (; ucs = uset, mu = mu))
 end
 """
-    no_bounds_returns_estimator(r, args...)
+    no_bounds_returns_estimator(r)
 
 Create a version of the return term with its lower bound removed.
 
 The sub-problems of the frontier and of [`NearOptimalCentering`](@ref) call it, because their
 corner solves must range over the whole feasible set.
 
-The function removes `lb`, and it removes `ucs` when `flag` is `false`. The term keeps all
-other fields, `mu` included. Without `mu`, the term takes the prior's own vector as its
-centre. But a set describes the neighbourhood of the one vector that it was calibrated on.
-Also, with several terms, each term then gives the same corner.
+The function removes `lb`, and the term keeps all other fields, `ucs` and `mu` included. The
+copy keeps `ucs`, so a corner solve and [`expected_return`](@ref) read the same worst case as
+the model of the term. The copy keeps `mu`, because without it the term takes the prior's own
+vector as its centre. But a set describes the neighbourhood of the one vector that it was
+calibrated on. Also, with several terms, each term then gives the same corner.
 
 # Arguments
 
   - `r`: One return term, or a vector of them.
-  - `flag::Bool`: When `false`, the copy drops the uncertainty set too.
 
 # Returns
 
@@ -415,10 +415,11 @@ Also, with several terms, each term then gives the same corner.
   - [`LogarithmicReturn`](@ref)
   - [`no_bounds_optimiser`](@ref)
 """
-function no_bounds_returns_estimator(r::ArithmeticReturn, flag::Bool = true)
-    return rebuild_struct(r,
-                          (; settings = rebuild_struct(r.settings, (; lb = nothing)),
-                           ucs = ifelse(flag, r.ucs, nothing)))
+function no_bounds_returns_estimator(r::JuMPReturnsEstimator)
+    return rebuild_struct(r, (; settings = rebuild_struct(r.settings, (; lb = nothing))))
+end
+function no_bounds_returns_estimator(r::VecJRE)
+    return [no_bounds_returns_estimator(ri) for ri in r]
 end
 """
 $(DocStringExtensions.TYPEDSIGNATURES)
@@ -577,9 +578,6 @@ function factory(rt::LogarithmicReturn, pr::AbstractPriorResult, args...; kwargs
     return LogarithmicReturn(; settings = rt.settings,
                              w = nothing_scalar_array_selector(rt.w, pr.w))
 end
-function no_bounds_returns_estimator(r::LogarithmicReturn, args...)
-    return rebuild_struct(r, (; settings = rebuild_struct(r.settings, (; lb = nothing))))
-end
 """
     obs_weights_view(rt::LogarithmicReturn, i) -> LogarithmicReturn
 
@@ -677,12 +675,6 @@ Keywords correspond to the struct's fields.
 end
 function NoReturn(; settings::JuMPReturnsSettings = JuMPReturnsSettings())::NoReturn
     return NoReturn(settings)
-end
-function no_bounds_returns_estimator(r::NoReturn, args...)
-    return NoReturn(; settings = rebuild_struct(r.settings, (; lb = nothing)))
-end
-function no_bounds_returns_estimator(r::VecJRE, args...)
-    return [no_bounds_returns_estimator(ri, args...) for ri in r]
 end
 """
     resolved_expected_return(rt::JRE_VecJRE, wd::VecNum, w::VecNum, X::MatNum,

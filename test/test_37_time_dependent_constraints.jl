@@ -918,7 +918,7 @@ end
     @testset "Problem-definition fields of the concrete estimators" begin
         # The concrete estimators' own problem definition varies over folds too: the risk
         # measure, objective, budgeting algorithm, warm starts and the fallback itself.
-        # Execution control (`bins`, `ucs_flag`, `alg` variants, `flag`, `ex`, `sq`, `rng`,
+        # Execution control (`bins`, `alg` variants, `flag`, `ex`, `sq`, `rng`,
         # `seed`, `strict`) stays static.
         cvw = IndexWalkForward(100, 50)
         jopt = JuMPOptimiser(; slv = slv)

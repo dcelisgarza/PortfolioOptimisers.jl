@@ -1048,12 +1048,11 @@ end
     # prior-carrying `factory` then resolves.
     @test PO.no_bounds_returns_estimator(rt).mu === me
     @test isnothing(PO.no_bounds_returns_estimator(rt).settings.lb)
-    # `flag = false` strips the uncertainty set, and the characteristic stays put. It used
-    # to be dropped too, which silently re-centred the corner solve on the prior's own
-    # vector — the ADR 0050 defect class, and with several terms it collapsed every corner
-    # onto the same one.
-    @test PO.no_bounds_returns_estimator(rt, false).mu === me
-    @test isnothing(PO.no_bounds_returns_estimator(rt, false).ucs)
+    # The copy keeps the uncertainty set and the characteristic. A copy without `mu`
+    # re-centred the corner solve on the prior's own vector, the ADR 0050 defect class, and
+    # with several terms it collapsed every corner onto the same one.
+    @test PO.no_bounds_returns_estimator(rt).ucs === rt.ucs
+    @test_throws MethodError PO.no_bounds_returns_estimator(rt, false)
 end
 
 @testset "Deferred Quantity: `ArithmeticReturn.mu` keeps the #277 ladder intact" begin

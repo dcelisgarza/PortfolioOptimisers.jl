@@ -351,7 +351,7 @@ This is the copy that a measure takes when it only measures a distance, as the m
   - [`MaxRiskMeasureSettings`](@ref)
   - [`no_bounds_no_risk_expr_risk_measure`](@ref)
 """
-function no_bounds_no_risk_expr_risk_measure(r::Skewness, ::Any = nothing)
+function no_bounds_no_risk_expr_risk_measure(r::Skewness)
     settings = MaxRiskMeasureSettings(; rke = false, lb = nothing,
                                       scale = one(r.settings.scale))
     return rebuild_struct(r, (; settings = settings))
@@ -385,7 +385,7 @@ Return a copy of [`Skewness`](@ref) `r` with `lb = nothing`, and keep `rke` and 
   - [`MaxRiskMeasureSettings`](@ref)
   - [`no_bounds_risk_measure`](@ref)
 """
-function no_bounds_risk_measure(r::Skewness, ::Any = nothing)
+function no_bounds_risk_measure(r::Skewness)
     return rebuild_struct(r, (; settings = rebuild_struct(r.settings, (; lb = nothing))))
 end
 """
@@ -794,13 +794,13 @@ A child holds the bound of its own term, so the method for a [`RiskMeasure`](@re
   - [`no_bounds_risk_measure`](@ref)
   - [`no_bounds_no_risk_expr_risk_measure`](@ref)
 """
-function no_bounds_risk_measure(r::VarianceSkewKurtosis, flag::Any = nothing)
+function no_bounds_risk_measure(r::VarianceSkewKurtosis)
     return VarianceSkewKurtosis(;
                                 settings = RiskMeasureSettings(; rke = r.settings.rke,
                                                                scale = r.settings.scale),
-                                vr = no_bounds_risk_measure(r.vr, flag),
-                                sk = no_bounds_risk_measure(r.sk, flag),
-                                kt = no_bounds_risk_measure(r.kt, flag), pe = r.pe)
+                                vr = no_bounds_risk_measure(r.vr),
+                                sk = no_bounds_risk_measure(r.sk),
+                                kt = no_bounds_risk_measure(r.kt), pe = r.pe)
 end
 """
 $(DocStringExtensions.TYPEDSIGNATURES)
@@ -815,13 +815,13 @@ The container takes `rke = false` and a unit `scale`, as the method for a [`Risk
   - [`no_bounds_no_risk_expr_risk_measure`](@ref)
   - [`no_bounds_risk_measure`](@ref)
 """
-function no_bounds_no_risk_expr_risk_measure(r::VarianceSkewKurtosis, flag::Any = nothing)
+function no_bounds_no_risk_expr_risk_measure(r::VarianceSkewKurtosis)
     return VarianceSkewKurtosis(;
                                 settings = RiskMeasureSettings(; rke = false,
                                                                scale = one(r.settings.scale)),
-                                vr = no_bounds_risk_measure(r.vr, flag),
-                                sk = no_bounds_risk_measure(r.sk, flag),
-                                kt = no_bounds_risk_measure(r.kt, flag), pe = r.pe)
+                                vr = no_bounds_risk_measure(r.vr),
+                                sk = no_bounds_risk_measure(r.sk),
+                                kt = no_bounds_risk_measure(r.kt), pe = r.pe)
 end
 
 # Expected-risk input kind — see `risk_input_kind`.

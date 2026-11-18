@@ -239,7 +239,6 @@ unique_key_dict!(arg_dict, :arg_dict,
                  :w_opt_noc => "`w_opt`: Anchor portfolio of the objective, or one for each point of a frontier sweep. If `nothing`, a sub-problem solves it.",#
                  :w_min_noc => "`w_min`: Anchor portfolio of minimum risk. If `nothing`, a sub-problem solves it.",#
                  :w_max_noc => "`w_max`: Anchor portfolio of maximum return. If `nothing`, a sub-problem solves it.",#
-                 :ucs_flag => "`ucs_flag`: If `true`, the copies of the risk measures and of the return terms without bounds keep their uncertainty sets. If `false`, they use the nominal moments. These copies solve the anchors of minimum risk and of maximum return, and the centring model of [`UnconstrainedNearOptimalCentering`](@ref).",#
                  # Optimiser config.
                  :kwargs => "`kwargs`: More keyword arguments.",#
                  # Near optimal centering result fields.

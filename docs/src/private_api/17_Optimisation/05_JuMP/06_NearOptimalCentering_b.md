@@ -9,5 +9,5 @@ assemble_near_optimal_centering_model!(::UnconstrainedNearOptimalCentering, mode
 anchor_cone_scale
 solve_near_optimal_centering!(::UnconstrainedNearOptimalCentering, model::JuMP.Model, noc::NearOptimalCentering, setup::NearOptimalSetup)
 get_overall_retcode
-compute_risk_ubs(model::JuMP.Model, noc::NearOptimalCentering{<:Any, <:Any, <:Any, <:Any, <:Any, <:Any, <:Any, <:Any, <:Any, <:Any, <:Any, <:ConstrainedNearOptimalCentering}, pr::AbstractPriorResult, fees::Option{<:Fees}, w_min::VecNum, w_max::VecNum, args...)
+compute_risk_ubs(model::JuMP.Model, noc::NearOptimalCentering{<:Any, <:Any, <:Any, <:Any, <:Any, <:Any, <:Any, <:Any, <:Any, <:Any, <:ConstrainedNearOptimalCentering}, pr::AbstractPriorResult, fees::Option{<:Fees}, w_min::VecNum, w_max::VecNum, args...)
 ```
