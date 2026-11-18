@@ -4,7 +4,7 @@
 
 Bound the 2-norm of the weights above by `val`, a ceiling that spreads the portfolio over more assets as it falls.
 
-The row multiplies `val` by the homogenisation variable `k`, so the ceiling holds on the weights the result reports: on ``\\boldsymbol{w} / k`` under [`MaximumRatio`](@ref), on the renormalised weights under [`RiskBudgeting`](@ref), and on ``\\boldsymbol{w}`` itself under every other objective, where ``k = 1``. The budget does not scale the ceiling. The builder takes a number. The caller-facing slot also takes an [`AbstractNormCeilingCalibrationAlgorithm`](@ref), which computes the ceiling from the universe the prior result carries, and [`assemble_jump_model!`](@ref) resolves it before it calls here. `nothing` adds nothing to the model. Any other type or arity is a `MethodError`.
+The row multiplies `val` by the homogenisation variable `k`, so the ceiling holds on the weights the result reports: on ``\\boldsymbol{w} / k`` under [`MaximumRatio`](@ref), on the renormalised weights under [`RiskBudgeting`](@ref), and on ``\\boldsymbol{w}`` itself under every other objective, where ``k = 1``. The budget does not scale the ceiling. The builder takes a number. The caller-facing slot also takes an [`AbstractNormCeilingCalibrationAlgorithm`](@ref), which computes the ceiling from the universe the prior result carries, and the stage 2 of the constraint block, [`resolve_constraint_block`](@ref), resolves it before the library builds the model. `nothing` adds nothing to the model. Any other type or arity is a `MethodError`.
 
 # Mathematical definition
 
@@ -204,7 +204,7 @@ end
 
 Bound the largest absolute weight above by `val`, the ∞-norm ceiling of the weights.
 
-The row multiplies `val` by the homogenisation variable `k`, so the ceiling holds on the weights the result reports, as in [`set_weight_norm_2_constraints!`](@ref). So `val = 0.2` keeps each reported weight within 20% of a portfolio that sums to one. The builder takes a number. The caller-facing slot also takes an [`AbstractNormCeilingCalibrationAlgorithm`](@ref), which computes the ceiling from the universe the prior result carries, and [`assemble_jump_model!`](@ref) resolves it before it calls here. `nothing` adds nothing to the model. Any other type or arity is a `MethodError`.
+The row multiplies `val` by the homogenisation variable `k`, so the ceiling holds on the weights the result reports, as in [`set_weight_norm_2_constraints!`](@ref). So `val = 0.2` keeps each reported weight within 20% of a portfolio that sums to one. The builder takes a number. The caller-facing slot also takes an [`AbstractNormCeilingCalibrationAlgorithm`](@ref), which computes the ceiling from the universe the prior result carries, and the stage 2 of the constraint block, [`resolve_constraint_block`](@ref), resolves it before the library builds the model. `nothing` adds nothing to the model. Any other type or arity is a `MethodError`.
 
 # Mathematical definition
 
