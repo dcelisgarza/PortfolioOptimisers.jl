@@ -18,6 +18,8 @@ The reduction changes nothing on a prior that is already reduced. The moments of
 
 Each method is the scalar twin of the `ret` expression that `set_return_constraints!` builds for the same estimator, so the two sides charge the same fee. For a [`NoReturn`](@ref), the model builds a zero expression and charges no fee on it. `settings.fee` has no effect on that term, and the scalar twin charges no fee either.
 
+An [`ArithmeticReturn`](@ref) whose `ucs` holds a fitted set gives the worst-case return over the set, [`ucs_expected_return`](@ref), in place of ``\\boldsymbol{w}^{\\intercal} \\boldsymbol{\\mu}``. The model expression of that term is the worst case, so a lower bound on the term holds at `w` exactly when this value meets it. An estimator in `ucs` gives the nominal return, because no set exists until an optimiser fits it. The functor of [`UncertaintySetVariance`](@ref) reads its set by the same rule. The resolved return terms of an optimisation, in the `ret` of its [`ResolvedJuMPOptimiser`](@ref), hold the fitted sets.
+
 The fourth method takes a vector of weight vectors. It applies one of the first three methods to each weight vector, and returns one expected return for each.
 
 # Mathematical definition

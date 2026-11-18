@@ -711,10 +711,10 @@ Solve the anchors of [`NearOptimalCentering`](@ref), and compute the bounds of i
  1. Process the optimiser into its attributes with [`resolve_jump_optimiser`](@ref), with the blocks of `blocks`, reduce `noc` and `rd` to the investable universe, and bind a data benchmark to the rows of the view. Give the blocks after the first of the bundle to every anchor sub-problem below, viewed at the investable universe, with [`constraint_block_steps`](@ref).
  2. If an anchor of minimum risk or of maximum return is missing, if the variant is [`UnconstrainedNearOptimalCentering`](@ref), or if a return term holds a [`Frontier`](@ref), make the copies of the risk measures and of the optimiser without bounds. `ucs_flag` selects whether they keep their uncertainty sets.
  3. Solve each missing anchor as a [`MeanRisk`](@ref) problem. The anchors of minimum risk and of maximum return solve with the copies without bounds, and the anchor of `obj` solves with `r` and `opt` as they are.
- 4. Compute the risks of the anchors with [`near_optimal_centering_risks`](@ref), and their returns with [`expected_return`](@ref).
- 5. For each return term that holds a [`Frontier`](@ref), compute its span with [`return_term_ends`](@ref).
- 6. Compute ``\\epsilon_{2} = R(\\boldsymbol{w}_{\\mathrm{opt}}) + (R(\\boldsymbol{w}_{\\max}) - R(\\boldsymbol{w}_{\\min})) / m`` and ``\\epsilon_{1} = \\mathrm{ret}(\\boldsymbol{w}_{\\mathrm{opt}}) - (\\mathrm{ret}(\\boldsymbol{w}_{\\max}) - \\mathrm{ret}(\\boldsymbol{w}_{\\min})) / m``, with ``m = T / N`` when `bins` is `nothing`.
- 7. For the unconstrained variant, give the centring model the copies without bounds.
+ 4. For the unconstrained variant, replace `r` and `opt` with the copies without bounds, which the centring model reads.
+ 5. Compute the risks of the anchors with [`near_optimal_centering_risks`](@ref) on `r`, and their returns with [`expected_return`](@ref) on the return terms of `opt`. Thus each anchor is a value of the expression that the centring model bounds. A term with a fitted uncertainty set gives its worst-case return, through [`ucs_expected_return`](@ref).
+ 6. For each return term that holds a [`Frontier`](@ref), compute its span with [`return_term_ends`](@ref).
+ 7. Compute ``\\epsilon_{2} = R(\\boldsymbol{w}_{\\mathrm{opt}}) + (R(\\boldsymbol{w}_{\\max}) - R(\\boldsymbol{w}_{\\min})) / m`` and ``\\epsilon_{1} = \\mathrm{ret}(\\boldsymbol{w}_{\\mathrm{opt}}) - (\\mathrm{ret}(\\boldsymbol{w}_{\\max}) - \\mathrm{ret}(\\boldsymbol{w}_{\\min})) / m``, with ``m = T / N`` when `bins` is `nothing`.
 
 # Arguments
 
@@ -785,6 +785,12 @@ function near_optimal_centering_setup(noc::NearOptimalCentering, rd::ReturnsResu
         w_max_retcode = res_max.retcode
         w_max = res_max.w
     end
+    # The anchors are values of the expressions that the centring model bounds. The
+    # unconstrained model reads the copies without bounds, so with `ucs_flag = false` its
+    # anchors read the nominal moments, as its rows do.
+    if unconstrained
+        r, opt = nb_r, nb_opt
+    end
     pr = opt.pe
     fees = opt.fees
     ret = opt.ret
@@ -809,9 +815,6 @@ function near_optimal_centering_setup(noc::NearOptimalCentering, rd::ReturnsResu
     rt_delta = (rt_max - rt_min) * ibins
     rk_opt = rk_opt ⊕ rk_delta
     rt_opt = rt_opt ⊖ rt_delta
-    if unconstrained
-        r, opt = nb_r, nb_opt
-    end
     return NearOptimalSetup(; w_opt = w_opt, rk_opt = rk_opt, rt_opt = rt_opt,
                             rk_delta = rk_delta, rt_delta = rt_delta, rt_min = rt_min,
                             rt_max = rt_max, rt_ends = rt_ends, w_min = w_min,

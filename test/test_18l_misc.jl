@@ -62,6 +62,85 @@ end
     end
 end
 
+@testset "A return term with a set reads the worst case that the model bounds" begin
+    # Issue #2185. `expected_return` of a term with a fitted set is the worst case, so a
+    # level of a return `Frontier` and an anchor of a centring read the value that the
+    # bound row holds, and not the nominal `mu'w`.
+    l1e = CharacteristicUncertaintySet(; pe = EmpiricalPrior(),
+                                       alg = L1UncertaintySetAlgorithm(;
+                                                                       method = ActiveAssetsUncertaintyAlgorithm(;
+                                                                                                                 active = CountOf(5))))
+    l1 = mu_ucs(l1e, rd)
+    nue(alg) = NormalUncertaintySet(; pe = EmpiricalPrior(), rng = StableRNG(2185),
+                                    alg = alg)
+    sets = (mu_ucs(nue(BoxUncertaintySetAlgorithm()), pr.X),
+            mu_ucs(nue(EllipsoidalUncertaintySetAlgorithm()), pr.X), l1,
+            SignedL1UncertaintySet(; ep = 0.01, en = 0.02, sd = sqrt.(diag(pr.sigma))),
+            mu_ucs(NormalUncertaintySet(;
+                                        alg = NormBallUncertaintySetAlgorithm(;
+                                                                              diagonal = false)),
+                   pr.X))
+    for ucs in sets
+        ret = ArithmeticReturn(; ucs = ucs)
+        opt = JuMPOptimiser(; pe = pr, slv = slv, ret = ret,
+                            wb = WeightBounds(; lb = -1, ub = 1), sbgt = 1, bgt = 1)
+        res = optimise(MeanRisk(; r = NoRisk(), obj = MaximumReturn(), opt = opt))
+        @test isa(res.retcode, OptimisationSuccess)
+        # The objective raises the return, so the model expression reaches the worst case.
+        rt = expected_return(ret, res.w, pr)
+        @test isapprox(rt, JuMP.value(res.model[:ret]); rtol = 1e-4, atol = 1e-8)
+        @test rt < LinearAlgebra.dot(pr.mu, res.w)
+        # A set that is not fitted gives the nominal return.
+        @test PortfolioOptimisers.ucs_expected_return(nothing, pr.mu, res.w) ==
+              LinearAlgebra.dot(pr.mu, res.w)
+    end
+    # A number in `mu` folds against the weights, as the model expression `dot_scalar` does.
+    w_eq = fill(inv(size(pr.X, 2)), size(pr.X, 2))
+    @test expected_return(ArithmeticReturn(; mu = 0.01), w_eq, pr) ≈ 0.01 * sum(w_eq)
+    # The span of a return frontier ends at the largest worst case, which the pure form
+    # reaches, and starts at the worst case of the minimum-risk portfolio. An estimator in
+    # the slot is fitted once, so the bundle holds the fitted set.
+    ret_l1 = ArithmeticReturn(; ucs = l1)
+    pure = optimise(MeanRisk(; r = NoRisk(), obj = MaximumReturn(),
+                             opt = JuMPOptimiser(; pe = pr, slv = slv, ret = ret_l1)))
+    rt_top = JuMP.objective_value(pure.model)
+    w_min = optimise(MeanRisk(; opt = JuMPOptimiser(; pe = pr, slv = slv, ret = ret_l1))).w
+    for u in (l1, l1e)
+        ret = ArithmeticReturn(; ucs = u,
+                               settings = JuMPReturnsSettings(; lb = Frontier(; N = 3)))
+        res = optimise(MeanRisk(; opt = JuMPOptimiser(; pe = pr, slv = slv, ret = ret)), rd)
+        @test all(x -> isa(x, OptimisationSuccess), res.retcode)
+        @test isa(res.jor.ret.ucs, L1UncertaintySet)
+        rts = [expected_return(ret_l1, w, pr) for w in res.w]
+        @test isapprox(rts[end], rt_top; rtol = 1e-6)
+        # The first level is the worst case of the minimum-risk portfolio, and the point
+        # meets it. The variance is flat at its minimum, so the point can hold a small slack.
+        @test rts[1] >= expected_return(ret_l1, w_min, pr) - 1e-8
+        @test issorted(rts)
+    end
+    # Each anchor of a centring is a value of the expression that its model bounds. The
+    # unconstrained model with `ucs_flag = false` reads the nominal moments, and the
+    # constrained model keeps the sets.
+    sus = sigma_ucs(nue(BoxUncertaintySetAlgorithm()), pr.X)
+    usv = UncertaintySetVariance(; ucs = sus)
+    for (alg, nominal) in ((UnconstrainedNearOptimalCentering(), true),
+                           (ConstrainedNearOptimalCentering(), false))
+        noc = NearOptimalCentering(; alg = alg, ucs_flag = false, r = usv,
+                                   opt = JuMPOptimiser(; pe = pr, slv = slv, ret = ret_l1))
+        s = PortfolioOptimisers.near_optimal_centering_setup(noc, rd)
+        rk = s.rk_opt - s.rk_delta
+        rt = s.rt_opt + s.rt_delta
+        if nominal
+            @test isapprox(rk, expected_risk(Variance(), s.w_opt, pr); rtol = 1e-10)
+            @test isapprox(rt, LinearAlgebra.dot(pr.mu, s.w_opt); rtol = 1e-10)
+            @test rk < expected_risk(usv, s.w_opt, pr)
+        else
+            @test isapprox(rk, expected_risk(usv, s.w_opt, pr); rtol = 1e-10)
+            @test isapprox(rt, expected_return(ret_l1, s.w_opt, pr); rtol = 1e-10)
+        end
+    end
+end
+
 @testset "Weight bounds" begin
     opt = JuMPOptimiser(; pe = pr, slv = slv, sets = sets, sbgt = 1, bgt = 1,
                         wb = WeightBoundsEstimator(; lb = ["group1" => -1, "group2" => 0.1],

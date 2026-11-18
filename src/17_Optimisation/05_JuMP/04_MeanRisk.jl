@@ -514,7 +514,7 @@ The high end of term `i` comes from a portfolio that maximises term `i` alone. T
  2. When `idx` is empty, return `ret_frontier`.
  3. Set the objective [`MinimumRisk`](@ref) and solve, giving `sol_min`. Unregister the objective expression.
  4. For each position `j` of `idx`, read the term index `i` of the entry. Set the objective [`MaximumElementReturn`](@ref)`(i)` and solve, giving `sol_max`. Unregister the objective expression.
- 5. Compute the value of term `i` with [`expected_return`](@ref) at `sol_min.w` and at `sol_max.w`, giving `rt_min` and `rt_max`.
+ 5. Compute the value of term `i` with [`expected_return`](@ref) at `sol_min.w` and at `sol_max.w`, giving `rt_min` and `rt_max`. The bound binds on the expression of the term, so a term with an uncertainty set gives its worst-case return, through [`ucs_expected_return`](@ref). The resolved term holds the set that the model fitted. The value of the expression at the minimum-risk corner can lie below the worst case, because that solve does not raise the return.
  6. Replace the bound of entry `j` with `range(rt_min, rt_max; length = N)`, with the `N` of its `Frontier`.
 
 # Arguments

@@ -21,7 +21,7 @@ A distance reader of a block, its `cte` or its `ple`, can refuse an asset that i
  3. Resolve the fees on the universe of the caller with [`fees_constraints`](@ref).
  4. Resolve stage 1 of the block of `opt` over the universe of the caller, with [`resolve_constraint_block_names`](@ref).
  5. Resolve every block through the shared entry [`resolve_block_entry`](@ref). The entry intersects the mask with the mask of each entry of `blocks`. The resolver of the head, [`resolve_jump_head_block`](@ref), places the fees on the axes that the mask leaves, reduces the prior, the optimiser and `rd` to the mask, and resolves stage 2 of the block of `opt`. The entry resolves each entry of `blocks` at the mask, and it fits again on a refusal.
- 6. Resolve the return terms against the prior with [`factory`](@ref), and return the bundle. Its `cbr` is the block Result of `opt` when `blocks` is empty, and the vector of every block Result otherwise.
+ 6. Fit the uncertainty set of each return term on the reduced prior and returns data with [`ucs_returns_estimator`](@ref). Resolve the return terms against the prior with [`factory`](@ref), and return the bundle. Its `cbr` is the block Result of `opt` when `blocks` is empty, and the vector of every block Result otherwise.
 
 # Arguments
 
@@ -77,12 +77,16 @@ function resolve_jump_optimiser(opt::JuMPOptimiser, rd::ReturnsResult; blocks::T
                            cbe = resolve_constraint_block_names(opt.cbe, opt.strict,
                                                                 datatype)))
     # The shared entry holds the one refusal branch for the readers of every block.
-    imsk, (fees, prr, optr), cbrs = resolve_block_entry(resolve_jump_head_block,
-                                                        (opt1, pr, rd, feesu, kwargs), imsk,
-                                                        blocks, rd, opt.strict)
+    imsk, (fees, prr, optr, rdr), cbrs = resolve_block_entry(resolve_jump_head_block,
+                                                             (opt1, pr, rd, feesu, kwargs),
+                                                             imsk, blocks, rd, opt.strict)
     cbr = isempty(blocks) ? first(cbrs) : [cbrs...]
-    return ResolvedJuMPOptimiser(; pr = prr, fees = fees, ret = factory(optr.ret, prr),
-                                 sca = optr.sca, imsk = imsk, cbr = cbr)
+    # The sets of the return terms are fitted once, on the prior and the rows that the
+    # builder reads. So the builder, the corners of a frontier and the anchors of a centring
+    # read one set, and the value of a term is the worst case that the model bounds.
+    ret = factory(ucs_returns_estimator(optr.ret, rdr, prr), prr)
+    return ResolvedJuMPOptimiser(; pr = prr, fees = fees, ret = ret, sca = optr.sca,
+                                 imsk = imsk, cbr = cbr)
 end
 """
     resolve_jump_head_block(imsk::Option{BitVector}, opt::JuMPOptimiser,
@@ -96,7 +100,7 @@ The entry calls it once on the first fit, and once more on each fit again after 
 
  1. Reduce the prior, the optimiser and `rd` to the mask with [`investable_reduction`](@ref). The reduction views the block of stage 1, and it declares the Non-Investable Axis on its `sets`.
  2. Resolve stage 2 of the reduced block with [`resolve_constraint_block`](@ref), through [`distance_reader_call`](@ref), under the solver and the `strict` flag of the head.
- 3. Place the fees on the axes that the mask leaves with [`investable_fees_view`](@ref), and return them with the reduced prior and optimiser.
+ 3. Place the fees on the axes that the mask leaves with [`investable_fees_view`](@ref), and return them with the reduced prior, optimiser and `rd`.
 
 # Arguments
 
@@ -109,7 +113,7 @@ The entry calls it once on the first fit, and once more on each fit again after 
 
 # Returns
 
-  - `((fees, pr, opt), (cbr,))::Tuple`: The fees, the prior and the optimiser at the mask, and the block Result of `opt`, or the [`DistanceReaderRefusalError`](@ref) of one of its readers.
+  - `((fees, pr, opt, rd), (cbr,))::Tuple`: The fees, the prior, the optimiser and the returns data at the mask, and the block Result of `opt`, or the [`DistanceReaderRefusalError`](@ref) of one of its readers. The builder of the model reads the same returns data, so [`resolve_jump_optimiser`](@ref) fits the sets of the return terms on them.
 
 # Related
 
@@ -122,7 +126,7 @@ function resolve_jump_head_block(imsk::Option{BitVector}, opt::JuMPOptimiser,
     _, prr, optr, rdr = investable_reduction(pr, opt, rd, imsk)
     cbr = distance_reader_call(resolve_constraint_block, optr.cbe, prr, rdr; slv = optr.slv,
                                strict = optr.strict, kwargs...)
-    return (investable_fees_view(fees, imsk, pr.X), prr, optr), (cbr,)
+    return (investable_fees_view(fees, imsk, pr.X), prr, optr, rdr), (cbr,)
 end
 """
     no_bounds_optimiser(opt::JuMPOptimiser, args...) -> JuMPOptimiser

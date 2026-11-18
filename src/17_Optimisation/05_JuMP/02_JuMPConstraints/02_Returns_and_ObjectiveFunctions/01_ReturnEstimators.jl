@@ -692,7 +692,7 @@ Compute the expected return of the weights `wd` from a return estimator that [`f
 
 A resolved estimator holds every moment that it reads, so the returns matrix `X` is the only data that the function needs. [`expected_return`](@ref) on a prior calls it on `factory(rt, pr)` and `pr.X`, and [`ExpectedReturn`](@ref) and [`ExpectedReturnRiskRatio`](@ref) call it on the returns matrix of the risk path. Thus both routes read one ladder, the ladder of the model that [`set_return_constraints!`](@ref) builds.
 
-[`expected_return`](@ref) states the closed form of each estimator. The function reads the gross return of `wd` and the fee term of `w`. The two are the same vector, except in [`difference_risk`](@ref), where `wd` is the difference of `w` and a benchmark. The `mu` slot of an [`ArithmeticReturn`](@ref) and the `w` slot of a [`LogarithmicReturn`](@ref) take the place of the moments of the prior. A vector of estimators sums `settings.scale` times the return of each term whose `settings.rte` is `true`.
+[`expected_return`](@ref) states the closed form of each estimator. The function reads the gross return of `wd` and the fee term of `w`. The two are the same vector, except in [`difference_risk`](@ref), where `wd` is the difference of `w` and a benchmark. The `mu` slot of an [`ArithmeticReturn`](@ref) and the `w` slot of a [`LogarithmicReturn`](@ref) take the place of the moments of the prior. An [`ArithmeticReturn`](@ref) reads its `ucs` through [`ucs_expected_return`](@ref). A fitted set gives the worst-case return over the set, and an estimator or `nothing` gives the nominal return. A vector of estimators sums `settings.scale` times the return of each term whose `settings.rte` is `true`.
 
 # Arguments
 
@@ -715,6 +715,7 @@ A resolved estimator holds every moment that it reads, so the returns matrix `X`
   - [`expected_return`](@ref)
   - [`ExpectedReturn`](@ref)
   - [`ExpectedReturnRiskRatio`](@ref)
+  - [`ucs_expected_return`](@ref)
   - [`term_fees`](@ref)
   - [`factory`](@ref)
 """
@@ -723,7 +724,10 @@ function resolved_expected_return(rt::ArithmeticReturn, wd::VecNum, w::VecNum, X
     assert_resolved_slots(rt)
     @argcheck(!isnothing(rt.mu),
               IsNothingError("an `ArithmeticReturn` reads the expected returns `mu` of a prior, and this one holds none. A returns matrix does not hold them. Pass the prior result, for example `expected_risk(r, w, pr)`, or resolve the measure first with `factory(r, pr)`, or state `mu` on the `ArithmeticReturn`."))
-    return LinearAlgebra.dot(wd, rt.mu) - term_fees(w, fees, size(X, 1), rt.settings.fee)
+    # A fitted set gives the worst case that the model bounds, as the functor of
+    # `UncertaintySetVariance` gives the worst-case variance.
+    return ucs_expected_return(rt.ucs, rt.mu, wd, rt.mtx_sqrt) -
+           term_fees(w, fees, size(X, 1), rt.settings.fee)
 end
 function resolved_expected_return(rt::LogarithmicReturn, wd::VecNum, w::VecNum, X::MatNum,
                                   fees::Option{<:Fees})
@@ -746,6 +750,141 @@ function resolved_expected_return(rt::VecJRE, wd::VecNum, w::VecNum, X::MatNum,
         ret += rt_i.settings.scale * resolved_expected_return(rt_i, wd, w, X, fees)
     end
     return ret
+end
+"""
+    ucs_expected_return(ucs, mu::Num_VecNum, w::VecNum,
+                        mtx_sqrt::Option{<:AbstractMatrixSquareRootAlgorithm} = EigenFallbackSquareRoot())
+
+Compute the expected return of the weights `w` over the mean uncertainty set `ucs`, before the charges.
+
+It is the value level of the return expression that [`set_ucs_return_constraints!`](@ref) builds for the same set. [`resolved_expected_return`](@ref) calls it on the `ucs` of an [`ArithmeticReturn`](@ref), as the functor of [`UncertaintySetVariance`](@ref) calls [`ucs_variance`](@ref). A fitted set gives the worst-case return over the set. An estimator or `nothing` gives the nominal return ``\\boldsymbol{\\mu}^\\intercal \\boldsymbol{w}``, because the set does not exist yet. [`ucs_returns_estimator`](@ref) fits the set before the optimiser builds a model, so every reader of a resolved term reads the worst case.
+
+The model expression lies at or below this value, and the two are equal when the objective raises the return or when the lower bound of the term binds. So a weight vector meets a lower bound on the model expression exactly when this value meets it. A level of a [`Frontier`](@ref) and an anchor of [`NearOptimalCentering`](@ref) read this value, and not the value of the model expression at a corner, which can lie far below it.
+
+# Mathematical definition
+
+```math
+\\begin{align}
+\\hat{r}_{\\mathrm{box}}(\\boldsymbol{w}) &= \\hat{\\boldsymbol{\\mu}}^\\intercal \\boldsymbol{w} - \\boldsymbol{\\Delta}^\\intercal \\lvert \\boldsymbol{w} \\rvert\\,,\\\\
+\\hat{r}_{\\mathrm{ell}}(\\boldsymbol{w}) &= \\hat{\\boldsymbol{\\mu}}^\\intercal \\boldsymbol{w} - \\kappa \\lVert \\mathbf{G}\\boldsymbol{w} \\rVert_2\\,,\\\\
+\\hat{r}_{\\ell_1}(\\boldsymbol{w}) &= \\hat{\\boldsymbol{\\mu}}^\\intercal \\boldsymbol{w} - \\epsilon \\lVert \\boldsymbol{\\sigma} \\odot \\boldsymbol{w} \\rVert_\\infty\\,,\\\\
+\\hat{r}_{\\pm\\ell_1}(\\boldsymbol{w}) &= \\hat{\\boldsymbol{\\mu}}^\\intercal \\boldsymbol{w} - \\epsilon_{+} \\left(\\underset{i}{\\max}\\, (-\\sigma_i w_i)\\right)_{+} - \\epsilon_{-} \\left(\\underset{i}{\\max}\\, (\\sigma_i w_i)\\right)_{+}\\,,\\\\
+\\hat{r}_{\\mathrm{nb}}(\\boldsymbol{w}) &= \\hat{\\boldsymbol{\\mu}}^\\intercal \\boldsymbol{w} - \\kappa_{b} \\lVert \\mathbf{L}^{\\intercal}\\boldsymbol{w} \\rVert_{p^{*}}\\,.
+\\end{align}
+```
+
+Where:
+
+  - ``\\hat{r}_{\\mathrm{box}}``, ``\\hat{r}_{\\mathrm{ell}}``, ``\\hat{r}_{\\ell_1}``, ``\\hat{r}_{\\pm\\ell_1}``, ``\\hat{r}_{\\mathrm{nb}}``: Worst-case expected return over a [`BoxUncertaintySet`](@ref), an [`EllipsoidalUncertaintySet`](@ref), an [`L1UncertaintySet`](@ref), a [`SignedL1UncertaintySet`](@ref) and a mean [`NormBallUncertaintySet`](@ref).
+  - $(math_dict[:mu_hat_ucs])
+  - $(math_dict[:w_port])
+  - ``\\boldsymbol{\\Delta}``: Half-width of the box, half the difference of its `ub` and `lb` fields.
+  - ``\\kappa``, ``\\mathbf{G}``: Radius of the ellipsoid, its `k` field, and the transpose of the square root of its `sigma` field that [`matrix_square_root`](@ref) takes under `mtx_sqrt`.
+  - ``\\epsilon``: Radius of the ``\\ell_1`` set, its `eps` field.
+  - ``\\epsilon_{+}``, ``\\epsilon_{-}``: Radii of the positive-error and the negative-error sides of the signed set, its `ep` and `en` fields.
+  - $(math_dict[:sigma_i_ucs]) ``\\boldsymbol{\\sigma}`` is the vector of these factors, the `sd` field.
+  - $(math_dict[:pos_part])
+  - ``\\kappa_{b}``, ``\\mathbf{L}``, ``p^{*}``: Radius of the norm ball, its map, and the dual order of its norm, [`dual_norm_order`](@ref) of its `p` field. A map with no column adds nothing.
+
+# Arguments
+
+  - `ucs`: Fitted mean uncertainty set, an estimator of one, or `nothing`.
+  - `mu::Num_VecNum`: Fallback centre. The centre that the set carries wins over it.
+  - $(arg_dict[:pw])
+  - `mtx_sqrt`: Square-root algorithm of the matrix of an ellipsoid, or `nothing` for the plain Cholesky factor. The other sets ignore it.
+
+# Validation
+
+  - Ellipsoid: `ucs.sigma` has a square root under `mtx_sqrt`, as [`matrix_square_root`](@ref) states. Raises a `LinearAlgebra.PosDefException`.
+
+# Returns
+
+  - `rt::Number`: The worst-case expected return for a fitted set, and the nominal expected return otherwise.
+
+# Related
+
+  - [`ArithmeticReturn`](@ref)
+  - [`resolved_expected_return`](@ref)
+  - [`ucs_returns_estimator`](@ref)
+  - [`ucs_variance`](@ref)
+  - [`set_ucs_return_constraints!`](@ref): The model expression, whose value lies at or below this value.
+"""
+function ucs_expected_return(::Option{<:AbstractUncertaintySetEstimator}, mu::Num_VecNum,
+                             w::VecNum, ::Any = nothing)
+    return dot_scalar(mu, w)
+end
+function ucs_expected_return(ucs::BoxUncertaintySet, mu::Num_VecNum, w::VecNum,
+                             ::Any = nothing)
+    # The set names its own centre, and `mu` is the fallback (ADR 0050).
+    mu = something(ucs.val, mu)
+    return dot_scalar(mu, w) - LinearAlgebra.dot((ucs.ub - ucs.lb) / 2, abs.(w))
+end
+function ucs_expected_return(ucs::EllipsoidalUncertaintySet, mu::Num_VecNum, w::VecNum,
+                             mtx_sqrt::Option{<:AbstractMatrixSquareRootAlgorithm} = EigenFallbackSquareRoot())
+    mu = something(ucs.val, mu)
+    G = transpose(matrix_square_root(mtx_sqrt, ucs.sigma))
+    return dot_scalar(mu, w) - ucs.k * LinearAlgebra.norm(G * w)
+end
+function ucs_expected_return(ucs::L1UncertaintySet, mu::Num_VecNum, w::VecNum,
+                             ::Any = nothing)
+    mu = something(ucs.mu, mu)
+    sw = isnothing(ucs.sd) ? w : ucs.sd .* w
+    return dot_scalar(mu, w) - ucs.eps * LinearAlgebra.norm(sw, Inf)
+end
+function ucs_expected_return(ucs::SignedL1UncertaintySet, mu::Num_VecNum, w::VecNum,
+                             ::Any = nothing)
+    mu = something(ucs.mu, mu)
+    sw = isnothing(ucs.sd) ? w : ucs.sd .* w
+    z = zero(eltype(sw))
+    return dot_scalar(mu, w) - ucs.ep * max(maximum(-sw), z) - ucs.en * max(maximum(sw), z)
+end
+function ucs_expected_return(ucs::NormBallUncertaintySet{<:Any, <:Any, <:Any,
+                                                         <:MuUncertaintySetClass},
+                             mu::Num_VecNum, w::VecNum, ::Any = nothing)
+    mu = something(ucs.val, mu)
+    # `norm` of an empty vector is zero under every order, so a map with no column pays
+    # nothing without a branch, as the builder raises no cone for it.
+    penalty = LinearAlgebra.norm(transpose(ucs.L) * w, dual_norm_order(ucs.p))
+    return dot_scalar(mu, w) - ucs.kappa * penalty
+end
+"""
+    ucs_returns_estimator(rt, rd::ReturnsResult, pr::AbstractPriorResult)
+
+Fit the estimator in the `ucs` of an [`ArithmeticReturn`](@ref) on the returns data `rd` and the prior result `pr`, so that the set becomes an [`AbstractUncertaintySetResult`](@ref).
+
+[`resolve_jump_optimiser`](@ref) calls it once, on the reduced prior and the reduced returns data that the builder of the model reads. So the model, the levels of a return [`Frontier`](@ref), the anchors of [`NearOptimalCentering`](@ref) and its sub-problems read one fitted set, and [`ucs_expected_return`](@ref) gives the worst case that the model bounds. It is the return twin of [`ucs_risk_measure`](@ref). The prior exists here, so an estimator that reads a prior result is fitted too, through [`mu_ucs`](@ref) of three arguments.
+
+A set that is already fitted, `nothing`, and a term of another type return unchanged. A vector of terms is fitted term by term.
+
+# Arguments
+
+  - `rt`: One return term, or a vector of them.
+  - $(arg_dict[:rd])
+  - $(arg_dict[:pr])
+
+# Returns
+
+  - The term, or the vector of terms, with each estimator in `ucs` replaced by its fitted set.
+
+# Related
+
+  - [`ArithmeticReturn`](@ref)
+  - [`mu_ucs`](@ref)
+  - [`ucs_expected_return`](@ref)
+  - [`ucs_risk_measure`](@ref)
+  - [`resolve_jump_optimiser`](@ref)
+"""
+function ucs_returns_estimator(rt::ArithmeticReturn{<:Any,
+                                                    <:AbstractUncertaintySetEstimator},
+                               rd::ReturnsResult, pr::AbstractPriorResult)
+    return rebuild_struct(rt, (; ucs = mu_ucs(rt.ucs, rd, pr)))
+end
+function ucs_returns_estimator(rt::JuMPReturnsEstimator, ::ReturnsResult,
+                               ::AbstractPriorResult)
+    return rt
+end
+function ucs_returns_estimator(rt::VecJRE, rd::ReturnsResult, pr::AbstractPriorResult)
+    return [ucs_returns_estimator(rt_i, rd, pr) for rt_i in rt]
 end
 """
     bounds_returns_estimator(r, lb)
