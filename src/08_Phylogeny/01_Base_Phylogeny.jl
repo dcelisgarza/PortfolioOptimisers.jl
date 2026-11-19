@@ -660,7 +660,7 @@ Where:
 
 The score of the asset itself is `f(0) = 1`. `rate` sets the contrast between an asset and its neighbour, and the budget has no effect on it. A large `rate` makes the score fall fast. The budget states only how far apart a related pair can be.
 
-The parameter is a rate, not a retention per step. ``\\rho^d`` and ``e^{-\\lambda d}`` are the same function when ``\\lambda = -\\log\\rho``. A retention per step applies to integer steps, but the separation is a real number. [`ExponentialSimilarity`](@ref) and [`ExpGerberIQDecay`](@ref) also use a rate. The rate needs one bound, `rate > 0`, for a monotone decay.
+The parameter is a rate, not a retention per step. ``\\rho^d`` and ``e^{-\\lambda d}`` are the same function when ``\\lambda = -\\log\\rho``. A retention per step applies to integer steps, but the separation is a real number. [`ExponentialSimilarity`](@ref) and [`ExpGerberIQDecay`](@ref) also use a rate. The rate needs `rate > 0` for a monotone decay, and a finite rate, because `Inf * 0` is `NaN` at the separation `0`. A large finite rate gives each neighbour a score near `0`, and the budget sets which neighbours the consumer reads.
 
 # Fields
 
@@ -707,8 +707,9 @@ julia> separation_decay.(Ref(ExponentialDecay()), 0:3, 3)
     """
     rate
     function ExponentialDecay(rate::Number)
-        @argcheck(zero(rate) < rate,
-                  DomainError(rate, "the rate of an ExponentialDecay must be > 0"))
+        @argcheck(isfinite(rate) && zero(rate) < rate,
+                  DomainError(rate,
+                              "the rate of an ExponentialDecay must be finite and > 0"))
         return new{typeof(rate)}(rate)
     end
 end

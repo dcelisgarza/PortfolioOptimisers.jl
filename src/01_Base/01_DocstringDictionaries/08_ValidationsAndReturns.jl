@@ -45,7 +45,7 @@ unique_key_dict!(val_dict, :val_dict, :oow => "If `w` is not `nothing`, `!isempt
                  :dbhtpower => "`power > 0`.",#
                  :dbhtcoef => "`isfinite(coef) && coef > 0`.",#
                  :Xe => "`!isempty(X)`.",#
-                 :sdrate => "`rate > 0`.",#
+                 :sdrate => "`isfinite(rate) && rate > 0`.",#
                  :sdpower => "`power > 0`.",#
                  :phX_Xv => "If `X` is a `MatNum`, `LinearAlgebra.issymmetric(X)` and `all(iszero, LinearAlgebra.diag(X))`. The constructor throws an `ArgumentError` otherwise.",#
                  :ntn => "A plain `n` passes [`count_or_fraction`](@ref). If `n` is a [`CountOf`](@ref), `n.val <= RESOURCE_LIMITS[].max_hop_count`. Three readers sum `A^i` over `i in 0:n.val`, so the compute cost is linear in `n.val`. See [`RESOURCE_LIMITS`](@ref). [`resolve_separation`](@ref) resolves a fraction or a rule, and the constructor does not check the value that it gives.",#

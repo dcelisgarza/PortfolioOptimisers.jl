@@ -355,6 +355,13 @@ end
     # Field validation, on the members that carry a parameter.
     @test_throws DomainError ExponentialDecay(; rate = 0)
     @test_throws DomainError ExponentialDecay(; rate = -1.0)
+    # An infinite rate scores the separation 0 as exp(-Inf * 0) = NaN (#2195).
+    @test_throws DomainError ExponentialDecay(; rate = Inf)
+    @test_throws DomainError ExponentialDecay(; rate = NaN)
+    @test ExponentialDecay(; rate = 1e300).rate == 1e300
+    @test separation_decay(ExponentialDecay(; rate = 1e300), 0, 3) == 1
+    @test ReciprocalDecay(; power = Inf).power == Inf
+    @test separation_decay(ReciprocalDecay(; power = Inf), 0, 3) == 1
     @test_throws DomainError ReciprocalDecay(; power = 0)
     @test_throws DomainError ReciprocalDecay(; power = -0.5)
     @test ExponentialDecay().rate == 1.0
