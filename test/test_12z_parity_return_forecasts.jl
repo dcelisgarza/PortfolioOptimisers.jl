@@ -197,8 +197,8 @@ include(joinpath(@__DIR__, "parity_harness.jl"))
         # `cv = nothing` calibrates on the predictions of the model fitted to the very forward
         # returns the calibration regresses on them. The oracle has no such mode. On the small
         # panel its slope is 1.34, against 1.23 out of fold: the regression fitted its own
-        # training targets, and the slope measures that fit too (#1418). The slopes were 1.43
-        # and 1.22 before the momentum restarted the relisted asset of the panel.
+        # training targets, and the slope measures that fit too (#1418). The slopes were 1.39
+        # and 1.18 before the momentum restarted the relisted asset of the panel.
         (_, rd, pr) = panels[1]
         oof = return_forecast(target[2][2], rd, pr.rr)
         ins = return_forecast(TargetReturnForecast(; scores = ds(), half_life = 10.0,

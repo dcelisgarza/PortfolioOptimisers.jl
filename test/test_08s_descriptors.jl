@@ -1858,6 +1858,33 @@ end
             @test isequal(r3.D, full[4:5, :])
         end
     end
+    @testset "A step copies only the rows of the ring that hold a value to clear" begin
+        # Asset 2 turns inactive at observation 3 and stays inactive. The step of observation
+        # 3 replaces the ring row of observation 1, which holds a return of asset 2, and keeps
+        # the row of observation 2, whose return of asset 2 is missing. The step of
+        # observation 4 then finds no value of asset 2 to clear, so it keeps every carried
+        # row: an asset that stays delisted costs no copy of the ring at each step (R78 of
+        # #1817).
+        amsk = trues(size(X))
+        amsk[3:end, 2] .= false
+        rd2 = ew_hand_panel(["adj_volume" => copy(vol),
+                             "adj_shares_outstanding" => copy(shr),
+                             "short_interest" => copy(si)], X; amsk = amsk)
+        rows(r, i) = PortfolioOptimisers.port_opt_view(r, i, :)
+        de = EWMean(; decay = lam, min_obs = 1, skip = 2)
+        full = descriptor(de, rd2)
+        st2 = partial_fit!(de, rows(rd2, 1:2))
+        old = collect(st2.cache.buf)
+        r3 = PortfolioOptimisers.descriptor_step(st2, rows(rd2, 3:3))
+        new = collect(r3.de.cache.buf)
+        @test isequal(r3.D, full[3:3, :])
+        @test all(r -> isnan(r[2]), new)
+        @test new[1] !== old[1] && isfinite(old[1][2])
+        @test new[2] === old[2]
+        r4 = PortfolioOptimisers.descriptor_step(r3.de, rows(rd2, 4:4))
+        @test isequal(r4.D, full[4:4, :])
+        @test all(k -> collect(r4.de.cache.buf)[k] === new[k + 1], 1:2)
+    end
     @testset "The estimator holds no data: two carriers, one estimator" begin
         de = EWVolumeRatio(; num = "adj_volume", den = "adj_shares_outstanding",
                            decay = lam, min_obs = 1)

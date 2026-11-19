@@ -864,7 +864,7 @@ end
 
 Pushes the log return of each observation of a matrix into the ring of an [`EWMeanState`](@ref), and returns the input of the recursion of an [`EWMean`](@ref) at each observation: the log return of the observation `skip` rows back, the oldest row of a full ring, or `NaN` while the ring is not full.
 
-An observation where an asset is inactive writes `NaN` into the column of that asset in every row of the ring, so the recursion that restarts there reads no return of an observation at or before it. A row of the ring can be a row of the carried state, so the function replaces such a row with a cleared copy and changes no carried row. The batch call [`descriptor`](@ref) reads the same `log1p` of the same return under the same rule, so the input equals the one of the batch call.
+An observation where an asset is inactive writes `NaN` into the column of that asset in every row of the ring, so the recursion that restarts there reads no return of an observation at or before it. A row of the ring can be a row of the carried state, so the function replaces such a row with a cleared copy and changes no carried row. It copies only a row that holds a value of an inactive asset, so an asset that stays inactive costs no copy of the ring after its first inactive observation. The batch call [`descriptor`](@ref) reads the same `log1p` of the same return under the same rule, so the input equals the one of the batch call.
 
 # Arguments
 
@@ -894,8 +894,12 @@ function ew_mean_delayed!(buf::DataStructures.CircularBuffer{<:AbstractVector{<:
         push!(buf, log1p.(view(X, t, :)))
         act = view(amsk, t, :)
         if !all(act)
-            for k in eachindex(buf)
-                # A new row, because a ring row can be a row of the carried state.
+            off = findall(!, act)
+            # The newest row is a new vector, so it is cleared in place.
+            buf[end][off] .= nan
+            # A new row, because a ring row can be a row of the carried state. A row that an
+            # earlier observation cleared is kept.
+            for k in findall(r -> any(!isnan, view(r, off)), buf)
                 buf[k] = ifelse.(act, buf[k], nan)
             end
         end
