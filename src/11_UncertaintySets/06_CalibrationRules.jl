@@ -981,10 +981,13 @@ Keywords correspond to the fields of the struct. No default of `target` is usefu
         assert_nonempty_finite_val(target, :target)
         return new{typeof(target)}(target)
     end
+    #! The refusal of `nothing` is an inner method, so `EntropyBudget(nothing)` and a lens
+    #! write of `nothing` reach it and not the generic positional constructor of `@concrete`.
+    function EntropyBudget(::Nothing)
+        return throw(ArgumentError("`EntropyBudget` states no default for `target`, the value of the Kaniadakis logarithm the measure is to spend. The band that value must lie in moves with the sample, so no default states anything and the rule asks for one: `EntropyBudget(; target = -1.3)`. `HillTailDecay` and `RadialTailDecay` are the rules of this family that read the tail of the sample instead, and both construct bare."))
+    end
 end
 function EntropyBudget(; target::Option{<:Number} = nothing)
-    @argcheck(!isnothing(target),
-              ArgumentError("`EntropyBudget` states no default for `target`, the value of the Kaniadakis logarithm the measure is to spend. The band that value must lie in moves with the sample, so no default states anything and the rule asks for one: `EntropyBudget(; target = -1.3)`. `HillTailDecay` and `RadialTailDecay` are the rules of this family that read the tail of the sample instead, and both construct bare."))
     return EntropyBudget(target)
 end
 """

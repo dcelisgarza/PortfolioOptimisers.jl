@@ -490,6 +490,8 @@ Return the [`PipelineContext`](@ref) slot a pipeline step writes.
 
 The estimator's family determines the slot via dispatch on the existing abstract-type taxonomy. Estimators whose family cannot be inferred must be wrapped in a [`PipelineStep`](@ref); the fallback method throws an `ArgumentError` saying so.
 
+A precomputed optimisation result writes `:opt` and reads `:returns`, as an optimisation estimator does. [`run_step`](@ref) writes it to `:opt` as it is. A fold of a [`TimeDependent`](@ref) schedule puts such a result in the place of the schedule, and the constructor of the [`Pipeline`](@ref) checks the slots of that fold.
+
 # Arguments
 
   - `est`: The step estimator.
@@ -523,7 +525,7 @@ pipe_writes(::AbstractConstraintEstimator) = :constraints
 function pipe_writes(ce::JuMPConstraintEstimator)
     return throw(ArgumentError("a $(Base.typename(typeof(ce)).wrapper) is configuration for the JuMP model rather than a value computed from data, so it is not a pipeline step; pass it to the optimiser's own field (`ccnt` for a CustomJuMPConstraint, `bgt`/`sbgt`/`gbgt` for a budget constraint) instead"))
 end
-pipe_writes(::OptimisationEstimator) = :opt
+pipe_writes(::Union{OptimisationEstimator, NonFiniteAllocationOptimisationResult}) = :opt
 """
 $(DocStringExtensions.TYPEDSIGNATURES)
 
@@ -564,7 +566,9 @@ pipe_reads(::AbstractPhylogenyEstimator) = (:returns,)
 pipe_reads(::AbstractUncertaintySetEstimator) = (:returns,)
 pipe_reads(::AbstractConstraintEstimator) = (:returns,)
 pipe_reads(::ExposureConstraintEstimator) = (:returns, :prior)
-pipe_reads(::OptimisationEstimator) = (:returns,)
+function pipe_reads(::Union{OptimisationEstimator, NonFiniteAllocationOptimisationResult})
+    return (:returns,)
+end
 """
     const PIPELINE_THRESHOLD_TARGETS = (:lt, :st, :slt, :sst, :sglt, :sgst)
 

@@ -1279,6 +1279,8 @@ Keywords correspond to the struct's fields. A state seeded for `N` assets is `Co
   - Every entry of `mu` and of `M` is finite. An `IsNonFiniteError` is thrown otherwise.
   - `size(M) == (length(mu), length(mu))`. A `DimensionMismatch` is thrown otherwise.
 
+The positional constructor runs each check except the scan for finite values, see [`assert_partial_fit_state`](@ref), so a fold and a lens write run them too. The keyword constructor alone runs the scan, see [`assert_partial_fit_values`](@ref), because it costs as much as the fold of one observation.
+
 ## View parameters
 
 [`port_opt_view`](@ref) takes the view of its fields at the selected assets:
@@ -1322,12 +1324,18 @@ PortfolioOptimisers.CovarianceState
     $(field_dict[:pf_cvg])
     """
     cvg
+    function CovarianceState(n::Integer, mu::VecNum, M::MatNum,
+                             cvg::Option{<:CoverageCounts})
+        assert_partial_fit_state(n, mu, M)
+        return new{typeof(n), typeof(mu), typeof(M), typeof(cvg)}(n, mu, M, cvg)
+    end
 end
 function CovarianceState(; n::Integer = 0, mu::VecNum,
                          M::MatNum = zeros(eltype(mu), length(mu), length(mu)),
                          cvg::Option{<:CoverageCounts} = nothing)::CovarianceState
-    assert_partial_fit_state(n, mu, M)
-    return CovarianceState(n, mu, M, cvg)
+    state = CovarianceState(n, mu, M, cvg)
+    assert_partial_fit_values(mu, M)
+    return state
 end
 """
 $(DocStringExtensions.TYPEDSIGNATURES)

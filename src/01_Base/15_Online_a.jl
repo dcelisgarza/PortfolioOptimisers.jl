@@ -167,6 +167,26 @@ PortfolioOptimisers.SampleBufferState
     $(field_dict[:pf_max_history])
     """
     max_history
+    #! `G` takes the declared type of its field. A wider bound makes the call ambiguous with
+    #! the generic positional constructor of `@concrete`.
+    function SampleBufferState(n::Integer, off::Integer, X::MatNum,
+                               A::Option{<:AbstractMatrix{<:Bool}},
+                               M::Option{<:AbstractMatrix{<:Bool}}, F::Option{<:MatNum},
+                               ne::Option{<:VecStr}, E::Option{<:MatNum},
+                               iv::Option{<:MatNum}, ivpa::Option{<:Num_VecNum},
+                               P::Option{<:AbstractVector}, G::Union{Nothing, Vector{Bool}},
+                               max_history::Option{<:Integer})
+        assert_sample_buffer_state(n, off, X, max_history)
+        assert_buffer_mask_shape(X, A, M, iv)
+        assert_buffer_factor_shape(X, F)
+        assert_buffer_series_shape(X, ne, E)
+        assert_buffer_panel_shape(X, n, P)
+        assert_buffer_gap_shape(X, G)
+        return new{typeof(n), typeof(off), typeof(X), typeof(A), typeof(M), typeof(F),
+                   typeof(ne), typeof(E), typeof(iv), typeof(ivpa), typeof(P),
+                   typeof(max_history)}(n, off, X, A, M, F, ne, E, iv, ivpa, P, G,
+                                        max_history)
+    end
 end
 function SampleBufferState(; n::Integer = 0, off::Integer = 0,
                            X::MatNum = Matrix{Float64}(undef, 0, 0),
@@ -178,12 +198,7 @@ function SampleBufferState(; n::Integer = 0, off::Integer = 0,
                            P::Option{<:AbstractVector} = nothing,
                            G::Option{<:AbstractVector{Bool}} = nothing,
                            max_history::Option{<:Integer} = nothing)::SampleBufferState
-    assert_sample_buffer_state(n, off, X, max_history)
-    assert_buffer_mask_shape(X, A, M, iv)
-    assert_buffer_factor_shape(X, F)
-    assert_buffer_series_shape(X, ne, E)
-    assert_buffer_panel_shape(X, n, P)
-    assert_buffer_gap_shape(X, G)
+    G = isnothing(G) ? G : convert(Vector{Bool}, G)
     return SampleBufferState(n, off, X, A, M, F, ne, E, iv, ivpa, P, G, max_history)
 end
 """
@@ -864,8 +879,9 @@ The marks `gaps` of the Shared Series gaps are one entry for each observation wh
  5. When a cap is set, truncate the incoming rows, their masks, their implied volatilities, their factor rows, their series, their Panel Fields and their marks to the last `max_history` of them.
  6. When the buffer holds no observations, seed it from the block with [`seed_sample_buffer`](@ref), and return it. The seed fixes the width, the element type, the masks, the implied volatilities with `ivpa`, the factor rows, the series with its names, and the Panel Fields.
  7. Refuse a block whose width is not the fixed width. Write the masks of a side that gives neither mask where the other side records masks, with [`buffer_universe_masks`](@ref). Refuse masks, implied volatilities, factor rows, a series or Panel Fields that are absent where the buffer records them or present where it does not, factor rows of a different width, a series under other names with [`assert_buffer_series_names`](@ref), and an `ivpa` that is not the pinned one with [`assert_pinned_value`](@ref).
- 8. Make room for the block with [`reserve_sample_buffer`](@ref), which drops the rows that the cap pushes out and grows the backing matrices.
- 9. Copy the block, its masks, its implied volatilities, its factor rows and its series after the valid region, and write its marks with [`append_buffer_gaps`](@ref). Join the Panel Fields that the buffer keeps to the Panel Fields of the block with [`panel_fields_append`](@ref), and build the buffer with the joined `P` and the new `n` through the positional constructor.
+ 8. Join the Panel Fields of the buffer to the Panel Fields of the block over the rows that the buffer keeps, with [`panel_fields_append`](@ref). The join comes before any change to the buffer, so a refused block leaves the buffer as it was.
+ 9. Make room for the block with [`reserve_sample_buffer`](@ref), which drops the rows that the cap pushes out and grows the backing matrices.
+10. Copy the block, its masks, its implied volatilities, its factor rows and its series after the valid region, and write its marks with [`append_buffer_gaps`](@ref). Build the buffer with the joined Panel Fields and the new `n` through the positional constructor.
 
 # Arguments
 
@@ -959,6 +975,7 @@ function partial_fit!(state::SampleBufferState, X::MatNum, F::Option{<:MatNum} =
     assert_buffer_factor_width(state.F, Fo)
     assert_buffer_series_names(state.ne, ne)
     assert_pinned_value(state.ivpa, ivpa, :ivpa)
+    P = panel_fields_append(state.P, Po, isnothing(w) ? state.n + t : min(state.n + t, w))
     state = reserve_sample_buffer(state, t)
     rows = (state.off + state.n + 1):(state.off + state.n + t)
     copyto!(view(state.X, rows, :), Xo)
@@ -969,8 +986,7 @@ function partial_fit!(state::SampleBufferState, X::MatNum, F::Option{<:MatNum} =
     copy_buffer_rows!(state.iv, rows, Vo)
     state = append_buffer_gaps(state, rows, Go)
     return SampleBufferState(state.n + t, state.off, state.X, state.A, state.M, state.F,
-                             state.ne, state.E, state.iv, state.ivpa,
-                             panel_fields_append(state.P, Po, state.n + t), state.G,
+                             state.ne, state.E, state.iv, state.ivpa, P, state.G,
                              state.max_history)
 end
 """
@@ -1262,7 +1278,7 @@ These steps make an append cost amortised `O(1)`. A drop moves `off` and copies 
 
 # Algorithm
 
- 1. Drop the oldest observations the cap pushes out, by moving `off` forward and `n` back.
+ 1. Drop the oldest observations the cap pushes out, by moving `off` forward and `n` back. Keep the last `n` rows of the Panel Fields with [`panel_fields_tail`](@ref), because `n` indexes them.
  2. Return when the valid region and the block already fit inside the backing matrix.
  3. Take a capacity of twice the current one, or of the room needed if that is larger, when the valid region and the block would fill more than half of the current one. Clamp it to twice the cap when a cap is set.
  4. Compact the observations, each mask, the factor rows, the series and the marks of the Shared Series gaps that the buffer records to that capacity with [`compact_buffer_array`](@ref), which allocates only when the capacity changes, and set `off` to zero.
@@ -1291,7 +1307,8 @@ function reserve_sample_buffer(state::SampleBufferState, t::Integer)
         off += drop
         n -= drop
         state = SampleBufferState(n, off, state.X, state.A, state.M, state.F, state.ne,
-                                  state.E, state.iv, state.ivpa, state.P, state.G, w)
+                                  state.E, state.iv, state.ivpa,
+                                  panel_fields_tail(state.P, n), state.G, w)
     end
     B = state.X
     cap = size(B, 1)
@@ -1730,64 +1747,4 @@ function slice_buffer_mask(::Nothing, ::Any)
 end
 function slice_buffer_mask(M::AbstractMatrix, i)
     return M[:, i]
-end
-"""
-$(DocStringExtensions.TYPEDSIGNATURES)
-
-Folds observations into the sample buffer an estimator carries.
-
-This is the buffering arm of [`partial_fit!`](@ref). Each estimator that carries a [`SampleBufferState`](@ref) reaches this method. A family that folds exactly has methods of its own, and each of them narrows the `cache` type parameter of its estimator to the state of that fold. So a buffer never reaches them, and it reaches this method. The type of the state selects the route, and no method refuses the step.
-
-The method covers both arms of the interface. The families that refuse the step also declare one method over both arms, and two narrower methods here would be ambiguous against each of them. So the body selects the arm by the type of `X`, and the compiler resolves that branch at each call site.
-
-A buffer carries the per-observation masks beside the observations. So a [`CoveragePolicy`](@ref) mask goes through the wrapper as it goes through the accumulator of an estimator, and the call with no data gives it back to the batch verb. A wrapped estimator folded under a policy gives the answer of a batch fit over the same window under the same policy. The implied volatilities and `ivpa` go through the wrapper in the same way, so a wrapped estimator that reads them, such as an [`ImpliedVolatility`](@ref) inside a [`PortfolioOptimisersCovariance`](@ref), gives the answer of a batch fit over the same rows.
-
-# Algorithm
-
- 1. Read the buffer out of the `cache` field with [`assert_sample_buffer`](@ref), which refuses an estimator that was never wrapped in [`Online`](@ref).
- 2. Fold a matrix, its masks and its implied volatilities through the block arm of [`partial_fit!`](@ref), and a vector, its masks and its implied volatilities through the single-observation arm.
- 3. Rebuild the estimator with the new buffer in `cache` through [`rebuild_struct`](@ref), and return it.
-
-# Arguments
-
-  - `est`: Estimator whose buffer is folded forward.
-  - `X`: Observations to fold. A matrix holds one observation per row when `dims == 1`, and one per column when `dims == 2`. A vector is a single observation across the assets, and `dims` is ignored.
-  - $(arg_dict[:dims])
-  - `active_mask`: The active mask of the block, of the shape of `X`, or of one entry per asset when `X` is one observation, or `nothing`.
-  - `estimation_mask`: The estimation mask, on the same terms as `active_mask`.
-  - `iv`: The implied volatilities, on the same terms as `active_mask`.
-  - `ivpa`: The implied volatility risk premium adjustment, or `nothing`.
-
-# Validation
-
-  - `est` carries a [`SampleBufferState`](@ref). An `ArgumentError` is thrown otherwise.
-  - The masks and `iv`, when they are not `nothing`, have the shape of `X`. A `DimensionMismatch` is thrown otherwise.
-  - A buffer that holds observations receives the masks that it records, and it receives `iv` if and only if it records implied volatilities. An `ArgumentError` is thrown otherwise.
-  - `ivpa` equals the adjustment that the first append pinned. An `ArgumentError` is thrown otherwise.
-  - $(val_dict[:dims])
-
-# Returns
-
-  - `est`: The estimator, with its `cache` field rebound to the buffer after the last observation.
-
-# Related
-
-  - [`SampleBufferState`](@ref)
-  - [`Online`](@ref)
-  - [`sample_buffer_kwargs`](@ref)
-  - [`CoveragePolicy`](@ref)
-  - [`partial_fit!`](@ref)
-"""
-function partial_fit!(est::Union{AbstractEstimator, StatsBase.CovarianceEstimator},
-                      X::VecNum_MatNum; dims::Int = 1, active_mask = nothing,
-                      estimation_mask = nothing, iv = nothing, ivpa = nothing)
-    state = assert_sample_buffer(est)
-    state = if isa(X, MatNum)
-        partial_fit!(state, X; dims = dims, active_mask = active_mask,
-                     estimation_mask = estimation_mask, iv = iv, ivpa = ivpa)
-    else
-        partial_fit!(state, X; active_mask = active_mask, estimation_mask = estimation_mask,
-                     iv = iv, ivpa = ivpa)
-    end
-    return state === est.cache ? est : rebuild_struct(est, (; cache = state))
 end

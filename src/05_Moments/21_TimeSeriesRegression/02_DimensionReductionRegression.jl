@@ -323,6 +323,7 @@ DimensionReductionRegression
             end
         end
         assert_nonempty_finite_val(proj, :proj)
+        assert_returns_source(x_src, ALL_RETURNS_SOURCES, :DimensionReductionRegression)
         return new{typeof(ve), typeof(drtgt), typeof(retgt), typeof(choice), typeof(proj),
                    typeof(x_src)}(ve, drtgt, retgt, choice, proj, x_src)
     end
@@ -333,7 +334,6 @@ function DimensionReductionRegression(; ve::AbstractVarianceEstimator = SimpleVa
                                       choice::AbstractChoiceRule = BatchChoice(),
                                       proj::Option{<:MatNum} = nothing,
                                       x_src::Option{<:AbstractReturnsSource} = nothing)::DimensionReductionRegression
-    assert_returns_source(x_src, ALL_RETURNS_SOURCES, :DimensionReductionRegression)
     return DimensionReductionRegression(ve, drtgt, retgt, choice, proj, x_src)
 end
 """

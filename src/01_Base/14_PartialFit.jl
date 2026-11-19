@@ -323,14 +323,16 @@ $(DocStringExtensions.TYPEDSIGNATURES)
 
 Refuses a partial-fit state whose count, mean or accumulator cannot describe a sample.
 
-The states of the sample mean, variance and covariance hold the same three quantities, so one check applies to the three. The count must not be negative, and the mean must be finite and not empty. Each axis of the accumulator must have the length of the mean. The accumulator holds one entry for each asset in a variance state, and it is a co-moment matrix in a covariance state. The axis rule reads both.
+The states of the sample mean, variance and covariance hold the same three quantities, so one check applies to the three. The count must not be negative, and the mean must not be empty. Each axis of the accumulator must have the length of the mean. The accumulator holds one entry for each asset in a variance state, and it is a co-moment matrix in a covariance state. The axis rule reads both.
+
+The inner constructor of each state calls this function, so a fold, a rebuild and a lens write run it. Each check costs `O(1)`. The scan for finite values costs `O(N²)` for a covariance state, which is as much as the fold of one observation, so the keyword constructor alone runs it, see [`assert_partial_fit_values`](@ref).
 
 # Algorithm
 
  1. Refuse a negative `n`.
- 2. Refuse an empty or non-finite `mu`.
+ 2. Refuse an empty `mu`.
  3. Return when `M` is `nothing`, which is the mean-only state.
- 4. Refuse a non-finite `M`, and refuse an `M` whose any axis does not have the length of `mu`.
+ 4. Refuse an `M` whose any axis does not have the length of `mu`.
 
 # Arguments
 
@@ -342,8 +344,6 @@ The states of the sample mean, variance and covariance hold the same three quant
 
   - `n >= 0`. The function throws a `DomainError` otherwise.
   - `!isempty(mu)`. The function throws an `IsEmptyError` otherwise.
-  - Every entry of `mu` is finite. The function throws an `IsNonFiniteError` otherwise.
-  - Every entry of `M` is finite. The function throws an `IsNonFiniteError` otherwise.
   - Every axis of `M` has the length of `mu`. The function throws a `DimensionMismatch` otherwise.
 
 # Returns
@@ -353,16 +353,48 @@ The states of the sample mean, variance and covariance hold the same three quant
 # Related
 
   - [`AbstractPartialFitState`](@ref)
+  - [`assert_partial_fit_values`](@ref)
   - [`merge_states`](@ref)
 """
 function assert_partial_fit_state(n::Integer, mu::VecNum, M::Option{<:ArrNum} = nothing)
     assert_nonneg(n, :n)
     assert_nonempty(mu, :mu)
+    if !isnothing(M)
+        @argcheck(all(==(length(mu)), size(M)),
+                  DimensionMismatch("every axis of `M` must have the length of `mu`, but `mu` has length $(length(mu)) and `M` has size $(size(M))."))
+    end
+    return nothing
+end
+"""
+$(DocStringExtensions.TYPEDSIGNATURES)
+
+Refuses a partial-fit state whose mean or accumulator holds a value that is not finite.
+
+The keyword constructor of the states of the sample mean, variance and covariance calls this function on the values that a caller gives. The inner constructor does not, because the fold of one observation builds the state through it, and the scan of `M` costs as much as that fold. [`assert_partial_fit_state`](@ref) holds the checks that each route runs.
+
+# Arguments
+
+  - $(arg_dict[:pf_mu])
+  - `M`: The second-moment accumulator, or `nothing` for a state that holds a mean alone.
+
+# Validation
+
+  - Every entry of `mu` is finite. The function throws an `IsNonFiniteError` otherwise.
+  - Every entry of `M` is finite. The function throws an `IsNonFiniteError` otherwise.
+
+# Returns
+
+  - `nothing`.
+
+# Related
+
+  - [`AbstractPartialFitState`](@ref)
+  - [`assert_partial_fit_state`](@ref)
+"""
+function assert_partial_fit_values(mu::VecNum, M::Option{<:ArrNum} = nothing)
     assert_all_finite(mu, :mu)
     if !isnothing(M)
         assert_all_finite(M, :M)
-        @argcheck(all(==(length(mu)), size(M)),
-                  DimensionMismatch("every axis of `M` must have the length of `mu`, but `mu` has length $(length(mu)) and `M` has size $(size(M))."))
     end
     return nothing
 end

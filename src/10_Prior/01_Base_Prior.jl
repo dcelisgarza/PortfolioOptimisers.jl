@@ -40,7 +40,7 @@ A prior that returns `true` also implements two methods. `partial_fit!(pe, f::Ma
 
 ## `returns_source` (optional)
 
-  - `returns_source(pe::MyPriorEstimator) -> Option{<:AbstractReturnsSource}`: Returns the source of the returns that the prior fits on. This is usually a field `x_src::Option{<:AbstractReturnsSource}`, which the keyword constructor checks with `PortfolioOptimisers.assert_returns_source(x_src, PortfolioOptimisers.DATA_RETURNS_SOURCES, :MyPriorEstimator)`.
+  - `returns_source(pe::MyPriorEstimator) -> Option{<:AbstractReturnsSource}`: Returns the source of the returns that the prior fits on. This is usually a field `x_src::Option{<:AbstractReturnsSource}`, which the inner constructor checks with `PortfolioOptimisers.assert_returns_source(x_src, PortfolioOptimisers.DATA_RETURNS_SOURCES, :MyPriorEstimator)`.
 
 The [`ReturnsResult`](@ref) method of [`prior`](@ref) reads the source through this method, and the frame walk of an optimiser also reads it. The fallback returns `nothing`, so a prior with no method reads the raw returns `rd.X`. A prior that holds another reader in a field refuses a source on that reader, with `PortfolioOptimisers.assert_inner_reader` in its keyword constructor. The outer prior picks the returns.
 

@@ -321,6 +321,51 @@ function first_duplicate(xs)
     return nothing
 end
 """
+$(DocStringExtensions.TYPEDSIGNATURES)
+
+Validate that each step of a [`Pipeline`](@ref) reads only slots that are filled, and makes stale no slot that an earlier step wrote.
+
+The check walks the steps in order. `avail` holds the Data Slots, see [`PIPELINE_DATA_SLOTS`](@ref), and the slot of each earlier step. `written` holds the slot of each earlier step, with the step that wrote it, so the message can name that step.
+
+# Arguments
+
+  - `ests`: The step estimators.
+
+# Validation
+
+  - Each slot that a step reads, see [`pipe_reads`](@ref), is in `avail`. Raises an `ArgumentError`.
+  - No slot that the write of a step makes stale, see [`PIPELINE_INVALIDATES`](@ref), is in `written`. Raises an `ArgumentError`.
+
+# Returns
+
+  - `nothing`.
+
+# Related
+
+  - [`Pipeline`](@ref)
+  - [`pipe_writes`](@ref)
+  - [`pipe_reads`](@ref)
+  - [`PIPELINE_INVALIDATES`](@ref)
+"""
+function assert_slot_order(ests)::Nothing
+    avail = Set{Symbol}(PIPELINE_DATA_SLOTS)
+    written = Dict{Symbol, eltype(ests)}()
+    for e in ests
+        slot = pipe_writes(e)
+        for r in pipe_reads(e)
+            @argcheck(r in avail,
+                      ArgumentError("a $(Base.typename(typeof(e)).wrapper) step reads the :$r slot, which no earlier step writes and the pipeline input cannot fill"))
+        end
+        for inv in get(PIPELINE_INVALIDATES, slot, ())
+            @argcheck(!haskey(written, inv),
+                      ArgumentError("a $(Base.typename(typeof(e)).wrapper) step writes the :$slot slot, invalidating the :$inv slot written by an earlier $(Base.typename(typeof(written[inv])).wrapper) step; the stale :$inv result would no longer match the assets of the new :$slot data. Move the $(Base.typename(typeof(e)).wrapper) step before the $(Base.typename(typeof(written[inv])).wrapper) step, or drop one of them."))
+        end
+        written[slot] = e
+        push!(avail, slot)
+    end
+    return nothing
+end
+"""
 $(DocStringExtensions.TYPEDEF)
 
 Runs an ordered list of steps as one end-to-end portfolio workflow.
@@ -334,11 +379,12 @@ A last optimiser is optional too. A prior-only pipeline is valid, but a predicti
 The keyword constructor runs these steps.
 
  1. Split each element of `steps` into its explicit name, or `nothing`, and its estimator, giving `explicit` and `ests`.
- 2. Run on `ests` each check of `## Validation` that has a function of its own.
- 3. Walk `ests` in order. Check each slot that a step reads against `avail`, which holds the Data Slots and the slots of the earlier steps. Check each slot that the write of the step makes stale against `written`, which holds the slots of the earlier steps.
- 4. Count the steps that write each slot, giving `counts`. The count includes the steps with an explicit name.
- 5. Name each step, giving `names`. A step keeps its explicit name. A step whose slot no other step writes takes the slot name, such as `"prior"`. Every other step takes the slot name and its position among the steps of that slot, such as `"prices_1"` and `"prices_2"`.
- 6. Call the positional constructor, which checks that the names are unique.
+ 2. Count the steps that write each slot, giving `counts`. The count includes the steps with an explicit name.
+ 3. Name each step, giving `names`. A step keeps its explicit name. A step whose slot no other step writes takes the slot name, such as `"prior"`. Every other step takes the slot name and its position among the steps of that slot, such as `"prices_1"` and `"prices_2"`.
+ 4. Call the positional constructor, which runs each check of `## Validation`.
+ 5. Log the warning of [`warn_raw_readers`](@ref) when it applies.
+
+The positional constructor runs the checks, so a rebuild through [`rebuild_struct`](@ref) and a lens write through `Accessors.set` run them too. A lens write that changes the steps to an order that the keyword constructor refuses is refused. The keyword constructor alone logs the warning, so a rebuild at each online step does not log it again.
 
 # Fields
 
@@ -362,8 +408,8 @@ Give the steps in the order of execution. Each element is a step estimator or a 
   - Each constraint step resolves to one routing target, see [`assert_constraint_targets`](@ref).
   - The last optimiser can receive each target that an earlier step writes, see [`assert_routable`](@ref).
   - A prior step that states `x_src = ExcessSource()` does not feed an optimiser that tracks a [`DataBenchmarkTracking`](@ref), see [`assert_pipeline_data_benchmark`](@ref).
-  - An earlier step writes each slot that a step reads, or the pipeline input fills it with `prices` or `returns`. Raises an `ArgumentError`.
-  - No step writes a slot that makes stale a slot that an earlier step wrote, see [`PIPELINE_INVALIDATES`](@ref). A step that rewrites `:returns` after a prior, phylogeny, uncertainty or constraint step leaves that result on an old asset universe. Raises an `ArgumentError`.
+  - An earlier step writes each slot that a step reads, or the pipeline input fills it with `prices` or `returns`, see [`assert_slot_order`](@ref). Raises an `ArgumentError`.
+  - No step writes a slot that makes stale a slot that an earlier step wrote, see [`PIPELINE_INVALIDATES`](@ref) and [`assert_slot_order`](@ref). A step that rewrites `:returns` after a prior, phylogeny, uncertainty or constraint step leaves that result on an old asset universe. Raises an `ArgumentError`.
   - The step names are unique. Raises an `ArgumentError`.
 
 The steps whose values the last optimiser receives join the group of that optimiser. When a reader of the group states `x_src = ExcessSource()`, and a reader at `x_src = nothing` reads the raw returns data, the constructor logs one warning that names the path of that reader, see [`warn_raw_readers`](@ref) and [`pipeline_frames`](@ref). The pipeline then builds as configured. The group also decides the gap drop, as in a head: when a reader of the group states `ExcessSource()`, each step of the group and the optimiser read the returns data without the observations at which a vector benchmark has a gap, in batch and online, see [`pipeline_gap_sources`](@ref). Each reader still reads the frame that its own `x_src` states.
@@ -411,6 +457,14 @@ julia> pipe.names
                       cache::Option{<:AbstractPartialFitState} = nothing)
         @argcheck(!isempty(steps), IsEmptyError("steps cannot be empty"))
         @argcheck(length(names) == length(steps), DimensionMismatch)
+        assert_split_position(steps)
+        assert_opt_last(steps)
+        assert_step_declarations(steps)
+        assert_nested_data_slots(steps)
+        assert_constraint_targets(steps)
+        assert_routable(steps)
+        assert_pipeline_data_benchmark(steps)
+        assert_slot_order(steps)
         @argcheck(allunique(names),
                   ArgumentError("pipeline step names must be unique; the name $(repr(first_duplicate(names))) is repeated among the $(length(names)) steps"))
         return new{typeof(names), typeof(steps), typeof(cache)}(names, steps, cache)
@@ -418,32 +472,10 @@ julia> pipe.names
 end
 function Pipeline(; steps::Union{Tuple, AbstractVector},
                   cache::Option{<:AbstractPartialFitState} = nothing)::Pipeline
-    @argcheck(!isempty(steps), IsEmptyError("steps cannot be empty"))
     # The steps take the element type of their values (#1979).
     ests = [isa(s, Pair) ? s.second : s for s in steps]
     explicit = Option{String}[isa(s, Pair) ? String(s.first) : nothing for s in steps]
-    assert_split_position(ests)
-    assert_opt_last(ests)
-    assert_step_declarations(ests)
-    assert_nested_data_slots(ests)
-    assert_constraint_targets(ests)
-    assert_routable(ests)
-    assert_pipeline_data_benchmark(ests)
     slots = Symbol[pipe_writes(e) for e in ests]
-    avail = Set{Symbol}(PIPELINE_DATA_SLOTS)
-    written = Dict{Symbol, eltype(ests)}()
-    for (e, slot) in zip(ests, slots)
-        for r in pipe_reads(e)
-            @argcheck(r in avail,
-                      ArgumentError("a $(Base.typename(typeof(e)).wrapper) step reads the :$r slot, which no earlier step writes and the pipeline input cannot fill"))
-        end
-        for inv in get(PIPELINE_INVALIDATES, slot, ())
-            @argcheck(!haskey(written, inv),
-                      ArgumentError("a $(Base.typename(typeof(e)).wrapper) step writes the :$slot slot, invalidating the :$inv slot written by an earlier $(Base.typename(typeof(written[inv])).wrapper) step; the stale :$inv result would no longer match the assets of the new :$slot data. Move the $(Base.typename(typeof(e)).wrapper) step before the $(Base.typename(typeof(written[inv])).wrapper) step, or drop one of them."))
-        end
-        written[slot] = e
-        push!(avail, slot)
-    end
     counts = Dict{Symbol, Int}()
     for s in slots
         counts[s] = get(counts, s, 0) + 1

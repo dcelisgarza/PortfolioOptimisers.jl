@@ -332,11 +332,14 @@ $(DocStringExtensions.FIELDS)
     The last observed price of each series column, in the order of [`series_values`](@ref), or `NaN` where no price was observed. `nothing` under the default gap rule.
     """
     anchor
+    function PricesToReturnsState(tail::PricesResult, anchor::Option{<:AbstractVector})
+        @argcheck(data_row_count(tail) == 1,
+                  DimensionMismatch("the tail of a PricesToReturnsState is the last price row folded, so it holds one observation; got $(data_row_count(tail))"))
+        return new{typeof(tail), typeof(anchor)}(tail, anchor)
+    end
 end
 function PricesToReturnsState(; tail::PricesResult,
                               anchor::Option{<:AbstractVector} = nothing)::PricesToReturnsState
-    @argcheck(data_row_count(tail) == 1,
-              DimensionMismatch("the tail of a PricesToReturnsState is the last price row folded, so it holds one observation; got $(data_row_count(tail))"))
     return PricesToReturnsState(tail, anchor)
 end
 function Base.copy(x::PricesToReturnsState)
@@ -705,10 +708,14 @@ $(DocStringExtensions.FIELDS)
     The last timestamp of the last block folded. The carried prices precede each observation after it, and the fitted result records it as the end of its training window.
     """
     te
+    function PriceGapFillState(nx::AbstractVector{Symbol}, v::AbstractVector,
+                               held::AbstractVector{Bool}, te)
+        @argcheck(length(nx) == length(v) == length(held), DimensionMismatch)
+        return new{typeof(nx), typeof(v), typeof(held), typeof(te)}(nx, v, held, te)
+    end
 end
 function PriceGapFillState(; nx::AbstractVector{Symbol}, v::AbstractVector,
                            held::AbstractVector{Bool}, te)::PriceGapFillState
-    @argcheck(length(nx) == length(v) == length(held), DimensionMismatch)
     return PriceGapFillState(nx, v, held, te)
 end
 function Base.copy(x::PriceGapFillState)
@@ -879,12 +886,16 @@ $(DocStringExtensions.FIELDS)
     The number of observations folded.
     """
     n
+    function MissingDataFilterState(nx::AbstractVector{Symbol},
+                                    miss::AbstractVector{<:Integer}, n::Integer)
+        @argcheck(length(nx) == length(miss), DimensionMismatch)
+        assert_nonneg(n, :n)
+        return new{typeof(nx), typeof(miss), typeof(n)}(nx, miss, n)
+    end
 end
 function MissingDataFilterState(; nx::AbstractVector{Symbol},
                                 miss::AbstractVector{<:Integer},
                                 n::Integer)::MissingDataFilterState
-    @argcheck(length(nx) == length(miss), DimensionMismatch)
-    assert_nonneg(n, :n)
     return MissingDataFilterState(nx, miss, n)
 end
 function Base.copy(x::MissingDataFilterState)

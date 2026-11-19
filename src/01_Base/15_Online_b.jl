@@ -144,6 +144,66 @@ function assert_sample_buffer(::Online)
     return throw(ArgumentError("an `Online` is a declaration, not an estimator that folds, and this one reached a fold unresolved. `update_online_estimator` resolves every wrapper it can reach at warm-up; a wrapper that survives to a fold came from a callable `TimeDependent`, whose value is computed per fold and so is never seeded. A schedule and a wrapper do not compose in that direction: a schedule replaces the field's value every fold, while the buffer is threaded through it, so a schedule that returns a captured estimator returns the buffer as it stood when the closure was built."))
 end
 """
+$(DocStringExtensions.TYPEDSIGNATURES)
+
+Folds observations into the sample buffer an estimator carries.
+
+This is the buffering arm of [`partial_fit!`](@ref). Each estimator that carries a [`SampleBufferState`](@ref) reaches this method. A family that folds exactly has methods of its own, and each of them narrows the `cache` type parameter of its estimator to the state of that fold. So a buffer never reaches them, and it reaches this method. The type of the state selects the route, and no method refuses the step.
+
+The method covers both arms of the interface. The families that refuse the step also declare one method over both arms, and two narrower methods here would be ambiguous against each of them. So the body selects the arm by the type of `X`, and the compiler resolves that branch at each call site.
+
+A buffer carries the per-observation masks beside the observations. So a [`CoveragePolicy`](@ref) mask goes through the wrapper as it goes through the accumulator of an estimator, and the call with no data gives it back to the batch verb. A wrapped estimator folded under a policy gives the answer of a batch fit over the same window under the same policy. The implied volatilities and `ivpa` go through the wrapper in the same way, so a wrapped estimator that reads them, such as an [`ImpliedVolatility`](@ref) inside a [`PortfolioOptimisersCovariance`](@ref), gives the answer of a batch fit over the same rows.
+
+# Algorithm
+
+ 1. Read the buffer out of the `cache` field with [`assert_sample_buffer`](@ref), which refuses an estimator that was never wrapped in [`Online`](@ref).
+ 2. Fold a matrix, its masks and its implied volatilities through the block arm of [`partial_fit!`](@ref), and a vector, its masks and its implied volatilities through the single-observation arm.
+ 3. Rebuild the estimator with the new buffer in `cache` through [`rebuild_struct`](@ref), and return it.
+
+# Arguments
+
+  - `est`: Estimator whose buffer is folded forward.
+  - `X`: Observations to fold. A matrix holds one observation per row when `dims == 1`, and one per column when `dims == 2`. A vector is a single observation across the assets, and `dims` is ignored.
+  - $(arg_dict[:dims])
+  - `active_mask`: The active mask of the block, of the shape of `X`, or of one entry per asset when `X` is one observation, or `nothing`.
+  - `estimation_mask`: The estimation mask, on the same terms as `active_mask`.
+  - `iv`: The implied volatilities, on the same terms as `active_mask`.
+  - `ivpa`: The implied volatility risk premium adjustment, or `nothing`.
+
+# Validation
+
+  - `est` carries a [`SampleBufferState`](@ref). An `ArgumentError` is thrown otherwise.
+  - The masks and `iv`, when they are not `nothing`, have the shape of `X`. A `DimensionMismatch` is thrown otherwise.
+  - A buffer that holds observations receives the masks that it records, and it receives `iv` if and only if it records implied volatilities. An `ArgumentError` is thrown otherwise.
+  - `ivpa` equals the adjustment that the first append pinned. An `ArgumentError` is thrown otherwise.
+  - $(val_dict[:dims])
+
+# Returns
+
+  - `est`: The estimator, with its `cache` field rebound to the buffer after the last observation.
+
+# Related
+
+  - [`SampleBufferState`](@ref)
+  - [`Online`](@ref)
+  - [`sample_buffer_kwargs`](@ref)
+  - [`CoveragePolicy`](@ref)
+  - [`partial_fit!`](@ref)
+"""
+function partial_fit!(est::Union{AbstractEstimator, StatsBase.CovarianceEstimator},
+                      X::VecNum_MatNum; dims::Int = 1, active_mask = nothing,
+                      estimation_mask = nothing, iv = nothing, ivpa = nothing)
+    state = assert_sample_buffer(est)
+    state = if isa(X, MatNum)
+        partial_fit!(state, X; dims = dims, active_mask = active_mask,
+                     estimation_mask = estimation_mask, iv = iv, ivpa = ivpa)
+    else
+        partial_fit!(state, X; active_mask = active_mask, estimation_mask = estimation_mask,
+                     iv = iv, ivpa = ivpa)
+    end
+    return state === est.cache ? est : rebuild_struct(est, (; cache = state))
+end
+"""
     const Online_Option{X} = Union{Nothing, Online, X}
 
 Alias for a field that accepts `nothing`, a static estimator of type `X`, or an [`Online`](@ref) declaration.

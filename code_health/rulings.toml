@@ -367,6 +367,21 @@ definition = "CovarianceForecastSummaryResult"
 metric = "arg"
 rationale = "keyword-constructor-arity"
 
+# Two Partial Fit States check their values in their inner constructors by the same rule (#2197),
+# so that a fold, a rebuild and a lens write run the checks. Each constructor takes one argument
+# for each field: 13 for `SampleBufferState`, 11 for `ReturnsBufferState`.
+[[exemption]]
+path = "src/01_Base/15_Online_a.jl"
+definition = "SampleBufferState"
+metric = "arg"
+rationale = "keyword-constructor-arity"
+
+[[exemption]]
+path = "src/03_InputData/17_ReturnsBufferState.jl"
+definition = "ReturnsBufferState"
+metric = "arg"
+rationale = "keyword-constructor-arity"
+
 # The two search estimators take one field for each option of the search, and `rank_prediction`
 # joined `train_score` as a switch (#2058). So `GridSearchCrossValidation` takes 11 arguments and
 # `RandomisedSearchCrossValidation` takes 14.

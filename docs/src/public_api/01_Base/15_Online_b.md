@@ -1,5 +1,5 @@
 ```@meta
-Description = "Online (b), public API of PortfolioOptimisers.jl: Online, AbstractWindowRule, RollingWindow, SeedWindow, AbstractChoiceRule, BatchChoice, PinnedChoice, …"
+Description = "Online (b), public API of PortfolioOptimisers.jl: Online, partial_fit!, AbstractWindowRule, RollingWindow, SeedWindow, AbstractChoiceRule, BatchChoice, …"
 ```
 
 # Online (b)
@@ -8,6 +8,7 @@ Description = "Online (b), public API of PortfolioOptimisers.jl: Online, Abstrac
 
 ```@docs
 Online
+PortfolioOptimisers.partial_fit!(est::Union{PortfolioOptimisers.AbstractEstimator, StatsBase.CovarianceEstimator}, X::PortfolioOptimisers.VecNum_MatNum; dims::Int = 1)
 ```
 
 A window rule says which observations the window of a windowed moment estimator keeps on the online step. A choice rule says how a choice that a fit makes over its whole sample behaves on the online step.

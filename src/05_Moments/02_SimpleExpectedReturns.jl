@@ -387,6 +387,8 @@ Keywords correspond to the struct's fields. A state seeded for `N` assets is `Si
   - `!isempty(mu)`. An `IsEmptyError` is thrown otherwise.
   - Every entry of `mu` is finite. An `IsNonFiniteError` is thrown otherwise.
 
+The positional constructor runs the first two checks, see [`assert_partial_fit_state`](@ref), so a fold and a lens write run them too. The keyword constructor alone runs the scan for finite values, see [`assert_partial_fit_values`](@ref).
+
 ## View parameters
 
 [`port_opt_view`](@ref) takes the view of its fields at the selected assets:
@@ -423,11 +425,17 @@ PortfolioOptimisers.SimpleExpectedReturnsState
     $(field_dict[:pf_cvg])
     """
     cvg
+    function SimpleExpectedReturnsState(n::Integer, mu::VecNum,
+                                        cvg::Option{<:CoverageCounts})
+        assert_partial_fit_state(n, mu)
+        return new{typeof(n), typeof(mu), typeof(cvg)}(n, mu, cvg)
+    end
 end
 function SimpleExpectedReturnsState(; n::Integer = 0, mu::VecNum,
                                     cvg::Option{<:CoverageCounts} = nothing)::SimpleExpectedReturnsState
-    assert_partial_fit_state(n, mu)
-    return SimpleExpectedReturnsState(n, mu, cvg)
+    state = SimpleExpectedReturnsState(n, mu, cvg)
+    assert_partial_fit_values(mu)
+    return state
 end
 """
 $(DocStringExtensions.TYPEDSIGNATURES)

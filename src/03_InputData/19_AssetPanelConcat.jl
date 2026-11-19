@@ -657,6 +657,48 @@ function panel_fields_view(P::AbstractVector{<:AbstractPanelField}, i, j)
     return AbstractPanelField[panel_field_view(f, i, j, nothing) for f in P]
 end
 """
+    panel_fields_tail(P::Nothing, n::Integer) -> nothing
+    panel_fields_tail(P::AbstractVector{<:AbstractPanelField}, n::Integer) -> Option{<:AbstractVector}
+
+Keeps the last `n` observations of the Panel Fields of a sample buffer, or gives `nothing` for a buffer that records no Panel Field.
+
+The Panel Fields of a [`SampleBufferState`](@ref) cover its valid region, so `n` indexes them. [`reserve_sample_buffer`](@ref) calls this function when the cap drops the oldest observations, so the buffer that it returns obeys that rule. A Panel Field holds at least one observation, so a cap that drops every row of the buffer gives `nothing`. [`panel_fields_append`](@ref) calls it to keep the rows of the buffer before the rows of the block.
+
+# Algorithm
+
+The method that Julia selects is the algorithm.
+
+ 1. `P` is `nothing`: return `nothing`.
+ 2. Return `nothing` when `n` is zero.
+ 3. Read the number of observations `tₚ` of `P`. Return `P` when `n` is at least `tₚ`.
+ 4. View the last `n` rows of `P` with [`panel_fields_view`](@ref).
+
+# Arguments
+
+  - `P`: The Panel Fields, or `nothing`.
+  - `n`: The number of observations to keep.
+
+# Returns
+
+  - `P′`: The Panel Fields of the last `n` observations, or `nothing`.
+
+# Related
+
+  - [`SampleBufferState`](@ref)
+  - [`panel_fields_view`](@ref)
+  - [`panel_fields_append`](@ref)
+"""
+function panel_fields_tail(::Nothing, ::Integer)
+    return nothing
+end
+function panel_fields_tail(P::AbstractVector{<:AbstractPanelField}, n::Integer)
+    if iszero(n)
+        return nothing
+    end
+    tp = first(panel_field_axes(first(P)))
+    return n < tp ? panel_fields_view(P, (tp - n + 1):tp, :) : P
+end
+"""
     panel_fields_append(P::Nothing, Po::Nothing, n::Integer) -> nothing
     panel_fields_append(P::AbstractVector{<:AbstractPanelField}, Po::AbstractVector{<:AbstractPanelField}, n::Integer) -> AbstractVector
 
@@ -672,7 +714,7 @@ The method that Julia selects is the algorithm.
  2. Make the panel `b` of `Po` with [`panel_fields_panel`](@ref).
  3. Check that the panel of `P` and `b` can join, with [`assert_panel_concat`](@ref).
  4. Set `keep = n - tₒ`, where `tₒ` is the number of rows of `Po`. Return `Po` when `keep` is zero.
- 5. When `keep` is less than the number of rows `tₚ` of `P`, view the last `keep` rows of `P` with [`panel_fields_view`](@ref). Otherwise keep all of `P`.
+ 5. Keep the last `keep` rows of `P` with [`panel_fields_tail`](@ref).
  6. Join the kept rows of `P` and `b` with `vcat`, and return the Panel Fields of the joined panel.
 
 # Arguments
@@ -702,13 +744,11 @@ function panel_fields_append(P::AbstractVector{<:AbstractPanelField},
                              Po::AbstractVector{<:AbstractPanelField}, n::Integer)
     b = panel_fields_panel(Po)
     assert_panel_concat(panel_fields_panel(P), b, 2)
-    tp = first(panel_field_axes(first(P)))
     keep = n - first(panel_field_axes(first(Po)))
     if iszero(keep)
         return Po
     end
-    Pk = keep < tp ? panel_fields_view(P, (tp - keep + 1):tp, :) : P
-    return vcat(panel_fields_panel(Pk), b).pf
+    return vcat(panel_fields_panel(panel_fields_tail(P, keep)), b).pf
 end
 """
     sample_buffer_panel(state::SampleBufferState) -> Option{<:AssetPanel}

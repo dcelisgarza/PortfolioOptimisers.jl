@@ -220,8 +220,16 @@ StepwiseRegression
                                 included::Option{<:AbstractVector{<:Option{<:AbstractVector{<:Integer}}}},
                                 x_src::Option{<:AbstractReturnsSource})
         assert_stepwise_regression(crit, tgt, included)
+        assert_returns_source(x_src, ALL_RETURNS_SOURCES, :StepwiseRegression)
         fs = (crit, alg, tgt, choice, included, x_src)
         return new{map(typeof, fs)...}(fs...)
+    end
+    #! A criterion given as a symbol is checked and converted here, so a lens write of a
+    #! symbol reaches the check and not the generic positional constructor of `@concrete`.
+    function StepwiseRegression(crit::Symbol, alg, tgt, choice, included, x_src)
+        @argcheck(crit in STEPWISE_REGRESSION_CRITERIA,
+                  "crit must be one of $STEPWISE_REGRESSION_CRITERIA. Got\ncrit => $crit")
+        return StepwiseRegression(Val(crit), alg, tgt, choice, included, x_src)
     end
 end
 function StepwiseRegression(;
@@ -232,12 +240,6 @@ function StepwiseRegression(;
                             choice::AbstractChoiceRule = BatchChoice(),
                             included::Option{<:AbstractVector{<:Option{<:AbstractVector{<:Integer}}}} = nothing,
                             x_src::Option{<:AbstractReturnsSource} = nothing)::StepwiseRegression
-    assert_returns_source(x_src, ALL_RETURNS_SOURCES, :StepwiseRegression)
-    if isa(crit, Symbol)
-        @argcheck(crit in STEPWISE_REGRESSION_CRITERIA,
-                  "crit must be one of $STEPWISE_REGRESSION_CRITERIA. Got\ncrit => $crit")
-        crit = Val(crit)
-    end
     return StepwiseRegression(crit, alg, tgt, choice, included, x_src)
 end
 """

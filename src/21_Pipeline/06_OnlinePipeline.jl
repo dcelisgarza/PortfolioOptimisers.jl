@@ -71,14 +71,17 @@ $(DocStringExtensions.FIELDS)
     $(field_dict[:pf_max_history])
     """
     max_history
+    function PipelineBufferState(data::Option{<:Prices_RR}, max_history::Option{<:Integer})
+        if !isnothing(max_history)
+            @argcheck(max_history > 0,
+                      DomainError(max_history,
+                                  "max_history is the number of observations the buffer keeps, so it must be positive. Pass `nothing`, the default, to keep every observation folded."))
+        end
+        return new{typeof(data), typeof(max_history)}(data, max_history)
+    end
 end
 function PipelineBufferState(; data::Option{<:Prices_RR} = nothing,
                              max_history::Option{<:Integer} = nothing)::PipelineBufferState
-    if !isnothing(max_history)
-        @argcheck(max_history > 0,
-                  DomainError(max_history,
-                              "max_history is the number of observations the buffer keeps, so it must be positive. Pass `nothing`, the default, to keep every observation folded."))
-    end
     return PipelineBufferState(data, max_history)
 end
 """

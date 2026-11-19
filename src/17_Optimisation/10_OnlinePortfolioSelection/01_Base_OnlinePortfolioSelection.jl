@@ -1712,6 +1712,30 @@ Keywords correspond to the struct's fields.
     The [`HeldStep`](@ref) record of the last folded row when the step held a projection of that row, or `nothing` when every projection of it met the budget. The return code of the Recursion Result carries it.
     """
     hold
+    function OnlinePortfolioSelectionState(n::Integer, w::AbstractVector, st,
+                                           X::Option{<:ReturnsBufferState},
+                                           nx::Option{<:VecStr}, nb::Option{<:VecStr},
+                                           pnl::Option{<:AssetPanel},
+                                           amsk::Option{<:AbstractVector{<:Bool}},
+                                           ts::Option{<:AbstractVector},
+                                           hold::Option{<:HeldStep})
+        assert_nonneg(n, :n)
+        if !isnothing(nx)
+            @argcheck(length(nx) == length(w),
+                      DimensionMismatch("the pinned names ($(length(nx))) and the allocation ($(length(w))) must have one length"))
+        end
+        if !isnothing(amsk)
+            @argcheck(length(amsk) == length(w),
+                      DimensionMismatch("the active mask ($(length(amsk))) and the allocation ($(length(w))) must have one length"))
+        end
+        if !isnothing(pnl)
+            @argcheck(panel_is_static(pnl),
+                      ArgumentError("an OnlinePortfolioSelectionState pins a static Asset Panel and never a time-varying one: the masks of a time-varying panel are per-observation, so the state keeps the mask of the last row in `amsk` and the rest beside the rows."))
+        end
+        return new{typeof(n), typeof(w), typeof(st), typeof(X), typeof(nx), typeof(nb),
+                   typeof(pnl), typeof(amsk), typeof(ts), typeof(hold)}(n, w, st, X, nx, nb,
+                                                                        pnl, amsk, ts, hold)
+    end
 end
 function OnlinePortfolioSelectionState(; n::Integer = 0, w::AbstractVector, st = nothing,
                                        X::Option{<:ReturnsBufferState} = nothing,
@@ -1721,19 +1745,6 @@ function OnlinePortfolioSelectionState(; n::Integer = 0, w::AbstractVector, st =
                                        amsk::Option{<:AbstractVector{<:Bool}} = nothing,
                                        ts::Option{<:AbstractVector} = nothing,
                                        hold::Option{<:HeldStep} = nothing)::OnlinePortfolioSelectionState
-    assert_nonneg(n, :n)
-    if !isnothing(nx)
-        @argcheck(length(nx) == length(w),
-                  DimensionMismatch("the pinned names ($(length(nx))) and the allocation ($(length(w))) must have one length"))
-    end
-    if !isnothing(amsk)
-        @argcheck(length(amsk) == length(w),
-                  DimensionMismatch("the active mask ($(length(amsk))) and the allocation ($(length(w))) must have one length"))
-    end
-    if !isnothing(pnl)
-        @argcheck(panel_is_static(pnl),
-                  ArgumentError("an OnlinePortfolioSelectionState pins a static Asset Panel and never a time-varying one: the masks of a time-varying panel are per-observation, so the state keeps the mask of the last row in `amsk` and the rest beside the rows."))
-    end
     return OnlinePortfolioSelectionState(n, w, st, X, nx, nb, pnl, amsk, ts, hold)
 end
 """

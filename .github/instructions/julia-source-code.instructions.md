@@ -108,6 +108,8 @@ The library uses a strict **inner/outer constructor split** for all structs:
   - It does any more validation that compares several fields and that the inner constructor cannot do, because the struct does not exist yet.
   - It calls the inner constructor.
 
+A lens write through `Accessors.set`, a `rebuild_struct` and a search candidate call the positional constructor, so a check in the keyword constructor alone does not run on them (#2197). A form that the keyword constructor converts, such as a `Symbol` that becomes a `Val`, takes an inner method of its own that converts and checks it. A check is kept out of the inner constructor only when the fold of one observation builds the type through it and the check costs as much as that fold, as the scan for finite values of a moment state does. The census in `test/test_05_tools.jl` reads each keyword constructor from the parsed source, and it names each such exception with its reason.
+
 ```julia
 @concrete struct MyEstimator <: AbstractEstimator
     "$(field_dict[:ce])"

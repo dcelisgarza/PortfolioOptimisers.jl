@@ -1697,8 +1697,152 @@ end
         free = setdiff(fieldnames(S), union(kws...))
         @test (n, issubset(free, PO.forward_derived(T))) == (n, true)
     end
-    # 37 types on 2026-11-19. A type can join the census, and none leaves it.
-    @test length(reached) >= 37
+    # 37 types on 2026-11-19. A type can join the census. A type leaves it only when it takes
+    # a hand-written constructor of every field, which a lens write then reaches: the fix of
+    # #2197 gave one to 11 types, so 26 remained.
+    @test length(reached) >= 26
+end
+@testset "A lens write and a positional call run the checks of the keyword constructor (#2197)" begin
+    using PortfolioOptimisers, Test
+    PO = PortfolioOptimisers
+    #=
+    A lens write on an undecorated type calls the positional constructor with every field.
+    The checks of `Pipeline` and of eleven states sat in the keyword constructor alone, so a
+    lens write, a rebuild and a positional call built a value that the keyword constructor
+    refuses. A search writes each candidate through `Accessors.set`, so a candidate that put
+    an optimiser before a prior step fitted with no refusal.
+    =#
+    pipe = Pipeline(; steps = (EmpiricalPrior(), InverseVolatility()))
+    @test_throws ArgumentError Accessors.@set pipe.steps = (InverseVolatility(),
+                                                            EmpiricalPrior())
+    @test_throws ArgumentError Pipeline(("a", "b"), (InverseVolatility(), EmpiricalPrior()))
+    @test_throws ArgumentError PO.rebuild_struct(pipe,
+                                                 (;
+                                                  steps = (InverseVolatility(),
+                                                           EmpiricalPrior())))
+    @test_throws ArgumentError Pipeline(("a", "b"), (EqualWeighted(), PricesToReturns()))
+    @test_throws ArgumentError Pipeline(("a", "b"), (EmpiricalPrior(), PricesToReturns()))
+    @test_throws IsEmptyError Pipeline(; steps = ())
+    pipe2 = Accessors.@set pipe.steps = (EmpiricalPrior(), EqualWeighted())
+    @test pipe2.names == pipe.names
+    @test isa(pipe2.steps[2], EqualWeighted)
+    # A fold of a schedule puts a precomputed result in the place of the schedule, and the
+    # inner constructor checks that fold, so the result states its slot.
+    rd = ReturnsResult(; nx = ["A", "B"], X = [0.01 0.02; -0.01 0.0; 0.02 -0.01])
+    res = optimise(EqualWeighted(), rd)
+    # A dynamic call, because a direct call folds the constant and runs no line of it.
+    @test Base.invokelatest(PO.pipe_writes, res) === :opt
+    @test Base.invokelatest(PO.pipe_reads, res) == (:returns,)
+    @test Pipeline(; steps = (EmpiricalPrior(), res)).names == ("prior", "opt")
+    sb = PO.SampleBufferState(; max_history = 2)
+    @test_throws DomainError Accessors.@set sb.max_history = 0
+    @test_throws DomainError Accessors.@set sb.off = -1
+    @test PO.SampleBufferState(; X = zeros(2, 2), G = falses(2)).G == [false, false]
+    @test_throws DimensionMismatch PO.SampleBufferState(; X = zeros(2, 2), G = falses(3))
+    @test_throws DomainError Accessors.@set PO.ReturnsBufferState().max_history = 0
+    @test_throws DomainError Accessors.@set PO.PipelineBufferState().max_history = 0
+    cs = PO.CovarianceState(; mu = zeros(3))
+    @test_throws DomainError Accessors.@set cs.n = -1
+    @test_throws DimensionMismatch Accessors.@set cs.M = zeros(2, 2)
+    @test_throws IsNonFiniteError PO.CovarianceState(; mu = [NaN, 0.0])
+    vs = PO.SimpleVarianceState(; mu = zeros(3))
+    @test_throws DimensionMismatch Accessors.@set vs.M = zeros(2)
+    @test_throws IsNonFiniteError PO.SimpleVarianceState(; mu = zeros(2), M = [Inf, 0.0])
+    ms = PO.SimpleExpectedReturnsState(; mu = zeros(3))
+    @test_throws DomainError Accessors.@set ms.n = -1
+    @test_throws IsEmptyError Accessors.@set ms.mu = Float64[]
+    @test_throws IsNonFiniteError PO.SimpleExpectedReturnsState(; mu = [NaN])
+    mf = PO.MissingDataFilterState(; nx = [:a], miss = [0], n = 0)
+    @test_throws DomainError Accessors.@set mf.n = -1
+    @test_throws DimensionMismatch Accessors.@set mf.miss = [0, 1]
+    pg = PO.PriceGapFillState(; nx = [:a], v = [1.0], held = [true], te = nothing)
+    @test_throws DimensionMismatch Accessors.@set pg.v = [1.0, 2.0]
+    pr = PO.PriceGapFillResult(; nx = [:a], v = [1.0], te = nothing, fill = CarriedPrice(),
+                               strict = false)
+    @test_throws DimensionMismatch Accessors.@set pr.v = [1.0, 2.0]
+    ops = PO.OnlinePortfolioSelectionState(; w = [0.5, 0.5])
+    @test_throws DomainError Accessors.@set ops.n = -1
+    @test_throws DimensionMismatch Accessors.@set ops.nx = ["A"]
+    @test_throws DimensionMismatch Accessors.@set ops.amsk = [true]
+    @test_throws ArgumentError PO.EntropyBudget(nothing)
+    @test_throws ArgumentError PO.EntropyBudget()
+    eb = PO.EntropyBudget(; target = -1.3)
+    @test_throws ArgumentError Accessors.@set eb.target = nothing
+    sr = StepwiseRegression()
+    @test (Accessors.@set sr.crit = :aic).crit === Val(:aic)
+    @test_throws ArgumentError Accessors.@set sr.crit = :none
+    @test StepwiseRegression(; crit = :bic).crit === Val(:bic)
+    #=
+    The census. A keyword constructor of a struct of the package holds no check: the inner
+    constructor holds it, so every route runs it. A keyword constructor that takes only
+    keywords is read from the parsed source, because no reflection reads the body of a
+    method. Each exception names its reason.
+    =#
+    KW_CHECK_EXCEPTIONS = Dict(:CovarianceState => "the scan for finite values costs as much as the fold of one observation, which builds the state through the positional constructor",
+                               :SimpleVarianceState => "the scan for finite values, as for `CovarianceState`",
+                               :SimpleExpectedReturnsState => "the scan for finite values, as for `CovarianceState`")
+    function census_files(root)
+        out = String[]
+        for d in ("src", "ext"), (dir, _, fs) in walkdir(joinpath(root, d)), f in fs
+            endswith(f, ".jl") && push!(out, joinpath(dir, f))
+        end
+        return out
+    end
+    function struct_names!(acc, x)
+        x isa Expr || return acc
+        if x.head === :struct
+            h = x.args[2]
+            h isa Expr && h.head === :(<:) && (h = h.args[1])
+            h isa Expr && h.head === :curly && (h = h.args[1])
+            h isa Symbol && push!(acc, h)
+            return acc
+        end
+        foreach(a -> struct_names!(acc, a), x.args)
+        return acc
+    end
+    function holds_check(x)
+        x isa Expr || return false
+        if x.head === :macrocall && string(x.args[1]) in ("@argcheck", "@assert")
+            return true
+        end
+        if x.head === :call && x.args[1] isa Symbol
+            s = string(x.args[1])
+            (s in ("throw", "error") || startswith(s, "assert") || startswith(s, "check")) &&
+                return true
+        end
+        return any(holds_check, x.args)
+    end
+    function strip_head(x)
+        while x isa Expr && x.head in (:(::), :where)
+            x = x.args[1]
+        end
+        return x
+    end
+    function keyword_checks!(acc, x, structs)
+        (x isa Expr && x.head !== :struct) || return acc
+        if x.head in (:function, :(=)) && length(x.args) == 2
+            call = strip_head(x.args[1])
+            if call isa Expr &&
+               call.head === :call &&
+               call.args[1] in structs &&
+               length(call.args) == 2 &&
+               call.args[2] isa Expr &&
+               call.args[2].head === :parameters
+                holds_check(x.args[2]) && push!(acc, call.args[1])
+                return acc
+            end
+        end
+        foreach(a -> keyword_checks!(acc, a, structs), x.args)
+        return acc
+    end
+    parsed = [Meta.parseall(read(f, String); filename = f)
+              for f in census_files(pkgdir(PortfolioOptimisers))]
+    structs = Set{Symbol}()
+    foreach(ex -> struct_names!(structs, ex), parsed)
+    found = Set{Symbol}()
+    foreach(ex -> keyword_checks!(found, ex, structs), parsed)
+    @test length(structs) > 500
+    @test found == Set(keys(KW_CHECK_EXCEPTIONS))
 end
 using Dates
 @testset "A carrier converts integer data once, and fits as its float copy does (#1972)" begin

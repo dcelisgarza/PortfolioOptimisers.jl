@@ -235,11 +235,18 @@ $(DocStringExtensions.FIELDS)
     $(field_dict[:strict_span])
     """
     strict
+    function PriceGapFillResult(nx::AbstractVector{Symbol}, v::AbstractVector, te,
+                                fill::Union{CarriedPrice, Num_VecToScaM}, strict::Bool)
+        @argcheck(length(nx) == length(v), DimensionMismatch)
+        return new{typeof(nx), typeof(v), typeof(te), typeof(fill), typeof(strict)}(nx, v,
+                                                                                    te,
+                                                                                    fill,
+                                                                                    strict)
+    end
 end
 function PriceGapFillResult(; nx::AbstractVector{Symbol}, v::AbstractVector, te,
                             fill::Union{CarriedPrice, Num_VecToScaM},
                             strict::Bool)::PriceGapFillResult
-    @argcheck(length(nx) == length(v), DimensionMismatch)
     return PriceGapFillResult(nx, v, te, fill, strict)
 end
 """
