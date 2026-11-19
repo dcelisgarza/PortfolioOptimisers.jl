@@ -881,8 +881,8 @@ function rolling_window_measure(r::BaseRM_VecBaseRM, pred::PredictionResult,
     return rolling_window_measure(r, pred.rd.X, window; kwargs...)
 end
 """
-    calc_net_asset_returns(pred::PredictionResult{<:Any,<:HeldWeightsResult}, fees = nothing)
-    calc_net_asset_returns(pred::PredictionResult{<:Any,Nothing}, args...)
+    calc_net_asset_returns(pred::PredictionResult{<:Any, <:HeldWeightsResult}, fees = nothing)
+    calc_net_asset_returns(pred::PredictionResult{<:Any, Nothing}, args...)
 
 Split a fold's net return series over the assets that produced it.
 
@@ -933,8 +933,8 @@ function calc_net_asset_returns(::PredictionResult{<:Any, Nothing}, args...)
     return throw(ArgumentError("`calc_net_asset_returns(pred::PredictionResult)` needs the fold's asset returns, and this fold kept none: `pred.rd.X` is the portfolio return series, and `pred.hw` is absent because the fold's scheme set neither `wd` nor a `DriftedWeights` source.\nSet one of them so the fold records its asset returns, or call `calc_net_asset_returns(w, X, fees)` with the returns you fitted on."))
 end
 """
-    risk_contribution(r::BaseRM_VecBaseRM, pred::PredictionResult{<:Any,<:HeldWeightsResult}, fees = nothing; kwargs...)
-    risk_contribution(r::BaseRM_VecBaseRM, pred::PredictionResult{<:Any,Nothing}, args...; kwargs...)
+    risk_contribution(r::BaseRM_VecBaseRM, pred::PredictionResult{<:Any, <:HeldWeightsResult}, fees = nothing; kwargs...)
+    risk_contribution(r::BaseRM_VecBaseRM, pred::PredictionResult{<:Any, Nothing}, args...; kwargs...)
 
 Decompose a fold's risk over its assets.
 
@@ -996,8 +996,8 @@ function risk_contribution(::BaseRM_VecBaseRM, ::PredictionResult{<:Any, Nothing
     return throw(ArgumentError("`risk_contribution(r, pred::PredictionResult)` needs the fold's asset returns, and this fold kept none: `pred.rd.X` is the portfolio return series, and `pred.hw` is absent because the fold's scheme set neither `wd` nor a `DriftedWeights` source.\nSet one of them so the fold records its asset returns, or call `risk_contribution(r, pred.res.w, rd.X, fees)` with the returns you fitted on."))
 end
 """
-    factor_risk_contribution(r::BaseRM_VecBaseRM, pred::PredictionResult{<:Any,<:HeldWeightsResult}, fees = nothing; rd, kwargs...)
-    factor_risk_contribution(r::BaseRM_VecBaseRM, pred::PredictionResult{<:Any,Nothing}, args...; kwargs...)
+    factor_risk_contribution(r::BaseRM_VecBaseRM, pred::PredictionResult{<:Any, <:HeldWeightsResult}, fees = nothing; rd, kwargs...)
+    factor_risk_contribution(r::BaseRM_VecBaseRM, pred::PredictionResult{<:Any, Nothing}, args...; kwargs...)
 
 Decompose a fold's risk over its factors.
 

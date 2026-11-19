@@ -680,6 +680,12 @@ end
     @test eltype(concrete_typed_array(Any[1, 2.0])) == Union{Float64, Int64}
     @test concrete_typed_array(Any[1, 2.0]) == [1, 2.0]
     @test size(concrete_typed_array(Any[1 2.0; 3 4.0])) == (2, 2)
+    # The union has one argument for each distinct type, so a long vector, such as the folds
+    # of a prediction Result, narrows in linear time (R73 of #1817). A union of one argument
+    # for each element took 2.4 s for these 50 000 entries, and the fix takes 8 ms.
+    long = Any[isodd(i) ? i : Float64(i) for i in 1:50_000]
+    @test eltype(concrete_typed_array(long)) == Union{Float64, Int64}
+    @test minimum(@elapsed(concrete_typed_array(long)) for _ in 1:3) < 0.5
     # The narrowing is opt-in and it is skipped when the element type is already concrete.
     already = [1.0, 2.0]
     @test PO.concrete_typed_array_if_abstract(already) === already

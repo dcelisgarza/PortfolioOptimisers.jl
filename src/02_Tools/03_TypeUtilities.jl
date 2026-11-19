@@ -66,12 +66,12 @@ Copy of `A` whose element type is the union of the types of its elements.
 
 An array with an abstract element type, such as `Any`, costs a dynamic dispatch at each use of an element. The compiler can split a small union, so the copy can make later code faster.
 
-The narrow type also costs compile time, because each new element type compiles again every method that takes the array or its holder. The split saves little where the code does much work for each element, such as a solve. So narrow a vector only where dispatch needs the narrow type, such as the turnover constraints of an estimator. Do not narrow a vector of a Result that many verbs read, such as the folds of a [`MultiPeriodPredictionResult`](@ref), or a vector of estimators, such as the `opti` of a [`Stacking`](@ref), which stores a `Vector{OptE_Opt_TD}`.
+The narrow type also costs compile time, because each new element type compiles again every method that takes the array or its holder. The split saves little where the code does much work for each element, such as a solve. So narrow a vector only where dispatch needs the narrow type, such as the turnover constraints of an estimator, or where the element type does not hold the type of an estimator. The folds of a [`MultiPeriodPredictionResult`](@ref) are of the second kind: the type of a [`PredictionResult`](@ref) does not hold the type of its optimiser, so the constructor narrows them. Do not narrow a vector of a Result that many verbs read when its element type holds the type of an estimator, or a vector of estimators, such as the `opti` of a [`Stacking`](@ref), which stores a `Vector{OptE_Opt_TD}`.
 
 # Algorithm
 
  1. Read the concrete type of every element of `A` with `typeof.(A)`.
- 2. Build the element type `Union{typeof.(A)...}`, the union of only those types. A type that no element has is not in the union.
+ 2. Build the element type `Union{unique(typeof.(A))...}`, the union of only those types. A type that no element has is not in the union. Each type enters the union one time, so the time is linear in the length of `A`. A union of one argument for each element takes a time that is quadratic in the length.
  3. Splat `A` into a vector of that element type, which flattens `A` to one dimension.
  4. Reshape the vector to `size(A)`, and return it.
 
@@ -102,9 +102,11 @@ julia> PortfolioOptimisers.concrete_typed_array(A)
   - [`ArrNum`](@ref)
 """
 function concrete_typed_array(A::AbstractArray)
-    # ADR 0067, amendment of 2026-11-02, measures the compile cost of a narrow type and lists
-    # the library sites that narrow.
-    return reshape(Union{typeof.(A)...}[A...], size(A))
+    # ADR 0067, amendments of 2026-11-02 and 2026-11-19, measure the compile cost of a narrow
+    # type and list the library sites that narrow. `unique` keeps the union of one argument
+    # for each distinct type: `Union{typeof.(A)...}` takes quadratic time in the length of `A`,
+    # 0.4 s for 20 000 folds of one type (R73 of #1817).
+    return reshape(Union{unique(typeof.(A))...}[A...], size(A))
 end
 """
     concrete_typed_array_if_abstract(A::AbstractArray) -> AbstractArray

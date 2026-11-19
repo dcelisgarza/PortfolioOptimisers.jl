@@ -564,3 +564,63 @@ every optimiser, so the three optimisers give one `MultiPeriodPredictionResult` 
 - `PredictionResult` has three type parameters in place of four. Code that names its parameters
   by position breaks. `PredictionResult{<:Any, <:Any, <:HeldWeightsResult}` becomes
   `PredictionResult{<:Any, <:HeldWeightsResult}`.
+
+## Amendment (2026-11-19)
+
+R73 of the release review #1817 read the amendment of 2026-11-18 against the code. The decisions
+of that amendment hold. This amendment adds the new site to the table of 2026-11-02, states the
+rule again, and records a cost of the narrowing that the amendment of 2026-11-18 did not measure.
+
+### The site that narrows a Result
+
+The amendment of 2026-11-02 lists each library site of `concrete_typed_array`, and gives the rule
+that a vector of a Result that many verbs read does not narrow. The constructor of
+`MultiPeriodPredictionResult` is a site of that kind, and the table did not list it:
+
+| Site | Vector | Why the narrowing stays |
+| :--- | :--- | :--- |
+| the inner constructor of `MultiPeriodPredictionResult` (#2186) | the folds of one prediction | The type of a fold holds no type of an estimator, so every optimiser gives one fold type. The fold type changes with the returns data and the scheme alone, as the type of the Result does already. |
+
+The rule is now: narrow the element type of a vector whose holder the library compiles on
+already, or of a vector whose element type holds no type of an estimator. Do not narrow a vector
+of a Result that many verbs read when its element type holds the type of an estimator. The
+docstring of `concrete_typed_array` states the same rule.
+
+### The narrowing takes linear time
+
+`concrete_typed_array` built its element type as `Union{typeof.(A)...}`, a union of one argument
+for each element. That union takes a time that is quadratic in the length of `A`. Each site of
+2026-11-02 narrows a short vector, but the folds of a prediction can be many, for example a
+walk-forward over daily data with a test window of one observation. The function now builds
+`Union{unique(typeof.(A))...}`, with one argument for each distinct type. Measured on the folds of
+one type, the fastest of three calls in a fresh process with one thread:
+
+| Folds | `Union{typeof.(A)...}` | `Union{unique(typeof.(A))...}` |
+| ---: | ---: | ---: |
+| 1 000 | 1.0 ms | 0.04 ms |
+| 2 500 | 6.2 ms | 0.11 ms |
+| 10 000 | 96.8 ms | 0.48 ms |
+| 20 000 | 379.8 ms | 1.04 ms |
+
+With the linear form, a `MultiPeriodPredictionResult` of 20 000 folds in a `Vector{PredictionResult}`
+takes 102 ms to build, and one of the same folds that are narrow already takes 108 ms. So the
+narrowing adds no measurable time to the constructor.
+
+### The measure again
+
+R73 ran the measure of the amendment of 2026-11-18 again, each form in a fresh process with one
+thread, on a host that ran the tests of other sessions. The first two rows are the parent
+`58c30eeea6`, the second with the folds narrowed by hand with `concrete_typed_array`. The last row
+is `0b8162d986`, over two runs:
+
+| Folds | First call on a new optimiser type | Warm call | Result types of four optimisers |
+| :--- | ---: | ---: | ---: |
+| `Vector{PredictionResult}` | 26.9–29.4 ms | 24.4–24.8 µs | 1 |
+| narrowed, with `res` as a type parameter | 395.9–445.9 ms | 13.4–14.2 µs | 4 |
+| narrowed, with `res` not a type parameter | 10.6–24.0 ms | 25.2–28.6 µs | 1 |
+
+The figures agree with the amendment of 2026-11-18 within the noise of the host, but the first
+call on a new optimiser type does not go to zero. The narrow folds remove the compile of about
+400 ms that a fold type for each optimiser costs. The 10 to 30 ms that stay are the methods that
+the run-time dispatch on `res` compiles for the new Result type, and the erased folds compile the
+same methods. A warm call keeps the time of the erased folds.
