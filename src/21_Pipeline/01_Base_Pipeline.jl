@@ -541,7 +541,7 @@ Constraint estimators read `:returns` — the minimal [`UniverseSets`](@ref) a b
 
 # Returns
 
-  - `slots::Tuple{Vararg{Symbol}}`: Subset of [`PIPELINE_SLOTS`](@ref).
+  - `slots::Union{Tuple{Vararg{Symbol}}, AbstractVector{<:Symbol}}`: Subset of [`PIPELINE_SLOTS`](@ref). A [`PipelineStep`](@ref) returns its `reads` in the form that it holds, a tuple or a vector.
 
 # Examples
 

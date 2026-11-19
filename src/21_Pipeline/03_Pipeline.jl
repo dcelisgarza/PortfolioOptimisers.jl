@@ -61,7 +61,7 @@ steps_form(::AbstractVector, v::AbstractVector) = [x for x in v]
 
 Return `f(e)` for each step `e` of a [`Pipeline`](@ref), in the container form of `ests`.
 
-The `Tuple` method calls `map`. The `AbstractVector` method uses a comprehension, which takes the element type of its values as `map` does. Over a vector of an abstract element type, `map` costs about three times the time of the comprehension, measured at about 5 µs against 0.2 µs to 2 µs for two steps. A pipeline maps over its steps at each fold of a prediction and at each online step, so the vector form takes the comprehension.
+The `Tuple` method calls `map`. The `AbstractVector` method uses a comprehension, which takes the element type of its values as `map` does. Over a vector of two steps of an abstract element type, `map` takes from 1.6 to 10 times the time of the comprehension, measured on the maps of [`update_online_estimator`](@ref), [`copy_states`](@ref) and [`reset_time_dependent_estimator`](@ref). A pipeline maps over its steps at each fold of a prediction and at each online step, so the vector form takes the comprehension.
 
 # Arguments
 
@@ -415,7 +415,7 @@ $(DocStringExtensions.TYPEDSIGNATURES)
 
 Validate that each step of a [`Pipeline`](@ref) reads only slots that are filled, and makes stale no slot that an earlier step wrote.
 
-The check walks the steps in order. `avail` holds the Data Slots, see [`PIPELINE_DATA_SLOTS`](@ref), and the slot of each earlier step. `written` holds the slot of each earlier step, with the step that wrote it, so the message can name that step.
+The check walks the steps in order, through [`foreach_step`](@ref). `slots` holds the slot that each step writes, see [`pipe_writes`](@ref). [`last_slot_writer`](@ref) reads it to find the last earlier step that writes a slot, so the message can name that step.
 
 # Arguments
 
@@ -423,8 +423,8 @@ The check walks the steps in order. `avail` holds the Data Slots, see [`PIPELINE
 
 # Validation
 
-  - Each slot that a step reads, see [`pipe_reads`](@ref), is in `avail`. Raises an `ArgumentError`.
-  - No slot that the write of a step makes stale, see [`PIPELINE_INVALIDATES`](@ref), is in `written`. Raises an `ArgumentError`.
+  - Each slot that a step reads, see [`pipe_reads`](@ref), is a Data Slot, see [`PIPELINE_DATA_SLOTS`](@ref), or the slot of an earlier step. Raises an `ArgumentError`.
+  - No slot that the write of a step makes stale, see [`PIPELINE_INVALIDATES`](@ref), is the slot of an earlier step. Raises an `ArgumentError`.
 
 # Returns
 
