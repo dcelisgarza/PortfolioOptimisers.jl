@@ -140,6 +140,7 @@ end
 """
     label_positions(names, sel, what::AbstractString) -> typeof(sel)
     label_positions(names, sel::Integer, what::AbstractString) -> UnitRange
+    label_positions(names, sel::Bool, what::AbstractString) -> Union{}
     label_positions(names, sel::Union{Dates.AbstractTime, VecDate}, what::AbstractString) -> Union{}
     label_positions(names::Nothing, sel::Union{AbstractString, VecStr}, what::AbstractString) -> Union{}
     label_positions(names::AbstractVector, sel::Union{AbstractString, VecStr}, what::AbstractString) -> Vector{Int}
@@ -150,6 +151,8 @@ Turn the names that select assets or factors in a view into the positions of tho
 
 One integer `n` gives the range `n:n`, and one name gives the position of that name in a vector. So the view keeps its matrix shape, as one timestamp in the observation index does, see [`timestamp_positions`](@ref). Without this step, `view(X, :, n)` drops the asset axis, and the constructor of the view refuses the vector with an error that names a field and not the index.
 
+One `Bool` is refused, as Julia refuses it in an index. `Bool <: Integer`, so the integer step would give `true:true`, and Julia reads a range of `Bool` as a mask. On an axis of one entry, `true` would then select that entry with no error. A vector of `Bool`, one entry for each position of the axis, passes through as a mask.
+
 A name that the input data does not hold is refused. An integer past the end of an axis throws, and a name that selects nothing is the same mistake. If the view dropped the name, a misspelt ticker would give a smaller universe and no error.
 
 # Algorithm
@@ -157,10 +160,11 @@ A name that the input data does not hold is refused. An integer past the end of 
 The method that Julia selects is the algorithm.
 
  1. `sel` is not an integer, not a name, not a vector of names, not a timestamp and not a vector of timestamps: return it unchanged.
- 2. `sel` is one integer `n`: return `n:n`.
- 3. `sel` is a timestamp or a vector of timestamps: throw. A timestamp selects an observation, and this index selects `what`.
- 4. `sel` is a name or a vector of names, and `names` is `nothing`: throw. The input data carries no names to match.
- 5. `sel` is a name or a vector of names: put one name in a vector of one name. Match the vector into `names` with `indexin`, giving the positions. Throw when a name has no match, and name every such entry.
+ 2. `sel` is one `Bool`: throw.
+ 3. `sel` is one integer `n`: return `n:n`.
+ 4. `sel` is a timestamp or a vector of timestamps: throw. A timestamp selects an observation, and this index selects `what`.
+ 5. `sel` is a name or a vector of names, and `names` is `nothing`: throw. The input data carries no names to match.
+ 6. `sel` is a name or a vector of names: put one name in a vector of one name. Match the vector into `names` with `indexin`, giving the positions. Throw when a name has no match, and name every such entry.
 
 # Arguments
 
@@ -170,6 +174,7 @@ The method that Julia selects is the algorithm.
 
 # Validation
 
+  - `sel` is not one `Bool`. Raises an `ArgumentError`.
   - `sel` is not a timestamp and not a vector of timestamps. Raises an `ArgumentError`.
   - `names` is not `nothing` when `sel` is a name or a vector of names. Raises an `ArgumentError`.
   - Every name of `sel` is in `names`. Raises an `ArgumentError`.
@@ -191,6 +196,9 @@ function label_positions(::Any, sel, ::AbstractString)
 end
 function label_positions(::Any, sel::Integer, ::AbstractString)
     return sel:sel
+end
+function label_positions(::Any, sel::Bool, what::AbstractString)
+    return throw(ArgumentError("one Bool is not a position of the $(what)s, and Julia refuses it in an index. Select one $what by its position, such as 1, or by its name, or pass a vector of Bool with one entry for each $what as a mask. Got\nsel => $(sel)"))
 end
 function label_positions(::Any, sel::Union{Dates.AbstractTime, VecDate},
                          what::AbstractString)
@@ -265,6 +273,7 @@ end
 """
     timestamp_positions(ts, i) -> typeof(i)
     timestamp_positions(ts, i::Integer) -> UnitRange
+    timestamp_positions(ts, i::Bool) -> Union{}
     timestamp_positions(ts, i::Union{AbstractString, VecStr}) -> Union{}
     timestamp_positions(ts::Nothing, i::Union{Dates.AbstractTime, VecDate}) -> Union{}
     timestamp_positions(ts::AbstractVector, i::Dates.AbstractTime) -> Vector{Int}
@@ -276,7 +285,7 @@ Turn the timestamps that select observations in a view of a [`ReturnsResult`](@r
 
 A vector of timestamps selects the observations that the clock holds, as the timestamp view of a [`PricesResult`](@ref) does. The rows come back in clock order whatever the order of `i`, and a timestamp that the clock does not hold selects no row. So a calendar range selects the trading days inside it. A window that keeps no row is refused by the [`ReturnsResult`](@ref) constructor, which refuses empty returns.
 
-One timestamp selects the one observation at that timestamp, and it gives a vector of one position. One integer `n` gives the range `n:n`. So the view keeps its matrix shape, as a vector of one timestamp does. A timestamp that the clock does not hold is refused, because one timestamp names one observation and not a window.
+One timestamp selects the one observation at that timestamp, and it gives a vector of one position. One integer `n` gives the range `n:n`. So the view keeps its matrix shape, as a vector of one timestamp does. A timestamp that the clock does not hold is refused, because one timestamp names one observation and not a window. One `Bool` is refused, for the reason that [`label_positions`](@ref) gives.
 
 The timestamps of `i` must compare with `ts`. [`assert_timestamp_type`](@ref) checks their types, so a `DateTime` selector of zoned timestamps raises an error that names `i`. When the element type of a vector `i` is abstract, such as `Dates.AbstractTime`, the check of that type passes, so the function also checks the type of each entry.
 
@@ -285,11 +294,12 @@ The timestamps of `i` must compare with `ts`. [`assert_timestamp_type`](@ref) ch
 The method that Julia selects is the algorithm.
 
  1. `i` is not an integer, not a timestamp, not a vector of timestamps, not a name and not a vector of names: return it unchanged.
- 2. `i` is one integer `n`: return `n:n`.
- 3. `i` is a name or a vector of names: throw. A name selects an asset or a factor, and this index selects observations.
- 4. `i` is a timestamp or a vector of timestamps, and `ts` is `nothing`: throw. The returns carry no timestamps to match.
- 5. `i` is a timestamp: check its type, and keep the positions of `ts` that equal `i`. Throw when no position equals `i`.
- 6. `i` is a vector of timestamps: check its element type. When that type is abstract, check the type of each entry. Sort `i`, and keep the position of each timestamp of `ts` that the sorted vector holds, with `insorted`.
+ 2. `i` is one `Bool`: throw.
+ 3. `i` is one integer `n`: return `n:n`.
+ 4. `i` is a name or a vector of names: throw. A name selects an asset or a factor, and this index selects observations.
+ 5. `i` is a timestamp or a vector of timestamps, and `ts` is `nothing`: throw. The returns carry no timestamps to match.
+ 6. `i` is a timestamp: check its type, and keep the positions of `ts` that equal `i`. Throw when no position equals `i`.
+ 7. `i` is a vector of timestamps: check its element type. When that type is abstract, check the type of each entry. Sort `i`, and keep the position of each timestamp of `ts` that the sorted vector holds, with `insorted`.
 
 # Arguments
 
@@ -298,6 +308,7 @@ The method that Julia selects is the algorithm.
 
 # Validation
 
+  - `i` is not one `Bool`. Raises an `ArgumentError`.
   - `i` is not a name and not a vector of names. Raises an `ArgumentError`.
   - `ts` is not `nothing` when `i` is a timestamp or a vector of timestamps. Raises an `ArgumentError`.
   - The timestamps of `i` compare with `ts`, and so does each entry of a vector `i` whose element type is abstract. Raises an `ArgumentError`. See [`assert_timestamp_type`](@ref).
@@ -321,6 +332,9 @@ function timestamp_positions(::Any, i)
 end
 function timestamp_positions(::Any, i::Integer)
     return i:i
+end
+function timestamp_positions(::Any, i::Bool)
+    return throw(ArgumentError("one Bool is not a position of the observations, and Julia refuses it in an index. Select one observation by its position, such as 1, or by its timestamp, or pass a vector of Bool with one entry for each observation as a mask. Got\ni => $(i)"))
 end
 function timestamp_positions(::Any, i::Union{AbstractString, VecStr})
     return throw(ArgumentError("a name selects an asset or a factor, but the first index of port_opt_view(rd, observations, assets, factors) selects the observations. Pass the asset names as the second index and the factor names as the third. Got\ni => $(i)"))

@@ -2142,6 +2142,35 @@ end
     @test_throws IsEmptyError PO.RRM_worst_case(x, Solver[], 0.05, 0.3)
     @test_throws IsEmptyError PO.PRM_worst_case(x, Solver[], 0.05, 2.0)
 end
+# R72 of #1817. The fix of #2191 checked the slots of the measure that a selector scores
+# with, but not the slots of its children. A `GenericValueatRiskRange` or a `RiskRatio` that
+# holds a measure with no solver is scoreable, so the constructors built, and the fit raised.
+@testset "A selector refuses a child measure with no solver by name (R72 of #1817)" begin
+    PO = PortfolioOptimisers
+    X = 0.01 .* randn(StableRNG(72), 60, 3)
+    slv = Solver(; name = :clarabel, solver = Clarabel.Optimizer,
+                 settings = Dict("verbose" => false),
+                 check_sol = (; allow_local = true, allow_almost = true))
+    for mk in (s -> GenericValueatRiskRange(; loss = EntropicValueatRisk(; slv = s),
+                                            gain = ConditionalValueatRisk()),
+               s -> GenericValueatRiskRange(; loss = ConditionalValueatRisk(),
+                                            gain = PowerNormValueatRisk(; slv = s)),
+               s -> RiskRatio(; r1 = RelativisticValueatRisk(; slv = s),
+                              r2 = ConditionalValueatRisk()))
+        r = mk(nothing)
+        @test PO.supports_precomputed_returns(r)
+        for f in (() -> ScoreSelector(; score = r, rule = RankRule(; best = 2)),
+                  () -> RedundancySelector(; score = r), () -> FoldRiskScorer(; r = r),
+                  () -> FoldRiskScorer(; r = [ConditionalValueatRisk(), r]),
+                  () -> ScoreWeightBounds(; score = r), () -> PO.asset_scores(r, X))
+            err = @test_throws IsNothingError f()
+            @test occursin(".slv` is `nothing`", err.value.msg)
+        end
+        # With a solver on the child, the selector builds.
+        @test ScoreSelector(; score = mk(slv), rule = RankRule(; best = 2)) isa
+              ScoreSelector
+    end
+end
 
 # The entropic risk measures of `src/16_RiskMeasures/06_XatRisk/03_EntropicXatRisk.jl`,
 # checked against the definition their docstrings state. The reference minimises

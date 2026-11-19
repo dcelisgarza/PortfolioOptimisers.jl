@@ -511,7 +511,7 @@ The method on an [`AbstractAssetScorer`](@ref) checks nothing and returns `nothi
 # Validation
 
   - `supports_precomputed_returns(score)`. Otherwise the function throws an `ArgumentError` that names the measure. When the measure is a [`Variance`](@ref) or a [`StandardDeviation`](@ref), the message also names `SCM()`, which computes the same quantity from a return series. When it is a [`Skewness`](@ref), the message names [`ThirdCentralMoment`](@ref), and when it is a [`Kurtosis`](@ref), it names [`HighOrderMoment`](@ref) and [`LowOrderMoment`](@ref).
-  - Every slot that [`functor_slots`](@ref) declares for the measure holds a value. Otherwise [`assert_filled_functor_slots`](@ref) throws an [`IsNothingError`](@ref) that names the slot. An [`EntropicValueatRisk`](@ref) with no solver `slv` is such a measure: a selector has no optimiser to give it one, so it states the solver on the measure.
+  - Every slot that [`functor_slots`](@ref) declares for the measure, or for a child measure that it holds, holds a value. Otherwise [`assert_resolved_slots`](@ref) throws an [`IsNothingError`](@ref) that names the slot. An [`EntropicValueatRisk`](@ref) with no solver `slv` is such a measure, and so is a [`GenericValueatRiskRange`](@ref) or a [`RiskRatio`](@ref) that holds one: a selector has no optimiser to give it a solver, so it states the solver on the measure.
 
 # Returns
 
@@ -536,7 +536,9 @@ function assert_scoreable(score::AbstractBaseRiskMeasure)::Nothing
         end
         throw(ArgumentError("`$(Base.typename(typeof(score)).wrapper)` cannot score a single asset's return series: its `supports_precomputed_returns` is false, so its functor consumes portfolio weights rather than a precomputed return vector.$hint"))
     end
-    assert_filled_functor_slots(score)
+    #! The walk reaches the children of a container, such as the tails of a
+    #! `GenericValueatRiskRange` or the two measures of a `RiskRatio`.
+    assert_resolved_slots(score)
     return nothing
 end
 function assert_scoreable(rs::VecBaseRM)::Nothing

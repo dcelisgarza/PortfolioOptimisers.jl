@@ -148,6 +148,35 @@ include(joinpath(@__DIR__, "asset_panel_fixture.jl"))
         err = @test_throws ArgumentError PV(rd, :, "Z")
         @test occursin("Z", err.value.msg)
     end
+    # R72 of #1817. `Bool <: Integer`, so the scalar step of #2190 turned `true` into
+    # `true:true`, which Julia reads as a mask. On an axis of one entry the view selected
+    # that entry with no error, and on a longer axis it raised a `BoundsError`. Also, the
+    # integer view of a PricesResult refused a timestamp in its asset index with the
+    # fallback message, where the other views name the index.
+    @testset "a Bool index and a timestamp in the asset index are refused by name (R72 of #1817)" begin
+        PV = PortfolioOptimisers.port_opt_view
+        X, F, B, iv = make_prices()
+        pr = PricesResult(; X = X)
+        ts = timestamp(X)
+        pr1 = PricesResult(; X = TimeArray(ts, reshape(values(X[:A1]), :, 1), [:A1]))
+        for c in (pr, prices_to_returns(pr), pr1, prices_to_returns(pr1))
+            for f in (() -> PV(c, :, true), () -> PV(c, true, :), () -> PV(c, :, false))
+                err = @test_throws ArgumentError f()
+                @test occursin("one Bool is not a position", err.value.msg)
+            end
+        end
+        err = @test_throws ArgumentError PV(pr1, true)
+        @test occursin("one Bool is not a position of the observations", err.value.msg)
+        # A vector of Bool is still a mask of the axis.
+        rd = prices_to_returns(pr)
+        @test PV(rd, :, [true, false, true]).nx == ["A1", "A3"]
+        for f in
+            (() -> PV(pr, 2, ts[3]), () -> PV(pr, :, ts[2:3]), () -> PV(pr, 1:2, ts[3]),
+             () -> PV(rd, 2, ts[3]), () -> PV(rd, :, ts[2:3]))
+            err = @test_throws ArgumentError f()
+            @test occursin("a timestamp selects an observation", err.value.msg)
+        end
+    end
 
     @testset "slot traits" begin
         # estimator families map to slots by dispatch

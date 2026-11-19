@@ -265,7 +265,7 @@ The method that Julia selects is the algorithm. The timestamp methods do the wor
      7. View the Listing Span at the kept timestamps and the assets `j` with [`listing_span_view`](@ref).
      8. Rebuild the [`PricesResult`](@ref).
 
- 4. `i` is one integer, integer indices, a range, a `Colon` or one timestamp, and `j` is one integer, one asset name, integer indices, a range, a `Colon` or asset names: find the positions of `i` with [`timestamp_positions`](@ref), read the timestamps of `X` at them, and call step 2 or step 3 with them. One integer `n` gives the positions `n:n`, and one timestamp gives the position of the one observation at it. A call such as `port_opt_view(pr, 2:3)` reaches this method.
+ 4. `i` is one integer, integer indices, a range, a `Colon` or one timestamp, and `j` is one integer, one asset name, integer indices, a range, a `Colon` or asset names: find the positions of `i` with [`timestamp_positions`](@ref), read the timestamps of `X` at them, and call step 2 or step 3 with them. One integer `n` gives the positions `n:n`, and one timestamp gives the position of the one observation at it. A call such as `port_opt_view(pr, 2:3)` reaches this method. A timestamp or a vector of timestamps in `j` reaches it too, and step 3 refuses it with the message of [`label_positions`](@ref), as the view of a [`ReturnsResult`](@ref) does.
 
  5. Any other call on an [`AbstractPricesResult`](@ref): throw an `ArgumentError` that names the type of each index argument, the keyword arguments, and the two call shapes of the interface. A call with three indices or with a keyword argument reaches this step. So does a subtype that implements no method.
 
@@ -363,7 +363,8 @@ function port_opt_view(pr::PricesResult, i::AbstractVector{<:Dates.AbstractTime}
 end
 function port_opt_view(pr::PricesResult,
                        i::Union{Integer, VecInt, Colon, Dates.AbstractTime} = :,
-                       j::Union{Integer, AbstractString, VecInt, VecStr, Colon} = :)
+                       j::Union{Integer, AbstractString, VecInt, VecStr, Colon,
+                                Dates.AbstractTime, VecDate} = :)
     ts = TimeSeries.timestamp(pr.X)
     return port_opt_view(pr, ts[timestamp_positions(ts, i)], j)
 end
