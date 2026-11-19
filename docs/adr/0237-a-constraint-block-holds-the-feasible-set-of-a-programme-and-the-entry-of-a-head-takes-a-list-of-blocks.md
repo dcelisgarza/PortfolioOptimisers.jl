@@ -73,7 +73,11 @@ A block field can read these data:
 1. The caller's object and `sets`.
 2. The prior result and the rows of its own block.
 3. The solver of its owner. A Calibration Rule in `l2c`, `lpc`, `linfc`, `l1`, `l2`, `lp` or
-   `linf` resolves against `slv`.
+   `linf` resolves against `slv`. Stage 2, `resolve_constraint_block`, resolves each rule, and
+   then checks the range of the four numbers that reach the model with no term to rebuild:
+   `l2c`, `linfc`, `l1` and `linf`. At `v0.33.0`, `assemble_jump_model!` and the allocation-set
+   programme each resolved the rules, and the four builders that they called checked the range.
+   ADRs 0095 and 0097 state that form.
 4. The Price-Adjusted Allocation, through `factory`.
 5. The values of its owner that the block cannot hold. The block builder `set_block_constraints!`
    takes them as arguments: the owner, the net budget `bgt`, for `sbgt` and `gbgt`; `fees`, for

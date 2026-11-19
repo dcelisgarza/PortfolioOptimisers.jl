@@ -429,9 +429,9 @@ $(DocStringExtensions.TYPEDSIGNATURES)
 
 Resolve the ambiguity radius in `val` against prior result `pr`, and return an [`L2Regularisation`](@ref) holding the number.
 
-[`assemble_jump_model!`](@ref) calls it with the prior result and the solver of the optimisation. The estimator is not `@propagatable`, so this method is the ordinary `factory` verb and not the generated one. The rebuild goes through the keyword constructor, so the positivity check and [`assert_ambiguity_radius_formulation`](@ref) run again on the resolved number.
+The stage 2 of the constraint block, [`resolve_constraint_block`](@ref), calls it with the prior result of the block and the solver of its owner, before the library builds the model. The estimator is not `@propagatable`, so this method is the ordinary `factory` verb and not the generated one. The rebuild goes through the keyword constructor, so the positivity check and [`assert_ambiguity_radius_formulation`](@ref) run again on the resolved number.
 
-The weights-only `factory(l2, w)` and [`port_opt_view`](@ref) return the estimator unchanged. Neither holds a prior result, so neither can resolve a rule. A rule that stays after a cluster slice is resolved against the prior of that cluster when the model is assembled.
+The weights-only `factory(l2, w)` and [`port_opt_view`](@ref) return the estimator unchanged. Neither holds a prior result, so neither can resolve a rule. A rule that stays after a cluster slice is resolved against the prior of that cluster when [`resolve_constraint_block`](@ref) resolves the block of the cluster.
 
 The slot resolves under the key `:l2reg_val` and not `:val`, because [`LpRegularisation`](@ref) also names its coefficient `val`, and the two coefficients belong to two different ground metrics. [`DualNormRadius`](@ref) reads the key to tell the type-2 metric of this penalty from the type-``q`` metric of the Lp penalty.
 
@@ -457,7 +457,7 @@ The slot resolves under the key `:l2reg_val` and not `:val`, because [`LpRegular
   - [`resolve_calibration_slot`](@ref)
   - [`assert_ambiguity_radius_formulation`](@ref)
   - [`assert_declared_calibration_resolver`](@ref)
-  - [`assemble_jump_model!`](@ref)
+  - [`resolve_constraint_block`](@ref)
 """
 function factory(x::L2Regularisation, pr::AbstractPriorResult, slv = nothing)
     val = resolve_calibration_slot(x.val, :l2reg_val, pr, pr.w, slv)

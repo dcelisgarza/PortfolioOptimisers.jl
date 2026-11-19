@@ -622,9 +622,9 @@ A rule gets no portfolio. A prior result holds no portfolio weight vector, so no
 
 **The context holds all the facts of the site, and this function rebuilds nothing.** `key` names the slot and not the quantity. So a rule reads from `ctx` the shape of a series, the significance level of a sibling slot, the norm order of its constraint, or the count of the scenarios that the site prices. No rule has a field for these facts, so the function rebuilds no occupant and overwrites nothing that a caller stated. [`CalibrationContext`](@ref) states which rule reads which field.
 
-**This function checks the value of a ceiling rule and of a radius rule, and of no other family.** [`AbstractNormCeilingCalibrationAlgorithm`](@ref) and [`AbstractAmbiguityRadiusCalibrationAlgorithm`](@ref) share one method. It runs [`assert_nonempty_gt0_finite_val`](@ref) on the number that the rule returned, under the `key` of the slot. Both quantities reach a JuMP model from a field of [`JuMPOptimiser`](@ref): the ceiling from `l2c` and `linfc`, and the radius from `l1` and `linf`. No term is rebuilt on that route, so nothing later checks the range. The three other families are only in slots that their owner rebuilds. The rebuild runs the constructor of the owner on the calibrated number, and that constructor checks the range. Only the calibrated path pays for the check, because a stated number takes the first method.
+**This function checks the value of a ceiling rule and of a radius rule, and of no other family.** [`AbstractNormCeilingCalibrationAlgorithm`](@ref) and [`AbstractAmbiguityRadiusCalibrationAlgorithm`](@ref) share one method. It runs [`assert_nonempty_gt0_finite_val`](@ref) on the number that the rule returned, under the `key` of the slot. Both quantities reach a JuMP model from a field of [`JuMPOptimiser`](@ref): the ceiling from `l2c` and `linfc`, and the radius from `l1` and `linf`. No term is rebuilt on that route, so the check here is the first one, and it names the slot. The three other families are only in slots that their owner rebuilds. The rebuild runs the constructor of the owner on the calibrated number, and that constructor checks the range. Only the calibrated path pays for the check, because a stated number takes the first method.
 
-**The site checks a rule that is a plain function.** A function has no family, so no method here can know the quantity that it computes. [`assemble_jump_model!`](@ref) is the one site that reads a calibrated number and rebuilds no term, and it checks the range of each of its four norm slots.
+**The site checks a rule that is a plain function.** A function has no family, so no method here can know the quantity that it computes. The stage 2 of the constraint block, [`resolve_constraint_block`](@ref), is the one site that reads a calibrated number and rebuilds no term. After the resolution, it checks the range of each of its four norm slots, whatever occupant gave the number.
 
 This function is the counterpart of [`resolve_slot`](@ref). It is a second function, and not a wider method of the first, for two reasons. The body of `resolve_slot` is `deferred_quantity(fit_deferred_quantity(dq, pr), key)`, a fit and then an extraction, and a rule fits nothing. Also, `resolve_slot` takes neither `w` nor `slv`, and a rule needs both. So the rule families are **not** members of the [`DeferredQuantity`](@ref) union.
 
@@ -1896,10 +1896,11 @@ const Num_AmbRadNormCeilCal = Union{AbstractAmbiguityRadiusCalibrationAlgorithm,
 # `JuMPOptimiser`: the ceiling from `l2c` and `linfc`, the radius from `l1` and `linf`.
 # There is no term to rebuild on that route, and the constructor's guard read a rule rather
 # than a number, so it selected the permissive fallback of the validator and stated nothing.
-# The range of the quantity is therefore checked here, on the number the rule returned, and
-# only on the calibrated path. The three other families stand only in slots their owner
-# rebuilds, and that rebuild states their range. A rule written as a plain function names no
-# family, so it reaches neither method here and `assemble_jump_model!` states its range.
+# The range of the quantity is checked here first, on the number the rule returned, under the
+# key of the slot. The three other families stand only in slots their owner rebuilds, and that
+# rebuild states their range. A rule written as a plain function names no family, so it
+# reaches neither method here. `resolve_constraint_block` checks the four numbers after the
+# resolution, so it states the range of a function too.
 function resolve_calibration_slot(alg::Union{AbstractNormCeilingCalibrationAlgorithm,
                                              AbstractAmbiguityRadiusCalibrationAlgorithm},
                                   key::Symbol, pr::AbstractPriorResult, w, slv = nothing,
