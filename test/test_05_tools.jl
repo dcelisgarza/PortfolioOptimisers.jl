@@ -1604,8 +1604,9 @@ end
     `forward_setproperties` turns this test red.
     =#
     ms = filter(m -> m.module === PO, methods(Accessors.setproperties))
-    # 27 types on 2026-11-19. A type can join the census, and none leaves it.
-    @test length(ms) >= 27
+    # 32 types on 2026-11-19, after R75 of #1817. A type can join the census, and none
+    # leaves it.
+    @test length(ms) >= 32
     for m in ms
         X = Base.rewrap_unionall(Base.unwrap_unionall(m.sig).parameters[2], m.sig)
         S = Base.unwrap_unionall(X).name.wrapper
@@ -1614,6 +1615,90 @@ end
         @test (S, issubset(der, fieldnames(S))) == (S, true)
         @test (S, any(c -> issubset(need, Base.kwarg_decl(c)), methods(S))) == (S, true)
     end
+end
+@testset "A lens write on an undecorated type with a derived field computes it again (R75 of #1817)" begin
+    using PortfolioOptimisers, StableRNGs, Test
+    PO = PortfolioOptimisers
+    #=
+    A type that `@forward_properties` does not decorate goes to the default `setproperties`
+    of ConstructionBase, which calls the positional constructor with every field. When no
+    hand-written constructor takes every field, the call reaches the generic constructor of
+    `@concrete`, which skips the inner constructor. So a field that the inner constructor
+    computes kept its old value, and no check ran. A search writes each candidate through
+    `Accessors.set`, so a search over `x` of a `LogRegimeAdjusted` scored the default `kappa`.
+    =#
+    function set_error(f)
+        return try
+            f()
+            ""
+        catch err
+            sprint(showerror, err)
+        end
+    end
+    la = PO.LogRegimeAdjusted()
+    la2 = Accessors.@set la.x = 3.0
+    @test la2.kappa == PO.LogRegimeAdjusted(3.0, 2.0).kappa
+    @test la2.kappa != la.kappa
+    @test PO.rebuild_struct(la, (; y = 3.0)).kappa == PO.LogRegimeAdjusted(0.5, 3.0).kappa
+    @test_throws DomainError Accessors.@set la.x = -1.0
+    @test occursin("`kappa` cannot be set on a `LogRegimeAdjusted`",
+                   set_error(() -> Accessors.@set la.kappa = 0.0))
+    nef = NormalEquationsFit(; XtX = [4.0 0.0; 0.0 16.0], Xty = [4.0, 8.0], n = 3)
+    @test (Accessors.@set nef.Xty = [8.0, 8.0]).coef == [2.0, 0.5]
+    @test occursin("`coef` cannot be set on a `NormalEquationsFit`",
+                   set_error(() -> Accessors.@set nef.coef = [0.0, 0.0]))
+    cv = PO.CustomValueReturnForecastResult([0.1, 0.2])
+    @test (Accessors.@set cv.mu = [0.3, 0.4]).mu == [0.3, 0.4]
+    @test_throws IsEmptyError Accessors.@set cv.mu = Float64[]
+    @test occursin("`hist` cannot be set on a `CustomValueReturnForecastResult`",
+                   set_error(() -> Accessors.@set cv.hist = 1))
+    tr = PO.TargetReturnForecastResult(; mu = [0.1, 0.2], calib = 1.0)
+    @test (Accessors.@set tr.calib = 2.0).calib == 2.0
+    @test occursin("`hist` cannot be set on a `TargetReturnForecastResult`",
+                   set_error(() -> Accessors.@set tr.hist = 1))
+    # `Resume` reads `opt` from `res`.
+    rng = StableRNG(123)
+    X = randn(rng, 120, 4) .* 0.01 .+ 0.0005
+    rd = ReturnsResult(; nx = ["A", "B", "C", "D"], X = X)
+    o1 = cross_val_predict(InverseVolatility(), rd, OnlineIndexWalkForward(60, 20))
+    o2 = cross_val_predict(InverseVolatility(), rd, OnlineIndexWalkForward(40, 20))
+    rs = Resume(o1)
+    @test (Accessors.@set rs.res = o2).opt === o2.opt
+    @test PO.rebuild_struct(rs, NamedTuple()).opt === rs.opt
+    b = cross_val_predict(InverseVolatility(), rd, IndexWalkForward(30, 10))
+    @test_throws ArgumentError Accessors.@set rs.res = b
+    @test occursin("`opt` cannot be set on a `Resume`",
+                   set_error(() -> Accessors.@set rs.opt = o2.opt))
+    #=
+    The census. Each concrete type of the package that has a keyword constructor, and no
+    hand-written constructor that takes every field positionally, names in a `derived` rule
+    each field that no keyword constructor takes.
+    =#
+    generated(m) = occursin("ConcreteStructs", string(m.file))
+    reached = Symbol[]
+    for n in names(PO; all = true)
+        isdefined(PO, n) || continue
+        T = getfield(PO, n)
+        T isa Type || continue
+        S = Base.unwrap_unionall(T)
+        (S isa DataType &&
+         isstructtype(S) &&
+         !isabstracttype(S) &&
+         parentmodule(S) === PO &&
+         S.name.wrapper === T) || continue
+        nf = fieldcount(S)
+        nf == 0 && continue
+        ms = collect(methods(T))
+        kws = [Base.kwarg_decl(m)
+               for m in ms if m.nargs == 1 && !isempty(Base.kwarg_decl(m))]
+        isempty(kws) && continue
+        any(m -> !generated(m) && (m.nargs - 1 == nf || m.isva), ms) && continue
+        push!(reached, n)
+        free = setdiff(fieldnames(S), union(kws...))
+        @test (n, issubset(free, PO.forward_derived(T))) == (n, true)
+    end
+    # 37 types on 2026-11-19. A type can join the census, and none leaves it.
+    @test length(reached) >= 37
 end
 using Dates
 @testset "A carrier converts integer data once, and fits as its float copy does (#1972)" begin

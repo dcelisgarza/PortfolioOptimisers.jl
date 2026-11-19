@@ -160,8 +160,9 @@ $(DocStringExtensions.TYPEDFIELDS)
 # Constructors
 
     NormalEquationsFit(XtX::MatNum, Xty::VecNum, n::Integer) -> NormalEquationsFit
+    NormalEquationsFit(; XtX::MatNum, Xty::VecNum, n::Integer) -> NormalEquationsFit
 
-The constructor solves the coefficients through [`normal_equations_coef`](@ref).
+The constructor solves the coefficients through [`normal_equations_coef`](@ref). `coef` is a derived field, so `Accessors.set` solves the coefficients again from the new sums, and it refuses a patch of `coef`.
 
 ## Validation
 
@@ -214,6 +215,13 @@ julia> PortfolioOptimisers.StatsAPI.predict(m, [1.0 2.0])
         coef = normal_equations_coef(XtX, Xty)
         return new{typeof(XtX), typeof(Xty), typeof(n), typeof(coef)}(XtX, Xty, n, coef)
     end
+end
+function NormalEquationsFit(; XtX::MatNum, Xty::VecNum, n::Integer)::NormalEquationsFit
+    return NormalEquationsFit(XtX, Xty, n)
+end
+# The inner constructor solves `coef` from the sums, so a lens write leaves it out.
+@forward_properties NormalEquationsFit begin
+    derived(coef)
 end
 function StatsAPI.coef(m::NormalEquationsFit)::VecNum
     return m.coef
@@ -566,7 +574,7 @@ $(DocStringExtensions.TYPEDEF)
 
 Result type produced by [`TargetReturnForecast`](@ref).
 
-Beside the two reads [`AbstractReturnForecastResult`](@ref) states, it carries the fitted model and the calibration coefficient. A reader can inspect the combination the target fitted and the coefficient that puts the prediction into return units. `hist` is `nothing`, because the member computes no history. When the caller asks for it, the Result also carries the calibration coefficient of the orthogonal part of the prediction.
+Beside the two reads [`AbstractReturnForecastResult`](@ref) states, it carries the fitted model and the calibration coefficient. A reader can inspect the combination the target fitted and the coefficient that puts the prediction into return units. `hist` is `nothing`, because the member computes no history. When the caller asks for it, the Result also carries the calibration coefficient of the orthogonal part of the prediction. `hist` is a derived field, so `Accessors.set` builds the Result again from the new values, and it refuses a patch of `hist`.
 
 # Fields
 
@@ -612,6 +620,10 @@ end
 function TargetReturnForecastResult(; mu::VecNum, model = nothing, calib::Number = NaN,
                                     ocalib::Option{<:Number} = nothing)::TargetReturnForecastResult
     return TargetReturnForecastResult(mu, model, calib, ocalib)
+end
+# The inner constructor sets `hist` to `nothing`, so a lens write leaves it out.
+@forward_properties TargetReturnForecastResult begin
+    derived(hist)
 end
 """
     target_forecast_variances(unit::IdiosyncraticReturnUnit,

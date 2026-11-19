@@ -174,8 +174,9 @@
     #=
     A positional call that fails, for a type whose inner constructor does not take every field,
     counts as zero bytes, so the keyword rebuild of that type must allocate nothing. A type that
-    `rebuild_struct` cannot rebuild at all is skipped: `Frontier` and `LogRegimeAdjusted`
-    derive a field that their keyword constructor does not take, and no step reaches them.
+    `rebuild_struct` cannot rebuild at all is skipped: `Frontier` takes `factor` by position
+    alone, and no step reaches it. A derived field, such as `kappa` of `LogRegimeAdjusted`, is
+    left out of the call, so `LogRegimeAdjusted` is measured (R75 of #1817).
     =#
     measured = DataType[]
     costly = Tuple{Symbol, Int, Int}[]

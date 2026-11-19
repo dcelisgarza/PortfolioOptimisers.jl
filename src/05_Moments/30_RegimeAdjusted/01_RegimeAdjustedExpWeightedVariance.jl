@@ -149,7 +149,8 @@ $(DocStringExtensions.FIELDS)
     ) -> LogRegimeAdjusted
 
 Keywords correspond to the struct's fields. The constructor derives the `kappa` field from `x`
-and `y`, so a caller cannot set it.
+and `y`, so a caller cannot set it. `Accessors.set`, and so a search over `x` or `y`, computes
+`kappa` again from the new values, and it refuses a patch of `kappa`.
 
 ## Validation
 
@@ -199,6 +200,10 @@ LogRegimeAdjusted
 end
 function LogRegimeAdjusted(; x::Number = 0.5, y::Number = 2.0)::LogRegimeAdjusted
     return LogRegimeAdjusted(x, y)
+end
+# The inner constructor computes `kappa` from `x` and `y`, so a lens write leaves it out.
+@forward_properties LogRegimeAdjusted begin
+    derived(kappa)
 end
 """
 $(DocStringExtensions.TYPEDEF)

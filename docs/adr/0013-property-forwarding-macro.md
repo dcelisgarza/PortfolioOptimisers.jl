@@ -343,3 +343,15 @@ The other form, a keyword `mrd = nothing` that the constructor ignores, would ac
 tuple, the compiler folds the removal, and `rebuild_struct` allocates what it allocated before.
 A census in `test/test_05_tools.jl` compares the fields of every type with a generated
 `setproperties` method against the keyword names of its constructors.
+
+The review of the release (R75 of #1817) found the same mechanism on five types that the macro
+did not decorate: `Resume`, `LogRegimeAdjusted`, `NormalEquationsFit`,
+`CustomValueReturnForecastResult` and `TargetReturnForecastResult`. An undecorated type goes to
+the default `setproperties` of `ConstructionBase`, which calls the positional constructor with
+every field. The generic constructor of `@concrete` takes that call and skips the inner
+constructor, so the derived field kept its old value and no check ran, with no error. A search
+writes each candidate through `Accessors.set`, so a search over `x` of a `LogRegimeAdjusted`
+scored the `kappa` of the start value. Each of the five now has a block with a `derived` rule.
+`NormalEquationsFit` gets a keyword constructor for it. A second census in the same file reads
+every type of the package that has a keyword constructor and no hand-written constructor of every
+field, and demands that a `derived` rule names each field that no keyword constructor takes.

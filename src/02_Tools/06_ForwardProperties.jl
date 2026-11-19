@@ -338,7 +338,7 @@ A `forward` rule with the `settable` option is the one exception. The function p
 
 The macro passes `ctor` as the name of `T` without its type parameters. So step 5 calls the ordinary keyword constructor, and it needs no reflection to find it. A patch that changes a type parameter, such as a value for an unset `L`, gives the specialisation that the constructor selects.
 
-The keyword constructor of `T` must take every field of `T` by its field name, except a field that a `derived` rule names. A type that marks a name as `settable` must also take that name as a keyword of its keyword constructor. The keyword replaces that slot of the nested part that the constructor is given, and the default of the keyword must leave that slot as it is. Step 3 passes the old nested part and the new value of the slot in one call. [`rebuild_struct`](@ref) calls the constructor in the same way, so the two give the same value.
+The keyword constructor of `T` must take every field of `T` by its field name, except a field that a `derived` rule names. A type that marks a name as `settable` must also take that name as a keyword of its keyword constructor. The keyword replaces that slot of the nested part that the constructor is given, and the default of the keyword must leave that slot as it is. Step 5 passes the old nested part and the new value of the slot in one call. [`rebuild_struct`](@ref) calls the constructor in the same way, so the two give the same value.
 
 # Related
 

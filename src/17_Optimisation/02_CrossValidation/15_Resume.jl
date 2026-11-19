@@ -132,6 +132,8 @@ $(DocStringExtensions.FIELDS)
     Resume(res::MultiPeriodPredictionResult)
     Resume(; res::MultiPeriodPredictionResult)
 
+`opt` is a derived field, so `Accessors.set` reads it again from the new `res`, and it refuses a patch of `opt`.
+
 ## Validation
 
   - `res.opt` is not `nothing`. An `ArgumentError` is thrown otherwise, because a batch run threads no estimator.
@@ -167,6 +169,10 @@ function Resume(::PopulationPredictionResult)
 end
 function Resume(; res::MultiPeriodPredictionResult)::Resume
     return Resume(res)
+end
+# The inner constructor reads `opt` from `res`, so a lens write leaves it out.
+@forward_properties Resume begin
+    derived(opt)
 end
 """
     is_time_dependent(r::Resume)

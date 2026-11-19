@@ -70,7 +70,7 @@ $(DocStringExtensions.TYPEDEF)
 
 Result type produced by [`CustomValueReturnForecast`](@ref).
 
-The member states its forecast and computes none, so `hist` is `nothing`. A stated vector has no history. The two fields are the two reads [`AbstractReturnForecastResult`](@ref) states.
+The member states its forecast and computes none, so `hist` is `nothing`. A stated vector has no history. The two fields are the two reads [`AbstractReturnForecastResult`](@ref) states. `hist` is a derived field, so `Accessors.set` builds the Result again from the new `mu`, and it refuses a patch of `hist`.
 
 # Fields
 
@@ -98,6 +98,10 @@ $(DocStringExtensions.TYPEDFIELDS)
 end
 function CustomValueReturnForecastResult(; mu::VecNum)::CustomValueReturnForecastResult
     return CustomValueReturnForecastResult(mu)
+end
+# The inner constructor sets `hist` to `nothing`, so a lens write leaves it out.
+@forward_properties CustomValueReturnForecastResult begin
+    derived(hist)
 end
 """
     return_forecast(rfe::CustomValueReturnForecast, rd::ReturnsResult,
