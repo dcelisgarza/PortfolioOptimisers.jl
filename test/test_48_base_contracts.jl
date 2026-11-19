@@ -1085,10 +1085,17 @@ end
     @test isnothing(pe.assert_partial_fit_state(3, [1.0, 2.0], zeros(2, 2)))
     @test_throws DomainError pe.assert_partial_fit_state(-1, [1.0])
     @test_throws IsEmptyError pe.assert_partial_fit_state(1, Float64[])
-    @test_throws IsNonFiniteError pe.assert_partial_fit_state(1, [NaN])
-    @test_throws IsNonFiniteError pe.assert_partial_fit_state(1, [1.0], [Inf])
     @test_throws DimensionMismatch pe.assert_partial_fit_state(1, [1.0, 2.0], zeros(3))
     @test_throws DimensionMismatch pe.assert_partial_fit_state(1, [1.0, 2.0], zeros(2, 3))
+    # The O(1) checks leave a value that is not finite to `assert_partial_fit_values`, which
+    # the keyword constructor alone runs, because the scan costs as much as a fold (#2197).
+    @test isnothing(pe.assert_partial_fit_state(1, [NaN]))
+    @test isnothing(pe.assert_partial_fit_state(1, [1.0], [Inf]))
+    @test isnothing(pe.assert_partial_fit_values([1.0, 2.0]))
+    @test isnothing(pe.assert_partial_fit_values([1.0, 2.0], zeros(2, 2)))
+    @test_throws IsNonFiniteError pe.assert_partial_fit_values([NaN])
+    @test_throws IsNonFiniteError pe.assert_partial_fit_values([1.0], [Inf])
+    @test_throws IsNonFiniteError pe.SimpleExpectedReturnsState(; n = 1, mu = [NaN])
 end
 @testset "observation_count reads the folded rows, and names a state that has no count" begin
     using Statistics
