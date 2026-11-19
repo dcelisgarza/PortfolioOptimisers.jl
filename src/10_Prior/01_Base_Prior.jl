@@ -1008,7 +1008,7 @@ LowOrderPrior
     """
     $(field_dict[:eoc_prior])
     """
-    eoc
+    eoc::Tuple{Option{<:Real}, Option{<:Real}}
     """
     $(field_dict[:kld])
     """
@@ -1105,8 +1105,11 @@ LowOrderPrior
         assert_moment_counts(eoc)
         assert_shared_series_gaps(ss_gaps, size(X, 1))
         assert_pool_cache(pc, size(X, 1))
-        fs = (X, o_X, mu, sigma, chol, w, ens, eoc, kld, ow, rr, fpr, x_src, ss_gaps, pc)
-        return new{map(typeof, fs)...}(fs...)
+        # `eoc` is not a type parameter: whether an entry is `nothing` depends on a value, so
+        # a type parameter would make the result type a guess for inference (issue #2186).
+        ps = (X, o_X, mu, sigma, chol, w, ens, kld, ow, rr, fpr, x_src, ss_gaps, pc)
+        return new{map(typeof, ps)...}(X, o_X, mu, sigma, chol, w, ens, eoc, kld, ow, rr,
+                                       fpr, x_src, ss_gaps, pc)
     end
 end
 """
@@ -1732,7 +1735,7 @@ HighOrderPrior
     """
     $(field_dict[:eoc_hop])
     """
-    eoc
+    eoc::Tuple{Option{<:Real}, Option{<:Real}}
     """
     $(field_dict[:fpr])
     """
@@ -1803,8 +1806,10 @@ HighOrderPrior
                       ConflictingArgumentError("the factor low order prior is reachable two ways, as `fpr.pr` and as `pr.fpr`, and they must be the same object, but they differ. `fpr.pr` is the distribution the factor co-moments were computed against, so a mismatch would make `hop.fpr.mu` and `hop.f_mu` disagree with no way to tell which is right. Build the nested block from the wrapped prior's own factor block: `HighOrderPrior(; pr = pr.fpr, kt = ...)`."))
         end
         assert_moment_counts(eoc)
-        fs = (pr, kt, D2, L2, S2, sk, V, skmp, eoc, fpr)
-        return new{map(typeof, fs)...}(fs...)
+        # `eoc` is not a type parameter: whether an entry is `nothing` depends on a value, so
+        # a type parameter would make the result type a guess for inference (issue #2186).
+        ps = (pr, kt, D2, L2, S2, sk, V, skmp, fpr)
+        return new{map(typeof, ps)...}(pr, kt, D2, L2, S2, sk, V, skmp, eoc, fpr)
     end
 end
 function HighOrderPrior(; pr::AbstractPriorResult, kt::Option{<:MatNum} = nothing,

@@ -492,3 +492,75 @@ The decisions:
 - #1941 removes two type parameters from `ProcessedJuMPOptimiserAttributes`, one from
   `HierarchicalRiskParityResult` and four from `HierarchicalEqualRiskContributionResult`. Code that
   names the parameters of these types by position breaks.
+
+## Amendment (2026-11-18)
+
+Issue #2186, step 3. The folds of a `MultiPeriodPredictionResult` are a vector of one concrete
+type. This replaces the decision of the amendment of 2026-11-02, that the folds stay a
+`Vector{PredictionResult}`.
+
+### Why the earlier decision changes
+
+The amendment of 2026-11-02 refused a narrow fold type, because the type of a fold held the type
+of its optimisation Result in its first type parameter. So each new optimiser gave a new fold
+type, and every verb on the prediction Result compiled again. #1939 and #1941 then took the type
+of each estimator part out of the optimisation Results, but the `res` field of `PredictionResult`
+still carried the type of the Result itself. That type differs for each optimiser type, for
+example `HierarchicalRiskParityResult` and `NaiveOptimisationResult`.
+
+The rule of #1939 reaches this field too: a holder that many verbs read does not carry the type of
+an estimator in a type parameter. A `PredictionResult` is such a holder, and its Result is the
+estimator part that it holds.
+
+### What the measure gives
+
+The measure is the measure of the amendment of 2026-11-02, with a new optimiser type in place of a
+new risk measure, because since #1939 a new risk measure gives no new fold type.
+`performance_summary(p)` and then `log_wealth_regret(p, p)` run on a `cross_val_predict` Result of
+an `IndexWalkForward(30, 10)` over 120 rows and 4 assets, which gives 9 folds. A warm-up compiles
+the verbs on a `MeanRisk` first. Each figure is for the first call on a `HierarchicalRiskParity`,
+a `HierarchicalEqualRiskContribution` and an `InverseVolatility`, and for the fastest of 200 warm
+calls. The tree is `dev` at `58c30eeea6`, Julia 1.13.4, with one thread:
+
+| Folds | First call on a new optimiser type | Warm call |
+| :--- | ---: | ---: |
+| `Vector{PredictionResult}`, before this amendment | 5.4–27.9 ms | 22.4–25.7 µs |
+| narrowed, with `res` as a type parameter | 380.9–408.8 ms | 12.1–19.0 µs |
+| narrowed, with `res` not a type parameter | 0.1–16.3 ms | 24.0–28.5 µs |
+
+The narrow folds with `res` out of the type parameters remove the compile for each optimiser type,
+and they do not slow a warm call down. A warm call is not faster either, because the readers of the
+weights of a fold read `pred.res.w`, and that read dispatches at run time. A fold has one type for
+every optimiser, so the three optimisers give one `MultiPeriodPredictionResult` type.
+
+### The decisions
+
+- `PredictionResult` binds `res` to `NonFiniteAllocationOptimisationResult` on the field, and the
+  field leaves the type parameters. The parameters are the types of `rd`, `hw` and `idx`.
+- The inner constructor of `MultiPeriodPredictionResult` narrows a vector of folds whose element
+  type is not concrete with `concrete_typed_array`, and calls itself again with the narrow vector.
+  That call is a function barrier, so the body compiles for the narrow vector. Folds of two types
+  have no one concrete type, so the constructor keeps the vector that it was given. A vector that
+  is narrow already is not copied.
+- `LowOrderPrior` and `HighOrderPrior` bind `eoc` to `Tuple{Option{<:Real}, Option{<:Real}}` on
+  the field, and the field leaves the type parameters. An entry of `eoc` is `nothing` when its
+  count equals the number of rows, so the type of the field depended on a value. Inference then
+  gave `prior` a result type with a free parameter, and every optimiser that fits a prior took
+  abstract arguments after it. The census of step 3 of #2186 found this as the largest loss frame,
+  in the `_optimise` of `HierarchicalRiskParity`.
+- `fold_loop`, `parallel_folds` and `run_folds` keep their `ElT`. The loop still infers its
+  vector abstractly, because `FLoops.@floop` makes `parallel_folds` infer `Any`. #2137, the map
+  that replaces FLoops, owns that defect, and its `map_index` can give the vector of the type that
+  the fold infers.
+
+### Consequences
+
+- A reader of `rd`, `hw` or `idx` of a fold infers. A reader of `res` infers abstractly, and the
+  value is concrete at run time. In a `PerformanceSummaryResult` of a prediction, the fields
+  `turnover`, `n_eff`, `long_exposure`, `short_exposure`, `gross_exposure` and `net_exposure` read
+  the weights through `res`, so they do not infer. The other fields infer.
+- The consequence of 2026-11-02, that a user can narrow the folds by hand, does not apply. The
+  constructor narrows them.
+- `PredictionResult` has three type parameters in place of four. Code that names its parameters
+  by position breaks. `PredictionResult{<:Any, <:Any, <:HeldWeightsResult}` becomes
+  `PredictionResult{<:Any, <:HeldWeightsResult}`.

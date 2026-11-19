@@ -663,6 +663,8 @@ $(DocStringExtensions.FIELDS)
 
 Keywords correspond to the struct's fields. `res` and `rd` are required, because a fold prediction needs both. `hw` defaults to `nothing`, which is a fold that held its target weights on every observation. `idx` defaults to `nothing`, which is a prediction made over returns data that no fold index selected.
 
+The type of `res` is not a type parameter. The field is bound to `NonFiniteAllocationOptimisationResult`, so the folds of two optimisers have one type when their `rd`, `hw` and `idx` have one type, and [`MultiPeriodPredictionResult`](@ref) narrows its folds to that type. The type parameters are the types of `rd`, `hw` and `idx`, in that order. A reader of `res` dispatches on its value at run time.
+
 `hw` is present only when a Weight Drift or a Previous-Weights Source ran over the fold, and the fold-taking consumers dispatch on its type. It carries the asset returns of the fold, the weights the drift started from, the weights held after the last observation and the drift that made them. [`weight_path`](@ref) rebuilds the weight path from it.
 
 # Related
@@ -680,7 +682,7 @@ Keywords correspond to the struct's fields. `res` and `rd` are required, because
     """
     $(field_dict[:pred_res])
     """
-    res
+    res::NonFiniteAllocationOptimisationResult
     """
     $(field_dict[:rd])
     """
@@ -696,7 +698,9 @@ Keywords correspond to the struct's fields. `res` and `rd` are required, because
     function PredictionResult(res::NonFiniteAllocationOptimisationResult,
                               rd::PredictionReturnsResult, hw::Option{<:HeldWeightsResult},
                               idx::Option{<:VecInt})
-        return new{typeof(res), typeof(rd), typeof(hw), typeof(idx)}(res, rd, hw, idx)
+        # `res` is not a type parameter, so the folds of every optimiser share one type
+        # (ADR 0067, amendment of 2026-11-18).
+        return new{typeof(rd), typeof(hw), typeof(idx)}(res, rd, hw, idx)
     end
 end
 function PredictionResult(; res::NonFiniteAllocationOptimisationResult,
@@ -877,8 +881,8 @@ function rolling_window_measure(r::BaseRM_VecBaseRM, pred::PredictionResult,
     return rolling_window_measure(r, pred.rd.X, window; kwargs...)
 end
 """
-    calc_net_asset_returns(pred::PredictionResult{<:Any, <:Any, <:HeldWeightsResult}, fees = nothing)
-    calc_net_asset_returns(pred::PredictionResult{<:Any, <:Any, Nothing}, args...)
+    calc_net_asset_returns(pred::PredictionResult{<:Any,<:HeldWeightsResult}, fees = nothing)
+    calc_net_asset_returns(pred::PredictionResult{<:Any,Nothing}, args...)
 
 Split a fold's net return series over the assets that produced it.
 
@@ -914,7 +918,7 @@ A fold that carries no Held Weights record raises. `pred.rd.X` is the **portfoli
   - [`PredictionResult`](@ref)
   - [`fold_fees`](@ref)
 """
-function calc_net_asset_returns(pred::PredictionResult{<:Any, <:Any, <:HeldWeightsResult},
+function calc_net_asset_returns(pred::PredictionResult{<:Any, <:HeldWeightsResult},
                                 fees::Option{<:Fees} = nothing)
     hw = pred.hw
     # The record was expanded back to the caller's universe on the way out of `predict`, so
@@ -925,12 +929,12 @@ function calc_net_asset_returns(pred::PredictionResult{<:Any, <:Any, <:HeldWeigh
                                   fold_fees(pred.res, fees, hw.X),
                                   result_investable_mask(pred.res))
 end
-function calc_net_asset_returns(::PredictionResult{<:Any, <:Any, Nothing}, args...)
+function calc_net_asset_returns(::PredictionResult{<:Any, Nothing}, args...)
     return throw(ArgumentError("`calc_net_asset_returns(pred::PredictionResult)` needs the fold's asset returns, and this fold kept none: `pred.rd.X` is the portfolio return series, and `pred.hw` is absent because the fold's scheme set neither `wd` nor a `DriftedWeights` source.\nSet one of them so the fold records its asset returns, or call `calc_net_asset_returns(w, X, fees)` with the returns you fitted on."))
 end
 """
-    risk_contribution(r::BaseRM_VecBaseRM, pred::PredictionResult{<:Any, <:Any, <:HeldWeightsResult}, fees = nothing; kwargs...)
-    risk_contribution(r::BaseRM_VecBaseRM, pred::PredictionResult{<:Any, <:Any, Nothing}, args...; kwargs...)
+    risk_contribution(r::BaseRM_VecBaseRM, pred::PredictionResult{<:Any,<:HeldWeightsResult}, fees = nothing; kwargs...)
+    risk_contribution(r::BaseRM_VecBaseRM, pred::PredictionResult{<:Any,Nothing}, args...; kwargs...)
 
 Decompose a fold's risk over its assets.
 
@@ -976,7 +980,7 @@ A fold that carries no Held Weights record raises, because `pred.rd.X` is the po
   - [`fold_fees`](@ref)
 """
 function risk_contribution(r::BaseRM_VecBaseRM,
-                           pred::PredictionResult{<:Any, <:Any, <:HeldWeightsResult},
+                           pred::PredictionResult{<:Any, <:HeldWeightsResult},
                            fees::Option{<:Fees} = nothing; kwargs...)
     # The record and the target weights are on the caller's universe, and the result's
     # fee is on the investable one, so the fold views the first two at the mask before
@@ -987,13 +991,13 @@ function risk_contribution(r::BaseRM_VecBaseRM,
                            fold_fees(pred.res, fees, pred.hw.X); kwargs...)
     return expand_investable_weights(imsk, rc)
 end
-function risk_contribution(::BaseRM_VecBaseRM, ::PredictionResult{<:Any, <:Any, Nothing},
-                           args...; kwargs...)
+function risk_contribution(::BaseRM_VecBaseRM, ::PredictionResult{<:Any, Nothing}, args...;
+                           kwargs...)
     return throw(ArgumentError("`risk_contribution(r, pred::PredictionResult)` needs the fold's asset returns, and this fold kept none: `pred.rd.X` is the portfolio return series, and `pred.hw` is absent because the fold's scheme set neither `wd` nor a `DriftedWeights` source.\nSet one of them so the fold records its asset returns, or call `risk_contribution(r, pred.res.w, rd.X, fees)` with the returns you fitted on."))
 end
 """
-    factor_risk_contribution(r::BaseRM_VecBaseRM, pred::PredictionResult{<:Any, <:Any, <:HeldWeightsResult}, fees = nothing; rd, kwargs...)
-    factor_risk_contribution(r::BaseRM_VecBaseRM, pred::PredictionResult{<:Any, <:Any, Nothing}, args...; kwargs...)
+    factor_risk_contribution(r::BaseRM_VecBaseRM, pred::PredictionResult{<:Any,<:HeldWeightsResult}, fees = nothing; rd, kwargs...)
+    factor_risk_contribution(r::BaseRM_VecBaseRM, pred::PredictionResult{<:Any,Nothing}, args...; kwargs...)
 
 Decompose a fold's risk over its factors.
 
@@ -1038,7 +1042,7 @@ The first-order caveat of the fold-taking [`risk_contribution`](@ref) method hol
   - [`fold_fees`](@ref)
 """
 function factor_risk_contribution(r::BaseRM_VecBaseRM,
-                                  pred::PredictionResult{<:Any, <:Any, <:HeldWeightsResult},
+                                  pred::PredictionResult{<:Any, <:HeldWeightsResult},
                                   fees::Option{<:Fees} = nothing;
                                   rd::Option{<:ReturnsResult} = nothing, kwargs...)
     # The same view at the mask as the `risk_contribution` method above, and `rd` takes
@@ -1087,9 +1091,8 @@ end
 function fold_factor_returns(imsk, rd::ReturnsResult, ::PredictionResult)
     return investable_returns_view(imsk, rd)
 end
-function factor_risk_contribution(::BaseRM_VecBaseRM,
-                                  ::PredictionResult{<:Any, <:Any, Nothing}, args...;
-                                  kwargs...)
+function factor_risk_contribution(::BaseRM_VecBaseRM, ::PredictionResult{<:Any, Nothing},
+                                  args...; kwargs...)
     return throw(ArgumentError("`factor_risk_contribution(r, pred::PredictionResult)` needs the fold's asset returns, and this fold kept none: `pred.rd.X` is the portfolio return series, and `pred.hw` is absent because the fold's scheme set neither `wd` nor a `DriftedWeights` source.\nSet one of them so the fold records its asset returns, or call `factor_risk_contribution(r, pred.res.w, rd.X, fees; rd = rd)` with the returns you fitted on."))
 end
 """
@@ -1171,6 +1174,8 @@ $(DocStringExtensions.FIELDS)
 
 Keywords correspond to the struct's fields. `pred` is required. The constructor concatenates the return data of the folds into `mrd`, and a concatenation of no folds has no names and no clock.
 
+The constructor narrows `pred` to the concrete type of its folds with [`concrete_typed_array`](@ref), when that type is not the element type of `pred` already. The type of a fold does not hold the type of its optimiser (see [`PredictionResult`](@ref)), so the folds of every optimiser narrow to one type, and a verb that reads the folds compiles one time for all of them. Folds of two types have no one concrete type, and the constructor keeps `pred` as it is.
+
 ## Validation
 
   - `!isempty(pred)`.
@@ -1204,6 +1209,18 @@ Keywords correspond to the struct's fields. `pred` is required. The constructor 
     function MultiPeriodPredictionResult(pred::VecPredRes, id::Any,
                                          opt::Option{<:AbstractEstimator})
         @argcheck(!isempty(pred), IsEmptyError("pred cannot be empty"))
+        # The fold loop fills a `Vector{PredictionResult}`, and the folds share one concrete
+        # type, because `res` is not a type parameter. The narrow copy lets every reader of
+        # the folds infer, and costs no compile for each optimiser (ADR 0067, amendment of
+        # 2026-11-18). The call again is the barrier: the body below compiles for the
+        # narrow vector, not for the abstract one. Folds of two types narrow to a `Union`,
+        # which is not concrete, so that vector stays as it is and the call does not repeat.
+        if !isconcretetype(eltype(pred))
+            narrow = concrete_typed_array(pred)
+            if isconcretetype(eltype(narrow))
+                return MultiPeriodPredictionResult(narrow, id, opt)
+            end
+        end
         rd = getfield.(pred, :rd)
         nx = rd[1].nx
         X = mapreduce_RetMtx(rd)

@@ -623,27 +623,39 @@ end
     @test occursin("long-run variance estimator", doc)
 end
 
-@testset "#1938: the folds of a prediction Result stay a `Vector{PredictionResult}`" begin
-    # ADR 0067, amendment of 2026-11-02. A narrow element type puts the type of the
-    # optimiser into the type of the prediction Result, so every verb that reads the Result
-    # compiles again for each optimiser. The loop keeps the folds type-erased by decision.
-    # This testset pins that decision, and that the verbs read a narrowed copy alike.
+@testset "#2186: the folds of a prediction Result have one concrete type for every optimiser" begin
+    # ADR 0067, amendment of 2026-11-18. The field `res` of a `PredictionResult` is not a
+    # type parameter, so the type of a fold does not name its optimiser. The constructor of
+    # `MultiPeriodPredictionResult` narrows the folds to that type, and a verb on the Result
+    # compiles one time for all the optimisers.
     rd = ReturnsResult(; nx = ["A", "B", "C", "D"], X = ER_X)
-    p = cross_val_predict(InverseVolatility(), rd, IndexWalkForward(20, 10))
+    cv = IndexWalkForward(20, 10)
+    p = cross_val_predict(InverseVolatility(), rd, cv)
+    q = cross_val_predict(HierarchicalRiskParity(), rd, cv)
     @test length(p.pred) == 4
-    @test eltype(p.pred) === PredictionResult
-    # The fold reader infers its result abstractly, but the value is concrete at run time.
+    @test isconcretetype(eltype(p.pred))
+    @test typeof(p) === typeof(q)
+    # The field keeps the Result of the optimiser of each fold.
+    @test fieldtype(eltype(p.pred), :res) === PO.NonFiniteAllocationOptimisationResult
+    @test typeof(p.pred[1].res) !== typeof(q.pred[1].res)
+    # A reader of `res` infers abstractly, but the value is concrete at run time.
     ps = performance_summary(p; ppy = 12)
     @test ps.turnover isa Float64
     @test ps.turnover > 0
-    # A user can narrow the folds. The narrowed copy infers, and gives the same figures.
-    n = MultiPeriodPredictionResult(; pred = concrete_typed_array(p.pred), id = p.id,
-                                    opt = p.opt)
-    @test isconcretetype(eltype(n.pred))
-    psn = @inferred performance_summary(n; ppy = 12)
+    # A vector that is already narrow is not copied, and gives the same figures.
+    n = MultiPeriodPredictionResult(; pred = p.pred, id = p.id, opt = p.opt)
+    @test n.pred === p.pred
+    psn = performance_summary(n; ppy = 12)
     for f in fieldnames(typeof(ps))
         @test isequal(getfield(psn, f), getfield(ps, f))
     end
+    # Folds of two types have no one concrete type, so the constructor keeps the vector that
+    # it was given, and does not call itself again.
+    f2 = PO.rebuild_struct(q.pred[2], (; idx = collect(q.pred[2].idx)))
+    @test typeof(f2) !== eltype(p.pred)
+    m = MultiPeriodPredictionResult(; pred = PredictionResult[p.pred[1], f2])
+    @test eltype(m.pred) === PredictionResult
+    @test m.pred[2].res === q.pred[2].res
 end
 
 @testset "#1939: a Result does not carry the type of its risk measure" begin
@@ -930,9 +942,9 @@ end
     @test pr.sharpe ==
           [performance_summary(r1, PS_RD).sharpe, performance_summary(r2, PS_RD).sharpe]
     @test pr.n_eff ≈ [4.0, number_effective_assets(r2.w)]
-    # The folds of a prediction stay a `Vector{PredictionResult}` (ADR 0067, amendment of
-    # 2026-11-02), so a summary of predictions is not checked with `@inferred`. A vector of
-    # optimisation results holds concrete weights, and it infers.
+    # The field `res` of a fold has an abstract type (ADR 0067, amendment of 2026-11-18), so
+    # the weight figures of a summary of predictions are not checked with `@inferred`. A
+    # vector of optimisation results holds concrete weights, and it infers.
     @test @inferred(performance_summary([r1, r1], PS_RD)) isa PerformanceSummaryResult
 end
 

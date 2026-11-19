@@ -1148,12 +1148,10 @@ function prrm_prediction_message(r::PrRM, pred)
 end
 """
     expected_risk(::Option{<:Scalariser}, r::PrRM,
-                  pred::PredictionResult{<:Any,
-                                         <:PredictionReturnsResult{<:Any, <:VecNum}};
+                  pred::PredictionResult{<:PredictionReturnsResult{<:Any, <:VecNum}};
                   kwargs...)
     expected_risk(::Option{<:Scalariser}, r::PrRM,
-                  pred::PredictionResult{<:Any,
-                                         <:PredictionReturnsResult{<:Any, <:VecVecNum}};
+                  pred::PredictionResult{<:PredictionReturnsResult{<:Any, <:VecVecNum}};
                   kwargs...)
     expected_risk(::Option{<:Scalariser}, r::PrRM, pred::MultiPeriodPredictionResult; kwargs...)
     expected_risk(::Option{<:Scalariser}, r::PrRM, pred::PopulationPredictionResult; kwargs...)
@@ -1191,14 +1189,12 @@ The caller has two routes:
   - [`PopulationPredictionResult`](@ref)
 """
 function expected_risk(::Option{<:Scalariser}, r::PrRM,
-                       pred::PredictionResult{<:Any,
-                                              <:PredictionReturnsResult{<:Any, <:VecNum}};
+                       pred::PredictionResult{<:PredictionReturnsResult{<:Any, <:VecNum}};
                        kwargs...)
     return throw(ArgumentError(prrm_prediction_message(r, pred)))
 end
 function expected_risk(::Option{<:Scalariser}, r::PrRM,
-                       pred::PredictionResult{<:Any,
-                                              <:PredictionReturnsResult{<:Any, <:VecVecNum}};
+                       pred::PredictionResult{<:PredictionReturnsResult{<:Any, <:VecVecNum}};
                        kwargs...)
     return throw(ArgumentError(prrm_prediction_message(r, pred)))
 end

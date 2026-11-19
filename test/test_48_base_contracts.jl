@@ -1332,6 +1332,14 @@ struct PlainCokurtosis1893 <: PortfolioOptimisers.CokurtosisEstimator end
         @test pe.port_opt_view(pr, 1:3).eoc == pr.eoc
         @test_throws DomainError LowOrderPrior(; X = X, mu = pr.mu, sigma = pr.sigma,
                                                eoc = (0.0, nothing))
+        # `eoc` is not a type parameter. A stated and an unstated count give one type, so the
+        # batch prior infers a result with no free type parameter (#2186).
+        p1 = LowOrderPrior(; X = X, mu = pr.mu, sigma = pr.sigma, eoc = (Tm, nothing))
+        p2 = LowOrderPrior(; X = X, mu = pr.mu, sigma = pr.sigma)
+        @test typeof(p1) === typeof(p2)
+        @test p1.eoc == (Tm, nothing)
+        rt = only(Base.return_types(prior, (typeof(EmpiricalPrior()), typeof(X))))
+        @test all(isconcretetype, Base.uniontypes(rt))
         # A high order prior states the counts of its two co-moments, and reads the four.
         hpe = HighOrderPriorEstimator(; pe = EmpiricalPrior(; me = em, ce = ew),
                                       kte = Cokurtosis(; w = wv),
@@ -1339,6 +1347,8 @@ struct PlainCokurtosis1893 <: PortfolioOptimisers.CokurtosisEstimator end
         hop = prior(hpe, X)
         @test getfield(hop, :eoc)[1] ≈ kish
         @test getfield(hop, :eoc)[2] ≈ kish
+        @test fieldtype(typeof(hop), :eoc) === fieldtype(typeof(pr), :eoc)
+        @test !isconcretetype(fieldtype(typeof(hop), :eoc))
         @test hop.eoc[1:2] == (Tm, Ts)
         @test pe.moment_observation_count(hop, 4) ≈ kish
         @test pe.port_opt_view(hop, 1:3).eoc == hop.eoc

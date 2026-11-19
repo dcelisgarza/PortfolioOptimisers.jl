@@ -160,7 +160,7 @@ function PortfolioOptimisers.plot_risk_contribution(r::PortfolioOptimisers.BaseR
                                                       sca = sca, kwargs...)
 end
 function PortfolioOptimisers.plot_risk_contribution(r::PortfolioOptimisers.BaseRM_VecBaseRM,
-                                                    pred::PredictionResult{<:Any, <:Any,
+                                                    pred::PredictionResult{<:Any,
                                                                            <:HeldWeightsResult},
                                                     fees::Option{<:Fees} = nothing;
                                                     kwargs...)
@@ -176,8 +176,7 @@ function PortfolioOptimisers.plot_risk_contribution(r::PortfolioOptimisers.BaseR
                                                       nx = nx, kwargs...)
 end
 function PortfolioOptimisers.plot_risk_contribution(::PortfolioOptimisers.BaseRM_VecBaseRM,
-                                                    ::PredictionResult{<:Any, <:Any,
-                                                                       Nothing},
+                                                    ::PredictionResult{<:Any, Nothing},
                                                     ::Option{<:Fees} = nothing; kwargs...)
     return throw(ArgumentError("`plot_risk_contribution(r, pred::PredictionResult)` needs the fold's asset returns, and this fold kept none: `pred.rd.X` is the portfolio return series, and `pred.hw` is absent because the fold's scheme set neither `wd` nor `pws`. Set one of them so the fold records its asset returns, or call `plot_risk_contribution(r, pred.res.w, rd::ReturnsResult, ...)` with the original returns data."))
 end
@@ -197,7 +196,6 @@ function PortfolioOptimisers.plot_factor_risk_contribution(r::PortfolioOptimiser
 end
 function PortfolioOptimisers.plot_factor_risk_contribution(r::PortfolioOptimisers.BaseRM_VecBaseRM,
                                                            pred::PredictionResult{<:Any,
-                                                                                  <:Any,
                                                                                   <:HeldWeightsResult},
                                                            fees::Option{<:Fees} = nothing;
                                                            rd::Option{<:ReturnsResult} = nothing,
@@ -215,7 +213,7 @@ function PortfolioOptimisers.plot_factor_risk_contribution(r::PortfolioOptimiser
                                                              kwargs...)
 end
 function PortfolioOptimisers.plot_factor_risk_contribution(::PortfolioOptimisers.BaseRM_VecBaseRM,
-                                                           ::PredictionResult{<:Any, <:Any,
+                                                           ::PredictionResult{<:Any,
                                                                               Nothing},
                                                            ::Option{<:Fees} = nothing;
                                                            kwargs...)
