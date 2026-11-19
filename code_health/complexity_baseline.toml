@@ -5,7 +5,7 @@
 julia = "1.13.4"
 code_complexity = "0.2.0"
 julia_syntax = "1.0.2"
-commit = "4d83c186be"
+commit = "89aa76492c"
 
 [file]
 "ext/PortfolioOptimisersGraphRecipesExt.jl" = { cyc = 3, cog = 2, arg = 6, cyc_sum = 6, cog_sum = 4, arg_sum = 16, macros = [] }
@@ -60,7 +60,7 @@ commit = "4d83c186be"
 "src/02_Tools/03_TypeUtilities.jl" = { cyc = 4, cog = 6, arg = 3, cyc_sum = 17, cog_sum = 11, arg_sum = 17, macros = [] }
 "src/02_Tools/04_Factory.jl" = { cyc = 1, cog = 1, arg = 4, cyc_sum = 5, cog_sum = 1, arg_sum = 13, macros = [] }
 "src/02_Tools/05_Propagatable.jl" = { cyc = 10, cog = 19, arg = 6, cyc_sum = 85, cog_sum = 89, arg_sum = 46, macros = [] }
-"src/02_Tools/06_ForwardProperties.jl" = { cyc = 53, cog = 100, arg = 4, cyc_sum = 86, cog_sum = 146, arg_sum = 16, macros = [] }
+"src/02_Tools/06_ForwardProperties.jl" = { cyc = 54, cog = 101, arg = 4, cyc_sum = 106, cog_sum = 172, arg_sum = 22, macros = [] }
 "src/02_Tools/07_VectorToScalarMeasures.jl" = { cyc = 3, cog = 4, arg = 3, cyc_sum = 35, cog_sum = 15, arg_sum = 78, macros = ["@propagatable"] }
 "src/02_Tools/08_MeanTest.jl" = { cyc = 7, cog = 10, arg = 11, cyc_sum = 92, cog_sum = 81, arg_sum = 123, macros = [] }
 "src/02_Tools/09_MeanTestDraws.jl" = { cyc = 7, cog = 12, arg = 10, cyc_sum = 54, cog_sum = 57, arg_sum = 95, macros = [] }

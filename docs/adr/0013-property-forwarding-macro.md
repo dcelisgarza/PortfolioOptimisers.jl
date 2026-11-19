@@ -318,3 +318,28 @@ subtype with no block fails at its first read of `res.w`.
 No library code patches a Result through `Accessors`. The library rebuilds a Result through
 `rebuild_struct`, and the search, the pipe routing and the pipeline context write estimators
 alone.
+
+## Amendment (2026-11-19)
+
+**A `derived` rule marks a field that the inner constructor computes, and a patch leaves it
+out.** The amendment of 2026-10-07 states the contract of `forward_setproperties`: the keyword
+constructor takes every field by its name. Two decorated types broke it
+([#2194](https://github.com/dcelisgarza/PortfolioOptimisers.jl/issues/2194)), so
+`Accessors.@set` on any of their fields, and `rebuild_struct`, raised a `MethodError`.
+`PipelineResult` had no keyword constructor, and it now has one.
+`MultiPeriodPredictionResult` computes `mrd` from `pred` in its inner constructor, so its
+keyword constructor does not take `mrd`.
+
+`derived(fields...)` names such fields. The macro makes one more method for each type that it
+decorates, `forward_derived(::Type{<:T})`, which gives the names, or `()` when the block has no
+`derived` rule. The fallback for a type that the macro does not decorate gives `()` too. `forward_setproperties`
+and `rebuild_struct` leave a derived field out of the call of the keyword constructor, so the
+constructor computes it again from the new values. `assert_not_derived` refuses a patch that names
+a derived field, and the message names the fields to set. The rule adds no name and changes no
+read.
+
+The other form, a keyword `mrd = nothing` that the constructor ignores, would accept a patch of
+`mrd` and drop it with no error. So that form loses. A type with no derived field gives the empty
+tuple, the compiler folds the removal, and `rebuild_struct` allocates what it allocated before.
+A census in `test/test_05_tools.jl` compares the fields of every type with a generated
+`setproperties` method against the keyword names of its constructors.

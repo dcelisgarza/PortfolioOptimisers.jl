@@ -583,6 +583,16 @@ Read the result of a step by its name with `getindex`, as in `res["prior"]`, or 
 
 $(DocStringExtensions.FIELDS)
 
+# Constructors
+
+    PipelineResult(;
+        names::Tuple{Vararg{String}},
+        results::Tuple,
+        ctx::PipelineContext
+    ) -> PipelineResult
+
+Keywords correspond to the struct's fields. [`fit`](@ref) builds the Result, and `Accessors.set` builds it again through this constructor.
+
 # Related
 
   - [`Pipeline`](@ref)
@@ -602,6 +612,10 @@ $(DocStringExtensions.FIELDS)
     The last [`PipelineContext`](@ref).
     """
     ctx
+end
+function PipelineResult(; names::Tuple{Vararg{String}}, results::Tuple,
+                        ctx::PipelineContext)::PipelineResult
+    return PipelineResult(names, results, ctx)
 end
 @forward_properties PipelineResult begin
     compute(w, ctx.opt.w; broadcast)

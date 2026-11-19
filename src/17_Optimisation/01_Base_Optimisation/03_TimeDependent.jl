@@ -1028,30 +1028,40 @@ end
 """
 $(DocStringExtensions.TYPEDSIGNATURES)
 
-Rebuilds a struct with its keyword constructor, with the fields in `repl` replaced. The struct can be an estimator, a result, or any other type whose keyword constructor takes every field by its name.
+Rebuilds a struct with its keyword constructor, with the fields in `repl` replaced. The struct can be an estimator, a result, or any other type whose keyword constructor takes every field by its name, except a derived field that [`forward_derived`](@ref) names.
 
-The other fields keep their values. The keyword constructor checks every rule of construction again.
+The other fields keep their values. The keyword constructor checks every rule of construction again, and it computes each derived field again from the new values.
 
 The function reads each field in one tuple expression, and it does not `merge` the fields with `repl`. A field with a declared `Union` type, such as the gap marks of a [`SampleBufferState`](@ref), makes the type of a merged `NamedTuple` abstract. The call to the constructor then dispatches at run time and allocates, and an online step calls this function on every fold.
 
+# Validation
+
+  - [`assert_not_derived`](@ref) refuses a `repl` that names a derived field.
+
 # Algorithm
 
- 1. Read each field of `x` into one tuple, in the order of the fields. Take the value in `repl` when `repl` names the field.
- 2. Keep the names of `repl` that are not fields of `x`.
- 3. Call the keyword constructor of the type of `x` with the fields and the kept names.
+ 1. Refuse a `repl` that names a derived field.
+ 2. Read each field of `x` into one tuple, in the order of the fields. Take the value in `repl` when `repl` names the field.
+ 3. Remove the derived fields from the tuple of step 2.
+ 4. Keep the names of `repl` that are not fields of `x`.
+ 5. Call the keyword constructor of the type of `x` with the fields and the kept names.
+
+A type with no derived field gives the empty tuple of names, so step 3 removes nothing, and the compiler folds it.
 
 # Related
 
   - [`update_time_dependent_fields`](@ref)
   - [`reset_time_dependent_fields`](@ref)
+  - [`forward_derived`](@ref)
 """
 function rebuild_struct(x, repl::NamedTuple)
+    assert_not_derived(x, repl)
     T = typeof(x)
     fns = fieldnames(T)
     vals = ntuple(i -> haskey(repl, fns[i]) ? getfield(repl, fns[i]) : getfield(x, i),
                   Val(fieldcount(T)))
-    return (T.name.wrapper)(; NamedTuple{fns}(vals)...,
-                            Base.structdiff(repl, NamedTuple{fns})...)
+    kept = Base.structdiff(NamedTuple{fns}(vals), NamedTuple{forward_derived(T)})
+    return (T.name.wrapper)(; kept..., Base.structdiff(repl, NamedTuple{fns})...)
 end
 """
     is_time_dependent(opt)

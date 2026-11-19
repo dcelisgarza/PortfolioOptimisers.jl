@@ -172,6 +172,38 @@ end
 """
 $(DocStringExtensions.TYPEDSIGNATURES)
 
+Check the arguments `args` of a `derived` rule of [`@forward_properties`](@ref), and append them to `names`.
+
+Each argument is the name of a field that the inner constructor computes. The macro cannot see the fields of the type when it expands, so the census of `test/test_05_tools.jl` checks that each name is a field.
+
+# Algorithm
+
+ 1. `args` is empty: raise an error.
+ 2. For each argument `n` of `args`:
+     1. `n` is not a `Symbol`: raise an error that names it.
+     2. Otherwise: push `n` onto `names`.
+ 3. Return `names`.
+
+# Related
+
+  - [`@forward_properties`](@ref)
+  - [`forward_derived`](@ref)
+"""
+function forward_derived_names!(names::Vector{Symbol}, args)
+    if isempty(args)
+        return error("@forward_properties: `derived` needs one or more field names")
+    end
+    for n in args
+        if !(n isa Symbol)
+            return error("@forward_properties: `derived` names must be bare identifiers, got: $(repr(n))")
+        end
+        push!(names, n)
+    end
+    return names
+end
+"""
+$(DocStringExtensions.TYPEDSIGNATURES)
+
 Give the source of the property `sym` of `x`, for a type that [`@forward_properties`](@ref) does not decorate: `nothing`.
 
 The macro adds a method of this function for each type that it decorates. That method gives `nothing` when no rule names `sym`. Otherwise it gives the pair `(path, settable)` of the first rule that names `sym`, in the order in which `getproperty` reads the rules. `path` is the tuple of the field symbols of the path that holds the value, from `x`. It is `nothing` for the function form of `compute`. `settable` is `true` for a name of a settable `forward` rule.
@@ -185,6 +217,54 @@ The macro adds a method of this function for each type that it decorates. That m
   - [`forward_storage_path`](@ref)
 """
 forward_source(x, sym::Symbol) = nothing
+"""
+$(DocStringExtensions.TYPEDSIGNATURES)
+
+Give the names of the derived fields of the type `T`, for a type that [`@forward_properties`](@ref) does not decorate: `()`.
+
+A derived field is a field that the inner constructor of its type computes from the other fields. The keyword constructor of the type does not take it. The macro adds a method of this function for each type that it decorates. That method gives the tuple of the names of the `derived` rules of the block, and `()` when the block has none. The function takes the type and not a value, because a derived field is a property of the type, and a census can read it with no instance.
+
+[`forward_setproperties`](@ref) and [`rebuild_struct`](@ref) leave these fields out of the call of the keyword constructor, so the constructor computes them again from the new values. [`assert_not_derived`](@ref) refuses a patch that names one of them.
+
+# Related
+
+  - [`@forward_properties`](@ref)
+  - [`assert_not_derived`](@ref)
+  - [`forward_setproperties`](@ref)
+  - [`rebuild_struct`](@ref)
+"""
+forward_derived(::Type{T}) where {T} = ()
+"""
+$(DocStringExtensions.TYPEDSIGNATURES)
+
+Refuse a `patch` that names a derived field of `x`.
+
+A derived field has no value of its own to set, because the inner constructor computes it from the other fields. A patch that carries a value for it would give a value that the constructor does not compute. [`forward_derived`](@ref) gives the names of the derived fields of `T`, the type of `x`.
+
+# Validation
+
+  - No key of `patch` is in `forward_derived(T)`. Raises an `ArgumentError` that names the derived field and the fields that the keyword constructor takes.
+
+# Returns
+
+  - `nothing`.
+
+# Related
+
+  - [`forward_derived`](@ref)
+  - [`forward_setproperties`](@ref)
+  - [`rebuild_struct`](@ref)
+"""
+function assert_not_derived(x::T, patch::NamedTuple)::Nothing where {T}
+    der = forward_derived(T)
+    for sym in keys(patch)
+        if sym in der
+            kept = Tuple(s for s in fieldnames(T) if !(s in der))
+            throw(ArgumentError("`$(sym)` cannot be set on a `$(nameof(T))`: it is a derived field, which the constructor of `$(nameof(T))` computes from its other fields. Set one of the fields $(kept) instead."))
+        end
+    end
+    return nothing
+end
 """
 $(DocStringExtensions.TYPEDSIGNATURES)
 
@@ -245,18 +325,20 @@ A `forward` rule with the `settable` option is the one exception. The function p
 
 # Algorithm
 
- 1. For each key `sym` of `patch` that is not a field of `T`:
+ 1. Refuse a patch that names a derived field of `T`, with [`assert_not_derived`](@ref).
+ 2. For each key `sym` of `patch` that is not a field of `T`:
      1. [`forward_source`](@ref) of `sym` is `nothing`: refuse it as a name that `T` does not have, and name the fields.
      2. The pair is settable: keep `sym` in the patch.
      3. The pair has no path: refuse it as a computed value, and name the fields.
      4. Otherwise: follow its path with [`forward_storage_path`](@ref). The path ends at a stored value: refuse `sym`, and name that path as the one to set.
      5. The path ends at a computed property: refuse `sym`. Name the property, the type that computes it, and the fields of that type as the ones to set.
- 2. Read every field of `x` with `getfield` into a `NamedTuple`, in declaration order.
- 3. Merge `patch` over it, and call `ctor`, the keyword constructor of `T`, with the result. Every check of the constructor runs on the new value.
+ 3. Read every field of `x` with `getfield` into a `NamedTuple`, in declaration order.
+ 4. Merge `patch` over it, and remove the derived fields that [`forward_derived`](@ref) names.
+ 5. Call `ctor`, the keyword constructor of `T`, with the result. Every check of the constructor runs on the new value, and the constructor computes each derived field again.
 
-The macro passes `ctor` as the name of `T` without its type parameters. So step 3 calls the ordinary keyword constructor, and it needs no reflection to find it. A patch that changes a type parameter, such as a value for an unset `L`, gives the specialisation that the constructor selects.
+The macro passes `ctor` as the name of `T` without its type parameters. So step 5 calls the ordinary keyword constructor, and it needs no reflection to find it. A patch that changes a type parameter, such as a value for an unset `L`, gives the specialisation that the constructor selects.
 
-The keyword constructor of `T` must take every field of `T` by its field name. A type that marks a name as `settable` must also take that name as a keyword of its keyword constructor. The keyword replaces that slot of the nested part that the constructor is given, and the default of the keyword must leave that slot as it is. Step 3 passes the old nested part and the new value of the slot in one call. [`rebuild_struct`](@ref) calls the constructor in the same way, so the two give the same value.
+The keyword constructor of `T` must take every field of `T` by its field name, except a field that a `derived` rule names. A type that marks a name as `settable` must also take that name as a keyword of its keyword constructor. The keyword replaces that slot of the nested part that the constructor is given, and the default of the keyword must leave that slot as it is. Step 3 passes the old nested part and the new value of the slot in one call. [`rebuild_struct`](@ref) calls the constructor in the same way, so the two give the same value.
 
 # Related
 
@@ -264,10 +346,13 @@ The keyword constructor of `T` must take every field of `T` by its field name. A
   - [`forward_rule_options`](@ref)
   - [`forward_source`](@ref)
   - [`forward_storage_path`](@ref)
+  - [`forward_derived`](@ref)
+  - [`assert_not_derived`](@ref)
   - [`forward_prior`](@ref)
   - [`rebuild_struct`](@ref)
 """
 function forward_setproperties(x::T, patch::NamedTuple, ctor) where {T}
+    assert_not_derived(x, patch)
     fnames = fieldnames(T)
     for sym in keys(patch)
         if sym in fnames
@@ -293,7 +378,7 @@ function forward_setproperties(x::T, patch::NamedTuple, ctor) where {T}
         end
     end
     vals = NamedTuple{fnames}(getfield.((x,), fnames))
-    return ctor(; merge(vals, patch)...)
+    return ctor(; Base.structdiff(merge(vals, patch), NamedTuple{forward_derived(T)})...)
 end
 
 """
@@ -305,6 +390,7 @@ end
         compute(exposed, fn)
         swap(field, loc)
         swap(field, fn)
+        derived(fields...)
     end
 
 Make the `Base.getproperty`, `Base.propertynames` and `Base.hasproperty` methods of the
@@ -355,11 +441,16 @@ resolves **before** the field check.
     `getfield(obj, :field)`, never with `obj.field`**. A dot access of the swapped field
     calls `getproperty` again, and the recursion raises a `StackOverflowError`. The body
     can use a dot access for every other field.
+  - `derived(fields...)`: mark real fields as derived. The inner constructor of `T`
+    computes a derived field from the other fields, and the keyword constructor does not
+    take it. The patch of `Accessors.set` leaves a derived field out of the call of the
+    keyword constructor, and it refuses a patch that names one. The rule adds no name, and
+    it does not change a read. [`forward_derived`](@ref) gives the names.
 
 # Algorithm
 
  1. `block` is not a `begin … end` block: raise an error.
- 2. Make five empty vectors: `swap_branches`, `getprop_branches`, `source_branches`, `has_branches` and `propname_contribs`.
+ 2. Make six empty vectors: `swap_branches`, `getprop_branches`, `source_branches`, `has_branches`, `propname_contribs` and `derived_names`.
  3. For each rule of the block, except a `LineNumberNode`:
      1. The rule is not a call: raise an error that names it.
      2. Read `marker`, the rule name. Read the `broadcast` and `settable` options and `args`, the other arguments, with [`forward_rule_options`](@ref).
@@ -367,13 +458,15 @@ resolves **before** the field check.
      4. `marker` is `alias`: check the exposed name, and build `walk` from the locator. Push a branch that matches the exposed name and returns `walk`. Push a source branch that gives the pair of the locator path and `false`. Push a branch onto `has_branches` that gives `true` for the exposed name, and add the name.
      5. `marker` is `compute`: check the exposed name. An anonymous-function source pushes a branch that returns `fn(x)`, and a source branch that gives `(nothing, false)`. `broadcast` with that form raises an error. A dotted source builds `walk` with the `broadcast` flag, pushes the matching branch, and pushes a source branch that gives the pair of the dotted path and `false`. Any other source raises an error. Push a branch onto `has_branches` that gives `true` for the exposed name, and add the name.
      6. `marker` is `swap`: do as for `compute`, but a bare name is also a valid source, and the branch goes onto `swap_branches` and not onto `getprop_branches`.
-     7. `marker` is any other name: raise an error that names it.
+     7. `marker` is `derived`: check the field names, and append them to `derived_names`, with [`forward_derived_names!`](@ref).
+     8. `marker` is any other name: raise an error that names it.
  4. Build `Base.getproperty(x::T, sym::Symbol)` in this order: the `swap` branches, then the own-field check against `fieldnames(S)`, which returns `getfield(x, sym)`, then the other branches in declaration order. `S` is the name of `T` without its type parameters. The last statement is `getfield(x, sym)`, which raises the standard error for an absent field.
  5. Build `Base.propertynames(x::T)` from `fieldnames(S)` and then every added name, and return the unique names as a tuple.
  6. Build `Base.hasproperty(x::T, sym::Symbol)`. It gives `true` when `sym` is in `fieldnames(S)`, then runs the `has_branches`, and gives `false` when no branch matches.
  7. Build `forward_source(x::T, sym::Symbol)`, which runs the `source_branches` and gives `nothing` when no branch matches.
  8. Build `ConstructionBase.setproperties(x::T, patch::NamedTuple)`, which calls [`forward_setproperties`](@ref) with one more argument: the name of `T` without its type parameters, which is its keyword constructor.
- 9. Return the five definitions in one escaped block.
+ 9. Build `forward_derived(::Type{<:T})`, which gives the tuple of `derived_names`. With no `derived` rule, the tuple is empty, the same value as the fallback.
+10. Return the definitions in one escaped block.
 
 Step 4 gives the two orders of the first paragraph. A `swap` runs **before** the own-field check, so it replaces a real field. Every other rule runs **after** that check, so it can only add a name. In each group, the first branch that matches wins, and the branches are in the declaration order of the rules.
 
@@ -387,6 +480,7 @@ Step 7 gives no source for a `swap`, because a `swap` names a real field, and th
   - [`forward_rule_options`](@ref)
   - [`forward_setproperties`](@ref)
   - [`forward_source`](@ref)
+  - [`forward_derived`](@ref)
   - [`@propagatable`](@ref)
 """
 macro forward_properties(T, block)
@@ -399,12 +493,13 @@ macro forward_properties(T, block)
     source_branches = Any[]
     has_branches = Any[]
     propname_contribs = Any[]
+    derived_names = Symbol[]
     for stmt in block.args
         if stmt isa LineNumberNode
             continue
         end
         if !(stmt isa Expr && stmt.head == :call)
-            return error("@forward_properties: each rule must be a `forward`/`alias`/`compute`/`swap` call, got: $(repr(stmt))")
+            return error("@forward_properties: each rule must be a `forward`/`alias`/`compute`/`swap`/`derived` call, got: $(repr(stmt))")
         end
         marker = stmt.args[1]
         broadcast, settable, args = forward_rule_options(marker, @view(stmt.args[2:end]))
@@ -518,8 +613,10 @@ macro forward_properties(T, block)
             end
             push!(has_branches, :(sym === $(QuoteNode(exposed)) && return true))
             push!(propname_contribs, QuoteNode(exposed))
+        elseif marker == :derived
+            forward_derived_names!(derived_names, args)
         else
-            return error("@forward_properties: unknown rule `$(marker)` (expected `forward`, `alias`, `compute`, or `swap`)")
+            return error("@forward_properties: unknown rule `$(marker)` (expected `forward`, `alias`, `compute`, `swap`, or `derived`)")
         end
     end
     # The name of `T` without its type parameters: the keyword constructor, and the type whose
@@ -564,12 +661,18 @@ macro forward_properties(T, block)
             return $(forward_setproperties)(x, patch, $ctor)
         end
     end
+    derived_def = quote
+        function $(@__MODULE__).forward_derived(::Type{<:$T})
+            return $(Expr(:tuple, QuoteNode.(derived_names)...))
+        end
+    end
     return esc(quote
                    $getproperty_def
                    $propertynames_def
                    $hasproperty_def
                    $source_def
                    $setproperties_def
+                   $derived_def
                end)
 end
 

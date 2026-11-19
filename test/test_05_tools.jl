@@ -1185,7 +1185,13 @@ end
     @test occursin("`broadcast` does not apply to the function form of `swap`",
                    rule_error(:(swap(n, x -> x; broadcast))))
     @test occursin("`swap` source must be a bare name", rule_error(:(swap(n, 1))))
+    # A `derived` rule names one or more fields, and it takes no option (#2194).
+    @test occursin("`derived` needs one or more field names", rule_error(:(derived())))
+    @test occursin("`derived` names must be bare identifiers", rule_error(:(derived(1))))
+    @test occursin("the option `broadcast` does not apply to `derived`",
+                   rule_error(:(derived(n; broadcast))))
     @test occursin("unknown rule `elide`", rule_error(:(elide(n))))
+    @test occursin("`swap`, or `derived`", rule_error(:(elide(n))))
     #=
     `forward_walk_expr` is the half that builds the property walk. A path of depth two or more
     guards each step with `forward_nonnothing`, so an unset intermediate names the whole
@@ -1528,6 +1534,86 @@ end
     @test occursin("of `pr` of the `HighOrderPrior` instead", msg)
     @test occursin("Set `pr.mu` of the `HighOrderPrior` instead",
                    set_error(() -> Accessors.setproperties(hp, (; mu = 1.0))))
+end
+@testset "@forward_properties: a derived field is computed again, and a patch of it is refused (#2194)" begin
+    using PortfolioOptimisers, StableRNGs, Test
+    PO = PortfolioOptimisers
+    #=
+    `forward_setproperties` and `rebuild_struct` call the keyword constructor with every
+    field. A field that the inner constructor computes from the others, such as `mrd` of a
+    `MultiPeriodPredictionResult`, is not a keyword, so the call raised a `MethodError`. A
+    `derived` rule leaves the field out of the call, and refuses a patch that names it.
+    =#
+    function set_error(f)
+        return try
+            f()
+            ""
+        catch err
+            sprint(showerror, err)
+        end
+    end
+    md = Module(:DerivedProbe)
+    Base.eval(md, :(using PortfolioOptimisers: @forward_properties))
+    Base.eval(md, quote
+                  struct DSum
+                      a::Int
+                      b::Int
+                      s::Int
+                      DSum(a::Int, b::Int) = new(a, b, a + b)
+                  end
+                  DSum(; a::Int = 1, b::Int = 2) = DSum(a, b)
+                  @forward_properties DSum begin
+                      derived(s)
+                  end
+              end)
+    @test PO.forward_derived(md.DSum) == (:s,)
+    @test PO.forward_derived(Int) == ()
+    d = md.DSum()
+    # The rule adds no name, and a read of the field is a field read.
+    @test propertynames(d) == (:a, :b, :s)
+    @test d.s == 3
+    # A patch of a field computes the derived field again.
+    @test (Accessors.@set d.a = 5).s == 7
+    @test PO.rebuild_struct(d, (; b = 10)).s == 11
+    @test PO.rebuild_struct(d, NamedTuple()).s == 3
+    # A patch of the derived field is refused, and the message names the fields to set.
+    msg = set_error(() -> Accessors.@set d.s = 0)
+    @test occursin("`s` cannot be set on a `DSum`: it is a derived field", msg)
+    @test occursin("Set one of the fields (:a, :b) instead", msg)
+    @test_throws ArgumentError PO.rebuild_struct(d, (; s = 0))
+    @test isnothing(PO.assert_not_derived(d, (; a = 1)))
+    # The case of the issue: `mrd` concatenates the folds of `pred`.
+    rng = StableRNG(123)
+    X = randn(rng, 120, 4) .* 0.01 .+ 0.0005
+    rd = ReturnsResult(; nx = ["A", "B", "C", "D"], X = X)
+    p = cross_val_predict(InverseVolatility(), rd, IndexWalkForward(30, 10))
+    p2 = Accessors.@set p.pred = p.pred[1:3]
+    @test p2.mrd.X == reduce(vcat, (q.rd.X for q in p.pred[1:3]))
+    @test PO.rebuild_struct(p, (; id = 7)).mrd.X == p.mrd.X
+    @test occursin("`mrd` cannot be set on a `MultiPeriodPredictionResult`",
+                   set_error(() -> Accessors.@set p.mrd = p.mrd))
+    # `PipelineResult` had no keyword constructor.
+    pr = fit(Pipeline(; steps = (EmpiricalPrior(), InverseVolatility())), rd)
+    pr2 = Accessors.@set pr.names = ("a", "b")
+    @test pr2.names == ("a", "b")
+    @test pr2.w == pr.w
+    #=
+    The census of the issue. For each `setproperties` method that the library makes, the
+    keyword constructor of the type takes every field, except a derived field. Every
+    derived name is a field. A new decorated type that breaks the contract of
+    `forward_setproperties` turns this test red.
+    =#
+    ms = filter(m -> m.module === PO, methods(Accessors.setproperties))
+    # 27 types on 2026-11-19. A type can join the census, and none leaves it.
+    @test length(ms) >= 27
+    for m in ms
+        X = Base.rewrap_unionall(Base.unwrap_unionall(m.sig).parameters[2], m.sig)
+        S = Base.unwrap_unionall(X).name.wrapper
+        der = PO.forward_derived(X)
+        need = setdiff(fieldnames(S), der)
+        @test (S, issubset(der, fieldnames(S))) == (S, true)
+        @test (S, any(c -> issubset(need, Base.kwarg_decl(c)), methods(S))) == (S, true)
+    end
 end
 using Dates
 @testset "A carrier converts integer data once, and fits as its float copy does (#1972)" begin

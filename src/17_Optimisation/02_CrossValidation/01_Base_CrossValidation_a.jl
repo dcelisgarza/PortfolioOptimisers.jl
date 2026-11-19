@@ -1172,7 +1172,7 @@ $(DocStringExtensions.FIELDS)
         opt::Option{<:AbstractEstimator} = nothing
     ) -> MultiPeriodPredictionResult
 
-Keywords correspond to the struct's fields. `pred` is required. The constructor concatenates the return data of the folds into `mrd`, and a concatenation of no folds has no names and no clock.
+Keywords correspond to the struct's fields. `pred` is required. The constructor concatenates the return data of the folds into `mrd`, and a concatenation of no folds has no names and no clock. `mrd` is a derived field, so `Accessors.set` computes it again from the new `pred`, and it refuses a patch of `mrd`.
 
 The constructor narrows `pred` to the concrete type of its folds with [`concrete_typed_array`](@ref), when that type is not the element type of `pred` already. The type of a fold does not hold the type of its optimiser (see [`PredictionResult`](@ref)), so the folds of every optimiser narrow to one type, and a verb that reads the folds compiles one time for all of them. Folds of two types have no one concrete type, and the constructor keeps `pred` as it is.
 
@@ -1260,9 +1260,11 @@ Represents a collection of [`MultiPeriodPredictionResult`](@ref) objects.
 const VecMPredRes = AbstractVector{<:MultiPeriodPredictionResult}
 # Virtual properties `:res` and `:rd` broadcast over the inner `pred` vector, collecting
 # per-fold results and per-fold prediction returns (see [`@forward_properties`](@ref)).
+# The inner constructor computes `mrd` from `pred`, so a lens write leaves it out.
 @forward_properties MultiPeriodPredictionResult begin
     compute(res, pred.res; broadcast)
     compute(rd, pred.rd; broadcast)
+    derived(mrd)
 end
 function expected_risk(sca::Option{<:Scalariser}, r::BaseRM_VecBaseRM,
                        mpred::MultiPeriodPredictionResult; kwargs...)
