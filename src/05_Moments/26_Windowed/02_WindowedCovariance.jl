@@ -103,7 +103,8 @@ function effective_observation_count(ce::WindowedCovariance, X::MatNum; mean = n
 end
 # The variance of the wrapper is the variance of the inner estimator on the window, as the method
 # of `WindowedVariance` reads it.
-function variance_count(ce::WindowedCovariance, X::MatNum)
+function variance_count(ce::WindowedCovariance, X::MatNum,
+                        amsk::Option{<:AbstractMatrix{<:Bool}} = nothing)
     inner, Xw, _ = windowed_preamble(ce.ce, ce.w, ce.window, X)
-    return variance_count(inner, Xw)
+    return variance_count(inner, Xw, windowed_rows(amsk, get_window(ce.window, X, 1), 1))
 end

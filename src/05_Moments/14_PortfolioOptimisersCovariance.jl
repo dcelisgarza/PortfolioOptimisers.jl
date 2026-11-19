@@ -697,8 +697,8 @@ function variance_count(ce::PortfolioOptimisersCovariance{<:Any,
                                                           <:MatrixProcessing{<:Any, <:Any,
                                                                              <:Any,
                                                                              Nothing}},
-                        X::MatNum)
-    return variance_count(ce.ce, X)
+                        X::MatNum, amsk::Option{<:AbstractMatrix{<:Bool}} = nothing)
+    return variance_count(ce.ce, X, amsk)
 end
 
 export PortfolioOptimisersCovariance

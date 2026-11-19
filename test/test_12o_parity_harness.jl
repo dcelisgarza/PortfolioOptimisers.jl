@@ -1256,7 +1256,7 @@ with them:
 | Family | `maxrel` |
 | --- | --- |
 | `EWMean`, `EWMomentum` | 4.2e-13 (large panel, default), before the division of #2134 |
-| `EWVolumeRatio`, `EWShareTurnover`, `EWAmihudIlliquidity`, `DaysToCover` | 0.0, before the division of #2134 |
+| `EWVolumeRatio`, `EWShareTurnover`, `EWAmihudIlliquidity`, `DaysToCover` | 3.9e-16, with the division and the restart |
 | `EWVolatility`, `EWDownsideVolatility` | 3.3e-16 |
 | `EWResidualVolatility`, `EWResidualDownsideVolatility` | 4.6e-16 (#2132) |
 | `EWBeta`, `EWMarketBeta` | 1.5e-13 (#2132) |
@@ -1267,9 +1267,11 @@ with them:
 
 The beta rows were measured again when the regression of each asset came to share its own
 observations (#2132), and their stored cases were made again then. Since then, the mean
-Descriptors divide their state by `1 - λ^n`, and the oracle does not. So the cases of the
-first two rows check the `NaN` pattern alone, until a field reaches the rule of the oracle
-(#2134).
+Descriptors divide their state by `1 - λ^n`, and they restart an asset that turns inactive.
+The oracle came to do both in its volume ratios and its days to cover, and the cases of the
+second row were made again then, so they check the values. Its log-return mean does neither.
+So the cases of the first row check the `NaN` pattern alone, away from the cells of the
+relisted asset after its relisting, until a field reaches the rule of the oracle (#2134).
 
 A rolling log return is the difference of two cumulative sums, on both sides. A window whose
 sum is near zero keeps the round-off of the cumulative sums, so its relative error is large
@@ -1299,7 +1301,8 @@ end
     fxs = parity_small_panel()
     rds = fxs.rd
     rdsc = parity_1380_clean(fxs)
-    rdl = parity_large_panel().rd
+    fxl = parity_large_panel()
+    rdl = fxl.rd
     macro_s = rds.E[:, findfirst(==("MACRO"), rds.ne)]
     # A volatility estimator whose warm-up is set apart from its half-life.
     vol(h, w) = RegimeAdjustedExpWeightedVariance(;
@@ -1399,19 +1402,32 @@ end
              ("MaxReturn", "SmallW5", rds, r -> descriptor(MaxReturn(; window = 5), r)),
              ("RollingMax", "SmallW2", rds, r -> descriptor(RollingMax(; window = 2), r))]
     rolling = ("RollingMomentum", "Reversal", "RollingLogReturn")
-    # The exponentially weighted means divide their state by the sum of its weights,
-    # `1 - λ^n`. The stored fixtures hold the state itself, which the start at zero shrinks
-    # toward zero, so their values are broken until the reference corrects that start. The
-    # warm-up does not move, so the `NaN` pattern still agrees.
-    zero_start = ("EWMomentum", "EWMean", "EWShareTurnover", "EWVolumeRatio",
-                  "EWAmihudIlliquidity", "DaysToCover")
+    # The exponentially weighted log-return means divide their state by the sum of its
+    # weights, `1 - λ^n`, and restart an asset that turns inactive. The stored momentum
+    # fixtures hold the state itself, which the start at zero shrinks toward zero and which
+    # the relisted asset carries across its gap, so their values are broken until the
+    # reference corrects that start. The restart moves the `NaN` pattern of the relisted
+    # asset alone, after its relisting, where the recursion is in its warm-up again.
+    zero_start = ("EWMomentum", "EWMean")
     for (unit, case, rd, f) in cases
         @testset "$unit $case" begin
             D = f(rd)
             O = parity_load(unit, case, "D")
             scale = unit in rolling ? :array : :cell
             r = parity_compare(D, O; scale = scale, name = "$(unit)_$(case)")
-            @test r.pattern
+            if unit in zero_start
+                i, _, b = (rd === rdl ? fxl : fxs).at.relist
+                keep = trues(size(D))
+                keep[b:end, i] .= false
+                @test isequal(isfinite.(D[keep]), isfinite.(O[keep]))
+                # After the relisting, a finite Descriptor has a finite reference, and the
+                # warm-up of the restart makes at least one cell `NaN` where the reference is
+                # finite.
+                @test all(k -> isfinite(O[k]) || !isfinite(D[k]), findall(.!keep))
+                @test any(k -> isfinite(O[k]) && !isfinite(D[k]), findall(.!keep))
+            else
+                @test r.pattern
+            end
             if unit in zero_start
                 @test_broken r.ok
             else

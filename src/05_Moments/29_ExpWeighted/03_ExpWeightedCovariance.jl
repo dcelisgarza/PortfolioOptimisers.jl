@@ -1165,7 +1165,7 @@ $(DocStringExtensions.TYPEDSIGNATURES)
 
 Return the effective number of observations of an exponentially weighted covariance over `n` rows.
 
-It is the count of [`variance_count(decay::Number, X::MatNum, centring::AbstractCentring)`](@ref) for one column of `n` finite rows. The covariance reads every row with the weight of its age, so the count reads all `n` rows, the rows with a `NaN` too, as `size(X, 1)` counts them. The count tends to ``(1 + \\lambda) / (1 - \\lambda)`` as `n` grows. Under equal weights it is `n`.
+It is the count of [`variance_count(decay::Number, X::MatNum, centring::AbstractCentring, amsk::Option{<:AbstractMatrix{<:Bool}})`](@ref) for one column of `n` finite rows. The covariance reads every row with the weight of its age, so the count reads all `n` rows, the rows with a `NaN` too, as `size(X, 1)` counts them. The count tends to ``(1 + \\lambda) / (1 - \\lambda)`` as `n` grows. Under equal weights it is `n`.
 
 # Mathematical definition
 
@@ -1210,8 +1210,9 @@ function effective_observation_count(ce::ExpWeightedCovariance, X::MatNum; kwarg
 end
 # The diagonal of the covariance is the variance of `ExpWeightedVariance` at the same decay and
 # centring, so the two read one count.
-function variance_count(ce::ExpWeightedCovariance, X::MatNum)
-    return variance_count(ce.decay, X, ce.centring)
+function variance_count(ce::ExpWeightedCovariance, X::MatNum,
+                        amsk::Option{<:AbstractMatrix{<:Bool}} = nothing)
+    return variance_count(ce.decay, X, ce.centring, amsk)
 end
 function effective_observation_count(ce::ExpWeightedCovariance,
                                      state::ExpWeightedCovarianceState; kwargs...)

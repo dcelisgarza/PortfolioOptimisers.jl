@@ -1359,8 +1359,10 @@ function simple_variance_count(w::StatsBase.AbstractWeights, corrected::Bool,
     return VarianceCount(n, n / (s * StatsBase.varcorrection(wf, corrected)))
 end
 # Each column reads its finite rows with their weights, through `observed_sample`, so a dynamic
-# weight resolves on the rows that the column reads, as the weighted available-case fit does.
-function variance_count(ve::SimpleVariance, X::MatNum)
+# weight resolves on the rows that the column reads, as the weighted available-case fit does. The
+# fit reads no active mask, so the count reads none.
+function variance_count(ve::SimpleVariance, X::MatNum,
+                        ::Option{<:AbstractMatrix{<:Bool}} = nothing)
     cnt = map(axes(X, 2)) do i
         x, w = observed_sample(view(X, :, i), ve.w)
         return simple_variance_count(w, ve.corrected, trues(length(x)))

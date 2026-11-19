@@ -127,9 +127,10 @@ include(joinpath(@__DIR__, "parity_harness.jl"))
     # A matrix or a forecast compares against its largest entry, a coefficient cell by cell.
     same(a, b, n) = parity_compare(a, b; scale = :array, name = n).ok
     cell(a, b, n) = parity_compare(a, b; name = n).ok
-    # `EWMomentum` divides its state by the sum of its weights, `1 - λ^n`. The stored fixtures
-    # hold the state itself, which the start at zero shrinks toward zero, so each check that
-    # reads the momentum score is broken until the reference corrects that start. A check
+    # `EWMomentum` divides its state by the sum of its weights, `1 - λ^n`, and restarts an
+    # asset that turns inactive. The stored fixtures hold the state itself, which the start at
+    # zero shrinks toward zero and which the relisted asset carries across its gap, so each
+    # check that reads the momentum score is broken until the reference corrects that start. A check
     # whose case reads no momentum, or whose number the change moves less than its
     # tolerance, stays a test, because an unexpected pass of a broken test is an error.
     check(ok, broken::Bool) = broken ? (@test_broken ok) : (@test ok)
@@ -166,7 +167,7 @@ include(joinpath(@__DIR__, "parity_harness.jl"))
             check(same(rf.hist, H[rows, :], "$(c) hist"), c != "Raw")
         end
         check(same(rf.mu, loadv("FixedWeightedReturnForecast", "$(p)$(c)", "Mu"),
-                   "$(c) mu"), c != "Raw" && (p, c) != ("Large", "Equal"))
+                   "$(c) mu"), c != "Raw")
     end
 
     @testset "The exponentially weighted member, $(p) $(c)" for (p, rd, pr) in panels,
@@ -181,7 +182,7 @@ include(joinpath(@__DIR__, "parity_harness.jl"))
         check(same(rf.mu, loadv("ExpWeightedReturnForecast", "$(p)$(c)", "Mu"), "$(c) mu"),
               true)
         check(cell(rf.coef, loadv("ExpWeightedReturnForecast", "$(p)$(c)", "Coef"),
-                   "$(c) coef"), (p, c) != ("Large", "Decay"))
+                   "$(c) coef"), true)
     end
 
     @testset "The target member, $(p) $(c)" for (p, rd, pr) in panels, (c, e) in target
@@ -195,14 +196,15 @@ include(joinpath(@__DIR__, "parity_harness.jl"))
     @testset "An in-sample calibration is ours only, and it is biased" begin
         # `cv = nothing` calibrates on the predictions of the model fitted to the very forward
         # returns the calibration regresses on them. The oracle has no such mode. On the small
-        # panel its slope is 1.43, against 1.22 out of fold: the regression fitted its own
-        # training targets, and the slope measures that fit too (#1418).
+        # panel its slope is 1.34, against 1.23 out of fold: the regression fitted its own
+        # training targets, and the slope measures that fit too (#1418). The slopes were 1.43
+        # and 1.22 before the momentum restarted the relisted asset of the panel.
         (_, rd, pr) = panels[1]
         oof = return_forecast(target[2][2], rd, pr.rr)
         ins = return_forecast(TargetReturnForecast(; scores = ds(), half_life = 10.0,
                                                    cv = nothing), rd, pr.rr)
         @test isfinite(ins.calib) && isfinite(oof.calib)
-        @test ins.calib > 1.1 * oof.calib
+        @test ins.calib > 1.05 * oof.calib
         # The uncalibrated prediction is the same model's, so the forecasts are proportional.
         f = isfinite.(oof.mu)
         @test isequal(isfinite.(ins.mu), f)

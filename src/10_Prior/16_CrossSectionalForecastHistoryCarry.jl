@@ -274,7 +274,7 @@ The batch fit passes them to `Statistics.cov`, and the carry fold passes the row
 
  1. Get `fv` from `ce` with [`gap_fill_value`](@ref). `fv` is the value that `ce` gives a gapped cell of `S`. A cell of `S` is non-finite where the asset is inactive, and where it is active with no finite standardised return: a missing return, or a variance in its warm-up.
  2. If `fv` is finite, write it over every non-finite cell of a copy of `S`, and give no keyword argument. The fallback `fv` is zero, which is the mean of a standardised series.
- 3. If `fv` is not finite, give `S` as it stands, with `amsk` as the `active_mask`. A gap-aware `ce` then freezes the block of an inactive asset and does not decay it, and it takes an active non-finite cell as a holiday.
+ 3. If `fv` is not finite, give `S` as it stands, with `amsk` as the `active_mask`. A gap-aware `ce`, such as [`ExpWeightedCovariance`](@ref), then resets the block of an asset that turns inactive, so a relisting starts a new history, and it takes an active non-finite cell as a holiday, which holds the block and does not decay it.
 
 # Arguments
 

@@ -2382,8 +2382,9 @@ end
 function supports_partial_fit(::RegimeAdjustedExpWeightedVariance)
     return true
 end
-function variance_count(ve::RegimeAdjustedExpWeightedVariance, X::MatNum)
-    return variance_count(ve.decay, X, ve.centring)
+function variance_count(ve::RegimeAdjustedExpWeightedVariance, X::MatNum,
+                        amsk::Option{<:AbstractMatrix{<:Bool}} = nothing)
+    return variance_count(ve.decay, X, ve.centring, amsk)
 end
 export LogRegimeAdjusted, FirstMomentRegimeAdjusted, RootMeanSquaredAdjusted,
        RegimeAdjustedExpWeightedVariance

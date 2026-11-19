@@ -18,9 +18,10 @@
         rule ┴ RollingWindow()
     """
 end
-function variance_count(ve::WindowedVariance, X::MatNum)
+function variance_count(ve::WindowedVariance, X::MatNum,
+                        amsk::Option{<:AbstractMatrix{<:Bool}} = nothing)
     inner, Xw, _ = windowed_preamble(ve.ve, ve.w, ve.window, X)
-    return variance_count(inner, Xw)
+    return variance_count(inner, Xw, windowed_rows(amsk, get_window(ve.window, X, 1), 1))
 end
 """
 $(DocStringExtensions.TYPEDSIGNATURES)

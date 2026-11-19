@@ -635,10 +635,10 @@ function cross_sectional_regression_stage(pe::CrossSectionalFactorPrior, X::MatN
     vs = variance_series(pe.ve, csr.eps; dims = 1, estimation_mask = emr, active_mask = amr)
     ca = cross_sectional_observed_append(cb, csr.f, view(fb.Ms, :, :, r[end]),
                                          view(Msw, :, :, r), nf, fam, fb.fcb)
-    fit = (; csr = csr, W = W, vs = vs, cnt = variance_count(pe.ve, csr.eps), amr = amr,
-           bwr = bwr, Xo = Xw[r, :], r = r, hist = nothing, S = nothing, Sc = nothing,
-           ce = nothing, idx = rw[r], ts = isnothing(ts) ? nothing : ts[rw[r]],
-           rf = nothing)
+    fit = (; csr = csr, W = W, vs = vs, cnt = variance_count(pe.ve, csr.eps, amr),
+           amr = amr, bwr = bwr, Xo = Xw[r, :], r = r, hist = nothing, S = nothing,
+           Sc = nothing, ce = nothing, idx = rw[r],
+           ts = isnothing(ts) ? nothing : ts[rw[r]], rf = nothing)
     # An Observed Factor carries the return the caller observed, so it is never empty.
     return RegressionStage(ca, vcat(lv, trues(size(ca.f, 2) - length(lv))), fit, rde)
 end

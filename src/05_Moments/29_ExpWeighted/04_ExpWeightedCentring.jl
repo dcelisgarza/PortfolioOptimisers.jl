@@ -282,7 +282,7 @@ end
 
 Exact factor of the variance of a deviation, in units of the variance of the return.
 
-Under [`EstimatedCentring`](@ref) the location of ``n`` returns has the variance ``\\sigma^2 / n^{\\mathrm{eff}}``, so the factor is ``1 + 1 / n^{\\mathrm{eff}}``, with ``n^{\\mathrm{eff}}`` the Kish count of [`variance_count(decay::Number, X::MatNum, centring::AbstractCentring)`](@ref). Under [`PreCentred`](@ref) the factor is one.
+Under [`EstimatedCentring`](@ref) the location of ``n`` returns has the variance ``\\sigma^2 / n^{\\mathrm{eff}}``, so the factor is ``1 + 1 / n^{\\mathrm{eff}}``, with ``n^{\\mathrm{eff}}`` the Kish count of [`variance_count(decay::Number, X::MatNum, centring::AbstractCentring, amsk::Option{<:AbstractMatrix{<:Bool}})`](@ref). Under [`PreCentred`](@ref) the factor is one.
 
 ```math
 \\begin{align}

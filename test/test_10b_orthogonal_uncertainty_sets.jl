@@ -1078,9 +1078,11 @@ struct ProbeMatrixProcessing1955 <: PortfolioOptimisers.AbstractMatrixProcessing
             # The root method states no count, which is not a count of its own. It is on the
             # covariance family, because a cross-sectional prior takes any covariance estimator
             # as its variance estimator and asks it for its count (#1928).
+            # The call with two arguments forwards to the one with no mask, so the root
+            # method is the one that takes the mask.
             @test isnothing(invoke(PO.variance_count,
-                                   Tuple{PO.AbstractCovarianceEstimator, PO.MatNum},
-                                   SimpleVariance(), X1334))
+                                   Tuple{PO.AbstractCovarianceEstimator, PO.MatNum,
+                                         Nothing}, SimpleVariance(), X1334, nothing))
             @test isnothing(PO.variance_count(Covariance(; alg = SemiMoment()), X1334))
         end
 
@@ -1265,6 +1267,37 @@ struct ProbeMatrixProcessing1955 <: PortfolioOptimisers.AbstractMatrixProcessing
                       sigma_ucs(OrthogonalUncertaintySet(; kappa = ResidualInflation()),
                                 prv).kappa
             end
+        end
+
+        @testset "The counts read the active mask that the variance read" begin
+            # The idiosyncratic variance restarts an asset where it turns inactive, so an
+            # asset delisted before the last observation has no variance there. Its count
+            # reads the rows after its last inactive row, none, so it states no degrees of
+            # freedom. An asset active at the last observation keeps the count of its rows.
+            rdd = synthetic_asset_panel(; n_assets = 60, n_observations = 300,
+                                        n_industries = 3, delisting_proba = 0.3,
+                                        rng = StableRNG(2214)).rd
+            am = rdd.pnl.amsk
+            dl = findall(j -> !am[end, j], axes(am, 2))
+            on = findall(j -> am[end, j], axes(am, 2))
+            @test !isempty(dl)
+            pe = CrossSectionalFactorPrior(; lambda = 1, minra = 10,
+                                           factors = ["market" => ConstantExposure(),
+                                                      "industry" => OneHotExposure(;
+                                                                                   field = "industry",
+                                                                                   family = "industry"),
+                                                      "size" => CompositeExposure(;
+                                                                                  descriptors = [LogMarketCap()],
+                                                                                  family = "style")])
+            prd = prior(pe, rdd)
+            csd = prd.rr.csr
+            phi = sum(csd.edof) / sum(csd.n)
+            @test all(isnan, prd.rr.esigma[dl])
+            @test all(iszero, prd.rr.edof[dl])
+            @test prd.rr.edof[on] ≈ phi * PO.variance_count(pe.ve, csd.eps).n[on]
+            @test isfinite(sigma_ucs(OrthogonalUncertaintySet(;
+                                                              kappa = ResidualInflation()),
+                                     prd).kappa)
         end
 
         @testset "A view, an expansion and the constructors carry the counts" begin

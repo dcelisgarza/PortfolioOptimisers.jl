@@ -1806,6 +1806,58 @@ end
             @test isnan(descriptor(de, rd2)[4, 1])
         end
     end
+    @testset "An asset that turns inactive restarts its recursion in every archetype" begin
+        # Asset 2 is inactive at observation 3 and active again at 4. Its return there stays
+        # finite on purpose, so a recursion that reads an inactive cell fails. After the
+        # restart, each archetype equals the hand recursion over observations 4 and 5 alone.
+        amsk = trues(size(X))
+        amsk[3, 2] = false
+        rd2 = ew_hand_panel(["adj_volume" => copy(vol),
+                             "adj_shares_outstanding" => copy(shr),
+                             "short_interest" => copy(si)], X; amsk = amsk)
+        after = 4:5
+        D = descriptor(EWMean(; decay = lam, min_obs = 1), rd2)
+        @test isnan(D[3, 2])
+        @test ew_same(D[after, 2:2], ew_hand_mean(log1p.(X[after, 2:2]), lam, 1))
+        # With a skip of one, observation 4 reads the inactive observation 3, and
+        # observation 5 reads observation 4, the first return after the restart.
+        D = descriptor(EWMean(; decay = lam, min_obs = 1, skip = 1), rd2)
+        @test isnan(D[3, 2]) && isnan(D[4, 2])
+        @test D[5, 2] == log1p(X[4, 2])
+        D = descriptor(EWVolumeRatio(; num = "adj_volume", den = "adj_shares_outstanding",
+                                     decay = lam, min_obs = 1), rd2)
+        @test ew_same(D[after, 2:2],
+                      ew_hand_mean(vol[after, 2:2] ./ shr[after, 2:2], lam, 1))
+        D = descriptor(DaysToCover(; decay = lam, min_obs = 1), rd2)
+        @test ew_same(D[after, 2:2],
+                      si[after, 2:2] ./ ew_hand_mean(vol[after, 2:2], lam, 1))
+        # The asset that stays active is the recursion over its whole history.
+        @test ew_same(D[:, 1:1], si[:, 1:1] ./ ew_hand_mean(vol[:, 1:1], lam, 1))
+    end
+    @testset "A step across an inactive observation equals the batch call" begin
+        # The ring of an EWMean is cleared where an asset turns inactive. A ring row can be a
+        # row of the carried state, so a second step from the same state gives the same rows.
+        amsk = trues(size(X))
+        amsk[3, 2] = false
+        rd2 = ew_hand_panel(["adj_volume" => copy(vol),
+                             "adj_shares_outstanding" => copy(shr),
+                             "short_interest" => copy(si)], X; amsk = amsk)
+        rows(r, i) = PortfolioOptimisers.port_opt_view(r, i, :)
+        for de in (EWMean(; decay = lam, min_obs = 1, skip = 2),
+                   EWVolumeRatio(; num = "adj_volume", den = "adj_shares_outstanding",
+                                 decay = lam, min_obs = 1),
+                   DaysToCover(; decay = lam, min_obs = 1))
+            full = descriptor(de, rd2)
+            st = partial_fit!(de, rows(rd2, 1:2))
+            ring = isnothing(st.cache.buf) ? nothing : deepcopy(collect(st.cache.buf))
+            r1 = PortfolioOptimisers.descriptor_step(st, rows(rd2, 3:3))
+            r2 = PortfolioOptimisers.descriptor_step(st, rows(rd2, 3:3))
+            @test isequal(r1.D, full[3:3, :]) && isequal(r2.D, r1.D)
+            @test isnothing(ring) || isequal(collect(st.cache.buf), ring)
+            r3 = PortfolioOptimisers.descriptor_step(r1.de, rows(rd2, 4:5))
+            @test isequal(r3.D, full[4:5, :])
+        end
+    end
     @testset "The estimator holds no data: two carriers, one estimator" begin
         de = EWVolumeRatio(; num = "adj_volume", den = "adj_shares_outstanding",
                            decay = lam, min_obs = 1)

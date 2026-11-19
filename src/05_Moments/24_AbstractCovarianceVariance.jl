@@ -314,21 +314,34 @@ $(DocStringExtensions.FIELDS)
     m
 end
 """
-    variance_count(ve::AbstractCovarianceEstimator, X::MatNum)
-    variance_count(ve::SimpleVariance, X::MatNum)
-    variance_count(ve::ExpWeightedVariance, X::MatNum)
-    variance_count(ve::RegimeAdjustedExpWeightedVariance, X::MatNum)
-    variance_count(ve::WindowedVariance, X::MatNum)
-    variance_count(ve::GeneralCovariance{<:StatsBase.SimpleCovariance}, X::MatNum)
-    variance_count(ve::Covariance{<:Any, <:Any, <:FullMoment}, X::MatNum)
-    variance_count(ve::ExpWeightedCovariance, X::MatNum)
-    variance_count(ve::RegimeAdjustedExpWeightedCovariance, X::MatNum)
-    variance_count(ve::WindowedCovariance, X::MatNum)
+    variance_count(ve::AbstractCovarianceEstimator, X::MatNum,
+                   amsk::Option{<:AbstractMatrix{<:Bool}} = nothing)
+    variance_count(ve::SimpleVariance, X::MatNum,
+                   amsk::Option{<:AbstractMatrix{<:Bool}} = nothing)
+    variance_count(ve::ExpWeightedVariance, X::MatNum,
+                   amsk::Option{<:AbstractMatrix{<:Bool}} = nothing)
+    variance_count(ve::RegimeAdjustedExpWeightedVariance, X::MatNum,
+                   amsk::Option{<:AbstractMatrix{<:Bool}} = nothing)
+    variance_count(ve::WindowedVariance, X::MatNum,
+                   amsk::Option{<:AbstractMatrix{<:Bool}} = nothing)
+    variance_count(ve::GeneralCovariance{<:StatsBase.SimpleCovariance}, X::MatNum,
+                   amsk::Option{<:AbstractMatrix{<:Bool}} = nothing)
+    variance_count(ve::Covariance{<:Any, <:Any, <:FullMoment}, X::MatNum,
+                   amsk::Option{<:AbstractMatrix{<:Bool}} = nothing)
+    variance_count(ve::ExpWeightedCovariance, X::MatNum,
+                   amsk::Option{<:AbstractMatrix{<:Bool}} = nothing)
+    variance_count(ve::RegimeAdjustedExpWeightedCovariance, X::MatNum,
+                   amsk::Option{<:AbstractMatrix{<:Bool}} = nothing)
+    variance_count(ve::WindowedCovariance, X::MatNum,
+                   amsk::Option{<:AbstractMatrix{<:Bool}} = nothing)
     variance_count(ve::PortfolioOptimisersCovariance{<:Any,
                                                      <:MatrixProcessing{<:Any, <:Any, <:Any,
-                                                                        Nothing}}, X::MatNum)
+                                                                        Nothing}}, X::MatNum,
+                   amsk::Option{<:AbstractMatrix{<:Bool}} = nothing)
 
 Return the effective count and the divisor of the variance that `ve` measures on each column of `X`.
+
+A variance that reads an active mask restarts an asset where the mask turns `false`, so the count of that variance reads the same rows. Pass the mask that the variance read as `amsk`. An estimator whose fit reads no mask ignores it.
 
 A consumer that prices the sampling error of a variance needs two facts that only the estimator knows. The first fact is the number of observations that the estimate is worth. The second fact is the divisor of the sum of squares. This function returns both. A prior that writes the idiosyncratic variances of a loadings block calls this function on the residuals. The prior writes the result next to the variances, so that [`ResidualInflation`](@ref) reads it from the block.
 
@@ -360,8 +373,8 @@ On an unweighted sample of ``T`` observations, ``n_{i} = T``. Then ``m_{i}`` is 
 
  1. On [`AbstractCovarianceEstimator`](@ref), return `nothing`.
  2. On [`SimpleVariance`](@ref), take the finite rows of each column with their weights, through [`observed_sample`](@ref), and read the count from those weights with [`simple_variance_count`](@ref). A dynamic weight resolves on the rows of the column.
- 3. On [`ExpWeightedVariance`](@ref) and [`RegimeAdjustedExpWeightedVariance`](@ref), take the Kish count of the exponential weights over the finite rows of each column with [`variance_count(decay::Number, X::MatNum, centring::AbstractCentring)`](@ref). The weights sum to one after the correction of the cold start, so the divisor equals the count. The count ignores the regime multiplier and the lags of a Heteroskedasticity and Autocorrelation Consistent (HAC) adjustment.
- 4. On [`WindowedVariance`](@ref) and [`WindowedCovariance`](@ref), apply the window and the weights of the wrapper with [`windowed_preamble`](@ref). Then return the count of the inner estimator.
+ 3. On [`ExpWeightedVariance`](@ref) and [`RegimeAdjustedExpWeightedVariance`](@ref), take the Kish count of the exponential weights over the finite rows of each column after its last inactive row of `amsk`, with [`variance_count(decay::Number, X::MatNum, centring::AbstractCentring, amsk::Option{<:AbstractMatrix{<:Bool}})`](@ref). The weights sum to one after the correction of the cold start, so the divisor equals the count. The count ignores the regime multiplier and the lags of a Heteroskedasticity and Autocorrelation Consistent (HAC) adjustment.
+ 4. On [`WindowedVariance`](@ref) and [`WindowedCovariance`](@ref), apply the window and the weights of the wrapper with [`windowed_preamble`](@ref), which cuts `amsk` to the window too. Then return the count of the inner estimator.
  5. On a [`GeneralCovariance`](@ref) over a `StatsBase.SimpleCovariance`, return the count of a [`SimpleVariance`](@ref) with the weights of the estimator and the `corrected` flag of `StatsBase.SimpleCovariance`. The diagonal of the covariance is that variance.
  6. On a [`Covariance`](@ref) with [`FullMoment`](@ref), return the count of its inner estimator, with the weights of `ve`, from [`covariance_inner_estimator`](@ref). An inner estimator with no count of its own, such as a shrinkage estimator, gives `nothing`. A [`SemiMoment`](@ref) variance is not a sum of squares of every residual, so it states no count.
  7. On [`ExpWeightedCovariance`](@ref) and [`RegimeAdjustedExpWeightedCovariance`](@ref), take the count of step 3 at the `decay` and the `centring` of the estimator. The diagonal of the covariance weights the squares as the matching variance estimator does. The regime multiplier of the covariance can differ from the one of [`RegimeAdjustedExpWeightedVariance`](@ref), and the count ignores it, as step 3 states.
@@ -371,6 +384,11 @@ On an unweighted sample of ``T`` observations, ``n_{i} = T``. Then ``m_{i}`` is 
 
   - $(arg_dict[:ve])
   - `X`: The data matrix, of shape `observations × assets`.
+  - `amsk`: The active mask that the variance read, of the shape of `X`, or `nothing` for a variance that read no mask.
+
+# Validation
+
+  - An exponentially weighted estimator checks that `amsk` has the size of `X`, through [`variance_count(decay::Number, X::MatNum, centring::AbstractCentring, amsk::Option{<:AbstractMatrix{<:Bool}})`](@ref). Raises a `DimensionMismatch`.
 
 # Returns
 
@@ -385,19 +403,22 @@ On an unweighted sample of ``T`` observations, ``n_{i} = T``. Then ``m_{i}`` is 
   - [`ResidualInflation`](@ref)
   - [`Regression`](@ref)
 """
-function variance_count(::AbstractCovarianceEstimator, ::MatNum)::Nothing
+function variance_count(::AbstractCovarianceEstimator, ::MatNum,
+                        ::Option{<:AbstractMatrix{<:Bool}} = nothing)::Nothing
     return nothing
 end
 # The diagonal of a full-moment `Covariance` is the variance of its inner estimator, centred on
 # the centre of `ce.me`. The count ignores the centre, as the count of `SimpleVariance` does.
-function variance_count(ce::Covariance{<:Any, <:Any, <:FullMoment}, X::MatNum)
-    return variance_count(covariance_inner_estimator(ce), X)
+function variance_count(ce::Covariance{<:Any, <:Any, <:FullMoment}, X::MatNum,
+                        amsk::Option{<:AbstractMatrix{<:Bool}} = nothing)
+    return variance_count(covariance_inner_estimator(ce), X, amsk)
 end
 # The diagonal of a `GeneralCovariance` over a `StatsBase.SimpleCovariance` is the variance of a
 # `SimpleVariance` with the same weights and the same bias correction.
-function variance_count(ce::GeneralCovariance{<:StatsBase.SimpleCovariance}, X::MatNum)
+function variance_count(ce::GeneralCovariance{<:StatsBase.SimpleCovariance}, X::MatNum,
+                        amsk::Option{<:AbstractMatrix{<:Bool}} = nothing)
     return variance_count(SimpleVariance(; me = nothing, w = ce.w,
-                                         corrected = ce.ce.corrected), X)
+                                         corrected = ce.ce.corrected), X, amsk)
 end
 """
     effective_observation_count(ce::StatsBase.CovarianceEstimator, X::MatNum; kwargs...) -> Real

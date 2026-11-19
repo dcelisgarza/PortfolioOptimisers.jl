@@ -977,9 +977,34 @@ end
     @test cnt.m == cnt.n
     @test cne.n == cne.m .+ 1
     λ = exp2(-inv(40.0))
-    @test PortfolioOptimisers.variance_count(λ, ones(10_000, 1), PreCentred()).n[1] ≈
+    @test PortfolioOptimisers.variance_count(λ, ones(10_000, 1), PreCentred(), nothing).n[1] ≈
           (1 + λ) / (1 - λ)
     @test round((1 + λ) / (1 - λ)) == 115
+
+    # The recursion restarts an asset where its active mask turns false, so the count of a
+    # variance that read the mask reads the rows after the last inactive row, as the variance
+    # does. Column 2 is inactive at row 4 and active again from row 5, with finite values on
+    # both sides. Column 1 stays active, so its count does not move.
+    am = trues(size(X))
+    am[4, 2] = false
+    X[4, 2] = 0.5
+    for ve in (ExpWeightedVariance(; decay = 0.9), RegimeAdjustedExpWeightedVariance(),
+               ExpWeightedCovariance(; decay = 0.9),
+               WindowedVariance(; ve = ExpWeightedVariance(; decay = 0.9), window = size(X, 1) - 1))
+        c = PortfolioOptimisers.variance_count(ve, X, am)
+        @test c.n[1] == PortfolioOptimisers.variance_count(ve, X).n[1]
+        @test c.n[2] == PortfolioOptimisers.variance_count(ve, X[5:end, 2:2]).n[1]
+        @test c.n[2] < PortfolioOptimisers.variance_count(ve, X).n[2]
+    end
+    v = PortfolioOptimisers.variance_series(ExpWeightedVariance(; decay = 0.9), X;
+                                            active_mask = am)
+    @test v[end, 2] ≈
+          PortfolioOptimisers.variance_series(ExpWeightedVariance(; decay = 0.9),
+                                              X[5:end, 2:2])[end, 1]
+    @test PortfolioOptimisers.variance_count(SimpleVariance(), X, am).n ==
+          PortfolioOptimisers.variance_count(SimpleVariance(), X).n
+    @test_throws DimensionMismatch PortfolioOptimisers.variance_count(ExpWeightedVariance(),
+                                                                      X, am[2:end, :])
 end
 
 #=

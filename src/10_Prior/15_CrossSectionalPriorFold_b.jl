@@ -53,11 +53,11 @@ function prior(pe::CrossSectionalFactorPrior, st::CrossSectionalCarryState;
     # these positions of the folded returns that a fit keeps. The buffer keeps every folded
     # observation with its mark, so the record of the cut maps each position to its
     # observation, as it does after a batch fit.
-    fit = (; csr = csr, W = st.W, vs = st.vs, cnt = variance_count(st.ve, csr.eps),
-           amr = view(st.amsk, r, :), bwr = view(st.bw, r, :), Xo = view(st.X, r, :), r = r,
-           hist = st.hist, S = st.S, Sc = st.Sc, ce = st.ce,
-           idx = (buffer_fit_count(st.buf) - Tf) .+ r, ts = nothing,
-           rf = if folds_forecast_rows(pe.rfe)
+    amr = view(st.amsk, r, :)
+    fit = (; csr = csr, W = st.W, vs = st.vs, cnt = variance_count(st.ve, csr.eps, amr),
+           amr = amr, bwr = view(st.bw, r, :), Xo = view(st.X, r, :), r = r, hist = st.hist,
+           S = st.S, Sc = st.Sc, ce = st.ce, idx = (buffer_fit_count(st.buf) - Tf) .+ r,
+           ts = nothing, rf = if folds_forecast_rows(pe.rfe)
                return_forecast_result(pe.rfe, st.fh, st.fst)
            else
                nothing

@@ -328,8 +328,9 @@ end
 # The diagonal of the covariance weights the squares at `decay`, and not at the correlation decay
 # `cor_decay`, as `RegimeAdjustedExpWeightedVariance` weights them. The two regime multipliers can
 # differ, and the count ignores the multiplier, so the two estimators read one count.
-function variance_count(ce::RegimeAdjustedExpWeightedCovariance, X::MatNum)
-    return variance_count(ce.decay, X, ce.centring)
+function variance_count(ce::RegimeAdjustedExpWeightedCovariance, X::MatNum,
+                        amsk::Option{<:AbstractMatrix{<:Bool}} = nothing)
+    return variance_count(ce.decay, X, ce.centring, amsk)
 end
 function effective_observation_count(ce::RegimeAdjustedExpWeightedCovariance, X::MatNum;
                                      kwargs...)
