@@ -1,4 +1,85 @@
 """
+    foreach_step(f, ests::Tuple) -> nothing
+    foreach_step(f, ests::AbstractVector) -> nothing
+
+Call `f(e, i)` on each step `e` of a [`Pipeline`](@ref) and its position `i`, in step order.
+
+The steps of a `Tuple` have different types. A `for` loop over them reads each step at a type that inference cannot know, so each call of `f` dispatches at run time and boxes the step. The `Tuple` method walks the steps through `map` over the steps and their positions, which Julia unrolls, so each call of `f` dispatches at compile time and allocates nothing. The `AbstractVector` method walks the steps with a loop, at the element type that the vector holds.
+
+# Arguments
+
+  - `f`: A function of a step and its position. Its value is ignored.
+  - `ests`: The step estimators.
+
+# Returns
+
+  - `nothing`.
+
+# Related
+
+  - [`Pipeline`](@ref)
+  - [`assert_slot_order`](@ref)
+"""
+function foreach_step(f, ests::Tuple)
+    map(f, ests, ntuple(identity, length(ests)))
+    return nothing
+end
+function foreach_step(f, ests::AbstractVector)
+    for i in eachindex(ests)
+        f(ests[i], i)
+    end
+    return nothing
+end
+"""
+    steps_form(ests::Tuple, v::AbstractVector) -> Tuple
+    steps_form(ests::AbstractVector, v::AbstractVector) -> Vector
+
+Return `v` in the container form of the steps `ests` of a [`Pipeline`](@ref).
+
+The user chooses the form of the steps, a `Tuple` or a vector, and the library does not convert one to the other. A `Tuple` of steps of different types compiles a method for each pipeline, and a vector of steps compiles one method for each element type, which can cost less time to the first result. The names of the steps and the fitted results of a [`PipelineResult`](@ref) take the same form as the steps. The `AbstractVector` method narrows `v` to the element type of its values.
+
+# Arguments
+
+  - `ests`: The step estimators, which give the form.
+  - `v`: A vector with one entry for each step.
+
+# Returns
+
+  - `Tuple(v)` when `ests` is a `Tuple`, and a new vector of the values of `v` otherwise.
+
+# Related
+
+  - [`Pipeline`](@ref)
+  - [`PipelineResult`](@ref)
+  - [`map_steps`](@ref)
+"""
+steps_form(::Tuple, v::AbstractVector) = Tuple(v)
+steps_form(::AbstractVector, v::AbstractVector) = [x for x in v]
+"""
+    map_steps(f, ests::Tuple) -> Tuple
+    map_steps(f, ests::AbstractVector) -> Vector
+
+Return `f(e)` for each step `e` of a [`Pipeline`](@ref), in the container form of `ests`.
+
+The `Tuple` method calls `map`. The `AbstractVector` method uses a comprehension, which takes the element type of its values as `map` does. Over a vector of an abstract element type, `map` costs about three times the time of the comprehension, measured at about 5 µs against 0.2 µs to 2 µs for two steps. A pipeline maps over its steps at each fold of a prediction and at each online step, so the vector form takes the comprehension.
+
+# Arguments
+
+  - `f`: A function of one step.
+  - `ests`: The step estimators.
+
+# Returns
+
+  - The values of `f`, a `Tuple` when `ests` is a `Tuple`, and a vector otherwise.
+
+# Related
+
+  - [`foreach_step`](@ref)
+  - [`steps_form`](@ref)
+"""
+map_steps(f, ests::Tuple) = map(f, ests)
+map_steps(f, ests::AbstractVector) = [f(e) for e in ests]
+"""
 $(DocStringExtensions.TYPEDSIGNATURES)
 
 Validate that a [`TrainTestSplit`](@ref) is the first step of a [`Pipeline`](@ref), and that no nested step contains one.
@@ -25,13 +106,14 @@ The split keeps the test window away from every fitted step. A stateful step bef
   - [`has_split`](@ref)
 """
 function assert_split_position(ests)::Nothing
-    for (i, e) in enumerate(ests)
+    foreach_step(ests) do e, i
         if isa(e, TrainTestSplit)
             @argcheck(i == 1,
                       ArgumentError("a TrainTestSplit step must be the first step of a Pipeline, but one appears at step $i; a stateful step fitted before the split would have seen the held-out test rows, leaking them into the fitted workflow"))
         elseif has_split(e)
             throw(ArgumentError("a TrainTestSplit step is nested inside a $(Base.typename(typeof(e)).wrapper) step of a Pipeline; the holdout must be the first step of the outermost Pipeline, where no step has yet touched the data"))
         end
+        return nothing
     end
     return nothing
 end
@@ -62,10 +144,11 @@ The optimiser writes the `:opt` slot, which is the output of the workflow. No st
 """
 function assert_opt_last(ests)::Nothing
     n = length(ests)
-    for (i, e) in enumerate(ests)
+    foreach_step(ests) do e, i
         if i < n && pipe_writes(e) === :opt
             throw(ArgumentError("an optimisation step writes the terminal :opt slot, so it must be the last step of a Pipeline, but one appears at step $i of $n; move it to the end, or drop the steps that follow it"))
         end
+        return nothing
     end
     return nothing
 end
@@ -96,12 +179,12 @@ The check calls [`resolve_constraint_target`](@ref) on each constraint step. [`r
   - [`assert_routable`](@ref)
 """
 function assert_constraint_targets(ests)::Nothing
-    for e in ests
+    foreach_step(ests) do e, _
         est = isa(e, PipelineStep) ? e.est : e
-        if !isa(est, AbstractConstraintEstimator) || !(pipe_writes(e) === :constraints)
-            continue
+        if isa(est, AbstractConstraintEstimator) && pipe_writes(e) === :constraints
+            resolve_constraint_target(est, isa(e, PipelineStep) ? e.target : nothing)
         end
-        resolve_constraint_target(est, isa(e, PipelineStep) ? e.target : nothing)
+        return nothing
     end
     return nothing
 end
@@ -138,7 +221,7 @@ function assert_step_declarations(ests)::Nothing
                      AbstractReturnsPreprocessingEstimator, AbstractPriorEstimator,
                      AbstractPhylogenyEstimator, AbstractUncertaintySetEstimator,
                      AbstractConstraintEstimator, OptimisationEstimator}
-    for (i, e) in enumerate(ests)
+    foreach_step(ests) do e, i
         est = isa(e, PipelineStep) ? e.est : e
         if isa(est, AbstractUncertaintySetEstimator)
             target = isa(e, PipelineStep) ? e.target : nothing
@@ -150,6 +233,7 @@ function assert_step_declarations(ests)::Nothing
             @argcheck(e.writes === slot,
                       ArgumentError("step $i of $n wraps a $(Base.typename(typeof(est)).wrapper) in a PipelineStep that declares writes = :$(e.writes), but the step writes the :$slot slot of its family when it runs; declare writes = :$slot"))
         end
+        return nothing
     end
     return nothing
 end
@@ -180,16 +264,18 @@ A nested pipeline gives one slot to the outer Pipeline Context, the slot of its 
 """
 function assert_nested_data_slots(ests)::Nothing
     n = length(ests)
-    for (i, e) in enumerate(ests)
+    foreach_step(ests) do e, i
         p = isa(e, PipelineStep) ? e.est : e
         if !isa(p, Pipeline) || pipe_writes(p) in PIPELINE_DATA_SLOTS
-            continue
+            return nothing
         end
-        for s in p.steps
+        foreach_step(p.steps) do s, _
             slot = pipe_writes(s)
             @argcheck(!(slot in PIPELINE_DATA_SLOTS),
                       ArgumentError("step $i of $n is a nested Pipeline that writes the :$(pipe_writes(p)) slot, and one of its steps rewrites the :$slot slot, which the outer pipeline never receives; the :$(pipe_writes(p)) result would describe other assets than the outer :$slot slot. Move the $(Base.typename(typeof(s)).wrapper) step into the outer pipeline"))
+            return nothing
         end
+        return nothing
     end
     return nothing
 end
@@ -278,11 +364,15 @@ function assert_routable(ests)::Nothing
         return nothing
     end
     n = length(ests)
-    for i in 1:(n - 1)
-        for target in pipe_required_targets(ests[i])
+    foreach_step(ests) do e, i
+        if i == n
+            return nothing
+        end
+        for target in pipe_required_targets(e)
             @argcheck(pipe_accepts(opt, Val(target)),
                       ArgumentError("step $i of $n writes the :$target target, which the terminal $(Base.typename(typeof(opt)).wrapper) cannot receive; a computed value that reaches no optimiser field would be silently dropped, so change the step's target, drop the step, or use an optimiser that accepts it"))
         end
+        return nothing
     end
     return nothing
 end
@@ -348,20 +438,52 @@ The check walks the steps in order. `avail` holds the Data Slots, see [`PIPELINE
   - [`PIPELINE_INVALIDATES`](@ref)
 """
 function assert_slot_order(ests)::Nothing
-    avail = Set{Symbol}(PIPELINE_DATA_SLOTS)
-    written = Dict{Symbol, eltype(ests)}()
-    for e in ests
+    slots = map_steps(pipe_writes, ests)
+    foreach_step(ests) do e, k
+        # `pipe_writes(e)` and not `slots[k]`: over a `Tuple` the type of `e` is known, so the
+        # slot folds to a constant, and so does its entry of `PIPELINE_INVALIDATES`.
         slot = pipe_writes(e)
         for r in pipe_reads(e)
-            @argcheck(r in avail,
+            @argcheck(r in PIPELINE_DATA_SLOTS || !isnothing(last_slot_writer(slots, r, k)),
                       ArgumentError("a $(Base.typename(typeof(e)).wrapper) step reads the :$r slot, which no earlier step writes and the pipeline input cannot fill"))
         end
         for inv in get(PIPELINE_INVALIDATES, slot, ())
-            @argcheck(!haskey(written, inv),
-                      ArgumentError("a $(Base.typename(typeof(e)).wrapper) step writes the :$slot slot, invalidating the :$inv slot written by an earlier $(Base.typename(typeof(written[inv])).wrapper) step; the stale :$inv result would no longer match the assets of the new :$slot data. Move the $(Base.typename(typeof(e)).wrapper) step before the $(Base.typename(typeof(written[inv])).wrapper) step, or drop one of them."))
+            j = last_slot_writer(slots, inv, k)
+            if !isnothing(j)
+                w = Base.typename(typeof(ests[j])).wrapper
+                throw(ArgumentError("a $(Base.typename(typeof(e)).wrapper) step writes the :$slot slot, invalidating the :$inv slot written by an earlier $w step; the stale :$inv result would no longer match the assets of the new :$slot data. Move the $(Base.typename(typeof(e)).wrapper) step before the $w step, or drop one of them."))
+            end
         end
-        written[slot] = e
-        push!(avail, slot)
+        return nothing
+    end
+    return nothing
+end
+"""
+$(DocStringExtensions.TYPEDSIGNATURES)
+
+Return the position of the last step before step `k` that writes the slot `s`.
+
+[`assert_slot_order`](@ref) calls this function with the slot that each step writes, so it needs no set of the filled slots and no dictionary of the writers.
+
+# Arguments
+
+  - `slots`: The slot that each step writes, in step order, see [`pipe_writes`](@ref).
+  - `s`: The slot to find.
+  - `k`: The position of the step that reads `s` or makes it stale.
+
+# Returns
+
+  - `j::Union{Nothing, Int}`: The largest `j < k` with `slots[j] === s`, or `nothing` when no earlier step writes `s`.
+
+# Related
+
+  - [`assert_slot_order`](@ref)
+"""
+function last_slot_writer(slots, s::Symbol, k::Integer)
+    for j in (k - 1):-1:1
+        if slots[j] === s
+            return j
+        end
     end
     return nothing
 end
@@ -396,6 +518,8 @@ $(DocStringExtensions.FIELDS)
                cache::Option{<:AbstractPartialFitState} = nothing) -> Pipeline
 
 Give the steps in the order of execution. Each element is a step estimator or a `"name" => estimator` pair.
+
+The steps keep the form that you give, a `Tuple` or a vector, and the names and the fitted results of a [`PipelineResult`](@ref) take the same form, see [`steps_form`](@ref). The two forms give the same results. A `Tuple` compiles the methods of each pipeline for its own step types. A vector compiles them for its element type, which can cost less time to the first result when you build many pipelines. The positional constructor takes `names` and `steps` as a `Tuple` or a vector too.
 
 ## Validation
 
@@ -453,7 +577,8 @@ julia> pipe.names
     $(field_dict[:pfcache])
     """
     cache
-    function Pipeline(names::Tuple{Vararg{String}}, steps::Tuple,
+    function Pipeline(names::Union{Tuple{Vararg{String}}, AbstractVector{<:String}},
+                      steps::Union{Tuple, AbstractVector},
                       cache::Option{<:AbstractPartialFitState} = nothing)
         @argcheck(!isempty(steps), IsEmptyError("steps cannot be empty"))
         @argcheck(length(names) == length(steps), DimensionMismatch)
@@ -472,8 +597,9 @@ julia> pipe.names
 end
 function Pipeline(; steps::Union{Tuple, AbstractVector},
                   cache::Option{<:AbstractPartialFitState} = nothing)::Pipeline
-    # The steps take the element type of their values (#1979).
-    ests = [isa(s, Pair) ? s.second : s for s in steps]
+    # The steps keep the form that the user gave, a `Tuple` or a vector. A vector
+    # takes the element type of its values (#1979).
+    ests = map_steps(s -> isa(s, Pair) ? s.second : s, steps)
     explicit = Option{String}[isa(s, Pair) ? String(s.first) : nothing for s in steps]
     slots = Symbol[pipe_writes(e) for e in ests]
     counts = Dict{Symbol, Int}()
@@ -493,7 +619,7 @@ function Pipeline(; steps::Union{Tuple, AbstractVector},
             string(s, '_', seen[s])
         end
     end
-    pipe = Pipeline(Tuple(names), Tuple(ests), cache)
+    pipe = Pipeline(steps_form(ests, names), ests, cache)
     warn_raw_readers(pipe)
     return pipe
 end
@@ -618,8 +744,8 @@ $(DocStringExtensions.FIELDS)
 # Constructors
 
     PipelineResult(;
-        names::Tuple{Vararg{String}},
-        results::Tuple,
+        names::Union{Tuple{Vararg{String}}, AbstractVector{<:String}},
+        results::Union{Tuple, AbstractVector},
         ctx::PipelineContext
     ) -> PipelineResult
 
@@ -645,7 +771,8 @@ Keywords correspond to the struct's fields. [`fit`](@ref) builds the Result, and
     """
     ctx
 end
-function PipelineResult(; names::Tuple{Vararg{String}}, results::Tuple,
+function PipelineResult(; names::Union{Tuple{Vararg{String}}, AbstractVector{<:String}},
+                        results::Union{Tuple, AbstractVector},
                         ctx::PipelineContext)::PipelineResult
     return PipelineResult(names, results, ctx)
 end
@@ -1037,7 +1164,7 @@ function StatsAPI.fit(pipe::Pipeline, data::Prices_RR)::PipelineResult
         step = maybe_inject_step(est, ctx)
         fitted[i], ctx = run_group_step(step, ctx, gsrcs[i])
     end
-    return PipelineResult(pipe.names, Tuple(fitted), ctx)
+    return PipelineResult(pipe.names, steps_form(pipe.steps, fitted), ctx)
 end
 """
 $(DocStringExtensions.TYPEDSIGNATURES)
@@ -1156,7 +1283,7 @@ Apply the fitted steps of a pipeline to a data window, in step order.
   - [`apply_fitted_step`](@ref)
   - [`predict(res::PipelineResult, data::AbstractPricesResult, window)`](@ref)
 """
-function apply_fitted_steps(results::Tuple, data::Prices_RR)
+function apply_fitted_steps(results::Union{Tuple, AbstractVector}, data::Prices_RR)
     for f in results
         data = apply_fitted_step(f, data)
     end

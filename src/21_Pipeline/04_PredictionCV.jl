@@ -111,7 +111,7 @@ The fold loop does this swap before [`fit`](@ref) runs, so `fit` and [`run_step`
 """
 function update_time_dependent_estimator(p::Pipeline, ctx::TimeDependentContext,
                                          all_binds::Bool = true)
-    steps = map(est -> update_time_dependent_estimator(est, ctx, all_binds), p.steps)
+    steps = map_steps(est -> update_time_dependent_estimator(est, ctx, all_binds), p.steps)
     return rebuild_struct(p, (; steps = steps))
 end
 """
@@ -202,7 +202,7 @@ The fold-less [`fit`](@ref) calls this function first when the pipeline [`is_tim
   - [`fit`](@ref)
 """
 function reset_time_dependent_estimator(p::Pipeline)
-    return rebuild_struct(p, (; steps = map(reset_time_dependent_step, p.steps)))
+    return rebuild_struct(p, (; steps = map_steps(reset_time_dependent_step, p.steps)))
 end
 """
     pipeline_step_factory(est, w)
@@ -245,7 +245,9 @@ The fold loop applies it after the swap of the schedules, so an optimiser that t
   - [`cross_val_predict`](@ref)
 """
 function factory(p::Pipeline, w::VecNum)
-    return rebuild_struct(p, (; steps = map(est -> pipeline_step_factory(est, w), p.steps)))
+    return rebuild_struct(p,
+                          (;
+                           steps = map_steps(est -> pipeline_step_factory(est, w), p.steps)))
 end
 """
     cross_val_predict(pipe::Pipeline, data::Prices_RR, cv::CombCVER, cv_res = split(cv, data); ex = FLoops.ThreadedEx(), kwargs...) -> PopulationPredictionResult
@@ -535,7 +537,7 @@ function fitted_step_keeps_observations(f::PipelineResult,
     return last(apply_fitted_steps_keeping(f.results, data))
 end
 """
-    apply_fitted_steps_keeping(results::Tuple, data::AbstractReturnsResult) -> (data′, kept::Bool)
+    apply_fitted_steps_keeping(results::Union{Tuple, AbstractVector}, data::AbstractReturnsResult) -> (data′, kept::Bool)
 
 Apply the fitted steps of a pipeline to a data window, in step order, and say whether the window kept its observations.
 
@@ -563,7 +565,8 @@ It is [`apply_fitted_steps`](@ref) with one more answer. The returns-data method
   - [`fitted_step_keeps_observations`](@ref)
   - [`pipeline_fold_prediction`](@ref)
 """
-function apply_fitted_steps_keeping(results::Tuple, data::AbstractReturnsResult)
+function apply_fitted_steps_keeping(results::Union{Tuple, AbstractVector},
+                                    data::AbstractReturnsResult)
     kept = true
     for f in results
         kept = kept && fitted_step_keeps_observations(f, data)

@@ -16,6 +16,7 @@ PortfolioOptimisers.view_owner
 PortfolioOptimisers.pipeline_fold_fit
 PortfolioOptimisers.step_estimator
 PortfolioOptimisers.rewrap_step
+PortfolioOptimisers.replace_step
 PortfolioOptimisers.is_data_step
 PortfolioOptimisers.is_universe_step
 PortfolioOptimisers.is_row_owner

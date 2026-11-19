@@ -692,7 +692,7 @@ $(DocStringExtensions.FIELDS)
     PipelineStep(;
         est::Union{AbstractEstimator, Function},
         writes::Symbol,
-        reads::Tuple{Vararg{Symbol}} = (),
+        reads::Union{Tuple{Vararg{Symbol}}, AbstractVector{<:Symbol}} = (),
         target::Option{Symbol} = nothing,
     ) -> PipelineStep
 
@@ -734,7 +734,7 @@ ExcessSource()
     """
     est
     """
-    Slots the step requires to be populated before it runs (a subset of [`PIPELINE_SLOTS`](@ref), as a tuple).
+    Slots the step requires to be populated before it runs (a subset of [`PIPELINE_SLOTS`](@ref), as a tuple or a vector, which the step keeps as given).
     """
     reads
     """
@@ -746,8 +746,8 @@ ExcessSource()
     """
     target
     function PipelineStep(est::Union{AbstractEstimator, Function},
-                          reads::Tuple{Vararg{Symbol}}, writes::Symbol,
-                          target::Option{Symbol})
+                          reads::Union{Tuple{Vararg{Symbol}}, AbstractVector{<:Symbol}},
+                          writes::Symbol, target::Option{Symbol})
         @argcheck(writes in PIPELINE_SLOTS,
                   ArgumentError("writes must be one of $(PIPELINE_SLOTS), got :$writes"))
         @argcheck(all(r -> r in PIPELINE_SLOTS, reads),
@@ -766,7 +766,7 @@ ExcessSource()
     end
 end
 function PipelineStep(; est::Union{AbstractEstimator, Function}, writes::Symbol,
-                      reads::Tuple{Vararg{Symbol}} = (),
+                      reads::Union{Tuple{Vararg{Symbol}}, AbstractVector{<:Symbol}} = (),
                       target::Option{Symbol} = nothing)::PipelineStep
     return PipelineStep(est, reads, writes, target)
 end

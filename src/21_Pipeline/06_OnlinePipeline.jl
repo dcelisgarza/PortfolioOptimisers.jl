@@ -523,7 +523,7 @@ On the fold route [`update_online_estimator`](@ref) resolves every step: a bare 
   - [`Online`](@ref)
 """
 function update_online_estimator(p::Pipeline)
-    return rebuild_struct(p, (; steps = map(update_online_estimator, p.steps)))
+    return rebuild_struct(p, (; steps = map_steps(update_online_estimator, p.steps)))
 end
 update_online_estimator(p::Pipeline{<:Any, <:Any, <:PipelineBufferState}) = p
 """
@@ -540,7 +540,7 @@ The states are the own `cache` of the pipeline and the states under every step, 
   - [`Resume`](@ref)
 """
 function copy_states(p::Pipeline)
-    return Pipeline(p.names, map(copy_states, p.steps), copy_state(p.cache))
+    return Pipeline(p.names, map_steps(copy_states, p.steps), copy_state(p.cache))
 end
 """
     copy_states(ps::PipelineStep)
@@ -618,6 +618,34 @@ Alias for a [`Resume`](@ref) whose Result carries a [`Pipeline`](@ref).
   - [`cross_val_predict(pipe::Pipeline, data::Prices_RR, cv::CVER)`](@ref)
 """
 const PipelineResume = Resume{<:Any, <:Pipeline}
+"""
+    replace_step(steps::Tuple, step, i::Integer) -> Tuple
+    replace_step(steps::AbstractVector, step, i::Integer) -> Vector
+
+Return the steps of a [`Pipeline`](@ref) with `step` at position `i`.
+
+A fold can change the type of a step, so the new container takes the type of `step`. The `Tuple` method calls `Base.setindex`. The `AbstractVector` method copies the steps into a vector whose element type joins the old element type and the type of `step`, through `Base.promote_typejoin`. Neither method changes `steps`, so the pipeline that holds them keeps its state.
+
+# Arguments
+
+  - `steps`: The step estimators, a `Tuple` or an `AbstractVector`, as the user gave them.
+  - `step`: The new step.
+  - `i`: The position of the new step.
+
+# Returns
+
+  - The steps, in the container form of `steps`, with `step` at position `i`.
+
+# Related
+
+  - [`partial_fit!(pipe::Pipeline{<:Any, <:Any, <:Option{<:Union{PipelineBufferState, ReturnsBufferState}}}, data::Prices_RR)`](@ref)
+"""
+replace_step(steps::Tuple, step, i::Integer) = Base.setindex(steps, step, i)
+function replace_step(steps::AbstractVector, step, i::Integer)
+    s = Vector{Base.promote_typejoin(eltype(steps), typeof(step))}(steps)
+    s[i] = step
+    return s
+end
 function assert_pipeline_entry(r::PipelineResume, cv)
     assert_no_holdout(r.opt)
     assert_resume_scheme(cv)
@@ -681,8 +709,8 @@ function partial_fit!(pipe::Pipeline{<:Any, <:Any,
     member = pipeline_online_member(pipe)
     @argcheck(isnothing(member),
               ArgumentError("the `$(member)` step holds an `Online` declaration that no warm-up resolved, and `partial_fit!(pipe, data)` would fold the estimator it wraps with no buffer, so its `max_history` would be ignored. Run the pipeline through an Online Scheme (`OnlineIndexWalkForward` or `OnlineDateWalkForward`), whose warm-up resolves the declaration, or hand the step the plain estimator."))
-    # A fold can change the type of a step, so the steps stay a `Tuple`, and each fold
-    # replaces one entry with `Base.setindex` (#1979).
+    # A fold can change the type of a step, so each fold replaces one entry through
+    # `replace_step`, which keeps the container form that the user gave (#2200).
     steps = pipe.steps
     block = data
     for i in 1:(k - 1)
@@ -695,14 +723,14 @@ function partial_fit!(pipe::Pipeline{<:Any, <:Any,
             continue
         end
         est, block = partial_fit_transform(est, block)
-        steps = Base.setindex(steps, rewrap_step(step, est), i)
+        steps = replace_step(steps, rewrap_step(step, est), i)
     end
     @argcheck(isa(block, ReturnsResult),
               ArgumentError("the rows reach the `$(pipe.names[k])` step, the row owner, as a `$(typeof(block).name.name)`, and a prior or an optimiser folds a `ReturnsResult`: put a `PricesToReturns` step before it."))
     owner = step_estimator(steps[k])
     owner, cache = fold_pipeline_owner(owner, pipe.cache, block,
                                        pipeline_gap_sources(pipe.steps)[k])
-    steps = Base.setindex(steps, rewrap_step(steps[k], owner), k)
+    steps = replace_step(steps, rewrap_step(steps[k], owner), k)
     return rebuild_struct(pipe, (; steps = steps, cache = cache))
 end
 function partial_fit!(pipe::Pipeline{<:Any, <:Any, <:PipelineBufferState}, data::Prices_RR)
@@ -860,7 +888,7 @@ function fit_pipeline_from_state(pipe::Pipeline, cache::Option{<:ReturnsBufferSt
         fitted[i], ctx = run_group_step(maybe_inject_step(pipe.steps[i], ctx), ctx,
                                         gsrcs[i])
     end
-    return PipelineResult(pipe.names, Tuple(fitted), ctx)
+    return PipelineResult(pipe.names, steps_form(pipe.steps, fitted), ctx)
 end
 """
     pipeline_returns_result(pe::AbstractPriorEstimator, cache::ReturnsBufferState, name)

@@ -1218,6 +1218,11 @@ end
         r = PO.UnseenMemberDesignResult(; Z = Zr)
         @test r.Z === Zr && r.P == ()
         @test first.(PO.UnseenMemberDesignResult(Zr, [2 => Pt]).P) == [2]
+        # A tuple of changes is kept as a tuple, and the readers read it as the vector (#2200).
+        rt = PO.UnseenMemberDesignResult(Zr, (2 => Pt,))
+        @test rt.P === (2 => Pt,)
+        @test PO.unseen_member_change_at(rt.P, 2) === Pt
+        @test_throws DomainError PO.UnseenMemberDesignResult(Zr, (0 => Pt,))
         # The observation of a change lies on the observation axis of the design.
         @test_throws DomainError PO.UnseenMemberDesignResult(Zr, [size(Zr, 3) + 1 => Pt])
         @test_throws DomainError PO.UnseenMemberDesignResult(Zr, [0 => Pt])

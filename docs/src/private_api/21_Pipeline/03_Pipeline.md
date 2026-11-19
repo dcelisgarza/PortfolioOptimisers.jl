@@ -1,5 +1,5 @@
 ```@meta
-Description = "Pipeline, private API of PortfolioOptimisers.jl: first_duplicate, assert_step_declarations, assert_nested_data_slots, assert_slot_order, inject_context, …"
+Description = "Pipeline, private API of PortfolioOptimisers.jl: first_duplicate, assert_step_declarations, assert_nested_data_slots, assert_slot_order, last_slot_writer, …"
 ```
 
 # Pipeline: private API
@@ -9,6 +9,17 @@ first_duplicate
 assert_step_declarations
 assert_nested_data_slots
 assert_slot_order
+last_slot_writer
+```
+
+## The container form of the steps
+
+The steps of a pipeline are a `Tuple` or a vector, as the user gives them. These functions walk the steps and build new containers in that form, so the checks of the constructor allocate nothing on a `Tuple`.
+
+```@docs
+foreach_step
+map_steps
+steps_form
 ```
 
 ## Injection

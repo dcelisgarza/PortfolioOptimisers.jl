@@ -3792,3 +3792,99 @@ end
         @test TimeSeries.colnames(bv) == TimeSeries.colnames(prs.X)[1:1]
     end
 end
+@testset "A Pipeline keeps the container form of its steps (#2200)" begin
+    using Dates, StableRNGs
+    PO = PortfolioOptimisers
+    rdl = ReturnsResult(; nx = ["a", "b", "c"],
+                        X = randn(StableRNG(2200), 40, 3) ./ 100 .+ 0.001,
+                        ts = Date(2024, 1, 1) .+ Day.(0:39))
+    rows(r) = ReturnsResult(; nx = rdl.nx, X = rdl.X[r, :], ts = rdl.ts[r])
+    weights(res) = hcat([p.res.w for p in res.pred]...)
+    iv = InverseVolatility()
+    ew = EqualWeighted()
+    pt = Pipeline(; steps = (CompleteAssetSelector(), "p" => EmpiricalPrior(), iv))
+    pv = Pipeline(; steps = [CompleteAssetSelector(), "p" => EmpiricalPrior(), iv])
+    @testset "the steps, the names and the results keep the form" begin
+        @test isa(pt.steps, Tuple) && pt.names == ("returns", "p", "opt")
+        @test isa(pv.steps, Vector) && pv.names == ["returns", "p", "opt"]
+        @test eltype(pv.steps) == PO.AbstractEstimator
+        rt = fit(pt, rdl)
+        rv = fit(pv, rdl)
+        @test isa(rt.results, Tuple) && isa(rv.results, Vector) && isa(rv.names, Vector)
+        @test rv.w ≈ rt.w
+        @test rv["p"].mu ≈ rt["p"].mu
+        @test predict(rv, rows(31:40)).rd.X ≈ predict(rt, rows(31:40)).rd.X
+        # The positional constructors take the vector form too.
+        pp = Pipeline(["a", "b"], [EmpiricalPrior(), iv])
+        @test isa(pp.steps, Vector) && pp.names == ["a", "b"]
+        res = PipelineResult(; names = ["a", "b"], results = collect(Any, rt.results)[2:3],
+                             ctx = rt.ctx)
+        @test isa(res.results, Vector) && res["b"].w ≈ rt.w
+        # A Pipeline step states its reads as a vector, and keeps it.
+        ps = PipelineStep(; est = EmpiricalPrior(), reads = [:returns], writes = :prior)
+        @test PO.pipe_reads(ps) == [:returns] && isa(ps.reads, Vector{Symbol})
+        @test fit(Pipeline(; steps = [ps, iv]), rdl).w ≈
+              fit(Pipeline(; steps = (ps, iv)), rdl).w
+    end
+    @testset "the online step folds the vector form and keeps the old pipeline" begin
+        qt = partial_fit!(pt, rows(1:30))
+        qv = partial_fit!(pv, rows(1:30))
+        @test isa(qv.steps, Vector)
+        @test isnothing(pv.steps[2].cache) && !isnothing(qv.steps[2].cache)
+        qt = partial_fit!(qt, rows(31:31))
+        qv = partial_fit!(qv, rows(31:31))
+        @test fit(qv).w ≈ fit(qt).w
+        @test isa(fit(qv).results, Vector)
+        # The fold replaces a step of a vector with a step of another type.
+        old = [EmpiricalPrior(), EmpiricalPrior()]
+        s = PO.replace_step(old, iv, 2)
+        @test s[2] === iv &&
+              eltype(s) == PO.AbstractEstimator &&
+              isa(old[2], EmpiricalPrior)
+        @test PO.replace_step((1, 2), "a", 2) === (1, "a")
+        online = OnlineIndexWalkForward(20, 5)
+        @test weights(cross_val_predict(pv, rdl, online)) ≈
+              weights(cross_val_predict(pt, rdl, online))
+    end
+    @testset "a schedule resolves over the vector form" begin
+        wf = IndexWalkForward(20, 5)
+        sched = TimeDependent([isodd(i) ? iv : ew for i in 1:n_splits(wf, rdl)];
+                              default = iv)
+        st = Pipeline(; steps = (EmpiricalPrior(), sched))
+        sv = Pipeline(; steps = [EmpiricalPrior(), sched])
+        @test weights(cross_val_predict(sv, rdl, wf)) ≈
+              weights(cross_val_predict(st, rdl, wf))
+        @test isa(PO.factory(sv, fill(1 / 3, 3)).steps, Vector)
+    end
+    @testset "the checks refuse the vector form as the tuple form" begin
+        for steps in ((EmpiricalPrior(), PricesToReturns(), iv),
+                      [EmpiricalPrior(), PricesToReturns(), iv])
+            # The type prints with its module in some contexts.
+            @test_throws r"invalidating the :prior slot written by an earlier (\w+\.)?EmpiricalPrior step" Pipeline(;
+                                                                                                                    steps = steps)
+        end
+        for steps in ((iv, EmpiricalPrior()), [iv, EmpiricalPrior()])
+            @test_throws r"appears at step 1 of 2" Pipeline(; steps = steps)
+        end
+        for reads in ((:phylogeny,), [:phylogeny])
+            bad = PipelineStep(; est = iv, reads = reads, writes = :opt)
+            @test_throws r"reads the :phylogeny slot" Pipeline(;
+                                                               steps = [EmpiricalPrior(),
+                                                                        bad])
+        end
+        @test_throws r"name \"a\" is repeated" Pipeline(;
+                                                        steps = ["a" => EmpiricalPrior(),
+                                                                 "a" => iv])
+        @test PO.last_slot_writer((:prices, :returns, :prior), :returns, 3) == 2
+        @test isnothing(PO.last_slot_writer((:prices, :returns, :prior), :prior, 3))
+    end
+    @testset "the checks of a tuple of steps allocate nothing" begin
+        allocs(f, s) = (f(s); @allocated f(s))
+        for f in
+            (PO.assert_split_position, PO.assert_opt_last, PO.assert_step_declarations,
+             PO.assert_nested_data_slots, PO.assert_constraint_targets, PO.assert_routable,
+             PO.assert_pipeline_data_benchmark, PO.assert_slot_order)
+            @test allocs(f, pt.steps) == 0
+        end
+    end
+end

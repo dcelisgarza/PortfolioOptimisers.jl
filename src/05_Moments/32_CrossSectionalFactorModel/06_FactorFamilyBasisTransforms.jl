@@ -743,9 +743,9 @@ $(DocStringExtensions.FIELDS)
 # Constructors
 
     UnseenMemberDesignResult(Z::Arr3Num,
-                             P::Union{Tuple{}, AbstractVector{<:Pair{<:Integer, <:AbstractMatrix}}})
+                             P::Union{Tuple{Vararg{Pair{<:Integer, <:AbstractMatrix}}}, AbstractVector{<:Pair{<:Integer, <:AbstractMatrix}}})
     UnseenMemberDesignResult(; Z::Arr3Num,
-                             P::Union{Tuple{}, AbstractVector{<:Pair{<:Integer, <:AbstractMatrix}}} = ())
+                             P::Union{Tuple{Vararg{Pair{<:Integer, <:AbstractMatrix}}}, AbstractVector{<:Pair{<:Integer, <:AbstractMatrix}}} = ())
 
 The positional constructor checks the values. The keyword constructor takes `Z` by name, and `P` with the default `()`, a rule that changes no observation, and calls it.
 
@@ -786,7 +786,8 @@ the observation of each change must be an observation of Z, in 1:3
     """
     P
     function UnseenMemberDesignResult(Z::Arr3Num,
-                                      P::Union{Tuple{},
+                                      P::Union{Tuple{Vararg{Pair{<:Integer,
+                                                                 <:AbstractMatrix}}},
                                                AbstractVector{<:Pair{<:Integer,
                                                                      <:AbstractMatrix}}})
         K = size(Z, 2)
@@ -801,7 +802,7 @@ the observation of each change must be an observation of Z, in 1:3
     end
 end
 function UnseenMemberDesignResult(; Z::Arr3Num,
-                                  P::Union{Tuple{},
+                                  P::Union{Tuple{Vararg{Pair{<:Integer, <:AbstractMatrix}}},
                                            AbstractVector{<:Pair{<:Integer,
                                                                  <:AbstractMatrix}}} = ())::UnseenMemberDesignResult
     return UnseenMemberDesignResult(Z, P)
