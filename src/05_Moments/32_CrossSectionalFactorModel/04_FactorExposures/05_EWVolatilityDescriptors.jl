@@ -354,6 +354,7 @@ Keywords correspond to the struct's fields, except `half_life` and `beta_half_li
 ## Validation
 
   - `mcap` is not empty.
+  - `ce` is mask-aware. Raises an `ArgumentError`, as [`assert_mask_aware_variance`](@ref) states.
   - `0 < beta_decay < 1`.
   - `beta_min_obs >= 1`.
   - `isfinite(mar)`.
@@ -386,7 +387,7 @@ julia> (de.ce.decay ≈ exp2(-inv(5.0)), de.ce.min_obs, de.beta_decay ≈ exp2(-
     """
     mcap
     """
-    Variance estimator whose [`variance_series`](@ref) the Descriptor takes the square root of, over the residual rather than over the return. It carries the recursion, the warm-up and the reset of an asset that turns inactive.
+    Variance estimator whose [`variance_series`](@ref) the Descriptor takes the square root of, over the residual rather than over the return. It carries the recursion, the warm-up and the reset of an asset that turns inactive. It must be mask-aware, because the residual of every asset is `NaN` until its beta exists, as [`assert_mask_aware_variance`](@ref) states.
     """
     ce
     """
@@ -414,6 +415,7 @@ julia> (de.ce.decay ≈ exp2(-inv(5.0)), de.ce.min_obs, de.beta_decay ≈ exp2(-
                                   alg::AbstractMomentAlgorithm, mar::Real,
                                   cache::Option{<:AbstractPartialFitState})
         assert_panel_terms(mcap, :mcap)
+        assert_mask_aware_variance(ce)
         assert_ew_decay(beta_decay)
         assert_nonempty_gt0_finite_val(beta_min_obs, :beta_min_obs)
         assert_finite(mar, :mar)
@@ -433,6 +435,61 @@ function EWResidualVolatility(; mcap::AbstractString = "market_cap", half_life::
                               alg::AbstractMomentAlgorithm = FullMoment(), mar::Real = 0.0,
                               cache::Option{<:AbstractPartialFitState} = nothing)::EWResidualVolatility
     return EWResidualVolatility(mcap, ce, beta_decay, beta_min_obs, alg, mar, cache)
+end
+"""
+    assert_mask_aware_variance(ce::AbstractCovarianceEstimator)
+    assert_mask_aware_variance(ce::Union{RegimeAdjustedExpWeightedVariance,
+                                         RegimeAdjustedExpWeightedCovariance,
+                                         ExpWeightedVariance, ExpWeightedCovariance,
+                                         Covariance{<:Any, <:Any, <:Any, <:Any,
+                                                    <:CoveragePolicy},
+                                         SimpleVariance{<:Any, <:Any, <:Any,
+                                                        <:CoveragePolicy}})
+    assert_mask_aware_variance(ce::WindowedVariance)
+    assert_mask_aware_variance(ce::WindowedCovariance)
+
+Refuses a variance estimator whose [`variance_series`](@ref) over an Asset Panel is not mask-aware, as the `ce` of an [`EWResidualVolatility`](@ref).
+
+[`ew_residual_returns`](@ref) writes `NaN` into the residual of every asset from its first observation until its beta exists. A plain estimator reduces each window of the series to its Coverage Universe, and every window holds the first observation. So no asset is in the Coverage Universe of a window, and every cell of the Descriptor is `NaN`, on every input. A windowed estimator over a plain one raises an `IsEmptyError` on its first window. A mask-aware estimator reads each asset from its first finite residual, so it answers. The configuration alone decides this, so the constructor refuses it.
+
+The admitted estimators are the ones whose series has a mask-aware method of its own: the exponentially weighted and the regime-adjusted families, a [`Covariance`](@ref) or a [`SimpleVariance`](@ref) with a [`CoveragePolicy`](@ref), and a windowed estimator over an admitted one. A [`PortfolioOptimisersCovariance`](@ref) has no such method, so it is refused whatever its inner estimator.
+
+# Arguments
+
+  - `ce`: The variance estimator of the Descriptor.
+
+# Validation
+
+  - `ce` is mask-aware. An `ArgumentError` that names the plain estimator is thrown otherwise.
+
+# Returns
+
+  - `nothing`.
+
+# Related
+
+  - [`EWResidualVolatility`](@ref)
+  - [`ew_residual_returns`](@ref)
+  - [`variance_series(ce::AbstractCovarianceEstimator, X::MatNum, pnl::Option{<:AssetPanel}; dims::Int = 1, kwargs...)`](@ref)
+  - [`CoveragePolicy`](@ref)
+"""
+function assert_mask_aware_variance(ce::AbstractCovarianceEstimator)::Nothing
+    return throw(ArgumentError("the `ce` of an EWResidualVolatility holds a `$(typeof(ce).name.name)`, which is not mask-aware: its variance series reduces each window to its Coverage Universe, and the residual of every asset is `NaN` until its beta exists, so every cell of the Descriptor would be `NaN`. Pass the default `ce`, an `ExpWeightedVariance`, or a `SimpleVariance(; cvg = CoveragePolicy())`."))
+end
+function assert_mask_aware_variance(::Union{RegimeAdjustedExpWeightedVariance,
+                                            RegimeAdjustedExpWeightedCovariance,
+                                            ExpWeightedVariance, ExpWeightedCovariance,
+                                            Covariance{<:Any, <:Any, <:Any, <:Any,
+                                                       <:CoveragePolicy},
+                                            SimpleVariance{<:Any, <:Any, <:Any,
+                                                           <:CoveragePolicy}})::Nothing
+    return nothing
+end
+function assert_mask_aware_variance(ce::WindowedVariance)::Nothing
+    return assert_mask_aware_variance(ce.ve)
+end
+function assert_mask_aware_variance(ce::WindowedCovariance)::Nothing
+    return assert_mask_aware_variance(ce.ce)
 end
 """
     ew_residual_returns(X::AbstractMatrix{<:Real}, rm::AbstractVector{<:Real},

@@ -265,7 +265,7 @@ end
         @test occursin("hold one entry per asset, got 2 and 1",
                        message(() -> po.EWMeanState(; s = [0.0, 0.0], n = [0])))
         @test po.show_fields(EWMean(; decay = 0.5, min_obs = 1)) ==
-              (:decay, :min_obs, :skip, :exponentiate)
+              (:decay, :min_obs, :skip, :exponentiate, :debias)
         # On the carry fold each Descriptor counts as one row, so the carry keeps the rows of
         # the lag alone, and the exposures of every step equal those of the batch fit.
         ew = ["market" => ConstantExposure(),

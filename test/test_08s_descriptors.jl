@@ -3192,6 +3192,31 @@ end
         @test_throws r"beta_half_life" EWResidualDownsideVolatility(; beta_half_life = 0)
         @test_throws r"half_life" EWResidualVolatility(; half_life = -1)
     end
+    @testset "A ce that is not mask-aware is refused, and a mask-aware one answers" begin
+        # The residual of every asset is `NaN` until its beta exists. A plain estimator
+        # reduces each window to its Coverage Universe, which then holds no asset, so the
+        # Descriptor would be `NaN` at every cell (#2223).
+        for ce in (Covariance(), SimpleVariance(), GerberCovariance(),
+                   PortfolioOptimisersCovariance(),
+                   PortfolioOptimisersCovariance(; ce = ExpWeightedCovariance()),
+                   WindowedVariance(; window = 4), WindowedCovariance(; window = 4))
+            @test_throws ArgumentError EWResidualVolatility(; ce = ce)
+            @test_throws r"not mask-aware" EWResidualDownsideVolatility(; ce = ce)
+        end
+        pol = CoveragePolicy()
+        Xl = 0.01 .* randn(StableRNGs.StableRNG(2223), 40, 3)
+        rdl = ewb_hand_panel(Xl, ones(40, 3))
+        for ce in (SimpleVariance(; cvg = pol), Covariance(; cvg = pol),
+                   ExpWeightedVariance(; min_obs = 3), ExpWeightedCovariance(; min_obs = 3),
+                   RegimeAdjustedExpWeightedCovariance(; min_obs = 3),
+                   WindowedVariance(; ve = SimpleVariance(; cvg = pol), window = 4),
+                   WindowedCovariance(; ce = Covariance(; cvg = pol), window = 4))
+            D = descriptor(EWResidualVolatility(; half_life = 2, beta_half_life = 3,
+                                                beta_min_obs = 2, ce = ce), rdl)
+            @test all(isnan, D[1:2, :])
+            @test all(isfinite, D[5:end, :])
+        end
+    end
 end
 
 @testset "EW beta descriptors: constructors and their refusals" begin
