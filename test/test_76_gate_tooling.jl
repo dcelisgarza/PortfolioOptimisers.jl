@@ -89,7 +89,7 @@ function commit(dir::AbstractString, msg::AbstractString)
 end
 
 """
-A repository with a `trunk` branch that plays `origin/dev`, and a `work` branch that changed
+A repository with a `trunk` branch that plays `origin/main`, and a `work` branch that changed
 `src/a/one.jl` and holds the untracked `src/a/new.jl`.
 """
 function fixture_repo()
@@ -308,8 +308,8 @@ end
 
         @test first(stamp(dir, "record", "jet")) == 0
         @test readchomp(stamps) == "jet\t$c0"
-        push = (; PRE_COMMIT_FROM_REF = c2, PRE_COMMIT_TO_REF = c1,
-                PRE_COMMIT_REMOTE_BRANCH = "refs/heads/dev")
+        push = (; GATE_STAMP_REF = c2, PRE_COMMIT_TO_REF = c1,
+                PRE_COMMIT_REMOTE_BRANCH = "refs/heads/agents/work")
 
         # `trunk` moved in `src/b/`, which the branch does not touch.
         @test first(stamp(dir, "check"; push...)) == 0
@@ -321,22 +321,30 @@ end
         put(dir, "src/a/three.jl", "three = 3\n")
         c3 = commit(dir, "c3")
         git(dir, "checkout", "-q", "work")
-        code, out = stamp(dir, "check"; push..., PRE_COMMIT_FROM_REF = c3)
+        code, out = stamp(dir, "check"; push..., GATE_STAMP_REF = c3)
         @test code == 1
         @test occursin("jet, measured on $(c0[1:10])", out)
         @test occursin("src/a/three.jl", out)
         @test !occursin("src/b/two.jl", out)
 
-        # The guard protects `dev` alone, and a plain run reads HEAD against the ref.
-        @test first(stamp(dir, "check"; push..., PRE_COMMIT_FROM_REF = c3,
+        # The guard protects the feature branches of ADR 0240 alone, and a plain run reads HEAD
+        # against the ref.
+        @test first(stamp(dir, "check"; push..., GATE_STAMP_REF = c3,
                           PRE_COMMIT_REMOTE_BRANCH = "refs/heads/other")) == 0
+        @test first(stamp(dir, "check"; push..., GATE_STAMP_REF = c3,
+                          PRE_COMMIT_REMOTE_BRANCH = "refs/heads/dev")) == 0
         @test first(stamp(dir, "check")) == 1
+        # The first push of a feature branch has no remote tip. The guard reads the tip of the
+        # ref, so it checks that push too, at any depth of the branch name.
+        @test first(stamp(dir, "check"; push..., GATE_STAMP_REF = c3,
+                          PRE_COMMIT_FROM_REF = "0"^40,
+                          PRE_COMMIT_REMOTE_BRANCH = "refs/heads/agents/2205/work")) == 1
 
         # A gate run again on the rebased tree is current.
         git(dir, "rebase", "-q", "trunk")
         @test first(stamp(dir, "record", "jet")) == 0
         head = git(dir, "rev-parse", "HEAD")
-        @test first(stamp(dir, "check"; push..., PRE_COMMIT_FROM_REF = c3,
+        @test first(stamp(dir, "check"; push..., GATE_STAMP_REF = c3,
                           PRE_COMMIT_TO_REF = head)) == 0
 
         # A file both sides change, outside `src/`, trips the guard too.
@@ -347,7 +355,7 @@ end
         put(dir, "test/t.jl", "t = 2\n")
         c5 = commit(dir, "c5")
         git(dir, "checkout", "-q", "work")
-        code, out = stamp(dir, "check"; push..., PRE_COMMIT_FROM_REF = c5,
+        code, out = stamp(dir, "check"; push..., GATE_STAMP_REF = c5,
                           PRE_COMMIT_TO_REF = head)
         # Both gates measured `c3`, and the branch changes the file `c5` changed.
         @test code == 1
@@ -361,7 +369,7 @@ end
         @test last(stamp(dir, "list")) == "jet\t$c3\n"
         @test first(stamp(dir, "drop", "jet")) == 0
         @test last(stamp(dir, "list")) == ""
-        @test first(stamp(dir, "check"; push..., PRE_COMMIT_FROM_REF = c5,
+        @test first(stamp(dir, "check"; push..., GATE_STAMP_REF = c5,
                           PRE_COMMIT_TO_REF = head)) == 0
         @test first(stamp(dir, "bogus")) == 2
     end
@@ -373,16 +381,16 @@ end
         put(dir, "src/a/three.jl", "three = 3\n")
         c3 = commit(dir, "c3")
         git(dir, "checkout", "-q", "work")
-        code, out = stamp(dir, "check"; PRE_COMMIT_FROM_REF = c3, PRE_COMMIT_TO_REF = c1,
-                          PRE_COMMIT_REMOTE_BRANCH = "refs/heads/dev")
+        code, out = stamp(dir, "check"; GATE_STAMP_REF = c3, PRE_COMMIT_TO_REF = c1,
+                          PRE_COMMIT_REMOTE_BRANCH = "refs/heads/agents/work")
         @test code == 1
         @test occursin("code_health/gate_stamp.sh drop jet size", out)
     end
 
     @testset "a push that changes src/ needs the required gates or a waiver" begin
         dir, c0, c1, c2 = fixture_repo()
-        push = (; PRE_COMMIT_FROM_REF = c2, PRE_COMMIT_TO_REF = c1,
-                PRE_COMMIT_REMOTE_BRANCH = "refs/heads/dev",
+        push = (; GATE_STAMP_REF = c2, PRE_COMMIT_TO_REF = c1,
+                PRE_COMMIT_REMOTE_BRANCH = "refs/heads/agents/work",
                 GATE_STAMP_REQUIRED = "jet doctest")
         # No stamp at all: both gates are absent.
         code, out = stamp(dir, "check"; push...)
@@ -401,7 +409,7 @@ end
         @test first(stamp(dir, "waive", "doctest")) == 2
         # A push that changes nothing under src/ or ext/ needs no gate.
         dir2, d0, _, d2 = fixture_repo()
-        @test first(stamp(dir2, "check"; push..., PRE_COMMIT_FROM_REF = d2,
+        @test first(stamp(dir2, "check"; push..., GATE_STAMP_REF = d2,
                           PRE_COMMIT_TO_REF = d0)) == 0
     end
 
@@ -427,9 +435,9 @@ end
     end
 
     @testset "the push guard demands only the gates a change reaches" begin
-        guard(dir, from, to) = stamp(dir, "check"; PRE_COMMIT_FROM_REF = from,
+        guard(dir, from, to) = stamp(dir, "check"; GATE_STAMP_REF = from,
                                      PRE_COMMIT_TO_REF = to,
-                                     PRE_COMMIT_REMOTE_BRANCH = "refs/heads/dev",
+                                     PRE_COMMIT_REMOTE_BRANCH = "refs/heads/agents/work",
                                      GATE_STAMP_REQUIRED = "jet doctest coverage")
         demand(text) = guard(reach_repo(text)...)
         @test demand(reach_text(; doc = "Other prose.")) == (0, "")
@@ -477,9 +485,8 @@ end
             change()
             from = commit(dir, "a sibling change")
             git(dir, "checkout", "-q", "work")
-            _, out = stamp(dir, "check"; PRE_COMMIT_FROM_REF = from,
-                           PRE_COMMIT_TO_REF = head,
-                           PRE_COMMIT_REMOTE_BRANCH = "refs/heads/dev")
+            _, out = stamp(dir, "check"; GATE_STAMP_REF = from, PRE_COMMIT_TO_REF = head,
+                           PRE_COMMIT_REMOTE_BRANCH = "refs/heads/agents/work")
             return Set(m.captures[1] for m in eachmatch(r"^  (\S+), measured on"m, out))
         end
         # A page of prose stales the prose gate, the test files and the full doctest run, and
@@ -502,16 +509,16 @@ end
         dir, c0, c1, c2 = fixture_repo()
         @test first(stamp(dir, "record", "jet")) == 0
         # The guard lets the push of `c1` through and remembers it. `trunk` then holds `c1`.
-        @test first(stamp(dir, "check"; PRE_COMMIT_FROM_REF = c0, PRE_COMMIT_TO_REF = c1,
-                          PRE_COMMIT_REMOTE_BRANCH = "refs/heads/dev")) == 0
+        @test first(stamp(dir, "check"; GATE_STAMP_REF = c0, PRE_COMMIT_TO_REF = c1,
+                          PRE_COMMIT_REMOTE_BRANCH = "refs/heads/agents/work")) == 0
         @test occursin(c1, read(joinpath(dir, ".git", "gate_pushed"), String))
         git(dir, "checkout", "-q", "trunk")
         git(dir, "reset", "-q", "--hard", c1)
         git(dir, "checkout", "-q", "work")
         put(dir, "src/a/one.jl", "one = 111\n")
         c6 = commit(dir, "c6 on work")
-        push = (; PRE_COMMIT_FROM_REF = c1, PRE_COMMIT_TO_REF = c6,
-                PRE_COMMIT_REMOTE_BRANCH = "refs/heads/dev")
+        push = (; GATE_STAMP_REF = c1, PRE_COMMIT_TO_REF = c6,
+                PRE_COMMIT_REMOTE_BRANCH = "refs/heads/agents/work")
         # `trunk` moved from `c0` to `c1` in `src/a/one.jl`, the file `c6` changes, but the move is
         # this worktree's own push.
         @test first(stamp(dir, "check"; push...)) == 0
@@ -531,8 +538,8 @@ end
         put(dir, "code_health/sweep_manifest.toml", "a = 2\n")
         c7 = commit(dir, "ledgers on trunk")
         git(dir, "checkout", "-q", "work")
-        code, out = stamp(dir, "check"; PRE_COMMIT_FROM_REF = c7, PRE_COMMIT_TO_REF = head,
-                          PRE_COMMIT_REMOTE_BRANCH = "refs/heads/dev")
+        code, out = stamp(dir, "check"; GATE_STAMP_REF = c7, PRE_COMMIT_TO_REF = head,
+                          PRE_COMMIT_REMOTE_BRANCH = "refs/heads/agents/work")
         @test code == 1
         @test occursin("prose, measured on", out)
         @test occursin("test/test_45_sweep_census.jl, measured on", out)

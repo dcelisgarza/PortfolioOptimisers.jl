@@ -48,16 +48,13 @@ jobs:
     if: github.repository == 'dcelisgarza/PortfolioOptimisers.jl'
     runs-on: ubuntu-latest
     steps:
-      # The job reads `dev`, because `dev` is where an addition lands and where `code_health/sweep_manifest.toml`
-      # is current. The workflow file itself must reach `main` for the schedule to fire at all,
-      # which is GitHub's rule and not a choice here.
+      # The job reads `main`, the default branch, because each addition lands there through its own
+      # pull request, and there `code_health/sweep_manifest.toml` is current (ADR 0240).
       #
       # `fetch-depth: 0` is NOT needed. `CodeHealth.yml` fetches the full history because its refile
       # clause reads a baseline row at a past commit. This job's trigger is a flag in the checked-out
       # tree, so the default shallow clone answers everything it asks.
       - uses: actions/checkout@v7
-        with:
-          ref: dev
       - name: Read the Julia pin from the Manifest
         id: pin
         run: |

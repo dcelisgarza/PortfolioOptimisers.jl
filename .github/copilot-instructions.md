@@ -84,7 +84,7 @@ PortfolioOptimisers.jl is a Julia package for portfolio optimization and risk ma
 
   - Write each commit message in the imperative mood, and say what the commit changes.
   - Keep each commit atomic.
-  - A session in this checkout rebases onto `dev` and pushes `dev`, as [`CLAUDE.md`](../CLAUDE.md) § *Parallel sessions* states.
+  - A session in this checkout pushes one `agents/<issue>-<slug>` branch from `origin/main` for each feature, and opens one pull request into `main` that merges by squash under auto-merge, as [`CLAUDE.md`](../CLAUDE.md) § *Parallel sessions* and ADR 0240 state.
   - An outside contributor who works from a fork rebases onto `upstream/main` before a PR, as [`docs/src/contribute/2-developer.md`](../docs/src/contribute/2-developer.md) states.
 - **Releases.**
 

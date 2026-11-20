@@ -13,8 +13,8 @@ repos:
         entry: found Copier update rejection files; review them and remove them
         language: fail
         files: "\\.rej$"
-      # Refuse a push to dev when dev moved under a gate after it measured the tree. It acts only
-      # in a worktree under .claude/worktrees/. See code_health/gate_stamp.sh.
+      # Refuse a push to a feature branch, agents/*, when main moved under a gate after it measured
+      # the tree. It acts only in a worktree under .claude/worktrees/. See code_health/gate_stamp.sh.
       - id: gate-stamps
         name: gate stamps are current against the push target
         entry: bash code_health/gate_stamp.sh check

@@ -90,7 +90,7 @@ directory to measure, such as `<worktree>/src/16_RiskMeasures`, because Julia co
 under it. A scratch directory holds no source file, so the run prints no `COVERAGE` line at all.
 
 The run then prints one `PATCH` line for each `.jl` file under `src/` or `ext/` that the working
-tree changes against its merge-base with `origin/dev`, with the added lines that CI reads as a miss,
+tree changes against its merge-base with `origin/main`, with the added lines that CI reads as a miss,
 by the rule of the `COVERAGE` line (#1912). A changed file that no test loaded has no counter, so
 each body line that it adds is a miss. When every file ran whole and green, every
 changed file lies under `<dir>`, and no added line is a miss, the run records the `coverage` stamp
@@ -723,12 +723,12 @@ git_text(args...) = readchomp(Cmd(`git $args`; dir = REPO_ROOT))
     patch_report(dir, tags) -> (lines, clean)
 
 One `PATCH` line for each `.jl` file under `src/` or `ext/` that the working tree changes against
-its merge-base with `origin/dev` (`GATE_STAMP_REF`), with the added lines that CI reads as a miss.
+its merge-base with `origin/main` (`GATE_STAMP_REF`), with the added lines that CI reads as a miss.
 `tags` maps a path relative to the repository to its [`coverage_tags`](@ref). `clean` is true when
 every changed file lies under `dir` and no added line is a miss.
 """
 function patch_report(dir::AbstractString, tags::AbstractDict)
-    ref = get(ENV, "GATE_STAMP_REF", "origin/dev")
+    ref = get(ENV, "GATE_STAMP_REF", "origin/main")
     base = try
         git_text("merge-base", ref, "HEAD")
     catch

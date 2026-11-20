@@ -10,10 +10,10 @@
 #     code_health/gate_stamp.sh reach                   the gates the change of the worktree reaches
 #     code_health/gate_stamp.sh check                   the pre-push guard of .pre-commit-config.yaml
 #
-# A gate measures a tree: the merge-base of the branch with origin/dev, plus the branch. When a
-# sibling commit lands on origin/dev and the branch rebases onto it, the tree changes, and a gate
+# A gate measures a tree: the merge-base of the branch with origin/main, plus the branch. When a
+# sibling commit lands on origin/main and the branch rebases onto it, the tree changes, and a gate
 # measured before the rebase measured a program nobody will ship. `check` refuses the push when
-# origin/dev changed, after a gate measured the tree, a file the branch also changes, or a file in
+# origin/main changed, after a gate measured the tree, a file the branch also changes, or a file in
 # the same directory under src/ or ext/. Re-run the gates it names on the rebased tree, or `drop`
 # the stamp of a gate the change cannot reach. Run `check` by hand after each rebase: it answers
 # before the push does.
@@ -38,7 +38,7 @@
 #     and a change to the code need the doctest stamp, and a changed literal does not need `jet`.
 #     `waive` records the reason a gate does not apply.
 #   - The doctest stamp is the scoped one, `doctest-files`, as JET and the other gates take a
-#     scoped run. `docs/doctest_files.jl --against origin/dev` runs the blocks of the changed
+#     scoped run. `docs/doctest_files.jl --against origin/main` runs the blocks of the changed
 #     files, and the full run of `--all` covers it too. A change can alter what a block of another
 #     file prints. The doctest job of CI runs every block and stays the gate for that case.
 #   - `coverage` is required of a `code` change alone. `test/run_files.jl --coverage=<dir>` records
@@ -52,17 +52,18 @@
 #
 # Stamps live in the git directory of the worktree, so each worktree has its own and none is
 # committed. The guard acts only in a worktree under `.claude/worktrees/`, where parallel sessions
-# work. The `dev` checkout of the maintainer records and checks nothing.
+# work. The checkout of the maintainer records and checks nothing.
 #
 # Environment:
-#   GATE_STAMP_REF       the ref a gate is measured against. Default: origin/dev.
-#   GATE_STAMP_BRANCH    the remote branch the guard protects. Default: refs/heads/dev.
+#   GATE_STAMP_REF       the ref a gate is measured against. Default: origin/main.
+#   GATE_STAMP_BRANCH    a glob of the remote branches the guard protects, the feature branches
+#                        of ADR 0240. Default: refs/heads/agents/*.
 #   GATE_STAMP_REQUIRED  the gates a push that changes src/ or ext/ needs. Default:
 #                        "jet size complexity perf doctest coverage". The tests set it empty.
 #   GATE_STAMP_FORCE     any value acts outside .claude/worktrees/ too. The tests use it.
-#   PRE_COMMIT_FROM_REF, PRE_COMMIT_TO_REF, PRE_COMMIT_REMOTE_BRANCH
-#                        set by pre-commit for a pre-push hook: the remote tip, the pushed tip,
-#                        and the branch pushed to.
+#   PRE_COMMIT_TO_REF, PRE_COMMIT_REMOTE_BRANCH
+#                        set by pre-commit for a pre-push hook: the pushed tip and the branch
+#                        pushed to.
 
 set -euo pipefail
 
@@ -78,7 +79,7 @@ gitdir=$(git rev-parse --absolute-git-dir)
 stamps="$gitdir/gate_stamps"
 waivers="$gitdir/gate_waivers"
 pushed="$gitdir/gate_pushed"
-ref=${GATE_STAMP_REF:-origin/dev}
+ref=${GATE_STAMP_REF:-origin/main}
 required=${GATE_STAMP_REQUIRED-jet size complexity perf doctest coverage}
 
 acts() {
@@ -278,20 +279,27 @@ moved_files() {
         sort -u
 }
 
-# Refuse the push when a stamp's base and the remote tip differ in a file the push changes, or in a
-# src/ or ext/ directory the push changes, or when a push that changes src/ or ext/ lacks a stamp of
-# a required gate. A plain run, outside pre-commit, checks HEAD against the ref.
+# Refuse the push when a stamp's base and the tip of the ref differ in a file the push changes, or in
+# a src/ or ext/ directory the push changes, or when a push that changes src/ or ext/ lacks a stamp
+# of a required gate. A plain run, outside pre-commit, checks HEAD against the ref.
+#
+# The tip that counts is the tip of the ref, the branch the pull request merges into, and not the
+# remote tip of the pushed branch. The pushed branch is the session's own, and its first push has
+# no remote tip at all.
 check() {
     acts || return 0
-    local protected=${GATE_STAMP_BRANCH:-refs/heads/dev}
-    [ "${PRE_COMMIT_REMOTE_BRANCH:-$protected}" = "$protected" ] || return 0
-    local from=${PRE_COMMIT_FROM_REF:-$(git rev-parse "$ref")}
-    local to=${PRE_COMMIT_TO_REF:-$(git rev-parse HEAD)}
-    # A new remote branch has no tip, and a tip this clone has not fetched makes the push a
-    # non-fast-forward that git refuses by itself.
-    case "$from" in
-    0000000000000000000000000000000000000000) return 0 ;;
-    esac
+    local protected=${GATE_STAMP_BRANCH:-refs/heads/agents/*}
+    if [ -n "${PRE_COMMIT_REMOTE_BRANCH:-}" ]; then
+        # The pattern is unquoted, so `case` reads it as a glob.
+        # shellcheck disable=SC2254
+        case "$PRE_COMMIT_REMOTE_BRANCH" in
+        $protected) ;;
+        *) return 0 ;;
+        esac
+    fi
+    local from to
+    from=$(git rev-parse "$ref")
+    to=${PRE_COMMIT_TO_REF:-$(git rev-parse HEAD)}
     git cat-file -e "$from^{commit}" 2>/dev/null || return 0
 
     # The branch's own files run from the merge-base, so a branch not yet rebased does not count
@@ -337,7 +345,7 @@ check() {
                 fi
             done)
             if [ -n "$hit" ]; then
-                stale+="  $gate, measured on ${base:0:10}. Since then origin/dev changed:"$'\n'
+                stale+="  $gate, measured on ${base:0:10}. Since then $ref changed:"$'\n'
                 stale+=$(printf '%s\n' "$hit" | sed 's/^/      /')$'\n'
                 names+=" $gate"
             fi

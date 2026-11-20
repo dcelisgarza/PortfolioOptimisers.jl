@@ -1795,7 +1795,7 @@ is in the set. Every row they drop is named in `foreign`.
 A key outside [`MEASURED_ROOTS`](@ref), such as a macro name of `code_health/expansion.jl`, is
 always in scope. A scoped run never hides a row it cannot attribute to a file.
 
-The scope serves a branch on a busy map, where a baseline lags `origin/dev` and a plain `check`
+The scope serves a branch on a busy map, where a baseline lags `origin/main` and a plain `check`
 reports rows that other commits raised. It is not a verdict. A rise in a file the branch did not
 touch can still be the branch's own: a JET report moves to a caller in another file, and a
 Declaration Macro raises the files that call it. So a scoped run prints every foreign row by name,
@@ -1844,7 +1844,7 @@ end
 Every path the branch changes against `ref`: the commits since the merge-base, the staged and
 unstaged edits, and the untracked files. A deleted or renamed file is named by its old path too.
 
-The diff starts at the merge-base, not at `ref`. A sibling ticket that lands on `origin/dev` after
+The diff starts at the merge-base, not at `ref`. A sibling ticket that lands on `origin/main` after
 this branch started moves `ref`, and a diff against `ref` itself names every file the sibling
 changed as a change of this branch.
 """
@@ -1925,7 +1925,7 @@ end
     record_gate(name; root = REPO_ROOT)
 
 Record that the gate of the baseline `name` measured this tree, for the push guard of
-`code_health/gate_stamp.sh`. The guard refuses a push when `origin/dev` changed a file of the
+`code_health/gate_stamp.sh`. The guard refuses a push when `origin/main` changed a file of the
 branch after a gate measured it, because that gate measured a tree nobody will ship.
 
 The stamp is a convenience of a local worktree. A failure to write it, on CI or with no `git`,
@@ -1963,7 +1963,7 @@ usage: <tool>.jl check | refresh | refresh --accept-rise
        ... [--against <ref> | --files <path>...]
 
   --against <ref>      answer only for the files this branch changes since its merge-base with
-                       <ref>, such as origin/dev. Every other row is named and does not fail.
+                       <ref>, such as origin/main. Every other row is named and does not fail.
   --files <path>...    answer only for the paths named.
 
 A scoped refresh records the rows in scope and keeps every other row as the baseline has it."""

@@ -73,7 +73,7 @@ The ruleset "Protect Main" targets `~DEFAULT_BRANCH`, which is `main`. It holds 
 | `deletion` | Nobody can delete `main`. |
 | `non_fast_forward` | Nobody can force-push `main`. |
 | `pull_request` | A change reaches `main` only through a pull request. No approval is needed. |
-| `required_status_checks` | A merge waits for the push checks below on the head of the pull request. The head must contain `main`. |
+| `required_status_checks` | A merge waits for the push checks below on the head of the pull request. The head need not contain `main` (ADR 0240). |
 | `code_scanning` | A merge waits for the CodeQL result. An error alert or a security alert blocks it. |
 
 The ruleset has no `update` rule and no bypass actor. With no bypass actor, an `update` rule refuses
@@ -102,22 +102,26 @@ The push trigger of `JET.yml` has no `paths:` filter. With the filter, a push to
 JET path leaves the head with no `JET - push` check, and the merge waits forever. From 2026-10-22 to
 2026-10-26, the filter skipped 4 of 117 pushes to `dev`. The pull-request trigger keeps its filter.
 
-The rule requires the head of the pull request to contain `main`. Then the merge commit has the
-tree of the head, so the push runs test the tree that the merge writes.
+The rule does not require the head of the pull request to contain `main`. A required current
+base makes each merge restart the CI of every other open pull request, and ADR 0240 lands each
+feature through its own pull request. The push run on `main` after the merge tests the tree that
+the merge writes.
 
 ## Consequences
 
 - One push to `dev` runs each check once while a pull request from `dev` is open. The one
   exception is the `Documentation` job of `Docs.yml`, which runs twice: the push run builds the
   docs, and the pull-request run builds them again to deploy the preview.
-- No run tests the merge commit of a pull request from `dev*` or `agents/**`. This is the trade that
-  the maintainer chose over a second run of each check (#1783, option 1). Into `main`, the rule
-  that the head contains `main` closes the gap: the push runs test the tree of the merge.
+- No run tests the merge commit of a pull request from `dev*` or `agents/**` before the merge.
+  This is the trade that the maintainer chose over a second run of each check (#1783, option 1).
+  The push run on `main` tests the tree of the merge after it, and ADR 0240 states what a red
+  run on `main` asks for.
 - No push trigger of these eight workflows carries a `paths:` filter, so each push to `dev` gives
   its head every check of the table.
 - A pull request into `main` from a fork cannot merge. No push run reaches its head. A change from a
-  fork goes into `dev` first.
-- A cancelled push run on the head of `dev` blocks the merge into `main` until it runs again.
+  fork goes onto an `agents/` branch of this repository first.
+- A cancelled push run on the head of a pull request blocks its merge into `main` until it runs
+  again.
 - `Link checker - push` reads external links, so an external site that is down blocks the merge.
 - A new workflow that triggers on both `push` and `pull_request` takes the same condition on each of
   its jobs. A new job that a merge into `main` must wait for carries the event in its name, and its

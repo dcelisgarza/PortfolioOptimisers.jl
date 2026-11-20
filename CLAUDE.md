@@ -24,11 +24,16 @@ name.
 
 ## Parallel sessions
 
-- **Work in your own worktree.** Create it with the `EnterWorktree` tool before your first edit.
-  Commit there, rebase onto `dev`, merge into the local `dev` as a fast-forward, and push `dev` to
-  `origin`, never the worktree branch. Then leave with `ExitWorktree` `remove`. Its commit count
-  compares with `main`, so it always reports hundreds of commits. When `git status --short` is
-  empty and `git branch -r --contains HEAD` lists `origin/dev`, pass `discard_changes: true`.
+- **Work in your own worktree, and land it through its own pull request** (ADR 0240). Create the
+  worktree with the `EnterWorktree` tool before your first edit. It starts at `origin/main`.
+  Commit there, and push the branch as `agents/<issue>-<slug>`, with
+  `git push origin HEAD:agents/<issue>-<slug>`. The push runs the CI. Open one pull request into
+  `main`, and turn on auto-merge with `gh pr merge <number> --auto --squash`. A pull request that
+  needs a ruling of the maintainer opens as a draft, with no auto-merge. Then leave with
+  `ExitWorktree` `remove`. When `git status --short` is empty and `git branch -r --contains HEAD`
+  lists the remote copy of your branch, pass `discard_changes: true`.
+- **Keep a pull request to one feature or one fix.** A second feature is a second branch from
+  `origin/main`. A rebase is necessary only when GitHub shows a conflict with `main`.
 - **Never commit a change you did not make.** Check `git status`, and stage the files you edited
   by name, never with `git add -A`.
 - **Do not edit a file at the same time as another session.** The session that finishes last
@@ -104,13 +109,15 @@ steps 3 and 4. Defer a feature whose design is not settled, as `sweep-conform` s
   comment that cites a source file of another repository names the package, the commit and the
   path in prose. `test/test_64_docs_page_metadata_census.jl` fails on a link to an external
   repository.
-- **A session that works an issue commits without being asked.** It commits, rebases and pushes
-  `dev` as § *Parallel sessions* states. Any other session commits only when asked.
+- **A session that works an issue commits without being asked.** It commits, pushes its branch
+  and opens its pull request as § *Parallel sessions* states. Any other session commits only when
+  asked.
 - **Assign the issue to your `gh` account before your first edit**, with
   `gh issue edit <number> --add-assignee @me`. An issue that you fix, close, or leave open with a
   part of the work done carries your account.
-- **Close the issue yourself after the commit that resolves it**, for every kind of issue: a
+- **The merge of the pull request closes the issue that it resolves**, for every kind of issue: a
   defect, a feature, a sweep sub-issue, a map. Name the issue in the commit message, for example
-  `Fix #493: …`. Close it with `gh issue close <number> --comment "…"` that names the commit. A
-  closing keyword acts only when the commit reaches `main`, the default branch. Leave the issue
-  open while a part of the work remains.
+  `Fix #493: …`, and write `Closes #493` in the body of the pull request. A squash merge puts
+  every commit message into the commit on `main`, and a closing keyword there closes the issue.
+  So a commit of a part of the work names `Part of #493: …`, with no closing keyword, and the
+  issue stays open while a part of the work remains.

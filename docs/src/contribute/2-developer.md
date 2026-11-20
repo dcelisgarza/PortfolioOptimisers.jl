@@ -133,6 +133,15 @@ We try to keep a linear history in this repo, so it is important to keep your br
 
 - Then you can open a pull request and work with the reviewer to address any issues.
 
+### How a change reaches `main`
+
+Each feature or fix reaches `main` through its own pull request, and the pull request merges by squash. The decision is ADR 0240.
+
+- A branch of this repository is named `agents/<issue>-<slug>`. A push to it runs the full CI, and the pull request shows those checks. A merge into `main` waits for them (ADR 0220).
+- A branch of a fork gets no push checks in this repository, so its pull request cannot merge. The maintainer pushes the branch of a fork to an `agents/` branch here, and the pull request from that branch merges.
+- The base of a pull request need not be current. Rebase only when GitHub shows a conflict with `main`.
+- Write `Closes #<issue>` in the body of the pull request. The merge closes the issue.
+
 ## When a code-health gate turns red
 
 Two checks hold the numbers that [issue #250](https://github.com/dcelisgarza/PortfolioOptimisers.jl/issues/250)
@@ -244,9 +253,11 @@ The same workflow keeps the documentation of the five newest minor series online
 
 ## Making a new release
 
+A release can come from any commit of `main` whose push checks are green. It can follow each feature, or a set of features (ADR 0240). Never register a commit whose checks are red.
+
 To create a new release, you can follow these simple steps:
 
-- Create a branch `release-x.y.z`
+- Create a branch `agents/release-x.y.z` from `origin/main`. A branch outside `agents/` gets no push checks, and its pull request cannot merge.
 
 - Update `version` in `Project.toml`
 - Create a commit "Release vx.y.z", push, create a PR, wait for it to pass, merge the PR.

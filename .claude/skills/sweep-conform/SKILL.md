@@ -1,6 +1,6 @@
 ---
 name: sweep-conform
-description: "Make an addition under src/ or ext/ conform to the sweep of #404 before the commit: the manifest row, the unit count, the child map, the coverage entry, the include line, the gate baseline rows, the size headroom, and the two tracker steps no Julia test can reach. Then land the branch in the order that survives a busy dev. Use after adding or changing any file under src/ or ext/, before committing, and before pushing to dev."
+description: "Make an addition under src/ or ext/ conform to the sweep of #404 before the commit: the manifest row, the unit count, the child map, the coverage entry, the include line, the gate baseline rows, the size headroom, and the two tracker steps no Julia test can reach. Then land the branch in the order that survives a busy main, through its own pull request (ADR 0240). Use after adding or changing any file under src/ or ext/, before committing, and before pushing a feature branch."
 ---
 
 # Conforming to the sweep
@@ -20,7 +20,7 @@ issue is worse than no answer. Other forms:
 
 | Command | What it checks |
 | --- | --- |
-| `sweep_check.jl` | the files that differ from `origin/dev`, plus the untracked ones |
+| `sweep_check.jl` | the files that differ from `origin/main`, plus the untracked ones |
 | `sweep_check.jl --base <ref>` | the same, against a ref you name |
 | `sweep_check.jl --file <path>` | one path, whatever the diff says |
 | `sweep_check.jl --all` | every file in `code_health/sweep_manifest.toml`, as a survey |
@@ -127,9 +127,10 @@ ADR changes a fourth. That rule matters most for these files:
 
 A ratchet is one number for the whole library. Two sessions that each lower it write two different
 numbers, and a merge keeps one of them. Lower a ratchet in the commit that does the work it counts.
-Rebase before you merge, so that you lower the number that is current.
+When `main` changed the ratchet after your branch started, rebase, so that you lower the number
+that is current. GitHub shows the conflict on the pull request.
 
-Sibling tickets land on `dev` while your gates run. A rebase makes a gate or a test stale only
+Sibling pull requests land on `main` while your gates run. A rebase makes a gate or a test stale only
 when the commits that it brings in change a file that the gate or the test reads. A fast gate that
 goes red makes you edit `src/`, and an edit makes every slow run stale. So run the gates in order
 of cost, the fast ones first, and the slow ones once, on the tree you will push:
@@ -137,9 +138,9 @@ of cost, the fast ones first, and the slow ones once, on the tree you will push:
 1. Format the files you changed: `pre-commit run julia-formatter --files <changed .jl>`. A
    reformat moves the line counts that the size gate reads.
 2. Run `sweep_check.jl --fetch`. Then run the fast gates scoped to your files, one call for each
-   gate: `julia --project=code_health code_health/<gate>.jl check --against origin/dev` for size,
+   gate: `julia --project=code_health code_health/<gate>.jl check --against origin/main` for size,
    complexity, perf and expansion. A scoped run names the foreign rows and does not fail on them.
-   A foreign row that is red on `dev` is a defect. File it once.
+   A foreign row that is red on `main` is a defect. File it once.
    Run the forward survey on each `src/` or `ext/` file that you changed, in one call:
    `julia --project=code_health code_health/forward_survey.jl <file> <file> …`. It parses the
    tree in about ten seconds and loads no package. Each finding carries the verdict of a ruling
@@ -186,11 +187,13 @@ of cost, the fast ones first, and the slow ones once, on the tree you will push:
    Run `bash code_health/gate_stamp.sh reach`. It parses your changed files in about a second,
    and names the gates the change reaches. When it names `doctest-files`, check the doctests of
    your files the same way. A green run records the stamp that the push guard asks for:
-   `julia -t 1 --project=docs docs/doctest_files.jl --against origin/dev`.
-6. `git fetch origin dev`. If `git log --oneline HEAD..origin/dev` is not empty, rebase now, then
-   run `bash code_health/gate_stamp.sh check`. It names the stamps that the rebase made stale.
+   `julia -t 1 --project=docs docs/doctest_files.jl --against origin/main`.
+6. `git fetch origin main`, then run `bash code_health/gate_stamp.sh check`. It names the stamps
+   that `main` made stale in the files and the `src/` directories that your branch changes. If it
+   names none, do not rebase: the merge applies your change to the new `main`, and every stamp
+   still holds. If it names one, rebase onto `origin/main` now.
    **Rerun only a stale stamp that your change reaches, and no other test or gate.** Read what
-   the new commits change with `git diff --stat <old base>..origin/dev`. Commits that change only
+   the new commits change with `git diff --stat <old base>..origin/main`. Commits that change only
    docs (`.md` pages, ADRs, `GLOSSARY.md`, docstring prose outside a `jldoctest` block) make no
    gate stale, so rerun nothing. Record the required stamps on the new base with
    `gate_stamp.sh record <gate>...`, and paste the `drop` line for the test stamps. Do not rerun a
@@ -201,13 +204,15 @@ of cost, the fast ones first, and the slow ones once, on the tree you will push:
    way, for `jet`. Run the full doctests (the `run-doctests` skill) when your change alters what a
    block of another file prints. A change to docstring prose reaches neither, and the push needs
    neither.
-8. Commit, fetch, and rebase again if `dev` moved. Run `gate_stamp.sh check` again, then push with
-   `git push origin HEAD:dev`.
+8. Commit and fetch. Run `gate_stamp.sh check` again, and rebase only if it names a stamp. Push
+   with `git push origin HEAD:agents/<issue>-<slug>`. Open one pull request into `main`, with the
+   body that the `pr` skill writes and `Closes #<issue>` in it. Turn on auto-merge with
+   `gh pr merge <number> --auto --squash`. GitHub merges it when the required checks pass.
 
 Each gate and each test file records a stamp of the tree it measured. The pre-push hook refuses
 the push in two cases, and the refusal names what to do:
 
-- `dev` moved, after a gate ran, in a file or a `src/` directory your branch changes. Re-run only
+- `main` moved, after a gate ran, in a file or a `src/` directory your branch changes. Re-run only
   the gates your change can reach, and paste the `drop` line that the refusal prints for the rest.
   Your own pushed commits and a sibling's edit to a ledger file that a gate does not read do not
   count. A stamp goes stale only on a change that can alter what its gate measured. A sibling's
