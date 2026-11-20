@@ -626,6 +626,11 @@ observation, so its covariance is `NaN`, and `Posdef`, `Denoise` and `Detone` re
 docstring of the composite states this in a warning, with the configuration that avoids it. This
 testset pins each claim of that warning.
 =#
+# A positive definite repair of the caller that returns a non-finite matrix without change.
+struct NonFinitePassPosdef <: PO.AbstractPosdefEstimator end
+function PO.posdef!(::NonFinitePassPosdef, X::PO.MatNum)
+    return all(isfinite, X) ? PO.posdef!(Posdef(), X) : X
+end
 @testset "a composite with a step in mp raises on row 1 of its variance series" begin
     X = 0.01 .* randn(StableRNG(78), 40, 3)
     for mp in (MatrixProcessing(), MatrixProcessing(; pdm = nothing, dn = Denoise()),
@@ -650,4 +655,20 @@ testset pins each claim of that warning.
         @test all(isnan, sw[1, :])
         @test sw ≈ PO.variance_series(WindowedCovariance(; window = 10, ce = inner), X) nans = true rtol = 1e-14
     end
+    # A `pdm` of the caller that returns a non-finite matrix without change avoids the raise,
+    # and it repairs every later row. A `dn` beside it still raises.
+    ownpd = PortfolioOptimisersCovariance(;
+                                          mp = MatrixProcessing(;
+                                                                pdm = NonFinitePassPosdef()))
+    s = PO.variance_series(ownpd, X)
+    @test all(isnan, s[1, :])
+    @test s ≈ PO.variance_series(PortfolioOptimisersCovariance(;
+                                                               mp = MatrixProcessing(;
+                                                                                     pdm = nothing)),
+                                 X) nans = true rtol = 1e-14
+    @test_throws ArgumentError PO.variance_series(PortfolioOptimisersCovariance(;
+                                                                                mp = MatrixProcessing(;
+                                                                                                      pdm = NonFinitePassPosdef(),
+                                                                                                      dn = Denoise())),
+                                                  X)
 end

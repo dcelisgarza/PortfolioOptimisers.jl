@@ -833,6 +833,30 @@ scenario mean.
             end
         end
     end
+    @testset "A composite with a step in mp raises as ve, and with none it fits as its inner estimator" begin
+        # The warning of `PortfolioOptimisersCovariance`: the variance series of the composite
+        # runs `mp` on the `NaN` fit of row 1, so each reader of the series raises.
+        csv(ve) = CrossSectionalFactorPrior(; lambda = 1, factors = csfp_factors(),
+                                            minra = 5, ve = ve)
+        @test_throws ArgumentError prior(csv(PortfolioOptimisersCovariance()), rd)
+        @test_throws ArgumentError prior(csv(WindowedCovariance()), rd)
+        @test_throws ArgumentError descriptor(EWVolatility(;
+                                                           ce = PortfolioOptimisersCovariance()),
+                                              rd)
+        @test_throws ArgumentError descriptor(EWVolatility(; ce = WindowedCovariance()), rd)
+        for inner in (Covariance(), ExpWeightedCovariance())
+            nopd = PortfolioOptimisersCovariance(; ce = inner,
+                                                 mp = MatrixProcessing(; pdm = nothing))
+            pc = prior(csv(nopd), rd)
+            pn = prior(csv(inner), rd)
+            @test isapprox(pc.rr.vs, pn.rr.vs; rtol = 1e-14, nans = true)
+            @test isapprox(pc.sigma, pn.sigma; rtol = 1e-14)
+            @test isapprox(pc.mu, pn.mu; rtol = 1e-14)
+            @test isapprox(descriptor(EWVolatility(; ce = nopd), rd),
+                           descriptor(EWVolatility(; ce = inner), rd); rtol = 1e-14,
+                           nans = true)
+        end
+    end
 end
 
 @testset "A constrained Factor Family re-bases the fit" begin

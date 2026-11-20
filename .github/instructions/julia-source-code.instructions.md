@@ -470,8 +470,9 @@ the behaviour to document. Find which one it is before you change the code.
   raise. Put a `!!! warning` in the docstring of the type whose call raises. The warning names the
   call, the condition, the error, and the configuration that avoids the raise. Do not add a
   method, a branch, a type bound or a trait that sends the call around the step. Such a route
-  skips the step on every fit, not only on the degenerate fit, so a step of the caller that
-  changes the result no longer changes it.
+  skips the step on every fit, not only on the degenerate fit. So the call no longer gives the
+  value that the docstring of the type defines, and a step of the caller that changes the result
+  no longer changes it.
 - **It is a defect** when the call is the purpose of the type, or when no configuration avoids
   the raise. Fix it or file it, as `CLAUDE.md` § *Defects you find* states.
 - **If you cannot find which one it is, file an issue.** Give the reproduction, the evidence for
