@@ -252,6 +252,31 @@ end
                         active_mask = amsk); atol = 1e-18)
 end
 
+@testset "Exponentially weighted expected returns: debias = nothing keeps the undivided state (#2134)" begin
+    X = oracle_returns()
+    amsk = oracle_active_mask()
+    Xg = gapped(X, amsk)
+    raw = ExpWeightedExpectedReturns(; decay = EW_DECAY, min_obs = 1, debias = nothing)
+    def = ExpWeightedExpectedReturns(; decay = EW_DECAY, min_obs = 1)
+    @test def.debias === ZeroStartDebias()
+    mu = mean(raw, Xg; active_mask = amsk)
+    md = mean(def, Xg; active_mask = amsk)
+    fm = partial_fit!(def, Xg; active_mask = amsk)
+    f = isfinite.(md)
+    @test isequal(isfinite.(mu), f)
+    # The undivided state is the divided mean times the weight that the zero start removes, so
+    # it is shrunk toward zero.
+    @test isapprox(mu[f], md[f] .* (1 .- EW_DECAY .^ fm.cache.obs_count[f]); rtol = 1e-14)
+    @test all(abs.(mu[f]) .< abs.(md[f]))
+    # The fold of one observation at a time reads the same rule as the batch call.
+    fold = foldl((c, i) -> partial_fit!(c, view(Xg, i, :); active_mask = view(amsk, i, :)),
+                 axes(Xg, 1); init = raw)
+    @test isequal(mean(fold), mu)
+    # With no gap, the undivided state is the sum of the returns under unnormalised weights.
+    w = (1 - EW_DECAY) .* EW_DECAY .^ ((EW_T - 1):-1:0)
+    @test isapprox(mean(raw, X), vec(transpose(w) * X); rtol = 1e-12)
+end
+
 @testset "Exponentially weighted moments: the Asset Panel seam" begin
     X = oracle_returns()
     amsk = oracle_active_mask()

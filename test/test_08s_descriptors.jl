@@ -2111,11 +2111,13 @@ end
 end
 
 #=
-The oracle ran the four named Descriptors on this panel at `half_life = 3`,
-and every cell agreed to the last bit, `NaN` pattern included. The panel carries what the
-synthetic panel above carries least: a gap in every Panel Field, a zero volume, a missing share
-count, a missing short interest, and an asset that is inactive for two rows. The literals below
-are what the oracle printed.
+The oracle ran the four named Descriptors on this panel at `half_life = 3`. The panel carries
+what the synthetic panel above carries least: a gap in every Panel Field, a zero volume, a
+missing share count, a missing short interest, and an asset that is inactive for two rows. The
+literals below are what the oracle printed, after it came to restart an inactive asset in every
+mean and to divide its volume ratios and its days to cover by `1 - λ^n`. Its log-return mean
+keeps the undivided state, which `debias = nothing` reads. The momentum agrees to the last bit,
+and the ratios to 2.4e-16 relative, `NaN` pattern included.
 =#
 @testset "The four named Descriptors agree with the oracle on a panel with gaps" begin
     X = [0.01 0.02 -0.01; -0.02 NaN 0.03; 0.03 0.01 NaN; NaN -0.01 NaN; 0.00 0.02 0.01;
@@ -2137,41 +2139,39 @@ are what the oracle printed.
     mom = vcat(n4,
                [0.004083124258934984 NaN NaN;
                 0.004083124258934984 0.002129448022702344 NaN;
-                0.0032407778719751347 0.005775415611009435 0.00558655940754667;
-                0.004624955122877056 -0.0016997680748015746 0.008519326735545996])
+                0.0032407778719751347 0.005775415611009435 NaN;
+                0.004624955122877056 -0.0016997680748015746 NaN])
     mom_exp = [NaN NaN NaN; NaN NaN NaN; 0.004091471567958498 NaN NaN;
                0.004091471567958498 0.0021317169073478514 NaN;
-               0.0032460348699697933 0.0057921254770681675 0.005602193330274423;
-               0.004635666735030029 -0.0016983242871980682 0.008555719473355195;
-               0.0015987269168514903 0.0007038888198189767 0.002597353510921931;
-               0.005367522558516728 0.0007038888198189767 0.004120060455043248]
-    trn = [NaN NaN NaN; NaN NaN NaN; 0.06152677898136927 0.0310074526087766 NaN;
-           0.08184175268216429 0.05142956306708006 NaN;
-           0.06495784215129441 0.0697015976196999 0.05329645965700086;
-           0.09281696828545455 0.0697015976196999 0.06636970003137363;
-           0.09281696828545455 0.08833011053523193 0.0774336027062162;
-           0.12318075031223083 0.1051785657747503 0.08690269299206196]
-    ami = [NaN NaN NaN; NaN NaN NaN; 0.00016451542876188153 NaN NaN;
-           0.00016451542876188153 NaN NaN;
-           0.00016451542876188153 5.468091941871078e-5 3.6706135970056026e-5;
-           0.00014933047997861418 5.468091941871078e-5 4.485173458939356e-5;
-           0.00013526876768109943 5.3168242023617174e-5 5.0679216242495956e-5;
-           0.0001375236338728997 5.3168242023617174e-5 4.7465239367207845e-5]
-    dtc = [NaN NaN NaN; NaN NaN NaN; 0.32506171021980756 NaN NaN;
-           0.30546755391576846 0.30263002317661414 NaN;
-           0.36656106469892213 0.2674556324606383 0.31271620617819745;
-           0.3295118216932188 0.3008875865182181 0.27623046849190186;
-           0.30842551111616473 0.2706803719462379 0.2582857997177295;
-           0.29518328704247854 0.25374393090195446 0.24932100399519014]
-    # The literals hold the state of the recursion, which the start at zero shrinks toward
-    # zero. The Descriptors divide the state by `1 - λ^n`, so the values are broken until the
-    # reference corrects that start.
-    @test_broken ew_same(descriptor(EWMomentum(; half_life = 3, skip = 2), rd), mom)
-    @test_broken ew_same(descriptor(EWMomentum(; half_life = 3, skip = 0,
-                                               exponentiate = true), rd), mom_exp)
-    @test_broken ew_same(descriptor(EWShareTurnover(; half_life = 3), rd), trn)
-    @test_broken ew_same(descriptor(EWAmihudIlliquidity(; half_life = 3), rd), ami)
-    @test_broken ew_same(descriptor(DaysToCover(; half_life = 3), rd), dtc)
+               0.0032460348699697933 0.0057921254770681675 NaN;
+               0.004635666735030029 -0.0016983242871980682 NaN;
+               0.0015987269168514903 0.0007038888198189767 0.00036789219752373937;
+               0.005367522558516728 0.0007038888198189767 0.002347441490082519]
+    trn = [NaN NaN NaN; NaN NaN NaN; 0.12305355796273856 0.062014905217553214 NaN;
+           0.1356906049369388 0.08526831715488616 NaN;
+           0.09482623432993012 0.1017512252587112 NaN;
+           0.12375595771393942 0.1017512252587112 NaN;
+           0.12375595771393942 0.11777348071364259 0.11717559299378977;
+           0.1536734186067112 0.13121489945293702 0.11928176748948979]
+    ami = [NaN NaN NaN; NaN NaN NaN; 0.0003290308575237631 NaN NaN;
+           0.0003290308575237631 NaN NaN;
+           0.0003290308575237631 0.00010936183883742159 NaN;
+           0.0002475844235950415 0.00010936183883742159 NaN;
+           0.00019746696375432492 8.815098268527698e-5 6.544232446954729e-5;
+           0.0001833648451638663 8.815098268527698e-5 5.506414148563246e-5]
+    dtc = [NaN NaN NaN; NaN NaN NaN; 0.16253085510990373 NaN NaN;
+           0.18424267480875753 0.15131501158830704 NaN;
+           0.22109120977050906 0.16131579437992896 NaN;
+           0.22572210160809567 0.18148026867742006 NaN;
+           0.23131913333712348 0.18542139734412819 0.17068400926343072;
+           0.2366115044956458 0.19030794817646582 0.18164273654459195]
+    @test ew_same(descriptor(EWMomentum(; half_life = 3, skip = 2, debias = nothing), rd),
+                  mom)
+    @test ew_same(descriptor(EWMomentum(; half_life = 3, skip = 0, exponentiate = true,
+                                        debias = nothing), rd), mom_exp)
+    @test ew_same(descriptor(EWShareTurnover(; half_life = 3), rd), trn)
+    @test ew_same(descriptor(EWAmihudIlliquidity(; half_life = 3), rd), ami)
+    @test ew_same(descriptor(DaysToCover(; half_life = 3), rd), dtc)
 end
 
 @testset "A mean Descriptor of an asset listed late equals the one of a full history" begin
@@ -2199,6 +2199,37 @@ end
         @test all(isapprox(val; rtol = 1e-12), view(D, hl:T, 2))
         @test all(isapprox(val; rtol = 1e-12), view(D, first_out:T, 1))
     end
+end
+
+@testset "debias = nothing keeps the undivided state of a log-return mean (#2134)" begin
+    # The state starts at zero, so after `n` valid inputs the undivided state of a constant
+    # input `v` is `v (1 - λ^n)`, below `v` at every observation. A momentum is a signed mean
+    # whose neutral value is zero, and the undivided state shrinks a short history toward it.
+    T, listing, hl = 40, 15, 10
+    amsk = trues(T, 2)
+    amsk[1:listing, 1] .= false
+    rd = ew_hand_panel(["adj_volume" => fill(1e6, T, 2)], ifelse.(amsk, 0.01, NaN);
+                       amsk = amsk)
+    lam = PortfolioOptimisers.half_life_decay(hl)
+    val = log1p(0.01)
+    D = descriptor(EWMomentum(; half_life = hl, skip = 0, debias = nothing), rd)
+    n = [amsk[t, i] ? (i == 2 ? t : t - listing) : 0 for t in 1:T, i in 1:2]
+    E = [n[t, i] >= hl ? val * (1 - lam^n[t, i]) : NaN for t in 1:T, i in 1:2]
+    @test ew_same(D, E)
+    Dd = descriptor(EWMomentum(; half_life = hl, skip = 0), rd)
+    f = isfinite.(D)
+    @test isequal(f, isfinite.(Dd))
+    @test all(D[f] .< Dd[f])
+    # A step of the carry fold reads the same rule as the batch call, to the last bit.
+    rows(r, i) = PortfolioOptimisers.port_opt_view(r, i, :)
+    de = EWMean(; decay = lam, min_obs = 1, skip = 2, debias = nothing)
+    full = descriptor(de, rd)
+    st = partial_fit!(de, rows(rd, 1:20))
+    @test isequal(PortfolioOptimisers.descriptor_step(st, rows(rd, 21:T)).D, full[21:T, :])
+    # The preset passes the rule to the archetype, and the division is the default.
+    @test isnothing(EWMomentum(; debias = nothing).debias)
+    @test EWMomentum().debias === ZeroStartDebias()
+    @test EWMean(; decay = lam, min_obs = 1).debias === ZeroStartDebias()
 end
 
 @testset "A named mean Descriptor refuses a half-life that is not positive and finite" begin

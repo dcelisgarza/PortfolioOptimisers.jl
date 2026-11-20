@@ -113,20 +113,21 @@ end
                                           scores = DescriptorScores(;
                                                                     descriptors = [EWMomentum(;
                                                                                               half_life = 8.0,
-                                                                                              skip = 2)],
+                                                                                              skip = 2,
+                                                                                              debias = nothing)],
                                                                     outlier = nothing,
                                                                     scoring = nothing),
                                           scale = 0.02)
         pr = prior(CrossSectionalFactorPrior(; factors = factors, rfe = rfe, lambda = 0.5,
                                              c = 1.0), fx.rd)
         load(o) = vec(parity_load("CrossSectionalFactorPrior", "CurrencyForecast", o))
-        # `EWMomentum` divides its state by the sum of its weights, `1 - λ^n`. The stored
-        # fixtures hold the state itself, which the start at zero shrinks toward zero, so the
-        # three numbers that read the momentum score are broken until the reference corrects
-        # that start.
-        @test_broken parity_compare(pr.rr.rf.mu, load("Alpha"); name = "alpha").ok
-        @test_broken parity_compare(pr.fpr.mu, load("FactorMu"); name = "factor mu").ok
-        @test_broken parity_compare(pr.mu, load("Mu"); name = "mu").ok
+        # The oracle keeps the state of its momentum undivided, which `debias = nothing`
+        # reads (#2134). The fixture holds no relisted asset, so the restart of an inactive
+        # asset moves none of the stored numbers. Measured maxrel 4.3e-16 (alpha), 9.9e-15
+        # (factor mean) and 1.4e-14 (`mu`).
+        @test parity_compare(pr.rr.rf.mu, load("Alpha"); name = "alpha").ok
+        @test parity_compare(pr.fpr.mu, load("FactorMu"); name = "factor mu").ok
+        @test parity_compare(pr.mu, load("Mu"); name = "mu").ok
         # The forecast of the base-currency returns differs, so the prior does not read `X`.
         @test !(pr.rr.rf.mu ≈ return_forecast(rfe, fx.rd, pr.rr).mu)
     end

@@ -447,6 +447,23 @@ abstract type AbstractRegimeDebias <: AbstractAlgorithm end
 """
 $(DocStringExtensions.TYPEDEF)
 
+Abstract supertype for the bias correction of an exponentially weighted mean that starts at zero. The rule selects how the estimator reads its mean out of the state of the recursion.
+
+The state of the recursion starts at zero, so after ``n`` valid inputs its weights sum to ``1 - \\lambda^{n}`` and not to one. Two estimators hold a rule, or `nothing` for the undivided state, in their `debias` field: [`ExpWeightedExpectedReturns`](@ref) and [`EWMean`](@ref), with its preset [`EWMomentum`](@ref). [`ZeroStartDebias`](@ref) divides the state by the sum of its weights, and its docstring gives the reason for each form. This file declares the root with the other roots, because the estimators bind their field to it before the members load.
+
+# Interfaces
+
+A rule is a marker for dispatch, and it holds no data. A new rule needs a method of [`zero_start_mean`](@ref).
+
+# Related
+
+  - [`ZeroStartDebias`](@ref)
+  - [`zero_start_mean`](@ref)
+"""
+abstract type AbstractZeroStartDebias <: AbstractAlgorithm end
+"""
+$(DocStringExtensions.TYPEDEF)
+
 Abstract supertype for the floor of a HAC term. The rule selects whether the estimator floors each HAC-adjusted product at zero before the product enters the variance recursion.
 
 The two regime-adjusted estimators hold a floor rule, or `nothing` for no floor, in their `hac_floor` field: [`RegimeAdjustedExpWeightedVariance`](@ref) and [`RegimeAdjustedExpWeightedCovariance`](@ref). The rule acts only where `hac_lags` is not `nothing`. On the covariance estimator it acts only on the variance of the separate correlation path, because the covariance of one decay floors no term. This file declares the root with the other roots, because the estimators bind their field to it before the members load.
@@ -532,5 +549,6 @@ A rule is a marker for dispatch, and it holds no data. A new rule needs a method
 abstract type AbstractLevelRecursion <: AbstractAlgorithm end
 public AbstractPartialFitState, DynamicAbstractWeights, AbstractOptimisationEstimator,
        OptimisationEstimator, NonFiniteAllocationOptimisationEstimator, AbstractCentring,
-       AbstractRegimeDebias, AbstractHacFloor, AbstractHacVolatilityTiming,
-       AbstractCorrelationVolatility, AbstractIndefiniteBlockRule, AbstractLevelRecursion
+       AbstractRegimeDebias, AbstractZeroStartDebias, AbstractHacFloor,
+       AbstractHacVolatilityTiming, AbstractCorrelationVolatility,
+       AbstractIndefiniteBlockRule, AbstractLevelRecursion

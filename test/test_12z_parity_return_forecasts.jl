@@ -7,7 +7,9 @@ one a `CrossSectionalFactorPrior` fits on the panels of `parity_harness.jl`: a m
 the two passthrough styles, the idiosyncratic returns and variances of the fit, and its exposure
 history. The oracle reads the same panel with that block padded back onto the whole observation
 axis, as its own prior pads it before it calls its forecast. The three Descriptors are two
-passthrough fields and a momentum with a warm-up.
+passthrough fields and a momentum with a warm-up. The oracle keeps the state of its momentum
+undivided, which `debias = nothing` reads, and it restarts an asset that turns inactive. The
+cases were made again when it came to restart (#2134).
 
 Every stored case under `test/assets/Parity_<Unit>_<Case>_<Output>.csv.gz` is the oracle output of
 one row of the case tables below:
@@ -58,7 +60,7 @@ include(joinpath(@__DIR__, "parity_harness.jl"))
     fit(rd; kw...) = prior(CrossSectionalFactorPrior(; lambda = 1, factors = factors,
                                                      pe = pe, ve = ve, kw...), rd)
     desc = [Passthrough(; field = "net_income_ttm"), Passthrough(; field = "sales_ttm"),
-            EWMomentum(; half_life = 5, skip = 3)]
+            EWMomentum(; half_life = 5, skip = 3, debias = nothing)]
     std2 = CrossSectionalStandardiser(; min_group_size = 2)
     # The oracle neutralises with no intercept, so every case passes its rule (#1521).
     ds(; kw...) = DescriptorScores(; descriptors = desc,
@@ -127,22 +129,13 @@ include(joinpath(@__DIR__, "parity_harness.jl"))
     # A matrix or a forecast compares against its largest entry, a coefficient cell by cell.
     same(a, b, n) = parity_compare(a, b; scale = :array, name = n).ok
     cell(a, b, n) = parity_compare(a, b; name = n).ok
-    # `EWMomentum` divides its state by the sum of its weights, `1 - λ^n`, and restarts an
-    # asset that turns inactive. The stored fixtures hold the state itself, which the start at
-    # zero shrinks toward zero and which the relisted asset carries across its gap, so each
-    # check that reads the momentum score is broken until the reference corrects that start. A check
-    # whose case reads no momentum, or whose number the change moves less than its
-    # tolerance, stays a test, because an unexpected pass of a broken test is an error.
-    check(ok, broken::Bool) = broken ? (@test_broken ok) : (@test ok)
 
     @testset "The Descriptor Scores, $(c)" for (c, d) in scores
         (_, rd, pr) = panels[1]
         S = descriptor_scores(d, rd, pr.rr).S
         for k in axes(S, 2)
-            # The third Descriptor is the momentum.
-            check(same(permutedims(S[:, k, :]),
-                       load("DescriptorScores", "Small$(c)", "Scores$(k)"), "$(c) $(k)"),
-                  k == 3)
+            @test same(permutedims(S[:, k, :]),
+                       load("DescriptorScores", "Small$(c)", "Scores$(k)"), "$(c) $(k)")
         end
     end
 
@@ -163,11 +156,9 @@ include(joinpath(@__DIR__, "parity_harness.jl"))
             rows = PO.return_forecast_rows(rd, pr.rr)
             # The oracle states the whole observation axis, and the member the block's rows.
             H = load("FixedWeightedReturnForecast", "Small$(c)", "Hist")
-            # "Raw" reads the two Panel Fields alone.
-            check(same(rf.hist, H[rows, :], "$(c) hist"), c != "Raw")
+            @test same(rf.hist, H[rows, :], "$(c) hist")
         end
-        check(same(rf.mu, loadv("FixedWeightedReturnForecast", "$(p)$(c)", "Mu"),
-                   "$(c) mu"), c != "Raw")
+        @test same(rf.mu, loadv("FixedWeightedReturnForecast", "$(p)$(c)", "Mu"), "$(c) mu")
     end
 
     @testset "The exponentially weighted member, $(p) $(c)" for (p, rd, pr) in panels,
@@ -177,28 +168,27 @@ include(joinpath(@__DIR__, "parity_harness.jl"))
         if p == "Small"
             rows = PO.return_forecast_rows(rd, pr.rr)
             H = load("ExpWeightedReturnForecast", "Small$(c)", "Hist")
-            check(same(rf.hist, H[rows, :], "$(c) hist"), true)
+            @test same(rf.hist, H[rows, :], "$(c) hist")
         end
-        check(same(rf.mu, loadv("ExpWeightedReturnForecast", "$(p)$(c)", "Mu"), "$(c) mu"),
-              true)
-        check(cell(rf.coef, loadv("ExpWeightedReturnForecast", "$(p)$(c)", "Coef"),
-                   "$(c) coef"), true)
+        @test same(rf.mu, loadv("ExpWeightedReturnForecast", "$(p)$(c)", "Mu"), "$(c) mu")
+        @test cell(rf.coef, loadv("ExpWeightedReturnForecast", "$(p)$(c)", "Coef"),
+                   "$(c) coef")
     end
 
     @testset "The target member, $(p) $(c)" for (p, rd, pr) in panels, (c, e) in target
         rf = return_forecast(e, rd, pr.rr)
-        check(same(rf.mu, loadv("TargetReturnForecast", "$(p)$(c)", "Mu"), "$(c) mu"), true)
-        # "NoCal" does not calibrate, so its calibration reads no score.
-        check(cell([rf.calib], loadv("TargetReturnForecast", "$(p)$(c)", "Calib"),
-                   "$(c) calib"), c != "NoCal")
+        @test same(rf.mu, loadv("TargetReturnForecast", "$(p)$(c)", "Mu"), "$(c) mu")
+        @test cell([rf.calib], loadv("TargetReturnForecast", "$(p)$(c)", "Calib"),
+                   "$(c) calib")
     end
 
     @testset "An in-sample calibration is ours only, and it is biased" begin
         # `cv = nothing` calibrates on the predictions of the model fitted to the very forward
         # returns the calibration regresses on them. The oracle has no such mode. On the small
-        # panel its slope is 1.34, against 1.23 out of fold: the regression fitted its own
+        # panel its slope is 1.38, against 1.27 out of fold: the regression fitted its own
         # training targets, and the slope measures that fit too (#1418). The slopes were 1.39
-        # and 1.18 before the momentum restarted the relisted asset of the panel.
+        # and 1.18 before the momentum restarted the relisted asset of the panel, and 1.34 and
+        # 1.23 with the restart and the division by `1 - λ^n`.
         (_, rd, pr) = panels[1]
         oof = return_forecast(target[2][2], rd, pr.rr)
         ins = return_forecast(TargetReturnForecast(; scores = ds(), half_life = 10.0,

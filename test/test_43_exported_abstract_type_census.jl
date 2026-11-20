@@ -267,6 +267,7 @@
         :AbstractVarianceEstimator,
         :AbstractWeightBoundsEstimator,
         :AbstractWindowRule,
+        :AbstractZeroStartDebias,
         :BaseGerberCovariance,
         :BaseGerberIQCovariance,
         :BaseHierarchicalOptimisationResult,

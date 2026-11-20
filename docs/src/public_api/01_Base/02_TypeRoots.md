@@ -1,5 +1,5 @@
 ```@meta
-Description = "Type roots, public API of PortfolioOptimisers.jl: AbstractPartialFitState, DynamicAbstractWeights, AbstractCentring, AbstractRegimeDebias, AbstractHacFloor, …"
+Description = "Type roots, public API of PortfolioOptimisers.jl: AbstractPartialFitState, DynamicAbstractWeights, AbstractCentring, AbstractRegimeDebias, …"
 ```
 
 # Type roots
@@ -11,6 +11,7 @@ AbstractPartialFitState
 DynamicAbstractWeights
 AbstractCentring
 AbstractRegimeDebias
+AbstractZeroStartDebias
 AbstractHacFloor
 AbstractHacVolatilityTiming
 AbstractCorrelationVolatility

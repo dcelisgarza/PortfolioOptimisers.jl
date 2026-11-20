@@ -1968,7 +1968,8 @@ THREE MORE CONVENTIONS SHAPE THESE PROBES.
     csr = CrossSectionalRegression(; f = zeros(Tb, 1), eps = eps, n = fill(N, Tb))
     csfm = CrossSectionalFactorModel(; M = ones(N, 1), b = zeros(N), csr = csr, vs = vs)
     ds = DescriptorScores(;
-                          descriptors = [EWMomentum(; half_life = 8.0, skip = 2),
+                          descriptors = [EWMomentum(; half_life = 8.0, skip = 2,
+                                                    debias = nothing),
                                          Passthrough(; field = "book_equity")],
                           outlier = CrossSectionalWinsoriser(),
                           scoring = CrossSectionalStandardiser(; min_group_size = 2),
@@ -2031,11 +2032,10 @@ THREE MORE CONVENTIONS SHAPE THESE PROBES.
         @test size(rf.hist) == (Tb, N)
         B = E[rows, :]
         @test isequal(isnan.(rf.hist), isnan.(B))
-        # Measured maxrel 1.2e-14, cell by cell (#1386). `EWMomentum` divides its state by
-        # the sum of its weights, `1 - λ^n`, and the stored case holds the state itself, which
-        # the start at zero shrinks toward zero. So the values of the stored cases that read
-        # the momentum score are broken until the reference corrects that start.
-        @test_broken all(isapprox.(rf.hist[isfinite.(B)], B[isfinite.(B)]; rtol = 1e-12))
+        # Measured maxrel 1.2e-14, cell by cell (#1386). The oracle keeps the state of its
+        # momentum undivided, which `debias = nothing` reads (#2134). The panel holds no
+        # relisted asset, so the restart of an inactive asset moves no stored case.
+        @test all(isapprox.(rf.hist[isfinite.(B)], B[isfinite.(B)]; rtol = 1e-12))
         @test isequal(rf.mu, rf.hist[end, :])
     end
 
@@ -2066,8 +2066,7 @@ THREE MORE CONVENTIONS SHAPE THESE PROBES.
                                 DataFrame)))
         @test isequal(isnan.(rf.mu), isnan.(E))
         # Measured maxrel 1.8e-13 at most over the four stored cases, cell by cell (#1386).
-        # Broken with the stored case of the fixed weighted member.
-        @test_broken all(isapprox.(rf.mu[isfinite.(E)], E[isfinite.(E)]; rtol = 1e-12))
+        @test all(isapprox.(rf.mu[isfinite.(E)], E[isfinite.(E)]; rtol = 1e-12))
         # The block's rows alone lose the boundary band, so the fit is a different one.
         rb = return_forecast(TargetReturnForecast(; scores = ds, horizon = 2, lag = 1,
                                                   calibrate = false, whole_history = false),
@@ -2084,11 +2083,10 @@ THREE MORE CONVENTIONS SHAPE THESE PROBES.
         E = vec(Matrix(CSV.read(joinpath(@__DIR__, "assets/TargetReturnForecast4.csv.gz"),
                                 DataFrame)))
         # The oracle's own coefficient, which the padded rows never enter.
-        # Bit-equal when measured (#1386). Broken with the stored case of the fixed weighted
-        # member.
-        @test_broken isapprox(rf.calib, -0.7730488894268933; rtol = 1e-14)
+        # Bit-equal when measured (#1386).
+        @test isapprox(rf.calib, -0.7730488894268933; rtol = 1e-14)
         # Measured maxrel 1.8e-13 at most over the four stored cases, cell by cell (#1386).
-        @test_broken all(isapprox.(rf.mu[isfinite.(E)], E[isfinite.(E)]; rtol = 1e-12))
+        @test all(isapprox.(rf.mu[isfinite.(E)], E[isfinite.(E)]; rtol = 1e-12))
     end
 
     @testset "In the Sharpe unit a row before the block trains nothing" begin

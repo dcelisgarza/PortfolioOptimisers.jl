@@ -1255,7 +1255,7 @@ with them:
 
 | Family | `maxrel` |
 | --- | --- |
-| `EWMean`, `EWMomentum` | 4.2e-13 (large panel, default), before the division of #2134 |
+| `EWMean`, `EWMomentum` | 4.2e-13 (large panel, default), under `debias = nothing` |
 | `EWVolumeRatio`, `EWShareTurnover`, `EWAmihudIlliquidity`, `DaysToCover` | 3.9e-16, with the division and the restart |
 | `EWVolatility`, `EWDownsideVolatility` | 3.3e-16 |
 | `EWResidualVolatility`, `EWResidualDownsideVolatility` | 4.6e-16 (#2132) |
@@ -1269,9 +1269,11 @@ The beta rows were measured again when the regression of each asset came to shar
 observations (#2132), and their stored cases were made again then. Since then, the mean
 Descriptors divide their state by `1 - λ^n`, and they restart an asset that turns inactive.
 The oracle came to do both in its volume ratios and its days to cover, and the cases of the
-second row were made again then, so they check the values. Its log-return mean does neither.
-So the cases of the first row check the `NaN` pattern alone, away from the cells of the
-relisted asset after its relisting, until a field reaches the rule of the oracle (#2134).
+second row were made again then. Its log-return mean came to restart an inactive asset and
+keeps its state undivided, which shrinks the momentum of a short history toward zero. The
+cases of the first row were made again then, and they read the same rule through
+`debias = nothing` (#2134). The default `ZeroStartDebias()` divides, and the testsets of the
+Descriptors pin it.
 
 A rolling log return is the difference of two cumulative sums, on both sides. A window whose
 sum is near zero keeps the round-off of the cumulative sums, so its relative error is large
@@ -1312,15 +1314,18 @@ end
     # Each case: the unit, the case, the returns data, and the Descriptor. The case names the
     # fixture (the small raw panel, its clean copy, or the large raw panel) and the
     # configuration. The output is the Descriptor, `observations × assets`.
+    # The log-return means keep their state undivided, as the oracle does.
     cases = [("EWMomentum", "SmallH5S3", rds,
-              r -> descriptor(EWMomentum(; half_life = 5, skip = 3), r)),
+              r -> descriptor(EWMomentum(; half_life = 5, skip = 3, debias = nothing), r)),
              ("EWMomentum", "SmallH5Min8Exp", rds,
               r -> descriptor(EWMomentum(; half_life = 5, skip = 0, min_obs = 8,
-                                         exponentiate = true), r)),
-             ("EWMomentum", "LargeDefault", rdl, r -> descriptor(EWMomentum(), r)),
+                                         exponentiate = true, debias = nothing), r)),
+             ("EWMomentum", "LargeDefault", rdl,
+              r -> descriptor(EWMomentum(; debias = nothing), r)),
              # The general form at a decay no half-life of the presets names.
              ("EWMean", "SmallDecay085", rds,
-              r -> descriptor(EWMean(; decay = 0.85, min_obs = 6, skip = 2), r)),
+              r -> descriptor(EWMean(; decay = 0.85, min_obs = 6, skip = 2,
+                                     debias = nothing), r)),
              ("EWShareTurnover", "SmallCleanDefault", rdsc,
               r -> descriptor(EWShareTurnover(), r)),
              ("EWShareTurnover", "SmallCleanH5", rdsc,
@@ -1402,37 +1407,14 @@ end
              ("MaxReturn", "SmallW5", rds, r -> descriptor(MaxReturn(; window = 5), r)),
              ("RollingMax", "SmallW2", rds, r -> descriptor(RollingMax(; window = 2), r))]
     rolling = ("RollingMomentum", "Reversal", "RollingLogReturn")
-    # The exponentially weighted log-return means divide their state by the sum of its
-    # weights, `1 - λ^n`, and restart an asset that turns inactive. The stored momentum
-    # fixtures hold the state itself, which the start at zero shrinks toward zero and which
-    # the relisted asset carries across its gap, so their values are broken until the
-    # reference corrects that start. The restart moves the `NaN` pattern of the relisted
-    # asset alone, after its relisting, where the recursion is in its warm-up again.
-    zero_start = ("EWMomentum", "EWMean")
     for (unit, case, rd, f) in cases
         @testset "$unit $case" begin
             D = f(rd)
             O = parity_load(unit, case, "D")
             scale = unit in rolling ? :array : :cell
             r = parity_compare(D, O; scale = scale, name = "$(unit)_$(case)")
-            if unit in zero_start
-                i, _, b = (rd === rdl ? fxl : fxs).at.relist
-                keep = trues(size(D))
-                keep[b:end, i] .= false
-                @test isequal(isfinite.(D[keep]), isfinite.(O[keep]))
-                # After the relisting, a finite Descriptor has a finite reference, and the
-                # warm-up of the restart makes at least one cell `NaN` where the reference is
-                # finite.
-                @test all(k -> isfinite(O[k]) || !isfinite(D[k]), findall(.!keep))
-                @test any(k -> isfinite(O[k]) && !isfinite(D[k]), findall(.!keep))
-            else
-                @test r.pattern
-            end
-            if unit in zero_start
-                @test_broken r.ok
-            else
-                @test r.ok
-            end
+            @test r.pattern
+            @test r.ok
         end
     end
 

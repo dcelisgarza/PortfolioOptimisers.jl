@@ -44,7 +44,7 @@ end
 
 Convert a half-life in observations into the warm-up of an exponentially weighted Descriptor.
 
-The recursion divides by the total weight of the observations it read, so its first value is not biased toward zero, but it reads few observations. Every exponentially weighted Descriptor returns `NaN` for an asset until that asset has this many valid observations.
+By default the recursion divides by the total weight of the observations it read, so its first value is not biased toward zero, but it reads few observations. Every exponentially weighted Descriptor returns `NaN` for an asset until that asset has this many valid observations.
 
 # Arguments
 
@@ -113,7 +113,7 @@ function assert_ew_decay(decay::Real)::Nothing
 end
 """
     ew_mean_series(R::AbstractMatrix{<:Real}, amsk::AbstractMatrix{Bool}, decay::Real,
-                   min_obs::Integer) -> Matrix{<:Real}
+                   min_obs::Integer, debias::Option{<:AbstractZeroStartDebias}) -> Matrix{<:Real}
 
 Run the exponentially weighted mean recursion down each column of a matrix.
 
@@ -125,11 +125,11 @@ This is the one recursion every exponentially weighted mean Descriptor shares, s
 \\begin{align}
 S_{t,i} &= \\begin{cases} 0 & \\text{if asset } i \\text{ is inactive at } t \\\\ \\lambda S_{t-1,i} + (1 - \\lambda) y_{t,i} & \\text{if } y_{t,i} \\text{ is finite} \\\\ S_{t-1,i} & \\text{otherwise} \\end{cases}\\,, \\quad S_{0,i} = 0\\,, \\\\
 n_{t,i} &= \\begin{cases} 0 & \\text{if asset } i \\text{ is inactive at } t \\\\ n_{t-1,i} + 1 & \\text{if } y_{t,i} \\text{ is finite} \\\\ n_{t-1,i} & \\text{otherwise} \\end{cases}\\,, \\quad n_{0,i} = 0\\,, \\\\
-m_{t,i} &= \\begin{cases} S_{t,i} / \\left(1 - \\lambda^{n_{t,i}}\\right) & \\text{if } n_{t,i} \\geq \\texttt{min\\_obs} \\\\ \\mathrm{NaN} & \\text{otherwise} \\end{cases}\\,.
+m_{t,i} &= \\begin{cases} S_{t,i} / \\left(1 - \\lambda^{n_{t,i}}\\right) & \\text{if } n_{t,i} \\geq \\texttt{min\\_obs} \\text{ under } \\texttt{ZeroStartDebias()} \\\\ S_{t,i} & \\text{if } n_{t,i} \\geq \\texttt{min\\_obs} \\text{ under } \\texttt{nothing} \\\\ \\mathrm{NaN} & \\text{otherwise} \\end{cases}\\,.
 \\end{align}
 ```
 
-The state starts at zero, so after ``n_{t,i}`` finite inputs it is ``1 - \\lambda^{n_{t,i}}`` times a weighted mean of those inputs whose weights sum to one. The division removes that factor, so the first value of an asset is ``y_{t,i}``. Without it, every value of an asset with a short history is shrunk toward zero, by about one half after one half-life. An asset listed late would then not be comparable with an asset observed since the start.
+The state starts at zero, so after ``n_{t,i}`` finite inputs it is ``1 - \\lambda^{n_{t,i}}`` times a weighted mean of those inputs whose weights sum to one. Under [`ZeroStartDebias`](@ref) the division removes that factor, so the first value of an asset is ``y_{t,i}``. Under `nothing` every value of an asset with a short history is shrunk toward zero, by one half after one half-life. [`ZeroStartDebias`](@ref) gives the reason for each form, and [`zero_start_mean`](@ref) reads the value out of the state.
 
 Where:
 
@@ -145,6 +145,7 @@ Where:
   - `amsk`: The active mask, `observations × assets`.
   - `decay`: The decay factor.
   - `min_obs`: The warm-up, in valid observations per asset.
+  - `debias`: The rule that reads the value out of the state, or `nothing` for the undivided state.
 
 # Validation
 
@@ -157,7 +158,8 @@ Where:
 # Examples
 
 ```jldoctest
-julia> PortfolioOptimisers.ew_mean_series([1.0; 3.0; NaN; 5.0;;], trues(4, 1), 0.5, 1)
+julia> PortfolioOptimisers.ew_mean_series([1.0; 3.0; NaN; 5.0;;], trues(4, 1), 0.5, 1,
+                                          ZeroStartDebias())
 4×1 Matrix{Float64}:
  1.0
  2.3333333333333335
@@ -165,7 +167,7 @@ julia> PortfolioOptimisers.ew_mean_series([1.0; 3.0; NaN; 5.0;;], trues(4, 1), 0
  3.857142857142857
 
 julia> PortfolioOptimisers.ew_mean_series([1.0; 3.0; 4.0; 5.0;;], [true; false; true; true;;], 0.5,
-                                          1)
+                                          1, ZeroStartDebias())
 4×1 Matrix{Float64}:
    1.0
  NaN
@@ -181,9 +183,10 @@ julia> PortfolioOptimisers.ew_mean_series([1.0; 3.0; 4.0; 5.0;;], [true; false; 
   - [`ew_mean_series!`](@ref)
 """
 function ew_mean_series(R::AbstractMatrix{<:Real}, amsk::AbstractMatrix{Bool}, decay::Real,
-                        min_obs::Integer)::Matrix{<:Real}
+                        min_obs::Integer,
+                        debias::Option{<:AbstractZeroStartDebias})::Matrix{<:Real}
     st = ew_mean_state(nothing, R, decay, nothing)
-    return ew_mean_series!(st.s, st.n, R, amsk, decay, min_obs)
+    return ew_mean_series!(st.s, st.n, R, amsk, decay, min_obs, debias)
 end
 """
 $(DocStringExtensions.TYPEDSIGNATURES)
@@ -200,6 +203,7 @@ The batch call starts it from zeros, and a step of the carry fold from the state
   - `amsk`: The active mask, `observations × assets`. An inactive cell sets the state and the count of its asset to zero.
   - `decay`: The decay factor.
   - `min_obs`: The warm-up, in valid observations per asset.
+  - `debias`: The rule that reads the value out of the state through [`zero_start_mean`](@ref), or `nothing` for the undivided state.
 
 # Validation
 
@@ -216,7 +220,8 @@ The batch call starts it from zeros, and a step of the carry fold from the state
 """
 function ew_mean_series!(s::AbstractVector{<:Real}, n::AbstractVector{<:Integer},
                          R::AbstractMatrix{<:Real}, amsk::AbstractMatrix{Bool}, decay::Real,
-                         min_obs::Integer)::Matrix{<:Real}
+                         min_obs::Integer,
+                         debias::Option{<:AbstractZeroStartDebias})::Matrix{<:Real}
     @argcheck(size(R) == size(amsk),
               DimensionMismatch("the input of the recursion is observations × assets, so it must match the active mask, got size(R) = $(size(R)) and size(amsk) = $(size(amsk))"))
     Tf = eltype(R)
@@ -234,7 +239,7 @@ function ew_mean_series!(s::AbstractVector{<:Real}, n::AbstractVector{<:Integer}
                 ni += 1
             end
             if ni >= min_obs
-                S[t, i] = si / (one(Tf) - decay^ni)
+                S[t, i] = zero_start_mean(debias, si, decay, ni)
             end
         end
         s[i] = si
@@ -255,7 +260,7 @@ This is the archetype of every momentum Descriptor. The skip separates a medium-
 \\begin{align}
 y_{t,i} &= \\begin{cases} \\log(1 + x_{t-s,\\,i}) & \\text{if } t > s \\text{ and asset } i \\text{ is active at every observation from } t - s \\text{ to } t \\\\ \\mathrm{NaN} & \\text{otherwise} \\end{cases}\\,, \\\\
 S_{t,i} &= \\lambda S_{t-1,i} + (1 - \\lambda) y_{t,i}\\,, \\quad S_{0,i} = 0\\,, \\\\
-\\bar{S}_{t,i} &= S_{t,i} / \\left(1 - \\lambda^{n_{t,i}}\\right)\\,, \\\\
+\\bar{S}_{t,i} &= \\begin{cases} S_{t,i} / \\left(1 - \\lambda^{n_{t,i}}\\right) & \\text{under } \\texttt{debias = ZeroStartDebias()} \\\\ S_{t,i} & \\text{under } \\texttt{debias = nothing} \\end{cases}\\,, \\\\
 d_{t,i} &= \\begin{cases} \\exp(\\bar{S}_{t,i}) - 1 & \\text{if } \\texttt{exponentiate} \\\\ \\bar{S}_{t,i} & \\text{otherwise} \\end{cases}\\,.
 \\end{align}
 ```
@@ -281,6 +286,7 @@ $(DocStringExtensions.FIELDS)
 
     EWMean(; decay::Real, min_obs::Integer, skip::Integer = 0,
            exponentiate::Bool = false,
+           debias::Option{<:AbstractZeroStartDebias} = ZeroStartDebias(),
            cache::Option{<:AbstractPartialFitState} = nothing) -> EWMean
 
 Keywords correspond to the struct's fields. `decay` and `min_obs` take no default, because they depend on the data frequency. [`EWMomentum`](@ref) states a half-life instead and converts it through [`half_life_decay`](@ref) and [`half_life_min_obs`](@ref).
@@ -299,7 +305,8 @@ EWMean
          decay ┼ Float64: 0.5
        min_obs ┼ Int64: 2
           skip ┼ Int64: 0
-  exponentiate ┴ Bool: false
+  exponentiate ┼ Bool: false
+        debias ┴ ZeroStartDebias()
 ```
 
 # Related
@@ -328,10 +335,15 @@ EWMean
     """
     exponentiate
     """
+    $(field_dict[:zs_debias])
+    """
+    debias
+    """
     $(field_dict[:ew_desc_cache])
     """
     cache
     function EWMean(decay::Real, min_obs::Integer, skip::Integer, exponentiate::Bool,
+                    debias::Option{<:AbstractZeroStartDebias},
                     cache::Option{<:AbstractPartialFitState})
         assert_ew_decay(decay)
         assert_nonempty_gt0_finite_val(min_obs, :min_obs)
@@ -339,13 +351,15 @@ EWMean
                   DomainError(skip,
                               "skip is the number of the most recent observations the recursion does not read, so it cannot be negative, got $skip"))
         return new{typeof(decay), typeof(min_obs), typeof(skip), typeof(exponentiate),
-                   typeof(cache)}(decay, min_obs, skip, exponentiate, cache)
+                   typeof(debias), typeof(cache)}(decay, min_obs, skip, exponentiate,
+                                                  debias, cache)
     end
 end
 function EWMean(; decay::Real, min_obs::Integer, skip::Integer = 0,
                 exponentiate::Bool = false,
+                debias::Option{<:AbstractZeroStartDebias} = ZeroStartDebias(),
                 cache::Option{<:AbstractPartialFitState} = nothing)::EWMean
-    return EWMean(decay, min_obs, skip, exponentiate, cache)
+    return EWMean(decay, min_obs, skip, exponentiate, debias, cache)
 end
 """
 $(DocStringExtensions.TYPEDEF)
@@ -683,7 +697,7 @@ function descriptor(de::EWMean, rd::ReturnsResult)::Matrix{<:Real}
             end
         end
     end
-    S = ew_mean_series(R, amsk, de.decay, de.min_obs)
+    S = ew_mean_series(R, amsk, de.decay, de.min_obs, de.debias)
     D = de.exponentiate ? expm1.(S) : S
     descriptor_active_fill!(D, pnl)
     return D
@@ -953,7 +967,7 @@ function ew_mean_fold(de::EWMean, rd::ReturnsResult, cache::Option{<:EWMeanState
     amsk = pnl.amsk
     st = ew_mean_state(cache, X, de.decay, de.skip + 1)
     S = ew_mean_series!(st.s, st.n, ew_mean_delayed!(st.buf, X, amsk), amsk, de.decay,
-                        de.min_obs)
+                        de.min_obs, de.debias)
     D = de.exponentiate ? expm1.(S) : S
     descriptor_active_fill!(D, pnl)
     return DescriptorFold(st, D)
@@ -965,7 +979,7 @@ function ew_mean_fold(de::EWVolumeRatio, rd::ReturnsResult, cache::Option{<:EWMe
     Q = positive_divide.(descriptor_field_values(rd, de.num),
                          descriptor_field_values(rd, de.den))
     st = ew_mean_state(cache, Q, de.decay, nothing)
-    D = ew_mean_series!(st.s, st.n, Q, pnl.amsk, de.decay, de.min_obs)
+    D = ew_mean_series!(st.s, st.n, Q, pnl.amsk, de.decay, de.min_obs, ZeroStartDebias())
     descriptor_active_fill!(D, pnl)
     return DescriptorFold(st, D)
 end
@@ -977,7 +991,9 @@ function ew_mean_fold(de::DaysToCover, rd::ReturnsResult, cache::Option{<:EWMean
     Tf = eltype(B)
     V = [b > zero(b) ? b : Tf(NaN) for b in B]
     st = ew_mean_state(cache, V, de.decay, nothing)
-    D = positive_divide.(A, ew_mean_series!(st.s, st.n, V, pnl.amsk, de.decay, de.min_obs))
+    D = positive_divide.(A,
+                         ew_mean_series!(st.s, st.n, V, pnl.amsk, de.decay, de.min_obs,
+                                         ZeroStartDebias()))
     descriptor_active_fill!(D, pnl)
     return DescriptorFold(st, D)
 end
@@ -1065,7 +1081,8 @@ end
     EWMomentum(; half_life::Real = 87.0, skip::Integer = 21,
                exponentiate::Bool = false,
                decay::Real = half_life_decay(half_life),
-               min_obs::Integer = half_life_min_obs(half_life)) -> EWMean
+               min_obs::Integer = half_life_min_obs(half_life),
+               debias::Option{<:AbstractZeroStartDebias} = ZeroStartDebias()) -> EWMean
 
 Exponentially weighted mean of the log returns of the past year, less the past month.
 
@@ -1078,6 +1095,7 @@ The value is the recursion of [`EWMean`](@ref) over `log1p(r)` delayed by `skip`
   - `exponentiate`: Whether the Descriptor is in return units.
   - `decay`: Decay factor of the recursion.
   - `min_obs`: Warm-up, in valid observations per asset.
+  - `debias`: How the momentum is read out of the state of the recursion. [`ZeroStartDebias`](@ref), the default, divides the state by the sum of its weights. `nothing` keeps the undivided state, which shrinks the momentum of an asset with a short history toward zero, the neutral value of a momentum.
 
 # Validation
 
@@ -1096,7 +1114,8 @@ EWMean
          decay ┼ Float64: 0.8705505632961241
        min_obs ┼ Int64: 5
           skip ┼ Int64: 21
-  exponentiate ┴ Bool: false
+  exponentiate ┼ Bool: false
+        debias ┴ ZeroStartDebias()
 ```
 
 # Related
@@ -1108,9 +1127,10 @@ EWMean
 """
 function EWMomentum(; half_life::Real = 87.0, skip::Integer = 21,
                     exponentiate::Bool = false, decay::Real = half_life_decay(half_life),
-                    min_obs::Integer = half_life_min_obs(half_life))::EWMean
+                    min_obs::Integer = half_life_min_obs(half_life),
+                    debias::Option{<:AbstractZeroStartDebias} = ZeroStartDebias())::EWMean
     return EWMean(; decay = decay, min_obs = min_obs, skip = skip,
-                  exponentiate = exponentiate)
+                  exponentiate = exponentiate, debias = debias)
 end
 """
     EWShareTurnover(; num::AbstractString = "adj_volume",
